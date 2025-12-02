@@ -1,0 +1,19 @@
+# Fichiers d'environnement
+.env
+.env.local
+.env.*.local
+.env.dev
+.env.prod
+
+# Données Docker
+postgres_data/
+pgadmin_data/
+maven_cache/
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
