@@ -45,7 +45,7 @@ export function Header({ isDark, toggleTheme }: Readonly<HeaderProps>) {
             alt="TaskForce AI Logo"
             width={40}
             height={40}
-            className="w-10 h-10"
+            className="w-10 h-10 rounded-md"
           />
           <span className="text-foreground text-lg font-semibold">TaskForce AI</span>
         </div>
