@@ -174,16 +174,16 @@ export function Authentication({ onLogin }: Readonly<AuthProps>) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4 py-24">
       <Button
         variant="outline"
-        className="absolute top-6 left-6"
+        className="fixed top-6 left-6 z-50"
         onClick={() => router.back()}
       >
         <ArrowLeft className="w-4 h-4 mr-2" />
         Retour
       </Button>
-      <div className="w-full max-w-6xl">
+      <div className="w-full max-w-6xl my-8">
         <div className="text-center mb-8">
           <motion.div
             initial={{ scale: 0.8, opacity: 0 }}
