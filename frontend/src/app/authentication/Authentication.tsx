@@ -24,6 +24,7 @@ import {
   Users,
   Zap,
   ArrowLeft,
+  Loader2,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -283,7 +284,14 @@ export function Authentication({ onLogin }: Readonly<AuthProps>) {
                       className="w-full"
                       disabled={isLoading}
                     >
-                      {isLoading ? "Connexion..." : "Se connecter"}
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Connexion...
+                        </>
+                      ) : (
+                        "Se connecter"
+                      )}
                     </Button>
                   </form>
                 </CardContent>
@@ -477,11 +485,16 @@ export function Authentication({ onLogin }: Readonly<AuthProps>) {
                           size="lg"
                           disabled={isLoading}
                         >
-                          {isLoading
-                            ? "Création du compte..."
-                            : `Créer mon compte ${
-                                plans.find((p) => p.id === selectedPlan)?.name
-                              }`}
+                          {isLoading ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Création du compte...
+                            </>
+                          ) : (
+                            `Créer mon compte ${
+                              plans.find((p) => p.id === selectedPlan)?.name
+                            }`
+                          )}
                         </Button>
                       </div>
                     </form>
