@@ -10,6 +10,7 @@ import { HowItWorks } from "./landing/HowItWorks";
 import { Pricing } from "./landing/Pricing";
 import { Testimonials } from "./landing/Testimonials";
 import { Footer } from "./landing/Footer";
+import { ScrollToTop } from "@/components/ui/scroll-to-top";
 
 export default function LandingPage() {
   const [isDark, setIsDark] = useState(false);
@@ -40,6 +41,7 @@ export default function LandingPage() {
         <Testimonials />
       </main>
       <Footer />
+      <ScrollToTop />
     </div>
   );
 }
