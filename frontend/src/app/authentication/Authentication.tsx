@@ -197,7 +197,7 @@ export function Authentication({ onLogin }: Readonly<AuthProps>) {
                 alt="TaskForce AI Logo"
                 width={80}
                 height={80}
-                className="w-20 h-20"
+                className="w-20 h-20 rounded-md"
               />
             </div>
           </motion.div>
