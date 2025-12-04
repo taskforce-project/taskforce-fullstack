@@ -461,21 +461,23 @@ export function Authentication({ onLogin }: Readonly<AuthProps>) {
                             className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                           >
                             J&apos;accepte les{" "}
-                            <Button
-                              variant="link"
-                              size="sm"
-                              className="px-0 h-auto"
+                            <a
+                              href="/legal-notices"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary hover:underline"
                             >
                               conditions d&apos;utilisation
-                            </Button>{" "}
+                            </a>{" "}
                             et la{" "}
-                            <Button
-                              variant="link"
-                              size="sm"
-                              className="px-0 h-auto"
+                            <a
+                              href="/privacy-policy"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary hover:underline"
                             >
                               politique de confidentialité
-                            </Button>
+                            </a>
                           </label>
                         </div>
 

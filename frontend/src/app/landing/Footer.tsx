@@ -25,10 +25,10 @@ export function Footer() {
       { label: "FAQ", href: "#" },
     ],
     legal: [
-      { label: "Mentions légales", href: "#" },
-      { label: "Confidentialité", href: "#" },
-      { label: "Conditions d'utilisation", href: "#" },
-      { label: "Cookies", href: "#" },
+      { label: "Mentions légales", href: "/legal-notices" },
+      { label: "Confidentialité", href: "/privacy-policy" },
+      { label: "Conditions d'utilisation", href: "/legal-notices#2-conditions-générales-d-utilisation-du-site-et-des-services-proposés" },
+      { label: "Cookies", href: "/privacy-policy#9-cookies" },
     ],
   };
 
