@@ -156,20 +156,13 @@ export function Authentication({ onLogin }: Readonly<AuthProps>) {
 
     // Simulate registration
     setTimeout(() => {
-      const user = {
-        name: registerName,
-        email: registerEmail,
-        role: "Admin",
-        plan: selectedPlan,
-        company: registerCompany,
-      };
       toast.success(
-        `Compte créé avec succès ! Plan ${
-          plans.find((p) => p.id === selectedPlan)?.name
-        } activé.`
+        `Compte créé avec succès ! Un code de vérification a été envoyé à ${registerEmail}`
       );
-      onLogin(user);
       setIsLoading(false);
+      
+      // Rediriger vers la page de vérification email
+      router.push(`/verify-email?email=${encodeURIComponent(registerEmail)}`);
     }, 1500);
   };
 
