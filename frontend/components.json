@@ -1,11 +1,10 @@
 {
-  "$schema": "https://ui.shadcn.com/schema.json",
+  "$schema": "https://shadcn-vue.com/schema.json",
   "style": "new-york",
-  "rsc": true,
-  "tsx": true,
+  "typescript": true,
   "tailwind": {
     "config": "",
-    "css": "src/app/styles/globals.css",
+    "css": "assets/css/tailwind.css",
     "baseColor": "neutral",
     "cssVariables": true,
     "prefix": ""
@@ -16,7 +15,7 @@
     "utils": "@/lib/utils",
     "ui": "@/components/ui",
     "lib": "@/lib",
-    "hooks": "@/hooks"
+    "composables": "@/composables"
   },
   "registries": {}
 }
