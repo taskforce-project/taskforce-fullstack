@@ -1,6 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Container from "@/components/layout/Container";
+import { TrendingUp, Check, ChevronRight } from "lucide-react";
+import { constants } from "@/config/constants";
+
+const { proFeatures } = constants;
 
 export default function ProFeatures() {
   return (
@@ -15,84 +19,44 @@ export default function ProFeatures() {
             {/* Left side - Content */}
             <div className="space-y-6">
               <Badge variant="secondary" className="px-4 py-1.5 text-sm font-medium">
-                <svg className="inline-block w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                </svg>
-                Pro Features
+                <TrendingUp className="inline-block w-4 h-4 mr-2" />
+                {proFeatures.badge}
               </Badge>
               
               <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight">
-                Unlock Advanced{" "}
+                {proFeatures.title.part1}{" "}
                 <span className="bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">
-                  Capabilities
+                  {proFeatures.title.highlight}
                 </span>
               </h2>
               
               <p className="text-lg text-muted-foreground">
-                Take your productivity to the next level with premium features designed for professional teams and power users.
+                {proFeatures.description}
               </p>
 
               <div className="grid sm:grid-cols-2 gap-4 pt-4">
-                <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center mt-1">
-                    <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
+                {proFeatures.features.map((feature, index) => (
+                  <div key={index} className="flex items-start gap-3">
+                    <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center mt-1">
+                      <Check className="w-4 h-4 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold mb-1">{feature.title}</h3>
+                      <p className="text-sm text-muted-foreground">{feature.description}</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-semibold mb-1">Advanced Analytics</h3>
-                    <p className="text-sm text-muted-foreground">Deep insights into team performance and productivity metrics</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center mt-1">
-                    <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold mb-1">AI-Powered Automation</h3>
-                    <p className="text-sm text-muted-foreground">Smart task suggestions and automated workflows</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center mt-1">
-                    <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold mb-1">Priority Support</h3>
-                    <p className="text-sm text-muted-foreground">24/7 dedicated support for your team</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center mt-1">
-                    <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold mb-1">Unlimited Integrations</h3>
-                    <p className="text-sm text-muted-foreground">Connect with all your favorite tools seamlessly</p>
-                  </div>
-                </div>
+                ))}
               </div>
 
               <div className="flex flex-col sm:flex-row gap-4 pt-4">
                 <Button size="lg" className="text-base px-8" asChild>
                   <a href="/pricing">
-                    View Pricing
-                    <svg className="ml-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
+                    {proFeatures.buttons.pricing}
+                    <ChevronRight className="ml-2 h-4 w-4" />
                   </a>
                 </Button>
                 <Button size="lg" variant="outline" className="text-base px-8" asChild>
-                  <a href="/features">Learn More</a>
+                  <a href="/features">{proFeatures.buttons.learnMore}</a>
                 </Button>
               </div>
             </div>
@@ -105,13 +69,11 @@ export default function ProFeatures() {
                   {/* Mock analytics dashboard */}
                   <div className="flex items-center justify-between mb-6">
                     <div>
-                      <h4 className="text-sm font-medium text-muted-foreground">Team Performance</h4>
-                      <p className="text-2xl font-bold">+24% this month</p>
+                      <h4 className="text-sm font-medium text-muted-foreground">{proFeatures.analytics.title}</h4>
+                      <p className="text-2xl font-bold">{proFeatures.analytics.growth}</p>
                     </div>
                     <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-                      <svg className="h-6 w-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                      </svg>
+                      <TrendingUp className="h-6 w-6 text-primary" />
                     </div>
                   </div>
 
@@ -130,11 +92,11 @@ export default function ProFeatures() {
                   <div className="grid grid-cols-3 gap-4 pt-6">
                     <div className="text-center p-4 rounded-lg bg-muted/30">
                       <p className="text-2xl font-bold text-primary">127</p>
-                      <p className="text-xs text-muted-foreground mt-1">Tasks Done</p>
+                      <p className="text-xs text-muted-foreground mt-1">{proFeatures.analytics.metrics.tasksDone}</p>
                     </div>
                     <div className="text-center p-4 rounded-lg bg-muted/30">
                       <p className="text-2xl font-bold text-primary">18</p>
-                      <p className="text-xs text-muted-foreground mt-1">Projects</p>
+                      <p className="text-xs text-muted-foreground mt-1">{proFeatures.analytics.metrics.activeProjects}</p>
                     </div>
                     <div className="text-center p-4 rounded-lg bg-muted/30">
                       <p className="text-2xl font-bold text-primary">5.2h</p>
