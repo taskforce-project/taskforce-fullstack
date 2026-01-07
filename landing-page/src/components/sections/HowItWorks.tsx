@@ -42,16 +42,16 @@ export default function HowItWorks() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 relative">
           {/* Connection line for desktop */}
-          <div className="hidden lg:block absolute top-24 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-border to-transparent" />
+          <div className="hidden lg:block absolute top-10 left-[12.5%] right-[12.5%] h-1 bg-gradient-to-r from-primary/20 via-primary to-primary/20 rounded-full" />
           
           {steps.map((step, index) => (
             <div key={index} className="relative">
               {/* Step card */}
               <div className="relative z-10 space-y-4">
                 <div className="relative inline-flex items-center justify-center">
-                  <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full" />
-                  <div className="relative flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-primary to-primary/70 text-primary-foreground shadow-lg">
-                    <span className="text-2xl font-bold">{step.number}</span>
+                  <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full animate-pulse" style={{ animationDelay: `${index * 0.2}s` }} />
+                  <div className="relative flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-primary to-primary/70 text-primary-foreground shadow-lg transform transition-transform duration-500 hover:scale-110" style={{ animationDelay: `${index * 0.15}s` }}>
+                    <span className="text-2xl font-bold animate-fade-in" style={{ animationDelay: `${index * 0.1}s` }}>{step.number}</span>
                   </div>
                 </div>
                 
@@ -64,7 +64,7 @@ export default function HowItWorks() {
               </div>
 
               {/* Connector dot */}
-              <div className="hidden lg:block absolute top-24 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-primary border-4 border-background z-20" />
+              <div className="hidden lg:block absolute top-10 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-primary border-4 border-background z-20 shadow-lg animate-pulse" style={{ animationDelay: `${index * 0.2}s` }} />
             </div>
           ))}
         </div>
