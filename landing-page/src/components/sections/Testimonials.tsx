@@ -68,7 +68,7 @@ export default function Testimonials() {
           {testimonials.map((testimonial, index) => (
             <Card
               key={index}
-              className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
+              className="group hover:shadow-lg transition-all duration-200 hover:-translate-y-1"
             >
               <CardContent className="pt-6">
                 <div className="flex items-start gap-4 mb-4">
