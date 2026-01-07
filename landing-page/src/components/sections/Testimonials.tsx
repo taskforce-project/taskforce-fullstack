@@ -1,76 +1,40 @@
-import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Container from "@/components/layout/Container";
+import { Sparkles } from "lucide-react";
+import { constants } from "@/config/constants";
 
-const testimonials = [
-  {
-    name: "Sarah Chen",
-    handle: "@sarahchen",
-    role: "Product Designer",
-    content: "TaskForce transformed how our team collaborates. The interface is intuitive and the themes make it a joy to use every day.",
-    avatar: "SC",
-  },
-  {
-    name: "Marcus Rodriguez",
-    handle: "@marcusdev",
-    role: "Lead Developer",
-    content: "Finally, a task manager that's both powerful and beautiful. The real-time collaboration features are game-changing.",
-    avatar: "MR",
-  },
-  {
-    name: "Emily Watson",
-    handle: "@emilywatson",
-    role: "Startup Founder",
-    content: "We switched from multiple tools to TaskForce. It's simplified our workflow and boosted productivity by 40%.",
-    avatar: "EW",
-  },
-  {
-    name: "David Kim",
-    handle: "@davidkim",
-    role: "Engineering Manager",
-    content: "The customization options are incredible. We've created a theme that matches our brand perfectly.",
-    avatar: "DK",
-  },
-  {
-    name: "Lisa Anderson",
-    handle: "@lisaanderson",
-    role: "UX Researcher",
-    content: "TaskForce gets out of your way and lets you focus on what matters. Best task manager I've used in 10 years.",
-    avatar: "LA",
-  },
-  {
-    name: "James Miller",
-    handle: "@jamesmiller",
-    role: "Freelance Designer",
-    content: "The attention to detail in the UI is outstanding. Every interaction feels polished and intentional.",
-    avatar: "JM",
-  },
-];
+const { testimonials } = constants;
 
-export default function Testimonials() {
+export default function ScrollingTestimonials() {
   return (
-    <section className="relative w-full py-20 md:py-32 bg-muted/30">
+    <section className="relative w-full py-20 md:py-32">
       <Container>
         <div className="text-center space-y-4 mb-16">
-          <Badge variant="secondary" className="px-4 py-1.5 text-sm font-medium">
-            ✦ Testimonials
+          <Badge
+            variant="secondary"
+            className="px-4 py-1.5 text-sm font-medium"
+          >
+            <Sparkles className="inline-block w-3 h-3 mr-1.5" />
+            {testimonials.badge}
           </Badge>
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight">
-            Loved by Teams Worldwide
+            {testimonials.title}
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            See what professionals are saying about TaskForce
+            {testimonials.description}
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {testimonials.map((testimonial, index) => (
-            <Card
-              key={index}
-              className="group hover:shadow-lg transition-all duration-200 hover:-translate-y-1"
-            >
-              <CardContent className="pt-6">
+        {/* Infinite scroll animation - Row 1 */}
+        <div className="relative overflow-hidden">
+          <div className="flex gap-4 animate-scroll-left">
+            {[...testimonials.items, ...testimonials.items].map((testimonial, index) => (
+              <Card
+                key={`${testimonial.name}-${index}`}
+                className="flex-shrink-0 w-80 p-6 cursor-pointer transition-all duration-200 hover:scale-105 hover:shadow-xl group"
+              >
                 <div className="flex items-start gap-4 mb-4">
                   <Avatar className="h-12 w-12 border-2 border-primary/20">
                     <AvatarFallback className="bg-primary/10 text-primary font-semibold">
@@ -79,25 +43,89 @@ export default function Testimonials() {
                   </Avatar>
                   <div className="flex-1">
                     <div className="font-semibold">{testimonial.name}</div>
-                    <div className="text-sm text-muted-foreground">{testimonial.handle}</div>
-                    <div className="text-xs text-muted-foreground mt-0.5">{testimonial.role}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {testimonial.role}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {testimonial.company}
+                    </div>
                   </div>
-                  <svg
-                    className="h-5 w-5 text-muted-foreground/40 group-hover:text-primary transition-colors"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                  >
-                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-                  </svg>
                 </div>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  "{testimonial.content}"
+                  "{testimonial.comment}"
                 </p>
-              </CardContent>
-            </Card>
-          ))}
+              </Card>
+            ))}
+          </div>
+        </div>
+
+        {/* Second row - reverse direction */}
+        <div className="relative overflow-hidden mt-4">
+          <div className="flex gap-4 animate-scroll-right">
+            {[...testimonials.items, ...testimonials.items]
+              .reverse()
+              .map((testimonial, index) => (
+                <Card
+                  key={`${testimonial.name}-reverse-${index}`}
+                  className="flex-shrink-0 w-80 p-6 cursor-pointer transition-all duration-200 hover:scale-105 hover:shadow-xl group"
+                >
+                  <div className="flex items-start gap-4 mb-4">
+                    <Avatar className="h-12 w-12 border-2 border-primary/20">
+                      <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+                        {testimonial.avatar}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <div className="font-semibold">{testimonial.name}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {testimonial.role}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {testimonial.company}
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    "{testimonial.comment}"
+                  </p>
+                </Card>
+              ))}
+          </div>
         </div>
       </Container>
+
+      <style>{`
+        @keyframes scroll-left {
+          0% {
+            transform: translateX(0);
+          }
+          100% {
+            transform: translateX(-50%);
+          }
+        }
+        
+        @keyframes scroll-right {
+          0% {
+            transform: translateX(-50%);
+          }
+          100% {
+            transform: translateX(0);
+          }
+        }
+        
+        .animate-scroll-left {
+          animation: scroll-left 60s linear infinite;
+        }
+        
+        .animate-scroll-right {
+          animation: scroll-right 60s linear infinite;
+        }
+        
+        .animate-scroll-left:hover,
+        .animate-scroll-right:hover {
+          animation-play-state: paused;
+        }
+      `}</style>
     </section>
   );
 }
