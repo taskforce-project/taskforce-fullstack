@@ -1,15 +1,7 @@
 ---
 import "@/styles/global.css";
-import Header from "@/components/layout/Header";
-import Footer from "@/components/layout/Footer";
-import Hero from "@/components/sections/Hero";
-import ScrollingTestimonials from "@/components/sections/Testimonials";
-import Features from "@/components/sections/Features";
-import ProFeatures from "@/components/sections/ProFeatures";
-import HowItWorks from "@/components/sections/HowItWorks";
-import Roadmap from "@/components/sections/Roadmap";
-import FAQ from "@/components/sections/FAQ";
-import CTA from "@/components/sections/CTA";
+import "@/styles/accessibility.css";
+import App from "@/components/App";
 
 const title = "TaskForce - Modern Task Management Platform";
 const description =
@@ -30,6 +22,11 @@ const canonicalURL = Astro.site
     <title>{title}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonicalURL} />
+
+    <!-- i18n / Alternate Languages -->
+    <link rel="alternate" hreflang="en" href={canonicalURL} />
+    <link rel="alternate" hreflang="fr" href={canonicalURL} />
+    <link rel="alternate" hreflang="x-default" href={canonicalURL} />
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
@@ -68,22 +65,38 @@ const canonicalURL = Astro.site
 
     <!-- Manifest -->
     <link rel="manifest" href="/manifest.json" />
+
+    <!-- Daltonism SVG Filters -->
+    <svg style="display: none;">
+      <defs>
+        <!-- Protanopia (Red-blind) Filter -->
+        <filter id="protanopia-filter">
+          <feColorMatrix type="matrix" values="0.567, 0.433, 0, 0, 0
+                                                 0.558, 0.442, 0, 0, 0
+                                                 0, 0.242, 0.758, 0, 0
+                                                 0, 0, 0, 1, 0"/>
+        </filter>
+        
+        <!-- Deuteranopia (Green-blind) Filter -->
+        <filter id="deuteranopia-filter">
+          <feColorMatrix type="matrix" values="0.625, 0.375, 0, 0, 0
+                                                 0.7, 0.3, 0, 0, 0
+                                                 0, 0.3, 0.7, 0, 0
+                                                 0, 0, 0, 1, 0"/>
+        </filter>
+        
+        <!-- Tritanopia (Blue-blind) Filter -->
+        <filter id="tritanopia-filter">
+          <feColorMatrix type="matrix" values="0.95, 0.05, 0, 0, 0
+                                                 0, 0.433, 0.567, 0, 0
+                                                 0, 0.475, 0.525, 0, 0
+                                                 0, 0, 0, 1, 0"/>
+        </filter>
+      </defs>
+    </svg>
   </head>
   <body class="min-h-screen bg-background font-sans antialiased">
-    <Header client:load />
-
-    <main>
-      <Hero client:visible />
-      <ScrollingTestimonials client:visible />
-      <Features client:visible />
-      <ProFeatures client:visible />
-      <HowItWorks client:visible />
-      <Roadmap client:visible />
-      <FAQ client:visible />
-      <CTA client:visible />
-    </main>
-
-    <Footer client:load />
+    <App client:only="react" />
 
     <!-- Schema.org structured data -->
     <script type="application/ld+json">

@@ -1,0 +1,88 @@
+---
+import "@/styles/global.css";
+import "@/styles/accessibility.css";
+import SitemapPage from "@/components/SitemapPage";
+
+const title = "Sitemap - TaskForce";
+const description = "Navigate all pages of TaskForce website";
+
+const pages = [
+  { title: "Home", url: "/" },
+  { title: "Features", url: "/#features" },
+  { title: "How It Works", url: "/#how-it-works" },
+  { title: "Roadmap", url: "/#roadmap" },
+  { title: "FAQ", url: "/#faq" },
+  { title: "Documentation", url: "/docs" },
+  { title: "Pricing", url: "/pricing" },
+  { title: "Contact", url: "/contact" },
+  { title: "Privacy Policy", url: "/privacy-policy" },
+  { title: "Terms of Service", url: "/terms" },
+  { title: "Accessibility Statement", url: "/accessibility" },
+  { title: "Sitemap", url: "/sitemap" },
+];
+---
+
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  </head>
+  <body class="min-h-screen bg-background font-sans antialiased">
+    <SitemapPage client:only="react" />
+  </body>
+</html>
+      
+      <main class="py-20">
+        <Container>
+          <div class="max-w-4xl mx-auto">
+            <h1 class="text-4xl font-bold mb-8">Sitemap</h1>
+            <p class="text-lg text-muted-foreground mb-12">
+              Browse all pages available on TaskForce website
+            </p>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {pages.map((page) => (
+                <a
+                  href={page.url}
+                  class="block p-6 rounded-lg border border-border/50 bg-card hover:border-primary/50 hover:shadow-lg transition-all duration-200 group"
+                >
+                  <h2 class="text-xl font-semibold mb-2 group-hover:text-primary transition-colors">
+                    {page.title}
+                  </h2>
+                  <span class="text-sm text-muted-foreground">{page.url}</span>
+                </a>
+              ))}
+            </div>
+
+            <div class="mt-16 p-8 rounded-lg border border-border/50 bg-muted/30">
+              <h2 class="text-2xl font-bold mb-4">Need Help Finding Something?</h2>
+              <p class="text-muted-foreground mb-4">
+                Can't find what you're looking for? Try our search or contact our support team.
+              </p>
+              <div class="flex gap-4">
+                <a
+                  href="/#faq"
+                  class="inline-flex items-center px-6 py-2.5 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors"
+                >
+                  View FAQ
+                </a>
+                <a
+                  href="/contact"
+                  class="inline-flex items-center px-6 py-2.5 rounded-lg border border-border bg-background font-medium hover:bg-accent transition-colors"
+                >
+                  Contact Us
+                </a>
+              </div>
+            </div>
+          </div>
+        </Container>
+      </main>
+
+      <Footer />
+    </Providers>
+  </body>
+</html>
