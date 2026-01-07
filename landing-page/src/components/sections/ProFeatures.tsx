@@ -2,11 +2,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Container from "@/components/layout/Container";
 import { TrendingUp, Check, ChevronRight } from "lucide-react";
-import { constants } from "@/config/constants";
-
-const { proFeatures } = constants;
+import { useTranslation } from "@/contexts/LanguageContext";
 
 export default function ProFeatures() {
+  const { t } = useTranslation();
+  const { proFeatures } = t;
   return (
     <section className="relative w-full py-20 md:py-32 overflow-hidden">
       {/* Background with gradient */}

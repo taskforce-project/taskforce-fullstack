@@ -1,11 +1,11 @@
 import { Badge } from "@/components/ui/badge";
 import Container from "@/components/layout/Container";
 import { ChevronRight, Sparkles } from "lucide-react";
-import { constants } from "@/config/constants";
-
-const { howItWorks } = constants;
+import { useTranslation } from "@/contexts/LanguageContext";
 
 export default function HowItWorks() {
+  const { t } = useTranslation();
+  const { howItWorks } = t;
   return (
     <section id="how-it-works" className="relative w-full py-20 md:py-32 bg-muted/30">
       <Container>

@@ -1,11 +1,11 @@
 import { Button } from "@/components/ui/button";
 import Container from "@/components/layout/Container";
 import { ChevronRight, Github, Check } from "lucide-react";
-import { constants } from "@/config/constants";
-
-const { cta } = constants;
+import { useTranslation } from "@/contexts/LanguageContext";
 
 export default function CTA() {
+  const { t } = useTranslation();
+  const { cta } = t;
   return (
     <section className="relative w-full py-20 md:py-32 overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-primary/10 to-background" />

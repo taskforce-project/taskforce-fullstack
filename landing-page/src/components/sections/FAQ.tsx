@@ -2,11 +2,11 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Badge } from "@/components/ui/badge";
 import Container from "@/components/layout/Container";
 import { ArrowRight, Sparkles } from "lucide-react";
-import { constants } from "@/config/constants";
-
-const { faq } = constants;
+import { useTranslation } from "@/contexts/LanguageContext";
 
 export default function FAQ() {
+  const { t } = useTranslation();
+  const { faq } = t;
   return (
     <section id="faq" className="relative w-full py-20 md:py-32 bg-muted/30">
       <Container>

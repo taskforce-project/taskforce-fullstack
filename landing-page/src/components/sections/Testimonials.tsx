@@ -3,11 +3,11 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Container from "@/components/layout/Container";
 import { Sparkles } from "lucide-react";
-import { constants } from "@/config/constants";
-
-const { testimonials } = constants;
+import { useTranslation } from "@/contexts/LanguageContext";
 
 export default function ScrollingTestimonials() {
+  const { t } = useTranslation();
+  const { testimonials } = t;
   return (
     <section className="relative w-full py-20 md:py-32">
       <Container>

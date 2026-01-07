@@ -10,7 +10,7 @@ import {
   Smartphone,
   Sparkles,
 } from "lucide-react";
-import { constants } from "@/config/constants";
+import { useTranslation } from "@/contexts/LanguageContext";
 
 const featureIcons = [
   <Palette className="h-6 w-6" />,
@@ -22,7 +22,8 @@ const featureIcons = [
 ];
 
 export default function Features() {
-  const { features } = constants;
+  const { t } = useTranslation();
+  const { features } = t;
   
   return (
     <section id="features" className="relative w-full py-20 md:py-32">

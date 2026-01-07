@@ -1,9 +1,10 @@
 import { Separator } from "@/components/ui/separator";
 import { Layers, Github, Twitter } from "lucide-react";
-import { constants } from "@/config/constants";
+import { useTranslation } from "@/contexts/LanguageContext";
 
 export default function Footer() {
-  const { footer } = constants;
+  const { t } = useTranslation();
+  const { footer } = t;
   
   return (
     <footer className="w-full border-t border-border/40 bg-background">

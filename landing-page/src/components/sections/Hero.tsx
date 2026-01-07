@@ -2,10 +2,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Container from "@/components/layout/Container";
 import { ChevronRight, Github, Check, Sparkles } from "lucide-react";
-import { constants } from "@/config/constants";
+import { useTranslation } from "@/contexts/LanguageContext";
 
 export default function Hero() {
-  const { hero } = constants;
+  const { t } = useTranslation();
+  const { hero } = t;
   
   return (
     <section className="relative w-full pt-20 pb-16 md:pt-32 md:pb-24 overflow-hidden">

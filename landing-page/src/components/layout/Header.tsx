@@ -1,10 +1,15 @@
 import { Button } from "@/components/ui/button";
-import { NavigationMenu, NavigationMenuContent, NavigationMenuItem, NavigationMenuLink, NavigationMenuList, NavigationMenuTrigger } from "@/components/ui/navigation-menu";
+import { NavigationMenu, NavigationMenuItem, NavigationMenuList } from "@/components/ui/navigation-menu";
 import { Layers, Github } from "lucide-react";
-import { constants } from "@/config/constants";
+import { useTranslation } from "@/contexts/LanguageContext";
+import LanguageSelector from "./LanguageSelector";
+import ThemeSwitcher from "./ThemeSwitcher";
+import AccessibilityDropdown from "./AccessibilityDropdown";
+import VersionSelector from "./VersionSelector";
 
 export default function Header() {
-  const { header } = constants;
+  const { t } = useTranslation();
+  const { header } = t;
   
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -44,15 +49,30 @@ export default function Header() {
         </NavigationMenu>
 
         <div className="flex flex-1 items-center justify-end gap-2">
+          {/* Version Selector - right of GitHub */}
+          <VersionSelector />
+          
+          {/* Theme Switcher - left of GitHub */}
+          <ThemeSwitcher />
+          
+          {/* GitHub Button */}
           <Button variant="ghost" size="sm" asChild>
             <a href="https://github.com" target="_blank" rel="noopener noreferrer">
               <Github className="h-5 w-5" />
             </a>
           </Button>
-          <Button variant="outline" size="sm" asChild>
+          
+          {/* Accessibility Dropdown - far right */}
+          <AccessibilityDropdown />
+          
+          {/* Language Selector - rightmost */}
+          <LanguageSelector />
+          
+          {/* Auth Buttons */}
+          <Button variant="outline" size="sm" asChild className="hidden sm:flex">
             <a href="/login">{header.buttons.login}</a>
           </Button>
-          <Button size="sm" asChild>
+          <Button size="sm" asChild className="hidden sm:flex">
             <a href="/register">{header.buttons.register}</a>
           </Button>
         </div>
