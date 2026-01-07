@@ -114,7 +114,7 @@ export default function Roadmap() {
             return (
               <Card
                 key={index}
-                className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1"
+                className="group relative overflow-hidden transition-all duration-200 hover:shadow-lg hover:-translate-y-1"
               >
                 <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full blur-2xl group-hover:bg-primary/10 transition-colors" />
                 <CardHeader>
