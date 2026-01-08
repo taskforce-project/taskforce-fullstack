@@ -10,10 +10,9 @@ import {
 } from "@/components/ui/navigation-menu";
 import { Layers, Github, BookOpen, FileText, Shield, Eye } from "lucide-react";
 import { useTranslation } from "@/contexts/LanguageContext";
-import LanguageSelector from "./LanguageSelector";
-import ThemeSwitcher from "./ThemeSwitcher";
-import AccessibilityDropdown from "./AccessibilityDropdown";
 import VersionSelector from "./VersionSelector";
+import SettingsDropdown from "./SettingsDropdown";
+import MobileMenu from "./MobileMenu";
 import { cn } from "@/lib/utils";
 
 export default function Header() {
@@ -32,7 +31,7 @@ export default function Header() {
           </a>
         </div>
 
-        <NavigationMenu className="hidden md:flex">
+        <NavigationMenu className="hidden lg:flex">
           <NavigationMenuList>
             <NavigationMenuItem>
               <a
@@ -118,37 +117,34 @@ export default function Header() {
           </NavigationMenuList>
         </NavigationMenu>
 
-        <div className="flex flex-1 items-center justify-end gap-12">
-          <div className="flex gap-2">
-            <VersionSelector />
-            <ThemeSwitcher />
-            <Button variant="ghost" size="sm" asChild>
-              <a
-                href="https://github.com"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Github className="h-5 w-5" />
-              </a>
-            </Button>
-          </div>
-          <div className="flex gap-2">
+        <div className="flex flex-1 items-center justify-end gap-2">
+          <div className="hidden lg:flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
               asChild
-              className="hidden sm:flex"
             >
               <a href="/login">{header.buttons.login}</a>
             </Button>
-            <Button size="sm" asChild className="hidden sm:flex">
+            <Button size="sm" asChild>
               <a href="/register">{header.buttons.register}</a>
             </Button>
           </div>
-          <div>
-            <AccessibilityDropdown />
-            <LanguageSelector />
+          <div className="hidden lg:flex items-center gap-1">
+            <VersionSelector />
+            <Button variant="ghost" size="icon" asChild>
+              <a
+                href="https://github.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="GitHub"
+              >
+                <Github className="h-5 w-5" />
+              </a>
+            </Button>
+            <SettingsDropdown />
           </div>
+          <MobileMenu />
         </div>
       </div>
     </header>
