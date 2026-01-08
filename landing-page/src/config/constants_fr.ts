@@ -14,7 +14,9 @@ export const constants_fr = {
     navigation: {
       features: "Fonctionnalités",
       howItWorks: "Comment ça marche",
+      documentation: "Documentation",
       roadmap: "Feuille de route",
+      resources: "Ressources",
       faq: "FAQ",
     },
     buttons: {

@@ -51,7 +51,7 @@ export default function Header() {
               </a>
             </NavigationMenuItem>
             <NavigationMenuItem>
-              <NavigationMenuTrigger>Documentation</NavigationMenuTrigger>
+              <NavigationMenuTrigger>{header.navigation.documentation}</NavigationMenuTrigger>
               <NavigationMenuContent>
                 <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px]">
                   <li className="row-span-3">
@@ -62,7 +62,7 @@ export default function Header() {
                       >
                         <BookOpen className="h-6 w-6" />
                         <div className="mb-2 mt-4 text-lg font-medium">
-                          Documentation
+                          {header.navigation.documentation}
                         </div>
                         <p className="text-sm leading-tight text-muted-foreground">
                           Learn how to use TaskForce with our comprehensive guides and API documentation.
@@ -94,7 +94,7 @@ export default function Header() {
               </a>
             </NavigationMenuItem>
             <NavigationMenuItem>
-              <NavigationMenuTrigger>Resources</NavigationMenuTrigger>
+              <NavigationMenuTrigger>{header.navigation.resources}</NavigationMenuTrigger>
               <NavigationMenuContent>
                 <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2">
                   <ListItem href="/terms" title="Terms of Service">

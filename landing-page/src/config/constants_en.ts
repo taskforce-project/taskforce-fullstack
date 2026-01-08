@@ -16,7 +16,9 @@ export const constants_en: Constants = {
     navigation: {
       features: "Features",
       howItWorks: "How It Works",
+      documentation: "Documentation",
       roadmap: "Roadmap",
+      resources: "Resources",
       faq: "FAQ",
     },
     buttons: {
