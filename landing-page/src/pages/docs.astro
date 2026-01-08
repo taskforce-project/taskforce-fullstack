@@ -1,7 +1,7 @@
 ---
 import "@/styles/global.css";
 import "@/styles/accessibility.css";
-import DocsPage from "@/components/DocsPage";
+import DocsPageNew from "@/components/DocsPageNew";
 
 const title = "Documentation - TaskForce";
 const description = "Complete documentation for TaskForce task management platform";
@@ -17,67 +17,6 @@ const description = "Complete documentation for TaskForce task management platfo
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   </head>
   <body class="min-h-screen bg-background font-sans antialiased">
-    <Providers client:only="react">
-      <Header />
-      
-      <main class="py-20">
-        <Container>
-          <div class="max-w-4xl mx-auto prose prose-lg dark:prose-invert">
-            <h1>Documentation</h1>
-            
-            <h2>Getting Started</h2>
-            <p>
-              Welcome to TaskForce! This comprehensive guide will help you get started with our 
-              powerful task management platform. Whether you're an individual user or managing a 
-              large team, TaskForce has the features you need to stay organized and productive.
-            </p>
-
-            <h2>Quick Start</h2>
-            <ol>
-              <li>Create your account (no credit card required)</li>
-              <li>Set up your workspace and choose a theme</li>
-              <li>Create your first project and tasks</li>
-              <li>Invite team members to collaborate</li>
-              <li>Start managing your tasks efficiently</li>
-            </ol>
-
-            <h2>Core Features</h2>
-            
-            <h3>Task Management</h3>
-            <p>
-              Create, organize, and track tasks with ease. Assign priorities, due dates, 
-              and labels to keep everything organized.
-            </p>
-
-            <h3>Team Collaboration</h3>
-            <p>
-              Work together in real-time. Share tasks, leave comments, mention team members, 
-              and track everyone's progress.
-            </p>
-
-            <h3>Customizable Themes</h3>
-            <p>
-              Personalize your workspace with beautiful themes. Choose from presets or create 
-              your own custom color schemes.
-            </p>
-
-            <h2>API Documentation</h2>
-            <p>
-              Integrate TaskForce with your existing tools using our comprehensive REST API. 
-              Visit our <a href="https://api.taskforce.app/docs">API documentation</a> for 
-              detailed information.
-            </p>
-
-            <h2>Support</h2>
-            <p>
-              Need help? Check out our <a href="/faq">FAQ section</a> or 
-              <a href="/contact">contact our support team</a>.
-            </p>
-          </div>
-        </Container>
-      </main>
-
-      <Footer />
-    </Providers>
+    <DocsPageNew client:only="react" />
   </body>
 </html>

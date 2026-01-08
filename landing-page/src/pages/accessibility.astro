@@ -1,9 +1,7 @@
 ---
 import "@/styles/global.css";
 import "@/styles/accessibility.css";
-import AccessibilityPage from "@/components/AccessibilityPage";
-import { Footer } from "react-day-picker";
-import Container from "@/components/layout/Container";
+import AccessibilityPageNew from "@/components/AccessibilityPageNew";
 
 const title = "Accessibility Statement - TaskForce";
 const description =
@@ -20,34 +18,9 @@ const description =
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   </head>
   <body class="min-h-screen bg-background font-sans antialiased">
-    <AccessibilityPage client:only="react" />
+    <AccessibilityPageNew client:only="react" />
   </body>
 </html>
-
-<main class="py-20">
-  <Container>
-    <div class="max-w-4xl mx-auto prose prose-lg dark:prose-invert">
-      <h1>Accessibility Statement</h1>
-      <p class="text-muted-foreground">Last updated: January 7, 2026</p>
-
-      <h2>Our Commitment</h2>
-      <p>
-        TaskForce is committed to ensuring digital accessibility for people with
-        disabilities. We are continually improving the user experience for
-        everyone and applying the relevant accessibility standards.
-      </p>
-
-      <h2>Conformance Status</h2>
-      <p>
-        We aim to conform with the Web Content Accessibility Guidelines (WCAG)
-        2.1 Level AA. These guidelines explain how to make web content more
-        accessible for people with disabilities and user-friendly for everyone.
-      </p>
-
-      <h2>Accessibility Features</h2>
-      <p>TaskForce includes the following accessibility features:</p>
-
-      <h3>Visual Adjustments</h3>
       <ul>
         <li>
           <strong>Font Size Control:</strong> Adjust text size from 80% to 150% of
