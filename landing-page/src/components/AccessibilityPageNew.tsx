@@ -1,3 +1,4 @@
+import { Providers } from "@/components/Providers";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { Badge } from "@/components/ui/badge";
@@ -168,8 +169,9 @@ export default function AccessibilityPageNew() {
   ];
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
+    <Providers>
+      <div className="min-h-screen bg-background">
+        <Header />
 
       {/* Hero Section */}
       <section className="relative border-b border-border/40 bg-gradient-to-b from-background via-background/95 to-muted/20">
@@ -486,6 +488,7 @@ export default function AccessibilityPageNew() {
       </section>
 
       <Footer />
-    </div>
+      </div>
+    </Providers>
   );
 }

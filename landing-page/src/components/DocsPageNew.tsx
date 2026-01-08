@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Providers } from "@/components/Providers";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
@@ -127,8 +128,9 @@ export default function DocsPageNew() {
   ];
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
+    <Providers>
+      <div className="min-h-screen bg-background">
+        <Header />
 
       {/* Hero Section */}
       <section className="relative border-b border-border/40 bg-gradient-to-b from-background via-background/95 to-muted/20">
@@ -326,6 +328,7 @@ export default function DocsPageNew() {
       </section>
 
       <Footer />
-    </div>
+      </div>
+    </Providers>
   );
 }
