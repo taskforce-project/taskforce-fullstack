@@ -8,7 +8,7 @@ import {
   NavigationMenuLink,
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
-import { Layers, Github, BookOpen, FileText, Shield, Eye } from "lucide-react";
+import { Github, BookOpen, FileText, Shield, Eye } from "lucide-react";
 import { useTranslation } from "@/contexts/LanguageContext";
 import VersionSelector from "./VersionSelector";
 import SettingsDropdown from "./SettingsDropdown";
@@ -23,9 +23,9 @@ export default function Header() {
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex h-16 max-w-screen-2xl items-center px-4 sm:px-6 lg:px-8">
         <div className="mr-4 flex items-center gap-2">
-          <a href="/" className="flex items-center gap-2 font-bold text-xl">
-            <Layers className="h-6 w-6 text-primary" />
-            <span className="bg-linear-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+          <a href="/" className="flex items-center gap-3 font-bold text-xl">
+            <img src="/logo_taskforce_tp.png" alt="TaskForce" className="h-10 w-auto" />
+            <span className="bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
               {header.brandName}
             </span>
           </a>
