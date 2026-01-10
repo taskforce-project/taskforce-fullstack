@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Toaster } from "@/components/ui/sonner";
+import { useEffect, useState } from "react";
 
 export default function AuthLayout({
   children,
@@ -17,6 +18,21 @@ export default function AuthLayout({
   children: React.ReactNode;
 }>) {
   const { theme, toggleTheme, language, setLanguage, t } = usePreferencesStore();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        <main className="flex-1 flex items-center justify-center p-4">
+          {children}
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
