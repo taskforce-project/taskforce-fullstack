@@ -24,7 +24,7 @@ export default function Header() {
       <div className="container mx-auto flex h-16 max-w-screen-2xl items-center px-4 sm:px-6 lg:px-8">
         <div className="mr-4 flex items-center gap-2">
           <a href="/" className="flex items-center gap-3 font-bold text-xl">
-            <img src="/logo_taskforce_tp.png" alt="TaskForce" className="h-10 w-auto" />
+            <img src="/logo_taskforce_tp.png" alt="TaskForce" className="h-18 w-auto" />
             <span className="bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
               {header.brandName}
             </span>
@@ -124,10 +124,10 @@ export default function Header() {
               size="sm"
               asChild
             >
-              <a href="/login">{header.buttons.login}</a>
+              <a href="http://localhost:3000/auth/login">{header.buttons.login}</a>
             </Button>
             <Button size="sm" asChild>
-              <a href="/register">{header.buttons.register}</a>
+              <a href="http://localhost:3000/auth/register">{header.buttons.register}</a>
             </Button>
           </div>
           <div className="hidden lg:flex items-center gap-1">
