@@ -5,7 +5,7 @@ import type { TranslationKeys } from "./constants_en";
 export const CONSTANTS_FR: TranslationKeys = {
   // Commun
   common: {
-    appName: "TaskForce AI",
+    appName: "Taskforce",
     language: "Langue",
     theme: "Thème",
     light: "Clair",

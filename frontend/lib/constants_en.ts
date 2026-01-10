@@ -3,7 +3,7 @@
 export const CONSTANTS_EN = {
   // Common
   common: {
-    appName: "TaskForce AI",
+    appName: "Taskforce",
     language: "Language",
     theme: "Theme",
     light: "Light",
