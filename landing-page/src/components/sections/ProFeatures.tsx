@@ -4,7 +4,7 @@ import Container from "@/components/layout/Container";
 import { TrendingUp, Check, ChevronRight } from "lucide-react";
 import { useTranslation } from "@/contexts/LanguageContext";
 
-export default function ProFeatures() {
+export function ProFeatures() {
   const { t } = useTranslation();
   const { proFeatures } = t;
   return (

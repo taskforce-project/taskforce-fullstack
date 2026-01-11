@@ -4,7 +4,7 @@ import Container from "@/components/layout/Container";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { useTranslation } from "@/contexts/LanguageContext";
 
-export default function FAQ() {
+export function FAQ() {
   const { t } = useTranslation();
   const { faq } = t;
   return (

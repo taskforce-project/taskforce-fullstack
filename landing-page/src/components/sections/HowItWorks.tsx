@@ -3,7 +3,7 @@ import Container from "@/components/layout/Container";
 import { ChevronRight, Sparkles } from "lucide-react";
 import { useTranslation } from "@/contexts/LanguageContext";
 
-export default function HowItWorks() {
+export function HowItWorks() {
   const { t } = useTranslation();
   const { howItWorks } = t;
   return (

@@ -21,7 +21,7 @@ const featureIcons = [
   <Smartphone className="h-6 w-6" />,
 ];
 
-export default function Features() {
+export function Features() {
   const { t } = useTranslation();
   const { features } = t;
   

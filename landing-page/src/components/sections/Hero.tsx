@@ -4,20 +4,23 @@ import Container from "@/components/layout/Container";
 import { ChevronRight, Github, Check, Sparkles } from "lucide-react";
 import { useTranslation } from "@/contexts/LanguageContext";
 
-export default function Hero() {
+export function Hero() {
   const { t } = useTranslation();
   const { hero } = t;
-  
+
   return (
     <section className="relative w-full pt-20 pb-16 md:pt-32 md:pb-24 overflow-hidden">
       {/* Background gradient */}
       <div className="absolute inset-0 -z-10 bg-gradient-to-b from-primary/5 via-background to-background" />
       <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(var(--primary),0.15),transparent)]" />
-      
+
       <Container>
         <div className="flex flex-col items-center text-center space-y-8">
           {/* Badge */}
-          <Badge variant="secondary" className="px-4 py-1.5 text-sm font-medium">
+          <Badge
+            variant="secondary"
+            className="px-4 py-1.5 text-sm font-medium"
+          >
             <Sparkles className="inline-block w-3 h-3 mr-1.5" />
             {hero.badge}
           </Badge>
@@ -43,8 +46,17 @@ export default function Hero() {
                 <ChevronRight className="ml-2 h-4 w-4" />
               </a>
             </Button>
-            <Button size="lg" variant="outline" className="text-base px-8 h-12" asChild>
-              <a href="https://github.com" target="_blank" rel="noopener noreferrer">
+            <Button
+              size="lg"
+              variant="outline"
+              className="text-base px-8 h-12"
+              asChild
+            >
+              <a
+                href="https://github.com"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 <Github className="mr-2 h-5 w-5" />
                 {hero.buttons.viewGithub}
               </a>
@@ -84,13 +96,19 @@ export default function Hero() {
                   </div>
                   <div className="space-y-2">
                     <div className="h-16 w-full bg-muted/50 rounded-lg animate-pulse" />
-                    <div className="h-16 w-full bg-muted/40 rounded-lg animate-pulse" style={{ animationDelay: '0.1s' }} />
-                    <div className="h-16 w-full bg-muted/30 rounded-lg animate-pulse" style={{ animationDelay: '0.2s' }} />
+                    <div
+                      className="h-16 w-full bg-muted/40 rounded-lg animate-pulse"
+                      style={{ animationDelay: "0.1s" }}
+                    />
+                    <div
+                      className="h-16 w-full bg-muted/30 rounded-lg animate-pulse"
+                      style={{ animationDelay: "0.2s" }}
+                    />
                   </div>
                 </div>
               </div>
             </div>
-            
+
             {/* Decorative elements */}
             <div className="absolute -top-4 -left-4 h-24 w-24 bg-primary/20 rounded-full blur-3xl -z-10" />
             <div className="absolute -bottom-4 -right-4 h-32 w-32 bg-primary/10 rounded-full blur-3xl -z-10" />

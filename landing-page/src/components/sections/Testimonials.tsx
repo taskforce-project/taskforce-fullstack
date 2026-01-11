@@ -5,7 +5,7 @@ import Container from "@/components/layout/Container";
 import { Sparkles } from "lucide-react";
 import { useTranslation } from "@/contexts/LanguageContext";
 
-export default function ScrollingTestimonials() {
+export function Testimonials() {
   const { t } = useTranslation();
   const { testimonials } = t;
   return (

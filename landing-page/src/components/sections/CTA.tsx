@@ -3,7 +3,7 @@ import Container from "@/components/layout/Container";
 import { ChevronRight, Github, Check } from "lucide-react";
 import { useTranslation } from "@/contexts/LanguageContext";
 
-export default function CTA() {
+export function CTA() {
   const { t } = useTranslation();
   const { cta } = t;
   return (

@@ -29,7 +29,7 @@ const getIconForItem = (index: number): ReactElement => {
   return icons[index] || <Sparkles className="h-6 w-6" />;
 };
 
-export default function Roadmap() {
+export function Roadmap() {
   const { t } = useTranslation();
   const { roadmap } = t;
 
