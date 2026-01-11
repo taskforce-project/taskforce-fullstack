@@ -2,7 +2,7 @@ import { Separator } from "@/components/ui/separator";
 import { Layers, Github, Twitter } from "lucide-react";
 import { useTranslation } from "@/contexts/LanguageContext";
 
-export default function Footer() {
+export function Footer() {
   const { t } = useTranslation();
   const { footer } = t;
   
@@ -23,7 +23,7 @@ export default function Footer() {
                 <span className="sr-only">GitHub</span>
                 <Github className="h-5 w-5" />
               </a>
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors duration-200">
+              <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors duration-200">
                 <span className="sr-only">Twitter</span>
                 <Twitter className="h-5 w-5" />
               </a>

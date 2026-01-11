@@ -1,4 +1,3 @@
-import { Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -25,14 +24,20 @@ import {
 import { useTranslation } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAccessibility } from "@/contexts/AccessibilityContext";
-import { Sun, Moon, Monitor, Languages, Accessibility, RotateCcw, ChevronRight } from "lucide-react";
-import { useState } from "react";
+import {
+  Sun,
+  Moon,
+  Monitor,
+  Languages,
+  Accessibility,
+  RotateCcw,
+  Settings,
+} from "lucide-react";
 
-export default function SettingsDropdown() {
+export function SettingsDropdown() {
   const { language, setLanguage } = useTranslation();
   const { theme, setTheme } = useTheme();
   const { settings, updateSettings, resetSettings } = useAccessibility();
-  const [showAccessibility, setShowAccessibility] = useState(false);
 
   return (
     <DropdownMenu>
@@ -44,7 +49,7 @@ export default function SettingsDropdown() {
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel>Settings</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        
+
         <DropdownMenuGroup>
           <DropdownMenuLabel className="text-xs font-normal text-muted-foreground px-2 py-1.5">
             Theme
@@ -115,7 +120,9 @@ export default function SettingsDropdown() {
                 <Label htmlFor="font-size" className="text-sm font-medium">
                   Font Size
                 </Label>
-                <span className="text-sm text-muted-foreground">{settings.fontSize}%</span>
+                <span className="text-sm text-muted-foreground">
+                  {settings.fontSize}%
+                </span>
               </div>
               <Slider
                 id="font-size"
@@ -123,7 +130,9 @@ export default function SettingsDropdown() {
                 max={150}
                 step={10}
                 value={[settings.fontSize]}
-                onValueChange={(value) => updateSettings({ fontSize: value[0] })}
+                onValueChange={(value) =>
+                  updateSettings({ fontSize: value[0] })
+                }
                 className="w-full"
               />
             </div>
@@ -144,7 +153,9 @@ export default function SettingsDropdown() {
                 max={0.2}
                 step={0.01}
                 value={[settings.letterSpacing]}
-                onValueChange={(value) => updateSettings({ letterSpacing: value[0] })}
+                onValueChange={(value) =>
+                  updateSettings({ letterSpacing: value[0] })
+                }
                 className="w-full"
               />
             </div>
@@ -153,25 +164,35 @@ export default function SettingsDropdown() {
 
             {/* Dyslexic Font */}
             <div className="flex items-center justify-between mb-4">
-              <Label htmlFor="dyslexic-font" className="text-sm font-medium cursor-pointer">
+              <Label
+                htmlFor="dyslexic-font"
+                className="text-sm font-medium cursor-pointer"
+              >
                 OpenDyslexic Font
               </Label>
               <Switch
                 id="dyslexic-font"
                 checked={settings.dyslexicFont}
-                onCheckedChange={(checked) => updateSettings({ dyslexicFont: checked })}
+                onCheckedChange={(checked) =>
+                  updateSettings({ dyslexicFont: checked })
+                }
               />
             </div>
 
             {/* High Contrast */}
             <div className="flex items-center justify-between mb-4">
-              <Label htmlFor="high-contrast" className="text-sm font-medium cursor-pointer">
+              <Label
+                htmlFor="high-contrast"
+                className="text-sm font-medium cursor-pointer"
+              >
                 High Contrast
               </Label>
               <Switch
                 id="high-contrast"
                 checked={settings.highContrast}
-                onCheckedChange={(checked) => updateSettings({ highContrast: checked })}
+                onCheckedChange={(checked) =>
+                  updateSettings({ highContrast: checked })
+                }
               />
             </div>
 
@@ -186,7 +207,11 @@ export default function SettingsDropdown() {
                 value={settings.daltonismMode}
                 onValueChange={(value) =>
                   updateSettings({
-                    daltonismMode: value as "none" | "protanopia" | "deuteranopia" | "tritanopia",
+                    daltonismMode: value as
+                      | "none"
+                      | "protanopia"
+                      | "deuteranopia"
+                      | "tritanopia",
                   })
                 }
               >
@@ -195,9 +220,15 @@ export default function SettingsDropdown() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">None</SelectItem>
-                  <SelectItem value="protanopia">Protanopia (Red-blind)</SelectItem>
-                  <SelectItem value="deuteranopia">Deuteranopia (Green-blind)</SelectItem>
-                  <SelectItem value="tritanopia">Tritanopia (Blue-blind)</SelectItem>
+                  <SelectItem value="protanopia">
+                    Protanopia (Red-blind)
+                  </SelectItem>
+                  <SelectItem value="deuteranopia">
+                    Deuteranopia (Green-blind)
+                  </SelectItem>
+                  <SelectItem value="tritanopia">
+                    Tritanopia (Blue-blind)
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>

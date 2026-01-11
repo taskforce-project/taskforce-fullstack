@@ -19,7 +19,7 @@ import {
 import { useAccessibility } from "@/contexts/AccessibilityContext";
 import { Accessibility, RotateCcw } from "lucide-react";
 
-export default function AccessibilityDropdown() {
+export function AccessibilityDropdown() {
   const { settings, updateSettings, resetSettings } = useAccessibility();
 
   return (
@@ -53,7 +53,9 @@ export default function AccessibilityDropdown() {
             <Label htmlFor="font-size" className="text-sm font-medium">
               Font Size
             </Label>
-            <span className="text-sm text-muted-foreground">{settings.fontSize}%</span>
+            <span className="text-sm text-muted-foreground">
+              {settings.fontSize}%
+            </span>
           </div>
           <Slider
             id="font-size"
@@ -82,7 +84,9 @@ export default function AccessibilityDropdown() {
             max={0.2}
             step={0.01}
             value={[settings.letterSpacing]}
-            onValueChange={(value) => updateSettings({ letterSpacing: value[0] })}
+            onValueChange={(value) =>
+              updateSettings({ letterSpacing: value[0] })
+            }
             className="w-full"
           />
         </div>
@@ -91,25 +95,35 @@ export default function AccessibilityDropdown() {
 
         {/* Dyslexic Font */}
         <div className="flex items-center justify-between mb-4">
-          <Label htmlFor="dyslexic-font" className="text-sm font-medium cursor-pointer">
+          <Label
+            htmlFor="dyslexic-font"
+            className="text-sm font-medium cursor-pointer"
+          >
             OpenDyslexic Font
           </Label>
           <Switch
             id="dyslexic-font"
             checked={settings.dyslexicFont}
-            onCheckedChange={(checked) => updateSettings({ dyslexicFont: checked })}
+            onCheckedChange={(checked) =>
+              updateSettings({ dyslexicFont: checked })
+            }
           />
         </div>
 
         {/* High Contrast */}
         <div className="flex items-center justify-between mb-4">
-          <Label htmlFor="high-contrast" className="text-sm font-medium cursor-pointer">
+          <Label
+            htmlFor="high-contrast"
+            className="text-sm font-medium cursor-pointer"
+          >
             High Contrast
           </Label>
           <Switch
             id="high-contrast"
             checked={settings.highContrast}
-            onCheckedChange={(checked) => updateSettings({ highContrast: checked })}
+            onCheckedChange={(checked) =>
+              updateSettings({ highContrast: checked })
+            }
           />
         </div>
 
@@ -124,7 +138,11 @@ export default function AccessibilityDropdown() {
             value={settings.daltonismMode}
             onValueChange={(value) =>
               updateSettings({
-                daltonismMode: value as "none" | "protanopia" | "deuteranopia" | "tritanopia",
+                daltonismMode: value as
+                  | "none"
+                  | "protanopia"
+                  | "deuteranopia"
+                  | "tritanopia",
               })
             }
           >
@@ -134,8 +152,12 @@ export default function AccessibilityDropdown() {
             <SelectContent>
               <SelectItem value="none">None</SelectItem>
               <SelectItem value="protanopia">Protanopia (Red-blind)</SelectItem>
-              <SelectItem value="deuteranopia">Deuteranopia (Green-blind)</SelectItem>
-              <SelectItem value="tritanopia">Tritanopia (Blue-blind)</SelectItem>
+              <SelectItem value="deuteranopia">
+                Deuteranopia (Green-blind)
+              </SelectItem>
+              <SelectItem value="tritanopia">
+                Tritanopia (Blue-blind)
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>

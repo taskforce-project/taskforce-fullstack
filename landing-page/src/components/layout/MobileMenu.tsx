@@ -25,12 +25,14 @@ import {
   ChevronRight,
   Github,
 } from "lucide-react";
-import LanguageSelector from "./LanguageSelector";
-import ThemeSwitcher from "./ThemeSwitcher";
-import AccessibilityDropdown from "./AccessibilityDropdown";
-import VersionSelector from "./VersionSelector";
+import {
+  LanguageSelector,
+  ThemeSwitcher,
+  AccessibilityDropdown,
+  VersionSelector,
+} from ".";
 
-export default function MobileMenu() {
+export function MobileMenu() {
   const { t } = useTranslation();
   const { header } = t;
   const [open, setOpen] = useState(false);

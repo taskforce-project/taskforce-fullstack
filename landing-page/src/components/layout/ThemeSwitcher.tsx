@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Sun, Moon } from "lucide-react";
 
-export default function ThemeSwitcher() {
+export function ThemeSwitcher() {
   const { theme, toggleTheme } = useTheme();
 
   return (
@@ -10,7 +10,9 @@ export default function ThemeSwitcher() {
       variant="ghost"
       size="sm"
       onClick={toggleTheme}
-      aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
+      aria-label={
+        theme === "light" ? "Switch to dark mode" : "Switch to light mode"
+      }
     >
       {theme === "light" ? (
         <Moon className="h-5 w-5" />

@@ -23,7 +23,7 @@ const versions: Version[] = [
   { version: "v0.7.0", releaseDate: "2025-10-10", isCurrent: false },
 ];
 
-export default function VersionSelector() {
+export function VersionSelector() {
   const currentVersion = versions.find((v) => v.isCurrent) || versions[0];
 
   return (

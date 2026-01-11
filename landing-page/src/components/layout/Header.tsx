@@ -6,26 +6,27 @@ import {
   NavigationMenuContent,
   NavigationMenuTrigger,
   NavigationMenuLink,
-  navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
 import { Github, BookOpen, FileText, Shield, Eye } from "lucide-react";
 import { useTranslation } from "@/contexts/LanguageContext";
-import VersionSelector from "./VersionSelector";
-import SettingsDropdown from "./SettingsDropdown";
-import MobileMenu from "./MobileMenu";
+import { VersionSelector, SettingsDropdown, MobileMenu } from ".";
 import { cn } from "@/lib/utils";
 
-export default function Header() {
+export function Header() {
   const { t } = useTranslation();
   const { header } = t;
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
       <div className="container mx-auto flex h-16 max-w-screen-2xl items-center px-4 sm:px-6 lg:px-8">
         <div className="mr-4 flex items-center gap-2">
           <a href="/" className="flex items-center gap-3 font-bold text-xl">
-            <img src="/logo_taskforce_tp.png" alt="TaskForce" className="h-18 w-auto" />
-            <span className="bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+            <img
+              src="/logo_taskforce_tp.png"
+              alt="TaskForce"
+              className="h-18 w-auto"
+            />
+            <span className="bg-linear-to-r from-primary to-primary/70 bg-clip-text text-transparent">
               {header.brandName}
             </span>
           </a>
@@ -50,13 +51,15 @@ export default function Header() {
               </a>
             </NavigationMenuItem>
             <NavigationMenuItem>
-              <NavigationMenuTrigger>{header.navigation.documentation}</NavigationMenuTrigger>
+              <NavigationMenuTrigger>
+                {header.navigation.documentation}
+              </NavigationMenuTrigger>
               <NavigationMenuContent>
-                <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px]">
+                <ul className="grid w-100 gap-3 p-4 md:w-125 md:grid-cols-2 lg:w-150">
                   <li className="row-span-3">
                     <NavigationMenuLink asChild>
                       <a
-                        className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-muted/50 to-muted p-6 no-underline outline-none focus:shadow-md"
+                        className="flex h-full w-full select-none flex-col justify-end rounded-md bg-linear-to-b from-muted/50 to-muted p-6 no-underline outline-none focus:shadow-md"
                         href="/docs"
                       >
                         <BookOpen className="h-6 w-6" />
@@ -64,12 +67,16 @@ export default function Header() {
                           {header.navigation.documentation}
                         </div>
                         <p className="text-sm leading-tight text-muted-foreground">
-                          Learn how to use TaskForce with our comprehensive guides and API documentation.
+                          Learn how to use TaskForce with our comprehensive
+                          guides and API documentation.
                         </p>
                       </a>
                     </NavigationMenuLink>
                   </li>
-                  <ListItem href="/docs#getting-started" title="Getting Started">
+                  <ListItem
+                    href="/docs#getting-started"
+                    title="Getting Started"
+                  >
                     Quick start guide to begin using TaskForce
                   </ListItem>
                   <ListItem href="/docs#api" title="API Reference">
@@ -93,9 +100,11 @@ export default function Header() {
               </a>
             </NavigationMenuItem>
             <NavigationMenuItem>
-              <NavigationMenuTrigger>{header.navigation.resources}</NavigationMenuTrigger>
+              <NavigationMenuTrigger>
+                {header.navigation.resources}
+              </NavigationMenuTrigger>
               <NavigationMenuContent>
-                <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2">
+                <ul className="grid w-100 gap-3 p-4 md:w-125 md:grid-cols-2">
                   <ListItem href="/terms" title="Terms of Service">
                     <FileText className="mr-2 h-4 w-4 inline" />
                     Legal terms and conditions
@@ -119,15 +128,15 @@ export default function Header() {
 
         <div className="flex flex-1 items-center justify-end gap-2">
           <div className="hidden lg:flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              asChild
-            >
-              <a href="http://localhost:3000/auth/login">{header.buttons.login}</a>
+            <Button variant="outline" size="sm" asChild>
+              <a href="http://localhost:3000/auth/login">
+                {header.buttons.login}
+              </a>
             </Button>
             <Button size="sm" asChild>
-              <a href="http://localhost:3000/auth/register">{header.buttons.register}</a>
+              <a href="http://localhost:3000/auth/register">
+                {header.buttons.register}
+              </a>
             </Button>
           </div>
           <div className="hidden lg:flex items-center gap-1">
