@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import Container from "@/components/layout/Container";
+import { Container } from "@/components/layout/";
 import { ChevronRight, Github, Check, Sparkles } from "lucide-react";
 import { useTranslation } from "@/contexts/LanguageContext";
 
@@ -11,7 +11,7 @@ export function Hero() {
   return (
     <section className="relative w-full pt-20 pb-16 md:pt-32 md:pb-24 overflow-hidden">
       {/* Background gradient */}
-      <div className="absolute inset-0 -z-10 bg-gradient-to-b from-primary/5 via-background to-background" />
+      <div className="absolute inset-0 -z-10 bg-linear-to-b from-primary/5 via-background to-background" />
       <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(var(--primary),0.15),transparent)]" />
 
       <Container>
@@ -29,7 +29,7 @@ export function Hero() {
           <div className="space-y-4 max-w-4xl">
             <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight">
               {hero.title.part1}{" "}
-              <span className="bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">
+              <span className="bg-linear-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">
                 {hero.title.highlight}
               </span>
             </h1>
@@ -65,8 +65,8 @@ export function Hero() {
 
           {/* Features badges */}
           <div className="flex flex-wrap gap-4 justify-center items-center pt-4 text-sm text-muted-foreground">
-            {hero.features.map((feature, index) => (
-              <div key={index} className="flex items-center gap-2">
+            {hero.features.map((feature) => (
+              <div key={feature} className="flex items-center gap-2">
                 <Check className="h-5 w-5 text-primary" />
                 <span>{feature}</span>
               </div>
@@ -88,7 +88,7 @@ export function Hero() {
                   </div>
                 </div>
               </div>
-              <div className="aspect-[16/10] bg-gradient-to-br from-muted/50 via-background to-muted/30 p-8">
+              <div className="aspect-16/10 bg-linear-to-br from-muted/50 via-background to-muted/30 p-8">
                 <div className="h-full w-full rounded-lg border border-border/50 bg-card/50 backdrop-blur-sm p-6 space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="h-6 w-32 bg-primary/20 rounded-md animate-pulse" />

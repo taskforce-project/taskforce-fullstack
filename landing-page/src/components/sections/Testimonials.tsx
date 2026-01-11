@@ -1,7 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import Container from "@/components/layout/Container";
+import { Container } from "@/components/layout/";
 import { Sparkles } from "lucide-react";
 import { useTranslation } from "@/contexts/LanguageContext";
 
@@ -30,32 +30,34 @@ export function Testimonials() {
         {/* Infinite scroll animation - Row 1 */}
         <div className="relative overflow-hidden">
           <div className="flex gap-4 animate-scroll-left">
-            {[...testimonials.items, ...testimonials.items].map((testimonial, index) => (
-              <Card
-                key={`${testimonial.name}-${index}`}
-                className="flex-shrink-0 w-80 p-6 cursor-pointer transition-all duration-200 hover:scale-105 hover:shadow-xl group"
-              >
-                <div className="flex items-start gap-4 mb-4">
-                  <Avatar className="h-12 w-12 border-2 border-primary/20">
-                    <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-                      {testimonial.avatar}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <div className="font-semibold">{testimonial.name}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {testimonial.role}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {testimonial.company}
+            {[...testimonials.items, ...testimonials.items].map(
+              (testimonial, index) => (
+                <Card
+                  key={`${testimonial.name}-${index}`}
+                  className="shrink-0 w-80 p-6 cursor-pointer transition-all duration-200 hover:scale-105 hover:shadow-xl group"
+                >
+                  <div className="flex items-start gap-4 mb-4">
+                    <Avatar className="h-12 w-12 border-2 border-primary/20">
+                      <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+                        {testimonial.avatar}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <div className="font-semibold">{testimonial.name}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {testimonial.role}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {testimonial.company}
+                      </div>
                     </div>
                   </div>
-                </div>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  "{testimonial.comment}"
-                </p>
-              </Card>
-            ))}
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    "{testimonial.comment}"
+                  </p>
+                </Card>
+              )
+            )}
           </div>
         </div>
 
@@ -67,7 +69,7 @@ export function Testimonials() {
               .map((testimonial, index) => (
                 <Card
                   key={`${testimonial.name}-reverse-${index}`}
-                  className="flex-shrink-0 w-80 p-6 cursor-pointer transition-all duration-200 hover:scale-105 hover:shadow-xl group"
+                  className="shrink-0 w-80 p-6 cursor-pointer transition-all duration-200 hover:scale-105 hover:shadow-xl group"
                 >
                   <div className="flex items-start gap-4 mb-4">
                     <Avatar className="h-12 w-12 border-2 border-primary/20">
