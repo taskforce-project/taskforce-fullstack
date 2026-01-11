@@ -1,7 +1,7 @@
 import React, { type ReactElement } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import Container from "@/components/layout/Container";
+import { Container } from "@/components/layout/";
 import {
   Smartphone,
   Code,
@@ -17,16 +17,16 @@ import { useTranslation } from "@/contexts/LanguageContext";
 
 const getIconForItem = (index: number): ReactElement => {
   const icons = [
-    <Smartphone className="h-6 w-6" />, // Mobile Applications
-    <Code className="h-6 w-6" />, // API Integration
-    <Lightbulb className="h-6 w-6" />, // AI-Powered Insights
-    <BarChart3 className="h-6 w-6" />, // Advanced Analytics
-    <Tag className="h-6 w-6" />, // White Label Solution
-    <Wifi className="h-6 w-6" />, // Offline Mode
-    <Video className="h-6 w-6" />, // Video Collaboration
-    <Clock className="h-6 w-6" />, // Time Tracking
+    <Smartphone key="smartphone" className="h-6 w-6" />, // Mobile Applications
+    <Code key="code" className="h-6 w-6" />, // API Integration
+    <Lightbulb key="lightbulb" className="h-6 w-6" />, // AI-Powered Insights
+    <BarChart3 key="barchart3" className="h-6 w-6" />, // Advanced Analytics
+    <Tag key="tag" className="h-6 w-6" />, // White Label Solution
+    <Wifi key="wifi" className="h-6 w-6" />, // Offline Mode
+    <Video key="video" className="h-6 w-6" />, // Video Collaboration
+    <Clock key="clock" className="h-6 w-6" />, // Time Tracking
   ];
-  return icons[index] || <Sparkles className="h-6 w-6" />;
+  return icons[index] || <Sparkles key="sparkles" className="h-6 w-6" />;
 };
 
 export function Roadmap() {
@@ -76,12 +76,12 @@ export function Roadmap() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {roadmap.items.map((item, index) => {
+          {roadmap.items.map((item) => {
             const config =
               statusConfig[item.status as keyof typeof statusConfig];
             return (
               <Card
-                key={index}
+                key={item.title}
                 className="group relative overflow-hidden transition-all duration-200 hover:shadow-lg hover:-translate-y-1"
               >
                 <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full blur-2xl group-hover:bg-primary/10 transition-colors" />
@@ -90,7 +90,7 @@ export function Roadmap() {
                     <div
                       className={`inline-flex items-center justify-center rounded-lg bg-primary/10 p-2.5 text-primary group-hover:scale-110 transition-transform ${config.color}`}
                     >
-                      {getIconForItem(index)}
+                      {getIconForItem(roadmap.items.indexOf(item))}
                     </div>
                     <Badge variant={config.variant} className="text-xs">
                       {config.label}
