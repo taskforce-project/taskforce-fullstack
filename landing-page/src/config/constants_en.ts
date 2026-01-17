@@ -5,14 +5,14 @@ import type { Constants } from "./constants_fr";
 export const constants_en: Constants = {
   // Page metadata
   meta: {
-    title: "TaskForce - Modern Task Management Platform",
+    title: "Taskforce - Modern Task Management Platform",
     description:
       "A powerful task management platform with beautiful themes. Organize your work, collaborate with your team, and boost productivity.",
   },
 
   // Header / Navigation
   header: {
-    brandName: "TaskForce",
+    brandName: "Taskforce",
     navigation: {
       features: "Features",
       howItWorks: "How It Works",
@@ -29,7 +29,7 @@ export const constants_en: Constants = {
 
   // Footer
   footer: {
-    brandName: "TaskForce",
+    brandName: "Taskforce",
     description:
       "A powerful task management platform built with modern technologies. Organize your work efficiently.",
     sections: {
@@ -61,7 +61,7 @@ export const constants_en: Constants = {
         },
       },
     },
-    copyright: "TaskForce. All rights reserved.",
+    copyright: "Taskforce. All rights reserved.",
     bottomLinks: {
       legalNotices: "Legal Notices",
       accessibilityStatement: "Accessibility Statement",
@@ -91,14 +91,14 @@ export const constants_en: Constants = {
   testimonials: {
     badge: "Testimonials",
     title: "Loved by Professionals Worldwide",
-    description: "See what people are saying about TaskForce",
+    description: "See what people are saying about Taskforce",
     items: [
       {
         name: "Sarah Chen",
         role: "Product Designer",
         company: "Stripe",
         comment:
-          "TaskForce transformed how our team collaborates. The interface is intuitive and the themes make it a joy to use every day.",
+          "Taskforce transformed how our team collaborates. The interface is intuitive and the themes make it a joy to use every day.",
         avatar: "SC",
       },
       {
@@ -114,7 +114,7 @@ export const constants_en: Constants = {
         role: "Startup Founder",
         company: "Notion",
         comment:
-          "We switched from multiple tools to TaskForce. It's simplified our workflow and boosted productivity by 40%.",
+          "We switched from multiple tools to Taskforce. It's simplified our workflow and boosted productivity by 40%.",
         avatar: "EW",
       },
       {
@@ -130,7 +130,7 @@ export const constants_en: Constants = {
         role: "UX Researcher",
         company: "Figma",
         comment:
-          "TaskForce gets out of your way and lets you focus on what matters. Best task manager I've used in 10 years.",
+          "Taskforce gets out of your way and lets you focus on what matters. Best task manager I've used in 10 years.",
         avatar: "LA",
       },
       {
@@ -154,7 +154,7 @@ export const constants_en: Constants = {
         role: "CTO",
         company: "Linear",
         comment:
-          "TaskForce handles our complex workflows with ease. It's become indispensable to our operations.",
+          "Taskforce handles our complex workflows with ease. It's become indispensable to our operations.",
         avatar: "AT",
       },
       {
@@ -162,7 +162,7 @@ export const constants_en: Constants = {
         role: "Design Lead",
         company: "Airbnb",
         comment:
-          "Beautiful design meets powerful functionality. TaskForce sets a new standard for task management.",
+          "Beautiful design meets powerful functionality. Taskforce sets a new standard for task management.",
         avatar: "MG",
       },
       {
@@ -263,7 +263,7 @@ export const constants_en: Constants = {
   howItWorks: {
     badge: "How It Works",
     title: "Simple Process, Beautiful Results",
-    description: "Get started with TaskForce in just a few simple steps.",
+    description: "Get started with Taskforce in just a few simple steps.",
     steps: [
       {
         number: "01",
@@ -301,7 +301,7 @@ export const constants_en: Constants = {
     badge: "Roadmap",
     title: "What's Coming Next",
     description:
-      "We're constantly working to improve TaskForce. Here's what's on our roadmap.",
+      "We're constantly working to improve Taskforce. Here's what's on our roadmap.",
     status: {
       done: "Done",
       inProgress: "In Progress",
@@ -364,32 +364,32 @@ export const constants_en: Constants = {
   faq: {
     badge: "FAQ",
     title: "Frequently Asked Questions",
-    description: "Find answers to common questions about TaskForce",
+    description: "Find answers to common questions about Taskforce",
     items: [
       {
-        question: "What is TaskForce?",
+        question: "What is Taskforce?",
         answer:
-          "TaskForce is a modern task management platform that helps teams collaborate effectively. It combines powerful features with beautiful design, offering customizable themes, real-time collaboration, and comprehensive analytics to boost your productivity.",
+          "Taskforce is a modern task management platform that helps teams collaborate effectively. It combines powerful features with beautiful design, offering customizable themes, real-time collaboration, and comprehensive analytics to boost your productivity.",
       },
       {
-        question: "Is TaskForce free to use?",
+        question: "Is Taskforce free to use?",
         answer:
-          "Yes! TaskForce offers a generous free tier that includes all core features. For teams requiring advanced features like unlimited integrations, priority support, and enhanced analytics, we offer premium plans at competitive prices.",
+          "Yes! Taskforce offers a generous free tier that includes all core features. For teams requiring advanced features like unlimited integrations, priority support, and enhanced analytics, we offer premium plans at competitive prices.",
       },
       {
         question: "How does team collaboration work?",
         answer:
-          "TaskForce provides real-time collaboration features including shared boards, task assignments, comments, mentions, and activity tracking. Team members can work together seamlessly, see updates instantly, and stay in sync across all devices.",
+          "Taskforce provides real-time collaboration features including shared boards, task assignments, comments, mentions, and activity tracking. Team members can work together seamlessly, see updates instantly, and stay in sync across all devices.",
       },
       {
         question: "Can I customize the appearance?",
         answer:
-          "Absolutely! TaskForce offers extensive customization options. Choose from our beautiful theme presets or create your own custom themes by adjusting colors, typography, and layout. Your workspace, your style.",
+          "Absolutely! Taskforce offers extensive customization options. Choose from our beautiful theme presets or create your own custom themes by adjusting colors, typography, and layout. Your workspace, your style.",
       },
       {
-        question: "What platforms does TaskForce support?",
+        question: "What platforms does Taskforce support?",
         answer:
-          "TaskForce is a web-based application that works on all modern browsers. We also offer native mobile apps for iOS and Android (coming soon), ensuring you can manage your tasks from anywhere, on any device.",
+          "Taskforce is a web-based application that works on all modern browsers. We also offer native mobile apps for iOS and Android (coming soon), ensuring you can manage your tasks from anywhere, on any device.",
       },
       {
         question: "How secure is my data?",
@@ -397,9 +397,9 @@ export const constants_en: Constants = {
           "Security is our top priority. All data is encrypted in transit and at rest using industry-standard encryption. We implement regular security audits, comply with GDPR, and never share your data with third parties without your consent.",
       },
       {
-        question: "Can I integrate TaskForce with other tools?",
+        question: "Can I integrate Taskforce with other tools?",
         answer:
-          "Yes! TaskForce integrates with popular tools like GitHub, Slack, Google Calendar, and more. Our comprehensive REST API also allows you to build custom integrations tailored to your workflow.",
+          "Yes! Taskforce integrates with popular tools like GitHub, Slack, Google Calendar, and more. Our comprehensive REST API also allows you to build custom integrations tailored to your workflow.",
       },
       {
         question: "Is there a mobile app?",
@@ -422,7 +422,7 @@ export const constants_en: Constants = {
       highlight: "Work Easier?",
     },
     description:
-      "Join thousands of teams already using TaskForce to organize their work and boost productivity.",
+      "Join thousands of teams already using Taskforce to organize their work and boost productivity.",
     buttons: {
       getStarted: "Get Started for Free",
       viewGithub: "View on GitHub",
@@ -433,15 +433,14 @@ export const constants_en: Constants = {
   // Documentation Page
   docs: {
     meta: {
-      title: "Documentation - TaskForce",
-      description: "Complete guides and API documentation for TaskForce",
+      title: "Documentation - Taskforce",
+      description: "Complete guides and API documentation for Taskforce",
     },
     hero: {
       badge: "Documentation",
       title: "Everything you need to build amazing workflows",
-      titleHighlight: "amazing workflows",
       description:
-        "Comprehensive guides, API references, and examples to help you get the most out of TaskForce.",
+        "Comprehensive guides, API references, and examples to help you get the most out of Taskforce.",
     },
     search: {
       placeholder: "Search documentation...",
@@ -456,26 +455,25 @@ export const constants_en: Constants = {
         title: "API Documentation",
         description: "Complete API reference with examples",
         href: "#api-docs",
-        color: "from-blue-500/20 to-cyan-500/20",
+        gradient: "from-blue-500/20 to-cyan-500/20",
       },
       {
         title: "Theme Builder",
         description: "Create custom themes for your workspace",
         href: "#theme-builder",
-        color: "from-purple-500/20 to-pink-500/20",
+        gradient: "from-purple-500/20 to-pink-500/20",
       },
       {
         title: "Examples",
         description: "Real-world examples and code snippets",
         href: "#examples",
-        color: "from-orange-500/20 to-yellow-500/20",
+        gradient: "from-orange-500/20 to-yellow-500/20",
       },
     ],
     sections: [
       {
         title: "Getting Started",
-        description: "Everything you need to start using TaskForce",
-        icon: "Zap",
+        description: "Everything you need to start using Taskforce",
         items: [
           { name: "Introduction", href: "#introduction", badge: "Start Here" },
           { name: "Installation", href: "#installation" },
@@ -486,8 +484,7 @@ export const constants_en: Constants = {
       },
       {
         title: "Core Concepts",
-        description: "Learn the fundamentals of TaskForce",
-        icon: "Layers",
+        description: "Learn the fundamentals of Taskforce",
         items: [
           { name: "Projects & Tasks", href: "#projects-tasks" },
           { name: "Workspaces", href: "#workspaces" },
@@ -499,7 +496,6 @@ export const constants_en: Constants = {
       {
         title: "Features",
         description: "Explore powerful features",
-        icon: "Settings",
         items: [
           { name: "Real-time Collaboration", href: "#collaboration" },
           { name: "Custom Themes", href: "#themes", badge: "Popular" },
@@ -510,8 +506,7 @@ export const constants_en: Constants = {
       },
       {
         title: "API Reference",
-        description: "Integrate TaskForce with your tools",
-        icon: "Code",
+        description: "Integrate Taskforce with your tools",
         items: [
           { name: "Authentication", href: "#api-auth" },
           { name: "REST API", href: "#rest-api", badge: "v2.0" },
@@ -523,7 +518,6 @@ export const constants_en: Constants = {
       {
         title: "Guides & Tutorials",
         description: "Step-by-step guides",
-        icon: "BookOpen",
         items: [
           { name: "Team Onboarding", href: "#guide-onboarding" },
           { name: "Custom Workflows", href: "#guide-workflows" },
@@ -534,8 +528,7 @@ export const constants_en: Constants = {
       },
       {
         title: "Deployment",
-        description: "Deploy and scale TaskForce",
-        icon: "Cloud",
+        description: "Deploy and scale Taskforce",
         items: [
           { name: "Self-Hosting", href: "#self-hosting" },
           { name: "Docker Setup", href: "#docker" },
@@ -546,46 +539,44 @@ export const constants_en: Constants = {
       },
     ],
     community: {
-      title: "Need Help?",
-      description: "Our community and support team are here to help",
-      communityCard: {
-        title: "Community",
-        description: "Join our vibrant community for discussions and help",
-        links: [
-          { label: "Discord Community", href: "https://discord.gg/taskforce" },
-          {
-            label: "GitHub Discussions",
-            href: "https://github.com/taskforce/discussions",
-          },
-          {
-            label: "Stack Overflow",
-            href: "https://stackoverflow.com/questions/tagged/taskforce",
-          },
-        ],
-      },
-      supportCard: {
-        title: "Support",
-        description: "Get help from our dedicated support team",
-        links: [
-          { label: "Contact Support", href: "#support" },
-          { label: "Report an Issue", href: "#issues" },
-          { label: "Feature Requests", href: "#requests" },
-        ],
-      },
+      title: "Community & Support",
+      description: "Get help and connect with other users",
+      channels: [
+        {
+          title: "GitHub Discussions",
+          description: "Ask your questions and shared answer with community",
+          href: "https://github.com/taskforce/discussions",
+        },
+        {
+          title: "Discord Server",
+          description: "Follow our Discord to get instant help",
+          href: "https://discord.gg/taskforce",
+        },
+        {
+          title: "Stack Overflow",
+          description: "Obtain answer about technical issues",
+          href: "https://stackoverflow.com/questions/tagged/taskforce",
+        },
+        {
+          title: "Twitter",
+          description: "Follow us to get in touch about new release and update",
+          href: "https://twitter.com/taskforce",
+        },
+      ],
     },
   },
 
   // Terms of Service Page
   terms: {
     meta: {
-      title: "Terms of Service - TaskForce",
-      description: "Terms and conditions for using TaskForce",
+      title: "Terms of Service - Taskforce",
+      description: "Terms and conditions for using Taskforce",
     },
     lastUpdated: "January 7, 2026",
     hero: {
       badge: "Legal",
       title: "Terms of Service",
-      description: "Please read these terms carefully before using TaskForce",
+      description: "Please read these terms carefully before using Taskforce",
     },
     tableOfContents: {
       title: "TABLE OF CONTENTS",
@@ -596,7 +587,7 @@ export const constants_en: Constants = {
         title: "Agreement to Terms",
         icon: "FileText",
         content: [
-          "By accessing or using TaskForce ('the Service'), you agree to be bound by these Terms of Service ('Terms'). If you disagree with any part of the terms, you may not access the Service.",
+          "By accessing or using Taskforce ('the Service'), you agree to be bound by these Terms of Service ('Terms'). If you disagree with any part of the terms, you may not access the Service.",
           "We reserve the right to modify these Terms at any time. We will notify users of any material changes via email or through the Service. Your continued use of the Service after such modifications constitutes acceptance of the updated Terms.",
         ],
       },
@@ -605,7 +596,7 @@ export const constants_en: Constants = {
         title: "Use License",
         icon: "Scale",
         content: [
-          "Permission is granted to use TaskForce for personal or commercial purposes, subject to the following restrictions:",
+          "Permission is granted to use Taskforce for personal or commercial purposes, subject to the following restrictions:",
         ],
         list: [
           "You must not modify, copy, or reproduce the Service materials without authorization",
@@ -634,7 +625,7 @@ export const constants_en: Constants = {
         id: "acceptable-use",
         title: "Acceptable Use Policy",
         icon: "Shield",
-        content: ["You agree not to use TaskForce in any way that:"],
+        content: ["You agree not to use Taskforce in any way that:"],
         prohibited: [
           {
             text: "Violates any applicable laws or regulations",
@@ -675,7 +666,7 @@ export const constants_en: Constants = {
         title: "Intellectual Property",
         icon: "FileText",
         content: [
-          "The Service and its original content, features, and functionality are owned by TaskForce and are protected by international copyright, trademark, patent, trade secret, and other intellectual property laws.",
+          "The Service and its original content, features, and functionality are owned by Taskforce and are protected by international copyright, trademark, patent, trade secret, and other intellectual property laws.",
           "Our trademarks and trade dress may not be used in connection with any product or service without our prior written consent.",
         ],
       },
@@ -684,7 +675,7 @@ export const constants_en: Constants = {
         title: "User Content & Data",
         icon: "FileText",
         content: [
-          "You retain all rights to any content you submit, post, or display on TaskForce ('User Content'). By posting User Content, you grant us a worldwide, non-exclusive, royalty-free license to use, modify, publicly perform, publicly display, reproduce, and distribute such content in connection with operating and providing the Service.",
+          "You retain all rights to any content you submit, post, or display on Taskforce ('User Content'). By posting User Content, you grant us a worldwide, non-exclusive, royalty-free license to use, modify, publicly perform, publicly display, reproduce, and distribute such content in connection with operating and providing the Service.",
           "You represent and warrant that:",
         ],
         list: [
@@ -708,7 +699,7 @@ export const constants_en: Constants = {
         title: "Limitation of Liability",
         icon: "AlertCircle",
         content: [
-          "In no event shall TaskForce, nor its directors, employees, partners, agents, suppliers, or affiliates, be liable for any indirect, incidental, special, consequential, or punitive damages, including but not limited to loss of profits, data, use, goodwill, or other intangible losses, resulting from:",
+          "In no event shall Taskforce, nor its directors, employees, partners, agents, suppliers, or affiliates, be liable for any indirect, incidental, special, consequential, or punitive damages, including but not limited to loss of profits, data, use, goodwill, or other intangible losses, resulting from:",
         ],
         list: [
           "Your access to or use of (or inability to access or use) the Service",
@@ -748,7 +739,7 @@ export const constants_en: Constants = {
         title: "Governing Law",
         icon: "Scale",
         content: [
-          "These Terms shall be governed and construed in accordance with the laws of the jurisdiction in which TaskForce is established, without regard to its conflict of law provisions.",
+          "These Terms shall be governed and construed in accordance with the laws of the jurisdiction in which Taskforce is established, without regard to its conflict of law provisions.",
           "Our failure to enforce any right or provision of these Terms will not be considered a waiver of those rights. If any provision of these Terms is held to be invalid or unenforceable, the remaining provisions will remain in effect.",
         ],
       },
@@ -761,7 +752,7 @@ export const constants_en: Constants = {
         ],
         contact: {
           email: "legal@taskforce.app",
-          address: "TaskForce Legal Department",
+          address: "Taskforce Legal Department",
           response: "We aim to respond to all inquiries within 48 hours.",
         },
       },
@@ -780,7 +771,7 @@ export const constants_en: Constants = {
   // Privacy Policy Page
   privacy: {
     meta: {
-      title: "Privacy Policy - TaskForce",
+      title: "Privacy Policy - Taskforce",
       description: "How we collect, use, and protect your data",
     },
     lastUpdated: "January 7, 2026",
@@ -820,8 +811,8 @@ export const constants_en: Constants = {
         title: "Introduction",
         icon: "Shield",
         content: [
-          "Welcome to TaskForce! This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our task management platform.",
-          "By accessing or using TaskForce, you agree to the terms of this Privacy Policy. If you do not agree with the terms, please do not access or use the Service.",
+          "Welcome to Taskforce! This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our task management platform.",
+          "By accessing or using Taskforce, you agree to the terms of this Privacy Policy. If you do not agree with the terms, please do not access or use the Service.",
         ],
       },
       {
@@ -876,7 +867,7 @@ export const constants_en: Constants = {
               },
               {
                 label: "Analytics Cookies",
-                description: "Help us understand how you use TaskForce",
+                description: "Help us understand how you use Taskforce",
               },
               {
                 label: "Marketing Cookies",
@@ -1115,7 +1106,7 @@ export const constants_en: Constants = {
         title: "Children's Privacy",
         icon: "Shield",
         content: [
-          "TaskForce is not intended for children under the age of 13. We do not knowingly collect personal information from children under 13. If you are a parent or guardian and believe your child has provided us with personal information, please contact us immediately.",
+          "Taskforce is not intended for children under the age of 13. We do not knowingly collect personal information from children under 13. If you are a parent or guardian and believe your child has provided us with personal information, please contact us immediately.",
           "If we discover that we have collected personal information from a child under 13 without parental consent, we will delete that information as quickly as possible.",
         ],
       },
@@ -1174,7 +1165,7 @@ export const constants_en: Constants = {
         contact: {
           email: "privacy@taskforce.app",
           dpo: "dpo@taskforce.app",
-          address: "TaskForce Data Protection Officer",
+          address: "Taskforce Data Protection Officer",
           response:
             "We aim to respond to all privacy inquiries within 30 days.",
         },
@@ -1194,7 +1185,7 @@ export const constants_en: Constants = {
   // Accessibility Page
   accessibility: {
     meta: {
-      title: "Accessibility - TaskForce",
+      title: "Accessibility - Taskforce",
       description: "Our commitment to accessibility and inclusive design",
     },
     hero: {
@@ -1202,7 +1193,7 @@ export const constants_en: Constants = {
       title: "Accessibility Statement",
       subtitle: "Commitment to Digital Accessibility",
       description:
-        "TaskForce is committed to ensuring digital accessibility for all users, regardless of abilities. We follow WCAG 2.1 guidelines and continuously work to improve the inclusivity of our platform.",
+        "Taskforce is committed to ensuring digital accessibility for all users, regardless of abilities. We follow WCAG 2.1 guidelines and continuously work to improve the inclusivity of our platform.",
       buttons: {
         getStarted: "Get Started",
         viewFeatures: "View Features",
@@ -1211,9 +1202,9 @@ export const constants_en: Constants = {
     commitment: {
       title: "Our Commitment",
       description:
-        "We believe in making TaskForce accessible to everyone, regardless of abilities or circumstances. We continuously work to improve the accessibility of our platform and welcome your feedback.",
+        "We believe in making Taskforce accessible to everyone, regardless of abilities or circumstances. We continuously work to improve the accessibility of our platform and welcome your feedback.",
       paragraphs: [
-        "TaskForce is committed to ensuring digital accessibility for all users. We adhere to the Web Content Accessibility Guidelines (WCAG) 2.1 Level AA and strive to exceed these standards where possible.",
+        "Taskforce is committed to ensuring digital accessibility for all users. We adhere to the Web Content Accessibility Guidelines (WCAG) 2.1 Level AA and strive to exceed these standards where possible.",
         "Our team regularly evaluates and updates our platform to ensure compliance with the latest accessibility standards and best practices. We actively seek feedback from users with diverse accessibility needs to help us improve.",
       ],
       ongoingImprovement: {
@@ -1226,7 +1217,7 @@ export const constants_en: Constants = {
       badge: "Accessibility Features",
       title: "Built for All Users",
       description:
-        "TaskForce includes a comprehensive range of accessibility features to ensure all users can interact effectively with our platform.",
+        "Taskforce includes a comprehensive range of accessibility features to ensure all users can interact effectively with our platform.",
     },
     features: [
       {
@@ -1382,7 +1373,7 @@ export const constants_en: Constants = {
       badge: "Assistive Technology",
       title: "Supported Assistive Technologies",
       description:
-        "TaskForce is compatible with a wide range of assistive technologies.",
+        "Taskforce is compatible with a wide range of assistive technologies.",
     },
     tools: [
       { name: "NVDA", category: "Screen Reader" },
@@ -1398,7 +1389,7 @@ export const constants_en: Constants = {
       badge: "Navigation",
       title: "Keyboard Shortcuts",
       description:
-        "Use these keyboard shortcuts to navigate TaskForce efficiently.",
+        "Use these keyboard shortcuts to navigate Taskforce efficiently.",
     },
     shortcuts: [
       { keys: "Tab", action: "Move focus forward" },

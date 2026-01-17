@@ -23,7 +23,7 @@ export function Header() {
           <a href="/" className="flex items-center gap-3 font-bold text-xl">
             <img
               src="/logo_taskforce_tp.png"
-              alt="TaskForce"
+              alt="Taskforce"
               className="h-18 w-auto"
             />
             <span className="bg-linear-to-r from-primary to-primary/70 bg-clip-text text-transparent">
