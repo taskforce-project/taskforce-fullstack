@@ -113,8 +113,8 @@ tf-api/
 │   │       │
 │   │       └── db/
 │   │           └── migration/                 # Migrations Flyway
-│   │               ├── V1__init_schema.sql
-│   │               └── V2__add_companies.sql
+│   │               ├── V1_init_schema.sql
+│   │               └── V2_add_companies.sql
 │   │
 │   └── test/
 │       └── java/com/taskforce/tf_api/

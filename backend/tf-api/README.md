@@ -9,6 +9,7 @@ API REST modulaire pour l'ERP Taskforce, construite avec **Spring Boot 4**, **Po
 - [Technologies](#-technologies)
 - [Prérequis](#-prérequis)
 - [Installation](#-installation)
+- [Configuration](#-configuration)
 - [Démarrage](#-démarrage)
 - [Documentation](#-documentation)
 - [Architecture](#-architecture)
@@ -62,6 +63,8 @@ cd backend/tf-api
 
 ### 2. Configurer les variables d'environnement
 
+#### Développement
+
 ```bash
 # Windows PowerShell
 copy .env.dev.example .env.dev
@@ -70,12 +73,59 @@ copy .env.dev.example .env.dev
 cp .env.dev.example .env.dev
 ```
 
-> ⚠️ **Production** : Créer `.env.prod` depuis `.env.prod.example` et modifier toutes les valeurs sensibles !
+Éditer `.env.dev` avec vos paramètres locaux (mot de passe PostgreSQL, etc.)
+
+#### Production
+
+```bash
+# Windows PowerShell
+copy .env.prod.example .env.prod
+
+# Linux/Mac
+cp .env.prod.example .env.prod
+```
+
+> ⚠️ **IMPORTANT** : Modifier **toutes les valeurs** dans `.env.prod` et ne **jamais commiter** ce fichier !
 
 ### 3. Installer les dépendances
 
 ```bash
 mvn clean install
+```
+
+---
+
+## ⚙️ Configuration
+
+### Variables d'environnement
+
+L'application charge automatiquement le fichier `.env.dev` ou `.env.prod` selon le profil actif :
+
+- **Par défaut** : `.env.dev` est chargé (profil `dev`)
+- **Production** : Définir `SPRING_PROFILE=prod` pour charger `.env.prod`
+
+### Fichiers de configuration Spring
+
+- **`application.yml`** : Configuration commune à tous les environnements
+- **`application-dev.yml`** : Configuration spécifique au développement
+- **`application-prod.yml`** : Configuration spécifique à la production
+
+**Important** : Les valeurs `${VARIABLE}` dans les fichiers YAML sont remplacées par les variables d'environnement du fichier `.env` correspondant.
+
+### Profiles Spring
+
+Pour changer de profil :
+
+```bash
+# Option 1 : Variable d'environnement
+export SPRING_PROFILE=prod  # Linux/Mac
+$env:SPRING_PROFILE="prod"  # Windows PowerShell
+
+# Option 2 : Argument JVM
+mvn spring-boot:run -Dspring-boot.run.profiles=prod
+
+# Option 3 : Dans .env.dev ou .env.prod
+SPRING_PROFILE=dev
 ```
 
 ---
@@ -88,15 +138,212 @@ Depuis la **racine du projet fullstack** :
 
 ```bash
 # Développement
-docker-compose --env-file backend/tf-api/.env.dev up
+docker-compose -f docker-compose.dev.yml up
 
 # Production
-docker-compose -f docker-compose.prod.yml --env-file backend/tf-api/.env.prod up
+docker-compose -f docker-compose.prod.yml up
 ```
 
 ### Option 2 : En local (sans Docker)
 
 **Prérequis :** PostgreSQL doit être lancé localement.
+
+#### Démarrage rapide (développement)
+
+```bash
+# 1. Démarrer PostgreSQL (si pas Docker)
+# Assurez-vous que PostgreSQL tourne sur localhost:5432
+
+# 2. Démarrer l'application
+mvn spring-boot:run
+```
+
+L'API sera accessible sur **http://localhost:8081/api**
+
+#### Démarrage en production
+
+```bash
+# 1. Définir le profil
+export SPRING_PROFILE=prod  # Linux/Mac
+$env:SPRING_PROFILE="prod"  # Windows PowerShell
+
+# 2. Lancer l'application
+mvn spring-boot:run
+```
+
+### Option 3 : Lancer depuis IntelliJ IDEA
+
+1. Ouvrir le projet dans IntelliJ
+2. Créer une configuration Run/Debug :
+   - **Main class** : `com.taskforce.tf_api.TfApiApplication`
+   - **VM options** : `-Dspring.profiles.active=dev`
+   - **Environment variables** : `SPRING_PROFILE=dev`
+3. Cliquer sur Run ▶️
+
+---
+
+## 📚 Documentation
+
+### Swagger UI (Interface interactive)
+
+Une fois l'application démarrée :
+
+- **URL** : http://localhost:8081/api/swagger-ui.html
+- Tester directement les endpoints
+- Voir les schémas de données
+
+### OpenAPI JSON
+
+- **URL** : http://localhost:8081/api/v3/api-docs
+
+### Health Check
+
+- **URL** : http://localhost:8081/api/actuator/health
+
+---
+
+## 🏗️ Architecture
+
+Voir **[ARCHITECTURE.md](ARCHITECTURE.md)** pour une description détaillée de l'architecture modulaire.
+
+### Structure du projet
+
+```
+tf-api/
+├── src/main/java/com/taskforce/tf_api/
+│   ├── TfApiApplication.java          # Point d'entrée
+│   ├── core/                           # Module Core (commun)
+│   │   ├── api/                        # Controllers Core
+│   │   ├── domain/                     # Entités Core
+│   │   ├── dto/                        # DTOs Core
+│   │   ├── repository/                 # Repositories Core
+│   │   └── service/                    # Services Core
+│   ├── modules/                        # Modules métiers
+│   │   ├── chat/                       # Module Chat
+│   │   ├── ged/                        # Module GED
+│   │   └── taskforceHorizon/           # Module Taskforce Horizon
+│   └── shared/                         # Code partagé
+│       ├── audit/                      # Auditabilité
+│       ├── config/                     # Configurations
+│       ├── dto/                        # DTOs communs
+│       ├── exception/                  # Gestion des erreurs
+│       ├── i18n/                       # Internationalisation
+│       ├── security/                   # Sécurité Keycloak
+│       └── utils/                      # Utilitaires
+└── src/main/resources/
+    ├── application.yml                 # Config commune
+    ├── application-dev.yml             # Config dev
+    ├── application-prod.yml            # Config prod
+    ├── db/migration/                   # Scripts Flyway
+    └── i18n/                           # Fichiers de traduction
+```
+
+---
+
+## 🧪 Tests
+
+### Lancer tous les tests
+
+```bash
+mvn test
+```
+
+### Lancer un test spécifique
+
+```bash
+mvn test -Dtest=TfApiApplicationTests
+```
+
+### Tests avec couverture
+
+```bash
+mvn clean test jacoco:report
+```
+
+Rapport dans `target/site/jacoco/index.html`
+
+---
+
+## 🚢 Déploiement
+
+### Construire le JAR
+
+```bash
+mvn clean package -DskipTests
+```
+
+Le JAR sera dans `target/tf-api-0.0.1-SNAPSHOT.jar`
+
+### Docker
+
+#### Construire l'image
+
+```bash
+docker build -t taskforce-api:latest .
+```
+
+#### Lancer le conteneur
+
+```bash
+# Développement
+docker run -p 8081:8081 --env-file .env.dev taskforce-api:latest
+
+# Production
+docker run -p 8080:8080 --env-file .env.prod taskforce-api:latest
+```
+
+### Déploiement production
+
+Voir le fichier `docker-compose.prod.yml` à la racine du projet fullstack.
+
+---
+
+## 🔒 Sécurité
+
+- **Authentification** : OAuth2/OIDC via Keycloak
+- **Autorisation** : Basée sur les rôles et scopes Keycloak
+- **CORS** : Configuré via `CORS_ALLOWED_ORIGINS`
+- **Variables sensibles** : Jamais en dur, toujours dans `.env`
+
+---
+
+## 🌍 Internationalisation (i18n)
+
+L'API supporte le français et l'anglais :
+
+- **Fichiers** : `src/main/resources/i18n/messages_{fr,en}.properties`
+- **Header HTTP** : `Accept-Language: fr` ou `Accept-Language: en`
+
+---
+
+## 🤝 Contribution
+
+### Ajouter un nouveau module
+
+Voir [ARCHITECTURE.md - Créer un nouveau module](ARCHITECTURE.md#créer-un-nouveau-module)
+
+### Standards de code
+
+- **Java** : Suivre les conventions Google Java Style
+- **Commits** : Messages en anglais, format conventionnel
+- **Tests** : Couverture minimum 80%
+
+---
+
+## 📞 Support
+
+Pour toute question ou problème :
+
+1. Vérifier [ARCHITECTURE.md](ARCHITECTURE.md)
+2. Consulter les logs : `docker logs tf-api` ou dans la console
+3. Contacter l'équipe de développement
+
+---
+
+## 📝 Licence
+
+Propriétaire - Taskforce © 2026
+
 
 ```bash
 # 1. Charger les variables d'environnement
@@ -262,7 +509,7 @@ String message = messageSource.getMessage(
 Les migrations sont dans `src/main/resources/db/migration/`
 
 ```
-V1__init_schema.sql
+V1_init_schema.sql
 V2__add_users_table.sql
 V3__add_companies_table.sql
 ```

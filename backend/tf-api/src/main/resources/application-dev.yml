@@ -4,9 +4,9 @@
 spring:
   # Database Configuration
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:taskforce_dev}
-    username: ${DB_USER:postgres}
-    password: ${DB_PASSWORD:postgres}
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:taskforce-db}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 10
@@ -26,6 +26,8 @@ spring:
   flyway:
     enabled: true
     clean-disabled: false
+    validate-on-migrate: false
+    baseline-on-migrate: true
 
   # Security Configuration
   security:

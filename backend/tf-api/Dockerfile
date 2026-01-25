@@ -19,8 +19,9 @@ RUN mvn dependency:go-offline -B
 # Copier le code source
 COPY src ./src
 
-# Build de l'application (skip tests pour plus de rapidité)
-RUN mvn clean package -DskipTests
+# Build de l'application (skip tests pour plus de rapidité en dev)
+ARG SKIP_TESTS=true
+RUN mvn clean package -DskipTests=${SKIP_TESTS}
 
 # ================================
 # Stage 2: Runtime
@@ -28,6 +29,9 @@ RUN mvn clean package -DskipTests
 FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
+
+# Installer curl pour healthcheck
+RUN apk add --no-cache curl
 
 # Créer un utilisateur non-root pour la sécurité
 RUN addgroup -S spring && adduser -S spring -G spring
@@ -44,9 +48,16 @@ USER spring:spring
 # Port exposé
 EXPOSE 8080
 
+# Variables d'environnement par défaut
+ENV SPRING_PROFILES_ACTIVE=dev \
+    JAVA_OPTS="-Xms256m -Xmx512m"
+
 # Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/api/actuator/health || exit 1
+HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:8080/api/actuator/health || exit 1
+
+# Commande de démarrage avec support des profils
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Djava.security.egd=file:/dev/./urandom -jar app.jar"]
 
 # Variables d'environnement par défaut
 ENV SPRING_PROFILE=dev \
