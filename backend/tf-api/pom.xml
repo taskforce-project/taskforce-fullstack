@@ -32,6 +32,7 @@
 		<springdoc.version>2.3.0</springdoc.version>
 		<dotenv.version>3.2.0</dotenv.version>
 		<flyway.version>11.20.0</flyway.version>
+		<stripe.version>31.2.0</stripe.version>
 	</properties>
 	<dependencies>
 		<!-- Core Dependencies -->
@@ -78,6 +79,13 @@
 			<artifactId>spring-boot-starter-security-oauth2-resource-server</artifactId>
 		</dependency>
 
+		<!-- Keycloak Admin Client -->
+		<dependency>
+			<groupId>org.keycloak</groupId>
+			<artifactId>keycloak-admin-client</artifactId>
+			<version>${keycloak.version}</version>
+		</dependency>
+
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-security-oauth2-client-test</artifactId>
@@ -87,6 +95,19 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-security-oauth2-resource-server-test</artifactId>
 			<scope>test</scope>
+		</dependency>
+
+		<!-- Stripe Payment Integration -->
+		<dependency>
+			<groupId>com.stripe</groupId>
+			<artifactId>stripe-java</artifactId>
+			<version>${stripe.version}</version>
+		</dependency>
+
+		<!-- Email (JavaMail for Mailtrap) -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-mail</artifactId>
 		</dependency>
 
 		<!-- Database Migration -->
