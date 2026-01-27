@@ -2,10 +2,10 @@
 # DOCKER COMPOSE - DÉVELOPPEMENT
 # ===============================
 # Utilisation:
-#   docker-compose -f docker-compose.dev.yml --env-file backend/tf-api/.env.dev up
+#   .\dev-docker.ps1
+#   ou
+#   docker-compose -f docker-compose.dev.yml --env-file .env.dev up
 # ===============================
-
-version: '3.8'
 
 services:
   # ================================
@@ -15,18 +15,18 @@ services:
     image: postgres:16-alpine
     container_name: taskforce-postgres-dev
     environment:
-      POSTGRES_DB: ${DB_NAME:-taskforce_dev}
-      POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-taskforce-db}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-PostgreSQLP54!}
     ports:
-      - "${DB_PORT:-5432}:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_dev_data:/var/lib/postgresql/data
       - ./backend/tf-api/src/main/resources/db/init:/docker-entrypoint-initdb.d
     networks:
       - taskforce-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -35,39 +35,29 @@ services:
   # Keycloak
   # ================================
   keycloak:
-    image: quay.io/keycloak/keycloak:23.0
+    build:
+      context: ./keycloak
+      dockerfile: Dockerfile
     container_name: taskforce-keycloak-dev
-    command: start-dev --import-realm
+    command: start-dev --import-realm --verbose
     environment:
-      # Database Keycloak
-      KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak_dev
-      KC_DB_USERNAME: ${DB_USER:-postgres}
-      KC_DB_PASSWORD: ${DB_PASSWORD:-postgres}
-
       # Admin Keycloak
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN_USERNAME:-admin}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
 
-      # Hostname
-      KC_HOSTNAME: localhost
-      KC_HOSTNAME_PORT: 8180
-      KC_HOSTNAME_STRICT: false
-      KC_HOSTNAME_STRICT_HTTPS: false
-      KC_HTTP_ENABLED: true
+      # HTTP Configuration
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME_STRICT: "false"
     ports:
       - "8180:8080"
-    depends_on:
-      postgres:
-        condition: service_healthy
     networks:
-      - taskforce-network`n    volumes:`n      # Import automatique du realm`n      - ./keycloak/realms:/opt/keycloak/data/import
+      - taskforce-network
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
+      test: ["CMD-SHELL", "timeout 1 bash -c '</dev/tcp/localhost/8080' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   # ================================
   # Backend API
@@ -79,14 +69,12 @@ services:
     container_name: taskforce-backend-dev
     environment:
       # Spring Profile
-      SPRING_PROFILE: dev
+      SPRING_PROFILES_ACTIVE: dev
 
       # Database
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_NAME: ${DB_NAME:-taskforce_dev}
-      DB_USER: ${DB_USER:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-taskforce-db}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-PostgreSQLP54!}
 
       # Keycloak
       KEYCLOAK_URL: http://keycloak:8080
@@ -103,24 +91,69 @@ services:
       # JVM Options
       JAVA_OPTS: "-Xmx512m -Xms256m -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
     ports:
-      - "8081:8080"  # API
-      - "5005:5005"  # Debug
+      - "${BACKEND_PORT:-8080}:8080" # API
+      - "5005:5005" # Debug
     depends_on:
       postgres:
         condition: service_healthy
       keycloak:
         condition: service_healthy
     networks:
-      - taskforce-network`n    volumes:`n      # Import automatique du realm`n      - ./keycloak/realms:/opt/keycloak/data/import
+      - taskforce-network
     volumes:
       # Hot reload (optionnel)
       - ./backend/tf-api/src:/app/src
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/api/actuator/health || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "wget --no-verbose --tries=1 --spider http://localhost:8080/api/actuator/health || exit 1",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
+    restart: unless-stopped
+
+  # ================================
+  # Frontend Next.js
+  # ================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: taskforce-frontend-dev
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      - backend
+    networks:
+      - taskforce-network
+    volumes:
+      # Hot reload pour développement
+      - ./frontend/app:/app/app
+      - ./frontend/components:/app/components
+      - ./frontend/lib:/app/lib
+      - ./frontend/public:/app/public
+    restart: unless-stopped
+
+  # ================================
+  # Landing Page (Astro)
+  # ================================
+  landing:
+    build:
+      context: ./landing-page
+      dockerfile: Dockerfile
+    container_name: taskforce-landing-dev
+    environment:
+      NODE_ENV: development
+    ports:
+      - "${LANDING_PORT:-4321}:4321"
+    networks:
+      - taskforce-network
     restart: unless-stopped
 
   # ================================
@@ -132,7 +165,7 @@ services:
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@taskforce.dev
       PGADMIN_DEFAULT_PASSWORD: admin
-      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_CONFIG_SERVER_MODE: "False"
     ports:
       - "5050:80"
     depends_on:
@@ -158,6 +191,3 @@ networks:
   taskforce-network:
     driver: bridge
     name: taskforce-dev-network
-
-
-

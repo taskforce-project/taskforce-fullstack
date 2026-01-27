@@ -179,6 +179,15 @@ export const CONSTANTS_EN = {
     closeMenu: "Close menu",
     skipToContent: "Skip to main content",
   },
-} as const;
+};
 
-export type TranslationKeys = typeof CONSTANTS_EN;
+// Type récursif pour transformer les literal types en string
+type DeepStringify<T> = {
+  [K in keyof T]: T[K] extends string
+    ? string
+    : T[K] extends object
+    ? DeepStringify<T[K]>
+    : T[K];
+};
+
+export type TranslationKeys = DeepStringify<typeof CONSTANTS_EN>;
