@@ -4,19 +4,49 @@
 # To apply: gh label import --file .github/labels.yml
 
 # ==========================================
-# RELEASE VERSIONING (OBLIGATOIRE SUR PR)
+# RELEASE VERSIONING - BACKEND
 # ==========================================
-- name: "release:major"
+- name: "backend:release:major"
   color: "d73a4a"
-  description: "⬆️ Breaking changes - Incrémente MAJOR (v1.0.0 -> v2.0.0)"
+  description: "🔧 Backend Breaking changes - Incrémente MAJOR"
 
-- name: "release:minor"
+- name: "backend:release:minor"
   color: "0e8a16"
-  description: "✨ New features - Incrémente MINOR (v1.0.0 -> v1.1.0)"
+  description: "🔧 Backend New features - Incrémente MINOR"
 
-- name: "release:patch"
+- name: "backend:release:patch"
   color: "fbca04"
-  description: "🐛 Bug fixes - Incrémente PATCH (v1.0.0 -> v1.0.1)"
+  description: "🔧 Backend Bug fixes - Incrémente PATCH"
+
+# ==========================================
+# RELEASE VERSIONING - FRONTEND
+# ==========================================
+- name: "frontend:release:major"
+  color: "d73a4a"
+  description: "🎨 Frontend Breaking changes - Incrémente MAJOR"
+
+- name: "frontend:release:minor"
+  color: "0e8a16"
+  description: "🎨 Frontend New features - Incrémente MINOR"
+
+- name: "frontend:release:patch"
+  color: "fbca04"
+  description: "🎨 Frontend Bug fixes - Incrémente PATCH"
+
+# ==========================================
+# RELEASE VERSIONING - LANDING
+# ==========================================
+- name: "landing:release:major"
+  color: "d73a4a"
+  description: "🌐 Landing Breaking changes - Incrémente MAJOR"
+
+- name: "landing:release:minor"
+  color: "0e8a16"
+  description: "🌐 Landing New features - Incrémente MINOR"
+
+- name: "landing:release:patch"
+  color: "fbca04"
+  description: "🌐 Landing Bug fixes - Incrémente PATCH"
 
 # ==========================================
 # TYPE (déjà existants à conserver)

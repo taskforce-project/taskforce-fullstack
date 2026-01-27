@@ -1,8 +1,8 @@
-name: 🏷️ Version Management
+name: 🏷️ Version Management (Service-Specific)
 
 on:
   pull_request:
-    types: [opened, synchronize, labeled, unlabeled]
+    types: [opened, synchronize, labeled, unlabeled, reopened]
     branches:
       - dev
       - main
@@ -13,149 +13,177 @@ permissions:
   issues: write
 
 jobs:
-  validate-version-label:
-    name: ✅ Validate Release Label
+  validate-service-labels:
+    name: ✅ Validate Service Labels
     runs-on: ubuntu-latest
     steps:
-      - name: Check for release label
+      - name: Check for service release labels
         uses: actions/github-script@v7
         with:
           script: |
             const labels = context.payload.pull_request.labels.map(l => l.name);
-            const releaseLabels = labels.filter(l => l.startsWith('release:'));
+            const serviceLabels = labels.filter(l => 
+              l.startsWith('backend:release:') || 
+              l.startsWith('frontend:release:') || 
+              l.startsWith('landing:release:')
+            );
             
-            if (releaseLabels.length === 0) {
-              core.setFailed('❌ Missing release label! Add one of: release:major, release:minor, or release:patch');
-              return;
+            core.info(`🔍 Found ${serviceLabels.length} service release labels: ${serviceLabels.join(', ')}`);
+            
+            if (serviceLabels.length === 0) {
+              core.setFailed('❌ This PR must have at least one service release label (e.g., backend:release:minor, frontend:release:patch)');
+              return false;
             }
             
-            if (releaseLabels.length > 1) {
-              core.setFailed('❌ Multiple release labels found! Use only ONE: ' + releaseLabels.join(', '));
-              return;
+            // Vérifier qu'il n'y a pas plusieurs labels pour le même service
+            const services = serviceLabels.map(l => l.split(':')[0]);
+            const uniqueServices = [...new Set(services)];
+            if (services.length !== uniqueServices.length) {
+              core.setFailed(`❌ Multiple release labels found for the same service. Each service can have only one release label.`);
+              return false;
             }
             
-            core.info('✅ Valid release label: ' + releaseLabels[0]);
+            const validLabels = [
+              'backend:release:major', 'backend:release:minor', 'backend:release:patch',
+              'frontend:release:major', 'frontend:release:minor', 'frontend:release:patch',
+              'landing:release:major', 'landing:release:minor', 'landing:release:patch'
+            ];
+            
+            for (const label of serviceLabels) {
+              if (!validLabels.includes(label)) {
+                core.setFailed(`❌ Invalid release label: ${label}. Must be one of: ${validLabels.join(', ')}`);
+                return false;
+              }
+            }
+            
+            core.info(`✅ Valid service release labels found: ${serviceLabels.join(', ')}`);
+            return true;
 
-  calculate-next-version:
-    name: 🔢 Calculate Next Version
+  calculate-next-versions:
+    name: 🔢 Calculate Next Versions
     runs-on: ubuntu-latest
-    needs: validate-version-label
+    needs: validate-service-labels
     outputs:
-      next_version: ${{ steps.calc.outputs.next_version }}
-      current_version: ${{ steps.calc.outputs.current_version }}
+      backend_version: ${{ steps.calc.outputs.backend_version }}
+      frontend_version: ${{ steps.calc.outputs.frontend_version }}
+      landing_version: ${{ steps.calc.outputs.landing_version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Get latest tag
-        id: latest-tag
-        run: |
-          # Récupérer le dernier tag selon la branche cible
-          if [[ "${{ github.base_ref }}" == "dev" ]]; then
-            LATEST=$(git tag -l "v*-rc*" --sort=-v:refname | head -n1)
-          else
-            LATEST=$(git tag -l "v*" --sort=-v:refname | grep -v "rc" | head -n1)
-          fi
-          
-          # Si aucun tag, commencer à v0.1.0
-          if [ -z "$LATEST" ]; then
-            if [[ "${{ github.base_ref }}" == "dev" ]]; then
-              LATEST="v0.1.0-rc0"
-            else
-              LATEST="v0.0.0"
-            fi
-          fi
-          
-          echo "latest=$LATEST" >> $GITHUB_OUTPUT
-          echo "📌 Latest tag: $LATEST"
-
-      - name: Calculate next version
+      - name: Calculate versions
         id: calc
         uses: actions/github-script@v7
         with:
           script: |
-            const latestTag = '${{ steps.latest-tag.outputs.latest }}';
-            const baseBranch = context.payload.pull_request.base.ref;
+            const branch = '${{ github.base_ref }}';
             const labels = context.payload.pull_request.labels.map(l => l.name);
             
-            // Extraire la version actuelle
-            let match = latestTag.match(/v(\d+)\.(\d+)\.(\d+)(-rc(\d+))?/);
-            if (!match) {
-              core.setFailed('Invalid tag format: ' + latestTag);
-              return;
-            }
+            const services = ['backend', 'frontend', 'landing'];
+            const versions = {};
             
-            let [_, major, minor, patch, __, rc] = match;
-            major = parseInt(major);
-            minor = parseInt(minor);
-            patch = parseInt(patch);
-            rc = rc ? parseInt(rc) : 0;
-            
-            // Déterminer le type de release
-            const releaseType = labels.find(l => l.startsWith('release:'))?.split(':')[1];
-            
-            let nextVersion;
-            
-            if (baseBranch === 'dev') {
-              // PR vers dev : incrémenter RC ou version selon label
-              if (labels.includes('release:major')) {
-                major += 1;
-                minor = 0;
-                patch = 0;
-                rc = 1;
-              } else if (labels.includes('release:minor')) {
-                minor += 1;
-                patch = 0;
-                rc = 1;
-              } else if (labels.includes('release:patch')) {
-                patch += 1;
-                rc = 1;
+            for (const service of services) {
+              const releaseLabel = labels.find(l => l.startsWith(`${service}:release:`));
+              if (!releaseLabel) continue;
+              
+              const increment = releaseLabel.split(':')[2]; // major, minor, patch
+              
+              // Récupérer le dernier tag du service
+              const prefix = `${service}-v`;
+              const { data: tags } = await github.rest.repos.listTags({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                per_page: 100
+              });
+              
+              let latestTag = null;
+              if (branch === 'dev') {
+                latestTag = tags.find(t => t.name.startsWith(prefix) && t.name.includes('-rc'));
               } else {
-                // Même version, incrémenter RC
-                rc += 1;
+                latestTag = tags.find(t => t.name.startsWith(prefix) && !t.name.includes('-rc'));
               }
-              nextVersion = `v${major}.${minor}.${patch}-rc${rc}`;
-            } else {
-              // PR vers main : enlever RC et incrémenter selon label
-              if (labels.includes('release:major')) {
-                major += 1;
-                minor = 0;
-                patch = 0;
-              } else if (labels.includes('release:minor')) {
-                minor += 1;
-                patch = 0;
+              
+              // Parser la version actuelle
+              let major = 0, minor = 1, patch = 0, rc = 0;
+              if (latestTag) {
+                const match = latestTag.name.match(/v(\d+)\.(\d+)\.(\d+)(-rc(\d+))?/);
+                if (match) {
+                  major = parseInt(match[1]);
+                  minor = parseInt(match[2]);
+                  patch = parseInt(match[3]);
+                  rc = match[5] ? parseInt(match[5]) : 0;
+                }
+              }
+              
+              // Calculer la nouvelle version
+              if (branch === 'dev') {
+                if (increment === 'major') {
+                  major++; minor = 0; patch = 0; rc = 1;
+                } else if (increment === 'minor') {
+                  minor++; patch = 0; rc = 1;
+                } else if (increment === 'patch') {
+                  patch++; rc = 1;
+                }
+                versions[service] = `${service}-v${major}.${minor}.${patch}-rc${rc}`;
               } else {
-                patch += 1;
+                if (increment === 'major') {
+                  major++; minor = 0; patch = 0;
+                } else if (increment === 'minor') {
+                  minor++; patch = 0;
+                } else {
+                  patch++;
+                }
+                versions[service] = `${service}-v${major}.${minor}.${patch}`;
               }
-              nextVersion = `v${major}.${minor}.${patch}`;
+              
+              core.info(`📦 ${service}: ${latestTag?.name || 'none'} → ${versions[service]}`);
+              core.setOutput(`${service}_version`, versions[service]);
             }
-            
-            core.setOutput('next_version', nextVersion);
-            core.setOutput('current_version', latestTag);
-            core.info('🎯 Next version: ' + nextVersion);
 
       - name: Comment on PR
         uses: actions/github-script@v7
         with:
           script: |
-            const nextVersion = '${{ steps.calc.outputs.next_version }}';
-            const currentVersion = '${{ steps.calc.outputs.current_version }}';
-            const baseBranch = context.payload.pull_request.base.ref;
+            const backendVer = '${{ steps.calc.outputs.backend_version }}';
+            const frontendVer = '${{ steps.calc.outputs.frontend_version }}';
+            const landingVer = '${{ steps.calc.outputs.landing_version }}';
             
-            const comment = `## 🏷️ Version Bump Preview
+            let message = '## 📦 Version Preview\n\n';
+            message += 'This PR will create the following versions:\n\n';
             
-            **Current version:** \`${currentVersion}\`  
-            **Next version:** \`${nextVersion}\`  
-            **Target branch:** \`${baseBranch}\`
+            if (backendVer) message += `- **Backend**: \`${backendVer}\`\n`;
+            if (frontendVer) message += `- **Frontend**: \`${frontendVer}\`\n`;
+            if (landingVer) message += `- **Landing**: \`${landingVer}\`\n`;
             
-            This version will be tagged automatically when the PR is merged.
-            `;
+            message += '\n---\n';
+            message += '_These versions will be created when this PR is merged._';
             
-            github.rest.issues.createComment({
+            // Rechercher un commentaire existant
+            const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: context.payload.pull_request.number,
-              body: comment
+              issue_number: context.payload.pull_request.number
             });
+            
+            const botComment = comments.find(c => 
+              c.user.type === 'Bot' && 
+              c.body.includes('📦 Version Preview')
+            );
+            
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: message
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                body: message
+              });
+            }
