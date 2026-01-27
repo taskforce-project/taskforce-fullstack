@@ -68,6 +68,40 @@ keycloak:
     username: ${KEYCLOAK_ADMIN_USERNAME:admin}
     password: ${KEYCLOAK_ADMIN_PASSWORD:admin}
 
+# Stripe Configuration
+stripe:
+  api-key: ${STRIPE_API_KEY:sk_test_your_stripe_key_here}
+  webhook-secret: ${STRIPE_WEBHOOK_SECRET:whsec_your_webhook_secret_here}
+  plans:
+    free:
+      price-id: ${STRIPE_FREE_PRICE_ID:}
+    premium:
+      price-id: ${STRIPE_PREMIUM_PRICE_ID:price_premium}
+    enterprise:
+      price-id: ${STRIPE_ENTERPRISE_PRICE_ID:price_enterprise}
+
+# Mailtrap Configuration (SMTP)
+mail:
+  host: ${MAIL_HOST:sandbox.smtp.mailtrap.io}
+  port: ${MAIL_PORT:2525}
+  username: ${MAIL_USERNAME:your_mailtrap_username}
+  password: ${MAIL_PASSWORD:your_mailtrap_password}
+  from: ${MAIL_FROM:noreply@taskforce.com}
+  from-name: ${MAIL_FROM_NAME:Taskforce}
+  properties:
+    mail:
+      smtp:
+        auth: true
+        starttls:
+          enable: true
+          required: true
+      debug: true
+
+# OTP Configuration
+otp:
+  expiration-minutes: ${OTP_EXPIRATION_MINUTES:10}
+  length: ${OTP_LENGTH:6}
+
 # Logging Configuration
 logging:
   level:
