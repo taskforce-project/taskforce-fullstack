@@ -6,7 +6,9 @@
 ![License](https://img.shields.io/badge/license-Fair%20Use-green.svg)
 ![Java](https://img.shields.io/badge/Java-21-orange.svg)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.4.1-brightgreen.svg)
-![Next.js](https://img.shields.io/badge/Next.js-15-black.svg)
+![Next.js](https://img.shields.io/badge/Next.js-16-black.svg)
+![TailwindCSS](https://img.shields.io/badge/TailwindCSS-4-38bdf8.svg)
+![Keycloak](https://img.shields.io/badge/Keycloak-26-blue.svg)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-blue.svg)
 ![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)
 
@@ -41,7 +43,7 @@
 
 ### 🌟 Caractéristiques Principales
 
-- **🎨 Interface Moderne** : UI/UX intuitive avec Next.js 15 et TailwindCSS
+- **🎨 Interface Moderne** : UI/UX intuitive avec Next.js 16 et TailwindCSS 4
 - **🔐 Sécurité Robuste** : Authentification OAuth2/OIDC via Keycloak
 - **📊 Gestion Multi-tenant** : Support natif du multi-organisation
 - **🔄 Architecture Modulaire** : Extensible via un système de modules
@@ -108,7 +110,7 @@
 | **Java** | 21 LTS | Langage principal |
 | **Spring Boot** | 3.4.1 | Framework backend |
 | **PostgreSQL** | 18 | Base de données |
-| **Keycloak** | 23.0 | Authentification/SSO |
+| **Keycloak** | 26 | Authentification/SSO |
 | **Flyway** | - | Migrations DB |
 | **Maven** | 3.9+ | Build tool |
 | **SpringDoc** | 2.7.0 | Documentation API |
@@ -117,9 +119,9 @@
 
 | Technologie | Version | Rôle |
 |-------------|---------|------|
-| **Next.js** | 15 | Framework React |
+| **Next.js** | 16 | Framework React |
 | **TypeScript** | 5.x | Langage typé |
-| **TailwindCSS** | 3.x | Styling |
+| **TailwindCSS** | 4+ | Styling |
 | **Shadcn/ui** | - | Composants UI |
 | **React Query** | 5.x | State management |
 
@@ -128,7 +130,7 @@
 | Technologie | Version | Rôle |
 |-------------|---------|------|
 | **Astro** | 5.x | Framework statique |
-| **TailwindCSS** | 3.x | Styling |
+| **TailwindCSS** | 4+ | Styling |
 
 ### DevOps
 
@@ -339,7 +341,7 @@ gh pr create --base dev --label "backend:release:minor"
 Chaque service a **son propre versioning indépendant** :
 
 - `backend-v1.2.3-rc1` - Backend API
-- `frontend-v2.0.1-rc2` - Frontend Next.js
+- `frontend-v2.0.1-rc2` - Frontend Next.js 16
 - `landing-v1.0.0-rc1` - Landing Astro
 
 📖 **[Documentation Versioning](../taskforce-docs/developpeur/git-workflow/versioning-par-service.md)**
