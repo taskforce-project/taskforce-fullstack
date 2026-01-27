@@ -5,9 +5,21 @@
   "registrationAllowed": true,
   "resetPasswordAllowed": true,
   "rememberMe": true,
-  "verifyEmail": false,
+  "verifyEmail": true,
   "loginWithEmailAllowed": true,
   "duplicateEmailsAllowed": false,
+  "registrationEmailAsUsername": false,
+  "smtpServer": {
+    "host": "${env.MAILTRAP_HOST:sandbox.smtp.mailtrap.io}",
+    "port": "${env.MAILTRAP_PORT:2525}",
+    "from": "noreply@taskforce.dev",
+    "fromDisplayName": "Taskforce Platform",
+    "auth": "true",
+    "user": "${env.MAILTRAP_USERNAME}",
+    "password": "${env.MAILTRAP_PASSWORD}",
+    "ssl": "false",
+    "starttls": "true"
+  },
   "clients": [
     {
       "clientId": "taskforce-api",
@@ -52,7 +64,19 @@
           "value": "Admin@2024",
           "temporary": false
         }
-      ]
+      ],
+      "realmRoles": ["user"]
     }
-  ]
+  ],
+  "roles": {
+    "realm": [
+      {
+        "name": "user",
+        "description": "Rôle utilisateur de base",
+        "composite": false,
+        "clientRole": false
+      }
+    ]
+  },
+  "defaultRoles": ["user"]
 }
