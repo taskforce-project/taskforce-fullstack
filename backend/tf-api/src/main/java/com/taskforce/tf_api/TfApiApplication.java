@@ -10,7 +10,6 @@ public class TfApiApplication {
 	public static void main(String[] args) {
 		// Charger le fichier .env selon le profil actif
 		loadEnvironmentVariables();
-
 		SpringApplication.run(TfApiApplication.class, args);
 	}
 
