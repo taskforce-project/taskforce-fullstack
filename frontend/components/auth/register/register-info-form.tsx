@@ -97,7 +97,7 @@ export function SignupForm({
   };
 
   return (
-    <div className={cn("flex flex-col gap-6", className)} {...props}>
+    <div className={cn("flex flex-col gap-6 w-[80%]", className)} {...props}>
       {/* Progress indicator */}
       <div className="w-full space-y-2">
         <div className="flex justify-between text-sm text-muted-foreground">
@@ -207,11 +207,12 @@ export function SignupForm({
               </FieldDescription>
             </FieldGroup>
           </form>
-          <div className="bg-muted relative hidden md:block">
+          <div className="bg-gradient relative hidden md:flex md:items-center md:justify-center">
+            <span aria-hidden="true"></span>
             <img
-              src="/placeholder.svg"
-              alt="Inscription"
-              className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
+              src="/assets/logo/logo_taskforce_tp.png"
+              alt="TaskForce Logo"
+              className="w-32 h-32 object-contain opacity-40 dark:opacity-30 relative z-10"
             />
           </div>
         </CardContent>
@@ -223,18 +224,4 @@ export function SignupForm({
       </FieldDescription>
     </div>
   );
-}
-              src="/placeholder.svg"
-              alt="Image"
-              className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
-            />
-          </div>
-        </CardContent>
-      </Card>
-      <FieldDescription className="px-6 text-center">
-        By clicking continue, you agree to our <a href="#">Terms of Service</a>{" "}
-        and <a href="#">Privacy Policy</a>.
-      </FieldDescription>
-    </div>
-  )
 }

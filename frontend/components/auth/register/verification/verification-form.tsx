@@ -125,7 +125,7 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
 
   return (
     <div
-      className={cn("flex flex-col gap-6 md:min-h-[450px]", className)}
+      className={cn("flex flex-col gap-6 md:min-h-112.5 w-[80%]", className)}
       {...props}
     >
       {/* Progress indicator */}
@@ -195,11 +195,12 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
               </Field>
             </FieldGroup>
           </form>
-          <div className="bg-muted relative hidden md:block">
+          <div className="bg-gradient relative hidden md:flex md:items-center md:justify-center">
+            <span aria-hidden="true"></span>
             <img
-              src="/placeholder.svg"
-              alt="Vérification"
-              className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
+              src="/assets/logo/logo_taskforce_tp.png"
+              alt="TaskForce Logo"
+              className="w-32 h-32 object-contain opacity-40 dark:opacity-30 relative z-10"
             />
           </div>
         </CardContent>

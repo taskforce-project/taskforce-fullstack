@@ -45,10 +45,10 @@ export function LoginForm({
       //   headers: { 'Content-Type': 'application/json' },
       //   body: JSON.stringify(formData)
       // });
-      
+
       await new Promise((resolve) => setTimeout(resolve, 1500));
       toast.success(t.auth.success.loginSuccess);
-      
+
       // TODO: Redirection vers dashboard après login avec router.push('/dashboard')
       console.log("Login successful:", formData);
     } catch (error) {
@@ -62,7 +62,7 @@ export function LoginForm({
   };
 
   return (
-    <div className={cn("flex flex-col gap-6", className)} {...props}>
+    <div className={cn("flex flex-col gap-6 w-[80%]", className)} {...props}>
       <Card className="overflow-hidden p-0">
         <CardContent className="grid p-0 md:grid-cols-2">
           <form onSubmit={handleSubmit} className="p-6 md:p-8">
@@ -119,11 +119,12 @@ export function LoginForm({
               </FieldDescription>
             </FieldGroup>
           </form>
-          <div className="bg-muted relative hidden md:block">
+          <div className="bg-gradient relative hidden md:flex md:items-center md:justify-center">
+            <span aria-hidden="true"></span>
             <img
-              src="/placeholder.svg"
-              alt="Connexion"
-              className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
+              src="/assets/logo/logo_taskforce_tp.png"
+              alt="TaskForce Logo"
+              className="w-32 h-32 object-contain opacity-40 dark:opacity-30 relative z-10"
             />
           </div>
         </CardContent>
@@ -135,9 +136,4 @@ export function LoginForm({
       </FieldDescription>
     </div>
   );
-}
-        and <a href="#">Privacy Policy</a>.
-      </FieldDescription>
-    </div>
-  )
 }
