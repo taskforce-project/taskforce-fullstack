@@ -1,0 +1,119 @@
+# ===============================
+# TASKFORCE API - GITIGNORE
+# ===============================
+
+# ===============================
+# VARIABLES D'ENVIRONNEMENT
+# ===============================
+.env
+.env.dev
+.env.prod
+.env.local
+*.env
+
+# ===============================
+# MAVEN
+# ===============================
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# ===============================
+# IDE
+# ===============================
+
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+*.iml.versionsBackup
+out/
+
+# Eclipse
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+.metadata
+bin/
+tmp/
+*.tmp
+*.bak
+*.swp
+*~.nib
+local.properties
+.loadpath
+.recommenders
+
+# VS Code
+.vscode/
+*.code-workspace
+.factorypath
+
+# NetBeans
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+# ===============================
+# SYSTÈME D'EXPLOITATION
+# ===============================
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Linux
+*~
+
+# ===============================
+# LOGS
+# ===============================
+logs/
+*.log
+*.log.*
+log/
+
+# ===============================
+# COMPILATION
+# ===============================
+*.class
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# ===============================
+# SPRING BOOT
+# ===============================
+spring-boot-devtools.properties
+application-local.yml
+application-local.properties
+
+# ===============================
+# AUTRES
+# ===============================
+node_modules/
+.gradle/
+build/
