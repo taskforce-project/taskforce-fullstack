@@ -109,12 +109,12 @@ function Build-Services {
     docker-compose -f $COMPOSE_FILE build --no-cache
     
     if ($LASTEXITCODE -eq 0) {
-        Write-ColorMessage "`n✅ Build terminé avec succès !`n" $COLOR_SUCCESS
+        Write-ColorMessage "`nBuild termine avec succes !`n" $COLOR_SUCCESS
     }
 }
 
 function Show-Logs {
-    Write-ColorMessage "`n📋 Affichage des logs (Ctrl+C pour quitter)...`n" $COLOR_INFO
+    Write-ColorMessage "`nAffichage des logs (Ctrl+C pour quitter)...`n" $COLOR_INFO
     docker-compose -f $COMPOSE_FILE logs -f
 }
 
@@ -206,7 +206,7 @@ function Main {
                 exit 0
             }
             default { 
-                Write-ColorMessage "`n❌ Option invalide. Réessayez.`n" $COLOR_ERROR
+                Write-ColorMessage "`nOption invalide. Reessayez.`n" $COLOR_ERROR
                 Start-Sleep -Seconds 1
             }
         }

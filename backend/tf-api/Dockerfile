@@ -59,10 +59,3 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
 # Commande de démarrage avec support des profils
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Djava.security.egd=file:/dev/./urandom -jar app.jar"]
 
-# Variables d'environnement par défaut
-ENV SPRING_PROFILE=dev \
-    JAVA_OPTS="-Xmx512m -Xms256m"
-
-# Lancement de l'application
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
-
