@@ -210,17 +210,24 @@ Pour le développement local :
 git clone https://github.com/taskforce-project/taskforce-fullstack.git
 cd taskforce-fullstack
 
-# 2. Démarrer tous les services
-docker-compose up -d
+# 2. Initialiser l'environnement
+bash scripts/init-dev.sh
 
-# 3. Attendre que tous les services soient prêts (~2 minutes)
-docker-compose logs -f
+# 3. Démarrer tous les services (menu interactif)
+bash scripts/dev-docker.sh
+
+# Ou démarrage rapide direct
+bash scripts/start-dev.sh
 
 # 4. Accéder à l'application
-# Frontend: http://localhost:3000
-# Backend:  http://localhost:8080
-# Keycloak: http://localhost:8180
+# Frontend:    http://localhost:3000
+# Backend:     http://localhost:8080/api
+# Keycloak:    http://localhost:8180 (admin/admin)
+# pgAdmin:     http://localhost:5050 (admin@taskforce.dev/admin)
 ```
+
+> 💡 **Astuce** : Tous les scripts Docker sont dans le dossier `scripts/`. 
+> Voir [scripts/README.md](scripts/README.md) pour la documentation complète.
 
 ### Installation Développement
 
