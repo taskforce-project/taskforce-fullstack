@@ -191,7 +191,7 @@ export function ForgotPasswordForm({
               <img
                 src="/assets/logo/logo_taskforce_tp.png"
                 alt="TaskForce Logo"
-                className="w-32 h-32 object-contain opacity-40 dark:opacity-30 relative z-10"
+                className="w-32 h-32 object-contain opacity-40 dark:opacity-30 dark:invert relative z-10"
               />
             </div>
           </CardContent>
@@ -266,7 +266,7 @@ export function ForgotPasswordForm({
               <img
                 src="/assets/logo/logo_taskforce_tp.png"
                 alt="TaskForce Logo"
-                className="w-32 h-32 object-contain opacity-40 dark:opacity-30 relative z-10"
+                className="w-32 h-32 object-contain opacity-40 dark:opacity-30 dark:invert relative z-10"
               />
             </div>
           </CardContent>
@@ -319,7 +319,7 @@ export function ForgotPasswordForm({
             <img
               src="/assets/logo/logo_taskforce_tp.png"
               alt="TaskForce Logo"
-              className="w-32 h-32 object-contain opacity-40 dark:opacity-30 relative z-10"
+              className="w-32 h-32 object-contain opacity-40 dark:opacity-30 dark:invert relative z-10"
             />
           </div>
         </CardContent>
