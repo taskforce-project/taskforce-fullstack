@@ -50,6 +50,23 @@ spring:
     error:
       include-stacktrace: always
 
+# Email Configuration (Mailtrap for development)
+mail:
+  host: ${MAIL_HOST:sandbox.smtp.mailtrap.io}
+  port: ${MAIL_PORT:2525}
+  username: ${MAIL_USERNAME:your_mailtrap_username}
+  password: ${MAIL_PASSWORD:your_mailtrap_password}
+  from: ${MAIL_FROM:noreply@taskforce.com}
+  from-name: ${MAIL_FROM_NAME:TaskForce}
+  properties:
+    mail:
+      smtp:
+        auth: true
+        starttls:
+          enable: true
+          required: true
+      debug: true
+
 # CORS Configuration
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
@@ -82,26 +99,6 @@ stripe:
   checkout:
     success-url: ${STRIPE_SUCCESS_URL:http://localhost:3000/payment/success}
     cancel-url: ${STRIPE_CANCEL_URL:http://localhost:3000/payment/cancel}
-
-  # Email Configuration (Mailtrap for development)
-  mail:
-    host: ${MAIL_HOST:sandbox.smtp.mailtrap.io}
-    port: ${MAIL_PORT:2525}
-    username: ${MAIL_USERNAME:your_mailtrap_username}
-    password: ${MAIL_PASSWORD:your_mailtrap_password}
-    from: ${MAIL_FROM:noreply@taskforce.com}
-    properties:
-      mail:
-        smtp:
-          auth: true
-          starttls:
-            enable: true
-            required: true
-        debug: true
-  
-  web:
-    error:
-      include-stacktrace: always
 
 # Application Configuration
 app:
