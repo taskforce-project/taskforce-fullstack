@@ -12,7 +12,11 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
           <div className="lg:col-span-2 space-y-4">
             <div className="flex items-center gap-2">
-              <Layers className="h-6 w-6 text-primary" />
+              <img
+                src="/logo_taskforce_tp.png"
+                alt="Taskforce"
+                className="h-8 w-auto dark:invert"
+              />
               <span className="font-bold text-xl">{footer.brandName}</span>
             </div>
             <p className="text-sm text-muted-foreground max-w-xs">
