@@ -67,40 +67,59 @@ keycloak:
   admin:
     username: ${KEYCLOAK_ADMIN_USERNAME:admin}
     password: ${KEYCLOAK_ADMIN_PASSWORD:admin}
+    client-id: ${KEYCLOAK_ADMIN_CLIENT_ID:admin-cli}
 
 # Stripe Configuration
 stripe:
   api-key: ${STRIPE_API_KEY:sk_test_your_stripe_key_here}
+  publishable-key: ${STRIPE_PUBLISHABLE_KEY:pk_test_your_publishable_key_here}
   webhook-secret: ${STRIPE_WEBHOOK_SECRET:whsec_your_webhook_secret_here}
   plans:
-    free:
-      price-id: ${STRIPE_FREE_PRICE_ID:}
     premium:
-      price-id: ${STRIPE_PREMIUM_PRICE_ID:price_premium}
+      price-id: ${STRIPE_PREMIUM_PRICE_ID:price_premium_test}
     enterprise:
-      price-id: ${STRIPE_ENTERPRISE_PRICE_ID:price_enterprise}
+      price-id: ${STRIPE_ENTERPRISE_PRICE_ID:price_enterprise_test}
+  checkout:
+    success-url: ${STRIPE_SUCCESS_URL:http://localhost:3000/payment/success}
+    cancel-url: ${STRIPE_CANCEL_URL:http://localhost:3000/payment/cancel}
 
-# Mailtrap Configuration (SMTP)
-mail:
-  host: ${MAIL_HOST:sandbox.smtp.mailtrap.io}
-  port: ${MAIL_PORT:2525}
-  username: ${MAIL_USERNAME:your_mailtrap_username}
-  password: ${MAIL_PASSWORD:your_mailtrap_password}
-  from: ${MAIL_FROM:noreply@taskforce.com}
-  from-name: ${MAIL_FROM_NAME:Taskforce}
-  properties:
-    mail:
-      smtp:
-        auth: true
-        starttls:
-          enable: true
-          required: true
-      debug: true
+# Email Configuration (Mailtrap for development)
+spring:
+  mail:
+    host: ${MAIL_HOST:sandbox.smtp.mailtrap.io}
+    port: ${MAIL_PORT:2525}
+    username: ${MAIL_USERNAME:your_mailtrap_username}
+    password: ${MAIL_PASSWORD:your_mailtrap_password}
+    from: ${MAIL_FROM:noreply@taskforce.com}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+        debug: true
+
+# Application Configuration
+app:
+  name: ${APP_NAME:TaskForce}
+  url: ${APP_URL:http://localhost:3000}
+  frontend-url: ${FRONTEND_URL:http://localhost:3000}
+
+# JWT Configuration
+jwt:
+  secret: ${JWT_SECRET:myVerySecretKeyForJWTTokenGenerationThatIsLongEnoughToBeSecure256Bits}
+  access-token:
+    expiration: ${JWT_ACCESS_TOKEN_EXPIRATION:3600}  # 1 heure en secondes
+  refresh-token:
+    expiration: ${JWT_REFRESH_TOKEN_EXPIRATION:2592000}  # 30 jours en secondes
 
 # OTP Configuration
 otp:
-  expiration-minutes: ${OTP_EXPIRATION_MINUTES:10}
+  expiration-minutes: ${OTP_EXPIRATION_MINUTES:15}
   length: ${OTP_LENGTH:6}
+  max-attempts: ${OTP_MAX_ATTEMPTS:5}
+  max-requests-per-hour: ${OTP_MAX_REQUESTS_PER_HOUR:5}
 
 # Logging Configuration
 logging:
