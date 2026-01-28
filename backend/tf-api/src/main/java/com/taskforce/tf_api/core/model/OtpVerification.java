@@ -39,9 +39,17 @@ public class OtpVerification {
 
     /**
      * ID de l'utilisateur concerné
+     * Peut être NULL lors de l'inscription (avant création du compte)
      */
-    @Column(name = "user_id", nullable = false)
+    @Column(name = "user_id")
     private Long userId;
+
+    /**
+     * ID Keycloak de l'utilisateur (si déjà créé dans Keycloak)
+     * Permet de lier l'OTP à un utilisateur Keycloak avant création dans notre DB
+     */
+    @Column(name = "keycloak_id", length = 100)
+    private String keycloakId;
 
     /**
      * Code OTP à 6 chiffres
