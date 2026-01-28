@@ -1,5 +1,11 @@
 package com.taskforce.tf_api.core.service;
 
+import java.util.HashMap;
+import java.util.Map;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
 import com.stripe.Stripe;
 import com.stripe.exception.StripeException;
 import com.stripe.model.Customer;
@@ -8,13 +14,9 @@ import com.stripe.model.Subscription;
 import com.stripe.model.checkout.Session;
 import com.stripe.param.CustomerCreateParams;
 import com.stripe.param.checkout.SessionCreateParams;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
-import java.util.HashMap;
-import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Service pour communiquer avec l'API Stripe
@@ -24,13 +26,13 @@ import java.util.Map;
 @Slf4j
 public class StripeService {
 
-    @Value("${stripe.api.secret-key}")
+    @Value("${stripe.api-key}")
     private String stripeSecretKey;
 
-    @Value("${stripe.price.premium}")
+    @Value("${stripe.plans.premium.price-id}")
     private String premiumPriceId;
 
-    @Value("${stripe.price.enterprise}")
+    @Value("${stripe.plans.enterprise.price-id}")
     private String enterprisePriceId;
 
     @PostConstruct

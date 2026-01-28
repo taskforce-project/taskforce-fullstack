@@ -24,7 +24,7 @@ import java.util.List;
 @Slf4j
 public class KeycloakService {
 
-    @Value("${keycloak.auth-server-url}")
+    @Value("${keycloak.url}")
     private String serverUrl;
 
     @Value("${keycloak.realm}")
