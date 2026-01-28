@@ -18,10 +18,11 @@ import java.time.LocalDateTime;
  */
 @Entity
 @Table(name = "users", indexes = {
-    @Index(name = "idx_users_email", columnList = "email"),
-    @Index(name = "idx_users_keycloak_id", columnList = "keycloak_id"),
+    @Index(name = "idx_users_email", columnList = "email", unique = true),
+    @Index(name = "idx_users_keycloak_id", columnList = "keycloak_id", unique = true),
     @Index(name = "idx_users_company_id", columnList = "company_id"),
-    @Index(name = "idx_users_stripe_customer_id", columnList = "stripe_customer_id")
+    @Index(name = "idx_users_stripe_customer_id", columnList = "stripe_customer_id"),
+    @Index(name = "idx_users_is_active", columnList = "is_active")
 })
 @Getter
 @Setter
@@ -38,41 +39,46 @@ public class User {
      * ID de l'utilisateur dans Keycloak (source of truth pour l'authentification)
      * Récupéré depuis le token JWT lors de l'authentification
      */
-    @Column(name = "keycloak_id", nullable = false, unique = true)
+    @Column(name = "keycloak_id", nullable = false, unique = true, length = 100)
     private String keycloakId;
 
     /**
      * Email de l'utilisateur (pour référence rapide, source = Keycloak)
+     * Utilisé pour les recherches et l'envoi d'emails
      */
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false, unique = true, length = 255)
     private String email;
 
     /**
      * Type de plan d'abonnement (FREE, PREMIUM, ENTERPRISE)
+     * Synchronisé avec la table Subscription
      */
     @Enumerated(EnumType.STRING)
-    @Column(name = "plan_type", nullable = false)
+    @Column(name = "plan_type", nullable = false, length = 20)
     @Builder.Default
     private PlanType planType = PlanType.FREE;
 
     /**
      * Statut de l'abonnement Stripe (ACTIVE, CANCELED, etc.)
+     * Synchronisé avec la table Subscription
      * NULL si plan FREE ou aucun abonnement actif
      */
     @Enumerated(EnumType.STRING)
-    @Column(name = "plan_status")
+    @Column(name = "plan_status", length = 20)
     private PlanStatus planStatus;
 
     /**
      * ID du client dans Stripe
+     * Créé lors du premier achat ou lors de l'inscription avec un plan payant
      */
-    @Column(name = "stripe_customer_id", unique = true)
+    @Column(name = "stripe_customer_id", unique = true, length = 100)
     private String stripeCustomerId;
 
     /**
      * ID de l'abonnement actif dans Stripe
+     * Référence rapide vers l'abonnement Stripe actif
      */
-    @Column(name = "stripe_subscription_id", unique = true)
+    @Column(name = "stripe_subscription_id", unique = true, length = 100)
     private String stripeSubscriptionId;
 
     /**
@@ -95,6 +101,7 @@ public class User {
 
     /**
      * ID de l'entreprise (peut être null pour les utilisateurs FREE)
+     * Sera utilisé pour les fonctionnalités multi-entreprises futures
      */
     @Column(name = "company_id")
     private Long companyId;
