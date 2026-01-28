@@ -116,7 +116,7 @@ services:
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     container_name: taskforce-frontend-dev
     env_file:
       - .env.dev
@@ -129,11 +129,21 @@ services:
     networks:
       - taskforce-network
     volumes:
-      # Hot reload pour développement
-      - ./frontend/app:/app/app
-      - ./frontend/components:/app/components
-      - ./frontend/lib:/app/lib
-      - ./frontend/public:/app/public
+      # Hot reload pour développement - monter tout le code source
+      - ./frontend:/app
+      # Volume anonyme pour node_modules (évite d'écraser les dépendances du container)
+      - /app/node_modules
+      - /app/.next
+    develop:
+      watch:
+        - action: sync
+          path: ./frontend
+          target: /app
+          ignore:
+            - node_modules/
+            - .next/
+        - action: rebuild
+          path: ./frontend/package.json
     restart: unless-stopped
 
   # ================================
@@ -142,7 +152,7 @@ services:
   landing:
     build:
       context: ./landing-page
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     container_name: taskforce-landing-dev
     env_file:
       - .env.dev
@@ -152,6 +162,20 @@ services:
       - "${LANDING_PORT:-4321}:4321"
     networks:
       - taskforce-network
+    volumes:
+      # Hot reload pour développement
+      - ./landing-page:/app
+      # Volume anonyme pour node_modules
+      - /app/node_modules
+    develop:
+      watch:
+        - action: sync
+          path: ./landing-page
+          target: /app
+          ignore:
+            - node_modules/
+        - action: rebuild
+          path: ./landing-page/package.json
     restart: unless-stopped
 
   # ================================

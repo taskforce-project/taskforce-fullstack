@@ -1,0 +1,29 @@
+# ===============================
+# DOCKERFILE NEXT.JS - DEVELOPMENT
+# Hot reload activé
+# ===============================
+
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copier package files
+COPY package.json package-lock.json* ./
+
+# Installer toutes les dépendances (dev + prod)
+RUN npm install
+
+# Copier le reste des fichiers (sera overridé par les volumes)
+COPY . .
+
+# Exposer le port
+EXPOSE 3000
+
+# Variables d'environnement
+ENV NODE_ENV=development
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+
+# Commande pour démarrer le serveur de développement
+CMD ["npm", "run", "dev"]
