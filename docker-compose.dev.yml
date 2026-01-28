@@ -4,7 +4,9 @@
 # Utilisation:
 #   .\dev-docker.ps1
 #   ou
-#   docker-compose -f docker-compose.dev.yml --env-file .env.dev up
+#   docker-compose -f docker-compose.dev.yml up
+# 
+# Le fichier .env.dev à la racine contient TOUTES les variables
 # ===============================
 
 services:
@@ -67,26 +69,19 @@ services:
       context: ./backend/tf-api
       dockerfile: Dockerfile
     container_name: taskforce-backend-dev
+    env_file:
+      - .env.dev
     environment:
       # Spring Profile
-      SPRING_PROFILES_ACTIVE: dev
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
 
       # Database
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-taskforce-db}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-PostgreSQLP54!}
 
-      # Keycloak
+      # Keycloak (utilise le nom du service docker)
       KEYCLOAK_URL: http://keycloak:8080
-      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-taskforce-dev}
-      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-taskforce-api}
-      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:-dev-secret}
-
-      # CORS
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
-
-      # Server
-      SERVER_PORT: 8080
 
       # JVM Options
       JAVA_OPTS: "-Xmx512m -Xms256m -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
@@ -123,9 +118,10 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: taskforce-frontend-dev
+    env_file:
+      - .env.dev
     environment:
       NODE_ENV: development
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     depends_on:
@@ -148,6 +144,8 @@ services:
       context: ./landing-page
       dockerfile: Dockerfile
     container_name: taskforce-landing-dev
+    env_file:
+      - .env.dev
     environment:
       NODE_ENV: development
     ports:
@@ -162,9 +160,11 @@ services:
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: taskforce-pgadmin-dev
+    env_file:
+      - .env.dev
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@taskforce.dev
-      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@taskforce.dev}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
       PGADMIN_CONFIG_SERVER_MODE: "False"
     ports:
       - "5050:80"
