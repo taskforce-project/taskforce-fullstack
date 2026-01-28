@@ -122,6 +122,9 @@ services:
       - .env.dev
     environment:
       NODE_ENV: development
+      # Enable polling for hot reload on Docker Desktop (Windows/macOS)
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     depends_on:

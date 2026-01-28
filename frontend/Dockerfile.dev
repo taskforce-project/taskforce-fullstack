@@ -25,5 +25,5 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# Commande pour démarrer le serveur de développement
-CMD ["npm", "run", "dev"]
+# Commande pour démarrer le serveur de développement avec webpack (Turbopack ne supporte pas bien le polling)
+CMD ["npm", "run", "dev", "--", "--webpack"]
