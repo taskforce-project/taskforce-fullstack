@@ -83,8 +83,7 @@ stripe:
     success-url: ${STRIPE_SUCCESS_URL:http://localhost:3000/payment/success}
     cancel-url: ${STRIPE_CANCEL_URL:http://localhost:3000/payment/cancel}
 
-# Email Configuration (Mailtrap for development)
-spring:
+  # Email Configuration (Mailtrap for development)
   mail:
     host: ${MAIL_HOST:sandbox.smtp.mailtrap.io}
     port: ${MAIL_PORT:2525}
@@ -99,6 +98,10 @@ spring:
             enable: true
             required: true
         debug: true
+  
+  web:
+    error:
+      include-stacktrace: always
 
 # Application Configuration
 app:
