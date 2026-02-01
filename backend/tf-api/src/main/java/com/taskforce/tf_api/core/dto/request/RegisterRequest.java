@@ -33,7 +33,4 @@ public class RegisterRequest {
     @NotBlank(message = "Le nom est obligatoire")
     @Size(min = 2, max = 50, message = "Le nom doit contenir entre 2 et 50 caractères")
     private String lastName;
-
-    @NotBlank(message = "Le type de plan est obligatoire")
-    private String planType; // FREE, PREMIUM, ENTERPRISE
 }
