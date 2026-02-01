@@ -5,7 +5,14 @@
 
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from "axios";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api";
+/**
+ * API URL configuration
+ * - SSR (serveur Next.js): utilise NEXT_PUBLIC_API_URL_SSR ou backend:8080 (réseau Docker)
+ * - CSR (navigateur): utilise NEXT_PUBLIC_API_URL ou localhost:8080 (hôte)
+ */
+const API_URL = typeof window === "undefined" 
+  ? (process.env.NEXT_PUBLIC_API_URL_SSR || "http://backend:8080/api") // Server-side
+  : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api");  // Client-side
 
 /**
  * Instance Axios configurée pour les appels API
