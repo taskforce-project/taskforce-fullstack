@@ -1,18 +1,19 @@
 package com.taskforce.tf_api.core.repository;
 
-import com.taskforce.tf_api.core.enums.OtpStatus;
-import com.taskforce.tf_api.core.enums.OtpType;
-import com.taskforce.tf_api.core.model.OtpVerification;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import com.taskforce.tf_api.core.enums.OtpStatus;
+import com.taskforce.tf_api.core.enums.OtpType;
+import com.taskforce.tf_api.core.model.OtpVerification;
 
 /**
  * Repository pour la gestion des codes OTP
@@ -29,6 +30,12 @@ public interface OtpVerificationRepository extends JpaRepository<OtpVerification
         @Param("code") String code,
         @Param("now") LocalDateTime now
     );
+
+    /**
+     * Trouve un OTP en attente par email (le plus récent)
+     */
+    @Query("SELECT o FROM OtpVerification o WHERE o.email = :email AND o.otpStatus = 'PENDING' AND o.expiresAt > CURRENT_TIMESTAMP ORDER BY o.createdAt DESC LIMIT 1")
+    Optional<OtpVerification> findPendingOtpByEmail(@Param("email") String email);
 
     /**
      * Trouve un OTP par email, type et statut
