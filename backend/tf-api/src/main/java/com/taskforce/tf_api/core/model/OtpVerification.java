@@ -1,14 +1,28 @@
 package com.taskforce.tf_api.core.model;
 
-import com.taskforce.tf_api.core.enums.OtpStatus;
-import com.taskforce.tf_api.core.enums.OtpType;
-import jakarta.persistence.*;
-import lombok.*;
+import java.time.LocalDateTime;
+import java.util.UUID;
+
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import java.time.LocalDateTime;
-import java.util.UUID;
+import com.taskforce.tf_api.core.enums.OtpStatus;
+import com.taskforce.tf_api.core.enums.OtpType;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 /**
  * Entité OTP Verification - Code OTP pour vérification email et réinitialisation mot de passe
@@ -77,6 +91,13 @@ public class OtpVerification {
      */
     @Column(nullable = false)
     private String email;
+
+    /**
+     * Plan sélectionné par l'utilisateur lors de l'inscription
+     * (Stocké temporairement jusqu'à la vérification OTP)
+     */
+    @Column(name = "plan_type", length = 20)
+    private String planType;
 
     /**
      * Nombre de tentatives de validation
