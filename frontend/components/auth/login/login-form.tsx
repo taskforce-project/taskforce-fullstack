@@ -14,11 +14,20 @@ import { usePreferencesStore } from "@/lib/store/preferences-store";
 import { useState } from "react";
 import { toast } from "sonner";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/contexts/auth-context";
+import {
+  validateEmail,
+  sanitizeInput,
+  globalRateLimiter,
+} from "@/lib/utils/validation";
 
 export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
+  const router = useRouter();
+  const { login } = useAuth();
   const { t } = usePreferencesStore();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -29,6 +38,7 @@ export function LoginForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Validation des champs vides
     if (!formData.email || !formData.password) {
       toast.error(t.common.error, {
         description: "Veuillez remplir tous les champs",
@@ -36,24 +46,45 @@ export function LoginForm({
       return;
     }
 
+    // Rate limiting - 5 tentatives par 15 minutes
+    if (!globalRateLimiter.isAllowed("login", 5, 15 * 60 * 1000)) {
+      const timeLeft = globalRateLimiter.getTimeUntilReset("login", 15 * 60 * 1000);
+      toast.error(t.common.error, {
+        description: `Trop de tentatives. Réessayez dans ${timeLeft} secondes`,
+      });
+      return;
+    }
+
+    // Validation format email
+    if (!validateEmail(formData.email)) {
+      toast.error(t.common.error, {
+        description: "Format d'email invalide",
+      });
+      return;
+    }
+
+    // Sanitization des inputs
+    const sanitizedEmail = sanitizeInput(formData.email);
+    const sanitizedPassword = sanitizeInput(formData.password);
+
     setIsLoading(true);
 
     try {
-      // TODO: Appel API login
-      // const response = await fetch('/api/auth/login', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(formData)
-      // });
-
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await login({
+        email: sanitizedEmail,
+        password: sanitizedPassword,
+      });
+      
+      // Réinitialiser le rate limiter en cas de succès
+      globalRateLimiter.reset("login");
+      
       toast.success(t.auth.success.loginSuccess);
 
-      // TODO: Redirection vers dashboard après login avec router.push('/dashboard')
-      console.log("Login successful:", formData);
-    } catch (error) {
+      // Redirection vers dashboard après login
+      router.push('/dashboard');
+    } catch (error: any) {
       toast.error(t.common.error, {
-        description: t.auth.errors.loginFailed,
+        description: error.message || t.auth.errors.loginFailed,
       });
       console.error("Login error:", error);
     } finally {
