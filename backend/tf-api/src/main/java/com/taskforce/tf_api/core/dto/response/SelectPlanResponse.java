@@ -6,20 +6,17 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * DTO de réponse après l'inscription (avant vérification OTP)
+ * Réponse après sélection du plan (Étape 2)
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class RegisterResponse {
+public class SelectPlanResponse {
 
     private String message;
     private String email;
-    private Boolean otpSent;
-    private Integer otpExpiresInMinutes;
-
-    public boolean isOtpSent() {
-        return Boolean.TRUE.equals(otpSent);
-    }
+    private String planType;
+    private boolean otpSent;
+    private int otpExpiresInMinutes;
 }
