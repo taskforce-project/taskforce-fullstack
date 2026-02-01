@@ -42,11 +42,12 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host "✅ Services démarrés avec succès !" -ForegroundColor Green
     Write-Host ""
     Write-Host "📋 Services disponibles :" -ForegroundColor Cyan
-    Write-Host "  - API Backend:      http://localhost:8081/api" -ForegroundColor White
-    Write-Host "  - Swagger UI:       http://localhost:8081/api/swagger-ui.html" -ForegroundColor White
+    Write-Host "  - Frontend:         http://localhost:3000" -ForegroundColor White
+    Write-Host "  - API Backend:      http://localhost:8080/api" -ForegroundColor White
+    Write-Host "  - Swagger UI:       http://localhost:8080/api/swagger-ui.html" -ForegroundColor White
     Write-Host "  - Keycloak Admin:   http://localhost:8180 (admin/admin)" -ForegroundColor White
     Write-Host "  - pgAdmin:          http://localhost:5050 (admin@taskforce.dev/admin)" -ForegroundColor White
-    Write-Host "  - PostgreSQL:       localhost:5433 (postgres/PostgreSQLP54!)" -ForegroundColor White
+    Write-Host "  - PostgreSQL:       localhost:5432 (postgres/PostgreSQLP54!)" -ForegroundColor White
     Write-Host ""
     Write-Host "📊 Voir les logs :" -ForegroundColor Cyan
     Write-Host "  docker-compose -f docker-compose.dev.yml logs -f" -ForegroundColor Gray
