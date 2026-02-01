@@ -29,23 +29,41 @@ spring:
     validate-on-migrate: false
     baseline-on-migrate: true
 
-  # Security Configuration
+  # Security Configuration OAuth2/OIDC
   security:
     oauth2:
+      # Resource Server : Pour valider les tokens JWT Keycloak
       resourceserver:
         jwt:
+          # Issuer : Vérifie que le token vient bien de Keycloak
           issuer-uri: ${KEYCLOAK_URL:http://localhost:8180}/realms/${KEYCLOAK_REALM:taskforce-dev}
+          # JWK Set : Clés publiques pour vérifier la signature des tokens
           jwk-set-uri: ${KEYCLOAK_URL:http://localhost:8180}/realms/${KEYCLOAK_REALM:taskforce-dev}/protocol/openid-connect/certs
+
+      # OAuth2 Client : Pour l'authentification Password Grant
       client:
         registration:
           keycloak:
             client-id: ${KEYCLOAK_CLIENT_ID:taskforce-api}
             client-secret: ${KEYCLOAK_CLIENT_SECRET:dev-secret}
-            authorization-grant-type: authorization_code
+            # Password Grant : Permet l'auth avec email/password sans redirection
+            authorization-grant-type: password
             scope: openid,profile,email
+            # Nom du provider (référence à la section provider ci-dessous)
+            provider: keycloak
         provider:
           keycloak:
+            # Issuer URI : Base URL du realm Keycloak
             issuer-uri: ${KEYCLOAK_URL:http://localhost:8180}/realms/${KEYCLOAK_REALM:taskforce-dev}
+            # Token Endpoint : Pour obtenir les tokens (Password Grant)
+            token-uri: ${KEYCLOAK_URL:http://localhost:8180}/realms/${KEYCLOAK_REALM:taskforce-dev}/protocol/openid-connect/token
+            # UserInfo Endpoint : Pour récupérer les infos utilisateur
+            user-info-uri: ${KEYCLOAK_URL:http://localhost:8180}/realms/${KEYCLOAK_REALM:taskforce-dev}/protocol/openid-connect/userinfo
+            # JWK Set URI : Clés publiques pour vérifier les signatures
+            jwk-set-uri: ${KEYCLOAK_URL:http://localhost:8180}/realms/${KEYCLOAK_REALM:taskforce-dev}/protocol/openid-connect/certs
+            # User Name Attribute : Claim utilisé comme identifiant
+            user-name-attribute: preferred_username
+
   web:
     error:
       include-stacktrace: always
@@ -81,10 +99,25 @@ keycloak:
   realm: ${KEYCLOAK_REALM:taskforce-dev}
   client-id: ${KEYCLOAK_CLIENT_ID:taskforce-api}
   client-secret: ${KEYCLOAK_CLIENT_SECRET:dev-secret}
+
+  # Admin Client (pour créer/gérer les utilisateurs)
   admin:
     username: ${KEYCLOAK_ADMIN_USERNAME:admin}
     password: ${KEYCLOAK_ADMIN_PASSWORD:admin}
     client-id: ${KEYCLOAK_ADMIN_CLIENT_ID:admin-cli}
+
+  # OAuth2/OIDC Endpoints
+  endpoints:
+    # Token Endpoint : Pour obtenir access_token et refresh_token (Password Grant)
+    token: ${keycloak.url}/realms/${keycloak.realm}/protocol/openid-connect/token
+    # Logout Endpoint : Pour révoquer les tokens
+    logout: ${keycloak.url}/realms/${keycloak.realm}/protocol/openid-connect/logout
+    # UserInfo Endpoint : Pour récupérer les infos de l'utilisateur authentifié
+    userinfo: ${keycloak.url}/realms/${keycloak.realm}/protocol/openid-connect/userinfo
+    # Token Introspection : Pour valider un token
+    introspect: ${keycloak.url}/realms/${keycloak.realm}/protocol/openid-connect/token/introspect
+    # JWK Set : Clés publiques pour vérifier les signatures JWT
+    certs: ${keycloak.url}/realms/${keycloak.realm}/protocol/openid-connect/certs
 
 # Stripe Configuration
 stripe:
@@ -134,5 +167,5 @@ logging:
 
 # Server Configuration
 server:
-  port: ${SERVER_PORT:8081}
+  port: ${SERVER_PORT:8080}
 
