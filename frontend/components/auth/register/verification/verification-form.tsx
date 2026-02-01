@@ -21,6 +21,8 @@ import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { getRegisterData, clearRegisterData } from "@/lib/auth/register-storage";
+import { validateOTP, globalRateLimiter } from "@/lib/utils/validation";
+import { authService } from "@/lib/api";
 
 export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
   const router = useRouter();
@@ -53,22 +55,26 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
   }, [countdown]);
 
   const handleResendCode = async () => {
+    // Rate limiting - 1 renvoi par minute
+    if (!globalRateLimiter.isAllowed("resend-otp", 1, 60 * 1000)) {
+      const timeLeft = globalRateLimiter.getTimeUntilReset("resend-otp", 60 * 1000);
+      toast.error(t.common.error, {
+        description: `Veuillez attendre ${timeLeft} secondes avant de renvoyer le code`,
+      });
+      return;
+    }
+
     setIsResending(true);
     
     try {
-      // TODO: Appel API pour renvoyer l'OTP
-      // const response = await fetch('/api/auth/resend-otp', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ email: userEmail })
-      // });
+      // Appel API pour renvoyer l'OTP
+      await authService.resendOtp({ email: userEmail });
       
-      await new Promise((resolve) => setTimeout(resolve, 1000));
       toast.success("Code de vérification renvoyé");
       setCountdown(60);
-    } catch (error) {
+    } catch (error: any) {
       toast.error(t.common.error, {
-        description: "Erreur lors de l'envoi du code",
+        description: error.message || "Erreur lors de l'envoi du code",
       });
       console.error("Resend OTP error:", error);
     } finally {
@@ -79,9 +85,10 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (otp.length !== 6) {
+    // Validation format OTP
+    if (!validateOTP(otp)) {
       toast.error(t.common.error, {
-        description: "Veuillez entrer le code à 6 chiffres",
+        description: "Veuillez entrer un code à 6 chiffres valide",
       });
       return;
     }
@@ -89,14 +96,16 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
     setIsLoading(true);
 
     try {
-      // TODO: Appel API pour vérifier l'OTP
-      // const response = await fetch('/api/auth/verify-otp', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ email: userEmail, otp })
-      // });
-      
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      // Récupérer le plan sélectionné
+      const registerData = getRegisterData();
+      const planType = registerData?.plan?.toUpperCase() || "FREE";
+
+      // Appel API pour vérifier l'OTP
+      await authService.verifyOtp({
+        email: userEmail,
+        otpCode: otp,
+        planType,
+      });
       
       // Nettoyer les données temporaires
       clearRegisterData();
@@ -107,9 +116,9 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
       
       // Redirection vers login
       router.push('/auth/login');
-    } catch (error) {
+    } catch (error: any) {
       toast.error(t.common.error, {
-        description: "Code de vérification invalide",
+        description: error.message || "Code de vérification invalide",
       });
       console.error("OTP verification error:", error);
     } finally {
