@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { Check } from "lucide-react";
 import { getRegisterData, setRegisterData } from "@/lib/auth/register-storage";
+import { authService } from "@/lib/api";
 
 type Plan = {
   id: string;
@@ -96,29 +97,24 @@ export function RegisterPlanForm({
     setIsLoading(true);
 
     try {
-      // TODO: Appel API pour sauvegarder le plan choisi
-      // const response = await fetch('/api/auth/register/plan', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ plan: selectedPlan })
-      // });
-
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Appel API pour sauvegarder le plan choisi
+      await authService.selectPlan({
+        email: userEmail,
+        planType: selectedPlan.toUpperCase(),
+      });
 
       // Stocker le plan sélectionné
       setRegisterData({ plan: selectedPlan });
 
-      toast.success("Plan sélectionné avec succès");
-
-      // Envoyer le code OTP par email
-      // TODO: Appel API pour envoyer l'OTP
-      toast.success("Code de vérification envoyé à votre email");
+      toast.success("Plan sélectionné avec succès", {
+        description: "Code de vérification envoyé à votre email",
+      });
 
       // Redirection vers vérification
       router.push("/auth/register/verification");
-    } catch (error) {
+    } catch (error: any) {
       toast.error(t.common.error, {
-        description: "Erreur lors de la sélection du plan",
+        description: error.message || "Erreur lors de la sélection du plan",
       });
       console.error("Plan selection error:", error);
     } finally {
