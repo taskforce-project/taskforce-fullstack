@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Roboto, Roboto_Serif, Roboto_Mono } from "next/font/google";
 import "./globals.css";
+import { AuthProvider } from "@/lib/contexts/auth-context";
 
 const roboto = Roboto({
   variable: "--font-roboto",
@@ -33,7 +34,7 @@ export default function RootLayout({
       <body
         className={`${roboto.variable} ${robotoSerif.variable} ${robotoMono.variable} font-sans antialiased`}
       >
-        {children}
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );
