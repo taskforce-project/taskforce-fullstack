@@ -17,6 +17,15 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { setRegisterData } from "@/lib/auth/register-storage";
+import { authService } from "@/lib/api";
+import {
+  validateEmail,
+  validateName,
+  validatePassword,
+  sanitizeInput,
+  isDisposableEmail,
+  calculatePasswordStrength,
+} from "@/lib/utils/validation";
 
 export function SignupForm({
   className,
@@ -36,7 +45,7 @@ export function SignupForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validation
+    // Validation des champs vides
     if (!formData.firstName || !formData.lastName || !formData.email || !formData.password || !formData.confirmPassword) {
       toast.error(t.common.error, { 
         description: "Veuillez remplir tous les champs" 
@@ -44,6 +53,38 @@ export function SignupForm({
       return;
     }
 
+    // Validation des noms
+    if (!validateName(formData.firstName)) {
+      toast.error(t.common.error, {
+        description: "Le prénom n'est pas valide (2-50 caractères, lettres uniquement)",
+      });
+      return;
+    }
+
+    if (!validateName(formData.lastName)) {
+      toast.error(t.common.error, {
+        description: "Le nom n'est pas valide (2-50 caractères, lettres uniquement)",
+      });
+      return;
+    }
+
+    // Validation email
+    if (!validateEmail(formData.email)) {
+      toast.error(t.common.error, {
+        description: "Format d'email invalide",
+      });
+      return;
+    }
+
+    // Vérifier les emails jetables
+    if (isDisposableEmail(formData.email)) {
+      toast.error(t.common.error, {
+        description: "Les adresses email temporaires ne sont pas autorisées",
+      });
+      return;
+    }
+
+    // Validation confirmation mot de passe
     if (formData.password !== formData.confirmPassword) {
       toast.error(t.common.error, { 
         description: t.auth.errors.passwordsDoNotMatch 
@@ -51,44 +92,59 @@ export function SignupForm({
       return;
     }
 
-    if (formData.password.length < 8) {
-      toast.error(t.common.error, { 
-        description: t.auth.errors.passwordTooShort 
+    // Validation renforcée du mot de passe
+    const passwordValidation = validatePassword(formData.password);
+    if (!passwordValidation.isValid) {
+      toast.error(t.common.error, {
+        description: passwordValidation.errors[0], // Afficher la première erreur
       });
       return;
     }
 
+    // Vérifier la force du mot de passe
+    const strength = calculatePasswordStrength(formData.password);
+    if (strength < 50) {
+      toast.error(t.common.error, {
+        description: "Le mot de passe est trop faible. Utilisez un mot de passe plus complexe.",
+      });
+      return;
+    }
+
+    // Sanitization des inputs
+    const sanitizedData = {
+      firstName: sanitizeInput(formData.firstName),
+      lastName: sanitizeInput(formData.lastName),
+      email: sanitizeInput(formData.email),
+      password: formData.password, // Ne pas sanitize le password pour garder les caractères spéciaux
+    };
+
     setIsLoading(true);
 
     try {
-      // TODO: Appel API pour créer le compte (étape 1)
-      // const response = await fetch('/api/auth/register', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({
-      //     firstName: formData.firstName,
-      //     lastName: formData.lastName,
-      //     email: formData.email,
-      //     password: formData.password,
-      //   })
-      // });
-      
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Appel API pour créer le compte (étape 1)
+      await authService.register({
+        email: sanitizedData.email,
+        password: sanitizedData.password,
+        firstName: sanitizedData.firstName,
+        lastName: sanitizedData.lastName,
+      });
       
       // Stocker les données dans sessionStorage pour les étapes suivantes
       setRegisterData({
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
+        firstName: sanitizedData.firstName,
+        lastName: sanitizedData.lastName,
+        email: sanitizedData.email,
       });
 
-      toast.success("Compte créé avec succès");
+      toast.success("Compte créé avec succès", {
+        description: "Un code de vérification a été envoyé à votre email",
+      });
       
       // Redirection vers choix du plan
       router.push('/auth/register/plan');
-    } catch (error) {
+    } catch (error: any) {
       toast.error(t.common.error, { 
-        description: t.auth.errors.registrationFailed 
+        description: error.message || t.auth.errors.registrationFailed 
       });
       console.error("Registration error:", error);
     } finally {
