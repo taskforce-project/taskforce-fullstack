@@ -1,23 +1,27 @@
 package com.taskforce.tf_api.core.service;
 
+import org.keycloak.representations.idm.UserRepresentation;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.stripe.exception.StripeException;
 import com.stripe.model.Customer;
 import com.taskforce.tf_api.core.dto.request.LoginRequest;
 import com.taskforce.tf_api.core.dto.request.RegisterRequest;
+import com.taskforce.tf_api.core.dto.request.SelectPlanRequest;
 import com.taskforce.tf_api.core.dto.request.VerifyOtpRequest;
 import com.taskforce.tf_api.core.dto.response.AuthResponse;
 import com.taskforce.tf_api.core.dto.response.RegisterResponse;
-import com.taskforce.tf_api.core.dto.response.UserResponse;
+import com.taskforce.tf_api.core.dto.response.SelectPlanResponse;
 import com.taskforce.tf_api.core.dto.response.VerifyOtpResponse;
 import com.taskforce.tf_api.core.enums.OtpType;
 import com.taskforce.tf_api.core.enums.PlanType;
+import com.taskforce.tf_api.core.model.OtpVerification;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.keycloak.representations.idm.UserRepresentation;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Service d'authentification principal
@@ -30,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AuthService {
 
     private final KeycloakService keycloakService;
+    private final KeycloakAuthService keycloakAuthService;
     private final OtpService otpService;
     private final StripeService stripeService;
     private final EmailService emailService;
@@ -83,21 +88,67 @@ public class AuthService {
     }
 
     /**
+     * Sélection du plan (Étape 2 de l'inscription)
+     * 1. Vérifie que l'utilisateur existe dans Keycloak
+     * 2. Stocke le plan sélectionné dans la table OTP
+     * 3. Renvoie un nouveau code OTP si nécessaire
+     */
+    public SelectPlanResponse selectPlan(SelectPlanRequest request) {
+        log.info("Sélection du plan {} pour : {}", request.getPlanType(), request.getEmail());
+
+        // Vérifier que l'utilisateur existe dans Keycloak
+        UserRepresentation keycloakUser = keycloakService.getUserByEmail(request.getEmail());
+        if (keycloakUser == null) {
+            throw new RuntimeException("Utilisateur non trouvé. Veuillez d'abord vous inscrire.");
+        }
+
+        String keycloakId = keycloakUser.getId();
+
+        // Vérifier si l'email est déjà vérifié
+        if (Boolean.TRUE.equals(keycloakUser.isEmailVerified())) {
+            throw new RuntimeException("Cet email est déjà vérifié. Veuillez vous connecter.");
+        }
+
+        // Stocker le plan dans la table OTP (mise à jour de l'OTP existant)
+        boolean planStored = otpService.updatePlanType(request.getEmail(), keycloakId, request.getPlanType());
+
+        if (!planStored) {
+            throw new RuntimeException("Erreur lors de l'enregistrement du plan. Code OTP introuvable.");
+        }
+
+        log.info("Plan {} enregistré pour {} dans OTP", request.getPlanType(), request.getEmail());
+
+        return SelectPlanResponse.builder()
+            .message("Plan sélectionné avec succès. Vérifiez votre email pour le code de confirmation.")
+            .email(request.getEmail())
+            .planType(request.getPlanType())
+            .otpSent(true)
+            .otpExpiresInMinutes(15)
+            .build();
+    }
+
+    /**
      * Vérification du code OTP et finalisation de l'inscription
-     * 1. Vérifie le code OTP
+     * 1. Vérifie le code OTP et récupère le plan sélectionné
      * 2. Marque l'email comme vérifié dans Keycloak
-     * 3. Crée l'utilisateur dans notre DB
+     * 3. Crée l'utilisateur dans notre DB avec le plan
      * 4. Si plan payant : crée client Stripe et retourne URL checkout
      * 5. Génère les tokens JWT
      */
-    public VerifyOtpResponse verifyOtpAndCompleteRegistration(VerifyOtpRequest request, String planType) {
+    public VerifyOtpResponse verifyOtpAndCompleteRegistration(VerifyOtpRequest request) {
         log.info("Vérification OTP pour : {}", request.getEmail());
 
-        // Vérifier le code OTP
-        boolean otpValid = otpService.verifyOtp(request.getEmail(), request.getOtpCode());
+        // Vérifier le code OTP et récupérer le plan sélectionné
+        OtpVerification otpVerification = otpService.verifyOtpAndGetDetails(request.getEmail(), request.getOtpCode());
 
-        if (!otpValid) {
+        if (otpVerification == null) {
             throw new RuntimeException("Code de vérification invalide ou expiré");
+        }
+
+        // Récupérer le plan depuis l'OTP
+        String planType = otpVerification.getPlanType();
+        if (planType == null || planType.isEmpty()) {
+            throw new RuntimeException("Plan non sélectionné. Veuillez d'abord choisir un plan.");
         }
 
         // Récupérer l'utilisateur depuis Keycloak
@@ -168,8 +219,18 @@ public class AuthService {
     public AuthResponse login(LoginRequest request) {
         log.info("Tentative de connexion pour : {}", request.getEmail());
 
-        // TODO: Authentifier via Keycloak (nécessite configuration OAuth2/OpenID Connect)
-        // Pour l'instant, on va juste vérifier que l'utilisateur existe
+        // Authentifier l'utilisateur via Keycloak (vérifie email + password)
+        try {
+            keycloakAuthService.authenticate(
+                request.getEmail(),
+                request.getPassword()
+            );
+
+            log.info("Authentification Keycloak réussie pour : {}", request.getEmail());
+        } catch (RuntimeException e) {
+            log.error("Échec d'authentification Keycloak pour {} : {}", request.getEmail(), e.getMessage());
+            throw new RuntimeException("Email ou mot de passe incorrect");
+        }
 
         // Récupérer l'utilisateur depuis Keycloak
         UserRepresentation keycloakUser = keycloakService.getUserByEmail(request.getEmail());

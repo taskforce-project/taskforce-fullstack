@@ -9,7 +9,6 @@ import org.springframework.stereotype.Service;
 
 /**
  * Service d'envoi d'emails via Mailtrap (développement) ou SMTP
- * L'API Java envoie les emails, pas le frontend
  */
 @Service
 @RequiredArgsConstructor
@@ -18,11 +17,11 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
 
-    @Value("${spring.mail.from:noreply@taskforce.com}")
+    @Value("${mail.from:noreply@taskforce.com}")
     private String fromEmail;
 
-    @Value("${app.name:TaskForce}")
-    private String appName;
+    @Value("${mail.from-name:TaskForce}")
+    private String fromName;
 
     /**
      * Envoie un code OTP par email
@@ -32,7 +31,7 @@ public class EmailService {
             SimpleMailMessage message = new SimpleMailMessage();
             message.setFrom(fromEmail);
             message.setTo(toEmail);
-            message.setSubject(String.format("[%s] Votre code de vérification", appName));
+            message.setSubject(String.format("[%s] Votre code de vérification", fromName));
             message.setText(buildOtpEmailBody(otpCode, firstName));
 
             mailSender.send(message);
@@ -51,7 +50,7 @@ public class EmailService {
             SimpleMailMessage message = new SimpleMailMessage();
             message.setFrom(fromEmail);
             message.setTo(toEmail);
-            message.setSubject(String.format("Bienvenue sur %s !", appName));
+            message.setSubject(String.format("Bienvenue sur %s !", fromName));
             message.setText(buildWelcomeEmailBody(firstName));
 
             mailSender.send(message);
@@ -69,7 +68,7 @@ public class EmailService {
             SimpleMailMessage message = new SimpleMailMessage();
             message.setFrom(fromEmail);
             message.setTo(toEmail);
-            message.setSubject(String.format("[%s] Confirmation de votre abonnement", appName));
+            message.setSubject(String.format("[%s] Confirmation de votre abonnement", fromName));
             message.setText(buildSubscriptionConfirmationBody(firstName, planType));
 
             mailSender.send(message);
@@ -96,7 +95,7 @@ public class EmailService {
             
             Cordialement,
             L'équipe %s
-            """, firstName, otpCode, appName);
+            """, firstName, otpCode, fromName);
     }
 
     /**
@@ -112,7 +111,7 @@ public class EmailService {
             
             Cordialement,
             L'équipe %s
-            """, firstName, appName, appName);
+            """, firstName, fromName, fromName);
     }
 
     /**
@@ -130,6 +129,6 @@ public class EmailService {
             
             Cordialement,
             L'équipe %s
-            """, firstName, planType, appName);
+            """, firstName, planType, fromName);
     }
 }

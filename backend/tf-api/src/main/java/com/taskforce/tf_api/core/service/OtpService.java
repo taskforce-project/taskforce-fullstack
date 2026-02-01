@@ -1,17 +1,19 @@
 package com.taskforce.tf_api.core.service;
 
+import java.security.SecureRandom;
+import java.time.LocalDateTime;
+import java.util.Optional;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.taskforce.tf_api.core.enums.OtpStatus;
 import com.taskforce.tf_api.core.enums.OtpType;
 import com.taskforce.tf_api.core.model.OtpVerification;
 import com.taskforce.tf_api.core.repository.OtpVerificationRepository;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.security.SecureRandom;
-import java.time.LocalDateTime;
-import java.util.Optional;
 
 /**
  * Service de gestion des codes OTP
@@ -111,6 +113,67 @@ public class OtpService {
         otpRepository.save(otp);
 
         log.info("Code OTP vérifié avec succès pour : {}", email);
+        return true;
+    }
+
+    /**
+     * Vérifie un code OTP et retourne l'objet OtpVerification complet
+     */
+    @Transactional
+    public OtpVerification verifyOtpAndGetDetails(String email, String otpCode) {
+        log.info("Vérification du code OTP avec détails pour : {}", email);
+
+        Optional<OtpVerification> otpOpt = otpRepository.findValidOtpByEmailAndCode(
+            email,
+            otpCode,
+            LocalDateTime.now()
+        );
+
+        if (otpOpt.isEmpty()) {
+            log.warn("Code OTP invalide ou expiré pour : {}", email);
+            return null;
+        }
+
+        OtpVerification otp = otpOpt.get();
+
+        // Vérifier si le code peut être validé
+        if (!otp.canBeValidated()) {
+            log.warn("Le code OTP ne peut pas être validé (expiré ou max tentatives atteint) : {}", email);
+            otpRepository.save(otp);
+            return null;
+        }
+
+        // Marquer comme vérifié
+        otp.markAsVerified();
+        otpRepository.save(otp);
+
+        log.info("Code OTP vérifié avec succès pour : {}", email);
+        return otp;
+    }
+
+    /**
+     * Met à jour le planType dans un OTP existant
+     * Utilisé lors de la sélection du plan (étape 2 de l'inscription)
+     */
+    @Transactional
+    public boolean updatePlanType(String email, String keycloakId, String planType) {
+        log.info("Mise à jour du plan {} pour : {}", planType, email);
+
+        // Récupérer l'OTP en attente pour cet email
+        Optional<OtpVerification> otpOpt = otpRepository.findPendingOtpByEmail(email);
+
+        if (otpOpt.isEmpty()) {
+            log.warn("Aucun OTP en attente trouvé pour : {}", email);
+            return false;
+        }
+
+        OtpVerification otp = otpOpt.get();
+
+        // Mettre à jour le plan
+        otp.setPlanType(planType);
+        otpRepository.save(otp);
+
+        log.info("Plan {} enregistré dans l'OTP pour : {}", planType, email);
         return true;
     }
 
