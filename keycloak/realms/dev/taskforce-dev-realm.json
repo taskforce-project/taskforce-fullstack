@@ -8,7 +8,7 @@
   "verifyEmail": true,
   "loginWithEmailAllowed": true,
   "duplicateEmailsAllowed": false,
-  "registrationEmailAsUsername": false,
+  "registrationEmailAsUsername": true,
   "smtpServer": {
     "host": "${env.MAILTRAP_HOST:sandbox.smtp.mailtrap.io}",
     "port": "${env.MAILTRAP_PORT:2525}",
@@ -23,36 +23,51 @@
   "clients": [
     {
       "clientId": "taskforce-api",
+      "name": "Taskforce API",
+      "description": "Backend API with Password Grant and Resource Server",
       "enabled": true,
       "publicClient": false,
-      "bearerOnly": true,
+      "bearerOnly": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
       "serviceAccountsEnabled": true,
       "clientAuthenticatorType": "client-secret",
-      "secret": "dev-secret",
-      "standardFlowEnabled": false,
-      "directAccessGrantsEnabled": true,
-      "fullScopeAllowed": true
-    },
-    {
-      "clientId": "taskforce-web",
-      "enabled": true,
-      "publicClient": true,
+      "secret": "${env.KEYCLOAK_CLIENT_SECRET:dev-secret-change-me}",
+      "rootUrl": "http://localhost:8081",
+      "baseUrl": "/api",
       "redirectUris": [
+        "http://localhost:8081/*",
         "http://localhost:3000/*",
         "http://localhost:5173/*"
       ],
       "webOrigins": [
         "http://localhost:3000",
-        "http://localhost:5173"
+        "http://localhost:5173",
+        "http://localhost:8081"
       ],
-      "standardFlowEnabled": true,
-      "directAccessGrantsEnabled": true,
-      "fullScopeAllowed": true
+      "fullScopeAllowed": true,
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "profile",
+        "roles",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access",
+        "microprofile-jwt"
+      ],
+      "attributes": {
+        "access.token.lifespan": "3600"
+      }
     }
   ],
   "users": [
     {
-      "username": "admin",
+      "username": "admin@taskforce.dev",
       "enabled": true,
       "emailVerified": true,
       "firstName": "Admin",
@@ -65,18 +80,57 @@
           "temporary": false
         }
       ],
-      "realmRoles": ["user"]
+      "realmRoles": [
+        "user"
+      ]
+    },
+    {
+      "username": "test@taskforce.dev",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Test",
+      "lastName": "User",
+      "email": "test@taskforce.dev",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Test@2024",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "user"
+      ]
     }
   ],
   "roles": {
     "realm": [
       {
         "name": "user",
-        "description": "Rôle utilisateur de base",
+        "description": "Utilisateur standard",
         "composite": false,
         "clientRole": false
       }
     ]
   },
-  "defaultRoles": ["user"]
+  "defaultRoles": [
+    "user"
+  ],
+  "accessTokenLifespan": 3600,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "maxFailureWaitSeconds": 900,
+  "minimumQuickLoginWaitSeconds": 60,
+  "waitIncrementSeconds": 60,
+  "quickLoginCheckMilliSeconds": 1000,
+  "maxDeltaTimeSeconds": 43200,
+  "failureFactor": 30,
+  "internationalizationEnabled": true,
+  "supportedLocales": [
+    "fr",
+    "en"
+  ],
+  "defaultLocale": "fr"
 }
