@@ -1,13 +1,13 @@
 package com.taskforce.tf_api.shared.config;
 
+import java.util.Arrays;
+import java.util.List;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
-
-import java.util.Arrays;
-import java.util.List;
 
 /**
  * Configuration CORS (Cross-Origin Resource Sharing)
@@ -28,7 +28,7 @@ public class CorsConfig {
                 "http://localhost:3000",      // React dev
                 "http://localhost:5173",      // Vite dev
                 "http://localhost:4200",      // Angular dev
-                "https://*.taskforce.com"     // Production (remplacer par votre domaine)
+                "https://*.taskforce.com"
         ));
 
         // Headers autorisés
@@ -62,7 +62,8 @@ public class CorsConfig {
         config.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/api/**", config);
+        // Utilise /** car avec context-path=/api, les URLs internes sont /auth/register (sans /api)
+        source.registerCorsConfiguration("/**", config);
 
         return new CorsFilter(source);
     }
