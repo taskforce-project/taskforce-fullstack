@@ -75,14 +75,14 @@ public class OtpVerification {
      * Type d'OTP (EMAIL_VERIFICATION, PASSWORD_RESET, TWO_FACTOR_AUTH)
      */
     @Enumerated(EnumType.STRING)
-    @Column(name = "otp_type", nullable = false)
+    @Column(name = "otp_type", nullable = false, length = 30)
     private OtpType otpType;
 
     /**
      * Statut de l'OTP (PENDING, VERIFIED, EXPIRED, USED)
      */
     @Enumerated(EnumType.STRING)
-    @Column(name = "otp_status", nullable = false)
+    @Column(name = "otp_status", nullable = false, length = 20)
     @Builder.Default
     private OtpStatus otpStatus = OtpStatus.PENDING;
 
