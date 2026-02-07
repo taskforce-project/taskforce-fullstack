@@ -86,6 +86,14 @@ services:
       # Keycloak (utilise le nom du service docker)
       KEYCLOAK_URL: http://keycloak:8080
 
+      # Email (Mailtrap)
+      MAIL_HOST: ${MAILTRAP_HOST:-sandbox.smtp.mailtrap.io}
+      MAIL_PORT: ${MAILTRAP_PORT:-2525}
+      MAIL_USERNAME: ${MAILTRAP_USERNAME}
+      MAIL_PASSWORD: ${MAILTRAP_PASSWORD}
+      MAIL_FROM: ${MAIL_FROM:-noreply@taskforce.com}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-TaskForce}
+
       # JVM Options
       JAVA_OPTS: "-Xmx512m -Xms256m -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
     ports:
