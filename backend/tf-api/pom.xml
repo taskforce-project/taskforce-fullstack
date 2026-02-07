@@ -28,7 +28,7 @@
 	</scm>
 	<properties>
 		<java.version>21</java.version>
-		<keycloak.version>23.0.4</keycloak.version>
+		<keycloak.version>25.0.6</keycloak.version>
 		<springdoc.version>2.3.0</springdoc.version>
 		<dotenv.version>3.2.0</dotenv.version>
 		<flyway.version>11.20.0</flyway.version>
