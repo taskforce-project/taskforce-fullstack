@@ -1,0 +1,14 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "Taskforce PostgreSQL (DEV)",
+      "Group": "Development",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "taskforce-db",
+      "Username": "postgres",
+      "SSLMode": "prefer",
+      "PassFile": "/pgpass"
+    }
+  }
+}

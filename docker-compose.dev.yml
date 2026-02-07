@@ -200,6 +200,8 @@ services:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@taskforce.dev}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
       PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_SERVER_JSON_FILE: /pgadmin4/servers.json
+      PGADMIN_LOAD_SERVERS: "true"
     ports:
       - "5050:80"
     depends_on:
@@ -208,6 +210,9 @@ services:
       - taskforce-network
     volumes:
       - pgadmin_dev_data:/var/lib/pgadmin
+      # Auto-import de la configuration du serveur PostgreSQL
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
+      - ./pgadmin/pgpass:/pgpass
 
 # ================================
 # Volumes
