@@ -8,6 +8,7 @@ export type RegisterData = {
   lastName: string;
   email: string;
   plan?: "free" | "pro" | "enterprise";
+  password: string;
 };
 
 const REGISTER_DATA_KEY = "registerData";
@@ -16,11 +17,11 @@ const REGISTER_DATA_KEY = "registerData";
  * Récupère les données d'inscription depuis sessionStorage
  */
 export function getRegisterData(): RegisterData | null {
-  if (typeof window === "undefined") return null;
-  
+  if (globalThis.window === undefined) return null;
+
   const data = sessionStorage.getItem(REGISTER_DATA_KEY);
   if (!data) return null;
-  
+
   try {
     return JSON.parse(data);
   } catch {
@@ -32,8 +33,8 @@ export function getRegisterData(): RegisterData | null {
  * Sauvegarde les données d'inscription dans sessionStorage
  */
 export function setRegisterData(data: Partial<RegisterData>): void {
-  if (typeof window === "undefined") return;
-  
+  if (globalThis.window === undefined) return;
+
   const existing = getRegisterData() || {};
   const updated = { ...existing, ...data };
   sessionStorage.setItem(REGISTER_DATA_KEY, JSON.stringify(updated));
@@ -43,7 +44,7 @@ export function setRegisterData(data: Partial<RegisterData>): void {
  * Supprime les données d'inscription de sessionStorage
  */
 export function clearRegisterData(): void {
-  if (typeof window === "undefined") return;
+  if (globalThis.window === undefined) return;
   sessionStorage.removeItem(REGISTER_DATA_KEY);
 }
 
