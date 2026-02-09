@@ -1,13 +1,29 @@
 package com.taskforce.tf_api.core.model;
 
+import java.time.LocalDateTime;
+
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
+
 import com.taskforce.tf_api.core.enums.PlanStatus;
 import com.taskforce.tf_api.core.enums.PlanType;
-import jakarta.persistence.*;
-import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 
-import java.time.LocalDateTime;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 /**
  * Entité User - Utilisateur de l'application
@@ -54,7 +70,8 @@ public class User {
      * Synchronisé avec la table Subscription
      */
     @Enumerated(EnumType.STRING)
-    @Column(name = "plan_type", nullable = false, length = 20)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "plan_type", nullable = false)
     @Builder.Default
     private PlanType planType = PlanType.FREE;
 
@@ -64,7 +81,8 @@ public class User {
      * NULL si plan FREE ou aucun abonnement actif
      */
     @Enumerated(EnumType.STRING)
-    @Column(name = "plan_status", length = 20)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "plan_status", nullable = true)
     private PlanStatus planStatus;
 
     /**
