@@ -1,6 +1,8 @@
 package com.taskforce.tf_api.core.service;
 
-import lombok.extern.slf4j.Slf4j;
+import java.util.Collections;
+import java.util.List;
+
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.KeycloakBuilder;
 import org.keycloak.admin.client.resource.RealmResource;
@@ -13,8 +15,7 @@ import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.ws.rs.core.Response;
-import java.util.Collections;
-import java.util.List;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Service pour communiquer avec Keycloak
@@ -65,11 +66,11 @@ public class KeycloakService {
 
         UserRepresentation user = new UserRepresentation();
         user.setEmail(email);
-        user.setUsername(email); // Utiliser l'email comme username
+        user.setUsername(email);
         user.setFirstName(firstName);
         user.setLastName(lastName);
         user.setEnabled(true);
-        user.setEmailVerified(false); // L'email sera vérifié après validation OTP
+        user.setEmailVerified(false);
 
         // Créer les credentials (mot de passe)
         CredentialRepresentation credential = new CredentialRepresentation();
