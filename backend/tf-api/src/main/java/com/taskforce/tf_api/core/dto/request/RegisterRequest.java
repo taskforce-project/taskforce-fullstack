@@ -1,7 +1,10 @@
 package com.taskforce.tf_api.core.dto.request;
 
+import com.taskforce.tf_api.core.enums.PlanType;
+
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -33,4 +36,7 @@ public class RegisterRequest {
     @NotBlank(message = "Le nom est obligatoire")
     @Size(min = 2, max = 50, message = "Le nom doit contenir entre 2 et 50 caractères")
     private String lastName;
+
+    @NotNull(message = "Le choix du plan est obligatoire")
+    private PlanType planType;
 }
