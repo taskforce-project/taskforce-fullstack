@@ -97,20 +97,15 @@ export function RegisterPlanForm({
     setIsLoading(true);
 
     try {
-      // Appel API pour sauvegarder le plan choisi
-      await authService.selectPlan({
-        email: userEmail,
-        planType: selectedPlan.toUpperCase(),
+      // Stocker le plan sélectionné dans sessionStorage uniquement
+      // L'API sera appelée à l'étape 3 avec toutes les données
+      setRegisterData({ planType: selectedPlan.toUpperCase() });
+
+      toast.success("Plan sélectionné", {
+        description: "Un code de vérification va être envoyé à l'étape suivante",
       });
 
-      // Stocker le plan sélectionné
-      setRegisterData({ plan: selectedPlan });
-
-      toast.success("Plan sélectionné avec succès", {
-        description: "Code de vérification envoyé à votre email",
-      });
-
-      // Redirection vers vérification
+      // Redirection vers vérification (étape 3)
       router.push("/auth/register/verification");
     } catch (error: any) {
       toast.error(t.common.error, {
@@ -206,7 +201,7 @@ export function RegisterPlanForm({
           </Button>
 
           <Button type="submit" disabled={isLoading}>
-            {isLoading ? "Envoi du code..." : "Continuer"}
+            {isLoading ? "Chargement..." : "Continuer"}
           </Button>
         </div>
       </form>
