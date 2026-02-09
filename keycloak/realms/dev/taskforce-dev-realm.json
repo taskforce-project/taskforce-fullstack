@@ -116,6 +116,7 @@
   "defaultRoles": [
     "user"
   ],
+  "requiredActions": [],
   "accessTokenLifespan": 3600,
   "ssoSessionIdleTimeout": 1800,
   "ssoSessionMaxLifespan": 36000,
