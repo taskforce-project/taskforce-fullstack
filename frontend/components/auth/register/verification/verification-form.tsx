@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/input-otp";
 import { Progress } from "@/components/ui/progress";
 import { usePreferencesStore } from "@/lib/store/preferences-store";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { getRegisterData, clearRegisterData } from "@/lib/auth/register-storage";
@@ -32,12 +32,13 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
   const [otp, setOtp] = useState("");
   const [userEmail, setUserEmail] = useState<string>("");
   const [countdown, setCountdown] = useState(0);
+  const hasSentRegistration = useRef(false);
 
   useEffect(() => {
-    // Récupérer les données des étapes précédentes
+    // Récupérer les données des étapes précédentes et envoyer l'inscription
     const registerData = getRegisterData();
-    if (!registerData) {
-      toast.error("Session expirée", {
+    if (!registerData?.email || !registerData?.password || !registerData?.firstName || !registerData?.lastName || !registerData?.planType) {
+      toast.error("Session expirée ou données incomplètes", {
         description: "Veuillez recommencer le processus d'inscription",
       });
       router.push('/auth/register');
@@ -45,7 +46,38 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
     }
     
     setUserEmail(registerData.email);
-  }, [router]);
+
+    // Envoyer l'inscription avec toutes les données si pas déjà fait
+    // useRef empêche le double appel en React StrictMode (dev)
+    if (!hasSentRegistration.current) {
+      hasSentRegistration.current = true;
+      
+      const sendRegistration = async () => {
+        try {
+          await authService.register({
+            email: registerData.email,
+            password: registerData.password,
+            firstName: registerData.firstName,
+            lastName: registerData.lastName,
+            planType: registerData.planType,
+          });
+          
+          toast.success("Code de vérification envoyé", {
+            description: "Consultez votre boîte mail",
+          });
+        } catch (error: any) {
+          toast.error(t.common.error, {
+            description: error.message || "Erreur lors de l'inscription",
+          });
+          console.error("Registration error:", error);
+          // Ne pas revenir à l'étape 1 si l'utilisateur existe déjà (cas idempotent)
+          // L'utilisateur peut toujours entrer son code OTP
+        }
+      };
+
+      sendRegistration();
+    }
+  }, [router, t.common.error]);
 
   useEffect(() => {
     if (countdown > 0) {
@@ -68,7 +100,7 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
     
     try {
       // Appel API pour renvoyer l'OTP
-      await authService.resendOtp({ email: userEmail });
+      await authService.resendOtp(userEmail);
       
       toast.success("Code de vérification renvoyé");
       setCountdown(60);
@@ -96,16 +128,8 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
     setIsLoading(true);
 
     try {
-      // Récupérer le plan sélectionné
-      const registerData = getRegisterData();
-      const planType = registerData?.plan?.toUpperCase() || "FREE";
-
       // Appel API pour vérifier l'OTP
-      await authService.verifyOtp({
-        email: userEmail,
-        otpCode: otp,
-        planType,
-      });
+      await authService.verifyOtp(userEmail, otp);
       
       // Nettoyer les données temporaires
       clearRegisterData();
