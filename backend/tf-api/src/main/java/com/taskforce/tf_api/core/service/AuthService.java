@@ -43,41 +43,87 @@ public class AuthService {
 
     /**
      * Inscription d'un nouvel utilisateur
-     * 1. Crée le compte dans Keycloak
+     * 1. Crée le compte dans Keycloak (ou renvoie OTP si déjà créé mais non vérifié)
      * 2. Génère et envoie le code OTP
      * 3. Retourne une réponse indiquant que l'OTP a été envoyé
+     * 
+     * Nouveau workflow : reçoit toutes les informations en une seule fois (incluant planType)
+     * Méthode idempotente : si l'utilisateur existe déjà dans Keycloak mais n'est pas vérifié,
+     * renvoie simplement un OTP au lieu de lever une erreur.
      */
     public RegisterResponse register(RegisterRequest request) {
-        log.info("Tentative d'inscription pour : {}", request.getEmail());
+        log.info("Tentative d'inscription pour : {} avec plan : {}", 
+            request.getEmail(), request.getPlanType());
 
-        // Vérifier si l'email existe déjà dans notre DB
+        // Vérifier si l'email existe déjà dans notre DB (utilisateur complètement enregistré)
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Cet email est déjà utilisé");
+            throw new RuntimeException("Cet email est déjà utilisé. Veuillez vous connecter.");
         }
+
+        String keycloakId;
+        String firstName = request.getFirstName();
+        boolean userAlreadyExists = false;
 
         // Vérifier si l'email existe déjà dans Keycloak
         if (keycloakService.emailExists(request.getEmail())) {
-            throw new RuntimeException("Cet email est déjà utilisé");
+            // Récupérer l'utilisateur Keycloak existant
+            UserRepresentation keycloakUser = keycloakService.getUserByEmail(request.getEmail());
+            
+            // Si l'email est déjà vérifié, l'utilisateur doit se connecter
+            if (Boolean.TRUE.equals(keycloakUser.isEmailVerified())) {
+                throw new RuntimeException("Cet email est déjà vérifié. Veuillez vous connecter.");
+            }
+            
+            // L'utilisateur existe mais n'est pas encore vérifié → renvoyer OTP (idempotent)
+            keycloakId = keycloakUser.getId();
+            firstName = keycloakUser.getFirstName(); // Utiliser le prénom de Keycloak
+            userAlreadyExists = true;
+            log.info("Utilisateur déjà créé dans Keycloak mais non vérifié : {}. Renvoi d'OTP.", request.getEmail());
+        } else {
+            // Créer l'utilisateur dans Keycloak avec gestion de race condition
+            try {
+                keycloakId = keycloakService.createUser(
+                    request.getEmail(),
+                    request.getPassword(),
+                    request.getFirstName(),
+                    request.getLastName()
+                );
+                log.info("Nouvel utilisateur créé dans Keycloak : {}", request.getEmail());
+            } catch (RuntimeException e) {
+                // Si l'utilisateur a été créé entre-temps (race condition), le récupérer
+                if (e.getMessage() != null && e.getMessage().contains("User exists")) {
+                    log.warn("Race condition détectée : utilisateur créé entre-temps pour {}", request.getEmail());
+                    UserRepresentation keycloakUser = keycloakService.getUserByEmail(request.getEmail());
+                    
+                    // Vérifier si l'email est vérifié
+                    if (Boolean.TRUE.equals(keycloakUser.isEmailVerified())) {
+                        throw new RuntimeException("Cet email est déjà vérifié. Veuillez vous connecter.");
+                    }
+                    
+                    keycloakId = keycloakUser.getId();
+                    firstName = keycloakUser.getFirstName();
+                    userAlreadyExists = true;
+                } else {
+                    // Erreur différente, la relever
+                    throw e;
+                }
+            }
         }
 
-        // Créer l'utilisateur dans Keycloak
-        String keycloakId = keycloakService.createUser(
-            request.getEmail(),
-            request.getPassword(),
-            request.getFirstName(),
-            request.getLastName()
-        );
-
-        // Générer et envoyer le code OTP
+        // Générer et envoyer le code OTP avec le plan sélectionné
         otpService.generateAndSendOtp(
             request.getEmail(),
-            request.getFirstName(),
+            firstName, // Utiliser le prénom récupéré (peut venir de Keycloak ou de la requête)
             OtpType.EMAIL_VERIFICATION,
             null, // userId pas encore créé dans notre DB
-            keycloakId
+            keycloakId,
+            request.getPlanType() // Stocker le plan directement dans l'OTP
         );
 
-        log.info("Inscription réussie pour : {}. OTP envoyé.", request.getEmail());
+        log.info("Inscription {} pour : {} avec plan {}. OTP envoyé.", 
+            userAlreadyExists ? "réessayée" : "réussie",
+            request.getEmail(), 
+            request.getPlanType());
 
         return RegisterResponse.builder()
             .message("Un code de vérification a été envoyé à votre adresse email")
@@ -159,11 +205,14 @@ public class AuthService {
         keycloakService.verifyEmail(keycloakId);
 
         // Créer l'utilisateur dans notre DB
+        PlanType planTypeEnum = PlanType.valueOf(planType.toUpperCase());
         User user = User.builder()
             .keycloakId(keycloakId)
             .email(request.getEmail())
-            .planType(PlanType.valueOf(planType.toUpperCase()))
+            .planType(planTypeEnum)
             .isActive(true)
+            // Plan status: NULL pour FREE, TRIALING pour plans payants en attente de configuration Stripe
+            .planStatus(planTypeEnum == PlanType.FREE ? null : com.taskforce.tf_api.core.enums.PlanStatus.TRIALING)
             .build();
 
         // Si plan payant, créer le client Stripe
@@ -267,13 +316,20 @@ public class AuthService {
             throw new RuntimeException("Cet email est déjà vérifié");
         }
 
+        // Récupérer le plan depuis l'OTP existant
+        OtpVerification existingOtp = otpService.getLatestPendingOtp(email);
+        PlanType planType = existingOtp != null && existingOtp.getPlanType() != null 
+            ? PlanType.valueOf(existingOtp.getPlanType()) 
+            : null;
+
         // Générer et envoyer un nouveau code OTP
         otpService.generateAndSendOtp(
             email,
             keycloakUser.getFirstName(),
             OtpType.EMAIL_VERIFICATION,
             null,
-            keycloakUser.getId()
+            keycloakUser.getId(),
+            planType
         );
 
         return RegisterResponse.builder()
