@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.taskforce.tf_api.core.enums.OtpStatus;
 import com.taskforce.tf_api.core.enums.OtpType;
+import com.taskforce.tf_api.core.enums.PlanType;
 import com.taskforce.tf_api.core.model.OtpVerification;
 import com.taskforce.tf_api.core.repository.OtpVerificationRepository;
 
@@ -39,9 +40,10 @@ public class OtpService {
         String firstName,
         OtpType otpType,
         Long userId,
-        String keycloakId
+        String keycloakId,
+        PlanType planType
     ) {
-        log.info("Génération d'un OTP pour : {}", email);
+        log.info("Génération d'un OTP pour : {} avec plan : {}", email, planType);
 
         // Vérifier le nombre de tentatives récentes (protection spam)
         long recentAttempts = otpRepository.countRecentOtpAttempts(
@@ -59,7 +61,7 @@ public class OtpService {
         // Générer un nouveau code OTP
         String otpCode = generateOtpCode();
 
-        // Créer l'enregistrement OTP
+        // Créer l'enregistrement OTP avec le plan sélectionné
         OtpVerification otp = OtpVerification.builder()
             .userId(userId)
             .keycloakId(keycloakId)
@@ -70,10 +72,11 @@ public class OtpService {
             .attempts(0)
             .maxAttempts(5)
             .expiresAt(LocalDateTime.now().plusMinutes(OTP_EXPIRY_MINUTES))
+            .planType(planType != null ? planType.toString() : null)
             .build();
 
         otp = otpRepository.save(otp);
-        log.info("OTP créé avec succès pour : {}", email);
+        log.info("OTP créé avec succès pour : {} avec plan {}", email, planType);
 
         // Envoyer l'email
         emailService.sendOtpEmail(email, otpCode, firstName);
@@ -175,6 +178,14 @@ public class OtpService {
 
         log.info("Plan {} enregistré dans l'OTP pour : {}", planType, email);
         return true;
+    }
+
+    /**
+     * Récupère le dernier OTP en attente pour un email
+     * Utilisé pour récupérer le plan lors du renvoi d'OTP
+     */
+    public OtpVerification getLatestPendingOtp(String email) {
+        return otpRepository.findPendingOtpByEmail(email).orElse(null);
     }
 
     /**
