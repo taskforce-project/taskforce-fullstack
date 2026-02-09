@@ -115,29 +115,23 @@ export function SignupForm({
       firstName: sanitizeInput(formData.firstName),
       lastName: sanitizeInput(formData.lastName),
       email: sanitizeInput(formData.email),
-      password: formData.password, // Ne pas sanitize le password pour garder les caractères spéciaux
+      password: formData.password,
     };
 
     setIsLoading(true);
 
     try {
-      // Appel API pour créer le compte (étape 1)
-      await authService.register({
-        email: sanitizedData.email,
-        password: sanitizedData.password,
-        firstName: sanitizedData.firstName,
-        lastName: sanitizedData.lastName,
-      });
-      
       // Stocker les données dans sessionStorage pour les étapes suivantes
+      // L'API sera appelée à l'étape 3 avec toutes les données
       setRegisterData({
         firstName: sanitizedData.firstName,
         lastName: sanitizedData.lastName,
         email: sanitizedData.email,
+        password: sanitizedData.password,
       });
 
-      toast.success("Compte créé avec succès", {
-        description: "Un code de vérification a été envoyé à votre email",
+      toast.success("Informations enregistrées", {
+        description: "Passez à l'étape suivante pour choisir votre plan",
       });
       
       // Redirection vers choix du plan
