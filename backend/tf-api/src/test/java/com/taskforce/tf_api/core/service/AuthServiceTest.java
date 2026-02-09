@@ -1,22 +1,24 @@
 package com.taskforce.tf_api.core.service;
 
-import com.taskforce.tf_api.core.dto.request.RegisterRequest;
-import com.taskforce.tf_api.core.dto.response.RegisterResponse;
-import com.taskforce.tf_api.core.enums.OtpType;
-import com.taskforce.tf_api.core.repository.UserRepository;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
-import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import com.taskforce.tf_api.core.dto.request.RegisterRequest;
+import com.taskforce.tf_api.core.dto.response.RegisterResponse;
+import com.taskforce.tf_api.core.enums.OtpType;
+import com.taskforce.tf_api.core.enums.PlanType;
+import com.taskforce.tf_api.core.repository.UserRepository;
 
 @ExtendWith(MockitoExtension.class)
 public class AuthServiceTest {
@@ -42,6 +44,7 @@ public class AuthServiceTest {
                 .password("Password123!")
                 .firstName("Test")
                 .lastName("User")
+                .planType(PlanType.FREE)
                 .build();
     }
 
@@ -64,6 +67,7 @@ public class AuthServiceTest {
                 eq(registerRequest.getFirstName()),
                 eq(OtpType.EMAIL_VERIFICATION),
                 isNull(),
-                eq(keycloakId)
+                eq(keycloakId),
+                eq(PlanType.FREE)
         );}
 }
