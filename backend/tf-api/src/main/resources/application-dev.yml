@@ -45,7 +45,7 @@ spring:
         registration:
           keycloak:
             client-id: ${KEYCLOAK_CLIENT_ID:taskforce-api}
-            client-secret: ${KEYCLOAK_CLIENT_SECRET:dev-secret}
+            client-secret: ${KEYCLOAK_CLIENT_SECRET:dev-secret-change-me}
             # Password Grant : Permet l'auth avec email/password sans redirection
             authorization-grant-type: password
             scope: openid,profile,email
@@ -98,7 +98,7 @@ keycloak:
   url: ${KEYCLOAK_URL:http://localhost:8180}
   realm: ${KEYCLOAK_REALM:taskforce-dev}
   client-id: ${KEYCLOAK_CLIENT_ID:taskforce-api}
-  client-secret: ${KEYCLOAK_CLIENT_SECRET:dev-secret}
+  client-secret: ${KEYCLOAK_CLIENT_SECRET:dev-secret-change-me}
 
   # Admin Client (pour créer/gérer les utilisateurs)
   admin:
