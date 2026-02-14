@@ -15,6 +15,7 @@ import com.taskforce.tf_api.core.dto.response.RegisterResponse;
 import com.taskforce.tf_api.core.dto.response.SelectPlanResponse;
 import com.taskforce.tf_api.core.dto.response.VerifyOtpResponse;
 import com.taskforce.tf_api.core.enums.OtpType;
+import com.taskforce.tf_api.core.enums.PlanStatus;
 import com.taskforce.tf_api.core.enums.PlanType;
 import com.taskforce.tf_api.core.model.OtpVerification;
 import com.taskforce.tf_api.core.model.User;
@@ -288,9 +289,24 @@ public class AuthService {
             throw new RuntimeException("Veuillez vérifier votre email avant de vous connecter");
         }
 
-        // Récupérer l'utilisateur depuis notre DB
+        // Récupérer ou créer l'utilisateur dans notre DB
+        // Just-in-time provisioning : si l'utilisateur existe dans Keycloak mais pas dans notre DB,
+        // on le crée automatiquement (cas des utilisateurs créés directement dans Keycloak)
         User user = userRepository.findByKeycloakId(keycloakUser.getId())
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+            .orElseGet(() -> {
+                log.info("Utilisateur {} trouvé dans Keycloak mais pas dans la DB. Création automatique...", 
+                    keycloakUser.getEmail());
+                
+                User newUser = User.builder()
+                    .keycloakId(keycloakUser.getId())
+                    .email(keycloakUser.getEmail())
+                    .planType(PlanType.FREE)  // Plan gratuit par défaut
+                    .planStatus(PlanStatus.ACTIVE)
+                    .isActive(true)
+                    .build();
+                
+                return userRepository.save(newUser);
+            });
 
         if (!user.getIsActive()) {
             throw new RuntimeException("Ce compte est désactivé");
