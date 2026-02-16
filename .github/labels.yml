@@ -1,0 +1,194 @@
+# ==========================================
+# LABELS GITHUB - TASKFORCE PROJECT
+# ==========================================
+# To apply: gh label import --file .github/labels.yml
+
+# ==========================================
+# RELEASE VERSIONING - BACKEND
+# ==========================================
+- name: "backend:release:major"
+  color: "d73a4a"
+  description: "🔧 Backend Breaking changes - Incrémente MAJOR"
+
+- name: "backend:release:minor"
+  color: "0e8a16"
+  description: "🔧 Backend New features - Incrémente MINOR"
+
+- name: "backend:release:patch"
+  color: "fbca04"
+  description: "🔧 Backend Bug fixes - Incrémente PATCH"
+
+# ==========================================
+# RELEASE VERSIONING - FRONTEND
+# ==========================================
+- name: "frontend:release:major"
+  color: "d73a4a"
+  description: "🎨 Frontend Breaking changes - Incrémente MAJOR"
+
+- name: "frontend:release:minor"
+  color: "0e8a16"
+  description: "🎨 Frontend New features - Incrémente MINOR"
+
+- name: "frontend:release:patch"
+  color: "fbca04"
+  description: "🎨 Frontend Bug fixes - Incrémente PATCH"
+
+# ==========================================
+# RELEASE VERSIONING - LANDING
+# ==========================================
+- name: "landing:release:major"
+  color: "d73a4a"
+  description: "🌐 Landing Breaking changes - Incrémente MAJOR"
+
+- name: "landing:release:minor"
+  color: "0e8a16"
+  description: "🌐 Landing New features - Incrémente MINOR"
+
+- name: "landing:release:patch"
+  color: "fbca04"
+  description: "🌐 Landing Bug fixes - Incrémente PATCH"
+
+# ==========================================
+# TYPE (déjà existants à conserver)
+# ==========================================
+- name: "bug"
+  color: "d73a4a"
+  description: "🐛 Something isn't working"
+
+- name: "enhancement"
+  color: "a2eeef"
+  description: "✨ New feature or request"
+
+- name: "documentation"
+  color: "0075ca"
+  description: "📚 Improvements or additions to documentation"
+
+# ==========================================
+# TYPE ADDITIONNELS
+# ==========================================
+- name: "type:feature"
+  color: "a2eeef"
+  description: "✨ Nouvelle fonctionnalité"
+
+- name: "type:bugfix"
+  color: "d73a4a"
+  description: "🐛 Correction de bug"
+
+- name: "type:hotfix"
+  color: "b60205"
+  description: "🚨 Hotfix urgent en production"
+
+- name: "type:refactor"
+  color: "fbca04"
+  description: "♻️ Refactoring de code"
+
+- name: "type:test"
+  color: "1d76db"
+  description: "🧪 Ajout ou modification de tests"
+
+- name: "type:ci/cd"
+  color: "ededed"
+  description: "⚙️ CI/CD et DevOps"
+
+# ==========================================
+# COMPONENTS (déjà existants à conserver)
+# ==========================================
+- name: "backend"
+  color: "5319e7"
+  description: "🔧 Backend / API"
+
+- name: "frontend"
+  color: "0052cc"
+  description: "🎨 Frontend / UI"
+
+- name: "database"
+  color: "c5def5"
+  description: "🗄️ Database related"
+
+# ==========================================
+# COMPONENTS ADDITIONNELS
+# ==========================================
+- name: "infra"
+  color: "ededed"
+  description: "🏗️ Infrastructure & DevOps"
+
+- name: "security"
+  color: "b60205"
+  description: "🔒 Sécurité"
+
+- name: "performance"
+  color: "fbca04"
+  description: "⚡ Performance optimization"
+
+# ==========================================
+# PRIORITY (déjà existants à conserver)
+# ==========================================
+- name: "priority:critical"
+  color: "b60205"
+  description: "🔴 Critique - À traiter immédiatement"
+
+- name: "priority:high"
+  color: "d93f0b"
+  description: "🟠 Haute - À traiter rapidement"
+
+- name: "priority:medium"
+  color: "fbca04"
+  description: "🟡 Moyenne - À traiter normalement"
+
+- name: "priority:low"
+  color: "0e8a16"
+  description: "🟢 Basse - Quand possible"
+
+# ==========================================
+# STATUS
+# ==========================================
+- name: "status:ready-for-review"
+  color: "0e8a16"
+  description: "✅ Prêt pour review"
+
+- name: "status:in-progress"
+  color: "fbca04"
+  description: "🚧 En cours de développement"
+
+- name: "status:blocked"
+  color: "d73a4a"
+  description: "🚫 Bloqué - Nécessite intervention"
+
+- name: "status:needs-info"
+  color: "d876e3"
+  description: "❓ Informations manquantes"
+
+- name: "status:on-hold"
+  color: "ededed"
+  description: "⏸️ En attente"
+
+# ==========================================
+# EPICS (déjà existants à conserver)
+# ==========================================
+- name: "epic:admin"
+  color: "3e4b9e"
+  description: "👤 Epic Admin"
+
+- name: "epic:auth"
+  color: "3e4b9e"
+  description: "🔐 Epic Authentication"
+
+- name: "epic:dashboard"
+  color: "3e4b9e"
+  description: "📊 Epic Dashboard"
+
+- name: "epic:notifications"
+  color: "3e4b9e"
+  description: "🔔 Epic Notifications"
+
+- name: "epic:projects"
+  color: "3e4b9e"
+  description: "📁 Epic Projects"
+
+- name: "epic:tasks"
+  color: "3e4b9e"
+  description: "✓ Epic Tasks"
+
+- name: "epic:teams"
+  color: "3e4b9e"
+  description: "👥 Epic Teams"

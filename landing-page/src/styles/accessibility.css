@@ -1,0 +1,116 @@
+/* OpenDyslexic Font Face */
+@font-face {
+  font-family: 'OpenDyslexic';
+  src: url('/src/styles/fonts/OpenDyslexic/OpenDyslexic-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'OpenDyslexic';
+  src: url('/src/styles/fonts/OpenDyslexic/OpenDyslexic-Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'OpenDyslexic';
+  src: url('/src/styles/fonts/OpenDyslexic/OpenDyslexic-Italic.otf') format('opentype');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'OpenDyslexic';
+  src: url('/src/styles/fonts/OpenDyslexic/OpenDyslexic-BoldItalic.otf') format('opentype');
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* Accessibility Variables */
+:root {
+  --a11y-font-scale: 1;
+  --a11y-letter-spacing: 0em;
+}
+
+/* Apply font size scaling */
+html {
+  font-size: calc(16px * var(--a11y-font-scale));
+}
+
+/* Apply letter spacing */
+body {
+  letter-spacing: var(--a11y-letter-spacing);
+}
+
+/* Dyslexic Font Class */
+html.dyslexic-font,
+html.dyslexic-font body,
+html.dyslexic-font * {
+  font-family: 'OpenDyslexic', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+}
+
+/* High Contrast Mode */
+html.high-contrast {
+  --background: 0 0% 100%;
+  --foreground: 0 0% 0%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 0%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 0%;
+  --primary: 0 0% 0%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 0 0% 95%;
+  --secondary-foreground: 0 0% 0%;
+  --muted: 0 0% 95%;
+  --muted-foreground: 0 0% 20%;
+  --accent: 0 0% 95%;
+  --accent-foreground: 0 0% 0%;
+  --destructive: 0 0% 0%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 0 0% 50%;
+  --input: 0 0% 50%;
+  --ring: 0 0% 0%;
+}
+
+html.high-contrast.dark {
+  --background: 0 0% 0%;
+  --foreground: 0 0% 100%;
+  --card: 0 0% 0%;
+  --card-foreground: 0 0% 100%;
+  --popover: 0 0% 0%;
+  --popover-foreground: 0 0% 100%;
+  --primary: 0 0% 100%;
+  --primary-foreground: 0 0% 0%;
+  --secondary: 0 0% 10%;
+  --secondary-foreground: 0 0% 100%;
+  --muted: 0 0% 10%;
+  --muted-foreground: 0 0% 80%;
+  --accent: 0 0% 10%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 0% 100%;
+  --destructive-foreground: 0 0% 0%;
+  --border: 0 0% 50%;
+  --input: 0 0% 50%;
+  --ring: 0 0% 100%;
+}
+
+/* Daltonism Filters */
+html[data-daltonism="protanopia"] {
+  filter: url('#protanopia-filter');
+}
+
+html[data-daltonism="deuteranopia"] {
+  filter: url('#deuteranopia-filter');
+}
+
+html[data-daltonism="tritanopia"] {
+  filter: url('#tritanopia-filter');
+}
+
+/* SVG Filters for Color Blindness Simulation */
+/* These will be injected into the DOM via a script */
