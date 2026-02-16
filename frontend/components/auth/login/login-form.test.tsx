@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { LoginForm } from './login-form';
 
@@ -55,7 +55,7 @@ const { mockIsAllowed, mockGetTimeUntilReset, mockReset } = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/utils/validation', async (importOriginal) => {
-  const actual = await importOriginal() as any;
+  const actual = await importOriginal<typeof import('@/lib/utils/validation')>();
   return {
     ...actual,
     globalRateLimiter: {
