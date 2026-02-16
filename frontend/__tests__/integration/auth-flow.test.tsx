@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 // MSW server removed due to happy-dom compatibility
@@ -45,14 +45,9 @@ vi.mock('@/lib/api/auth-service', () => ({
   },
 }));
 
-// MSW setup removed - using mocks instead
-import { beforeAll, afterEach, afterAll } from 'vitest';
-// beforeAll(() => server.listen());
 afterEach(() => {
-  // server.resetHandlers();
   vi.clearAllMocks();
 });
-// afterAll(() => server.close());
 
 describe('Integration Tests - Authentication Flow', () => {
   describe('Complete Login Flow', () => {
@@ -116,8 +111,6 @@ describe('Integration Tests - Authentication Flow', () => {
 
   describe('Password Validation Integration', () => {
     it('should validate password requirements during registration', async () => {
-      const user = userEvent.setup();
-      
       // Create a simple test component
       const { validatePassword } = await import('@/lib/utils/validation');
       
@@ -333,7 +326,7 @@ describe('Integration Tests - Authentication Flow', () => {
 
   describe('Security Validations Integration', () => {
     it('should sanitize malicious input before API call', async () => {
-      const { sanitizeInput, validateEmail } = await import('@/lib/utils/validation');
+      const { sanitizeInput } = await import('@/lib/utils/validation');
       
       const maliciousInput = '<script>void(0)</script>test@example.com';
       const sanitized = sanitizeInput(maliciousInput);
