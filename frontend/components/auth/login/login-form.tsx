@@ -82,9 +82,10 @@ export function LoginForm({
 
       // Redirection vers dashboard après login
       router.push('/dashboard');
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       toast.error(t.common.error, {
-        description: error.message || t.auth.errors.loginFailed,
+        description: errorMessage || t.auth.errors.loginFailed,
       });
     } finally {
       setIsLoading(false);
