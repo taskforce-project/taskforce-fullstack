@@ -1,0 +1,203 @@
+name: Frontend Tests
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+      - 'feature/**'
+      - 'fix/**'
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-tests.yml'
+  pull_request:
+    branches:
+      - main
+      - dev
+    paths:
+      - 'frontend/**'
+
+jobs:
+  test:
+    name: Run Frontend Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    strategy:
+      matrix:
+        node-version: [20.x]
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Nécessaire pour --changed (comparer avec les commits précédents)
+
+      - name: 🔧 Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🔍 Run ESLint
+        run: npm run lint
+        continue-on-error: true
+
+      - name: 🎯 Determine test strategy
+        id: test-strategy
+        run: |
+          # Test ALL if: PR, dev, or main
+          if [[ "${{ github.event_name }}" == "pull_request" ]] || \
+             [[ "${{ github.ref }}" == "refs/heads/dev" ]] || \
+             [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "strategy=full" >> $GITHUB_OUTPUT
+            echo "🔍 Running ALL tests (PR or protected branch)"
+          else
+            echo "strategy=changed" >> $GITHUB_OUTPUT
+            echo "⚡ Running tests for changed files only"
+          fi
+
+      - name: 🧪 Run unit tests (changed files only)
+        if: steps.test-strategy.outputs.strategy == 'changed'
+        run: npm run test -- --changed --passWithNoTests
+        continue-on-error: false
+
+      - name: 🧪 Run ALL unit tests
+        if: steps.test-strategy.outputs.strategy == 'full'
+        run: npm run test
+        continue-on-error: false
+
+      - name: 📊 Run tests with coverage (changed files only)
+        if: steps.test-strategy.outputs.strategy == 'changed'
+        run: npm run test:coverage -- --changed --passWithNoTests
+        continue-on-error: false
+
+      - name: 📊 Run tests with coverage (ALL tests)
+        if: steps.test-strategy.outputs.strategy == 'full'
+        run: npm run test:coverage
+        continue-on-error: false
+
+      - name: 📈 Upload coverage to Codecov (optional)
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          files: ./frontend/coverage/coverage-final.json
+          flags: frontend
+          name: frontend-coverage
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        continue-on-error: true
+
+      - name: 💾 Archive coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: frontend/coverage/
+          retention-days: 7
+
+      - name: 📝 Comment PR with coverage
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const coveragePath = 'frontend/coverage/coverage-summary.json';
+            
+            if (fs.existsSync(coveragePath)) {
+              const coverage = JSON.parse(fs.readFileSync(coveragePath, 'utf8'));
+              const total = coverage.total;
+              
+              const testStrategy = '${{ steps.test-strategy.outputs.strategy }}' === 'full' 
+                ? '🔍 **Tous les tests** (Pull Request)' 
+                : '⚡ **Tests modifiés uniquement**';
+              
+              const comment = `## 📊 Frontend Test Coverage\n\n` +
+                `${testStrategy}\n\n` +
+                `| Metric | Coverage | Status |\n` +
+                `|--------|----------|--------|\n` +
+                `| Lines | ${total.lines.pct}% | ${total.lines.pct >= 70 ? '✅' : '❌'} |\n` +
+                `| Statements | ${total.statements.pct}% | ${total.statements.pct >= 70 ? '✅' : '❌'} |\n` +
+                `| Functions | ${total.functions.pct}% | ${total.functions.pct >= 70 ? '✅' : '❌'} |\n` +
+                `| Branches | ${total.branches.pct}% | ${total.branches.pct >= 60 ? '✅' : '❌'} |\n\n` +
+                `**Thresholds:** Lines: 70%, Functions: 70%, Branches: 60%, Statements: 70%`;
+              
+              github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: comment
+              });
+            }
+        continue-on-error: true
+
+  type-check:
+    name: TypeScript Type Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🔍 Run TypeScript compiler check
+        run: npx tsc --noEmit
+
+  build:
+    name: Build Frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [test, type-check]
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🏗️ Build application
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:8080/api
+
+      - name: 💾 Archive build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/.next/
+          retention-days: 1
