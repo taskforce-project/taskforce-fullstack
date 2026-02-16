@@ -14,8 +14,6 @@ services:
     runtime: static
     buildCommand: cd landing-page && npm ci && npm run build
     staticPublishPath: ./landing-page/dist
-    plan: starter
-    region: frankfurt
     branch: main
 
     # Headers personnalisés pour SEO et sécurité
