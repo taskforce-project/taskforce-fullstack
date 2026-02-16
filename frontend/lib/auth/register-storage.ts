@@ -8,6 +8,7 @@ export type RegisterData = {
   lastName: string;
   email: string;
   plan?: "free" | "pro" | "enterprise";
+  planType?: string;
   password: string;
 };
 
