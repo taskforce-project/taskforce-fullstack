@@ -1,0 +1,34 @@
+# ===============================
+# RENDER.COM - Landing Page Only
+# ===============================
+# Ce fichier déploie UNIQUEMENT la landing page
+# Les autres services seront ajoutés plus tard quand mergés sur main
+# ===============================
+
+services:
+  # ================================
+  # Landing Page (Astro Static)
+  # ================================
+  - type: web
+    name: taskforce-landing
+    runtime: static
+    buildCommand: cd landing-page && npm ci && npm run build
+    staticPublishPath: ./landing-page/dist
+    plan: starter
+    region: frankfurt
+    branch: main
+
+    # Headers personnalisés pour SEO et sécurité
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*
+        name: X-XSS-Protection
+        value: "1; mode=block"
