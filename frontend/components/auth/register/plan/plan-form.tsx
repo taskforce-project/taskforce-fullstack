@@ -11,7 +11,6 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { Check } from "lucide-react";
 import { getRegisterData, setRegisterData } from "@/lib/auth/register-storage";
-import { authService } from "@/lib/api";
 
 type Plan = {
   id: string;
@@ -111,7 +110,6 @@ export function RegisterPlanForm({
       toast.error(t.common.error, {
         description: error.message || "Erreur lors de la sélection du plan",
       });
-      console.error("Plan selection error:", error);
     } finally {
       setIsLoading(false);
     }
