@@ -1,0 +1,162 @@
+# ===============================
+# RENDER.COM - Infrastructure as Code
+# Déploiement automatique de Taskforce
+# ===============================
+# Utilisation:
+#   1. Connecter le repo GitHub à Render
+#   2. Render détectera automatiquement ce fichier
+#   3. Les services seront créés automatiquement
+# ===============================
+
+services:
+  # ================================
+  # 1. Backend API (Spring Boot)
+  # ================================
+  - type: web
+    name: taskforce-backend
+    runtime: docker
+    dockerfilePath: ./backend/tf-api/Dockerfile
+    dockerContext: ./backend/tf-api
+    plan: starter # Passer à 'standard' pour plus de ressources
+    region: frankfurt # ou 'oregon', 'singapore', etc.
+    branch: main
+
+    healthCheckPath: /api/actuator/health
+
+    envVars:
+      # Spring Profile
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+
+      # Database (PostgreSQL Render)
+      - key: DB_HOST
+        fromDatabase:
+          name: taskforce-postgres
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: taskforce-postgres
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: taskforce-postgres
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: taskforce-postgres
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: taskforce-postgres
+          property: password
+
+      # Keycloak
+      - key: KEYCLOAK_URL
+        value: https://taskforce-keycloak.onrender.com
+      - key: KEYCLOAK_REALM
+        value: taskforce
+      - key: KEYCLOAK_CLIENT_ID
+        sync: false # À définir dans Render Dashboard
+      - key: KEYCLOAK_CLIENT_SECRET
+        sync: false # Secret - à définir manuellement
+
+      # CORS
+      - key: ALLOWED_ORIGINS
+        value: https://taskforce.onrender.com
+
+      # Logging
+      - key: LOGGING_LEVEL_ROOT
+        value: INFO
+      - key: LOGGING_LEVEL_COM_TASKFORCE
+        value: INFO
+
+  # ================================
+  # 2. Frontend (Next.js 16)
+  # ================================
+  - type: web
+    name: taskforce-frontend
+    runtime: docker
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    plan: starter
+    region: frankfurt
+    branch: main
+
+    healthCheckPath: /
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+      # URL API Backend
+      - key: NEXT_PUBLIC_API_URL
+        value: https://taskforce-backend.onrender.com/api
+
+      # Keycloak (public)
+      - key: NEXT_PUBLIC_KEYCLOAK_URL
+        value: https://taskforce-keycloak.onrender.com
+      - key: NEXT_PUBLIC_KEYCLOAK_REALM
+        value: taskforce
+      - key: NEXT_PUBLIC_KEYCLOAK_CLIENT_ID
+        sync: false # À définir dans Dashboard
+
+  # ================================
+  # 3. Keycloak (Auth Server)
+  # ================================
+  - type: web
+    name: taskforce-keycloak
+    runtime: docker
+    dockerfilePath: ./keycloak/Dockerfile.prod
+    dockerContext: ./keycloak
+    plan: standard # Keycloak nécessite plus de RAM
+    region: frankfurt
+    branch: main
+
+    healthCheckPath: /health/ready
+
+    envVars:
+      # Database Keycloak (même PostgreSQL)
+      - key: KC_DB
+        value: postgres
+      - key: KC_DB_URL
+        fromDatabase:
+          name: taskforce-postgres
+          property: connectionString
+      - key: KC_DB_USERNAME
+        fromDatabase:
+          name: taskforce-postgres
+          property: user
+      - key: KC_DB_PASSWORD
+        fromDatabase:
+          name: taskforce-postgres
+          property: password
+
+      # Admin
+      - key: KEYCLOAK_ADMIN
+        sync: false # À définir manuellement
+      - key: KEYCLOAK_ADMIN_PASSWORD
+        sync: false # Secret
+
+      # Production Settings
+      - key: KC_HOSTNAME
+        value: taskforce-keycloak.onrender.com
+      - key: KC_HOSTNAME_STRICT
+        value: true
+      - key: KC_HOSTNAME_STRICT_HTTPS
+        value: true
+      - key: KC_PROXY
+        value: edge
+      - key: KC_HTTP_ENABLED
+        value: true
+
+# ================================
+# 4. PostgreSQL Database
+# ================================
+databases:
+  - name: taskforce-postgres
+    databaseName: taskforce_prod
+    user: taskforce_admin
+    plan: starter # 256MB RAM, 1GB SSD - Passer à 'standard' si nécessaire
+    region: frankfurt
+    ipAllowList: [] # Vide = accessible uniquement par services Render
+
