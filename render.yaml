@@ -101,7 +101,31 @@ services:
         sync: false # À définir dans Dashboard
 
   # ================================
-  # 3. Keycloak (Auth Server)
+  # 3. Landing Page (Astro Static)
+  # ================================
+  - type: web
+    name: taskforce-landing
+    runtime: static
+    buildCommand: cd landing-page && npm ci && npm run build
+    staticPublishPath: ./landing-page/dist
+    plan: starter
+    region: frankfurt
+    branch: main
+    
+    # Headers personnalisés pour SEO et sécurité
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+
+  # ================================
+  # 4. Keycloak (Auth Server)
   # ================================
   - type: web
     name: taskforce-keycloak
@@ -150,7 +174,7 @@ services:
         value: true
 
 # ================================
-# 4. PostgreSQL Database
+# 5. PostgreSQL Database
 # ================================
 databases:
   - name: taskforce-postgres
