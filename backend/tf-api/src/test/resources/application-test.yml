@@ -1,0 +1,79 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+  h2:
+    console:
+      enabled: true
+  flyway:
+    enabled: false
+  mail:
+    host: localhost
+    port: 1025
+    username: test
+    password: test
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
+
+# JWT Configuration
+jwt:
+  secret: testSecretKeyForJWTTokenGenerationThatIsVeryLongForTestingPurposes
+  access-token:
+    expiration: 3600
+  refresh-token:
+    expiration: 86400
+
+# Keycloak Configuration (mock)
+keycloak:
+  realm: taskforce-test
+  auth-server-url: http://localhost:8080/auth
+  resource: taskforce-api-test
+  credentials:
+    secret: test-secret
+  admin:
+    client-id: admin-cli
+    client-secret: test-admin-secret
+    username: admin-test
+    password: admin-test
+
+# Stripe Configuration (mock)
+stripe:
+  api-key: sk_test_mock_key
+  plans:
+    premium:
+      price-id: price_premium_test
+    enterprise:
+      price-id: price_enterprise_test
+
+# OTP Configuration
+otp:
+  length: 6
+  expiry-minutes: 15
+  max-attempts: 5
+
+# Mail Configuration
+mail:
+  from: noreply@taskforce-test.com
+  from-name: TaskForce Test
+
+# Logging
+logging:
+  level:
+    com.taskforce.tf_api: DEBUG
+    org.springframework.security: DEBUG
+    org.hibernate.SQL: DEBUG
+
