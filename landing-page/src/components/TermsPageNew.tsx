@@ -64,7 +64,7 @@ export default function TermsPageNew() {
               {terms.tableOfContents.title}
             </h2>
             <div className="grid sm:grid-cols-2 gap-2">
-              {terms.sections.map((section, index) => (
+              {terms.sections.map((section: any, index: number) => (
                 <a
                   key={section.id}
                   href={`#${section.id}`}
@@ -83,7 +83,7 @@ export default function TermsPageNew() {
       <section className="py-16">
         <div className="container mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8">
           <div className="max-w-4xl mx-auto space-y-12">
-            {terms.sections.map((section, index) => {
+            {terms.sections.map((section: any, index: number) => {
               const Icon = iconMap[section.icon];
               return (
               <Card key={section.id} id={section.id} className="scroll-mt-20">
@@ -101,15 +101,15 @@ export default function TermsPageNew() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {section.content.map((paragraph, idx) => (
+                  {section.content.map((paragraph: string, idx: number) => (
                     <p key={idx} className="text-muted-foreground leading-relaxed">
                       {paragraph}
                     </p>
-                  ))}
+                  ))}}
 
                   {section.list && (
                     <ul className="space-y-2 ml-4">
-                      {section.list.map((item, idx) => (
+                      {section.list.map((item: string, idx: number) => (
                         <li key={idx} className="flex items-start gap-2">
                           <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
                           <span className="text-muted-foreground">{item}</span>
@@ -120,7 +120,7 @@ export default function TermsPageNew() {
 
                   {section.prohibited && (
                     <ul className="space-y-2">
-                      {section.prohibited.map((item, idx) => (
+                      {section.prohibited.map((item: any, idx: number) => (
                         <li key={idx} className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
                           <XCircle
                             className={`h-5 w-5 mt-0.5 flex-shrink-0 ${

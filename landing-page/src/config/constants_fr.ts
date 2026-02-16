@@ -622,6 +622,53 @@ export const constants_fr = {
       description:
         "Veuillez lire attentivement ces conditions avant d'utiliser Taskforce",
     },
+    tableOfContents: {
+      title: "TABLE DES MATIÈRES",
+    },
+    sections: [
+      {
+        id: "agreement",
+        title: "Acceptation des Conditions",
+        icon: "FileText",
+        content: [
+          "En accédant ou en utilisant Taskforce ('le Service'), vous acceptez d'être lié par ces Conditions d'Utilisation ('Conditions'). Si vous n'acceptez pas une partie des conditions, vous ne pouvez pas accéder au Service.",
+        ],
+      },
+      {
+        id: "license",
+        title: "Licence d'Utilisation",
+        icon: "Scale",
+        content: [
+          "La permission est accordée d'utiliser Taskforce à des fins personnelles ou commerciales, sous réserve des restrictions suivantes :",
+        ],
+        list: [
+          "Vous ne devez pas modifier, copier ou reproduire les matériaux du Service sans autorisation",
+          "Vous ne devez pas utiliser le Service à des fins illégales",
+        ],
+      },
+      {
+        id: "contact",
+        title: "Nous Contacter",
+        icon: "FileText",
+        content: [
+          "Si vous avez des questions sur ces Conditions, veuillez nous contacter à :",
+        ],
+        contact: {
+          email: "legal@taskforce.app",
+          address: "Service Juridique Taskforce",
+          response: "Nous visons à répondre à toutes les demandes sous 48 heures.",
+        },
+      },
+    ],
+    bottomCta: {
+      title: "Questions sur nos Conditions ?",
+      description:
+        "Notre équipe juridique est là pour vous aider à clarifier vos préoccupations.",
+      buttons: {
+        contact: "Contacter l'Équipe Juridique",
+        privacy: "Voir la Politique de Confidentialité",
+      },
+    },
   },
 
   // Page Politique de Confidentialité

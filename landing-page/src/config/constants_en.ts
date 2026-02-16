@@ -1,8 +1,6 @@
 // English constants configuration for the landing page
 
-import type { Constants } from "./constants_fr";
-
-export const constants_en: Constants = {
+export const constants_en = {
   // Page metadata
   meta: {
     title: "Taskforce - Modern Task Management Platform",
