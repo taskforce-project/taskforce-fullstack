@@ -65,11 +65,11 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
           toast.success("Code de vérification envoyé", {
             description: "Consultez votre boîte mail",
           });
-        } catch (error: any) {
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
           toast.error(t.common.error, {
-            description: error.message || "Erreur lors de l'inscription",
+            description: errorMessage || "Erreur lors de l'inscription",
           });
-          console.error("Registration error:", error);
           // Ne pas revenir à l'étape 1 si l'utilisateur existe déjà (cas idempotent)
           // L'utilisateur peut toujours entrer son code OTP
         }
@@ -104,11 +104,11 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
       
       toast.success("Code de vérification renvoyé");
       setCountdown(60);
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       toast.error(t.common.error, {
-        description: error.message || "Erreur lors de l'envoi du code",
+        description: errorMessage || "Erreur lors de l'envoi du code",
       });
-      console.error("Resend OTP error:", error);
     } finally {
       setIsResending(false);
     }
@@ -140,11 +140,11 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
       
       // Redirection vers login
       router.push('/auth/login');
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       toast.error(t.common.error, {
-        description: error.message || "Code de vérification invalide",
+        description: errorMessage || "Code de vérification invalide",
       });
-      console.error("OTP verification error:", error);
     } finally {
       setIsLoading(false);
     }
