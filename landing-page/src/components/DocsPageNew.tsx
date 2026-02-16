@@ -199,7 +199,7 @@ export default function DocsPageNew() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
-                      {docs.community.communityCard.links.map((link) => (
+                      {docs.community.communityCard.links.map((link: { label: string; href: string }) => (
                         <Button
                           key={link.label}
                           variant="outline"
@@ -230,7 +230,7 @@ export default function DocsPageNew() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
-                      {docs.community.supportCard.links.map((link) => (
+                      {docs.community.supportCard.links.map((link: { label: string; href: string }) => (
                         <Button
                           key={link.label}
                           variant="outline"
