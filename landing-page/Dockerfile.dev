@@ -1,0 +1,27 @@
+# ===============================
+# DOCKERFILE ASTRO - DEVELOPMENT
+# Hot reload activé
+# ===============================
+
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copier package files
+COPY package.json package-lock.json* ./
+
+# Installer toutes les dépendances (dev + prod)
+RUN npm install
+
+# Copier le reste des fichiers (sera overridé par les volumes)
+COPY . .
+
+# Exposer le port
+EXPOSE 4321
+
+# Variables d'environnement
+ENV NODE_ENV=development
+ENV HOST=0.0.0.0
+
+# Commande pour démarrer le serveur de développement
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]

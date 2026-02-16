@@ -1,0 +1,421 @@
+name: 🚀 Release Services (Independent Versioning)
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+
+permissions:
+  contents: write
+  packages: write
+  pull-requests: read
+
+jobs:
+  detect-and-version:
+    name: 📦 Detect Changes & Version Services
+    runs-on: ubuntu-latest
+    outputs:
+      backend_version: ${{ steps.backend.outputs.version }}
+      frontend_version: ${{ steps.frontend.outputs.version }}
+      landing_version: ${{ steps.landing.outputs.version }}
+      backend_changed: ${{ steps.changes.outputs.backend }}
+      frontend_changed: ${{ steps.changes.outputs.frontend }}
+      landing_changed: ${{ steps.changes.outputs.landing }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get PR labels
+        id: pr-labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const commit = context.payload.head_commit.id;
+            const prs = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: commit
+            });
+            
+            if (prs.data.length === 0) {
+              core.info('No PR found, using auto-detection');
+              core.setOutput('labels', '');
+              return;
+            }
+            
+            const pr = prs.data[0];
+            const labels = pr.labels.map(l => l.name);
+            core.setOutput('labels', labels.join(','));
+            core.info('PR #' + pr.number + ' labels: ' + labels.join(', '));
+
+      - name: Detect changed services
+        id: changes
+        run: |
+          LABELS="${{ steps.pr-labels.outputs.labels }}"
+          
+          # Détecter via labels ou fichiers modifiés
+          if [[ "$LABELS" == *"backend:release:"* ]] || git diff --name-only HEAD~1 HEAD | grep -q "^backend/"; then
+            echo "backend=true" >> $GITHUB_OUTPUT
+            echo "✅ Backend changed"
+          else
+            echo "backend=false" >> $GITHUB_OUTPUT
+            echo "⏭️  Backend unchanged"
+          fi
+          
+          if [[ "$LABELS" == *"frontend:release:"* ]] || git diff --name-only HEAD~1 HEAD | grep -q "^frontend/"; then
+            echo "frontend=true" >> $GITHUB_OUTPUT
+            echo "✅ Frontend changed"
+          else
+            echo "frontend=false" >> $GITHUB_OUTPUT
+            echo "⏭️  Frontend unchanged"
+          fi
+          
+          if [[ "$LABELS" == *"landing:release:"* ]] || git diff --name-only HEAD~1 HEAD | grep -q "^landing-page/"; then
+            echo "landing=true" >> $GITHUB_OUTPUT
+            echo "✅ Landing changed"
+          else
+            echo "landing=false" >> $GITHUB_OUTPUT
+            echo "⏭️  Landing unchanged"
+          fi
+
+      - name: Calculate Backend Version
+        id: backend
+        if: steps.changes.outputs.backend == 'true'
+        run: |
+          LABELS="${{ steps.pr-labels.outputs.labels }}"
+          BRANCH="${{ github.ref_name }}"
+          
+          # Récupérer le dernier tag backend
+          if [[ "$BRANCH" == "dev" ]]; then
+            LATEST=$(git tag -l "backend-v*-rc*" --sort=-v:refname | head -n1)
+          else
+            LATEST=$(git tag -l "backend-v*" --sort=-v:refname | grep -v "rc" | head -n1)
+          fi
+          
+          if [ -z "$LATEST" ]; then
+            if [[ "$BRANCH" == "dev" ]]; then
+              LATEST="backend-v0.0.0-rc0"
+            else
+              LATEST="backend-v0.0.0"
+            fi
+          fi
+          
+          # Parser version
+          if [[ $LATEST =~ backend-v([0-9]+)\.([0-9]+)\.([0-9]+)(-rc([0-9]+))? ]]; then
+            MAJOR="${BASH_REMATCH[1]}"
+            MINOR="${BASH_REMATCH[2]}"
+            PATCH="${BASH_REMATCH[3]}"
+            RC="${BASH_REMATCH[5]:-0}"
+          else
+            MAJOR=0; MINOR=1; PATCH=0; RC=0
+          fi
+          
+          # Calculer nouvelle version
+          if [[ "$BRANCH" == "dev" ]]; then
+            if [[ "$LABELS" == *"backend:release:major"* ]]; then
+              MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0; RC=1
+            elif [[ "$LABELS" == *"backend:release:minor"* ]]; then
+              MINOR=$((MINOR + 1)); PATCH=0; RC=1
+            elif [[ "$LABELS" == *"backend:release:patch"* ]]; then
+              PATCH=$((PATCH + 1)); RC=1
+            else
+              RC=$((RC + 1))
+            fi
+            NEW_VERSION="backend-v${MAJOR}.${MINOR}.${PATCH}-rc${RC}"
+          else
+            if [[ "$LABELS" == *"backend:release:major"* ]]; then
+              MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0
+            elif [[ "$LABELS" == *"backend:release:minor"* ]]; then
+              MINOR=$((MINOR + 1)); PATCH=0
+            else
+              PATCH=$((PATCH + 1))
+            fi
+            NEW_VERSION="backend-v${MAJOR}.${MINOR}.${PATCH}"
+          fi
+          
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "📦 Backend: $LATEST → $NEW_VERSION"
+
+      - name: Calculate Frontend Version
+        id: frontend
+        if: steps.changes.outputs.frontend == 'true'
+        run: |
+          LABELS="${{ steps.pr-labels.outputs.labels }}"
+          BRANCH="${{ github.ref_name }}"
+          
+          if [[ "$BRANCH" == "dev" ]]; then
+            LATEST=$(git tag -l "frontend-v*-rc*" --sort=-v:refname | head -n1)
+          else
+            LATEST=$(git tag -l "frontend-v*" --sort=-v:refname | grep -v "rc" | head -n1)
+          fi
+          
+          if [ -z "$LATEST" ]; then
+            if [[ "$BRANCH" == "dev" ]]; then
+              LATEST="frontend-v0.0.0-rc0"
+            else
+              LATEST="frontend-v0.0.0"
+            fi
+          fi
+          
+          if [[ $LATEST =~ frontend-v([0-9]+)\.([0-9]+)\.([0-9]+)(-rc([0-9]+))? ]]; then
+            MAJOR="${BASH_REMATCH[1]}"
+            MINOR="${BASH_REMATCH[2]}"
+            PATCH="${BASH_REMATCH[3]}"
+            RC="${BASH_REMATCH[5]:-0}"
+          else
+            MAJOR=0; MINOR=1; PATCH=0; RC=0
+          fi
+          
+          if [[ "$BRANCH" == "dev" ]]; then
+            if [[ "$LABELS" == *"frontend:release:major"* ]]; then
+              MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0; RC=1
+            elif [[ "$LABELS" == *"frontend:release:minor"* ]]; then
+              MINOR=$((MINOR + 1)); PATCH=0; RC=1
+            elif [[ "$LABELS" == *"frontend:release:patch"* ]]; then
+              PATCH=$((PATCH + 1)); RC=1
+            else
+              RC=$((RC + 1))
+            fi
+            NEW_VERSION="frontend-v${MAJOR}.${MINOR}.${PATCH}-rc${RC}"
+          else
+            if [[ "$LABELS" == *"frontend:release:major"* ]]; then
+              MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0
+            elif [[ "$LABELS" == *"frontend:release:minor"* ]]; then
+              MINOR=$((MINOR + 1)); PATCH=0
+            else
+              PATCH=$((PATCH + 1))
+            fi
+            NEW_VERSION="frontend-v${MAJOR}.${MINOR}.${PATCH}"
+          fi
+          
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "📦 Frontend: $LATEST → $NEW_VERSION"
+
+      - name: Calculate Landing Version
+        id: landing
+        if: steps.changes.outputs.landing == 'true'
+        run: |
+          LABELS="${{ steps.pr-labels.outputs.labels }}"
+          BRANCH="${{ github.ref_name }}"
+          
+          if [[ "$BRANCH" == "dev" ]]; then
+            LATEST=$(git tag -l "landing-v*-rc*" --sort=-v:refname | head -n1)
+          else
+            LATEST=$(git tag -l "landing-v*" --sort=-v:refname | grep -v "rc" | head -n1)
+          fi
+          
+          if [ -z "$LATEST" ]; then
+            if [[ "$BRANCH" == "dev" ]]; then
+              LATEST="landing-v0.0.0-rc0"
+            else
+              LATEST="landing-v0.0.0"
+            fi
+          fi
+          
+          if [[ $LATEST =~ landing-v([0-9]+)\.([0-9]+)\.([0-9]+)(-rc([0-9]+))? ]]; then
+            MAJOR="${BASH_REMATCH[1]}"
+            MINOR="${BASH_REMATCH[2]}"
+            PATCH="${BASH_REMATCH[3]}"
+            RC="${BASH_REMATCH[5]:-0}"
+          else
+            MAJOR=0; MINOR=1; PATCH=0; RC=0
+          fi
+          
+          if [[ "$BRANCH" == "dev" ]]; then
+            if [[ "$LABELS" == *"landing:release:major"* ]]; then
+              MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0; RC=1
+            elif [[ "$LABELS" == *"landing:release:minor"* ]]; then
+              MINOR=$((MINOR + 1)); PATCH=0; RC=1
+            elif [[ "$LABELS" == *"landing:release:patch"* ]]; then
+              PATCH=$((PATCH + 1)); RC=1
+            else
+              RC=$((RC + 1))
+            fi
+            NEW_VERSION="landing-v${MAJOR}.${MINOR}.${PATCH}-rc${RC}"
+          else
+            if [[ "$LABELS" == *"landing:release:major"* ]]; then
+              MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0
+            elif [[ "$LABELS" == *"landing:release:minor"* ]]; then
+              MINOR=$((MINOR + 1)); PATCH=0
+            else
+              PATCH=$((PATCH + 1))
+            fi
+            NEW_VERSION="landing-v${MAJOR}.${MINOR}.${PATCH}"
+          fi
+          
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "📦 Landing: $LATEST → $NEW_VERSION"
+
+      - name: Create Git Tags
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          if [[ "${{ steps.changes.outputs.backend }}" == "true" ]]; then
+            git tag -a "${{ steps.backend.outputs.version }}" -m "Backend Release ${{ steps.backend.outputs.version }}"
+            git push origin "${{ steps.backend.outputs.version }}"
+            echo "✅ Created tag: ${{ steps.backend.outputs.version }}"
+          fi
+          
+          if [[ "${{ steps.changes.outputs.frontend }}" == "true" ]]; then
+            git tag -a "${{ steps.frontend.outputs.version }}" -m "Frontend Release ${{ steps.frontend.outputs.version }}"
+            git push origin "${{ steps.frontend.outputs.version }}"
+            echo "✅ Created tag: ${{ steps.frontend.outputs.version }}"
+          fi
+          
+          if [[ "${{ steps.changes.outputs.landing }}" == "true" ]]; then
+            git tag -a "${{ steps.landing.outputs.version }}" -m "Landing Release ${{ steps.landing.outputs.version }}"
+            git push origin "${{ steps.landing.outputs.version }}"
+            echo "✅ Created tag: ${{ steps.landing.outputs.version }}"
+          fi
+
+  build-backend:
+    name: 🔧 Build Backend
+    needs: detect-and-version
+    if: needs.detect-and-version.outputs.backend_changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Backend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend/tf-api
+          file: ./backend/tf-api/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/backend:${{ needs.detect-and-version.outputs.backend_version }}
+            ghcr.io/${{ github.repository }}/backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  build-frontend:
+    name: 🎨 Build Frontend
+    needs: detect-and-version
+    if: needs.detect-and-version.outputs.frontend_changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/frontend:${{ needs.detect-and-version.outputs.frontend_version }}
+            ghcr.io/${{ github.repository }}/frontend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  build-landing:
+    name: 🌐 Build Landing
+    needs: detect-and-version
+    if: needs.detect-and-version.outputs.landing_changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Landing
+        uses: docker/build-push-action@v5
+        with:
+          context: ./landing-page
+          file: ./landing-page/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/landing:${{ needs.detect-and-version.outputs.landing_version }}
+            ghcr.io/${{ github.repository }}/landing:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  create-release:
+    name: 📝 Create GitHub Release
+    needs: [detect-and-version, build-backend, build-frontend, build-landing]
+    if: always() && (needs.build-backend.result == 'success' || needs.build-frontend.result == 'success' || needs.build-landing.result == 'success')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create Release Notes
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const branch = '${{ github.ref_name }}';
+            const backendChanged = '${{ needs.detect-and-version.outputs.backend_changed }}';
+            const frontendChanged = '${{ needs.detect-and-version.outputs.frontend_changed }}';
+            const landingChanged = '${{ needs.detect-and-version.outputs.landing_changed }}';
+            
+            let releaseBody = `## Release from \`${branch}\` branch\n\n**Docker Images:**\n`;
+            let tags = [];
+            
+            if (backendChanged === 'true') {
+              const version = '${{ needs.detect-and-version.outputs.backend_version }}';
+              tags.push(version);
+              releaseBody += `- Backend: \`ghcr.io/${{ github.repository }}/backend:${version}\`\n`;
+            }
+            
+            if (frontendChanged === 'true') {
+              const version = '${{ needs.detect-and-version.outputs.frontend_version }}';
+              tags.push(version);
+              releaseBody += `- Frontend: \`ghcr.io/${{ github.repository }}/frontend:${version}\`\n`;
+            }
+            
+            if (landingChanged === 'true') {
+              const version = '${{ needs.detect-and-version.outputs.landing_version }}';
+              tags.push(version);
+              releaseBody += `- Landing: \`ghcr.io/${{ github.repository }}/landing:${version}\`\n`;
+            }
+            
+            // Créer une release pour chaque tag
+            for (const tag of tags) {
+              const isPrerelease = tag.includes('-rc');
+              try {
+                await github.rest.repos.createRelease({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  tag_name: tag,
+                  name: tag,
+                  body: releaseBody,
+                  draft: false,
+                  prerelease: isPrerelease
+                });
+                core.info(`✅ Created release for ${tag}`);
+              } catch (error) {
+                core.warning(`Failed to create release for ${tag}: ${error.message}`);
+              }
+            }
