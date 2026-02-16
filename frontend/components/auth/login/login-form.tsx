@@ -86,7 +86,6 @@ export function LoginForm({
       toast.error(t.common.error, {
         description: error.message || t.auth.errors.loginFailed,
       });
-      console.error("Login error:", error);
     } finally {
       setIsLoading(false);
     }
