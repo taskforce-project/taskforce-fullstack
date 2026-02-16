@@ -136,9 +136,10 @@ export function SignupForm({
       
       // Redirection vers choix du plan
       router.push('/auth/register/plan');
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       toast.error(t.common.error, { 
-        description: error.message || t.auth.errors.registrationFailed 
+        description: errorMessage || t.auth.errors.registrationFailed 
       });
       console.error("Registration error:", error);
     } finally {
