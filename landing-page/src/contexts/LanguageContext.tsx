@@ -7,9 +7,10 @@ import {
 } from "react";
 import { constants_en } from "@/config/constants_en";
 import { constants_fr } from "@/config/constants_fr";
-import type { Constants } from "@/config/constants_fr";
 
 export type Language = "en" | "fr";
+
+type Constants = typeof constants_en | typeof constants_fr;
 
 interface LanguageContextType {
   language: Language;

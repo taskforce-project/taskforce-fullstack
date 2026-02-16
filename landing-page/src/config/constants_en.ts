@@ -1,8 +1,6 @@
 // English constants configuration for the landing page
 
-import type { Constants } from "./constants_fr";
-
-export const constants_en: Constants = {
+export const constants_en = {
   // Page metadata
   meta: {
     title: "Taskforce - Modern Task Management Platform",
@@ -439,6 +437,7 @@ export const constants_en: Constants = {
     hero: {
       badge: "Documentation",
       title: "Everything you need to build amazing workflows",
+      titleHighlight: "amazing workflows",
       description:
         "Comprehensive guides, API references, and examples to help you get the most out of Taskforce.",
     },
@@ -455,18 +454,21 @@ export const constants_en: Constants = {
         title: "API Documentation",
         description: "Complete API reference with examples",
         href: "#api-docs",
+        color: "from-blue-500/20 to-cyan-500/20",
         gradient: "from-blue-500/20 to-cyan-500/20",
       },
       {
         title: "Theme Builder",
         description: "Create custom themes for your workspace",
         href: "#theme-builder",
+        color: "from-purple-500/20 to-pink-500/20",
         gradient: "from-purple-500/20 to-pink-500/20",
       },
       {
         title: "Examples",
         description: "Real-world examples and code snippets",
         href: "#examples",
+        color: "from-orange-500/20 to-yellow-500/20",
         gradient: "from-orange-500/20 to-yellow-500/20",
       },
     ],
@@ -474,6 +476,7 @@ export const constants_en: Constants = {
       {
         title: "Getting Started",
         description: "Everything you need to start using Taskforce",
+        icon: "Zap",
         items: [
           { name: "Introduction", href: "#introduction", badge: "Start Here" },
           { name: "Installation", href: "#installation" },
@@ -485,6 +488,7 @@ export const constants_en: Constants = {
       {
         title: "Core Concepts",
         description: "Learn the fundamentals of Taskforce",
+        icon: "Layers",
         items: [
           { name: "Projects & Tasks", href: "#projects-tasks" },
           { name: "Workspaces", href: "#workspaces" },
@@ -496,6 +500,7 @@ export const constants_en: Constants = {
       {
         title: "Features",
         description: "Explore powerful features",
+        icon: "Settings",
         items: [
           { name: "Real-time Collaboration", href: "#collaboration" },
           { name: "Custom Themes", href: "#themes", badge: "Popular" },
@@ -507,6 +512,7 @@ export const constants_en: Constants = {
       {
         title: "API Reference",
         description: "Integrate Taskforce with your tools",
+        icon: "Code",
         items: [
           { name: "Authentication", href: "#api-auth" },
           { name: "REST API", href: "#rest-api", badge: "v2.0" },
@@ -518,6 +524,7 @@ export const constants_en: Constants = {
       {
         title: "Guides & Tutorials",
         description: "Step-by-step guides",
+        icon: "BookOpen",
         items: [
           { name: "Team Onboarding", href: "#guide-onboarding" },
           { name: "Custom Workflows", href: "#guide-workflows" },
@@ -529,6 +536,7 @@ export const constants_en: Constants = {
       {
         title: "Deployment",
         description: "Deploy and scale Taskforce",
+        icon: "Cloud",
         items: [
           { name: "Self-Hosting", href: "#self-hosting" },
           { name: "Docker Setup", href: "#docker" },
@@ -563,6 +571,24 @@ export const constants_en: Constants = {
           href: "https://twitter.com/taskforce",
         },
       ],
+      communityCard: {
+        title: "Join the Community",
+        description: "Connect with other developers using Taskforce",
+        links: [
+          { label: "GitHub Discussions", href: "https://github.com/taskforce/discussions" },
+          { label: "Discord Server", href: "https://discord.gg/taskforce" },
+          { label: "Stack Overflow", href: "https://stackoverflow.com/questions/tagged/taskforce" },
+        ],
+      },
+      supportCard: {
+        title: "Premium Support",
+        description: "Get fast help from our expert team",
+        links: [
+          { label: "Contact Support", href: "/contact" },
+          { label: "Documentation", href: "/docs" },
+          { label: "Report a Bug", href: "https://github.com/taskforce/issues" },
+        ],
+      },
     },
   },
 

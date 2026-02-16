@@ -448,6 +448,7 @@ export const constants_fr = {
     hero: {
       badge: "Documentation",
       title: "Tout ce dont vous avez besoin pour développer avec Taskforce",
+      titleHighlight: "Taskforce",
       description:
         "Guides complets, références API et ressources pour tirer le meilleur parti de Taskforce.",
     },
@@ -459,18 +460,21 @@ export const constants_fr = {
         title: "Démarrage Rapide",
         description: "Démarrez en moins de 5 minutes",
         href: "#quick-start",
+        color: "from-blue-500 to-cyan-500",
         gradient: "from-blue-500 to-cyan-500",
       },
       {
         title: "Référence API",
         description: "Documentation complète REST et WebSocket",
         href: "#api",
+        color: "from-purple-500 to-pink-500",
         gradient: "from-purple-500 to-pink-500",
       },
       {
         title: "Exemples",
         description: "Exemples de code et démos pratiques",
         href: "#examples",
+        color: "from-orange-500 to-red-500",
         gradient: "from-orange-500 to-red-500",
       },
     ],
@@ -483,6 +487,7 @@ export const constants_fr = {
       {
         title: "Bien Démarrer",
         description: "Tout ce qu'il faut pour commencer avec Taskforce",
+        icon: "Zap",
         items: [
           {
             name: "Introduction",
@@ -498,6 +503,7 @@ export const constants_fr = {
       {
         title: "Concepts de Base",
         description: "Apprenez les fondamentaux de Taskforce",
+        icon: "Layers",
         items: [
           { name: "Projets & Tâches", href: "#projects-tasks" },
           { name: "Espaces de Travail", href: "#workspaces" },
@@ -509,6 +515,7 @@ export const constants_fr = {
       {
         title: "Fonctionnalités",
         description: "Explorez les fonctionnalités puissantes",
+        icon: "Settings",
         items: [
           { name: "Collaboration en Temps Réel", href: "#collaboration" },
           { name: "Thèmes Personnalisés", href: "#themes", badge: "Populaire" },
@@ -520,6 +527,7 @@ export const constants_fr = {
       {
         title: "Référence API",
         description: "Intégrez Taskforce avec vos outils",
+        icon: "Code",
         items: [
           { name: "Authentification", href: "#api-auth" },
           { name: "API REST", href: "#rest-api", badge: "v2.0" },
@@ -531,6 +539,7 @@ export const constants_fr = {
       {
         title: "Guides",
         description: "Tutoriels pas à pas et bonnes pratiques",
+        icon: "BookOpen",
         items: [
           { name: "Déploiement en Production", href: "#deploy" },
           { name: "Configuration Base de Données", href: "#database" },
@@ -542,6 +551,7 @@ export const constants_fr = {
       {
         title: "Déploiement",
         description: "Déployez Taskforce sur votre infrastructure",
+        icon: "Cloud",
         items: [
           { name: "Guide Auto-Hébergement", href: "#self-hosting" },
           { name: "Déploiement Docker", href: "#docker" },
@@ -578,6 +588,24 @@ export const constants_fr = {
           href: "https://twitter.com/taskforce",
         },
       ],
+      communityCard: {
+        title: "Rejoignez la Communauté",
+        description: "Connectez-vous avec d'autres développeurs utilisant Taskforce",
+        links: [
+          { label: "Discussions GitHub", href: "https://github.com/taskforce/discussions" },
+          { label: "Serveur Discord", href: "https://discord.gg/taskforce" },
+          { label: "Stack Overflow", href: "https://stackoverflow.com/questions/tagged/taskforce" },
+        ],
+      },
+      supportCard: {
+        title: "Support Premium",
+        description: "Obtenez de l'aide rapide de notre équipe d'experts",
+        links: [
+          { label: "Contacter le Support", href: "/contact" },
+          { label: "Documentation", href: "/docs" },
+          { label: "Signaler un Bug", href: "https://github.com/taskforce/issues" },
+        ],
+      },
     },
   },
 
@@ -593,6 +621,53 @@ export const constants_fr = {
       title: "Conditions d'Utilisation",
       description:
         "Veuillez lire attentivement ces conditions avant d'utiliser Taskforce",
+    },
+    tableOfContents: {
+      title: "TABLE DES MATIÈRES",
+    },
+    sections: [
+      {
+        id: "agreement",
+        title: "Acceptation des Conditions",
+        icon: "FileText",
+        content: [
+          "En accédant ou en utilisant Taskforce ('le Service'), vous acceptez d'être lié par ces Conditions d'Utilisation ('Conditions'). Si vous n'acceptez pas une partie des conditions, vous ne pouvez pas accéder au Service.",
+        ],
+      },
+      {
+        id: "license",
+        title: "Licence d'Utilisation",
+        icon: "Scale",
+        content: [
+          "La permission est accordée d'utiliser Taskforce à des fins personnelles ou commerciales, sous réserve des restrictions suivantes :",
+        ],
+        list: [
+          "Vous ne devez pas modifier, copier ou reproduire les matériaux du Service sans autorisation",
+          "Vous ne devez pas utiliser le Service à des fins illégales",
+        ],
+      },
+      {
+        id: "contact",
+        title: "Nous Contacter",
+        icon: "FileText",
+        content: [
+          "Si vous avez des questions sur ces Conditions, veuillez nous contacter à :",
+        ],
+        contact: {
+          email: "legal@taskforce.app",
+          address: "Service Juridique Taskforce",
+          response: "Nous visons à répondre à toutes les demandes sous 48 heures.",
+        },
+      },
+    ],
+    bottomCta: {
+      title: "Questions sur nos Conditions ?",
+      description:
+        "Notre équipe juridique est là pour vous aider à clarifier vos préoccupations.",
+      buttons: {
+        contact: "Contacter l'Équipe Juridique",
+        privacy: "Voir la Politique de Confidentialité",
+      },
     },
   },
 
