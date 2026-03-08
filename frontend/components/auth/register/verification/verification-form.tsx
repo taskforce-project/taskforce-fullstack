@@ -54,6 +54,13 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
       
       const sendRegistration = async () => {
         try {
+          console.log('[DEBUG] Données d\'inscription:', {
+            email: registerData.email,
+            firstName: registerData.firstName,
+            lastName: registerData.lastName,
+            planType: registerData.planType,
+          });
+          
           await authService.register({
             email: registerData.email,
             password: registerData.password,
@@ -161,6 +168,20 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
       className={cn("flex flex-col gap-6 md:min-h-112.5 w-[80%]", className)}
       {...props}
     >
+      {/* Bouton retour en haut à gauche */}
+      <div className="absolute top-4 left-4">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => router.push('/auth/register/plan')}
+          disabled={isLoading}
+          className="gap-2"
+        >
+          ← Retour
+        </Button>
+      </div>
+
       {/* Progress indicator */}
       <div className="w-full space-y-2">
         <div className="flex justify-between text-sm text-muted-foreground">
