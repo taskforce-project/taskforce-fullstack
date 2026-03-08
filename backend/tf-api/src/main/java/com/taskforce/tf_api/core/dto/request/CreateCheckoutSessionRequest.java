@@ -17,7 +17,7 @@ import lombok.NoArgsConstructor;
 public class CreateCheckoutSessionRequest {
 
     @NotBlank(message = "Le type de plan est obligatoire")
-    private String planType; // PREMIUM, ENTERPRISE
+    private String planType; // PRO, ENTERPRISE
 
     private String successUrl; // URL de redirection après paiement réussi
 
