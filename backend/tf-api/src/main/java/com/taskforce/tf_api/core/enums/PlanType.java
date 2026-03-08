@@ -10,10 +10,10 @@ public enum PlanType {
     FREE,
 
     /**
-     * Plan premium avec fonctionnalités avancées
+     * Plan PRO avec fonctionnalités avancées
      * Prix : 29€/mois (configurable dans Stripe)
      */
-    PREMIUM,
+    PRO,
 
     /**
      * Plan entreprise avec support premium et fonctionnalités complètes
