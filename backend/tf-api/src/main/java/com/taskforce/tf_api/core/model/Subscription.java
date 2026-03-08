@@ -44,7 +44,7 @@ public class Subscription {
     private Long userId;
 
     /**
-     * Type de plan (FREE, PREMIUM, ENTERPRISE)
+     * Type de plan (FREE, PRO, ENTERPRISE)
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "plan_type", nullable = false)
