@@ -418,4 +418,104 @@ public class AuthService {
 
         log.info("Mot de passe réinitialisé avec succès pour : {}", email);
     }
+
+    /**
+     * Finalise l'inscription après validation du paiement Stripe
+     * 1. Récupère la session Stripe et vérifie le paiement
+     * 2. Récupère les données d'inscription depuis otp_verification
+     * 3. Crée l'utilisateur en base avec plan PRO/ENTERPRISE + ACTIVE
+     * 4. Marque l'email comme vérifié dans Keycloak
+     * 5. Retourne les tokens JWT et les détails du paiement
+     * 
+     * @param sessionId ID de la session Stripe Checkout
+     * @return Détails de la vérification et création de l'utilisateur
+     */
+    public com.taskforce.tf_api.core.dto.response.VerifySessionResponse completeRegistrationAfterPayment(String sessionId) throws StripeException {
+        log.info("Finalisation de l'inscription après paiement - Session: {}", sessionId);
+
+        // 1. Récupérer la session Stripe
+        com.stripe.model.checkout.Session session = stripeService.getCheckoutSession(sessionId);
+        
+        // 2. Vérifier que le paiement est complété
+        if (!"paid".equals(session.getPaymentStatus())) {
+            throw new RuntimeException("Le paiement n'est pas encore validé. Statut: " + session.getPaymentStatus());
+        }
+
+        String customerEmail = session.getCustomerEmail();
+        String customerId = session.getCustomer();
+        String subscriptionId = session.getSubscription();
+
+        log.info("Paiement validé pour {} - Customer: {}, Subscription: {}", 
+            customerEmail, customerId, subscriptionId);
+
+        // 3. Récupérer les données d'inscription depuis OTP (dernier OTP même si déjà vérifié)
+        OtpVerification otpVerification = otpService.getLatestOtp(customerEmail);
+        
+        if (otpVerification == null) {
+            throw new RuntimeException("Aucune inscription en attente trouvée pour cet email");
+        }
+
+        String keycloakId = otpVerification.getKeycloakId();
+        String planType = otpVerification.getPlanType();
+
+        if (keycloakId == null || planType == null) {
+            throw new RuntimeException("Données d'inscription incomplètes");
+        }
+
+        // 4. Vérifier si l'utilisateur existe déjà en base (cas de double soumission)
+        if (userRepository.existsByEmail(customerEmail)) {
+            User existingUser = userRepository.findByEmail(customerEmail)
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+            
+            log.warn("Utilisateur {} déjà créé en base. Retour des informations existantes.", customerEmail);
+            
+            return com.taskforce.tf_api.core.dto.response.VerifySessionResponse.builder()
+                .email(customerEmail)
+                .planType(existingUser.getPlanType().toString())
+                .paymentStatus(session.getPaymentStatus())
+                .subscriptionId(subscriptionId)
+                .customerId(customerId)
+                .userCreated(false)
+                .message("Utilisateur déjà créé. Inscription terminée avec succès.")
+                .build();
+        }
+
+        // 5. Récupérer l'utilisateur Keycloak
+        UserRepresentation keycloakUser = keycloakService.getUserByEmail(customerEmail);
+        
+        // 6. Marquer l'email comme vérifié dans Keycloak
+        if (!Boolean.TRUE.equals(keycloakUser.isEmailVerified())) {
+            keycloakService.verifyEmail(keycloakId);
+            log.info("Email marqué comme vérifié dans Keycloak pour {}", customerEmail);
+        }
+
+        // 7. Créer l'utilisateur en base avec plan payant ACTIVE
+        PlanType planTypeEnum = PlanType.valueOf(planType.toUpperCase());
+        User user = User.builder()
+            .keycloakId(keycloakId)
+            .email(customerEmail)
+            .planType(planTypeEnum)
+            .planStatus(PlanStatus.ACTIVE)  // Plan activé immédiatement après paiement
+            .stripeCustomerId(customerId)
+            .stripeSubscriptionId(subscriptionId)
+            .isActive(true)
+            .build();
+
+        user = userRepository.save(user);
+        log.info("Utilisateur {} créé en base avec plan {} ACTIVE (ID: {})", 
+            customerEmail, planType, user.getId());
+
+        // 8. Envoyer l'email de bienvenue
+        emailService.sendWelcomeEmail(customerEmail, keycloakUser.getFirstName());
+
+        return com.taskforce.tf_api.core.dto.response.VerifySessionResponse.builder()
+            .email(customerEmail)
+            .planType(planType)
+            .paymentStatus(session.getPaymentStatus())
+            .subscriptionId(subscriptionId)
+            .customerId(customerId)
+            .userCreated(true)
+            .message("Inscription finalisée avec succès. Votre abonnement est actif.")
+            .build();
+    }
 }
