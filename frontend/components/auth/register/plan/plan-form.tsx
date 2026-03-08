@@ -117,6 +117,20 @@ export function RegisterPlanForm({
 
   return (
     <div className={cn("flex flex-col gap-6 w-full", className)} {...props}>
+      {/* Bouton retour en haut à gauche */}
+      <div className="absolute top-4 left-4">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => router.push('/auth/register')}
+          disabled={isLoading}
+          className="gap-2"
+        >
+          ← Retour
+        </Button>
+      </div>
+
       {/* Progress indicator */}
       <div className="w-full space-y-2">
         <div className="flex justify-between text-sm text-muted-foreground">
