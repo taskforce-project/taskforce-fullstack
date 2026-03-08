@@ -107,19 +107,19 @@ class OtpServiceTest {
         }
 
         @Test
-        @DisplayName("devrait créer OTP avec plan PREMIUM")
-        void generateAndSendOtp_withPremiumPlan_shouldCreateOtpWithPremiumPlan() {
+        @DisplayName("devrait créer OTP avec plan PRO")
+        void generateAndSendOtp_withProPlan_shouldCreateOtpWithProPlan() {
             // Given
-            String email = "premium@test.com";
+            String email = "pro@test.com";
             when(otpRepository.countRecentOtpAttempts(eq(email), any(LocalDateTime.class))).thenReturn(0L);
             when(otpRepository.save(any(OtpVerification.class))).thenAnswer(i -> i.getArgument(0));
 
             // When
             OtpVerification result = otpService.generateAndSendOtp(
-                    email, "Premium", OtpType.EMAIL_VERIFICATION, null, "keycloak-premium", PlanType.PREMIUM);
+                    email, "Pro User", OtpType.EMAIL_VERIFICATION, null, "keycloak-pro", PlanType.PRO);
 
             // Then
-            assertThat(result.getPlanType()).isEqualTo(PlanType.PREMIUM.toString());
+            assertThat(result.getPlanType()).isEqualTo(PlanType.PRO.toString());
         }
 
         @Test
@@ -256,7 +256,7 @@ class OtpServiceTest {
             // Given
             String email = "test@example.com";
             String keycloakId = "keycloak-123";
-            String planType = PlanType.PREMIUM.toString();
+            String planType = PlanType.PRO.toString();
             OtpVerification otp = TestDataBuilder.buildOtp(email, "123456", OtpType.EMAIL_VERIFICATION);
 
             when(otpRepository.findPendingOtpByEmail(email)).thenReturn(Optional.of(otp));
@@ -279,7 +279,7 @@ class OtpServiceTest {
             when(otpRepository.findPendingOtpByEmail(email)).thenReturn(Optional.empty());
 
             // When
-            boolean result = otpService.updatePlanType(email, "keycloak-123", PlanType.PREMIUM.toString());
+            boolean result = otpService.updatePlanType(email, "keycloak-123", PlanType.PRO.toString());
 
             // Then
             assertThat(result).isFalse();
