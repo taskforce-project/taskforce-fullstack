@@ -23,4 +23,5 @@ export type RegisterCredentials = {
   lastName: string;
   email: string;
   password: string;
+  planType: string; // "FREE" | "PRO" | "PREMIUM" | "ENTERPRISE"
 };
