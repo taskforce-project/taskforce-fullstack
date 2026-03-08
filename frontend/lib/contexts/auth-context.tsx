@@ -57,15 +57,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   /**
+   * Redirection automatique après authentification depuis la page login
+   */
+  useEffect(() => {
+    if (!isLoading && user && globalThis.window !== undefined) {
+      const currentPath = globalThis.location.pathname;
+      if (currentPath === "/auth/login" || currentPath === "/") {
+        router.replace("/dashboard");
+      }
+    }
+  }, [user, isLoading, router]);
+
+  /**
    * Connexion
    */
   const login = async (credentials: LoginCredentials) => {
     try {
       const response = await authService.login(credentials);
       setUser(response.user);
-      
-      // Redirection vers dashboard
-      router.push("/dashboard");
+      // La redirection est gérée par le composant appelant
     } catch (error) {
       setUser(null);
       throw error;
