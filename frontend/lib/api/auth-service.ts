@@ -47,16 +47,19 @@ export const authService = {
    */
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     try {
-      const response = await apiClient.post<AuthResponse>("/auth/login", credentials);
+      const response = await apiClient.post<{ success: boolean; message: string; data: AuthResponse }>("/auth/login", credentials);
+      
+      // Le backend renvoie { success, message, data: AuthResponse }
+      const authData = response.data.data;
       
       // Sauvegarder les tokens et l'utilisateur dans localStorage
       if (typeof window !== "undefined") {
-        localStorage.setItem("accessToken", response.data.accessToken);
-        localStorage.setItem("refreshToken", response.data.refreshToken);
-        localStorage.setItem("user", JSON.stringify(response.data.user));
+        localStorage.setItem("accessToken", authData.accessToken);
+        localStorage.setItem("refreshToken", authData.refreshToken);
+        localStorage.setItem("user", JSON.stringify(authData.user));
       }
       
-      return response.data;
+      return authData;
     } catch (error) {
       throw new Error(getErrorMessage(error));
     }
@@ -64,13 +67,13 @@ export const authService = {
 
   /**
    * Inscription utilisateur (Étape 1)
-   * @param data - Données d'inscription
+   * @param data - Données d'inscription avec plan
    * @returns ID utilisateur et email
    */
   async register(data: RegisterCredentials): Promise<{ userId: string; email: string }> {
     try {
-      const response = await apiClient.post("/auth/register", data);
-      return response.data;
+      const response = await apiClient.post<{ success: boolean; message: string; data: any }>("/auth/register", data);
+      return response.data.data;
     } catch (error) {
       throw new Error(getErrorMessage(error));
     }
@@ -78,19 +81,19 @@ export const authService = {
 
   /**
    * Sélection du plan (Étape 2)
-   * @param userId - ID utilisateur
-   * @param plan - Type de plan (FREE, PRO, ENTERPRISE)
+   * @param email - Email utilisateur
+   * @param planType - Type de plan (FREE, PRO, ENTERPRISE)
    * @returns URL Stripe si plan payant
    */
-  async selectPlan(userId: string, plan: string): Promise<{
-    userId: string;
-    plan: string;
+  async selectPlan(email: string, planType: string): Promise<{
+    email: string;
+    planType: string;
     stripeCheckoutUrl?: string;
     message: string;
   }> {
     try {
-      const response = await apiClient.post("/auth/register/plan", { userId, plan });
-      return response.data;
+      const response = await apiClient.post<{ success: boolean; message: string; data: any }>("/auth/select-plan", { email, planType });
+      return response.data.data;
     } catch (error) {
       throw new Error(getErrorMessage(error));
     }
@@ -104,21 +107,23 @@ export const authService = {
    */
   async verifyOtp(email: string, otp: string): Promise<VerifyOtpResponse> {
     try {
-      const response = await apiClient.post<VerifyOtpResponse>("/auth/verify-otp", {
+      const response = await apiClient.post<{ success: boolean; message: string; data: VerifyOtpResponse }>("/auth/verify-otp", {
         email,
         otpCode: otp,
       });
       
+      const otpData = response.data.data;
+      
       // Si vérification réussie et tokens fournis, les sauvegarder
-      if (response.data.authData) {
+      if (otpData.authData) {
         if (typeof window !== "undefined") {
-          localStorage.setItem("accessToken", response.data.authData.accessToken);
-          localStorage.setItem("refreshToken", response.data.authData.refreshToken);
-          localStorage.setItem("user", JSON.stringify(response.data.authData.user));
+          localStorage.setItem("accessToken", otpData.authData.accessToken);
+          localStorage.setItem("refreshToken", otpData.authData.refreshToken);
+          localStorage.setItem("user", JSON.stringify(otpData.authData.user));
         }
       }
       
-      return response.data;
+      return otpData;
     } catch (error) {
       throw new Error(getErrorMessage(error));
     }
@@ -131,8 +136,8 @@ export const authService = {
    */
   async resendOtp(email: string): Promise<OtpResponse> {
     try {
-      const response = await apiClient.post<OtpResponse>("/auth/resend-otp", { email });
-      return response.data;
+      const response = await apiClient.post<{ success: boolean; message: string; data: OtpResponse }>("/auth/resend-otp", { email });
+      return response.data.data;
     } catch (error) {
       throw new Error(getErrorMessage(error));
     }
@@ -145,8 +150,8 @@ export const authService = {
    */
   async forgotPassword(email: string): Promise<{ message: string }> {
     try {
-      const response = await apiClient.post("/auth/forgot-password", { email });
-      return response.data;
+      const response = await apiClient.post<{ success: boolean; message: string; data: any }>("/auth/forgot-password", { email });
+      return { message: response.data.message || "Email envoyé" };
     } catch (error) {
       throw new Error(getErrorMessage(error));
     }
@@ -160,8 +165,8 @@ export const authService = {
    */
   async resetPassword(token: string, password: string): Promise<{ message: string }> {
     try {
-      const response = await apiClient.post("/auth/reset-password", { token, password });
-      return response.data;
+      const response = await apiClient.post<{ success: boolean; message: string; data: any }>("/auth/reset-password", { token, password });
+      return { message: response.data.message || "Mot de passe réinitialisé" };
     } catch (error) {
       throw new Error(getErrorMessage(error));
     }
@@ -174,14 +179,16 @@ export const authService = {
    */
   async refreshToken(refreshToken: string): Promise<{ accessToken: string; expiresIn: number }> {
     try {
-      const response = await apiClient.post("/auth/refresh", { refreshToken });
+      const response = await apiClient.post<{ success: boolean; message: string; data: { accessToken: string; expiresIn: number } }>("/auth/refresh", { refreshToken });
+      
+      const tokenData = response.data.data;
       
       // Sauvegarder le nouveau token
       if (typeof window !== "undefined") {
-        localStorage.setItem("accessToken", response.data.accessToken);
+        localStorage.setItem("accessToken", tokenData.accessToken);
       }
       
-      return response.data;
+      return tokenData;
     } catch (error) {
       throw new Error(getErrorMessage(error));
     }
