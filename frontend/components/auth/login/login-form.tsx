@@ -80,8 +80,7 @@ export function LoginForm({
       
       toast.success(t.auth.success.loginSuccess);
 
-      // Redirection vers dashboard après login
-      router.push('/dashboard');
+      // La redirection est gérée automatiquement par le contexte
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       toast.error(t.common.error, {
