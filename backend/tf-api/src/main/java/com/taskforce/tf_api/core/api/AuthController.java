@@ -14,6 +14,8 @@ import com.taskforce.tf_api.core.dto.request.RegisterRequest;
 import com.taskforce.tf_api.core.dto.request.ResendOtpRequest;
 import com.taskforce.tf_api.core.dto.request.SelectPlanRequest;
 import com.taskforce.tf_api.core.dto.request.VerifyOtpRequest;
+import com.taskforce.tf_api.core.dto.request.ForgotPasswordRequest;
+import com.taskforce.tf_api.core.dto.request.ResetPasswordRequest;
 import com.taskforce.tf_api.core.dto.response.AuthResponse;
 import com.taskforce.tf_api.core.dto.response.RegisterResponse;
 import com.taskforce.tf_api.core.dto.response.SelectPlanResponse;
@@ -155,6 +157,54 @@ public class AuthController {
         } catch (Exception e) {
             log.error("Erreur lors de la connexion : {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.error(e.getMessage()));
+        }
+    }
+
+    /**
+     * Demande de réinitialisation de mot de passe
+     * POST /api/auth/forgot-password
+     */
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ApiResponse<Void>> forgotPassword(
+        @Valid @RequestBody ForgotPasswordRequest request
+    ) {
+        log.info("Requête de réinitialisation de mot de passe pour : {}", request.getEmail());
+
+        try {
+            authService.forgotPassword(request.getEmail());
+
+            return ResponseEntity.ok(
+                ApiResponse.<Void>success("Un code de vérification a été envoyé à votre adresse email", null)
+            );
+
+        } catch (Exception e) {
+            log.error("Erreur lors de la demande de réinitialisation : {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(e.getMessage()));
+        }
+    }
+
+    /**
+     * Réinitialisation du mot de passe avec code OTP
+     * POST /api/auth/reset-password
+     */
+    @PostMapping("/reset-password")
+    public ResponseEntity<ApiResponse<Void>> resetPassword(
+        @Valid @RequestBody ResetPasswordRequest request
+    ) {
+        log.info("Requête de réinitialisation de mot de passe pour : {}", request.getEmail());
+
+        try {
+            authService.resetPassword(request.getEmail(), request.getOtpCode(), request.getNewPassword());
+
+            return ResponseEntity.ok(
+                ApiResponse.<Void>success("Mot de passe réinitialisé avec succès", null)
+            );
+
+        } catch (Exception e) {
+            log.error("Erreur lors de la réinitialisation du mot de passe : {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error(e.getMessage()));
         }
     }
