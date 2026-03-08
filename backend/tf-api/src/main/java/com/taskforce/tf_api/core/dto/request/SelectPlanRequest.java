@@ -23,7 +23,7 @@ public class SelectPlanRequest {
     private String email;
 
     @NotBlank(message = "Le type de plan est obligatoire")
-    @Pattern(regexp = "^(FREE|PRO|PREMIUM|ENTERPRISE)$", 
-             message = "Le plan doit être FREE, PRO, PREMIUM ou ENTERPRISE")
+    @Pattern(regexp = "^(FREE|PRO|ENTERPRISE)$", 
+             message = "Le plan doit être FREE, PRO ou ENTERPRISE")
     private String planType;
 }
