@@ -136,17 +136,26 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
 
     try {
       // Appel API pour vérifier l'OTP
-      await authService.verifyOtp(userEmail, otp);
+      const result = await authService.verifyOtp(userEmail, otp);
       
       // Nettoyer les données temporaires
       clearRegisterData();
       
       toast.success("Compte vérifié avec succès !", {
-        description: "Vous pouvez maintenant vous connecter",
+        description: "Bienvenue sur TaskForce !",
       });
       
-      // Redirection vers login
-      router.push('/auth/login');
+      // Si checkout URL présente (plan payant), rediriger vers Stripe
+      if (result.checkoutSessionUrl) {
+        toast.info("Redirection vers la page de paiement...", {
+          description: "Finalisation de votre abonnement",
+        });
+        window.location.href = result.checkoutSessionUrl;
+        return;
+      }
+      
+      // Sinon redirection vers dashboard (les tokens sont déjà sauvegardés)
+      router.push('/dashboard');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       toast.error(t.common.error, {
