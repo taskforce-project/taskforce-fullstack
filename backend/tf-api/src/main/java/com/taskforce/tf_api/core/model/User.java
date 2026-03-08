@@ -66,7 +66,7 @@ public class User {
     private String email;
 
     /**
-     * Type de plan d'abonnement (FREE, PREMIUM, ENTERPRISE)
+     * Type de plan d'abonnement (FREE, PRO, ENTERPRISE)
      * Synchronisé avec la table Subscription
      */
     @Enumerated(EnumType.STRING)
@@ -158,10 +158,10 @@ public class User {
     private String updatedBy;
 
     /**
-     * Vérifie si l'utilisateur a un plan premium ou supérieur
+     * Vérifie si l'utilisateur a un plan PRO ou supérieur
      */
-    public boolean isPremiumOrHigher() {
-        return planType == PlanType.PREMIUM || planType == PlanType.ENTERPRISE;
+    public boolean isProOrHigher() {
+        return planType == PlanType.PRO || planType == PlanType.ENTERPRISE;
     }
 
     /**
