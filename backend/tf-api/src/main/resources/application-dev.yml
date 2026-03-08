@@ -130,10 +130,12 @@ keycloak:
 
 # Stripe Configuration
 stripe:
-  api-key: ${STRIPE_API_KEY:sk_test_your_stripe_key_here}
-  publishable-key: ${STRIPE_PUBLISHABLE_KEY:pk_test_your_publishable_key_here}
+  api-key: ${STRIPE_SECRET_KEY:sk_test_your_stripe_key_here}
+  publishable-key: ${STRIPE_PUBLIC_KEY:pk_test_your_publishable_key_here}
   webhook-secret: ${STRIPE_WEBHOOK_SECRET:whsec_your_webhook_secret_here}
   plans:
+    pro:
+      price-id: ${STRIPE_PRICE_ID_PRO:price_pro_test}
     premium:
       price-id: ${STRIPE_PREMIUM_PRICE_ID:price_premium_test}
     enterprise:
