@@ -17,7 +17,6 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { setRegisterData } from "@/lib/auth/register-storage";
-import { authService } from "@/lib/api";
 import {
   validateEmail,
   validateName,
