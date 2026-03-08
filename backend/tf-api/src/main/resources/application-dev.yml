@@ -136,8 +136,6 @@ stripe:
   plans:
     pro:
       price-id: ${STRIPE_PRICE_ID_PRO:price_pro_test}
-    premium:
-      price-id: ${STRIPE_PREMIUM_PRICE_ID:price_premium_test}
     enterprise:
       price-id: ${STRIPE_ENTERPRISE_PRICE_ID:price_enterprise_test}
   checkout:
