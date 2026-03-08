@@ -78,8 +78,12 @@ public class OtpService {
         otp = otpRepository.save(otp);
         log.info("OTP créé avec succès pour : {} avec plan {}", email, planType);
 
-        // Envoyer l'email
-        emailService.sendOtpEmail(email, otpCode, firstName);
+        // Envoyer l'email selon le type d'OTP
+        if (otpType == OtpType.PASSWORD_RESET) {
+            emailService.sendResetPasswordEmail(email, otpCode, firstName);
+        } else {
+            emailService.sendOtpEmail(email, otpCode, firstName);
+        }
 
         return otp;
     }
@@ -117,6 +121,56 @@ public class OtpService {
 
         log.info("Code OTP vérifié avec succès pour : {}", email);
         return true;
+    }
+
+    /**
+     * Vérifie un code OTP pour un type spécifique
+     */
+    @Transactional
+    public boolean verifyOtpWithType(String email, String otpCode, OtpType otpType) {
+        log.info("Vérification du code OTP de type {} pour : {}", otpType, email);
+
+        Optional<OtpVerification> otpOpt = otpRepository.findValidOtpByEmailAndCode(
+            email,
+            otpCode,
+            LocalDateTime.now()
+        );
+
+        if (otpOpt.isEmpty()) {
+            log.warn("Code OTP invalide ou expiré pour : {}", email);
+            return false;
+        }
+
+        OtpVerification otp = otpOpt.get();
+
+        // Vérifier que le type correspond
+        if (otp.getOtpType() != otpType) {
+            log.warn("Type d'OTP incorrect. Attendu: {}, Reçu: {}", otpType, otp.getOtpType());
+            return false;
+        }
+
+        // Vérifier si le code peut être validé
+        if (!otp.canBeValidated()) {
+            log.warn("Le code OTP ne peut pas être validé (expiré ou max tentatives atteint) : {}", email);
+            otpRepository.save(otp);
+            return false;
+        }
+
+        // Marquer comme vérifié
+        otp.markAsVerified();
+        otpRepository.save(otp);
+
+        log.info("Code OTP de type {} vérifié avec succès pour : {}", otpType, email);
+        return true;
+    }
+
+    /**
+     * Invalide tous les OTP en attente pour un email
+     */
+    @Transactional
+    public void invalidateAllPendingOtps(String email) {
+        log.info("Invalidation de tous les OTP en attente pour : {}", email);
+        otpRepository.expireAllPendingOtpsByEmail(email);
     }
 
     /**
