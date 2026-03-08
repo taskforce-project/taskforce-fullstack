@@ -68,6 +68,15 @@ spring:
     error:
       include-stacktrace: always
 
+  # Thymeleaf Configuration
+  thymeleaf:
+    enabled: true
+    prefix: classpath:/templates/
+    suffix: .html
+    mode: HTML
+    encoding: UTF-8
+    cache: false  # Désactiver le cache en DEV pour voir les changements immédiatement
+
 # Email Configuration (Mailtrap for development)
 mail:
   host: ${MAIL_HOST:sandbox.smtp.mailtrap.io}
