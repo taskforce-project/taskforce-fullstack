@@ -10,6 +10,8 @@ import com.taskforce.tf_api.core.dto.request.LoginRequest;
 import com.taskforce.tf_api.core.dto.request.RegisterRequest;
 import com.taskforce.tf_api.core.dto.request.SelectPlanRequest;
 import com.taskforce.tf_api.core.dto.request.VerifyOtpRequest;
+import com.taskforce.tf_api.core.dto.request.ForgotPasswordRequest;
+import com.taskforce.tf_api.core.dto.request.ResetPasswordRequest;
 import com.taskforce.tf_api.core.dto.response.AuthResponse;
 import com.taskforce.tf_api.core.dto.response.RegisterResponse;
 import com.taskforce.tf_api.core.dto.response.SelectPlanResponse;
@@ -357,5 +359,63 @@ public class AuthService {
             .otpSent(true)
             .otpExpiresInMinutes(15)
             .build();
+    }
+
+    /**
+     * Demande de réinitialisation de mot de passe
+     * 1. Vérifie que l'utilisateur existe
+     * 2. Génère un code OTP
+     * 3. Envoie l'email avec le code
+     */
+    public void forgotPassword(String email) {
+        log.info("Demande de réinitialisation de mot de passe pour : {}", email);
+
+        // Vérifier que l'utilisateur existe dans Keycloak
+        if (!keycloakService.emailExists(email)) {
+            throw new RuntimeException("Aucun compte associé à cet email");
+        }
+
+        UserRepresentation keycloakUser = keycloakService.getUserByEmail(email);
+
+        // Générer et envoyer le code OTP pour reset password
+        // L'email sera envoyé automatiquement avec le template reset-password
+        otpService.generateAndSendOtp(
+            email,
+            keycloakUser.getFirstName(),
+            OtpType.PASSWORD_RESET,
+            null,
+            keycloakUser.getId(),
+            null
+        );
+
+        log.info("Email de réinitialisation envoyé à : {}", email);
+    }
+
+    /**
+     * Réinitialisation du mot de passe avec code OTP
+     * 1. Vérifie le code OTP
+     * 2. Change le mot de passe dans Keycloak
+     * 3. Invalide tous les OTP en attente
+     */
+    public void resetPassword(String email, String otpCode, String newPassword) {
+        log.info("Tentative de réinitialisation de mot de passe pour : {}", email);
+
+        // Vérifier le code OTP avec le type PASSWORD_RESET
+        boolean isValid = otpService.verifyOtpWithType(email, otpCode, OtpType.PASSWORD_RESET);
+
+        if (!isValid) {
+            throw new RuntimeException("Code de vérification invalide ou expiré");
+        }
+
+        // Récupérer l'utilisateur Keycloak
+        UserRepresentation keycloakUser = keycloakService.getUserByEmail(email);
+
+        // Changer le mot de passe dans Keycloak
+        keycloakService.updatePassword(keycloakUser.getId(), newPassword);
+
+        // Invalider tous les OTP en attente pour cet email
+        otpService.invalidateAllPendingOtps(email);
+
+        log.info("Mot de passe réinitialisé avec succès pour : {}", email);
     }
 }
