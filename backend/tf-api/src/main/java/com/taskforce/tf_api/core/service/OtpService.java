@@ -126,27 +126,39 @@ public class OtpService {
     public OtpVerification verifyOtpAndGetDetails(String email, String otpCode) {
         log.info("Vérification du code OTP avec détails pour : {}", email);
 
-        Optional<OtpVerification> otpOpt = otpRepository.findValidOtpByEmailAndCode(
-            email,
-            otpCode,
-            LocalDateTime.now()
-        );
-
-        if (otpOpt.isEmpty()) {
-            log.warn("Code OTP invalide ou expiré pour : {}", email);
+        // Chercher l'OTP PENDING pour cet email (peu importe le code)
+        Optional<OtpVerification> pendingOtpOpt = otpRepository.findPendingOtpByEmail(email);
+        
+        if (pendingOtpOpt.isEmpty()) {
+            log.warn("Aucun OTP en attente trouvé pour : {}", email);
             return null;
         }
 
-        OtpVerification otp = otpOpt.get();
-
-        // Vérifier si le code peut être validé
-        if (!otp.canBeValidated()) {
-            log.warn("Le code OTP ne peut pas être validé (expiré ou max tentatives atteint) : {}", email);
+        OtpVerification otp = pendingOtpOpt.get();
+        
+        // Vérifier si l'OTP n'est pas expiré
+        if (otp.isExpired()) {
+            log.warn("OTP expiré pour : {}", email);
+            return null;
+        }
+        
+        // Vérifier si le nombre max de tentatives est atteint
+        if (otp.hasReachedMaxAttempts()) {
+            log.warn("Nombre maximum de tentatives atteint pour : {}", email);
+            return null;
+        }
+        
+        // Vérifier si le code correspond
+        if (!otp.getOtpCode().equals(otpCode)) {
+            // Code incorrect : incrémenter les tentatives
+            log.warn("Code OTP incorrect pour : {} (tentative {}/{})", 
+                email, otp.getAttempts() + 1, otp.getMaxAttempts());
+            otp.incrementAttempts();
             otpRepository.save(otp);
             return null;
         }
 
-        // Marquer comme vérifié
+        // Code correct : marquer comme vérifié
         otp.markAsVerified();
         otpRepository.save(otp);
 
@@ -186,6 +198,14 @@ public class OtpService {
      */
     public OtpVerification getLatestPendingOtp(String email) {
         return otpRepository.findPendingOtpByEmail(email).orElse(null);
+    }
+
+    /**
+     * Récupère le dernier OTP pour un email (peu importe le status)
+     * Utilisé pour récupérer le plan lors du resend même si l'OTP précédent est expiré
+     */
+    public OtpVerification getLatestOtp(String email) {
+        return otpRepository.findLatestOtpByEmail(email).orElse(null);
     }
 
     /**
