@@ -3,15 +3,28 @@
  * Validations côté client pour sécuriser les inputs utilisateur
  */
 
-import DOMPurify from "isomorphic-dompurify";
-
 /**
  * Sanitize un input en supprimant tout code malveillant
  * @param input - Texte à nettoyer
  * @returns Texte nettoyé
+ *
+ * Note: N'utilise DOMPurify que côté client pour éviter les erreurs jsdom dans Next.js 16
+ * Côté serveur, Next.js échappe automatiquement les données dans les composants React
  */
 export function sanitizeInput(input: string): string {
-  return DOMPurify.sanitize(input, { ALLOWED_TAGS: [] });
+  // Côté serveur, retourne l'input tel quel (Next.js échappe automatiquement)
+  if (globalThis.window === undefined) {
+    return input;
+  }
+
+  // Côté client uniquement, utilise DOMPurify
+  try {
+    const DOMPurify = require("isomorphic-dompurify");
+    return DOMPurify.sanitize(input, { ALLOWED_TAGS: [] });
+  } catch (error) {
+    console.warn("DOMPurify non disponible, retour de l'input brut:", error);
+    return input;
+  }
 }
 
 /**
@@ -41,32 +54,32 @@ export function validatePassword(password: string): {
   strength: "weak" | "medium" | "strong";
 } {
   const errors: string[] = [];
-  
+
   // Longueur minimale
   if (password.length < 8) {
     errors.push("Le mot de passe doit contenir au moins 8 caractères");
   }
-  
+
   // Au moins une majuscule
   if (!/[A-Z]/.test(password)) {
     errors.push("Le mot de passe doit contenir au moins une majuscule");
   }
-  
+
   // Au moins une minuscule
   if (!/[a-z]/.test(password)) {
     errors.push("Le mot de passe doit contenir au moins une minuscule");
   }
-  
+
   // Au moins un chiffre
   if (!/[0-9]/.test(password)) {
     errors.push("Le mot de passe doit contenir au moins un chiffre");
   }
-  
+
   // Au moins un caractère spécial
   if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
     errors.push("Le mot de passe doit contenir au moins un caractère spécial");
   }
-  
+
   // Calculer la force du mot de passe
   let strength: "weak" | "medium" | "strong" = "weak";
   if (errors.length === 0) {
@@ -76,7 +89,7 @@ export function validatePassword(password: string): {
       strength = "medium";
     }
   }
-  
+
   return {
     isValid: errors.length === 0,
     errors,
@@ -113,7 +126,10 @@ export function validateName(name: string): boolean {
  * @param maxLength - Longueur maximale autorisée
  * @returns Objet avec état de validation
  */
-export function validateInput(input: string, maxLength: number = 255): {
+export function validateInput(
+  input: string,
+  maxLength: number = 255,
+): {
   isValid: boolean;
   sanitized: string;
   error?: string;
@@ -126,7 +142,7 @@ export function validateInput(input: string, maxLength: number = 255): {
       error: `Le champ ne peut pas dépasser ${maxLength} caractères`,
     };
   }
-  
+
   // Détecter des patterns suspects
   const suspiciousPatterns = [
     /<script/i,
@@ -134,11 +150,11 @@ export function validateInput(input: string, maxLength: number = 255): {
     /on\w+\s*=/i, // onclick=, onload=, etc.
     /<iframe/i,
   ];
-  
-  const hasSuspiciousContent = suspiciousPatterns.some(pattern => 
-    pattern.test(input)
+
+  const hasSuspiciousContent = suspiciousPatterns.some((pattern) =>
+    pattern.test(input),
   );
-  
+
   if (hasSuspiciousContent) {
     return {
       isValid: false,
@@ -146,7 +162,7 @@ export function validateInput(input: string, maxLength: number = 255): {
       error: "Le contenu contient des caractères non autorisés",
     };
   }
-  
+
   return {
     isValid: true,
     sanitized: sanitizeInput(input),
@@ -160,26 +176,26 @@ export function validateInput(input: string, maxLength: number = 255): {
  */
 export function calculatePasswordStrength(password: string): number {
   let score = 0;
-  
+
   // Longueur (max 40 points)
   score += Math.min(password.length * 4, 40);
-  
+
   // Majuscules (10 points)
   if (/[A-Z]/.test(password)) score += 10;
-  
+
   // Minuscules (10 points)
   if (/[a-z]/.test(password)) score += 10;
-  
+
   // Chiffres (10 points)
   if (/[0-9]/.test(password)) score += 10;
-  
+
   // Caractères spéciaux (15 points)
   if (/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) score += 15;
-  
+
   // Diversité des caractères (15 points)
   const uniqueChars = new Set(password.split("")).size;
   score += Math.min((uniqueChars / password.length) * 15, 15);
-  
+
   return Math.min(score, 100);
 }
 
@@ -197,7 +213,7 @@ export function isDisposableEmail(email: string): boolean {
     "mailinator.com",
     "trashmail.com",
   ];
-  
+
   const domain = email.split("@")[1]?.toLowerCase();
   return disposableDomains.includes(domain);
 }
@@ -208,7 +224,7 @@ export function isDisposableEmail(email: string): boolean {
  */
 export class RateLimiter {
   private attempts: Map<string, number[]> = new Map();
-  
+
   /**
    * Vérifie si une action est autorisée
    * @param key - Clé unique pour l'action (ex: "login", "resend-otp")
@@ -219,21 +235,21 @@ export class RateLimiter {
   isAllowed(key: string, maxAttempts: number, windowMs: number): boolean {
     const now = Date.now();
     const attempts = this.attempts.get(key) || [];
-    
+
     // Filtrer les tentatives dans la fenêtre de temps
-    const recentAttempts = attempts.filter(time => now - time < windowMs);
-    
+    const recentAttempts = attempts.filter((time) => now - time < windowMs);
+
     if (recentAttempts.length >= maxAttempts) {
       return false;
     }
-    
+
     // Ajouter la nouvelle tentative
     recentAttempts.push(now);
     this.attempts.set(key, recentAttempts);
-    
+
     return true;
   }
-  
+
   /**
    * Réinitialise les tentatives pour une clé
    * @param key - Clé à réinitialiser
@@ -241,7 +257,7 @@ export class RateLimiter {
   reset(key: string): void {
     this.attempts.delete(key);
   }
-  
+
   /**
    * Obtient le temps restant avant de pouvoir réessayer
    * @param key - Clé de l'action
@@ -251,11 +267,11 @@ export class RateLimiter {
   getTimeUntilReset(key: string, windowMs: number): number {
     const attempts = this.attempts.get(key) || [];
     if (attempts.length === 0) return 0;
-    
+
     const oldestAttempt = Math.min(...attempts);
     const resetTime = oldestAttempt + windowMs;
     const remaining = Math.max(0, resetTime - Date.now());
-    
+
     return Math.ceil(remaining / 1000);
   }
 }
