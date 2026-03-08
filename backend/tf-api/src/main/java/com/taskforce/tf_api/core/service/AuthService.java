@@ -186,6 +186,7 @@ public class AuthService {
         log.info("Vérification OTP pour : {}", request.getEmail());
 
         // Vérifier le code OTP et récupérer le plan sélectionné
+        // (les tentatives sont incrémentées automatiquement en cas d'échec)
         OtpVerification otpVerification = otpService.verifyOtpAndGetDetails(request.getEmail(), request.getOtpCode());
 
         if (otpVerification == null) {
@@ -332,11 +333,13 @@ public class AuthService {
             throw new RuntimeException("Cet email est déjà vérifié");
         }
 
-        // Récupérer le plan depuis l'OTP existant
-        OtpVerification existingOtp = otpService.getLatestPendingOtp(email);
+        // Récupérer le plan depuis le dernier OTP (même expiré)
+        OtpVerification existingOtp = otpService.getLatestOtp(email);
         PlanType planType = existingOtp != null && existingOtp.getPlanType() != null 
             ? PlanType.valueOf(existingOtp.getPlanType()) 
             : null;
+        
+        log.info("Plan récupéré depuis le dernier OTP : {} pour {}", planType, email);
 
         // Générer et envoyer un nouveau code OTP
         otpService.generateAndSendOtp(
