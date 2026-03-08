@@ -38,6 +38,13 @@ public interface OtpVerificationRepository extends JpaRepository<OtpVerification
     Optional<OtpVerification> findPendingOtpByEmail(@Param("email") String email);
 
     /**
+     * Récupère le dernier OTP pour un email (peu importe le status)
+     * Utilisé pour récupérer le plan lors du resend même si l'OTP précédent est expiré
+     */
+    @Query("SELECT o FROM OtpVerification o WHERE o.email = :email ORDER BY o.createdAt DESC LIMIT 1")
+    Optional<OtpVerification> findLatestOtpByEmail(@Param("email") String email);
+
+    /**
      * Trouve un OTP par email, type et statut
      */
     Optional<OtpVerification> findFirstByEmailAndOtpTypeAndOtpStatusOrderByCreatedAtDesc(
