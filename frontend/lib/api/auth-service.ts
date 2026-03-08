@@ -158,14 +158,19 @@ export const authService = {
   },
 
   /**
-   * Réinitialisation du mot de passe
-   * @param token - Token de réinitialisation
-   * @param password - Nouveau mot de passe
+   * Réinitialisation du mot de passe avec code OTP
+   * @param email - Email utilisateur
+   * @param otpCode - Code OTP à 6 chiffres
+   * @param newPassword - Nouveau mot de passe
    * @returns Message de confirmation
    */
-  async resetPassword(token: string, password: string): Promise<{ message: string }> {
+  async resetPassword(email: string, otpCode: string, newPassword: string): Promise<{ message: string }> {
     try {
-      const response = await apiClient.post<{ success: boolean; message: string; data: any }>("/auth/reset-password", { token, password });
+      const response = await apiClient.post<{ success: boolean; message: string; data: any }>("/auth/reset-password", { 
+        email, 
+        otpCode, 
+        newPassword 
+      });
       return { message: response.data.message || "Mot de passe réinitialisé" };
     } catch (error) {
       throw new Error(getErrorMessage(error));
