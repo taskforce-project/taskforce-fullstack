@@ -34,16 +34,23 @@ function PaymentSuccessContent() {
       }
 
       try {
-        // TODO: Appel API pour vérifier le paiement côté backend
-        // const response = await fetch(`/api/stripe/verify-session?session_id=${sessionId}`, {
-        //   method: 'GET',
-        //   headers: {
-        //     'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-        //   }
-        // });
+        // Appeler l'API backend pour vérifier le paiement et créer l'utilisateur
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/stripe/verify-session?session_id=${sessionId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`Erreur HTTP: ${response.status}`);
+        }
+
+        const data = await response.json();
         
-        // Simuler la vérification (à remplacer par l'appel API réel)
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        if (!data.success) {
+          throw new Error(data.message || "Erreur lors de la vérification du paiement");
+        }
         
         setVerificationStatus("success");
         
@@ -51,7 +58,7 @@ function PaymentSuccessContent() {
         refreshUser();
         
         toast.success("Paiement réussi !", {
-          description: "Votre abonnement a été activé avec succès",
+          description: data.data?.message || "Votre abonnement a été activé avec succès",
         });
       } catch (error) {
         setVerificationStatus("error");
