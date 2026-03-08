@@ -23,7 +23,7 @@ export const apiClient: AxiosInstance = axios.create({
     "Content-Type": "application/json",
   },
   timeout: 10000, // 10 secondes
-  withCredentials: false, // Modifier à true si cookies nécessaires
+  withCredentials: true, // Activé pour accepter les cookies HttpOnly JWT
 });
 
 /**
