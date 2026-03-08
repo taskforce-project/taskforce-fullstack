@@ -8,7 +8,7 @@
       "MaintenanceDB": "taskforce-db",
       "Username": "postgres",
       "SSLMode": "prefer",
-      "PassFile": "/pgpass"
+      "PassFile": "/pgpass/pgpassfile"
     }
   }
 }
