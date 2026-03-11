@@ -139,9 +139,9 @@ services:
     environment:
       NODE_ENV: development
       # API URL pour les appels côté client (navigateur)
-      NEXT_PUBLIC_API_URL: http://localhost:8080/api
+      NEXT_PUBLIC_API_URL: http://localhost:8080
       # API URL pour les appels côté serveur (SSR dans Docker)
-      NEXT_PUBLIC_API_URL_SSR: http://backend:8080/api
+      NEXT_PUBLIC_API_URL_SSR: http://backend:8080
       # Enable polling for hot reload on Docker Desktop (Windows/macOS)
       WATCHPACK_POLLING: "true"
       CHOKIDAR_USEPOLLING: "true"

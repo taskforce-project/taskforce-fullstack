@@ -11,8 +11,8 @@ import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from "ax
  * - CSR (navigateur): utilise NEXT_PUBLIC_API_URL ou localhost:8080 (hôte)
  */
 const API_URL = typeof window === "undefined" 
-  ? (process.env.NEXT_PUBLIC_API_URL_SSR || "http://backend:8080/api") // Server-side
-  : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api");  // Client-side
+  ? (process.env.NEXT_PUBLIC_API_URL_SSR || "http://backend:8080") // Server-side
+  : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080");  // Client-side
 
 /**
  * Instance Axios configurée pour les appels API
