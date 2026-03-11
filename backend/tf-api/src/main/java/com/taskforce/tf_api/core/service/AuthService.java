@@ -1,6 +1,7 @@
 package com.taskforce.tf_api.core.service;
 
 import org.keycloak.representations.idm.UserRepresentation;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,6 +44,12 @@ public class AuthService {
     private final EmailService emailService;
     private final UserRepository userRepository;
     private final JwtService jwtService;
+
+    @Value("${stripe.success-url}")
+    private String stripeSuccessUrl;
+
+    @Value("${stripe.cancel-url}")
+    private String stripeCancelUrl;
 
     /**
      * Inscription d'un nouvel utilisateur
@@ -234,8 +241,8 @@ public class AuthService {
                 var session = stripeService.createCheckoutSession(
                     stripeCustomer.getId(),
                     priceId,
-                    "http://localhost:3000/payment/success", // À configurer
-                    "http://localhost:3000/payment/cancel",  // À configurer
+                    stripeSuccessUrl,
+                    stripeCancelUrl,
                     null
                 );
                 checkoutUrl = session.getUrl();
@@ -462,12 +469,21 @@ public class AuthService {
             throw new RuntimeException("Données d'inscription incomplètes");
         }
 
-        // 4. Vérifier si l'utilisateur existe déjà en base (cas de double soumission)
+        // 4. Vérifier si l'utilisateur existe déjà en base (cas normal pour plans payants)
         if (userRepository.existsByEmail(customerEmail)) {
             User existingUser = userRepository.findByEmail(customerEmail)
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
             
-            log.warn("Utilisateur {} déjà créé en base. Retour des informations existantes.", customerEmail);
+            log.info("Utilisateur {} déjà créé en base. Mise à jour avec les infos de paiement.", customerEmail);
+            
+            // Mettre à jour avec les informations de paiement
+            existingUser.setStripeCustomerId(customerId);
+            existingUser.setStripeSubscriptionId(subscriptionId);
+            existingUser.setPlanStatus(PlanStatus.ACTIVE);
+            userRepository.save(existingUser);
+            
+            log.info("Utilisateur {} mis à jour : plan {} ACTIVE, subscription {}", 
+                customerEmail, existingUser.getPlanType(), subscriptionId);
             
             return com.taskforce.tf_api.core.dto.response.VerifySessionResponse.builder()
                 .email(customerEmail)
@@ -476,7 +492,7 @@ public class AuthService {
                 .subscriptionId(subscriptionId)
                 .customerId(customerId)
                 .userCreated(false)
-                .message("Utilisateur déjà créé. Inscription terminée avec succès.")
+                .message("Paiement validé avec succès. Votre abonnement est maintenant actif.")
                 .build();
         }
 
