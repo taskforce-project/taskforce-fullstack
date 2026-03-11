@@ -42,7 +42,7 @@ public class SecurityConfig {
         http
             .cors(Customizer.withDefaults())
             .authorizeHttpRequests(authz -> authz
-                .requestMatchers("/auth/**", "/actuator/**", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                .requestMatchers("/api/auth/**", "/api/stripe/**", "/actuator/**", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                 .anyRequest().authenticated()
             )
             .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> {}))

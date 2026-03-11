@@ -6,6 +6,7 @@
 
 /**
  * Routes d'authentification
+ * Backend: @RequestMapping("/api/auth")
  */
 export const AUTH_ROUTES = {
   LOGIN: "/api/auth/login",
@@ -21,6 +22,7 @@ export const AUTH_ROUTES = {
 
 /**
  * Routes Stripe (paiements et abonnements)
+ * Backend: @RequestMapping("/api/stripe")
  */
 export const STRIPE_ROUTES = {
   CREATE_CHECKOUT: "/api/stripe/create-checkout",
@@ -32,12 +34,13 @@ export const STRIPE_ROUTES = {
 
 /**
  * Routes utilisateur (profil, etc.)
+ * TODO: À implémenter quand UserController sera créé
  */
-export const USER_ROUTES = {
-  PROFILE: "/api/users/profile",
-  UPDATE_PROFILE: "/api/users/profile",
-  DELETE_ACCOUNT: "/api/users/account",
-} as const;
+// export const USER_ROUTES = {
+//   PROFILE: "/api/users/profile",
+//   UPDATE_PROFILE: "/api/users/profile",
+//   DELETE_ACCOUNT: "/api/users/account",
+// } as const;
 
 /**
  * Toutes les routes groupées (export par défaut)
@@ -45,7 +48,7 @@ export const USER_ROUTES = {
 export const API_ROUTES = {
   AUTH: AUTH_ROUTES,
   STRIPE: STRIPE_ROUTES,
-  USER: USER_ROUTES,
+  // USER: USER_ROUTES,
 } as const;
 
 export default API_ROUTES;

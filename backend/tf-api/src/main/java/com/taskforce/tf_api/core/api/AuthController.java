@@ -32,7 +32,7 @@ import lombok.extern.slf4j.Slf4j;
  * Tous les appels à Keycloak et Stripe passent par l'API Java
  */
 @RestController
-@RequestMapping("/auth")
+@RequestMapping("/api/auth")
 @RequiredArgsConstructor
 @Slf4j
 public class AuthController {
