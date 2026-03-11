@@ -23,9 +23,11 @@ import { useRouter } from "next/navigation";
 import { getRegisterData, clearRegisterData } from "@/lib/auth/register-storage";
 import { validateOTP, globalRateLimiter } from "@/lib/utils/validation";
 import { authService } from "@/lib/api";
+import { useAuth } from "@/lib/contexts/auth-context";
 
 export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
   const router = useRouter();
+  const { refreshUser } = useAuth();
   const { t } = usePreferencesStore();
   const [isLoading, setIsLoading] = useState(false);
   const [isResending, setIsResending] = useState(false);
@@ -141,6 +143,9 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
       // Nettoyer les données temporaires
       clearRegisterData();
       
+      // Rafraîchir l'état d'authentification dans le contexte
+      refreshUser();
+      
       toast.success("Compte vérifié avec succès !", {
         description: "Bienvenue sur TaskForce !",
       });
@@ -150,11 +155,11 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
         toast.info("Redirection vers la page de paiement...", {
           description: "Finalisation de votre abonnement",
         });
-        window.location.href = result.checkoutSessionUrl;
+        globalThis.window.location.href = result.checkoutSessionUrl;
         return;
       }
       
-      // Sinon redirection vers dashboard (les tokens sont déjà sauvegardés)
+      // Sinon redirection vers dashboard
       router.push('/dashboard');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
