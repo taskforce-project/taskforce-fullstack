@@ -4,6 +4,7 @@
  */
 
 import { apiClient, getErrorMessage } from "./client";
+import { STRIPE_ROUTES } from "../config/api-routes";
 
 /**
  * Réponse de création de session Stripe
@@ -46,7 +47,7 @@ export const stripeService = {
     try {
       const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
       
-      const response = await apiClient.post<CheckoutSessionResponse>("/stripe/create-checkout", {
+      const response = await apiClient.post<CheckoutSessionResponse>(STRIPE_ROUTES.CREATE_CHECKOUT, {
         planType,
         successUrl: successUrl || `${baseUrl}/payment/success`,
         cancelUrl: cancelUrl || `${baseUrl}/payment/cancel`,
@@ -64,7 +65,7 @@ export const stripeService = {
    */
   async getSubscriptionInfo(): Promise<SubscriptionInfo> {
     try {
-      const response = await apiClient.get<SubscriptionInfo>("/stripe/subscription");
+      const response = await apiClient.get<SubscriptionInfo>(STRIPE_ROUTES.SUBSCRIPTION_INFO);
       return response.data;
     } catch (error) {
       throw new Error(getErrorMessage(error));
@@ -78,7 +79,7 @@ export const stripeService = {
    */
   async cancelSubscription(immediately: boolean = false): Promise<{ message: string }> {
     try {
-      const response = await apiClient.post("/stripe/cancel", { immediately });
+      const response = await apiClient.post(STRIPE_ROUTES.CANCEL_SUBSCRIPTION, { immediately });
       return response.data;
     } catch (error) {
       throw new Error(getErrorMessage(error));

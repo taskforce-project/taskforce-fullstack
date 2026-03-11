@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { authService } from './auth-service';
 import * as client from './client';
+import { AUTH_ROUTES } from '../config/api-routes';
 
 // Mock apiClient
 vi.mock('./client', () => ({
@@ -71,7 +72,7 @@ describe('authService - API Service', () => {
       expect(response.refreshToken).toBe('mock-refresh-token');
       expect(response.expiresIn).toBe(3600);
       
-      expect(client.apiClient.post).toHaveBeenCalledWith('/auth/login', credentials);
+      expect(client.apiClient.post).toHaveBeenCalledWith(AUTH_ROUTES.LOGIN, credentials);
     });
 
     it('should store tokens in localStorage on successful login', async () => {
@@ -141,7 +142,7 @@ describe('authService - API Service', () => {
       expect(response.userId).toBe('mock-user-id');
       expect(response.email).toBe('newuser@example.com');
       
-      expect(client.apiClient.post).toHaveBeenCalledWith('/auth/register', registerData);
+      expect(client.apiClient.post).toHaveBeenCalledWith(AUTH_ROUTES.REGISTER, registerData);
     });
 
     it('should throw error when registration fails', async () => {
@@ -177,7 +178,7 @@ describe('authService - API Service', () => {
       expect(response.message).toBe('Plan selected successfully');
       expect(response.stripeCheckoutUrl).toBeUndefined();
       
-      expect(client.apiClient.post).toHaveBeenCalledWith('/auth/register/plan', {
+      expect(client.apiClient.post).toHaveBeenCalledWith(AUTH_ROUTES.SELECT_PLAN, {
         userId: 'user-123',
         plan: 'FREE',
       });
@@ -233,7 +234,7 @@ describe('authService - API Service', () => {
       expect(response.authData).toBeDefined();
       expect(response.authData?.user.email).toBe('test@example.com');
       
-      expect(client.apiClient.post).toHaveBeenCalledWith('/auth/verify-otp', {
+      expect(client.apiClient.post).toHaveBeenCalledWith(AUTH_ROUTES.VERIFY_OTP, {
         email: 'test@example.com',
         otpCode: '123456',
       });
@@ -292,7 +293,7 @@ describe('authService - API Service', () => {
       expect(response.message).toBe('OTP resent successfully');
       expect(response.expiresIn).toBe(300);
       
-      expect(client.apiClient.post).toHaveBeenCalledWith('/auth/resend-otp', {
+      expect(client.apiClient.post).toHaveBeenCalledWith(AUTH_ROUTES.RESEND_OTP, {
         email: 'test@example.com',
       });
     });
@@ -320,7 +321,7 @@ describe('authService - API Service', () => {
       expect(response).toBeDefined();
       expect(response.message).toBe('Password reset link sent');
       
-      expect(client.apiClient.post).toHaveBeenCalledWith('/auth/forgot-password', {
+      expect(client.apiClient.post).toHaveBeenCalledWith(AUTH_ROUTES.FORGOT_PASSWORD, {
         email: 'test@example.com',
       });
     });

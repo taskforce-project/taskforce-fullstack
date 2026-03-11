@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { CheckCircle2, Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/contexts/auth-context";
+import { STRIPE_ROUTES } from "@/lib/config/api-routes";
 
 function PaymentSuccessContent() {
   const router = useRouter();
@@ -35,7 +36,7 @@ function PaymentSuccessContent() {
 
       try {
         // Appeler l'API backend pour vérifier le paiement et créer l'utilisateur
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/stripe/verify-session?session_id=${sessionId}`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${STRIPE_ROUTES.VERIFY_SESSION}?session_id=${sessionId}`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json'

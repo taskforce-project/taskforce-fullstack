@@ -5,6 +5,7 @@
 
 import { apiClient, getErrorMessage } from "./client";
 import type { LoginCredentials, RegisterCredentials, AuthUser } from "../auth";
+import { AUTH_ROUTES } from "../config/api-routes";
 
 /**
  * Réponse d'authentification (login/register)
@@ -47,7 +48,7 @@ export const authService = {
    */
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     try {
-      const response = await apiClient.post<{ success: boolean; message: string; data: AuthResponse }>("/auth/login", credentials);
+      const response = await apiClient.post<{ success: boolean; message: string; data: AuthResponse }>(AUTH_ROUTES.LOGIN, credentials);
       
       // Le backend renvoie { success, message, data: AuthResponse }
       const authData = response.data.data;
@@ -72,7 +73,7 @@ export const authService = {
    */
   async register(data: RegisterCredentials): Promise<{ userId: string; email: string }> {
     try {
-      const response = await apiClient.post<{ success: boolean; message: string; data: any }>("/auth/register", data);
+      const response = await apiClient.post<{ success: boolean; message: string; data: any }>(AUTH_ROUTES.REGISTER, data);
       return response.data.data;
     } catch (error) {
       throw new Error(getErrorMessage(error));
@@ -92,7 +93,7 @@ export const authService = {
     message: string;
   }> {
     try {
-      const response = await apiClient.post<{ success: boolean; message: string; data: any }>("/auth/select-plan", { email, planType });
+      const response = await apiClient.post<{ success: boolean; message: string; data: any }>(AUTH_ROUTES.SELECT_PLAN, { email, planType });
       return response.data.data;
     } catch (error) {
       throw new Error(getErrorMessage(error));
@@ -107,7 +108,7 @@ export const authService = {
    */
   async verifyOtp(email: string, otp: string): Promise<VerifyOtpResponse> {
     try {
-      const response = await apiClient.post<{ success: boolean; message: string; data: VerifyOtpResponse }>("/auth/verify-otp", {
+      const response = await apiClient.post<{ success: boolean; message: string; data: VerifyOtpResponse }>(AUTH_ROUTES.VERIFY_OTP, {
         email,
         otpCode: otp,
       });
@@ -136,7 +137,7 @@ export const authService = {
    */
   async resendOtp(email: string): Promise<OtpResponse> {
     try {
-      const response = await apiClient.post<{ success: boolean; message: string; data: OtpResponse }>("/auth/resend-otp", { email });
+      const response = await apiClient.post<{ success: boolean; message: string; data: OtpResponse }>(AUTH_ROUTES.RESEND_OTP, { email });
       return response.data.data;
     } catch (error) {
       throw new Error(getErrorMessage(error));
@@ -150,7 +151,7 @@ export const authService = {
    */
   async forgotPassword(email: string): Promise<{ message: string }> {
     try {
-      const response = await apiClient.post<{ success: boolean; message: string; data: any }>("/auth/forgot-password", { email });
+      const response = await apiClient.post<{ success: boolean; message: string; data: any }>(AUTH_ROUTES.FORGOT_PASSWORD, { email });
       return { message: response.data.message || "Email envoyé" };
     } catch (error) {
       throw new Error(getErrorMessage(error));
@@ -166,7 +167,7 @@ export const authService = {
    */
   async resetPassword(email: string, otpCode: string, newPassword: string): Promise<{ message: string }> {
     try {
-      const response = await apiClient.post<{ success: boolean; message: string; data: any }>("/auth/reset-password", { 
+      const response = await apiClient.post<{ success: boolean; message: string; data: any }>(AUTH_ROUTES.RESET_PASSWORD, { 
         email, 
         otpCode, 
         newPassword 
@@ -184,7 +185,7 @@ export const authService = {
    */
   async refreshToken(refreshToken: string): Promise<{ accessToken: string; expiresIn: number }> {
     try {
-      const response = await apiClient.post<{ success: boolean; message: string; data: { accessToken: string; expiresIn: number } }>("/auth/refresh", { refreshToken });
+      const response = await apiClient.post<{ success: boolean; message: string; data: { accessToken: string; expiresIn: number } }>(AUTH_ROUTES.REFRESH_TOKEN, { refreshToken });
       
       const tokenData = response.data.data;
       
