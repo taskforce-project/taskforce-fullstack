@@ -448,9 +448,12 @@ public class AuthService {
             throw new RuntimeException("Le paiement n'est pas encore validé. Statut: " + session.getPaymentStatus());
         }
 
-        String customerEmail = session.getCustomerEmail();
         String customerId = session.getCustomer();
         String subscriptionId = session.getSubscription();
+        
+        // 3. Récupérer l'email depuis le Customer Stripe (pas depuis la session)
+        com.stripe.model.Customer customer = com.stripe.model.Customer.retrieve(customerId);
+        String customerEmail = customer.getEmail();
 
         log.info("Paiement validé pour {} - Customer: {}, Subscription: {}", 
             customerEmail, customerId, subscriptionId);
