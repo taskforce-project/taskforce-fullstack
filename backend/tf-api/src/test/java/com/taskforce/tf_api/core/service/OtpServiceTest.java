@@ -206,7 +206,6 @@ class OtpServiceTest {
 
     @Nested
     @DisplayName("Verify OTP And Get Details Tests")
-    @Disabled("TODO: Réécrire ces tests - la méthode utilise maintenant findPendingOtpByEmail au lieu de findValidOtpByEmailAndCode")
     class VerifyOtpAndGetDetailsTests {
 
         @Test
@@ -216,8 +215,9 @@ class OtpServiceTest {
             String email = "test@example.com";
             String code = "123456";
             OtpVerification otp = TestDataBuilder.buildOtp(email, code, OtpType.EMAIL_VERIFICATION);
+            otp.setOtpStatus(OtpStatus.PENDING);
 
-            when(otpRepository.findValidOtpByEmailAndCode(eq(email), eq(code), any(LocalDateTime.class)))
+            when(otpRepository.findPendingOtpByEmail(email))
                     .thenReturn(Optional.of(otp));
             when(otpRepository.save(any(OtpVerification.class))).thenReturn(otp);
 
@@ -229,6 +229,8 @@ class OtpServiceTest {
             assertThat(result.getEmail()).isEqualTo(email);
             assertThat(result.getOtpCode()).isEqualTo(code);
             assertThat(result.getOtpStatus()).isEqualTo(OtpStatus.VERIFIED);
+            verify(otpRepository).findPendingOtpByEmail(email);
+            verify(otpRepository).save(any(OtpVerification.class));
         }
 
         @Test
@@ -237,7 +239,8 @@ class OtpServiceTest {
             // Given
             String email = "test@example.com";
             String code = "999999";
-            lenient().when(otpRepository.findValidOtpByEmailAndCode(eq(email), eq(code), any(LocalDateTime.class)))
+            
+            when(otpRepository.findPendingOtpByEmail(email))
                     .thenReturn(Optional.empty());
 
             // When
@@ -245,6 +248,8 @@ class OtpServiceTest {
 
             // Then
             assertThat(result).isNull();
+            verify(otpRepository).findPendingOtpByEmail(email);
+            verify(otpRepository, never()).save(any());
         }
     }
 
