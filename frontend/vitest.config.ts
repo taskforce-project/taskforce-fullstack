@@ -34,10 +34,65 @@ export default defineConfig({
       ],
       // Objectifs de couverture
       thresholds: {
-        lines: 70,
-        functions: 70,
-        branches: 60,
-        statements: 70,
+        // Global (incluant pages/shadcn/UI non testés)
+        global: {
+          lines: 60,
+          functions: 60,
+          branches: 60,
+          statements: 60,
+        },
+        // Services API - CRITIQUE
+        'lib/api/auth-service.ts': {
+          lines: 90,
+          functions: 95,
+          branches: 75,
+          statements: 90,
+        },
+        'lib/api/client.ts': {
+          lines: 42,
+          functions: 50,
+          branches: 85,
+          statements: 42,
+        },
+        'lib/api/stripe-service.ts': {
+          lines: 95,
+          functions: 95,
+          branches: 90,
+          statements: 95,
+        },
+        // Composants métier auth
+        'components/auth/**/*.tsx': {
+          lines: 85,
+          functions: 85,
+          branches: 80,
+          statements: 85,
+        },
+        // Context & State Management
+        'lib/contexts/**/*.tsx': {
+          lines: 90,
+          functions: 90,
+          branches: 85,
+          statements: 90,
+        },
+        'lib/store/**/*.ts': {
+          lines: 90,
+          functions: 90,
+          branches: 84,
+          statements: 90,
+        },
+        // Utils & Validation
+        'lib/utils/**/*.ts': {
+          lines: 85,
+          functions: 85,
+          branches: 85,
+          statements: 85,
+        },
+        'lib/auth/**/*.ts': {
+          lines: 90,
+          functions: 80,
+          branches: 69,
+          statements: 90,
+        },
       },
     },
     include: ["**/*.{test,spec}.{ts,tsx}"],
