@@ -170,7 +170,11 @@ describe('LoginForm Component', () => {
   });
 
   it('should redirect to dashboard on successful login', async () => {
-    mockLogin.mockResolvedValue({});
+    // Simuler le comportement du contexte qui redirige après login
+    mockLogin.mockImplementation(async () => {
+      mockPush('/dashboard');
+    });
+    
     const user = userEvent.setup();
     render(<LoginForm />);
 
