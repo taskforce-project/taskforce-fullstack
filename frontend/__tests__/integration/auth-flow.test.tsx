@@ -52,7 +52,11 @@ afterEach(() => {
 describe('Integration Tests - Authentication Flow', () => {
   describe('Complete Login Flow', () => {
     it('should complete full login flow successfully', async () => {
-      mockLogin.mockResolvedValue({});
+      // Simuler le comportement du contexte qui redirige après login
+      mockLogin.mockImplementation(async () => {
+        mockPush('/dashboard');
+      });
+      
       const user = userEvent.setup();
       
       // Dynamically import to avoid module resolution issues
