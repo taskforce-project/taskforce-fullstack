@@ -4,26 +4,30 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.thymeleaf.TemplateEngine;
+import org.thymeleaf.context.Context;
+
+import jakarta.mail.MessagingException;
+import jakarta.mail.Session;
+import jakarta.mail.internet.MimeMessage;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("EmailService Tests")
-@Disabled("TODO: Réécrire les tests EmailService avec MimeMessage et Thymeleaf - voir ligne 104")
 class EmailServiceTest {
 
     @Mock
@@ -36,12 +40,21 @@ class EmailServiceTest {
     private EmailService emailService;
 
     @Captor
-    private ArgumentCaptor<SimpleMailMessage> messageCaptor;
+    private ArgumentCaptor<MimeMessage> messageCaptor;
+
+    private MimeMessage mimeMessage;
 
     @BeforeEach
     void setup() {
         ReflectionTestUtils.setField(emailService, "fromEmail", "noreply@taskforce.com");
         ReflectionTestUtils.setField(emailService, "fromName", "TaskForce");
+        ReflectionTestUtils.setField(emailService, "appUrl", "http://localhost:3000");
+        ReflectionTestUtils.setField(emailService, "supportUrl", "http://localhost:3000/support");
+        ReflectionTestUtils.setField(emailService, "contactUrl", "http://localhost:3000/contact");
+        
+        // Créer un vrai MimeMessage pour les tests (lenient pour éviter les unnecessary stubbing)
+        mimeMessage = new MimeMessage((Session) null);
+        lenient().when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
     }
 
     @Nested
@@ -55,48 +68,45 @@ class EmailServiceTest {
             String toEmail = "test@example.com";
             String otpCode = "123456";
             String firstName = "John";
+            String htmlContent = "<html><body>Your OTP: 123456</body></html>";
 
-            doNothing().when(mailSender).send(any(SimpleMailMessage.class));
+            when(templateEngine.process(eq("email/otp-email"), any(Context.class)))
+                    .thenReturn(htmlContent);
+            doNothing().when(mailSender).send(any(MimeMessage.class));
 
             // When
             emailService.sendOtpEmail(toEmail, otpCode, firstName);
 
             // Then
-            verify(mailSender).send(messageCaptor.capture());
-            SimpleMailMessage sentMessage = messageCaptor.getValue();
-
-            assertThat(sentMessage.getTo()).containsExactly(toEmail);
-            assertThat(sentMessage.getFrom()).isEqualTo("noreply@taskforce.com");
-            assertThat(sentMessage.getSubject()).contains("TaskForce").contains("code de vérification");
-            assertThat(sentMessage.getText())
-                    .contains(firstName)
-                    .contains(otpCode)
-                    .contains("15 minutes");
+            verify(mailSender).send(any(MimeMessage.class));
+            verify(templateEngine).process(eq("email/otp-email"), any(Context.class));
         }
 
         @Test
-        @DisplayName("devrait inclure le code OTP dans le corps de l'email")
-        void sendOtpEmail_shouldIncludeOtpCodeInBody() {
+        @DisplayName("devrait utiliser le bon template Thymeleaf")
+        void sendOtpEmail_shouldUseCorrectTemplate() {
             // Given
             String toEmail = "test@example.com";
             String otpCode = "987654";
             String firstName = "Jane";
+            
+            when(templateEngine.process(anyString(), any(Context.class)))
+                    .thenReturn("<html>Template content</html>");
 
             // When
             emailService.sendOtpEmail(toEmail, otpCode, firstName);
 
             // Then
-            verify(mailSender).send(messageCaptor.capture());
-            assertThat(messageCaptor.getValue().getText()).contains(otpCode);
+            verify(templateEngine).process(eq("email/otp-email"), any(Context.class));
         }
 
         @Test
-        @DisplayName("devrait lancer exception si erreur d'envoi")
-        void sendOtpEmail_withMailError_shouldThrowException() {
+        @DisplayName("devrait lancer exception si erreur Thymeleaf")
+        void sendOtpEmail_withTemplateError_shouldThrowException() {
             // Given
             String toEmail = "test@example.com";
-            doThrow(new RuntimeException("Mail server error"))
-                    .when(mailSender).send(any(SimpleMailMessage.class));
+            when(templateEngine.process(anyString(), any(Context.class)))
+                    .thenThrow(new RuntimeException("Template not found"));
 
             // When/Then
             assertThatThrownBy(() -> emailService.sendOtpEmail(toEmail, "123456", "John"))
@@ -105,11 +115,6 @@ class EmailServiceTest {
         }
     }
 
-    // TODO: Réécrire tous les tests EmailService avec MimeMessage/MimeMessageHelper au lieu de SimpleMailMessage
-    // Les méthodes sont maintenant: sendOtpEmail(), sendWelcomeEmail(), sendResetPasswordEmail()
-    // Tous utilisent Thymeleaf pour générer du HTML
-
-    /*
     @Nested
     @DisplayName("Send Welcome Email Tests")
     class SendWelcomeEmailTests {
@@ -119,39 +124,89 @@ class EmailServiceTest {
         void sendWelcomeEmail_withValidData_shouldSendEmail() {
             // Given
             String toEmail = "test@example.com";
-            String firstName = "John";
+            String firstName = "Alice";
+            String htmlContent = "<html><body>Welcome Alice!</body></html>";
 
-            doNothing().when(mailSender).send(any(SimpleMailMessage.class));
+            when(templateEngine.process(eq("email/welcome-email"), any(Context.class)))
+                    .thenReturn(htmlContent);
+            doNothing().when(mailSender).send(any(MimeMessage.class));
 
             // When
             emailService.sendWelcomeEmail(toEmail, firstName);
 
             // Then
-            verify(mailSender).send(messageCaptor.capture());
-            SimpleMailMessage sentMessage = messageCaptor.getValue();
-
-            assertThat(sentMessage.getTo()).containsExactly(toEmail);
-            assertThat(sentMessage.getFrom()).isEqualTo("noreply@taskforce.com");
-            assertThat(sentMessage.getSubject()).contains("Bienvenue").contains("TaskForce");
-            assertThat(sentMessage.getText()).contains(firstName);
+            verify(mailSender).send(any(MimeMessage.class));
+            verify(templateEngine).process(eq("email/welcome-email"), any(Context.class));
         }
 
         @Test
-        @DisplayName("devrait gérer l'erreur silencieusement")
-        void sendWelcomeEmail_withMailError_shouldNotThrowException() {
+        @DisplayName("devrait utiliser le bon template Thymeleaf")
+        void sendWelcomeEmail_shouldUseCorrectTemplate() {
             // Given
-            String toEmail = "test@example.com";
-            doThrow(new RuntimeException("Mail server error"))
-                    .when(mailSender).send(any(SimpleMailMessage.class));
+            when(templateEngine.process(anyString(), any(Context.class)))
+                    .thenReturn("<html>Welcome template</html>");
 
-            // When/Then - ne devrait pas lancer d'exception
-            emailService.sendWelcomeEmail(toEmail, "John");
+            // When
+            emailService.sendWelcomeEmail("test@example.com", "Bob");
 
-            verify(mailSender).send(any(SimpleMailMessage.class));
+            // Then
+            verify(templateEngine).process(eq("email/welcome-email"), any(Context.class));
         }
     }
-    */
 
-    // TODO: Réécrire tests pour sendResetPasswordEmail() avec MimeMessage/Thymeleaf
-    // Les anciens tests utilisaient SimpleMailMessage, mais maintenant on utilise HTML
+    @Nested
+    @DisplayName("Send Reset Password Email Tests")
+    class SendResetPasswordEmailTests {
+
+        @Test
+        @DisplayName("devrait envoyer email reset password avec succès")
+        void sendResetPasswordEmail_withValidData_shouldSendEmail() {
+            // Given
+            String toEmail = "test@example.com";
+            String resetCode = "654321";
+            String firstName = "Charlie";
+            String htmlContent = "<html><body>Reset code: 654321</body></html>";
+
+            when(templateEngine.process(eq("email/reset-password-email"), any(Context.class)))
+                    .thenReturn(htmlContent);
+            doNothing().when(mailSender).send(any(MimeMessage.class));
+
+            // When
+            emailService.sendResetPasswordEmail(toEmail, resetCode, firstName);
+
+            // Then
+            verify(mailSender).send(any(MimeMessage.class));
+            verify(templateEngine).process(eq("email/reset-password-email"), any(Context.class));
+        }
+
+        @Test
+        @DisplayName("devrait utiliser le bon template Thymeleaf")
+        void sendResetPasswordEmail_shouldUseCorrectTemplate() {
+            // Given
+            when(templateEngine.process(anyString(), any(Context.class)))
+                    .thenReturn("<html>Reset template</html>");
+
+            // When
+            emailService.sendResetPasswordEmail("test@example.com", "111111", "David");
+
+            // Then
+            verify(templateEngine).process(eq("email/reset-password-email"), any(Context.class));
+        }
+
+        @Test
+        @DisplayName("devrait lancer exception si erreur d'envoi")
+        void sendResetPasswordEmail_withMailError_shouldThrowException() {
+            // Given
+            String toEmail = "test@example.com";
+            when(templateEngine.process(anyString(), any(Context.class)))
+                    .thenReturn("<html>Content</html>");
+            doThrow(new RuntimeException("Mail server error"))
+                    .when(mailSender).send(any(MimeMessage.class));
+
+            // When/Then
+            assertThatThrownBy(() -> emailService.sendResetPasswordEmail(toEmail, "123", "Eve"))
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageContaining("Erreur lors de l'envoi de l'email");
+        }
+    }
 }
