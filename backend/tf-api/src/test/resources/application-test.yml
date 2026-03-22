@@ -48,7 +48,18 @@ keycloak:
     client-id: admin-cli
     client-secret: test-admin-secret
     username: admin-test
-    password: admin-test
+    password: admin
+
+# Stripe Configuration (mock)
+stripe:
+  api-key: sk_test_fake_key_for_testing
+  success-url: http://localhost:3000/auth/verify-email?session_id={CHECKOUT_SESSION_ID}
+  cancel-url: http://localhost:3000/auth/register
+  plans:
+    pro:
+      price-id: price_test_pro
+    enterprise:
+      price-id: price_test_enterprise-test
 
 # Stripe Configuration (mock)
 stripe:
