@@ -106,7 +106,7 @@ describe('RegisterPlanForm - Step 2: Plan Selection', () => {
     it('should render navigation buttons', () => {
       render(<RegisterPlanForm />);
 
-      expect(screen.getByRole('button', { name: /retour/i })).toBeInTheDocument();
+      expect(screen.getAllByRole('button', { name: /retour/i })[0]).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /continuer/i })).toBeInTheDocument();
     });
   });
@@ -263,7 +263,7 @@ describe('RegisterPlanForm - Step 2: Plan Selection', () => {
       const user = userEvent.setup();
       render(<RegisterPlanForm />);
 
-      const backButton = screen.getByRole('button', { name: /retour/i });
+      const backButton = screen.getAllByRole('button', { name: /retour/i })[0];
       await user.click(backButton);
 
       expect(mockPush).toHaveBeenCalledWith('/auth/register');
@@ -274,7 +274,7 @@ describe('RegisterPlanForm - Step 2: Plan Selection', () => {
       render(<RegisterPlanForm />);
 
       const submitButton = screen.getByRole('button', { name: /continuer/i });
-      const backButton = screen.getByRole('button', { name: /retour/i });
+      const backButton = screen.getAllByRole('button', { name: /retour/i })[0];
 
       // Click and immediately check
       await user.click(submitButton);
