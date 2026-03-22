@@ -31,7 +31,7 @@ class StripeServiceTest {
     @BeforeEach
     void setup() {
         ReflectionTestUtils.setField(stripeService, "stripeSecretKey", "sk_test_mock_key");
-        ReflectionTestUtils.setField(stripeService, "premiumPriceId", "price_premium_test");
+        ReflectionTestUtils.setField(stripeService, "proPriceId", "price_pro_test");
         ReflectionTestUtils.setField(stripeService, "enterprisePriceId", "price_enterprise_test");
     }
 
@@ -40,13 +40,13 @@ class StripeServiceTest {
     class GetPriceIdForPlanTests {
 
         @Test
-        @DisplayName("devrait retourner le price ID pour PREMIUM")
+        @DisplayName("devrait retourner le price ID pour PRO")
         void getPriceIdForPlan_withPremium_shouldReturnPremiumPriceId() {
             // When
-            String priceId = stripeService.getPriceIdForPlan("PREMIUM");
+            String priceId = stripeService.getPriceIdForPlan("PRO");
 
             // Then
-            assertThat(priceId).isEqualTo("price_premium_test");
+            assertThat(priceId).isEqualTo("price_pro_test");
         }
 
         @Test
@@ -80,10 +80,10 @@ class StripeServiceTest {
         @DisplayName("devrait gérer les plans en minuscules")
         void getPriceIdForPlan_withLowerCase_shouldWork() {
             // When
-            String priceId = stripeService.getPriceIdForPlan("premium");
+            String priceId = stripeService.getPriceIdForPlan("pro");
 
             // Then
-            assertThat(priceId).isEqualTo("price_premium_test");
+            assertThat(priceId).isEqualTo("price_pro_test");
         }
     }
 
@@ -159,12 +159,12 @@ class StripeServiceTest {
         @DisplayName("devrait avoir les price IDs configurés")
         void shouldHaveConfiguredPriceIds() {
             // When
-            String premiumPriceId = (String) ReflectionTestUtils.getField(stripeService, "premiumPriceId");
+            String proPriceId = (String) ReflectionTestUtils.getField(stripeService, "proPriceId");
             String enterprisePriceId = (String) ReflectionTestUtils.getField(stripeService, "enterprisePriceId");
 
             // Then
-            assertThat(premiumPriceId).isNotNull().isNotEmpty();
-            assertThat(enterprisePriceId).isNotNull().isNotEmpty();
+            assertThat(proPriceId).isNotNull().isEqualTo("price_pro_test");
+            assertThat(enterprisePriceId).isNotNull().isEqualTo("price_enterprise_test");
         }
 
         @Test
