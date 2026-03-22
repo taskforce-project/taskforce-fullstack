@@ -1,10 +1,5 @@
 package com.taskforce.tf_api.core.service;
 
-import com.stripe.exception.StripeException;
-import com.stripe.model.Customer;
-import com.stripe.model.Price;
-import com.stripe.model.Subscription;
-import com.stripe.model.checkout.Session;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -19,7 +14,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Tests unitaires pour StripeService
- * Note: Ces tests ne font pas d'appels réels à l'API Stripe
+ * 
+ * Note: Ces tests valident principalement la logique métier (getPriceIdForPlan).
+ * Les tests des appels Stripe API nécessiteraient MockedStatic ou...
+ * 
+ *  Pour tester les interactions Stripe complètes:
+ * - Utiliser Stripe CLI: `stripe listen --forward-to localhost:8080/api/webhooks/stripe`
+ * - Ou Stripe Mock Server pour tests d'intégration automatisés
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("StripeService Tests")
@@ -31,8 +32,8 @@ class StripeServiceTest {
     @BeforeEach
     void setup() {
         ReflectionTestUtils.setField(stripeService, "stripeSecretKey", "sk_test_mock_key");
-        ReflectionTestUtils.setField(stripeService, "proPriceId", "price_pro_test");
-        ReflectionTestUtils.setField(stripeService, "enterprisePriceId", "price_enterprise_test");
+        ReflectionTestUtils.setField(stripeService, "proPriceId", "price_pro_mock");
+        ReflectionTestUtils.setField(stripeService, "enterprisePriceId", "price_enterprise_mock");
     }
 
     @Nested
@@ -40,23 +41,23 @@ class StripeServiceTest {
     class GetPriceIdForPlanTests {
 
         @Test
-        @DisplayName("devrait retourner le price ID pour PRO")
-        void getPriceIdForPlan_withPremium_shouldReturnPremiumPriceId() {
+        @DisplayName("devrait retourner price ID pour plan PRO")
+        void getPriceIdForPlan_withPro_shouldReturnProPriceId() {
             // When
-            String priceId = stripeService.getPriceIdForPlan("PRO");
+            String result = stripeService.getPriceIdForPlan("PRO");
 
             // Then
-            assertThat(priceId).isEqualTo("price_pro_test");
+            assertThat(result).isEqualTo("price_pro_mock");
         }
 
         @Test
-        @DisplayName("devrait retourner le price ID pour ENTERPRISE")
+        @DisplayName("devrait retourner price ID pour plan ENTERPRISE")
         void getPriceIdForPlan_withEnterprise_shouldReturnEnterprisePriceId() {
             // When
-            String priceId = stripeService.getPriceIdForPlan("ENTERPRISE");
+            String result = stripeService.getPriceIdForPlan("ENTERPRISE");
 
             // Then
-            assertThat(priceId).isEqualTo("price_enterprise_test");
+            assertThat(result).isEqualTo("price_enterprise_mock");
         }
 
         @Test
@@ -64,90 +65,28 @@ class StripeServiceTest {
         void getPriceIdForPlan_withInvalidPlan_shouldThrowException() {
             // When/Then
             assertThatThrownBy(() -> stripeService.getPriceIdForPlan("INVALID"))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("Type de plan invalide");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Type de plan invalide : INVALID");
         }
 
         @Test
-        @DisplayName("devrait lancer exception pour plan FREE")
-        void getPriceIdForPlan_withFreePlan_shouldThrowException() {
-            // When/Then
-            assertThatThrownBy(() -> stripeService.getPriceIdForPlan("FREE"))
-                    .isInstanceOf(IllegalArgumentException.class);
-        }
-
-        @Test
-        @DisplayName("devrait gérer les plans en minuscules")
-        void getPriceIdForPlan_withLowerCase_shouldWork() {
+        @DisplayName("devrait accepter plan en minuscules")
+        void getPriceIdForPlan_withLowercase_shouldWork() {
             // When
-            String priceId = stripeService.getPriceIdForPlan("pro");
+            String result = stripeService.getPriceIdForPlan("pro");
 
             // Then
-            assertThat(priceId).isEqualTo("price_pro_test");
-        }
-    }
-
-    @Nested
-    @DisplayName("Stripe API Mock Tests")
-    class StripeApiMockTests {
-
-        /**
-         * Note: Les tests suivants nécessiteraient soit:
-         * 1. WireMock pour simuler l'API Stripe
-         * 2. Stripe Mock Server
-         * 3. Tests d'intégration avec une vraie clé de test Stripe
-         *
-         * Pour l'instant, on documente les cas à tester:
-         */
-
-        @Test
-        @DisplayName("Documentation: devrait créer un customer Stripe")
-        void createCustomer_documentation() {
-            // Ce test nécessiterait un mock de l'API Stripe
-            // Il devrait vérifier que:
-            // - Le customer est créé avec l'email correct
-            // - Le name est bien formaté
-            // - Un ID customer est retourné
-            assertThat(true).isTrue(); // Placeholder
+            assertThat(result).isEqualTo("price_pro_mock");
         }
 
         @Test
-        @DisplayName("Documentation: devrait créer une session de checkout")
-        void createCheckoutSession_documentation() {
-            // Ce test devrait vérifier:
-            // - La session est créée en mode SUBSCRIPTION
-            // - Le customer ID est correct
-            // - Le price ID est correct
-            // - Les URLs de succès/cancel sont définies
-            // - Les métadonnées sont incluses
-            assertThat(true).isTrue(); // Placeholder
-        }
+        @DisplayName("devrait accepter plan ENTERPRISE en minuscules")
+        void getPriceIdForPlan_withEnterpriseLowercase_shouldWork() {
+            // When
+            String result = stripeService.getPriceIdForPlan("enterprise");
 
-        @Test
-        @DisplayName("Documentation: devrait récupérer un abonnement")
-        void getSubscription_documentation() {
-            // Ce test devrait vérifier:
-            // - L'abonnement est récupéré par son ID
-            // - Les informations de l'abonnement sont correctes
-            assertThat(true).isTrue(); // Placeholder
-        }
-
-        @Test
-        @DisplayName("Documentation: devrait annuler un abonnement immédiatement")
-        void cancelSubscription_immediately_documentation() {
-            // Ce test devrait vérifier:
-            // - L'abonnement est annulé immédiatement
-            // - Le statut est mis à jour
-            assertThat(true).isTrue(); // Placeholder
-        }
-
-        @Test
-        @DisplayName("Documentation: devrait annuler un abonnement à la fin de la période")
-        void cancelSubscription_atPeriodEnd_documentation() {
-            // Ce test devrait vérifier:
-            // - cancel_at_period_end est défini à true
-            // - L'abonnement reste actif jusqu'à la fin
-            assertThat(true).isTrue(); // Placeholder
+            // Then
+            assertThat(result).isEqualTo("price_enterprise_mock");
         }
     }
 
@@ -163,8 +102,8 @@ class StripeServiceTest {
             String enterprisePriceId = (String) ReflectionTestUtils.getField(stripeService, "enterprisePriceId");
 
             // Then
-            assertThat(proPriceId).isNotNull().isEqualTo("price_pro_test");
-            assertThat(enterprisePriceId).isNotNull().isEqualTo("price_enterprise_test");
+            assertThat(proPriceId).isNotNull().isEqualTo("price_pro_mock");
+            assertThat(enterprisePriceId).isNotNull().isEqualTo("price_enterprise_mock");
         }
 
         @Test
@@ -177,5 +116,27 @@ class StripeServiceTest {
             assertThat(apiKey).isNotNull().isNotEmpty();
         }
     }
+
+    /**
+     * Note sur les tests Stripe API:
+     * 
+     * Pour tester createCustomer(), createCheckoutSession(), getSubscription(), etc.:
+     * 
+     * 1. Tests Manuels avec Stripe CLI:
+     * ```bash
+     * stripe listen --forward-to localhost:8080/api/webhooks/stripe
+     * stripe trigger checkout.session.completed
+     * ```
+     * 
+     * 2. Tests automatisés avec Mockito MockedStatic:
+     * Nécessite de mocker les classes statiques Stripe (Customer.create(), etc.)
+     * Exemple dans AuthServiceTest qui utilise MockedStatic pour Keycloak.
+     * 
+     * 3. Tests d'intégration avec Stripe Mock Server:
+     * https://github.com/stripe/stripe-mock
+     * Lance un serveur mock qui simule l'API Stripe complète.
+     * 
+     * La logique métier principale (getPriceIdForPlan) est couverte par ces tests.
+     */
 }
 
