@@ -43,16 +43,20 @@ describe('authService - API Service', () => {
     it('should login successfully with valid credentials', async () => {
       const mockResponse = {
         data: {
-          user: {
-            id: '123',
-            email: 'test@example.com',
-            firstName: 'Test',
-            lastName: 'User',
-            role: 'USER' as const,
+          success: true,
+          message: 'Login successful',
+          data: {
+            user: {
+              id: '123',
+              email: 'test@example.com',
+              firstName: 'Test',
+              lastName: 'User',
+              role: 'USER' as const,
+            },
+            accessToken: 'mock-access-token',
+            refreshToken: 'mock-refresh-token',
+            expiresIn: 3600,
           },
-          accessToken: 'mock-access-token',
-          refreshToken: 'mock-refresh-token',
-          expiresIn: 3600,
         },
       };
 
@@ -78,16 +82,20 @@ describe('authService - API Service', () => {
     it('should store tokens in localStorage on successful login', async () => {
       const mockResponse = {
         data: {
-          user: {
-            id: '123',
-            email: 'test@example.com',
-            firstName: 'Test',
-            lastName: 'User',
-            role: 'USER' as const,
+          success: true,
+          message: 'Login successful',
+          data: {
+            user: {
+              id: '123',
+              email: 'test@example.com',
+              firstName: 'Test',
+              lastName: 'User',
+              role: 'USER' as const,
+            },
+            accessToken: 'mock-access-token',
+            refreshToken: 'mock-refresh-token',
+            expiresIn: 3600,
           },
-          accessToken: 'mock-access-token',
-          refreshToken: 'mock-refresh-token',
-          expiresIn: 3600,
         },
       };
 
@@ -102,7 +110,7 @@ describe('authService - API Service', () => {
 
       expect(localStorageMock.setItem).toHaveBeenCalledWith('accessToken', 'mock-access-token');
       expect(localStorageMock.setItem).toHaveBeenCalledWith('refreshToken', 'mock-refresh-token');
-      expect(localStorageMock.setItem).toHaveBeenCalledWith('user', JSON.stringify(mockResponse.data.user));
+      expect(localStorageMock.setItem).toHaveBeenCalledWith('user', JSON.stringify(mockResponse.data.data.user));
     });
 
     it('should throw error when login fails', async () => {
@@ -122,8 +130,12 @@ describe('authService - API Service', () => {
     it('should register successfully with valid data', async () => {
       const mockResponse = {
         data: {
-          userId: 'mock-user-id',
-          email: 'newuser@example.com',
+          success: true,
+          message: 'Registration successful',
+          data: {
+            userId: 'mock-user-id',
+            email: 'newuser@example.com',
+          },
         },
       };
 
@@ -164,39 +176,47 @@ describe('authService - API Service', () => {
     it('should select FREE plan successfully', async () => {
       const mockResponse = {
         data: {
-          userId: 'user-123',
-          plan: 'FREE',
+          success: true,
           message: 'Plan selected successfully',
+          data: {
+            email: 'test@example.com',
+            planType: 'FREE',
+            message: 'Plan selected successfully',
+          },
         },
       };
 
       vi.mocked(client.apiClient.post).mockResolvedValue(mockResponse);
 
-      const response = await authService.selectPlan('user-123', 'FREE');
+      const response = await authService.selectPlan('test@example.com', 'FREE');
 
       expect(response).toBeDefined();
       expect(response.message).toBe('Plan selected successfully');
       expect(response.stripeCheckoutUrl).toBeUndefined();
       
       expect(client.apiClient.post).toHaveBeenCalledWith(AUTH_ROUTES.SELECT_PLAN, {
-        userId: 'user-123',
-        plan: 'FREE',
+        email: 'test@example.com',
+        planType: 'FREE',
       });
     });
 
     it('should return checkout URL for paid plans', async () => {
       const mockResponse = {
         data: {
-          userId: 'user-123',
-          plan: 'PRO',
-          stripeCheckoutUrl: 'https://checkout.stripe.com/mock',
+          success: true,
           message: 'Redirecting to payment',
+          data: {
+            email: 'test@example.com',
+            planType: 'PRO',
+            stripeCheckoutUrl: 'https://checkout.stripe.com/mock',
+            message: 'Redirecting to payment',
+          },
         },
       };
 
       vi.mocked(client.apiClient.post).mockResolvedValue(mockResponse);
 
-      const response = await authService.selectPlan('user-123', 'PRO');
+      const response = await authService.selectPlan('test@example.com', 'PRO');
 
       expect(response).toBeDefined();
       expect(response.stripeCheckoutUrl).toBe('https://checkout.stripe.com/mock');
@@ -207,19 +227,23 @@ describe('authService - API Service', () => {
     it('should verify OTP successfully with correct code', async () => {
       const mockResponse = {
         data: {
-          verified: true,
+          success: true,
           message: 'OTP verified successfully',
-          authData: {
-            user: {
-              id: '123',
-              email: 'test@example.com',
-              firstName: 'Test',
-              lastName: 'User',
-              role: 'USER' as const,
+          data: {
+            verified: true,
+            message: 'OTP verified successfully',
+            authData: {
+              user: {
+                id: '123',
+                email: 'test@example.com',
+                firstName: 'Test',
+                lastName: 'User',
+                role: 'USER' as const,
+              },
+              accessToken: 'access-token',
+              refreshToken: 'refresh-token',
+              expiresIn: 3600,
             },
-            accessToken: 'access-token',
-            refreshToken: 'refresh-token',
-            expiresIn: 3600,
           },
         },
       };
@@ -243,19 +267,23 @@ describe('authService - API Service', () => {
     it('should store tokens when OTP verification includes authData', async () => {
       const mockResponse = {
         data: {
-          verified: true,
+          success: true,
           message: 'OTP verified successfully',
-          authData: {
-            user: {
-              id: '123',
-              email: 'test@example.com',
-              firstName: 'Test',
-              lastName: 'User',
-              role: 'USER' as const,
+          data: {
+            verified: true,
+            message: 'OTP verified successfully',
+            authData: {
+              user: {
+                id: '123',
+                email: 'test@example.com',
+                firstName: 'Test',
+                lastName: 'User',
+                role: 'USER' as const,
+              },
+              accessToken: 'access-token',
+              refreshToken: 'refresh-token',
+              expiresIn: 3600,
             },
-            accessToken: 'access-token',
-            refreshToken: 'refresh-token',
-            expiresIn: 3600,
           },
         },
       };
@@ -280,8 +308,12 @@ describe('authService - API Service', () => {
     it('should resend OTP successfully', async () => {
       const mockResponse = {
         data: {
+          success: true,
           message: 'OTP resent successfully',
-          expiresIn: 300,
+          data: {
+            message: 'OTP resent successfully',
+            expiresIn: 300,
+          },
         },
       };
 
@@ -310,7 +342,9 @@ describe('authService - API Service', () => {
     it('should send password reset link successfully', async () => {
       const mockResponse = {
         data: {
+          success: true,
           message: 'Password reset link sent',
+          data: {},
         },
       };
 
@@ -324,6 +358,98 @@ describe('authService - API Service', () => {
       expect(client.apiClient.post).toHaveBeenCalledWith(AUTH_ROUTES.FORGOT_PASSWORD, {
         email: 'test@example.com',
       });
+    });
+
+    it('should throw error when forgot password fails', async () => {
+      vi.mocked(client.apiClient.post).mockRejectedValue(new Error('Email not found'));
+      vi.mocked(client.getErrorMessage).mockReturnValue('Email not found');
+
+      await expect(authService.forgotPassword('unknown@example.com')).rejects.toThrow('Email not found');
+    });
+  });
+
+  describe('resetPassword', () => {
+    it('should reset password successfully with valid OTP', async () => {
+      const mockResponse = {
+        data: {
+          success: true,
+          message: 'Mot de passe réinitialisé',
+          data: {},
+        },
+      };
+
+      vi.mocked(client.apiClient.post).mockResolvedValue(mockResponse);
+
+      const response = await authService.resetPassword('test@example.com', '123456', 'NewPass@2024!');
+
+      expect(response).toBeDefined();
+      expect(response.message).toBe('Mot de passe réinitialisé');
+      
+      expect(client.apiClient.post).toHaveBeenCalledWith(AUTH_ROUTES.RESET_PASSWORD, {
+        email: 'test@example.com',
+        otpCode: '123456',
+        newPassword: 'NewPass@2024!',
+      });
+    });
+
+    it('should throw error with invalid OTP', async () => {
+      vi.mocked(client.apiClient.post).mockRejectedValue(new Error('Invalid OTP code'));
+      vi.mocked(client.getErrorMessage).mockReturnValue('Invalid OTP code');
+
+      await expect(authService.resetPassword('test@example.com', '000000', 'NewPass@2024!')).rejects.toThrow('Invalid OTP code');
+    });
+  });
+
+  describe('refreshToken', () => {
+    it('should refresh access token successfully', async () => {
+      const mockResponse = {
+        data: {
+          success: true,
+          message: 'Token refreshed',
+          data: {
+            accessToken: 'new-access-token',
+            expiresIn: 3600,
+          },
+        },
+      };
+
+      vi.mocked(client.apiClient.post).mockResolvedValue(mockResponse);
+
+      const response = await authService.refreshToken('refresh-token');
+
+      expect(response).toBeDefined();
+      expect(response.accessToken).toBe('new-access-token');
+      expect(response.expiresIn).toBe(3600);
+      
+      expect(client.apiClient.post).toHaveBeenCalledWith(AUTH_ROUTES.REFRESH_TOKEN, {
+        refreshToken: 'refresh-token',
+      });
+    });
+
+    it('should store new access token in localStorage', async () => {
+      const mockResponse = {
+        data: {
+          success: true,
+          message: 'Token refreshed',
+          data: {
+            accessToken: 'new-access-token',
+            expiresIn: 3600,
+          },
+        },
+      };
+
+      vi.mocked(client.apiClient.post).mockResolvedValue(mockResponse);
+
+      await authService.refreshToken('refresh-token');
+
+      expect(localStorageMock.setItem).toHaveBeenCalledWith('accessToken', 'new-access-token');
+    });
+
+    it('should throw error when refresh fails', async () => {
+      vi.mocked(client.apiClient.post).mockRejectedValue(new Error('Invalid refresh token'));
+      vi.mocked(client.getErrorMessage).mockReturnValue('Invalid refresh token');
+
+      await expect(authService.refreshToken('invalid-token')).rejects.toThrow('Invalid refresh token');
     });
   });
 
