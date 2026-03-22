@@ -452,7 +452,7 @@ public class AuthService {
         String subscriptionId = session.getSubscription();
         
         // 3. Récupérer l'email depuis le Customer Stripe (pas depuis la session)
-        com.stripe.model.Customer customer = com.stripe.model.Customer.retrieve(customerId);
+        com.stripe.model.Customer customer = stripeService.retrieveCustomer(customerId);
         String customerEmail = customer.getEmail();
 
         log.info("Paiement validé pour {} - Customer: {}, Subscription: {}", 
