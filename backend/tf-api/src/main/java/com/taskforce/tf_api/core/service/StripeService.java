@@ -146,6 +146,13 @@ public class StripeService {
     }
 
     /**
+     * Récupère un client Stripe (alias de getCustomer pour cohérence)
+     */
+    public Customer retrieveCustomer(String customerId) throws StripeException {
+        return getCustomer(customerId);
+    }
+
+    /**
      * Récupère une session Checkout par son ID
      */
     public Session getCheckoutSession(String sessionId) throws StripeException {
