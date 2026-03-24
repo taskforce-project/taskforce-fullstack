@@ -1,5 +1,6 @@
 // Export des composants de pricing
 export { PricingCardsEnhanced } from "./pricing-cards-enhanced";
+export { PricingCardsPlane } from "./pricing-cards-plane";
 export { ComparisonTable } from "./comparison-table";
 export { ROICalculator } from "./roi-calculator";
 export { PricingToggle } from "./pricing-toggle";
