@@ -10,6 +10,10 @@ export type RegisterData = {
   plan?: "free" | "pro" | "enterprise";
   planType?: string;
   password: string;
+  // Champs optionnels pour le plan ENTERPRISE
+  companyName?: string;
+  phoneNumber?: string;
+  enterpriseMessage?: string;
 };
 
 const REGISTER_DATA_KEY = "registerData";
