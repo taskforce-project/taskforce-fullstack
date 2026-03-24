@@ -45,7 +45,7 @@ export function DeploymentOptions({ className }: Readonly<DeploymentOptionsProps
       {/* Header */}
       <div className="text-center space-y-2">
         <h2 className="text-3xl font-bold tracking-tight">
-          Déployez TaskForce à votre façon
+          Exécutez TaskForce à votre manière sur votre infrastructure
         </h2>
         <p className="text-muted-foreground">
           Flexibilité maximale pour répondre à vos exigences d'infrastructure et de conformité

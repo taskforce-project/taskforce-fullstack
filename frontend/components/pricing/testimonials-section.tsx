@@ -18,7 +18,7 @@ export function TestimonialsSection({
       {/* Header */}
       <div className="text-center space-y-2">
         <h2 className="text-3xl font-bold tracking-tight">
-          Des équipes qui nous font confiance
+          Choisies par des équipes ambitieuses et à grande échelle
         </h2>
         <p className="text-muted-foreground">
           Rejoignez plus de 1,000+ équipes qui utilisent TaskForce au quotidien
@@ -47,7 +47,7 @@ function TestimonialCard({ testimonial }: Readonly<TestimonialCardProps>) {
     .toUpperCase();
 
   return (
-    <Card className="border-2 hover:shadow-lg transition-shadow">
+    <Card className="border-2 hover:shadow-lg hover:border-primary/50 transition-all">
       <CardContent className="pt-6 space-y-4">
         {/* Quote Icon */}
         <Quote className="h-8 w-8 text-primary/20" />

@@ -32,7 +32,7 @@ export function TrustSection({ className }: Readonly<TrustSectionProps>) {
       {/* Header */}
       <div className="text-center space-y-2">
         <h2 className="text-3xl font-bold tracking-tight">
-          Sécurité et conformité
+          TaskForce est audité et certifié de manière indépendante
         </h2>
         <p className="text-muted-foreground">
           Vos données protégées selon les plus hauts standards de sécurité

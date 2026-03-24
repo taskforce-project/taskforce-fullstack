@@ -19,7 +19,7 @@ export function PricingFAQ({ className }: Readonly<PricingFAQProps>) {
       {/* Header */}
       <div className="text-center space-y-2">
         <h2 className="text-3xl font-bold tracking-tight">
-          Questions fréquentes
+          À quoi pouvons-nous répondre aujourd'hui ?
         </h2>
         <p className="text-muted-foreground">
           Tout ce que vous devez savoir sur nos tarifs et nos plans
