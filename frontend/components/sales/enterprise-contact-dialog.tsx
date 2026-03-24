@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +27,9 @@ interface EnterpriseContactDialogProps {
   open: boolean;
   onClose: () => void;
   onSuccess: (email: string) => void;
+  initialEmail?: string;
+  initialFirstName?: string;
+  initialLastName?: string;
 }
 
 interface EnterpriseInquiryRequest {
@@ -42,13 +45,36 @@ export function EnterpriseContactDialog({
   open,
   onClose,
   onSuccess,
-}: EnterpriseContactDialogProps) {
-  const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
+  initialEmail = "",
+  initialFirstName = "",
+  initialLastName = "",
+}: Readonly<EnterpriseContactDialogProps>) {
+  // Préremplir le nom complet avec prénom + nom si disponibles
+  const [fullName, setFullName] = useState(
+    initialFirstName && initialLastName
+      ? `${initialFirstName} ${initialLastName}`
+      : "",
+  );
+  const [email, setEmail] = useState(initialEmail);
   const [teamSize, setTeamSize] = useState("");
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Mettre à jour les valeurs quand le dialog s'ouvre avec de nouvelles données
+  useEffect(() => {
+    if (open) {
+      setFullName(
+        initialFirstName && initialLastName
+          ? `${initialFirstName} ${initialLastName}`
+          : "",
+      );
+      setEmail(initialEmail);
+      setTeamSize("");
+      setMessage("");
+      setErrors({});
+    }
+  }, [open, initialEmail, initialFirstName, initialLastName]);
 
   // Validation
   const validate = (): boolean => {
@@ -96,9 +122,13 @@ export function EnterpriseContactDialog({
         onClose();
         onSuccess(email);
 
-        // Reset form
-        setFullName("");
-        setEmail("");
+        // Reset aux valeurs initiales (pas vides)
+        setFullName(
+          initialFirstName && initialLastName
+            ? `${initialFirstName} ${initialLastName}`
+            : "",
+        );
+        setEmail(initialEmail);
         setTeamSize("");
         setMessage("");
         setErrors({});
@@ -111,7 +141,7 @@ export function EnterpriseContactDialog({
         toast.error(error.response.data.message);
       } else {
         toast.error(
-          "Erreur lors de l'envoi de votre demande. Veuillez réessayer."
+          "Erreur lors de l'envoi de votre demande. Veuillez réessayer.",
         );
       }
     } finally {
@@ -120,8 +150,13 @@ export function EnterpriseContactDialog({
   };
 
   const handleCancel = () => {
-    setFullName("");
-    setEmail("");
+    // Reset aux valeurs initiales
+    setFullName(
+      initialFirstName && initialLastName
+        ? `${initialFirstName} ${initialLastName}`
+        : "",
+    );
+    setEmail(initialEmail);
     setTeamSize("");
     setMessage("");
     setErrors({});
@@ -208,9 +243,7 @@ export function EnterpriseContactDialog({
 
           {/* Message (optionnel) */}
           <div className="space-y-2">
-            <Label htmlFor="message">
-              Décrivez votre projet (optionnel)
-            </Label>
+            <Label htmlFor="message">Décrivez votre projet (optionnel)</Label>
             <Textarea
               id="message"
               placeholder="Parlez-nous de vos besoins..."
