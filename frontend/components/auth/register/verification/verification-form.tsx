@@ -60,7 +60,7 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
             email: registerData.email,
             firstName: registerData.firstName,
             lastName: registerData.lastName,
-            planType: registerData.planType,
+            planType: registerData.planType || "FREE",
           });
           
           await authService.register({
@@ -68,7 +68,7 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
             password: registerData.password,
             firstName: registerData.firstName,
             lastName: registerData.lastName,
-            planType: registerData.planType,
+            planType: registerData.planType || "FREE",
           });
           
           toast.success("Code de vérification envoyé", {
