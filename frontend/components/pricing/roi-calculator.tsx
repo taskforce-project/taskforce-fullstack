@@ -13,6 +13,7 @@ import {
   DollarSign,
   Users,
   Sparkles,
+  Euro,
 } from "lucide-react";
 import {
   competitorTools,
@@ -114,8 +115,8 @@ export function ROICalculator({ className }: Readonly<ROICalculatorProps>) {
                       className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
                     >
                       {tool.name}
-                      <span className="text-xs text-muted-foreground ml-1">
-                        ({tool.pricePerUser}€/user)
+                      <span className="text-xs text-muted-foreground ml-1 flex items-center gap-0.5">
+                        ({tool.pricePerUser}<Euro className="h-3 w-3 inline" />/user)
                       </span>
                     </label>
                   </div>
@@ -138,8 +139,8 @@ export function ROICalculator({ className }: Readonly<ROICalculatorProps>) {
               <CardTitle className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-green-600" />
                 <span>Avec le plan GRATUIT</span>
-                <Badge variant="secondary" className="ml-auto">
-                  0€
+                <Badge variant="secondary" className="ml-auto flex items-center gap-1">
+                  0<Euro className="h-3.5 w-3.5" />
                 </Badge>
               </CardTitle>
             </CardHeader>
@@ -154,8 +155,8 @@ export function ROICalculator({ className }: Readonly<ROICalculatorProps>) {
               <CardTitle className="flex items-center gap-2">
                 <TrendingDown className="h-5 w-5 text-primary" />
                 <span>Avec le plan PRO</span>
-                <Badge className="ml-auto bg-primary">
-                  {29 * numberOfUsers}€/mois
+                <Badge className="ml-auto bg-primary flex items-center gap-1">
+                  {29 * numberOfUsers}<Euro className="h-3.5 w-3.5" />/mois
                 </Badge>
               </CardTitle>
             </CardHeader>
@@ -168,13 +169,13 @@ export function ROICalculator({ className }: Readonly<ROICalculatorProps>) {
           <Card className="bg-linear-to-r from-purple-600 to-pink-600 text-white border-0">
             <CardContent className="pt-6 text-center space-y-2">
               <Sparkles className="h-8 w-8 mx-auto mb-2" />
-              <p className="font-semibold text-lg">
-                Économisez jusqu'à{" "}
+              <p className="font-semibold text-lg flex items-center justify-center gap-1">
+                Économisez jusqu'à
                 {Math.max(
                   freeSavings.yearlySavings,
                   proSavings.yearlySavings,
-                ).toLocaleString("fr-FR")}{" "}
-                € par an !
+                ).toLocaleString("fr-FR")}<Euro className="h-5 w-5" />
+                par an !
               </p>
               <p className="text-sm opacity-90">
                 Essayez TaskForce gratuitement dès aujourd'hui
@@ -200,16 +201,16 @@ function SavingsDisplay({ savings, isPro }: Readonly<SavingsDisplayProps>) {
       {/* Coût actuel */}
       <div className="flex justify-between items-center">
         <span className="text-sm text-muted-foreground">Coût actuel</span>
-        <span className="font-semibold">
-          {savings.currentMonthlyCost.toLocaleString("fr-FR")} €/mois
+        <span className="font-semibold flex items-center gap-1">
+          {savings.currentMonthlyCost.toLocaleString("fr-FR")}<Euro className="h-4 w-4" />/mois
         </span>
       </div>
 
       {/* Coût TaskForce */}
       <div className="flex justify-between items-center">
         <span className="text-sm text-muted-foreground">Coût TaskForce</span>
-        <span className={cn("font-semibold", isPro && "text-primary")}>
-          {savings.taskforceCost.toLocaleString("fr-FR")} €/mois
+        <span className={cn("font-semibold flex items-center gap-1", isPro && "text-primary")}>
+          {savings.taskforceCost.toLocaleString("fr-FR")}<Euro className="h-4 w-4" />/mois
         </span>
       </div>
 
@@ -222,12 +223,12 @@ function SavingsDisplay({ savings, isPro }: Readonly<SavingsDisplayProps>) {
           </span>
           <span
             className={cn(
-              "text-xl font-bold",
+              "text-xl font-bold flex items-center gap-1",
               hasPositiveSavings ? "text-green-600" : "text-muted-foreground",
             )}
           >
             {hasPositiveSavings ? "+" : ""}
-            {savings.monthlySavings.toLocaleString("fr-FR")} €
+            {savings.monthlySavings.toLocaleString("fr-FR")}<Euro className="h-5 w-5" />
           </span>
         </div>
 
@@ -239,12 +240,12 @@ function SavingsDisplay({ savings, isPro }: Readonly<SavingsDisplayProps>) {
           </span>
           <span
             className={cn(
-              "text-2xl font-extrabold",
+              "text-2xl font-extrabold flex items-center gap-1",
               hasPositiveSavings ? "text-green-600" : "text-muted-foreground",
             )}
           >
             {hasPositiveSavings ? "+" : ""}
-            {savings.yearlySavings.toLocaleString("fr-FR")} €
+            {savings.yearlySavings.toLocaleString("fr-FR")}<Euro className="h-6 w-6" />
           </span>
         </div>
 
