@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Check, Sparkles } from "lucide-react";
+import { Check, Sparkles, Euro } from "lucide-react";
 import { pricingPlans, type PlanDetails } from "@/lib/constants/pricing-data";
 
 interface PricingCardsEnhancedProps {
@@ -12,6 +12,7 @@ interface PricingCardsEnhancedProps {
   selectedPlan?: string;
   showCta?: boolean;
   variant?: "default" | "compact";
+  billingPeriod?: "monthly" | "yearly";
 }
 
 export function PricingCardsEnhanced({
@@ -19,6 +20,7 @@ export function PricingCardsEnhanced({
   selectedPlan,
   showCta = true,
   variant = "default",
+  billingPeriod = "monthly",
 }: Readonly<PricingCardsEnhancedProps>) {
   return (
     <div className="grid gap-6 md:grid-cols-3 w-full">
@@ -30,6 +32,7 @@ export function PricingCardsEnhanced({
           onSelect={() => onSelectPlan(plan.id)}
           showCta={showCta}
           variant={variant}
+          billingPeriod={billingPeriod}
         />
       ))}
     </div>
@@ -42,6 +45,7 @@ interface PricingCardProps {
   onSelect: () => void;
   showCta: boolean;
   variant: "default" | "compact";
+  billingPeriod: "monthly" | "yearly";
 }
 
 function PricingCard({
@@ -50,8 +54,33 @@ function PricingCard({
   onSelect,
   showCta,
   variant,
+  billingPeriod,
 }: Readonly<PricingCardProps>) {
   const isCompact = variant === "compact";
+
+  // Calcul du prix dynamique
+  const price = (() => {
+    if (plan.id === "free" || plan.id === "enterprise") return plan.price;
+    const amount =
+      billingPeriod === "yearly" ? plan.priceYearly : plan.priceMonthly;
+    return amount;
+  })();
+
+  const priceDisplay = (() => {
+    if (plan.id === "free") return "Gratuit";
+    if (plan.id === "enterprise") return "Sur mesure";
+    return (
+      <span className="flex items-center gap-1">
+        {price}
+        <Euro className="h-6 w-6" />
+      </span>
+    );
+  })();
+
+  const priceDetail = (() => {
+    if (plan.id === "free" || plan.id === "enterprise") return plan.priceDetail;
+    return billingPeriod === "yearly" ? "/mois (facturé annuellement)" : "/mois";
+  })();
 
   return (
     <Card
@@ -94,11 +123,11 @@ function PricingCard({
         {/* Prix */}
         <div className="flex items-baseline gap-2">
           <span className="text-4xl font-extrabold tracking-tight">
-            {plan.price}
+            {priceDisplay}
           </span>
-          {plan.priceDetail && (
+          {priceDetail && (
             <span className="text-sm text-muted-foreground">
-              {plan.priceDetail}
+              {priceDetail}
             </span>
           )}
         </div>
