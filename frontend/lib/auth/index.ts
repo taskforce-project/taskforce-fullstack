@@ -24,4 +24,8 @@ export type RegisterCredentials = {
   email: string;
   password: string;
   planType: string; // "FREE" | "PRO" | "PREMIUM" | "ENTERPRISE"
+  // Champs optionnels pour le plan ENTERPRISE
+  companyName?: string;
+  phoneNumber?: string;
+  enterpriseMessage?: string;
 };
