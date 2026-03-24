@@ -36,6 +36,8 @@ export function RegisterPlanFormEnhanced({
     "free" | "pro" | "enterprise"
   >("free");
   const [userEmail, setUserEmail] = useState<string>("");
+  const [userFirstName, setUserFirstName] = useState<string>("");
+  const [userLastName, setUserLastName] = useState<string>("");
 
   // États pour les dialogs ENTERPRISE
   const [showEnterpriseDialog, setShowEnterpriseDialog] = useState(false);
@@ -53,6 +55,8 @@ export function RegisterPlanFormEnhanced({
     }
 
     setUserEmail(registerData.email);
+    setUserFirstName(registerData.firstName || "");
+    setUserLastName(registerData.lastName || "");
   }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -224,6 +228,9 @@ export function RegisterPlanFormEnhanced({
         open={showEnterpriseDialog}
         onClose={() => setShowEnterpriseDialog(false)}
         onSuccess={handleEnterpriseSuccess}
+        initialEmail={userEmail}
+        initialFirstName={userFirstName}
+        initialLastName={userLastName}
       />
 
       <EnterpriseConfirmationDialog
