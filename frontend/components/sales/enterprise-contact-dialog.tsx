@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2 } from "lucide-react";
-import axios from "axios";
+import { apiClient, getErrorMessage } from "@/lib/api/client";
 import { toast } from "sonner";
 
 interface EnterpriseContactDialogProps {
@@ -38,8 +38,6 @@ interface EnterpriseInquiryRequest {
   teamSize: string;
   message?: string;
 }
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api";
 
 export function EnterpriseContactDialog({
   open,
@@ -115,7 +113,11 @@ export function EnterpriseContactDialog({
         message: message.trim() || undefined,
       };
 
-      const response = await axios.post(`${API_URL}/sales/inquiry`, payload);
+      const response = await apiClient.post<{
+        success: boolean;
+        message: string;
+        data: any;
+      }>("/api/sales/inquiry", payload);
 
       if (response.data.success) {
         // Fermer le dialog et afficher le dialog de confirmation
@@ -135,15 +137,7 @@ export function EnterpriseContactDialog({
       }
     } catch (error: any) {
       console.error("Erreur lors de l'envoi de la demande:", error);
-
-      // Gérer les erreurs backend
-      if (error.response?.data?.message) {
-        toast.error(error.response.data.message);
-      } else {
-        toast.error(
-          "Erreur lors de l'envoi de votre demande. Veuillez réessayer.",
-        );
-      }
+      toast.error(getErrorMessage(error));
     } finally {
       setIsSubmitting(false);
     }
