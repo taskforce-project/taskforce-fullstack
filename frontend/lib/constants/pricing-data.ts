@@ -13,6 +13,10 @@ export interface PlanDetails {
   price: string;
   priceMonthly: number; // Prix numérique pour calculs
   priceYearly: number; // Prix annuel (avec réduction)
+  priceDetail?: string; // Détail du prix (ex: "pour toujours", "par utilisateur/mois")
+  description?: string; // Description courte du plan
+  recommended?: boolean; // Plan recommandé
+  badge?: string; // Badge affiché (ex: "Populaire", "Sur mesure")
   cta: string; // Call to action (ex: "Commencer", "Contactez-nous")
 
   // Features principales (affichées sur la carte)
