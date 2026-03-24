@@ -2,9 +2,13 @@
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Check, Sparkles, Euro } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardFooter,
+} from "@/components/ui/card";
+import { Check, ArrowRight } from "lucide-react";
 import { pricingPlans, type PlanDetails } from "@/lib/constants/pricing-data";
 
 interface PricingCardsEnhancedProps {
@@ -13,6 +17,7 @@ interface PricingCardsEnhancedProps {
   showCta?: boolean;
   variant?: "default" | "compact";
   billingPeriod?: "monthly" | "yearly";
+  deploymentType?: "cloud" | "self-hosted";
 }
 
 export function PricingCardsEnhanced({
@@ -21,6 +26,7 @@ export function PricingCardsEnhanced({
   showCta = true,
   variant = "default",
   billingPeriod = "monthly",
+  deploymentType = "cloud",
 }: Readonly<PricingCardsEnhancedProps>) {
   return (
     <div className="grid gap-6 md:grid-cols-3 w-full">
@@ -33,6 +39,7 @@ export function PricingCardsEnhanced({
           showCta={showCta}
           variant={variant}
           billingPeriod={billingPeriod}
+          deploymentType={deploymentType}
         />
       ))}
     </div>
@@ -46,6 +53,7 @@ interface PricingCardProps {
   showCta: boolean;
   variant: "default" | "compact";
   billingPeriod: "monthly" | "yearly";
+  deploymentType: "cloud" | "self-hosted";
 }
 
 function PricingCard({
@@ -55,92 +63,88 @@ function PricingCard({
   showCta,
   variant,
   billingPeriod,
+  deploymentType,
 }: Readonly<PricingCardProps>) {
   const isCompact = variant === "compact";
 
-  // Calcul du prix dynamique
-  const price = (() => {
-    if (plan.id === "free" || plan.id === "enterprise") return plan.price;
-    const amount =
+  // Calcul du prix dynamique (Plane.so style)
+  const getPriceDisplay = () => {
+    if (plan.id === "free") {
+      return (
+        <div className="flex items-baseline gap-2">
+          <span className="text-5xl font-bold">$0</span>
+        </div>
+      );
+    }
+
+    if (plan.id === "enterprise") {
+      return (
+        <div className="text-2xl font-semibold text-muted-foreground">
+          Tarif sur demande
+        </div>
+      );
+    }
+
+    // Pro plan - responsive au billing period
+    const price =
       billingPeriod === "yearly" ? plan.priceYearly : plan.priceMonthly;
-    return amount;
-  })();
-
-  const priceDisplay = (() => {
-    if (plan.id === "free") return "Gratuit";
-    if (plan.id === "enterprise") return "Sur mesure";
     return (
-      <span className="flex items-center gap-1">
-        {price}
-        <Euro className="h-6 w-6" />
-      </span>
+      <div className="flex items-baseline gap-2">
+        <span className="text-5xl font-bold">${price}</span>
+      </div>
     );
-  })();
+  };
 
-  const priceDetail = (() => {
-    if (plan.id === "free" || plan.id === "enterprise") return plan.priceDetail;
-    return billingPeriod === "yearly" ? "/mois (facturé annuellement)" : "/mois";
-  })();
+  const getPriceDetail = () => {
+    if (plan.id === "free") return "pour toujours";
+    if (plan.id === "enterprise") return "";
+    return billingPeriod === "yearly"
+      ? "par utilisateur/mois (facturé annuellement)"
+      : "par utilisateur/mois";
+  };
 
   return (
     <Card
       className={cn(
-        "relative cursor-pointer transition-all duration-300",
-        "hover:shadow-xl hover:scale-105",
-        isSelected && "ring-2 ring-primary shadow-xl scale-105",
-        plan.recommended && "border-primary border-2",
-        plan.id === "pro" &&
-          "bg-linear-to-br from-primary/5 via-transparent to-transparent",
+        "relative flex flex-col",
+        "border-2 transition-all duration-200",
+        isSelected && "border-primary shadow-lg",
+        !isSelected && "border-border hover:border-muted-foreground/20",
       )}
-      onClick={onSelect}
     >
-      {/* Badge en haut */}
-      {plan.badge && (
-        <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10">
-          <Badge
-            className={cn(
-              "shadow-lg",
-              plan.id === "pro"
-                ? "bg-primary text-primary-foreground"
-                : "bg-linear-to-r from-purple-600 to-pink-600 text-white",
-            )}
-          >
-            {plan.recommended && <Sparkles className="h-3 w-3 mr-1" />}
-            {plan.badge}
-          </Badge>
-        </div>
-      )}
-
-      <CardHeader className="space-y-4 pb-4">
-        {/* Nom et prix */}
+      <CardHeader className="space-y-6 pb-6">
+        {/* Plan Name */}
         <div>
-          <h3 className="text-2xl font-bold tracking-tight">{plan.name}</h3>
-          <p className="text-sm text-muted-foreground mt-1">
-            {plan.description}
-          </p>
+          <h3 className="text-2xl font-bold">{plan.name}</h3>
         </div>
 
-        {/* Prix */}
-        <div className="flex items-baseline gap-2">
-          <span className="text-4xl font-extrabold tracking-tight">
-            {priceDisplay}
-          </span>
-          {priceDetail && (
-            <span className="text-sm text-muted-foreground">
-              {priceDetail}
-            </span>
+        {/* Price */}
+        <div className="space-y-1">
+          {getPriceDisplay()}
+          {getPriceDetail() && (
+            <p className="text-sm text-muted-foreground">{getPriceDetail()}</p>
           )}
         </div>
 
-        {/* CTA Button */}
+        {/* Description */}
+        {plan.description && (
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            {plan.description}
+          </p>
+        )}
+      </CardHeader>
+
+      <CardContent className="flex-1 space-y-4">
+        {/* CTA Button on top (Plane.so style) */}
         {showCta && (
           <Button
             type="button"
             className={cn(
-              "w-full",
+              "w-full group",
               plan.id === "pro" && "bg-primary hover:bg-primary/90",
+              plan.id === "free" && "",
               plan.id === "enterprise" &&
-                "bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700",
+                "bg-foreground hover:bg-foreground/90",
             )}
             variant={plan.id === "free" ? "outline" : "default"}
             size="lg"
@@ -150,65 +154,54 @@ function PricingCard({
             }}
           >
             {plan.cta}
+            <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
           </Button>
         )}
-      </CardHeader>
 
-      <CardContent className="space-y-6 pt-6 border-t">
-        {/* Limites/Quotas */}
-        {!isCompact && (
-          <div className="space-y-3">
-            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Limites
-            </h4>
-            <div className="grid grid-cols-2 gap-2">
-              <LimitBadge
-                label="Projets"
-                value={plan.limits.projects}
-                unlimited={plan.limits.projects
-                  .toLowerCase()
-                  .includes("illimité")}
-              />
-              <LimitBadge
-                label="Utilisateurs"
-                value={plan.limits.users}
-                unlimited={plan.limits.users.toLowerCase().includes("illimité")}
-              />
-              <LimitBadge
-                label="Stockage"
-                value={plan.limits.storage}
-                unlimited={plan.limits.storage
-                  .toLowerCase()
-                  .includes("personnalisé")}
-              />
-              {plan.limits.apiCalls && (
-                <LimitBadge
-                  label="API"
-                  value={plan.limits.apiCalls}
-                  unlimited={plan.limits.apiCalls
-                    .toLowerCase()
-                    .includes("illimité")}
-                />
-              )}
-            </div>
+        {/* Key Features avec icône */}
+        {!isCompact && plan.highlights && (
+          <div className="space-y-3 pt-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Fonctionnalités clés
+            </p>
+            <ul className="space-y-3">
+              {plan.highlights.map((feature, idx) => (
+                <li key={idx} className="flex items-start gap-3">
+                  <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                  <span className="text-sm text-muted-foreground leading-relaxed">
+                    {feature}
+                  </span>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
-
-        {/* Features principales */}
-        <div className="space-y-3">
-          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            Fonctionnalités clés
-          </h4>
-          <ul className="space-y-2">
-            {plan.highlights.map((feature, idx) => (
-              <li key={idx} className="flex items-start gap-2">
-                <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                <span className="text-sm leading-relaxed">{feature}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
       </CardContent>
+
+      {/* Limits at bottom (Plane.so shows this subtly) */}
+      {!isCompact && (
+        <CardFooter className="border-t pt-6">
+          <div className="w-full space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Limites
+            </p>
+            <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+              <div>
+                <span className="font-medium">{plan.limits.users}</span>{" "}
+                utilisateurs
+              </div>
+              <div>
+                <span className="font-medium">{plan.limits.projects}</span>{" "}
+                projets
+              </div>
+              <div className="col-span-2">
+                <span className="font-medium">{plan.limits.storage}</span> de
+                stockage
+              </div>
+            </div>
+          </div>
+        </CardFooter>
+      )}
     </Card>
   );
 }
