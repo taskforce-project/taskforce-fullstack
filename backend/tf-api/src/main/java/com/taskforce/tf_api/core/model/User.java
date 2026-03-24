@@ -132,6 +132,14 @@ public class User {
     private Boolean isActive = true;
 
     /**
+     * Indique si l'utilisateur a manifesté un intérêt pour le plan ENTERPRISE
+     * Utilisé pour identifier les leads sales même s'ils démarrent avec un compte FREE
+     */
+    @Column(name = "enterprise_interest")
+    @Builder.Default
+    private Boolean enterpriseInterest = false;
+
+    /**
      * Date de création de l'enregistrement
      */
     @CreationTimestamp
