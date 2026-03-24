@@ -11,6 +11,8 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { Check } from "lucide-react";
 import { getRegisterData, setRegisterData } from "@/lib/auth/register-storage";
+import { EnterpriseContactDialog } from "@/components/sales/enterprise-contact-dialog";
+import { EnterpriseConfirmationDialog } from "@/components/sales/enterprise-confirmation-dialog";
 
 type Plan = {
   id: string;
@@ -76,6 +78,10 @@ export function RegisterPlanForm({
     "free" | "pro" | "enterprise"
   >("free");
   const [userEmail, setUserEmail] = useState<string>("");
+  
+  // États pour les dialogs ENTERPRISE
+  const [showEnterpriseDialog, setShowEnterpriseDialog] = useState(false);
+  const [showConfirmationDialog, setShowConfirmationDialog] = useState(false);
 
   useEffect(() => {
     // Récupérer les données de la première étape
@@ -93,12 +99,14 @@ export function RegisterPlanForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     setIsLoading(true);
 
     try {
-      // Stocker le plan sélectionné dans sessionStorage uniquement
-      // L'API sera appelée à l'étape 3 avec toutes les données
-      setRegisterData({ planType: selectedPlan.toUpperCase() });
+      // Stocker le plan dans sessionStorage
+      setRegisterData({ 
+        planType: selectedPlan.toUpperCase(),
+      });
 
       toast.success("Plan sélectionné", {
         description: "Un code de vérification va être envoyé à l'étape suivante",
@@ -113,6 +121,33 @@ export function RegisterPlanForm({
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Callback après soumission du formulaire ENTERPRISE
+  const handleEnterpriseSuccess = () => {
+    setShowConfirmationDialog(true);
+  };
+
+  // Callback si l'utilisateur accepte de créer un compte FREE
+  const handleAcceptFreeAccount = () => {
+    setShowConfirmationDialog(false);
+    setSelectedPlan("free");
+    toast.success("Plan gratuit sélectionné", {
+      description: "Vous pourrez tester l'outil en attendant notre retour",
+    });
+    // Continuer le flow d'inscription avec FREE
+    setRegisterData({ planType: "FREE" });
+    router.push("/auth/register/verification");
+  };
+
+  // Callback si l'utilisateur refuse
+  const handleDeclineFreeAccount = () => {
+    setShowConfirmationDialog(false);
+    toast.success("Demande enregistrée", {
+      description: "Notre équipe vous contactera sous 48h",
+    });
+    // Rediriger vers landing page
+    router.push("/");
   };
 
   return (
@@ -160,9 +195,14 @@ export function RegisterPlanForm({
                 selectedPlan === plan.id && "ring-2 ring-primary",
                 plan.recommended && "border-primary",
               )}
-              onClick={() =>
-                setSelectedPlan(plan.id as "free" | "pro" | "enterprise")
-              }
+              onClick={() => {
+                if (plan.id === "enterprise") {
+                  // Ouvrir le dialog au lieu de sélectionner directement
+                  setShowEnterpriseDialog(true);
+                } else {
+                  setSelectedPlan(plan.id as "free" | "pro" | "enterprise");
+                }
+              }}
             >
               {plan.recommended && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
@@ -202,6 +242,8 @@ export function RegisterPlanForm({
           ))}
         </div>
 
+
+
         <div className="flex justify-between items-center">
           <Button
             type="button"
@@ -217,6 +259,20 @@ export function RegisterPlanForm({
           </Button>
         </div>
       </form>
+
+      {/* Dialogs ENTERPRISE */}
+      <EnterpriseContactDialog
+        open={showEnterpriseDialog}
+        onClose={() => setShowEnterpriseDialog(false)}
+        onSuccess={handleEnterpriseSuccess}
+      />
+
+      <EnterpriseConfirmationDialog
+        open={showConfirmationDialog}
+        onClose={() => setShowConfirmationDialog(false)}
+        onAccept={handleAcceptFreeAccount}
+        onDecline={handleDeclineFreeAccount}
+      />
     </div>
   );
 }
