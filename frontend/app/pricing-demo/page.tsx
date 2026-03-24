@@ -1,9 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { PricingCardsEnhanced } from "@/components/pricing/pricing-cards-enhanced";
-import { ROICalculator } from "@/components/pricing/roi-calculator";
-import { ComparisonTable } from "@/components/pricing/comparison-table";
+import {
+  PricingCardsEnhanced,
+  ROICalculator,
+  ComparisonTable,
+  PricingToggle,
+  DeploymentOptions,
+  TestimonialsSection,
+  TrustSection,
+  PricingFAQ,
+} from "@/components/pricing";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -13,6 +20,9 @@ export default function PricingDemoPage() {
   const [selectedPlan, setSelectedPlan] = useState<
     "free" | "pro" | "enterprise"
   >("pro");
+  const [billingPeriod, setBillingPeriod] = useState<"monthly" | "yearly">(
+    "monthly"
+  );
 
   const handleSelectPlan = (planId: "free" | "pro" | "enterprise") => {
     setSelectedPlan(planId);
@@ -36,14 +46,22 @@ export default function PricingDemoPage() {
 
       <div className="container mx-auto px-4 py-12 space-y-24">
         {/* Hero Section */}
-        <section className="text-center space-y-4 max-w-3xl mx-auto">
-          <h1 className="text-5xl font-extrabold tracking-tight">
-            Choisissez le plan parfait pour votre équipe
+        <section className="text-center space-y-6 max-w-3xl mx-auto">
+          <h1 className="text-5xl font-extrabold tracking-tight bg-linear-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+            Commencez gratuitement, évoluez confortablement
           </h1>
           <p className="text-xl text-muted-foreground">
             Des tarifs transparents et simples. Passez à un plan supérieur quand
-            vous voulez.
+            vous en avez besoin.
           </p>
+
+          {/* Billing Toggle */}
+          <div className="pt-6">
+            <PricingToggle
+              billingPeriod={billingPeriod}
+              onToggle={setBillingPeriod}
+            />
+          </div>
         </section>
 
         {/* Pricing Cards */}
@@ -52,53 +70,38 @@ export default function PricingDemoPage() {
             onSelectPlan={handleSelectPlan}
             selectedPlan={selectedPlan}
             showCta={true}
+            billingPeriod={billingPeriod}
           />
         </section>
 
+        {/* Deployment Options */}
+        <section id="deployment">
+          <DeploymentOptions />
+        </section>
+
         {/* ROI Calculator */}
-        <section id="calculator" className="py-12">
+        <section id="calculator">
           <ROICalculator />
         </section>
 
         {/* Comparison Table */}
-        <section id="comparison" className="py-12">
+        <section id="comparison">
           <ComparisonTable />
         </section>
 
-        {/* FAQ Section (placeholder) */}
-        <section className="text-center space-y-6 py-12">
-          <h2 className="text-3xl font-bold">Questions fréquentes</h2>
-          <div className="max-w-2xl mx-auto space-y-4 text-left">
-            <details className="group rounded-lg border p-4">
-              <summary className="font-semibold cursor-pointer">
-                Puis-je changer de plan à tout moment ?
-              </summary>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Oui ! Vous pouvez upgrader ou downgrader votre plan à tout
-                moment depuis votre tableau de bord. Les changements sont
-                effectifs immédiatement.
-              </p>
-            </details>
-            <details className="group rounded-lg border p-4">
-              <summary className="font-semibold cursor-pointer">
-                Y a-t-il une période d'essai ?
-              </summary>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Le plan Gratuit est disponible sans limite de temps. Le plan Pro
-                offre un essai gratuit de 14 jours, sans carte bancaire requise.
-              </p>
-            </details>
-            <details className="group rounded-log border p-4">
-              <summary className="font-semibold cursor-pointer">
-                Comment fonctionne le plan Enterprise ?
-              </summary>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Le plan Enterprise est personnalisé selon vos besoins. Contactez
-                notre équipe pour discuter de vos exigences et obtenir un devis
-                sur mesure.
-              </p>
-            </details>
-          </div>
+        {/* Testimonials */}
+        <section id="testimonials">
+          <TestimonialsSection />
+        </section>
+
+        {/* Trust & Security */}
+        <section id="trust">
+          <TrustSection />
+        </section>
+
+        {/* FAQ */}
+        <section id="faq">
+          <PricingFAQ />
         </section>
       </div>
     </div>
