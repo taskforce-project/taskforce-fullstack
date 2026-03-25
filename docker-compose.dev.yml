@@ -99,6 +99,9 @@ services:
       MAIL_FROM: ${MAIL_FROM:-noreply@taskforce.com}
       MAIL_FROM_NAME: ${MAIL_FROM_NAME:-TaskForce}
 
+      # Flyway : lire les migrations depuis le volume src monté (évite un rebuild après changement de migration)
+      SPRING_FLYWAY_LOCATIONS: filesystem:/app/src/main/resources/db/migration
+
       # JVM Options
       JAVA_OPTS: "-Xmx512m -Xms256m -Duser.timezone=UTC -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
     ports:
