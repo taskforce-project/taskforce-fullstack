@@ -40,12 +40,18 @@ apiClient.interceptors.request.use(
       config.url?.includes(endpoint)
     );
     
-    // Ajouter le token uniquement si ce n'est PAS un endpoint public
     if (!isPublicEndpoint) {
+      // Ajouter le token pour les endpoints protégés
       const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
       
       if (token && config.headers) {
         config.headers.Authorization = `Bearer ${token}`;
+      }
+    } else {
+      // Supprimer explicitement le header pour les endpoints publics
+      // (évite qu'un token expiré soit envoyé par erreur et déclenche un 401)
+      if (config.headers) {
+        delete config.headers["Authorization"];
       }
     }
     
