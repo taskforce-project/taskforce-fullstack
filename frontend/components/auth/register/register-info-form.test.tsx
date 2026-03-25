@@ -40,7 +40,7 @@ vi.mock('@/lib/store/preferences-store', () => ({
 }));
 
 vi.mock('@/lib/auth/register-storage', () => ({
-  setRegisterData: (...args: any[]) => mockSetRegisterData(...args),
+  setRegisterData: (data: Parameters<typeof mockSetRegisterData>[0]) => mockSetRegisterData(data),
   getRegisterData: vi.fn(),
   clearRegisterData: vi.fn(),
 }));
@@ -88,7 +88,6 @@ describe('SignupForm - Step 1: Information Form', () => {
 
   describe('Validation - Empty Fields', () => {
     it('should show error when submitting empty form', async () => {
-      const user = userEvent.setup();
       render(<SignupForm />);
 
       const submitButton = screen.getByRole('button', { name: /continuer/i });

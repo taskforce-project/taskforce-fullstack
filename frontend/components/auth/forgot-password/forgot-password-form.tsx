@@ -15,6 +15,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { authService } from "@/lib/api/auth-service";
 
 type FormState = "request" | "otp-sent";
@@ -171,7 +172,6 @@ export function ForgotPasswordForm({
                     maxLength={6}
                     value={formData.otpCode}
                     onChange={(e) =>
-                      // eslint-disable-next-line unicorn/prefer-string-replace-all
                       setFormData({ ...formData, otpCode: e.target.value.replace(/\D/g, "") })
                     }
                     disabled={isLoading}
@@ -243,9 +243,11 @@ export function ForgotPasswordForm({
 
             <div className="bg-gradient relative hidden md:flex md:items-center md:justify-center">
               <span aria-hidden="true"></span>
-              <img
+              <Image
                 src="/assets/logo/logo_taskforce_tp.png"
                 alt="TaskForce Logo"
+                width={240}
+                height={240}
                 className="w-60 h-60 object-contain opacity-40 dark:opacity-30 dark:invert relative z-10"
               />
             </div>
@@ -296,9 +298,11 @@ export function ForgotPasswordForm({
 
           <div className="bg-gradient relative hidden md:flex md:items-center md:justify-center">
             <span aria-hidden="true"></span>
-            <img
+            <Image
               src="/assets/logo/logo_taskforce_tp.png"
               alt="TaskForce Logo"
+              width={240}
+              height={240}
               className="w-60 h-60 object-contain opacity-40 dark:opacity-30 dark:invert relative z-10"
             />
           </div>

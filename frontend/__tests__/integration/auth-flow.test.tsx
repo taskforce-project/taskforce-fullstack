@@ -216,7 +216,7 @@ describe('Integration Tests - Authentication Flow', () => {
       // Reset tous les mocks
       Object.values(authService).forEach(fn => {
         if (typeof fn === 'function' && 'mockReset' in fn) {
-          (fn as any).mockReset();
+          (fn as { mockReset(): void }).mockReset();
         }
       });
     });

@@ -77,9 +77,9 @@ export function RegisterPlanFormEnhanced({
 
       // Redirection vers vérification (étape 3)
       router.push("/auth/register/verification");
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error(t.common.error, {
-        description: error.message || "Erreur lors de la sélection du plan",
+        description: error instanceof Error ? error.message : "Erreur lors de la sélection du plan",
       });
     } finally {
       setIsLoading(false);
@@ -98,7 +98,7 @@ export function RegisterPlanFormEnhanced({
   };
 
   // Callback après soumission du formulaire ENTERPRISE
-  const handleEnterpriseSuccess = (email: string) => {
+  const handleEnterpriseSuccess = () => {
     setShowEnterpriseDialog(false);
     setShowConfirmationDialog(true);
   };

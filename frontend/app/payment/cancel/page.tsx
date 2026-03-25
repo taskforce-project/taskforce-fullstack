@@ -63,7 +63,7 @@ export default function PaymentCancelPage() {
             <div className="flex items-start gap-3">
               <HelpCircle className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
               <div className="space-y-1">
-                <p className="text-sm font-medium">Besoin d'aide ?</p>
+                <p className="text-sm font-medium">Besoin d&apos;aide ?</p>
                 <p className="text-xs text-muted-foreground">
                   Si vous rencontrez des difficultés avec le paiement, notre équipe support est disponible pour vous aider.
                 </p>
@@ -91,7 +91,7 @@ export default function PaymentCancelPage() {
 
           <div className="flex justify-center gap-4 text-xs text-muted-foreground pt-4 border-t">
             <Link href="/legal-notices" className="hover:underline">
-              Conditions d'utilisation
+              Conditions d&apos;utilisation
             </Link>
             <span>•</span>
             <Link href="/privacy-policy" className="hover:underline">

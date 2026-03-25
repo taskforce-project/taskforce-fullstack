@@ -39,8 +39,16 @@ const mockClearRegisterData = vi.fn();
 
 vi.mock('@/lib/auth/register-storage', () => ({
   getRegisterData: () => mockGetRegisterData(),
-  setRegisterData: (...args: any[]) => mockSetRegisterData(...args),
+  setRegisterData: (data: Parameters<typeof mockSetRegisterData>[0]) => mockSetRegisterData(data),
   clearRegisterData: () => mockClearRegisterData(),
+}));
+
+vi.mock('@/components/sales/enterprise-contact-dialog', () => ({
+  EnterpriseContactDialog: () => null,
+}));
+
+vi.mock('@/components/sales/enterprise-confirmation-dialog', () => ({
+  EnterpriseConfirmationDialog: () => null,
 }));
 
 describe('RegisterPlanForm - Step 2: Plan Selection', () => {
@@ -83,7 +91,7 @@ describe('RegisterPlanForm - Step 2: Plan Selection', () => {
       expect(recommendedBadge).toBeInTheDocument();
       
       // Should be near the FREE plan
-      const freeCard = screen.getByText('Gratuit').closest('.relative');
+      const freeCard = screen.getByTestId('plan-card-free');
       expect(freeCard).toContainElement(recommendedBadge);
     });
 
@@ -139,7 +147,7 @@ describe('RegisterPlanForm - Step 2: Plan Selection', () => {
     it('should select FREE plan by default', () => {
       render(<RegisterPlanForm />);
 
-      const freeCard = screen.getByText('Gratuit').closest('.relative');
+      const freeCard = screen.getByTestId('plan-card-free');
       expect(freeCard).toHaveClass('ring-2', 'ring-primary');
     });
 
@@ -147,13 +155,13 @@ describe('RegisterPlanForm - Step 2: Plan Selection', () => {
       const user = userEvent.setup();
       render(<RegisterPlanForm />);
 
-      const proCard = screen.getByText('Pro').closest('.relative');
-      
+      const proCard = screen.getByTestId('plan-card-pro');
+
       // Initially should not be selected
       expect(proCard).not.toHaveClass('ring-2');
 
       // Click to select
-      await user.click(proCard!);
+      await user.click(proCard);
 
       // Now should be selected
       await waitFor(() => {
@@ -161,16 +169,17 @@ describe('RegisterPlanForm - Step 2: Plan Selection', () => {
       });
     });
 
-    it('should change selection when clicking on ENTERPRISE plan', async () => {
+    it('should open enterprise dialog when clicking on ENTERPRISE plan', async () => {
       const user = userEvent.setup();
       render(<RegisterPlanForm />);
 
-      const enterpriseCard = screen.getByText('Enterprise').closest('.relative');
-      
-      await user.click(enterpriseCard!);
+      const enterpriseCard = screen.getByTestId('plan-card-enterprise');
 
+      await user.click(enterpriseCard);
+
+      // Enterprise clicking opens contact dialog, not direct plan selection
       await waitFor(() => {
-        expect(enterpriseCard).toHaveClass('ring-2', 'ring-primary');
+        expect(enterpriseCard).not.toHaveClass('ring-2', 'ring-primary');
       });
     });
 
@@ -178,20 +187,17 @@ describe('RegisterPlanForm - Step 2: Plan Selection', () => {
       const user = userEvent.setup();
       render(<RegisterPlanForm />);
 
-      const proCard = screen.getByText('Pro').closest('.relative');
-      const enterpriseCard = screen.getByText('Enterprise').closest('.relative');
+      const freeCard = screen.getByTestId('plan-card-free');
+      const proCard = screen.getByTestId('plan-card-pro');
+
+      // Start with FREE selected
+      expect(freeCard).toHaveClass('ring-2', 'ring-primary');
 
       // Select Pro
-      await user.click(proCard!);
+      await user.click(proCard);
       await waitFor(() => {
         expect(proCard).toHaveClass('ring-2', 'ring-primary');
-      });
-
-      // Switch to Enterprise
-      await user.click(enterpriseCard!);
-      await waitFor(() => {
-        expect(enterpriseCard).toHaveClass('ring-2', 'ring-primary');
-        expect(proCard).not.toHaveClass('ring-2');
+        expect(freeCard).not.toHaveClass('ring-2');
       });
     });
   });
@@ -226,8 +232,8 @@ describe('RegisterPlanForm - Step 2: Plan Selection', () => {
       
       render(<RegisterPlanForm />);
 
-      const proCard = screen.getByText('Pro').closest('.relative');
-      await user.click(proCard!);
+      const proCard = screen.getByTestId('plan-card-pro');
+      await user.click(proCard);
 
       const submitButton = screen.getByRole('button', { name: /continuer/i });
       await user.click(submitButton);
@@ -239,22 +245,20 @@ describe('RegisterPlanForm - Step 2: Plan Selection', () => {
       });
     });
 
-    it('should store ENTERPRISE plan when selected', async () => {
+    it('should open enterprise dialog instead of storing ENTERPRISE plan', async () => {
       const user = userEvent.setup();
-      
+
       render(<RegisterPlanForm />);
 
-      const enterpriseCard = screen.getByText('Enterprise').closest('.relative');
-      await user.click(enterpriseCard!);
+      const enterpriseCard = screen.getByTestId('plan-card-enterprise');
+      await user.click(enterpriseCard);
 
+      // Clicking enterprise opens contact dialog, no plan stored directly
+      expect(mockSetRegisterData).not.toHaveBeenCalled();
+
+      // Submit button on the plan form remains accessible
       const submitButton = screen.getByRole('button', { name: /continuer/i });
-      await user.click(submitButton);
-
-      await waitFor(() => {
-        expect(mockSetRegisterData).toHaveBeenCalledWith({
-          planType: 'ENTERPRISE',
-        });
-      });
+      expect(submitButton).toBeInTheDocument();
     });
   });
 
@@ -274,7 +278,6 @@ describe('RegisterPlanForm - Step 2: Plan Selection', () => {
       render(<RegisterPlanForm />);
 
       const submitButton = screen.getByRole('button', { name: /continuer/i });
-      const backButton = screen.getAllByRole('button', { name: /retour/i })[0];
 
       // Click and immediately check
       await user.click(submitButton);
@@ -354,15 +357,14 @@ describe('RegisterPlanForm - Step 2: Plan Selection', () => {
       const user = userEvent.setup();
       render(<RegisterPlanForm />);
 
-      const freeCard = screen.getByText('Gratuit').closest('.relative');
-      const proCard = screen.getByText('Pro').closest('.relative');
+      const freeCard = screen.getByTestId('plan-card-free');
 
       // Tab to first card
       await user.tab();
-      
+
       // Should be able to click with keyboard
       await user.keyboard('{Enter}');
-      
+
       expect(freeCard).toHaveClass('ring-2');
     });
 

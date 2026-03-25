@@ -15,6 +15,7 @@ import { usePreferencesStore } from "@/lib/store/preferences-store";
 import { useState } from "react";
 import { toast } from "sonner";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { setRegisterData } from "@/lib/auth/register-storage";
 import {
@@ -259,9 +260,11 @@ export function SignupForm({
           </form>
           <div className="bg-gradient relative hidden md:flex md:items-center md:justify-center">
             <span aria-hidden="true"></span>
-            <img
+            <Image
               src="/assets/logo/logo_taskforce_tp.png"
               alt="TaskForce Logo"
+              width={240}
+              height={240}
               className="w-60 h-60 object-contain opacity-40 dark:opacity-30 dark:invert relative z-10"
             />
           </div>

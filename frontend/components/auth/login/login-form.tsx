@@ -14,7 +14,7 @@ import { usePreferencesStore } from "@/lib/store/preferences-store";
 import { useState } from "react";
 import { toast } from "sonner";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { useAuth } from "@/lib/contexts/auth-context";
 import {
   validateEmail,
@@ -26,7 +26,6 @@ export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
-  const router = useRouter();
   const { login } = useAuth();
   const { t } = usePreferencesStore();
   const [isLoading, setIsLoading] = useState(false);
@@ -151,9 +150,11 @@ export function LoginForm({
           </form>
           <div className="bg-gradient relative hidden md:flex md:items-center md:justify-center">
             <span aria-hidden="true"></span>
-            <img
+            <Image
               src="/assets/logo/logo_taskforce_tp.png"
               alt="TaskForce Logo"
+              width={240}
+              height={240}
               className="w-60 h-60 object-contain opacity-40 dark:opacity-30 dark:invert relative z-10"
             />
           </div>

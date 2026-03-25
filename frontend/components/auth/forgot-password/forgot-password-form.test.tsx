@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ForgotPasswordForm } from './forgot-password-form';
 import * as authService from '@/lib/api/auth-service';
 import { useRouter } from 'next/navigation';
@@ -49,7 +49,7 @@ describe('ForgotPasswordForm', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useRouter).mockReturnValue(mockRouter as any);
+    vi.mocked(useRouter).mockReturnValue(mockRouter as unknown as ReturnType<typeof useRouter>);
   });
 
   describe('Request Reset Form', () => {

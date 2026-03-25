@@ -20,6 +20,7 @@ import { usePreferencesStore } from "@/lib/store/preferences-store";
 import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { getRegisterData, clearRegisterData } from "@/lib/auth/register-storage";
 import { validateOTP, globalRateLimiter } from "@/lib/utils/validation";
 import { authService } from "@/lib/api";
@@ -265,9 +266,11 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
           </form>
           <div className="bg-gradient relative hidden md:flex md:items-center md:justify-center">
             <span aria-hidden="true"></span>
-            <img
+            <Image
               src="/assets/logo/logo_taskforce_tp.png"
               alt="TaskForce Logo"
+              width={240}
+              height={240}
               className="w-60 h-60 object-contain opacity-40 dark:opacity-30 dark:invert relative z-10"
             />
           </div>

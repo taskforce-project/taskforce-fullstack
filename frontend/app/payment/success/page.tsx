@@ -107,7 +107,7 @@ function PaymentSuccessContent() {
             </div>
             <CardTitle className="text-2xl">Erreur de vérification</CardTitle>
             <CardDescription>
-              Nous n'avons pas pu vérifier votre paiement
+              Nous n&apos;avons pas pu vérifier votre paiement
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
