@@ -116,7 +116,7 @@ export function EnterpriseContactDialog({
       const response = await apiClient.post<{
         success: boolean;
         message: string;
-        data: any;
+        data: Record<string, unknown>;
       }>("/api/sales/inquiry", payload);
 
       if (response.data.success) {
@@ -135,7 +135,7 @@ export function EnterpriseContactDialog({
         setMessage("");
         setErrors({});
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Erreur lors de l'envoi de la demande:", error);
       toast.error(getErrorMessage(error));
     } finally {

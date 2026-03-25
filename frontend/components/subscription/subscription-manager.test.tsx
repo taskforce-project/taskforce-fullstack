@@ -38,18 +38,21 @@ describe('SubscriptionManager', () => {
       logout: vi.fn(),
       refreshUser: mockRefreshUser,
     });
-    delete (window as any).location;
-    (window as any).location = { href: '' };
+    Object.defineProperty(window, 'location', {
+      value: { href: '' },
+      writable: true,
+      configurable: true,
+    });
   });
 
   describe('Loading State', () => {
     it('should show loading state while fetching subscription', async () => {
-      let resolvePromise: any;
+      let resolvePromise!: (value: unknown) => void;
       const promise = new Promise((resolve) => {
         resolvePromise = resolve;
       });
       
-      vi.mocked(stripeService.stripeService.getSubscriptionInfo).mockReturnValue(promise as any);
+      vi.mocked(stripeService.stripeService.getSubscriptionInfo).mockReturnValue(promise as ReturnType<typeof stripeService.stripeService.getSubscriptionInfo>);
 
       render(<SubscriptionManager />);
 

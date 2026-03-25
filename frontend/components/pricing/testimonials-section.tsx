@@ -53,7 +53,7 @@ function TestimonialCard({ testimonial }: Readonly<TestimonialCardProps>) {
         <Quote className="h-8 w-8 text-primary/20" />
 
         {/* Quote Text */}
-        <p className="text-sm leading-relaxed italic">"{testimonial.quote}"</p>
+        <p className="text-sm leading-relaxed italic">&ldquo;{testimonial.quote}&rdquo;</p>
 
         {/* Author */}
         <div className="flex items-center gap-3 pt-4 border-t">

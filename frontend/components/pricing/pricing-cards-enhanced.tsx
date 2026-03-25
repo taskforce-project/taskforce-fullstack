@@ -26,7 +26,6 @@ export function PricingCardsEnhanced({
   showCta = true,
   variant = "default",
   billingPeriod = "monthly",
-  deploymentType = "cloud",
 }: Readonly<PricingCardsEnhancedProps>) {
   return (
     <div className="grid gap-6 md:grid-cols-3 w-full">
@@ -39,7 +38,6 @@ export function PricingCardsEnhanced({
           showCta={showCta}
           variant={variant}
           billingPeriod={billingPeriod}
-          deploymentType={deploymentType}
         />
       ))}
     </div>
@@ -53,7 +51,6 @@ interface PricingCardProps {
   showCta: boolean;
   variant: "default" | "compact";
   billingPeriod: "monthly" | "yearly";
-  deploymentType: "cloud" | "self-hosted";
 }
 
 function PricingCard({
@@ -63,7 +60,6 @@ function PricingCard({
   showCta,
   variant,
   billingPeriod,
-  deploymentType: _deploymentType,
 }: Readonly<PricingCardProps>) {
   const isCompact = variant === "compact";
 

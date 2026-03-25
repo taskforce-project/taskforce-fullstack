@@ -107,7 +107,7 @@ export function SubscriptionManager() {
             <CardTitle>Erreur</CardTitle>
           </div>
           <CardDescription>
-            Impossible de charger les informations d'abonnement
+            Impossible de charger les informations d&apos;abonnement
           </CardDescription>
         </CardHeader>
         <CardFooter>
@@ -198,13 +198,13 @@ export function SubscriptionManager() {
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Confirmer l'annulation</AlertDialogTitle>
+                  <AlertDialogTitle>Confirmer l&apos;annulation</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Êtes-vous sûr de vouloir annuler votre abonnement ? Vous perdrez l'accès aux fonctionnalités premium à la fin de votre période de facturation.
+                    Êtes-vous sûr de vouloir annuler votre abonnement ? Vous perdrez l&apos;accès aux fonctionnalités premium à la fin de votre période de facturation.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Conserver l'abonnement</AlertDialogCancel>
+                  <AlertDialogCancel>Conserver l&apos;abonnement</AlertDialogCancel>
                   <AlertDialogAction onClick={() => handleCancel(false)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                     Annuler à la fin de la période
                   </AlertDialogAction>
@@ -223,13 +223,13 @@ export function SubscriptionManager() {
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Confirmer l'annulation</AlertDialogTitle>
+                <AlertDialogTitle>Confirmer l&apos;annulation</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Êtes-vous sûr de vouloir annuler votre abonnement Enterprise ? Vous perdrez l'accès à toutes les fonctionnalités avancées à la fin de votre période de facturation.
+                  Êtes-vous sûr de vouloir annuler votre abonnement Enterprise ? Vous perdrez l&apos;accès à toutes les fonctionnalités avancées à la fin de votre période de facturation.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>Conserver l'abonnement</AlertDialogCancel>
+                <AlertDialogCancel>Conserver l&apos;abonnement</AlertDialogCancel>
                 <AlertDialogAction onClick={() => handleCancel(false)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                   Annuler à la fin de la période
                 </AlertDialogAction>

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { screen, waitFor, renderHook, act } from '@testing-library/react';
+import { waitFor, renderHook, act } from '@testing-library/react';
 import { AuthProvider, useAuth, useRequireAuth } from './auth-context';
 import * as authService from '../api/auth-service';
 import { useRouter } from 'next/navigation';
@@ -34,9 +34,8 @@ describe('AuthContext', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useRouter).mockReturnValue(mockRouter as any);
-    delete (globalThis as any).location;
-    (globalThis as any).location = { pathname: '/dashboard' };
+    vi.mocked(useRouter).mockReturnValue(mockRouter as unknown as ReturnType<typeof useRouter>);
+    vi.stubGlobal('location', { pathname: '/dashboard' });
   });
 
   describe('AuthProvider', () => {
@@ -72,7 +71,7 @@ describe('AuthContext', () => {
 
     it('should redirect to dashboard when authenticated on login page', async () => {
       vi.mocked(authService.authService.getCurrentUser).mockReturnValue(mockUser);
-      (globalThis as any).location = { pathname: '/auth/login' };
+      vi.stubGlobal('location', { pathname: '/auth/login' });
 
       renderHook(() => useAuth(), {
         wrapper: AuthProvider,
@@ -85,7 +84,7 @@ describe('AuthContext', () => {
 
     it('should redirect to dashboard when authenticated on home page', async () => {
       vi.mocked(authService.authService.getCurrentUser).mockReturnValue(mockUser);
-      (globalThis as any).location = { pathname: '/' };
+      vi.stubGlobal('location', { pathname: '/' });
 
       renderHook(() => useAuth(), {
         wrapper: AuthProvider,
@@ -98,7 +97,7 @@ describe('AuthContext', () => {
 
     it('should not redirect when on other pages', async () => {
       vi.mocked(authService.authService.getCurrentUser).mockReturnValue(mockUser);
-      (globalThis as any).location = { pathname: '/dashboard' };
+      vi.stubGlobal('location', { pathname: '/dashboard' });
 
       renderHook(() => useAuth(), {
         wrapper: AuthProvider,
@@ -207,7 +206,7 @@ describe('AuthContext', () => {
         await act(async () => {
           await result.current.logout();
         });
-      } catch (error) {
+      } catch {
         // Expected to throw
       }
 
