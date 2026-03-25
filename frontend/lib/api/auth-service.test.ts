@@ -146,6 +146,7 @@ describe('authService - API Service', () => {
         password: 'NewUser@2024!',
         firstName: 'New',
         lastName: 'User',
+        planType: 'FREE',
       };
 
       const response = await authService.register(registerData);
@@ -166,6 +167,7 @@ describe('authService - API Service', () => {
         password: '',
         firstName: '',
         lastName: '',
+        planType: 'FREE',
       };
 
       await expect(authService.register(invalidData)).rejects.toThrow('Registration failed');

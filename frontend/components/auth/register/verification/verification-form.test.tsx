@@ -525,7 +525,7 @@ describe('OTPForm - Step 3: Verification', () => {
 
     it('should disable resend button while loading', async () => {
       const user = userEvent.setup();
-      vi.mocked(authService.resendOtp).mockResolvedValue();
+      vi.mocked(authService.resendOtp).mockResolvedValue({ message: 'OTP resent' });
 
       render(<OTPForm />);
 

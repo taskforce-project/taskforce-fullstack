@@ -282,8 +282,8 @@ describe('Integration Tests - Authentication Flow', () => {
       
       // Mock Step 2: Select Plan
       vi.mocked(authService.selectPlan).mockResolvedValue({
-        userId: 'mock-user-id',
-        plan: 'FREE',
+        email: 'newuser@example.com',
+        planType: 'FREE',
         message: 'Plan selected successfully',
       });
       
@@ -311,6 +311,7 @@ describe('Integration Tests - Authentication Flow', () => {
         password: 'NewUser@2024!',
         firstName: 'New',
         lastName: 'User',
+        planType: 'FREE',
       });
       expect(registerResponse.userId).toBe('mock-user-id');
       expect(authService.register).toHaveBeenCalledTimes(1);

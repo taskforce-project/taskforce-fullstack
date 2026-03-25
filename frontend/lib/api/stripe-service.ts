@@ -10,7 +10,7 @@ import { STRIPE_ROUTES } from "../config/api-routes";
  * Réponse de création de session Stripe
  */
 export interface CheckoutSessionResponse {
-  sessionId: string;
+  sessionId?: string;
   checkoutUrl: string;
 }
 
@@ -18,8 +18,8 @@ export interface CheckoutSessionResponse {
  * Réponse d'informations d'abonnement
  */
 export interface SubscriptionInfo {
-  id: number;
-  userId: number;
+  id?: number;
+  userId?: number;
   planType: "FREE" | "PRO" | "ENTERPRISE";
   status: string;
   amount?: number;

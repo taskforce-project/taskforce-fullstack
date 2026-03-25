@@ -3,7 +3,8 @@ import { renderHook, act } from '@testing-library/react';
 import { useIsMobile } from './use-mobile';
 
 describe('useIsMobile', () => {
-  let matchMediaSpy: ReturnType<typeof vi.spyOn>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let matchMediaSpy: any;
   let addEventListenerSpy: ReturnType<typeof vi.fn>;
   let removeEventListenerSpy: ReturnType<typeof vi.fn>;
 
@@ -12,7 +13,7 @@ describe('useIsMobile', () => {
     removeEventListenerSpy = vi.fn();
 
     matchMediaSpy = vi.spyOn(window, 'matchMedia');
-    matchMediaSpy.mockImplementation((query) => ({
+    matchMediaSpy.mockImplementation((query: string) => ({
       matches: false,
       media: query,
       onchange: null,

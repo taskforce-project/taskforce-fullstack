@@ -10,7 +10,8 @@ export type AuthUser = {
   email: string;
   firstName: string;
   lastName: string;
-  plan: "free" | "pro" | "enterprise";
+  role?: string;
+  plan?: "free" | "pro" | "enterprise";
 };
 
 export type LoginCredentials = {
