@@ -111,7 +111,7 @@ services:
     plan: starter
     region: frankfurt
     branch: main
-    
+
     # Headers personnalisés pour SEO et sécurité
     headers:
       - path: /*
@@ -183,4 +183,3 @@ databases:
     plan: starter # 256MB RAM, 1GB SSD - Passer à 'standard' si nécessaire
     region: frankfurt
     ipAllowList: [] # Vide = accessible uniquement par services Render
-

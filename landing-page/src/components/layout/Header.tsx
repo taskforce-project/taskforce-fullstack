@@ -160,7 +160,20 @@ export function Header() {
   );
 }
 
-const ListItem = ({ className, title, children, href, ...props }: any) => {
+interface ListItemProps extends React.AnchorHTMLAttributes<HTMLAnchorElement> {
+  className?: string;
+  title: string;
+  children: React.ReactNode;
+  href: string;
+}
+
+const ListItem = ({
+  className,
+  title,
+  children,
+  href,
+  ...props
+}: ListItemProps) => {
   return (
     <li>
       <NavigationMenuLink asChild>
