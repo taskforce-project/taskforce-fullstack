@@ -28,14 +28,25 @@ export const apiClient: AxiosInstance = axios.create({
 
 /**
  * Intercepteur pour ajouter le token JWT aux requêtes
+ * Exclut les endpoints publics qui ne nécessitent pas d'authentification
  */
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    // Récupérer le token depuis localStorage
-    const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+    // Liste des endpoints publics qui ne doivent PAS avoir de token
+    const publicEndpoints = ["/api/auth/", "/api/sales/"];
     
-    if (token && config.headers) {
-      config.headers.Authorization = `Bearer ${token}`;
+    // Vérifier si l'URL correspond à un endpoint public
+    const isPublicEndpoint = publicEndpoints.some(endpoint => 
+      config.url?.includes(endpoint)
+    );
+    
+    // Ajouter le token uniquement si ce n'est PAS un endpoint public
+    if (!isPublicEndpoint) {
+      const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+      
+      if (token && config.headers) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
     }
     
     return config;
