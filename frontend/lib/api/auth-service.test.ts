@@ -466,8 +466,6 @@ describe('authService - API Service', () => {
 
     it('should clear localStorage even if logout fails', async () => {
       // Force an error during logout
-      const originalRemoveItem = localStorageMock.removeItem;
-      
       try {
         await authService.logout();
       } catch {

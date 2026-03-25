@@ -50,7 +50,7 @@ vi.mock('@/lib/api', () => ({
 }));
 
 vi.mock('@/lib/utils/validation', async (importOriginal) => {
-  const actual = await importOriginal() as any;
+  const actual = await importOriginal() as Record<string, unknown>;
   return {
     ...actual,
     globalRateLimiter: {
@@ -91,12 +91,12 @@ describe('OTPForm - Step 3: Verification', () => {
     // Mock successful register call
     vi.mocked(authService.register).mockResolvedValue({
       message: 'OTP sent successfully',
-    } as any);
+    } as unknown as Awaited<ReturnType<typeof authService.register>>);
 
     // Mock successful verify call
     vi.mocked(authService.verifyOtp).mockResolvedValue({
       user: { id: '1', email: 'test@example.com' },
-    } as any);
+    } as unknown as Awaited<ReturnType<typeof authService.verifyOtp>>);
   });
 
   afterEach(async () => {
@@ -424,7 +424,7 @@ describe('OTPForm - Step 3: Verification', () => {
       const user = userEvent.setup();
       vi.mocked(authService.resendOtp).mockResolvedValue({
         message: 'OTP resent',
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof authService.resendOtp>>);
 
       render(<OTPForm />);
 
@@ -446,7 +446,7 @@ describe('OTPForm - Step 3: Verification', () => {
       const user = userEvent.setup();
       vi.mocked(authService.resendOtp).mockResolvedValue({
         message: 'OTP resent',
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof authService.resendOtp>>);
 
       render(<OTPForm />);
 

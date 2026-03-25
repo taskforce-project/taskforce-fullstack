@@ -18,7 +18,6 @@ import {
 import {
   competitorTools,
   calculateSavings,
-  type CompetitorTool,
 } from "@/lib/constants/pricing-data";
 
 interface ROICalculatorProps {
@@ -58,7 +57,7 @@ export function ROICalculator({ className }: Readonly<ROICalculatorProps>) {
         <div className="flex items-center justify-center gap-2 mb-2">
           <Calculator className="h-8 w-8 text-primary" />
           <h2 className="text-3xl font-bold tracking-tight">
-            Calculateur d'économies
+            Calculateur d&apos;économies
           </h2>
         </div>
         <p className="text-muted-foreground">
@@ -79,7 +78,7 @@ export function ROICalculator({ className }: Readonly<ROICalculatorProps>) {
             {/* Nombre d'utilisateurs */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <Label htmlFor="users-slider">Nombre d'utilisateurs</Label>
+                <Label htmlFor="users-slider">Nombre d&apos;utilisateurs</Label>
                 <Badge variant="secondary" className="text-lg font-bold">
                   {numberOfUsers}
                 </Badge>
@@ -170,7 +169,7 @@ export function ROICalculator({ className }: Readonly<ROICalculatorProps>) {
             <CardContent className="pt-6 text-center space-y-2">
               <Sparkles className="h-8 w-8 mx-auto mb-2" />
               <p className="font-semibold text-lg flex items-center justify-center gap-1">
-                Économisez jusqu'à
+                Économisez jusqu&apos;à
                 {Math.max(
                   freeSavings.yearlySavings,
                   proSavings.yearlySavings,
@@ -178,7 +177,7 @@ export function ROICalculator({ className }: Readonly<ROICalculatorProps>) {
                 par an !
               </p>
               <p className="text-sm opacity-90">
-                Essayez TaskForce gratuitement dès aujourd'hui
+                Essayez TaskForce gratuitement dès aujourd&apos;hui
               </p>
             </CardContent>
           </Card>

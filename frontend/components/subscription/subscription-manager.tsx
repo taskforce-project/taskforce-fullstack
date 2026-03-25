@@ -28,7 +28,7 @@ const PLAN_COLORS = {
 };
 
 export function SubscriptionManager() {
-  const { user, refreshUser } = useAuth();
+  const { refreshUser } = useAuth();
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCancelling, setIsCancelling] = useState(false);

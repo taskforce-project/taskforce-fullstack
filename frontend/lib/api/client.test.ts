@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import axios from 'axios';
 
 // Mock axios before importing apiClient
 vi.mock('axios', () => {

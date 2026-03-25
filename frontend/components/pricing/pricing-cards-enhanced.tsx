@@ -63,7 +63,7 @@ function PricingCard({
   showCta,
   variant,
   billingPeriod,
-  deploymentType,
+  deploymentType: _deploymentType,
 }: Readonly<PricingCardProps>) {
   const isCompact = variant === "compact";
 
@@ -206,24 +206,4 @@ function PricingCard({
   );
 }
 
-interface LimitBadgeProps {
-  label: string;
-  value: string;
-  unlimited?: boolean;
-}
 
-function LimitBadge({ label, value, unlimited }: Readonly<LimitBadgeProps>) {
-  return (
-    <div
-      className={cn(
-        "rounded-lg border p-2 text-center space-y-1",
-        unlimited && "bg-primary/5 border-primary/20",
-      )}
-    >
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className={cn("text-sm font-semibold", unlimited && "text-primary")}>
-        {value}
-      </div>
-    </div>
-  );
-}

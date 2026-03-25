@@ -48,7 +48,7 @@ export function DeploymentOptions({ className }: Readonly<DeploymentOptionsProps
           Exécutez TaskForce à votre manière sur votre infrastructure
         </h2>
         <p className="text-muted-foreground">
-          Flexibilité maximale pour répondre à vos exigences d'infrastructure et de conformité
+          Flexibilité maximale pour répondre à vos exigences d&apos;infrastructure et de conformité
         </p>
       </div>
 
