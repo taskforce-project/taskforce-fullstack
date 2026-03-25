@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code de vérification - TaskForce</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #fafafa;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid #e5e5e5;
+        }
+
+        .header {
+            background: #171717;
+            padding: 32px 24px;
+            text-align: center;
+        }
+
+        .logo {
+            height: 50px;
+            width: auto;
+            max-width: 200px;
+        }
+
+        .content {
+            padding: 40px 32px;
+        }
+
+        .greeting {
+            font-size: 24px;
+            font-weight: 600;
+            color: #0a0a0a;
+            margin-bottom: 16px;
+        }
+
+        .message {
+            color: #737373;
+            margin-bottom: 32px;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .otp-card {
+            background: #fafafa;
+            border: 1px solid #e5e5e5;
+            border-radius: 10px;
+            padding: 32px;
+            text-align: center;
+            margin: 32px 0;
+        }
+
+        .otp-label {
+            color: #737373;
+            font-size: 13px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 16px;
+        }
+
+        .otp-code {
+            font-size: 48px;
+            font-weight: 700;
+            color: #171717;
+            letter-spacing: 12px;
+            font-family: ui-monospace, 'SF Mono', 'Courier New', monospace;
+        }
+
+        .info-box {
+            background: #fafafa;
+            border: 1px solid #e5e5e5;
+            border-radius: 10px;
+            padding: 16px 20px;
+            margin: 24px 0;
+            font-size: 14px;
+            color: #525252;
+        }
+
+        .info-box strong {
+            color: #171717;
+        }
+
+        .security-note {
+            color: #737373;
+            font-size: 13px;
+            line-height: 1.5;
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 1px solid #e5e5e5;
+        }
+
+        .footer {
+            background: #fafafa;
+            padding: 32px 24px;
+            text-align: center;
+            border-top: 1px solid #e5e5e5;
+        }
+
+        .footer-text {
+            color: #a3a3a3;
+            font-size: 13px;
+            margin-bottom: 16px;
+        }
+
+        .footer-links {
+            margin-top: 12px;
+        }
+
+        .footer-link {
+            color: #525252;
+            text-decoration: none;
+            margin: 0 12px;
+            font-size: 13px;
+        }
+
+        .footer-link:hover {
+            color: #171717;
+        }
+
+        @media only screen and (max-width: 600px) {
+            .content {
+                padding: 32px 24px;
+            }
+
+            .otp-code {
+                font-size: 36px;
+                letter-spacing: 8px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="data:image/png;base64,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36DdfrsRxhVyzTN8gjydOiXIXMPpp4Y89VRGXH8UX4rJr4KX5haY8fujV/PbLDSdzAl44e9hA0JL/RWOgARZ4dhanEa19VO73P2Uy90zT6qkT2f+/+nQP31lMoPM/TPz9+L/fWMW42xKkcenk8KtT+lGVvDe0kxBhU4mIAJFI+Dy5bpo8xexo+oORKTI/Xu1qzINUIIsU1LyFAERKCyBDG/EhW03iK1nLMjUl88J5P/tL5+NX+8g8h5KgAcoQRag9dFURCABgYxuxAmaUFYgCBRohlKMXhpKAMciQeaFVdAYRKAwBJwuxIVpX62KgAiIgAgUnYAEWdHRqz8REAEREAEREAEREE8REB4REIEREAEREAEREK8QkCDzyko4j8MZV7kIiIAIiIAIiIAIBJCABFkAF1VTEgEREAEREAEREAGHgASZA4aiIiACIiACIiACIhBAAhJkAVxUTUkEREAEREAEREAEHAISZA4YioqACIiACIiACIhAAAl4S5DlB0QBERABERABERABvxLIjYx7gsw9P7XkVwISX/5dO41cBFwk4J5z1S3H3fmqKREQAREofoH6Ir1E1K8IiIAIiIAI+IyABJnPFk7DFQEREAEREAERqE1AgqyWDyVEQAREQAREQAREwGcEiizIfLZOGq4IiEDYCfjlT96GHabmLwIiEH4CRRZk4Z+fZigCIiACIiACIiACRScgQVZ05OpQBERABERABERABPIhIEGWD70S1q19ZS9hZ+paBERABERABEQgxwVwT5DlOB1VEwEREAEREAEREAEP8ZIg89AV14dD8dBSaCgiIAIiIAIiIAIikAkBCbJMKMlHBERABERABERABEpAQIKsBNDVpQiIgAiIgAiIgAhkQkCCLBNK8hEBERABERABEfAtgUD/cSlp1LBVCH+WVRNXQQREIHwE/PKPkOHDqhmLgAhkSUAKxpmXBJkzB+WKgAiIgAiIgAiIgA8ISJD5YJE0RBEQAREQAREQARGQIAt5H6B5i4AIiIAI+JOAfjrEn+sWllFLkIVlpTVPERABERABvxFQX+W3FQveeP9be0ECi0dTEgEREAEREIF8CehTaP78VDsfAhJk+dDzad3aV3afLqCGLQIiIAIiIAIiUAgCEmSFoNqfNsQ9kf5M1YoIFCaIdCEuDFW1KQIi4FUCEmReXRmNSwREQAREQAREQATiCEiQxQFRUgREQAREQAREQAS8SkCCzKsrozci4gqaCERABERABERABNwgIEHmBkU1IAIiIAIiIAIiIAIlIiBBViLw6lYEREAEREAEREAE3CAgQeYGRTUgAiIgAiIgAiIgAiUiIEFWIvDqtnQE9Gme0rFXzyIQcAL6vg/4Aofj8l+CLL/1Vc8lIKBP85QAujoVgXAS0Pd9ONc9rLOWIAvryoe4D3/+pXLQZ1BC/ArQVEVABLxJQLdpr62LBJnXVkTjEQEREAEREAEREIE6BCTIqphIo1ah0M+wE9Do/b/GmoEIBIOAbtOBWEdNQgREQAREQAREIBQEJOhDscyapAiIgAiIgAiIQIAJ/B/aAB6OuMlRWgAAAABJRU5ErkJggg=="
+                alt="TaskForce" class="logo" />
+        </div>
+
+        <div class="content">
+            <div class="greeting">Bonjour <span th:text="${firstName}">Prénom</span>,</div>
+
+            <div class="message">
+                Merci de votre inscription sur TaskForce. Pour finaliser la création de votre compte,
+                veuillez utiliser le code de vérification ci-dessous.
+            </div>
+
+            <div class="otp-card">
+                <div class="otp-label">Code de vérification</div>
+                <div class="otp-code" th:text="${otpCode}">123456</div>
+            </div>
+
+            <div class="info-box">
+                ⏱️ Ce code expire dans <strong>15 minutes</strong>. Si vous n'avez pas demandé ce code, ignorez cet
+                email.
+            </div>
+
+            <div class="security-note">
+                🔒 Pour votre sécurité, ne partagez jamais ce code. Notre équipe ne vous demandera jamais
+                votre code de vérification par email ou téléphone.
+            </div>
+        </div>
+
+        <div class="footer">
+            <p class="footer-text">© 2026 TaskForce. Tous droits réservés.</p>
+            <div class="footer-links">
+                <a href="#" class="footer-link">Centre d'aide</a>
+                <a href="#" class="footer-link">Confidentialité</a>
+                <a href="#" class="footer-link">Contact</a>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

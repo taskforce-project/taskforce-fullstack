@@ -11,11 +11,12 @@
 .env.dev
 .env.prod
 .env.test
+*.dev
+*.prod
 *.env
 !.env.example
 !.env.dev.example
 !.env.prod.example
-
 # ===========================
 # Docker
 # ===========================

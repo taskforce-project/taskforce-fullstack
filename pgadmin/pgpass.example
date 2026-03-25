@@ -1,0 +1,5 @@
+# Fichier de mots de passe PostgreSQL pour pgAdmin
+# Copier ce fichier en 'pgpass' et remplacer par le bon mot de passe
+# Format: hostname:port:database:username:password
+
+postgres:5432:*:postgres:VOTRE_MOT_DE_PASSE_ICI

@@ -4,7 +4,9 @@
 # Utilisation:
 #   .\dev-docker.ps1
 #   ou
-#   docker-compose -f docker-compose.dev.yml --env-file .env.dev up
+#   docker-compose -f docker-compose.dev.yml up
+# 
+# Le fichier .env.dev à la racine contient TOUTES les variables
 # ===============================
 
 services:
@@ -15,6 +17,8 @@ services:
     image: postgres:16-alpine
     container_name: taskforce-postgres-dev
     environment:
+      TZ: UTC
+      PGTZ: UTC
       POSTGRES_DB: ${POSTGRES_DB:-taskforce-db}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-PostgreSQLP54!}
@@ -67,29 +71,39 @@ services:
       context: ./backend/tf-api
       dockerfile: Dockerfile
     container_name: taskforce-backend-dev
+    env_file:
+      - .env.dev
     environment:
+      # Timezone
+      TZ: ${TZ:-America/New_York}
+      
       # Spring Profile
-      SPRING_PROFILES_ACTIVE: dev
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+
+      # Server Port
+      SERVER_PORT: 8080
 
       # Database
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-taskforce-db}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-PostgreSQLP54!}
 
-      # Keycloak
+      # Keycloak (utilise le nom du service docker)
       KEYCLOAK_URL: http://keycloak:8080
-      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-taskforce-dev}
-      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-taskforce-api}
-      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:-dev-secret}
 
-      # CORS
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      # Email Configuration (Mailtrap)
+      MAIL_HOST: ${MAILTRAP_HOST:-sandbox.smtp.mailtrap.io}
+      MAIL_PORT: ${MAILTRAP_PORT:-2525}
+      MAIL_USERNAME: ${MAILTRAP_USERNAME}
+      MAIL_PASSWORD: ${MAILTRAP_PASSWORD}
+      MAIL_FROM: ${MAIL_FROM:-noreply@taskforce.com}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-TaskForce}
 
-      # Server
-      SERVER_PORT: 8080
+      # Flyway : lire les migrations depuis le volume src monté (évite un rebuild après changement de migration)
+      SPRING_FLYWAY_LOCATIONS: filesystem:/app/src/main/resources/db/migration
 
       # JVM Options
-      JAVA_OPTS: "-Xmx512m -Xms256m -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
+      JAVA_OPTS: "-Xmx512m -Xms256m -Duser.timezone=UTC -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
     ports:
       - "${BACKEND_PORT:-8080}:8080" # API
       - "5005:5005" # Debug
@@ -121,11 +135,19 @@ services:
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     container_name: taskforce-frontend-dev
+    env_file:
+      - .env.dev
     environment:
       NODE_ENV: development
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+      # API URL pour les appels côté client (navigateur)
+      NEXT_PUBLIC_API_URL: http://localhost:8080
+      # API URL pour les appels côté serveur (SSR dans Docker)
+      NEXT_PUBLIC_API_URL_SSR: http://backend:8080
+      # Enable polling for hot reload on Docker Desktop (Windows/macOS)
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     depends_on:
@@ -133,11 +155,21 @@ services:
     networks:
       - taskforce-network
     volumes:
-      # Hot reload pour développement
-      - ./frontend/app:/app/app
-      - ./frontend/components:/app/components
-      - ./frontend/lib:/app/lib
-      - ./frontend/public:/app/public
+      # Hot reload pour développement - monter tout le code source
+      - ./frontend:/app
+      # Volume anonyme pour node_modules (évite d'écraser les dépendances du container)
+      - /app/node_modules
+      - /app/.next
+    develop:
+      watch:
+        - action: sync
+          path: ./frontend
+          target: /app
+          ignore:
+            - node_modules/
+            - .next/
+        - action: rebuild
+          path: ./frontend/package.json
     restart: unless-stopped
 
   # ================================
@@ -146,14 +178,30 @@ services:
   landing:
     build:
       context: ./landing-page
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     container_name: taskforce-landing-dev
+    env_file:
+      - .env.dev
     environment:
       NODE_ENV: development
     ports:
       - "${LANDING_PORT:-4321}:4321"
     networks:
       - taskforce-network
+    volumes:
+      # Hot reload pour développement
+      - ./landing-page:/app
+      # Volume anonyme pour node_modules
+      - /app/node_modules
+    develop:
+      watch:
+        - action: sync
+          path: ./landing-page
+          target: /app
+          ignore:
+            - node_modules/
+        - action: rebuild
+          path: ./landing-page/package.json
     restart: unless-stopped
 
   # ================================
@@ -162,10 +210,14 @@ services:
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: taskforce-pgadmin-dev
+    env_file:
+      - .env.dev
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@taskforce.dev
-      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@taskforce.dev}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
       PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_SERVER_JSON_FILE: /pgadmin4/servers.json
+      PGADMIN_LOAD_SERVERS: "true"
     ports:
       - "5050:80"
     depends_on:
@@ -174,6 +226,9 @@ services:
       - taskforce-network
     volumes:
       - pgadmin_dev_data:/var/lib/pgadmin
+      # Auto-import de la configuration du serveur PostgreSQL
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
+      - ./pgadmin/pgpass:/pgpass
 
 # ================================
 # Volumes

@@ -1,0 +1,127 @@
+name: Backend Tests
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+      - 'feature/**'
+      - 'fix/**'
+    paths:
+      - 'backend/tf-api/**'
+      - '.github/workflows/backend-tests.yml'
+  pull_request:
+    branches:
+      - main
+      - dev
+    paths:
+      - 'backend/tf-api/**'
+
+jobs:
+  test:
+    name: Run Backend Tests with Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: backend/tf-api
+
+    strategy:
+      matrix:
+        java-version: [21]
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: ☕ Setup Java ${{ matrix.java-version }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ matrix.java-version }}
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: 🔍 Verify Maven Wrapper
+        run: |
+          if [ ! -f mvnw ]; then
+            echo "❌ Maven wrapper not found!"
+            exit 1
+          fi
+          chmod +x mvnw
+
+      - name: 🧪 Run tests with JaCoCo coverage
+        run: ./mvnw clean test jacoco:report
+        env:
+          MAVEN_OPTS: -Xmx2048m
+
+      - name: 📊 Generate coverage summary
+        if: always()
+        run: |
+          echo "## 📊 Test Coverage Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f target/site/jacoco/index.html ]; then
+            # Extract coverage from JaCoCo HTML report
+            COVERAGE=$(grep -oP 'Total.*?<td class="ctr2" id="c\d+">\K\d+' target/site/jacoco/index.html | head -1)
+            echo "✅ Coverage: ${COVERAGE}%" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "📁 Full report available in artifacts" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Coverage report not generated" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: 📈 Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          files: ./backend/tf-api/target/site/jacoco/jacoco.xml
+          flags: backend
+          name: backend-coverage
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        continue-on-error: true
+
+      - name: 💾 Archive JaCoCo coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jacoco-coverage-report
+          path: backend/tf-api/target/site/jacoco/
+          retention-days: 30
+
+      - name: 💾 Archive test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: backend/tf-api/target/surefire-reports/
+          retention-days: 7
+
+      - name: 📋 Display test results
+        if: always()
+        run: |
+          echo "## 🧪 Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -d target/surefire-reports ]; then
+            TOTAL=$(find target/surefire-reports -name "TEST-*.xml" -exec grep -oP 'tests="\K\d+' {} \; | awk '{s+=$1} END {print s}')
+            FAILURES=$(find target/surefire-reports -name "TEST-*.xml" -exec grep -oP 'failures="\K\d+' {} \; | awk '{s+=$1} END {print s}')
+            ERRORS=$(find target/surefire-reports -name "TEST-*.xml" -exec grep -oP 'errors="\K\d+' {} \; | awk '{s+=$1} END {print s}')
+            SKIPPED=$(find target/surefire-reports -name "TEST-*.xml" -exec grep -oP 'skipped="\K\d+' {} \; | awk '{s+=$1} END {print s}')
+            
+            echo "- ✅ Tests passed: $((TOTAL - FAILURES - ERRORS - SKIPPED))" >> $GITHUB_STEP_SUMMARY
+            echo "- ❌ Tests failed: ${FAILURES}" >> $GITHUB_STEP_SUMMARY
+            echo "- ⚠️ Tests errors: ${ERRORS}" >> $GITHUB_STEP_SUMMARY
+            echo "- ⏭️ Tests skipped: ${SKIPPED}" >> $GITHUB_STEP_SUMMARY
+            echo "- 📊 **Total: ${TOTAL} tests**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ No test results found" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: ❌ Fail if tests failed
+        if: failure()
+        run: |
+          echo "::error::Tests failed! Check the test results artifact for details."
+          exit 1

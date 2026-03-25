@@ -29,26 +29,70 @@ spring:
     validate-on-migrate: false
     baseline-on-migrate: true
 
-  # Security Configuration
+  # Security Configuration OAuth2/OIDC
   security:
     oauth2:
+      # Resource Server : Pour valider les tokens JWT Keycloak
       resourceserver:
         jwt:
+          # Issuer : Vérifie que le token vient bien de Keycloak
           issuer-uri: ${KEYCLOAK_URL:http://localhost:8180}/realms/${KEYCLOAK_REALM:taskforce-dev}
+          # JWK Set : Clés publiques pour vérifier la signature des tokens
           jwk-set-uri: ${KEYCLOAK_URL:http://localhost:8180}/realms/${KEYCLOAK_REALM:taskforce-dev}/protocol/openid-connect/certs
+
+      # OAuth2 Client : Pour l'authentification Password Grant
       client:
         registration:
           keycloak:
             client-id: ${KEYCLOAK_CLIENT_ID:taskforce-api}
-            client-secret: ${KEYCLOAK_CLIENT_SECRET:dev-secret}
-            authorization-grant-type: authorization_code
+            client-secret: ${KEYCLOAK_CLIENT_SECRET:dev-secret-change-me}
+            # Password Grant : Permet l'auth avec email/password sans redirection
+            authorization-grant-type: password
             scope: openid,profile,email
+            # Nom du provider (référence à la section provider ci-dessous)
+            provider: keycloak
         provider:
           keycloak:
+            # Issuer URI : Base URL du realm Keycloak
             issuer-uri: ${KEYCLOAK_URL:http://localhost:8180}/realms/${KEYCLOAK_REALM:taskforce-dev}
+            # Token Endpoint : Pour obtenir les tokens (Password Grant)
+            token-uri: ${KEYCLOAK_URL:http://localhost:8180}/realms/${KEYCLOAK_REALM:taskforce-dev}/protocol/openid-connect/token
+            # UserInfo Endpoint : Pour récupérer les infos utilisateur
+            user-info-uri: ${KEYCLOAK_URL:http://localhost:8180}/realms/${KEYCLOAK_REALM:taskforce-dev}/protocol/openid-connect/userinfo
+            # JWK Set URI : Clés publiques pour vérifier les signatures
+            jwk-set-uri: ${KEYCLOAK_URL:http://localhost:8180}/realms/${KEYCLOAK_REALM:taskforce-dev}/protocol/openid-connect/certs
+            # User Name Attribute : Claim utilisé comme identifiant
+            user-name-attribute: preferred_username
+
   web:
     error:
       include-stacktrace: always
+
+  # Thymeleaf Configuration
+  thymeleaf:
+    enabled: true
+    prefix: classpath:/templates/
+    suffix: .html
+    mode: HTML
+    encoding: UTF-8
+    cache: false  # Désactiver le cache en DEV pour voir les changements immédiatement
+
+# Email Configuration (Mailtrap for development)
+mail:
+  host: ${MAIL_HOST:sandbox.smtp.mailtrap.io}
+  port: ${MAIL_PORT:2525}
+  username: ${MAIL_USERNAME:your_mailtrap_username}
+  password: ${MAIL_PASSWORD:your_mailtrap_password}
+  from: ${MAIL_FROM:noreply@taskforce.com}
+  from-name: ${MAIL_FROM_NAME:TaskForce}
+  properties:
+    mail:
+      smtp:
+        auth: true
+        starttls:
+          enable: true
+          required: true
+      debug: true
 
 # CORS Configuration
 cors:
@@ -63,10 +107,61 @@ keycloak:
   url: ${KEYCLOAK_URL:http://localhost:8180}
   realm: ${KEYCLOAK_REALM:taskforce-dev}
   client-id: ${KEYCLOAK_CLIENT_ID:taskforce-api}
-  client-secret: ${KEYCLOAK_CLIENT_SECRET:dev-secret}
+  client-secret: ${KEYCLOAK_CLIENT_SECRET:dev-secret-change-me}
+
+  # Admin Client (pour créer/gérer les utilisateurs)
   admin:
     username: ${KEYCLOAK_ADMIN_USERNAME:admin}
     password: ${KEYCLOAK_ADMIN_PASSWORD:admin}
+    client-id: ${KEYCLOAK_ADMIN_CLIENT_ID:admin-cli}
+
+  # OAuth2/OIDC Endpoints
+  endpoints:
+    # Token Endpoint : Pour obtenir access_token et refresh_token (Password Grant)
+    token: ${keycloak.url}/realms/${keycloak.realm}/protocol/openid-connect/token
+    # Logout Endpoint : Pour révoquer les tokens
+    logout: ${keycloak.url}/realms/${keycloak.realm}/protocol/openid-connect/logout
+    # UserInfo Endpoint : Pour récupérer les infos de l'utilisateur authentifié
+    userinfo: ${keycloak.url}/realms/${keycloak.realm}/protocol/openid-connect/userinfo
+    # Token Introspection : Pour valider un token
+    introspect: ${keycloak.url}/realms/${keycloak.realm}/protocol/openid-connect/token/introspect
+    # JWK Set : Clés publiques pour vérifier les signatures JWT
+    certs: ${keycloak.url}/realms/${keycloak.realm}/protocol/openid-connect/certs
+
+# Stripe Configuration
+stripe:
+  api-key: ${STRIPE_SECRET_KEY:sk_test_your_stripe_key_here}
+  publishable-key: ${STRIPE_PUBLIC_KEY:pk_test_your_publishable_key_here}
+  webhook-secret: ${STRIPE_WEBHOOK_SECRET:whsec_your_webhook_secret_here}
+  plans:
+    pro:
+      price-id: ${STRIPE_PRICE_ID_PRO:price_pro_test}
+    enterprise:
+      price-id: ${STRIPE_ENTERPRISE_PRICE_ID:price_enterprise_test}
+  checkout:
+    success-url: ${STRIPE_SUCCESS_URL:http://localhost:3000/payment/success}
+    cancel-url: ${STRIPE_CANCEL_URL:http://localhost:3000/payment/cancel}
+
+# Application Configuration
+app:
+  name: ${APP_NAME:TaskForce}
+  url: ${APP_URL:http://localhost:3000}
+  frontend-url: ${FRONTEND_URL:http://localhost:3000}
+
+# JWT Configuration
+jwt:
+  secret: ${JWT_SECRET:myVerySecretKeyForJWTTokenGenerationThatIsLongEnoughToBeSecure256Bits}
+  access-token:
+    expiration: ${JWT_ACCESS_TOKEN_EXPIRATION:3600}  # 1 heure en secondes
+  refresh-token:
+    expiration: ${JWT_REFRESH_TOKEN_EXPIRATION:2592000}  # 30 jours en secondes
+
+# OTP Configuration
+otp:
+  expiration-minutes: ${OTP_EXPIRATION_MINUTES:15}
+  length: ${OTP_LENGTH:6}
+  max-attempts: ${OTP_MAX_ATTEMPTS:5}
+  max-requests-per-hour: ${OTP_MAX_REQUESTS_PER_HOUR:5}
 
 # Logging Configuration
 logging:
@@ -81,5 +176,5 @@ logging:
 
 # Server Configuration
 server:
-  port: ${SERVER_PORT:8081}
+  port: ${SERVER_PORT:8080}
 

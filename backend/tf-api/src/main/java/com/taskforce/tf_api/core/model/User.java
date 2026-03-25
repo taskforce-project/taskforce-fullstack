@@ -1,0 +1,190 @@
+package com.taskforce.tf_api.core.model;
+
+import java.time.LocalDateTime;
+
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
+
+import com.taskforce.tf_api.core.enums.PlanStatus;
+import com.taskforce.tf_api.core.enums.PlanType;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+/**
+ * Entité User - Utilisateur de l'application
+ *
+ * Cette table stocke les informations métier des utilisateurs.
+ * L'authentification est gérée par Keycloak (email, password, email verification).
+ * Le lien est fait via keycloakId qui référence l'ID de l'utilisateur dans Keycloak.
+ */
+@Entity
+@Table(name = "users", indexes = {
+    @Index(name = "idx_users_email", columnList = "email", unique = true),
+    @Index(name = "idx_users_keycloak_id", columnList = "keycloak_id", unique = true),
+    @Index(name = "idx_users_company_id", columnList = "company_id"),
+    @Index(name = "idx_users_stripe_customer_id", columnList = "stripe_customer_id"),
+    @Index(name = "idx_users_is_active", columnList = "is_active")
+})
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class User {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    /**
+     * ID de l'utilisateur dans Keycloak (source of truth pour l'authentification)
+     * Récupéré depuis le token JWT lors de l'authentification
+     */
+    @Column(name = "keycloak_id", nullable = false, unique = true, length = 100)
+    private String keycloakId;
+
+    /**
+     * Email de l'utilisateur (pour référence rapide, source = Keycloak)
+     * Utilisé pour les recherches et l'envoi d'emails
+     */
+    @Column(nullable = false, unique = true, length = 255)
+    private String email;
+
+    /**
+     * Type de plan d'abonnement (FREE, PRO, ENTERPRISE)
+     * Synchronisé avec la table Subscription
+     */
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "plan_type", nullable = false)
+    @Builder.Default
+    private PlanType planType = PlanType.FREE;
+
+    /**
+     * Statut de l'abonnement Stripe (ACTIVE, CANCELED, etc.)
+     * Synchronisé avec la table Subscription
+     * NULL si plan FREE ou aucun abonnement actif
+     */
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "plan_status", nullable = true)
+    private PlanStatus planStatus;
+
+    /**
+     * ID du client dans Stripe
+     * Créé lors du premier achat ou lors de l'inscription avec un plan payant
+     */
+    @Column(name = "stripe_customer_id", unique = true, length = 100)
+    private String stripeCustomerId;
+
+    /**
+     * ID de l'abonnement actif dans Stripe
+     * Référence rapide vers l'abonnement Stripe actif
+     */
+    @Column(name = "stripe_subscription_id", unique = true, length = 100)
+    private String stripeSubscriptionId;
+
+    /**
+     * Date de début de l'abonnement
+     */
+    @Column(name = "subscription_start_date")
+    private LocalDateTime subscriptionStartDate;
+
+    /**
+     * Date de fin de l'abonnement (renouvellement ou expiration)
+     */
+    @Column(name = "subscription_end_date")
+    private LocalDateTime subscriptionEndDate;
+
+    /**
+     * Date de fin de la période d'essai (si applicable)
+     */
+    @Column(name = "trial_end_date")
+    private LocalDateTime trialEndDate;
+
+    /**
+     * ID de l'entreprise (peut être null pour les utilisateurs FREE)
+     * Sera utilisé pour les fonctionnalités multi-entreprises futures
+     */
+    @Column(name = "company_id")
+    private Long companyId;
+
+    /**
+     * Indique si l'utilisateur est actif
+     */
+    @Column(name = "is_active", nullable = false)
+    @Builder.Default
+    private Boolean isActive = true;
+
+    /**
+     * Indique si l'utilisateur a manifesté un intérêt pour le plan ENTERPRISE
+     * Utilisé pour identifier les leads sales même s'ils démarrent avec un compte FREE
+     */
+    @Column(name = "enterprise_interest")
+    @Builder.Default
+    private Boolean enterpriseInterest = false;
+
+    /**
+     * Date de création de l'enregistrement
+     */
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    /**
+     * Date de dernière modification
+     */
+    @UpdateTimestamp
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+
+    /**
+     * Utilisateur qui a créé cet enregistrement (keycloakId)
+     */
+    @Column(name = "created_by")
+    private String createdBy;
+
+    /**
+     * Utilisateur qui a modifié cet enregistrement (keycloakId)
+     */
+    @Column(name = "updated_by")
+    private String updatedBy;
+
+    /**
+     * Vérifie si l'utilisateur a un plan PRO ou supérieur
+     */
+    public boolean isProOrHigher() {
+        return planType == PlanType.PRO || planType == PlanType.ENTERPRISE;
+    }
+
+    /**
+     * Vérifie si l'abonnement est actif
+     */
+    public boolean hasActiveSubscription() {
+        return planStatus == PlanStatus.ACTIVE || planStatus == PlanStatus.TRIALING;
+    }
+
+    /**
+     * Vérifie si l'utilisateur est en période d'essai
+     */
+    public boolean isInTrial() {
+        return planStatus == PlanStatus.TRIALING
+            && trialEndDate != null
+            && trialEndDate.isAfter(LocalDateTime.now());
+    }
+}
