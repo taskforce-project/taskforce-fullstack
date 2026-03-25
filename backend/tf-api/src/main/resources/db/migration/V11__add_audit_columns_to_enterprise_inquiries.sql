@@ -12,8 +12,8 @@
 -- ===============================
 
 ALTER TABLE enterprise_inquiries 
-ADD COLUMN created_by VARCHAR(255),
-ADD COLUMN updated_by VARCHAR(255);
+ADD COLUMN IF NOT EXISTS created_by VARCHAR(255),
+ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);
 
 -- Commentaires
 COMMENT ON COLUMN enterprise_inquiries.created_by IS 'Utilisateur ayant créé l''enregistrement (audit)';
