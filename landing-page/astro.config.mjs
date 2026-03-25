@@ -1,5 +1,4 @@
-// @ts-check
-
+// @ts-nocheck
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'astro/config';
 

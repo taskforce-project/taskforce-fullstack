@@ -29,7 +29,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [20.x]
+        node-version: [22.x]
 
     steps:
       - name: 📥 Checkout code
@@ -43,14 +43,19 @@ jobs:
           cache-dependency-path: landing-page/package-lock.json
 
       - name: 📦 Install dependencies
-        run: npm ci
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
 
       - name: 🔍 Run ESLint
         run: npm run lint
         continue-on-error: false
 
       - name: 📝 Run TypeScript compiler check
-        run: npx tsc --noEmit
+        run: npm run typecheck
 
       - name: 🏗️ Build Astro site
         run: npm run build
@@ -119,10 +124,15 @@ jobs:
       - name: 🔧 Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20.x
+          node-version: 22.x
 
       - name: 📦 Install dependencies
-        run: npm ci
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
 
       - name: 🔒 Run npm audit
         run: npm audit --audit-level=moderate
