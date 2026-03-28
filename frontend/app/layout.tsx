@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Roboto, Roboto_Serif, Roboto_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/contexts/auth-context";
+import { I18nProvider } from "@/lib/i18n";
 import { ThemeProvider } from "next-themes";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
@@ -44,12 +45,14 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <TooltipProvider>
-            <AuthProvider>
-              {children}
-              <Toaster position="bottom-right" richColors closeButton />
-            </AuthProvider>
-          </TooltipProvider>
+          <I18nProvider>
+            <TooltipProvider>
+              <AuthProvider>
+                {children}
+                <Toaster position="bottom-right" richColors closeButton />
+              </AuthProvider>
+            </TooltipProvider>
+          </I18nProvider>
         </ThemeProvider>
       </body>
     </html>
