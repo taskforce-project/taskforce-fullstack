@@ -22,6 +22,23 @@ export const CONSTANTS_EN = {
     previous: "Previous",
     finish: "Finish",
     or: "or",
+    search: "Search...",
+    notifications: "Notifications",
+    logout: "Log out",
+    noResults: "No results found",
+    viewAll: "View all",
+    createNew: "Create",
+    filter: "Filter",
+    sort: "Sort by",
+    export: "Export",
+    required: "Required",
+    optional: "Optional",
+    comingSoon: "Coming soon",
+    free: "Free",
+    pro: "Pro",
+    enterprise: "Enterprise",
+    upgrade: "Upgrade",
+    learnMore: "Learn more",
   },
 
   // Authentication - Login
@@ -178,6 +195,64 @@ export const CONSTANTS_EN = {
     openMenu: "Open menu",
     closeMenu: "Close menu",
     skipToContent: "Skip to main content",
+  },
+
+  // Navigation (sidebar)
+  nav: {
+    dashboard: "Dashboard",
+    myWork: "My Work",
+    inbox: "Inbox",
+    projects: "Projects",
+    issues: "Issues",
+    teams: "Teams",
+    members: "Members",
+    skills: "Skills",
+    analytics: "Analytics",
+    discussions: "Discussions",
+    settings: "Settings",
+    admin: "Admin",
+    createProject: "New Project",
+    sub: {
+      myIssues: "My Issues",
+      myCycles: "My Cycles",
+      myPages: "My Pages",
+      allNotifications: "All",
+      mentions: "Mentions",
+      alerts: "Alerts",
+      assignments: "Assignments",
+    },
+  },
+
+  // Dashboard page
+  dashboard: {
+    title: "Dashboard",
+    welcomeBack: "Welcome back",
+    stats: {
+      activeProjects: "Active Projects",
+      openIssues: "Open Issues",
+      myTasks: "My Tasks",
+      teamMembers: "Members",
+      completedThisWeek: "Completed this week",
+      overloaded: "Overloaded",
+    },
+    activity: {
+      title: "Recent Activity",
+      empty: "No recent activity",
+      viewAll: "View all activity",
+    },
+    quickActions: {
+      title: "Quick Actions",
+      createProject: "New Project",
+      createIssue: "New Issue",
+      inviteMember: "Invite Member",
+    },
+    workload: {
+      title: "Team Workload",
+      noData: "No workload data available",
+      overloaded: "Overloaded",
+      available: "Available",
+      capacity: "capacity",
+    },
   },
 };
 
