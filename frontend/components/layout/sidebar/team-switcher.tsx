@@ -22,10 +22,10 @@ import {
 export function TeamSwitcher({
   teams,
 }: {
-  teams: {
-    name: string
-    logo: React.ElementType
-    plan: string
+  readonly teams: readonly {
+    readonly name: string
+    readonly logo: React.ElementType
+    readonly plan: string
   }[]
 }) {
   const { isMobile } = useSidebar()
