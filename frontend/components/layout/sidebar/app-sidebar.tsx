@@ -1,121 +1,298 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
+import { usePathname } from "next/navigation"
 import {
-  AudioWaveform,
-  BookOpen,
-  Bot,
-  Command,
-  Frame,
-  GalleryVerticalEnd,
-  Map,
-  PieChart,
-  Settings2,
-  SquareTerminal,
+  LayoutDashboard,
+  Inbox,
+  Briefcase,
+  FolderKanban,
+  Users,
+  UserCircle,
+  Sparkles,
+  BarChart3,
+  MessageSquare,
+  Settings,
+  ShieldCheck,
+  Plus,
+  Zap,
+  ChevronRight,
 } from "lucide-react"
 
-import { NavMain } from "@/components/layout/sidebar/nav-main"
-import { NavProjects } from "@/components/layout/sidebar/nav-projects"
 import { NavUser } from "@/components/layout/sidebar/nav-user"
-import { TeamSwitcher } from "@/components/layout/sidebar/team-switcher"
+import { useAuth } from "@/lib/contexts/auth-context"
+import { useTranslation } from "@/lib/i18n"
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
+  SidebarGroup,
+  SidebarGroupLabel,
   SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarRail,
+  SidebarSeparator,
 } from "@/components/ui/sidebar"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
+import { Badge } from "@/components/ui/badge"
 
-// Temporary sample data — will be replaced by real data in Phase 2 (API wiring)
-const data = {
-  user: {
-    name: "shadcn",
-    email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
-  },
-  teams: [
-    {
-      name: "Acme Inc",
-      logo: GalleryVerticalEnd,
-      plan: "Enterprise",
-    },
-    {
-      name: "Acme Corp.",
-      logo: AudioWaveform,
-      plan: "Startup",
-    },
-    {
-      name: "Evil Corp.",
-      logo: Command,
-      plan: "Free",
-    },
-  ],
-  navMain: [
-    {
-      title: "Playground",
-      url: "#",
-      icon: SquareTerminal,
-      isActive: true,
-      items: [
-        { title: "History", url: "#" },
-        { title: "Starred", url: "#" },
-        { title: "Settings", url: "#" },
-      ],
-    },
-    {
-      title: "Models",
-      url: "#",
-      icon: Bot,
-      items: [
-        { title: "Genesis", url: "#" },
-        { title: "Explorer", url: "#" },
-        { title: "Quantum", url: "#" },
-      ],
-    },
-    {
-      title: "Documentation",
-      url: "#",
-      icon: BookOpen,
-      items: [
-        { title: "Introduction", url: "#" },
-        { title: "Get Started", url: "#" },
-        { title: "Tutorials", url: "#" },
-        { title: "Changelog", url: "#" },
-      ],
-    },
-    {
-      title: "Settings",
-      url: "#",
-      icon: Settings2,
-      items: [
-        { title: "General", url: "#" },
-        { title: "Team", url: "#" },
-        { title: "Billing", url: "#" },
-        { title: "Limits", url: "#" },
-      ],
-    },
-  ],
-  projects: [
-    { name: "Design Engineering", url: "#", icon: Frame },
-    { name: "Sales & Marketing", url: "#", icon: PieChart },
-    { name: "Travel", url: "#", icon: Map },
-  ],
+type NavItem = {
+  readonly key: string
+  readonly url: string
+  readonly icon: React.ElementType
+  readonly badge?: string
+  readonly requiresRole?: readonly string[]
+  readonly requiresPlan?: readonly string[]
+  readonly items?: readonly {
+    readonly key: string
+    readonly url: string
+  }[]
 }
 
+const NAV_MAIN: readonly NavItem[] = [
+  {
+    key: "nav.dashboard",
+    url: "/dashboard",
+    icon: LayoutDashboard,
+  },
+  {
+    key: "nav.inbox",
+    url: "/inbox",
+    icon: Inbox,
+    items: [
+      { key: "nav.sub.allNotifications", url: "/inbox" },
+      { key: "nav.sub.mentions", url: "/inbox/mentions" },
+      { key: "nav.sub.alerts", url: "/inbox/alerts" },
+      { key: "nav.sub.assignments", url: "/inbox/assignments" },
+    ],
+  },
+  {
+    key: "nav.myWork",
+    url: "/my-work",
+    icon: Briefcase,
+    items: [
+      { key: "nav.sub.myIssues", url: "/my-work/issues" },
+      { key: "nav.sub.myCycles", url: "/my-work/cycles" },
+      { key: "nav.sub.myPages", url: "/my-work/pages" },
+    ],
+  },
+  {
+    key: "nav.projects",
+    url: "/projects",
+    icon: FolderKanban,
+  },
+  {
+    key: "nav.teams",
+    url: "/teams",
+    icon: Users,
+  },
+  {
+    key: "nav.members",
+    url: "/members",
+    icon: UserCircle,
+  },
+  {
+    key: "nav.skills",
+    url: "/skills",
+    icon: Sparkles,
+  },
+  {
+    key: "nav.discussions",
+    url: "/discussions",
+    icon: MessageSquare,
+  },
+  {
+    key: "nav.analytics",
+    url: "/analytics",
+    icon: BarChart3,
+    requiresPlan: ["pro", "enterprise"],
+  },
+]
+
+const NAV_BOTTOM: readonly NavItem[] = [
+  {
+    key: "nav.settings",
+    url: "/settings",
+    icon: Settings,
+  },
+  {
+    key: "nav.admin",
+    url: "/admin",
+    icon: ShieldCheck,
+    requiresRole: ["ADMIN"],
+  },
+]
+
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { user } = useAuth()
+  const { t } = useTranslation()
+  const pathname = usePathname()
+
+  const navUser = user
+    ? {
+        name: `${user.firstName} ${user.lastName}`,
+        email: user.email,
+        avatar: "",
+      }
+    : { name: "...", email: "...", avatar: "" }
+
+  const isActive = (url: string) =>
+    pathname === url || pathname.startsWith(`${url}/`)
+
+  const canAccess = (item: NavItem) => {
+    if (item.requiresRole && user?.role) {
+      if (!item.requiresRole.includes(user.role)) return false
+    }
+    if (item.requiresPlan && user?.plan) {
+      if (!item.requiresPlan.includes(user.plan)) return false
+    }
+    return true
+  }
+
   return (
     <Sidebar collapsible="icon" {...props}>
-      <SidebarHeader>
-        <TeamSwitcher teams={data.teams} />
+      {/* Logo / Workspace header */}
+      <SidebarHeader className="p-4">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              size="lg"
+              className="data-[state=open]:bg-sidebar-accent"
+            >
+              <Link href="/dashboard">
+                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+                  <Zap className="size-4" />
+                </div>
+                <div className="grid flex-1 text-left text-sm leading-tight">
+                  <span className="truncate font-semibold">TaskForce</span>
+                  <span className="truncate text-xs capitalize text-muted-foreground">
+                    {user?.plan ?? "free"}
+                  </span>
+                </div>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarHeader>
+
+      <SidebarSeparator />
+
       <SidebarContent>
-        <NavMain items={data.navMain} />
-        <NavProjects projects={data.projects} />
+        {/* Main nav */}
+        <SidebarGroup>
+          <SidebarGroupLabel>Workspace</SidebarGroupLabel>
+          <SidebarMenu>
+            {NAV_MAIN.filter(canAccess).map((item) =>
+              item.items ? (
+                <Collapsible
+                  key={item.key}
+                  defaultOpen={isActive(item.url)}
+                  className="group/collapsible"
+                  asChild
+                >
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton
+                        tooltip={t(item.key)}
+                        isActive={isActive(item.url)}
+                      >
+                        <item.icon />
+                        <span>{t(item.key)}</span>
+                        <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub>
+                        {item.items.map((sub) => (
+                          <SidebarMenuSubItem key={sub.key}>
+                            <SidebarMenuSubButton asChild isActive={isActive(sub.url)}>
+                              <Link href={sub.url}>{t(sub.key)}</Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        ))}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
+              ) : (
+                <SidebarMenuItem key={item.key}>
+                  <SidebarMenuButton
+                    asChild
+                    tooltip={t(item.key)}
+                    isActive={isActive(item.url)}
+                  >
+                    <Link href={item.url}>
+                      <item.icon />
+                      <span>{t(item.key)}</span>
+                      {item.badge && (
+                        <Badge className="ml-auto size-5 justify-center rounded-full p-0 text-xs">
+                          {item.badge}
+                        </Badge>
+                      )}
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )
+            )}
+          </SidebarMenu>
+        </SidebarGroup>
+
+        {/* Quick create project */}
+        <SidebarGroup className="group-data-[collapsible=icon]:hidden">
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild className="text-muted-foreground">
+                <Link href="/projects/new">
+                  <Plus className="size-4" />
+                  <span>{t("nav.createProject")}</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroup>
+
+        <SidebarSeparator />
+
+        {/* Bottom nav (settings / admin) */}
+        <SidebarGroup>
+          <SidebarMenu>
+            {NAV_BOTTOM.filter(canAccess).map((item) => (
+              <SidebarMenuItem key={item.key}>
+                <SidebarMenuButton
+                  asChild
+                  tooltip={t(item.key)}
+                  isActive={isActive(item.url)}
+                >
+                  <Link href={item.url}>
+                    <item.icon />
+                    <span>{t(item.key)}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
+        </SidebarGroup>
       </SidebarContent>
+
+      <SidebarSeparator />
+
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser user={navUser} />
       </SidebarFooter>
+
       <SidebarRail />
     </Sidebar>
   )
 }
+
