@@ -212,7 +212,7 @@ export const CONSTANTS_FR: TranslationKeys = {
     analytics: "Analytiques",
     discussions: "Discussions",
     settings: "Paramètres",
-    admin: "Administration",
+    help: "Aide & Docs",
     createProject: "Nouveau projet",
     sub: {
       myIssues: "Mes tâches",

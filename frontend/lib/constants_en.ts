@@ -210,7 +210,7 @@ export const CONSTANTS_EN = {
     analytics: "Analytics",
     discussions: "Discussions",
     settings: "Settings",
-    admin: "Admin",
+    help: "Help & Docs",
     createProject: "New Project",
     sub: {
       myIssues: "My Issues",

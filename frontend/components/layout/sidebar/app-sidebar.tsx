@@ -8,13 +8,9 @@ import {
   Inbox,
   Briefcase,
   FolderKanban,
-  Users,
-  UserCircle,
-  Sparkles,
   BarChart3,
-  MessageSquare,
   Settings,
-  ShieldCheck,
+  HelpCircle,
   Plus,
   Zap,
   ChevronRight,
@@ -92,26 +88,6 @@ const NAV_MAIN: readonly NavItem[] = [
     icon: FolderKanban,
   },
   {
-    key: "nav.teams",
-    url: "/teams",
-    icon: Users,
-  },
-  {
-    key: "nav.members",
-    url: "/members",
-    icon: UserCircle,
-  },
-  {
-    key: "nav.skills",
-    url: "/skills",
-    icon: Sparkles,
-  },
-  {
-    key: "nav.discussions",
-    url: "/discussions",
-    icon: MessageSquare,
-  },
-  {
     key: "nav.analytics",
     url: "/analytics",
     icon: BarChart3,
@@ -126,10 +102,9 @@ const NAV_BOTTOM: readonly NavItem[] = [
     icon: Settings,
   },
   {
-    key: "nav.admin",
-    url: "/admin",
-    icon: ShieldCheck,
-    requiresRole: ["ADMIN"],
+    key: "nav.help",
+    url: "/help",
+    icon: HelpCircle,
   },
 ]
 
