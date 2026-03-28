@@ -160,9 +160,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   }
 
   return (
-    <Sidebar collapsible="icon" {...props}>
+    <Sidebar collapsible="icon" className="overflow-x-hidden" {...props}>
       {/* Logo / Workspace header */}
-      <SidebarHeader className="p-4">
+      <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
@@ -188,7 +188,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
       <SidebarSeparator />
 
-      <SidebarContent>
+      <SidebarContent className="overflow-x-hidden">
         {/* Main nav */}
         <SidebarGroup>
           <SidebarGroupLabel>Workspace</SidebarGroupLabel>
