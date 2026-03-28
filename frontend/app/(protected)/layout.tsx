@@ -1,40 +1,37 @@
-/**
- * Layout pour les pages protégées
- * Vérifie l'authentification avant d'afficher le contenu
- */
+"use client"
 
-"use client";
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { Loader2 } from "lucide-react"
 
-import { useAuth } from "@/lib/contexts/auth-context";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
-import { Loader2 } from "lucide-react";
+import { useAuth } from "@/lib/contexts/auth-context"
+import { AppShell } from "@/components/layout/app-shell"
 
 export default function ProtectedLayout({
   children,
 }: {
-  children: React.ReactNode;
+  readonly children: React.ReactNode
 }) {
-  const { isAuthenticated, isLoading } = useAuth();
-  const router = useRouter();
+  const { isAuthenticated, isLoading } = useAuth()
+  const router = useRouter()
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      router.replace("/auth/login");
+      router.replace("/auth/login")
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [isAuthenticated, isLoading, router])
 
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-600" />
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
-    );
+    )
   }
 
   if (!isAuthenticated) {
-    return null;
+    return null
   }
 
-  return <>{children}</>;
+  return <AppShell>{children}</AppShell>
 }
