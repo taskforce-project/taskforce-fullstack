@@ -20,7 +20,7 @@ export function AppShell({ children }: AppShellProps) {
       <AppSidebar />
       <SidebarInset className="overflow-hidden">
         <AppTopbar />
-        <main className="flex flex-1 flex-col gap-4 p-4 md:p-6">{children}</main>
+        <main className="flex flex-1 flex-col gap-6 p-6 md:p-8">{children}</main>
       </SidebarInset>
     </SidebarProvider>
   )
