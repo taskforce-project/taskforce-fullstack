@@ -21,6 +21,7 @@ import {
 import { useAuth } from "@/lib/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Pod } from "@/components/ui/pod"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -74,15 +75,15 @@ const SUGGESTIONS = [
 
 function ThinkingDots() {
   return (
-    <div className="flex items-end gap-2.5">
-      <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted">
-        <Bot className="size-3.5 text-muted-foreground" />
+    <div className="flex items-end gap-3">
+      <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-muted to-muted/50 shadow-sm">
+        <Bot className="size-4 text-muted-foreground" />
       </div>
-      <div className="rounded-2xl rounded-bl-sm bg-muted px-4 py-3">
-        <div className="flex items-center gap-1">
-          <div className="size-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:0ms]" />
-          <div className="size-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:150ms]" />
-          <div className="size-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:300ms]" />
+      <div className="rounded-2xl rounded-bl-none bg-linear-to-br from-muted to-muted/50 px-5 py-3.5 shadow-sm">
+        <div className="flex items-center gap-1.5">
+          <div className="size-2 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:0ms]" />
+          <div className="size-2 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:150ms]" />
+          <div className="size-2 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:300ms]" />
         </div>
       </div>
     </div>
@@ -98,7 +99,7 @@ interface ChatInputProps {
 
 function ChatInput({ input, setInput, send, isThinking }: ChatInputProps) {
   return (
-    <div className="flex w-full gap-2">
+    <div className="flex w-full gap-3">
       <input
         type="text"
         value={input}
@@ -109,15 +110,15 @@ function ChatInput({ input, setInput, send, isThinking }: ChatInputProps) {
             send(input)
           }
         }}
-        placeholder="Ask anything about your workspace..."
+        placeholder="Type your message..."
         disabled={isThinking}
-        className="h-10 flex-1 rounded-xl border border-border/60 bg-background/60 px-4 text-sm outline-none placeholder:text-muted-foreground focus:border-primary/50 focus:bg-background disabled:opacity-60"
+        className="h-11 flex-1 rounded-xl border border-border bg-background px-4 text-sm shadow-sm outline-none placeholder:text-muted-foreground transition-all focus:border-primary focus:shadow-md focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
       />
       <Button
         size="icon"
         onClick={() => send(input)}
         disabled={!input.trim() || isThinking}
-        className="size-10 shrink-0 rounded-xl"
+        className="size-11 shrink-0 rounded-xl shadow-md transition-all hover:shadow-lg hover:scale-105"
       >
         <Send className="size-4" />
       </Button>
@@ -176,71 +177,71 @@ function CopilotPanel({ userName }: CopilotPanelProps) {
   const isEmpty = messages.length === 0
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-card/60 backdrop-blur-xl [box-shadow:var(--shadow-xl)]">
-      {/* Gradient glow overlay */}
-      <div className="pointer-events-none absolute inset-0 bg-linear-to-br from-violet-500/5 via-transparent to-pink-500/5" />
-
+    <>
       {isEmpty ? (
         /* ─── Empty state ─── */
-        <div className="relative flex flex-col items-center gap-5 px-6 pb-6 pt-10 text-center sm:px-12">
-          <div className="flex size-14 items-center justify-center rounded-2xl border border-border/50 bg-linear-to-br from-violet-500/20 to-pink-500/20 [box-shadow:var(--shadow-lg)]">
-            <Sparkles className="size-7" />
+        <div className="flex flex-col items-center gap-6 py-8 text-center">
+          <div className="relative">
+            <div className="absolute inset-0 animate-pulse rounded-2xl bg-primary/10 blur-xl" />
+            <div className="relative flex size-16 items-center justify-center rounded-2xl border-2 border-primary/20 bg-linear-to-br from-primary/10 to-primary/5">
+              <Sparkles className="size-8 text-primary" />
+            </div>
           </div>
-          <div className="space-y-1">
-            <h2 className="text-xl font-semibold">
-              What can I help you with, {userName}?
-            </h2>
+          <div className="space-y-2">
+            <h3 className="text-2xl font-bold">Hello, {userName}! 👋</h3>
             <p className="text-sm text-muted-foreground">
-              Ask me anything about your projects, team or tasks
+              I&apos;m your workspace assistant. How can I help you today?
             </p>
           </div>
 
           {/* Suggestion chips */}
-          <div className="grid w-full max-w-lg grid-cols-2 gap-2 sm:grid-cols-3">
+          <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-3">
             {SUGGESTIONS.map((s) => (
               <button
                 key={s.label}
                 onClick={() => send(s.prompt)}
-                className="flex items-center gap-2 rounded-xl border border-border/60 bg-background/50 px-3 py-2.5 text-left text-xs font-medium transition-all hover:border-primary/40 hover:bg-accent"
+                className="group flex items-center gap-3 rounded-xl border border-border bg-linear-to-br from-background to-muted/30 px-4 py-3.5 text-left text-xs font-medium shadow-sm transition-all hover:border-primary/40 hover:shadow-md hover:-translate-y-0.5"
               >
-                <s.icon className="size-3.5 shrink-0 text-muted-foreground" />
-                <span className="truncate">{s.label}</span>
+                <div className="rounded-lg bg-background p-2 shadow-sm transition-colors group-hover:bg-primary/10">
+                  <s.icon className="size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
+                </div>
+                <span className="truncate font-semibold">{s.label}</span>
               </button>
             ))}
           </div>
 
           {/* Input */}
-          <div className="w-full max-w-lg">
+          <div className="w-full">
             <ChatInput input={input} setInput={setInput} send={send} isThinking={isThinking} />
           </div>
         </div>
       ) : (
         /* ─── Chat mode ─── */
-        <div className="relative flex flex-col" style={{ height: 460 }}>
-          <div className="flex-1 space-y-4 overflow-y-auto p-5">
+        <div className="flex flex-col" style={{ height: 520 }}>
+          <div className="flex-1 space-y-4 overflow-y-auto px-1 py-6">
             {messages.map((msg) => (
               <div
                 key={msg.id}
-                className={`flex items-end gap-2.5 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
+                className={`flex items-end gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
               >
                 <div
-                  className={`flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-medium ${
+                  className={`flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold shadow-sm ${
                     msg.role === "user"
                       ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-muted-foreground"
+                      : "bg-linear-to-br from-muted to-muted/50 text-muted-foreground"
                   }`}
                 >
                   {msg.role === "user" ? (
                     userName.charAt(0).toUpperCase()
                   ) : (
-                    <Bot className="size-3.5" />
+                    <Bot className="size-4" />
                   )}
                 </div>
                 <div
-                  className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                  className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${
                     msg.role === "user"
-                      ? "rounded-br-sm bg-primary text-primary-foreground"
-                      : "rounded-bl-sm bg-muted"
+                      ? "rounded-br-none bg-primary text-primary-foreground"
+                      : "rounded-bl-none bg-linear-to-br from-muted to-muted/50"
                   }`}
                 >
                   {msg.content}
@@ -252,12 +253,12 @@ function CopilotPanel({ userName }: CopilotPanelProps) {
           </div>
 
           {/* Input bar */}
-          <div className="border-t border-border/40 p-3">
+          <div className="border-t border-border bg-muted/30 p-4">
             <ChatInput input={input} setInput={setInput} send={send} isThinking={isThinking} />
           </div>
         </div>
       )}
-    </div>
+    </>
   )
 }
 
@@ -287,65 +288,90 @@ export default function DashboardPage() {
   const { user } = useAuth()
   const firstName = user?.firstName ?? "…"
 
+  const currentHour = new Date().getHours()
+  let greeting = "Good evening"
+  if (currentHour < 12) {
+    greeting = "Good morning"
+  } else if (currentHour < 18) {
+    greeting = "Good afternoon"
+  }
+
   return (
     <div className="flex flex-col gap-6">
       {/* Greeting */}
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">
-          Good morning, <span className="text-primary">{firstName}</span>
+      <div className="space-y-2">
+        <h1 className="text-3xl font-bold tracking-tight">
+          {greeting}, <span className="bg-linear-to-r from-primary to-primary/60 bg-clip-text text-transparent">{firstName}</span>
         </h1>
-        <p className="text-sm text-muted-foreground">
-          Here&apos;s what&apos;s happening with your workspace.
+        <p className="text-base text-muted-foreground">
+          Here&apos;s what&apos;s happening in your workspace
         </p>
       </div>
 
-      {/* Copilot hero */}
-      <CopilotPanel userName={firstName} />
-
-      {/* Stats chips */}
-      <div className="flex flex-wrap gap-2">
-        {STATS.map((stat) => (
-          <Link
-            key={stat.label}
-            href={stat.href}
-            className="flex items-center gap-2 rounded-xl border border-border/50 bg-card/60 px-4 py-2 text-sm backdrop-blur-sm transition-all hover:border-primary/30 hover:bg-card"
-          >
-            <stat.icon className="size-3.5 text-muted-foreground" />
-            <span className="font-semibold">{stat.value}</span>
-            <span className="text-muted-foreground">{stat.label}</span>
-          </Link>
-        ))}
-      </div>
-
-      {/* Recent activity */}
-      <div>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Recent activity
-          </h2>
-          <Button variant="ghost" size="sm" className="h-auto px-2 py-1 text-xs" asChild>
-            <Link href="/inbox" className="flex items-center gap-1">
-              View all <ArrowUpRight className="size-3" />
-            </Link>
-          </Button>
-        </div>
-        <div className="divide-y divide-border/40 rounded-xl border border-border/50 bg-card/60 backdrop-blur-sm">
-          {ACTIVITY.map((event) => (
-            <div key={event.id} className="flex items-center gap-3 px-4 py-3">
-              <Avatar className="size-7 shrink-0">
-                <AvatarFallback className="text-xs">{event.initials}</AvatarFallback>
-              </Avatar>
-              <p className="flex-1 min-w-0 text-sm">
-                <span className="font-medium">{event.name}</span>{" "}
-                <span className="text-muted-foreground">{event.action}</span>{" "}
-                <span className="font-medium">{event.target}</span>
-              </p>
-              <div className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-                <Clock className="size-3" />
-                {event.time}
-              </div>
+      {/* Main grid layout - pods system */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Left column - Stats + Activity */}
+        <div className="space-y-6 lg:col-span-1">
+          {/* Stats Pod */}
+          <Pod title="Workspace overview" description="Quick stats at a glance">
+            <div className="space-y-3">
+              {STATS.map((stat) => (
+                <Link
+                  key={stat.label}
+                  href={stat.href}
+                  className="group flex items-center justify-between rounded-lg border border-border bg-background px-4 py-3.5 text-sm transition-all hover:border-primary/40 hover:bg-muted/50 hover:shadow-sm"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="rounded-md bg-muted p-2 transition-colors group-hover:bg-primary/10">
+                      <stat.icon className="size-4 text-muted-foreground transition-colors group-hover:text-primary" />
+                    </div>
+                    <span className="font-medium text-muted-foreground group-hover:text-foreground">{stat.label}</span>
+                  </div>
+                  <span className="text-xl font-bold">{stat.value}</span>
+                </Link>
+              ))}
             </div>
-          ))}
+          </Pod>
+
+          {/* Activity Pod */}
+          <Pod
+            title="Recent activity"
+            action={
+              <Button variant="ghost" size="sm" className="h-auto px-3 py-1.5 text-xs font-medium" asChild>
+                <Link href="/inbox" className="flex items-center gap-1.5">
+                  View all <ArrowUpRight className="size-3.5" />
+                </Link>
+              </Button>
+            }
+          >
+            <div className="space-y-3">
+              {ACTIVITY.map((event) => (
+                <div key={event.id} className="group flex items-start gap-3 rounded-lg border border-border bg-background p-3 transition-all hover:border-primary/30 hover:bg-muted/30">
+                  <Avatar className="size-8 shrink-0">
+                    <AvatarFallback className="text-xs font-medium">{event.initials}</AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <p className="text-sm leading-tight">
+                      <span className="font-semibold">{event.name}</span>{" "}
+                      <span className="text-muted-foreground">{event.action}</span>
+                    </p>
+                    <p className="truncate text-sm font-medium text-foreground/90">{event.target}</p>
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Clock className="size-3.5" />
+                      <span className="font-medium">{event.time}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Pod>
+        </div>
+
+        {/* Right column - Copilot Chat */}
+        <div className="lg:col-span-2">
+          <Pod>
+            <CopilotPanel userName={firstName} />
+          </Pod>
         </div>
       </div>
     </div>
