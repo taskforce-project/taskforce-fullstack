@@ -14,6 +14,9 @@ import {
   Plus,
   Zap,
   ChevronRight,
+  Users,
+  UsersRound,
+  MessageSquare,
 } from "lucide-react"
 
 import { NavUser } from "@/components/layout/sidebar/nav-user"
@@ -86,6 +89,21 @@ const NAV_MAIN: readonly NavItem[] = [
     key: "nav.projects",
     url: "/projects",
     icon: FolderKanban,
+  },
+  {
+    key: "nav.members",
+    url: "/members",
+    icon: Users,
+  },
+  {
+    key: "nav.teams",
+    url: "/teams",
+    icon: UsersRound,
+  },
+  {
+    key: "nav.discussions",
+    url: "/discussions",
+    icon: MessageSquare,
   },
   {
     key: "nav.analytics",
