@@ -129,7 +129,7 @@ export default function HelpPage() {
   }, [query])
 
   return (
-    <div className="flex flex-col gap-8 max-w-4xl">
+    <div className="flex flex-col gap-8 max-w-4xl mx-auto w-full">
       {/* Header */}
       <div className="flex flex-col gap-6">
         <div>
