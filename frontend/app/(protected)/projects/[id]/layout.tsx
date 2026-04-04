@@ -14,6 +14,7 @@ import {
   ChevronRight,
   MoreHorizontal,
   Star,
+  CircleDot,
 } from "lucide-react"
 
 import { useTranslation } from "@/lib/i18n"
@@ -100,6 +101,7 @@ const PROJECT_TABS: ProjectTab[] = [
   { key: "detail.board", icon: LayoutGrid, pathSuffix: "" },
   { key: "detail.list", icon: List, pathSuffix: "/list" },
   { key: "detail.backlog", icon: AlignLeft, pathSuffix: "/backlog" },
+  { key: "detail.issues", icon: CircleDot, pathSuffix: "/issues" },
   { key: "detail.cycles", icon: RefreshCw, pathSuffix: "/cycles" },
   { key: "detail.pages", icon: FileText, pathSuffix: "/pages" },
   { key: "detail.members", icon: Users, pathSuffix: "/members" },
