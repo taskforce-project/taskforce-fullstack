@@ -287,6 +287,7 @@ export const CONSTANTS_EN = {
       board: "Board",
       list: "List",
       backlog: "Backlog",
+      issues: "Issues",
       cycles: "Cycles",
       pages: "Pages",
       members: "Members",
