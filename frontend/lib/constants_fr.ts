@@ -289,6 +289,7 @@ export const CONSTANTS_FR: TranslationKeys = {
       board: "Tableau",
       list: "Liste",
       backlog: "Backlog",
+      issues: "Tâches",
       cycles: "Cycles",
       pages: "Pages",
       members: "Membres",
