@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { useTranslation } from "@/lib/i18n"
-import { useAuth } from "@/hooks/use-auth"
+import { useAuth } from "@/lib/contexts/auth-context"
 import { cn } from "@/lib/utils"
 
 // ---------------------------------------------------------------------------
@@ -255,7 +255,7 @@ function AccountPanel() {
 function TeamPanel() {
   return (
     <div className="flex flex-col gap-4 max-w-md">
-      <p className="text-sm text-muted-foreground">Manage your workspace's team members, roles, and invitations.</p>
+      <p className="text-sm text-muted-foreground">Manage your workspace&apos;s team members, roles, and invitations.</p>
       <div className="rounded-xl border border-border bg-card [box-shadow:var(--shadow-sm)] overflow-hidden">
         {[
           { name: "You", email: "you@taskforce.io", role: "Owner", initials: "ME", color: "bg-primary" },
@@ -289,7 +289,7 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<SettingsTab>("profile")
 
   return (
-    <div className="flex gap-8 max-w-4xl">
+    <div className="flex gap-8 max-w-4xl mx-auto w-full">
       {/* Sidebar nav */}
       <nav className="flex flex-col gap-0.5 w-44 shrink-0">
         {TABS.map((tab) => (
