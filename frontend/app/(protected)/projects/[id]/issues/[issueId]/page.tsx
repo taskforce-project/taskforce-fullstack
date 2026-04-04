@@ -237,7 +237,7 @@ export default function IssueDetailPage() {
   const priority = PRIORITY_CONFIG[issue.priority]
 
   return (
-    <div className="flex flex-col gap-0 max-w-5xl">
+    <div className="flex flex-col gap-0 max-w-5xl mx-auto w-full">
       {/* Breadcrumb */}
       <nav className="flex items-center gap-1 text-xs text-muted-foreground mb-4">
         <Link href="/projects" className="hover:text-foreground transition-colors">Projects</Link>
