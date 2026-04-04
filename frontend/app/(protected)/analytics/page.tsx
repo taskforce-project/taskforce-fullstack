@@ -5,7 +5,7 @@ import { BarChart3, TrendingUp, TrendingDown, Zap, FolderKanban, CircleDot, Refr
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useTranslation } from "@/lib/i18n"
-import { useAuth } from "@/hooks/use-auth"
+import { useAuth } from "@/lib/contexts/auth-context"
 import { cn } from "@/lib/utils"
 
 // ---------------------------------------------------------------------------
@@ -132,7 +132,7 @@ export default function AnalyticsPage() {
   const maxVelocity = Math.max(...VELOCITY_DATA.map((d) => d.completed))
 
   return (
-    <div className="flex flex-col gap-8 max-w-5xl">
+    <div className="flex flex-col gap-8 max-w-5xl mx-auto w-full">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-foreground">{t("analytics.title")}</h1>
