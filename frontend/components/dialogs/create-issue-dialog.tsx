@@ -285,16 +285,24 @@ export function CreateIssueDialog({ children, defaultStatus = "todo", onCreated 
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* Due date */}
-            <div className="relative">
-              <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
-              <Input
-                type="date"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                className="pl-8 h-8 text-xs w-36 border-border"
-              />
-            </div>
+            {/* Due date — Shadcn Calendar Popover */}
+            <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5">
+                  <CalendarIcon className="size-3.5 text-muted-foreground" />
+                  {dueDate ? format(dueDate, "MMM d, yyyy") : "Due date"}
+                  <ChevronDown className="size-3 text-muted-foreground" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={dueDate}
+                  onSelect={(date) => { setDueDate(date); setDatePopoverOpen(false) }}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
           </div>
 
           {/* Labels */}
