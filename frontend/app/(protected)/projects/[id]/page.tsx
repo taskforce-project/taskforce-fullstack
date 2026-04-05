@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useRef } from "react"
-import { useRouter, useParams } from "next/navigation"
 import {
   DndContext,
   DragEndEvent,
@@ -26,6 +25,7 @@ import {
 } from "lucide-react"
 
 import { CreateIssueDialog } from "@/components/dialogs/create-issue-dialog"
+import { IssueSheet, SheetIssue } from "@/components/sheets/issue-sheet"
 import { useTranslation } from "@/lib/i18n"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -159,9 +159,8 @@ function IssueCard({ issue }: { readonly issue: BoardIssue }) {
 // DraggableCard — entire card is the drag source; click navigates to issue
 // ---------------------------------------------------------------------------
 
-function DraggableCard({ issue, projectId }: { readonly issue: BoardIssue; readonly projectId: string }) {
+function DraggableCard({ issue, onOpen }: { readonly issue: BoardIssue; readonly onOpen: (issue: BoardIssue) => void }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: issue.id })
-  const router = useRouter()
 
   return (
     <button
@@ -170,7 +169,7 @@ function DraggableCard({ issue, projectId }: { readonly issue: BoardIssue; reado
       {...attributes}
       {...listeners}
       className={cn("block w-full text-left cursor-grab active:cursor-grabbing", isDragging && "opacity-30 scale-[0.97] transition-transform")}
-      onClick={() => router.push(`/projects/${projectId}/issues/${issue.identifier.toLowerCase().replace("-", "")}`)}
+      onClick={() => onOpen(issue)}
     >
       <IssueCard issue={issue} />
     </button>
@@ -183,16 +182,16 @@ function DraggableCard({ issue, projectId }: { readonly issue: BoardIssue; reado
 
 function ColumnDropZone({
   column,
-  projectId,
   isSource,
   t,
   onRenameColumn,
+  onOpen,
 }: {
   readonly column: BoardColumn
-  readonly projectId: string
   readonly isSource: boolean
   readonly t: (k: string) => string
   readonly onRenameColumn: (id: IssueStatus, title: string) => void
+  readonly onOpen: (issue: BoardIssue) => void
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id })
   const showHighlight = isOver && !isSource
@@ -286,7 +285,7 @@ function ColumnDropZone({
         ) : (
           <>
             {column.issues.map((issue: BoardIssue) => (
-              <DraggableCard key={issue.id} issue={issue} projectId={projectId} />
+              <DraggableCard key={issue.id} issue={issue} onOpen={onOpen} />
             ))}
             {showHighlight && <div className="h-1 rounded-full bg-primary/30 mx-2 mt-1" />}
           </>
@@ -302,12 +301,27 @@ function ColumnDropZone({
 
 export default function ProjectBoardPage() {
   const { t } = useTranslation()
-  const params = useParams()
-  const projectId = typeof params.id === "string" ? params.id : "1"
 
   const [columns, setColumns] = useState<BoardColumn[]>(INITIAL_COLUMNS)
   const [activeIssue, setActiveIssue] = useState<BoardIssue | null>(null)
   const [sourceColId, setSourceColId] = useState<IssueStatus | null>(null)
+  const [selectedIssue, setSelectedIssue] = useState<SheetIssue | null>(null)
+
+  function toSheetIssue(issue: BoardIssue): SheetIssue {
+    return {
+      id: issue.id,
+      identifier: issue.identifier,
+      title: issue.title,
+      priority: issue.priority,
+      status: "todo",
+      assignee: issue.assignee ? { ...issue.assignee, name: issue.assignee.initials } : null,
+      labels: issue.labels,
+      dueDate: null,
+      storyPoints: null,
+      cycle: null,
+      createdAt: "—",
+    }
+  }
 
   function handleRenameColumn(id: IssueStatus, title: string) {
     setColumns((prev) => prev.map((c) => (c.id === id ? { ...c, title } : c)))
@@ -380,10 +394,10 @@ export default function ProjectBoardPage() {
             <ColumnDropZone
               key={col.id}
               column={col}
-              projectId={projectId}
               isSource={col.id === sourceColId}
               t={t}
               onRenameColumn={handleRenameColumn}
+              onOpen={(issue) => setSelectedIssue(toSheetIssue(issue))}
             />
           ))}
         </div>
@@ -397,6 +411,12 @@ export default function ProjectBoardPage() {
           ) : null}
         </DragOverlay>
       </DndContext>
+
+      <IssueSheet
+        issue={selectedIssue}
+        open={selectedIssue !== null}
+        onOpenChange={(open) => { if (!open) setSelectedIssue(null) }}
+      />
     </div>
   )
 }
