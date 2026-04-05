@@ -1,8 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import Link from "next/link"
-import { useParams } from "next/navigation"
+import { IssueSheet } from "@/components/sheets/issue-sheet"
 import {
   CircleDot,
   RefreshCw,
@@ -113,13 +112,14 @@ const ALL_ISSUES: Issue[] = [
 // IssueRow
 // ---------------------------------------------------------------------------
 
-function IssueRow({ issue, projectId }: { readonly issue: Issue; readonly projectId: string }) {
+function IssueRow({ issue, onOpen }: { readonly issue: Issue; readonly onOpen: (issue: Issue) => void }) {
   const isOverdue = issue.dueDate === "Overdue"
 
   return (
-    <Link
-      href={`/projects/${projectId}/issues/${issue.identifier.toLowerCase().replace("-", "")}`}
-      className="group flex items-center gap-3 px-4 py-2.5 hover:bg-muted/40 transition-colors border-b border-border/50 last:border-0"
+    <button
+      type="button"
+      onClick={() => onOpen(issue)}
+      className="group flex w-full items-center gap-3 px-4 py-2.5 hover:bg-muted/40 transition-colors border-b border-border/50 last:border-0 text-left"
     >
       {/* Priority dot */}
       <div className={cn("size-2 rounded-full shrink-0", PRIORITY_DOT[issue.priority])} />
@@ -178,7 +178,7 @@ function IssueRow({ issue, projectId }: { readonly issue: Issue; readonly projec
       </div>
 
       <ArrowUpRight className="size-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-    </Link>
+    </button>
   )
 }
 
@@ -239,12 +239,10 @@ function IssueStats({ issues }: { readonly issues: Issue[] }) {
 // ---------------------------------------------------------------------------
 
 export default function ProjectIssuesPage() {
-  const params = useParams()
-  const projectId = typeof params.id === "string" ? params.id : "1"
-
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("all")
+  const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null)
 
   const filtered = useMemo(() => {
     let list = ALL_ISSUES
@@ -388,7 +386,7 @@ export default function ProjectIssuesPage() {
           </div>
         ) : (
           filtered.map((issue) => (
-            <IssueRow key={issue.id} issue={issue} projectId={projectId} />
+            <IssueRow key={issue.id} issue={issue} onOpen={setSelectedIssue} />
           ))
         )}
 
@@ -398,6 +396,12 @@ export default function ProjectIssuesPage() {
           <span className="text-xs">Add issue</span>
         </div>
       </div>
+
+      <IssueSheet
+        issue={selectedIssue as import("@/components/sheets/issue-sheet").SheetIssue | null}
+        open={selectedIssue !== null}
+        onOpenChange={(open) => { if (!open) setSelectedIssue(null) }}
+      />
     </div>
   )
 }
