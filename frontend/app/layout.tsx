@@ -6,6 +6,7 @@ import { I18nProvider } from "@/lib/i18n";
 import { ThemeProvider } from "next-themes";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
+import { ErrorBoundary } from "@/components/providers/error-boundary";
 
 const roboto = Roboto({
   variable: "--font-roboto",
@@ -43,14 +44,15 @@ export default function RootLayout({
           attribute="class"
           defaultTheme="system"
           enableSystem
-          disableTransitionOnChange
         >
           <I18nProvider>
             <TooltipProvider>
-              <AuthProvider>
-                {children}
-                <Toaster position="bottom-right" richColors closeButton />
-              </AuthProvider>
+              <ErrorBoundary>
+                <AuthProvider>
+                  {children}
+                  <Toaster position="bottom-right" richColors closeButton />
+                </AuthProvider>
+              </ErrorBoundary>
             </TooltipProvider>
           </I18nProvider>
         </ThemeProvider>

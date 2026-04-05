@@ -260,3 +260,58 @@ body {
   background: linear-gradient(135deg, rgba(255, 0, 85, 0.18), rgba(236, 72, 153, 0.18));
   opacity: 0.35;
 }
+
+/* ─── Cursor pointer on all interactive elements ─────────────────────────── */
+button:not([disabled]),
+[role="button"]:not([aria-disabled="true"]),
+a[href],
+select:not([disabled]),
+input[type="checkbox"]:not([disabled]),
+input[type="radio"]:not([disabled]),
+input[type="submit"]:not([disabled]),
+input[type="reset"]:not([disabled]),
+input[type="button"]:not([disabled]),
+label[for],
+[data-radix-collection-item],
+[data-state],
+[tabindex="0"]:not(input):not(textarea) {
+  cursor: pointer;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([disabled]),
+textarea:not([disabled]) {
+  cursor: text;
+}
+
+/* ─── Theme circle‑reveal transition (View Transitions API) ──────────────── */
+::view-transition-old(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-new(root) {
+  animation: theme-circle-reveal 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  mix-blend-mode: normal;
+}
+
+.dark::view-transition-new(root) {
+  animation: theme-circle-reveal-dark 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes theme-circle-reveal {
+  from {
+    clip-path: circle(0% at var(--theme-x, 50%) var(--theme-y, 50%));
+  }
+  to {
+    clip-path: circle(150% at var(--theme-x, 50%) var(--theme-y, 50%));
+  }
+}
+
+@keyframes theme-circle-reveal-dark {
+  from {
+    clip-path: circle(0% at var(--theme-x, 50%) var(--theme-y, 50%));
+  }
+  to {
+    clip-path: circle(150% at var(--theme-x, 50%) var(--theme-y, 50%));
+  }
+}
