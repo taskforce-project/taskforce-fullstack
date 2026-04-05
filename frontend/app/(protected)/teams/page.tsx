@@ -26,12 +26,21 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
+import { Separator } from "@/components/ui/separator"
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 
 // ---------------------------------------------------------------------------
@@ -195,12 +204,115 @@ function CreateTeamDialog() {
 }
 
 // ---------------------------------------------------------------------------
+// TeamSettingsSheet
+// ---------------------------------------------------------------------------
+
+function TeamSettingsSheet({ team, open, onOpenChange }: { readonly team: Team; readonly open: boolean; readonly onOpenChange: (v: boolean) => void }) {
+  const [name, setName] = useState(team.name)
+  const [description, setDescription] = useState(team.description)
+
+  function handleSave() {
+    toast.success("Équipe mise à jour", { description: `${name} a été sauvegardé.` })
+    onOpenChange(false)
+  }
+
+  function handleDelete() {
+    toast.error("Équipe supprimée", { description: `${team.name} a été supprimée.` })
+    onOpenChange(false)
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+        <SheetHeader className="px-6 pt-2">
+          <SheetTitle className="flex items-center gap-2">
+            <span>{team.emoji}</span>
+            Settings — {team.name}
+          </SheetTitle>
+          <SheetDescription>Modifier les paramètres de l&apos;équipe</SheetDescription>
+        </SheetHeader>
+
+        <div className="flex flex-col gap-6 mt-6 px-6 pb-6">
+          {/* General */}
+          <div className="flex flex-col gap-4">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Général</h3>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium">Nom</label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium">Description</label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={3}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              />
+            </div>
+            <Button size="sm" className="w-fit gap-2" onClick={handleSave}>
+              Sauvegarder
+            </Button>
+          </div>
+
+          <Separator />
+
+          {/* Members */}
+          <div className="flex flex-col gap-3">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Membres</h3>
+            {team.members.map((m) => (
+              <div key={m.name} className="flex items-center gap-3">
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className={cn("text-xs text-white", m.color)}>{m.initials}</AvatarFallback>
+                </Avatar>
+                <div className="flex-1">
+                  <p className="text-sm font-medium">{m.name}</p>
+                  <p className="text-xs text-muted-foreground capitalize">{m.role}</p>
+                </div>
+                {m.role !== "lead" && (
+                  <Button variant="ghost" size="sm" className="text-xs text-muted-foreground h-7">
+                    Retirer
+                  </Button>
+                )}
+              </div>
+            ))}
+            <Button variant="outline" size="sm" className="gap-2 w-fit mt-1">
+              <Users className="h-3.5 w-3.5" />
+              Ajouter un membre
+            </Button>
+          </div>
+
+          <Separator />
+
+          {/* Danger */}
+          <div className="flex flex-col gap-3">
+            <h3 className="text-xs font-semibold text-red-400 uppercase tracking-wide">Zone de danger</h3>
+            <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-4 flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium">Supprimer cette équipe</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Action irréversible.</p>
+              </div>
+              <Button variant="destructive" size="sm" onClick={handleDelete} className="shrink-0">
+                Supprimer
+              </Button>
+            </div>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // TeamCard
 // ---------------------------------------------------------------------------
 
 function TeamCard({ team }: { readonly team: Team }) {
+  const [settingsOpen, setSettingsOpen] = useState(false)
+
   return (
-    <div className="group flex flex-col rounded-xl border border-border bg-card p-5 shadow-sm hover:shadow-md hover:border-primary/30 transition-all">
+    <>
+      <TeamSettingsSheet team={team} open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <div className="group flex flex-col rounded-xl border border-border bg-card p-5 shadow-sm hover:shadow-md hover:border-primary/30 transition-all">
       {/* Header */}
       <div className="flex items-start justify-between gap-2 mb-4">
         <div className="flex items-center gap-3">
@@ -226,7 +338,7 @@ function TeamCard({ team }: { readonly team: Team }) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem className="gap-2">
+            <DropdownMenuItem className="gap-2" onClick={() => setSettingsOpen(true)}>
               <Settings className="size-4" /> Team settings
             </DropdownMenuItem>
             <DropdownMenuItem className="gap-2">
@@ -284,6 +396,7 @@ function TeamCard({ team }: { readonly team: Team }) {
         <span className="text-xs text-muted-foreground">{team.updatedAt}</span>
       </div>
     </div>
+    </>
   )
 }
 
