@@ -98,7 +98,7 @@ const PROJECT_MEMBERS: ProjectMember[] = [
 
 export default function ProjectMembersPage() {
   return (
-    <div className="flex flex-col gap-4 max-w-2xl">
+    <div className="flex flex-col gap-4 w-full max-w-4xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
