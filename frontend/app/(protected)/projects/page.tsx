@@ -13,6 +13,8 @@ import {
   PauseCircle,
 } from "lucide-react"
 
+import { CreateProjectDialog } from "@/components/dialogs/create-project-dialog"
+
 import { useTranslation } from "@/lib/i18n"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -303,12 +305,12 @@ function EmptyState({ isSearch, t }: { isSearch: boolean; t: (k: string) => stri
       </div>
       <p className="text-base font-medium text-foreground">{t("projects.empty.title")}</p>
       <p className="mt-1 text-sm text-muted-foreground mb-4">{t("projects.empty.description")}</p>
-      <Button size="sm" className="gap-2" asChild>
-        <Link href="/projects/new">
+      <CreateProjectDialog>
+        <Button size="sm" className="gap-2">
           <Plus className="h-4 w-4" />
           {t("projects.empty.cta")}
-        </Link>
-      </Button>
+        </Button>
+      </CreateProjectDialog>
     </div>
   )
 }
@@ -343,12 +345,12 @@ export default function ProjectsPage() {
           <h1 className="text-2xl font-semibold tracking-tight">{t("projects.title")}</h1>
           <p className="text-sm text-muted-foreground mt-0.5">{t("projects.subtitle")}</p>
         </div>
-        <Button size="sm" className="gap-2 shrink-0" asChild>
-          <Link href="/projects/new">
+        <CreateProjectDialog>
+          <Button size="sm" className="gap-2 shrink-0">
             <Plus className="h-4 w-4" />
             {t("projects.newProject")}
-          </Link>
-        </Button>
+          </Button>
+        </CreateProjectDialog>
       </div>
 
       {/* Toolbar */}
