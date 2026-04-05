@@ -237,16 +237,15 @@ function ColumnDropZone({
               )}
             />
           ) : (
-            <span
-              role="button"
-              tabIndex={0}
-              className={cn("text-sm font-medium cursor-pointer hover:opacity-80 transition-opacity", column.headerColor)}
+            <button
+              type="button"
+              className={cn("text-sm font-medium bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity", column.headerColor)}
               onDoubleClick={startEdit}
               onKeyDown={(e) => e.key === "Enter" && startEdit()}
               title="Double-clic pour renommer"
             >
               {column.title}
-            </span>
+            </button>
           )}
           <Badge variant="secondary" className="h-5 min-w-5 px-1.5 text-xs bg-muted text-muted-foreground border-0 shrink-0">
             {column.issues.length}
