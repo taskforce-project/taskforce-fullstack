@@ -1,13 +1,14 @@
 "use client"
 
-import { useParams } from "next/navigation"
-import Link from "next/link"
+import { useState } from "react"
 import {
   CircleDot,
   Plus,
   ArrowUpRight,
   GripVertical,
 } from "lucide-react"
+
+import { IssueSheet, SheetIssue } from "@/components/sheets/issue-sheet"
 
 
 import { Badge } from "@/components/ui/badge"
@@ -47,10 +48,25 @@ const BACKLOG_ISSUES: BacklogIssue[] = [
   { id: "10", identifier: "TF-77", title: "Setup Storybook for component documentation", priority: "low", assignee: null, labels: ["dev"], points: null },
 ]
 
+function toSheetIssue(issue: BacklogIssue): SheetIssue {
+  return {
+    id: issue.id,
+    identifier: issue.identifier,
+    title: issue.title,
+    priority: issue.priority,
+    status: "todo",
+    assignee: issue.assignee ? { ...issue.assignee, name: issue.assignee.initials } : null,
+    labels: issue.labels,
+    dueDate: null,
+    storyPoints: issue.points,
+    cycle: null,
+    createdAt: "—",
+  }
+}
+
 export default function ProjectBacklogPage() {
-  const params = useParams()
-  const projectId = typeof params.id === "string" ? params.id : "1"
   const totalPoints = BACKLOG_ISSUES.reduce((sum, i) => sum + (i.points ?? 0), 0)
+  const [selectedIssue, setSelectedIssue] = useState<SheetIssue | null>(null)
 
   return (
     <div className="flex flex-col gap-4">
@@ -64,10 +80,11 @@ export default function ProjectBacklogPage() {
       {/* List */}
       <div className="rounded-xl border border-border bg-card overflow-hidden [box-shadow:var(--shadow-sm)]">
         {BACKLOG_ISSUES.map((issue) => (
-          <Link
+          <button
             key={issue.id}
-            href={`/projects/${projectId}/issues/${issue.identifier.toLowerCase().replace("-", "")}`}
-            className="group flex items-center gap-3 px-4 py-2.5 hover:bg-muted/40 transition-colors border-b border-border/50 last:border-0"
+            type="button"
+            onClick={() => setSelectedIssue(toSheetIssue(issue))}
+            className="group flex w-full items-center gap-3 px-4 py-2.5 hover:bg-muted/40 transition-colors border-b border-border/50 last:border-0 text-left"
           >
             {/* Drag handle hint */}
             <GripVertical className="h-3.5 w-3.5 text-muted-foreground/30 group-hover:text-muted-foreground/60 shrink-0 transition-colors" />
@@ -99,7 +116,7 @@ export default function ProjectBacklogPage() {
               )}
             </div>
             <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-          </Link>
+          </button>
         ))}
 
         <div className="flex items-center gap-2 px-4 py-2.5 text-muted-foreground hover:bg-muted/20 transition-colors cursor-pointer">
@@ -107,6 +124,12 @@ export default function ProjectBacklogPage() {
           <span className="text-xs">Add to backlog</span>
         </div>
       </div>
+
+      <IssueSheet
+        issue={selectedIssue}
+        open={selectedIssue !== null}
+        onOpenChange={(open) => { if (!open) setSelectedIssue(null) }}
+      />
     </div>
   )
 }
