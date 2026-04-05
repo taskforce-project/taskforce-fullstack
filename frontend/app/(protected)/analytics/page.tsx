@@ -1,5 +1,9 @@
 "use client"
 
+import {
+  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
+} from "recharts"
 import { BarChart3, TrendingUp, TrendingDown, Zap, FolderKanban, CircleDot, RefreshCw } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -8,64 +12,74 @@ import { useTranslation } from "@/lib/i18n"
 import { useAuth } from "@/lib/contexts/auth-context"
 import { cn } from "@/lib/utils"
 
-// ---------------------------------------------------------------------------
-// Mock data
-// ---------------------------------------------------------------------------
-
 const OVERVIEW_STATS = [
-  { key: "issuesCreated", value: 42, change: +12, icon: <CircleDot className="h-4 w-4" /> },
-  { key: "issuesCompleted", value: 31, change: +8, icon: <RefreshCw className="h-4 w-4" /> },
-  { key: "cyclesCompleted", value: 5, change: +1, icon: <BarChart3 className="h-4 w-4" /> },
-  { key: "activeProjects", value: 3, change: 0, icon: <FolderKanban className="h-4 w-4" /> },
+  { key: "issuesCreated",   value: 42, change: +12, icon: "circle" },
+  { key: "issuesCompleted", value: 31, change: +8,  icon: "refresh" },
+  { key: "cyclesCompleted", value: 5,  change: +1,  icon: "chart" },
+  { key: "activeProjects",  value: 3,  change: 0,   icon: "folder" },
 ]
 
-// Velocity: weekly issue completions over 8 weeks
 const VELOCITY_DATA = [
-  { week: "W4", completed: 4 },
-  { week: "W5", completed: 7 },
-  { week: "W6", completed: 5 },
-  { week: "W7", completed: 9 },
-  { week: "W8", completed: 6 },
-  { week: "W9", completed: 11 },
-  { week: "W10", completed: 8 },
-  { week: "W11", completed: 13 },
+  { week: "W4",  completed: 4,  created: 6  },
+  { week: "W5",  completed: 7,  created: 9  },
+  { week: "W6",  completed: 5,  created: 7  },
+  { week: "W7",  completed: 9,  created: 8  },
+  { week: "W8",  completed: 6,  created: 10 },
+  { week: "W9",  completed: 11, created: 12 },
+  { week: "W10", completed: 8,  created: 7  },
+  { week: "W11", completed: 13, created: 11 },
+]
+
+const BURNDOWN_DATA = [
+  { day: "Day 1", remaining: 28, ideal: 28 },
+  { day: "Day 3", remaining: 24, ideal: 21 },
+  { day: "Day 5", remaining: 21, ideal: 14 },
+  { day: "Day 7", remaining: 16, ideal: 7  },
+  { day: "Day 9", remaining: 9,  ideal: 0  },
 ]
 
 const TEAM_WORKLOAD = [
-  { name: "You", initials: "ME", color: "bg-primary", open: 7, completed: 12 },
-  { name: "Sophie Martin", initials: "SM", color: "bg-violet-500", open: 5, completed: 9 },
-  { name: "Emma Petit", initials: "EP", color: "bg-emerald-500", open: 4, completed: 7 },
-  { name: "Thomas Bernard", initials: "TB", color: "bg-orange-500", open: 3, completed: 5 },
+  { name: "You",       open: 7, completed: 12 },
+  { name: "Sophie M.", open: 5, completed: 9  },
+  { name: "Emma P.",   open: 4, completed: 7  },
+  { name: "Thomas B.", open: 3, completed: 5  },
+]
+
+const PROJECT_PIE = [
+  { name: "Website Redesign", value: 34, color: "#8b5cf6" },
+  { name: "Mobile App",       value: 21, color: "#3b82f6" },
+  { name: "API v2",           value: 9,  color: "#10b981" },
 ]
 
 const PROJECT_PROGRESS = [
-  { name: "🚀 Frontend v2", total: 28, done: 19, color: "bg-primary" },
-  { name: "🔒 Auth Overhaul", total: 14, done: 11, color: "bg-violet-500" },
-  { name: "📊 Analytics SDK", total: 22, done: 4, color: "bg-emerald-500" },
+  { name: "Website Redesign", total: 28, done: 19, color: "bg-primary"     },
+  { name: "Mobile App",       total: 14, done: 11, color: "bg-violet-500"  },
+  { name: "API v2",           total: 22, done: 4,  color: "bg-emerald-500" },
 ]
 
-// ---------------------------------------------------------------------------
-// Sub-components
-// ---------------------------------------------------------------------------
+const STAT_ICONS: Record<string, React.ReactNode> = {
+  circle:  <CircleDot className="h-4 w-4" />,
+  refresh: <RefreshCw className="h-4 w-4" />,
+  chart:   <BarChart3 className="h-4 w-4" />,
+  folder:  <FolderKanban className="h-4 w-4" />,
+}
 
-function StatCard({
-  label,
-  value,
-  change,
-  icon,
-}: {
-  readonly label: string
-  readonly value: number
-  readonly change: number
-  readonly icon: React.ReactNode
-}) {
+const TOOLTIP_STYLE = {
+  backgroundColor: "hsl(var(--card))",
+  border: "1px solid hsl(var(--border))",
+  borderRadius: "8px",
+  color: "hsl(var(--foreground))",
+  fontSize: "12px",
+}
+
+function StatCard({ label, value, change, icon }: Readonly<{ label: string; value: number; change: number; icon: string }>) {
   const isPositive = change > 0
-  const isNeutral = change === 0
+  const isNeutral  = change === 0
   return (
     <div className="rounded-xl border border-border bg-card p-4 [box-shadow:var(--shadow-sm)] flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <span className="text-xs text-muted-foreground">{label}</span>
-        <div className="text-muted-foreground">{icon}</div>
+        <div className="text-muted-foreground">{STAT_ICONS[icon]}</div>
       </div>
       <div className="flex items-end justify-between">
         <span className="text-3xl font-bold text-foreground tabular-nums">{value}</span>
@@ -80,27 +94,13 @@ function StatCard({
   )
 }
 
-function VelocityBar({ week, completed, max }: { readonly week: string; readonly completed: number; readonly max: number }) {
-  const pct = Math.round((completed / max) * 100)
+function UpgradeGate({ title, description, children }: Readonly<{ title: string; description: string; children: React.ReactNode }>) {
   return (
-    <div className="flex flex-col items-center gap-1.5">
-      <span className="text-xs font-medium text-foreground">{completed}</span>
-      <div className="w-8 bg-muted rounded-sm overflow-hidden" style={{ height: "80px" }}>
-        <div
-          className="w-full bg-primary rounded-sm transition-all"
-          style={{ height: `${pct}%`, marginTop: `${100 - pct}%` }}
-        />
+    <div className="relative overflow-hidden rounded-xl">
+      <div className="pointer-events-none select-none blur-sm saturate-0 opacity-50">
+        {children}
       </div>
-      <span className="text-xs text-muted-foreground">{week}</span>
-    </div>
-  )
-}
-
-function UpgradeGate({ title, description }: { readonly title: string; readonly description: string }) {
-  return (
-    <div className="relative rounded-xl border border-border bg-card p-8 [box-shadow:var(--shadow-sm)] overflow-hidden flex flex-col items-center text-center gap-4">
-      {/* Blur overlay */}
-      <div className="absolute inset-0 backdrop-blur-[2px] bg-background/60 z-10 flex flex-col items-center justify-center gap-4 p-8">
+      <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 p-8 text-center bg-background/75 backdrop-blur-sm rounded-xl">
         <div className="flex items-center gap-2 rounded-full bg-amber-500/15 border border-amber-500/20 px-3 py-1">
           <Zap className="h-3.5 w-3.5 text-amber-400" />
           <span className="text-xs font-semibold text-amber-400">Pro</span>
@@ -112,34 +112,24 @@ function UpgradeGate({ title, description }: { readonly title: string; readonly 
           Upgrade to Pro
         </Button>
       </div>
-      {/* Blurred background content */}
-      <div className="opacity-30 pointer-events-none select-none">
-        <div className="h-40 w-full rounded bg-muted" />
-      </div>
     </div>
   )
 }
-
-// ---------------------------------------------------------------------------
-// Page
-// ---------------------------------------------------------------------------
 
 export default function AnalyticsPage() {
   const { t } = useTranslation()
   const { user } = useAuth()
 
   const isPro = user?.plan === "pro" || user?.plan === "enterprise"
-  const maxVelocity = Math.max(...VELOCITY_DATA.map((d) => d.completed))
 
   return (
     <div className="flex flex-col gap-8 max-w-5xl mx-auto w-full">
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-foreground">{t("analytics.title")}</h1>
         <p className="text-sm text-muted-foreground mt-1">{t("analytics.subtitle")}</p>
       </div>
 
-      {/* Overview stats — visible to all */}
+      {/* Overview stats */}
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold text-foreground">{t("analytics.overview")}</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -167,69 +157,179 @@ export default function AnalyticsPage() {
         </div>
       </section>
 
-      {/* Velocity — Pro only */}
+      {/* Velocity */}
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-foreground">{t("analytics.velocity")}</h2>
-          {!isPro && (
-            <Badge variant="outline" className="text-xs border px-1.5 py-0 bg-amber-500/15 text-amber-400 border-amber-500/20">
-              Pro
-            </Badge>
-          )}
+          {!isPro && <Badge variant="outline" className="text-xs border px-1.5 py-0 bg-amber-500/15 text-amber-400 border-amber-500/20">Pro</Badge>}
         </div>
         {isPro ? (
           <div className="rounded-xl border border-border bg-card p-5 [box-shadow:var(--shadow-sm)]">
-            <div className="flex items-end gap-4 justify-between">
-              {VELOCITY_DATA.map((d) => (
-                <VelocityBar key={d.week} week={d.week} completed={d.completed} max={maxVelocity} />
-              ))}
-            </div>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={VELOCITY_DATA} barGap={4} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                <XAxis dataKey="week" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: "hsl(var(--muted))", opacity: 0.4 }} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Bar dataKey="created"   name="Created"   fill="hsl(var(--muted))"   radius={[4, 4, 0, 0]} />
+                <Bar dataKey="completed" name="Completed" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         ) : (
-          <UpgradeGate title={t("analytics.upgradeTitle")} description={t("analytics.upgradeDesc")} />
+          <UpgradeGate title={t("analytics.upgradeTitle")} description={t("analytics.upgradeDesc")}>
+            <div className="rounded-xl border border-border bg-card p-5 [box-shadow:var(--shadow-sm)]">
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={VELOCITY_DATA} barGap={4} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                  <XAxis dataKey="week" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar dataKey="created"   name="Created"   fill="hsl(var(--muted))"   radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="completed" name="Completed" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </UpgradeGate>
         )}
       </section>
 
-      {/* Workload — Pro only */}
+      {/* Burndown */}
+      <section className="flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-foreground">Sprint Burndown</h2>
+          {!isPro && <Badge variant="outline" className="text-xs border px-1.5 py-0 bg-amber-500/15 text-amber-400 border-amber-500/20">Pro</Badge>}
+        </div>
+        {isPro ? (
+          <div className="rounded-xl border border-border bg-card p-5 [box-shadow:var(--shadow-sm)]">
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={BURNDOWN_DATA} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                <XAxis dataKey="day" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                <YAxis                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Line type="monotone" dataKey="ideal"     name="Ideal"     stroke="hsl(var(--muted-foreground))" strokeDasharray="5 5" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="remaining" name="Remaining" stroke="hsl(var(--primary))" strokeWidth={2.5} dot={{ r: 4, fill: "hsl(var(--primary))" }} activeDot={{ r: 6 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <UpgradeGate title="Sprint Burndown Chart" description="Visualize sprint velocity and track remaining work in real time.">
+            <div className="rounded-xl border border-border bg-card p-5 [box-shadow:var(--shadow-sm)]">
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={BURNDOWN_DATA} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                  <XAxis dataKey="day" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                  <YAxis                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Line type="monotone" dataKey="ideal"     name="Ideal"     stroke="hsl(var(--muted-foreground))" strokeDasharray="5 5" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="remaining" name="Remaining" stroke="hsl(var(--primary))" strokeWidth={2.5} dot={{ r: 4, fill: "hsl(var(--primary))" }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </UpgradeGate>
+        )}
+      </section>
+
+      {/* Workload */}
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-foreground">{t("analytics.workload")}</h2>
-          {!isPro && (
-            <Badge variant="outline" className="text-xs border px-1.5 py-0 bg-amber-500/15 text-amber-400 border-amber-500/20">
-              Pro
-            </Badge>
-          )}
+          {!isPro && <Badge variant="outline" className="text-xs border px-1.5 py-0 bg-amber-500/15 text-amber-400 border-amber-500/20">Pro</Badge>}
         </div>
         {isPro ? (
-          <div className="rounded-xl border border-border bg-card [box-shadow:var(--shadow-sm)] overflow-hidden">
-            {TEAM_WORKLOAD.map((member, i) => {
-              const total = member.open + member.completed
-              const pct = Math.round((member.completed / total) * 100)
-              return (
-                <div
-                  key={member.name}
-                  className={cn("flex items-center gap-4 px-4 py-3", i < TEAM_WORKLOAD.length - 1 && "border-b border-border/50")}
-                >
-                  <div className={cn("h-7 w-7 rounded-full flex items-center justify-center text-[9px] font-medium text-white shrink-0", member.color)}>
-                    {member.initials}
-                  </div>
-                  <span className="text-sm text-foreground w-32 shrink-0">{member.name}</span>
-                  <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
-                    <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
-                  </div>
-                  <span className="text-xs text-muted-foreground shrink-0 w-20 text-right">
-                    {member.completed}/{total} done
-                  </span>
-                </div>
-              )
-            })}
+          <div className="rounded-xl border border-border bg-card p-5 [box-shadow:var(--shadow-sm)]">
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={TEAM_WORKLOAD} layout="vertical" barGap={4} margin={{ top: 0, right: 20, left: 60, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+                <XAxis type="number"   tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} width={60} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: "hsl(var(--muted))", opacity: 0.4 }} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Bar dataKey="open"      name="Open"      fill="hsl(var(--muted))" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="completed" name="Completed" fill="#10b981"            radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         ) : (
-          <UpgradeGate title={t("analytics.upgradeTitle")} description={t("analytics.upgradeDesc")} />
+          <UpgradeGate title={t("analytics.upgradeTitle")} description={t("analytics.upgradeDesc")}>
+            <div className="rounded-xl border border-border bg-card p-5 [box-shadow:var(--shadow-sm)]">
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={TEAM_WORKLOAD} layout="vertical" barGap={4} margin={{ top: 0, right: 20, left: 60, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+                  <XAxis type="number"   tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} width={60} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar dataKey="open"      name="Open"      fill="hsl(var(--muted))" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="completed" name="Completed" fill="#10b981"            radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </UpgradeGate>
         )}
       </section>
 
-      {/* Project Progress — visible to all */}
+      {/* Project distribution */}
+      <section className="flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-foreground">Project distribution</h2>
+          {!isPro && <Badge variant="outline" className="text-xs border px-1.5 py-0 bg-amber-500/15 text-amber-400 border-amber-500/20">Pro</Badge>}
+        </div>
+        {isPro ? (
+          <div className="rounded-xl border border-border bg-card p-5 [box-shadow:var(--shadow-sm)]">
+            <div className="flex items-center gap-8">
+              <ResponsiveContainer width={200} height={200}>
+                <PieChart>
+                  <Pie data={PROJECT_PIE} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value">
+                    {PROJECT_PIE.map((entry, idx) => (
+                      <Cell key={idx} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={TOOLTIP_STYLE} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="flex flex-col gap-3">
+                {PROJECT_PIE.map((entry) => (
+                  <div key={entry.name} className="flex items-center gap-2">
+                    <div className="h-3 w-3 rounded-sm shrink-0" style={{ backgroundColor: entry.color }} />
+                    <span className="text-sm text-foreground">{entry.name}</span>
+                    <span className="text-sm font-medium text-muted-foreground ml-auto">{entry.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <UpgradeGate title="Project distribution" description="Visualize how issues are distributed across your projects.">
+            <div className="rounded-xl border border-border bg-card p-5 [box-shadow:var(--shadow-sm)]">
+              <div className="flex items-center gap-8">
+                <ResponsiveContainer width={200} height={200}>
+                  <PieChart>
+                    <Pie data={PROJECT_PIE} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value">
+                      {PROJECT_PIE.map((entry, idx) => (
+                        <Cell key={idx} fill={entry.color} />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="flex flex-col gap-3">
+                  {PROJECT_PIE.map((entry) => (
+                    <div key={entry.name} className="flex items-center gap-2">
+                      <div className="h-3 w-3 rounded-sm shrink-0" style={{ backgroundColor: entry.color }} />
+                      <span className="text-sm text-foreground">{entry.name}</span>
+                      <span className="text-sm font-medium text-muted-foreground ml-auto">{entry.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </UpgradeGate>
+        )}
+      </section>
+
+      {/* Project progress */}
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold text-foreground">{t("analytics.progress")}</h2>
         <div className="rounded-xl border border-border bg-card [box-shadow:var(--shadow-sm)] overflow-hidden">
