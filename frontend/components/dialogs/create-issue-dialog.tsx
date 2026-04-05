@@ -299,7 +299,6 @@ export function CreateIssueDialog({ children, defaultStatus = "todo", onCreated 
                   mode="single"
                   selected={dueDate}
                   onSelect={(date) => { setDueDate(date); setDatePopoverOpen(false) }}
-                  initialFocus
                 />
               </PopoverContent>
             </Popover>
@@ -312,41 +311,71 @@ export function CreateIssueDialog({ children, defaultStatus = "todo", onCreated 
               <span className="text-xs text-muted-foreground font-medium">Labels</span>
             </div>
             <div className="flex flex-wrap gap-1.5">
-              {COMMON_LABELS.map((label) => (
-                <button
-                  key={label}
-                  onClick={() => toggleLabel(label)}
-                  className={cn(
-                    "px-2 py-0.5 rounded-md text-xs border transition-all",
-                    labels.includes(label)
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border bg-muted/30 text-muted-foreground hover:border-border/80"
-                  )}
-                >
-                  {label}
-                </button>
-              ))}
+              {COMMON_LABELS.map((label) => {
+                const isSelected = labels.some((l) => l.name === label.name)
+                return (
+                  <button
+                    key={label.name}
+                    onClick={() => toggleLabel(label)}
+                    className={cn(
+                      "flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs border transition-all",
+                      isSelected
+                        ? "border-transparent text-white"
+                        : "border-border bg-muted/30 text-muted-foreground hover:border-border/80"
+                    )}
+                    style={isSelected ? { backgroundColor: label.color, borderColor: label.color } : undefined}
+                  >
+                    <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: label.color }} />
+                    {label.name}
+                  </button>
+                )
+              })}
             </div>
+
+            {/* Selected labels summary */}
             {labels.length > 0 && (
               <div className="flex flex-wrap gap-1">
-                {labels.filter((l) => !COMMON_LABELS.includes(l)).map((label) => (
-                  <Badge key={label} variant="secondary" className="text-xs gap-1">
-                    {label}
-                    <button onClick={() => toggleLabel(label)} className="hover:text-foreground">×</button>
+                {labels.map((label) => (
+                  <Badge
+                    key={label.name}
+                    variant="secondary"
+                    className="text-xs gap-1 text-white border-0"
+                    style={{ backgroundColor: label.color + "33", color: label.color, borderColor: label.color + "55" }}
+                  >
+                    <span className="size-1.5 rounded-full" style={{ backgroundColor: label.color }} />
+                    {label.name}
+                    <button onClick={() => removeLabel(label.name)} className="hover:opacity-70 ml-0.5">×</button>
                   </Badge>
                 ))}
               </div>
             )}
-            <div className="flex gap-2">
+
+            {/* Custom label input with color picker */}
+            <div className="flex items-center gap-2">
+              <div className="flex gap-1">
+                {LABEL_COLORS.map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={() => setCustomLabelColor(color)}
+                    className={cn(
+                      "size-5 rounded-full border-2 transition-all",
+                      customLabelColor === color ? "border-foreground scale-110" : "border-transparent hover:scale-105"
+                    )}
+                    style={{ backgroundColor: color }}
+                    title={color}
+                  />
+                ))}
+              </div>
               <Input
                 value={labelInput}
                 onChange={(e) => setLabelInput(e.target.value)}
                 placeholder="Custom label…"
-                className="h-7 text-xs w-36"
+                className="h-7 text-xs flex-1"
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustomLabel() } }}
               />
               {labelInput && (
-                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={addCustomLabel}>
+                <Button size="sm" variant="outline" className="h-7 text-xs shrink-0" onClick={addCustomLabel}>
                   Add
                 </Button>
               )}
