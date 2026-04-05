@@ -4,6 +4,7 @@
  */
 
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from "axios";
+import { toast } from "sonner";
 
 /**
  * API URL configuration
@@ -109,12 +110,34 @@ apiClient.interceptors.response.use(
         return Promise.reject(refreshError);
       }
     }
-    
-    return Promise.reject(error);
+
+    // Show toast for non-401 errors (and 401 that could not be refreshed)
+    if (typeof window !== "undefined") {
+      const status = error.response?.status
+      const data = error.response?.data as { message?: string } | undefined
+      const message = data?.message || error.message || "Une erreur est survenue"
+
+      if (status === 403) {
+        toast.error("Accès refusé", { description: message })
+      } else if (status === 404) {
+        // 404 are usually silent (handled per-feature)
+      } else if (status && status >= 500) {
+        toast.error("Erreur serveur", { description: `${status} — ${message}` })
+      } else if (status && status >= 400) {
+        toast.error("Requête invalide", { description: message })
+      } else if (!error.response) {
+        toast.error("Impossible de contacter le serveur", {
+          description: "Vérifiez votre connexion réseau.",
+        })
+      }
+    }
+
+    return Promise.reject(error)
   }
 );
 
 /**
+ * Intercepteur global pour toast d'erreur réseau (no response)
  * Types d'erreurs API
  */
 export interface ApiError {
