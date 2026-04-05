@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { format } from "date-fns"
 import {
   Plus,
   CircleDot,
@@ -10,12 +11,13 @@ import {
   Flag,
   User,
   Tag,
-  Calendar,
+  CalendarIcon,
   ChevronDown,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Calendar } from "@/components/ui/calendar"
 import {
   Dialog,
   DialogContent,
@@ -31,6 +33,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 
@@ -41,14 +48,19 @@ import { cn } from "@/lib/utils"
 type IssuePriority = "urgent" | "high" | "medium" | "low" | "none"
 type IssueStatus = "todo" | "in_progress" | "in_review" | "done"
 
+interface IssueLabel {
+  name: string
+  color: string
+}
+
 interface CreateIssuePayload {
   title: string
   description: string
   status: IssueStatus
   priority: IssuePriority
   assigneeId: string | null
-  labels: string[]
-  dueDate: string | null
+  labels: IssueLabel[]
+  dueDate: Date | null
 }
 
 interface CreateIssueDialogProps {
@@ -60,6 +72,24 @@ interface CreateIssueDialogProps {
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
+
+const LABEL_COLORS = [
+  "#ef4444", "#f97316", "#eab308", "#22c55e",
+  "#3b82f6", "#8b5cf6", "#ec4899", "#64748b",
+]
+
+const COMMON_LABELS: IssueLabel[] = [
+  { name: "bug",      color: "#ef4444" },
+  { name: "feature",  color: "#8b5cf6" },
+  { name: "ui",       color: "#3b82f6" },
+  { name: "backend",  color: "#f97316" },
+  { name: "frontend", color: "#06b6d4" },
+  { name: "auth",     color: "#eab308" },
+  { name: "perf",     color: "#22c55e" },
+  { name: "docs",     color: "#64748b" },
+  { name: "seo",      color: "#ec4899" },
+  { name: "security", color: "#dc2626" },
+]
 
 const PRIORITY_OPTIONS: { value: IssuePriority; label: string; dotClass: string }[] = [
   { value: "urgent", label: "Urgent", dotClass: "bg-red-400" },
@@ -83,8 +113,6 @@ const MEMBERS = [
   { id: "tb", name: "Thomas Bernard", initials: "TB", color: "bg-orange-500" },
   { id: "ld", name: "Lucas Dufour", initials: "LD", color: "bg-blue-500" },
 ]
-
-const COMMON_LABELS = ["bug", "feature", "ui", "backend", "frontend", "auth", "perf", "docs", "seo", "security"]
 
 // ---------------------------------------------------------------------------
 // CreateIssueDialog
