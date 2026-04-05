@@ -125,29 +125,39 @@ export function CreateIssueDialog({ children, defaultStatus = "todo", onCreated 
   const [status, setStatus] = useState<IssueStatus>(defaultStatus)
   const [priority, setPriority] = useState<IssuePriority>("medium")
   const [assigneeId, setAssigneeId] = useState<string | null>(null)
-  const [labels, setLabels] = useState<string[]>([])
-  const [dueDate, setDueDate] = useState("")
+  const [labels, setLabels] = useState<IssueLabel[]>([])
+  const [dueDate, setDueDate] = useState<Date | undefined>(undefined)
   const [labelInput, setLabelInput] = useState("")
+  const [customLabelColor, setCustomLabelColor] = useState(LABEL_COLORS[4])
+  const [datePopoverOpen, setDatePopoverOpen] = useState(false)
 
   const currentStatus = STATUS_OPTIONS.find((s) => s.value === status) ?? STATUS_OPTIONS[0]
   const currentPriority = PRIORITY_OPTIONS.find((p) => p.value === priority) ?? PRIORITY_OPTIONS[2]
   const currentAssignee = assigneeId ? MEMBERS.find((m) => m.id === assigneeId) : null
 
-  function toggleLabel(label: string) {
-    setLabels((prev) => prev.includes(label) ? prev.filter((l) => l !== label) : [...prev, label])
+  function toggleLabel(label: IssueLabel) {
+    setLabels((prev) =>
+      prev.some((l) => l.name === label.name)
+        ? prev.filter((l) => l.name !== label.name)
+        : [...prev, label]
+    )
+  }
+
+  function removeLabel(name: string) {
+    setLabels((prev) => prev.filter((l) => l.name !== name))
   }
 
   function addCustomLabel() {
-    const l = labelInput.trim().toLowerCase()
-    if (l && !labels.includes(l)) {
-      setLabels((prev) => [...prev, l])
+    const name = labelInput.trim().toLowerCase()
+    if (name && !labels.some((l) => l.name === name)) {
+      setLabels((prev) => [...prev, { name, color: customLabelColor }])
     }
     setLabelInput("")
   }
 
   function handleCreate() {
     if (!title.trim()) return
-    onCreated?.({ title, description, status, priority, assigneeId, labels, dueDate: dueDate || null })
+    onCreated?.({ title, description, status, priority, assigneeId, labels, dueDate: dueDate ?? null })
     resetForm()
     setOpen(false)
   }
@@ -159,8 +169,10 @@ export function CreateIssueDialog({ children, defaultStatus = "todo", onCreated 
     setPriority("medium")
     setAssigneeId(null)
     setLabels([])
-    setDueDate("")
+    setDueDate(undefined)
     setLabelInput("")
+    setCustomLabelColor(LABEL_COLORS[4])
+    setDatePopoverOpen(false)
   }
 
   return (
