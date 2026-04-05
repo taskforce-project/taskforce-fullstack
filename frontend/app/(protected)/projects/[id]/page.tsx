@@ -1,14 +1,14 @@
 "use client"
 
-import { useState } from "react"
-import Link from "next/link"
-import { useParams } from "next/navigation"
+import { useState, useRef } from "react"
+import { useRouter, useParams } from "next/navigation"
 import {
   DndContext,
   DragEndEvent,
   DragOverlay,
   DragStartEvent,
   PointerSensor,
+  closestCenter,
   useSensor,
   useSensors,
   useDraggable,
@@ -22,9 +22,10 @@ import {
   AlertTriangle,
   Plus,
   MoreHorizontal,
-  GripVertical,
+  Pencil,
 } from "lucide-react"
 
+import { CreateIssueDialog } from "@/components/dialogs/create-issue-dialog"
 import { useTranslation } from "@/lib/i18n"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -113,13 +114,12 @@ const INITIAL_COLUMNS: BoardColumn[] = [
 ]
 
 // ---------------------------------------------------------------------------
-// IssueCard — pure display (no drag state)
+// IssueCard — pure display (no drag state, no navigation)
 // ---------------------------------------------------------------------------
 
-function IssueCard({ issue, projectId }: { readonly issue: BoardIssue; readonly projectId: string }) {
+function IssueCard({ issue }: { readonly issue: BoardIssue }) {
   return (
-    <Link
-      href={`/projects/${projectId}/issues/${issue.identifier.toLowerCase().replace("-", "")}`}
+    <div
       className="group block rounded-lg border border-border bg-background p-3 hover:border-primary/40 hover:bg-muted/20 transition-all [box-shadow:var(--shadow-sm)] hover:[box-shadow:var(--shadow-md)]"
     >
       {issue.labels.length > 0 && (
@@ -151,35 +151,29 @@ function IssueCard({ issue, projectId }: { readonly issue: BoardIssue; readonly 
           </Avatar>
         )}
       </div>
-    </Link>
+    </div>
   )
 }
 
 // ---------------------------------------------------------------------------
-// DraggableCard — wraps IssueCard with a drag handle
+// DraggableCard — entire card is the drag source; click navigates to issue
 // ---------------------------------------------------------------------------
 
 function DraggableCard({ issue, projectId }: { readonly issue: BoardIssue; readonly projectId: string }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: issue.id })
+  const router = useRouter()
 
   return (
-    <div
+    <button
+      type="button"
       ref={setNodeRef}
-      className={cn("relative group/card", isDragging && "opacity-30 scale-[0.97] transition-transform")}
+      {...attributes}
+      {...listeners}
+      className={cn("block w-full text-left cursor-grab active:cursor-grabbing", isDragging && "opacity-30 scale-[0.97] transition-transform")}
+      onClick={() => router.push(`/projects/${projectId}/issues/${issue.identifier.toLowerCase().replace("-", "")}`)}
     >
-      {/* Grip handle — visible on hover, outside Link so it doesn't navigate */}
-      <button
-        type="button"
-        aria-label="Drag to move issue"
-        {...attributes}
-        {...listeners}
-        className="absolute top-2.5 right-2.5 z-10 p-1 rounded opacity-0 group-hover/card:opacity-100 cursor-grab active:cursor-grabbing hover:bg-muted/60 transition-opacity touch-none"
-        onClick={(e) => e.preventDefault()}
-      >
-        <GripVertical className="size-3.5 text-muted-foreground" />
-      </button>
-      <IssueCard issue={issue} projectId={projectId} />
-    </div>
+      <IssueCard issue={issue} />
+    </button>
   )
 }
 
@@ -192,29 +186,82 @@ function ColumnDropZone({
   projectId,
   isSource,
   t,
+  onRenameColumn,
 }: {
   readonly column: BoardColumn
   readonly projectId: string
   readonly isSource: boolean
   readonly t: (k: string) => string
+  readonly onRenameColumn: (id: IssueStatus, title: string) => void
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id })
   const showHighlight = isOver && !isSource
+  const [editing, setEditing] = useState(false)
+  const [draftTitle, setDraftTitle] = useState(column.title)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  function startEdit() {
+    setDraftTitle(column.title)
+    setEditing(true)
+    setTimeout(() => inputRef.current?.select(), 10)
+  }
+
+  function commitEdit() {
+    const trimmed = draftTitle.trim()
+    if (trimmed && trimmed !== column.title) {
+      onRenameColumn(column.id, trimmed)
+    }
+    setEditing(false)
+  }
 
   return (
     <div className="flex flex-col w-72 shrink-0">
       {/* Column header */}
       <div className="flex items-center justify-between mb-3 px-1">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
           {column.icon}
-          <span className={cn("text-sm font-medium", column.headerColor)}>{column.title}</span>
-          <Badge variant="secondary" className="h-5 min-w-5 px-1.5 text-xs bg-muted text-muted-foreground border-0">
+          {editing ? (
+            <input
+              ref={inputRef}
+              autoFocus
+              value={draftTitle}
+              onChange={(e) => setDraftTitle(e.target.value)}
+              onBlur={commitEdit}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commitEdit()
+                if (e.key === "Escape") setEditing(false)
+              }}
+              className={cn(
+                "text-sm font-medium bg-transparent border-b border-primary outline-none w-full min-w-0 pb-0.5",
+                column.headerColor
+              )}
+            />
+          ) : (
+            <span
+              className={cn("text-sm font-medium cursor-pointer hover:opacity-80 transition-opacity", column.headerColor)}
+              onDoubleClick={startEdit}
+              title="Double-clic pour renommer"
+            >
+              {column.title}
+            </span>
+          )}
+          <Badge variant="secondary" className="h-5 min-w-5 px-1.5 text-xs bg-muted text-muted-foreground border-0 shrink-0">
             {column.issues.length}
           </Badge>
+          <button
+            type="button"
+            onClick={startEdit}
+            className="opacity-0 group-hover/col:opacity-60 hover:opacity-100! transition-opacity p-0.5 rounded hover:bg-muted/60 shrink-0"
+            title="Renommer la colonne"
+          >
+            <Pencil className="size-3" />
+          </button>
         </div>
-        <Button variant="ghost" size="sm" className="size-6 p-0 opacity-60 hover:opacity-100">
-          <Plus className="size-3.5" />
-        </Button>
+        <CreateIssueDialog defaultStatus={column.id}>
+          <Button variant="ghost" size="sm" className="size-6 p-0 opacity-60 hover:opacity-100">
+            <Plus className="size-3.5" />
+          </Button>
+        </CreateIssueDialog>
       </div>
 
       {/* Drop zone */}
@@ -236,7 +283,7 @@ function ColumnDropZone({
           </div>
         ) : (
           <>
-            {column.issues.map((issue) => (
+            {column.issues.map((issue: BoardIssue) => (
               <DraggableCard key={issue.id} issue={issue} projectId={projectId} />
             ))}
             {showHighlight && <div className="h-1 rounded-full bg-primary/30 mx-2 mt-1" />}
@@ -259,6 +306,10 @@ export default function ProjectBoardPage() {
   const [columns, setColumns] = useState<BoardColumn[]>(INITIAL_COLUMNS)
   const [activeIssue, setActiveIssue] = useState<BoardIssue | null>(null)
   const [sourceColId, setSourceColId] = useState<IssueStatus | null>(null)
+
+  function handleRenameColumn(id: IssueStatus, title: string) {
+    setColumns((prev) => prev.map((c) => (c.id === id ? { ...c, title } : c)))
+  }
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -317,6 +368,7 @@ export default function ProjectBoardPage() {
       {/* Kanban board with drag & drop */}
       <DndContext
         sensors={sensors}
+        collisionDetection={closestCenter}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
@@ -329,6 +381,7 @@ export default function ProjectBoardPage() {
               projectId={projectId}
               isSource={col.id === sourceColId}
               t={t}
+              onRenameColumn={handleRenameColumn}
             />
           ))}
         </div>
@@ -336,8 +389,8 @@ export default function ProjectBoardPage() {
         {/* Drag overlay — card clone that follows the cursor */}
         <DragOverlay>
           {activeIssue ? (
-            <div className="w-72 rotate-1 opacity-95 shadow-2xl ring-1 ring-primary/20 rounded-lg">
-              <IssueCard issue={activeIssue} projectId={projectId} />
+            <div className="w-72 rotate-1 opacity-95 shadow-2xl ring-1 ring-primary/20 rounded-lg cursor-grabbing">
+              <IssueCard issue={activeIssue} />
             </div>
           ) : null}
         </DragOverlay>

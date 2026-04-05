@@ -27,6 +27,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { CreateIssueDialog } from "@/components/dialogs/create-issue-dialog"
 import { cn } from "@/lib/utils"
 
 // ---------------------------------------------------------------------------
@@ -105,6 +106,7 @@ const PROJECT_TABS: ProjectTab[] = [
   { key: "detail.cycles", icon: RefreshCw, pathSuffix: "/cycles" },
   { key: "detail.pages", icon: FileText, pathSuffix: "/pages" },
   { key: "detail.members", icon: Users, pathSuffix: "/members" },
+  { key: "detail.settings", icon: Settings, pathSuffix: "/settings" },
 ]
 
 // ---------------------------------------------------------------------------
@@ -174,10 +176,12 @@ export default function ProjectLayout({ children }: { readonly children: React.R
               <Star className="h-4 w-4" />
             </Button>
 
-            <Button size="sm" className="gap-1.5 h-8 text-xs">
-              <Plus className="h-3.5 w-3.5" />
-              {t("projects.detail.newIssue")}
-            </Button>
+            <CreateIssueDialog>
+              <Button size="sm" className="gap-1.5 h-8 text-xs">
+                <Plus className="h-3.5 w-3.5" />
+                {t("projects.detail.newIssue")}
+              </Button>
+            </CreateIssueDialog>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
