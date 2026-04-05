@@ -273,7 +273,6 @@ input[type="reset"]:not([disabled]),
 input[type="button"]:not([disabled]),
 label[for],
 [data-radix-collection-item],
-[data-state],
 [tabindex="0"]:not(input):not(textarea) {
   cursor: pointer;
 }
