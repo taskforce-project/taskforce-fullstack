@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
+import Link from "next/link"
 import {
   Search,
   UserPlus,
@@ -361,7 +362,9 @@ function MemberRow({ member }: { readonly member: WorkspaceMember }) {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem>Change role</DropdownMenuItem>
-            <DropdownMenuItem>View profile</DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href={`/members/${member.id}`}>View profile</Link>
+            </DropdownMenuItem>
             {member.status === "pending" && (
               <DropdownMenuItem>Resend invitation</DropdownMenuItem>
             )}
