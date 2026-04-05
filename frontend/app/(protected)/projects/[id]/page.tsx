@@ -238,8 +238,11 @@ function ColumnDropZone({
             />
           ) : (
             <span
+              role="button"
+              tabIndex={0}
               className={cn("text-sm font-medium cursor-pointer hover:opacity-80 transition-opacity", column.headerColor)}
               onDoubleClick={startEdit}
+              onKeyDown={(e) => e.key === "Enter" && startEdit()}
               title="Double-clic pour renommer"
             >
               {column.title}
