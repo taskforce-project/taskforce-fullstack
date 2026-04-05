@@ -4,10 +4,12 @@ import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from "recharts"
-import { BarChart3, TrendingUp, TrendingDown, Zap, FolderKanban, CircleDot, RefreshCw } from "lucide-react"
+import { BarChart3, TrendingUp, TrendingDown, Zap, FolderKanban, CircleDot, RefreshCw, Lock } from "lucide-react"
+import { useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { useTranslation } from "@/lib/i18n"
 import { useAuth } from "@/lib/contexts/auth-context"
 import { cn } from "@/lib/utils"
@@ -64,11 +66,20 @@ const STAT_ICONS: Record<string, React.ReactNode> = {
   folder:  <FolderKanban className="h-4 w-4" />,
 }
 
+// Fixed palette — vivid enough for both light & dark cards
+const C = {
+  primary:   "#6366f1",  // indigo-500
+  secondary: "#a5b4fc",  // indigo-300
+  emerald:   "#10b981",  // emerald-500
+  slate:     "#94a3b8",  // slate-400
+}
+
+// CSS vars are hex values here, so use var() directly (no hsl() wrapper)
 const TOOLTIP_STYLE = {
-  backgroundColor: "hsl(var(--card))",
-  border: "1px solid hsl(var(--border))",
+  backgroundColor: "var(--card)",
+  border: "1px solid var(--border)",
   borderRadius: "8px",
-  color: "hsl(var(--foreground))",
+  color: "var(--foreground)",
   fontSize: "12px",
 }
 
@@ -94,23 +105,50 @@ function StatCard({ label, value, change, icon }: Readonly<{ label: string; valu
   )
 }
 
-function UpgradeGate({ title, description, children }: Readonly<{ title: string; description: string; children: React.ReactNode }>) {
+function UpgradeDialog({ open, onClose }: Readonly<{ open: boolean; onClose: () => void }>) {
   return (
-    <div className="relative overflow-hidden rounded-xl">
-      <div className="pointer-events-none select-none blur-sm saturate-0 opacity-50">
-        {children}
-      </div>
-      <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 p-8 text-center bg-background/75 backdrop-blur-sm rounded-xl">
-        <div className="flex items-center gap-2 rounded-full bg-amber-500/15 border border-amber-500/20 px-3 py-1">
-          <Zap className="h-3.5 w-3.5 text-amber-400" />
-          <span className="text-xs font-semibold text-amber-400">Pro</span>
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <div className="flex items-center gap-2 mb-1">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-500/15">
+              <Zap className="h-4 w-4 text-amber-400" />
+            </div>
+            <DialogTitle>Pro feature</DialogTitle>
+          </div>
+          <DialogDescription>
+            Cette fonctionnalité est réservée aux membres Pro. Passez à un plan supérieur pour accéder aux graphiques avancés, au burndown chart, aux filtres et bien plus.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col gap-2 mt-2">
+          <Button className="w-full gap-1.5" size="sm" onClick={onClose}>
+            <Zap className="h-3.5 w-3.5" />
+            Upgrade to Pro
+          </Button>
+          <Button variant="ghost" size="sm" className="w-full" onClick={onClose}>
+            Maybe later
+          </Button>
         </div>
-        <h3 className="text-base font-semibold text-foreground">{title}</h3>
-        <p className="text-sm text-muted-foreground max-w-sm">{description}</p>
-        <Button size="sm" className="gap-1.5 h-8 text-xs">
-          <Zap className="h-3.5 w-3.5" />
-          Upgrade to Pro
-        </Button>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function UpgradeGate({ children, onUpgrade }: Readonly<{ title?: string; description?: string; children: React.ReactNode; onUpgrade: () => void }>) {
+  return (
+    <div className="relative group">
+      {children}
+      {/* Invisible clickable overlay */}
+      <button
+        type="button"
+        className="absolute inset-0 w-full cursor-pointer bg-transparent"
+        onClick={onUpgrade}
+        aria-label="Upgrade to Pro to interact with this chart"
+      ></button>
+      {/* Lock badge — top-right corner, visible on hover */}
+      <div className="absolute top-3 right-3 flex items-center gap-1.5 rounded-full bg-amber-500/15 border border-amber-500/20 px-2.5 py-1 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+        <Lock className="h-3 w-3 text-amber-400" />
+        <span className="text-xs font-semibold text-amber-400">Pro</span>
       </div>
     </div>
   )
@@ -119,11 +157,13 @@ function UpgradeGate({ title, description, children }: Readonly<{ title: string;
 export default function AnalyticsPage() {
   const { t } = useTranslation()
   const { user } = useAuth()
+  const [upgradeOpen, setUpgradeOpen] = useState(false)
 
   const isPro = user?.plan === "pro" || user?.plan === "enterprise"
 
   return (
     <div className="flex flex-col gap-8 max-w-5xl mx-auto w-full">
+      <UpgradeDialog open={upgradeOpen} onClose={() => setUpgradeOpen(false)} />
       <div>
         <h1 className="text-2xl font-bold text-foreground">{t("analytics.title")}</h1>
         <p className="text-sm text-muted-foreground mt-1">{t("analytics.subtitle")}</p>
@@ -167,27 +207,27 @@ export default function AnalyticsPage() {
           <div className="rounded-xl border border-border bg-card p-5 [box-shadow:var(--shadow-sm)]">
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={VELOCITY_DATA} barGap={4} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                <XAxis dataKey="week" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: "hsl(var(--muted))", opacity: 0.4 }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                <XAxis dataKey="week" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: "var(--muted)", opacity: 0.5 }} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey="created"   name="Created"   fill="hsl(var(--muted))"   radius={[4, 4, 0, 0]} />
-                <Bar dataKey="completed" name="Completed" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="created"   name="Created"   fill={C.secondary} radius={[4, 4, 0, 0]} />
+                <Bar dataKey="completed" name="Completed" fill={C.primary}   radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         ) : (
-          <UpgradeGate title={t("analytics.upgradeTitle")} description={t("analytics.upgradeDesc")}>
+          <UpgradeGate onUpgrade={() => setUpgradeOpen(true)}>
             <div className="rounded-xl border border-border bg-card p-5 [box-shadow:var(--shadow-sm)]">
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={VELOCITY_DATA} barGap={4} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                  <XAxis dataKey="week" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                  <XAxis dataKey="week" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Bar dataKey="created"   name="Created"   fill="hsl(var(--muted))"   radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="completed" name="Completed" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="created"   name="Created"   fill={C.secondary} radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="completed" name="Completed" fill={C.primary}   radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -205,27 +245,27 @@ export default function AnalyticsPage() {
           <div className="rounded-xl border border-border bg-card p-5 [box-shadow:var(--shadow-sm)]">
             <ResponsiveContainer width="100%" height={200}>
               <LineChart data={BURNDOWN_DATA} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                <XAxis dataKey="day" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
-                <YAxis                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                <XAxis dataKey="day" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
+                <YAxis                tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
                 <Tooltip contentStyle={TOOLTIP_STYLE} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Line type="monotone" dataKey="ideal"     name="Ideal"     stroke="hsl(var(--muted-foreground))" strokeDasharray="5 5" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="remaining" name="Remaining" stroke="hsl(var(--primary))" strokeWidth={2.5} dot={{ r: 4, fill: "hsl(var(--primary))" }} activeDot={{ r: 6 }} />
+                <Line type="monotone" dataKey="ideal"     name="Ideal"     stroke={C.slate}   strokeDasharray="5 5" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="remaining" name="Remaining" stroke={C.primary} strokeWidth={2.5} dot={{ r: 4, fill: C.primary }} activeDot={{ r: 6 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
         ) : (
-          <UpgradeGate title="Sprint Burndown Chart" description="Visualize sprint velocity and track remaining work in real time.">
+          <UpgradeGate onUpgrade={() => setUpgradeOpen(true)}>
             <div className="rounded-xl border border-border bg-card p-5 [box-shadow:var(--shadow-sm)]">
               <ResponsiveContainer width="100%" height={200}>
                 <LineChart data={BURNDOWN_DATA} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                  <XAxis dataKey="day" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
-                  <YAxis                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                  <XAxis dataKey="day" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
+                  <YAxis                tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Line type="monotone" dataKey="ideal"     name="Ideal"     stroke="hsl(var(--muted-foreground))" strokeDasharray="5 5" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="remaining" name="Remaining" stroke="hsl(var(--primary))" strokeWidth={2.5} dot={{ r: 4, fill: "hsl(var(--primary))" }} />
+                  <Line type="monotone" dataKey="ideal"     name="Ideal"     stroke={C.slate}   strokeDasharray="5 5" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="remaining" name="Remaining" stroke={C.primary} strokeWidth={2.5} dot={{ r: 4, fill: C.primary }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -243,27 +283,27 @@ export default function AnalyticsPage() {
           <div className="rounded-xl border border-border bg-card p-5 [box-shadow:var(--shadow-sm)]">
             <ResponsiveContainer width="100%" height={180}>
               <BarChart data={TEAM_WORKLOAD} layout="vertical" barGap={4} margin={{ top: 0, right: 20, left: 60, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
-                <XAxis type="number"   tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} width={60} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: "hsl(var(--muted))", opacity: 0.4 }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
+                <XAxis type="number"   tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} width={60} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: "var(--muted)", opacity: 0.5 }} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey="open"      name="Open"      fill="hsl(var(--muted))" radius={[0, 4, 4, 0]} />
-                <Bar dataKey="completed" name="Completed" fill="#10b981"            radius={[0, 4, 4, 0]} />
+                <Bar dataKey="open"      name="Open"      fill={C.slate}   radius={[0, 4, 4, 0]} />
+                <Bar dataKey="completed" name="Completed" fill={C.emerald} radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         ) : (
-          <UpgradeGate title={t("analytics.upgradeTitle")} description={t("analytics.upgradeDesc")}>
+          <UpgradeGate onUpgrade={() => setUpgradeOpen(true)}>
             <div className="rounded-xl border border-border bg-card p-5 [box-shadow:var(--shadow-sm)]">
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={TEAM_WORKLOAD} layout="vertical" barGap={4} margin={{ top: 0, right: 20, left: 60, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
-                  <XAxis type="number"   tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} width={60} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
+                  <XAxis type="number"   tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} width={60} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Bar dataKey="open"      name="Open"      fill="hsl(var(--muted))" radius={[0, 4, 4, 0]} />
-                  <Bar dataKey="completed" name="Completed" fill="#10b981"            radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="open"      name="Open"      fill={C.slate}   radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="completed" name="Completed" fill={C.emerald} radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -283,8 +323,8 @@ export default function AnalyticsPage() {
               <ResponsiveContainer width={200} height={200}>
                 <PieChart>
                   <Pie data={PROJECT_PIE} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value">
-                    {PROJECT_PIE.map((entry, idx) => (
-                      <Cell key={idx} fill={entry.color} />
+                      {PROJECT_PIE.map((entry) => (
+                      <Cell key={entry.name} fill={entry.color} />
                     ))}
                   </Pie>
                   <Tooltip contentStyle={TOOLTIP_STYLE} />
@@ -302,14 +342,14 @@ export default function AnalyticsPage() {
             </div>
           </div>
         ) : (
-          <UpgradeGate title="Project distribution" description="Visualize how issues are distributed across your projects.">
+          <UpgradeGate onUpgrade={() => setUpgradeOpen(true)}>
             <div className="rounded-xl border border-border bg-card p-5 [box-shadow:var(--shadow-sm)]">
               <div className="flex items-center gap-8">
                 <ResponsiveContainer width={200} height={200}>
                   <PieChart>
                     <Pie data={PROJECT_PIE} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value">
-                      {PROJECT_PIE.map((entry, idx) => (
-                        <Cell key={idx} fill={entry.color} />
+                      {PROJECT_PIE.map((entry) => (
+                        <Cell key={entry.name} fill={entry.color} />
                       ))}
                     </Pie>
                   </PieChart>
