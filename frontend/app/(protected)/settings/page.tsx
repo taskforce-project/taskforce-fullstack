@@ -2,7 +2,8 @@
 
 import { useState } from "react"
 import {
-  User, Bell, CreditCard, Users, Check, Zap, Globe, Key, Palette, Webhook
+  User, Bell, CreditCard, Users, Check, Zap, Globe, Key, Palette, Webhook,
+  AlertTriangle, X as XIcon, Plus,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -54,6 +55,12 @@ const SECTION_GROUPS = [
   { label: "Workspace", keys: ["billing", "team", "integrations"] as const },
 ]
 
+const SKILL_OPTIONS = [
+  "React", "TypeScript", "Vue", "Angular", "Node.js", "Java", "Spring",
+  "Python", "PostgreSQL", "Docker", "UI/UX", "Design", "QA", "DevOps",
+  "Product", "CSS", "Tailwind", "GraphQL", "REST API", "Security",
+]
+
 // ---------------------------------------------------------------------------
 // Primitives
 // ---------------------------------------------------------------------------
@@ -82,6 +89,80 @@ function SectionCard({ title, description, children }: Readonly<{ title: string;
   )
 }
 
+function SkillsTagInput({ value, onChange }: Readonly<{ value: string[]; onChange: (v: string[]) => void }>) {
+  const [input, setInput] = useState("")
+  const available = SKILL_OPTIONS.filter(
+    (s) => !value.includes(s) && s.toLowerCase().includes(input.toLowerCase())
+  )
+
+  function add(skill: string) {
+    if (!value.includes(skill)) onChange([...value, skill])
+    setInput("")
+  }
+
+  function remove(skill: string) {
+    onChange(value.filter((s) => s !== skill))
+  }
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter" && input.trim()) {
+      add(input.trim())
+      e.preventDefault()
+    } else if (e.key === "Backspace" && !input && value.length > 0) {
+      remove(value.at(-1) as string)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {value.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {value.map((s) => (
+            <span
+              key={s}
+              className="inline-flex items-center gap-1 rounded-full bg-primary/15 border border-primary/30 px-2.5 py-0.5 text-xs text-primary font-medium"
+            >
+              {s}
+              <button
+                type="button"
+                onClick={() => remove(s)}
+                className="text-primary/60 hover:text-primary transition-colors ml-0.5"
+              >
+                <XIcon className="size-2.5" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="flex items-center h-9 rounded-md border border-border bg-background px-3 gap-2 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20 transition-all">
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={onKeyDown}
+          placeholder="Type a skill or pick one below…"
+          className="flex-1 text-sm text-foreground placeholder:text-muted-foreground outline-none bg-transparent"
+        />
+      </div>
+      {available.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {available.slice(0, 12).map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => add(s)}
+              className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground hover:border-primary/40 hover:text-primary hover:bg-primary/10 transition-colors"
+            >
+              <Plus className="size-2.5" />
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function StyledInput(props: Readonly<React.InputHTMLAttributes<HTMLInputElement>>) {
   return (
     <input
@@ -102,10 +183,20 @@ function StyledInput(props: Readonly<React.InputHTMLAttributes<HTMLInputElement>
 function ProfilePanel() {
   const [name, setName] = useState("Your Name")
   const [bio, setBio] = useState("")
-  const [role, setRole] = useState("Developer")
+  const [role, setRole] = useState("")
+  const [skills, setSkills] = useState<string[]>([])
+
+  const isProfileComplete = skills.length > 0 && role.trim().length > 0
 
   return (
     <div className="flex flex-col gap-4">
+      {!isProfileComplete && (
+        <div className="flex items-center gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-400">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          Complete your profile — add your <strong className="font-semibold">role</strong> and{" "}
+          <strong className="font-semibold">skills</strong> to enable smart issue assignment.
+        </div>
+      )}
       <SectionCard title="Public profile" description="This information is visible to all workspace members.">
         <div className="flex flex-col gap-5">
           <FormField label="Profile picture">
@@ -123,8 +214,16 @@ function ProfilePanel() {
           <FormField label="Display name" hint="Used across Taskforce.">
             <StyledInput value={name} onChange={(e) => setName(e.target.value)} />
           </FormField>
-          <FormField label="Role / Title" hint="Optional.">
-            <StyledInput value={role} onChange={(e) => setRole(e.target.value)} placeholder="e.g. Lead Engineer" />
+          <FormField label="Role / Title *" hint="Required — shown to team members.">
+            <StyledInput
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              placeholder="e.g. Lead Engineer"
+              className={role.trim() ? "" : "border-amber-500/40"}
+            />
+          </FormField>
+          <FormField label="Skills *" hint="Required — used for smart issue assignment.">
+            <SkillsTagInput value={skills} onChange={setSkills} />
           </FormField>
           <FormField label="Bio" hint="Brief description.">
             <textarea
@@ -138,7 +237,14 @@ function ProfilePanel() {
         </div>
       </SectionCard>
       <div className="flex justify-end">
-        <Button size="sm" className="h-8 text-xs" onClick={() => toast.success("Profile updated")}>Save profile</Button>
+        <Button
+          size="sm"
+          className="h-8 text-xs"
+          disabled={!isProfileComplete}
+          onClick={() => toast.success("Profile updated")}
+        >
+          Save profile
+        </Button>
       </div>
     </div>
   )
