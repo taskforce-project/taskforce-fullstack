@@ -337,7 +337,7 @@ export default function IssueDetailPage() {
               </Avatar>
               <div className="flex-1 flex flex-col gap-2">
                 <textarea
-                  className="w-full rounded-lg border border-border bg-muted/20 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground resize-none outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all min-h-[80px]"
+                  className="w-full rounded-lg border border-border bg-muted/20 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground resize-none outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all min-h-20"
                   placeholder="Add a comment…"
                   value={commentValue}
                   onChange={(e) => setCommentValue(e.target.value)}
