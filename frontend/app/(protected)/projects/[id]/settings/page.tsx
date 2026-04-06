@@ -8,7 +8,7 @@ import {
   AlertTriangle,
   Users,
   GitBranch,
-  Slack,
+  MessageSquare,
   Webhook,
   Save,
   Archive,
@@ -50,15 +50,24 @@ const MOCK_PROJECTS: Record<string, { name: string; description: string; emoji: 
 
 const INTEGRATIONS = [
   { id: "github", name: "GitHub", description: "Sync issues with GitHub pull requests and commits.", icon: GitBranch, connected: true, detail: "taskforce-org/website-redesign" },
-  { id: "slack", name: "Slack", description: "Get notifications in Slack when issues are updated.", icon: Slack, connected: false, detail: null },
+  { id: "slack", name: "Slack", description: "Get notifications in Slack when issues are updated.", icon: MessageSquare, connected: false, detail: null },
   { id: "webhook", name: "Webhooks", description: "Send custom HTTP requests on project events.", icon: Webhook, connected: false, detail: null },
 ]
+
+// ---------------------------------------------------------------------------
+// Helper functions
+// ---------------------------------------------------------------------------
+
+function handleSaveGeneral(e: React.FormEvent) {
+  e.preventDefault()
+  toast.success("Paramètres sauvegardés", { description: "Les modifications ont été appliquées." })
+}
 
 // ---------------------------------------------------------------------------
 // Section components
 // ---------------------------------------------------------------------------
 
-function SectionTitle({ icon: Icon, title, description }: { icon: React.ElementType; title: string; description?: string }) {
+function SectionTitle({ icon: Icon, title, description }: Readonly<{ icon: React.ElementType; title: string; description?: string }>) {
   return (
     <div className="flex items-start gap-3 mb-5">
       <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center shrink-0">
@@ -87,11 +96,6 @@ export default function ProjectSettingsPage() {
   const [status, setStatus] = useState<"active" | "paused" | "archived">(project.status)
   const [deleteConfirm, setDeleteConfirm] = useState("")
 
-  function handleSaveGeneral(e: React.FormEvent) {
-    e.preventDefault()
-    toast.success("Paramètres sauvegardés", { description: "Les modifications ont été appliquées." })
-  }
-
   return (
     <div className="flex flex-col gap-10 max-w-2xl mx-auto w-full">
 
@@ -101,12 +105,13 @@ export default function ProjectSettingsPage() {
         <form onSubmit={handleSaveGeneral} className="flex flex-col gap-4">
           <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-4">
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Nom du projet</label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Mon projet" />
+              <label htmlFor="project-name" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Nom du projet</label>
+              <Input id="project-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Mon projet" />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Identifiant</label>
+              <label htmlFor="project-identifier" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Identifiant</label>
               <Input
+                id="project-identifier"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value.toUpperCase().slice(0, 6))}
                 placeholder="TF"
@@ -117,8 +122,9 @@ export default function ProjectSettingsPage() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Description</label>
+            <label htmlFor="project-description" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Description</label>
             <textarea
+              id="project-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
@@ -128,7 +134,7 @@ export default function ProjectSettingsPage() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Statut</label>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Statut</p>
             <Select value={status} onValueChange={(v) => setStatus(v as typeof status)}>
               <SelectTrigger className="w-48">
                 <SelectValue />
@@ -136,20 +142,17 @@ export default function ProjectSettingsPage() {
               <SelectContent>
                 <SelectItem value="active">
                   <span className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block" />
-                    Actif
+                    <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block"></span>Actif
                   </span>
                 </SelectItem>
                 <SelectItem value="paused">
                   <span className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-amber-500 inline-block" />
-                    En pause
+                    <span className="h-2 w-2 rounded-full bg-amber-500 inline-block"></span>En pause
                   </span>
                 </SelectItem>
                 <SelectItem value="archived">
                   <span className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-muted-foreground inline-block" />
-                    Archivé
+                    <span className="h-2 w-2 rounded-full bg-muted-foreground inline-block"></span>Archivé
                   </span>
                 </SelectItem>
               </SelectContent>
