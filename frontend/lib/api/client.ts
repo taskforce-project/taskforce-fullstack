@@ -11,7 +11,7 @@ import { toast } from "sonner";
  * - SSR (serveur Next.js): utilise NEXT_PUBLIC_API_URL_SSR ou backend:8080 (réseau Docker)
  * - CSR (navigateur): utilise NEXT_PUBLIC_API_URL ou localhost:8080 (hôte)
  */
-const API_URL = typeof window === "undefined" 
+const API_URL = globalThis.window === undefined 
   ? (process.env.NEXT_PUBLIC_API_URL_SSR || "http://backend:8080") // Server-side
   : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080");  // Client-side
 
@@ -41,18 +41,18 @@ apiClient.interceptors.request.use(
       config.url?.includes(endpoint)
     );
     
-    if (!isPublicEndpoint) {
-      // Ajouter le token pour les endpoints protégés
-      const token = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
-      
-      if (token && config.headers) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-    } else {
+    if (isPublicEndpoint) {
       // Supprimer explicitement le header pour les endpoints publics
       // (évite qu'un token expiré soit envoyé par erreur et déclenche un 401)
       if (config.headers) {
         delete config.headers["Authorization"];
+      }
+    } else {
+      // Ajouter le token pour les endpoints protégés
+      const token = globalThis.window ? localStorage.getItem("accessToken") : null;
+      
+      if (token && config.headers) {
+        config.headers.Authorization = `Bearer ${token}`;
       }
     }
     
@@ -77,7 +77,7 @@ apiClient.interceptors.response.use(
       
       try {
         // Tentative de refresh du token
-        const refreshToken = typeof window !== "undefined" ? localStorage.getItem("refreshToken") : null;
+        const refreshToken = globalThis.window !== undefined ? localStorage.getItem("refreshToken") : null;
         
         if (refreshToken) {
           const response = await axios.post(`${API_URL}/auth/refresh`, {
@@ -87,7 +87,7 @@ apiClient.interceptors.response.use(
           const { accessToken } = response.data;
           
           // Sauvegarder le nouveau token
-          if (typeof window !== "undefined") {
+          if (globalThis.window !== undefined) {
             localStorage.setItem("accessToken", accessToken);
           }
           
@@ -100,7 +100,7 @@ apiClient.interceptors.response.use(
         }
       } catch (refreshError) {
         // Si le refresh échoue, déconnecter l'utilisateur
-        if (typeof window !== "undefined") {
+        if (globalThis.window !== undefined) {
           localStorage.removeItem("accessToken");
           localStorage.removeItem("refreshToken");
           localStorage.removeItem("user");
@@ -112,7 +112,7 @@ apiClient.interceptors.response.use(
     }
 
     // Show toast for non-401 errors (and 401 that could not be refreshed)
-    if (typeof window !== "undefined") {
+    if (globalThis.window !== undefined) {
       const status = error.response?.status
       const data = error.response?.data as { message?: string } | undefined
       const message = data?.message || error.message || "Une erreur est survenue"
