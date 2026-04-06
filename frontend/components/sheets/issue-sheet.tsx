@@ -20,6 +20,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
+import { SmartAssignPanel } from "@/components/smart-assign/smart-assign-panel"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -101,8 +102,92 @@ function MetaRow({ icon, label, children }: Readonly<{ icon: React.ReactNode; la
 }
 
 // ---------------------------------------------------------------------------
+// Sub-component: comments tab
+// ---------------------------------------------------------------------------
+
+interface CommentsTabProps {
+  comment: string
+  onChange: (v: string) => void
+  onSend: () => void
+}
+
+function CommentsTab({ comment, onChange, onSend }: Readonly<CommentsTabProps>) {
+  function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") onSend()
+  }
+  return (
+    <div className="flex flex-col gap-5">
+      {MOCK_COMMENTS.map((c) => (
+        <div key={c.id} className="flex gap-3">
+          <Avatar className="size-7 shrink-0 mt-0.5">
+            <AvatarFallback className={cn("text-[9px] text-white", c.color)}>
+              {c.initials}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1 min-w-0 rounded-lg border border-border bg-muted/20 overflow-hidden">
+            <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 bg-muted/30">
+              <span className="text-xs font-semibold text-foreground">{c.author}</span>
+              <span className="text-xs text-muted-foreground">{c.time}</span>
+            </div>
+            <p className="px-3 py-2.5 text-sm text-foreground leading-relaxed">{c.body}</p>
+          </div>
+        </div>
+      ))}
+
+      {/* Comment input */}
+      <div className="flex gap-3 mt-1">
+        <Avatar className="size-7 shrink-0">
+          <AvatarFallback className="text-[9px] text-white bg-primary">ME</AvatarFallback>
+        </Avatar>
+        <div className="flex-1 rounded-lg border border-border overflow-hidden focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20 transition-all">
+          <input
+            type="text"
+            placeholder="Leave a comment…"
+            value={comment}
+            onChange={(e) => onChange(e.target.value)}
+            onKeyDown={onKeyDown}
+            className="w-full px-3 py-2.5 text-sm text-foreground bg-transparent placeholder:text-muted-foreground outline-none"
+          />
+          {comment.trim() && (
+            <div className="flex justify-end px-2 pb-2">
+              <Button size="sm" className="h-7 text-xs gap-1.5" onClick={onSend}>
+                <Send className="size-3" />
+                Comment
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
+
+function toggleLabels(prev: string[], l: string): string[] {
+  return prev.includes(l) ? prev.filter((x) => x !== l) : [...prev, l]
+}
+
+function makeKeyHandler(
+  onEnter?: () => void,
+  onEscape?: () => void
+): (e: React.KeyboardEvent) => void {
+  return (e) => {
+    if (e.key === "Enter") onEnter?.()
+    if (e.key === "Escape") onEscape?.()
+  }
+}
+
+function parsePointsDraft(draft: string): number | null {
+  return draft.trim() === "" ? null : Number(draft.trim())
+}
+
+function formatDueDateDraft(dueDate: string | null): string {
+  if (!dueDate || dueDate === "Overdue") return ""
+  return dueDate
+}
 
 interface IssueSheetProps {
   issue: SheetIssue | null
@@ -111,6 +196,7 @@ interface IssueSheetProps {
 }
 
 export function IssueSheet({ issue, open, onOpenChange }: Readonly<IssueSheetProps>) {
+  const initDescription = issue?.description ?? ""
   const [comment, setComment] = useState("")
   const [tab, setTab] = useState<"comments" | "activity">("comments")
   const [status, setStatus] = useState<IssueStatus>(issue?.status ?? "todo")
@@ -118,9 +204,9 @@ export function IssueSheet({ issue, open, onOpenChange }: Readonly<IssueSheetPro
   // Main content editing
   const [title, setTitle] = useState(issue?.title ?? "")
   const [editingTitle, setEditingTitle] = useState(false)
-  const [description, setDescription] = useState(issue?.description ?? "")
+  const [description, setDescription] = useState(initDescription)
   const [editingDesc, setEditingDesc] = useState(false)
-  const [descDraft, setDescDraft] = useState(issue?.description ?? "")
+  const [descDraft, setDescDraft] = useState(initDescription)
   const titleRef = useRef<HTMLInputElement>(null)
   const descRef = useRef<HTMLTextAreaElement>(null)
 
@@ -155,8 +241,7 @@ export function IssueSheet({ issue, open, onOpenChange }: Readonly<IssueSheetPro
   const noAssignee  = assignee === null
 
   function savePoints() {
-    const val = pointsDraft.trim()
-    setPoints(val === "" ? null : Number(val))
+    setPoints(parsePointsDraft(pointsDraft))
     setEditingPoints(false)
     toast.success("Points updated")
   }
@@ -170,34 +255,38 @@ export function IssueSheet({ issue, open, onOpenChange }: Readonly<IssueSheetPro
   function saveDueDate() {
     setDueDate(dueDateDraft || null)
     setEditingDueDate(false)
-    if (dueDateDraft) toast.success("Due date updated")
+    toast.success("Due date updated")
   }
 
-  function onPointsKey(e: React.KeyboardEvent) {
-    if (e.key === "Enter") { savePoints() } else if (e.key === "Escape") { setEditingPoints(false) }
-  }
-
-  function onCycleKey(e: React.KeyboardEvent) {
-    if (e.key === "Enter") { saveCycle() } else if (e.key === "Escape") { setEditingCycle(false) }
-  }
-
-  function onDueDateKey(e: React.KeyboardEvent) {
-    if (e.key === "Escape") { setEditingDueDate(false) }
-  }
+  const onPointsKey  = makeKeyHandler(savePoints,  () => setEditingPoints(false))
+  const onCycleKey   = makeKeyHandler(saveCycle,   () => setEditingCycle(false))
+  const onDueDateKey = makeKeyHandler(undefined,   () => setEditingDueDate(false))
 
   function toggleLabel(l: string) {
-    setLabels(prev => prev.includes(l) ? prev.filter(x => x !== l) : [...prev, l])
+    setLabels(prev => toggleLabels(prev, l))
   }
 
   function onPointsClick() { setPointsDraft(String(points ?? "")); setEditingPoints(true) }
   function onCycleClick()  { setCycleDraft(cycle ?? ""); setEditingCycle(true) }
-  function onDueDateClick() { setDueDateDraft(dueDate && dueDate !== "Overdue" ? dueDate : ""); setEditingDueDate(true) }
+  function onDueDateClick() { setDueDateDraft(formatDueDateDraft(dueDate)); setEditingDueDate(true) }
 
   function handleSendComment() {
     if (!comment.trim()) return
     toast.success("Comment added")
     setComment("")
   }
+
+  function onTitleBlur() { setEditingTitle(false); toast.success("Title updated") }
+  function onTitleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") { setEditingTitle(false); toast.success("Title updated") }
+    if (e.key === "Escape") { setTitle(issue!.title); setEditingTitle(false) }
+  }
+
+  function onDescKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Escape") { setDescDraft(description); setEditingDesc(false) }
+  }
+  function saveDescription() { setDescription(descDraft); setEditingDesc(false); toast.success("Description updated") }
+  function cancelDescription() { setDescDraft(description); setEditingDesc(false) }
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -266,11 +355,8 @@ export function IssueSheet({ issue, open, onOpenChange }: Readonly<IssueSheetPro
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                onBlur={() => { setEditingTitle(false); toast.success("Title updated") }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") { setEditingTitle(false); toast.success("Title updated") }
-                  if (e.key === "Escape") { setTitle(issue.title); setEditingTitle(false) }
-                }}
+                onBlur={onTitleBlur}
+                onKeyDown={onTitleKeyDown}
                 className="w-full text-xl font-semibold text-foreground leading-snug bg-transparent border-b-2 border-primary outline-none pb-0.5"
               />
             ) : (
@@ -294,16 +380,16 @@ export function IssueSheet({ issue, open, onOpenChange }: Readonly<IssueSheetPro
                     ref={descRef}
                     value={descDraft}
                     onChange={(e) => setDescDraft(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Escape") { setDescDraft(description); setEditingDesc(false) } }}
+                    onKeyDown={onDescKeyDown}
                     rows={5}
                     className="w-full rounded-md border border-primary/50 bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-primary/20 resize-none transition-all"
                     placeholder="Add a description…"
                   />
                   <div className="flex gap-2">
-                    <Button size="sm" className="h-7 text-xs gap-1.5" onClick={() => { setDescription(descDraft); setEditingDesc(false); toast.success("Description updated") }}>
+                    <Button size="sm" className="h-7 text-xs gap-1.5" onClick={saveDescription}>
                       <CheckIcon className="size-3" />Save
                     </Button>
-                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setDescDraft(description); setEditingDesc(false) }}>
+                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={cancelDescription}>
                       Cancel
                     </Button>
                   </div>
@@ -357,49 +443,7 @@ export function IssueSheet({ issue, open, onOpenChange }: Readonly<IssueSheetPro
               </div>
 
               {tab === "comments" && (
-                <div className="flex flex-col gap-5">
-                  {MOCK_COMMENTS.map((c) => (
-                    <div key={c.id} className="flex gap-3">
-                      <Avatar className="size-7 shrink-0 mt-0.5">
-                        <AvatarFallback className={cn("text-[9px] text-white", c.color)}>
-                          {c.initials}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0 rounded-lg border border-border bg-muted/20 overflow-hidden">
-                        <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 bg-muted/30">
-                          <span className="text-xs font-semibold text-foreground">{c.author}</span>
-                          <span className="text-xs text-muted-foreground">{c.time}</span>
-                        </div>
-                        <p className="px-3 py-2.5 text-sm text-foreground leading-relaxed">{c.body}</p>
-                      </div>
-                    </div>
-                  ))}
-
-                  {/* Comment input */}
-                  <div className="flex gap-3 mt-1">
-                    <Avatar className="size-7 shrink-0">
-                      <AvatarFallback className="text-[9px] text-white bg-primary">ME</AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 rounded-lg border border-border overflow-hidden focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20 transition-all">
-                      <input
-                        type="text"
-                        placeholder="Leave a comment…"
-                        value={comment}
-                        onChange={(e) => setComment(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === "Enter") handleSendComment() }}
-                        className="w-full px-3 py-2.5 text-sm text-foreground bg-transparent placeholder:text-muted-foreground outline-none"
-                      />
-                      {comment.trim() && (
-                        <div className="flex justify-end px-2 pb-2">
-                          <Button size="sm" className="h-7 text-xs gap-1.5" onClick={handleSendComment}>
-                            <Send className="size-3" />
-                            Comment
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                <CommentsTab comment={comment} onChange={setComment} onSend={handleSendComment} />
               )}
 
               {tab === "activity" && (
@@ -485,6 +529,17 @@ export function IssueSheet({ issue, open, onOpenChange }: Readonly<IssueSheetPro
                 </DropdownMenuContent>
               </DropdownMenu>
             </MetaRow>
+
+            {/* Smart Auto-Assign */}
+            <SmartAssignPanel
+              issueLabels={labels}
+              issuePriority={priority}
+              currentAssignee={assignee}
+              onAssign={(m) => {
+                setAssignee({ initials: m.initials, color: m.color, name: m.name })
+                toast.success(`Assigned to ${m.name}`)
+              }}
+            />
 
             {/* Labels — multi-select */}
             <MetaRow icon={<Tag className="size-3.5" />} label="Labels">
