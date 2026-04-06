@@ -17,6 +17,7 @@ import {
   Users,
   UsersRound,
   MessageSquare,
+  MessagesSquare,
 } from "lucide-react"
 
 import { NavUser } from "@/components/layout/sidebar/nav-user"
@@ -99,6 +100,11 @@ const NAV_MAIN: readonly NavItem[] = [
     key: "nav.teams",
     url: "/teams",
     icon: UsersRound,
+  },
+  {
+    key: "nav.messages",
+    url: "/messages",
+    icon: MessagesSquare,
   },
   {
     key: "nav.discussions",
