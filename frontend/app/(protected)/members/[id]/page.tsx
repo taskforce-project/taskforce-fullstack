@@ -176,7 +176,7 @@ export default function MemberProfilePage() {
                 <div className="shrink-0">{status.icon}</div>
                 <span className="text-xs text-muted-foreground font-mono w-14 shrink-0">{issue.id}</span>
                 <span className="flex-1 text-sm text-foreground truncate">{issue.title}</span>
-                <span className="text-xs text-muted-foreground shrink-0 hidden sm:block flex items-center gap-1">
+                <span className="text-xs text-muted-foreground shrink-0 max-sm:hidden flex items-center gap-1">
                   <FolderKanban className="h-3 w-3 inline mr-1" />
                   {issue.project}
                 </span>
