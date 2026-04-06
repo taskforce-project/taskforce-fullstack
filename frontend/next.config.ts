@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import webpack from "webpack";
 
 const nextConfig: NextConfig = {
   output: 'standalone', // Pour Docker
@@ -13,9 +14,43 @@ const nextConfig: NextConfig = {
     "@tiptap/extension-task-list",
     "@tiptap/extension-task-item",
   ],
-  webpack(config) {
+  webpack(config, { isServer }) {
     // Force Webpack to resolve TipTap v3 ESM packages using their CJS build
     config.resolve.conditionNames = ["require", "node", "default", "browser"]
+
+    // Strip "node:" URI prefix so Webpack resolves built-ins normally
+    config.plugins.push(
+      new webpack.NormalModuleReplacementPlugin(/^node:/, (resource: { request: string }) => {
+        resource.request = resource.request.replace(/^node:/, "")
+      })
+    )
+
+    // isomorphic-dompurify pulls in jsdom (Node.js built-ins) — ignore them client-side
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        net: false,
+        tls: false,
+        fs: false,
+        http: false,
+        https: false,
+        stream: false,
+        crypto: false,
+        path: false,
+        os: false,
+        zlib: false,
+        child_process: false,
+        http2: false,
+        dns: false,
+        buffer: false,
+        util: false,
+        url: false,
+        assert: false,
+        events: false,
+        querystring: false,
+      }
+    }
+
     return config
   },
 };
