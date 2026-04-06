@@ -176,7 +176,7 @@ const STATUS_CONFIG: Record<ProjectStatus, { icon: React.ReactNode; badgeClass: 
 // ProjectCard
 // ---------------------------------------------------------------------------
 
-function ProjectCard({ project, t }: { project: Project; t: (k: string) => string }) {
+function ProjectCard({ project, t }: Readonly<{ project: Project; t: (k: string) => string }>) {
   const statusCfg = STATUS_CONFIG[project.status]
 
   return (
@@ -254,8 +254,8 @@ function ProjectCard({ project, t }: { project: Project; t: (k: string) => strin
         {/* Members */}
         <div className="flex items-center">
           <div className="flex -space-x-2">
-            {project.members.slice(0, 4).map((m, i) => (
-              <Avatar key={i} className="h-6 w-6 ring-2 ring-card">
+            {project.members.slice(0, 4).map((m) => (
+              <Avatar key={m.initials} className="h-6 w-6 ring-2 ring-card">
                 <AvatarFallback className={cn("text-[9px] text-white", m.color)}>
                   {m.initials}
                 </AvatarFallback>
@@ -289,7 +289,7 @@ function ProjectCard({ project, t }: { project: Project; t: (k: string) => strin
 // Empty state
 // ---------------------------------------------------------------------------
 
-function EmptyState({ isSearch, t }: { isSearch: boolean; t: (k: string) => string }) {
+function EmptyState({ isSearch, t }: Readonly<{ isSearch: boolean; t: (k: string) => string }>) {
   if (isSearch) {
     return (
       <div className="col-span-full flex flex-col items-center justify-center py-16 text-center">
