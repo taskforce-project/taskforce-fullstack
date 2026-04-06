@@ -1,7 +1,8 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import {
   FileText,
   Plus,
@@ -12,6 +13,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { CreatePageDialog, type CreatePagePayload } from "@/components/dialogs/create-page-dialog"
 import { cn } from "@/lib/utils"
 
 interface ProjectPage {
@@ -74,7 +76,15 @@ const PAGES: ProjectPage[] = [
 
 export default function ProjectPagesPage() {
   const params = useParams()
+  const router = useRouter()
   const projectId = typeof params.id === "string" ? params.id : "1"
+
+  const [pages, setPages] = useState(PAGES)
+
+  function handlePageCreated(payload: CreatePagePayload) {
+    setPages((prev) => [payload, ...prev])
+    router.push(`/projects/${projectId}/pages/${payload.id}`)
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -83,14 +93,16 @@ export default function ProjectPagesPage() {
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           <Input placeholder="Search pages..." className="pl-8 h-8 text-sm" />
         </div>
-        <Button size="sm" className="gap-1.5 h-8 text-xs">
-          <Plus className="h-3.5 w-3.5" />
-          New Page
-        </Button>
+        <CreatePageDialog onCreated={handlePageCreated}>
+          <Button size="sm" className="gap-1.5 h-8 text-xs">
+            <Plus className="h-3.5 w-3.5" />
+            New Page
+          </Button>
+        </CreatePageDialog>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {PAGES.map((page) => (
+        {pages.map((page) => (
           <Link
             key={page.id}
             href={`/projects/${projectId}/pages/${page.id}`}
