@@ -98,7 +98,7 @@ function getTypeLabel(type: NotifType, t: (key: string) => string): string {
 // NotificationItem
 // ---------------------------------------------------------------------------
 
-function NotificationItem({ notif, onMarkRead, t }: { notif: Notification; onMarkRead: (id: string) => void; t: (key: string) => string }) {
+function NotificationItem({ notif, onMarkRead, t }: Readonly<{ notif: Notification; onMarkRead: (id: string) => void; t: (key: string) => string }>) {
   const router = useRouter()
 
   function handleRowClick() {
@@ -107,13 +107,14 @@ function NotificationItem({ notif, onMarkRead, t }: { notif: Notification; onMar
   }
 
   return (
-    <div
+    <button
+      type="button"
       onClick={handleRowClick}
-      className={cn("group flex items-start gap-3 px-4 py-3 transition-colors hover:bg-muted/40 border-b border-border/50 last:border-0 cursor-pointer", !notif.read && "bg-primary/5")}>
-      <div className="mt-1.5 flex-shrink-0 w-4 flex items-center justify-center">
+      className={cn("group flex items-start gap-3 px-4 py-3 transition-colors hover:bg-muted/40 border-b border-border/50 last:border-0 cursor-pointer w-full text-left", !notif.read && "bg-primary/5")}>
+      <div className="mt-1.5 shrink-0 w-4 flex items-center justify-center">
         {!notif.read && <Circle className="h-2 w-2 fill-primary text-primary" />}
       </div>
-      <div className="flex-shrink-0 mt-0.5">
+      <div className="shrink-0 mt-0.5">
         {notif.actor ? (
           <Avatar className="h-8 w-8"><AvatarFallback className={cn("text-xs text-white", notif.actor.color)}>{notif.actor.initials}</AvatarFallback></Avatar>
         ) : (
@@ -124,7 +125,7 @@ function NotificationItem({ notif, onMarkRead, t }: { notif: Notification; onMar
         <div className="flex items-center gap-1.5 flex-wrap">
           {notif.actor && <span className="text-sm font-medium text-foreground">{notif.actor.name}</span>}
           <span className="text-sm text-muted-foreground">{getTypeLabel(notif.type, t)}</span>
-          <Link href={notif.issueUrl} onClick={(e) => e.stopPropagation()} className="text-sm font-medium text-foreground hover:text-primary truncate max-w-[200px] sm:max-w-xs">{notif.issueTitle}</Link>
+          <Link href={notif.issueUrl} onClick={(e) => e.stopPropagation()} className="text-sm font-medium text-foreground hover:text-primary truncate max-w-50 sm:max-w-xs">{notif.issueTitle}</Link>
         </div>
         {notif.comment && <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1 italic">&ldquo;{notif.comment}&rdquo;</p>}
         <div className="mt-1 flex items-center gap-2">
@@ -136,11 +137,11 @@ function NotificationItem({ notif, onMarkRead, t }: { notif: Notification; onMar
         </div>
       </div>
       {!notif.read && (
-        <button onClick={(e) => { e.stopPropagation(); onMarkRead(notif.id) }} title={t("inbox.markRead")} className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground">
+        <button onClick={(e) => { e.stopPropagation(); onMarkRead(notif.id) }} title={t("inbox.markRead")} className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground">
           <CheckCheck className="h-3.5 w-3.5" />
         </button>
       )}
-    </div>
+    </button>
   )
 }
 
@@ -152,7 +153,7 @@ interface InboxViewProps {
   defaultTab?: NotifTab
 }
 
-export function InboxView({ defaultTab = "all" }: InboxViewProps) {
+export function InboxView({ defaultTab = "all" }: Readonly<InboxViewProps>) {
   const { t } = useTranslation()
   const [activeTab, setActiveTab] = useState<NotifTab>(defaultTab)
   const [notifications, setNotifications] = useState<Notification[]>(MOCK_NOTIFICATIONS)
