@@ -237,12 +237,13 @@ function TeamSettingsSheet({ team, open, onOpenChange }: { readonly team: Team; 
           <div className="flex flex-col gap-4">
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Général</h3>
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium">Nom</label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} />
+              <label htmlFor="team-name" className="text-sm font-medium">Nom</label>
+              <Input id="team-name" value={name} onChange={(e) => setName(e.target.value)} />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium">Description</label>
+              <label htmlFor="team-description" className="text-sm font-medium">Description</label>
               <textarea
+                id="team-description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
