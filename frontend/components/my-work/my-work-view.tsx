@@ -281,7 +281,7 @@ const TAB_HREF: Record<MyWorkTab, string> = {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function IssueRow({ issue, t }: { issue: Issue; t: (k: string) => string }) {
+function IssueRow({ issue, t }: Readonly<{ issue: Issue; t: (k: string) => string }>) {
   const priority = PRIORITY_CONFIG[issue.priority]
   const status = STATUS_CONFIG[issue.status]
   const isOverdue = issue.dueDate === "Overdue"
@@ -291,31 +291,31 @@ function IssueRow({ issue, t }: { issue: Issue; t: (k: string) => string }) {
       href={issue.url}
       className="group flex items-center gap-3 px-4 py-2.5 hover:bg-muted/40 transition-colors border-b border-border/50 last:border-0"
     >
-      <div className={cn("h-2 w-2 rounded-full flex-shrink-0", priority.dotClass)} title={priority.label} />
-      <div className="flex-shrink-0">{status.icon}</div>
-      <span className="text-xs text-muted-foreground font-mono flex-shrink-0 w-12">{issue.identifier}</span>
+      <div className={cn("h-2 w-2 rounded-full shrink-0", priority.dotClass)} title={priority.label} />
+      <div className="shrink-0">{status.icon}</div>
+      <span className="text-xs text-muted-foreground font-mono shrink-0 w-12">{issue.identifier}</span>
       <span className="flex-1 text-sm text-foreground truncate group-hover:text-primary transition-colors">
         {issue.title}
       </span>
-      <span className="hidden sm:flex items-center gap-1 text-xs text-muted-foreground flex-shrink-0">
+      <span className="hidden sm:flex items-center gap-1 text-xs text-muted-foreground shrink-0">
         <FolderKanban className="h-3 w-3" />
         {issue.project}
       </span>
       <span
         className={cn(
-          "text-xs flex-shrink-0 hidden md:block",
+          "text-xs shrink-0 hidden md:block",
           isOverdue ? "text-red-400 font-medium" : "text-muted-foreground"
         )}
       >
         {isOverdue ? <AlertTriangle className="h-3.5 w-3.5 inline mr-1" /> : null}
         {issue.dueDate ?? t("myWork.issues.noDue")}
       </span>
-      <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+      <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
     </Link>
   )
 }
 
-function CycleCard({ cycle, t }: { cycle: Cycle; t: (k: string) => string }) {
+function CycleCard({ cycle, t }: Readonly<{ cycle: Cycle; t: (k: string) => string }>) {
   const statusCfg = CYCLE_STATUS_CONFIG[cycle.status]
 
   return (
@@ -323,7 +323,7 @@ function CycleCard({ cycle, t }: { cycle: Cycle; t: (k: string) => string }) {
       href={cycle.url}
       className="group flex flex-col sm:flex-row sm:items-center gap-3 px-4 py-3.5 hover:bg-muted/40 transition-colors border-b border-border/50 last:border-0"
     >
-      <div className="flex-shrink-0 h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
+      <div className="shrink-0 h-9 w-9 rounded-lg bg-muted flex items-center justify-center">
         <RefreshCw className="h-4 w-4 text-muted-foreground" />
       </div>
       <div className="flex-1 min-w-0">
@@ -353,7 +353,7 @@ function CycleCard({ cycle, t }: { cycle: Cycle; t: (k: string) => string }) {
         </div>
       </div>
       {cycle.status !== "upcoming" && (
-        <div className="flex items-center gap-2 flex-shrink-0 sm:w-36">
+        <div className="flex items-center gap-2 shrink-0 sm:w-36">
           <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
             <div
               className={cn(
@@ -366,29 +366,29 @@ function CycleCard({ cycle, t }: { cycle: Cycle; t: (k: string) => string }) {
           <span className="text-xs text-muted-foreground w-8 text-right">{cycle.progress}%</span>
         </div>
       )}
-      <span className="text-xs text-muted-foreground flex-shrink-0 hidden md:block">
+      <span className="text-xs text-muted-foreground shrink-0 hidden md:block">
         {cycle.completedIssues}/{cycle.totalIssues} {t("myWork.cycles.issues")}
       </span>
-      <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+      <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
     </Link>
   )
 }
 
-function PageRow({ page, t }: { page: Page; t: (k: string) => string }) {
+function PageRow({ page, t }: Readonly<{ page: Page; t: (k: string) => string }>) {
   return (
     <Link
       href={page.url}
       className="group flex items-center gap-3 px-4 py-2.5 hover:bg-muted/40 transition-colors border-b border-border/50 last:border-0"
     >
-      <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+      <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
       <span className="flex-1 text-sm text-foreground truncate group-hover:text-primary transition-colors">
         {page.title}
       </span>
-      <span className="hidden sm:flex items-center gap-1 text-xs text-muted-foreground flex-shrink-0">
+      <span className="hidden sm:flex items-center gap-1 text-xs text-muted-foreground shrink-0">
         <FolderKanban className="h-3 w-3" />
         {page.project}
       </span>
-      <div className="hidden md:flex items-center gap-1.5 flex-shrink-0 text-xs text-muted-foreground">
+      <div className="hidden md:flex items-center gap-1.5 shrink-0 text-xs text-muted-foreground">
         <Avatar className="h-5 w-5">
           <AvatarFallback className={cn("text-[9px] text-white", page.lastEditedByColor)}>
             {page.lastEditedByInitials}
@@ -396,12 +396,12 @@ function PageRow({ page, t }: { page: Page; t: (k: string) => string }) {
         </Avatar>
         <span>{t("myWork.pages.lastEdited")} {page.lastEditedAt}</span>
       </div>
-      <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+      <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
     </Link>
   )
 }
 
-function EmptyState({ tab, t }: { tab: MyWorkTab; t: (k: string) => string }) {
+function EmptyState({ tab, t }: Readonly<{ tab: MyWorkTab; t: (k: string) => string }>) {
   const messages: Record<MyWorkTab, string> = {
     issues: t("myWork.empty.issues"),
     cycles: t("myWork.empty.cycles"),
@@ -442,7 +442,7 @@ interface MyWorkViewProps {
   defaultTab?: MyWorkTab
 }
 
-export function MyWorkView({ defaultTab = "issues" }: MyWorkViewProps) {
+export function MyWorkView({ defaultTab = "issues" }: Readonly<MyWorkViewProps>) {
   const { t } = useTranslation()
   const activeTab = defaultTab
 
@@ -498,13 +498,13 @@ export function MyWorkView({ defaultTab = "issues" }: MyWorkViewProps) {
           {activeTab === "issues" && (
             <>
               <div className="flex items-center gap-3 px-4 py-2 border-b border-border/50 bg-muted/20">
-                <div className="w-2 flex-shrink-0" />
-                <div className="w-3.5 flex-shrink-0" />
-                <div className="w-12 flex-shrink-0" />
+                <div className="w-2 shrink-0" />
+                <div className="w-3.5 shrink-0" />
+                <div className="w-12 shrink-0" />
                 <span className="flex-1 text-xs text-muted-foreground">{t("myWork.issues.status")}</span>
                 <span className="hidden sm:block text-xs text-muted-foreground w-24 text-right">{t("myWork.issues.project")}</span>
                 <span className="hidden md:block text-xs text-muted-foreground w-24 text-right">{t("myWork.issues.dueDate")}</span>
-                <div className="w-3.5 flex-shrink-0" />
+                <div className="w-3.5 shrink-0" />
               </div>
               {MOCK_ISSUES.length === 0 ? (
                 <EmptyState tab="issues" t={t} />
