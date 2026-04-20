@@ -18,8 +18,6 @@ import {
 import { Button } from "@/components/ui/button"
 import { Kbd } from "@/components/ui/kbd"
 import { ThemeToggle } from "@/components/common/theme-toggle"
-import { useAuth } from "@/lib/contexts/auth-context"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useTranslation } from "@/lib/i18n"
 import { CommandPalette } from "@/components/command-palette"
 
@@ -77,21 +75,6 @@ function useBreadcrumbs() {
       return { href, label, isLast }
     })
   }, [pathname])
-}
-
-function UserAvatar() {
-  const { user } = useAuth()
-
-  const initials = user
-    ? `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase()
-    : "?"
-
-  return (
-    <Avatar className="size-8">
-      <AvatarImage src="" alt={user?.firstName ?? "User"} />
-      <AvatarFallback className="text-xs font-medium">{initials}</AvatarFallback>
-    </Avatar>
-  )
 }
 
 export function AppTopbar() {
@@ -182,13 +165,6 @@ export function AppTopbar() {
 
         {/* Theme toggle */}
         <ThemeToggle />
-
-        {/* User avatar → profile */}
-        <Button variant="ghost" size="icon" className="rounded-full" asChild>
-          <Link href="/profile" aria-label="My profile">
-            <UserAvatar />
-          </Link>
-        </Button>
       </div>
 
       {/* Command palette */}
