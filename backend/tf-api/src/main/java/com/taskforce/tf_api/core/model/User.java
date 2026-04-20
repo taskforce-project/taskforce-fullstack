@@ -166,6 +166,18 @@ public class User {
     private String updatedBy;
 
     /**
+     * Nom d'affichage personnalisé (nullable — construit depuis Keycloak si absent)
+     */
+    @Column(name = "display_name", length = 150)
+    private String displayName;
+
+    /**
+     * URL de l'avatar de l'utilisateur (nullable)
+     */
+    @Column(name = "avatar_url", length = 500)
+    private String avatarUrl;
+
+    /**
      * Vérifie si l'utilisateur a un plan PRO ou supérieur
      */
     public boolean isProOrHigher() {
