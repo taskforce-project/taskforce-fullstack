@@ -115,7 +115,6 @@ const NAV_MAIN: readonly NavItem[] = [
     key: "nav.analytics",
     url: "/analytics",
     icon: BarChart3,
-    requiresPlan: ["PRO", "ENTERPRISE"],
   },
 ]
 

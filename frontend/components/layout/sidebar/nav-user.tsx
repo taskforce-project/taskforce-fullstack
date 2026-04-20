@@ -1,5 +1,6 @@
 "use client"
 
+import { useRouter } from "next/navigation"
 import {
   BadgeCheck,
   Bell,
@@ -29,6 +30,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { useAuth } from "@/lib/contexts/auth-context"
 
 export function NavUser({
   user,
@@ -40,6 +42,15 @@ export function NavUser({
   }
 }) {
   const { isMobile } = useSidebar()
+  const { logout, user: authUser } = useAuth()
+  const router = useRouter()
+
+  const isPro = authUser?.planType === "PRO" || authUser?.planType === "ENTERPRISE"
+
+  const handleLogout = async () => {
+    await logout()
+    router.push("/auth/login")
+  }
 
   return (
     <SidebarMenu>
@@ -81,28 +92,30 @@ export function NavUser({
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
-                <Sparkles />
-                Upgrade to Pro
-              </DropdownMenuItem>
+              {!isPro && (
+                <DropdownMenuItem onClick={() => router.push("/settings?section=billing")}>
+                  <Sparkles />
+                  Upgrade to Pro
+                </DropdownMenuItem>
+              )}
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push("/profile")}>
                 <BadgeCheck />
                 Account
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push("/settings?section=billing")}>
                 <CreditCard />
                 Billing
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push("/settings?section=notifications")}>
                 <Bell />
                 Notifications
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={handleLogout}>
               <LogOut />
               Log out
             </DropdownMenuItem>
