@@ -45,11 +45,17 @@ export const USER_ROUTES = {
  * Backend: @RequestMapping("/api/workspaces")
  */
 export const WORKSPACE_ROUTES = {
+  // Liste et création
+  LIST: "/api/workspaces",
+  CREATE: "/api/workspaces",
+  // Par slug
+  BY_SLUG: (slug: string) => `/api/workspaces/${slug}`,
+  MEMBERS: (slug: string) => `/api/workspaces/${slug}/members`,
+  INVITE: (slug: string) => `/api/workspaces/${slug}/members/invite`,
+  MEMBER_ROLE: (slug: string, memberId: number) => `/api/workspaces/${slug}/members/${memberId}/role`,
+  MEMBER: (slug: string, memberId: number) => `/api/workspaces/${slug}/members/${memberId}`,
+  // Rétrocompatibilité
   CURRENT: "/api/workspaces/current",
-  MEMBERS: "/api/workspaces/current/members",
-  INVITE: "/api/workspaces/current/members/invite",
-  MEMBER_ROLE: (memberId: number) => `/api/workspaces/current/members/${memberId}/role`,
-  MEMBER: (memberId: number) => `/api/workspaces/current/members/${memberId}`,
 } as const;
 
 /**

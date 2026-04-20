@@ -12,7 +12,6 @@ import {
   Settings,
   HelpCircle,
   Plus,
-  Zap,
   ChevronRight,
   Users,
   UsersRound,
@@ -21,9 +20,11 @@ import {
 } from "lucide-react"
 
 import { NavUser } from "@/components/layout/sidebar/nav-user"
+import { WorkspaceSwitcher } from "@/components/layout/sidebar/team-switcher"
 import { getAvatarUrl } from "@/lib/utils/avatar"
 import { useAuth } from "@/lib/contexts/auth-context"
 import { useTranslation } from "@/lib/i18n"
+import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import {
   Sidebar,
   SidebarContent,
@@ -136,6 +137,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { user } = useAuth()
   const { t } = useTranslation()
   const pathname = usePathname()
+  const activeWorkspace = useWorkspaceStore((s) => s.activeWorkspace)
+  const slug = activeWorkspace?.slug ?? ""
+
+  /** Préfixe une URL relative avec le slug du workspace actif */
+  const withSlug = (url: string) => (slug ? `/${slug}${url}` : url)
 
   const navUser = user
     ? {
@@ -145,8 +151,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       }
     : { name: "...", email: "...", avatar: "" }
 
-  const isActive = (url: string) =>
-    pathname === url || pathname.startsWith(`${url}/`)
+  const isActive = (url: string) => {
+    const full = withSlug(url)
+    return pathname === full || pathname.startsWith(`${full}/`)
+  }
 
   const canAccess = (item: NavItem) => {
     if (item.requiresPlan && user?.planType) {
@@ -157,29 +165,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   return (
     <Sidebar collapsible="icon" className="overflow-x-hidden" {...props}>
-      {/* Logo / Workspace header */}
+      {/* Workspace switcher */}
       <SidebarHeader>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              size="lg"
-              className="data-[state=open]:bg-sidebar-accent"
-            >
-              <Link href="/dashboard">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                  <Zap className="size-4" />
-                </div>
-                <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">TaskForce</span>
-                  <span className="truncate text-xs capitalize text-muted-foreground">
-                    {user?.planType ?? "FREE"}
-                  </span>
-                </div>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+        <WorkspaceSwitcher />
       </SidebarHeader>
 
       <SidebarSeparator />
@@ -213,7 +201,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                         {item.items.map((sub) => (
                           <SidebarMenuSubItem key={sub.key}>
                             <SidebarMenuSubButton asChild isActive={isActive(sub.url)}>
-                              <Link href={sub.url}>{t(sub.key)}</Link>
+                              <Link href={withSlug(sub.url)}>{t(sub.key)}</Link>
                             </SidebarMenuSubButton>
                           </SidebarMenuSubItem>
                         ))}
@@ -228,7 +216,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     tooltip={t(item.key)}
                     isActive={isActive(item.url)}
                   >
-                    <Link href={item.url}>
+                    <Link href={withSlug(item.url)}>
                       <item.icon />
                       <span>{t(item.key)}</span>
                       {item.badge && (
@@ -249,7 +237,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton asChild className="text-muted-foreground">
-                <Link href="/projects/new">
+                <Link href={withSlug("/projects/new")}>
                   <Plus className="size-4" />
                   <span>{t("nav.createProject")}</span>
                 </Link>
@@ -270,7 +258,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   tooltip={t(item.key)}
                   isActive={isActive(item.url)}
                 >
-                  <Link href={item.url}>
+                  <Link href={withSlug(item.url)}>
                     <item.icon />
                     <span>{t(item.key)}</span>
                   </Link>
