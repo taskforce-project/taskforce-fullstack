@@ -3,6 +3,7 @@ package com.taskforce.tf_api.core.model;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -48,6 +49,11 @@ public class Workspace {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    /** UUID stable pour l'identification externe (ne change jamais) */
+    @Column(name = "uuid", nullable = false, unique = true, columnDefinition = "uuid")
+    @Builder.Default
+    private UUID uuid = UUID.randomUUID();
 
     @Column(nullable = false, length = 100)
     private String name;
