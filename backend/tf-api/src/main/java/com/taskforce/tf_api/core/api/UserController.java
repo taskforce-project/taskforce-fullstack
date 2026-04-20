@@ -38,9 +38,9 @@ public class UserController {
     public ResponseEntity<ApiResponse<UserResponse>> getMe(
         @AuthenticationPrincipal Jwt jwt
     ) {
-        String keycloakId = jwt.getClaim("keycloakId");
-        log.debug("GET /api/users/me — keycloakId={}", keycloakId);
-        UserResponse response = userService.getByKeycloakId(keycloakId);
+        String email = jwt.getClaim("sub");
+        log.debug("GET /api/users/me — email={}", email);
+        UserResponse response = userService.getByEmail(email);
         return ResponseEntity.ok(ApiResponse.success("Utilisateur récupéré", response));
     }
 
@@ -53,9 +53,9 @@ public class UserController {
         @AuthenticationPrincipal Jwt jwt,
         @Valid @RequestBody UpdateUserRequest request
     ) {
-        String keycloakId = jwt.getClaim("keycloakId");
-        log.debug("PATCH /api/users/me — keycloakId={}", keycloakId);
-        UserResponse response = userService.updateUser(keycloakId, request);
+        String email = jwt.getClaim("sub");
+        log.debug("PATCH /api/users/me — email={}", email);
+        UserResponse response = userService.updateUserByEmail(email, request);
         return ResponseEntity.ok(ApiResponse.success("Profil mis à jour", response));
     }
 }
