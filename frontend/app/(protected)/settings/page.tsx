@@ -16,6 +16,7 @@ import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useAuth } from "@/lib/contexts/auth-context"
 import { useUserStore } from "@/lib/store/user-store"
+import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { getAvatarUrl } from "@/lib/utils/avatar"
 import { cn } from "@/lib/utils"
 
@@ -626,80 +627,115 @@ function BillingPanel() {
 
 function TeamPanel() {
   const [invited, setInvited] = useState("")
-  const [roles, setRoles] = useState<Record<string, string>>({
-    "you@taskforce.io":    "owner",
-    "sophie@taskforce.io": "admin",
-    "emma@taskforce.io":   "member",
-    "thomas@taskforce.io": "member",
-  })
+  const [inviting, setInviting] = useState(false)
+  const { members, membersLoading, fetchMembers, invite, changeRole, kick } = useWorkspaceStore()
+  const currentUser = useUserStore((s) => s.user)
 
-  const MEMBERS = [
-    { name: "You",            email: "you@taskforce.io",    initials: "ME", color: "bg-primary"     },
-    { name: "Sophie Martin",  email: "sophie@taskforce.io", initials: "SM", color: "bg-violet-500"  },
-    { name: "Emma Petit",     email: "emma@taskforce.io",   initials: "EP", color: "bg-emerald-500" },
-    { name: "Thomas Bernard", email: "thomas@taskforce.io", initials: "TB", color: "bg-orange-500"  },
-  ]
+  useEffect(() => { fetchMembers() }, [fetchMembers])
+
+  const currentMember = members.find((m) => String(m.userId) === currentUser?.id)
+  const isOwner = currentMember?.role === "OWNER"
+  const canManage = isOwner || currentMember?.role === "ADMIN"
+
+  async function handleInvite() {
+    if (!invited.trim()) return
+    setInviting(true)
+    const result = await invite({ email: invited.trim() })
+    setInviting(false)
+    if (result) {
+      toast.success(`${invited} ajouté au workspace`)
+      setInvited("")
+    } else {
+      toast.error("Impossible d'ajouter ce membre")
+    }
+  }
 
   return (
     <div className="flex flex-col gap-4">
       <SectionCard title="Workspace members" description="Manage members, roles, and invitations.">
         <div className="flex flex-col divide-y divide-border/50">
-          {MEMBERS.map((m) => (
-            <div key={m.email} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-              <div className={cn("h-8 w-8 rounded-full flex items-center justify-center text-xs font-semibold text-white shrink-0", m.color)}>
-                {m.initials}
+          {membersLoading && (
+            <p className="text-sm text-muted-foreground py-3">Loading…</p>
+          )}
+          {!membersLoading && members.map((m) => {
+            const isYou = String(m.userId) === currentUser?.id
+            const displayLabel = m.displayName ?? m.email
+            const nameParts = displayLabel.split(" ")
+            const initials = `${nameParts[0]?.charAt(0) ?? ""}${nameParts[1]?.charAt(0) ?? ""}`.toUpperCase() || "?"
+            return (
+              <div key={m.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+                <div className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-semibold text-white bg-primary shrink-0">
+                  {initials}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground">
+                    {displayLabel}{isYou && <span className="ml-1 text-xs text-muted-foreground font-normal">(you)</span>}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{m.email}</p>
+                </div>
+                {isOwner && !isYou && m.role !== "OWNER" && (
+                  <Select
+                    value={m.role}
+                    onValueChange={async (val) => {
+                      const result = await changeRole(m.id, { role: val as "ADMIN" | "MEMBER" })
+                      if (result) toast.success("Rôle mis à jour")
+                      else toast.error("Impossible de changer le rôle")
+                    }}
+                  >
+                    <SelectTrigger size="sm" className="w-28">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ADMIN">Admin</SelectItem>
+                      <SelectItem value="MEMBER">Member</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+                {!isOwner && (
+                  <span className="text-xs text-muted-foreground capitalize">{m.role.toLowerCase()}</span>
+                )}
+                {isYou && (
+                  <span className="text-xs text-muted-foreground capitalize">{m.role.toLowerCase()}</span>
+                )}
+                {canManage && !isYou && m.role !== "OWNER" && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
+                    onClick={async () => {
+                      try { await kick(m.id); toast.success(`${displayLabel} retiré`) }
+                      catch { toast.error("Impossible de retirer ce membre") }
+                    }}
+                  >
+                    Remove
+                  </Button>
+                )}
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground">{m.name}</p>
-                <p className="text-xs text-muted-foreground">{m.email}</p>
-              </div>
-              <Select
-                value={roles[m.email]}
-                onValueChange={(val) => setRoles((r) => ({ ...r, [m.email]: val }))}
-                disabled={roles[m.email] === "owner"}
-              >
-                <SelectTrigger size="sm" className="w-28">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="owner">Owner</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="member">Member</SelectItem>
-                  <SelectItem value="viewer">Viewer</SelectItem>
-                </SelectContent>
-              </Select>
-              {roles[m.email] !== "owner" && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
-                  onClick={() => toast.success(`${m.name} removed`)}
-                >
-                  Remove
-                </Button>
-              )}
-            </div>
-          ))}
+            )
+          })}
         </div>
       </SectionCard>
-      <SectionCard title="Invite member" description="Send an invitation by email.">
-        <div className="flex gap-2">
-          <StyledInput
-            type="email"
-            placeholder="colleague@company.com"
-            value={invited}
-            onChange={(e) => setInvited(e.target.value)}
-          />
-          <Button
-            size="sm"
-            className="h-9 text-xs shrink-0"
-            onClick={() => { toast.success(`Invitation sent to ${invited}`); setInvited("") }}
-            disabled={!invited}
-          >
-            Send invite
-          </Button>
-        </div>
-      </SectionCard>
+      {canManage && (
+        <SectionCard title="Invite member" description="Add an existing Taskforce user by email.">
+          <div className="flex gap-2">
+            <StyledInput
+              type="email"
+              placeholder="colleague@company.com"
+              value={invited}
+              onChange={(e) => setInvited(e.target.value)}
+              onKeyDown={(e: React.KeyboardEvent) => e.key === "Enter" && handleInvite()}
+            />
+            <Button
+              size="sm"
+              className="h-9 text-xs shrink-0"
+              onClick={handleInvite}
+              disabled={!invited || inviting}
+            >
+              {inviting ? "Adding…" : "Add member"}
+            </Button>
+          </div>
+        </SectionCard>
+      )}
     </div>
   )
 }
