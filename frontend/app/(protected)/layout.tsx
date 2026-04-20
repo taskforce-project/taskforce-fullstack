@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react"
 
 import { useAuth } from "@/lib/contexts/auth-context"
 import { AppShell } from "@/components/layout/app-shell"
+import { Toaster } from "@/components/ui/sonner"
 
 export default function ProtectedLayout({
   children,
@@ -33,5 +34,10 @@ export default function ProtectedLayout({
     return null
   }
 
-  return <AppShell>{children}</AppShell>
+  return (
+    <>
+      <AppShell>{children}</AppShell>
+      <Toaster position="bottom-right" richColors closeButton />
+    </>
+  )
 }

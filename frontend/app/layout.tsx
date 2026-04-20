@@ -5,7 +5,6 @@ import { AuthProvider } from "@/lib/contexts/auth-context";
 import { I18nProvider } from "@/lib/i18n";
 import { ThemeProvider } from "next-themes";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { Toaster } from "@/components/ui/sonner";
 import { ErrorBoundary } from "@/components/providers/error-boundary";
 
 const roboto = Roboto({
@@ -50,7 +49,6 @@ export default function RootLayout({
               <ErrorBoundary>
                 <AuthProvider>
                   {children}
-                  <Toaster position="bottom-right" richColors closeButton />
                 </AuthProvider>
               </ErrorBoundary>
             </TooltipProvider>
