@@ -10,12 +10,13 @@ import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Avatar, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useAuth } from "@/lib/contexts/auth-context"
 import { useUserStore } from "@/lib/store/user-store"
+import { getAvatarUrl } from "@/lib/utils/avatar"
 import { cn } from "@/lib/utils"
 
 type SettingsSection =
@@ -181,80 +182,6 @@ function StyledInput(props: Readonly<React.InputHTMLAttributes<HTMLInputElement>
 // ---------------------------------------------------------------------------
 // Panels
 // ---------------------------------------------------------------------------
-// Avatar par défaut style Vercel — couleur déterministe + grille de points
-// ---------------------------------------------------------------------------
-
-const AVATAR_COLORS: [string, string][] = [
-  ["#6366f1", "#818cf8"], // indigo
-  ["#8b5cf6", "#a78bfa"], // violet
-  ["#ec4899", "#f472b6"], // pink
-  ["#14b8a6", "#2dd4bf"], // teal
-  ["#f59e0b", "#fbbf24"], // amber
-  ["#ef4444", "#f87171"], // red
-  ["#10b981", "#34d399"], // emerald
-  ["#3b82f6", "#60a5fa"], // blue
-  ["#f97316", "#fb923c"], // orange
-]
-
-function getAvatarColor(seed: string): [string, string] {
-  let hash = 0
-  for (let i = 0; i < seed.length; i++) {
-    hash = (seed.codePointAt(i) ?? 0) + ((hash << 5) - hash)
-  }
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
-}
-
-// SVG avatar généré — initiales + gradient + grille de points façon Vercel
-function GeneratedAvatar({ initials, seed, size = 56 }: Readonly<{ initials: string; seed: string; size?: number }>) {
-  const [from, to] = getAvatarColor(seed || "default")
-  const id = `grad-${seed.replaceAll(/[^a-z0-9]/gi, "")}`
-
-  // Grille 5×5 de dots, certains plus opaques
-  const dots: React.ReactNode[] = []
-  for (let r = 0; r < 5; r++) {
-    for (let c = 0; c < 5; c++) {
-      const opacity = ((r * 7 + c * 3 + (seed.codePointAt(r + c) ?? 0)) % 3) === 0 ? 0.25 : 0.1
-      dots.push(
-        <circle
-          key={`${r}-${c}`}
-          cx={6 + c * 11}
-          cy={6 + r * 11}
-          r={1.5}
-          fill="white"
-          opacity={opacity}
-        />
-      )
-    }
-  }
-
-  return (
-    <svg width={size} height={size} viewBox="0 0 56 56" xmlns="http://www.w3.org/2000/svg" style={{ borderRadius: "50%" }}>
-      <defs>
-        <linearGradient id={id} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor={from} />
-          <stop offset="100%" stopColor={to} />
-        </linearGradient>
-      </defs>
-      <rect width="56" height="56" fill={`url(#${id})`} />
-      {dots}
-      <text
-        x="28"
-        y="28"
-        textAnchor="middle"
-        dominantBaseline="central"
-        fill="white"
-        fontSize="18"
-        fontWeight="700"
-        fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-        style={{ userSelect: "none" }}
-      >
-        {initials}
-      </text>
-    </svg>
-  )
-}
-
-// ---------------------------------------------------------------------------
 
 function ProfilePanel() {
   const { user } = useAuth()
@@ -278,11 +205,15 @@ function ProfilePanel() {
     }
   }, [user])
 
-  const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || "?"
-  const avatarSeed = (user?.email ?? firstName + lastName).toLowerCase()
-  const hasCustomAvatar = avatarUrl.startsWith("http") || avatarUrl.startsWith("data:")
+  // Utilise l'avatar custom si défini, sinon l'API route qui génère le SVG gradient
+  const effectiveAvatar = getAvatarUrl({
+    firstName,
+    lastName,
+    email: user?.email ?? "",
+    avatarUrl: avatarUrl || null,
+  })
+  const hasCustomAvatar = Boolean(avatarUrl)
 
-  // Upload depuis le PC → data URL base64
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -328,18 +259,9 @@ function ProfilePanel() {
             <div className="flex items-center gap-4">
               {/* Avatar preview */}
               <div className="relative group shrink-0">
-                {hasCustomAvatar ? (
-                  <Avatar className="h-14 w-14">
-                    <AvatarImage src={avatarUrl} alt={displayName} className="object-cover" />
-                    <AvatarFallback>
-                      <GeneratedAvatar initials={initials} seed={avatarSeed} size={56} />
-                    </AvatarFallback>
-                  </Avatar>
-                ) : (
-                  <div className="h-14 w-14 rounded-full overflow-hidden ring-2 ring-border">
-                    <GeneratedAvatar initials={initials} seed={avatarSeed} size={56} />
-                  </div>
-                )}
+                <Avatar className="h-14 w-14">
+                  <AvatarImage src={effectiveAvatar} alt={displayName} className="object-cover" />
+                </Avatar>
                 {/* Overlay camera au hover */}
                 <button
                   type="button"
