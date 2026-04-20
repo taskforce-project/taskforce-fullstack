@@ -4,6 +4,7 @@ import { useState } from "react"
 import {
   Plus,
   FolderKanban,
+  Loader2,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -17,63 +18,65 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { cn } from "@/lib/utils"
+import { useWorkspaceStore } from "@/lib/store/workspace-store"
+import { useProjectStore } from "@/lib/store/project-store"
+import type { Project } from "@/lib/api/project-service"
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-interface CreateProjectPayload {
-  name: string
-  description: string
-  emoji: string
-  color: string
-}
-
 interface CreateProjectDialogProps {
   readonly children?: React.ReactNode
-  readonly onCreated?: (payload: CreateProjectPayload) => void
+  readonly onCreated?: (project: Project) => void
 }
-
-// ---------------------------------------------------------------------------
-// Config
-// ---------------------------------------------------------------------------
-
-const EMOJIS = ["🚀", "🎨", "⚡", "📱", "🔒", "📊", "🌐", "🛠️", "💎", "🔬", "🗄️", "📋"]
-const COLORS = [
-  { value: "bg-violet-500", preview: "bg-violet-500" },
-  { value: "bg-blue-500", preview: "bg-blue-500" },
-  { value: "bg-emerald-500", preview: "bg-emerald-500" },
-  { value: "bg-amber-500", preview: "bg-amber-500" },
-  { value: "bg-red-500", preview: "bg-red-500" },
-  { value: "bg-orange-500", preview: "bg-orange-500" },
-  { value: "bg-pink-500", preview: "bg-pink-500" },
-  { value: "bg-slate-500", preview: "bg-slate-500" },
-]
 
 // ---------------------------------------------------------------------------
 // CreateProjectDialog
 // ---------------------------------------------------------------------------
 
 export function CreateProjectDialog({ children, onCreated }: CreateProjectDialogProps) {
-  const [open, setOpen] = useState(false)
-  const [name, setName] = useState("")
-  const [description, setDescription] = useState("")
-  const [emoji, setEmoji] = useState("🚀")
-  const [color, setColor] = useState("bg-violet-500")
+  const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug)
+  const createProject = useProjectStore((s) => s.createProject)
 
-  function handleCreate() {
-    if (!name.trim()) return
-    onCreated?.({ name, description, emoji, color })
-    resetForm()
-    setOpen(false)
+  const [open, setOpen] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [name, setName] = useState("")
+  const [identifier, setIdentifier] = useState("")
+  const [description, setDescription] = useState("")
+
+  function handleNameChange(value: string) {
+    setName(value)
+    const derived = value.toUpperCase().replaceAll(/[^A-Z0-9]/g, "").slice(0, 6)
+    const prevDerived = name.toUpperCase().replaceAll(/[^A-Z0-9]/g, "").slice(0, 6)
+    if (!identifier || identifier === prevDerived) {
+      setIdentifier(derived)
+    }
+  }
+
+  async function handleCreate() {
+    if (!name.trim() || !identifier.trim() || !slug) return
+    setIsLoading(true)
+    try {
+      const project = await createProject(slug, {
+        name: name.trim(),
+        identifier: identifier.trim().toUpperCase(),
+        description: description.trim() || undefined,
+      })
+      if (project) {
+        onCreated?.(project)
+        resetForm()
+        setOpen(false)
+      }
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   function resetForm() {
     setName("")
+    setIdentifier("")
     setDescription("")
-    setEmoji("🚀")
-    setColor("bg-violet-500")
   }
 
   return (
@@ -98,65 +101,37 @@ export function CreateProjectDialog({ children, onCreated }: CreateProjectDialog
         <div className="flex flex-col gap-5 py-2">
           {/* Icon + Name row */}
           <div className="flex items-start gap-3">
-            {/* Emoji + color picker */}
-            <div className="flex flex-col gap-2 shrink-0">
-              <div className={cn("size-12 rounded-xl flex items-center justify-center text-2xl bg-linear-to-br from-muted to-muted/50 border border-border")}>
-                {emoji}
-              </div>
+            <div className="size-12 rounded-xl flex items-center justify-center bg-muted border border-border shrink-0">
+              <FolderKanban className="size-6 text-muted-foreground" />
             </div>
 
-            {/* Name */}
             <div className="flex-1 flex flex-col gap-1.5">
               <label htmlFor="project-name" className="text-sm font-medium text-foreground">Project name</label>
               <Input
                 id="project-name"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => handleNameChange(e.target.value)}
                 placeholder="My New Project"
                 className="h-9"
                 autoFocus
-                onKeyDown={(e) => e.key === "Enter" && name.trim() && handleCreate()}
+                onKeyDown={(e) => e.key === "Enter" && name.trim() && identifier.trim() && handleCreate()}
               />
             </div>
           </div>
 
-          {/* Emoji picker */}
+          {/* Identifier */}
           <div className="flex flex-col gap-1.5">
-            <p className="text-xs font-medium text-muted-foreground">Icon</p>
-            <div className="flex flex-wrap gap-2">
-              {EMOJIS.map((e) => (
-                <button
-                  key={e}
-                  onClick={() => setEmoji(e)}
-                  className={cn(
-                    "size-9 rounded-lg border flex items-center justify-center text-xl transition-all",
-                    emoji === e
-                      ? "border-primary bg-primary/5"
-                      : "border-border bg-muted/30 hover:border-border/80"
-                  )}
-                >
-                  {e}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Color picker */}
-          <div className="flex flex-col gap-1.5">
-            <p className="text-xs font-medium text-muted-foreground">Color</p>
-            <div className="flex gap-2">
-              {COLORS.map((c) => (
-                <button
-                  key={c.value}
-                  onClick={() => setColor(c.value)}
-                  className={cn(
-                    "size-7 rounded-full transition-all ring-offset-background",
-                    c.preview,
-                    color === c.value ? "ring-2 ring-offset-2 ring-foreground/20" : "opacity-70 hover:opacity-100"
-                  )}
-                />
-              ))}
-            </div>
+            <label htmlFor="project-identifier" className="text-sm font-medium text-foreground">
+              Identifier{" "}
+              <span className="ml-1.5 text-xs font-normal text-muted-foreground">Used as issue prefix (e.g. WEB-42)</span>
+            </label>
+            <Input
+              id="project-identifier"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value.toUpperCase().replaceAll(/[^A-Z0-9-]/g, "").slice(0, 10))}
+              placeholder="WEB"
+              className="h-9 font-mono uppercase"
+            />
           </div>
 
           {/* Description */}
@@ -175,11 +150,11 @@ export function CreateProjectDialog({ children, onCreated }: CreateProjectDialog
         </div>
 
         <DialogFooter className="gap-2">
-          <Button variant="outline" size="sm" onClick={() => setOpen(false)}>
+          <Button variant="outline" size="sm" onClick={() => setOpen(false)} disabled={isLoading}>
             Cancel
           </Button>
-          <Button size="sm" onClick={handleCreate} disabled={!name.trim()} className="gap-2">
-            <FolderKanban className="size-4" />
+          <Button size="sm" onClick={handleCreate} disabled={!name.trim() || !identifier.trim() || isLoading} className="gap-2">
+            {isLoading ? <Loader2 className="size-4 animate-spin" /> : <FolderKanban className="size-4" />}
             Create project
           </Button>
         </DialogFooter>
