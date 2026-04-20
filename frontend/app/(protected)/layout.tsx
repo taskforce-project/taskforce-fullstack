@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Loader2 } from "lucide-react"
 
@@ -15,14 +15,23 @@ export default function ProtectedLayout({
 }) {
   const { isAuthenticated, isLoading } = useAuth()
   const router = useRouter()
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (!mounted || isLoading) return
+    // Ne rediriger que si : pas authentifié ET pas de token en localStorage
+    // Évite les faux positifs dus au timing React (état contexte pas encore propagé)
+    const hasLocalToken = !!localStorage.getItem("accessToken")
+    if (!isAuthenticated && !hasLocalToken) {
       router.replace("/auth/login")
     }
-  }, [isAuthenticated, isLoading, router])
+  }, [mounted, isAuthenticated, isLoading, router])
 
-  if (isLoading) {
+  if (!mounted || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -30,7 +39,10 @@ export default function ProtectedLayout({
     )
   }
 
-  if (!isAuthenticated) {
+  // Double vérification : token localStorage présent = laisser passer
+  // (le contexte se synchronisera au prochain cycle)
+  const hasLocalToken = typeof window !== "undefined" && !!localStorage.getItem("accessToken")
+  if (!isAuthenticated && !hasLocalToken) {
     return null
   }
 
@@ -41,4 +53,5 @@ export default function ProtectedLayout({
     </>
   )
 }
+
 
