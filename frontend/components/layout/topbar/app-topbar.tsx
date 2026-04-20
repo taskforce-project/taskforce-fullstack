@@ -20,6 +20,7 @@ import { Kbd } from "@/components/ui/kbd"
 import { ThemeToggle } from "@/components/common/theme-toggle"
 import { useTranslation } from "@/lib/i18n"
 import { CommandPalette } from "@/components/command-palette"
+import { useWorkspaceStore } from "@/lib/store/workspace-store"
 
 /**
  * Map a URL segment (slug) to a display label.
@@ -79,6 +80,7 @@ function useBreadcrumbs() {
 
 export function AppTopbar() {
   const { t } = useTranslation()
+  const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug)
   const breadcrumbs = useBreadcrumbs()
   const [cmdOpen, setCmdOpen] = React.useState(false)
 
@@ -158,7 +160,7 @@ export function AppTopbar() {
           aria-label={t("common.notifications")}
           asChild
         >
-          <Link href="/inbox">
+          <Link href={`/${slug}/inbox`}>
             <Bell className="size-4" />
           </Link>
         </Button>

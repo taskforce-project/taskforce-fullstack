@@ -31,6 +31,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { useAuth } from "@/lib/contexts/auth-context"
+import { useWorkspaceStore } from "@/lib/store/workspace-store"
 
 export function NavUser({
   user,
@@ -44,6 +45,7 @@ export function NavUser({
   const { isMobile } = useSidebar()
   const { logout, user: authUser } = useAuth()
   const router = useRouter()
+  const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug)
 
   const isPro = authUser?.planType === "PRO" || authUser?.planType === "ENTERPRISE"
 
@@ -91,23 +93,22 @@ export function NavUser({
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
               {!isPro && (
-                <DropdownMenuItem onClick={() => router.push("/settings?section=billing")}>
-                  <Sparkles />
+                <DropdownMenuItem onClick={() => router.push(`/${slug}/settings?section=billing`)}>
                   Upgrade to Pro
                 </DropdownMenuItem>
               )}
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem onClick={() => router.push("/profile")}>
+              <DropdownMenuItem onClick={() => router.push(`/${slug}/profile`)}>
                 <BadgeCheck />
                 Account
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => router.push("/settings?section=billing")}>
+              <DropdownMenuItem onClick={() => router.push(`/${slug}/settings?section=billing`)}>
                 <CreditCard />
                 Billing
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => router.push("/settings?section=notifications")}>
+              <DropdownMenuItem onClick={() => router.push(`/${slug}/settings?section=notifications`)}>
                 <Bell />
                 Notifications
               </DropdownMenuItem>

@@ -6,6 +6,7 @@ import { Lock } from "lucide-react"
 
 import { useAuth } from "@/lib/contexts/auth-context"
 import { useTranslation } from "@/lib/i18n"
+import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { Button } from "@/components/ui/button"
 
 type Plan = "FREE" | "PRO" | "ENTERPRISE"
@@ -42,6 +43,7 @@ interface PlanGateProps {
 export function PlanGate({ minPlan, plans, children, fallback }: PlanGateProps) {
   const { user } = useAuth()
   const { t } = useTranslation()
+  const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug)
 
   const userPlan: Plan = (user?.planType as Plan) ?? "FREE"
 
@@ -74,7 +76,7 @@ export function PlanGate({ minPlan, plans, children, fallback }: PlanGateProps) 
         </p>
       </div>
       <Button size="sm" asChild>
-        <Link href="/settings/billing">{t("common.learnMore")}</Link>
+        <Link href={`/${slug}/settings?section=billing`}>{t("common.learnMore")}</Link>
       </Button>
     </div>
   )
