@@ -28,10 +28,8 @@ export default function ProtectedRootPage() {
     fetchWorkspaces().then((list) => {
       if (list.length > 0) {
         router.replace(`/${list[0].slug}/dashboard`)
-      } else {
-        // Aucun workspace — onboarding ou page de création
-        router.replace("/auth/login")
       }
+      // Si aucun workspace, rester sur le loader (ne pas boucler vers /auth/login)
     })
   }, [isAuthenticated, authLoading, workspaces, fetchWorkspaces, router])
 

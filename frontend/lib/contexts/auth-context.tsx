@@ -78,8 +78,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     if (!isLoading && user && globalThis.window !== undefined) {
       const currentPath = globalThis.location.pathname;
-      if (currentPath === "/auth/login" || currentPath === "/") {
-        router.replace("/dashboard");
+      if (currentPath === "/auth/login") {
+        router.replace("/");
       }
     }
   }, [user, isLoading, router]);
