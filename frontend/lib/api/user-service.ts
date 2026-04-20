@@ -8,6 +8,8 @@ import type { AuthUser } from "../auth";
 import { USER_ROUTES } from "../config/api-routes";
 
 export interface UpdateUserPayload {
+  firstName?: string;
+  lastName?: string;
   displayName?: string;
   avatarUrl?: string;
 }

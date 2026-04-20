@@ -4,17 +4,18 @@ import { useState, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
 import {
   User, Bell, CreditCard, Users, Check, Zap, Globe, Key, Palette, Webhook,
-  AlertTriangle, X as XIcon, Plus,
+  X as XIcon, Plus,
 } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useAuth } from "@/lib/contexts/auth-context"
+import { useUserStore } from "@/lib/store/user-store"
 import { cn } from "@/lib/utils"
 
 type SettingsSection =
@@ -182,69 +183,89 @@ function StyledInput(props: Readonly<React.InputHTMLAttributes<HTMLInputElement>
 // ---------------------------------------------------------------------------
 
 function ProfilePanel() {
-  const [name, setName] = useState("Your Name")
-  const [bio, setBio] = useState("")
-  const [role, setRole] = useState("")
-  const [skills, setSkills] = useState<string[]>([])
+  const { user } = useAuth()
+  const { updateProfile } = useUserStore()
 
-  const isProfileComplete = skills.length > 0 && role.trim().length > 0
+  const [firstName, setFirstName] = useState(user?.firstName ?? "")
+  const [lastName, setLastName]   = useState(user?.lastName ?? "")
+  const [displayName, setDisplayName] = useState(user?.displayName ?? "")
+  const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl ?? "")
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (user) {
+      setFirstName(user.firstName)
+      setLastName(user.lastName)
+      setDisplayName(user.displayName)
+      setAvatarUrl(user.avatarUrl ?? "")
+    }
+  }, [user])
+
+  const initials = user
+    ? `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase()
+    : "?"
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      const payload: Record<string, string> = {}
+      if (firstName !== user?.firstName)         payload.firstName   = firstName
+      if (lastName !== user?.lastName)           payload.lastName    = lastName
+      if (displayName !== user?.displayName)     payload.displayName = displayName
+      if (avatarUrl !== (user?.avatarUrl ?? "")) payload.avatarUrl   = avatarUrl
+
+      if (Object.keys(payload).length === 0) {
+        toast.info("No changes to save")
+        return
+      }
+
+      await updateProfile(payload)
+      toast.success("Profile updated")
+    } catch {
+      toast.error("Failed to update profile")
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <div className="flex flex-col gap-4">
-      {!isProfileComplete && (
-        <div className="flex items-center gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-400">
-          <AlertTriangle className="h-4 w-4 shrink-0" />
-          Complete your profile — add your <strong className="font-semibold">role</strong> and{" "}
-          <strong className="font-semibold">skills</strong> to enable smart issue assignment.
-        </div>
-      )}
       <SectionCard title="Public profile" description="This information is visible to all workspace members.">
         <div className="flex flex-col gap-5">
           <FormField label="Profile picture">
             <div className="flex items-center gap-3">
               <Avatar className="h-14 w-14">
-                <AvatarFallback className="text-base font-semibold bg-primary text-primary-foreground">ME</AvatarFallback>
+                <AvatarImage src={avatarUrl} alt={displayName} />
+                <AvatarFallback className="text-base font-semibold bg-primary text-primary-foreground">{initials}</AvatarFallback>
               </Avatar>
-              <div>
-                <Button variant="outline" size="sm" className="h-8 text-xs">Upload photo</Button>
-                <p className="text-xs text-muted-foreground mt-1">JPG, PNG or GIF - max 2 MB</p>
+              <div className="flex-1">
+                <StyledInput
+                  value={avatarUrl}
+                  onChange={(e) => setAvatarUrl(e.target.value)}
+                  placeholder="https://example.com/avatar.jpg"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Paste an image URL</p>
               </div>
             </div>
           </FormField>
           <Separator />
-          <FormField label="Display name" hint="Used across Taskforce.">
-            <StyledInput value={name} onChange={(e) => setName(e.target.value)} />
+          <FormField label="First name">
+            <StyledInput value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First name" />
           </FormField>
-          <FormField label="Role / Title *" hint="Required — shown to team members.">
-            <StyledInput
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              placeholder="e.g. Lead Engineer"
-              className={role.trim() ? "" : "border-amber-500/40"}
-            />
+          <FormField label="Last name">
+            <StyledInput value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last name" />
           </FormField>
-          <FormField label="Skills *" hint="Required — used for smart issue assignment.">
-            <SkillsTagInput value={skills} onChange={setSkills} />
+          <FormField label="Display name" hint="Shown across Taskforce. Defaults to First + Last.">
+            <StyledInput value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder={`${firstName} ${lastName}`.trim()} />
           </FormField>
-          <FormField label="Bio" hint="Brief description.">
-            <textarea
-              value={bio}
-              onChange={(e) => setBio(e.target.value)}
-              rows={3}
-              placeholder="Tell your team a bit about yourself..."
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all resize-none"
-            />
+          <FormField label="Email" hint="Managed via your identity provider.">
+            <StyledInput type="email" value={user?.email ?? ""} readOnly />
           </FormField>
         </div>
       </SectionCard>
       <div className="flex justify-end">
-        <Button
-          size="sm"
-          className="h-8 text-xs"
-          disabled={!isProfileComplete}
-          onClick={() => toast.success("Profile updated")}
-        >
-          Save profile
+        <Button size="sm" className="h-8 text-xs" onClick={handleSave} disabled={saving}>
+          {saving ? "Saving…" : "Save profile"}
         </Button>
       </div>
     </div>
@@ -252,7 +273,7 @@ function ProfilePanel() {
 }
 
 function AccountPanel() {
-  const [email] = useState("you@taskforce.io")
+  const { user } = useAuth()
   const [timezone, setTimezone] = useState("Europe/Paris")
   const [language, setLanguage] = useState("en")
 
@@ -261,7 +282,7 @@ function AccountPanel() {
       <SectionCard title="Account info" description="Manage your login and localization preferences.">
         <div className="flex flex-col gap-5">
           <FormField label="Email" hint="Managed via your identity provider.">
-            <StyledInput type="email" value={email} readOnly />
+            <StyledInput type="email" value={user?.email ?? ""} readOnly />
           </FormField>
           <Separator />
           <FormField label="Language">
