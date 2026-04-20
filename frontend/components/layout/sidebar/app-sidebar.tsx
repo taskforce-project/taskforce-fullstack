@@ -115,7 +115,7 @@ const NAV_MAIN: readonly NavItem[] = [
     key: "nav.analytics",
     url: "/analytics",
     icon: BarChart3,
-    requiresPlan: ["pro", "enterprise"],
+    requiresPlan: ["PRO", "ENTERPRISE"],
   },
 ]
 
@@ -139,9 +139,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   const navUser = user
     ? {
-        name: `${user.firstName} ${user.lastName}`,
+        name: user.displayName ?? `${user.firstName} ${user.lastName}`,
         email: user.email,
-        avatar: "",
+        avatar: user.avatarUrl ?? "",
       }
     : { name: "...", email: "...", avatar: "" }
 
@@ -149,11 +149,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     pathname === url || pathname.startsWith(`${url}/`)
 
   const canAccess = (item: NavItem) => {
-    if (item.requiresRole && user?.role) {
-      if (!item.requiresRole.includes(user.role)) return false
-    }
-    if (item.requiresPlan && user?.plan) {
-      if (!item.requiresPlan.includes(user.plan)) return false
+    if (item.requiresPlan && user?.planType) {
+      if (!item.requiresPlan.includes(user.planType)) return false
     }
     return true
   }
@@ -176,7 +173,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">TaskForce</span>
                   <span className="truncate text-xs capitalize text-muted-foreground">
-                    {user?.plan ?? "free"}
+                    {user?.planType ?? "FREE"}
                   </span>
                 </div>
               </Link>
