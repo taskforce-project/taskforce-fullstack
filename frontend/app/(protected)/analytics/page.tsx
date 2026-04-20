@@ -159,7 +159,7 @@ export default function AnalyticsPage() {
   const { user } = useAuth()
   const [upgradeOpen, setUpgradeOpen] = useState(false)
 
-  const isPro = user?.plan === "pro" || user?.plan === "enterprise"
+  const isPro = user?.planType === "PRO" || user?.planType === "ENTERPRISE"
 
   return (
     <div className="flex flex-col gap-8 max-w-5xl mx-auto w-full">
