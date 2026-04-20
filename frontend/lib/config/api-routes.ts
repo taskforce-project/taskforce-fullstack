@@ -33,14 +33,12 @@ export const STRIPE_ROUTES = {
 } as const;
 
 /**
- * Routes utilisateur (profil, etc.)
- * TODO: À implémenter quand UserController sera créé
+ * Routes utilisateur (profil)
+ * Backend: @RequestMapping("/api/users")
  */
-// export const USER_ROUTES = {
-//   PROFILE: "/api/users/profile",
-//   UPDATE_PROFILE: "/api/users/profile",
-//   DELETE_ACCOUNT: "/api/users/account",
-// } as const;
+export const USER_ROUTES = {
+  ME: "/api/users/me",
+} as const;
 
 /**
  * Toutes les routes groupées (export par défaut)
@@ -48,7 +46,7 @@ export const STRIPE_ROUTES = {
 export const API_ROUTES = {
   AUTH: AUTH_ROUTES,
   STRIPE: STRIPE_ROUTES,
-  // USER: USER_ROUTES,
+  USER: USER_ROUTES,
 } as const;
 
 export default API_ROUTES;
