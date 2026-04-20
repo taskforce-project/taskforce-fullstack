@@ -21,6 +21,7 @@ import {
 } from "lucide-react"
 
 import { NavUser } from "@/components/layout/sidebar/nav-user"
+import { getAvatarUrl } from "@/lib/utils/avatar"
 import { useAuth } from "@/lib/contexts/auth-context"
 import { useTranslation } from "@/lib/i18n"
 import {
@@ -140,7 +141,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     ? {
         name: user.displayName ?? `${user.firstName} ${user.lastName}`,
         email: user.email,
-        avatar: user.avatarUrl ?? "",
+        avatar: getAvatarUrl(user),
       }
     : { name: "...", email: "...", avatar: "" }
 
