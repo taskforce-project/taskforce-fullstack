@@ -5,13 +5,26 @@
 export * from "./register-storage";
 
 // Types
+export type PlanType = "FREE" | "PRO" | "ENTERPRISE";
+export type PlanStatus =
+  | "ACTIVE"
+  | "CANCELED"
+  | "PAST_DUE"
+  | "TRIALING"
+  | "INCOMPLETE"
+  | "UNPAID";
+
 export type AuthUser = {
   id: string;
   email: string;
   firstName: string;
   lastName: string;
-  role?: string;
-  plan?: "free" | "pro" | "enterprise";
+  displayName: string;
+  avatarUrl?: string;
+  planType: PlanType;
+  planStatus?: PlanStatus;
+  isActive?: boolean;
+  createdAt?: string;
 };
 
 export type LoginCredentials = {
