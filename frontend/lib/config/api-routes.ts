@@ -59,6 +59,23 @@ export const WORKSPACE_ROUTES = {
 } as const;
 
 /**
+ * Routes projets
+ * Backend: @RequestMapping("/api/workspaces/{slug}/projects")
+ */
+export const PROJECT_ROUTES = {
+  LIST:    (slug: string) => `/api/workspaces/${slug}/projects`,
+  CREATE:  (slug: string) => `/api/workspaces/${slug}/projects`,
+  BY_ID:   (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}`,
+  UPDATE:  (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}`,
+  ARCHIVE: (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/archive`,
+  DELETE:  (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}`,
+  MEMBERS: (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/members`,
+  MEMBER:  (slug: string, id: number, memberId: number) => `/api/workspaces/${slug}/projects/${id}/members/${memberId}`,
+  LABELS:  (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/labels`,
+  LABEL:   (slug: string, id: number, labelId: number) => `/api/workspaces/${slug}/projects/${id}/labels/${labelId}`,
+} as const;
+
+/**
  * Toutes les routes groupées (export par défaut)
  */
 export const API_ROUTES = {
