@@ -62,6 +62,8 @@ public class JwtService {
             .email(user.getEmail())
             .firstName(keycloakUser.getFirstName())
             .lastName(keycloakUser.getLastName())
+            .displayName(keycloakUser.getFirstName() + " " + keycloakUser.getLastName().toUpperCase())
+            .avatarUrl(null)
             .planType(user.getPlanType())
             .planStatus(user.getPlanStatus())
             .subscriptionStartDate(user.getSubscriptionStartDate())
