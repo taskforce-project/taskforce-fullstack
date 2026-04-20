@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import {
   User, Bell, CreditCard, Users, Check, Zap, Globe, Key, Palette, Webhook,
   AlertTriangle, X as XIcon, Plus,
@@ -674,7 +675,15 @@ function IntegrationsPanel() {
 // ---------------------------------------------------------------------------
 
 export default function SettingsPage() {
+  const searchParams = useSearchParams()
   const [active, setActive] = useState<SettingsSection>("profile")
+
+  useEffect(() => {
+    const section = searchParams.get("section") as SettingsSection | null
+    if (section && SECTIONS.some((s) => s.key === section)) {
+      setActive(section)
+    }
+  }, [searchParams])
 
   const activeSection = SECTIONS.find((s) => s.key === active)
 
