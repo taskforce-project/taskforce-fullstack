@@ -28,14 +28,16 @@ export const apiClient: AxiosInstance = axios.create({
 });
 
 /**
+ * Endpoints publics qui ne nécessitent pas de token JWT
+ */
+const publicEndpoints = ["/api/auth/", "/api/sales/"];
+
+/**
  * Intercepteur pour ajouter le token JWT aux requêtes
  * Exclut les endpoints publics qui ne nécessitent pas d'authentification
  */
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    // Liste des endpoints publics qui ne doivent PAS avoir de token
-    const publicEndpoints = ["/api/auth/", "/api/sales/"];
-    
     // Vérifier si l'URL correspond à un endpoint public
     const isPublicEndpoint = publicEndpoints.some(endpoint => 
       config.url?.includes(endpoint)
@@ -112,7 +114,11 @@ apiClient.interceptors.response.use(
     }
 
     // Show toast for non-401 errors (and 401 that could not be refreshed)
-    if (globalThis.window !== undefined) {
+    // Skip toast for auth/public endpoints: the calling forms handle their own error display
+    const requestUrl = error.config?.url ?? ""
+    const isAuthEndpoint = publicEndpoints.some((ep) => requestUrl.includes(ep))
+
+    if (globalThis.window !== undefined && !isAuthEndpoint) {
       const status = error.response?.status
       const data = error.response?.data as { message?: string } | undefined
       const message = data?.message || error.message || "Une erreur est survenue"
