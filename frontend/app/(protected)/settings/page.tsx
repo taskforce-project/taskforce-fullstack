@@ -450,12 +450,12 @@ function SecurityPanel() {
 
 function BillingPanel() {
   const { user } = useAuth()
-  const plan = (user?.plan ?? "free") as string
+  const plan = (user?.planType ?? "FREE") as string
 
   const PLANS = [
-    { key: "free",       label: "Free",       price: "$0",     features: PLAN_FEATURES.free,       highlight: false },
-    { key: "pro",        label: "Pro",        price: "$12/mo", features: PLAN_FEATURES.pro,        highlight: true  },
-    { key: "enterprise", label: "Enterprise", price: "Custom", features: PLAN_FEATURES.enterprise, highlight: false },
+    { key: "FREE",       label: "Free",       price: "$0",     features: PLAN_FEATURES.free,       highlight: false },
+    { key: "PRO",        label: "Pro",        price: "$12/mo", features: PLAN_FEATURES.pro,        highlight: true  },
+    { key: "ENTERPRISE", label: "Enterprise", price: "Custom", features: PLAN_FEATURES.enterprise, highlight: false },
   ]
 
   return (
@@ -465,17 +465,17 @@ function BillingPanel() {
           <div className="flex-1">
             <div className="flex items-center gap-2">
               <span className="text-lg font-bold capitalize text-foreground">{plan}</span>
-              {plan !== "free" && (
+              {plan !== "FREE" && (
                 <Badge variant="outline" className="bg-amber-500/15 text-amber-400 border-amber-500/20 text-xs">
                   <Zap className="h-3 w-3 mr-1" />Active
                 </Badge>
               )}
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {plan === "free" ? "No active subscription" : "Billed monthly - renews Jan 15, 2026"}
+              {plan === "FREE" ? "No active subscription" : "Billed monthly - renews Jan 15, 2026"}
             </p>
           </div>
-          {plan !== "free" && (
+          {plan !== "FREE" && (
             <Button variant="outline" size="sm" className="h-8 text-xs text-destructive border-destructive/30 hover:bg-destructive/10">
               Cancel plan
             </Button>
