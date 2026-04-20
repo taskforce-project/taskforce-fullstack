@@ -41,12 +41,25 @@ export const USER_ROUTES = {
 } as const;
 
 /**
+ * Routes workspace
+ * Backend: @RequestMapping("/api/workspaces")
+ */
+export const WORKSPACE_ROUTES = {
+  CURRENT: "/api/workspaces/current",
+  MEMBERS: "/api/workspaces/current/members",
+  INVITE: "/api/workspaces/current/members/invite",
+  MEMBER_ROLE: (memberId: number) => `/api/workspaces/current/members/${memberId}/role`,
+  MEMBER: (memberId: number) => `/api/workspaces/current/members/${memberId}`,
+} as const;
+
+/**
  * Toutes les routes groupées (export par défaut)
  */
 export const API_ROUTES = {
   AUTH: AUTH_ROUTES,
   STRIPE: STRIPE_ROUTES,
   USER: USER_ROUTES,
+  WORKSPACE: WORKSPACE_ROUTES,
 } as const;
 
 export default API_ROUTES;
