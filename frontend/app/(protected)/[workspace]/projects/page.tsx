@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import Link from "next/link"
+import { useParams } from "next/navigation"
 import {
   Plus,
   Search,
@@ -11,6 +12,7 @@ import {
   MoreHorizontal,
   Archive,
   PauseCircle,
+  Loader2,
 } from "lucide-react"
 
 import { CreateProjectDialog } from "@/components/dialogs/create-project-dialog"
@@ -27,161 +29,47 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
+import { useProjectStore } from "@/lib/store/project-store"
+import type { Project } from "@/lib/api/project-service"
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-type ProjectStatus = "active" | "paused" | "archived"
 type FilterTab = "all" | "active" | "archived"
-
-interface ProjectMember {
-  name: string
-  initials: string
-  color: string
-}
-
-interface Project {
-  id: string
-  name: string
-  description: string
-  status: ProjectStatus
-  color: string
-  emoji: string
-  totalIssues: number
-  openIssues: number
-  members: ProjectMember[]
-  progress: number
-  updatedAt: string
-  url: string
-}
-
-// ---------------------------------------------------------------------------
-// Mock data
-// ---------------------------------------------------------------------------
-
-const MOCK_PROJECTS: Project[] = [
-  {
-    id: "1",
-    name: "Website Redesign",
-    description: "Complete overhaul of the marketing site with new design system and improved performance.",
-    status: "active",
-    color: "bg-violet-500",
-    emoji: "🎨",
-    totalIssues: 34,
-    openIssues: 12,
-    members: [
-      { name: "Sophie Martin", initials: "SM", color: "bg-violet-500" },
-      { name: "You", initials: "ME", color: "bg-primary" },
-      { name: "Emma Petit", initials: "EP", color: "bg-emerald-500" },
-    ],
-    progress: 65,
-    updatedAt: "2 hours ago",
-    url: "/projects/1",
-  },
-  {
-    id: "2",
-    name: "Mobile App",
-    description: "iOS & Android native app — authentication, onboarding, and core feature set.",
-    status: "active",
-    color: "bg-blue-500",
-    emoji: "📱",
-    totalIssues: 58,
-    openIssues: 21,
-    members: [
-      { name: "Lucas Dufour", initials: "LD", color: "bg-blue-500" },
-      { name: "You", initials: "ME", color: "bg-primary" },
-      { name: "Emma Petit", initials: "EP", color: "bg-emerald-500" },
-      { name: "Thomas Bernard", initials: "TB", color: "bg-orange-500" },
-    ],
-    progress: 42,
-    updatedAt: "15 min ago",
-    url: "/projects/2",
-  },
-  {
-    id: "3",
-    name: "API v2",
-    description: "New RESTful API with improved auth, rate limiting, and OpenAPI documentation.",
-    status: "active",
-    color: "bg-emerald-500",
-    emoji: "⚡",
-    totalIssues: 27,
-    openIssues: 9,
-    members: [
-      { name: "You", initials: "ME", color: "bg-primary" },
-      { name: "Thomas Bernard", initials: "TB", color: "bg-orange-500" },
-    ],
-    progress: 78,
-    updatedAt: "Yesterday",
-    url: "/projects/3",
-  },
-  {
-    id: "4",
-    name: "Analytics Dashboard",
-    description: "Real-time analytics and reporting dashboard for workspace administrators.",
-    status: "paused",
-    color: "bg-amber-500",
-    emoji: "📊",
-    totalIssues: 15,
-    openIssues: 8,
-    members: [
-      { name: "Sophie Martin", initials: "SM", color: "bg-violet-500" },
-      { name: "You", initials: "ME", color: "bg-primary" },
-    ],
-    progress: 30,
-    updatedAt: "3 days ago",
-    url: "/projects/4",
-  },
-  {
-    id: "5",
-    name: "Design System",
-    description: "Component library, tokens, and documentation for all Taskforce products.",
-    status: "archived",
-    color: "bg-slate-500",
-    emoji: "💎",
-    totalIssues: 42,
-    openIssues: 0,
-    members: [
-      { name: "Emma Petit", initials: "EP", color: "bg-emerald-500" },
-    ],
-    progress: 100,
-    updatedAt: "2 weeks ago",
-    url: "/projects/5",
-  },
-]
 
 // ---------------------------------------------------------------------------
 // Status config
 // ---------------------------------------------------------------------------
 
-const STATUS_CONFIG: Record<ProjectStatus, { icon: React.ReactNode; badgeClass: string; label: string }> = {
-  active: {
+const STATUS_CONFIG = {
+  ACTIVE: {
     icon: <CircleDot className="h-3 w-3 text-emerald-400" />,
     badgeClass: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20",
     label: "Active",
   },
-  paused: {
+  PAUSED: {
     icon: <PauseCircle className="h-3 w-3 text-amber-400" />,
     badgeClass: "bg-amber-500/15 text-amber-400 border-amber-500/20",
     label: "Paused",
   },
-  archived: {
+  ARCHIVED: {
     icon: <Archive className="h-3 w-3 text-muted-foreground" />,
     badgeClass: "bg-muted text-muted-foreground border-border",
     label: "Archived",
   },
-}
-
+} as const
 // ---------------------------------------------------------------------------
 // ProjectCard
 // ---------------------------------------------------------------------------
 
-function ProjectCard({ project, t }: Readonly<{ project: Project; t: (k: string) => string }>) {
+function ProjectCard({ project, slug, t }: Readonly<{ project: Project; slug: string; t: (k: string) => string }>) {
   const statusCfg = STATUS_CONFIG[project.status]
+  const archiveProject = useProjectStore((s) => s.archiveProject)
 
   return (
     <Link
-      href={project.url}
+      href={`/${slug}/projects/${project.id}`}
       className="group relative flex flex-col rounded-xl border border-border bg-card p-5 hover:border-primary/40 hover:bg-card/80 transition-all [box-shadow:var(--shadow-sm)] hover:[box-shadow:var(--shadow-md)]"
     >
       {/* Header */}
@@ -222,29 +110,40 @@ function ProjectCard({ project, t }: Readonly<{ project: Project; t: (k: string)
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem>Edit project</DropdownMenuItem>
-            <DropdownMenuItem>Archive</DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={async (e) => {
+                e.preventDefault()
+                await archiveProject(slug, project.id)
+              }}
+            >
+              Archive
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
 
       {/* Description */}
       <p className="text-sm text-muted-foreground line-clamp-2 mb-4 flex-1">
-        {project.description}
+        {project.description ?? <span className="italic">No description</span>}
       </p>
 
-      {/* Progress bar */}
+      {/* Progress bar — basé sur issues résolues vs total */}
       <div className="mb-4">
         <div className="flex items-center justify-between mb-1.5">
           <span className="text-xs text-muted-foreground">{t("projects.meta.progress")}</span>
-          <span className="text-xs text-muted-foreground">{project.progress}%</span>
+          <span className="text-xs text-muted-foreground">
+            {project.totalIssues > 0
+              ? Math.round(((project.totalIssues - project.openIssues) / project.totalIssues) * 100)
+              : 0}%
+          </span>
         </div>
         <div className="h-1.5 rounded-full bg-muted overflow-hidden">
           <div
             className={cn(
               "h-full rounded-full transition-all",
-              project.progress === 100 ? "bg-emerald-500" : "bg-primary"
+              project.openIssues === 0 && project.totalIssues > 0 ? "bg-emerald-500" : "bg-primary"
             )}
-            style={{ width: `${project.progress}%` }}
+            style={{ width: `${project.totalIssues > 0 ? Math.round(((project.totalIssues - project.openIssues) / project.totalIssues) * 100) : 0}%` }}
           />
         </div>
       </div>
@@ -255,9 +154,9 @@ function ProjectCard({ project, t }: Readonly<{ project: Project; t: (k: string)
         <div className="flex items-center">
           <div className="flex -space-x-2">
             {project.members.slice(0, 4).map((m) => (
-              <Avatar key={m.initials} className="h-6 w-6 ring-2 ring-card">
-                <AvatarFallback className={cn("text-[9px] text-white", m.color)}>
-                  {m.initials}
+              <Avatar key={m.id} className="h-6 w-6 ring-2 ring-card">
+                <AvatarFallback className="text-[9px] text-white bg-primary">
+                  {(m.displayName ?? m.email).slice(0, 2).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
             ))}
@@ -268,7 +167,7 @@ function ProjectCard({ project, t }: Readonly<{ project: Project; t: (k: string)
             )}
           </div>
           <span className="ml-2 text-xs text-muted-foreground">
-            {project.members.length} {t("projects.meta.members")}
+            {project.memberCount} {t("projects.meta.members")}
           </span>
         </div>
 
@@ -323,19 +222,28 @@ const FILTER_TABS: FilterTab[] = ["all", "active", "archived"]
 
 export default function ProjectsPage() {
   const { t } = useTranslation()
+  const params = useParams<{ workspace: string }>()
+  const slug = params.workspace
+
+  const { projects, isLoading, fetchProjects } = useProjectStore()
+
   const [filter, setFilter] = useState<FilterTab>("all")
   const [search, setSearch] = useState("")
 
+  useEffect(() => {
+    if (slug) fetchProjects(slug)
+  }, [slug, fetchProjects])
+
   const filtered = useMemo(() => {
-    let list = MOCK_PROJECTS
-    if (filter === "active") list = list.filter((p) => p.status === "active" || p.status === "paused")
-    if (filter === "archived") list = list.filter((p) => p.status === "archived")
+    let list = projects
+    if (filter === "active") list = list.filter((p) => p.status === "ACTIVE" || p.status === "PAUSED")
+    if (filter === "archived") list = list.filter((p) => p.status === "ARCHIVED")
     if (search.trim()) {
       const q = search.toLowerCase()
-      list = list.filter((p) => p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q))
+      list = list.filter((p) => p.name.toLowerCase().includes(q) || (p.description ?? "").toLowerCase().includes(q))
     }
     return list
-  }, [filter, search])
+  }, [projects, filter, search])
 
   return (
     <div className="flex flex-col gap-0 w-full">
@@ -387,11 +295,17 @@ export default function ProjectsPage() {
 
       {/* Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {filtered.length === 0 ? (
-          <EmptyState isSearch={search.trim().length > 0} t={t} />
-        ) : (
-          filtered.map((project) => <ProjectCard key={project.id} project={project} t={t} />)
+        {isLoading && (
+          <div className="col-span-full flex justify-center py-16">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
         )}
+        {!isLoading && filtered.length === 0 && (
+          <EmptyState isSearch={search.trim().length > 0} t={t} />
+        )}
+        {!isLoading && filtered.map((project) => (
+          <ProjectCard key={project.id} project={project} slug={slug} t={t} />
+        ))}
       </div>
     </div>
   )
