@@ -18,6 +18,7 @@ import lombok.NoArgsConstructor;
 public class WorkspaceResponse {
 
     private Long id;
+    private String uuid;
     private String name;
     private String slug;
     private String description;
