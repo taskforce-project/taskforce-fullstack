@@ -14,6 +14,12 @@ import lombok.AllArgsConstructor;
 @AllArgsConstructor
 public class UpdateUserRequest {
 
+    @Size(max = 100, message = "Le prénom ne peut pas dépasser 100 caractères")
+    private String firstName;
+
+    @Size(max = 100, message = "Le nom ne peut pas dépasser 100 caractères")
+    private String lastName;
+
     @Size(max = 150, message = "Le nom d'affichage ne peut pas dépasser 150 caractères")
     private String displayName;
 

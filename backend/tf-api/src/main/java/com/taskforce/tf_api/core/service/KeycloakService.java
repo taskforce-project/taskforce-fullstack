@@ -175,6 +175,23 @@ public class KeycloakService {
     }
 
     /**
+     * Met à jour le prénom et/ou le nom d'un utilisateur dans Keycloak.
+     * Seuls les champs non-null sont appliqués.
+     */
+    public void updateUserNames(String keycloakId, String firstName, String lastName) {
+        log.info("Mise à jour des noms pour l'utilisateur Keycloak : {}", keycloakId);
+
+        UserResource userResource = realmResource.users().get(keycloakId);
+        UserRepresentation user = userResource.toRepresentation();
+
+        if (firstName != null) user.setFirstName(firstName);
+        if (lastName != null)  user.setLastName(lastName);
+
+        userResource.update(user);
+        log.info("Noms mis à jour avec succès pour keycloakId={}", keycloakId);
+    }
+
+    /**
      * Supprime un utilisateur de Keycloak
      */
     public void deleteUser(String keycloakId) {

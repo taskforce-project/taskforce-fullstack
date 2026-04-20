@@ -47,7 +47,7 @@ public class UserService {
         User user = userRepository.findByKeycloakId(keycloakId)
             .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
 
-        // Patch partiel : uniquement les champs fournis
+        // Patch partiel champs DB
         if (request.getDisplayName() != null) {
             user.setDisplayName(request.getDisplayName());
         }
@@ -56,6 +56,13 @@ public class UserService {
         }
 
         userRepository.save(user);
+
+        // Propagation des noms vers Keycloak si fournis
+        boolean namesChanged = request.getFirstName() != null || request.getLastName() != null;
+        if (namesChanged) {
+            keycloakService.updateUserNames(keycloakId, request.getFirstName(), request.getLastName());
+        }
+
         log.info("Profil mis à jour pour keycloakId={}", keycloakId);
 
         UserRepresentation keycloakUser = keycloakService.getUserById(keycloakId);
