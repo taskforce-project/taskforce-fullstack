@@ -23,6 +23,7 @@ import com.taskforce.tf_api.core.enums.PlanType;
 import com.taskforce.tf_api.core.model.OtpVerification;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
+import com.taskforce.tf_api.core.service.WorkspaceService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,6 +45,7 @@ public class AuthService {
     private final EmailService emailService;
     private final UserRepository userRepository;
     private final JwtService jwtService;
+    private final WorkspaceService workspaceService;
 
     @Value("${stripe.success-url}")
     private String stripeSuccessUrl;
@@ -217,11 +219,15 @@ public class AuthService {
 
         // Créer l'utilisateur dans notre DB
         PlanType planTypeEnum = PlanType.valueOf(planType.toUpperCase());
+        String firstName = keycloakUser.getFirstName();
+        String lastName = keycloakUser.getLastName();
+        String displayName = buildDisplayName(firstName, lastName);
         User user = User.builder()
             .keycloakId(keycloakId)
             .email(request.getEmail())
             .planType(planTypeEnum)
             .isActive(true)
+            .displayName(displayName)
             // Plan status: NULL pour FREE, TRIALING pour plans payants en attente de configuration Stripe
             .planStatus(planTypeEnum == PlanType.FREE ? null : com.taskforce.tf_api.core.enums.PlanStatus.TRIALING)
             .build();
@@ -255,6 +261,9 @@ public class AuthService {
 
         user = userRepository.save(user);
         log.info("Utilisateur créé dans la DB avec ID : {}", user.getId());
+
+        // Créer automatiquement un workspace pour le nouvel utilisateur
+        workspaceService.createWorkspace(user, keycloakUser.getFirstName());
 
         // Envoyer l'email de bienvenue
         emailService.sendWelcomeEmail(request.getEmail(), keycloakUser.getFirstName());
@@ -313,6 +322,7 @@ public class AuthService {
                     .planType(PlanType.FREE)  // Plan gratuit par défaut
                     .planStatus(PlanStatus.ACTIVE)
                     .isActive(true)
+                    .displayName(buildDisplayName(keycloakUser.getFirstName(), keycloakUser.getLastName()))
                     .build();
                 
                 return userRepository.save(newUser);
@@ -518,10 +528,11 @@ public class AuthService {
             .stripeCustomerId(customerId)
             .stripeSubscriptionId(subscriptionId)
             .isActive(true)
+            .displayName(buildDisplayName(keycloakUser.getFirstName(), keycloakUser.getLastName()))
             .build();
 
         user = userRepository.save(user);
-        log.info("Utilisateur {} créé en base avec plan {} ACTIVE (ID: {})", 
+        log.info("Utilisateur {} créé en base avec plan {} ACTIVE (ID: {})",
             customerEmail, planType, user.getId());
 
         // 8. Envoyer l'email de bienvenue
@@ -536,5 +547,14 @@ public class AuthService {
             .userCreated(true)
             .message("Inscription finalisée avec succès. Votre abonnement est actif.")
             .build();
+    }
+
+    private String buildDisplayName(String firstName, String lastName) {
+        String fn = (firstName != null && !firstName.isBlank()) ? firstName.trim() : "";
+        String ln = (lastName != null && !lastName.isBlank()) ? lastName.trim() : "";
+        if (!fn.isEmpty() && !ln.isEmpty()) return fn + " " + ln;
+        if (!fn.isEmpty()) return fn;
+        if (!ln.isEmpty()) return ln;
+        return null;
     }
 }
