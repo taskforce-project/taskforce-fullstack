@@ -8,11 +8,13 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.taskforce.tf_api.core.dto.request.CreateWorkspaceRequest;
 import com.taskforce.tf_api.core.dto.request.InviteMemberRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateMemberRoleRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateWorkspaceRequest;
 import com.taskforce.tf_api.core.dto.response.WorkspaceMemberResponse;
 import com.taskforce.tf_api.core.dto.response.WorkspaceResponse;
+import com.taskforce.tf_api.core.enums.PlanType;
 import com.taskforce.tf_api.core.enums.WorkspaceRole;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
@@ -37,6 +39,10 @@ public class WorkspaceService {
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceMemberRepository workspaceMemberRepository;
     private final UserRepository userRepository;
+
+    // Limites de workspaces par plan
+    private static final long MAX_WORKSPACES_FREE = 2;
+    private static final long MAX_WORKSPACES_PRO = 10;
 
     // -------------------------------------------------------------------------
     // Création automatique à l'inscription
@@ -88,6 +94,73 @@ public class WorkspaceService {
             .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
 
         return toResponse(workspace);
+    }
+
+    /**
+     * Retourne un workspace par son slug.
+     * L'utilisateur doit être membre.
+     */
+    @Transactional(readOnly = true)
+    public WorkspaceResponse getWorkspaceBySlug(String slug, Long userId) {
+        Workspace workspace = workspaceRepository.findBySlug(slug)
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
+        assertIsMember(workspace, userId);
+        return toResponse(workspace);
+    }
+
+    /**
+     * Retourne tous les workspaces dont l'utilisateur est membre.
+     */
+    @Transactional(readOnly = true)
+    public List<WorkspaceResponse> listWorkspacesByUser(Long userId) {
+        return workspaceRepository.findAllByMemberId(userId).stream()
+            .map(this::toResponse)
+            .collect(Collectors.toList());
+    }
+
+    /**
+     * Crée un nouveau workspace (déclenché depuis le controller).
+     * Vérifie la limite de workspaces selon le plan.
+     */
+    @Transactional
+    public WorkspaceResponse createNewWorkspace(Long userId, CreateWorkspaceRequest request) {
+        User owner = userRepository.findById(userId)
+            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+
+        long count = workspaceRepository.countByMemberId(userId);
+        checkWorkspaceLimit(owner.getPlanType(), count);
+
+        String slug = generateUniqueSlug(request.getName());
+        Workspace workspace = Workspace.builder()
+            .name(request.getName())
+            .slug(slug)
+            .description(request.getDescription())
+            .owner(owner)
+            .build();
+
+        workspace = workspaceRepository.save(workspace);
+        log.info("Workspace '{}' créé par l'utilisateur {}", workspace.getSlug(), userId);
+
+        WorkspaceMember ownerMember = WorkspaceMember.builder()
+            .workspace(workspace)
+            .user(owner)
+            .role(WorkspaceRole.OWNER)
+            .build();
+        workspaceMemberRepository.save(ownerMember);
+
+        return toResponse(workspace);
+    }
+
+    private void checkWorkspaceLimit(PlanType plan, long current) {
+        long limit = switch (plan) {
+            case FREE -> MAX_WORKSPACES_FREE;
+            case PRO -> MAX_WORKSPACES_PRO;
+            default -> Long.MAX_VALUE;
+        };
+        if (current >= limit) {
+            throw new IllegalStateException(
+                "Limite de workspaces atteinte pour votre plan (" + limit + " max)");
+        }
     }
 
     /**
@@ -317,6 +390,7 @@ public class WorkspaceService {
 
         return WorkspaceResponse.builder()
             .id(workspace.getId())
+            .uuid(workspace.getUuid().toString())
             .name(workspace.getName())
             .slug(workspace.getSlug())
             .description(workspace.getDescription())
