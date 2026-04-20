@@ -8,12 +8,12 @@ import { useAuth } from "@/lib/contexts/auth-context"
 import { useTranslation } from "@/lib/i18n"
 import { Button } from "@/components/ui/button"
 
-type Plan = "free" | "pro" | "enterprise"
+type Plan = "FREE" | "PRO" | "ENTERPRISE"
 
 const PLAN_RANK: Record<Plan, number> = {
-  free: 0,
-  pro: 1,
-  enterprise: 2,
+  FREE: 0,
+  PRO: 1,
+  ENTERPRISE: 2,
 }
 
 interface PlanGateProps {
@@ -43,7 +43,7 @@ export function PlanGate({ minPlan, plans, children, fallback }: PlanGateProps) 
   const { user } = useAuth()
   const { t } = useTranslation()
 
-  const userPlan: Plan = (user?.plan as Plan) ?? "free"
+  const userPlan: Plan = (user?.planType as Plan) ?? "FREE"
 
   const hasAccess = (() => {
     if (plans) {
