@@ -1,7 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
-import Link from "next/link"
+import { useState, useMemo, useEffect } from "react"
 import {
   Search,
   UserPlus,
@@ -12,13 +11,14 @@ import {
   Mail,
   Check,
   X,
-  Clock,
   Filter,
+  Loader2,
 } from "lucide-react"
+import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
 import {
   DropdownMenu,
@@ -37,144 +37,39 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-type MemberRole = "owner" | "admin" | "member"
-type MemberStatus = "active" | "pending"
-
-interface WorkspaceMember {
-  id: string
-  name: string
-  email: string
-  initials: string
-  color: string
-  role: MemberRole
-  status: MemberStatus
-  joinedAt: string
-  lastActive: string
-  projectsCount: number
-  issuesCount: number
-  isYou?: boolean
-}
-
-type RoleFilter = "all" | MemberRole
+import { useWorkspaceStore } from "@/lib/store/workspace-store"
+import { useUserStore } from "@/lib/store/user-store"
+import type { WorkspaceMember, WorkspaceRole } from "@/lib/api/workspace-service"
 
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
 
-const ROLE_CONFIG: Record<MemberRole, { label: string; badgeClass: string; icon: React.ReactNode }> = {
-  owner: {
+type RoleFilter = "all" | WorkspaceRole
+
+const ROLE_CONFIG: Record<WorkspaceRole, { label: string; badgeClass: string; icon: React.ReactNode }> = {
+  OWNER: {
     label: "Owner",
     badgeClass: "bg-amber-500/15 text-amber-400 border-amber-500/20",
     icon: <Crown className="size-3 text-amber-400" />,
   },
-  admin: {
+  ADMIN: {
     label: "Admin",
     badgeClass: "bg-violet-500/15 text-violet-400 border-violet-500/20",
     icon: <Shield className="size-3 text-violet-400" />,
   },
-  member: {
+  MEMBER: {
     label: "Member",
     badgeClass: "bg-muted text-muted-foreground border-border",
     icon: <User className="size-3 text-muted-foreground" />,
   },
 }
 
-// ---------------------------------------------------------------------------
-// Mock data
-// ---------------------------------------------------------------------------
-
-const WORKSPACE_MEMBERS: WorkspaceMember[] = [
-  {
-    id: "1",
-    name: "You",
-    email: "you@taskforce.io",
-    initials: "ME",
-    color: "bg-primary",
-    role: "owner",
-    status: "active",
-    joinedAt: "Feb 10, 2026",
-    lastActive: "Just now",
-    projectsCount: 4,
-    issuesCount: 23,
-    isYou: true,
-  },
-  {
-    id: "2",
-    name: "Sophie Martin",
-    email: "sophie.martin@taskforce.io",
-    initials: "SM",
-    color: "bg-violet-500",
-    role: "admin",
-    status: "active",
-    joinedAt: "Feb 12, 2026",
-    lastActive: "2 hours ago",
-    projectsCount: 3,
-    issuesCount: 18,
-  },
-  {
-    id: "3",
-    name: "Emma Petit",
-    email: "emma.petit@taskforce.io",
-    initials: "EP",
-    color: "bg-emerald-500",
-    role: "member",
-    status: "active",
-    joinedAt: "Feb 18, 2026",
-    lastActive: "Yesterday",
-    projectsCount: 2,
-    issuesCount: 11,
-  },
-  {
-    id: "4",
-    name: "Thomas Bernard",
-    email: "thomas.bernard@taskforce.io",
-    initials: "TB",
-    color: "bg-orange-500",
-    role: "member",
-    status: "active",
-    joinedAt: "Mar 3, 2026",
-    lastActive: "3 days ago",
-    projectsCount: 2,
-    issuesCount: 7,
-  },
-  {
-    id: "5",
-    name: "Lucas Dufour",
-    email: "lucas.dufour@taskforce.io",
-    initials: "LD",
-    color: "bg-blue-500",
-    role: "member",
-    status: "active",
-    joinedAt: "Mar 15, 2026",
-    lastActive: "Last week",
-    projectsCount: 1,
-    issuesCount: 5,
-  },
-  {
-    id: "6",
-    name: "Invited User",
-    email: "invite@example.com",
-    initials: "IU",
-    color: "bg-muted-foreground",
-    role: "member",
-    status: "pending",
-    joinedAt: "—",
-    lastActive: "Pending",
-    projectsCount: 0,
-    issuesCount: 0,
-  },
-]
-
 const ROLE_FILTER_TABS: { key: RoleFilter; label: string }[] = [
   { key: "all", label: "All" },
-  { key: "owner", label: "Owners" },
-  { key: "admin", label: "Admins" },
-  { key: "member", label: "Members" },
+  { key: "OWNER", label: "Owners" },
+  { key: "ADMIN", label: "Admins" },
+  { key: "MEMBER", label: "Members" },
 ]
 
 // ---------------------------------------------------------------------------
@@ -184,18 +79,26 @@ const ROLE_FILTER_TABS: { key: RoleFilter; label: string }[] = [
 function InviteMemberDialog() {
   const [open, setOpen] = useState(false)
   const [email, setEmail] = useState("")
-  const [role, setRole] = useState<MemberRole>("member")
+  const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
+  const invite = useWorkspaceStore((s) => s.invite)
 
-  function handleInvite() {
+  async function handleInvite() {
     if (!email.trim()) return
-    setSent(true)
-    setTimeout(() => {
-      setSent(false)
-      setEmail("")
-      setRole("member")
-      setOpen(false)
-    }, 1500)
+    setLoading(true)
+    const result = await invite({ email: email.trim() })
+    setLoading(false)
+    if (result) {
+      setSent(true)
+      toast.success(`${email} ajouté au workspace`)
+      setTimeout(() => {
+        setSent(false)
+        setEmail("")
+        setOpen(false)
+      }, 1200)
+    } else {
+      toast.error("Impossible d'inviter ce membre. Vérifiez que l'email correspond à un compte existant.")
+    }
   }
 
   return (
@@ -211,12 +114,11 @@ function InviteMemberDialog() {
         <DialogHeader>
           <DialogTitle>Invite team member</DialogTitle>
           <DialogDescription>
-            Send an invitation to join your workspace. They&apos;ll receive an email with a link to accept.
+            Add an existing Taskforce user to your workspace by their email address.
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-4 py-2">
-          {/* Email */}
           <div className="flex flex-col gap-1.5">
             <label htmlFor="invite-email" className="text-sm font-medium text-foreground">Email address</label>
             <div className="relative">
@@ -232,49 +134,16 @@ function InviteMemberDialog() {
               />
             </div>
           </div>
-
-          {/* Role */}
-          <div className="flex flex-col gap-1.5">
-            <p className="text-sm font-medium text-foreground">Role</p>
-            <div className="flex gap-2">
-              {(["member", "admin"] as MemberRole[]).map((r) => {
-                const cfg = ROLE_CONFIG[r]
-                return (
-                  <button
-                    key={r}
-                    onClick={() => setRole(r)}
-                    className={cn(
-                      "flex-1 flex flex-col items-center gap-1.5 rounded-lg border p-3 text-sm transition-all",
-                      role === r
-                        ? "border-primary bg-primary/5 text-foreground"
-                        : "border-border bg-card text-muted-foreground hover:border-border/80 hover:bg-muted/30"
-                    )}
-                  >
-                    <span className="font-medium capitalize">{cfg.label}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {r === "member" ? "Can view & edit" : "Full access"}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
         </div>
 
         <DialogFooter className="gap-2">
           <Button variant="outline" size="sm" onClick={() => setOpen(false)}>
             Cancel
           </Button>
-          <Button size="sm" onClick={handleInvite} disabled={!email.trim()} className="gap-2">
-            {sent ? (
-              <>
-                <Check className="size-4" /> Sent!
-              </>
-            ) : (
-              <>
-                <Mail className="size-4" /> Send invitation
-              </>
-            )}
+          <Button size="sm" onClick={handleInvite} disabled={!email.trim() || loading} className="gap-2">
+            {loading && <Loader2 className="size-4 animate-spin" />}
+            {!loading && sent && <><Check className="size-4" /> Added!</>}
+            {!loading && !sent && <><Mail className="size-4" /> Add member</>}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -286,43 +155,76 @@ function InviteMemberDialog() {
 // MemberRow
 // ---------------------------------------------------------------------------
 
-function MemberRow({ member }: { readonly member: WorkspaceMember }) {
+interface MemberRowProps {
+  readonly member: WorkspaceMember
+  readonly isYou: boolean
+  readonly canManage: boolean
+  readonly isOwner: boolean
+}
+
+function MemberRow({ member, isYou, canManage, isOwner }: MemberRowProps) {
   const role = ROLE_CONFIG[member.role]
+  const changeRole = useWorkspaceStore((s) => s.changeRole)
+  const kick = useWorkspaceStore((s) => s.kick)
+
+  const displayLabel = member.displayName ?? member.email
+  const isEmail = !member.displayName
+  let initials: string
+  if (isEmail) {
+    // fallback email : utiliser les 2 premiers chars de la partie locale
+    const localPart = member.email.split("@")[0] ?? ""
+    initials = localPart.slice(0, 2).toUpperCase() || "?"
+  } else {
+    const nameParts = displayLabel.split(" ")
+    initials = `${nameParts[0]?.charAt(0) ?? ""}${nameParts[1]?.charAt(0) ?? ""}`.toUpperCase() || "?"
+  }
+  const avatarSrc = member.avatarUrl ?? `/api/avatar?initials=${encodeURIComponent(initials)}&seed=${encodeURIComponent(member.email.toLowerCase())}`
+
+  async function handleChangeRole(newRole: WorkspaceRole) {
+    const result = await changeRole(member.id, { role: newRole })
+    if (result) toast.success("Rôle mis à jour")
+    else toast.error("Impossible de changer le rôle")
+  }
+
+  async function handleRemove() {
+    try {
+      await kick(member.id)
+      toast.success("Membre retiré du workspace")
+    } catch {
+      toast.error("Impossible de retirer ce membre")
+    }
+  }
+
+  const joinedDate = new Date(member.joinedAt).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  })
 
   return (
     <div className="group flex items-center gap-4 px-5 py-3.5 border-b border-border/50 last:border-0 hover:bg-muted/20 transition-colors">
       {/* Avatar */}
       <div className="relative shrink-0">
         <Avatar className="size-9">
-          <AvatarFallback className={cn("text-xs text-white font-semibold", member.status === "pending" ? "bg-muted-foreground/40" : member.color)}>
-            {member.initials}
+          <AvatarImage src={avatarSrc} alt={displayLabel} />
+          <AvatarFallback className="text-xs font-semibold">
+            {displayLabel.slice(0, 2).toUpperCase()}
           </AvatarFallback>
         </Avatar>
-        {member.status === "active" && (
-          <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full bg-emerald-400 ring-2 ring-card" />
-        )}
-        {member.status === "pending" && (
-          <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full bg-amber-400 ring-2 ring-card" />
-        )}
+        <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full bg-emerald-400 ring-2 ring-card" />
       </div>
 
       {/* Info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-medium text-foreground">
-            {member.name}
-            {member.isYou && <span className="ml-1 text-xs text-muted-foreground font-normal">(you)</span>}
+            {displayLabel}
+            {isYou && <span className="ml-1 text-xs text-muted-foreground font-normal">(you)</span>}
           </span>
           <Badge variant="outline" className={cn("text-xs border px-1.5 py-0 h-4 flex items-center gap-1", role.badgeClass)}>
             {role.icon}
             {role.label}
           </Badge>
-          {member.status === "pending" && (
-            <Badge variant="outline" className="text-xs border px-1.5 py-0 h-4 bg-amber-500/15 text-amber-400 border-amber-500/20 flex items-center gap-1">
-              <Clock className="size-3" />
-              Pending
-            </Badge>
-          )}
         </div>
         <div className="flex items-center gap-1.5 mt-0.5 text-xs text-muted-foreground">
           <Mail className="size-3" />
@@ -330,26 +232,13 @@ function MemberRow({ member }: { readonly member: WorkspaceMember }) {
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="hidden md:flex items-center gap-5 text-xs text-muted-foreground shrink-0">
-        <div className="flex flex-col items-center">
-          <span className="font-semibold text-foreground text-sm">{member.projectsCount}</span>
-          <span>projects</span>
-        </div>
-        <div className="flex flex-col items-center">
-          <span className="font-semibold text-foreground text-sm">{member.issuesCount}</span>
-          <span>issues</span>
-        </div>
-      </div>
-
       {/* Joined */}
       <div className="hidden lg:flex flex-col items-end gap-0.5 shrink-0 text-xs text-muted-foreground">
-        <span>Joined {member.joinedAt}</span>
-        <span className="text-muted-foreground/70">{member.lastActive}</span>
+        <span>Joined {joinedDate}</span>
       </div>
 
-      {/* Actions */}
-      {!member.isYou && (
+      {/* Actions — only shown if current user can manage and target is not OWNER */}
+      {!isYou && canManage && member.role !== "OWNER" && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -361,16 +250,23 @@ function MemberRow({ member }: { readonly member: WorkspaceMember }) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem>Change role</DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href={`/members/${member.id}`}>View profile</Link>
-            </DropdownMenuItem>
-            {member.status === "pending" && (
-              <DropdownMenuItem>Resend invitation</DropdownMenuItem>
+            {/* Only OWNER can change roles */}
+            {isOwner && member.role !== "ADMIN" && (
+              <DropdownMenuItem onClick={() => handleChangeRole("ADMIN")}>
+                Promote to Admin
+              </DropdownMenuItem>
+            )}
+            {isOwner && member.role === "ADMIN" && (
+              <DropdownMenuItem onClick={() => handleChangeRole("MEMBER")}>
+                Demote to Member
+              </DropdownMenuItem>
             )}
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive focus:text-destructive">
-              {member.status === "pending" ? "Cancel invitation" : "Remove from workspace"}
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onClick={handleRemove}
+            >
+              Remove from workspace
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -387,20 +283,34 @@ export default function MembersPage() {
   const [search, setSearch] = useState("")
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all")
 
+  const { members, membersLoading, fetchMembers, workspace } = useWorkspaceStore()
+  const currentUser = useUserStore((s) => s.user)
+
+  useEffect(() => {
+    fetchMembers()
+  }, [fetchMembers])
+
+  const currentMember = members.find((m) => String(m.userId) === currentUser?.id)
+  const canManage = currentMember?.role === "OWNER" || currentMember?.role === "ADMIN"
+  const isOwner = currentMember?.role === "OWNER"
+
   const filtered = useMemo(() => {
-    let list = WORKSPACE_MEMBERS
+    let list = members
     if (roleFilter !== "all") list = list.filter((m) => m.role === roleFilter)
     if (search.trim()) {
       const q = search.toLowerCase()
       list = list.filter(
-        (m) => m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q)
+        (m) =>
+          (m.displayName ?? "").toLowerCase().includes(q) ||
+          m.email.toLowerCase().includes(q)
       )
     }
     return list
-  }, [search, roleFilter])
+  }, [members, search, roleFilter])
 
-  const activeCount = WORKSPACE_MEMBERS.filter((m) => m.status === "active").length
-  const pendingCount = WORKSPACE_MEMBERS.filter((m) => m.status === "pending").length
+  const memberCount = members.length
+  const memberSuffix = memberCount === 1 ? "" : "s"
+  const memberCountLabel = membersLoading ? "Loading…" : `${memberCount} member${memberSuffix}`
 
   return (
     <div className="flex flex-col gap-6 max-w-4xl mx-auto w-full">
@@ -409,15 +319,14 @@ export default function MembersPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Members</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {activeCount} active · {pendingCount} pending invitation{pendingCount !== 1 && "s"}
+            {memberCountLabel}
           </p>
         </div>
-        <InviteMemberDialog />
+        {canManage && <InviteMemberDialog />}
       </div>
 
       {/* Toolbar */}
       <div className="flex items-center gap-3 flex-wrap">
-        {/* Role filter tabs */}
         <div className="flex items-center rounded-lg bg-muted p-1 gap-0.5">
           {ROLE_FILTER_TABS.map((tab) => (
             <button
@@ -435,7 +344,6 @@ export default function MembersPage() {
           ))}
         </div>
 
-        {/* Search */}
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
           <Input
@@ -461,45 +369,55 @@ export default function MembersPage() {
         <div className="flex items-center gap-4 px-5 py-2.5 border-b border-border bg-muted/20 text-xs text-muted-foreground">
           <div className="size-9 shrink-0" />
           <div className="flex-1">Member</div>
-          <div className="hidden md:flex items-center gap-5">
-            <span className="w-16 text-center">Projects</span>
-            <span className="w-14 text-center">Issues</span>
-          </div>
           <div className="hidden lg:block w-32 text-right">Joined</div>
           <div className="size-8 shrink-0" />
         </div>
 
-        {filtered.length === 0 ? (
+        {membersLoading && (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="size-6 animate-spin text-muted-foreground" />
+          </div>
+        )}
+        {!membersLoading && filtered.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <Filter className="size-8 text-muted-foreground/30 mb-3" />
             <p className="text-sm font-medium text-foreground">No members found</p>
             <p className="text-xs text-muted-foreground mt-1">Try adjusting your search or filter</p>
           </div>
-        ) : (
-          filtered.map((member) => <MemberRow key={member.id} member={member} />)
         )}
+        {!membersLoading && filtered.length > 0 && filtered.map((member) => (
+          <MemberRow
+            key={member.id}
+            member={member}
+              isYou={String(member.userId) === currentUser?.id}
+            canManage={canManage}
+            isOwner={isOwner}
+          />
+        ))}
       </div>
 
       {/* Plan info */}
-      <div className="rounded-xl border border-border bg-card p-4 shadow-sm flex items-center justify-between gap-4">
-        <div>
-          <p className="text-sm font-medium text-foreground">
-            {activeCount} / 5 members
-          </p>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Free plan includes up to 5 members. Upgrade for unlimited.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-32 h-1.5 rounded-full bg-muted overflow-hidden">
-            <div
-              className="h-full rounded-full bg-primary transition-all"
-              style={{ width: `${(activeCount / 5) * 100}%` }}
-            />
+      {workspace && (
+        <div className="rounded-xl border border-border bg-card p-4 shadow-sm flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-foreground">
+              {memberCount} member{memberCount === 1 ? "" : "s"} in <span className="font-semibold">{workspace.name}</span>
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Free plan includes up to 5 members. Upgrade for unlimited.
+            </p>
           </div>
-          <span className="text-xs text-muted-foreground shrink-0">{activeCount}/5</span>
+          <div className="flex items-center gap-2">
+            <div className="w-32 h-1.5 rounded-full bg-muted overflow-hidden">
+              <div
+                className="h-full rounded-full bg-primary transition-all"
+                style={{ width: `${Math.min((memberCount / 5) * 100, 100)}%` }}
+              />
+            </div>
+            <span className="text-xs text-muted-foreground shrink-0">{memberCount}/5</span>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
