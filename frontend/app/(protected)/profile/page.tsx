@@ -165,11 +165,11 @@ function ProjectCard({ project: p }: { readonly project: typeof RECENT_PROJECTS[
 export default function ProfilePage() {
   const { user } = useAuth()
 
-  const displayName  = user ? `${user.firstName} ${user.lastName}` : "Your Name"
+  const displayName  = user?.displayName ?? (user ? `${user.firstName} ${user.lastName}` : "Your Name")
   const initials     = user ? `${user.firstName[0]}${user.lastName[0]}`.toUpperCase() : "ME"
   const email        = user?.email ?? "you@taskforce.io"
-  const plan         = user?.plan ?? "free"
-  const isPro        = plan === "pro" || plan === "enterprise"
+  const plan         = user?.planType ?? "FREE"
+  const isPro        = plan === "PRO" || plan === "ENTERPRISE"
 
   return (
     <div className="flex flex-col gap-6 max-w-4xl mx-auto w-full">
