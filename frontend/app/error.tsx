@@ -12,7 +12,7 @@ interface ErrorPageProps {
   reset: () => void;
 }
 
-export default function ErrorPage({ error, reset }: ErrorPageProps) {
+export default function ErrorPage({ error, reset }: Readonly<ErrorPageProps>) {
   useEffect(() => {
     toast.error("Une erreur inattendue s'est produite", {
       description: error.message || "Essayez de recharger la page.",
@@ -47,11 +47,11 @@ export default function ErrorPage({ error, reset }: ErrorPageProps) {
 
         {/* Error code */}
         <div className="relative select-none">
-          <span className="text-[clamp(7rem,22vw,14rem)] font-black leading-none tracking-tighter text-foreground/[0.06]">
+          <span className="text-[clamp(7rem,22vw,14rem)] font-black leading-none tracking-tighter text-foreground/6">
             500
           </span>
           <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-[clamp(4rem,12vw,8rem)] font-black leading-none tracking-tighter bg-gradient-to-b from-destructive/80 to-destructive/30 bg-clip-text text-transparent">
+            <span className="text-[clamp(4rem,12vw,8rem)] font-black leading-none tracking-tighter bg-linear-to-b from-destructive/80 to-destructive/30 bg-clip-text text-transparent">
               500
             </span>
           </div>
