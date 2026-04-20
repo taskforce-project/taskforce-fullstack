@@ -25,26 +25,38 @@ public class UserService {
     private final KeycloakService keycloakService;
 
     /**
-     * Récupère le profil complet de l'utilisateur par son keycloakId.
-     * Enrichit les données DB avec les infos Keycloak (firstName, lastName).
+     * Récupère le profil complet de l'utilisateur par son email (claim "sub" du JWT Keycloak).
+     * Utilise l'UUID Keycloak stocké en DB pour enrichir avec les infos Keycloak.
      */
-    @Transactional(readOnly = true)
-    public UserResponse getByKeycloakId(String keycloakId) {
-        User user = userRepository.findByKeycloakId(keycloakId)
+    @Transactional
+    public UserResponse getByEmail(String email) {
+        User user = userRepository.findByEmail(email)
             .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
 
-        UserRepresentation keycloakUser = keycloakService.getUserById(keycloakId);
+        UserRepresentation keycloakUser = keycloakService.getUserById(user.getKeycloakId());
+
+        // Auto-sync displayName depuis Keycloak si absent en DB
+        if (user.getDisplayName() == null || user.getDisplayName().isBlank()) {
+            String fn = keycloakUser.getFirstName();
+            String ln = keycloakUser.getLastName();
+            String synced = buildRawDisplayName(fn, ln);
+            if (synced != null) {
+                user.setDisplayName(synced);
+                userRepository.save(user);
+                log.info("displayName sync\u00e9 depuis Keycloak pour {}", email);
+            }
+        }
 
         return buildUserResponse(user, keycloakUser);
     }
 
     /**
      * Met à jour le displayName et/ou l'avatarUrl de l'utilisateur courant.
-     * Seuls les champs non-null de la requête sont appliqués (patch partiel).
+     * Lookup par email (claim "sub" du JWT), puis utilise l'UUID DB pour les calls Keycloak.
      */
     @Transactional
-    public UserResponse updateUser(String keycloakId, UpdateUserRequest request) {
-        User user = userRepository.findByKeycloakId(keycloakId)
+    public UserResponse updateUserByEmail(String email, UpdateUserRequest request) {
+        User user = userRepository.findByEmail(email)
             .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
 
         // Patch partiel champs DB
@@ -58,12 +70,13 @@ public class UserService {
         userRepository.save(user);
 
         // Propagation des noms vers Keycloak si fournis
+        String keycloakId = user.getKeycloakId();
         boolean namesChanged = request.getFirstName() != null || request.getLastName() != null;
         if (namesChanged) {
             keycloakService.updateUserNames(keycloakId, request.getFirstName(), request.getLastName());
         }
 
-        log.info("Profil mis à jour pour keycloakId={}", keycloakId);
+        log.info("Profil mis à jour pour email={}", email);
 
         UserRepresentation keycloakUser = keycloakService.getUserById(keycloakId);
         return buildUserResponse(user, keycloakUser);
@@ -94,5 +107,14 @@ public class UserService {
             .isActive(user.getIsActive())
             .createdAt(user.getCreatedAt())
             .build();
+    }
+
+    private String buildRawDisplayName(String firstName, String lastName) {
+        String fn = (firstName != null && !firstName.isBlank()) ? firstName.trim() : "";
+        String ln = (lastName != null && !lastName.isBlank()) ? lastName.trim() : "";
+        if (!fn.isEmpty() && !ln.isEmpty()) return fn + " " + ln;
+        if (!fn.isEmpty()) return fn;
+        if (!ln.isEmpty()) return ln;
+        return null;
     }
 }
