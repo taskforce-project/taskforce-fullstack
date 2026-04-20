@@ -8,6 +8,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { authService } from "../api/auth-service";
+import { useUserStore } from "../store/user-store";
 import type { AuthUser, LoginCredentials } from "../auth";
 
 /**
@@ -19,7 +20,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (credentials: LoginCredentials) => Promise<void>;
   logout: () => Promise<void>;
-  refreshUser: () => void;
+  refreshUser: () => Promise<void>;
 }
 
 /**
@@ -42,18 +43,33 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+  const { fetchMe, setUser: setStoreUser, clearUser } = useUserStore();
 
   /**
-   * Initialisation - Récupère l'utilisateur depuis localStorage
+   * Initialisation — lit le token en localStorage puis charge le profil depuis le backend.
+   * Si le token est absent ou expiré, reste non-authentifié.
    */
   useEffect(() => {
-    const initAuth = () => {
-      const currentUser = authService.getCurrentUser();
-      setUser(currentUser);
+    const initAuth = async () => {
+      const hasToken = authService.isAuthenticated();
+      if (!hasToken) {
+        setIsLoading(false);
+        return;
+      }
+      // Tenter de récupérer le profil complet depuis le backend
+      const remoteUser = await fetchMe();
+      if (remoteUser) {
+        setUser(remoteUser);
+      } else {
+        // Token invalide ou expiré → fallback sur localStorage
+        const localUser = authService.getCurrentUser();
+        setUser(localUser);
+      }
       setIsLoading(false);
     };
 
     initAuth();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /**
@@ -74,7 +90,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const login = async (credentials: LoginCredentials) => {
     try {
       const response = await authService.login(credentials);
-      setUser(response.user);
+      // Enrichir avec le profil complet depuis le backend
+      const remoteUser = await fetchMe();
+      const resolvedUser = remoteUser ?? response.user;
+      setUser(resolvedUser);
+      setStoreUser(resolvedUser);
       // La redirection est gérée par le composant appelant
     } catch (error) {
       setUser(null);
@@ -89,23 +109,29 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       await authService.logout();
       setUser(null);
-      
+      clearUser();
       // Redirection vers login
       router.push("/auth/login");
     } catch (error) {
       // Même en cas d'erreur, déconnecter côté client
       setUser(null);
+      clearUser();
       router.push("/auth/login");
       throw error;
     }
   };
 
   /**
-   * Rafraîchir les données utilisateur
+   * Rafraîchir les données utilisateur depuis le backend
    */
-  const refreshUser = () => {
-    const currentUser = authService.getCurrentUser();
-    setUser(currentUser);
+  const refreshUser = async () => {
+    const remoteUser = await fetchMe();
+    if (remoteUser) {
+      setUser(remoteUser);
+    } else {
+      const localUser = authService.getCurrentUser();
+      setUser(localUser);
+    }
   };
 
   const value: AuthContextType = {
