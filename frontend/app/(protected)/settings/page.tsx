@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useSearchParams } from "next/navigation"
 import {
   User, Bell, CreditCard, Users, Check, Zap, Globe, Key, Palette, Webhook,
-  X as XIcon, Plus,
+  X as XIcon, Plus, Upload, Camera,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -181,15 +181,92 @@ function StyledInput(props: Readonly<React.InputHTMLAttributes<HTMLInputElement>
 // ---------------------------------------------------------------------------
 // Panels
 // ---------------------------------------------------------------------------
+// Avatar par défaut style Vercel — couleur déterministe + grille de points
+// ---------------------------------------------------------------------------
+
+const AVATAR_COLORS: [string, string][] = [
+  ["#6366f1", "#818cf8"], // indigo
+  ["#8b5cf6", "#a78bfa"], // violet
+  ["#ec4899", "#f472b6"], // pink
+  ["#14b8a6", "#2dd4bf"], // teal
+  ["#f59e0b", "#fbbf24"], // amber
+  ["#ef4444", "#f87171"], // red
+  ["#10b981", "#34d399"], // emerald
+  ["#3b82f6", "#60a5fa"], // blue
+  ["#f97316", "#fb923c"], // orange
+]
+
+function getAvatarColor(seed: string): [string, string] {
+  let hash = 0
+  for (let i = 0; i < seed.length; i++) {
+    hash = (seed.codePointAt(i) ?? 0) + ((hash << 5) - hash)
+  }
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
+}
+
+// SVG avatar généré — initiales + gradient + grille de points façon Vercel
+function GeneratedAvatar({ initials, seed, size = 56 }: Readonly<{ initials: string; seed: string; size?: number }>) {
+  const [from, to] = getAvatarColor(seed || "default")
+  const id = `grad-${seed.replaceAll(/[^a-z0-9]/gi, "")}`
+
+  // Grille 5×5 de dots, certains plus opaques
+  const dots: React.ReactNode[] = []
+  for (let r = 0; r < 5; r++) {
+    for (let c = 0; c < 5; c++) {
+      const opacity = ((r * 7 + c * 3 + (seed.codePointAt(r + c) ?? 0)) % 3) === 0 ? 0.25 : 0.1
+      dots.push(
+        <circle
+          key={`${r}-${c}`}
+          cx={6 + c * 11}
+          cy={6 + r * 11}
+          r={1.5}
+          fill="white"
+          opacity={opacity}
+        />
+      )
+    }
+  }
+
+  return (
+    <svg width={size} height={size} viewBox="0 0 56 56" xmlns="http://www.w3.org/2000/svg" style={{ borderRadius: "50%" }}>
+      <defs>
+        <linearGradient id={id} x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor={from} />
+          <stop offset="100%" stopColor={to} />
+        </linearGradient>
+      </defs>
+      <rect width="56" height="56" fill={`url(#${id})`} />
+      {dots}
+      <text
+        x="28"
+        y="28"
+        textAnchor="middle"
+        dominantBaseline="central"
+        fill="white"
+        fontSize="18"
+        fontWeight="700"
+        fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+        style={{ userSelect: "none" }}
+      >
+        {initials}
+      </text>
+    </svg>
+  )
+}
+
+// ---------------------------------------------------------------------------
 
 function ProfilePanel() {
   const { user } = useAuth()
   const { updateProfile } = useUserStore()
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [firstName, setFirstName] = useState(user?.firstName ?? "")
   const [lastName, setLastName]   = useState(user?.lastName ?? "")
   const [displayName, setDisplayName] = useState(user?.displayName ?? "")
   const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl ?? "")
+  const [role, setRole] = useState("")
+  const [skills, setSkills] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -201,9 +278,22 @@ function ProfilePanel() {
     }
   }, [user])
 
-  const initials = user
-    ? `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase()
-    : "?"
+  const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() || "?"
+  const avatarSeed = (user?.email ?? firstName + lastName).toLowerCase()
+  const hasCustomAvatar = avatarUrl.startsWith("http") || avatarUrl.startsWith("data:")
+
+  // Upload depuis le PC → data URL base64
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Image too large — max 2 MB")
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => setAvatarUrl(reader.result as string)
+    reader.readAsDataURL(file)
+  }
 
   const handleSave = async () => {
     setSaving(true)
@@ -232,23 +322,78 @@ function ProfilePanel() {
     <div className="flex flex-col gap-4">
       <SectionCard title="Public profile" description="This information is visible to all workspace members.">
         <div className="flex flex-col gap-5">
+
+          {/* ---- Avatar ---- */}
           <FormField label="Profile picture">
-            <div className="flex items-center gap-3">
-              <Avatar className="h-14 w-14">
-                <AvatarImage src={avatarUrl} alt={displayName} />
-                <AvatarFallback className="text-base font-semibold bg-primary text-primary-foreground">{initials}</AvatarFallback>
-              </Avatar>
-              <div className="flex-1">
+            <div className="flex items-center gap-4">
+              {/* Avatar preview */}
+              <div className="relative group shrink-0">
+                {hasCustomAvatar ? (
+                  <Avatar className="h-14 w-14">
+                    <AvatarImage src={avatarUrl} alt={displayName} className="object-cover" />
+                    <AvatarFallback>
+                      <GeneratedAvatar initials={initials} seed={avatarSeed} size={56} />
+                    </AvatarFallback>
+                  </Avatar>
+                ) : (
+                  <div className="h-14 w-14 rounded-full overflow-hidden ring-2 ring-border">
+                    <GeneratedAvatar initials={initials} seed={avatarSeed} size={56} />
+                  </div>
+                )}
+                {/* Overlay camera au hover */}
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="absolute inset-0 rounded-full flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <Camera className="h-4 w-4 text-white" />
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/gif,image/webp"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+              </div>
+
+              {/* Actions + URL input */}
+              <div className="flex-1 flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs gap-1.5"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Upload className="h-3 w-3" />
+                    Upload image
+                  </Button>
+                  {hasCustomAvatar && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs text-muted-foreground"
+                      onClick={() => setAvatarUrl("")}
+                    >
+                      Remove
+                    </Button>
+                  )}
+                </div>
                 <StyledInput
                   value={avatarUrl}
                   onChange={(e) => setAvatarUrl(e.target.value)}
-                  placeholder="https://example.com/avatar.jpg"
+                  placeholder="Or paste a URL…"
                 />
-                <p className="text-xs text-muted-foreground mt-1">Paste an image URL</p>
+                <p className="text-xs text-muted-foreground">JPG, PNG, GIF, WEBP — max 2 MB</p>
               </div>
             </div>
           </FormField>
+
           <Separator />
+
           <FormField label="First name">
             <StyledInput value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First name" />
           </FormField>
@@ -256,10 +401,19 @@ function ProfilePanel() {
             <StyledInput value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last name" />
           </FormField>
           <FormField label="Display name" hint="Shown across Taskforce. Defaults to First + Last.">
-            <StyledInput value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder={`${firstName} ${lastName}`.trim()} />
+            <StyledInput value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder={`${firstName} ${lastName}`.trim() || "Display name"} />
           </FormField>
           <FormField label="Email" hint="Managed via your identity provider.">
             <StyledInput type="email" value={user?.email ?? ""} readOnly />
+          </FormField>
+
+          <Separator />
+
+          <FormField label="Role / Title" hint="Shown to team members.">
+            <StyledInput value={role} onChange={(e) => setRole(e.target.value)} placeholder="e.g. Lead Engineer" />
+          </FormField>
+          <FormField label="Skills" hint="Used for smart issue assignment.">
+            <SkillsTagInput value={skills} onChange={setSkills} />
           </FormField>
         </div>
       </SectionCard>
@@ -697,14 +851,10 @@ function IntegrationsPanel() {
 
 export default function SettingsPage() {
   const searchParams = useSearchParams()
-  const [active, setActive] = useState<SettingsSection>("profile")
-
-  useEffect(() => {
+  const [active, setActive] = useState<SettingsSection>(() => {
     const section = searchParams.get("section") as SettingsSection | null
-    if (section && SECTIONS.some((s) => s.key === section)) {
-      setActive(section)
-    }
-  }, [searchParams])
+    return section && SECTIONS.some((s) => s.key === section) ? section : "profile"
+  })
 
   const activeSection = SECTIONS.find((s) => s.key === active)
 
