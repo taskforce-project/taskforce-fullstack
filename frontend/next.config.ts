@@ -54,6 +54,18 @@ const nextConfig: NextConfig = {
 
     return config
   },
+  async redirects() {
+    const legacyRoutes = [
+      "dashboard", "inbox", "my-work", "projects", "members",
+      "teams", "messages", "discussions", "analytics",
+      "settings", "help", "roadmap", "cycles", "issues", "profile",
+    ]
+    return legacyRoutes.map((path) => ({
+      source: `/${path}`,
+      destination: "/",
+      permanent: false,
+    }))
+  },
 };
 
 export default nextConfig;
