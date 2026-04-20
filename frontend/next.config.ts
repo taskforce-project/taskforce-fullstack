@@ -48,6 +48,7 @@ const nextConfig: NextConfig = {
         assert: false,
         events: false,
         querystring: false,
+        canvas: false,
       }
     }
 
