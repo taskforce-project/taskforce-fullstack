@@ -51,12 +51,14 @@ export function WorkspaceSwitcher() {
   const [newName, setNewName] = React.useState("")
   const [creating, setCreating] = React.useState(false)
 
-  // Charger la liste si vide
+  const workspacesLoaded = useWorkspaceStore((s) => s.workspacesLoaded)
+
+  // Charger la liste une seule fois
   React.useEffect(() => {
-    if (workspaces.length === 0) {
+    if (!workspacesLoaded) {
       fetchWorkspaces()
     }
-  }, [workspaces.length, fetchWorkspaces])
+  }, [workspacesLoaded, fetchWorkspaces])
 
   const handleSwitch = (slug: string) => {
     router.push(`/${slug}/dashboard`)
