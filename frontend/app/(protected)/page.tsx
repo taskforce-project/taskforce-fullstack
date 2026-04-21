@@ -16,12 +16,16 @@ export default function ProtectedRootPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth()
   const fetchWorkspaces = useWorkspaceStore((s) => s.fetchWorkspaces)
   const workspaces = useWorkspaceStore((s) => s.workspaces)
+  const workspacesLoaded = useWorkspaceStore((s) => s.workspacesLoaded)
 
   useEffect(() => {
     if (!isAuthenticated || authLoading) return
 
-    if (workspaces.length > 0) {
-      router.replace(`/${workspaces[0].slug}/dashboard`)
+    if (workspacesLoaded) {
+      if (workspaces.length > 0) {
+        router.replace(`/${workspaces[0].slug}/dashboard`)
+      }
+      // workspacesLoaded=true mais liste vide → aucun workspace, on reste sur le loader
       return
     }
 
@@ -29,9 +33,8 @@ export default function ProtectedRootPage() {
       if (list.length > 0) {
         router.replace(`/${list[0].slug}/dashboard`)
       }
-      // Si aucun workspace, rester sur le loader (ne pas boucler vers /auth/login)
     })
-  }, [isAuthenticated, authLoading, workspaces, fetchWorkspaces, router])
+  }, [isAuthenticated, authLoading, workspacesLoaded, workspaces, fetchWorkspaces, router])
 
   return (
     <div className="min-h-screen flex items-center justify-center">
