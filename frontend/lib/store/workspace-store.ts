@@ -26,6 +26,8 @@ interface WorkspaceState {
   members: WorkspaceMember[];
   isLoading: boolean;
   membersLoading: boolean;
+  /** true une fois que fetchWorkspaces a été appelé au moins une fois */
+  workspacesLoaded: boolean;
 
   /** Charge tous les workspaces de l'utilisateur */
   fetchWorkspaces: () => Promise<Workspace[]>;
@@ -66,18 +68,19 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   members: [],
   isLoading: false,
   membersLoading: false,
+  workspacesLoaded: false,
 
-  clearWorkspace: () => set({ workspaces: [], activeWorkspace: null, workspace: null, members: [] }),
+  clearWorkspace: () => set({ workspaces: [], activeWorkspace: null, workspace: null, members: [], workspacesLoaded: false }),
 
   setWorkspace: (workspace) => set({ workspace, activeWorkspace: workspace }),
   fetchWorkspaces: async () => {
     set({ isLoading: true });
     try {
       const workspaces = await listWorkspaces();
-      set({ workspaces, isLoading: false });
+      set({ workspaces, isLoading: false, workspacesLoaded: true });
       return workspaces;
     } catch {
-      set({ isLoading: false });
+      set({ isLoading: false, workspacesLoaded: true });
       return [];
     }
   },
