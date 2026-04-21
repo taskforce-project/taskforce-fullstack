@@ -21,6 +21,7 @@ import { ThemeToggle } from "@/components/common/theme-toggle"
 import { useTranslation } from "@/lib/i18n"
 import { CommandPalette } from "@/components/command-palette"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
+import { useProjectStore } from "@/lib/store/project-store"
 
 /**
  * Map a URL segment (slug) to a display label.
@@ -64,18 +65,32 @@ function segmentLabel(segment: string): string {
 
 function useBreadcrumbs() {
   const pathname = usePathname()
+  const projects = useProjectStore((s) => s.projects)
 
   return React.useMemo(() => {
-    // Remove leading slash, split
     const segments = pathname.replace(/^\//, "").split("/").filter(Boolean)
+    const result: { href: string; label: string; isLast: boolean }[] = []
 
-    return segments.map((seg, i) => {
+    for (let i = 0; i < segments.length; i++) {
+      const seg = segments[i]
       const href = "/" + segments.slice(0, i + 1).join("/")
-      const label = segmentLabel(seg)
       const isLast = i === segments.length - 1
-      return { href, label, isLast }
-    })
-  }, [pathname])
+
+      // Segment numérique après "projects" = ID de projet → remplacer par le nom
+      if (/^\d+$/.test(seg) && segments[i - 1] === "projects") {
+        const project = projects.find((p) => p.id === Number(seg))
+        if (project) {
+          result.push({ href, label: project.name, isLast })
+        }
+        // Si projet pas encore chargé, on omet le segment numérique
+        continue
+      }
+
+      result.push({ href, label: segmentLabel(seg), isLast })
+    }
+
+    return result
+  }, [pathname, projects])
 }
 
 export function AppTopbar() {
