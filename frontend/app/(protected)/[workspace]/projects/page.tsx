@@ -21,14 +21,21 @@ import { useTranslation } from "@/lib/i18n"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
+import { getAvatarUrl } from "@/lib/utils/avatar"
 import { useProjectStore } from "@/lib/store/project-store"
 import type { Project } from "@/lib/api/project-service"
 
@@ -63,9 +70,35 @@ const STATUS_CONFIG = {
 // ProjectCard
 // ---------------------------------------------------------------------------
 
+/** Génère une couleur de fond déterministe basée sur le nom du projet (style Vercel) */
+function projectGradient(name: string): string {
+  const palettes = [
+    "from-violet-500 to-purple-600",
+    "from-blue-500 to-cyan-600",
+    "from-emerald-500 to-teal-600",
+    "from-orange-500 to-amber-600",
+    "from-pink-500 to-rose-600",
+    "from-indigo-500 to-blue-600",
+    "from-teal-500 to-emerald-600",
+    "from-amber-500 to-yellow-600",
+  ]
+  const index = name.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0) % palettes.length
+  return palettes[index]
+}
+
 function ProjectCard({ project, slug, t }: Readonly<{ project: Project; slug: string; t: (k: string) => string }>) {
   const statusCfg = STATUS_CONFIG[project.status]
   const archiveProject = useProjectStore((s) => s.archiveProject)
+  const updateProject = useProjectStore((s) => s.updateProject)
+
+  // Owner toujours en premier, puis les autres
+  const sortedMembers = [...project.members].sort((a, b) => {
+    if (a.userId === project.createdById) return -1
+    if (b.userId === project.createdById) return 1
+    return 0
+  })
+  const visibleMembers = sortedMembers.slice(0, 4)
+  const hiddenMembers = sortedMembers.slice(4)
 
   return (
     <Link
@@ -77,11 +110,11 @@ function ProjectCard({ project, slug, t }: Readonly<{ project: Project; slug: st
         <div className="flex items-center gap-3">
           <div
             className={cn(
-              "h-10 w-10 rounded-lg flex items-center justify-center text-xl shrink-0",
-              "bg-linear-to-br from-muted to-muted/50"
+              "h-10 w-10 rounded-lg flex items-center justify-center text-sm font-bold text-white shrink-0 bg-linear-to-br",
+              projectGradient(project.name)
             )}
           >
-            {project.emoji}
+            {project.name.slice(0, 2).toUpperCase()}
           </div>
           <div className="min-w-0">
             <h3 className="font-semibold text-foreground truncate group-hover:text-primary transition-colors">
@@ -110,14 +143,25 @@ function ProjectCard({ project, slug, t }: Readonly<{ project: Project; slug: st
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem>Edit project</DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={async (e) => {
-                e.preventDefault()
-                await archiveProject(slug, project.id)
-              }}
-            >
-              Archive
-            </DropdownMenuItem>
+            {project.status === "ARCHIVED" ? (
+              <DropdownMenuItem
+                onClick={async (e) => {
+                  e.preventDefault()
+                  await updateProject(slug, project.id, { status: "ACTIVE" })
+                }}
+              >
+                Reactivate
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem
+                onClick={async (e) => {
+                  e.preventDefault()
+                  await archiveProject(slug, project.id)
+                }}
+              >
+                Archive
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -151,25 +195,50 @@ function ProjectCard({ project, slug, t }: Readonly<{ project: Project; slug: st
       {/* Footer */}
       <div className="flex items-center justify-between">
         {/* Members */}
-        <div className="flex items-center">
-          <div className="flex -space-x-2">
-            {project.members.slice(0, 4).map((m) => (
-              <Avatar key={m.id} className="h-6 w-6 ring-2 ring-card">
-                <AvatarFallback className="text-[9px] text-white bg-primary">
-                  {(m.displayName ?? m.email).slice(0, 2).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-            ))}
-            {project.members.length > 4 && (
-              <div className="h-6 w-6 rounded-full bg-muted ring-2 ring-card flex items-center justify-center">
-                <span className="text-[9px] text-muted-foreground">+{project.members.length - 4}</span>
-              </div>
-            )}
+        <TooltipProvider>
+          <div className="flex items-center">
+            <div className="flex -space-x-2">
+              {visibleMembers.map((m) => (
+                <Tooltip key={m.id}>
+                  <TooltipTrigger asChild>
+                    <Avatar className="h-6 w-6 ring-2 ring-card cursor-default">
+                      <AvatarImage
+                        src={getAvatarUrl({ email: m.email, avatarUrl: m.avatarUrl })}
+                        alt={m.displayName ?? m.email}
+                      />
+                      <AvatarFallback className="text-[9px] text-white bg-primary">
+                        {(m.displayName ?? m.email).slice(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="flex flex-col gap-0.5">
+                    <p className="text-xs font-medium">{m.displayName ?? m.email}</p>
+                    {m.userId === project.createdById && (
+                      <p className="text-[10px] text-muted-foreground">Owner</p>
+                    )}
+                  </TooltipContent>
+                </Tooltip>
+              ))}
+              {hiddenMembers.length > 0 && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="h-6 w-6 rounded-full bg-muted ring-2 ring-card flex items-center justify-center cursor-default">
+                      <span className="text-[9px] text-muted-foreground">+{hiddenMembers.length}</span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="flex flex-col gap-1">
+                    {hiddenMembers.map((m) => (
+                      <p key={m.id} className="text-xs">{m.displayName ?? m.email}</p>
+                    ))}
+                  </TooltipContent>
+                </Tooltip>
+              )}
+            </div>
+            <span className="ml-2 text-xs text-muted-foreground">
+              {project.memberCount} {t("projects.meta.members")}
+            </span>
           </div>
-          <span className="ml-2 text-xs text-muted-foreground">
-            {project.memberCount} {t("projects.meta.members")}
-          </span>
-        </div>
+        </TooltipProvider>
 
         {/* Issues */}
         <div className="flex items-center gap-3">
