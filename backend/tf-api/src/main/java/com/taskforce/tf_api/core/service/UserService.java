@@ -12,6 +12,9 @@ import org.keycloak.representations.idm.UserRepresentation;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+
 /**
  * Service pour les opérations sur l'utilisateur courant.
  * Complète AuthService (qui gère l'authentification) en se concentrant sur le profil.
@@ -42,11 +45,18 @@ public class UserService {
             String synced = buildRawDisplayName(fn, ln);
             if (synced != null) {
                 user.setDisplayName(synced);
-                userRepository.save(user);
-                log.info("displayName sync\u00e9 depuis Keycloak pour {}", email);
+                log.info("displayName syncé depuis Keycloak pour {}", email);
             }
         }
 
+        // Auto-génération de l'avatar DiceBear si absent en DB
+        if (user.getAvatarUrl() == null || user.getAvatarUrl().isBlank()) {
+            String seed = URLEncoder.encode(user.getEmail(), StandardCharsets.UTF_8);
+            user.setAvatarUrl("https://api.dicebear.com/9.x/identicon/svg?seed=" + seed);
+            log.info("avatarUrl généré et sauvegardé pour {}", email);
+        }
+
+        userRepository.save(user);
         return buildUserResponse(user, keycloakUser);
     }
 
