@@ -1,11 +1,12 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
+import { useParams } from "next/navigation"
 import { IssueSheet } from "@/components/sheets/issue-sheet"
+import type { SheetIssue } from "@/components/sheets/issue-sheet"
 import {
   CircleDot,
   RefreshCw,
-  Clock,
   CheckCircle2,
   AlertTriangle,
   Plus,
@@ -18,7 +19,7 @@ import {
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
 import {
   DropdownMenu,
@@ -28,84 +29,109 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
+import { getAvatarUrl } from "@/lib/utils/avatar"
+import { useIssueStore } from "@/lib/store/issue-store"
+import type { Issue, IssuePriority, IssueStatusCategory } from "@/lib/api/issue-service"
 
 // ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-type IssuePriority = "urgent" | "high" | "medium" | "low" | "none"
-type IssueStatus = "todo" | "in_progress" | "in_review" | "done" | "cancelled"
-type StatusFilter = "all" | IssueStatus
-type PriorityFilter = "all" | IssuePriority
-
-interface Issue {
-  id: string
-  identifier: string
-  title: string
-  priority: IssuePriority
-  status: IssueStatus
-  assignee: { initials: string; color: string; name: string } | null
-  labels: string[]
-  dueDate: string | null
-  storyPoints: number | null
-  cycle: string | null
-  createdAt: string
-}
-
-// ---------------------------------------------------------------------------
-// Config
+// Mapping helpers
 // ---------------------------------------------------------------------------
 
 const PRIORITY_DOT: Record<IssuePriority, string> = {
-  urgent: "bg-red-400",
-  high: "bg-orange-400",
-  medium: "bg-yellow-400",
-  low: "bg-slate-400",
-  none: "bg-muted-foreground/30",
+  URGENT: "bg-red-400",
+  HIGH:   "bg-orange-400",
+  MEDIUM: "bg-yellow-400",
+  LOW:    "bg-slate-400",
+  NONE:   "bg-muted-foreground/30",
 }
 
 const PRIORITY_LABEL: Record<IssuePriority, string> = {
-  urgent: "Urgent",
-  high: "High",
-  medium: "Medium",
-  low: "Low",
-  none: "None",
+  URGENT: "Urgent",
+  HIGH:   "High",
+  MEDIUM: "Medium",
+  LOW:    "Low",
+  NONE:   "None",
 }
 
-const STATUS_ICON: Record<IssueStatus, React.ReactNode> = {
-  todo: <CircleDot className="size-3.5 text-muted-foreground" />,
-  in_progress: <RefreshCw className="size-3.5 text-blue-400" />,
-  in_review: <Clock className="size-3.5 text-yellow-400" />,
-  done: <CheckCircle2 className="size-3.5 text-emerald-400" />,
-  cancelled: <X className="size-3.5 text-muted-foreground" />,
+function getCategoryIcon(category: IssueStatusCategory): React.ReactNode {
+  switch (category) {
+    case "STARTED":   return <RefreshCw className="size-3.5 text-blue-400" />
+    case "COMPLETED": return <CheckCircle2 className="size-3.5 text-emerald-400" />
+    case "CANCELLED": return <X className="size-3.5 text-muted-foreground" />
+    default:          return <CircleDot className="size-3.5 text-muted-foreground" />
+  }
 }
 
-
-const STATUS_TABS: { key: StatusFilter; label: string }[] = [
-  { key: "all", label: "All" },
-  { key: "todo", label: "Todo" },
-  { key: "in_progress", label: "In Progress" },
-  { key: "in_review", label: "In Review" },
-  { key: "done", label: "Done" },
+const AVATAR_COLORS = [
+  "bg-violet-500", "bg-blue-500", "bg-emerald-500", "bg-orange-500",
+  "bg-pink-500", "bg-cyan-500", "bg-amber-500", "bg-indigo-500",
 ]
 
+function emailInitials(email: string): string {
+  return email.slice(0, 2).toUpperCase()
+}
+
+function emailColor(id: number): string {
+  return AVATAR_COLORS[id % AVATAR_COLORS.length]
+}
+
+function formatDate(iso: string | null): string | null {
+  if (!iso) return null
+  try {
+    return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+  } catch {
+    return null
+  }
+}
+
+function isDueDateOverdue(iso: string | null): boolean {
+  if (!iso) return false
+  return new Date(iso) < new Date()
+}
+
+/** Convertit une Issue API en SheetIssue (format attendu par IssueSheet) */
+function toSheetIssue(issue: Issue): SheetIssue {
+  const priorityMap: Record<IssuePriority, SheetIssue["priority"]> = {
+    NONE: "none", URGENT: "urgent", HIGH: "high", MEDIUM: "medium", LOW: "low",
+  }
+  const statusMap: Record<IssueStatusCategory, SheetIssue["status"]> = {
+    BACKLOG:   "todo",
+    UNSTARTED: "todo",
+    STARTED:   "in_progress",
+    COMPLETED: "done",
+    CANCELLED: "cancelled",
+  }
+  return {
+    id:          String(issue.id),
+    identifier:  issue.identifier,
+    title:       issue.title,
+    description: issue.description ?? undefined,
+    priority:    priorityMap[issue.priority],
+    status:      statusMap[issue.status.category],
+    assignee:    issue.assignee
+      ? { initials: emailInitials(issue.assignee.email), color: emailColor(issue.assignee.id), name: issue.assignee.email }
+      : null,
+    labels:      issue.labels.map((l) => l.name),
+    dueDate:     formatDate(issue.dueDate),
+    storyPoints: null,
+    cycle:       null,
+    createdAt:   formatDate(issue.createdAt) ?? issue.createdAt,
+  }
+}
+
 // ---------------------------------------------------------------------------
-// Mock data
+// Tabs
 // ---------------------------------------------------------------------------
 
-const ALL_ISSUES: Issue[] = [
-  { id: "1", identifier: "TF-001", title: "Implement JWT refresh token rotation", priority: "high", status: "in_progress", assignee: { initials: "SM", color: "bg-violet-500", name: "Sophie Martin" }, labels: ["security", "auth"], dueDate: "Apr 15", storyPoints: 5, cycle: "Sprint 4", createdAt: "Feb 14" },
-  { id: "2", identifier: "TF-029", title: "Implement dark mode toggle", priority: "low", status: "in_progress", assignee: { initials: "ME", color: "bg-primary", name: "You" }, labels: ["ui"], dueDate: "Apr 2", storyPoints: 2, cycle: "Sprint 4", createdAt: "Mar 1" },
-  { id: "3", identifier: "TF-032", title: "Responsive navigation redesign", priority: "high", status: "in_progress", assignee: { initials: "SM", color: "bg-violet-500", name: "Sophie Martin" }, labels: ["ui", "mobile"], dueDate: "Apr 1", storyPoints: 8, cycle: "Sprint 4", createdAt: "Mar 5" },
-  { id: "4", identifier: "TF-038", title: "SEO meta tags refactor", priority: "medium", status: "in_progress", assignee: { initials: "EP", color: "bg-emerald-500", name: "Emma Petit" }, labels: ["seo"], dueDate: null, storyPoints: 3, cycle: "Sprint 4", createdAt: "Mar 10" },
-  { id: "5", identifier: "TF-041", title: "Update hero section copy", priority: "high", status: "todo", assignee: { initials: "ME", color: "bg-primary", name: "You" }, labels: ["copy"], dueDate: "Mar 31", storyPoints: 1, cycle: null, createdAt: "Mar 15" },
-  { id: "6", identifier: "TF-044", title: "Add social proof section with testimonials", priority: "medium", status: "todo", assignee: null, labels: ["design"], dueDate: null, storyPoints: 5, cycle: null, createdAt: "Mar 18" },
-  { id: "7", identifier: "TF-047", title: "Implement cookie consent banner", priority: "low", status: "todo", assignee: { initials: "EP", color: "bg-emerald-500", name: "Emma Petit" }, labels: ["legal"], dueDate: null, storyPoints: 3, cycle: null, createdAt: "Mar 20" },
-  { id: "8", identifier: "TF-022", title: "Analytics integration with Plausible", priority: "medium", status: "in_review", assignee: { initials: "SM", color: "bg-violet-500", name: "Sophie Martin" }, labels: ["analytics"], dueDate: "Mar 30", storyPoints: 5, cycle: "Sprint 4", createdAt: "Mar 2" },
-  { id: "9", identifier: "TF-025", title: "Accessibility audit — WCAG 2.1 AA", priority: "high", status: "in_review", assignee: { initials: "ME", color: "bg-primary", name: "You" }, labels: ["a11y"], dueDate: "Overdue", storyPoints: 8, cycle: "Sprint 4", createdAt: "Mar 3" },
-  { id: "10", identifier: "TF-011", title: "Set up Next.js 15 project", priority: "none", status: "done", assignee: { initials: "ME", color: "bg-primary", name: "You" }, labels: [], dueDate: null, storyPoints: 3, cycle: "Sprint 1", createdAt: "Feb 10" },
-  { id: "11", identifier: "TF-012", title: "Design system tokens (colors, typography)", priority: "none", status: "done", assignee: { initials: "EP", color: "bg-emerald-500", name: "Emma Petit" }, labels: ["design"], dueDate: null, storyPoints: 5, cycle: "Sprint 1", createdAt: "Feb 10" },
-  { id: "12", identifier: "TF-014", title: "CI/CD pipeline with GitHub Actions", priority: "none", status: "done", assignee: { initials: "SM", color: "bg-violet-500", name: "Sophie Martin" }, labels: ["devops"], dueDate: null, storyPoints: 5, cycle: "Sprint 1", createdAt: "Feb 11" },
+type CategoryFilter = "all" | IssueStatusCategory
+
+const CATEGORY_TABS: { key: CategoryFilter; label: string }[] = [
+  { key: "all",       label: "All" },
+  { key: "UNSTARTED", label: "Todo" },
+  { key: "BACKLOG",   label: "Backlog" },
+  { key: "STARTED",   label: "In Progress" },
+  { key: "COMPLETED", label: "Done" },
+  { key: "CANCELLED", label: "Cancelled" },
 ]
 
 // ---------------------------------------------------------------------------
@@ -113,7 +139,7 @@ const ALL_ISSUES: Issue[] = [
 // ---------------------------------------------------------------------------
 
 function IssueRow({ issue, onOpen }: { readonly issue: Issue; readonly onOpen: (issue: Issue) => void }) {
-  const isOverdue = issue.dueDate === "Overdue"
+  const overdue = isDueDateOverdue(issue.dueDate)
 
   return (
     <button
@@ -125,51 +151,43 @@ function IssueRow({ issue, onOpen }: { readonly issue: Issue; readonly onOpen: (
       <div className={cn("size-2 rounded-full shrink-0", PRIORITY_DOT[issue.priority])} />
 
       {/* Status icon */}
-      <div className="shrink-0">{STATUS_ICON[issue.status]}</div>
+      <div className="shrink-0">{getCategoryIcon(issue.status.category)}</div>
 
       {/* Identifier */}
-      <span className="text-xs text-muted-foreground font-mono w-14 shrink-0">{issue.identifier}</span>
+      <span className="text-xs text-muted-foreground font-mono w-16 shrink-0">{issue.identifier}</span>
 
       {/* Title */}
       <span className="flex-1 text-sm text-foreground truncate group-hover:text-primary transition-colors">
         {issue.title}
       </span>
 
-      {/* Cycle */}
-      {issue.cycle && (
-        <span className="hidden xl:block text-xs text-muted-foreground bg-muted/60 rounded px-1.5 py-0.5 shrink-0">
-          {issue.cycle}
-        </span>
-      )}
+      {/* Status name */}
+      <span className="hidden xl:block text-xs text-muted-foreground bg-muted/60 rounded px-1.5 py-0.5 shrink-0">
+        {issue.status.name}
+      </span>
 
       {/* Labels */}
       <div className="hidden md:flex gap-1 shrink-0">
         {issue.labels.slice(0, 2).map((l) => (
-          <Badge key={l} variant="secondary" className="text-[10px] px-1.5 h-4 bg-muted/60 border-0 text-muted-foreground">
-            {l}
+          <Badge key={l.id} variant="secondary" className="text-[10px] px-1.5 h-4 bg-muted/60 border-0 text-muted-foreground">
+            {l.name}
           </Badge>
         ))}
       </div>
 
-      {/* Story points */}
-      {issue.storyPoints !== null && (
-        <span className="hidden sm:block text-xs text-muted-foreground font-medium bg-muted rounded px-1.5 py-0.5 shrink-0">
-          {issue.storyPoints}p
-        </span>
-      )}
-
       {/* Due date */}
-      <span className={cn("hidden md:block text-xs w-20 text-right shrink-0", isOverdue ? "text-red-400 font-medium" : "text-muted-foreground")}>
-        {isOverdue && <AlertTriangle className="size-3 inline mr-1" />}
-        {issue.dueDate ?? "—"}
+      <span className={cn("hidden md:flex items-center gap-1 text-xs w-20 text-right shrink-0", overdue ? "text-red-400 font-medium" : "text-muted-foreground")}>
+        {overdue && <AlertTriangle className="size-3" />}
+        {formatDate(issue.dueDate) ?? "—"}
       </span>
 
       {/* Assignee */}
       <div className="hidden lg:flex items-center justify-center w-8 shrink-0">
         {issue.assignee ? (
           <Avatar className="size-5">
-            <AvatarFallback className={cn("text-[9px] text-white", issue.assignee.color)}>
-              {issue.assignee.initials}
+            <AvatarImage src={getAvatarUrl({ email: issue.assignee.email })} alt={issue.assignee.email} />
+            <AvatarFallback className={cn("text-[9px] text-white", emailColor(issue.assignee.id))}>
+              {emailInitials(issue.assignee.email)}
             </AvatarFallback>
           </Avatar>
         ) : (
@@ -187,15 +205,11 @@ function IssueRow({ issue, onOpen }: { readonly issue: Issue; readonly onOpen: (
 // ---------------------------------------------------------------------------
 
 function IssueStats({ issues }: { readonly issues: Issue[] }) {
-  const counts = {
-    todo: issues.filter((i) => i.status === "todo").length,
-    in_progress: issues.filter((i) => i.status === "in_progress").length,
-    in_review: issues.filter((i) => i.status === "in_review").length,
-    done: issues.filter((i) => i.status === "done").length,
-  }
-
-  const total = issues.length
-  const donePercent = total > 0 ? Math.round((counts.done / total) * 100) : 0
+  const started   = issues.filter((i) => i.status.category === "STARTED").length
+  const unstarted = issues.filter((i) => i.status.category === "UNSTARTED" || i.status.category === "BACKLOG").length
+  const completed = issues.filter((i) => i.status.category === "COMPLETED").length
+  const total     = issues.length
+  const donePercent = total > 0 ? Math.round((completed / total) * 100) : 0
 
   return (
     <div className="flex items-center gap-4 flex-wrap text-xs text-muted-foreground">
@@ -205,19 +219,15 @@ function IssueStats({ issues }: { readonly issues: Issue[] }) {
       <span>·</span>
       <span className="flex items-center gap-1">
         <CircleDot className="size-3 text-muted-foreground" />
-        {counts.todo} todo
+        {unstarted} not started
       </span>
       <span className="flex items-center gap-1">
         <RefreshCw className="size-3 text-blue-400" />
-        {counts.in_progress} in progress
-      </span>
-      <span className="flex items-center gap-1">
-        <Clock className="size-3 text-yellow-400" />
-        {counts.in_review} in review
+        {started} in progress
       </span>
       <span className="flex items-center gap-1">
         <CheckCircle2 className="size-3 text-emerald-400" />
-        {counts.done} done
+        {completed} done
       </span>
 
       {/* Progress bar */}
@@ -239,46 +249,65 @@ function IssueStats({ issues }: { readonly issues: Issue[] }) {
 // ---------------------------------------------------------------------------
 
 export default function ProjectIssuesPage() {
-  const [search, setSearch] = useState("")
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
-  const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("all")
+  const params = useParams()
+  const workspaceRaw = params.workspace
+  let workspace = ""
+  if (typeof workspaceRaw === "string") workspace = workspaceRaw
+  else if (Array.isArray(workspaceRaw)) workspace = workspaceRaw[0] ?? ""
+
+  const idRaw = params.id
+  let projectId = 0
+  if (typeof idRaw === "string") projectId = Number(idRaw)
+  else if (Array.isArray(idRaw)) projectId = Number(idRaw[0] ?? "0")
+
+  const { issues, isLoading, fetchIssues } = useIssueStore()
+
+  const [search, setSearch]               = useState("")
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all")
+  const [priorityFilter, setPriorityFilter] = useState<IssuePriority | "all">("all")
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null)
 
+  useEffect(() => {
+    if (workspace && projectId) {
+      fetchIssues(workspace, projectId)
+    }
+  }, [workspace, projectId, fetchIssues])
+
   const filtered = useMemo(() => {
-    let list = ALL_ISSUES
-    if (statusFilter !== "all") list = list.filter((i) => i.status === statusFilter)
+    let list = issues
+    if (categoryFilter !== "all") list = list.filter((i) => i.status.category === categoryFilter)
     if (priorityFilter !== "all") list = list.filter((i) => i.priority === priorityFilter)
     if (search.trim()) {
       const q = search.toLowerCase()
       list = list.filter((i) => i.title.toLowerCase().includes(q) || i.identifier.toLowerCase().includes(q))
     }
     return list
-  }, [search, statusFilter, priorityFilter])
+  }, [issues, search, categoryFilter, priorityFilter])
 
-  const hasFilters = statusFilter !== "all" || priorityFilter !== "all" || search.trim()
+  const hasFilters = categoryFilter !== "all" || priorityFilter !== "all" || search.trim()
 
   function clearFilters() {
     setSearch("")
-    setStatusFilter("all")
+    setCategoryFilter("all")
     setPriorityFilter("all")
   }
 
   return (
     <div className="flex flex-col gap-4">
       {/* Stats */}
-      <IssueStats issues={ALL_ISSUES} />
+      <IssueStats issues={issues} />
 
       {/* Toolbar */}
       <div className="flex items-center gap-2 flex-wrap">
-        {/* Status tabs */}
+        {/* Category tabs */}
         <div className="flex items-center gap-0 overflow-x-auto scrollbar-hide">
-          {STATUS_TABS.map((tab) => (
+          {CATEGORY_TABS.map((tab) => (
             <button
               key={tab.key}
-              onClick={() => setStatusFilter(tab.key)}
+              onClick={() => setCategoryFilter(tab.key)}
               className={cn(
                 "px-3 py-1.5 text-xs font-medium transition-all border-b-2 whitespace-nowrap",
-                statusFilter === tab.key
+                categoryFilter === tab.key
                   ? "border-primary text-foreground"
                   : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
               )}
@@ -301,7 +330,7 @@ export default function ProjectIssuesPage() {
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => setPriorityFilter("all")}>All priorities</DropdownMenuItem>
             <DropdownMenuSeparator />
-            {(["urgent", "high", "medium", "low", "none"] as IssuePriority[]).map((p) => (
+            {(["URGENT", "HIGH", "MEDIUM", "LOW", "NONE"] as IssuePriority[]).map((p) => (
               <DropdownMenuItem key={p} onClick={() => setPriorityFilter(p)} className="gap-2">
                 <div className={cn("size-2 rounded-full", PRIORITY_DOT[p])} />
                 {PRIORITY_LABEL[p]}
@@ -360,17 +389,22 @@ export default function ProjectIssuesPage() {
         <div className="flex items-center gap-3 px-4 py-2.5 border-b border-border bg-muted/20 text-xs text-muted-foreground">
           <div className="size-2 shrink-0" />
           <div className="size-3.5 shrink-0" />
-          <div className="w-14 shrink-0">ID</div>
+          <div className="w-16 shrink-0">ID</div>
           <div className="flex-1">Title</div>
-          <div className="hidden xl:block w-20 text-right shrink-0">Cycle</div>
+          <div className="hidden xl:block w-24 text-right shrink-0">Status</div>
           <div className="hidden md:block w-24 text-right shrink-0">Labels</div>
-          <div className="hidden sm:block w-8 text-right shrink-0">Pts</div>
           <div className="hidden md:block w-20 text-right shrink-0">Due</div>
           <div className="hidden lg:block w-8 text-center shrink-0">Who</div>
           <div className="size-3.5 shrink-0" />
         </div>
 
-        {filtered.length === 0 ? (
+        {isLoading && (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <RefreshCw className="size-6 text-muted-foreground/40 animate-spin mb-3" />
+            <p className="text-sm text-muted-foreground">Loading issues…</p>
+          </div>
+        )}
+        {!isLoading && filtered.length === 0 && (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <Search className="size-8 text-muted-foreground/30 mb-3" />
             <p className="text-sm font-medium text-foreground">No issues found</p>
@@ -384,7 +418,8 @@ export default function ProjectIssuesPage() {
               </Button>
             )}
           </div>
-        ) : (
+        )}
+        {!isLoading && filtered.length > 0 && (
           filtered.map((issue) => (
             <IssueRow key={issue.id} issue={issue} onOpen={setSelectedIssue} />
           ))
@@ -398,7 +433,7 @@ export default function ProjectIssuesPage() {
       </div>
 
       <IssueSheet
-        issue={selectedIssue as import("@/components/sheets/issue-sheet").SheetIssue | null}
+        issue={selectedIssue ? toSheetIssue(selectedIssue) : null}
         open={selectedIssue !== null}
         onOpenChange={(open) => { if (!open) setSelectedIssue(null) }}
       />
