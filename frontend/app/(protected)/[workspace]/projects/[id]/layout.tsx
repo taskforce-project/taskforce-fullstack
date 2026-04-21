@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect } from "react"
 import Link from "next/link"
 import { useParams, usePathname } from "next/navigation"
 import {
@@ -29,63 +30,37 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { CreateIssueDialog } from "@/components/dialogs/create-issue-dialog"
 import { cn } from "@/lib/utils"
+import { useProjectStore } from "@/lib/store/project-store"
+import type { UpdateProjectPayload } from "@/lib/api/project-service"
 
 // ---------------------------------------------------------------------------
-// Mock project lookup
+// Helpers
 // ---------------------------------------------------------------------------
 
-const MOCK_PROJECTS: Record<string, {
-  id: string
-  name: string
-  emoji: string
-  color: string
-  description: string
-  status: "active" | "paused" | "archived"
-  openIssues: number
-  members: { name: string; initials: string; color: string }[]
-}> = {
-  "1": {
-    id: "1",
-    name: "Website Redesign",
-    emoji: "🎨",
-    color: "bg-violet-500",
-    description: "Complete overhaul of the marketing site",
-    status: "active",
-    openIssues: 12,
-    members: [
-      { name: "Sophie Martin", initials: "SM", color: "bg-violet-500" },
-      { name: "You", initials: "ME", color: "bg-primary" },
-      { name: "Emma Petit", initials: "EP", color: "bg-emerald-500" },
-    ],
-  },
-  "2": {
-    id: "2",
-    name: "Mobile App",
-    emoji: "📱",
-    color: "bg-blue-500",
-    description: "iOS & Android native app",
-    status: "active",
-    openIssues: 21,
-    members: [
-      { name: "Lucas Dufour", initials: "LD", color: "bg-blue-500" },
-      { name: "You", initials: "ME", color: "bg-primary" },
-      { name: "Emma Petit", initials: "EP", color: "bg-emerald-500" },
-      { name: "Thomas Bernard", initials: "TB", color: "bg-orange-500" },
-    ],
-  },
-  "3": {
-    id: "3",
-    name: "API v2",
-    emoji: "⚡",
-    color: "bg-emerald-500",
-    description: "New RESTful API with improved auth",
-    status: "active",
-    openIssues: 9,
-    members: [
-      { name: "You", initials: "ME", color: "bg-primary" },
-      { name: "Thomas Bernard", initials: "TB", color: "bg-orange-500" },
-    ],
-  },
+const AVATAR_COLORS = [
+  "bg-violet-500", "bg-blue-500", "bg-emerald-500", "bg-orange-500",
+  "bg-pink-500", "bg-cyan-500", "bg-amber-500", "bg-indigo-500",
+]
+
+function getMemberInitials(displayName: string | null, email: string): string {
+  if (displayName) {
+    const parts = displayName.trim().split(/\s+/)
+    if (parts.length >= 2) {
+      return ((parts.at(0)?.at(0) ?? "") + (parts.at(-1)?.at(0) ?? "")).toUpperCase()
+    }
+    return parts[0].slice(0, 2).toUpperCase()
+  }
+  return email.slice(0, 2).toUpperCase()
+}
+
+function getMemberColor(id: number): string {
+  return AVATAR_COLORS[id % AVATAR_COLORS.length]
+}
+
+function extractParam(p: string | string[] | undefined): string {
+  if (typeof p === "string") return p
+  if (Array.isArray(p)) return p[0] ?? ""
+  return ""
 }
 
 // ---------------------------------------------------------------------------
@@ -117,12 +92,20 @@ export default function ProjectLayout({ children }: { readonly children: React.R
   const { t } = useTranslation()
   const params = useParams()
   const pathname = usePathname()
-  let projectId = "1"
-  if (typeof params.id === "string") projectId = params.id
-  else if (Array.isArray(params.id)) projectId = params.id[0]
 
-  const project = MOCK_PROJECTS[projectId] ?? MOCK_PROJECTS["1"]
-  const basePath = `/projects/${projectId}`
+  const workspace = extractParam(params.workspace)
+  const projectId = extractParam(params.id) || "0"
+
+  const { projects, fetchProjects, archiveProject, updateProject } = useProjectStore()
+
+  useEffect(() => {
+    if (workspace && projects.length === 0) {
+      fetchProjects(workspace)
+    }
+  }, [workspace, projects.length, fetchProjects])
+
+  const project = projects.find((p) => p.id === Number(projectId))
+  const basePath = `/${workspace}/projects/${projectId}`
 
   function isTabActive(suffix: string): boolean {
     if (suffix === "") {
@@ -138,36 +121,36 @@ export default function ProjectLayout({ children }: { readonly children: React.R
       <div className="px-4 md:px-6 pt-4 md:pt-6 pb-0 border-b border-border bg-background/80 backdrop-blur-sm sticky top-14 z-30">
         {/* Breadcrumb */}
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-3">
-          <Link href="/projects" className="hover:text-foreground transition-colors">
+          <Link href={`/${workspace}/projects`} className="hover:text-foreground transition-colors">
             {t("projects.title")}
           </Link>
           <ChevronRight className="h-3 w-3" />
-          <span className="text-foreground font-medium">{project.name}</span>
+          <span className="text-foreground font-medium">{project?.name ?? "…"}</span>
         </div>
 
         {/* Project name + actions */}
         <div className="flex items-center justify-between gap-4 mb-3">
           <div className="flex items-center gap-3 min-w-0">
-            <span className="text-2xl">{project.emoji}</span>
+            <span className="text-2xl">{project?.name?.slice(0, 1) ?? "📁"}</span>
             <div className="min-w-0">
-              <h1 className="text-xl font-semibold text-foreground truncate">{project.name}</h1>
-              <p className="text-xs text-muted-foreground truncate">{project.description}</p>
+              <h1 className="text-xl font-semibold text-foreground truncate">{project?.name ?? "…"}</h1>
+              <p className="text-xs text-muted-foreground truncate">{project?.description ?? ""}</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
             {/* Members avatars */}
             <div className="hidden sm:flex -space-x-2 mr-1">
-              {project.members.slice(0, 3).map((m, i) => (
-                <Avatar key={`${m.initials}-${i}`} className="h-7 w-7 ring-2 ring-background">
-                  <AvatarFallback className={cn("text-[9px] text-white", m.color)}>
-                    {m.initials}
+              {(project?.members ?? []).slice(0, 3).map((m) => (
+                <Avatar key={m.id} className="h-7 w-7 ring-2 ring-background">
+                  <AvatarFallback className={cn("text-[9px] text-white", getMemberColor(m.userId))}>
+                    {getMemberInitials(m.displayName, m.email)}
                   </AvatarFallback>
                 </Avatar>
               ))}
-              {project.members.length > 3 && (
+              {(project?.members?.length ?? 0) > 3 && (
                 <div className="h-7 w-7 rounded-full bg-muted ring-2 ring-background flex items-center justify-center">
-                  <span className="text-[9px] text-muted-foreground">+{project.members.length - 3}</span>
+                  <span className="text-[9px] text-muted-foreground">+{(project?.members?.length ?? 0) - 3}</span>
                 </div>
               )}
             </div>
@@ -196,7 +179,19 @@ export default function ProjectLayout({ children }: { readonly children: React.R
                     {t("projects.detail.settings")}
                   </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem>Archive project</DropdownMenuItem>
+                {project?.status === "ARCHIVED" ? (
+                  <DropdownMenuItem
+                    onClick={() => updateProject(workspace, Number(projectId), { status: "ACTIVE" } as UpdateProjectPayload)}
+                  >
+                    Reactivate project
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem
+                    onClick={() => archiveProject(workspace, Number(projectId))}
+                  >
+                    Archive project
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -219,12 +214,12 @@ export default function ProjectLayout({ children }: { readonly children: React.R
               >
                 <Icon className="h-4 w-4" />
                 {t(`projects.${key}`)}
-                {key === "detail.board" && project.openIssues > 0 && (
+                {key === "detail.board" && (project?.openIssues ?? 0) > 0 && (
                   <Badge
                     variant="secondary"
                     className="h-4 min-w-4 px-1 text-[10px] bg-muted text-muted-foreground border-0"
                   >
-                    {project.openIssues}
+                    {project?.openIssues}
                   </Badge>
                 )}
               </Link>
