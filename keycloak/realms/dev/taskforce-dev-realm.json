@@ -67,6 +67,7 @@
   ],
   "users": [
     {
+      "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
       "username": "admin@taskforce.dev",
       "enabled": true,
       "emailVerified": true,
@@ -85,6 +86,7 @@
       ]
     },
     {
+      "id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
       "username": "test@taskforce.dev",
       "enabled": true,
       "emailVerified": true,
