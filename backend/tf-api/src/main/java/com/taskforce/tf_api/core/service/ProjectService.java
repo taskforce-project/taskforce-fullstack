@@ -26,7 +26,9 @@ import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.service.IssueService;
 import com.taskforce.tf_api.shared.exception.BusinessException;
+import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import lombok.RequiredArgsConstructor;
@@ -47,6 +49,7 @@ public class ProjectService {
     private final WorkspaceRepository      workspaceRepository;
     private final WorkspaceMemberRepository workspaceMemberRepository;
     private final UserRepository           userRepository;
+    private final IssueService             issueService;
 
     // -------------------------------------------------------------------------
     // Lecture
@@ -118,6 +121,9 @@ public class ProjectService {
             .addedBy(creator)
             .build();
         projectMemberRepository.save(lead);
+
+        // Initialiser les statuts, types et compteur d'issues par défaut
+        issueService.seedDefaultStatusesAndTypes(project);
 
         return toResponse(project);
     }
