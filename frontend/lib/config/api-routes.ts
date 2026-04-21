@@ -76,6 +76,24 @@ export const PROJECT_ROUTES = {
 } as const;
 
 /**
+ * Routes issues
+ * Backend: /api/workspaces/{slug}/projects/{projectId}/issues
+ */
+export const ISSUE_ROUTES = {
+  LIST:    (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues`,
+  CREATE:  (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues`,
+  BY_ID:   (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}`,
+  UPDATE:  (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}`,
+  DELETE:  (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}`,
+  STATUSES:      (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/statuses`,
+  STATUS:        (slug: string, projectId: number, statusId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/statuses/${statusId}`,
+  TYPES:         (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/types`,
+  COMMENTS:      (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/comments`,
+  COMMENT:       (slug: string, projectId: number, issueId: number, commentId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/comments/${commentId}`,
+  ACTIVITY:      (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/activity`,
+} as const;
+
+/**
  * Toutes les routes groupées (export par défaut)
  */
 export const API_ROUTES = {
