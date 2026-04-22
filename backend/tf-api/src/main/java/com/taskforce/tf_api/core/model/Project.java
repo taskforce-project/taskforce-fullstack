@@ -85,6 +85,10 @@ public class Project {
     @Builder.Default
     private boolean isPublic = false;
 
+    /** URL de l'icône/logo du projet (image uploadée, emoji unicode ou lucide:IconName) */
+    @Column(name = "icon_url", columnDefinition = "TEXT")
+    private String iconUrl;
+
     /** Utilisateur ayant créé le projet */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", nullable = false)
