@@ -106,6 +106,7 @@ public class ProjectService {
             .description(request.getDescription())
             .status(ProjectStatus.ACTIVE)
             .isPublic(request.isPublic())
+            .iconUrl(request.getIconUrl())
             .createdBy(creator)
             .build();
 
@@ -151,6 +152,9 @@ public class ProjectService {
         }
         if (request.getIsPublic() != null) {
             project.setPublic(request.getIsPublic());
+        }
+        if (request.getIconUrl() != null) {
+            project.setIconUrl(request.getIconUrl());
         }
 
         return toResponse(projectRepository.save(project));
@@ -408,6 +412,7 @@ public class ProjectService {
             .openIssues(0)    // Étape 3 — issues
             .members(members.stream().map(this::toMemberResponse).collect(Collectors.toList()))
             .labels(labels.stream().map(this::toLabelResponse).collect(Collectors.toList()))
+            .iconUrl(project.getIconUrl())
             .createdAt(project.getCreatedAt())
             .updatedAt(project.getUpdatedAt())
             .build();
