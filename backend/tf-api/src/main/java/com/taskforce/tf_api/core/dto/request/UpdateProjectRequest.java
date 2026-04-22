@@ -21,4 +21,7 @@ public class UpdateProjectRequest {
     private ProjectStatus status;
 
     private Boolean isPublic;
+
+    @Size(max = 500)
+    private String iconUrl;
 }

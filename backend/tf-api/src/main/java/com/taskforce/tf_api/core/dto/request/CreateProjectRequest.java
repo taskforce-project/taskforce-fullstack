@@ -29,4 +29,7 @@ public class CreateProjectRequest {
 
     /** true = visible par tous les membres du workspace, false = membres explicites seulement */
     private boolean isPublic = false;
+
+    /** URL de l'icône/logo (image uploadée, emoji unicode ou lucide:IconName). Optionnel. */
+    private String iconUrl;
 }
