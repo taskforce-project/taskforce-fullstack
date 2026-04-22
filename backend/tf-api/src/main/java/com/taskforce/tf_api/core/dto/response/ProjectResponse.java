@@ -45,6 +45,9 @@ public class ProjectResponse {
     /** Labels */
     private List<ProjectLabelResponse> labels;
 
+    /** URL de l'icône/logo du projet (image uploadée ou emoji unicode) */
+    private String iconUrl;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
