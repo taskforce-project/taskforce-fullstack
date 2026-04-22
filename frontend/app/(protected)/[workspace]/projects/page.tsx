@@ -16,6 +16,7 @@ import {
 } from "lucide-react"
 
 import { CreateProjectDialog } from "@/components/dialogs/create-project-dialog"
+import { ProjectIcon } from "@/components/ui/project-icon"
 
 import { useTranslation } from "@/lib/i18n"
 import { Button } from "@/components/ui/button"
@@ -70,22 +71,6 @@ const STATUS_CONFIG = {
 // ProjectCard
 // ---------------------------------------------------------------------------
 
-/** Génère une couleur de fond déterministe basée sur le nom du projet (style Vercel) */
-function projectGradient(name: string): string {
-  const palettes = [
-    "from-violet-500 to-purple-600",
-    "from-blue-500 to-cyan-600",
-    "from-emerald-500 to-teal-600",
-    "from-orange-500 to-amber-600",
-    "from-pink-500 to-rose-600",
-    "from-indigo-500 to-blue-600",
-    "from-teal-500 to-emerald-600",
-    "from-amber-500 to-yellow-600",
-  ]
-  const index = name.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0) % palettes.length
-  return palettes[index]
-}
-
 function ProjectCard({ project, slug, t }: Readonly<{ project: Project; slug: string; t: (k: string) => string }>) {
   const statusCfg = STATUS_CONFIG[project.status]
   const archiveProject = useProjectStore((s) => s.archiveProject)
@@ -108,14 +93,7 @@ function ProjectCard({ project, slug, t }: Readonly<{ project: Project; slug: st
       {/* Header */}
       <div className="flex items-start justify-between gap-2 mb-3">
         <div className="flex items-center gap-3">
-          <div
-            className={cn(
-              "h-10 w-10 rounded-lg flex items-center justify-center text-sm font-bold text-white shrink-0 bg-linear-to-br",
-              projectGradient(project.name)
-            )}
-          >
-            {project.name.slice(0, 2).toUpperCase()}
-          </div>
+          <ProjectIcon iconUrl={project.iconUrl} name={project.name} size={40} className="rounded-lg" />
           <div className="min-w-0">
             <h3 className="font-semibold text-foreground truncate group-hover:text-primary transition-colors">
               {project.name}
