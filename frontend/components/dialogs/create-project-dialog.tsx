@@ -18,6 +18,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { ProjectIconPicker } from "@/components/ui/project-icon-picker"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { useProjectStore } from "@/lib/store/project-store"
 import type { Project } from "@/lib/api/project-service"
@@ -44,6 +45,7 @@ export function CreateProjectDialog({ children, onCreated }: CreateProjectDialog
   const [name, setName] = useState("")
   const [identifier, setIdentifier] = useState("")
   const [description, setDescription] = useState("")
+  const [iconUrl, setIconUrl] = useState<string | null>(null)
 
   function handleNameChange(value: string) {
     setName(value)
@@ -62,6 +64,7 @@ export function CreateProjectDialog({ children, onCreated }: CreateProjectDialog
         name: name.trim(),
         identifier: identifier.trim().toUpperCase(),
         description: description.trim() || undefined,
+        iconUrl: iconUrl ?? undefined,
       })
       if (project) {
         onCreated?.(project)
@@ -77,10 +80,11 @@ export function CreateProjectDialog({ children, onCreated }: CreateProjectDialog
     setName("")
     setIdentifier("")
     setDescription("")
+    setIconUrl(null)
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) resetForm() }}>
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) resetForm() }} modal={false}>
       <DialogTrigger asChild>
         {children ?? (
           <Button size="sm" className="gap-2">
@@ -100,12 +104,10 @@ export function CreateProjectDialog({ children, onCreated }: CreateProjectDialog
 
         <div className="flex flex-col gap-5 py-2">
           {/* Icon + Name row */}
-          <div className="flex items-start gap-3">
-            <div className="size-12 rounded-xl flex items-center justify-center bg-muted border border-border shrink-0">
-              <FolderKanban className="size-6 text-muted-foreground" />
-            </div>
+          <div className="flex items-end gap-4">
+            <ProjectIconPicker value={iconUrl} onChange={setIconUrl} />
 
-            <div className="flex-1 flex flex-col gap-1.5">
+            <div className="flex-1 flex flex-col gap-1.5 pb-0.5">
               <label htmlFor="project-name" className="text-sm font-medium text-foreground">Project name</label>
               <Input
                 id="project-name"
