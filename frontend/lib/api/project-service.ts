@@ -47,6 +47,7 @@ export interface Project {
   openIssues: number;
   members: ProjectMember[];
   labels: ProjectLabel[];
+  iconUrl: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -56,6 +57,7 @@ export interface CreateProjectPayload {
   identifier: string;
   description?: string;
   isPublic?: boolean;
+  iconUrl?: string;
 }
 
 export interface UpdateProjectPayload {
@@ -63,6 +65,7 @@ export interface UpdateProjectPayload {
   description?: string;
   status?: ProjectStatus;
   isPublic?: boolean;
+  iconUrl?: string;
 }
 
 export interface AddProjectMemberPayload {
