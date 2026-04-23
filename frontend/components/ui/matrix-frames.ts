@@ -102,6 +102,33 @@ export const errorPattern: Frame = [
 ]
 
 // ---------------------------------------------------------------------------
+// Thinking: 8-position pixel spinner — 8 frames
+// ---------------------------------------------------------------------------
+
+export const thinkingAnim: Frame[] = (() => {
+  // Clock positions around the 7×7 center
+  const spinnerPath: Array<[number, number]> = [
+    [0, 3], [1, 5], [3, 6], [5, 5], [6, 3], [5, 1], [3, 0], [1, 1],
+  ]
+  const n = spinnerPath.length
+  const frames: Frame[] = []
+  for (let f = 0; f < n; f++) {
+    const frame = emptyFrame()
+    // Center dim glow
+    px(frame, 3, 3, 0.2)
+    // Trail: -2 dim, -1 mid, current full
+    const [r2, c2] = spinnerPath[(f - 2 + n) % n]
+    const [r1, c1] = spinnerPath[(f - 1 + n) % n]
+    const [r0, c0] = spinnerPath[f]
+    px(frame, r2, c2, 0.2)
+    px(frame, r1, c1, 0.5)
+    px(frame, r0, c0, 1)
+    frames.push(frame)
+  }
+  return frames
+})()
+
+// ---------------------------------------------------------------------------
 // Writing / active: organic blob morphing — 20 frames
 // ---------------------------------------------------------------------------
 
@@ -222,6 +249,18 @@ export const errorAnim: Frame[] = (() => {
 })()
 
 // ---------------------------------------------------------------------------
+// Success: static checkmark (single frame, no animation)
+// ---------------------------------------------------------------------------
+
+export const successStatic: Frame[] = [successPattern]
+
+// ---------------------------------------------------------------------------
+// Error: static × cross (single frame, no animation)
+// ---------------------------------------------------------------------------
+
+export const errorStatic: Frame[] = [errorPattern]
+
+// ---------------------------------------------------------------------------
 // Info animated: "i" with pulse dot — 8 frames
 // ---------------------------------------------------------------------------
 
@@ -326,15 +365,15 @@ const C_BLUE = "#2671f4"
 const C_GREEN = "#22c55e"
 
 export const AI_MODE_CONFIG: Record<AiMode, ModeConfig> = {
-  idle:     { frames: idleAnim,    color: C_PURPLE, fps: 4,  label: "Idle" },
-  thinking: { frames: writing,     color: C_ORANGE, fps: 10, label: "Thinking…" },
-  writing:  { frames: writing,     color: C_BLUE,   fps: 10, label: "Writing…" },
+  idle:     { frames: idleAnim,     color: C_PURPLE, fps: 4,  label: "Idle" },
+  thinking: { frames: thinkingAnim, color: C_ORANGE, fps: 12, label: "Thinking…" },
+  writing:  { frames: writing,      color: C_BLUE,   fps: 10, label: "Writing…" },
   question: { frames: questionAnim, color: C_ORANGE, fps: 6,  label: "Question" },
-  info:     { frames: infoAnim,    color: C_PURPLE, fps: 4,  label: "Info" },
-  tip:      { frames: tipAnim,     color: C_AMBER,  fps: 8,  label: "Tip" },
-  warning:  { frames: warningAnim, color: C_RED,    fps: 6,  label: "Warning" },
-  success:  { frames: successAnim, color: C_GREEN,  fps: 10, label: "Success" },
-  error:    { frames: errorAnim,   color: C_RED,    fps: 8,  label: "Error" },
+  info:     { frames: infoAnim,     color: C_PURPLE, fps: 4,  label: "Info" },
+  tip:      { frames: tipAnim,      color: C_AMBER,  fps: 8,  label: "Tip" },
+  warning:  { frames: warningAnim,  color: C_RED,    fps: 6,  label: "Warning" },
+  success:  { frames: successStatic, color: C_GREEN, fps: 1,  label: "Success" },
+  error:    { frames: errorStatic,   color: C_RED,   fps: 1,  label: "Error" },
 }
 
 // Re-export common animations so consumers don't need to import matrix.tsx directly
