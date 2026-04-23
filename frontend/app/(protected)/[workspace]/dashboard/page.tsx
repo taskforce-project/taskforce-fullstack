@@ -34,6 +34,8 @@ type ChatMessage = {
   content: string
 }
 
+type AiState = "idle" | "thinking" | "success" | "error"
+
 // ---------------------------------------------------------------------------
 // Mock AI response — front-only, LLM to be connected later
 // ---------------------------------------------------------------------------
@@ -249,21 +251,24 @@ function HeroState({ userName, isThinking, input, setInput, send }: HeroStatePro
 function CopilotPanel({ userName }: CopilotPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState("")
-  const [isThinking, setIsThinking] = useState(false)
+  const [aiState, setAiState] = useState<AiState>("idle")
+  const [lastMsgId, setLastMsgId] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+
+  const isThinking = aiState === "thinking"
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages, isThinking])
+  }, [messages, aiState])
 
   const send = useCallback(
     (text: string) => {
       const trimmed = text.trim()
-      if (!trimmed || isThinking) return
+      if (!trimmed || aiState === "thinking") return
       const userMsg: ChatMessage = { id: Math.random().toString(36).slice(2), role: "user", content: trimmed }
       setMessages((prev) => [...prev, userMsg])
       setInput("")
-      setIsThinking(true)
+      setAiState("thinking")
       setTimeout(() => {
         const assistantMsg: ChatMessage = {
           id: Math.random().toString(36).slice(2),
@@ -271,10 +276,12 @@ function CopilotPanel({ userName }: CopilotPanelProps) {
           content: simulateResponse(trimmed),
         }
         setMessages((prev) => [...prev, assistantMsg])
-        setIsThinking(false)
+        setLastMsgId(assistantMsg.id)
+        setAiState("success")
+        setTimeout(() => setAiState("idle"), 2000)
       }, 1200 + Math.random() * 800)
     },
-    [isThinking],
+    [aiState],
   )
 
   const isEmpty = messages.length === 0
@@ -287,7 +294,7 @@ function CopilotPanel({ userName }: CopilotPanelProps) {
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div className="flex items-center gap-3">
-            <AiMatrixIcon mode={isThinking ? "thinking" : "idle"} size={3} color="#ffae04" />
+            <AiMatrixIcon mode={aiState} size={3} color="#ffae04" />
             <div>
               <p className="text-sm font-semibold">Taskforce AI</p>
               <p className="text-[10px] text-muted-foreground flex items-center gap-1.5">
@@ -323,7 +330,10 @@ function CopilotPanel({ userName }: CopilotPanelProps) {
                     className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}
                   >
                     {msg.role === "assistant" ? (
-                      <AiMatrixIcon mode="writing" size={3} />
+                      <AiMatrixIcon
+                        mode={msg.id === lastMsgId && aiState === "success" ? "success" : "writing"}
+                        size={3}
+                      />
                     ) : (
                       <div className="size-7 shrink-0 rounded-full bg-foreground text-background flex items-center justify-center text-[10px] font-bold">
                         {userName.charAt(0).toUpperCase()}
