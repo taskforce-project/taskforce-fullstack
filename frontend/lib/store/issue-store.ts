@@ -1,20 +1,23 @@
 import { create } from "zustand";
-import type {
-  Issue,
-  IssueStatus,
-  IssueType,
-  IssueComment,
-  IssueActivity,
-  CreateIssuePayload,
-  UpdateIssuePayload,
-} from "../api/issue-service";
 import {
+  type Issue,
+  type IssueStatus,
+  type IssueType,
+  type IssueComment,
+  type IssueActivity,
+  type CreateIssuePayload,
+  type UpdateIssuePayload,
+  type CreateIssueStatusPayload,
+  type UpdateIssueStatusPayload,
   listIssues,
   getIssue,
   createIssue as createIssueApi,
   updateIssue as updateIssueApi,
   deleteIssue as deleteIssueApi,
   listStatuses,
+  createStatus as createStatusApi,
+  updateStatus as updateStatusApi,
+  deleteStatus as deleteStatusApi,
   listTypes,
   listComments,
   addComment as addCommentApi,
@@ -47,6 +50,9 @@ interface IssueState {
 
   // Statuts & types
   fetchStatuses: (slug: string, projectId: number) => Promise<IssueStatus[]>;
+  createStatus: (slug: string, projectId: number, payload: CreateIssueStatusPayload) => Promise<IssueStatus | null>;
+  updateStatus: (slug: string, projectId: number, statusId: number, payload: UpdateIssueStatusPayload) => Promise<IssueStatus | null>;
+  deleteStatus: (slug: string, projectId: number, statusId: number) => Promise<void>;
   fetchTypes: (slug: string, projectId: number) => Promise<IssueType[]>;
 
   // Commentaires
@@ -153,6 +159,40 @@ export const useIssueStore = create<IssueState>((set, get) => ({
       const message = err instanceof Error ? err.message : "Erreur lors du chargement des statuts";
       set({ error: message });
       return [];
+    }
+  },
+
+  createStatus: async (slug, projectId, payload) => {
+    try {
+      const status = await createStatusApi(slug, projectId, payload);
+      set((state) => ({ statuses: [...state.statuses, status] }));
+      return status;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erreur lors de la création du statut";
+      set({ error: message });
+      return null;
+    }
+  },
+
+  updateStatus: async (slug, projectId, statusId, payload) => {
+    try {
+      const updated = await updateStatusApi(slug, projectId, statusId, payload);
+      set((state) => ({ statuses: state.statuses.map((s) => (s.id === updated.id ? updated : s)) }));
+      return updated;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erreur lors de la mise à jour du statut";
+      set({ error: message });
+      return null;
+    }
+  },
+
+  deleteStatus: async (slug, projectId, statusId) => {
+    try {
+      await deleteStatusApi(slug, projectId, statusId);
+      set((state) => ({ statuses: state.statuses.filter((s) => s.id !== statusId) }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erreur lors de la suppression du statut";
+      set({ error: message });
     }
   },
 
