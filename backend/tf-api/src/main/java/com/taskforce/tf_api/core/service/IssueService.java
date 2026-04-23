@@ -112,12 +112,15 @@ public class IssueService {
         issueTypeRepository.save(buildType(project, "Bug",     "#ef4444", "bug",        false));
         issueTypeRepository.save(buildType(project, "Feature", "#10b981", "zap",        false));
 
-        // --- Compteur séquence ---
-        IssueSequenceCounter counter = IssueSequenceCounter.builder()
-            .project(project)
-            .lastNumber(0)
-            .build();
-        sequenceCounterRepository.save(counter);
+        // --- Compteur séquence (uniquement si absent) ---
+        boolean counterExists = sequenceCounterRepository.findByProjectIdForUpdate(project.getId()).isPresent();
+        if (!counterExists) {
+            IssueSequenceCounter counter = IssueSequenceCounter.builder()
+                .project(project)
+                .lastNumber(0)
+                .build();
+            sequenceCounterRepository.save(counter);
+        }
 
         log.info("Statuts, types et compteur d'issues initialisés pour le projet '{}'", project.getIdentifier());
     }
@@ -332,13 +335,17 @@ public class IssueService {
     // Statuts
     // =========================================================================
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<IssueStatusResponse> listStatuses(String workspaceSlug, Long projectId, Long userId) {
         Project project = resolveProject(workspaceSlug, projectId);
         assertWorkspaceMember(project.getWorkspace().getId(), userId);
-        return issueStatusRepository.findByProjectIdOrderByPosition(project.getId()).stream()
-            .map(this::toStatusResponse)
-            .toList();
+        List<IssueStatus> statuses = issueStatusRepository.findByProjectIdOrderByPosition(project.getId());
+        if (statuses.isEmpty()) {
+            log.info("Aucun statut trouvé pour le projet {} — initialisation par défaut", projectId);
+            seedDefaultStatusesAndTypes(project);
+            statuses = issueStatusRepository.findByProjectIdOrderByPosition(project.getId());
+        }
+        return statuses.stream().map(this::toStatusResponse).toList();
     }
 
     @Transactional
@@ -627,6 +634,8 @@ public class IssueService {
         return UserSummaryResponse.builder()
             .id(u.getId())
             .email(u.getEmail())
+            .displayName(u.getDisplayName())
+            .avatarUrl(u.getAvatarUrl())
             .build();
     }
 }
