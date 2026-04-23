@@ -41,7 +41,7 @@ import lombok.extern.slf4j.Slf4j;
  * /api/workspaces/{slug}/projects/{projectId}/issues/*
  */
 @RestController
-@RequestMapping("/workspaces/{slug}/projects/{projectId}/issues")
+@RequestMapping("/api/workspaces/{slug}/projects/{projectId}/issues")
 @RequiredArgsConstructor
 @Slf4j
 public class IssueController {
