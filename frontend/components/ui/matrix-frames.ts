@@ -81,8 +81,8 @@ export const tipPattern: Frame = [
 
 /** Success: checkmark — 7×7 */
 export const successPattern: Frame = [
+  [0, 0, 0, 0, 0, 0, 1],
   [0, 0, 0, 0, 0, 1, 0],
-  [0, 0, 0, 0, 1, 0, 0],
   [0, 0, 0, 0, 1, 0, 0],
   [0, 0, 0, 1, 0, 0, 0],
   [1, 0, 1, 0, 0, 0, 0],
