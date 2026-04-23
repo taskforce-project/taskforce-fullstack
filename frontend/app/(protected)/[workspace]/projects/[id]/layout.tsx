@@ -21,7 +21,8 @@ import {
 import { useTranslation } from "@/lib/i18n"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { ProjectIcon } from "@/components/ui/project-icon"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -131,7 +132,7 @@ export default function ProjectLayout({ children }: { readonly children: React.R
         {/* Project name + actions */}
         <div className="flex items-center justify-between gap-4 mb-3">
           <div className="flex items-center gap-3 min-w-0">
-            <span className="text-2xl">{project?.name?.slice(0, 1) ?? "📁"}</span>
+            <ProjectIcon iconUrl={project?.iconUrl ?? null} size={36} />
             <div className="min-w-0">
               <h1 className="text-xl font-semibold text-foreground truncate">{project?.name ?? "…"}</h1>
               <p className="text-xs text-muted-foreground truncate">{project?.description ?? ""}</p>
@@ -143,6 +144,7 @@ export default function ProjectLayout({ children }: { readonly children: React.R
             <div className="hidden sm:flex -space-x-2 mr-1">
               {(project?.members ?? []).slice(0, 3).map((m) => (
                 <Avatar key={m.id} className="h-7 w-7 ring-2 ring-background">
+                  {m.avatarUrl && <AvatarImage src={m.avatarUrl} alt={m.displayName ?? m.email} />}
                   <AvatarFallback className={cn("text-[9px] text-white", getMemberColor(m.userId))}>
                     {getMemberInitials(m.displayName, m.email)}
                   </AvatarFallback>
@@ -159,7 +161,7 @@ export default function ProjectLayout({ children }: { readonly children: React.R
               <Star className="h-4 w-4" />
             </Button>
 
-            <CreateIssueDialog>
+            <CreateIssueDialog projectId={Number(projectId)} workspaceSlug={workspace}>
               <Button size="sm" className="gap-1.5 h-8 text-xs">
                 <Plus className="h-3.5 w-3.5" />
                 {t("projects.detail.newIssue")}
