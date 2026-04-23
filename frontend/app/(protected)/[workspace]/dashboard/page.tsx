@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect, useCallback } from "react"
 import Link from "next/link"
 import {
-  Sparkles,
   FolderKanban,
   UserPlus,
   Layers,
@@ -11,7 +10,6 @@ import {
   CheckSquare,
   ListChecks,
   Send,
-  Bot,
   Users,
   CircleDot,
   Clock,
@@ -22,6 +20,9 @@ import { useAuth } from "@/lib/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Pod } from "@/components/ui/pod"
+import Orb from "@/components/effects/Orb"
+import { AiMatrixIcon } from "@/components/ui/ai-matrix-icon"
+import { StripedPattern } from "@/components/magicui/striped-pattern"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -64,6 +65,7 @@ function simulateResponse(input: string): string {
 // Chat sub-components
 // ---------------------------------------------------------------------------
 
+
 const SUGGESTIONS = [
   { label: "Init a new project", icon: FolderKanban, prompt: "Help me initialize a new project with my team" },
   { label: "Invite team members", icon: UserPlus, prompt: "I want to invite team members to the workspace" },
@@ -73,22 +75,36 @@ const SUGGESTIONS = [
   { label: "Create issues in bulk", icon: ListChecks, prompt: "I need to create multiple issues for a project" },
 ] as const
 
+// ---------------------------------------------------------------------------
+// Orb keyframes — injected once at module level
+// ---------------------------------------------------------------------------
+
+const ORB_KEYFRAMES = `
+  @keyframes micro-bounce { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-3px); } }
+  @keyframes status-pulse { 0%,100% { opacity:1; } 50% { opacity:0.45; } }
+`
+
+// Thinking dots row
 function ThinkingDots() {
   return (
     <div className="flex items-end gap-3">
-      <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-muted to-muted/50 shadow-sm">
-        <Bot className="size-4 text-muted-foreground" />
-      </div>
-      <div className="rounded-2xl rounded-bl-none bg-linear-to-br from-muted to-muted/50 px-5 py-3.5 shadow-sm">
-        <div className="flex items-center gap-1.5">
-          <div className="size-2 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:0ms]" />
-          <div className="size-2 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:150ms]" />
-          <div className="size-2 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:300ms]" />
-        </div>
+      <AiMatrixIcon mode="thinking" size={3} />
+      <div className="rounded-tl-sm rounded-tr-2xl rounded-br-2xl rounded-bl-2xl border border-border bg-muted px-4 py-3 flex items-center gap-1.5">
+        {[0, 150, 300].map((delay) => (
+          <div
+            key={delay}
+            className="size-1.5 rounded-full bg-muted-foreground/50"
+            style={{ animation: "micro-bounce 0.8s ease-in-out infinite", animationDelay: `${delay}ms` }}
+          />
+        ))}
       </div>
     </div>
   )
 }
+
+// ---------------------------------------------------------------------------
+// Chat input bar
+// ---------------------------------------------------------------------------
 
 interface ChatInputProps {
   readonly input: string
@@ -98,10 +114,24 @@ interface ChatInputProps {
 }
 
 function ChatInput({ input, setInput, send, isThinking }: ChatInputProps) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = "auto"
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`
+  }, [input])
+
+  const canSend = input.trim() !== "" && !isThinking
+
   return (
-    <div className="flex w-full gap-3">
-      <input
-        type="text"
+    <div
+      className="rounded-xl border bg-card overflow-hidden transition-colors focus-within:border-foreground/20"
+      style={{ borderColor: isThinking ? "rgba(255,174,4,0.3)" : undefined }}
+    >
+      <textarea
+        ref={textareaRef}
         value={input}
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={(e) => {
@@ -110,28 +140,110 @@ function ChatInput({ input, setInput, send, isThinking }: ChatInputProps) {
             send(input)
           }
         }}
-        placeholder="Type your message..."
+        placeholder="Ask me anything about your workspace…"
         disabled={isThinking}
-        className="h-11 flex-1 rounded-xl border border-border bg-background px-4 text-sm shadow-sm outline-none placeholder:text-muted-foreground transition-all focus:border-primary focus:shadow-md focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
+        rows={1}
+        className="w-full bg-transparent px-4 pt-3 pb-1 text-sm text-foreground placeholder:text-muted-foreground/40 outline-none resize-none min-h-11 max-h-30 overflow-y-auto disabled:opacity-40"
       />
-      <Button
-        size="icon"
-        onClick={() => send(input)}
-        disabled={!input.trim() || isThinking}
-        className="size-11 shrink-0 rounded-xl shadow-md transition-all hover:shadow-lg hover:scale-105"
-      >
-        <Send className="size-4" />
-      </Button>
+      <div className="flex items-center justify-between px-3 pb-3">
+        <span className="text-[10px] text-muted-foreground/40 font-mono">Shift+Enter for new line</span>
+        <button
+          type="button"
+          onClick={() => send(input)}
+          disabled={!canSend}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
+            canSend
+              ? "bg-foreground text-background hover:opacity-80 cursor-pointer"
+              : "bg-muted text-muted-foreground cursor-not-allowed"
+          }`}
+        >
+          <Send className="size-3" />
+          Send
+        </button>
+      </div>
     </div>
   )
 }
 
 // ---------------------------------------------------------------------------
-// Copilot panel
+// Copilot panel — self-contained dark card
 // ---------------------------------------------------------------------------
 
 interface CopilotPanelProps {
   readonly userName: string
+}
+
+interface HeroStateProps {
+  readonly userName: string
+  readonly isThinking: boolean
+  readonly input: string
+  readonly setInput: (v: string) => void
+  readonly send: (text: string) => void
+}
+
+// Shadow palette hue-rotate offsets (degrees) applied on Orb canvas — purple→pink→orange→red→amber
+const ORB_SHADOW_HUES = [0, 60, 120, 70, 135] as const
+
+function HeroState({ userName, isThinking, input, setInput, send }: HeroStateProps) {
+  const [hueIdx, setHueIdx] = useState(0)
+
+  useEffect(() => {
+    const id = setInterval(() => setHueIdx((i) => (i + 1) % ORB_SHADOW_HUES.length), 2500)
+    return () => clearInterval(id)
+  }, [])
+
+  return (
+    <div className="flex-1 flex flex-col items-center gap-6 pt-8 pb-4 relative overflow-hidden">
+      {/* Striped background — same as 404 page */}
+      <StripedPattern direction="left" width={28} height={28} className="text-muted-foreground/8" />
+      {/* Radial fade to hide stripes toward center */}
+      <div className="pointer-events-none absolute inset-0 z-20 bg-[radial-gradient(ellipse_85%_75%_at_50%_40%,transparent_15%,hsl(var(--card))_70%)]" />
+
+      {/* Content above the bg layers */}
+      <div className="relative z-30 flex flex-col items-center gap-6 w-full">
+        {/* Orb — brand mark, cycles through shadow palette colors */}
+        <div
+          style={{
+            width: 96,
+            height: 96,
+            filter: `hue-rotate(${ORB_SHADOW_HUES[hueIdx]}deg)`,
+            transition: "filter 1.5s ease",
+          }}
+        >
+          <Orb hue={0} hoverIntensity={0.5} forceHoverState={isThinking || input.length > 0} backgroundColor="#090909" />
+        </div>
+
+        {/* Title */}
+        <div className="text-center space-y-1.5 max-w-xs">
+          <h3 className="text-lg font-semibold tracking-tight">Hi, {userName}</h3>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Your agentic workspace AI. Plan sprints, manage issues, generate reports.
+          </p>
+        </div>
+
+        {/* Suggestion chips */}
+        <div className="flex flex-wrap gap-2 justify-center max-w-sm">
+          {SUGGESTIONS.map((s) => (
+            <button
+              key={s.label}
+              type="button"
+              onClick={() => send(s.prompt)}
+              disabled={isThinking}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border bg-transparent text-muted-foreground text-xs hover:border-foreground/25 hover:text-foreground transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <s.icon className="size-3 shrink-0" />
+              {s.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Input */}
+        <div className="w-full">
+          <ChatInput input={input} setInput={setInput} send={send} isThinking={isThinking} />
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function CopilotPanel({ userName }: CopilotPanelProps) {
@@ -148,28 +260,19 @@ function CopilotPanel({ userName }: CopilotPanelProps) {
     (text: string) => {
       const trimmed = text.trim()
       if (!trimmed || isThinking) return
-
-      const userMsg: ChatMessage = {
-        id: Math.random().toString(36).slice(2),
-        role: "user",
-        content: trimmed,
-      }
+      const userMsg: ChatMessage = { id: Math.random().toString(36).slice(2), role: "user", content: trimmed }
       setMessages((prev) => [...prev, userMsg])
       setInput("")
       setIsThinking(true)
-
-      setTimeout(
-        () => {
-          const assistantMsg: ChatMessage = {
-            id: Math.random().toString(36).slice(2),
-            role: "assistant",
-            content: simulateResponse(trimmed),
-          }
-          setMessages((prev) => [...prev, assistantMsg])
-          setIsThinking(false)
-        },
-        1200 + Math.random() * 800,
-      )
+      setTimeout(() => {
+        const assistantMsg: ChatMessage = {
+          id: Math.random().toString(36).slice(2),
+          role: "assistant",
+          content: simulateResponse(trimmed),
+        }
+        setMessages((prev) => [...prev, assistantMsg])
+        setIsThinking(false)
+      }, 1200 + Math.random() * 800)
     },
     [isThinking],
   )
@@ -178,86 +281,77 @@ function CopilotPanel({ userName }: CopilotPanelProps) {
 
   return (
     <>
-      {isEmpty ? (
-        /* ─── Empty state ─── */
-        <div className="flex flex-col items-center gap-6 py-8 text-center">
-          <div className="relative">
-            <div className="absolute inset-0 animate-pulse rounded-2xl bg-primary/10 blur-xl" />
-            <div className="relative flex size-16 items-center justify-center rounded-2xl border-2 border-primary/20 bg-linear-to-br from-primary/10 to-primary/5">
-              <Sparkles className="size-8 text-primary" />
+      <style dangerouslySetInnerHTML={{ __html: ORB_KEYFRAMES }} />
+      <div className="rounded-2xl border border-border bg-card overflow-hidden flex flex-col" style={{ minHeight: 540 }}>
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <div className="flex items-center gap-3">
+            <AiMatrixIcon mode={isThinking ? "thinking" : "idle"} size={3} color="#ffae04" />
+            <div>
+              <p className="text-sm font-semibold">Taskforce AI</p>
+              <p className="text-[10px] text-muted-foreground flex items-center gap-1.5">
+                <span
+                  className="inline-block size-1.5 rounded-full"
+                  style={{
+                    background: isThinking ? "#ffae04" : "#22c55e",
+                    boxShadow: isThinking ? "0 0 5px #ffae04" : "0 0 5px #22c55e",
+                    animation: "status-pulse 2s ease-in-out infinite",
+                    transition: "background 0.4s, box-shadow 0.4s",
+                  }}
+                />
+                {isThinking ? "Processing…" : "Ready"}
+              </p>
             </div>
           </div>
-          <div className="space-y-2">
-            <h3 className="text-2xl font-bold">Hello, {userName}! 👋</h3>
-            <p className="text-sm text-muted-foreground">
-              I&apos;m your workspace assistant. How can I help you today?
-            </p>
-          </div>
-
-          {/* Suggestion chips */}
-          <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-3">
-            {SUGGESTIONS.map((s) => (
-              <button
-                key={s.label}
-                onClick={() => send(s.prompt)}
-                className="group flex items-center gap-3 rounded-xl border border-border bg-linear-to-br from-background to-muted/30 px-4 py-3.5 text-left text-xs font-medium shadow-sm transition-all hover:border-primary/40 hover:shadow-md hover:-translate-y-0.5"
-              >
-                <div className="rounded-lg bg-background p-2 shadow-sm transition-colors group-hover:bg-primary/10">
-                  <s.icon className="size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
-                </div>
-                <span className="truncate font-semibold">{s.label}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* Input */}
-          <div className="w-full">
-            <ChatInput input={input} setInput={setInput} send={send} isThinking={isThinking} />
-          </div>
+          <span className="text-[10px] text-muted-foreground/50 font-mono uppercase tracking-widest border border-border px-2 py-1 rounded-md">
+            Preview
+          </span>
         </div>
-      ) : (
-        /* ─── Chat mode ─── */
-        <div className="flex flex-col" style={{ height: 520 }}>
-          <div className="flex-1 space-y-4 overflow-y-auto px-1 py-6">
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex items-end gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
-              >
-                <div
-                  className={`flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold shadow-sm ${
-                    msg.role === "user"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-linear-to-br from-muted to-muted/50 text-muted-foreground"
-                  }`}
-                >
-                  {msg.role === "user" ? (
-                    userName.charAt(0).toUpperCase()
-                  ) : (
-                    <Bot className="size-4" />
-                  )}
-                </div>
-                <div
-                  className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${
-                    msg.role === "user"
-                      ? "rounded-br-none bg-primary text-primary-foreground"
-                      : "rounded-bl-none bg-linear-to-br from-muted to-muted/50"
-                  }`}
-                >
-                  {msg.content}
-                </div>
+
+        {/* Content */}
+        <div className="flex-1 flex flex-col px-5 pb-5">
+          {isEmpty ? (
+            <HeroState userName={userName} isThinking={isThinking} input={input} setInput={setInput} send={send} />
+          ) : (
+            <div className="flex-1 flex flex-col pt-5 gap-4">
+              {/* Messages */}
+              <div className="flex-1 overflow-y-auto flex flex-col gap-4 pr-1 min-h-0 max-h-90">
+                {messages.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}
+                  >
+                    {msg.role === "assistant" ? (
+                      <AiMatrixIcon mode="writing" size={3} />
+                    ) : (
+                      <div className="size-7 shrink-0 rounded-full bg-foreground text-background flex items-center justify-center text-[10px] font-bold">
+                        {userName.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <div
+                      className={`max-w-[80%] px-4 py-2.5 text-sm leading-relaxed ${
+                        msg.role === "user"
+                          ? "bg-foreground text-background rounded-tl-2xl rounded-tr-sm rounded-br-2xl rounded-bl-2xl"
+                          : "bg-muted text-foreground border border-border rounded-tl-sm rounded-tr-2xl rounded-br-2xl rounded-bl-2xl"
+                      }`}
+                    >
+                      {msg.content}
+                    </div>
+                  </div>
+                ))}
+                {isThinking && <ThinkingDots />}
+                <div ref={bottomRef} />
               </div>
-            ))}
-            {isThinking && <ThinkingDots />}
-            <div ref={bottomRef} />
-          </div>
 
-          {/* Input bar */}
-          <div className="border-t border-border bg-muted/30 p-4">
-            <ChatInput input={input} setInput={setInput} send={send} isThinking={isThinking} />
-          </div>
+              {/* Input */}
+              <div className="mt-2">
+                <ChatInput input={input} setInput={setInput} send={send} isThinking={isThinking} />
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </>
   )
 }
@@ -369,9 +463,7 @@ export default function DashboardPage() {
 
         {/* Right column - Copilot Chat */}
         <div className="lg:col-span-2">
-          <Pod>
-            <CopilotPanel userName={firstName} />
-          </Pod>
+          <CopilotPanel userName={firstName} />
         </div>
       </div>
     </div>
