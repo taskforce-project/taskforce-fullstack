@@ -21,6 +21,8 @@ export type IssueActivityType =
 export interface UserSummary {
   id: number;
   email: string;
+  displayName: string | null;
+  avatarUrl: string | null;
 }
 
 export interface IssueStatus {
