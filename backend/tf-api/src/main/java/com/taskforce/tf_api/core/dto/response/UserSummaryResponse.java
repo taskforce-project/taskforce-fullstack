@@ -13,4 +13,6 @@ import lombok.NoArgsConstructor;
 public class UserSummaryResponse {
     private Long id;
     private String email;
+    private String displayName;
+    private String avatarUrl;
 }
