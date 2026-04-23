@@ -123,6 +123,9 @@ export default function Orb({
   backgroundColor = "#000000",
 }: Readonly<OrbProps>) {
   const ctnDom = useRef<HTMLDivElement>(null)
+  // Use a ref so the animation loop always reads the latest value without re-creating the WebGL context
+  const forceHoverRef = useRef(forceHoverState)
+  useEffect(() => { forceHoverRef.current = forceHoverState }, [forceHoverState])
 
   useEffect(() => {
     const container = ctnDom.current
@@ -191,7 +194,7 @@ export default function Orb({
       program.uniforms.hue.value = hue
       program.uniforms.hoverIntensity.value = hoverIntensity
       program.uniforms.backgroundColor.value = hexToVec3(backgroundColor)
-      const effectiveHover = forceHoverState ? 1 : targetHover
+      const effectiveHover = forceHoverRef.current ? 1 : targetHover
       program.uniforms.hover.value += (effectiveHover - program.uniforms.hover.value) * 0.1
       if (rotateOnHover && effectiveHover > 0.5) currentRot += dt * rotationSpeed
       program.uniforms.rot.value = currentRot
@@ -210,7 +213,7 @@ export default function Orb({
       gl.getExtension("WEBGL_lose_context")?.loseContext()
     }
     // biome-ignore lint/correctness/useExhaustiveDependencies: intentional full re-init when these props change
-  }, [hue, hoverIntensity, rotateOnHover, forceHoverState, backgroundColor])
+  }, [hue, hoverIntensity, rotateOnHover, backgroundColor])
 
   return <div ref={ctnDom} className="orb-container" />
 }
