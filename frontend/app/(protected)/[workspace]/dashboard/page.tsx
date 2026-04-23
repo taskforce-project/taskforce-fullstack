@@ -28,13 +28,16 @@ import { StripedPattern } from "@/components/magicui/striped-pattern"
 // Types
 // ---------------------------------------------------------------------------
 
+type MsgState = "writing" | "success" | "error"
+
 type ChatMessage = {
   id: string
   role: "user" | "assistant"
   content: string
+  msgState?: MsgState
 }
 
-type AiState = "idle" | "thinking" | "success" | "error"
+type AiState = "idle" | "thinking"
 
 // ---------------------------------------------------------------------------
 // Mock AI response — front-only, LLM to be connected later
@@ -84,19 +87,40 @@ const SUGGESTIONS = [
 const ORB_KEYFRAMES = `
   @keyframes micro-bounce { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-3px); } }
   @keyframes status-pulse { 0%,100% { opacity:1; } 50% { opacity:0.45; } }
+  @keyframes equalizer { from { transform: scaleY(0.2); } to { transform: scaleY(1); } }
 `
 
-// Thinking dots row
+// Equalizer bars — AI thinking indicator
+const EQ_BARS = [
+  { id: "b0", delay: 0,   dur: 0.45 },
+  { id: "b1", delay: 80,  dur: 0.55 },
+  { id: "b2", delay: 160, dur: 0.4 },
+  { id: "b3", delay: 60,  dur: 0.6 },
+  { id: "b4", delay: 200, dur: 0.5 },
+  { id: "b5", delay: 100, dur: 0.35 },
+  { id: "b6", delay: 240, dur: 0.48 },
+  { id: "b7", delay: 40,  dur: 0.58 },
+  { id: "b8", delay: 180, dur: 0.42 },
+] as const
+
 function ThinkingDots() {
   return (
     <div className="flex items-end gap-3">
       <AiMatrixIcon mode="thinking" size={3} />
-      <div className="rounded-tl-sm rounded-tr-2xl rounded-br-2xl rounded-bl-2xl border border-border bg-muted px-4 py-3 flex items-center gap-1.5">
-        {[0, 150, 300].map((delay) => (
+      <div className="rounded-tl-sm rounded-tr-2xl rounded-br-2xl rounded-bl-2xl border border-border bg-muted px-5 py-3 flex items-end gap-0.75">
+        {EQ_BARS.map(({ id, delay, dur }) => (
           <div
-            key={delay}
-            className="size-1.5 rounded-full bg-muted-foreground/50"
-            style={{ animation: "micro-bounce 0.8s ease-in-out infinite", animationDelay: `${delay}ms` }}
+            key={id}
+            style={{
+              width: 3,
+              height: 24,
+              borderRadius: 2,
+              background: "#ff7a00",
+              opacity: 0.75,
+              transformOrigin: "bottom",
+              animation: `equalizer ${dur}s ease-in-out infinite alternate`,
+              animationDelay: `${delay}ms`,
+            }}
           />
         ))}
       </div>
@@ -212,7 +236,7 @@ function HeroState({ userName, isThinking, input, setInput, send }: HeroStatePro
             transition: "filter 1.5s ease",
           }}
         >
-          <Orb hue={0} hoverIntensity={0.5} forceHoverState={isThinking || input.length > 0} backgroundColor="#090909" />
+          <Orb hue={0} hoverIntensity={0.5} forceHoverState={input.length > 0} backgroundColor="#090909" />
         </div>
 
         {/* Title */}
@@ -252,7 +276,6 @@ function CopilotPanel({ userName }: CopilotPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState("")
   const [aiState, setAiState] = useState<AiState>("idle")
-  const [lastMsgId, setLastMsgId] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   const isThinking = aiState === "thinking"
@@ -274,11 +297,10 @@ function CopilotPanel({ userName }: CopilotPanelProps) {
           id: Math.random().toString(36).slice(2),
           role: "assistant",
           content: simulateResponse(trimmed),
+          msgState: "success",
         }
         setMessages((prev) => [...prev, assistantMsg])
-        setLastMsgId(assistantMsg.id)
-        setAiState("success")
-        setTimeout(() => setAiState("idle"), 2000)
+        setAiState("idle")
       }, 1200 + Math.random() * 800)
     },
     [aiState],
@@ -294,7 +316,7 @@ function CopilotPanel({ userName }: CopilotPanelProps) {
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div className="flex items-center gap-3">
-            <AiMatrixIcon mode={aiState} size={3} color="#ffae04" />
+            <AiMatrixIcon mode={isThinking ? "thinking" : "idle"} size={3} color="#ffae04" />
             <div>
               <p className="text-sm font-semibold">Taskforce AI</p>
               <p className="text-[10px] text-muted-foreground flex items-center gap-1.5">
@@ -330,10 +352,7 @@ function CopilotPanel({ userName }: CopilotPanelProps) {
                     className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}
                   >
                     {msg.role === "assistant" ? (
-                      <AiMatrixIcon
-                        mode={msg.id === lastMsgId && aiState === "success" ? "success" : "writing"}
-                        size={3}
-                      />
+                      <AiMatrixIcon mode={msg.msgState ?? "writing"} size={3} />
                     ) : (
                       <div className="size-7 shrink-0 rounded-full bg-foreground text-background flex items-center justify-center text-[10px] font-bold">
                         {userName.charAt(0).toUpperCase()}
