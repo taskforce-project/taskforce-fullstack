@@ -1,18 +1,19 @@
-"use client"
+﻿"use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { format } from "date-fns"
 import {
   Plus,
-  CircleDot,
   RefreshCw,
-  Clock,
+  Circle,
   CheckCircle2,
+  XCircle,
   Flag,
   User,
   Tag,
   CalendarIcon,
   ChevronDown,
+  X,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -38,137 +39,168 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
+import { useIssueStore } from "@/lib/store/issue-store"
+import { useProjectStore } from "@/lib/store/project-store"
+import { createProjectLabel } from "@/lib/api/project-service"
+import type { Issue, IssuePriority, IssueStatusCategory } from "@/lib/api/issue-service"
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-type IssuePriority = "urgent" | "high" | "medium" | "low" | "none"
-type IssueStatus = "todo" | "in_progress" | "in_review" | "done"
-
-interface IssueLabel {
-  name: string
-  color: string
-}
-
-interface CreateIssuePayload {
-  title: string
-  description: string
-  status: IssueStatus
-  priority: IssuePriority
-  assigneeId: string | null
-  labels: IssueLabel[]
-  dueDate: Date | null
-}
-
 interface CreateIssueDialogProps {
   readonly children?: React.ReactNode
-  readonly defaultStatus?: IssueStatus
-  readonly onCreated?: (payload: CreateIssuePayload) => void
+  readonly projectId?: number
+  readonly workspaceSlug?: string
+  readonly defaultStatusId?: number
+  readonly onCreated?: (issue: Issue) => void
 }
 
 // ---------------------------------------------------------------------------
-// Config
+// Helpers
 // ---------------------------------------------------------------------------
+
+const PRIORITY_OPTIONS: { value: IssuePriority; label: string; dotClass: string }[] = [
+  { value: "URGENT", label: "Urgent",      dotClass: "bg-red-400" },
+  { value: "HIGH",   label: "High",        dotClass: "bg-orange-400" },
+  { value: "MEDIUM", label: "Medium",      dotClass: "bg-yellow-400" },
+  { value: "LOW",    label: "Low",         dotClass: "bg-slate-400" },
+  { value: "NONE",   label: "No priority", dotClass: "bg-muted-foreground/30" },
+]
 
 const LABEL_COLORS = [
   "#ef4444", "#f97316", "#eab308", "#22c55e",
   "#3b82f6", "#8b5cf6", "#ec4899", "#64748b",
 ]
 
-const COMMON_LABELS: IssueLabel[] = [
-  { name: "bug",      color: "#ef4444" },
-  { name: "feature",  color: "#8b5cf6" },
-  { name: "ui",       color: "#3b82f6" },
-  { name: "backend",  color: "#f97316" },
-  { name: "frontend", color: "#06b6d4" },
-  { name: "auth",     color: "#eab308" },
-  { name: "perf",     color: "#22c55e" },
-  { name: "docs",     color: "#64748b" },
-  { name: "seo",      color: "#ec4899" },
-  { name: "security", color: "#dc2626" },
+const AVATAR_COLORS = [
+  "bg-violet-500", "bg-blue-500", "bg-emerald-500", "bg-orange-500",
+  "bg-pink-500", "bg-cyan-500", "bg-amber-500", "bg-indigo-500",
 ]
 
-const PRIORITY_OPTIONS: { value: IssuePriority; label: string; dotClass: string }[] = [
-  { value: "urgent", label: "Urgent", dotClass: "bg-red-400" },
-  { value: "high", label: "High", dotClass: "bg-orange-400" },
-  { value: "medium", label: "Medium", dotClass: "bg-yellow-400" },
-  { value: "low", label: "Low", dotClass: "bg-slate-400" },
-  { value: "none", label: "No priority", dotClass: "bg-muted-foreground/30" },
-]
+function getMemberInitials(displayName: string | null, email: string): string {
+  if (displayName) {
+    const parts = displayName.trim().split(/\s+/)
+    if (parts.length >= 2) return ((parts[0][0] ?? "") + (parts.at(-1)![0] ?? "")).toUpperCase()
+    return parts[0].slice(0, 2).toUpperCase()
+  }
+  return email.slice(0, 2).toUpperCase()
+}
 
-const STATUS_OPTIONS: { value: IssueStatus; label: string; icon: React.ReactNode }[] = [
-  { value: "todo", label: "Todo", icon: <CircleDot className="size-3.5 text-muted-foreground" /> },
-  { value: "in_progress", label: "In Progress", icon: <RefreshCw className="size-3.5 text-blue-400" /> },
-  { value: "in_review", label: "In Review", icon: <Clock className="size-3.5 text-yellow-400" /> },
-  { value: "done", label: "Done", icon: <CheckCircle2 className="size-3.5 text-emerald-400" /> },
-]
+function getMemberColor(userId: number): string {
+  return AVATAR_COLORS[userId % AVATAR_COLORS.length]
+}
 
-const MEMBERS = [
-  { id: "me", name: "You", initials: "ME", color: "bg-primary" },
-  { id: "sm", name: "Sophie Martin", initials: "SM", color: "bg-violet-500" },
-  { id: "ep", name: "Emma Petit", initials: "EP", color: "bg-emerald-500" },
-  { id: "tb", name: "Thomas Bernard", initials: "TB", color: "bg-orange-500" },
-  { id: "ld", name: "Lucas Dufour", initials: "LD", color: "bg-blue-500" },
-]
+function getCategoryIcon(category: IssueStatusCategory, color: string) {
+  switch (category) {
+    case "BACKLOG":   return <Circle       className="size-3.5" style={{ color }} />
+    case "UNSTARTED": return <Circle       className="size-3.5" style={{ color }} />
+    case "STARTED":   return <RefreshCw   className="size-3.5" style={{ color }} />
+    case "COMPLETED": return <CheckCircle2 className="size-3.5" style={{ color }} />
+    case "CANCELLED": return <XCircle     className="size-3.5" style={{ color }} />
+  }
+}
 
 // ---------------------------------------------------------------------------
 // CreateIssueDialog
 // ---------------------------------------------------------------------------
 
-export function CreateIssueDialog({ children, defaultStatus = "todo", onCreated }: CreateIssueDialogProps) {
+export function CreateIssueDialog({
+  children,
+  projectId,
+  workspaceSlug,
+  defaultStatusId,
+  onCreated,
+}: CreateIssueDialogProps) {
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
-  const [status, setStatus] = useState<IssueStatus>(defaultStatus)
-  const [priority, setPriority] = useState<IssuePriority>("medium")
-  const [assigneeId, setAssigneeId] = useState<string | null>(null)
-  const [labels, setLabels] = useState<IssueLabel[]>([])
+  const [statusId, setStatusId] = useState<number | undefined>(defaultStatusId)
+  const [priority, setPriority] = useState<IssuePriority>("MEDIUM")
+  const [assigneeId, setAssigneeId] = useState<number | undefined>(undefined)
+  const [selectedLabelIds, setSelectedLabelIds] = useState<number[]>([])
   const [dueDate, setDueDate] = useState<Date | undefined>(undefined)
+  const [datePopoverOpen, setDatePopoverOpen] = useState(false)
   const [labelInput, setLabelInput] = useState("")
   const [customLabelColor, setCustomLabelColor] = useState(LABEL_COLORS[4])
-  const [datePopoverOpen, setDatePopoverOpen] = useState(false)
+  const [isCreating, setIsCreating] = useState(false)
 
-  const currentStatus = STATUS_OPTIONS.find((s) => s.value === status) ?? STATUS_OPTIONS[0]
+  const { statuses, fetchStatuses, createIssue } = useIssueStore()
+  const { projects } = useProjectStore()
+
+  const project = projectId ? projects.find((p) => p.id === projectId) : null
+  const members = project?.members ?? []
+  const projectLabels = project?.labels ?? []
+
+  useEffect(() => {
+    if (open && workspaceSlug && projectId && statuses.length === 0) {
+      fetchStatuses(workspaceSlug, projectId)
+    }
+  }, [open, workspaceSlug, projectId, statuses.length, fetchStatuses])
+
+  useEffect(() => {
+    if (statuses.length > 0 && statusId === undefined) {
+      const defaultStatus = statuses.find((s) => s.isDefault) ?? [...statuses].sort((a, b) => a.position - b.position)[0]
+      if (defaultStatus) setStatusId(defaultStatus.id)
+    }
+  }, [statuses, statusId])
+
+  const currentStatus = statuses.find((s) => s.id === statusId)
   const currentPriority = PRIORITY_OPTIONS.find((p) => p.value === priority) ?? PRIORITY_OPTIONS[2]
-  const currentAssignee = assigneeId ? MEMBERS.find((m) => m.id === assigneeId) : null
+  const currentAssignee = assigneeId !== undefined ? members.find((m) => m.userId === assigneeId) : null
 
-  function toggleLabel(label: IssueLabel) {
-    setLabels((prev) =>
-      prev.some((l) => l.name === label.name)
-        ? prev.filter((l) => l.name !== label.name)
-        : [...prev, label]
+  function toggleLabel(labelId: number) {
+    setSelectedLabelIds((prev) =>
+      prev.includes(labelId) ? prev.filter((id) => id !== labelId) : [...prev, labelId]
     )
   }
 
-  function removeLabel(name: string) {
-    setLabels((prev) => prev.filter((l) => l.name !== name))
-  }
-
-  function addCustomLabel() {
+  async function addCustomLabel() {
     const name = labelInput.trim().toLowerCase()
-    if (name && !labels.some((l) => l.name === name)) {
-      setLabels((prev) => [...prev, { name, color: customLabelColor }])
+    if (!name || !workspaceSlug || !projectId) return
+    try {
+      await createProjectLabel(workspaceSlug, projectId, { name, color: customLabelColor })
+      const { fetchProjects } = useProjectStore.getState()
+      await fetchProjects(workspaceSlug)
+    } catch {
+      // silently fail
     }
     setLabelInput("")
   }
 
-  function handleCreate() {
-    if (!title.trim()) return
-    onCreated?.({ title, description, status, priority, assigneeId, labels, dueDate: dueDate ?? null })
-    resetForm()
-    setOpen(false)
-  }
+  const handleCreate = useCallback(async () => {
+    if (!title.trim() || !workspaceSlug || !projectId) return
+    setIsCreating(true)
+    try {
+      const issue = await createIssue(workspaceSlug, projectId, {
+        title: title.trim(),
+        description: description.trim() || undefined,
+        statusId,
+        priority,
+        assigneeId,
+        dueDate: dueDate ? format(dueDate, "yyyy-MM-dd") : undefined,
+      })
+      if (issue) {
+        onCreated?.(issue)
+        resetForm()
+        setOpen(false)
+      }
+    } finally {
+      setIsCreating(false)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, description, statusId, priority, assigneeId, dueDate, workspaceSlug, projectId])
 
   function resetForm() {
     setTitle("")
     setDescription("")
-    setStatus(defaultStatus)
-    setPriority("medium")
-    setAssigneeId(null)
-    setLabels([])
+    setStatusId(defaultStatusId)
+    setPriority("MEDIUM")
+    setAssigneeId(undefined)
+    setSelectedLabelIds([])
     setDueDate(undefined)
     setLabelInput("")
     setCustomLabelColor(LABEL_COLORS[4])
@@ -176,7 +208,7 @@ export function CreateIssueDialog({ children, defaultStatus = "todo", onCreated 
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) resetForm() }}>
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) resetForm() }} modal={false}>
       <DialogTrigger asChild>
         {children ?? (
           <Button size="sm" className="gap-2">
@@ -194,26 +226,22 @@ export function CreateIssueDialog({ children, defaultStatus = "todo", onCreated 
 
         <div className="flex flex-col gap-5 py-2">
           {/* Title */}
-          <div className="flex flex-col gap-1.5">
-            <Input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Issue title…"
-              className="h-10 text-base font-medium border-0 bg-transparent px-0 focus-visible:ring-0 placeholder:text-muted-foreground/50 border-b border-border/50 rounded-none"
-              autoFocus
-              onKeyDown={(e) => e.key === "Enter" && title.trim() && handleCreate()}
-            />
-          </div>
+          <Input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Issue title…"
+            className="h-10 text-base font-medium"
+            autoFocus
+            onKeyDown={(e) => e.key === "Enter" && title.trim() && handleCreate()}
+          />
 
           {/* Description */}
-          <div>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Add description, acceptance criteria, or context…"
-              className="w-full rounded-lg border border-border bg-muted/20 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground resize-none outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all min-h-25"
-            />
-          </div>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Add description, acceptance criteria, or context…"
+            className="w-full rounded-lg border border-border bg-muted/20 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground resize-none outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all min-h-[100px]"
+          />
 
           {/* Metadata row */}
           <div className="flex flex-wrap gap-2">
@@ -221,17 +249,23 @@ export function CreateIssueDialog({ children, defaultStatus = "todo", onCreated 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5">
-                  {currentStatus.icon}
-                  {currentStatus.label}
+                  {currentStatus
+                    ? getCategoryIcon(currentStatus.category, currentStatus.color)
+                    : <Circle className="size-3.5 text-muted-foreground" />
+                  }
+                  {currentStatus?.name ?? "Status"}
                   <ChevronDown className="size-3 text-muted-foreground" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
-                {STATUS_OPTIONS.map((s) => (
-                  <DropdownMenuItem key={s.value} className="gap-2" onClick={() => setStatus(s.value)}>
-                    {s.icon} {s.label}
-                  </DropdownMenuItem>
-                ))}
+                {[...statuses]
+                  .sort((a, b) => a.position - b.position)
+                  .map((s) => (
+                    <DropdownMenuItem key={s.id} className="gap-2" onClick={() => setStatusId(s.id)}>
+                      {getCategoryIcon(s.category, s.color)}
+                      {s.name}
+                    </DropdownMenuItem>
+                  ))}
               </DropdownMenuContent>
             </DropdownMenu>
 
@@ -256,36 +290,46 @@ export function CreateIssueDialog({ children, defaultStatus = "todo", onCreated 
             </DropdownMenu>
 
             {/* Assignee */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5">
-                  {currentAssignee ? (
-                    <div className={cn("size-4 rounded-full flex items-center justify-center text-[8px] text-white font-semibold", currentAssignee.color)}>
-                      {currentAssignee.initials}
-                    </div>
-                  ) : (
-                    <User className="size-3.5 text-muted-foreground" />
-                  )}
-                  {currentAssignee ? currentAssignee.name : "Assignee"}
-                  <ChevronDown className="size-3 text-muted-foreground" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem onClick={() => setAssigneeId(null)}>
-                  <User className="size-4 mr-2 text-muted-foreground" /> Unassigned
-                </DropdownMenuItem>
-                {MEMBERS.map((m) => (
-                  <DropdownMenuItem key={m.id} className="gap-2" onClick={() => setAssigneeId(m.id)}>
-                    <div className={cn("size-5 rounded-full flex items-center justify-center text-[9px] text-white font-medium", m.color)}>
-                      {m.initials}
-                    </div>
-                    {m.name}
+            {members.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5">
+                    {currentAssignee ? (
+                      <Avatar className="size-4">
+                        {currentAssignee.avatarUrl && <AvatarImage src={currentAssignee.avatarUrl} />}
+                        <AvatarFallback className={cn("text-[8px] text-white", getMemberColor(currentAssignee.userId))}>
+                          {getMemberInitials(currentAssignee.displayName, currentAssignee.email)}
+                        </AvatarFallback>
+                      </Avatar>
+                    ) : (
+                      <User className="size-3.5 text-muted-foreground" />
+                    )}
+                    {currentAssignee
+                      ? (currentAssignee.displayName ?? currentAssignee.email)
+                      : "Assignee"}
+                    <ChevronDown className="size-3 text-muted-foreground" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onClick={() => setAssigneeId(undefined)}>
+                    <User className="size-4 mr-2 text-muted-foreground" /> Unassigned
                   </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  {members.map((m) => (
+                    <DropdownMenuItem key={m.userId} className="gap-2" onClick={() => setAssigneeId(m.userId)}>
+                      <Avatar className="size-5">
+                        {m.avatarUrl && <AvatarImage src={m.avatarUrl} />}
+                        <AvatarFallback className={cn("text-[9px] text-white", getMemberColor(m.userId))}>
+                          {getMemberInitials(m.displayName, m.email)}
+                        </AvatarFallback>
+                      </Avatar>
+                      {m.displayName ?? m.email}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
 
-            {/* Due date — Shadcn Calendar Popover */}
+            {/* Due date */}
             <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5">
@@ -305,53 +349,64 @@ export function CreateIssueDialog({ children, defaultStatus = "todo", onCreated 
           </div>
 
           {/* Labels */}
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-2">
-              <Tag className="size-3.5 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground font-medium">Labels</span>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {COMMON_LABELS.map((label) => {
-                const isSelected = labels.some((l) => l.name === label.name)
-                return (
-                  <button
-                    key={label.name}
-                    onClick={() => toggleLabel(label)}
-                    className={cn(
-                      "flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs border transition-all",
-                      isSelected
-                        ? "border-transparent text-white"
-                        : "border-border bg-muted/30 text-muted-foreground hover:border-border/80"
-                    )}
-                    style={isSelected ? { backgroundColor: label.color, borderColor: label.color } : undefined}
-                  >
-                    <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: label.color }} />
-                    {label.name}
-                  </button>
-                )
-              })}
-            </div>
-
-            {/* Selected labels summary */}
-            {labels.length > 0 && (
-              <div className="flex flex-wrap gap-1">
-                {labels.map((label) => (
-                  <Badge
-                    key={label.name}
-                    variant="secondary"
-                    className="text-xs gap-1 text-white border-0"
-                    style={{ backgroundColor: label.color + "33", color: label.color, borderColor: label.color + "55" }}
-                  >
-                    <span className="size-1.5 rounded-full" style={{ backgroundColor: label.color }} />
-                    {label.name}
-                    <button onClick={() => removeLabel(label.name)} className="hover:opacity-70 ml-0.5">×</button>
-                  </Badge>
-                ))}
+          {projectLabels.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <Tag className="size-3.5 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground font-medium">Labels</span>
               </div>
-            )}
+              <div className="flex flex-wrap gap-1.5">
+                {projectLabels.map((label) => {
+                  const isSelected = selectedLabelIds.includes(label.id)
+                  return (
+                    <button
+                      key={label.id}
+                      type="button"
+                      onClick={() => toggleLabel(label.id)}
+                      className={cn(
+                        "flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs border transition-all",
+                        isSelected
+                          ? "border-transparent text-white"
+                          : "border-border bg-muted/30 text-muted-foreground hover:border-border/80"
+                      )}
+                      style={isSelected ? { backgroundColor: label.color, borderColor: label.color } : undefined}
+                    >
+                      <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: label.color }} />
+                      {label.name}
+                    </button>
+                  )
+                })}
+              </div>
 
-            {/* Custom label input with color picker */}
+              {selectedLabelIds.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {selectedLabelIds.map((id) => {
+                    const label = projectLabels.find((l) => l.id === id)
+                    if (!label) return null
+                    return (
+                      <Badge
+                        key={id}
+                        variant="secondary"
+                        className="text-xs gap-1 border-0"
+                        style={{ backgroundColor: label.color + "33", color: label.color }}
+                      >
+                        <span className="size-1.5 rounded-full" style={{ backgroundColor: label.color }} />
+                        {label.name}
+                        <button type="button" onClick={() => toggleLabel(id)} className="hover:opacity-70 ml-0.5">
+                          <X className="size-2.5" />
+                        </button>
+                      </Badge>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Create new label */}
+          {workspaceSlug && projectId && (
             <div className="flex items-center gap-2">
+              <Tag className="size-3.5 text-muted-foreground shrink-0" />
               <div className="flex gap-1">
                 {LABEL_COLORS.map((color) => (
                   <button
@@ -370,7 +425,7 @@ export function CreateIssueDialog({ children, defaultStatus = "todo", onCreated 
               <Input
                 value={labelInput}
                 onChange={(e) => setLabelInput(e.target.value)}
-                placeholder="Custom label…"
+                placeholder="New label…"
                 className="h-7 text-xs flex-1"
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustomLabel() } }}
               />
@@ -380,16 +435,21 @@ export function CreateIssueDialog({ children, defaultStatus = "todo", onCreated 
                 </Button>
               )}
             </div>
-          </div>
+          )}
         </div>
 
         <DialogFooter className="gap-2">
           <Button variant="outline" size="sm" onClick={() => setOpen(false)}>
             Cancel
           </Button>
-          <Button size="sm" onClick={handleCreate} disabled={!title.trim()} className="gap-2">
+          <Button
+            size="sm"
+            onClick={handleCreate}
+            disabled={!title.trim() || isCreating || !workspaceSlug || !projectId}
+            className="gap-2"
+          >
             <Plus className="size-4" />
-            Create issue
+            {isCreating ? "Creating…" : "Create issue"}
           </Button>
         </DialogFooter>
       </DialogContent>
