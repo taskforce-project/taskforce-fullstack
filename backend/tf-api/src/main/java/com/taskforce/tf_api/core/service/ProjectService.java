@@ -126,7 +126,29 @@ public class ProjectService {
         // Initialiser les statuts, types et compteur d'issues par défaut
         issueService.seedDefaultStatusesAndTypes(project);
 
+        // Seed labels par défaut
+        seedDefaultLabels(project);
+
         return toResponse(project);
+    }
+
+    private void seedDefaultLabels(Project project) {
+        String[][] defaults = {
+            { "Bug",         "#ef4444" },
+            { "Feature",     "#6366f1" },
+            { "Improvement", "#f59e0b" },
+            { "Documentation", "#10b981" },
+            { "Question",    "#64748b" },
+        };
+        for (String[] entry : defaults) {
+            ProjectLabel label = ProjectLabel.builder()
+                .project(project)
+                .name(entry[0])
+                .color(entry[1])
+                .build();
+            projectLabelRepository.save(label);
+        }
+        log.info("Labels par défaut initialisés pour le projet '{}'", project.getIdentifier());
     }
 
     /**
