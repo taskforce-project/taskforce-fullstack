@@ -87,40 +87,18 @@ const SUGGESTIONS = [
 const ORB_KEYFRAMES = `
   @keyframes micro-bounce { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-3px); } }
   @keyframes status-pulse { 0%,100% { opacity:1; } 50% { opacity:0.45; } }
-  @keyframes equalizer { from { transform: scaleY(0.2); } to { transform: scaleY(1); } }
 `
-
-// Equalizer bars — AI thinking indicator
-const EQ_BARS = [
-  { id: "b0", delay: 0,   dur: 0.45 },
-  { id: "b1", delay: 80,  dur: 0.55 },
-  { id: "b2", delay: 160, dur: 0.4 },
-  { id: "b3", delay: 60,  dur: 0.6 },
-  { id: "b4", delay: 200, dur: 0.5 },
-  { id: "b5", delay: 100, dur: 0.35 },
-  { id: "b6", delay: 240, dur: 0.48 },
-  { id: "b7", delay: 40,  dur: 0.58 },
-  { id: "b8", delay: 180, dur: 0.42 },
-] as const
 
 function ThinkingDots() {
   return (
     <div className="flex items-end gap-3">
       <AiMatrixIcon mode="thinking" size={3} />
-      <div className="rounded-tl-sm rounded-tr-2xl rounded-br-2xl rounded-bl-2xl border border-border bg-muted px-5 py-3 flex items-end gap-0.75">
-        {EQ_BARS.map(({ id, delay, dur }) => (
+      <div className="rounded-tl-sm rounded-tr-2xl rounded-br-2xl rounded-bl-2xl border border-border bg-muted px-4 py-3 flex items-center gap-1.5">
+        {[0, 150, 300].map((delay) => (
           <div
-            key={id}
-            style={{
-              width: 3,
-              height: 24,
-              borderRadius: 2,
-              background: "#ff7a00",
-              opacity: 0.75,
-              transformOrigin: "bottom",
-              animation: `equalizer ${dur}s ease-in-out infinite alternate`,
-              animationDelay: `${delay}ms`,
-            }}
+            key={delay}
+            className="size-1.5 rounded-full bg-muted-foreground/50"
+            style={{ animation: "micro-bounce 0.8s ease-in-out infinite", animationDelay: `${delay}ms` }}
           />
         ))}
       </div>
