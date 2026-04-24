@@ -2,6 +2,7 @@
 
 <div align="center">
 
+<!-- BADGES:START -->
 ![Version](https://img.shields.io/badge/version-0.2.0--rc1-blue.svg)
 ![License](https://img.shields.io/badge/license-Fair%20Use-green.svg)
 ![Java](https://img.shields.io/badge/Java-21-orange.svg)
@@ -11,6 +12,11 @@
 ![Keycloak](https://img.shields.io/badge/Keycloak-26-blue.svg)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-blue.svg)
 ![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)
+![Backend App](https://img.shields.io/badge/backend-0.0.1--SNAPSHOT-6f42c1.svg)
+![Frontend App](https://img.shields.io/badge/frontend-0.1.0-0ea5e9.svg)
+![Landing App](https://img.shields.io/badge/landing-0.0.1-f59e0b.svg)
+![Runtime](https://img.shields.io/badge/runtime-local%20docker-informational.svg)
+<!-- BADGES:END -->
 
 **Plateforme ERP complète pour la gestion de projets, ressources et compétences**
 
