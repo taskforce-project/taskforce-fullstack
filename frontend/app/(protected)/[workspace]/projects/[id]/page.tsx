@@ -30,7 +30,6 @@ import {
 } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 import { useIssueStore } from "@/lib/store/issue-store"
-import { useProjectStore } from "@/lib/store/project-store"
 import type { Issue, IssueStatus, IssueStatusCategory, IssuePriority } from "@/lib/api/issue-service"
 
 // ---------------------------------------------------------------------------
@@ -309,13 +308,15 @@ function BoardColumn({
               className="text-xs font-semibold uppercase tracking-wide bg-transparent border-b border-primary outline-none w-full text-muted-foreground"
             />
           ) : (
-            <span
-              className="text-xs font-semibold uppercase tracking-wide text-muted-foreground truncate cursor-pointer hover:text-foreground"
+            <button
+              type="button"
+              className="text-xs font-semibold uppercase tracking-wide text-muted-foreground truncate cursor-pointer hover:text-foreground text-left bg-transparent border-0 p-0 min-w-0"
               onDoubleClick={startEdit}
+              onKeyDown={(e) => e.key === "Enter" && startEdit()}
               title="Double-cliquer pour renommer"
             >
               {status.name}
-            </span>
+            </button>
           )}
           <span className="text-xs text-muted-foreground/60 font-medium ml-0.5 shrink-0">{issues.length}</span>
         </div>
@@ -479,15 +480,35 @@ export default function ProjectBoardPage() {
   const workspace = extractParam(params.workspace)
   const projectId = Number(extractParam(params.id))
 
-  const { issues, statuses, isLoading, fetchIssues, fetchStatuses, updateIssue, deleteStatus, updateStatus } = useIssueStore()
-  const { projects } = useProjectStore()
+  const { issues, statuses, error, fetchIssues, fetchStatuses, createStatus, clearIssues, updateIssue, deleteStatus, updateStatus } = useIssueStore()
 
-  const project = projects.find((p) => p.id === projectId)
+  // Local state to track the full initialization sequence
+  const [initializing, setInitializing] = useState(true)
 
   useEffect(() => {
     if (!workspace || !projectId) return
-    fetchStatuses(workspace, projectId)
-    fetchIssues(workspace, projectId)
+    clearIssues()
+    setInitializing(true)
+    void (async () => {
+      try {
+        const loaded = await fetchStatuses(workspace, projectId)
+        await fetchIssues(workspace, projectId)
+        // Fallback : seed côté front si le backend n'a rien retourné
+        if (loaded.length === 0) {
+          const defaults: Array<{ name: string; category: IssueStatusCategory; color: string }> = [
+            { name: "Backlog",     category: "BACKLOG",   color: "#94a3b8" },
+            { name: "Todo",        category: "UNSTARTED", color: "#6366f1" },
+            { name: "In Progress", category: "STARTED",   color: "#f59e0b" },
+            { name: "Done",        category: "COMPLETED", color: "#10b981" },
+          ]
+          for (const s of defaults) {
+            await createStatus(workspace, projectId, s)
+          }
+        }
+      } finally {
+        setInitializing(false)
+      }
+    })()
   }, [workspace, projectId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const sortedStatuses = useMemo(
@@ -523,26 +544,37 @@ export default function ProjectBoardPage() {
   return (
     <div className="flex flex-col gap-0 h-full">
       {/* Toolbar */}
-      <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5">
-            <MoreHorizontal className="size-3.5" />
-            Filtres
-          </Button>
-        </div>
-        {project && (
-          <CreateIssueDialog projectId={projectId} workspaceSlug={workspace}>
-            <Button size="sm" className="gap-1.5 h-8 text-xs">
-              <Plus className="h-3.5 w-3.5" />
-              {t("projects.detail.newIssue")}
-            </Button>
-          </CreateIssueDialog>
-        )}
+      <div className="flex items-center gap-2 mb-4">
+        <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5">
+          <MoreHorizontal className="size-3.5" />
+          Filtres
+        </Button>
       </div>
 
-      {isLoading && statuses.length === 0 ? (
+      {/* Error banner */}
+      {error && !initializing && (
+        <div className="mb-4 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-xs text-destructive flex items-center justify-between">
+          <span>Erreur ({workspace}/{projectId}) : {error}</span>
+          <button
+            type="button"
+            className="ml-4 underline hover:no-underline"
+            onClick={() => {
+              clearIssues()
+              setInitializing(true)
+              void fetchStatuses(workspace, projectId).then(() => fetchIssues(workspace, projectId)).finally(() => setInitializing(false))
+            }}
+          >
+            Réessayer
+          </button>
+        </div>
+      )}
+
+      {initializing ? (
         <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
-          Chargement…
+          <div className="flex flex-col items-center gap-2">
+            <div className="size-5 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+            <span className="text-xs">Chargement du tableau…</span>
+          </div>
         </div>
       ) : (
         <div className="flex gap-5 overflow-x-auto pb-6 -mx-4 md:-mx-6 px-4 md:px-6 items-start">

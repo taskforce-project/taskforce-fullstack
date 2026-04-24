@@ -119,7 +119,7 @@ export default function ProjectLayout({ children }: { readonly children: React.R
   return (
     <div className="flex flex-col gap-0 w-full -m-4 md:-m-6 min-h-full">
       {/* Project header */}
-      <div className="px-4 md:px-6 pt-4 md:pt-6 pb-0 border-b border-border bg-background/80 backdrop-blur-sm sticky top-14 z-30">
+      <div className="px-4 md:px-6 pt-4 md:pt-6 pb-0 border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-30">
         {/* Breadcrumb */}
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-3">
           <Link href={`/${workspace}/projects`} className="hover:text-foreground transition-colors">
@@ -231,7 +231,7 @@ export default function ProjectLayout({ children }: { readonly children: React.R
       </div>
 
       {/* Page content */}
-      <div className="flex-1 p-4 md:p-6">
+      <div className="flex-1 px-4 pt-5 pb-6 md:px-6 md:pt-6 md:pb-8">
         {children}
       </div>
     </div>
