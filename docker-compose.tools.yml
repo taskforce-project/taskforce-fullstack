@@ -14,6 +14,8 @@
 #   Demarrer d'abord la stack app via docker-compose.dev.yml (ou creer le reseau manuellement).
 # ===============================
 
+name: taskforce-tools
+
 services:
   # ================================
   # Profil observability (SigNoz)
@@ -160,6 +162,8 @@ services:
     volumes:
       - ./observability/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
       - ./observability/signoz/otel-collector-opamp-config.yaml:/etc/manager-config.yaml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - taskforce-network
     profiles:

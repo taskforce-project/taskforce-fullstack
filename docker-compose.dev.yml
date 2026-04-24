@@ -9,6 +9,8 @@
 # Le fichier .env.dev à la racine contient TOUTES les variables
 # ===============================
 
+name: taskforce-app
+
 services:
   # ================================
   # PostgreSQL Database
