@@ -6,7 +6,6 @@ import { I18nProvider } from "@/lib/i18n";
 import { ThemeProvider } from "next-themes";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorBoundary } from "@/components/providers/error-boundary";
-import { PostHogProvider } from "@/components/providers/posthog-provider";
 
 const roboto = Roboto({
   variable: "--font-roboto",
@@ -45,17 +44,15 @@ export default function RootLayout({
           defaultTheme="system"
           enableSystem
         >
-          <PostHogProvider>
-            <I18nProvider>
-              <TooltipProvider>
-                <ErrorBoundary>
-                  <AuthProvider>
-                    {children}
-                  </AuthProvider>
-                </ErrorBoundary>
-              </TooltipProvider>
-            </I18nProvider>
-          </PostHogProvider>
+          <I18nProvider>
+            <TooltipProvider>
+              <ErrorBoundary>
+                <AuthProvider>
+                  {children}
+                </AuthProvider>
+              </ErrorBoundary>
+            </TooltipProvider>
+          </I18nProvider>
         </ThemeProvider>
       </body>
     </html>
