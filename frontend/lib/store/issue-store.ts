@@ -1,4 +1,14 @@
 import { create } from "zustand";
+import axios from "axios";
+
+/** Extrait le message lisible depuis une erreur Axios ou générique */
+function extractError(err: unknown, fallback: string): string {
+  if (axios.isAxiosError(err)) {
+    const data = err.response?.data as { message?: string; error?: string } | undefined;
+    return data?.message ?? data?.error ?? err.message;
+  }
+  return err instanceof Error ? err.message : fallback;
+}
 import {
   type Issue,
   type IssueStatus,
@@ -92,7 +102,7 @@ export const useIssueStore = create<IssueState>((set, get) => ({
       set({ issues, isLoading: false });
       return issues;
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Erreur lors du chargement des issues";
+      const message = extractError(err, "Erreur lors du chargement des issues");
       set({ isLoading: false, error: message });
       return [];
     }
@@ -104,7 +114,7 @@ export const useIssueStore = create<IssueState>((set, get) => ({
       set({ activeIssue: issue });
       return issue;
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Erreur lors du chargement de l'issue";
+      const message = extractError(err, "Erreur lors du chargement de l'issue");
       set({ error: message });
       return null;
     }
@@ -116,7 +126,7 @@ export const useIssueStore = create<IssueState>((set, get) => ({
       set((state) => ({ issues: [issue, ...state.issues] }));
       return issue;
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Erreur lors de la création de l'issue";
+      const message = extractError(err, "Erreur lors de la création de l'issue");
       set({ error: message });
       return null;
     }
@@ -131,7 +141,7 @@ export const useIssueStore = create<IssueState>((set, get) => ({
       }));
       return updated;
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Erreur lors de la mise à jour de l'issue";
+      const message = extractError(err, "Erreur lors de la mise à jour de l'issue");
       set({ error: message });
       return null;
     }
@@ -145,7 +155,7 @@ export const useIssueStore = create<IssueState>((set, get) => ({
         activeIssue: state.activeIssue?.id === issueId ? null : state.activeIssue,
       }));
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Erreur lors de la suppression de l'issue";
+      const message = extractError(err, "Erreur lors de la suppression de l'issue");
       set({ error: message });
     }
   },
@@ -156,7 +166,7 @@ export const useIssueStore = create<IssueState>((set, get) => ({
       set({ statuses });
       return statuses;
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Erreur lors du chargement des statuts";
+      const message = extractError(err, "Erreur lors du chargement des statuts");
       set({ error: message });
       return [];
     }
@@ -168,7 +178,7 @@ export const useIssueStore = create<IssueState>((set, get) => ({
       set((state) => ({ statuses: [...state.statuses, status] }));
       return status;
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Erreur lors de la création du statut";
+      const message = extractError(err, "Erreur lors de la création du statut");
       set({ error: message });
       return null;
     }
@@ -180,7 +190,7 @@ export const useIssueStore = create<IssueState>((set, get) => ({
       set((state) => ({ statuses: state.statuses.map((s) => (s.id === updated.id ? updated : s)) }));
       return updated;
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Erreur lors de la mise à jour du statut";
+      const message = extractError(err, "Erreur lors de la mise à jour du statut");
       set({ error: message });
       return null;
     }
@@ -191,7 +201,7 @@ export const useIssueStore = create<IssueState>((set, get) => ({
       await deleteStatusApi(slug, projectId, statusId);
       set((state) => ({ statuses: state.statuses.filter((s) => s.id !== statusId) }));
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Erreur lors de la suppression du statut";
+      const message = extractError(err, "Erreur lors de la suppression du statut");
       set({ error: message });
     }
   },
