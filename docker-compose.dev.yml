@@ -104,6 +104,20 @@ services:
 
       # JVM Options
       JAVA_OPTS: "-Xmx512m -Xms256m -Duser.timezone=UTC -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
+
+      # ── OpenTelemetry (actif uniquement si --profile observability) ──────────
+      # Pour activer les traces/métriques dans SigNoz, ajouter la dépendance
+      # micrometer-registry-otlp dans pom.xml OU utiliser le Java agent :
+      #   -javaagent:/otel/opentelemetry-javaagent.jar (voir service otel-agent-init)
+      OTEL_SERVICE_NAME: taskforce-backend
+      OTEL_RESOURCE_ATTRIBUTES: "deployment.environment=dev,service.version=1.0.0"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://signoz-otel-collector:4317
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      # Désactivé par défaut - passe à "false" quand le profil observability est actif
+      OTEL_SDK_DISABLED: "${OTEL_SDK_DISABLED:-true}"
+      # Agent Java OTel - active l'instrumentation automatique (traces, métriques, logs)
+      # Le JAR est téléchargé au build du Dockerfile. OTEL_SDK_DISABLED contrôle l'export.
+      OTEL_JAVA_AGENT: "-javaagent:/otel/opentelemetry-javaagent.jar"
     ports:
       - "${BACKEND_PORT:-8080}:8080" # API
       - "5005:5005" # Debug
@@ -148,6 +162,13 @@ services:
       # Enable polling for hot reload on Docker Desktop (Windows/macOS)
       WATCHPACK_POLLING: "true"
       CHOKIDAR_USEPOLLING: "true"
+
+      # ── OpenTelemetry (actif uniquement si --profile observability) ──────────
+      # Pour activer le tracing côté serveur Next.js, installer @vercel/otel
+      OTEL_SERVICE_NAME: taskforce-frontend
+      OTEL_RESOURCE_ATTRIBUTES: "deployment.environment=dev"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://signoz-otel-collector:4318
+      OTEL_SDK_DISABLED: "${OTEL_SDK_DISABLED:-true}"
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     depends_on:
@@ -230,6 +251,264 @@ services:
       - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
       - ./pgadmin/pgpass:/pgpass
 
+  # ================================
+  # ── PROFIL : observability ──────
+  # Démarrer avec : docker compose -f docker-compose.dev.yml --profile observability up
+  # UI SigNoz : http://localhost:3301
+  # OTel Collector gRPC : 4317 | HTTP : 4318
+  # ================================
+
+  # ZooKeeper pour ClickHouse répliqué (SigNoz)
+  signoz-zookeeper:
+    image: signoz/zookeeper:3.7.1
+    container_name: taskforce-signoz-zookeeper
+    user: root
+    environment:
+      ZOO_SERVER_ID: "1"
+      ALLOW_ANONYMOUS_LOGIN: "yes"
+      ZOO_AUTOPURGE_INTERVAL: "1"
+      ZOO_ENABLE_PROMETHEUS_METRICS: "yes"
+      ZOO_PROMETHEUS_METRICS_PORT_NUMBER: "9141"
+    volumes:
+      - signoz_zookeeper_data:/bitnami/zookeeper
+    networks:
+      - taskforce-network
+    profiles:
+      - observability
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -m 2 http://localhost:8080/commands/ruok | grep error | grep null"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Init container : télécharge le binaire histogramQuantile pour ClickHouse
+  signoz-init-clickhouse:
+    image: clickhouse/clickhouse-server:25.5.6
+    container_name: taskforce-signoz-init-clickhouse
+    command:
+      - bash
+      - -c
+      - |
+        version="v0.0.1"
+        node_os=$$(uname -s | tr '[:upper:]' '[:lower:]')
+        node_arch=$$(uname -m | sed s/aarch64/arm64/ | sed s/x86_64/amd64/)
+        target="/var/lib/clickhouse/user_scripts/histogramQuantile"
+        if [ -f "$$target" ]; then
+          echo "histogramQuantile already present, skipping download."
+          exit 0
+        fi
+        echo "Downloading histogram-quantile for $${node_os}/$${node_arch}..."
+        cd /tmp
+        wget -q -O histogram-quantile.tar.gz \
+          "https://github.com/SigNoz/signoz/releases/download/histogram-quantile%2F$${version}/histogram-quantile_$${node_os}_$${node_arch}.tar.gz" \
+          && tar -xzf histogram-quantile.tar.gz \
+          && mv histogram-quantile "$$target" \
+          && chmod +x "$$target" \
+          && echo "histogramQuantile downloaded successfully." \
+          || echo "WARNING: Could not download histogramQuantile (offline?). Histogram metrics may be unavailable."
+    volumes:
+      - signoz_clickhouse_user_scripts:/var/lib/clickhouse/user_scripts/
+    networks:
+      - taskforce-network
+    profiles:
+      - observability
+    restart: on-failure
+
+  # ClickHouse - stockage des traces/métriques/logs SigNoz
+  signoz-clickhouse:
+    image: clickhouse/clickhouse-server:25.5.6
+    container_name: taskforce-signoz-clickhouse
+    tty: true
+    depends_on:
+      signoz-init-clickhouse:
+        condition: service_completed_successfully
+      signoz-zookeeper:
+        condition: service_healthy
+    environment:
+      CLICKHOUSE_SKIP_USER_SETUP: "1"
+    volumes:
+      - ./observability/clickhouse/config.xml:/etc/clickhouse-server/config.xml:ro
+      - ./observability/clickhouse/users.xml:/etc/clickhouse-server/users.xml:ro
+      - ./observability/clickhouse/custom-function.xml:/etc/clickhouse-server/custom-function.xml:ro
+      - ./observability/clickhouse/cluster.xml:/etc/clickhouse-server/config.d/cluster.xml:ro
+      - signoz_clickhouse_user_scripts:/var/lib/clickhouse/user_scripts/
+      - signoz_clickhouse_data:/var/lib/clickhouse/
+    networks:
+      - taskforce-network
+    profiles:
+      - observability
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "0.0.0.0:8123/ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    ulimits:
+      nproc: 65535
+      nofile:
+        soft: 262144
+        hard: 262144
+    restart: unless-stopped
+
+  # Migration du schéma SigNoz dans ClickHouse
+  signoz-telemetrystore-migrator:
+    image: signoz/signoz-otel-collector:v0.144.3
+    container_name: taskforce-signoz-migrator
+    depends_on:
+      signoz-clickhouse:
+        condition: service_healthy
+    environment:
+      SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_DSN: tcp://signoz-clickhouse:9000
+      SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_CLUSTER: cluster
+      SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_REPLICATION: "true"
+      SIGNOZ_OTEL_COLLECTOR_TIMEOUT: 10m
+    entrypoint: ["/bin/sh"]
+    command:
+      - -c
+      - |
+        /signoz-otel-collector migrate bootstrap &&
+        /signoz-otel-collector migrate sync up &&
+        /signoz-otel-collector migrate async up
+    networks:
+      - taskforce-network
+    profiles:
+      - observability
+    restart: on-failure
+
+  # OTel Collector SigNoz - reçoit les télémétries de nos services
+  signoz-otel-collector:
+    image: signoz/signoz-otel-collector:v0.144.3
+    container_name: taskforce-signoz-otel-collector
+    depends_on:
+      signoz-clickhouse:
+        condition: service_healthy
+    entrypoint: ["/bin/sh"]
+    command:
+      - -c
+      - |
+        /signoz-otel-collector migrate sync check &&
+        /signoz-otel-collector \
+          --config=/etc/otel-collector-config.yaml \
+          --manager-config=/etc/manager-config.yaml \
+          --copy-path=/var/tmp/collector-config.yaml
+    environment:
+      OTEL_RESOURCE_ATTRIBUTES: "host.name=signoz-host,os.type=linux"
+      LOW_CARDINAL_EXCEPTION_GROUPING: "false"
+      SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_DSN: tcp://signoz-clickhouse:9000
+      SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_CLUSTER: cluster
+      SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_REPLICATION: "true"
+      SIGNOZ_OTEL_COLLECTOR_TIMEOUT: 10m
+    ports:
+      - "4317:4317"   # OTLP gRPC - envoyer les traces/métriques ici
+      - "4318:4318"   # OTLP HTTP
+    volumes:
+      - ./observability/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+      - ./observability/signoz/otel-collector-opamp-config.yaml:/etc/manager-config.yaml:ro
+    networks:
+      - taskforce-network
+    profiles:
+      - observability
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "localhost:13133"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # SigNoz UI + Query Service - http://localhost:3301
+  signoz:
+    image: signoz/signoz:v0.120.0
+    container_name: taskforce-signoz
+    depends_on:
+      signoz-clickhouse:
+        condition: service_healthy
+    ports:
+      - "3301:8080"   # SigNoz UI
+    environment:
+      SIGNOZ_ALERTMANAGER_PROVIDER: signoz
+      SIGNOZ_TELEMETRYSTORE_CLICKHOUSE_DSN: tcp://signoz-clickhouse:9000
+      SIGNOZ_SQLSTORE_SQLITE_PATH: /var/lib/signoz/signoz.db
+      SIGNOZ_TOKENIZER_JWT_SECRET: "${SIGNOZ_JWT_SECRET:-dev-signoz-secret-change-me}"
+    volumes:
+      - signoz_sqlite_data:/var/lib/signoz/
+    networks:
+      - taskforce-network
+    profiles:
+      - observability
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "localhost:8080/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ================================
+  # ── PROFIL : security ───────────
+  # Scanners de sécurité (one-shot, exécutés avec `docker compose run`)
+  #
+  # Exemples d'utilisation :
+  #
+  # Trivy - scanner CVE sur les images Docker :
+  #   docker compose -f docker-compose.dev.yml --profile security run --rm trivy image taskforce-backend-dev
+  #   docker compose -f docker-compose.dev.yml --profile security run --rm trivy image taskforce-frontend-dev
+  #
+  # Trivy - scanner le code source :
+  #   docker compose -f docker-compose.dev.yml --profile security run --rm trivy fs --scanners vuln,secret,misconfig /workspace
+  #
+  # Semgrep - analyse statique du code (règles auto-détectées) :
+  #   docker compose -f docker-compose.dev.yml --profile security run --rm semgrep
+  #
+  # Semgrep - règles spécifiques :
+  #   docker compose -f docker-compose.dev.yml --profile security run --rm semgrep semgrep scan /src --config p/java --config p/javascript
+  # ================================
+
+  # Trivy - scanner CVE (images, filesystem, secrets, misconfigs)
+  # Gratuit, open-source (Apache 2.0) - https://github.com/aquasecurity/trivy
+  trivy:
+    image: aquasec/trivy:latest
+    container_name: taskforce-trivy
+    # Commande par défaut : scan filesystem du workspace
+    command: ["fs", "--scanners", "vuln,secret,misconfig", "--exit-code", "0", "--format", "table", "/workspace"]
+    volumes:
+      # Monte le workspace pour le scan du code source
+      - .:/workspace:ro
+      # Cache Trivy (évite de re-télécharger la DB de vulnérabilités à chaque run)
+      - trivy_cache:/root/.cache/trivy
+      # Socket Docker pour scanner les images locales
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - taskforce-network
+    profiles:
+      - security
+    restart: "no"
+
+  # Semgrep CE - analyse statique multi-langage (Java, TypeScript, secrets...)
+  # Gratuit en mode Community (sans login) - https://semgrep.dev/docs/getting-started/
+  semgrep:
+    image: semgrep/semgrep:latest
+    container_name: taskforce-semgrep
+    # Scan avec les règles auto-détectées selon les langages du projet
+    command:
+      - semgrep
+      - scan
+      - /src
+      - --config
+      - auto
+      - --config
+      - p/secrets
+      - --no-git-ignore
+      - --text
+      - --severity
+      - WARNING
+    volumes:
+      - .:/src:ro
+    networks:
+      - taskforce-network
+    profiles:
+      - security
+    restart: "no"
+
+
 # ================================
 # Volumes
 # ================================
@@ -237,6 +516,24 @@ volumes:
   postgres_dev_data:
     driver: local
   pgadmin_dev_data:
+    driver: local
+
+  # ── Volumes SigNoz (profil observability) ──
+  signoz_zookeeper_data:
+    driver: local
+    name: signoz-zookeeper-1
+  signoz_clickhouse_data:
+    driver: local
+    name: signoz-clickhouse
+  signoz_clickhouse_user_scripts:
+    driver: local
+    name: signoz-clickhouse-user-scripts
+  signoz_sqlite_data:
+    driver: local
+    name: signoz-sqlite
+
+  # ── Volumes Security (profil security) ──
+  trivy_cache:
     driver: local
 
 # ================================
