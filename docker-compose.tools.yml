@@ -240,16 +240,16 @@ services:
 
 volumes:
   signoz_zookeeper_data:
-    driver: local
+    external: true
     name: signoz-zookeeper-1
   signoz_clickhouse_data:
-    driver: local
+    external: true
     name: signoz-clickhouse
   signoz_clickhouse_user_scripts:
-    driver: local
+    external: true
     name: signoz-clickhouse-user-scripts
   signoz_sqlite_data:
-    driver: local
+    external: true
     name: signoz-sqlite
   trivy_cache:
     driver: local
