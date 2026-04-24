@@ -137,6 +137,7 @@ services:
   signoz-otel-collector:
     image: signoz/signoz-otel-collector:v0.144.3
     container_name: taskforce-signoz-otel-collector
+    user: "0:0"
     depends_on:
       signoz-clickhouse:
         condition: service_healthy
@@ -146,9 +147,7 @@ services:
       - |
         /signoz-otel-collector migrate sync check &&
         /signoz-otel-collector \
-          --config=/etc/otel-collector-config.yaml \
-          --manager-config=/etc/manager-config.yaml \
-          --copy-path=/var/tmp/collector-config.yaml
+          --config=/etc/otel-collector-config.yaml
     environment:
       OTEL_RESOURCE_ATTRIBUTES: "host.name=signoz-host,os.type=linux"
       LOW_CARDINAL_EXCEPTION_GROUPING: "false"
@@ -161,7 +160,6 @@ services:
       - "4318:4318"
     volumes:
       - ./observability/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
-      - ./observability/signoz/otel-collector-opamp-config.yaml:/etc/manager-config.yaml:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
