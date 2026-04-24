@@ -16,11 +16,11 @@ interface AppShellProps {
  */
 export function AppShell({ children }: AppShellProps) {
   return (
-    <SidebarProvider>
+    <SidebarProvider className="h-svh">
       <AppSidebar />
       <SidebarInset className="overflow-hidden">
         <AppTopbar />
-        <main className="flex flex-1 flex-col gap-6 p-6 md:p-8">{children}</main>
+        <main className="flex flex-1 flex-col gap-6 overflow-y-auto p-6 md:p-8">{children}</main>
       </SidebarInset>
     </SidebarProvider>
   )
