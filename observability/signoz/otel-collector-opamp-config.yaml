@@ -1,0 +1,3 @@
+# Configuration OpAMP pour le SigNoz OTel Collector
+# Permet la gestion centralisée de la configuration du collector via SigNoz UI
+server_endpoint: ws://signoz:4320/v1/opamp
