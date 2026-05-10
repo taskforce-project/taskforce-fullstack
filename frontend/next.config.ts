@@ -13,10 +13,17 @@ const nextConfig: NextConfig = {
     "@tiptap/extension-typography",
     "@tiptap/extension-task-list",
     "@tiptap/extension-task-item",
+    "@assistant-ui/react",
+    "@assistant-ui/core",
+    "@assistant-ui/store",
+    "@assistant-ui/tap",
+    "assistant-stream",
+    "assistant-cloud",
   ],
   webpack(config, { isServer }) {
-    // Force Webpack to resolve TipTap v3 ESM packages using their CJS build
-    config.resolve.conditionNames = ["require", "node", "default", "browser"]
+    // Resolve conditions: "import" first for ESM-only packages (assistant-ui),
+    // then "require" for CJS fallback (TipTap), then platform defaults.
+    config.resolve.conditionNames = ["import", "require", "node", "default", "browser"]
 
     // Strip "node:" URI prefix so Webpack resolves built-ins normally
     config.plugins.push(
