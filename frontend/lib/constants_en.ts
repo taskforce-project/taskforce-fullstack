@@ -210,6 +210,7 @@ export const CONSTANTS_EN = {
     members: "Members",
     skills: "Skills",
     analytics: "Analytics",
+    agents: "AI Agents",
     messages: "Messages",
     discussions: "Discussions",
     settings: "Settings",

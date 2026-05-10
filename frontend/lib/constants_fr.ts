@@ -212,6 +212,7 @@ export const CONSTANTS_FR: TranslationKeys = {
     members: "Membres",
     skills: "Compétences",
     analytics: "Analytiques",
+    agents: "Agents IA",
     messages: "Messages",
     discussions: "Discussions",
     settings: "Paramètres",
