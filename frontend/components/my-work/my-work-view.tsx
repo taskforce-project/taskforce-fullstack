@@ -1,5 +1,6 @@
 "use client"
 
+import { useParams } from "next/navigation"
 import Link from "next/link"
 import {
   CircleDot,
@@ -271,10 +272,15 @@ const CYCLE_STATUS_CONFIG: Record<CycleStatus, { label: string; badgeClass: stri
   completed: { label: "Completed", badgeClass: "bg-muted text-muted-foreground border-border" },
 }
 
-const TAB_HREF: Record<MyWorkTab, string> = {
-  issues: "/my-work/issues",
-  cycles: "/my-work/cycles",
-  pages: "/my-work/pages",
+function useTabHref(): Record<MyWorkTab, string> {
+  const params = useParams()
+  const ws = params?.workspace as string | undefined
+  const base = ws ? `/${ws}` : ""
+  return {
+    issues: `${base}/my-work/issues`,
+    cycles: `${base}/my-work/cycles`,
+    pages: `${base}/my-work/pages`,
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -444,6 +450,7 @@ interface MyWorkViewProps {
 
 export function MyWorkView({ defaultTab = "issues" }: Readonly<MyWorkViewProps>) {
   const { t } = useTranslation()
+  const TAB_HREF = useTabHref()
   const activeTab = defaultTab
 
   const tabLabelMap: Record<MyWorkTab, string> = {
