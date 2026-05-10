@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useParams } from "next/navigation"
 import {
   Bell, AtSign, AlertTriangle, ClipboardList, CheckCheck,
   Circle, FolderKanban, Clock, CheckCircle2, MessageSquare, ArrowRight,
@@ -58,11 +58,16 @@ const TABS: { key: NotifTab; icon: React.ElementType; filter: (n: Notification) 
   { key: "assignments", icon: ClipboardList, filter: (n) => n.type === "assigned" },
 ]
 
-const TAB_HREF: Record<NotifTab, string> = {
-  all: "/inbox",
-  mentions: "/inbox/mentions",
-  alerts: "/inbox/alerts",
-  assignments: "/inbox/assignments",
+function useTabHref(): Record<NotifTab, string> {
+  const params = useParams()
+  const ws = params?.workspace as string | undefined
+  const base = ws ? `/${ws}` : ""
+  return {
+    all: `${base}/inbox`,
+    mentions: `${base}/inbox/mentions`,
+    alerts: `${base}/inbox/alerts`,
+    assignments: `${base}/inbox/assignments`,
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -155,6 +160,7 @@ interface InboxViewProps {
 
 export function InboxView({ defaultTab = "all" }: Readonly<InboxViewProps>) {
   const { t } = useTranslation()
+  const TAB_HREF = useTabHref()
   const [activeTab, setActiveTab] = useState<NotifTab>(defaultTab)
   const [notifications, setNotifications] = useState<Notification[]>(MOCK_NOTIFICATIONS)
 
