@@ -9,6 +9,7 @@ import {
   Briefcase,
   FolderKanban,
   BarChart3,
+  Bot,
   Settings,
   HelpCircle,
   Plus,
@@ -117,6 +118,11 @@ const NAV_MAIN: readonly NavItem[] = [
     key: "nav.analytics",
     url: "/analytics",
     icon: BarChart3,
+  },
+  {
+    key: "nav.agents",
+    url: "/agents",
+    icon: Bot,
   },
 ]
 
