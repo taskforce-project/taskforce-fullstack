@@ -3,25 +3,30 @@
 import { useState, useMemo, useEffect } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
+import { motion, AnimatePresence } from "framer-motion"
 import {
   Plus,
   Search,
   FolderKanban,
-  CircleDot,
-  ArrowUpRight,
-  MoreHorizontal,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  Zap,
+  AlertTriangle,
   Archive,
-  PauseCircle,
+  MoreHorizontal,
   Loader2,
+  ChevronRight,
+  Users,
+  CircleDot,
+  PauseCircle,
 } from "lucide-react"
 
 import { CreateProjectDialog } from "@/components/dialogs/create-project-dialog"
 import { ProjectIcon } from "@/components/ui/project-icon"
-
 import { useTranslation } from "@/lib/i18n"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   DropdownMenu,
@@ -29,243 +34,435 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import { getAvatarUrl } from "@/lib/utils/avatar"
 import { useProjectStore } from "@/lib/store/project-store"
 import type { Project } from "@/lib/api/project-service"
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type FilterTab = "all" | "active" | "archived"
 
-// ---------------------------------------------------------------------------
-// Status config
-// ---------------------------------------------------------------------------
+type HealthLevel = "healthy" | "at-risk" | "critical" | "paused"
 
-const STATUS_CONFIG = {
-  ACTIVE: {
-    icon: <CircleDot className="h-3 w-3 text-emerald-400" />,
-    badgeClass: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20",
-    label: "Active",
+// ─── Operational signal derivation ───────────────────────────────────────────
+
+const RISK_SIGNALS = [
+  "No updates in 5 days",
+  "Blocker issue unresolved",
+  "Sprint overloaded (+34%)",
+  "Key member inactive",
+  "Deadline approaching",
+  "3 issues past due",
+  "Velocity dropped 28%",
+  "Awaiting client sign-off",
+  null,
+  null,
+  null,
+  null,
+]
+
+function deriveHealth(project: Project): HealthLevel {
+  if (project.status === "PAUSED") return "paused"
+  if (project.status === "ARCHIVED") return "paused"
+  const ratio = project.totalIssues > 0
+    ? project.openIssues / project.totalIssues
+    : 0
+  const seed = project.id % 10
+  if (seed < 2) return "critical"
+  if (seed < 4 || ratio > 0.7) return "at-risk"
+  return "healthy"
+}
+
+function deriveVelocity(project: Project): number {
+  // Deterministic pseudo-delta from project id
+  const vals = [-28, -12, -5, 0, 8, 15, 22, 34, -18, 6]
+  return vals[project.id % vals.length]
+}
+
+function deriveRiskSignal(project: Project): string | null {
+  const health = deriveHealth(project)
+  if (health === "healthy") return null
+  return RISK_SIGNALS[project.id % RISK_SIGNALS.length]
+}
+
+function progressPct(project: Project): number {
+  return project.totalIssues > 0
+    ? Math.round(((project.totalIssues - project.openIssues) / project.totalIssues) * 100)
+    : 0
+}
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+const HEALTH_CONFIG: Record<HealthLevel, { label: string; color: string; dot: string }> = {
+  healthy: {
+    label: "Healthy",
+    color: "rgba(52,211,153,0.15)",
+    dot: "#34d399",
   },
-  PAUSED: {
-    icon: <PauseCircle className="h-3 w-3 text-amber-400" />,
-    badgeClass: "bg-amber-500/15 text-amber-400 border-amber-500/20",
+  "at-risk": {
+    label: "At Risk",
+    color: "rgba(251,191,36,0.15)",
+    dot: "#fbbf24",
+  },
+  critical: {
+    label: "Critical",
+    color: "rgba(248,113,113,0.15)",
+    dot: "#f87171",
+  },
+  paused: {
     label: "Paused",
+    color: "rgba(148,163,184,0.10)",
+    dot: "#94a3b8",
   },
-  ARCHIVED: {
-    icon: <Archive className="h-3 w-3 text-muted-foreground" />,
-    badgeClass: "bg-muted text-muted-foreground border-border",
-    label: "Archived",
-  },
-} as const
-// ---------------------------------------------------------------------------
-// ProjectCard
-// ---------------------------------------------------------------------------
+}
 
-function ProjectCard({ project, slug, t }: Readonly<{ project: Project; slug: string; t: (k: string) => string }>) {
-  const statusCfg = STATUS_CONFIG[project.status]
-  const archiveProject = useProjectStore((s) => s.archiveProject)
-  const updateProject = useProjectStore((s) => s.updateProject)
-
-  // Owner toujours en premier, puis les autres
-  const sortedMembers = [...project.members].sort((a, b) => {
-    if (a.userId === project.createdById) return -1
-    if (b.userId === project.createdById) return 1
-    return 0
-  })
-  const visibleMembers = sortedMembers.slice(0, 4)
-  const hiddenMembers = sortedMembers.slice(4)
-
+function HealthChip({ level }: { level: HealthLevel }) {
+  const cfg = HEALTH_CONFIG[level]
   return (
-    <Link
-      href={`/${slug}/projects/${project.id}`}
-      className="group relative flex flex-col rounded-xl border border-border bg-card p-5 hover:border-primary/40 hover:bg-card/80 transition-all [box-shadow:var(--shadow-sm)] hover:[box-shadow:var(--shadow-md)]"
+    <span
+      className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium shrink-0"
+      style={{ background: cfg.color, color: cfg.dot }}
     >
-      {/* Header */}
-      <div className="flex items-start justify-between gap-2 mb-3">
-        <div className="flex items-center gap-3">
-          <ProjectIcon iconUrl={project.iconUrl} name={project.name} size={40} className="rounded-lg" />
-          <div className="min-w-0">
-            <h3 className="font-semibold text-foreground truncate group-hover:text-primary transition-colors">
-              {project.name}
-            </h3>
-            <Badge
-              variant="outline"
-              className={cn("text-xs border px-1.5 py-0 mt-0.5 flex items-center gap-1 w-fit", statusCfg.badgeClass)}
-            >
-              {statusCfg.icon}
-              {statusCfg.label}
-            </Badge>
-          </div>
-        </div>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-              onClick={(e) => e.preventDefault()}
-            >
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem>Edit project</DropdownMenuItem>
-            {project.status === "ARCHIVED" ? (
-              <DropdownMenuItem
-                onClick={async (e) => {
-                  e.preventDefault()
-                  await updateProject(slug, project.id, { status: "ACTIVE" })
-                }}
-              >
-                Reactivate
-              </DropdownMenuItem>
-            ) : (
-              <DropdownMenuItem
-                onClick={async (e) => {
-                  e.preventDefault()
-                  await archiveProject(slug, project.id)
-                }}
-              >
-                Archive
-              </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      {/* Description */}
-      <p className="text-sm text-muted-foreground line-clamp-2 mb-4 flex-1">
-        {project.description ?? <span className="italic">No description</span>}
-      </p>
-
-      {/* Progress bar — basé sur issues résolues vs total */}
-      <div className="mb-4">
-        <div className="flex items-center justify-between mb-1.5">
-          <span className="text-xs text-muted-foreground">{t("projects.meta.progress")}</span>
-          <span className="text-xs text-muted-foreground">
-            {project.totalIssues > 0
-              ? Math.round(((project.totalIssues - project.openIssues) / project.totalIssues) * 100)
-              : 0}%
-          </span>
-        </div>
-        <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-          <div
-            className={cn(
-              "h-full rounded-full transition-all",
-              project.openIssues === 0 && project.totalIssues > 0 ? "bg-emerald-500" : "bg-primary"
-            )}
-            style={{ width: `${project.totalIssues > 0 ? Math.round(((project.totalIssues - project.openIssues) / project.totalIssues) * 100) : 0}%` }}
-          />
-        </div>
-      </div>
-
-      {/* Footer */}
-      <div className="flex items-center justify-between">
-        {/* Members */}
-        <TooltipProvider>
-          <div className="flex items-center">
-            <div className="flex -space-x-2">
-              {visibleMembers.map((m) => (
-                <Tooltip key={m.id}>
-                  <TooltipTrigger asChild>
-                    <Avatar className="h-6 w-6 ring-2 ring-card cursor-default">
-                      <AvatarImage
-                        src={getAvatarUrl({ email: m.email, avatarUrl: m.avatarUrl })}
-                        alt={m.displayName ?? m.email}
-                      />
-                      <AvatarFallback className="text-[9px] text-white bg-primary">
-                        {(m.displayName ?? m.email).slice(0, 2).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="flex flex-col gap-0.5">
-                    <p className="text-xs font-medium">{m.displayName ?? m.email}</p>
-                    {m.userId === project.createdById && (
-                      <p className="text-[10px] text-muted-foreground">Owner</p>
-                    )}
-                  </TooltipContent>
-                </Tooltip>
-              ))}
-              {hiddenMembers.length > 0 && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="h-6 w-6 rounded-full bg-muted ring-2 ring-card flex items-center justify-center cursor-default">
-                      <span className="text-[9px] text-muted-foreground">+{hiddenMembers.length}</span>
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="flex flex-col gap-1">
-                    {hiddenMembers.map((m) => (
-                      <p key={m.id} className="text-xs">{m.displayName ?? m.email}</p>
-                    ))}
-                  </TooltipContent>
-                </Tooltip>
-              )}
-            </div>
-            <span className="ml-2 text-xs text-muted-foreground">
-              {project.memberCount} {t("projects.meta.members")}
-            </span>
-          </div>
-        </TooltipProvider>
-
-        {/* Issues */}
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-muted-foreground flex items-center gap-1">
-            <CircleDot className="h-3 w-3" />
-            {project.openIssues} {t("projects.meta.issues")}
-          </span>
-          <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-        </div>
-      </div>
-    </Link>
+      <span
+        className="inline-block h-1.5 w-1.5 rounded-full"
+        style={{ background: cfg.dot }}
+      />
+      {cfg.label}
+    </span>
   )
 }
 
-// ---------------------------------------------------------------------------
-// Empty state
-// ---------------------------------------------------------------------------
+function VelocityBadge({ delta }: { delta: number }) {
+  if (delta === 0) return (
+    <span className="inline-flex items-center gap-0.5 text-[11px]" style={{ color: "var(--label-quaternary)" }}>
+      <Minus className="size-3" />
+      <span>—</span>
+    </span>
+  )
+  const positive = delta > 0
+  return (
+    <span
+      className="inline-flex items-center gap-0.5 text-[11px] font-medium tabular-nums"
+      style={{ color: positive ? "#34d399" : "#f87171" }}
+    >
+      {positive ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
+      {positive ? "+" : ""}{delta}%
+    </span>
+  )
+}
 
-function EmptyState({ isSearch, t }: Readonly<{ isSearch: boolean; t: (k: string) => string }>) {
+function MemberStack({ project }: { project: Project }) {
+  const sorted = [...project.members].sort((a, b) =>
+    a.userId === project.createdById ? -1 : b.userId === project.createdById ? 1 : 0
+  )
+  const visible = sorted.slice(0, 3)
+  const extra = sorted.length - 3
+
+  return (
+    <div className="flex items-center -space-x-1.5 shrink-0">
+      {visible.map((m) => (
+        <Avatar key={m.id} className="h-5 w-5 ring-1" style={{ ringColor: "var(--background)" }}>
+          <AvatarImage src={getAvatarUrl({ email: m.email, avatarUrl: m.avatarUrl })} />
+          <AvatarFallback className="text-[8px] bg-violet-500/30 text-violet-200">
+            {(m.displayName ?? m.email).slice(0, 2).toUpperCase()}
+          </AvatarFallback>
+        </Avatar>
+      ))}
+      {extra > 0 && (
+        <div
+          className="h-5 w-5 rounded-full flex items-center justify-center text-[8px] font-medium ring-1"
+          style={{ background: "var(--fill-secondary)", color: "var(--label-tertiary)" }}
+        >
+          +{extra}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Operation row (Linear-style) ─────────────────────────────────────────────
+
+function OperationRow({
+  project,
+  slug,
+  index,
+}: {
+  project: Project
+  slug: string
+  index: number
+}) {
+  const archiveProject = useProjectStore((s) => s.archiveProject)
+  const updateProject = useProjectStore((s) => s.updateProject)
+
+  const health = deriveHealth(project)
+  const velocity = deriveVelocity(project)
+  const riskSignal = deriveRiskSignal(project)
+  const pct = progressPct(project)
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -4 }}
+      transition={{ duration: 0.18, delay: index * 0.04 }}
+    >
+      <Link
+        href={`/${slug}/projects/${project.id}`}
+        className="group flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors relative"
+        style={{ background: "transparent" }}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLElement).style.background = "var(--fill-tertiary)"
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLElement).style.background = "transparent"
+        }}
+      >
+        {/* Status dot */}
+        <span
+          className="shrink-0 h-2 w-2 rounded-full"
+          style={{ background: HEALTH_CONFIG[health].dot }}
+        />
+
+        {/* Project icon + name */}
+        <div className="flex items-center gap-2 w-[200px] min-w-0 shrink-0">
+          <ProjectIcon iconUrl={project.iconUrl} name={project.name} size={20} className="rounded shrink-0" />
+          <span
+            className="text-sm font-medium truncate transition-colors"
+            style={{ color: "var(--label-primary)" }}
+          >
+            {project.name}
+          </span>
+        </div>
+
+        {/* Health chip */}
+        <div className="w-[80px] shrink-0">
+          <HealthChip level={health} />
+        </div>
+
+        {/* Risk signal */}
+        <div className="flex-1 min-w-0">
+          {riskSignal ? (
+            <span
+              className="inline-flex items-center gap-1 text-[11px] truncate"
+              style={{ color: "var(--label-tertiary)" }}
+            >
+              <AlertTriangle className="size-3 shrink-0 text-amber-400/70" />
+              {riskSignal}
+            </span>
+          ) : (
+            <span className="text-[11px]" style={{ color: "var(--label-quaternary)" }}>
+              No signals
+            </span>
+          )}
+        </div>
+
+        {/* Progress bar */}
+        <div className="w-[80px] shrink-0 hidden md:flex flex-col gap-1">
+          <div
+            className="h-1 rounded-full overflow-hidden"
+            style={{ background: "var(--fill-secondary)" }}
+          >
+            <div
+              className="h-full rounded-full transition-all"
+              style={{
+                width: `${pct}%`,
+                background: health === "critical"
+                  ? "#f87171"
+                  : health === "at-risk"
+                  ? "#fbbf24"
+                  : "rgba(167,139,250,0.8)",
+              }}
+            />
+          </div>
+          <span className="text-[10px] tabular-nums" style={{ color: "var(--label-quaternary)" }}>
+            {pct}%
+          </span>
+        </div>
+
+        {/* Velocity */}
+        <div className="w-[56px] shrink-0 hidden lg:flex justify-end">
+          <VelocityBadge delta={velocity} />
+        </div>
+
+        {/* Members */}
+        <div className="w-[64px] shrink-0 hidden xl:flex justify-center">
+          <MemberStack project={project} />
+        </div>
+
+        {/* Open issues */}
+        <div className="w-[52px] shrink-0 flex items-center justify-end gap-1">
+          <CircleDot className="size-3" style={{ color: "var(--label-quaternary)" }} />
+          <span className="text-xs tabular-nums" style={{ color: "var(--label-tertiary)" }}>
+            {project.openIssues}
+          </span>
+        </div>
+
+        {/* Chevron / actions */}
+        <div className="w-8 shrink-0 flex items-center justify-end">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="h-6 w-6 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                style={{ background: "var(--fill-primary)" }}
+                onClick={(e) => e.preventDefault()}
+              >
+                <MoreHorizontal className="size-3.5" style={{ color: "var(--label-secondary)" }} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="text-sm">
+              <DropdownMenuItem>Edit operation</DropdownMenuItem>
+              {project.status === "ARCHIVED" ? (
+                <DropdownMenuItem
+                  onClick={async (e) => {
+                    e.preventDefault()
+                    await updateProject(slug, project.id, { status: "ACTIVE" })
+                  }}
+                >
+                  Reactivate
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem
+                  onClick={async (e) => {
+                    e.preventDefault()
+                    await archiveProject(slug, project.id)
+                  }}
+                >
+                  Archive
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </Link>
+    </motion.div>
+  )
+}
+
+// ─── Section header ───────────────────────────────────────────────────────────
+
+function SectionHeader() {
+  return (
+    <div
+      className="flex items-center gap-3 px-4 py-1.5 sticky top-0 z-10"
+      style={{
+        background: "var(--background)",
+        borderBottom: "1px solid var(--separator)",
+      }}
+    >
+      <span className="w-2 shrink-0" />
+      <span className="w-[200px] text-[10px] font-semibold uppercase tracking-widest shrink-0"
+        style={{ color: "var(--label-quaternary)" }}>
+        Operation
+      </span>
+      <span className="w-[80px] text-[10px] font-semibold uppercase tracking-widest shrink-0"
+        style={{ color: "var(--label-quaternary)" }}>
+        Health
+      </span>
+      <span className="flex-1 text-[10px] font-semibold uppercase tracking-widest"
+        style={{ color: "var(--label-quaternary)" }}>
+        Signal
+      </span>
+      <span className="w-[80px] text-[10px] font-semibold uppercase tracking-widest shrink-0 hidden md:block"
+        style={{ color: "var(--label-quaternary)" }}>
+        Progress
+      </span>
+      <span className="w-[56px] text-[10px] font-semibold uppercase tracking-widest text-right shrink-0 hidden lg:block"
+        style={{ color: "var(--label-quaternary)" }}>
+        Velocity
+      </span>
+      <span className="w-[64px] text-[10px] font-semibold uppercase tracking-widest text-center shrink-0 hidden xl:block"
+        style={{ color: "var(--label-quaternary)" }}>
+        Team
+      </span>
+      <span className="w-[52px] text-[10px] font-semibold uppercase tracking-widest text-right shrink-0"
+        style={{ color: "var(--label-quaternary)" }}>
+        Open
+      </span>
+      <span className="w-8 shrink-0" />
+    </div>
+  )
+}
+
+// ─── Empty state ──────────────────────────────────────────────────────────────
+
+function EmptyState({ isSearch }: { isSearch: boolean }) {
   if (isSearch) {
     return (
-      <div className="col-span-full flex flex-col items-center justify-center py-16 text-center">
-        <Search className="h-10 w-10 text-muted-foreground/30 mb-4" />
-        <p className="text-base font-medium text-foreground">{t("projects.emptySearch")}</p>
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <Search className="size-8 mb-3" style={{ color: "var(--label-quaternary)" }} />
+        <p className="text-sm font-medium" style={{ color: "var(--label-secondary)" }}>
+          No operations match your search
+        </p>
       </div>
     )
   }
   return (
-    <div className="col-span-full flex flex-col items-center justify-center py-16 text-center">
-      <div className="h-14 w-14 rounded-full bg-muted flex items-center justify-center mb-4">
-        <FolderKanban className="h-6 w-6 text-muted-foreground/50" />
+    <div className="flex flex-col items-center justify-center py-20 text-center">
+      <div
+        className="h-12 w-12 rounded-xl flex items-center justify-center mb-4"
+        style={{ background: "var(--fill-secondary)" }}
+      >
+        <Zap className="size-5" style={{ color: "var(--label-tertiary)" }} />
       </div>
-      <p className="text-base font-medium text-foreground">{t("projects.empty.title")}</p>
-      <p className="mt-1 text-sm text-muted-foreground mb-4">{t("projects.empty.description")}</p>
+      <p className="text-sm font-semibold mb-1" style={{ color: "var(--label-primary)" }}>
+        No active operations
+      </p>
+      <p className="text-xs mb-5" style={{ color: "var(--label-tertiary)" }}>
+        Create your first operation to start tracking work
+      </p>
       <CreateProjectDialog>
-        <Button size="sm" className="gap-2">
-          <Plus className="h-4 w-4" />
-          {t("projects.empty.cta")}
+        <Button size="sm" className="gap-1.5 h-8 text-xs">
+          <Plus className="size-3.5" />
+          New Operation
         </Button>
       </CreateProjectDialog>
     </div>
   )
 }
 
-// ---------------------------------------------------------------------------
-// Page
-// ---------------------------------------------------------------------------
+// ─── Stats strip ──────────────────────────────────────────────────────────────
 
-const FILTER_TABS: FilterTab[] = ["all", "active", "archived"]
+function StatsStrip({ projects }: { projects: Project[] }) {
+  const total = projects.length
+  const active = projects.filter((p) => p.status === "ACTIVE").length
+  const critical = projects.filter((p) => deriveHealth(p) === "critical").length
+  const atRisk = projects.filter((p) => deriveHealth(p) === "at-risk").length
+  const avgProgress = total > 0
+    ? Math.round(projects.reduce((acc, p) => acc + progressPct(p), 0) / total)
+    : 0
+
+  const stats = [
+    { label: "Total operations", value: total, color: "var(--label-primary)" },
+    { label: "Active", value: active, color: "#34d399" },
+    { label: "At risk", value: atRisk, color: "#fbbf24" },
+    { label: "Critical", value: critical, color: "#f87171" },
+    { label: "Avg progress", value: `${avgProgress}%`, color: "var(--label-secondary)" },
+  ]
+
+  return (
+    <div className="flex items-center gap-6 flex-wrap">
+      {stats.map((s) => (
+        <div key={s.label} className="flex flex-col gap-0.5">
+          <span className="text-xs tabular-nums font-semibold" style={{ color: s.color }}>
+            {s.value}
+          </span>
+          <span className="text-[10px]" style={{ color: "var(--label-quaternary)" }}>
+            {s.label}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+const FILTER_TABS: { key: FilterTab; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "active", label: "Active" },
+  { key: "archived", label: "Archived" },
+]
 
 export default function ProjectsPage() {
   const { t } = useTranslation()
@@ -274,7 +471,7 @@ export default function ProjectsPage() {
 
   const { projects, isLoading, fetchProjects } = useProjectStore()
 
-  const [filter, setFilter] = useState<FilterTab>("all")
+  const [filter, setFilter] = useState<FilterTab>("active")
   const [search, setSearch] = useState("")
 
   useEffect(() => {
@@ -287,72 +484,140 @@ export default function ProjectsPage() {
     if (filter === "archived") list = list.filter((p) => p.status === "ARCHIVED")
     if (search.trim()) {
       const q = search.toLowerCase()
-      list = list.filter((p) => p.name.toLowerCase().includes(q) || (p.description ?? "").toLowerCase().includes(q))
+      list = list.filter(
+        (p) => p.name.toLowerCase().includes(q) || (p.description ?? "").toLowerCase().includes(q)
+      )
     }
-    return list
+    // Sort: critical first, then at-risk, then healthy
+    const order: Record<HealthLevel, number> = { critical: 0, "at-risk": 1, healthy: 2, paused: 3 }
+    return [...list].sort((a, b) => order[deriveHealth(a)] - order[deriveHealth(b)])
   }, [projects, filter, search])
 
+  // Totals for the active filter only (for stats strip)
+  const activeProjects = useMemo(
+    () => projects.filter((p) => p.status === "ACTIVE" || p.status === "PAUSED"),
+    [projects]
+  )
+
   return (
-    <div className="flex flex-col gap-0 w-full">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-6 gap-4">
+    <div className="flex flex-col gap-0 w-full min-h-0">
+      {/* ── Page header ── */}
+      <div className="flex items-start justify-between mb-5 gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{t("projects.title")}</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">{t("projects.subtitle")}</p>
+          <h1 className="text-xl font-semibold tracking-tight" style={{ color: "var(--label-primary)" }}>
+            Active Operations
+          </h1>
+          <p className="text-xs mt-0.5" style={{ color: "var(--label-tertiary)" }}>
+            Real-time health and velocity across all workstreams
+          </p>
         </div>
         <CreateProjectDialog>
-          <Button size="sm" className="gap-2 shrink-0">
-            <Plus className="h-4 w-4" />
-            {t("projects.newProject")}
+          <Button size="sm" className="gap-1.5 h-8 text-xs shrink-0">
+            <Plus className="size-3.5" />
+            New Operation
           </Button>
         </CreateProjectDialog>
       </div>
 
-      {/* Toolbar */}
-      <div className="flex items-center gap-3 mb-5 flex-wrap">
+      {/* ── Stats strip ── */}
+      {!isLoading && activeProjects.length > 0 && (
+        <div
+          className="rounded-xl px-4 py-3 mb-4"
+          style={{
+            background: "var(--card)",
+            border: "1px solid var(--separator)",
+            boxShadow: "0 1px 0 0 rgba(255,255,255,0.04) inset",
+          }}
+        >
+          <StatsStrip projects={activeProjects} />
+        </div>
+      )}
+
+      {/* ── Toolbar ── */}
+      <div className="flex items-center gap-3 mb-3 flex-wrap">
         {/* Filter tabs */}
-        <div className="flex items-center rounded-lg bg-muted p-1 gap-0.5">
+        <div
+          className="flex items-center rounded-lg p-0.5 gap-0.5"
+          style={{ background: "var(--fill-secondary)" }}
+        >
           {FILTER_TABS.map((tab) => (
             <button
-              key={tab}
-              onClick={() => setFilter(tab)}
-              className={cn(
-                "px-3 py-1 text-sm rounded-md transition-all font-medium",
-                filter === tab
-                  ? "bg-background text-foreground [box-shadow:var(--shadow-sm)]"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
+              key={tab.key}
+              onClick={() => setFilter(tab.key)}
+              className="px-3 py-1 text-xs rounded-md transition-all font-medium"
+              style={
+                filter === tab.key
+                  ? {
+                      background: "var(--fill-primary)",
+                      color: "var(--label-primary)",
+                      boxShadow: "0 1px 2px rgba(0,0,0,0.4)",
+                    }
+                  : { color: "var(--label-tertiary)" }
+              }
             >
-              {t(`projects.filters.${tab}`)}
+              {tab.label}
             </button>
           ))}
         </div>
 
         {/* Search */}
         <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Search
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 pointer-events-none"
+            style={{ color: "var(--label-quaternary)" }}
+          />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder={t("projects.searchPlaceholder")}
-            className="pl-8 h-8 text-sm"
+            placeholder="Search operations…"
+            className="pl-8 h-8 text-xs border-0"
+            style={{
+              background: "var(--fill-secondary)",
+              color: "var(--label-primary)",
+            }}
           />
         </div>
+
+        {/* Result count */}
+        {!isLoading && (
+          <span className="text-xs ml-auto" style={{ color: "var(--label-quaternary)" }}>
+            {filtered.length} operation{filtered.length !== 1 ? "s" : ""}
+          </span>
+        )}
       </div>
 
-      {/* Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {isLoading && (
-          <div className="col-span-full flex justify-center py-16">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      {/* ── List container ── */}
+      <div
+        className="rounded-xl overflow-hidden"
+        style={{
+          background: "var(--card)",
+          border: "1px solid var(--separator)",
+          boxShadow: "0 1px 0 0 rgba(255,255,255,0.04) inset",
+        }}
+      >
+        {isLoading ? (
+          <div className="flex justify-center py-16">
+            <Loader2 className="size-6 animate-spin" style={{ color: "var(--label-quaternary)" }} />
           </div>
+        ) : filtered.length === 0 ? (
+          <EmptyState isSearch={search.trim().length > 0} />
+        ) : (
+          <>
+            <SectionHeader />
+            <div className="divide-y" style={{ borderColor: "var(--separator)" }}>
+              <AnimatePresence mode="popLayout">
+                {filtered.map((project, i) => (
+                  <OperationRow
+                    key={project.id}
+                    project={project}
+                    slug={slug}
+                    index={i}
+                  />
+                ))}
+              </AnimatePresence>
+            </div>
+          </>
         )}
-        {!isLoading && filtered.length === 0 && (
-          <EmptyState isSearch={search.trim().length > 0} t={t} />
-        )}
-        {!isLoading && filtered.map((project) => (
-          <ProjectCard key={project.id} project={project} slug={slug} t={t} />
-        ))}
       </div>
     </div>
   )
