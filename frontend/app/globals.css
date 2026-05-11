@@ -4,50 +4,51 @@
 @custom-variant dark (&:is(.dark, .dark *));
 
 /* ============================================================================
-   DESIGN TOKENS — Raycast-inspired
+   DESIGN TOKENS
    ============================================================================
-   Dark  : Near-black with strong violet/blue ambient orbs (Raycast signature)
-   Light : Clean macOS white with soft lavender tint
+   Dark-first. #0d0d0d base + white text + purple/pink gradient accents.
+   Reference: https://raycast.com design system.
    ============================================================================ */
 
+/* ── LIGHT MODE (default) ── macOS / Apple HIG palette ─────────────────────── */
 :root {
-  --background:         #f4f4f8;
-  --card:               rgba(255, 255, 255, 0.70);
-  --popover:            rgba(255, 255, 255, 0.90);
-  --sidebar:            rgba(236, 236, 244, 0.80);
+  --background:         #f2f2f7;
+  --card:               rgba(255, 255, 255, 0.72);
+  --popover:            rgba(255, 255, 255, 0.94);
+  --sidebar:            rgba(250, 250, 254, 0.90);
 
-  --foreground:         #1a1a1e;
-  --card-foreground:    #1a1a1e;
-  --popover-foreground: #1a1a1e;
-  --sidebar-foreground: #1a1a1e;
+  --foreground:         #1c1c1e;
+  --card-foreground:    #1c1c1e;
+  --popover-foreground: #1c1c1e;
+  --sidebar-foreground: rgba(28, 28, 30, 0.82);
 
-  --primary:            #1a1a1e;
+  --primary:            #1c1c1e;
   --primary-foreground: #ffffff;
-  --secondary:          rgba(0, 0, 0, 0.05);
-  --secondary-foreground: #1a1a1e;
-  --muted:              rgba(0, 0, 0, 0.04);
-  --muted-foreground:   rgba(60, 60, 67, 0.55);
-  --accent:             rgba(0, 0, 0, 0.05);
-  --accent-foreground:  #1a1a1e;
+  --secondary:          rgba(0, 0, 0, 0.06);
+  --secondary-foreground: #1c1c1e;
+  --muted:              rgba(0, 0, 0, 0.05);
+  --muted-foreground:   rgba(28, 28, 30, 0.45);
+  --accent:             rgba(0, 0, 0, 0.06);
+  --accent-foreground:  #1c1c1e;
   --destructive:        #ff3b30;
   --destructive-foreground: #ffffff;
 
-  --border:             rgba(0, 0, 0, 0.09);
-  --input:              rgba(0, 0, 0, 0.06);
-  --ring:               rgba(0, 0, 0, 0.25);
+  --border:             rgba(0, 0, 0, 0.10);
+  --input:              rgba(0, 0, 0, 0.07);
+  --ring:               rgba(28, 28, 30, 0.25);
 
-  --sidebar-primary:            #1a1a1e;
+  --sidebar-primary:            #1c1c1e;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent:             rgba(0, 0, 0, 0.05);
-  --sidebar-accent-foreground:  #1a1a1e;
-  --sidebar-border:             rgba(0, 0, 0, 0.07);
-  --sidebar-ring:               #1a1a1e;
+  --sidebar-accent:             rgba(0, 0, 0, 0.06);
+  --sidebar-accent-foreground:  #1c1c1e;
+  --sidebar-border:             rgba(0, 0, 0, 0.08);
+  --sidebar-ring:               rgba(28, 28, 30, 0.15);
 
-  --chart-1: #007aff;
+  --chart-1: #0a84ff;
   --chart-2: #34c759;
-  --chart-3: #8e8e93;
-  --chart-4: #d1d1d6;
-  --chart-5: #3c3c43;
+  --chart-3: rgba(28, 28, 30, 0.35);
+  --chart-4: rgba(28, 28, 30, 0.18);
+  --chart-5: #1c1c1e;
 
   --font-sans: var(--font-inter), "SF Pro Text", -apple-system, system-ui, sans-serif;
   --font-serif: Georgia, serif;
@@ -55,92 +56,109 @@
 
   --radius:          0.5rem;
   --spacing:         0.25rem;
-  --tracking-normal: -0.012em;
+  --tracking-normal: -0.016em;
 
-  --shadow-2xs: 0 1px 2px rgba(0,0,0,0.05);
-  --shadow-xs:  0 1px 4px rgba(0,0,0,0.07);
-  --shadow-sm:  0 2px 6px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
-  --shadow:     0 4px 10px rgba(0,0,0,0.09), 0 1px 3px rgba(0,0,0,0.04);
-  --shadow-md:  0 8px 20px rgba(0,0,0,0.10), 0 2px 6px rgba(0,0,0,0.04);
-  --shadow-lg:  0 16px 36px rgba(0,0,0,0.11), 0 4px 10px rgba(0,0,0,0.04);
-  --shadow-xl:  0 24px 52px rgba(0,0,0,0.12), 0 8px 18px rgba(0,0,0,0.04);
-  --shadow-2xl: 0 40px 80px rgba(0,0,0,0.16);
+  /* Soft shadows for light bg */
+  --shadow-2xs: 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-xs:  0 1px 4px rgba(0,0,0,0.08);
+  --shadow-sm:  0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow:     0 4px 16px rgba(0,0,0,0.10), 0 2px 4px rgba(0,0,0,0.05);
+  --shadow-md:  0 8px 26px rgba(0,0,0,0.12), 0 4px 8px rgba(0,0,0,0.05);
+  --shadow-lg:  0 16px 44px rgba(0,0,0,0.14), 0 6px 14px rgba(0,0,0,0.05);
+  --shadow-xl:  0 24px 60px rgba(0,0,0,0.16), 0 8px 20px rgba(0,0,0,0.06);
+  --shadow-2xl: 0 40px 80px rgba(0,0,0,0.20);
 
-  --label-primary:    #1a1a1e;
-  --label-secondary:  rgba(60, 60, 67, 0.55);
-  --label-tertiary:   rgba(60, 60, 67, 0.32);
-  --label-quaternary: rgba(60, 60, 67, 0.18);
-  --fill-primary:     rgba(0, 0, 0, 0.10);
-  --fill-secondary:   rgba(0, 0, 0, 0.06);
+  --label-primary:    #1c1c1e;
+  --label-secondary:  rgba(28, 28, 30, 0.60);
+  --label-tertiary:   rgba(28, 28, 30, 0.38);
+  --label-quaternary: rgba(28, 28, 30, 0.20);
+  --fill-primary:     rgba(0, 0, 0, 0.12);
+  --fill-secondary:   rgba(0, 0, 0, 0.07);
   --fill-tertiary:    rgba(0, 0, 0, 0.04);
   --separator:        rgba(0, 0, 0, 0.09);
+
+  /* ── Gradient accents */
+  --gradient-purple-pink: linear-gradient(61.1307deg, rgb(248, 58, 58) 10%, rgb(241, 61, 212) 50%, rgb(112, 0, 255) 90%);
+  --gradient-red-pink:    linear-gradient(100.41deg, rgb(255, 91, 55) 0.52%, rgb(171, 0, 82) 100%);
+
+  /* ── Semantic accent palette */
+  --accent-green:   #34c759;
+  --accent-red:     #ff3b30;
+  --accent-pink:    #ff2d55;
+  --accent-purple:  #5856d6;
+  --accent-orange:  #ff9500;
+
+  /* ── Glow effects */
+  --shadow-glow-purple: 0px 0px 27px 0px rgba(88, 86, 214, 0.35);
+  --shadow-glow-red:    0px 0px 27px 0px rgba(255, 59, 48, 0.35);
 }
 
-/* ── Dark — Raycast ────────────────────────────────────────────────────────── */
+/* ── DARK MODE ── Raycast / near-black palette ──────────────────────────────── */
 .dark {
-  /* Near-black, slight violet tint — Raycast's signature */
-  --background:         #08080c;
-  --card:               rgba(255, 255, 255, 0.04);
-  --popover:            rgba(18, 18, 24, 0.95);
-  --sidebar:            rgba(6, 6, 10, 0.90);
+  --background:         #0d0d0d;
+  --card:               rgba(255, 255, 255, 0.05);
+  --popover:            rgba(20, 20, 20, 0.97);
+  --sidebar:            rgba(10, 10, 10, 0.90);
 
-  --foreground:         #f0f0f8;
-  --card-foreground:    #f0f0f8;
-  --popover-foreground: #f0f0f8;
-  --sidebar-foreground: #f0f0f8;
+  --foreground:         #ffffff;
+  --card-foreground:    #ffffff;
+  --popover-foreground: #ffffff;
+  --sidebar-foreground: rgba(255, 255, 255, 0.90);
 
-  --primary:            #f0f0f8;
-  --primary-foreground: #08080c;
-  --secondary:          rgba(255, 255, 255, 0.06);
-  --secondary-foreground: #f0f0f8;
-  --muted:              rgba(255, 255, 255, 0.05);
-  --muted-foreground:   rgba(255, 255, 255, 0.40);
-  --accent:             rgba(255, 255, 255, 0.07);
-  --accent-foreground:  #f0f0f8;
-  --destructive:        #ff453a;
-  --destructive-foreground: #f0f0f8;
+  --primary:            #ffffff;
+  --primary-foreground: #0d0d0d;
+  --secondary:          rgba(255, 255, 255, 0.10);
+  --secondary-foreground: #ffffff;
+  --muted:              rgba(255, 255, 255, 0.10);
+  --muted-foreground:   rgba(255, 255, 255, 0.55);
+  --accent:             rgba(255, 255, 255, 0.10);
+  --accent-foreground:  #ffffff;
+  --destructive:        #f83a3a;
+  --destructive-foreground: #ffffff;
 
-  --border:             rgba(255, 255, 255, 0.08);
+  --border:             rgba(255, 255, 255, 0.10);
   --input:              rgba(255, 255, 255, 0.08);
-  --ring:               rgba(255, 255, 255, 0.22);
+  --ring:               rgba(255, 255, 255, 0.45);
 
-  --sidebar-primary:            #f0f0f8;
-  --sidebar-primary-foreground: #08080c;
-  --sidebar-accent:             rgba(255, 255, 255, 0.07);
-  --sidebar-accent-foreground:  #f0f0f8;
-  --sidebar-border:             rgba(255, 255, 255, 0.05);
-  --sidebar-ring:               rgba(255, 255, 255, 0.22);
+  --sidebar-primary:            #ffffff;
+  --sidebar-primary-foreground: #0d0d0d;
+  --sidebar-accent:             rgba(255, 255, 255, 0.10);
+  --sidebar-accent-foreground:  #ffffff;
+  --sidebar-border:             rgba(255, 255, 255, 0.08);
+  --sidebar-ring:               rgba(255, 255, 255, 0.40);
 
   --chart-1: #0a84ff;
-  --chart-2: #30d158;
-  --chart-3: #636366;
-  --chart-4: #3a3a3c;
-  --chart-5: #f0f0f8;
+  --chart-2: #59d499;
+  --chart-3: rgba(255, 255, 255, 0.40);
+  --chart-4: rgba(255, 255, 255, 0.20);
+  --chart-5: #ffffff;
 
-  --shadow-2xs: 0 1px 3px rgba(0,0,0,0.55);
-  --shadow-xs:  0 1px 5px rgba(0,0,0,0.65);
-  --shadow-sm:  0 2px 8px rgba(0,0,0,0.65), 0 1px 3px rgba(0,0,0,0.40);
-  --shadow:     0 4px 14px rgba(0,0,0,0.70), 0 2px 4px rgba(0,0,0,0.40);
-  --shadow-md:  0 8px 24px rgba(0,0,0,0.72), 0 4px 8px rgba(0,0,0,0.40);
-  --shadow-lg:  0 16px 40px rgba(0,0,0,0.75), 0 6px 14px rgba(0,0,0,0.40);
-  --shadow-xl:  0 24px 56px rgba(0,0,0,0.80), 0 8px 20px rgba(0,0,0,0.40);
-  --shadow-2xl: 0 40px 80px rgba(0,0,0,0.90);
-
-  --label-primary:    #f0f0f8;
-  --label-secondary:  rgba(240, 240, 248, 0.55);
-  --label-tertiary:   rgba(240, 240, 248, 0.30);
-  --label-quaternary: rgba(240, 240, 248, 0.15);
-  --fill-primary:     rgba(255, 255, 255, 0.10);
-  --fill-secondary:   rgba(255, 255, 255, 0.06);
+  --label-primary:    #ffffff;
+  --label-secondary:  rgba(255, 255, 255, 0.60);
+  --label-tertiary:   rgba(255, 255, 255, 0.38);
+  --label-quaternary: rgba(255, 255, 255, 0.20);
+  --fill-primary:     rgba(255, 255, 255, 0.14);
+  --fill-secondary:   rgba(255, 255, 255, 0.08);
   --fill-tertiary:    rgba(255, 255, 255, 0.04);
-  --separator:        rgba(255, 255, 255, 0.07);
+  --separator:        rgba(255, 255, 255, 0.09);
 
-  --font-sans: var(--font-inter), "SF Pro Text", -apple-system, system-ui, sans-serif;
-  --font-serif: Georgia, serif;
-  --font-mono: var(--font-jetbrains-mono), "SF Mono", ui-monospace, monospace;
-  --radius: 0.5rem;
-  --spacing: 0.25rem;
-  --tracking-normal: -0.012em;
+  --shadow-2xs: 0 1px 3px rgba(0,0,0,0.60);
+  --shadow-xs:  0 1px 5px rgba(0,0,0,0.70);
+  --shadow-sm:  0 2px 8px rgba(0,0,0,0.70), 0 1px 3px rgba(0,0,0,0.45);
+  --shadow:     0 4px 16px rgba(0,0,0,0.75), 0 2px 4px rgba(0,0,0,0.45);
+  --shadow-md:  0 8px 26px rgba(0,0,0,0.78), 0 4px 8px rgba(0,0,0,0.45);
+  --shadow-lg:  0 16px 44px rgba(0,0,0,0.80), 0 6px 14px rgba(0,0,0,0.45);
+  --shadow-xl:  0 24px 60px rgba(0,0,0,0.85), 0 8px 20px rgba(0,0,0,0.45);
+  --shadow-2xl: 0 40px 80px rgba(0,0,0,0.92);
+
+  --accent-green:   #59d499;
+  --accent-red:     #f83a3a;
+  --accent-pink:    #f13dd4;
+  --accent-purple:  #7000ff;
+  --accent-orange:  #ff5b37;
+
+  --shadow-glow-purple: 0px 0px 27px 0px rgba(112, 0, 255, 0.48);
+  --shadow-glow-red:    0px 0px 27px 0px rgba(248, 58, 58, 0.48);
 }
 
 /* ============================================================================
@@ -225,39 +243,33 @@
     min-height: 100svh;
   }
 
-  /* ── Raycast ambient orbs — dark mode ─────────────────────────────────────
-     These are PROMINENT, not whispered. Raycast uses bold color orbs that
-     are clearly visible behind the glass surfaces. Three orbs:
-       1. Large violet/purple — top-left  (primary AI accent)
-       2. Deep blue — bottom-right        (system/tech accent)
-       3. Hot pink hint — top-right       (energy/brand accent)
-     All sit behind content via z-index.                                   */
-  .dark body {
-    background-color: #08080c;
+  /* ── Ambient gradient orbs — dark mode only ── */
+  /* body::before is position:fixed so it stays behind all content including opaque layout shells */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+  .dark body::before {
+    opacity: 1;
     background-image:
-      radial-gradient(ellipse 90% 75% at -5%  -15%, rgba(109,  40, 217, 0.42) 0%, transparent 55%),
-      radial-gradient(ellipse 65% 65% at 105% 108%, rgba( 37,  99, 235, 0.28) 0%, transparent 55%),
-      radial-gradient(ellipse 45% 40% at 102%  -5%, rgba(219,  39, 119, 0.16) 0%, transparent 50%);
+      radial-gradient(ellipse 80% 65% at -5%  -12%, rgba(112,   0, 255, 0.55) 0%, transparent 52%),
+      radial-gradient(ellipse 60% 55% at 108% 110%, rgba(241,  61, 212, 0.24) 0%, transparent 54%),
+      radial-gradient(ellipse 45% 40% at 104%  -6%, rgba(248,  58,  58, 0.16) 0%, transparent 50%);
   }
 
-  /* Light mode — soft lavender tint from top-right */
-  body {
-    background-color: #f4f4f8;
-    background-image:
-      radial-gradient(ellipse 60% 50% at 100% 0%, rgba(139, 92, 246, 0.07) 0%, transparent 55%);
-  }
+  ::selection       { background: rgba(88, 86, 214, 0.22); color: inherit; }
+  .dark ::selection { background: rgba(112, 0, 255, 0.38); color: inherit; }
 
-  /* Raycast-style text selection */
-  ::selection       { background: rgba(109,  40, 217, 0.30); color: inherit; }
-  .dark ::selection  { background: rgba(139,  92, 246, 0.40); color: inherit; }
-
-  /* Focus ring */
   :focus-visible {
-    outline: 2px solid rgba(109, 40, 217, 0.60);
+    outline: 2px solid var(--ring);
     outline-offset: 2px;
     border-radius: var(--radius-sm);
   }
-  .dark :focus-visible { outline-color: rgba(139, 92, 246, 0.70); }
 
   /* Placeholder */
   ::placeholder { color: var(--label-tertiary); opacity: 1; }
@@ -267,29 +279,61 @@
    GLASS SYSTEM
    ============================================================================ */
 
-/* Sidebar — darker glass, orbs bleed through */
+/* ── Critical: make the main content shell transparent so body orbs show through ── */
+/* SidebarInset uses bg-background (opaque) by default — override to transparent    */
+[data-slot="sidebar-inset"] {
+  background: transparent !important;
+}
+/* Also make the outer sidebar wrapper transparent */
+[data-slot="sidebar-wrapper"] {
+  background: transparent;
+}
+
+/* ── Sidebar inner panel — glass blur against the body gradient ── */
 [data-sidebar="sidebar"] {
-  backdrop-filter: blur(32px) saturate(180%);
-  -webkit-backdrop-filter: blur(32px) saturate(180%);
+  backdrop-filter: blur(32px) saturate(200%);
+  -webkit-backdrop-filter: blur(32px) saturate(200%);
   border-right: 1px solid var(--separator);
 }
 
-/* Popovers / dropdowns */
+/* ── Topbar — glass ── */
+header[class*="sticky"] {
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+}
+
+/* ── Cards — any rounded-xl with a border gets glass blur ── */
+/* This covers shadcn Cards, custom panel divs, and our dashboard/page cards */
+.rounded-xl.border:not(button):not(input):not(select):not(textarea),
+.rounded-lg.border:not(button):not(input):not(select):not(textarea),
+[data-slot="card"] {
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+}
+
+/* ── Modals / dialogs ── */
+[role="dialog"],
+[role="alertdialog"] {
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+}
+
+/* ── Popovers / dropdowns ── */
 [data-radix-popper-content-wrapper] > *,
 [role="menu"],
 [role="listbox"] {
-  backdrop-filter: blur(24px) saturate(160%);
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
 }
 
 /* ============================================================================
    SCROLLBAR
    ============================================================================ */
 
-::-webkit-scrollbar        { width: 5px; height: 5px; }
-::-webkit-scrollbar-track  { background: transparent; }
-::-webkit-scrollbar-thumb  { background: var(--separator); border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover { background: var(--label-tertiary); }
+::-webkit-scrollbar        { width: 8px; height: 8px; }
+::-webkit-scrollbar-track  { background: var(--fill-tertiary); }
+::-webkit-scrollbar-thumb  { background: var(--fill-primary); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--fill-secondary); }
 
 /* ============================================================================
    CURSORS
@@ -318,6 +362,8 @@ textarea:not([disabled]) { cursor: text; }
 @keyframes fade-in  { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes fade-up  { from { opacity: 0; transform: translateY(10px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes scale-in { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+@keyframes fadeIn   { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pulse    { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
 
 .animate-fade-in  { animation: fade-in  0.30s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 .animate-fade-up  { animation: fade-up  0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
@@ -358,8 +404,7 @@ textarea:not([disabled]) { cursor: text; }
 .ProseMirror pre  { background:var(--fill-secondary); border-radius:var(--radius); padding:1rem; overflow-x:auto; margin:0.75rem 0; }
 .ProseMirror pre code { background:transparent; padding:0; }
 .ProseMirror hr { border:none; border-top:1px solid var(--border); margin:1.5rem 0; }
-.ProseMirror a  { color:#7c3aed; text-decoration:underline; text-underline-offset:2px; }
-.dark .ProseMirror a { color:#a78bfa; }
+.ProseMirror a  { color: var(--accent-purple); text-decoration:underline; text-underline-offset:2px; }
 .ProseMirror ul[data-type="taskList"]           { list-style:none; padding:0; }
 .ProseMirror ul[data-type="taskList"] li        { display:flex; align-items:flex-start; gap:0.5rem; }
 .ProseMirror ul[data-type="taskList"] li label  { display:flex; align-items:center; cursor:pointer; margin-top:0.15rem; }
@@ -698,7 +743,7 @@ textarea:not([disabled]) { cursor: text; }
     cursor: pointer;
   }
   .pulse-item:last-child { border-right: none; }
-  .pulse-item:hover      { background: rgba(255,255,255,0.04); }
+  .pulse-item:hover      { background: var(--fill-tertiary); }
   .pulse-item--urgent    { background: rgba(255, 69, 58, 0.07); }
 
   /* ────────────────────────────────────────────────────────────────────────
@@ -713,7 +758,7 @@ textarea:not([disabled]) { cursor: text; }
     transition: background 150ms;
     cursor: pointer;
   }
-  .item-row:hover { background: rgba(255,255,255,0.04); }
+  .item-row:hover { background: var(--fill-tertiary); }
 
   .item-row--lg {
     padding: 1rem 1.25rem;
@@ -931,8 +976,8 @@ textarea:not([disabled]) { cursor: text; }
     text-align: left;
     cursor: pointer;
   }
-  .roster-item:hover   { background: rgba(255,255,255,0.05); }
-  .roster-item--active { background: rgba(255,255,255,0.10); }
+  .roster-item:hover   { background: var(--fill-secondary); }
+  .roster-item--active { background: var(--fill-primary); }
 
   /* Active selection indicator line (right edge) */
   .roster-item__indicator {
@@ -1165,7 +1210,7 @@ textarea:not([disabled]) { cursor: text; }
     transition: background 150ms;
     cursor: pointer;
   }
-  .btn-dashed:hover { background: rgba(255,255,255,0.05); }
+  .btn-dashed:hover { background: var(--fill-secondary); }
 
   /* ────────────────────────────────────────────────────────────────────────
      BACK LINK
@@ -1183,5 +1228,156 @@ textarea:not([disabled]) { cursor: text; }
     cursor: pointer;
   }
   .back-link:hover { opacity: 1; }
+
+  /* ────────────────────────────────────────────────────────────────────────
+     GRADIENT TEXT
+     ──────────────────────────────────────────────────────────────────────── */
+
+  .gradient-text {
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-image: var(--gradient-purple-pink);
+  }
+
+  .gradient-text-red {
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-image: var(--gradient-red-pink);
+  }
+
+  /* ────────────────────────────────────────────────────────────────────────
+     GLASS SURFACES  (reference style — lighter than .glass-card)
+     ──────────────────────────────────────────────────────────────────────── */
+
+  .glass {
+    background: var(--card);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    border: 1px solid var(--separator);
+  }
+
+  .glass-strong {
+    background: var(--fill-primary);
+    backdrop-filter: blur(24px) saturate(200%);
+    -webkit-backdrop-filter: blur(24px) saturate(200%);
+    border: 1px solid var(--border);
+  }
+
+  /* ────────────────────────────────────────────────────────────────────────
+     BUTTON VARIANTS
+     ──────────────────────────────────────────────────────────────────────── */
+
+  .btn-primary {
+    background: rgba(255, 255, 255, 0.90);
+    color: #0d0d0d;
+    padding: 0.75rem 1.5rem;
+    border-radius: var(--radius-md);
+    font-weight: 500;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+    border: 2px solid rgba(255, 255, 255, 0.30);
+    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.30);
+    cursor: pointer;
+  }
+  .btn-primary:hover {
+    background: rgba(255, 255, 255, 1);
+    transform: translateY(-1px);
+    box-shadow: 0px 8px 16px rgba(0, 0, 0, 0.15);
+  }
+
+  .btn-secondary {
+    background: rgba(255, 255, 255, 0.20);
+    color: white;
+    padding: 0.75rem 1.25rem;
+    border-radius: var(--radius-md);
+    font-weight: 500;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+    cursor: pointer;
+  }
+  .btn-secondary:hover { background: rgba(255, 255, 255, 0.25); }
+
+  .btn-gradient {
+    background: linear-gradient(100.41deg, rgba(255, 91, 55, 0.10) 0.52%, rgba(171, 0, 82, 0.10) 100%);
+    border-radius: var(--radius-md);
+    padding: 0.5rem 1rem;
+    transition: all 0.2s ease;
+    cursor: pointer;
+  }
+  .btn-gradient:hover {
+    background: linear-gradient(100.41deg, rgba(255, 91, 55, 0.15) 0.52%, rgba(171, 0, 82, 0.15) 100%);
+  }
+
+  /* ────────────────────────────────────────────────────────────────────────
+     CARD  (reference style — hover lift)
+     ──────────────────────────────────────────────────────────────────────── */
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--separator);
+    border-radius: var(--radius-lg);
+    padding: 2rem;
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    transition: all 0.3s ease;
+  }
+  .card:hover {
+    background: var(--fill-primary);
+    transform: translateY(-2px);
+  }
+
+  .card-glow {
+    position: relative;
+    overflow: hidden;
+  }
+  .card-glow::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.30) 0%, transparent 100%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+  }
+  .card-glow:hover::before { opacity: 1; }
+
+  /* ────────────────────────────────────────────────────────────────────────
+     BACKGROUND GRADIENTS
+     ──────────────────────────────────────────────────────────────────────── */
+
+  .bg-gradient-purple-pink { background-image: var(--gradient-purple-pink); }
+  .bg-gradient-red-pink    { background-image: var(--gradient-red-pink); }
+  .bg-gradient-radial      { background: radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.30) 0%, transparent 100%); }
+
+  /* ────────────────────────────────────────────────────────────────────────
+     OVERLAY / BLEND
+     ──────────────────────────────────────────────────────────────────────── */
+
+  .overlay-gradient { position: relative; }
+  .overlay-gradient::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, transparent 0%, rgba(13, 13, 13, 0.80) 100%);
+    pointer-events: none;
+  }
+  .mix-blend-overlay { mix-blend-mode: overlay; }
+
+  /* ────────────────────────────────────────────────────────────────────────
+     DIVIDERS
+     ──────────────────────────────────────────────────────────────────────── */
+
+  .divider          { height: 1px; background: rgba(255, 255, 255, 0.10); width: 100%; }
+  .divider-vertical { width: 1px;  background: rgba(255, 255, 255, 0.20); height: 100%; }
+
+  /* ────────────────────────────────────────────────────────────────────────
+     ANIMATION ALIASES  (reference names)
+     ──────────────────────────────────────────────────────────────────────── */
+
+  .fade-in { animation: fadeIn 0.6s ease-out; }
+  .pulse   { animation: pulse  2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
 
 } /* end @layer components */
