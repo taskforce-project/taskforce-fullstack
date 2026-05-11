@@ -5,19 +5,19 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
   LayoutDashboard,
-  Inbox,
-  Briefcase,
-  FolderKanban,
-  BarChart3,
-  Bot,
-  Settings,
+  Radio,
+  ListTodo,
+  Layers,
+  Activity,
+  Cpu,
+  Users,
+  UsersRound,
+  MessagesSquare,
+  MessageSquare,
+  Settings2,
   HelpCircle,
   Plus,
   ChevronRight,
-  Users,
-  UsersRound,
-  MessageSquare,
-  MessagesSquare,
 } from "lucide-react"
 
 import { NavUser } from "@/components/layout/sidebar/nav-user"
@@ -47,7 +47,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
-import { Badge } from "@/components/ui/badge"
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type NavItem = {
   readonly key: string
@@ -62,7 +63,9 @@ type NavItem = {
   }[]
 }
 
-const NAV_MAIN: readonly NavItem[] = [
+// ─── Nav groups — operations-centric information architecture ─────────────────
+
+const NAV_COMMAND: readonly NavItem[] = [
   {
     key: "nav.dashboard",
     url: "/dashboard",
@@ -71,29 +74,45 @@ const NAV_MAIN: readonly NavItem[] = [
   {
     key: "nav.inbox",
     url: "/inbox",
-    icon: Inbox,
+    icon: Radio,
     items: [
       { key: "nav.sub.allNotifications", url: "/inbox" },
-      { key: "nav.sub.mentions", url: "/inbox/mentions" },
-      { key: "nav.sub.alerts", url: "/inbox/alerts" },
-      { key: "nav.sub.assignments", url: "/inbox/assignments" },
+      { key: "nav.sub.mentions",         url: "/inbox/mentions" },
+      { key: "nav.sub.alerts",           url: "/inbox/alerts" },
+      { key: "nav.sub.assignments",      url: "/inbox/assignments" },
     ],
   },
   {
     key: "nav.myWork",
     url: "/my-work",
-    icon: Briefcase,
+    icon: ListTodo,
     items: [
       { key: "nav.sub.myIssues", url: "/my-work/issues" },
       { key: "nav.sub.myCycles", url: "/my-work/cycles" },
-      { key: "nav.sub.myPages", url: "/my-work/pages" },
+      { key: "nav.sub.myPages",  url: "/my-work/pages" },
     ],
   },
+]
+
+const NAV_WORK: readonly NavItem[] = [
   {
     key: "nav.projects",
     url: "/projects",
-    icon: FolderKanban,
+    icon: Layers,
   },
+  {
+    key: "nav.analytics",
+    url: "/analytics",
+    icon: Activity,
+  },
+  {
+    key: "nav.agents",
+    url: "/agents",
+    icon: Cpu,
+  },
+]
+
+const NAV_PEOPLE: readonly NavItem[] = [
   {
     key: "nav.members",
     url: "/members",
@@ -104,6 +123,9 @@ const NAV_MAIN: readonly NavItem[] = [
     url: "/teams",
     icon: UsersRound,
   },
+]
+
+const NAV_COMMS: readonly NavItem[] = [
   {
     key: "nav.messages",
     url: "/messages",
@@ -114,23 +136,13 @@ const NAV_MAIN: readonly NavItem[] = [
     url: "/discussions",
     icon: MessageSquare,
   },
-  {
-    key: "nav.analytics",
-    url: "/analytics",
-    icon: BarChart3,
-  },
-  {
-    key: "nav.agents",
-    url: "/agents",
-    icon: Bot,
-  },
 ]
 
 const NAV_BOTTOM: readonly NavItem[] = [
   {
     key: "nav.settings",
     url: "/settings",
-    icon: Settings,
+    icon: Settings2,
   },
   {
     key: "nav.help",
@@ -139,6 +151,8 @@ const NAV_BOTTOM: readonly NavItem[] = [
   },
 ]
 
+// ─── Component ────────────────────────────────────────────────────────────────
+
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { user } = useAuth()
   const { t } = useTranslation()
@@ -146,7 +160,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const activeWorkspace = useWorkspaceStore((s) => s.activeWorkspace)
   const slug = activeWorkspace?.slug ?? ""
 
-  /** Préfixe une URL relative avec le slug du workspace actif */
   const withSlug = (url: string) => (slug ? `/${slug}${url}` : url)
 
   const navUser = user
@@ -169,9 +182,53 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     return true
   }
 
+  const renderItem = (item: NavItem) => {
+    if (item.items) {
+      return (
+        <Collapsible
+          key={item.key}
+          defaultOpen={isActive(item.url)}
+          className="group/collapsible"
+          asChild
+        >
+          <SidebarMenuItem>
+            <CollapsibleTrigger asChild>
+              <SidebarMenuButton tooltip={t(item.key)} isActive={isActive(item.url)}>
+                <item.icon />
+                <span>{t(item.key)}</span>
+                <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+              </SidebarMenuButton>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <SidebarMenuSub>
+                {item.items.map((sub) => (
+                  <SidebarMenuSubItem key={sub.key}>
+                    <SidebarMenuSubButton asChild isActive={isActive(sub.url)}>
+                      <Link href={withSlug(sub.url)}>{t(sub.key)}</Link>
+                    </SidebarMenuSubButton>
+                  </SidebarMenuSubItem>
+                ))}
+              </SidebarMenuSub>
+            </CollapsibleContent>
+          </SidebarMenuItem>
+        </Collapsible>
+      )
+    }
+
+    return (
+      <SidebarMenuItem key={item.key}>
+        <SidebarMenuButton asChild tooltip={t(item.key)} isActive={isActive(item.url)}>
+          <Link href={withSlug(item.url)}>
+            <item.icon />
+            <span>{t(item.key)}</span>
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    )
+  }
+
   return (
     <Sidebar collapsible="icon" className="overflow-x-hidden" {...props}>
-      {/* Workspace switcher */}
       <SidebarHeader>
         <WorkspaceSwitcher />
       </SidebarHeader>
@@ -179,67 +236,41 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarSeparator />
 
       <SidebarContent className="overflow-x-hidden">
-        {/* Main nav */}
+
+        {/* Command — daily driver surfaces */}
         <SidebarGroup>
-          <SidebarGroupLabel>Workspace</SidebarGroupLabel>
+          <SidebarGroupLabel>Command</SidebarGroupLabel>
           <SidebarMenu>
-            {NAV_MAIN.filter(canAccess).map((item) =>
-              item.items ? (
-                <Collapsible
-                  key={item.key}
-                  defaultOpen={isActive(item.url)}
-                  className="group/collapsible"
-                  asChild
-                >
-                  <SidebarMenuItem>
-                    <CollapsibleTrigger asChild>
-                      <SidebarMenuButton
-                        tooltip={t(item.key)}
-                        isActive={isActive(item.url)}
-                      >
-                        <item.icon />
-                        <span>{t(item.key)}</span>
-                        <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                      </SidebarMenuButton>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <SidebarMenuSub>
-                        {item.items.map((sub) => (
-                          <SidebarMenuSubItem key={sub.key}>
-                            <SidebarMenuSubButton asChild isActive={isActive(sub.url)}>
-                              <Link href={withSlug(sub.url)}>{t(sub.key)}</Link>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                        ))}
-                      </SidebarMenuSub>
-                    </CollapsibleContent>
-                  </SidebarMenuItem>
-                </Collapsible>
-              ) : (
-                <SidebarMenuItem key={item.key}>
-                  <SidebarMenuButton
-                    asChild
-                    tooltip={t(item.key)}
-                    isActive={isActive(item.url)}
-                  >
-                    <Link href={withSlug(item.url)}>
-                      <item.icon />
-                      <span>{t(item.key)}</span>
-                      {item.badge && (
-                        <Badge className="ml-auto size-5 justify-center rounded-full p-0 text-xs">
-                          {item.badge}
-                        </Badge>
-                      )}
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )
-            )}
+            {NAV_COMMAND.filter(canAccess).map(renderItem)}
           </SidebarMenu>
         </SidebarGroup>
 
-        {/* Quick create project */}
-        <SidebarGroup className="group-data-[collapsible=icon]:hidden">
+        {/* Work — ops, intelligence, agents */}
+        <SidebarGroup>
+          <SidebarGroupLabel>Work</SidebarGroupLabel>
+          <SidebarMenu>
+            {NAV_WORK.filter(canAccess).map(renderItem)}
+          </SidebarMenu>
+        </SidebarGroup>
+
+        {/* People */}
+        <SidebarGroup>
+          <SidebarGroupLabel>People</SidebarGroupLabel>
+          <SidebarMenu>
+            {NAV_PEOPLE.filter(canAccess).map(renderItem)}
+          </SidebarMenu>
+        </SidebarGroup>
+
+        {/* Comms */}
+        <SidebarGroup>
+          <SidebarGroupLabel>Comms</SidebarGroupLabel>
+          <SidebarMenu>
+            {NAV_COMMS.filter(canAccess).map(renderItem)}
+          </SidebarMenu>
+        </SidebarGroup>
+
+        {/* Quick create */}
+        <SidebarGroup className="group-data-[collapsible=icon]:hidden mt-auto">
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton asChild className="text-muted-foreground">
@@ -254,23 +285,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
         <SidebarSeparator />
 
-        {/* Bottom nav (settings / admin) */}
+        {/* Settings / Help */}
         <SidebarGroup>
           <SidebarMenu>
-            {NAV_BOTTOM.filter(canAccess).map((item) => (
-              <SidebarMenuItem key={item.key}>
-                <SidebarMenuButton
-                  asChild
-                  tooltip={t(item.key)}
-                  isActive={isActive(item.url)}
-                >
-                  <Link href={withSlug(item.url)}>
-                    <item.icon />
-                    <span>{t(item.key)}</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
+            {NAV_BOTTOM.filter(canAccess).map(renderItem)}
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
@@ -285,4 +303,3 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     </Sidebar>
   )
 }
-
