@@ -3,150 +3,211 @@
 
 @custom-variant dark (&:is(.dark, .dark *));
 
+/* ============================================================================
+   DESIGN TOKENS — macOS / Raycast
+   ============================================================================
+   Palette philosophy:
+   - Light : Apple HIG systemBackground hierarchy
+   - Dark  : macOS Sonoma dark + Raycast ambient
+   Color values are raw hex/rgba so Tailwind can consume them via CSS vars.
+   ============================================================================ */
+
 :root {
-  --background: #fcfcfc;
-  --foreground: #000000;
-  --card: #ffffff;
-  --card-foreground: #000000;
-  --popover: #fcfcfc;
-  --popover-foreground: #000000;
-  --primary: #000000;
-  --primary-foreground: #ffffff;
-  --secondary: #ebebeb;
-  --secondary-foreground: #000000;
-  --muted: #f5f5f5;
-  --muted-foreground: #525252;
-  --accent: #ebebeb;
-  --accent-foreground: #000000;
-  --destructive: #e54b4f;
+  /* ── Surfaces ─────────────────────────────────────────────────────────── */
+  --background:          #f0f0f5;
+  --card:                #ffffff;
+  --popover:             rgba(255, 255, 255, 0.92);
+  --sidebar:             rgba(232, 232, 240, 0.78);
+
+  /* ── Text ─────────────────────────────────────────────────────────────── */
+  --foreground:          #1d1d1f;
+  --card-foreground:     #1d1d1f;
+  --popover-foreground:  #1d1d1f;
+  --sidebar-foreground:  #1d1d1f;
+
+  /* ── Semantic ─────────────────────────────────────────────────────────── */
+  --primary:             #1d1d1f;
+  --primary-foreground:  #ffffff;
+
+  --secondary:           rgba(0, 0, 0, 0.05);
+  --secondary-foreground: #1d1d1f;
+
+  --muted:               rgba(0, 0, 0, 0.04);
+  --muted-foreground:    rgba(60, 60, 67, 0.55);
+
+  --accent:              rgba(0, 0, 0, 0.06);
+  --accent-foreground:   #1d1d1f;
+
+  --destructive:         #ff3b30;
   --destructive-foreground: #ffffff;
-  --border: #e4e4e4;
-  --input: #ebebeb;
-  --ring: #000000;
-  --chart-1: #ffae04;
-  --chart-2: #2d62ef;
-  --chart-3: #a4a4a4;
-  --chart-4: #e4e4e4;
-  --chart-5: #747474;
-  --sidebar: #fcfcfc;
-  --sidebar-foreground: #000000;
-  --sidebar-primary: #000000;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #ebebeb;
-  --sidebar-accent-foreground: #000000;
-  --sidebar-border: #ebebeb;
-  --sidebar-ring: #000000;
-  --font-sans: Geist, sans-serif;
+
+  /* ── Chrome ───────────────────────────────────────────────────────────── */
+  --border:              rgba(0, 0, 0, 0.09);
+  --input:               rgba(0, 0, 0, 0.06);
+  --ring:                rgba(0, 0, 0, 0.30);
+
+  /* ── Sidebar chrome ───────────────────────────────────────────────────── */
+  --sidebar-primary:             #1d1d1f;
+  --sidebar-primary-foreground:  #ffffff;
+  --sidebar-accent:              rgba(0, 0, 0, 0.06);
+  --sidebar-accent-foreground:   #1d1d1f;
+  --sidebar-border:              rgba(0, 0, 0, 0.07);
+  --sidebar-ring:                #1d1d1f;
+
+  /* ── Charts ───────────────────────────────────────────────────────────── */
+  --chart-1: #007aff;
+  --chart-2: #34c759;
+  --chart-3: #8e8e93;
+  --chart-4: #d1d1d6;
+  --chart-5: #3c3c43;
+
+  /* ── Typography ───────────────────────────────────────────────────────── */
+  --font-sans: var(--font-inter), "SF Pro Text", -apple-system, system-ui, sans-serif;
   --font-serif: Georgia, serif;
-  --font-mono: Geist Mono, monospace;
+  --font-mono: var(--font-jetbrains-mono), "SF Mono", ui-monospace, monospace;
+
+  /* ── Shape ────────────────────────────────────────────────────────────── */
   --radius: 0.5rem;
-  --shadow-x: 0px;
-  --shadow-y: 1px;
-  --shadow-blur: 2px;
-  --shadow-spread: 0px;
-  --shadow-opacity: 0.18;
-  --shadow-color: hsl(0 0% 0%);
-  --shadow-2xs: 0px 1px 2px 0px hsl(0 0% 0% / 0.09);
-  --shadow-xs: 0px 1px 2px 0px hsl(0 0% 0% / 0.09);
-  --shadow-sm: 0px 1px 2px 0px hsl(0 0% 0% / 0.18), 0px 1px 2px -1px hsl(0 0% 0% / 0.18);
-  --shadow: 0px 1px 2px 0px hsl(0 0% 0% / 0.18), 0px 1px 2px -1px hsl(0 0% 0% / 0.18);
-  --shadow-md: 0px 1px 2px 0px hsl(0 0% 0% / 0.18), 0px 2px 4px -1px hsl(0 0% 0% / 0.18);
-  --shadow-lg: 0px 1px 2px 0px hsl(0 0% 0% / 0.18), 0px 4px 6px -1px hsl(0 0% 0% / 0.18);
-  --shadow-xl: 0px 1px 2px 0px hsl(0 0% 0% / 0.18), 0px 8px 10px -1px hsl(0 0% 0% / 0.18);
-  --shadow-2xl: 0px 1px 2px 0px hsl(0 0% 0% / 0.45);
-  --tracking-normal: 0em;
   --spacing: 0.25rem;
+  --tracking-normal: -0.011em;
+
+  /* ── Shadows — light (short, subtle, Apple-like) ──────────────────────── */
+  --shadow-2xs: 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-xs:  0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-sm:  0 2px 4px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow:     0 4px 8px rgba(0,0,0,0.07), 0 1px 3px rgba(0,0,0,0.04);
+  --shadow-md:  0 8px 16px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
+  --shadow-lg:  0 16px 32px rgba(0,0,0,0.09), 0 4px 8px rgba(0,0,0,0.04);
+  --shadow-xl:  0 24px 48px rgba(0,0,0,0.10), 0 8px 16px rgba(0,0,0,0.04);
+  --shadow-2xl: 0 40px 80px rgba(0,0,0,0.14);
+
+  /* ── Extra label hierarchy (macOS label system) ───────────────────────── */
+  --label-secondary:    rgba(60, 60, 67, 0.55);
+  --label-tertiary:     rgba(60, 60, 67, 0.30);
+  --label-quaternary:   rgba(60, 60, 67, 0.18);
+  --fill-primary:       rgba(0, 0, 0, 0.10);
+  --fill-secondary:     rgba(0, 0, 0, 0.06);
+  --fill-tertiary:      rgba(0, 0, 0, 0.04);
+  --separator:          rgba(0, 0, 0, 0.09);
 }
 
 .dark {
-  --background: #000000;
-  --foreground: #ffffff;
-  --card: #090909;
-  --card-foreground: #ffffff;
-  --popover: #121212;
-  --popover-foreground: #ffffff;
-  --primary: #ffffff;
-  --primary-foreground: #000000;
-  --secondary: #222222;
-  --secondary-foreground: #ffffff;
-  --muted: #1d1d1d;
-  --muted-foreground: #a4a4a4;
-  --accent: #333333;
-  --accent-foreground: #ffffff;
-  --destructive: #ff5b5b;
-  --destructive-foreground: #000000;
-  --border: #242424;
-  --input: #333333;
-  --ring: #a4a4a4;
-  --chart-1: #ffae04;
-  --chart-2: #2671f4;
-  --chart-3: #747474;
-  --chart-4: #525252;
-  --chart-5: #e4e4e4;
-  --sidebar: #121212;
-  --sidebar-foreground: #ffffff;
-  --sidebar-primary: #ffffff;
-  --sidebar-primary-foreground: #000000;
-  --sidebar-accent: #333333;
-  --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #333333;
-  --sidebar-ring: #a4a4a4;
-  --font-sans: Geist, sans-serif;
+  /* ── Surfaces ─────────────────────────────────────────────────────────── */
+  --background:          #0c0c0e;
+  --card:                #161618;
+  --popover:             rgba(26, 26, 28, 0.96);
+  --sidebar:             rgba(20, 20, 22, 0.78);
+
+  /* ── Text ─────────────────────────────────────────────────────────────── */
+  --foreground:          #f0f0f0;
+  --card-foreground:     #f0f0f0;
+  --popover-foreground:  #f0f0f0;
+  --sidebar-foreground:  #f0f0f0;
+
+  /* ── Semantic ─────────────────────────────────────────────────────────── */
+  --primary:             #f0f0f0;
+  --primary-foreground:  #0c0c0e;
+
+  --secondary:           rgba(255, 255, 255, 0.06);
+  --secondary-foreground: #f0f0f0;
+
+  --muted:               rgba(255, 255, 255, 0.05);
+  --muted-foreground:    rgba(235, 235, 245, 0.50);
+
+  --accent:              rgba(255, 255, 255, 0.08);
+  --accent-foreground:   #f0f0f0;
+
+  --destructive:         #ff453a;
+  --destructive-foreground: #0c0c0e;
+
+  /* ── Chrome ───────────────────────────────────────────────────────────── */
+  --border:              rgba(255, 255, 255, 0.08);
+  --input:               rgba(255, 255, 255, 0.08);
+  --ring:                rgba(255, 255, 255, 0.25);
+
+  /* ── Sidebar chrome ───────────────────────────────────────────────────── */
+  --sidebar-primary:             #f0f0f0;
+  --sidebar-primary-foreground:  #0c0c0e;
+  --sidebar-accent:              rgba(255, 255, 255, 0.07);
+  --sidebar-accent-foreground:   #f0f0f0;
+  --sidebar-border:              rgba(255, 255, 255, 0.06);
+  --sidebar-ring:                rgba(255, 255, 255, 0.25);
+
+  /* ── Charts ───────────────────────────────────────────────────────────── */
+  --chart-1: #0a84ff;
+  --chart-2: #30d158;
+  --chart-3: #636366;
+  --chart-4: #3a3a3c;
+  --chart-5: #ebebf5;
+
+  /* ── Shadows — dark (much more opaque needed) ─────────────────────────── */
+  --shadow-2xs: 0 1px 2px rgba(0,0,0,0.40);
+  --shadow-xs:  0 1px 3px rgba(0,0,0,0.50), 0 1px 2px rgba(0,0,0,0.30);
+  --shadow-sm:  0 2px 4px rgba(0,0,0,0.50), 0 1px 2px rgba(0,0,0,0.30);
+  --shadow:     0 4px 8px rgba(0,0,0,0.55), 0 1px 3px rgba(0,0,0,0.30);
+  --shadow-md:  0 8px 16px rgba(0,0,0,0.60), 0 2px 4px rgba(0,0,0,0.30);
+  --shadow-lg:  0 16px 32px rgba(0,0,0,0.65), 0 4px 8px rgba(0,0,0,0.30);
+  --shadow-xl:  0 24px 48px rgba(0,0,0,0.70), 0 8px 16px rgba(0,0,0,0.30);
+  --shadow-2xl: 0 40px 80px rgba(0,0,0,0.80);
+
+  /* ── Extra label hierarchy (macOS dark label system) ──────────────────── */
+  --label-secondary:    rgba(235, 235, 245, 0.55);
+  --label-tertiary:     rgba(235, 235, 245, 0.25);
+  --label-quaternary:   rgba(235, 235, 245, 0.10);
+  --fill-primary:       rgba(255, 255, 255, 0.10);
+  --fill-secondary:     rgba(255, 255, 255, 0.07);
+  --fill-tertiary:      rgba(255, 255, 255, 0.05);
+  --separator:          rgba(255, 255, 255, 0.08);
+
+  /* Typography stays same in dark */
+  --font-sans: var(--font-inter), "SF Pro Text", -apple-system, system-ui, sans-serif;
   --font-serif: Georgia, serif;
-  --font-mono: Geist Mono, monospace;
+  --font-mono: var(--font-jetbrains-mono), "SF Mono", ui-monospace, monospace;
   --radius: 0.5rem;
-  --shadow-x: 0px;
-  --shadow-y: 1px;
-  --shadow-blur: 2px;
-  --shadow-spread: 0px;
-  --shadow-opacity: 0.18;
-  --shadow-color: hsl(0 0% 0%);
-  --shadow-2xs: 0px 1px 2px 0px hsl(0 0% 0% / 0.09);
-  --shadow-xs: 0px 1px 2px 0px hsl(0 0% 0% / 0.09);
-  --shadow-sm: 0px 1px 2px 0px hsl(0 0% 0% / 0.18), 0px 1px 2px -1px hsl(0 0% 0% / 0.18);
-  --shadow: 0px 1px 2px 0px hsl(0 0% 0% / 0.18), 0px 1px 2px -1px hsl(0 0% 0% / 0.18);
-  --shadow-md: 0px 1px 2px 0px hsl(0 0% 0% / 0.18), 0px 2px 4px -1px hsl(0 0% 0% / 0.18);
-  --shadow-lg: 0px 1px 2px 0px hsl(0 0% 0% / 0.18), 0px 4px 6px -1px hsl(0 0% 0% / 0.18);
-  --shadow-xl: 0px 1px 2px 0px hsl(0 0% 0% / 0.18), 0px 8px 10px -1px hsl(0 0% 0% / 0.18);
-  --shadow-2xl: 0px 1px 2px 0px hsl(0 0% 0% / 0.45);
+  --spacing: 0.25rem;
+  --tracking-normal: -0.011em;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
+/* ============================================================================
+   TAILWIND THEME MAPPING
+   ============================================================================ */
 
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-mono);
+@theme inline {
+  --color-background:        var(--background);
+  --color-foreground:        var(--foreground);
+  --color-card:              var(--card);
+  --color-card-foreground:   var(--card-foreground);
+  --color-popover:           var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary:           var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary:         var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted:             var(--muted);
+  --color-muted-foreground:  var(--muted-foreground);
+  --color-accent:            var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive:       var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border:            var(--border);
+  --color-input:             var(--input);
+  --color-ring:              var(--ring);
+  --color-chart-1:           var(--chart-1);
+  --color-chart-2:           var(--chart-2);
+  --color-chart-3:           var(--chart-3);
+  --color-chart-4:           var(--chart-4);
+  --color-chart-5:           var(--chart-5);
+  --color-sidebar:           var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary:   var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent:    var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border:    var(--sidebar-border);
+  --color-sidebar-ring:      var(--sidebar-ring);
+
+  --font-sans:  var(--font-sans);
+  --font-mono:  var(--font-mono);
   --font-serif: var(--font-serif);
 
   --radius-sm: calc(var(--radius) - 4px);
@@ -155,281 +216,121 @@
   --radius-xl: calc(var(--radius) + 4px);
 
   --shadow-2xs: var(--shadow-2xs);
-  --shadow-xs: var(--shadow-xs);
-  --shadow-sm: var(--shadow-sm);
-  --shadow: var(--shadow);
-  --shadow-md: var(--shadow-md);
-  --shadow-lg: var(--shadow-lg);
-  --shadow-xl: var(--shadow-xl);
+  --shadow-xs:  var(--shadow-xs);
+  --shadow-sm:  var(--shadow-sm);
+  --shadow:     var(--shadow);
+  --shadow-md:  var(--shadow-md);
+  --shadow-lg:  var(--shadow-lg);
+  --shadow-xl:  var(--shadow-xl);
   --shadow-2xl: var(--shadow-2xl);
 }
 
-body {
-  letter-spacing: var(--tracking-normal);
-}
+/* ============================================================================
+   BASE STYLES
+   ============================================================================ */
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    box-sizing: border-box;
+  }
+
+  html {
+    text-rendering: optimizeLegibility;
+    -webkit-text-size-adjust: 100%;
   }
 
   body {
     @apply bg-background text-foreground;
-  }
-}
-
-@keyframes fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: var(--tracking-normal);
   }
 
-  to {
+  /* Raycast ambient glow — dark mode only, very restrained */
+  .dark body {
+    background-image:
+      radial-gradient(ellipse 80% 50% at 20% 0%,   rgba(80,  80, 110, 0.07) 0%, transparent 65%),
+      radial-gradient(ellipse 50% 35% at 80% 100%, rgba(50,  50,  80, 0.05) 0%, transparent 60%);
+  }
+
+  /* macOS text selection */
+  ::selection {
+    background: rgba(0, 122, 255, 0.25);
+    color: inherit;
+  }
+
+  .dark ::selection {
+    background: rgba(10, 132, 255, 0.35);
+    color: inherit;
+  }
+
+  /* Focus ring — macOS blue ring, not the default */
+  :focus-visible {
+    outline: 2px solid rgba(0, 122, 255, 0.60);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  .dark :focus-visible {
+    outline-color: rgba(10, 132, 255, 0.70);
+  }
+
+  /* Placeholder text */
+  ::placeholder {
+    color: var(--label-tertiary);
     opacity: 1;
-    transform: translateY(0);
   }
 }
 
-.animate-fade-in {
-  animation: fade-in 0.6s ease-out forwards;
+/* ============================================================================
+   GLASS EFFECTS — macOS vibrancy system
+   ============================================================================ */
+
+/* Sidebar vibrancy */
+[data-sidebar="sidebar"] {
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border-right: 1px solid var(--separator);
 }
 
-
-
-/* ─── TipTap / ProseMirror editor styles ─────────────────────────────────── */
-
-.ProseMirror {
-  padding: 1.5rem;
-  min-height: 400px;
-  outline: none;
-  font-size: 0.875rem;
-  line-height: 1.7;
-  color: var(--foreground);
+/* Floating surfaces (popovers, dropdowns, tooltips) */
+[data-radix-popper-content-wrapper] > *,
+[role="menu"],
+[role="listbox"] {
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
 }
 
-.ProseMirror>*+* {
-  margin-top: 0.75em;
+/* ============================================================================
+   SCROLLBAR — minimal, macOS style
+   ============================================================================ */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
 
-.ProseMirror h1 {
-  font-size: 1.25rem;
-  font-weight: 700;
-  margin-top: 1.5rem;
-  margin-bottom: 0.5rem;
-}
-
-.ProseMirror h2 {
-  font-size: 1.1rem;
-  font-weight: 600;
-  margin-top: 1.25rem;
-  margin-bottom: 0.5rem;
-}
-
-.ProseMirror h3 {
-  font-size: 1rem;
-  font-weight: 600;
-  margin-top: 1rem;
-  margin-bottom: 0.25rem;
-}
-
-.ProseMirror p {
-  margin: 0.25rem 0;
-}
-
-.ProseMirror ul {
-  list-style-type: disc;
-  padding-left: 1.5rem;
-}
-
-.ProseMirror ol {
-  list-style-type: decimal;
-  padding-left: 1.5rem;
-}
-
-.ProseMirror li {
-  margin: 0.25rem 0;
-}
-
-.ProseMirror blockquote {
-  border-left: 3px solid var(--border);
-  padding-left: 1rem;
-  color: var(--muted-foreground);
-  margin: 0.75rem 0;
-}
-
-.ProseMirror code {
-  background: var(--muted);
-  color: var(--primary);
-  padding: 0.125rem 0.375rem;
-  border-radius: 0.25rem;
-  font-size: 0.8125rem;
-  font-family: var(--font-mono);
-}
-
-.ProseMirror pre {
-  background: var(--muted);
-  border-radius: 0.5rem;
-  padding: 1rem;
-  overflow-x: auto;
-  margin: 0.75rem 0;
-}
-
-.ProseMirror pre code {
+::-webkit-scrollbar-track {
   background: transparent;
-  padding: 0;
-  font-size: 0.8125rem;
-  color: var(--foreground);
 }
 
-.ProseMirror hr {
-  border: none;
-  border-top: 1px solid var(--border);
-  margin: 1.5rem 0;
+::-webkit-scrollbar-thumb {
+  background: var(--separator);
+  border-radius: 99px;
+  transition: background 0.15s;
 }
 
-.ProseMirror a {
-  color: var(--primary);
-  text-decoration: underline;
-  text-underline-offset: 2px;
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
 }
 
-/* Task list */
-.ProseMirror ul[data-type="taskList"] {
-  list-style: none;
-  padding: 0;
-}
+/* ============================================================================
+   INTERACTIVE CURSORS
+   ============================================================================ */
 
-.ProseMirror ul[data-type="taskList"] li {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-}
-
-.ProseMirror ul[data-type="taskList"] li label {
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  margin-top: 0.15rem;
-}
-
-.ProseMirror ul[data-type="taskList"] li>div {
-  flex: 1;
-}
-
-/* Placeholder */
-.ProseMirror p.is-editor-empty:first-child::before {
-  content: attr(data-placeholder);
-  float: left;
-  color: var(--muted-foreground);
-  pointer-events: none;
-  height: 0;
-}
-
-/* Table */
-.ProseMirror table {
-  border-collapse: collapse;
-  table-layout: fixed;
-  width: 100%;
-  overflow: hidden;
-  margin: 0.75rem 0;
-}
-
-.ProseMirror table td,
-.ProseMirror table th {
-  border: 1px solid var(--border);
-  padding: 0.375rem 0.75rem;
-  font-size: 0.875rem;
-  text-align: left;
-  vertical-align: top;
-}
-
-.ProseMirror table th {
-  font-weight: 600;
-  background: var(--muted);
-}
-
-/* Float variations */
-@keyframes blob-float-1 {
-
-  0%,
-  100% {
-    transform: translate(0, 0) rotate(0deg) scale(1);
-  }
-
-  25% {
-    transform: translate(80px, 60px) rotate(90deg) scale(1.1);
-  }
-
-  50% {
-    transform: translate(-40px, 120px) rotate(180deg) scale(0.95);
-  }
-
-  75% {
-    transform: translate(120px, -30px) rotate(270deg) scale(1.05);
-  }
-}
-
-@keyframes blob-float-2 {
-
-  0%,
-  100% {
-    transform: translate(0, 0) rotate(0deg) scale(1);
-  }
-
-  30% {
-    transform: translate(-90px, -50px) rotate(110deg) scale(1.08);
-  }
-
-  60% {
-    transform: translate(60px, -100px) rotate(240deg) scale(0.92);
-  }
-
-  90% {
-    transform: translate(-70px, 40px) rotate(320deg) scale(1.03);
-  }
-}
-
-@keyframes blob-float-3 {
-
-  0%,
-  100% {
-    transform: translate(-50%, -50%) rotate(0deg) scale(1);
-  }
-
-  20% {
-    transform: translate(calc(-50% + 50px), calc(-50% - 60px)) rotate(72deg) scale(1.12);
-  }
-
-  40% {
-    transform: translate(calc(-50% - 70px), calc(-50% + 50px)) rotate(144deg) scale(0.88);
-  }
-
-  60% {
-    transform: translate(calc(-50% + 40px), calc(-50% + 80px)) rotate(216deg) scale(1.06);
-  }
-
-  80% {
-    transform: translate(calc(-50% - 50px), calc(-50% - 40px)) rotate(288deg) scale(0.94);
-  }
-}
-
-/* Dark mode */
-.dark .bg-gradient::before {
-  background: linear-gradient(135deg, rgba(236, 72, 153, 0.22), rgba(168, 85, 247, 0.2));
-  opacity: 0.45;
-}
-
-.dark .bg-gradient::after {
-  background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(255, 122, 0, 0.18));
-  opacity: 0.4;
-}
-
-.dark .bg-gradient>span {
-  background: linear-gradient(135deg, rgba(255, 0, 85, 0.18), rgba(236, 72, 153, 0.18));
-  opacity: 0.35;
-}
-
-/* ─── Cursor pointer on all interactive elements ─────────────────────────── */
 button:not([disabled]),
 [role="button"]:not([aria-disabled="true"]),
 a[href],
@@ -450,37 +351,160 @@ textarea:not([disabled]) {
   cursor: text;
 }
 
-/* ─── Theme circle‑reveal transition (View Transitions API) ──────────────── */
+/* ============================================================================
+   ANIMATIONS
+   ============================================================================ */
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0)  scale(1); }
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.animate-fade-in  { animation: fade-in  0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.animate-fade-up  { animation: fade-up  0.40s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.animate-scale-in { animation: scale-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+/* ============================================================================
+   THEME TRANSITION — circle reveal (View Transitions API)
+   ============================================================================ */
+
 ::view-transition-old(root) {
   animation: none;
   mix-blend-mode: normal;
 }
 
 ::view-transition-new(root) {
-  animation: theme-circle-reveal 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: theme-reveal 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
   mix-blend-mode: normal;
 }
 
-.dark::view-transition-new(root) {
-  animation: theme-circle-reveal-dark 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+@keyframes theme-reveal {
+  from { clip-path: circle(0%   at var(--theme-x, 50%) var(--theme-y, 50%)); }
+  to   { clip-path: circle(150% at var(--theme-x, 50%) var(--theme-y, 50%)); }
 }
 
-@keyframes theme-circle-reveal {
-  from {
-    clip-path: circle(0% at var(--theme-x, 50%) var(--theme-y, 50%));
-  }
+/* ============================================================================
+   TIPTAP / PROSEMIRROR — rich text editor
+   ============================================================================ */
 
-  to {
-    clip-path: circle(150% at var(--theme-x, 50%) var(--theme-y, 50%));
-  }
+.ProseMirror {
+  padding: 1.5rem;
+  min-height: 400px;
+  outline: none;
+  font-size: 0.875rem;
+  line-height: 1.7;
+  color: var(--foreground);
 }
 
-@keyframes theme-circle-reveal-dark {
-  from {
-    clip-path: circle(0% at var(--theme-x, 50%) var(--theme-y, 50%));
-  }
+.ProseMirror > * + * { margin-top: 0.75em; }
 
-  to {
-    clip-path: circle(150% at var(--theme-x, 50%) var(--theme-y, 50%));
-  }
+.ProseMirror h1 {
+  font-size: 1.25rem; font-weight: 700;
+  margin-top: 1.5rem; margin-bottom: 0.5rem;
+  letter-spacing: -0.02em;
+}
+.ProseMirror h2 {
+  font-size: 1.1rem; font-weight: 600;
+  margin-top: 1.25rem; margin-bottom: 0.5rem;
+  letter-spacing: -0.015em;
+}
+.ProseMirror h3 {
+  font-size: 1rem; font-weight: 600;
+  margin-top: 1rem; margin-bottom: 0.25rem;
+}
+
+.ProseMirror p { margin: 0.25rem 0; }
+
+.ProseMirror ul { list-style-type: disc;    padding-left: 1.5rem; }
+.ProseMirror ol { list-style-type: decimal; padding-left: 1.5rem; }
+.ProseMirror li { margin: 0.25rem 0; }
+
+.ProseMirror blockquote {
+  border-left: 2px solid var(--border);
+  padding-left: 1rem;
+  color: var(--muted-foreground);
+  margin: 0.75rem 0;
+}
+
+.ProseMirror code {
+  background: var(--muted);
+  color: var(--foreground);
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-size: 0.8125rem;
+  font-family: var(--font-mono);
+}
+
+.ProseMirror pre {
+  background: var(--muted);
+  border-radius: var(--radius);
+  padding: 1rem;
+  overflow-x: auto;
+  margin: 0.75rem 0;
+}
+
+.ProseMirror pre code {
+  background: transparent;
+  padding: 0;
+  font-size: 0.8125rem;
+  color: var(--foreground);
+}
+
+.ProseMirror hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1.5rem 0;
+}
+
+.ProseMirror a {
+  color: #007aff;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.dark .ProseMirror a { color: #0a84ff; }
+
+.ProseMirror ul[data-type="taskList"] { list-style: none; padding: 0; }
+.ProseMirror ul[data-type="taskList"] li { display: flex; align-items: flex-start; gap: 0.5rem; }
+.ProseMirror ul[data-type="taskList"] li label { display: flex; align-items: center; cursor: pointer; margin-top: 0.15rem; }
+.ProseMirror ul[data-type="taskList"] li > div { flex: 1; }
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--label-tertiary);
+  pointer-events: none;
+  height: 0;
+}
+
+.ProseMirror table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: 100%;
+  overflow: hidden;
+  margin: 0.75rem 0;
+}
+
+.ProseMirror table td,
+.ProseMirror table th {
+  border: 1px solid var(--border);
+  padding: 0.375rem 0.75rem;
+  font-size: 0.875rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.ProseMirror table th {
+  font-weight: 600;
+  background: var(--muted);
 }
