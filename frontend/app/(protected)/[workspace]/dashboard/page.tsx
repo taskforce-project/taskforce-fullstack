@@ -54,14 +54,15 @@ const AGENTS = [
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 const STATUS_CFG = {
-  on_track: { label: "On track", text: "text-emerald-400", bar: "bg-emerald-500" },
-  at_risk:  { label: "At risk",  text: "text-amber-400",  bar: "bg-amber-500"  },
-  blocked:  { label: "Blocked",  text: "text-red-400",    bar: "bg-red-500"    },
+  on_track: { label: "On track", text: "text-emerald-400", fill: "progress-fill--on-track"  },
+  at_risk:  { label: "At risk",  text: "text-amber-400",   fill: "progress-fill--at-risk"   },
+  blocked:  { label: "Blocked",  text: "text-red-400",     fill: "progress-fill--blocked"   },
 }
-const AGENT_DOT = {
-  active:  { dot: "bg-amber-400",   pulse: true  },
-  standby: { dot: "bg-emerald-400", pulse: false },
-  idle:    { dot: "bg-zinc-600",    pulse: false },
+
+const STATUS_DOT: Record<string, string> = {
+  active:  "status-dot--active",
+  standby: "status-dot--standby",
+  idle:    "status-dot--idle",
 }
 
 // ─── Animation ────────────────────────────────────────────────────────────────
@@ -80,11 +81,11 @@ function LiveClock() {
     const tick = () => setT(new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }))
     tick(); const id = setInterval(tick, 1000); return () => clearInterval(id)
   }, [])
-  return <span className="font-mono text-[11px] tabular-nums" style={{ color: "var(--label-quaternary)" }}>{t}</span>
+  return <span className="text-mono-xs tabular-nums">{t}</span>
 }
 
 function Delta({ value }: { value: number }) {
-  if (value === 0) return <Minus className="size-2.5" style={{ color: "var(--label-quaternary)" }} />
+  if (value === 0) return <Minus className="size-2.5 label-faint" />
   const up = value > 0
   return (
     <span className={cn("flex items-center gap-0.5 text-[10px] font-semibold", up ? "text-red-400" : "text-emerald-400")}>
@@ -94,26 +95,23 @@ function Delta({ value }: { value: number }) {
 }
 
 function ConfBar({ value }: { value: number }) {
-  const color = value >= 80 ? "bg-emerald-500" : value >= 60 ? "bg-amber-500" : "bg-red-500"
+  const fillClass = value >= 80 ? "conf-bar__fill--high" : value >= 60 ? "conf-bar__fill--mid" : "conf-bar__fill--low"
   return (
-    <div className="flex items-center gap-2">
-      <div className="flex-1 h-px rounded-full overflow-hidden" style={{ background: "var(--fill-secondary)" }}>
-        <div className={cn("h-full rounded-full", color)} style={{ width: `${value}%` }} />
+    <div className="conf-bar">
+      <div className="conf-bar__track">
+        <div className={cn("conf-bar__fill", fillClass)} style={{ width: `${value}%` }} />
       </div>
-      <span className="text-[10px] font-mono tabular-nums" style={{ color: "var(--label-tertiary)" }}>{value}%</span>
+      <span className="conf-bar__label">{value}%</span>
     </div>
   )
 }
 
 function SectionLabel({ children, href }: { children: React.ReactNode; href?: string }) {
   return (
-    <div className="flex items-center justify-between mb-3">
-      <p className="text-[10px] font-semibold tracking-widest uppercase" style={{ color: "var(--label-tertiary)" }}>
-        {children}
-      </p>
+    <div className="section-header">
+      <p className="label-overline">{children}</p>
       {href && (
-        <Link href={href} className="flex items-center gap-0.5 text-[11px] transition-opacity opacity-50 hover:opacity-100"
-          style={{ color: "var(--label-secondary)" }}>
+        <Link href={href} className="section-header-link">
           View all <ArrowUpRight className="size-3" />
         </Link>
       )}
@@ -121,18 +119,9 @@ function SectionLabel({ children, href }: { children: React.ReactNode; href?: st
   )
 }
 
-/* The core Raycast glass card — transparent background, blur, barely-there border */
-function Card({ children, className, style }: { children: React.ReactNode; className?: string; style?: React.CSSProperties }) {
+function Card({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div
-      className={cn("rounded-xl border backdrop-blur-md", className)}
-      style={{
-        background: "var(--card)",
-        borderColor: "var(--separator)",
-        boxShadow: "0 1px 0 0 rgba(255,255,255,0.04) inset, var(--shadow)",
-        ...style,
-      }}
-    >
+    <div className={cn("glass-card", className)}>
       {children}
     </div>
   )
@@ -152,45 +141,38 @@ export default function DashboardPage() {
     <motion.div className="flex flex-col gap-6" variants={stagger} initial="initial" animate="animate">
 
       {/* ── System strip ─────────────────────────────────────────────── */}
-      <motion.div variants={row} className="flex items-center justify-between pb-3"
-        style={{ borderBottom: "1px solid var(--separator)" }}>
+      <motion.div variants={row} className="system-strip">
         <div className="flex items-center gap-2">
-          {/* Glow dot — Raycast-style indicator */}
-          <span className="relative flex size-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-40" />
-            <span className="relative inline-flex rounded-full size-2 bg-emerald-400" />
+          <span className="glow-dot">
+            <span className="glow-dot__ring glow-dot--emerald" />
+            <span className="glow-dot__core glow-dot--emerald" />
           </span>
-          <span className="text-[11px]" style={{ color: "var(--label-tertiary)" }}>All systems operational</span>
+          <span className="label-dim" style={{ fontSize: "0.6875rem" }}>All systems operational</span>
         </div>
         <div className="flex items-center gap-4">
           <LiveClock />
-          <span className="text-[10px] font-mono" style={{ color: "var(--label-quaternary)" }}>Taskforce OS · v1.0</span>
+          <span className="text-mono-xs">Taskforce OS · v1.0</span>
         </div>
       </motion.div>
 
       {/* ── Header ───────────────────────────────────────────────────── */}
       <motion.div variants={row} className="flex items-end justify-between gap-4">
         <div>
-          <p className="text-[10px] font-semibold tracking-widest uppercase mb-1"
-            style={{ color: "var(--label-tertiary)" }}>{greeting}</p>
+          <p className="label-overline mb-1">{greeting}</p>
           <h1 className="text-3xl font-semibold tracking-tight">{firstName}</h1>
         </div>
 
         <div className="flex items-center gap-2 pb-0.5">
           {criticals > 0 && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg"
-              style={{ background: "rgba(255,69,58,0.12)", border: "1px solid rgba(255,69,58,0.22)" }}>
-              <AlertTriangle className="size-3 text-red-400 shrink-0" />
-              <span className="text-[11px] font-semibold text-red-400">{criticals} critical</span>
+            <div className="badge-critical">
+              <AlertTriangle className="size-3 shrink-0" />
+              {criticals} critical
             </div>
           )}
           {decisions > 0 && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg"
-              style={{ background: "rgba(167,139,250,0.14)", border: "1px solid rgba(167,139,250,0.25)" }}>
-              <Zap className="size-3 shrink-0" style={{ color: "#a78bfa" }} />
-              <span className="text-[11px] font-semibold" style={{ color: "#a78bfa" }}>
-                {decisions} decision{decisions > 1 ? "s" : ""} pending
-              </span>
+            <div className="badge-decision">
+              <Zap className="size-3 shrink-0" />
+              {decisions} decision{decisions > 1 ? "s" : ""} pending
             </div>
           )}
         </div>
@@ -198,24 +180,23 @@ export default function DashboardPage() {
 
       {/* ── Operational pulse ─────────────────────────────────────────── */}
       <motion.div variants={row}>
-        <Card className="flex overflow-hidden divide-x" style={{ divideColor: "var(--separator)" } as React.CSSProperties}>
+        <div className="pulse-strip">
           {PULSE.map(m => (
-            <Link key={m.id} href={m.href}
-              className="group flex-1 flex flex-col gap-2.5 px-5 py-4 transition-all duration-150 hover:bg-white/[0.04]"
-              style={m.urgent && m.value > 0 ? { background: "rgba(255,69,58,0.07)" } : undefined}
+            <Link
+              key={m.id}
+              href={m.href}
+              className={cn("pulse-item", m.urgent && m.value > 0 && "pulse-item--urgent")}
             >
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-semibold tracking-widest uppercase"
-                  style={{ color: "var(--label-tertiary)" }}>{m.label}</span>
+                <span className="label-overline">{m.label}</span>
                 <Delta value={m.delta} />
               </div>
-              <span className={cn("text-[22px] font-semibold tabular-nums tracking-tight leading-none",
-                m.urgent && m.value > 0 ? "text-red-400" : "text-foreground")}>
+              <span className={cn("metric-value", m.urgent && m.value > 0 ? "text-red-400" : "text-foreground")}>
                 {m.value}
               </span>
             </Link>
           ))}
-        </Card>
+        </div>
       </motion.div>
 
       {/* ── Main grid ────────────────────────────────────────────────── */}
@@ -231,23 +212,21 @@ export default function DashboardPage() {
                 <SectionLabel>Needs attention</SectionLabel>
                 <div className="space-y-1.5">
                   {EXCEPTIONS.map(ex => (
-                    <Link key={ex.id} href="./projects"
-                      className="group flex items-center gap-3 rounded-xl px-4 py-3 transition-all duration-150"
-                      style={{
-                        background:   ex.severity === "critical" ? "rgba(255,69,58,0.09)"   : "rgba(255,159,10,0.09)",
-                        border: `1px solid ${ex.severity === "critical" ? "rgba(255,69,58,0.22)"  : "rgba(255,159,10,0.22)"}`,
-                        backdropFilter: "blur(12px)",
-                      }}
+                    <Link
+                      key={ex.id}
+                      href="./projects"
+                      className={cn(
+                        "group alert-row",
+                        ex.severity === "critical" ? "alert-row--critical" : "alert-row--warning",
+                      )}
                     >
                       <AlertTriangle className={cn("size-3.5 shrink-0", ex.severity === "critical" ? "text-red-400" : "text-amber-400")} />
                       <p className={cn("flex-1 text-[12px] leading-relaxed font-medium",
                         ex.severity === "critical" ? "text-red-300" : "text-amber-300")}>{ex.message}</p>
                       <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-[10px] px-1.5 py-0.5 rounded font-mono"
-                          style={{ background: "var(--fill-secondary)", color: "var(--label-tertiary)" }}>{ex.source}</span>
-                        <span className="text-[10px] font-mono" style={{ color: "var(--label-quaternary)" }}>{ex.age}</span>
-                        <ChevronRight className="size-3 opacity-0 group-hover:opacity-50 transition-opacity"
-                          style={{ color: "var(--label-tertiary)" }} />
+                        <span className="source-tag">{ex.source}</span>
+                        <span className="text-mono-xs">{ex.age}</span>
+                        <ChevronRight className="size-3 opacity-0 group-hover:opacity-50 transition-opacity label-dim" />
                       </div>
                     </Link>
                   ))}
@@ -263,10 +242,11 @@ export default function DashboardPage() {
               {OPERATIONS.map((op, i) => {
                 const st = STATUS_CFG[op.status]
                 return (
-                  <Link key={op.id} href={`./projects/${op.id}`}
-                    className={cn("group flex items-center gap-5 px-5 py-4 transition-all duration-150 hover:bg-white/[0.04]",
-                      i < OPERATIONS.length - 1 && "border-b")}
-                    style={{ borderColor: "var(--separator)" }}>
+                  <Link
+                    key={op.id}
+                    href={`./projects/${op.id}`}
+                    className={cn("group item-row item-row--lg", i < OPERATIONS.length - 1 && "item-divider")}
+                  >
                     <div className="flex-1 min-w-0 space-y-2.5">
                       <div className="flex items-center justify-between gap-3">
                         <p className="text-sm font-medium truncate">{op.name}</p>
@@ -280,17 +260,15 @@ export default function DashboardPage() {
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
-                        <div className="flex-1 h-px rounded-full overflow-hidden" style={{ background: "var(--fill-secondary)" }}>
-                          <div className={cn("h-full rounded-full", st.bar, "opacity-80")}
-                            style={{ width: `${op.progress}%` }} />
+                        <div className="progress-track">
+                          <div className={cn("progress-fill", st.fill)} style={{ width: `${op.progress}%` }} />
                         </div>
-                        <span className="text-[10px] tabular-nums font-mono shrink-0"
-                          style={{ color: "var(--label-tertiary)" }}>{op.done}/{op.total}</span>
+                        <span className="text-mono-sm shrink-0">{op.done}/{op.total}</span>
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-1.5 shrink-0">
-                      <span className="text-[10px] font-mono" style={{ color: "var(--label-tertiary)" }}>{op.sprint}</span>
-                      <div className="flex items-center gap-1 text-[10px]" style={{ color: "var(--label-quaternary)" }}>
+                      <span className="text-mono-sm">{op.sprint}</span>
+                      <div className="flex items-center gap-1 text-mono-xs">
                         <Clock className="size-2.5" /><span>{op.daysLeft}d</span>
                       </div>
                     </div>
@@ -305,22 +283,19 @@ export default function DashboardPage() {
             <SectionLabel href="./agents">AI recommendations</SectionLabel>
             <div className="space-y-2">
               {AI_INSIGHTS.map(ins => (
-                <div key={ins.id}
-                  className="rounded-xl border backdrop-blur-md px-5 py-4 transition-all duration-150 hover:bg-white/[0.03]"
-                  style={{
-                    background:   ins.urgency === "high" ? "rgba(167,139,250,0.07)" : "var(--card)",
-                    borderColor:  ins.urgency === "high" ? "rgba(167,139,250,0.22)" : "var(--separator)",
-                    boxShadow:    ins.urgency === "high"
-                      ? "0 0 0 1px rgba(167,139,250,0.08) inset, var(--shadow)"
-                      : "0 1px 0 0 rgba(255,255,255,0.04) inset, var(--shadow)",
-                  }}>
+                <div
+                  key={ins.id}
+                  className={cn("ai-card", ins.urgency === "high" && "ai-card--high")}
+                >
                   {/* Header */}
                   <div className="flex items-center gap-2.5 mb-3">
-                    <span className="text-[9px] font-bold px-2 py-1 rounded-md tracking-widest uppercase"
-                      style={{ background: `${ins.agentColor}1a`, color: ins.agentColor, border: `1px solid ${ins.agentColor}30` }}>
+                    <span
+                      className="agent-tag"
+                      style={{ "--agent-color": ins.agentColor } as React.CSSProperties}
+                    >
                       {ins.agent}
                     </span>
-                    <span className="text-[10px]" style={{ color: "var(--label-tertiary)" }}>{ins.category}</span>
+                    <span className="label-dim" style={{ fontSize: "0.625rem" }}>{ins.category}</span>
                     {ins.urgency === "high" && (
                       <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold" style={{ color: "#a78bfa" }}>
                         <Zap className="size-2.5" />AI priority
@@ -328,18 +303,15 @@ export default function DashboardPage() {
                     )}
                   </div>
                   {/* Insight */}
-                  <p className="text-[13px] leading-relaxed mb-4" style={{ color: "var(--label-secondary)" }}>
-                    {ins.insight}
-                  </p>
+                  <p className="text-[13px] leading-relaxed mb-4 label-soft">{ins.insight}</p>
                   {/* Footer */}
                   <div className="flex items-center gap-4">
                     <div className="flex-1">
-                      <p className="text-[9px] uppercase tracking-widest mb-1.5 font-semibold"
-                        style={{ color: "var(--label-quaternary)" }}>Confidence</p>
+                      <p className="label-overline-faint mb-1.5">Confidence</p>
                       <ConfBar value={ins.confidence} />
                     </div>
                     <Button variant="ghost" size="sm"
-                      className="h-7 px-3 text-xs shrink-0 rounded-lg border hover:bg-white/8"
+                      className="h-7 px-3 text-xs shrink-0 rounded-lg border"
                       style={{ borderColor: "var(--separator)" }}
                       asChild>
                       <Link href={ins.href} className="flex items-center gap-1.5">
@@ -360,27 +332,24 @@ export default function DashboardPage() {
           <motion.section variants={row}>
             <SectionLabel href="./agents">Agent activity</SectionLabel>
             <Card className="overflow-hidden">
-              {AGENTS.map((agent, i) => {
-                const d = AGENT_DOT[agent.status]
-                return (
-                  <Link key={agent.id} href="./agents"
-                    className={cn("group flex items-center gap-3 px-4 py-3 transition-all duration-150 hover:bg-white/[0.04]",
-                      i < AGENTS.length - 1 && "border-b")}
-                    style={{ borderColor: "var(--separator)" }}>
-                    <div className="relative size-1.5 shrink-0">
-                      <div className={cn("size-1.5 rounded-full", d.dot)} />
-                      {d.pulse && <div className={cn("absolute inset-0 rounded-full animate-ping opacity-70", d.dot)} />}
+              {AGENTS.map((agent, i) => (
+                <Link
+                  key={agent.id}
+                  href="./agents"
+                  className={cn("group item-row", i < AGENTS.length - 1 && "item-divider")}
+                >
+                  <div className={cn("status-dot shrink-0", STATUS_DOT[agent.status])}>
+                    {agent.status === "active" && <div className="status-dot__ping" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="text-[11px] font-semibold" style={{ color: agent.color }}>{agent.acronym}</span>
+                      <span className="text-mono-xs tabular-nums">{agent.ago}</span>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline justify-between gap-2">
-                        <span className="text-[11px] font-semibold" style={{ color: agent.color }}>{agent.acronym}</span>
-                        <span className="text-[10px] font-mono tabular-nums" style={{ color: "var(--label-quaternary)" }}>{agent.ago}</span>
-                      </div>
-                      <p className="text-[11px] truncate mt-0.5" style={{ color: "var(--label-tertiary)" }}>{agent.task}</p>
-                    </div>
-                  </Link>
-                )
-              })}
+                    <p className="text-[11px] truncate mt-0.5 label-dim">{agent.task}</p>
+                  </div>
+                </Link>
+              ))}
             </Card>
           </motion.section>
 
@@ -389,25 +358,28 @@ export default function DashboardPage() {
             <SectionLabel>Pending decisions</SectionLabel>
             <div className="space-y-1.5">
               {AI_INSIGHTS.filter(i => i.urgency === "high").map(ins => (
-                <Link key={ins.id} href={ins.href}
-                  className="group flex items-start gap-3 rounded-xl border px-4 py-3 backdrop-blur-md transition-all duration-150 hover:bg-white/[0.04]"
-                  style={{ background: "var(--card)", borderColor: "var(--separator)" }}>
-                  <div className="size-5 rounded-md flex items-center justify-center text-[8px] font-bold shrink-0 mt-0.5"
-                    style={{ background: `${ins.agentColor}18`, color: ins.agentColor }}>
+                <Link
+                  key={ins.id}
+                  href={ins.href}
+                  className="group item-row glass-card"
+                >
+                  <div
+                    className="agent-avatar agent-avatar--sm shrink-0 mt-0.5"
+                    style={{ "--agent-color": ins.agentColor } as React.CSSProperties}
+                  >
                     {ins.agent}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-[11px] font-medium truncate">{ins.action}</p>
-                    <p className="text-[10px] mt-0.5" style={{ color: "var(--label-tertiary)" }}>{ins.confidence}% confidence</p>
+                    <p className="text-[10px] mt-0.5 label-dim">{ins.confidence}% confidence</p>
                   </div>
                   <ChevronRight className="size-3 shrink-0 mt-1 opacity-0 group-hover:opacity-40 transition-opacity" />
                 </Link>
               ))}
               {AI_INSIGHTS.filter(i => i.urgency === "high").length === 0 && (
-                <div className="flex items-center gap-2 rounded-xl border px-4 py-3 backdrop-blur-md"
-                  style={{ background: "var(--card)", borderColor: "var(--separator)" }}>
+                <div className="item-row glass-card">
                   <CheckCircle2 className="size-3.5 text-emerald-400 shrink-0" />
-                  <span className="text-[12px]" style={{ color: "var(--label-tertiary)" }}>No decisions pending</span>
+                  <span className="text-[12px] label-dim">No decisions pending</span>
                 </div>
               )}
             </div>

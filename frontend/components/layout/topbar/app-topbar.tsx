@@ -112,7 +112,7 @@ export function AppTopbar() {
   }, [])
 
   return (
-    <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center gap-2 border-b border-border/50 bg-background/80 px-4 backdrop-blur-xl">
+    <header className="topbar">
       {/* Left: sidebar trigger + breadcrumb */}
       <div className="flex flex-1 items-center gap-2">
         <SidebarTrigger className="-ml-1" />
@@ -143,19 +143,17 @@ export function AppTopbar() {
       {/* Right: search, notifications, theme, user */}
       <div className="flex items-center gap-1">
         {/* Global search button — desktop */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="hidden h-8 gap-2 rounded-md border border-border/60 bg-muted/30 px-2 text-muted-foreground hover:bg-muted/60 sm:flex"
+        <button
+          className="topbar-search"
           onClick={() => setCmdOpen(true)}
           aria-label="Open command palette"
         >
           <Search className="size-3.5" />
-          <span className="hidden text-xs text-muted-foreground/80 lg:inline">Search…</span>
+          <span className="hidden lg:inline">Search…</span>
           <Kbd className="hidden lg:inline-flex gap-0.5">
             <span>⌘</span><span>K</span>
           </Kbd>
-        </Button>
+        </button>
 
         {/* Mobile search icon */}
         <Button

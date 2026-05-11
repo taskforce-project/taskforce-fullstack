@@ -1,7 +1,6 @@
 "use client";
 
 import { usePreferencesStore } from "@/lib/store/preferences-store";
-import { Button } from "@/components/ui/button";
 import { Moon, Sun, Languages } from "lucide-react";
 import {
   DropdownMenu,
@@ -26,29 +25,25 @@ export default function AuthLayout({
 
   if (!mounted) {
     return (
-      <div className="min-h-screen bg-background flex flex-col">
-        <main className="flex-1 flex items-center justify-center p-4">
-          {children}
-        </main>
+      <div className="auth-shell">
+        <main className="auth-main">{children}</main>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="auth-shell">
       {/* Top Bar - Controls */}
-      <div className="fixed top-0 right-0 z-50 p-4 flex items-center gap-2">
+      <div className="auth-controls">
         {/* Language Selector */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon"
-              className="rounded-full bg-background/80 backdrop-blur-sm border-border/50 hover:bg-accent"
+            <button
+              className="auth-control-btn"
               aria-label={t.accessibility.changeLanguage}
             >
               <Languages className="h-4 w-4" />
-            </Button>
+            </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem
@@ -67,11 +62,9 @@ export default function AuthLayout({
         </DropdownMenu>
 
         {/* Theme Toggle */}
-        <Button
-          variant="outline"
-          size="icon"
+        <button
+          className="auth-control-btn"
           onClick={toggleTheme}
-          className="rounded-full bg-background/80 backdrop-blur-sm border-border/50 hover:bg-accent"
           aria-label={t.accessibility.toggleTheme}
         >
           {theme === "dark" ? (
@@ -79,11 +72,11 @@ export default function AuthLayout({
           ) : (
             <Moon className="h-4 w-4" />
           )}
-        </Button>
+        </button>
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 flex items-center justify-center p-4">
+      <main className="auth-main">
         {children}
       </main>
 
