@@ -1153,7 +1153,7 @@ textarea:not([disabled]) { cursor: text; }
 
   .auth-shell {
     min-height: 100svh;
-    background: var(--background);
+    background: transparent;
     display: flex;
     flex-direction: column;
   }
@@ -1188,9 +1188,8 @@ textarea:not([disabled]) { cursor: text; }
   .auth-main {
     flex: 1;
     display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 1rem;
+    flex-direction: column;
+    overflow: hidden;
   }
 
   /* ────────────────────────────────────────────────────────────────────────
