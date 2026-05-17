@@ -9,44 +9,24 @@ import {
   Activity, Clock, CheckCircle2, ArrowUpRight, Lock,
   ShieldAlert, Flame, Minus,
 } from "lucide-react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useParams } from "next/navigation"
 import { motion } from "framer-motion"
 
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { useAuth } from "@/lib/contexts/auth-context"
 import { cn } from "@/lib/utils"
+import {
+  getAnalyticsKpis,
+  getAnalyticsThroughput,
+  getAnalyticsBurndown,
+  type AnalyticsKpis,
+  type ThroughputPoint,
+  type BurndownPoint,
+} from "@/lib/api/analytics-service"
 
-// ─── Static data ──────────────────────────────────────────────────────────────
-
-const THROUGHPUT_DATA = [
-  { week: "W4",  resolved: 4,  opened: 6  },
-  { week: "W5",  resolved: 7,  opened: 9  },
-  { week: "W6",  resolved: 5,  opened: 7  },
-  { week: "W7",  resolved: 9,  opened: 8  },
-  { week: "W8",  resolved: 6,  opened: 10 },
-  { week: "W9",  resolved: 11, opened: 12 },
-  { week: "W10", resolved: 8,  opened: 7  },
-  { week: "W11", resolved: 13, opened: 11 },
-]
-
-const HEALTH_TIMELINE = [
-  { day: "Mon", score: 82 },
-  { day: "Tue", score: 78 },
-  { day: "Wed", score: 74 },
-  { day: "Thu", score: 71 },
-  { day: "Fri", score: 76 },
-  { day: "Sat", score: 80 },
-  { day: "Sun", score: 85 },
-]
-
-const BURNDOWN_DATA = [
-  { day: "D1", remaining: 28, ideal: 28 },
-  { day: "D3", remaining: 24, ideal: 21 },
-  { day: "D5", remaining: 21, ideal: 14 },
-  { day: "D7", remaining: 16, ideal: 7  },
-  { day: "D9", remaining: 9,  ideal: 0  },
-]
+// ─── Static data (AI anomalies kept as mock - complex ML feature) ─────────────
 
 const CAPACITY_DATA = [
   { name: "You",       utilization: 85, capacity: 100 },
@@ -97,92 +77,21 @@ const AI_ANOMALIES: {
   },
 ]
 
-const KPI_METRICS = [
-  {
-    label: "Tasks resolved",
-    value: "31",
-    delta: +8,
-    unit: "this month",
-    icon: CheckCircle2,
-    color: "#34d399",
-  },
-  {
-    label: "Avg resolution",
-    value: "4.2",
-    delta: -0.8,
-    unit: "days",
-    icon: Clock,
-    color: "#60a5fa",
-    deltaInverse: true,
-  },
-  {
-    label: "Blockers detected",
-    value: "7",
-    delta: +3,
-    unit: "active",
-    icon: ShieldAlert,
-    color: "#f87171",
-    deltaInverse: true,
-  },
-  {
-    label: "Sprint velocity",
-    value: "13",
-    delta: +18,
-    unit: "tasks/week",
-    icon: Activity,
-    color: "#a78bfa",
-  },
-]
+// ─── KpiCard — accepts dynamic data ───────────────────────────────────────────
+
+interface KpiMetric {
+  label: string
+  value: string
+  delta: number
+  unit: string
+  icon: React.ElementType
+  color: string
+  deltaInverse?: boolean
+}
 
 // ─── Chart style ───────────────────────────────────────────────────────────────
 
 const TOOLTIP_STYLE = {
-  backgroundColor: "var(--popover)",
-  border: "1px solid var(--separator)",
-  borderRadius: "8px",
-  color: "var(--label-primary)",
-  fontSize: "11px",
-  boxShadow: "var(--shadow-md)",
-}
-
-// ─── Sub-components ────────────────────────────────────────────────────────────
-
-function GlassCard({
-  children,
-  className,
-  style,
-}: {
-  children: React.ReactNode
-  className?: string
-  style?: React.CSSProperties
-}) {
-  return (
-    <div
-      className={cn("rounded-xl border", className)}
-      style={{
-        background: "var(--card)",
-        borderColor: "var(--separator)",
-        boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset, var(--shadow)",
-        backdropFilter: "blur(16px) saturate(180%)",
-        WebkitBackdropFilter: "blur(16px) saturate(180%)",
-        ...style,
-      }}
-    >
-      {children}
-    </div>
-  )
-}
-
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="text-[10px] font-semibold uppercase tracking-widest mb-3"
-      style={{ color: "var(--label-quaternary)" }}>
-      {children}
-    </p>
-  )
-}
-
-function KpiCard({ metric, index }: { metric: typeof KPI_METRICS[0]; index: number }) {
   const positive = metric.delta > 0
   const isGood = metric.deltaInverse ? !positive : positive
   const deltaColor = metric.delta === 0 ? "var(--label-quaternary)" : isGood ? "#34d399" : "#f87171"
