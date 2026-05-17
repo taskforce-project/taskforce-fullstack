@@ -17,4 +17,13 @@ public interface CycleRepository extends JpaRepository<Cycle, Long> {
     Optional<Cycle> findByIdAndProjectId(Long id, Long projectId);
 
     boolean existsByNameAndProjectId(String name, Long projectId);
+
+    /** Cycles actifs pour tous les projets d'un workspace */
+    @Query("""
+        SELECT c FROM Cycle c
+        WHERE c.project.workspace.slug = :slug
+          AND c.status = com.taskforce.tf_api.core.enums.CycleStatus.ACTIVE
+        ORDER BY c.startDate ASC
+        """)
+    List<Cycle> findActiveByWorkspaceSlug(@Param("slug") String slug);
 }
