@@ -111,6 +111,16 @@ export const CYCLE_ROUTES = {
 } as const;
 
 /**
+ * Routes analytics
+ * Backend: /api/workspaces/{slug}/analytics
+ */
+export const ANALYTICS_ROUTES = {
+  KPIS:       (slug: string) => `/api/workspaces/${slug}/analytics/kpis`,
+  THROUGHPUT: (slug: string) => `/api/workspaces/${slug}/analytics/throughput`,
+  BURNDOWN:   (slug: string) => `/api/workspaces/${slug}/analytics/burndown`,
+} as const;
+
+/**
  * Toutes les routes groupées (export par défaut)
  */
 export const API_ROUTES = {
@@ -118,6 +128,7 @@ export const API_ROUTES = {
   STRIPE: STRIPE_ROUTES,
   USER: USER_ROUTES,
   WORKSPACE: WORKSPACE_ROUTES,
+  ANALYTICS: ANALYTICS_ROUTES,
 } as const;
 
 export default API_ROUTES;
