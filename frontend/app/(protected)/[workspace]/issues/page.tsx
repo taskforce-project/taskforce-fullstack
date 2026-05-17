@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
+import { useParams } from "next/navigation"
 import {
   Search,
   Plus,
@@ -32,6 +33,9 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
 import { CreateIssueDialog } from "@/components/dialogs/create-issue-dialog"
+import { useIssueStore } from "@/lib/store/issue-store"
+import { useProjectStore } from "@/lib/store/project-store"
+import type { IssueStatusCategory, IssuePriority as ApiPriority } from "@/lib/api/issue-service"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -50,31 +54,45 @@ interface Issue {
   assignee: { name: string; initials: string; color: string } | null
   labels: string[]
   dueDate: string | null
-  createdAt: string
-  storyPoints: number | null
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Mock data
+// API → UI mapping helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-const MOCK_ISSUES: Issue[] = [
-  { id: "1",  identifier: "TF-001", title: "Fix authentication token refresh on mobile",    status: "in_progress", priority: "urgent", project: { id: "1", name: "Mobile App",    color: "bg-blue-500",    emoji: "📱" }, assignee: { name: "You",            initials: "ME", color: "bg-primary"     }, labels: ["bug", "auth"],      dueDate: "2026-04-07", createdAt: "3 days ago", storyPoints: 3  },
-  { id: "2",  identifier: "TF-002", title: "Implement dark mode for dashboard",              status: "todo",        priority: "high",   project: { id: "1", name: "Website",       color: "bg-violet-500",  emoji: "🎨" }, assignee: { name: "Sophie Martin", initials: "SM", color: "bg-violet-500"  }, labels: ["feature", "ui"],    dueDate: "2026-04-10", createdAt: "2 days ago", storyPoints: 5  },
-  { id: "3",  identifier: "TF-003", title: "Set up rate limiting on public API endpoints",  status: "in_review",   priority: "high",   project: { id: "3", name: "API v2",        color: "bg-emerald-500", emoji: "⚡" }, assignee: { name: "Thomas Bernard",initials: "TB", color: "bg-orange-500"  }, labels: ["security"],         dueDate: "2026-04-08", createdAt: "1 day ago",  storyPoints: 8  },
-  { id: "4",  identifier: "TF-004", title: "Add pagination to GET /issues endpoint",        status: "todo",        priority: "medium", project: { id: "3", name: "API v2",        color: "bg-emerald-500", emoji: "⚡" }, assignee: { name: "You",            initials: "ME", color: "bg-primary"     }, labels: ["backend"],          dueDate: null,         createdAt: "4 days ago", storyPoints: 2  },
-  { id: "5",  identifier: "TF-005", title: "Redesign onboarding flow for new users",        status: "todo",        priority: "medium", project: { id: "1", name: "Mobile App",    color: "bg-blue-500",    emoji: "📱" }, assignee: { name: "Emma Petit",    initials: "EP", color: "bg-emerald-500" }, labels: ["ux", "feature"],    dueDate: "2026-04-15", createdAt: "5 days ago", storyPoints: 13 },
-  { id: "6",  identifier: "TF-006", title: "Fix chart rendering on Safari 16",              status: "in_progress", priority: "high",   project: { id: "4", name: "Analytics",     color: "bg-amber-500",   emoji: "📊" }, assignee: { name: "You",            initials: "ME", color: "bg-primary"     }, labels: ["bug"],              dueDate: "2026-04-06", createdAt: "1 day ago",  storyPoints: 3  },
-  { id: "7",  identifier: "TF-007", title: "Create button component documentation",         status: "done",        priority: "low",    project: { id: "5", name: "Design System", color: "bg-slate-500",   emoji: "💎" }, assignee: { name: "Emma Petit",    initials: "EP", color: "bg-emerald-500" }, labels: ["docs"],             dueDate: null,         createdAt: "1 week ago", storyPoints: 1  },
-  { id: "8",  identifier: "TF-008", title: "Optimize Postgres indexes for issues table",    status: "done",        priority: "high",   project: { id: "3", name: "API v2",        color: "bg-emerald-500", emoji: "⚡" }, assignee: { name: "Thomas Bernard",initials: "TB", color: "bg-orange-500"  }, labels: ["performance", "db"],dueDate: null,         createdAt: "1 week ago", storyPoints: 5  },
-  { id: "9",  identifier: "TF-009", title: "Integrate Stripe billing for Pro plan",         status: "in_progress", priority: "urgent", project: { id: "2", name: "Mobile App",    color: "bg-blue-500",    emoji: "📱" }, assignee: { name: "Sophie Martin", initials: "SM", color: "bg-violet-500"  }, labels: ["billing", "feature"],dueDate: "2026-04-09", createdAt: "2 days ago", storyPoints: 8  },
-  { id: "10", identifier: "TF-010", title: "Write E2E tests for auth flow",                 status: "todo",        priority: "medium", project: { id: "1", name: "Website",       color: "bg-violet-500",  emoji: "🎨" }, assignee: null,                                                                  labels: ["test"],             dueDate: "2026-04-20", createdAt: "3 days ago", storyPoints: 5  },
-  { id: "11", identifier: "TF-011", title: "Fix mobile keyboard pushing layout up",         status: "in_review",   priority: "medium", project: { id: "1", name: "Mobile App",    color: "bg-blue-500",    emoji: "📱" }, assignee: { name: "Emma Petit",    initials: "EP", color: "bg-emerald-500" }, labels: ["bug", "mobile"],    dueDate: "2026-04-11", createdAt: "2 days ago", storyPoints: 2  },
-  { id: "12", identifier: "TF-012", title: "Add CSV export to analytics reports",           status: "todo",        priority: "low",    project: { id: "4", name: "Analytics",     color: "bg-amber-500",   emoji: "📊" }, assignee: { name: "Sophie Martin", initials: "SM", color: "bg-violet-500"  }, labels: ["feature"],          dueDate: null,         createdAt: "4 days ago", storyPoints: 3  },
-  { id: "13", identifier: "TF-013", title: "Migrate remaining pages to App Router",         status: "cancelled",   priority: "low",    project: { id: "1", name: "Website",       color: "bg-violet-500",  emoji: "🎨" }, assignee: { name: "You",            initials: "ME", color: "bg-primary"     }, labels: ["refactor"],         dueDate: null,         createdAt: "2 weeks ago",storyPoints: 8  },
-  { id: "14", identifier: "TF-014", title: "Localize app for French and German markets",    status: "todo",        priority: "medium", project: { id: "2", name: "Mobile App",    color: "bg-blue-500",    emoji: "📱" }, assignee: null,                                                                  labels: ["i18n"],             dueDate: "2026-04-30", createdAt: "5 days ago", storyPoints: 13 },
-  { id: "15", identifier: "TF-015", title: "Set up Sentry error tracking in production",    status: "done",        priority: "high",   project: { id: "3", name: "API v2",        color: "bg-emerald-500", emoji: "⚡" }, assignee: { name: "Thomas Bernard",initials: "TB", color: "bg-orange-500"  }, labels: ["devops", "monitoring"],dueDate: null,       createdAt: "1 week ago", storyPoints: 3  },
+const PROJECT_COLORS = [
+  "bg-blue-500", "bg-violet-500", "bg-emerald-500", "bg-amber-500",
+  "bg-slate-500", "bg-orange-500", "bg-pink-500", "bg-cyan-500",
 ]
+
+function projectColor(id: number): string {
+  return PROJECT_COLORS[id % PROJECT_COLORS.length]
+}
+
+const AVATAR_COLORS = [
+  "bg-violet-500", "bg-blue-500", "bg-emerald-500", "bg-orange-500",
+  "bg-pink-500", "bg-cyan-500", "bg-amber-500", "bg-indigo-500",
+]
+
+function userColor(id: number): string {
+  return AVATAR_COLORS[id % AVATAR_COLORS.length]
+}
+
+const STATUS_MAP: Record<IssueStatusCategory, IssueStatus> = {
+  BACKLOG:   "todo",
+  UNSTARTED: "todo",
+  STARTED:   "in_progress",
+  COMPLETED: "done",
+  CANCELLED: "cancelled",
+}
+
+const PRIORITY_MAP: Record<ApiPriority, IssuePriority> = {
+  NONE:   "none",
+  URGENT: "urgent",
+  HIGH:   "high",
+  MEDIUM: "medium",
+  LOW:    "low",
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Config
@@ -258,13 +276,56 @@ type FilterPriority = IssuePriority | "all"
 const STATUS_ORDER: IssueStatus[] = ["in_progress", "in_review", "todo", "done", "cancelled"]
 
 export default function IssuesPage() {
+  const params  = useParams()
+  const slug    = typeof params?.workspace === "string" ? params.workspace : ""
+
+  const { projects, fetchProjects } = useProjectStore()
+  const { fetchIssues, isLoading }  = useIssueStore()
+
+  const [allIssues, setAllIssues] = useState<Issue[]>([])
   const [search,         setSearch]         = useState("")
   const [filterStatus,   setFilterStatus]   = useState<FilterStatus>("all")
   const [filterPriority, setFilterPriority] = useState<FilterPriority>("all")
   const [groupBy,        setGroupBy]        = useState<GroupBy>("status")
 
+  // Fetch all projects then all issues across them
+  useEffect(() => {
+    if (!slug) return
+    fetchProjects(slug).then((projs) => {
+      Promise.all(projs.map((p) => fetchIssues(slug, p.id))).then((results) => {
+        const mapped: Issue[] = results.flatMap((issues, idx) => {
+          const proj = projs[idx]
+          return issues.map((issue) => ({
+            id:         String(issue.id),
+            identifier: issue.identifier,
+            title:      issue.title,
+            status:     STATUS_MAP[issue.status.category],
+            priority:   PRIORITY_MAP[issue.priority],
+            project: {
+              id:    String(proj.id),
+              name:  proj.name,
+              color: projectColor(proj.id),
+              emoji: proj.identifier.slice(0, 2),
+            },
+            assignee: issue.assignee
+              ? {
+                  name:     issue.assignee.displayName ?? issue.assignee.email,
+                  initials: issue.assignee.email.slice(0, 2).toUpperCase(),
+                  color:    userColor(issue.assignee.id),
+                }
+              : null,
+            labels:  issue.labels.map((l) => l.name.toLowerCase()),
+            dueDate: issue.dueDate ?? null,
+          }))
+        })
+        setAllIssues(mapped)
+      })
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug])
+
   const filtered = useMemo(() => {
-    let list = MOCK_ISSUES
+    let list = allIssues
     if (filterStatus   !== "all") list = list.filter((i) => i.status   === filterStatus)
     if (filterPriority !== "all") list = list.filter((i) => i.priority === filterPriority)
     if (search.trim()) {
@@ -276,7 +337,7 @@ export default function IssuesPage() {
       )
     }
     return list
-  }, [search, filterStatus, filterPriority])
+  }, [allIssues, search, filterStatus, filterPriority])
 
   const grouped = useMemo(() => {
     if (groupBy === "status") {
@@ -310,7 +371,7 @@ export default function IssuesPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Issues</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {openCount} open · {filtered.length} total
+            {isLoading ? "Loading…" : `${openCount} open · ${filtered.length} total`}
           </p>
         </div>
         <CreateIssueDialog>
