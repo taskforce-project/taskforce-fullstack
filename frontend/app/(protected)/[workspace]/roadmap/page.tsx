@@ -1,6 +1,7 @@
 "use client"
 
-import { useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { useParams } from "next/navigation"
 import {
   ChevronLeft,
   ChevronRight,
@@ -19,6 +20,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
+import { useProjectStore } from "@/lib/store/project-store"
+import { useCycleStore } from "@/lib/store/cycle-store"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -41,20 +44,18 @@ interface RoadmapItem {
 // Mock data
 // ─────────────────────────────────────────────────────────────────────────────
 
-const MOCK_ITEMS: RoadmapItem[] = [
-  { id: "1",  title: "Mobile App v1.0",           type: "project",   project: { name: "Mobile App",    emoji: "📱", color: "bg-blue-500"    }, startDate: "2026-02-01", endDate: "2026-05-15", progress: 62, color: "bg-blue-500"    },
-  { id: "2",  title: "Sprint 3 — Onboarding",     type: "cycle",     project: { name: "Mobile App",    emoji: "📱", color: "bg-blue-500"    }, startDate: "2026-03-03", endDate: "2026-03-16", progress: 100,color: "bg-blue-400"    },
-  { id: "3",  title: "Sprint 4 — Auth & Billing", type: "cycle",     project: { name: "Mobile App",    emoji: "📱", color: "bg-blue-500"    }, startDate: "2026-04-01", endDate: "2026-04-14", progress: 58, color: "bg-blue-400"    },
-  { id: "4",  title: "Website Redesign",          type: "project",   project: { name: "Website",       emoji: "🎨", color: "bg-violet-500"  }, startDate: "2026-03-10", endDate: "2026-06-01", progress: 40, color: "bg-violet-500"  },
-  { id: "5",  title: "Sprint 7 — Dashboard v2",   type: "cycle",     project: { name: "Website",       emoji: "🎨", color: "bg-violet-500"  }, startDate: "2026-03-31", endDate: "2026-04-11", progress: 75, color: "bg-violet-400"  },
-  { id: "6",  title: "API v2 Launch",             type: "project",   project: { name: "API v2",        emoji: "⚡", color: "bg-emerald-500" }, startDate: "2026-01-15", endDate: "2026-04-30", progress: 78, color: "bg-emerald-500" },
-  { id: "7",  title: "Rate Limiting Sprint",      type: "cycle",     project: { name: "API v2",        emoji: "⚡", color: "bg-emerald-500" }, startDate: "2026-04-15", endDate: "2026-04-28", progress: 0,  color: "bg-emerald-400" },
-  { id: "8",  title: "Public Beta",               type: "milestone", project: { name: "API v2",        emoji: "⚡", color: "bg-emerald-500" }, startDate: "2026-04-30", endDate: "2026-04-30", progress: 0,  color: "bg-emerald-500" },
-  { id: "9",  title: "Analytics Platform",        type: "project",   project: { name: "Analytics",     emoji: "📊", color: "bg-amber-500"   }, startDate: "2026-03-01", endDate: "2026-06-30", progress: 30, color: "bg-amber-500"   },
-  { id: "10", title: "Q2 Analytics Sprint",       type: "cycle",     project: { name: "Analytics",     emoji: "📊", color: "bg-amber-500"   }, startDate: "2026-04-20", endDate: "2026-05-03", progress: 0,  color: "bg-amber-400"   },
-  { id: "11", title: "Design System v1",          type: "project",   project: { name: "Design System", emoji: "💎", color: "bg-slate-500"   }, startDate: "2026-01-20", endDate: "2026-04-20", progress: 88, color: "bg-slate-500"   },
-  { id: "12", title: "Component Docs Release",    type: "milestone", project: { name: "Design System", emoji: "💎", color: "bg-slate-500"   }, startDate: "2026-04-20", endDate: "2026-04-20", progress: 0,  color: "bg-slate-400"   },
+// ─────────────────────────────────────────────────────────────────────────────
+// Config
+// ─────────────────────────────────────────────────────────────────────────────
+
+const PROJECT_COLORS = [
+  "bg-blue-500", "bg-violet-500", "bg-emerald-500", "bg-amber-500",
+  "bg-slate-500", "bg-orange-500", "bg-pink-500", "bg-cyan-500",
 ]
+
+function projectColor(id: number): string {
+  return PROJECT_COLORS[id % PROJECT_COLORS.length]
+}
 
 const TYPE_COLORS: Record<RoadmapItem["type"], string> = {
   project:   "border-border/40 text-muted-foreground",
@@ -180,7 +181,61 @@ function GanttBar({ item, viewStart, totalDays, dayPx }: Readonly<GanttBarProps>
 
 const ROW_H = 44 // px per row
 
+import type { Cycle as ApiCycle } from "@/lib/api/cycle-service"
+import type { Project } from "@/lib/api/project-service"
+
+function mapProjectCycles(cycles: ApiCycle[], p: Project): RoadmapItem[] {
+  return cycles
+    .filter((c) => c.startDate && c.endDate)
+    .map((c) => ({
+      id:        `cycle-${c.id}`,
+      title:     c.name,
+      type:      "cycle" as const,
+      project:   { name: p.name, emoji: p.identifier.slice(0, 2), color: projectColor(p.id) },
+      startDate: c.startDate!,
+      endDate:   c.endDate!,
+      progress:  0,
+      color:     projectColor(p.id),
+    }))
+}
+
 export default function RoadmapPage() {
+  const params = useParams()
+  const slug   = typeof params?.workspace === "string" ? params.workspace : ""
+
+  const { fetchProjects } = useProjectStore()
+  const { fetchCycles }   = useCycleStore()
+
+  const [items, setItems] = useState<RoadmapItem[]>([])
+
+  useEffect(() => {
+    if (!slug) return
+
+    async function load() {
+      const projs = await fetchProjects(slug)
+      const projectItems: RoadmapItem[] = projs.map((p) => ({
+        id:        `project-${p.id}`,
+        title:     p.name,
+        type:      "project",
+        project:   { name: p.name, emoji: p.identifier.slice(0, 2), color: projectColor(p.id) },
+        startDate: p.createdAt.slice(0, 10),
+        endDate:   p.updatedAt.slice(0, 10),
+        progress:  p.totalIssues > 0 ? Math.round((p.totalIssues - p.openIssues) / p.totalIssues * 100) : 0,
+        color:     projectColor(p.id),
+      }))
+
+      const cycleResults = await Promise.all(projs.map(async (p) => ({ p, cycles: await fetchCycles(slug, p.id) })))
+      const cycleItems: RoadmapItem[] = cycleResults.flatMap(({ p, cycles }) =>
+        mapProjectCycles(cycles, p)
+      )
+
+      setItems([...projectItems, ...cycleItems])
+    }
+
+    void load()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug])
+
   const today = useMemo(() => new Date(), [])
 
   const [scale,      setScale]      = useState<TimeScale>("month")
@@ -234,8 +289,8 @@ export default function RoadmapPage() {
   const todayLeft = Math.max(daysBetween(viewStart, today), 0) * dayPx
 
   const filtered = filterType === "all"
-    ? MOCK_ITEMS
-    : MOCK_ITEMS.filter((i) => i.type === filterType)
+    ? items
+    : items.filter((i) => i.type === filterType)
 
   // Group by project
   const projectGroups = useMemo(() => {
