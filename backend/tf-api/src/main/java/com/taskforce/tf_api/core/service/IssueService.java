@@ -9,12 +9,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.taskforce.tf_api.core.dto.request.CreateIssueCommentRequest;
+import com.taskforce.tf_api.core.dto.request.CreateIssueRelationRequest;
 import com.taskforce.tf_api.core.dto.request.CreateIssueRequest;
 import com.taskforce.tf_api.core.dto.request.CreateIssueStatusRequest;
+import com.taskforce.tf_api.core.dto.request.ReorderStatusesRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateIssueRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateIssueStatusRequest;
 import com.taskforce.tf_api.core.dto.response.IssueActivityResponse;
 import com.taskforce.tf_api.core.dto.response.IssueCommentResponse;
+import com.taskforce.tf_api.core.dto.response.IssueRelationResponse;
 import com.taskforce.tf_api.core.dto.response.IssueResponse;
 import com.taskforce.tf_api.core.dto.response.IssueStatusResponse;
 import com.taskforce.tf_api.core.dto.response.IssueTypeResponse;
@@ -23,10 +26,12 @@ import com.taskforce.tf_api.core.dto.response.ProjectLabelResponse;
 import com.taskforce.tf_api.core.dto.response.UserSummaryResponse;
 import com.taskforce.tf_api.core.enums.IssueActivityType;
 import com.taskforce.tf_api.core.enums.IssuePriority;
+import com.taskforce.tf_api.core.enums.IssueRelationType;
 import com.taskforce.tf_api.core.enums.IssueStatusCategory;
 import com.taskforce.tf_api.core.model.Issue;
 import com.taskforce.tf_api.core.model.IssueActivity;
 import com.taskforce.tf_api.core.model.IssueComment;
+import com.taskforce.tf_api.core.model.IssueRelation;
 import com.taskforce.tf_api.core.model.IssueSequenceCounter;
 import com.taskforce.tf_api.core.model.IssueStatus;
 import com.taskforce.tf_api.core.model.IssueType;
@@ -34,6 +39,7 @@ import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.IssueActivityRepository;
 import com.taskforce.tf_api.core.repository.IssueCommentRepository;
+import com.taskforce.tf_api.core.repository.IssueRelationRepository;
 import com.taskforce.tf_api.core.repository.IssueRepository;
 import com.taskforce.tf_api.core.repository.IssueSequenceCounterRepository;
 import com.taskforce.tf_api.core.repository.IssueStatusRepository;
@@ -61,6 +67,7 @@ public class IssueService {
     private final IssueSequenceCounterRepository sequenceCounterRepository;
     private final IssueCommentRepository        commentRepository;
     private final IssueActivityRepository       activityRepository;
+    private final IssueRelationRepository       relationRepository;
     private final ProjectRepository             projectRepository;
     private final WorkspaceRepository           workspaceRepository;
     private final WorkspaceMemberRepository     workspaceMemberRepository;
@@ -73,6 +80,7 @@ public class IssueService {
         IssueSequenceCounterRepository sequenceCounterRepository,
         IssueCommentRepository commentRepository,
         IssueActivityRepository activityRepository,
+        IssueRelationRepository relationRepository,
         ProjectRepository projectRepository,
         WorkspaceRepository workspaceRepository,
         WorkspaceMemberRepository workspaceMemberRepository,
@@ -84,6 +92,7 @@ public class IssueService {
         this.sequenceCounterRepository = sequenceCounterRepository;
         this.commentRepository = commentRepository;
         this.activityRepository = activityRepository;
+        this.relationRepository = relationRepository;
         this.projectRepository = projectRepository;
         this.workspaceRepository = workspaceRepository;
         this.workspaceMemberRepository = workspaceMemberRepository;
@@ -219,6 +228,9 @@ public class IssueService {
         // Numéro de séquence atomique
         int seqNumber = incrementAndGetSequence(project.getId());
 
+        // Position dans la colonne = nombre d'issues déjà dans ce statut
+        int issuePosition = (int) issueRepository.countByProjectIdAndStatusId(project.getId(), status.getId());
+
         Issue issue = Issue.builder()
             .project(project)
             .sequenceNumber(seqNumber)
@@ -230,6 +242,7 @@ public class IssueService {
             .assignee(assignee)
             .reporter(reporter)
             .parent(parent)
+            .position(issuePosition)
             .startDate(request.getStartDate() != null ? LocalDate.parse(request.getStartDate()) : null)
             .dueDate(request.getDueDate() != null ? LocalDate.parse(request.getDueDate()) : null)
             .build();
@@ -313,6 +326,9 @@ public class IssueService {
         if (request.getDueDate() != null) {
             issue.setDueDate(LocalDate.parse(request.getDueDate()));
             logActivity(issue, actor, IssueActivityType.DUE_DATE_CHANGED, null, request.getDueDate());
+        }
+        if (request.getPosition() != null) {
+            issue.setPosition(request.getPosition());
         }
 
         issue = issueRepository.save(issue);
@@ -399,6 +415,29 @@ public class IssueService {
             throw new BusinessException("Impossible de supprimer le statut par défaut");
         }
         issueStatusRepository.delete(status);
+    }
+
+    /**
+     * Réordonne les statuts d'un projet en une seule transaction.
+     * Typiquement déclenché par un drag & drop de colonne kanban.
+     */
+    @Transactional
+    public List<IssueStatusResponse> reorderStatuses(String workspaceSlug, Long projectId,
+                                                      ReorderStatusesRequest request, Long userId) {
+        Project project = resolveProject(workspaceSlug, projectId);
+        assertWorkspaceMember(project.getWorkspace().getId(), userId);
+
+        for (ReorderStatusesRequest.StatusPosition sp : request.getStatuses()) {
+            IssueStatus status = issueStatusRepository.findById(sp.getId())
+                .filter(s -> s.getProject().getId().equals(project.getId()))
+                .orElseThrow(() -> new ResourceNotFoundException("Statut introuvable : " + sp.getId()));
+            status.setPosition(sp.getPosition());
+            issueStatusRepository.save(status);
+        }
+
+        return issueStatusRepository.findByProjectIdOrderByPosition(project.getId()).stream()
+            .map(this::toStatusResponse)
+            .toList();
     }
 
     // =========================================================================
@@ -496,6 +535,60 @@ public class IssueService {
     }
 
     // =========================================================================
+    // Relations
+    // =========================================================================
+
+    @Transactional(readOnly = true)
+    public List<IssueRelationResponse> listRelations(String workspaceSlug, Long projectId, Long issueId, Long userId) {
+        Project project = resolveProject(workspaceSlug, projectId);
+        assertWorkspaceMember(project.getWorkspace().getId(), userId);
+        Issue issue = resolveIssue(issueId, project.getId());
+        return relationRepository.findByIssueId(issue.getId()).stream()
+            .map(r -> toRelationResponse(r, issue.getId()))
+            .toList();
+    }
+
+    @Transactional
+    public IssueRelationResponse addRelation(String workspaceSlug, Long projectId, Long issueId,
+                                              CreateIssueRelationRequest request, Long userId) {
+        Project project = resolveProject(workspaceSlug, projectId);
+        assertWorkspaceMember(project.getWorkspace().getId(), userId);
+        Issue source = resolveIssue(issueId, project.getId());
+        Issue target = resolveIssue(request.getTargetIssueId(), project.getId());
+
+        IssueRelationType type;
+        try {
+            type = IssueRelationType.valueOf(request.getRelationType());
+        } catch (IllegalArgumentException e) {
+            throw new BusinessException("Type de relation invalide : " + request.getRelationType());
+        }
+
+        if (relationRepository.existsBySourceIdAndTargetIdAndRelationType(source.getId(), target.getId(), type)) {
+            throw new BusinessException("Cette relation existe déjà");
+        }
+
+        User actor = resolveUser(userId);
+        IssueRelation relation = IssueRelation.builder()
+            .source(source)
+            .target(target)
+            .relationType(type)
+            .createdBy(actor)
+            .build();
+        relation = relationRepository.save(relation);
+        return toRelationResponse(relation, source.getId());
+    }
+
+    @Transactional
+    public void deleteRelation(String workspaceSlug, Long projectId, Long issueId, Long relationId, Long userId) {
+        Project project = resolveProject(workspaceSlug, projectId);
+        assertWorkspaceMember(project.getWorkspace().getId(), userId);
+        IssueRelation relation = relationRepository.findById(relationId)
+            .filter(r -> r.getSource().getId().equals(issueId) || r.getTarget().getId().equals(issueId))
+            .orElseThrow(() -> new ResourceNotFoundException("Relation introuvable"));
+        relationRepository.delete(relation);
+    }
+
+    // =========================================================================
     // Helpers privés
     // =========================================================================
 
@@ -564,6 +657,7 @@ public class IssueService {
             .startDate(issue.getStartDate())
             .dueDate(issue.getDueDate())
             .completedAt(issue.getCompletedAt())
+            .position(issue.getPosition())
             .labels(issue.getLabels().stream()
                 .map(l -> ProjectLabelResponse.builder()
                     .id(l.getId())
@@ -627,6 +721,21 @@ public class IssueService {
             .oldValue(a.getOldValue())
             .newValue(a.getNewValue())
             .createdAt(a.getCreatedAt())
+            .build();
+    }
+
+    private IssueRelationResponse toRelationResponse(IssueRelation r, Long perspectiveIssueId) {
+        // "issue" = l'issue du point de vue de l'appelant, "relatedIssue" = l'autre
+        boolean isSource = r.getSource().getId().equals(perspectiveIssueId);
+        Issue self    = isSource ? r.getSource() : r.getTarget();
+        Issue related = isSource ? r.getTarget() : r.getSource();
+        return IssueRelationResponse.builder()
+            .id(r.getId())
+            .relationType(r.getRelationType())
+            .issue(toIssueSummary(self))
+            .relatedIssue(toIssueSummary(related))
+            .createdBy(toUserSummary(r.getCreatedBy()))
+            .createdAt(r.getCreatedAt())
             .build();
     }
 
