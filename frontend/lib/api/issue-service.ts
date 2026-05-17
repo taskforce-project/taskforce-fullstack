@@ -12,6 +12,7 @@ import { ISSUE_ROUTES } from "../config/api-routes";
 
 export type IssuePriority = "NONE" | "URGENT" | "HIGH" | "MEDIUM" | "LOW";
 export type IssueStatusCategory = "BACKLOG" | "UNSTARTED" | "STARTED" | "COMPLETED" | "CANCELLED";
+export type IssueRelationType = "BLOCKS" | "BLOCKED_BY" | "DUPLICATE" | "RELATES_TO";
 export type IssueActivityType =
   | "CREATED" | "STATUS_CHANGED" | "PRIORITY_CHANGED" | "ASSIGNEE_CHANGED"
   | "TYPE_CHANGED" | "TITLE_CHANGED" | "DESCRIPTION_CHANGED" | "LABEL_ADDED"
@@ -114,10 +115,34 @@ export interface UpdateIssuePayload {
   statusId?: number;
   typeId?: number;
   priority?: IssuePriority;
-  assigneeId?: number;
-  parentId?: number;
-  startDate?: string;
-  dueDate?: string;
+  assigneeId?: number | null;
+  parentId?: number | null;
+  startDate?: string | null;
+  dueDate?: string | null;
+  position?: number;
+}
+
+export interface StatusPosition {
+  id: number;
+  position: number;
+}
+
+export interface ReorderStatusesPayload {
+  statuses: StatusPosition[];
+}
+
+export interface IssueRelation {
+  id: number;
+  relationType: IssueRelationType;
+  issue: IssueSummary;
+  relatedIssue: IssueSummary;
+  createdBy: UserSummary;
+  createdAt: string;
+}
+
+export interface CreateIssueRelationPayload {
+  targetIssueId: number;
+  relationType: IssueRelationType;
 }
 
 export interface CreateIssueStatusPayload {
@@ -280,4 +305,57 @@ export async function listActivity(
 ): Promise<IssueActivity[]> {
   const res = await apiClient.get<{ data: IssueActivity[] }>(ISSUE_ROUTES.ACTIVITY(slug, projectId, issueId));
   return res.data.data;
+}
+
+// ---------------------------------------------------------------------------
+// Reorder statuts
+// ---------------------------------------------------------------------------
+
+export async function reorderStatuses(
+  slug: string,
+  projectId: number,
+  payload: ReorderStatusesPayload
+): Promise<IssueStatus[]> {
+  const res = await apiClient.post<{ data: IssueStatus[] }>(
+    ISSUE_ROUTES.STATUSES_REORDER(slug, projectId),
+    payload
+  );
+  return res.data.data;
+}
+
+// ---------------------------------------------------------------------------
+// Relations
+// ---------------------------------------------------------------------------
+
+export async function listRelations(
+  slug: string,
+  projectId: number,
+  issueId: number
+): Promise<IssueRelation[]> {
+  const res = await apiClient.get<{ data: IssueRelation[] }>(
+    ISSUE_ROUTES.RELATIONS(slug, projectId, issueId)
+  );
+  return res.data.data;
+}
+
+export async function addRelation(
+  slug: string,
+  projectId: number,
+  issueId: number,
+  payload: CreateIssueRelationPayload
+): Promise<IssueRelation> {
+  const res = await apiClient.post<{ data: IssueRelation }>(
+    ISSUE_ROUTES.RELATIONS(slug, projectId, issueId),
+    payload
+  );
+  return res.data.data;
+}
+
+export async function deleteRelation(
+  slug: string,
+  projectId: number,
+  issueId: number,
+  relationId: number
+): Promise<void> {
+  await apiClient.delete(ISSUE_ROUTES.RELATION(slug, projectId, issueId, relationId));
 }
