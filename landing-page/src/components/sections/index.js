@@ -1,4 +1,5 @@
 export * from './Hero';
+export * from './AIAgents';
 export * from './Features';
 export * from './Testimonials';
 export * from './Roadmap';
