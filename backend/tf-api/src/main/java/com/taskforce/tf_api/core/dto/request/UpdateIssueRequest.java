@@ -27,4 +27,7 @@ public class UpdateIssueRequest {
     private String startDate;
 
     private String dueDate;
+
+    /** Position dans la colonne kanban (kanban drag & drop) */
+    private Integer position;
 }
