@@ -2,6 +2,7 @@ import { Providers } from "@/components/Providers";
 import { Header, Footer } from "@/components/layout/";
 import {
   Hero,
+  AIAgents,
   Testimonials,
   Features,
   ProFeatures,
@@ -17,6 +18,7 @@ export default function App() {
 
       <main>
         <Hero />
+        <AIAgents />
         <Testimonials />
         <Features />
         <ProFeatures />
