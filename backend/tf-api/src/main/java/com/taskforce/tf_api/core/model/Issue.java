@@ -113,6 +113,11 @@ public class Issue {
     @Builder.Default
     private List<Issue> children = new ArrayList<>();
 
+    /** Position d'affichage dans la colonne kanban (0-based, croissant) */
+    @Column(nullable = false)
+    @Builder.Default
+    private Integer position = 0;
+
     @Column(name = "start_date")
     private LocalDate startDate;
 
