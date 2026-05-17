@@ -640,7 +640,7 @@ public class IssueService {
     // Mapping vers DTO
     // =========================================================================
 
-    private IssueResponse toResponse(Issue issue) {
+    public IssueResponse toResponse(Issue issue) {
         return IssueResponse.builder()
             .id(issue.getId())
             .sequenceNumber(issue.getSequenceNumber())
@@ -737,6 +737,10 @@ public class IssueService {
             .createdBy(toUserSummary(r.getCreatedBy()))
             .createdAt(r.getCreatedAt())
             .build();
+    }
+
+    public UserSummaryResponse toUserSummaryPublic(User u) {
+        return toUserSummary(u);
     }
 
     private UserSummaryResponse toUserSummary(User u) {
