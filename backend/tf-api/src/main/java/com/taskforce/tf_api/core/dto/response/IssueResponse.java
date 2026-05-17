@@ -41,6 +41,9 @@ public class IssueResponse {
     private LocalDate dueDate;
     private LocalDateTime completedAt;
 
+    /** Position dans la colonne kanban */
+    private Integer position;
+
     private List<ProjectLabelResponse> labels;
 
     private int commentCount;
