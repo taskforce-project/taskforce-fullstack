@@ -16,12 +16,15 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.taskforce.tf_api.core.dto.request.CreateIssueCommentRequest;
+import com.taskforce.tf_api.core.dto.request.CreateIssueRelationRequest;
 import com.taskforce.tf_api.core.dto.request.CreateIssueRequest;
 import com.taskforce.tf_api.core.dto.request.CreateIssueStatusRequest;
+import com.taskforce.tf_api.core.dto.request.ReorderStatusesRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateIssueRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateIssueStatusRequest;
 import com.taskforce.tf_api.core.dto.response.IssueActivityResponse;
 import com.taskforce.tf_api.core.dto.response.IssueCommentResponse;
+import com.taskforce.tf_api.core.dto.response.IssueRelationResponse;
 import com.taskforce.tf_api.core.dto.response.IssueResponse;
 import com.taskforce.tf_api.core.dto.response.IssueStatusResponse;
 import com.taskforce.tf_api.core.dto.response.IssueTypeResponse;
@@ -167,6 +170,22 @@ public class IssueController {
         return ResponseEntity.ok(ApiResponse.success("Statut supprimé", null));
     }
 
+    /**
+     * POST /api/workspaces/{slug}/projects/{projectId}/issues/statuses/reorder
+     * Réordonne tous les statuts d'un projet en une seule requête.
+     */
+    @PostMapping("/statuses/reorder")
+    public ResponseEntity<ApiResponse<List<IssueStatusResponse>>> reorderStatuses(
+        @PathVariable String slug,
+        @PathVariable Long projectId,
+        @Valid @RequestBody ReorderStatusesRequest request,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long userId = resolveUserId(jwt);
+        List<IssueStatusResponse> statuses = issueService.reorderStatuses(slug, projectId, request, userId);
+        return ResponseEntity.ok(ApiResponse.success("Statuts réordonnés", statuses));
+    }
+
     // =========================================================================
     // Types
     // =========================================================================
@@ -253,6 +272,92 @@ public class IssueController {
         Long userId = resolveUserId(jwt);
         List<IssueActivityResponse> activities = issueService.listActivity(slug, projectId, issueId, userId);
         return ResponseEntity.ok(ApiResponse.success("Activité récupérée", activities));
+    }
+
+    // =========================================================================
+    // Relations
+    // =========================================================================
+
+    @GetMapping("/{issueId}/relations")
+    public ResponseEntity<ApiResponse<List<IssueRelationResponse>>> listRelations(
+        @PathVariable String slug,
+        @PathVariable Long projectId,
+        @PathVariable Long issueId,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long userId = resolveUserId(jwt);
+        List<IssueRelationResponse> relations = issueService.listRelations(slug, projectId, issueId, userId);
+        return ResponseEntity.ok(ApiResponse.success("Relations récupérées", relations));
+    }
+
+    @PostMapping("/{issueId}/relations")
+    public ResponseEntity<ApiResponse<IssueRelationResponse>> addRelation(
+        @PathVariable String slug,
+        @PathVariable Long projectId,
+        @PathVariable Long issueId,
+        @Valid @RequestBody CreateIssueRelationRequest request,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long userId = resolveUserId(jwt);
+        IssueRelationResponse relation = issueService.addRelation(slug, projectId, issueId, request, userId);
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(ApiResponse.success("Relation créée", relation));
+    }
+
+    @DeleteMapping("/{issueId}/relations/{relationId}")
+    public ResponseEntity<ApiResponse<Void>> deleteRelation(
+        @PathVariable String slug,
+        @PathVariable Long projectId,
+        @PathVariable Long issueId,
+        @PathVariable Long relationId,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long userId = resolveUserId(jwt);
+        issueService.deleteRelation(slug, projectId, issueId, relationId, userId);
+        return ResponseEntity.ok(ApiResponse.success("Relation supprimée", null));
+    }
+
+    // =========================================================================
+    // Relations
+    // =========================================================================
+
+    @GetMapping("/{issueId}/relations")
+    public ResponseEntity<ApiResponse<List<IssueRelationResponse>>> listRelations(
+        @PathVariable String slug,
+        @PathVariable Long projectId,
+        @PathVariable Long issueId,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long userId = resolveUserId(jwt);
+        List<IssueRelationResponse> relations = issueService.listRelations(slug, projectId, issueId, userId);
+        return ResponseEntity.ok(ApiResponse.success("Relations récupérées", relations));
+    }
+
+    @PostMapping("/{issueId}/relations")
+    public ResponseEntity<ApiResponse<IssueRelationResponse>> addRelation(
+        @PathVariable String slug,
+        @PathVariable Long projectId,
+        @PathVariable Long issueId,
+        @Valid @RequestBody CreateIssueRelationRequest request,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long userId = resolveUserId(jwt);
+        IssueRelationResponse relation = issueService.addRelation(slug, projectId, issueId, request, userId);
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(ApiResponse.success("Relation créée", relation));
+    }
+
+    @DeleteMapping("/{issueId}/relations/{relationId}")
+    public ResponseEntity<ApiResponse<Void>> deleteRelation(
+        @PathVariable String slug,
+        @PathVariable Long projectId,
+        @PathVariable Long issueId,
+        @PathVariable Long relationId,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long userId = resolveUserId(jwt);
+        issueService.deleteRelation(slug, projectId, issueId, relationId, userId);
+        return ResponseEntity.ok(ApiResponse.success("Relation supprimée", null));
     }
 
     // =========================================================================
