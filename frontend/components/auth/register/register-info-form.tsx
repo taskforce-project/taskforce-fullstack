@@ -1,18 +1,11 @@
-"use client";
+﻿"use client";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import {
-  Field,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
 import { usePreferencesStore } from "@/lib/store/preferences-store";
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { toast } from "sonner";
 import Link from "next/link";
 import Image from "next/image";
@@ -26,6 +19,8 @@ import {
   isDisposableEmail,
   calculatePasswordStrength,
 } from "@/lib/utils/validation";
+import { Loader2, ArrowRight } from "lucide-react";
+import { FloatingPaths } from "@/components/auth/floating-paths";
 
 export function SignupForm({
   className,
@@ -45,72 +40,41 @@ export function SignupForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validation des champs vides
     if (!formData.firstName || !formData.lastName || !formData.email || !formData.password || !formData.confirmPassword) {
-      toast.error(t.common.error, { 
-        description: "Veuillez remplir tous les champs" 
-      });
+      toast.error(t.common.error, { description: "Veuillez remplir tous les champs" });
       return;
     }
-
-    // Validation des noms
     if (!validateName(formData.firstName)) {
-      toast.error(t.common.error, {
-        description: "Le prénom n'est pas valide (2-50 caractères, lettres uniquement)",
-      });
+      toast.error(t.common.error, { description: "Le prénom n'est pas valide (2-50 caractères, lettres uniquement)" });
       return;
     }
-
     if (!validateName(formData.lastName)) {
-      toast.error(t.common.error, {
-        description: "Le nom n'est pas valide (2-50 caractères, lettres uniquement)",
-      });
+      toast.error(t.common.error, { description: "Le nom n'est pas valide (2-50 caractères, lettres uniquement)" });
       return;
     }
-
-    // Validation email
     if (!validateEmail(formData.email)) {
-      toast.error(t.common.error, {
-        description: "Format d'email invalide",
-      });
+      toast.error(t.common.error, { description: "Format d'email invalide" });
       return;
     }
-
-    // Vérifier les emails jetables
     if (isDisposableEmail(formData.email)) {
-      toast.error(t.common.error, {
-        description: "Les adresses email temporaires ne sont pas autorisées",
-      });
+      toast.error(t.common.error, { description: "Les adresses email temporaires ne sont pas autorisées" });
       return;
     }
-
-    // Validation confirmation mot de passe
     if (formData.password !== formData.confirmPassword) {
-      toast.error(t.common.error, { 
-        description: t.auth.errors.passwordsDoNotMatch 
-      });
+      toast.error(t.common.error, { description: t.auth.errors.passwordsDoNotMatch });
       return;
     }
-
-    // Validation renforcée du mot de passe
     const passwordValidation = validatePassword(formData.password);
     if (!passwordValidation.isValid) {
-      toast.error(t.common.error, {
-        description: passwordValidation.errors[0], // Afficher la première erreur
-      });
+      toast.error(t.common.error, { description: passwordValidation.errors[0] });
       return;
     }
-
-    // Vérifier la force du mot de passe
     const strength = calculatePasswordStrength(formData.password);
     if (strength < 50) {
-      toast.error(t.common.error, {
-        description: "Le mot de passe est trop faible. Utilisez un mot de passe plus complexe.",
-      });
+      toast.error(t.common.error, { description: "Le mot de passe est trop faible. Utilisez un mot de passe plus complexe." });
       return;
     }
 
-    // Sanitization des inputs
     const sanitizedData = {
       firstName: sanitizeInput(formData.firstName),
       lastName: sanitizeInput(formData.lastName),
@@ -119,162 +83,328 @@ export function SignupForm({
     };
 
     setIsLoading(true);
-
     try {
-      // Stocker les données dans sessionStorage pour les étapes suivantes
-      // L'API sera appelée à l'étape 3 avec toutes les données
-      setRegisterData({
-        firstName: sanitizedData.firstName,
-        lastName: sanitizedData.lastName,
-        email: sanitizedData.email,
-        password: sanitizedData.password,
-      });
-
+      setRegisterData(sanitizedData);
       toast.success("Informations enregistrées", {
         description: "Passez à l'étape suivante pour choisir votre plan",
       });
-      
-      // Redirection vers choix du plan
-      router.push('/auth/register/plan');
+      router.push("/auth/register/plan");
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      toast.error(t.common.error, { 
-        description: errorMessage || t.auth.errors.registrationFailed 
-      });
-      console.error("Registration error:", error);
+      toast.error(t.common.error, { description: errorMessage || t.auth.errors.registrationFailed });
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className={cn("flex flex-col gap-6 w-[80%]", className)} {...props}>
-      {/* Progress indicator */}
-      <div className="w-full space-y-2">
-        <div className="flex justify-between text-sm text-muted-foreground">
-          <span>Étape 1 sur 3</span>
-          <span>33%</span>
+    <div className={cn("relative flex min-h-screen w-full overflow-hidden", className)} {...props}>
+
+      {/* ── Left: brand panel ── */}
+      <div
+        className="relative hidden lg:flex lg:w-[45%] flex-col justify-between p-10 overflow-hidden"
+        style={{ background: "#0d0d0d", color: "#ffffff" }}
+      >
+        <FloatingPaths position={1} />
+        <FloatingPaths position={-1} />
+
+        {/* Bottom gradient fade */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute bottom-0 inset-x-0 h-56 z-10"
+          style={{ background: "linear-gradient(to top, #0d0d0d 0%, transparent 100%)" }}
+        />
+        {/* Right edge fade */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 right-0 w-24 z-10"
+          style={{ background: "linear-gradient(to left, #0d0d0d 0%, transparent 100%)" }}
+        />
+
+        {/* Logo */}
+        <div className="relative z-20 flex items-center gap-2.5">
+          <Image
+            src="/assets/logo/logo_taskforce_tp.png"
+            alt="TaskForce"
+            width={84}
+            height={84}
+            style={{ filter: "brightness(0) invert(1) drop-shadow(0 0 8px rgba(112,0,255,0.6))" }}
+          />
+          <span className="text-base font-semibold" style={{ color: "#ffffff" }}>
+            TaskForce
+          </span>
         </div>
-        <Progress value={33} />
+
+        {/* Quote */}
+        <div className="relative z-20">
+          <blockquote className="space-y-3">
+            <p
+              className="text-xl font-medium leading-snug"
+              style={{ color: "#ffffff" }}
+            >
+              &ldquo;Rejoignez la plateforme qui révolutionne la gestion d&rsquo;équipes et d&rsquo;agents IA.&rdquo;
+            </p>
+            <footer className="text-sm font-mono" style={{ color: "rgba(255,255,255,0.4)" }}>
+              — TaskForce Team
+            </footer>
+          </blockquote>
+        </div>
       </div>
 
-      <Card className="overflow-hidden p-0">
-        <CardContent className="grid p-0 md:grid-cols-2">
-          <form onSubmit={handleSubmit} className="p-6 md:p-8">
-            <FieldGroup>
-              <div className="flex flex-col items-center gap-2 text-center">
-                <h1 className="text-2xl font-bold">Créer un compte</h1>
-                <p className="text-muted-foreground text-sm text-balance">
-                  Entrez vos informations pour créer votre compte
-                </p>
-              </div>
-              <Field className="grid grid-cols-2 gap-4">
-                <Field>
-                  <FieldLabel htmlFor="firstName">Prénom</FieldLabel>
-                  <Input
-                    id="firstName"
-                    type="text"
-                    placeholder="John"
-                    required
-                    value={formData.firstName}
-                    onChange={(e) =>
-                      setFormData({ ...formData, firstName: e.target.value })
-                    }
-                    disabled={isLoading}
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="lastName">Nom</FieldLabel>
-                  <Input
-                    id="lastName"
-                    type="text"
-                    placeholder="Doe"
-                    required
-                    value={formData.lastName}
-                    onChange={(e) =>
-                      setFormData({ ...formData, lastName: e.target.value })
-                    }
-                    disabled={isLoading}
-                  />
-                </Field>
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="email">Email</FieldLabel>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="john.doe@exemple.com"
-                  required
-                  value={formData.email}
-                  onChange={(e) =>
-                    setFormData({ ...formData, email: e.target.value })
-                  }
-                  disabled={isLoading}
+      {/* ── Right: form panel ── */}
+      <div
+        className="relative flex flex-1 flex-col items-center justify-center px-6 py-16 sm:px-10 overflow-y-auto"
+        style={{ background: "var(--background)" }}
+      >
+        {/* Subtle radial decoration */}
+        <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div
+            className="absolute -top-32 -right-32 h-125 w-125 rounded-full"
+            style={{
+              background: "radial-gradient(circle, rgba(112,0,255,0.06) 0%, transparent 65%)",
+            }}
+          />
+          <div
+            className="absolute -bottom-24 -left-24 h-100 w-100 rounded-full"
+            style={{
+              background: "radial-gradient(circle, rgba(241,61,212,0.04) 0%, transparent 65%)",
+            }}
+          />
+        </div>
+
+        {/* Mobile logo */}
+        <div className="flex lg:hidden items-center gap-2 mb-8 self-start">
+          <Image
+            src="/assets/logo/logo_taskforce_tp.png"
+            alt="TaskForce"
+            width={22}
+            height={22}
+          />
+          <span className="text-sm font-semibold" style={{ color: "var(--label-primary)" }}>
+            TaskForce
+          </span>
+        </div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+          className="relative z-10 w-full max-w-sm space-y-6"
+        >
+          {/* Step indicator */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              {[1, 2, 3].map((step) => (
+                <div
+                  key={step}
+                  className="h-1 flex-1 rounded-full transition-all"
+                  style={{
+                    background: step === 1
+                      ? "var(--gradient-purple-pink)"
+                      : "var(--fill-tertiary)",
+                  }}
                 />
-              </Field>
-              <Field>
-                <Field className="grid grid-cols-2 gap-4">
-                  <Field>
-                    <FieldLabel htmlFor="password">Mot de passe</FieldLabel>
-                    <Input
-                      id="password"
-                      type="password"
-                      required
-                      value={formData.password}
-                      onChange={(e) =>
-                        setFormData({ ...formData, password: e.target.value })
-                      }
-                      disabled={isLoading}
-                    />
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="confirm-password">
-                      Confirmer
-                    </FieldLabel>
-                    <Input
-                      id="confirm-password"
-                      type="password"
-                      required
-                      value={formData.confirmPassword}
-                      onChange={(e) =>
-                        setFormData({ ...formData, confirmPassword: e.target.value })
-                      }
-                      disabled={isLoading}
-                    />
-                  </Field>
-                </Field>
-                <FieldDescription>
-                  Au moins 8 caractères.
-                </FieldDescription>
-              </Field>
-              <Field>
-                <Button type="submit" disabled={isLoading}>
-                  {isLoading ? "Création..." : "Continuer"}
-                </Button>
-              </Field>
-              <FieldDescription className="text-center">
-                Vous avez déjà un compte ?{" "}
-                <Link href="/auth/login">Se connecter</Link>
-              </FieldDescription>
-            </FieldGroup>
-          </form>
-          <div className="bg-gradient relative hidden md:flex md:items-center md:justify-center">
-            <span aria-hidden="true"></span>
-            <Image
-              src="/assets/logo/logo_taskforce_tp.png"
-              alt="TaskForce Logo"
-              width={240}
-              height={240}
-              className="w-60 h-60 object-contain opacity-40 dark:opacity-30 dark:invert relative z-10"
-            />
+              ))}
+            </div>
+            <p className="text-[11px]" style={{ color: "var(--label-quaternary)" }}>
+              Étape 1 sur 3 — Informations personnelles
+            </p>
           </div>
-        </CardContent>
-      </Card>
-      <FieldDescription className="text-center">
-        En continuant, vous acceptez nos{" "}
-        <Link href="/legal-notices">Conditions d&apos;utilisation</Link> et{" "}
-        <Link href="/privacy-policy">Politique de confidentialité</Link>.
-      </FieldDescription>
+
+          {/* Heading */}
+          <div className="space-y-1.5">
+            <h1
+              className="text-2xl font-bold tracking-tight"
+              style={{ color: "var(--label-primary)" }}
+            >
+              Créer un compte
+            </h1>
+            <p className="text-sm" style={{ color: "var(--label-tertiary)" }}>
+              Entrez vos informations pour commencer
+            </p>
+          </div>
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Name row */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="firstName"
+                  className="text-xs font-medium"
+                  style={{ color: "var(--label-secondary)" }}
+                >
+                  Prénom
+                </label>
+                <Input
+                  id="firstName"
+                  type="text"
+                  placeholder="John"
+                  required
+                  value={formData.firstName}
+                  onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                  disabled={isLoading}
+                  className="h-9 text-sm"
+                  style={{
+                    background: "var(--fill-secondary)",
+                    borderColor: "var(--separator)",
+                    color: "var(--label-primary)",
+                  }}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="lastName"
+                  className="text-xs font-medium"
+                  style={{ color: "var(--label-secondary)" }}
+                >
+                  Nom
+                </label>
+                <Input
+                  id="lastName"
+                  type="text"
+                  placeholder="Doe"
+                  required
+                  value={formData.lastName}
+                  onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                  disabled={isLoading}
+                  className="h-9 text-sm"
+                  style={{
+                    background: "var(--fill-secondary)",
+                    borderColor: "var(--separator)",
+                    color: "var(--label-primary)",
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Email */}
+            <div className="space-y-1.5">
+              <label
+                htmlFor="email"
+                className="text-xs font-medium"
+                style={{ color: "var(--label-secondary)" }}
+              >
+                Email
+              </label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="john.doe@exemple.com"
+                required
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                disabled={isLoading}
+                className="h-9 text-sm"
+                style={{
+                  background: "var(--fill-secondary)",
+                  borderColor: "var(--separator)",
+                  color: "var(--label-primary)",
+                }}
+              />
+            </div>
+
+            {/* Password row */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="password"
+                  className="text-xs font-medium"
+                  style={{ color: "var(--label-secondary)" }}
+                >
+                  Mot de passe
+                </label>
+                <Input
+                  id="password"
+                  type="password"
+                  required
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  disabled={isLoading}
+                  className="h-9 text-sm"
+                  style={{
+                    background: "var(--fill-secondary)",
+                    borderColor: "var(--separator)",
+                    color: "var(--label-primary)",
+                  }}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="confirm-password"
+                  className="text-xs font-medium"
+                  style={{ color: "var(--label-secondary)" }}
+                >
+                  Confirmer
+                </label>
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  required
+                  value={formData.confirmPassword}
+                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                  disabled={isLoading}
+                  className="h-9 text-sm"
+                  style={{
+                    background: "var(--fill-secondary)",
+                    borderColor: "var(--separator)",
+                    color: "var(--label-primary)",
+                  }}
+                />
+              </div>
+            </div>
+            <p className="text-[11px]" style={{ color: "var(--label-quaternary)" }}>
+              Au moins 8 caractères, une majuscule, un chiffre et un symbole.
+            </p>
+
+            <Button
+              type="submit"
+              disabled={isLoading}
+              className="btn-primary h-9 w-full gap-2 font-medium text-sm mt-1"
+            >
+              {isLoading ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <>
+                  Continuer
+                  <ArrowRight className="size-4" />
+                </>
+              )}
+            </Button>
+          </form>
+
+          {/* Login link */}
+          <p className="text-center text-xs" style={{ color: "var(--label-quaternary)" }}>
+            Vous avez déjà un compte ?{" "}
+            <Link
+              href="/auth/login"
+              className="font-medium transition-colors"
+              style={{ color: "var(--label-secondary)" }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.color = "var(--label-primary)";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.color = "var(--label-secondary)";
+              }}
+            >
+              Se connecter
+            </Link>
+          </p>
+
+          {/* Legal */}
+          <p className="text-center text-[10px]" style={{ color: "var(--label-quaternary)" }}>
+            En continuant, vous acceptez nos{" "}
+            <Link href="/legal-notices" className="underline underline-offset-2">
+              Conditions d&apos;utilisation
+            </Link>
+            {" "}et{" "}
+            <Link href="/privacy-policy" className="underline underline-offset-2">
+              Politique de confidentialité
+            </Link>
+            .
+          </p>
+        </motion.div>
+      </div>
     </div>
   );
 }
