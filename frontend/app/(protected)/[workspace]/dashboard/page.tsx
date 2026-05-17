@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import { useParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   ArrowUpRight, ArrowUp, ArrowDown, Minus,
@@ -9,28 +10,21 @@ import {
   Zap, TrendingUp, TrendingDown, Clock,
 } from "lucide-react"
 import { useAuth } from "@/lib/contexts/auth-context"
+import { useProjectStore } from "@/lib/store/project-store"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
-const PULSE = [
-  { id: "ops",    label: "Active ops",    value: 4,  delta: +1, href: "./projects",       urgent: false },
-  { id: "issues", label: "Open issues",   value: 18, delta: +3, href: "./projects",       urgent: false },
-  { id: "risk",   label: "At risk",       value: 3,  delta: +2, href: "./projects",       urgent: true  },
-  { id: "queue",  label: "My queue",      value: 7,  delta: -2, href: "./my-work/issues", urgent: false },
-  { id: "agents", label: "Agents active", value: 2,  delta:  0, href: "./agents",         urgent: false },
+const PULSE_STATIC = [
+  { id: "risk",   label: "At risk",       value: 0,  delta: 0, href: "./projects",       urgent: true  },
+  { id: "queue",  label: "My queue",      value: 0,  delta: 0, href: "./my-work/issues", urgent: false },
+  { id: "agents", label: "Agents active", value: 2,  delta: 0, href: "./agents",         urgent: false },
 ] as const
 
 const EXCEPTIONS = [
   { id: "1", severity: "critical" as const, source: "COO",    message: "Mobile App sprint velocity −31% — delivery at risk",  age: "2h" },
   { id: "2", severity: "warning"  as const, source: "System", message: "TF-38 overdue by 2 days — no assignee update",        age: "5h" },
-]
-
-const OPERATIONS = [
-  { id: "1", name: "Website Redesign", sprint: "Sprint 9", progress: 72, done: 13, total: 18, velocity: +8,  daysLeft: 4, status: "on_track" as const },
-  { id: "2", name: "Mobile App v2",    sprint: "Sprint 3", progress: 41, done: 7,  total: 17, velocity: -31, daysLeft: 6, status: "at_risk"  as const },
-  { id: "3", name: "API v2 Migration", sprint: "Sprint 6", progress: 88, done: 15, total: 17, velocity: +12, daysLeft: 2, status: "on_track" as const },
 ]
 
 const AI_INSIGHTS = [
@@ -84,7 +78,7 @@ function LiveClock() {
   return <span className="text-mono-xs tabular-nums">{t}</span>
 }
 
-function Delta({ value }: { value: number }) {
+function Delta({ value }: Readonly<{ value: number }>) {
   if (value === 0) return <Minus className="size-2.5 label-faint" />
   const up = value > 0
   return (
@@ -94,8 +88,10 @@ function Delta({ value }: { value: number }) {
   )
 }
 
-function ConfBar({ value }: { value: number }) {
-  const fillClass = value >= 80 ? "conf-bar__fill--high" : value >= 60 ? "conf-bar__fill--mid" : "conf-bar__fill--low"
+function ConfBar({ value }: Readonly<{ value: number }>) {
+  let fillClass = "conf-bar__fill--low"
+  if (value >= 80) fillClass = "conf-bar__fill--high"
+  else if (value >= 60) fillClass = "conf-bar__fill--mid"
   return (
     <div className="conf-bar">
       <div className="conf-bar__track">
@@ -106,7 +102,7 @@ function ConfBar({ value }: { value: number }) {
   )
 }
 
-function SectionLabel({ children, href }: { children: React.ReactNode; href?: string }) {
+function SectionLabel({ children, href }: Readonly<{ children: React.ReactNode; href?: string }>) {
   return (
     <div className="section-header">
       <p className="label-overline">{children}</p>
@@ -119,7 +115,7 @@ function SectionLabel({ children, href }: { children: React.ReactNode; href?: st
   )
 }
 
-function Card({ children, className }: { children: React.ReactNode; className?: string }) {
+function Card({ children, className }: Readonly<{ children: React.ReactNode; className?: string }>) {
   return (
     <div className={cn("glass-card", className)}>
       {children}
@@ -130,10 +126,44 @@ function Card({ children, className }: { children: React.ReactNode; className?: 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
+  const params = useParams()
+  const slug   = typeof params?.workspace === "string" ? params.workspace : ""
+
   const { user } = useAuth()
+  const { fetchProjects, projects } = useProjectStore()
+
+  useEffect(() => {
+    if (slug) void fetchProjects(slug)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug])
+
+  const activeOps  = projects.filter((p) => p.status === "ACTIVE").length
+  const openIssues = projects.reduce((s, p) => s + p.openIssues, 0)
+
+  const PULSE = [
+    { id: "ops",    label: "Active ops",  value: activeOps,  delta: 0, href: "./projects",       urgent: false },
+    { id: "issues", label: "Open issues", value: openIssues, delta: 0, href: "./projects",       urgent: false },
+    ...PULSE_STATIC,
+  ]
+
+  const OPERATIONS = projects.map((p) => ({
+    id:       String(p.id),
+    name:     p.name,
+    sprint:   "Active",
+    progress: p.totalIssues > 0 ? Math.round((p.totalIssues - p.openIssues) / p.totalIssues * 100) : 0,
+    done:     p.totalIssues - p.openIssues,
+    total:    p.totalIssues,
+    velocity: 0,
+    daysLeft: 0,
+    status:   "on_track" as const,
+  })
+
   const firstName = user?.firstName ?? "—"
   const hour = new Date().getHours()
-  const greeting = hour < 5 ? "Still up," : hour < 12 ? "Good morning," : hour < 18 ? "Good afternoon," : "Good evening,"
+  let greeting = "Good evening,"
+  if (hour < 5)       greeting = "Still up,"
+  else if (hour < 12) greeting = "Good morning,"
+  else if (hour < 18) greeting = "Good afternoon,"
   const criticals = EXCEPTIONS.filter(e => e.severity === "critical").length
   const decisions  = AI_INSIGHTS.filter(i => i.urgency === "high").length
 
