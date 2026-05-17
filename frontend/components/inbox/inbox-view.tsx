@@ -3,59 +3,229 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter, useParams } from "next/navigation"
+import { motion, AnimatePresence } from "framer-motion"
 import {
-  Bell, AtSign, AlertTriangle, ClipboardList, CheckCheck,
-  Circle, FolderKanban, Clock, CheckCircle2, MessageSquare, ArrowRight,
+  Radio, AtSign, ShieldAlert, ClipboardList,
+  CheckCheck, Flame, AlertTriangle, Clock, CheckCircle2,
+  MessageSquare, ArrowRight, Zap, Circle,
+  ArrowUpRight, X,
 } from "lucide-react"
 
 import { useTranslation } from "@/lib/i18n"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type NotifType = "mention" | "assigned" | "commented" | "statusChanged" | "dueSoon" | "overdue" | "completed"
+type Urgency   = "critical" | "warning" | "info" | "low"
 export type NotifTab = "all" | "mentions" | "alerts" | "assignments"
 
-interface Notification {
+interface Signal {
   id: string
   type: NotifType
+  urgency: Urgency
   read: boolean
+  acknowledged: boolean
   actor?: { name: string; initials: string; color: string }
-  project: string
-  projectUrl: string
-  issueTitle: string
+  operation: string
+  operationUrl: string
+  title: string
   issueId: string
   issueUrl: string
   timestamp: string
-  comment?: string
+  body?: string
 }
 
-// ---------------------------------------------------------------------------
-// Mock data
-// ---------------------------------------------------------------------------
+// ─── Mock data ─────────────────────────────────────────────────────────────────
 
-const MOCK_NOTIFICATIONS: Notification[] = [
-  { id: "1", type: "mention", read: false, actor: { name: "Sophie Martin", initials: "SM", color: "bg-violet-500" }, project: "Website Redesign", projectUrl: "/projects/1", issueTitle: "Update hero section copy", issueId: "TF-41", issueUrl: "/projects/1/issues/41", timestamp: "2 min ago", comment: "Hey @you can you take a look at the design specs for this one?" },
-  { id: "2", type: "assigned", read: false, actor: { name: "Lucas Dufour", initials: "LD", color: "bg-blue-500" }, project: "Mobile App", projectUrl: "/projects/2", issueTitle: "Fix login screen crash on iOS 17", issueId: "TF-43", issueUrl: "/projects/2/issues/43", timestamp: "15 min ago" },
-  { id: "3", type: "overdue", read: false, project: "API v2", projectUrl: "/projects/3", issueTitle: "Migrate authentication endpoints", issueId: "TF-38", issueUrl: "/projects/3/issues/38", timestamp: "1 hour ago" },
-  { id: "4", type: "commented", read: true, actor: { name: "Emma Petit", initials: "EP", color: "bg-emerald-500" }, project: "Website Redesign", projectUrl: "/projects/1", issueTitle: "Implement dark mode toggle", issueId: "TF-29", issueUrl: "/projects/1/issues/29", timestamp: "3 hours ago", comment: "LGTM! Merging this tomorrow if no other comments." },
-  { id: "5", type: "dueSoon", read: true, project: "Mobile App", projectUrl: "/projects/2", issueTitle: "Sprint review preparation", issueId: "TF-51", issueUrl: "/projects/2/issues/51", timestamp: "5 hours ago" },
-  { id: "6", type: "mention", read: true, actor: { name: "Thomas Bernard", initials: "TB", color: "bg-orange-500" }, project: "API v2", projectUrl: "/projects/3", issueTitle: "Rate limiting strategy", issueId: "TF-22", issueUrl: "/projects/3/issues/22", timestamp: "Yesterday", comment: "Ping @you — what do you think about using sliding window?" },
-  { id: "7", type: "statusChanged", read: true, actor: { name: "Sophie Martin", initials: "SM", color: "bg-violet-500" }, project: "Website Redesign", projectUrl: "/projects/1", issueTitle: "SEO audit & fixes", issueId: "TF-17", issueUrl: "/projects/1/issues/17", timestamp: "Yesterday" },
-  { id: "8", type: "completed", read: true, actor: { name: "Lucas Dufour", initials: "LD", color: "bg-blue-500" }, project: "Mobile App", projectUrl: "/projects/2", issueTitle: "Onboarding flow redesign", issueId: "TF-12", issueUrl: "/projects/2/issues/12", timestamp: "2 days ago" },
-  { id: "9", type: "assigned", read: true, actor: { name: "Emma Petit", initials: "EP", color: "bg-emerald-500" }, project: "API v2", projectUrl: "/projects/3", issueTitle: "Write OpenAPI spec for /users endpoints", issueId: "TF-55", issueUrl: "/projects/3/issues/55", timestamp: "2 days ago" },
+const MOCK_SIGNALS: Signal[] = [
+  {
+    id: "1",
+    type: "overdue",
+    urgency: "critical",
+    read: false,
+    acknowledged: false,
+    operation: "API v2",
+    operationUrl: "/projects/3",
+    title: "Migrate authentication endpoints — deadline breached",
+    issueId: "TF-38",
+    issueUrl: "/projects/3/issues/38",
+    timestamp: "1h ago",
+    body: "This task was due 2 days ago. Sprint completion is now at risk.",
+  },
+  {
+    id: "2",
+    type: "mention",
+    urgency: "warning",
+    read: false,
+    acknowledged: false,
+    actor: { name: "Sophie Martin", initials: "SM", color: "#8b5cf6" },
+    operation: "Website Redesign",
+    operationUrl: "/projects/1",
+    title: "Update hero section copy — needs your review",
+    issueId: "TF-41",
+    issueUrl: "/projects/1/issues/41",
+    timestamp: "2 min ago",
+    body: "Hey @you can you take a look at the design specs for this one? Blocking the front-end team.",
+  },
+  {
+    id: "3",
+    type: "dueSoon",
+    urgency: "warning",
+    read: false,
+    acknowledged: false,
+    operation: "Mobile App",
+    operationUrl: "/projects/2",
+    title: "Sprint review preparation — due in 4 hours",
+    issueId: "TF-51",
+    issueUrl: "/projects/2/issues/51",
+    timestamp: "5h ago",
+  },
+  {
+    id: "4",
+    type: "assigned",
+    urgency: "info",
+    read: false,
+    acknowledged: false,
+    actor: { name: "Lucas Dufour", initials: "LD", color: "#3b82f6" },
+    operation: "Mobile App",
+    operationUrl: "/projects/2",
+    title: "Fix login screen crash on iOS 17",
+    issueId: "TF-43",
+    issueUrl: "/projects/2/issues/43",
+    timestamp: "15 min ago",
+  },
+  {
+    id: "5",
+    type: "commented",
+    urgency: "low",
+    read: true,
+    acknowledged: true,
+    actor: { name: "Emma Petit", initials: "EP", color: "#10b981" },
+    operation: "Website Redesign",
+    operationUrl: "/projects/1",
+    title: "Implement dark mode toggle",
+    issueId: "TF-29",
+    issueUrl: "/projects/1/issues/29",
+    timestamp: "3h ago",
+    body: "LGTM! Merging this tomorrow if no other comments.",
+  },
+  {
+    id: "6",
+    type: "mention",
+    urgency: "low",
+    read: true,
+    acknowledged: true,
+    actor: { name: "Thomas Bernard", initials: "TB", color: "#f97316" },
+    operation: "API v2",
+    operationUrl: "/projects/3",
+    title: "Rate limiting strategy — opinion requested",
+    issueId: "TF-22",
+    issueUrl: "/projects/3/issues/22",
+    timestamp: "Yesterday",
+    body: "Ping @you — what do you think about using sliding window?",
+  },
+  {
+    id: "7",
+    type: "statusChanged",
+    urgency: "low",
+    read: true,
+    acknowledged: true,
+    actor: { name: "Sophie Martin", initials: "SM", color: "#8b5cf6" },
+    operation: "Website Redesign",
+    operationUrl: "/projects/1",
+    title: "SEO audit & fixes — moved to In Review",
+    issueId: "TF-17",
+    issueUrl: "/projects/1/issues/17",
+    timestamp: "Yesterday",
+  },
+  {
+    id: "8",
+    type: "completed",
+    urgency: "low",
+    read: true,
+    acknowledged: true,
+    actor: { name: "Lucas Dufour", initials: "LD", color: "#3b82f6" },
+    operation: "Mobile App",
+    operationUrl: "/projects/2",
+    title: "Onboarding flow redesign — completed",
+    issueId: "TF-12",
+    issueUrl: "/projects/2/issues/12",
+    timestamp: "2 days ago",
+  },
+  {
+    id: "9",
+    type: "assigned",
+    urgency: "low",
+    read: true,
+    acknowledged: true,
+    actor: { name: "Emma Petit", initials: "EP", color: "#10b981" },
+    operation: "API v2",
+    operationUrl: "/projects/3",
+    title: "Write OpenAPI spec for /users endpoints",
+    issueId: "TF-55",
+    issueUrl: "/projects/3/issues/55",
+    timestamp: "2 days ago",
+  },
 ]
 
-const TABS: { key: NotifTab; icon: React.ElementType; filter: (n: Notification) => boolean }[] = [
-  { key: "all", icon: Bell, filter: () => true },
-  { key: "mentions", icon: AtSign, filter: (n) => n.type === "mention" },
-  { key: "alerts", icon: AlertTriangle, filter: (n) => n.type === "dueSoon" || n.type === "overdue" },
-  { key: "assignments", icon: ClipboardList, filter: (n) => n.type === "assigned" },
+// ─── Config ───────────────────────────────────────────────────────────────────
+
+const URGENCY_CONFIG: Record<Urgency, {
+  bg: string; border: string; dot: string; leftBar: string; label: string
+}> = {
+  critical: {
+    bg: "rgba(248,113,113,0.07)",
+    border: "rgba(248,113,113,0.18)",
+    dot: "#f87171",
+    leftBar: "#f87171",
+    label: "Critical",
+  },
+  warning: {
+    bg: "rgba(251,191,36,0.07)",
+    border: "rgba(251,191,36,0.18)",
+    dot: "#fbbf24",
+    leftBar: "#fbbf24",
+    label: "Warning",
+  },
+  info: {
+    bg: "rgba(96,165,250,0.06)",
+    border: "rgba(96,165,250,0.14)",
+    dot: "#60a5fa",
+    leftBar: "#60a5fa",
+    label: "Info",
+  },
+  low: {
+    bg: "transparent",
+    border: "var(--separator)",
+    dot: "var(--label-quaternary)",
+    leftBar: "transparent",
+    label: "",
+  },
+}
+
+const TYPE_CONFIG: Record<NotifType, { icon: React.ElementType; label: string; color: string }> = {
+  overdue:       { icon: Flame,          label: "Deadline breached", color: "#f87171" },
+  dueSoon:       { icon: Clock,          label: "Deadline risk",     color: "#fbbf24" },
+  mention:       { icon: AtSign,         label: "Mentioned you",     color: "#a78bfa" },
+  assigned:      { icon: ClipboardList,  label: "Assigned to you",   color: "#60a5fa" },
+  commented:     { icon: MessageSquare,  label: "Commented",         color: "var(--label-tertiary)" },
+  statusChanged: { icon: ArrowRight,     label: "Status updated",    color: "var(--label-tertiary)" },
+  completed:     { icon: CheckCircle2,   label: "Completed",         color: "#34d399" },
+}
+
+const TABS: {
+  key: NotifTab
+  icon: React.ElementType
+  label: string
+  filter: (s: Signal) => boolean
+}[] = [
+  { key: "all",         icon: Radio,        label: "All Signals",  filter: () => true },
+  { key: "alerts",      icon: ShieldAlert,  label: "Alerts",       filter: (s) => s.type === "dueSoon" || s.type === "overdue" },
+  { key: "mentions",    icon: AtSign,       label: "Mentions",     filter: (s) => s.type === "mention" },
+  { key: "assignments", icon: ClipboardList,label: "Assignments",  filter: (s) => s.type === "assigned" },
 ]
 
 function useTabHref(): Record<NotifTab, string> {
@@ -63,96 +233,231 @@ function useTabHref(): Record<NotifTab, string> {
   const ws = params?.workspace as string | undefined
   const base = ws ? `/${ws}` : ""
   return {
-    all: `${base}/inbox`,
-    mentions: `${base}/inbox/mentions`,
-    alerts: `${base}/inbox/alerts`,
+    all:         `${base}/inbox`,
+    mentions:    `${base}/inbox/mentions`,
+    alerts:      `${base}/inbox/alerts`,
     assignments: `${base}/inbox/assignments`,
   }
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+// ─── Signal row ───────────────────────────────────────────────────────────────
 
-function getTypeIcon(type: NotifType) {
-  switch (type) {
-    case "mention": return <AtSign className="h-3.5 w-3.5 text-violet-400" />
-    case "assigned": return <ClipboardList className="h-3.5 w-3.5 text-blue-400" />
-    case "commented": return <MessageSquare className="h-3.5 w-3.5 text-slate-400" />
-    case "statusChanged": return <ArrowRight className="h-3.5 w-3.5 text-slate-400" />
-    case "dueSoon": return <Clock className="h-3.5 w-3.5 text-yellow-400" />
-    case "overdue": return <AlertTriangle className="h-3.5 w-3.5 text-red-400" />
-    case "completed": return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
-  }
-}
-
-function getTypeLabel(type: NotifType, t: (key: string) => string): string {
-  const map: Record<NotifType, string> = {
-    mention: t("inbox.types.mention"),
-    assigned: t("inbox.types.assigned"),
-    commented: t("inbox.types.commented"),
-    statusChanged: t("inbox.types.statusChanged"),
-    dueSoon: t("inbox.types.dueSoon"),
-    overdue: t("inbox.types.overdue"),
-    completed: t("inbox.types.completed"),
-  }
-  return map[type]
-}
-
-// ---------------------------------------------------------------------------
-// NotificationItem
-// ---------------------------------------------------------------------------
-
-function NotificationItem({ notif, onMarkRead, t }: Readonly<{ notif: Notification; onMarkRead: (id: string) => void; t: (key: string) => string }>) {
+function SignalRow({
+  signal,
+  onMarkRead,
+  onAcknowledge,
+  index,
+}: {
+  signal: Signal
+  onMarkRead: (id: string) => void
+  onAcknowledge: (id: string) => void
+  index: number
+}) {
   const router = useRouter()
+  const ucfg = URGENCY_CONFIG[signal.urgency]
+  const tcfg = TYPE_CONFIG[signal.type]
+  const TypeIcon = tcfg.icon
 
-  function handleRowClick() {
-    onMarkRead(notif.id)
-    router.push(notif.issueUrl)
+  function handleClick() {
+    onMarkRead(signal.id)
+    router.push(signal.issueUrl)
   }
 
   return (
-    <button
-      type="button"
-      onClick={handleRowClick}
-      className={cn("group flex items-start gap-3 px-4 py-3 transition-colors hover:bg-muted/40 border-b border-border/50 last:border-0 cursor-pointer w-full text-left", !notif.read && "bg-primary/5")}>
-      <div className="mt-1.5 shrink-0 w-4 flex items-center justify-center">
-        {!notif.read && <Circle className="h-2 w-2 fill-primary text-primary" />}
-      </div>
-      <div className="shrink-0 mt-0.5">
-        {notif.actor ? (
-          <Avatar className="h-8 w-8"><AvatarFallback className={cn("text-xs text-white", notif.actor.color)}>{notif.actor.initials}</AvatarFallback></Avatar>
-        ) : (
-          <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">{getTypeIcon(notif.type)}</div>
+    <motion.div
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, x: -8 }}
+      transition={{ duration: 0.16, delay: index * 0.03 }}
+      className="group relative flex items-start gap-0 transition-colors"
+      style={{
+        background: signal.read ? "transparent" : ucfg.bg,
+        borderBottom: "1px solid var(--separator)",
+      }}
+      onMouseEnter={(e) => {
+        if (signal.read) (e.currentTarget as HTMLElement).style.background = "var(--fill-tertiary)"
+      }}
+      onMouseLeave={(e) => {
+        if (signal.read) (e.currentTarget as HTMLElement).style.background = "transparent"
+        else (e.currentTarget as HTMLElement).style.background = ucfg.bg
+      }}
+    >
+      {/* Urgency left bar */}
+      <div
+        className="w-0.5 self-stretch shrink-0 rounded-r-full"
+        style={{ background: signal.read ? "transparent" : ucfg.leftBar }}
+      />
+
+      <button
+        type="button"
+        onClick={handleClick}
+        className="flex-1 flex items-start gap-3 px-4 py-3 text-left"
+      >
+        {/* Unread dot */}
+        <div className="mt-2 w-2 h-2 shrink-0 flex items-center justify-center">
+          {!signal.read && (
+            <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: ucfg.dot }} />
+          )}
+        </div>
+
+        {/* Avatar or icon */}
+        <div className="shrink-0 mt-0.5">
+          {signal.actor ? (
+            <Avatar className="h-7 w-7">
+              <AvatarFallback
+                className="text-[9px] font-semibold"
+                style={{ background: `${signal.actor.color}22`, color: signal.actor.color }}
+              >
+                {signal.actor.initials}
+              </AvatarFallback>
+            </Avatar>
+          ) : (
+            <div
+              className="h-7 w-7 rounded-full flex items-center justify-center"
+              style={{ background: `${tcfg.color}18` }}
+            >
+              <TypeIcon className="size-3.5" style={{ color: tcfg.color }} />
+            </div>
+          )}
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+            {/* Type label */}
+            <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: tcfg.color }}>
+              {tcfg.label}
+            </span>
+            {/* Operation */}
+            <span
+              className="text-[10px] px-1.5 py-0.5 rounded"
+              style={{
+                background: "var(--fill-secondary)",
+                color: "var(--label-tertiary)",
+                fontFamily: "var(--font-mono)",
+              }}
+            >
+              {signal.operation}
+            </span>
+            <span className="text-[10px]" style={{ color: "var(--label-quaternary)" }}>
+              {signal.issueId}
+            </span>
+          </div>
+
+          <p
+            className="text-sm font-medium leading-snug mb-1 truncate"
+            style={{ color: signal.read ? "var(--label-secondary)" : "var(--label-primary)" }}
+          >
+            {signal.title}
+          </p>
+
+          {signal.body && (
+            <p className="text-xs line-clamp-1 italic mb-1.5" style={{ color: "var(--label-tertiary)" }}>
+              &ldquo;{signal.body}&rdquo;
+            </p>
+          )}
+
+          <span className="text-[10px]" style={{ color: "var(--label-quaternary)" }}>
+            {signal.timestamp}
+          </span>
+        </div>
+      </button>
+
+      {/* Actions */}
+      <div className="flex items-center gap-1 pr-3 pt-3 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+        {!signal.acknowledged && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onAcknowledge(signal.id) }}
+            className="flex items-center gap-1 h-6 px-2 rounded text-[10px] font-medium transition-colors"
+            style={{
+              background: "var(--fill-secondary)",
+              color: "var(--label-tertiary)",
+            }}
+            title="Acknowledge"
+          >
+            <CheckCheck className="size-3" />
+            Ack
+          </button>
         )}
+        <Link
+          href={signal.issueUrl}
+          onClick={(e) => { e.stopPropagation(); onMarkRead(signal.id) }}
+          className="h-6 w-6 flex items-center justify-center rounded transition-colors"
+          style={{ background: "var(--fill-secondary)", color: "var(--label-tertiary)" }}
+          title="Open"
+        >
+          <ArrowUpRight className="size-3" />
+        </Link>
       </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {notif.actor && <span className="text-sm font-medium text-foreground">{notif.actor.name}</span>}
-          <span className="text-sm text-muted-foreground">{getTypeLabel(notif.type, t)}</span>
-          <Link href={notif.issueUrl} onClick={(e) => e.stopPropagation()} className="text-sm font-medium text-foreground hover:text-primary truncate max-w-50 sm:max-w-xs">{notif.issueTitle}</Link>
-        </div>
-        {notif.comment && <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1 italic">&ldquo;{notif.comment}&rdquo;</p>}
-        <div className="mt-1 flex items-center gap-2">
-          <Link href={notif.projectUrl} onClick={(e) => e.stopPropagation()} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"><FolderKanban className="h-3 w-3" />{notif.project}</Link>
-          <span className="text-xs text-muted-foreground/60">·</span>
-          <span className="text-xs text-muted-foreground">{notif.issueId}</span>
-          <span className="text-xs text-muted-foreground/60">·</span>
-          <span className="text-xs text-muted-foreground">{notif.timestamp}</span>
-        </div>
-      </div>
-      {!notif.read && (
-        <button onClick={(e) => { e.stopPropagation(); onMarkRead(notif.id) }} title={t("inbox.markRead")} className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground">
-          <CheckCheck className="h-3.5 w-3.5" />
-        </button>
-      )}
-    </button>
+    </motion.div>
   )
 }
 
-// ---------------------------------------------------------------------------
-// InboxView — reusable across sub-routes
-// ---------------------------------------------------------------------------
+// ─── Summary strip ────────────────────────────────────────────────────────────
+
+function SummaryStrip({ signals }: { signals: Signal[] }) {
+  const critical  = signals.filter((s) => s.urgency === "critical" && !s.acknowledged).length
+  const warnings  = signals.filter((s) => s.urgency === "warning"  && !s.acknowledged).length
+  const unread    = signals.filter((s) => !s.read).length
+
+  if (critical === 0 && warnings === 0 && unread === 0) return null
+
+  return (
+    <div
+      className="flex items-center gap-4 px-4 py-2.5 text-[11px]"
+      style={{ background: "var(--fill-tertiary)", borderBottom: "1px solid var(--separator)" }}
+    >
+      {critical > 0 && (
+        <span className="flex items-center gap-1.5 font-semibold" style={{ color: "#f87171" }}>
+          <Flame className="size-3" />
+          {critical} critical
+        </span>
+      )}
+      {warnings > 0 && (
+        <span className="flex items-center gap-1.5 font-semibold" style={{ color: "#fbbf24" }}>
+          <AlertTriangle className="size-3" />
+          {warnings} warnings
+        </span>
+      )}
+      {unread > 0 && (
+        <span className="flex items-center gap-1.5" style={{ color: "var(--label-tertiary)" }}>
+          <Circle className="size-2.5 fill-current" />
+          {unread} unread
+        </span>
+      )}
+      <span className="ml-auto" style={{ color: "var(--label-quaternary)" }}>
+        Live · updated just now
+      </span>
+    </div>
+  )
+}
+
+// ─── Empty state ──────────────────────────────────────────────────────────────
+
+function EmptyState({ tab }: { tab: NotifTab }) {
+  const messages: Record<NotifTab, { title: string; sub: string }> = {
+    all:         { title: "All clear", sub: "No signals in your feed." },
+    alerts:      { title: "No active alerts", sub: "Operations are running smoothly." },
+    mentions:    { title: "No mentions", sub: "Nobody has mentioned you yet." },
+    assignments: { title: "Nothing assigned", sub: "You have no open assignments." },
+  }
+  const { title, sub } = messages[tab]
+
+  return (
+    <div className="flex flex-col items-center justify-center py-20 text-center">
+      <div
+        className="h-12 w-12 rounded-xl flex items-center justify-center mb-4"
+        style={{ background: "var(--fill-secondary)" }}
+      >
+        <CheckCircle2 className="size-5" style={{ color: "#34d399" }} />
+      </div>
+      <p className="text-sm font-semibold mb-1" style={{ color: "var(--label-primary)" }}>{title}</p>
+      <p className="text-xs" style={{ color: "var(--label-tertiary)" }}>{sub}</p>
+    </div>
+  )
+}
+
+// ─── InboxView ────────────────────────────────────────────────────────────────
 
 interface InboxViewProps {
   defaultTab?: NotifTab
@@ -162,75 +467,161 @@ export function InboxView({ defaultTab = "all" }: Readonly<InboxViewProps>) {
   const { t } = useTranslation()
   const TAB_HREF = useTabHref()
   const [activeTab, setActiveTab] = useState<NotifTab>(defaultTab)
-  const [notifications, setNotifications] = useState<Notification[]>(MOCK_NOTIFICATIONS)
+  const [signals, setSignals] = useState<Signal[]>(() =>
+    // Sort urgency-first on init
+    [...MOCK_SIGNALS].sort((a, b) => {
+      const order: Record<Urgency, number> = { critical: 0, warning: 1, info: 2, low: 3 }
+      return order[a.urgency] - order[b.urgency]
+    })
+  )
 
-  const tabConfig = TABS.find((tab) => tab.key === activeTab)!
-  const filtered = notifications.filter(tabConfig.filter)
-  const unreadCount = notifications.filter((n) => !n.read).length
+  const tabCfg = TABS.find((t) => t.key === activeTab)!
+  const filtered = signals.filter(tabCfg.filter)
+  const unreadCount = signals.filter((s) => !s.read).length
 
   function markRead(id: string) {
-    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)))
+    setSignals((prev) => prev.map((s) => s.id === id ? { ...s, read: true } : s))
+  }
+
+  function acknowledge(id: string) {
+    setSignals((prev) => prev.map((s) => s.id === id ? { ...s, read: true, acknowledged: true } : s))
   }
 
   function markAllRead() {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
+    setSignals((prev) => prev.map((s) => ({ ...s, read: true })))
   }
 
+  function clearAcknowledged() {
+    setSignals((prev) => prev.filter((s) => !s.acknowledged))
+  }
+
+  const acknowledgedCount = signals.filter((s) => s.acknowledged).length
+
   return (
-    <div className="flex flex-col gap-0 max-w-4xl mx-auto w-full">
-      <div className="flex items-center justify-between mb-6">
+    <div className="flex flex-col gap-0 max-w-3xl mx-auto w-full">
+
+      {/* ── Page header ── */}
+      <div className="flex items-start justify-between mb-5 gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{t("inbox.title")}</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">{t("inbox.subtitle")}</p>
+          <h1 className="text-xl font-semibold tracking-tight" style={{ color: "var(--label-primary)" }}>
+            Signal Center
+          </h1>
+          <p className="text-xs mt-0.5" style={{ color: "var(--label-tertiary)" }}>
+            Operational alerts, mentions, and assignments — sorted by urgency
+          </p>
         </div>
-        {unreadCount > 0 && (
-          <Button variant="ghost" size="sm" onClick={markAllRead} className="gap-2">
-            <CheckCheck className="h-4 w-4" />{t("inbox.markAllRead")}
-          </Button>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {acknowledgedCount > 0 && (
+            <button
+              onClick={clearAcknowledged}
+              className="flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs transition-colors"
+              style={{ background: "var(--fill-secondary)", color: "var(--label-tertiary)" }}
+            >
+              <X className="size-3" />
+              Clear {acknowledgedCount} acked
+            </button>
+          )}
+          {unreadCount > 0 && (
+            <Button variant="ghost" size="sm" onClick={markAllRead} className="gap-1.5 h-8 text-xs">
+              <CheckCheck className="size-3.5" />
+              Mark all read
+            </Button>
+          )}
+        </div>
       </div>
 
-      <div className="rounded-xl border border-border bg-card overflow-hidden [box-shadow:var(--shadow-sm)]">
-        <div className="flex items-center border-b border-border bg-muted/30 overflow-x-auto">
-          {TABS.map(({ key, icon: Icon }) => {
-            const tabNotifs = notifications.filter(TABS.find((tb) => tb.key === key)!.filter)
-            const tabUnread = tabNotifs.filter((n) => !n.read).length
-            const isActive = activeTab === key
+      {/* ── Signal card ── */}
+      <div
+        className="rounded-xl overflow-hidden"
+        style={{
+          background: "var(--card)",
+          border: "1px solid var(--separator)",
+          boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset, var(--shadow)",
+          backdropFilter: "blur(16px) saturate(180%)",
+          WebkitBackdropFilter: "blur(16px) saturate(180%)",
+        }}
+      >
+        {/* Tab bar */}
+        <div
+          className="flex items-center overflow-x-auto"
+          style={{ borderBottom: "1px solid var(--separator)", background: "var(--fill-tertiary)" }}
+        >
+          {TABS.map(({ key, icon: Icon, label }) => {
+            const tabSignals = signals.filter(TABS.find((t) => t.key === key)!.filter)
+            const tabUnread  = tabSignals.filter((s) => !s.read).length
+            const tabCritical = tabSignals.filter((s) => s.urgency === "critical" && !s.acknowledged).length
+            const isActive   = activeTab === key
+
             return (
               <Link
                 key={key}
                 href={TAB_HREF[key]}
                 onClick={() => setActiveTab(key)}
                 className={cn(
-                  "flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all border-b-2 -mb-px whitespace-nowrap",
-                  isActive ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+                  "flex items-center gap-2 px-4 py-2.5 text-xs font-medium transition-all border-b-2 -mb-px whitespace-nowrap"
                 )}
+                style={{
+                  borderBottomColor: isActive ? "var(--label-primary)" : "transparent",
+                  color: isActive ? "var(--label-primary)" : "var(--label-tertiary)",
+                }}
               >
-                <Icon className="h-4 w-4" />
-                {t(`inbox.tabs.${key}`)}
-                {tabUnread > 0 && (
-                  <Badge variant="secondary" className="h-5 min-w-5 px-1.5 text-xs bg-primary/15 text-primary border-0">{tabUnread}</Badge>
+                <Icon className="size-3.5" />
+                {label}
+                {tabCritical > 0 && (
+                  <span
+                    className="h-4 min-w-4 px-1 rounded text-[9px] font-bold flex items-center justify-center"
+                    style={{ background: "rgba(248,113,113,0.15)", color: "#f87171" }}
+                  >
+                    {tabCritical}
+                  </span>
+                )}
+                {tabCritical === 0 && tabUnread > 0 && (
+                  <span
+                    className="h-4 min-w-4 px-1 rounded text-[9px] font-bold flex items-center justify-center"
+                    style={{ background: "var(--fill-primary)", color: "var(--label-secondary)" }}
+                  >
+                    {tabUnread}
+                  </span>
                 )}
               </Link>
             )
           })}
         </div>
 
+        {/* Summary strip */}
+        <SummaryStrip signals={filtered} />
+
+        {/* Signal list */}
         <div>
           {filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-              <div className="h-14 w-14 rounded-full bg-muted flex items-center justify-center mb-4">
-                <Bell className="h-6 w-6 text-muted-foreground/50" />
-              </div>
-              <p className="text-base font-medium text-foreground">{t(`inbox.empty.${activeTab}`)}</p>
-              <p className="mt-1 text-sm text-muted-foreground">{t("inbox.empty.description")}</p>
-            </div>
+            <EmptyState tab={activeTab} />
           ) : (
-            filtered.map((notif) => (
-              <NotificationItem key={notif.id} notif={notif} onMarkRead={markRead} t={t} />
-            ))
+            <AnimatePresence mode="popLayout" initial={false}>
+              {filtered.map((signal, i) => (
+                <SignalRow
+                  key={signal.id}
+                  signal={signal}
+                  onMarkRead={markRead}
+                  onAcknowledge={acknowledge}
+                  index={i}
+                />
+              ))}
+            </AnimatePresence>
           )}
         </div>
+
+        {/* Footer — AI summary */}
+        {filtered.length > 0 && (
+          <div
+            className="flex items-center gap-2 px-4 py-2.5"
+            style={{ borderTop: "1px solid var(--separator)", background: "var(--fill-tertiary)" }}
+          >
+            <Zap className="size-3 shrink-0" style={{ color: "#a78bfa" }} />
+            <span className="text-[10px]" style={{ color: "var(--label-quaternary)" }}>
+              AI triage active · signals ranked by operational impact
+            </span>
+          </div>
+        )}
       </div>
     </div>
   )
