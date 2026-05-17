@@ -49,6 +49,9 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
 
     Optional<Issue> findByProjectIdAndSequenceNumber(Long projectId, Integer sequenceNumber);
 
+    /** Nombre d'issues d'un projet dans un statut donné (pour auto-assign position) */
+    long countByProjectIdAndStatusId(Long projectId, Long statusId);
+
     /** Compte les issues ouvertes (non COMPLETED/CANCELLED) */
     @Query("""
         SELECT COUNT(i) FROM Issue i
@@ -66,7 +69,7 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
         LEFT JOIN FETCH i.labels
         WHERE i.project.id = :projectId
           AND i.parent IS NULL
-        ORDER BY i.status.position ASC, i.sequenceNumber DESC
+        ORDER BY i.status.position ASC, i.position ASC, i.sequenceNumber DESC
         """)
     List<Issue> findForKanban(@Param("projectId") Long projectId);
 }
