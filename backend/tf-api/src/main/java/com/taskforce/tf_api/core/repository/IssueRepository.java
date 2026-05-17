@@ -1,5 +1,6 @@
 package com.taskforce.tf_api.core.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -72,4 +73,38 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
         ORDER BY i.status.position ASC, i.position ASC, i.sequenceNumber DESC
         """)
     List<Issue> findForKanban(@Param("projectId") Long projectId);
+
+    // -------------------------------------------------------------------------
+    // Analytics
+    // -------------------------------------------------------------------------
+
+    /** Nombre d'issues créées dans une plage pour une liste de projets */
+    @Query("""
+        SELECT COUNT(i) FROM Issue i
+        WHERE i.project.id IN :projectIds
+          AND i.createdAt >= :start AND i.createdAt < :end
+        """)
+    long countCreatedBetween(@Param("projectIds") List<Long> projectIds,
+                             @Param("start") LocalDateTime start,
+                             @Param("end") LocalDateTime end);
+
+    /** Nombre d'issues complétées dans une plage pour une liste de projets */
+    @Query("""
+        SELECT COUNT(i) FROM Issue i
+        WHERE i.project.id IN :projectIds
+          AND i.completedAt >= :start AND i.completedAt < :end
+        """)
+    long countCompletedBetween(@Param("projectIds") List<Long> projectIds,
+                               @Param("start") LocalDateTime start,
+                               @Param("end") LocalDateTime end);
+
+    /** Issues complétées dans une plage (pour calcul du temps de résolution) */
+    @Query("""
+        SELECT i FROM Issue i
+        WHERE i.project.id IN :projectIds
+          AND i.completedAt >= :start AND i.completedAt < :end
+        """)
+    List<Issue> findCompletedBetween(@Param("projectIds") List<Long> projectIds,
+                                     @Param("start") LocalDateTime start,
+                                     @Param("end") LocalDateTime end);
 }
