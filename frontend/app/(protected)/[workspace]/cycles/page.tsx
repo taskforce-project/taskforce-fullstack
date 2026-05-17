@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useParams } from "next/navigation"
 import {
   Plus,
   RefreshCw,
@@ -25,6 +26,9 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
 import { CreateCycleDialog } from "@/components/dialogs/create-cycle-dialog"
+import { useCycleStore } from "@/lib/store/cycle-store"
+import { useProjectStore } from "@/lib/store/project-store"
+import type { CycleStatus as ApiCycleStatus } from "@/lib/api/cycle-service"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -52,72 +56,23 @@ interface Cycle {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Mock data
+// Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-const MOCK_CYCLES: Cycle[] = [
-  {
-    id: "1",
-    name: "Sprint 4 — Auth & Billing",
-    description: "Focus on authentication improvements and Stripe integration.",
-    project: { id: "1", name: "Mobile App", emoji: "📱", color: "bg-blue-500" },
-    status: "active",
-    startDate: "2026-04-01",
-    endDate: "2026-04-14",
-    issues: { total: 12, done: 7, inProgress: 3, todo: 2, cancelled: 0 },
-  },
-  {
-    id: "2",
-    name: "Sprint 7 — Dashboard v2",
-    description: "Redesign the main dashboard with new chart components.",
-    project: { id: "2", name: "Website", emoji: "🎨", color: "bg-violet-500" },
-    status: "active",
-    startDate: "2026-03-31",
-    endDate: "2026-04-11",
-    issues: { total: 8, done: 5, inProgress: 2, todo: 1, cancelled: 0 },
-  },
-  {
-    id: "3",
-    name: "API v2 — Rate Limiting",
-    description: null,
-    project: { id: "3", name: "API v2", emoji: "⚡", color: "bg-emerald-500" },
-    status: "upcoming",
-    startDate: "2026-04-15",
-    endDate: "2026-04-28",
-    issues: { total: 6, done: 0, inProgress: 0, todo: 6, cancelled: 0 },
-  },
-  {
-    id: "4",
-    name: "Sprint Q2 — Analytics",
-    description: "Chart exports, filters and performance improvements.",
-    project: { id: "4", name: "Analytics", emoji: "📊", color: "bg-amber-500" },
-    status: "upcoming",
-    startDate: "2026-04-20",
-    endDate: "2026-05-03",
-    issues: { total: 9, done: 0, inProgress: 0, todo: 9, cancelled: 0 },
-  },
-  {
-    id: "5",
-    name: "Sprint 2 — Core Components",
-    description: "Build foundational button, input, and form components.",
-    project: { id: "5", name: "Design System", emoji: "💎", color: "bg-slate-500" },
-    status: "completed",
-    startDate: "2026-02-17",
-    endDate: "2026-03-02",
-    issues: { total: 15, done: 14, inProgress: 0, todo: 0, cancelled: 1 },
-  },
-  {
-    id: "6",
-    name: "Sprint 3 — Onboarding",
-    description: "New user onboarding flow, welcome email & plan selection.",
-    project: { id: "1", name: "Mobile App", emoji: "📱", color: "bg-blue-500" },
-    status: "completed",
-    startDate: "2026-03-03",
-    endDate: "2026-03-16",
-    issues: { total: 10, done: 10, inProgress: 0, todo: 0, cancelled: 0 },
-  },
+const PROJECT_COLORS = [
+  "bg-blue-500", "bg-violet-500", "bg-emerald-500", "bg-amber-500",
+  "bg-slate-500", "bg-orange-500", "bg-pink-500", "bg-cyan-500",
 ]
 
+function projectColor(id: number): string {
+  return PROJECT_COLORS[id % PROJECT_COLORS.length]
+}
+
+const API_STATUS_MAP: Record<ApiCycleStatus, CycleStatus> = {
+  ACTIVE:    "active",
+  DRAFT:     "upcoming",
+  COMPLETED: "completed",
+}
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
@@ -306,26 +261,58 @@ function CycleSection({ title, cycles, defaultOpen = true }: Readonly<{
 // Page
 // ─────────────────────────────────────────────────────────────────────────────
 
+function mapApiCyclesToLocal(
+  results: import("@/lib/api/cycle-service").Cycle[][],
+  projs: import("@/lib/api/project-service").Project[]
+): Cycle[] {
+  return results.flatMap((apiCycles, idx) => {
+    const proj = projs[idx]
+    return apiCycles.map((c) => ({
+      id:          String(c.id),
+      name:        c.name,
+      description: c.description,
+      project: {
+        id:    String(proj.id),
+        name:  proj.name,
+        emoji: proj.identifier.slice(0, 2),
+        color: projectColor(proj.id),
+      },
+      status:    API_STATUS_MAP[c.status],
+      startDate: c.startDate ?? "",
+      endDate:   c.endDate ?? "",
+      issues: {
+        total:      c.issueCount,
+        done:       0,
+        inProgress: 0,
+        todo:       c.issueCount,
+        cancelled:  0,
+      },
+    }))
+  })
+}
+
 export default function CyclesPage() {
-  const [cycles, setCycles] = useState(MOCK_CYCLES)
+  const params = useParams()
+  const slug   = typeof params?.workspace === "string" ? params.workspace : ""
+
+  const { fetchProjects } = useProjectStore()
+  const { fetchCycles, isLoading }  = useCycleStore()
+
+  const [cycles, setCycles] = useState<Cycle[]>([])
+
+  useEffect(() => {
+    if (!slug) return
+    fetchProjects(slug).then((projs) => {
+      Promise.all(projs.map((p) => fetchCycles(slug, p.id))).then((results) => {
+        setCycles(mapApiCyclesToLocal(results, projs))
+      })
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug])
 
   const active    = cycles.filter((c) => c.status === "active")
   const upcoming  = cycles.filter((c) => c.status === "upcoming")
   const completed = cycles.filter((c) => c.status === "completed")
-
-  function handleCycleCreated(payload: { name: string; description: string; projectId: string; startDate: Date; endDate: Date }) {
-    const newCycle: Cycle = {
-      id: Date.now().toString(),
-      name: payload.name,
-      description: payload.description || null,
-      project: { id: payload.projectId, name: "New Project", emoji: "📁", color: "bg-muted-foreground" },
-      status: "upcoming",
-      startDate: payload.startDate.toISOString().slice(0, 10),
-      endDate: payload.endDate.toISOString().slice(0, 10),
-      issues: { total: 0, done: 0, inProgress: 0, todo: 0, cancelled: 0 },
-    }
-    setCycles((prev) => [...prev, newCycle])
-  }
 
   return (
     <div className="flex flex-col gap-8 w-full max-w-6xl mx-auto">
@@ -334,10 +321,10 @@ export default function CyclesPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Cycles</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {active.length} active · {upcoming.length} upcoming · {completed.length} completed
+            {isLoading ? "Loading…" : `${active.length} active · ${upcoming.length} upcoming · ${completed.length} completed`}
           </p>
         </div>
-        <CreateCycleDialog onCreated={handleCycleCreated}>
+        <CreateCycleDialog>
           <Button size="sm" className="gap-2 shrink-0">
             <Plus className="h-4 w-4" />
             New cycle
@@ -361,12 +348,12 @@ export default function CyclesPage() {
       )}
 
       {/* Empty state */}
-      {cycles.length === 0 && (
+      {!isLoading && cycles.length === 0 && (
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <RefreshCw className="h-10 w-10 text-muted-foreground/30 mb-4" />
           <p className="text-base font-medium text-foreground">No cycles yet</p>
           <p className="text-sm text-muted-foreground mt-1">Create a cycle to track a sprint or milestone.</p>
-          <CreateCycleDialog onCreated={handleCycleCreated}>
+          <CreateCycleDialog>
             <Button size="sm" className="mt-4 gap-2">
               <Plus className="h-4 w-4" />
               New cycle
