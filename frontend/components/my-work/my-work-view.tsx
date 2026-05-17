@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
 import { motion } from "framer-motion"
@@ -11,6 +12,12 @@ import {
 import { useTranslation } from "@/lib/i18n"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
+import { useProjectStore } from "@/lib/store/project-store"
+import { useIssueStore } from "@/lib/store/issue-store"
+import { useCycleStore } from "@/lib/store/cycle-store"
+import { useUserStore } from "@/lib/store/user-store"
+import type { IssueStatusCategory, IssuePriority as ApiPriority, Issue as ApiIssue } from "@/lib/api/issue-service"
+import type { CycleStatus as ApiCycleStatus, Cycle as ApiCycle } from "@/lib/api/cycle-service"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -59,30 +66,29 @@ interface Page {
   url: string
 }
 
-// ─── Mock data ─────────────────────────────────────────────────────────────────
+// ─── Mapping helpers ──────────────────────────────────────────────────────────
 
-const MOCK_ISSUES: Issue[] = [
-  { id: "1", identifier: "TF-43", title: "Fix login screen crash on iOS 17",           priority: "urgent", status: "in_progress", project: "Mobile App",       projectId: "2", dueDate: "Today",     url: "/projects/2/issues/43" },
-  { id: "2", identifier: "TF-41", title: "Update hero section copy",                   priority: "high",   status: "todo",        project: "Website Redesign", projectId: "1", dueDate: "Tomorrow",  url: "/projects/1/issues/41" },
-  { id: "3", identifier: "TF-38", title: "Implement push notification service",        priority: "high",   status: "in_review",   project: "Mobile App",       projectId: "2", dueDate: "Mar 29",    url: "/projects/2/issues/38" },
-  { id: "4", identifier: "TF-35", title: "Dark mode inconsistencies in dashboard",     priority: "medium", status: "todo",        project: "Website Redesign", projectId: "1", dueDate: "Overdue",   url: "/projects/1/issues/35" },
-  { id: "5", identifier: "TF-29", title: "API rate limiting — implement token bucket", priority: "high",   status: "in_progress", project: "API v2",           projectId: "3", dueDate: "Apr 2",     url: "/projects/1/issues/29" },
-  { id: "6", identifier: "TF-61", title: "Profile settings page — avatar upload",      priority: "medium", status: "todo",        project: "Mobile App",       projectId: "2", dueDate: null,        url: "/projects/2/issues/61" },
-]
+const STATUS_MAP: Record<IssueStatusCategory, IssueStatus> = {
+  BACKLOG:   "todo",
+  UNSTARTED: "todo",
+  STARTED:   "in_progress",
+  COMPLETED: "done",
+  CANCELLED: "cancelled",
+}
 
-const MOCK_CYCLES: Cycle[] = [
-  { id: "1", title: "Sprint 4 — Mobile hardening",    project: "Mobile App", projectId: "2", status: "active",    progress: 62,  totalIssues: 14, completedIssues: 9, startDate: "Mar 24", endDate: "Apr 4",  daysLeft: 6,    url: "/projects/2/cycles/1" },
-  { id: "2", title: "Sprint 3 — API foundations",     project: "API v2",     projectId: "3", status: "active",    progress: 45,  totalIssues: 11, completedIssues: 5, startDate: "Mar 20", endDate: "Apr 2",  daysLeft: 4,    url: "/projects/3/cycles/2" },
-  { id: "3", title: "Sprint 5 — Onboarding flow",     project: "Mobile App", projectId: "2", status: "upcoming",  progress: 0,   totalIssues: 0,  completedIssues: 0, startDate: "Apr 7",  endDate: "Apr 18", daysLeft: null, url: "/projects/2/cycles/3" },
-  { id: "4", title: "Sprint 2 — Auth & security",     project: "API v2",     projectId: "3", status: "completed", progress: 100, totalIssues: 9,  completedIssues: 9, startDate: "Mar 3",  endDate: "Mar 14", daysLeft: null, url: "/projects/3/cycles/4" },
-]
+const PRIORITY_MAP: Record<ApiPriority, IssuePriority> = {
+  NONE:   "none",
+  URGENT: "urgent",
+  HIGH:   "high",
+  MEDIUM: "medium",
+  LOW:    "low",
+}
 
-const MOCK_PAGES: Page[] = [
-  { id: "1", title: "Architecture Decision Records — Auth Service",  project: "API v2",     projectId: "3", lastEditedAt: "2 hours ago", lastEditedBy: "You",           lastEditedByInitials: "ME", lastEditedByColor: "#8b5cf6", url: "/projects/3/pages/1" },
-  { id: "2", title: "Mobile App — Design System Guidelines",         project: "Mobile App", projectId: "2", lastEditedAt: "Yesterday",   lastEditedBy: "Sophie Martin", lastEditedByInitials: "SM", lastEditedByColor: "#8b5cf6", url: "/projects/2/pages/2" },
-  { id: "3", title: "Sprint 4 — Team retrospective notes",           project: "Mobile App", projectId: "2", lastEditedAt: "3 days ago",  lastEditedBy: "You",           lastEditedByInitials: "ME", lastEditedByColor: "#8b5cf6", url: "/projects/2/pages/3" },
-  { id: "4", title: "API v2 — Rate limiting strategy",               project: "API v2",     projectId: "3", lastEditedAt: "Last week",   lastEditedBy: "Thomas Bernard",lastEditedByInitials: "TB", lastEditedByColor: "#f97316", url: "/projects/3/pages/4" },
-]
+const CYCLE_STATUS_MAP: Record<ApiCycleStatus, CycleStatus> = {
+  ACTIVE:    "active",
+  DRAFT:     "upcoming",
+  COMPLETED: "completed",
+}
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -121,7 +127,7 @@ function useTabHref(): Record<MyWorkTab, string> {
 
 // ─── Row components ───────────────────────────────────────────────────────────
 
-function IssueRow({ issue, index }: { issue: Issue; index: number }) {
+function IssueRow({ issue, index }: Readonly<{ issue: Issue; index: number }>) {
   const sc = STATUS_CONFIG[issue.status]
   const isOverdue = issue.dueDate === "Overdue"
 
@@ -183,7 +189,7 @@ function IssueRow({ issue, index }: { issue: Issue; index: number }) {
   )
 }
 
-function CycleRow({ cycle, index }: { cycle: Cycle; index: number }) {
+function CycleRow({ cycle, index }: Readonly<{ cycle: Cycle; index: number }>) {
   const sc = CYCLE_STATUS[cycle.status]
 
   return (
@@ -241,7 +247,7 @@ function CycleRow({ cycle, index }: { cycle: Cycle; index: number }) {
 
         {/* Progress */}
         {cycle.status !== "upcoming" && (
-          <div className="flex items-center gap-2 shrink-0 w-28 hidden md:flex">
+          <div className="items-center gap-2 shrink-0 w-28 hidden md:flex">
             <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: "var(--fill-secondary)" }}>
               <div
                 className="h-full rounded-full transition-all"
@@ -268,7 +274,7 @@ function CycleRow({ cycle, index }: { cycle: Cycle; index: number }) {
   )
 }
 
-function PageRow({ page, index }: { page: Page; index: number }) {
+function PageRow({ page, index }: Readonly<{ page: Page; index: number }>) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 4 }}
@@ -318,7 +324,7 @@ function PageRow({ page, index }: { page: Page; index: number }) {
 
 // ─── Empty state ──────────────────────────────────────────────────────────────
 
-function EmptyState({ tab }: { tab: MyWorkTab }) {
+function EmptyState({ tab }: Readonly<{ tab: MyWorkTab }>) {
   const cfg: Record<MyWorkTab, { icon: React.ElementType; title: string; sub: string }> = {
     issues: { icon: CircleDot,  title: "No open issues",  sub: "Issues assigned to you will appear here." },
     cycles: { icon: RefreshCw,  title: "No active sprints", sub: "Your sprint memberships will appear here." },
@@ -337,12 +343,57 @@ function EmptyState({ tab }: { tab: MyWorkTab }) {
   )
 }
 
-// ─── Tab config ───────────────────────────────────────────────────────────────
+import type { Project } from "@/lib/api/project-service"
 
-const TABS: { key: MyWorkTab; icon: React.ElementType; label: string; count: number }[] = [
-  { key: "issues", icon: CircleDot, label: "Issues",  count: MOCK_ISSUES.length },
-  { key: "cycles", icon: RefreshCw, label: "Sprints", count: MOCK_CYCLES.filter((c) => c.status === "active").length },
-  { key: "pages",  icon: FileText,  label: "Pages",   count: MOCK_PAGES.length },
+function mapApiIssue(i: ApiIssue, proj: Project, userEmail: string, baseUrl: string): Issue | null {
+  if (i.assignee?.email !== userEmail) return null
+  return {
+    id:         String(i.id),
+    identifier: `${proj.identifier}-${i.id}`,
+    title:      i.title,
+    priority:   PRIORITY_MAP[i.priority],
+    status:     STATUS_MAP[i.status.category],
+    project:    proj.name,
+    projectId:  String(proj.id),
+    dueDate:    i.dueDate ? new Date(i.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null,
+    url:        `${baseUrl}/projects/${proj.id}/issues/${i.id}`,
+  }
+}
+
+function mapApiCycle(c: ApiCycle, proj: Project, baseUrl: string): Cycle {
+  const daysLeftMs = c.endDate ? Math.ceil((new Date(c.endDate).getTime() - Date.now()) / 86400000) : null
+  return {
+    id:              String(c.id),
+    title:           c.name,
+    project:         proj.name,
+    projectId:       String(proj.id),
+    status:          CYCLE_STATUS_MAP[c.status],
+    progress:        0,
+    totalIssues:     c.issueCount,
+    completedIssues: 0,
+    startDate:       c.startDate ? new Date(c.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—",
+    endDate:         c.endDate   ? new Date(c.endDate).toLocaleDateString("en-US",   { month: "short", day: "numeric" }) : "—",
+    daysLeft:        daysLeftMs !== null && daysLeftMs > 0 ? daysLeftMs : null,
+    url:             `${baseUrl}/projects/${proj.id}/cycles/${c.id}`,
+  }
+}
+
+function flattenIssues(results: { proj: Project; issues: ApiIssue[] }[], userEmail: string, baseUrl: string): Issue[] {
+  return results.flatMap(({ proj, issues }) =>
+    issues.map((i) => mapApiIssue(i, proj, userEmail, baseUrl)).filter((x): x is Issue => x !== null)
+  )
+}
+
+function flattenCycles(results: { proj: Project; cycles: ApiCycle[] }[], baseUrl: string): Cycle[] {
+  return results.flatMap(({ proj, cycles }) => cycles.map((c) => mapApiCycle(c, proj, baseUrl)))
+}
+
+
+
+const TAB_KEYS: { key: MyWorkTab; icon: React.ElementType; label: string }[] = [
+  { key: "issues", icon: CircleDot, label: "Issues"  },
+  { key: "cycles", icon: RefreshCw, label: "Sprints" },
+  { key: "pages",  icon: FileText,  label: "Pages"   },
 ]
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -352,9 +403,51 @@ interface MyWorkViewProps {
 }
 
 export function MyWorkView({ defaultTab = "issues" }: Readonly<MyWorkViewProps>) {
-  const { t } = useTranslation()
+  useTranslation()
   const TAB_HREF = useTabHref()
   const activeTab = defaultTab
+
+  const params = useParams()
+  const slug   = typeof params?.workspace === "string" ? params.workspace : ""
+
+  const { user, fetchMe }           = useUserStore()
+  const { fetchProjects }           = useProjectStore()
+  const { fetchIssues }             = useIssueStore()
+  const { fetchCycles }             = useCycleStore()
+
+  const [myIssues, setMyIssues] = useState<Issue[]>([])
+  const [myCycles, setMyCycles] = useState<Cycle[]>([])
+
+  useEffect(() => {
+    fetchMe()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    if (!slug || !user) return
+    const baseUrl = `/${slug}`
+
+    async function load() {
+      const projs = await fetchProjects(slug)
+      const [issueResults, cycleResults] = await Promise.all([
+        Promise.all(projs.map(async (p) => ({ proj: p, issues: await fetchIssues(slug, p.id) }))),
+        Promise.all(projs.map(async (p) => ({ proj: p, cycles: await fetchCycles(slug, p.id) }))),
+      ])
+
+      setMyIssues(flattenIssues(issueResults, user.email, baseUrl))
+      setMyCycles(flattenCycles(cycleResults, baseUrl))
+    }
+
+    void load()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug, user])
+
+  function tabCount(key: MyWorkTab): number {
+    if (key === "issues") return myIssues.length
+    if (key === "cycles") return myCycles.filter((c) => c.status === "active").length
+    return 0
+  }
+  const TABS = TAB_KEYS.map((tk) => ({ ...tk, count: tabCount(tk.key) }))
 
   return (
     <div className="flex flex-col gap-0 max-w-4xl mx-auto w-full">
@@ -431,19 +524,17 @@ export function MyWorkView({ defaultTab = "issues" }: Readonly<MyWorkViewProps>)
         {/* Content */}
         <div>
           {activeTab === "issues" && (
-            MOCK_ISSUES.length === 0
+            myIssues.length === 0
               ? <EmptyState tab="issues" />
-              : MOCK_ISSUES.map((issue, i) => <IssueRow key={issue.id} issue={issue} index={i} />)
+              : myIssues.map((issue, i) => <IssueRow key={issue.id} issue={issue} index={i} />)
           )}
           {activeTab === "cycles" && (
-            MOCK_CYCLES.length === 0
+            myCycles.length === 0
               ? <EmptyState tab="cycles" />
-              : MOCK_CYCLES.map((cycle, i) => <CycleRow key={cycle.id} cycle={cycle} index={i} />)
+              : myCycles.map((cycle, i) => <CycleRow key={cycle.id} cycle={cycle} index={i} />)
           )}
           {activeTab === "pages" && (
-            MOCK_PAGES.length === 0
-              ? <EmptyState tab="pages" />
-              : MOCK_PAGES.map((page, i) => <PageRow key={page.id} page={page} index={i} />)
+            <EmptyState tab="pages" />
           )}
         </div>
       </div>
