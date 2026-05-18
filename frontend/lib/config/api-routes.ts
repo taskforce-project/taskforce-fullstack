@@ -121,6 +121,18 @@ export const ANALYTICS_ROUTES = {
 } as const;
 
 /**
+ * Routes notifications
+ * Backend: /api/workspaces/{slug}/notifications
+ */
+export const NOTIFICATION_ROUTES = {
+  LIST:            (slug: string) => `/api/workspaces/${slug}/notifications`,
+  UNREAD_COUNT:    (slug: string) => `/api/workspaces/${slug}/notifications/unread-count`,
+  MARK_READ:       (slug: string, id: number) => `/api/workspaces/${slug}/notifications/${id}/read`,
+  MARK_ALL_READ:   (slug: string) => `/api/workspaces/${slug}/notifications/read-all`,
+  ACKNOWLEDGE_ALL: (slug: string) => `/api/workspaces/${slug}/notifications/acknowledge-all`,
+} as const;
+
+/**
  * Toutes les routes groupées (export par défaut)
  */
 export const API_ROUTES = {
