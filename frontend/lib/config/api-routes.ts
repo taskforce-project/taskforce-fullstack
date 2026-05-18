@@ -153,6 +153,21 @@ export const PAGE_ROUTES = {
 } as const;
 
 /**
+ * Routes teams
+ * Backend: /api/workspaces/{slug}/teams
+ */
+export const TEAM_ROUTES = {
+  LIST:           (slug: string) => `/api/workspaces/${slug}/teams`,
+  CREATE:         (slug: string) => `/api/workspaces/${slug}/teams`,
+  BY_ID:          (slug: string, teamId: number) => `/api/workspaces/${slug}/teams/${teamId}`,
+  UPDATE:         (slug: string, teamId: number) => `/api/workspaces/${slug}/teams/${teamId}`,
+  DELETE:         (slug: string, teamId: number) => `/api/workspaces/${slug}/teams/${teamId}`,
+  MEMBERS:        (slug: string, teamId: number) => `/api/workspaces/${slug}/teams/${teamId}/members`,
+  ADD_MEMBER:     (slug: string, teamId: number) => `/api/workspaces/${slug}/teams/${teamId}/members`,
+  REMOVE_MEMBER:  (slug: string, teamId: number, userId: number) => `/api/workspaces/${slug}/teams/${teamId}/members/${userId}`,
+} as const;
+
+/**
  * Toutes les routes groupées (export par défaut)
  */
 export const API_ROUTES = {
