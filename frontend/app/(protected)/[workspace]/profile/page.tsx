@@ -23,55 +23,16 @@ import { Separator } from "@/components/ui/separator"
 import { useAuth } from "@/lib/contexts/auth-context"
 import { cn } from "@/lib/utils"
 import { useProjectStore } from "@/lib/store/project-store"
+import { useProfileStore, type HeatWeek, type HeatCell } from "@/lib/store/profile-store"
 import type { Project } from "@/lib/api/project-service"
 
 // ---------------------------------------------------------------------------
-// Mock data
+// Static config
 // ---------------------------------------------------------------------------
-
-const ACTIVITY_WEEKS = 20
-const ACTIVITY_DAYS  = 7
-
-interface HeatCell { id: string; val: number }
-interface HeatWeek { id: string; days: HeatCell[] }
-
-/** Generate a pseudo-random heat map seeded by position */
-function genHeatmap(): HeatWeek[] {
-  const grid: HeatWeek[] = []
-  for (let w = 0; w < ACTIVITY_WEEKS; w++) {
-    const days: HeatCell[] = []
-    for (let d = 0; d < ACTIVITY_DAYS; d++) {
-      const v = Math.floor(Math.abs(Math.sin(w * 7 + d + 1) * 5))
-      days.push({ id: `w${w}d${d}`, val: v })
-    }
-    grid.push({ id: `w${w}`, days })
-  }
-  return grid
-}
-
-const HEATMAP = genHeatmap()
 
 const PROJECT_COLORS = [
   "bg-primary", "bg-violet-500", "bg-emerald-500",
   "bg-orange-500", "bg-blue-500", "bg-pink-500",
-]
-
-const ACTIVITY_FEED = [
-  { id: "1", type: "issue_closed",   text: 'Closed "Fix login redirect loop"',              time: "2 hours ago",  color: "text-emerald-400" },
-  { id: "2", type: "issue_created",  text: 'Created "Add dark mode to onboarding"',         time: "4 hours ago",  color: "text-primary" },
-  { id: "3", type: "comment",        text: 'Commented on "Rate limit strategy for API v2"', time: "Yesterday",    color: "text-yellow-400" },
-  { id: "4", type: "issue_closed",   text: 'Closed "Setup CI/CD pipeline"',                 time: "Yesterday",    color: "text-emerald-400" },
-  { id: "5", type: "cycle_started",  text: 'Started cycle "Sprint 5" in Website Redesign',  time: "2 days ago",   color: "text-violet-400" },
-  { id: "6", type: "issue_created",  text: 'Created "Implement drag-and-drop kanban"',      time: "3 days ago",   color: "text-primary" },
-  { id: "7", type: "issue_closed",   text: 'Closed "Migrate auth to Keycloak"',             time: "4 days ago",   color: "text-emerald-400" },
-  { id: "8", type: "comment",        text: 'Commented on "PWA offline support"',            time: "5 days ago",   color: "text-yellow-400" },
-]
-
-const STATS = [
-  { label: "Issues created",   value: 86, icon: <CircleDot className="h-4 w-4" /> },
-  { label: "Closed",           value: 61, icon: <CheckCircle2 className="h-4 w-4" /> },
-  { label: "Cycles completed", value: 9,  icon: <GitCommitHorizontal className="h-4 w-4" /> },
-  { label: "Days active",      value: 47, icon: <Clock className="h-4 w-4" /> },
 ]
 
 const ACTIVITY_TYPE_ICON: Record<string, React.ReactNode> = {
@@ -94,8 +55,8 @@ const HEAT_COLORS = [
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function ContributionGraph() {
-  const totalContribs = HEATMAP.flatMap((w) => w.days).reduce((a, cell) => a + cell.val, 0)
+function ContributionGraph({ heatmap }: Readonly<{ heatmap: HeatWeek[] }>) {
+  const totalContribs = heatmap.flatMap((w) => w.days).reduce((a, cell) => a + cell.val, 0)
 
   return (
     <div className="rounded-xl border border-border bg-card [box-shadow:var(--shadow-sm)] p-5">
@@ -105,9 +66,9 @@ function ContributionGraph() {
       </div>
 
       <div className="flex gap-1 overflow-x-auto pb-1">
-        {HEATMAP.map((week) => (
+        {heatmap.map((week) => (
           <div key={week.id} className="flex flex-col gap-1">
-            {week.days.map((cell) => (
+            {week.days.map((cell: HeatCell) => (
               <div
                 key={cell.id}
                 title={`${cell.val} contribution${cell.val === 1 ? "" : "s"}`}
@@ -167,10 +128,14 @@ export default function ProfilePage() {
   const slug     = typeof params.workspace === "string" ? params.workspace : ""
 
   const { projects, fetchProjects } = useProjectStore()
+  const { stats, activity, heatmap, fetchProfile } = useProfileStore()
 
   useEffect(() => {
-    if (slug) void fetchProjects(slug)
-  }, [slug, fetchProjects])
+    if (slug) {
+      void fetchProjects(slug)
+      fetchProfile(slug).catch(console.error)
+    }
+  }, [slug, fetchProjects, fetchProfile])
 
   const displayName  = user?.displayName ?? (user ? `${user.firstName} ${user.lastName}` : "Your Name")
   const initials     = user ? `${user.firstName[0]}${user.lastName[0]}`.toUpperCase() : "ME"
@@ -223,7 +188,7 @@ export default function ProfilePage() {
             <div className="flex items-center gap-4 mt-4">
               <button className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
                 <Users className="h-3.5 w-3.5" />
-                <span className="font-medium text-foreground">4</span> teammates
+                <span className="font-medium text-foreground">{stats?.teammateCount ?? "—"}</span> teammates
               </button>
               <button className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
                 <FolderKanban className="h-3.5 w-3.5" />
@@ -231,7 +196,7 @@ export default function ProfilePage() {
               </button>
               <button className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
                 <GitCommitHorizontal className="h-3.5 w-3.5" />
-                <span className="font-medium text-foreground">9</span> cycles
+                <span className="font-medium text-foreground">{stats?.cyclesCompleted ?? "—"}</span> cycles
               </button>
             </div>
           </div>
@@ -240,7 +205,12 @@ export default function ProfilePage() {
 
       {/* Stats row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {STATS.map((stat) => (
+        {[
+          { label: "Issues created",   value: stats?.issuesCreated   ?? "—", icon: <CircleDot className="h-4 w-4" /> },
+          { label: "Closed",           value: stats?.issuesClosed    ?? "—", icon: <CheckCircle2 className="h-4 w-4" /> },
+          { label: "Cycles completed", value: stats?.cyclesCompleted ?? "—", icon: <GitCommitHorizontal className="h-4 w-4" /> },
+          { label: "Days active",      value: stats?.daysActive      ?? "—", icon: <Clock className="h-4 w-4" /> },
+        ].map((stat) => (
           <div key={stat.label} className="rounded-xl border border-border bg-card p-4 [box-shadow:var(--shadow-sm)] flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground">{stat.label}</span>
@@ -256,7 +226,7 @@ export default function ProfilePage() {
         {/* Left column */}
         <div className="flex flex-col gap-6">
           {/* Activity graph */}
-          <ContributionGraph />
+          <ContributionGraph heatmap={heatmap} />
 
           {/* Recent activity feed */}
           <div className="rounded-xl border border-border bg-card [box-shadow:var(--shadow-sm)]">
@@ -264,15 +234,21 @@ export default function ProfilePage() {
               <h3 className="text-sm font-semibold text-foreground">Recent activity</h3>
             </div>
             <div className="divide-y divide-border/40">
-              {ACTIVITY_FEED.map((item) => (
+              {activity.map((item) => (
                 <div key={item.id} className="flex items-start gap-3 px-5 py-3">
-                  {ACTIVITY_TYPE_ICON[item.type]}
+                  {ACTIVITY_TYPE_ICON[item.type] ?? ACTIVITY_TYPE_ICON["issue_created"]}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-foreground truncate">{item.text}</p>
+                    <p className="text-sm text-foreground truncate">
+                      <span className="text-muted-foreground font-mono text-xs mr-1">{item.issueIdentifier}</span>
+                      {item.issueTitle}
+                    </p>
                   </div>
-                  <span className="text-xs text-muted-foreground shrink-0">{item.time}</span>
+                  <span className="text-xs text-muted-foreground shrink-0">{item.projectName}</span>
                 </div>
               ))}
+              {activity.length === 0 && (
+                <p className="px-5 py-6 text-sm text-muted-foreground text-center">Aucune activité récente.</p>
+              )}
             </div>
           </div>
         </div>
