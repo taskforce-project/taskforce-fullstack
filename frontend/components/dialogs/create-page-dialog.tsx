@@ -20,14 +20,8 @@ import {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface CreatePagePayload {
-  id: string
   title: string
   emoji: string
-  excerpt: string
-  lastEditedBy: string
-  lastEditedByInitials: string
-  lastEditedByColor: string
-  lastEditedAt: string
 }
 
 interface CreatePageDialogProps {
@@ -54,14 +48,8 @@ export function CreatePageDialog({ children, onCreated }: CreatePageDialogProps)
   function handleCreate() {
     if (!canCreate) return
     const payload: CreatePagePayload = {
-      id: Date.now().toString(),
       title: title.trim(),
       emoji,
-      excerpt: "New page — start writing to add content.",
-      lastEditedBy: "You",
-      lastEditedByInitials: "ME",
-      lastEditedByColor: "bg-primary",
-      lastEditedAt: "Just now",
     }
     onCreated?.(payload)
     resetForm()
