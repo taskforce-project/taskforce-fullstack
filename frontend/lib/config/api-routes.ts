@@ -141,6 +141,18 @@ export const PROFILE_ROUTES = {
 } as const;
 
 /**
+ * Routes pages/wiki
+ * Backend: /api/workspaces/{slug}/projects/{projectId}/pages
+ */
+export const PAGE_ROUTES = {
+  LIST:   (slug: string, projectId: string) => `/api/workspaces/${slug}/projects/${projectId}/pages`,
+  CREATE: (slug: string, projectId: string) => `/api/workspaces/${slug}/projects/${projectId}/pages`,
+  GET:    (slug: string, projectId: string, pageId: string) => `/api/workspaces/${slug}/projects/${projectId}/pages/${pageId}`,
+  UPDATE: (slug: string, projectId: string, pageId: string) => `/api/workspaces/${slug}/projects/${projectId}/pages/${pageId}`,
+  DELETE: (slug: string, projectId: string, pageId: string) => `/api/workspaces/${slug}/projects/${projectId}/pages/${pageId}`,
+} as const;
+
+/**
  * Toutes les routes groupées (export par défaut)
  */
 export const API_ROUTES = {
