@@ -26,4 +26,23 @@ public interface CycleRepository extends JpaRepository<Cycle, Long> {
         ORDER BY c.startDate ASC
         """)
     List<Cycle> findActiveByWorkspaceSlug(@Param("slug") String slug);
+
+    /** Nombre de cycles complétés créés par un utilisateur dans un workspace */
+    @Query("""
+        SELECT COUNT(c) FROM Cycle c
+        WHERE c.createdBy.id = :userId
+          AND c.project.workspace.slug = :slug
+          AND c.status = com.taskforce.tf_api.core.enums.CycleStatus.COMPLETED
+        """)
+    long countCompletedByCreatorIdAndWorkspaceSlug(
+        @Param("userId") Long userId,
+        @Param("slug") String slug
+    );
+
+    /** Nombre total de cycles dans un workspace (pour les compteurs profil) */
+    @Query("""
+        SELECT COUNT(c) FROM Cycle c
+        WHERE c.project.workspace.slug = :slug
+        """)
+    long countByWorkspaceSlug(@Param("slug") String slug);
 }
