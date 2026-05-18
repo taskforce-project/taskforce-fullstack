@@ -72,6 +72,7 @@ public class IssueService {
     private final WorkspaceRepository           workspaceRepository;
     private final WorkspaceMemberRepository     workspaceMemberRepository;
     private final UserRepository                userRepository;
+    private final NotificationService           notificationService;
 
     public IssueService(
         IssueRepository issueRepository,
@@ -84,7 +85,8 @@ public class IssueService {
         ProjectRepository projectRepository,
         WorkspaceRepository workspaceRepository,
         WorkspaceMemberRepository workspaceMemberRepository,
-        UserRepository userRepository
+        UserRepository userRepository,
+        @org.springframework.context.annotation.Lazy NotificationService notificationService
     ) {
         this.issueRepository = issueRepository;
         this.issueStatusRepository = issueStatusRepository;
@@ -97,6 +99,7 @@ public class IssueService {
         this.workspaceRepository = workspaceRepository;
         this.workspaceMemberRepository = workspaceMemberRepository;
         this.userRepository = userRepository;
+        this.notificationService = notificationService;
     }
 
     // =========================================================================
@@ -250,6 +253,11 @@ public class IssueService {
         issue = issueRepository.save(issue);
         logActivity(issue, reporter, IssueActivityType.CREATED, null, issue.getTitle());
 
+        // Notification d'assignation à la création
+        if (assignee != null) {
+            notificationService.notifyAssigned(issue, reporter);
+        }
+
         return toResponse(issue);
     }
 
@@ -297,6 +305,7 @@ public class IssueService {
                 } else {
                     logActivity(issue, actor, IssueActivityType.STATUS_CHANGED, old, newStatus.getName());
                 }
+                notificationService.notifyStatusChanged(issue, actor, newStatus.getName());
             }
         }
         if (request.getTypeId() != null) {
@@ -312,6 +321,7 @@ public class IssueService {
             String old = issue.getAssignee() != null ? issue.getAssignee().getEmail() : null;
             issue.setAssignee(newAssignee);
             logActivity(issue, actor, IssueActivityType.ASSIGNEE_CHANGED, old, newAssignee.getEmail());
+            notificationService.notifyAssigned(issue, actor);
         }
         if (request.getParentId() != null) {
             Issue newParent = resolveIssue(request.getParentId(), project.getId());
@@ -482,6 +492,7 @@ public class IssueService {
             .build();
         comment = commentRepository.save(comment);
         logActivity(issue, author, IssueActivityType.COMMENT_ADDED, null, null);
+        notificationService.notifyCommented(issue, author, comment);
         return toCommentResponse(comment);
     }
 
