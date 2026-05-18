@@ -133,6 +133,14 @@ export const NOTIFICATION_ROUTES = {
 } as const;
 
 /**
+ * Routes profil utilisateur
+ * Backend: /api/workspaces/{slug}/profile
+ */
+export const PROFILE_ROUTES = {
+  GET: (slug: string) => `/api/workspaces/${slug}/profile`,
+} as const;
+
+/**
  * Toutes les routes groupées (export par défaut)
  */
 export const API_ROUTES = {
