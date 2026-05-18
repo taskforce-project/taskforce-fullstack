@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter, useParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
@@ -15,161 +15,15 @@ import { useTranslation } from "@/lib/i18n"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
+import { useNotificationStore } from "@/lib/store/notification-store"
+import type { Signal, NotifType, Urgency } from "@/lib/store/notification-store"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type NotifType = "mention" | "assigned" | "commented" | "statusChanged" | "dueSoon" | "overdue" | "completed"
-type Urgency   = "critical" | "warning" | "info" | "low"
 export type NotifTab = "all" | "mentions" | "alerts" | "assignments"
 
-interface Signal {
-  id: string
-  type: NotifType
-  urgency: Urgency
-  read: boolean
-  acknowledged: boolean
-  actor?: { name: string; initials: string; color: string }
-  operation: string
-  operationUrl: string
-  title: string
-  issueId: string
-  issueUrl: string
-  timestamp: string
-  body?: string
-}
+// Signal, NotifType et Urgency sont importés depuis notification-store
 
-// ─── Mock data ─────────────────────────────────────────────────────────────────
-
-const MOCK_SIGNALS: Signal[] = [
-  {
-    id: "1",
-    type: "overdue",
-    urgency: "critical",
-    read: false,
-    acknowledged: false,
-    operation: "API v2",
-    operationUrl: "/projects/3",
-    title: "Migrate authentication endpoints — deadline breached",
-    issueId: "TF-38",
-    issueUrl: "/projects/3/issues/38",
-    timestamp: "1h ago",
-    body: "This task was due 2 days ago. Sprint completion is now at risk.",
-  },
-  {
-    id: "2",
-    type: "mention",
-    urgency: "warning",
-    read: false,
-    acknowledged: false,
-    actor: { name: "Sophie Martin", initials: "SM", color: "#8b5cf6" },
-    operation: "Website Redesign",
-    operationUrl: "/projects/1",
-    title: "Update hero section copy — needs your review",
-    issueId: "TF-41",
-    issueUrl: "/projects/1/issues/41",
-    timestamp: "2 min ago",
-    body: "Hey @you can you take a look at the design specs for this one? Blocking the front-end team.",
-  },
-  {
-    id: "3",
-    type: "dueSoon",
-    urgency: "warning",
-    read: false,
-    acknowledged: false,
-    operation: "Mobile App",
-    operationUrl: "/projects/2",
-    title: "Sprint review preparation — due in 4 hours",
-    issueId: "TF-51",
-    issueUrl: "/projects/2/issues/51",
-    timestamp: "5h ago",
-  },
-  {
-    id: "4",
-    type: "assigned",
-    urgency: "info",
-    read: false,
-    acknowledged: false,
-    actor: { name: "Lucas Dufour", initials: "LD", color: "#3b82f6" },
-    operation: "Mobile App",
-    operationUrl: "/projects/2",
-    title: "Fix login screen crash on iOS 17",
-    issueId: "TF-43",
-    issueUrl: "/projects/2/issues/43",
-    timestamp: "15 min ago",
-  },
-  {
-    id: "5",
-    type: "commented",
-    urgency: "low",
-    read: true,
-    acknowledged: true,
-    actor: { name: "Emma Petit", initials: "EP", color: "#10b981" },
-    operation: "Website Redesign",
-    operationUrl: "/projects/1",
-    title: "Implement dark mode toggle",
-    issueId: "TF-29",
-    issueUrl: "/projects/1/issues/29",
-    timestamp: "3h ago",
-    body: "LGTM! Merging this tomorrow if no other comments.",
-  },
-  {
-    id: "6",
-    type: "mention",
-    urgency: "low",
-    read: true,
-    acknowledged: true,
-    actor: { name: "Thomas Bernard", initials: "TB", color: "#f97316" },
-    operation: "API v2",
-    operationUrl: "/projects/3",
-    title: "Rate limiting strategy — opinion requested",
-    issueId: "TF-22",
-    issueUrl: "/projects/3/issues/22",
-    timestamp: "Yesterday",
-    body: "Ping @you — what do you think about using sliding window?",
-  },
-  {
-    id: "7",
-    type: "statusChanged",
-    urgency: "low",
-    read: true,
-    acknowledged: true,
-    actor: { name: "Sophie Martin", initials: "SM", color: "#8b5cf6" },
-    operation: "Website Redesign",
-    operationUrl: "/projects/1",
-    title: "SEO audit & fixes — moved to In Review",
-    issueId: "TF-17",
-    issueUrl: "/projects/1/issues/17",
-    timestamp: "Yesterday",
-  },
-  {
-    id: "8",
-    type: "completed",
-    urgency: "low",
-    read: true,
-    acknowledged: true,
-    actor: { name: "Lucas Dufour", initials: "LD", color: "#3b82f6" },
-    operation: "Mobile App",
-    operationUrl: "/projects/2",
-    title: "Onboarding flow redesign — completed",
-    issueId: "TF-12",
-    issueUrl: "/projects/2/issues/12",
-    timestamp: "2 days ago",
-  },
-  {
-    id: "9",
-    type: "assigned",
-    urgency: "low",
-    read: true,
-    acknowledged: true,
-    actor: { name: "Emma Petit", initials: "EP", color: "#10b981" },
-    operation: "API v2",
-    operationUrl: "/projects/3",
-    title: "Write OpenAPI spec for /users endpoints",
-    issueId: "TF-55",
-    issueUrl: "/projects/3/issues/55",
-    timestamp: "2 days ago",
-  },
-]
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -466,33 +320,36 @@ interface InboxViewProps {
 export function InboxView({ defaultTab = "all" }: Readonly<InboxViewProps>) {
   const { t } = useTranslation()
   const TAB_HREF = useTabHref()
+  const params = useParams()
+  const slug = params?.workspace as string | undefined
+
+  const { signals, fetchNotifications, markAsRead, markAllAsRead, acknowledgeAll, acknowledgeLocal } =
+    useNotificationStore()
+
   const [activeTab, setActiveTab] = useState<NotifTab>(defaultTab)
-  const [signals, setSignals] = useState<Signal[]>(() =>
-    // Sort urgency-first on init
-    [...MOCK_SIGNALS].sort((a, b) => {
-      const order: Record<Urgency, number> = { critical: 0, warning: 1, info: 2, low: 3 }
-      return order[a.urgency] - order[b.urgency]
-    })
-  )
+
+  useEffect(() => {
+    if (slug) fetchNotifications(slug)
+  }, [slug, fetchNotifications])
 
   const tabCfg = TABS.find((t) => t.key === activeTab)!
   const filtered = signals.filter(tabCfg.filter)
   const unreadCount = signals.filter((s) => !s.read).length
 
   function markRead(id: string) {
-    setSignals((prev) => prev.map((s) => s.id === id ? { ...s, read: true } : s))
+    if (slug) markAsRead(slug, id)
   }
 
   function acknowledge(id: string) {
-    setSignals((prev) => prev.map((s) => s.id === id ? { ...s, read: true, acknowledged: true } : s))
+    acknowledgeLocal(id)
   }
 
   function markAllRead() {
-    setSignals((prev) => prev.map((s) => ({ ...s, read: true })))
+    if (slug) markAllAsRead(slug)
   }
 
   function clearAcknowledged() {
-    setSignals((prev) => prev.filter((s) => !s.acknowledged))
+    if (slug) acknowledgeAll(slug)
   }
 
   const acknowledgedCount = signals.filter((s) => s.acknowledged).length
