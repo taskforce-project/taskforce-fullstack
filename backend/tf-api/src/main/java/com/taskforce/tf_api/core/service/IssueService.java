@@ -176,6 +176,19 @@ public class IssueService {
     }
 
     /**
+     * Retourne toutes les issues planifiées (startDate ou dueDate renseigné) du workspace — utilisé par la roadmap.
+     */
+    @Transactional(readOnly = true)
+    public List<IssueResponse> getScheduledIssues(String slug, Long userId) {
+        var ws = workspaceRepository.findBySlug(slug)
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
+        assertWorkspaceMember(ws.getId(), userId);
+        return issueRepository.findScheduledByWorkspaceSlug(slug).stream()
+            .map(this::toResponse)
+            .toList();
+    }
+
+    /**
      * Récupère une issue par son identifiant.
      */
     @Transactional(readOnly = true)
