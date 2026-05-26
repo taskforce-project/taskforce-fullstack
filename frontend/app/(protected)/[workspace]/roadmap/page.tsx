@@ -183,6 +183,8 @@ const ROW_H = 44 // px per row
 
 import type { Cycle as ApiCycle } from "@/lib/api/cycle-service"
 import type { Project } from "@/lib/api/project-service"
+import { getScheduledIssues } from "@/lib/api/issue-service"
+import type { Issue as ApiIssue } from "@/lib/api/issue-service"
 
 function mapProjectCycles(cycles: ApiCycle[], p: Project): RoadmapItem[] {
   return cycles
@@ -199,6 +201,29 @@ function mapProjectCycles(cycles: ApiCycle[], p: Project): RoadmapItem[] {
     }))
 }
 
+function mapScheduledIssue(issue: ApiIssue, projectsById: Map<number, Project>): RoadmapItem | null {
+  // projectId n'est pas dans ApiIssue directement — on l'infère depuis l'identifier (ex: "WEB-42" → project identifier "WEB")
+  // On utilise la map project lookup par identifier prefix
+  const prefix = issue.identifier.replace(/-\d+$/, "")
+  const proj = Array.from(projectsById.values()).find((p) => p.identifier === prefix)
+  if (!proj) return null
+
+  const start = issue.startDate ?? issue.dueDate!
+  const end   = issue.dueDate   ?? issue.startDate!
+  const isMilestone = !issue.startDate || !issue.dueDate
+
+  return {
+    id:        `issue-${issue.id}`,
+    title:     issue.title,
+    type:      isMilestone ? "milestone" : "cycle",
+    project:   { name: proj.name, emoji: proj.identifier.slice(0, 2), color: projectColor(proj.id) },
+    startDate: start,
+    endDate:   end,
+    progress:  issue.status.category === "COMPLETED" ? 100 : 0,
+    color:     projectColor(proj.id),
+  }
+}
+
 export default function RoadmapPage() {
   const params = useParams()
   const slug   = typeof params?.workspace === "string" ? params.workspace : ""
@@ -213,6 +238,8 @@ export default function RoadmapPage() {
 
     async function load() {
       const projs = await fetchProjects(slug)
+      const projectsById = new Map(projs.map((p) => [p.id, p]))
+
       const projectItems: RoadmapItem[] = projs.map((p) => ({
         id:        `project-${p.id}`,
         title:     p.name,
@@ -224,12 +251,20 @@ export default function RoadmapPage() {
         color:     projectColor(p.id),
       }))
 
-      const cycleResults = await Promise.all(projs.map(async (p) => ({ p, cycles: await fetchCycles(slug, p.id) })))
+      const [cycleResults, scheduledIssues] = await Promise.all([
+        Promise.all(projs.map(async (p) => ({ p, cycles: await fetchCycles(slug, p.id) }))),
+        getScheduledIssues(slug),
+      ])
+
       const cycleItems: RoadmapItem[] = cycleResults.flatMap(({ p, cycles }) =>
         mapProjectCycles(cycles, p)
       )
 
-      setItems([...projectItems, ...cycleItems])
+      const issueItems: RoadmapItem[] = scheduledIssues
+        .map((i) => mapScheduledIssue(i, projectsById))
+        .filter((x): x is RoadmapItem => x !== null)
+
+      setItems([...projectItems, ...cycleItems, ...issueItems])
     }
 
     void load()
