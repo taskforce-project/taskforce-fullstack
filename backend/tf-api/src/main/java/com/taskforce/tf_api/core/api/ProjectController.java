@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.taskforce.tf_api.core.dto.request.AddProjectMemberRequest;
 import com.taskforce.tf_api.core.dto.request.CreateLabelRequest;
+import com.taskforce.tf_api.core.dto.request.UpdateLabelRequest;
 import com.taskforce.tf_api.core.dto.request.CreateProjectRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateProjectRequest;
 import com.taskforce.tf_api.core.dto.response.ProjectLabelResponse;
@@ -222,6 +223,22 @@ public class ProjectController {
         ProjectLabelResponse label = projectService.createLabel(slug, id, userId, request);
         return ResponseEntity.status(HttpStatus.CREATED)
             .body(ApiResponse.success("Label créé", label));
+    }
+
+    /**
+     * PUT /api/workspaces/{slug}/projects/{id}/labels/{labelId}
+     */
+    @PutMapping("/{id}/labels/{labelId}")
+    public ResponseEntity<ApiResponse<ProjectLabelResponse>> updateLabel(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String slug,
+        @PathVariable Long id,
+        @PathVariable Long labelId,
+        @Valid @RequestBody UpdateLabelRequest request
+    ) {
+        Long userId = resolveUserId(jwt);
+        ProjectLabelResponse label = projectService.updateLabel(slug, id, labelId, userId, request);
+        return ResponseEntity.ok(ApiResponse.success("Label modifié", label));
     }
 
     /**
