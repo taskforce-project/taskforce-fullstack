@@ -4,21 +4,26 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.stereotype.Service;
 
 import com.taskforce.tf_api.core.dto.response.AnalyticsKpisResponse;
 import com.taskforce.tf_api.core.dto.response.BurndownPointResponse;
+import com.taskforce.tf_api.core.dto.response.MemberCapacityResponse;
 import com.taskforce.tf_api.core.dto.response.ThroughputPointResponse;
 import com.taskforce.tf_api.core.model.Cycle;
 import com.taskforce.tf_api.core.model.CycleIssue;
 import com.taskforce.tf_api.core.model.Issue;
 import com.taskforce.tf_api.core.model.Workspace;
+import com.taskforce.tf_api.core.model.WorkspaceMember;
 import com.taskforce.tf_api.core.repository.CycleIssueRepository;
 import com.taskforce.tf_api.core.repository.CycleRepository;
 import com.taskforce.tf_api.core.repository.IssueRepository;
 import com.taskforce.tf_api.core.repository.ProjectRepository;
+import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
@@ -28,11 +33,12 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class AnalyticsService {
 
-    private final WorkspaceRepository  workspaceRepository;
-    private final ProjectRepository    projectRepository;
-    private final IssueRepository      issueRepository;
-    private final CycleRepository      cycleRepository;
-    private final CycleIssueRepository cycleIssueRepository;
+    private final WorkspaceRepository       workspaceRepository;
+    private final WorkspaceMemberRepository  workspaceMemberRepository;
+    private final ProjectRepository          projectRepository;
+    private final IssueRepository            issueRepository;
+    private final CycleRepository            cycleRepository;
+    private final CycleIssueRepository       cycleIssueRepository;
 
     // -------------------------------------------------------------------------
     // KPIs
@@ -148,6 +154,32 @@ public class AnalyticsService {
             result.add(new BurndownPointResponse(dayDate.toString(), remaining, ideal));
         }
         return result;
+    }
+
+    // -------------------------------------------------------------------------
+    // Capacity (issues ouvertes par membre)
+    // -------------------------------------------------------------------------
+
+    public List<MemberCapacityResponse> getCapacity(String slug) {
+        Workspace ws = findWorkspace(slug);
+        List<Long> projectIds = getProjectIds(ws.getId());
+
+        // Build map: userId → open issue count
+        Map<Long, Long> openCounts = new HashMap<>();
+        if (!projectIds.isEmpty()) {
+            issueRepository.countOpenIssuesGroupedByAssignee(projectIds)
+                .forEach(row -> openCounts.put((Long) row[0], (Long) row[1]));
+        }
+
+        List<WorkspaceMember> members = workspaceMemberRepository.findByWorkspaceId(ws.getId());
+        return members.stream()
+            .map(m -> new MemberCapacityResponse(
+                m.getUser().getId(),
+                m.getUser().getDisplayName() != null ? m.getUser().getDisplayName() : m.getUser().getEmail(),
+                m.getUser().getAvatarUrl(),
+                openCounts.getOrDefault(m.getUser().getId(), 0L)
+            ))
+            .toList();
     }
 
     // -------------------------------------------------------------------------
