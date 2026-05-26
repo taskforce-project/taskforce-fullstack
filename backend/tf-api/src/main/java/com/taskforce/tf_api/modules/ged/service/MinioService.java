@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import io.minio.BucketExistsArgs;
+import io.minio.GetObjectArgs;
 import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
@@ -80,6 +81,19 @@ public class MinioService {
             );
         } catch (Exception e) {
             throw new RuntimeException("Minio delete failed: " + e.getMessage(), e);
+        }
+    }
+
+    public InputStream getObjectStream(String objectKey) {
+        try {
+            return minioClient.getObject(
+                GetObjectArgs.builder()
+                    .bucket(bucket)
+                    .object(objectKey)
+                    .build()
+            );
+        } catch (Exception e) {
+            throw new RuntimeException("Minio object not found: " + objectKey, e);
         }
     }
 }
