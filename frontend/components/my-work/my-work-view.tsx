@@ -16,6 +16,7 @@ import { useProjectStore } from "@/lib/store/project-store"
 import { useIssueStore } from "@/lib/store/issue-store"
 import { useCycleStore } from "@/lib/store/cycle-store"
 import { useUserStore } from "@/lib/store/user-store"
+import { pageService, type PageSummary } from "@/lib/api/page-service"
 import type { IssueStatusCategory, IssuePriority as ApiPriority, Issue as ApiIssue } from "@/lib/api/issue-service"
 import type { CycleStatus as ApiCycleStatus, Cycle as ApiCycle } from "@/lib/api/cycle-service"
 
@@ -388,7 +389,23 @@ function flattenCycles(results: { proj: Project; cycles: ApiCycle[] }[], baseUrl
   return results.flatMap(({ proj, cycles }) => cycles.map((c) => mapApiCycle(c, proj, baseUrl)))
 }
 
+function mapApiPage(p: PageSummary, proj: Project, baseUrl: string): Page {
+  return {
+    id:                   String(p.id),
+    title:                p.title,
+    project:              proj.name,
+    projectId:            String(proj.id),
+    lastEditedAt:         new Date(p.updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+    lastEditedBy:         p.createdByName,
+    lastEditedByInitials: p.createdByInitials,
+    lastEditedByColor:    "#a78bfa",
+    url:                  `${baseUrl}/projects/${proj.id}/pages/${p.id}`,
+  }
+}
 
+function flattenPages(results: { proj: Project; pages: PageSummary[] }[], baseUrl: string): Page[] {
+  return results.flatMap(({ proj, pages }) => pages.map((p) => mapApiPage(p, proj, baseUrl)))
+}
 
 const TAB_KEYS: { key: MyWorkTab; icon: React.ElementType; label: string }[] = [
   { key: "issues", icon: CircleDot, label: "Issues"  },
@@ -417,6 +434,7 @@ export function MyWorkView({ defaultTab = "issues" }: Readonly<MyWorkViewProps>)
 
   const [myIssues, setMyIssues] = useState<Issue[]>([])
   const [myCycles, setMyCycles] = useState<Cycle[]>([])
+  const [myPages,  setMyPages]  = useState<Page[]>([])
 
   useEffect(() => {
     fetchMe()
@@ -429,13 +447,15 @@ export function MyWorkView({ defaultTab = "issues" }: Readonly<MyWorkViewProps>)
 
     async function load() {
       const projs = await fetchProjects(slug)
-      const [issueResults, cycleResults] = await Promise.all([
+      const [issueResults, cycleResults, pageResults] = await Promise.all([
         Promise.all(projs.map(async (p) => ({ proj: p, issues: await fetchIssues(slug, p.id) }))),
         Promise.all(projs.map(async (p) => ({ proj: p, cycles: await fetchCycles(slug, p.id) }))),
+        Promise.all(projs.map(async (p) => ({ proj: p, pages: await pageService.list(slug, String(p.id)) }))),
       ])
 
       setMyIssues(flattenIssues(issueResults, user.email, baseUrl))
       setMyCycles(flattenCycles(cycleResults, baseUrl))
+      setMyPages(flattenPages(pageResults, baseUrl))
     }
 
     void load()
@@ -445,6 +465,7 @@ export function MyWorkView({ defaultTab = "issues" }: Readonly<MyWorkViewProps>)
   function tabCount(key: MyWorkTab): number {
     if (key === "issues") return myIssues.length
     if (key === "cycles") return myCycles.filter((c) => c.status === "active").length
+    if (key === "pages")  return myPages.length
     return 0
   }
   const TABS = TAB_KEYS.map((tk) => ({ ...tk, count: tabCount(tk.key) }))
@@ -534,7 +555,9 @@ export function MyWorkView({ defaultTab = "issues" }: Readonly<MyWorkViewProps>)
               : myCycles.map((cycle, i) => <CycleRow key={cycle.id} cycle={cycle} index={i} />)
           )}
           {activeTab === "pages" && (
-            <EmptyState tab="pages" />
+            myPages.length === 0
+              ? <EmptyState tab="pages" />
+              : myPages.map((page, i) => <PageRow key={page.id} page={page} index={i} />)
           )}
         </div>
       </div>
