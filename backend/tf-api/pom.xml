@@ -35,6 +35,7 @@
 		<stripe.version>31.2.0</stripe.version>
 		<jjwt.version>0.12.6</jjwt.version>
 		<lombok.version>1.18.36</lombok.version>
+		<minio.version>8.5.11</minio.version>
 	</properties>
 	<dependencies>
 		<!-- Core Dependencies -->
@@ -104,6 +105,25 @@
 			<groupId>com.stripe</groupId>
 			<artifactId>stripe-java</artifactId>
 			<version>${stripe.version}</version>
+		</dependency>
+
+		<!-- WebSocket / STOMP -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-websocket</artifactId>
+		</dependency>
+
+		<!-- Minio — stockage objet S3-compatible -->
+		<dependency>
+			<groupId>io.minio</groupId>
+			<artifactId>minio</artifactId>
+			<version>${minio.version}</version>
+		</dependency>
+
+		<!-- Reactor Netty — TCP client for STOMP broker relay -->
+		<dependency>
+			<groupId>io.projectreactor.netty</groupId>
+			<artifactId>reactor-netty-all</artifactId>
 		</dependency>
 
 		<!-- Email (JavaMail for Mailtrap) -->
