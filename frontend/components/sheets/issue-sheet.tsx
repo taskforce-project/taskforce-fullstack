@@ -29,21 +29,28 @@ import {
   formatFileSize,
   type Attachment,
 } from "@/lib/api/attachment-service"
+import { useIssueStore } from "@/lib/store/issue-store"
+import { listProjectMembers, type ProjectMember } from "@/lib/api/project-service"
+import type { IssueComment } from "@/lib/api/issue-service"
+import type { IssueStatus as ApiIssueStatus } from "@/lib/api/issue-service"
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export type IssuePriority = "urgent" | "high" | "medium" | "low" | "none"
-export type IssueStatus   = "todo" | "in_progress" | "in_review" | "done" | "cancelled"
+export type IssuePriority     = "NONE" | "URGENT" | "HIGH" | "MEDIUM" | "LOW"
+export type IssueStatusCategory = "BACKLOG" | "UNSTARTED" | "STARTED" | "COMPLETED" | "CANCELLED"
 
 export interface SheetIssue {
   id: string
   identifier: string
   title: string
   priority: IssuePriority
-  status: IssueStatus
-  assignee: { initials: string; color: string; name: string } | null
+  statusId: number
+  statusName: string
+  statusCategory: IssueStatusCategory
+  assignee: { initials: string; color: string; name: string; userId: number } | null
+  assigneeId: number | null
   labels: string[]
   dueDate: string | null
   storyPoints: number | null
@@ -57,41 +64,52 @@ export interface SheetIssue {
 // ---------------------------------------------------------------------------
 
 const PRIORITY_CONFIG: Record<IssuePriority, { dot: string; label: string }> = {
-  urgent:  { dot: "bg-red-400",               label: "Urgent" },
-  high:    { dot: "bg-orange-400",             label: "High" },
-  medium:  { dot: "bg-yellow-400",             label: "Medium" },
-  low:     { dot: "bg-slate-400",              label: "Low" },
-  none:    { dot: "bg-muted-foreground/30",    label: "None" },
+  URGENT:  { dot: "bg-red-400",               label: "Urgent" },
+  HIGH:    { dot: "bg-orange-400",             label: "High" },
+  MEDIUM:  { dot: "bg-yellow-400",             label: "Medium" },
+  LOW:     { dot: "bg-slate-400",              label: "Low" },
+  NONE:    { dot: "bg-muted-foreground/30",    label: "None" },
 }
 
-const STATUS_CONFIG: Record<IssueStatus, { icon: React.ReactNode; label: string; color: string }> = {
-  todo:        { icon: <CircleDot className="size-3.5" />,     label: "Todo",        color: "text-muted-foreground" },
-  in_progress: { icon: <RefreshCw className="size-3.5" />,     label: "In Progress", color: "text-blue-400" },
-  in_review:   { icon: <Clock className="size-3.5" />,         label: "In Review",   color: "text-yellow-400" },
-  done:        { icon: <CheckCircle2 className="size-3.5" />,  label: "Done",        color: "text-emerald-400" },
-  cancelled:   { icon: <X className="size-3.5" />,             label: "Cancelled",   color: "text-muted-foreground" },
+const STATUS_CATEGORY_CONFIG: Record<IssueStatusCategory, { icon: React.ReactNode; label: string; color: string }> = {
+  BACKLOG:   { icon: <CircleDot className="size-3.5" />,    label: "Backlog",     color: "text-muted-foreground" },
+  UNSTARTED: { icon: <CircleDot className="size-3.5" />,    label: "Todo",        color: "text-muted-foreground" },
+  STARTED:   { icon: <RefreshCw className="size-3.5" />,    label: "In Progress", color: "text-blue-400" },
+  COMPLETED: { icon: <CheckCircle2 className="size-3.5" />, label: "Done",        color: "text-emerald-400" },
+  CANCELLED: { icon: <X className="size-3.5" />,            label: "Cancelled",   color: "text-muted-foreground" },
 }
 
-const MOCK_COMMENTS = [
-  { id: "1", author: "Sophie M.", initials: "SM", color: "bg-violet-500", time: "2 days ago", body: "I've started looking into this. We need to make sure the token store is cleared on logout too." },
-  { id: "2", author: "You",       initials: "ME", color: "bg-primary",    time: "1 day ago",  body: "Good point, I'll add that to the acceptance criteria." },
-]
-
-const MOCK_ACTIVITY = [
-  { id: "a1", text: "Status changed to In Progress",      time: "3 days ago" },
-  { id: "a2", text: "Assigned to Sophie Martin",          time: "3 days ago" },
-  { id: "a3", text: "Added to Sprint 4",                  time: "2 days ago" },
-  { id: "a4", text: "Priority changed from Medium to High", time: "1 day ago" },
-]
-
-const TEAM_MEMBERS = [
-  { initials: "ME", color: "bg-primary",    name: "You" },
-  { initials: "SM", color: "bg-violet-500", name: "Sophie Martin" },
-  { initials: "EP", color: "bg-emerald-500",name: "Emma Petit" },
-  { initials: "TB", color: "bg-orange-500", name: "Thomas Bernard" },
-]
+function getStatusCfg(category: IssueStatusCategory) {
+  return STATUS_CATEGORY_CONFIG[category] ?? STATUS_CATEGORY_CONFIG.BACKLOG
+}
 
 const ALL_LABELS = ["bug", "feature", "ui", "backend", "auth", "perf", "docs", "test", "design"]
+
+const AVATAR_COLORS = [
+  "bg-violet-500", "bg-blue-500", "bg-emerald-500", "bg-orange-500",
+  "bg-pink-500", "bg-cyan-500", "bg-amber-500", "bg-indigo-500",
+]
+function memberColor(id: number): string { return AVATAR_COLORS[id % AVATAR_COLORS.length] }
+function memberInitials(m: ProjectMember): string {
+  if (m.displayName) return m.displayName.slice(0, 2).toUpperCase()
+  return m.email.slice(0, 2).toUpperCase()
+}
+function formatActivityTime(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+  } catch { return iso }
+}
+function formatCommentTime(iso: string): string {
+  try {
+    const d = new Date(iso)
+    const now = new Date()
+    const diff = Math.floor((now.getTime() - d.getTime()) / 1000)
+    if (diff < 60) return "just now"
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
+    return `${Math.floor(diff / 86400)}d ago`
+  } catch { return iso }
+}
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -114,33 +132,57 @@ function MetaRow({ icon, label, children }: Readonly<{ icon: React.ReactNode; la
 // ---------------------------------------------------------------------------
 
 interface CommentsTabProps {
+  comments: IssueComment[]
+  loading: boolean
   comment: string
   onChange: (v: string) => void
   onSend: () => void
+  onDelete: (id: number) => void
 }
 
-function CommentsTab({ comment, onChange, onSend }: Readonly<CommentsTabProps>) {
+function CommentsTab({ comments, loading, comment, onChange, onSend, onDelete }: Readonly<CommentsTabProps>) {
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter") onSend()
   }
   return (
     <div className="flex flex-col gap-5">
-      {MOCK_COMMENTS.map((c) => (
-        <div key={c.id} className="flex gap-3">
-          <Avatar className="size-7 shrink-0 mt-0.5">
-            <AvatarFallback className={cn("text-[9px] text-white", c.color)}>
-              {c.initials}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex-1 min-w-0 rounded-lg border border-border bg-muted/20 overflow-hidden">
-            <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 bg-muted/30">
-              <span className="text-xs font-semibold text-foreground">{c.author}</span>
-              <span className="text-xs text-muted-foreground">{c.time}</span>
+      {loading && (
+        <p className="text-xs text-muted-foreground text-center py-4">Loading comments…</p>
+      )}
+      {!loading && comments.length === 0 && (
+        <p className="text-xs text-muted-foreground text-center py-4 italic">No comments yet. Be the first!</p>
+      )}
+      {comments.map((c) => {
+        const initials = c.author.displayName
+          ? c.author.displayName.slice(0, 2).toUpperCase()
+          : c.author.email.slice(0, 2).toUpperCase()
+        const color = memberColor(c.author.id)
+        return (
+          <div key={c.id} className="flex gap-3">
+            <Avatar className="size-7 shrink-0 mt-0.5">
+              <AvatarFallback className={cn("text-[9px] text-white", color)}>{initials}</AvatarFallback>
+            </Avatar>
+            <div className="flex-1 min-w-0 rounded-lg border border-border bg-muted/20 overflow-hidden">
+              <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 bg-muted/30">
+                <span className="text-xs font-semibold text-foreground">
+                  {c.author.displayName ?? c.author.email}
+                </span>
+                <span className="text-xs text-muted-foreground">{formatCommentTime(c.createdAt)}</span>
+                {c.isEdited && <span className="text-[10px] text-muted-foreground/60 italic">(edited)</span>}
+                <button
+                  type="button"
+                  className="ml-auto p-0.5 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors"
+                  title="Delete comment"
+                  onClick={() => onDelete(c.id)}
+                >
+                  <Trash2 className="size-3" />
+                </button>
+              </div>
+              <p className="px-3 py-2.5 text-sm text-foreground leading-relaxed whitespace-pre-wrap">{c.content}</p>
             </div>
-            <p className="px-3 py-2.5 text-sm text-foreground leading-relaxed">{c.body}</p>
           </div>
-        </div>
-      ))}
+        )
+      })}
 
       {/* Comment input */}
       <div className="flex gap-3 mt-1">
@@ -335,10 +377,24 @@ interface IssueSheetProps {
 }
 
 export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId }: Readonly<IssueSheetProps>) {
+  const { fetchComments, addComment, deleteComment, fetchActivity, updateIssue, fetchStatuses,
+          comments: storeComments, activity: storeActivity, statuses: storeStatuses } = useIssueStore()
+
   const initDescription = issue?.description ?? ""
   const [comment, setComment] = useState("")
   const [tab, setTab] = useState<"comments" | "activity" | "attachments">("comments")
-  const [status, setStatus] = useState<IssueStatus>(issue?.status ?? "todo")
+
+  // Status (real IDs from API)
+  const [statusId, setStatusId]             = useState<number>(issue?.statusId ?? 0)
+  const [statusName, setStatusName]         = useState<string>(issue?.statusName ?? "")
+  const [statusCategory, setStatusCategory] = useState<IssueStatusCategory>(issue?.statusCategory ?? "BACKLOG")
+
+  // Project members
+  const [projectMembers, setProjectMembers] = useState<ProjectMember[]>([])
+
+  // Loading flags
+  const [loadingComments, setLoadingComments] = useState(false)
+  const [loadingActivity, setLoadingActivity] = useState(false)
 
   // Main content editing
   const [title, setTitle] = useState(issue?.title ?? "")
@@ -350,7 +406,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
   const descRef = useRef<HTMLTextAreaElement>(null)
 
   // Sidebar editable state
-  const [priority, setPriority] = useState<IssuePriority>(issue?.priority ?? "none")
+  const [priority, setPriority] = useState<IssuePriority>(issue?.priority ?? "NONE")
   const [assignee, setAssignee] = useState(issue?.assignee ?? null)
   const [labels, setLabels] = useState<string[]>(issue?.labels ?? [])
   const [points, setPoints] = useState<number | null>(issue?.storyPoints ?? null)
@@ -372,15 +428,75 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
   useEffect(() => { if (editingCycle)   cycleRef.current?.focus()  }, [editingCycle])
   useEffect(() => { if (editingDueDate) dueDateRef.current?.focus() }, [editingDueDate])
 
+  // Reset state when issue changes
+  useEffect(() => {
+    if (!issue) return
+    setTitle(issue.title)
+    setDescription(issue.description ?? "")
+    setDescDraft(issue.description ?? "")
+    setPriority(issue.priority)
+    setAssignee(issue.assignee ?? null)
+    setLabels(issue.labels)
+    setDueDate(issue.dueDate)
+    setPoints(issue.storyPoints)
+    setCycle(issue.cycle)
+    setStatusId(issue.statusId)
+    setStatusId(issue.statusId)
+    setStatusName(issue.statusName)
+    setStatusCategory(issue.statusCategory)
+  }, [issue])
+
+  // Load project members + statuses when sheet opens
+  useEffect(() => {
+    if (!open || !workspaceSlug || !projectId) return
+    listProjectMembers(workspaceSlug, projectId)
+      .then(setProjectMembers)
+      .catch(() => { /* silent */ })
+    fetchStatuses(workspaceSlug, projectId)
+      .catch(() => { /* silent */ })
+  }, [open, workspaceSlug, projectId, fetchStatuses])
+
+  // Load comments when tab = comments
+  useEffect(() => {
+    if (!open || tab !== "comments" || !workspaceSlug || !projectId || !issue) return
+    setLoadingComments(true)
+    fetchComments(workspaceSlug, projectId, Number(issue.id))
+      .catch(() => toast.error("Could not load comments"))
+      .finally(() => setLoadingComments(false))
+  }, [open, tab, issue, workspaceSlug, projectId, fetchComments])
+
+  // Load activity when tab = activity
+  useEffect(() => {
+    if (!open || tab !== "activity" || !workspaceSlug || !projectId || !issue) return
+    setLoadingActivity(true)
+    fetchActivity(workspaceSlug, projectId, Number(issue.id))
+      .catch(() => toast.error("Could not load activity"))
+      .finally(() => setLoadingActivity(false))
+  }, [open, tab, issue, workspaceSlug, projectId, fetchActivity])
+
   if (!issue) return null
 
-  const statusCfg   = STATUS_CONFIG[status]
+  const statusCfg   = getStatusCfg(statusCategory)
   const priorityCfg = PRIORITY_CONFIG[priority]
   const isOverdue   = dueDate === "Overdue"
   const noAssignee  = assignee === null
+  const issueId     = Number(issue.id)
+
+  // Use real statuses from store if loaded, fallback to category-based config
+  const displayStatuses: ApiIssueStatus[] = storeStatuses
+
+  async function callUpdate(payload: Parameters<typeof updateIssue>[3]) {
+    if (!workspaceSlug || !projectId) return
+    try {
+      await updateIssue(workspaceSlug, projectId, issueId, payload)
+    } catch {
+      toast.error("Failed to save")
+    }
+  }
 
   function savePoints() {
-    setPoints(parsePointsDraft(pointsDraft))
+    const val = parsePointsDraft(pointsDraft)
+    setPoints(val)
     setEditingPoints(false)
     toast.success("Points updated")
   }
@@ -391,15 +507,17 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
     toast.success("Cycle updated")
   }
 
-  function saveDueDate() {
-    setDueDate(dueDateDraft || null)
+  async function saveDueDate() {
+    const val = dueDateDraft || null
+    setDueDate(val)
     setEditingDueDate(false)
+    await callUpdate({ dueDate: val })
     toast.success("Due date updated")
   }
 
   const onPointsKey  = makeKeyHandler(savePoints,  () => setEditingPoints(false))
   const onCycleKey   = makeKeyHandler(saveCycle,   () => setEditingCycle(false))
-  const onDueDateKey = makeKeyHandler(undefined,   () => setEditingDueDate(false))
+  const onDueDateKey = makeKeyHandler(saveDueDate, () => setEditingDueDate(false))
 
   function toggleLabel(l: string) {
     setLabels(prev => toggleLabels(prev, l))
@@ -409,22 +527,48 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
   function onCycleClick()  { setCycleDraft(cycle ?? ""); setEditingCycle(true) }
   function onDueDateClick() { setDueDateDraft(formatDueDateDraft(dueDate)); setEditingDueDate(true) }
 
-  function handleSendComment() {
-    if (!comment.trim()) return
-    toast.success("Comment added")
+  async function handleSendComment() {
+    if (!comment.trim() || !workspaceSlug || !projectId) return
+    const content = comment.trim()
     setComment("")
+    try {
+      await addComment(workspaceSlug, projectId, issueId, content)
+      toast.success("Comment added")
+    } catch {
+      toast.error("Failed to add comment")
+      setComment(content)
+    }
   }
 
-  function onTitleBlur() { setEditingTitle(false); toast.success("Title updated") }
-  function onTitleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter") { setEditingTitle(false); toast.success("Title updated") }
+  async function handleDeleteComment(commentId: number) {
+    if (!workspaceSlug || !projectId) return
+    try {
+      await deleteComment(workspaceSlug, projectId, issueId, commentId)
+      toast.success("Comment deleted")
+    } catch {
+      toast.error("Failed to delete comment")
+    }
+  }
+
+  async function onTitleBlur() {
+    setEditingTitle(false)
+    await callUpdate({ title })
+    toast.success("Title updated")
+  }
+  async function onTitleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") { setEditingTitle(false); await callUpdate({ title }); toast.success("Title updated") }
     if (e.key === "Escape") { setTitle(issue!.title); setEditingTitle(false) }
   }
 
   function onDescKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Escape") { setDescDraft(description); setEditingDesc(false) }
   }
-  function saveDescription() { setDescription(descDraft); setEditingDesc(false); toast.success("Description updated") }
+  async function saveDescription() {
+    setDescription(descDraft)
+    setEditingDesc(false)
+    await callUpdate({ description: descDraft })
+    toast.success("Description updated")
+  }
   function cancelDescription() { setDescDraft(description); setEditingDesc(false) }
 
   return (
@@ -446,19 +590,43 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
             <DropdownMenuTrigger asChild>
               <button type="button" className={cn("flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium hover:bg-muted/60 transition-colors", statusCfg.color)}>
                 {statusCfg.icon}
-                <span className="ml-1">{statusCfg.label}</span>
+                <span className="ml-1">{statusName || statusCfg.label}</span>
                 <ChevronDown className="size-3 ml-0.5 opacity-60" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="min-w-36">
-              {(Object.keys(STATUS_CONFIG) as IssueStatus[]).map((s) => (
+            <DropdownMenuContent align="start" className="min-w-48">
+              {displayStatuses.length > 0 ? displayStatuses.map((s) => {
+                const cfg = getStatusCfg(s.category)
+                return (
+                  <DropdownMenuItem
+                    key={s.id}
+                    className={cn("flex items-center gap-2 text-xs", cfg.color)}
+                    onClick={async () => {
+                      setStatusId(s.id)
+                      setStatusName(s.name)
+                      setStatusCategory(s.category)
+                      await callUpdate({ statusId: s.id })
+                      toast.success(`Status → ${s.name}`)
+                    }}
+                  >
+                    {cfg.icon}
+                    {s.name}
+                    {statusId === s.id && <CheckIcon className="ml-auto size-3 text-primary" />}
+                  </DropdownMenuItem>
+                )
+              }) : (Object.keys(STATUS_CATEGORY_CONFIG) as IssueStatusCategory[]).map((cat) => (
                 <DropdownMenuItem
-                  key={s}
-                  className={cn("flex items-center gap-2 text-xs", STATUS_CONFIG[s].color)}
-                  onClick={() => { setStatus(s); toast.success(`Status → ${STATUS_CONFIG[s].label}`) }}
+                  key={cat}
+                  className={cn("flex items-center gap-2 text-xs", STATUS_CATEGORY_CONFIG[cat].color)}
+                  onClick={() => {
+                    setStatusCategory(cat)
+                    setStatusName(STATUS_CATEGORY_CONFIG[cat].label)
+                    toast.success(`Status → ${STATUS_CATEGORY_CONFIG[cat].label}`)
+                  }}
                 >
-                  {STATUS_CONFIG[s].icon}
-                  {STATUS_CONFIG[s].label}
+                  {STATUS_CATEGORY_CONFIG[cat].icon}
+                  {STATUS_CATEGORY_CONFIG[cat].label}
+                  {statusCategory === cat && <CheckIcon className="ml-auto size-3 text-primary" />}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
@@ -564,7 +732,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                   )}
                 >
                   <MessageSquare className="size-3.5" />
-                  Comments ({MOCK_COMMENTS.length})
+                  Comments ({storeComments.length})
                 </button>
                 <button
                   type="button"
@@ -597,22 +765,42 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
               </div>
 
               {tab === "comments" && (
-                <CommentsTab comment={comment} onChange={setComment} onSend={handleSendComment} />
+                <CommentsTab
+                  comments={storeComments}
+                  loading={loadingComments}
+                  comment={comment}
+                  onChange={setComment}
+                  onSend={handleSendComment}
+                  onDelete={handleDeleteComment}
+                />
               )}
 
               {tab === "activity" && (
                 <div className="flex flex-col gap-0">
-                  {MOCK_ACTIVITY.map((a, i) => (
+                  {loadingActivity && (
+                    <p className="text-xs text-muted-foreground text-center py-4">Loading activity…</p>
+                  )}
+                  {!loadingActivity && storeActivity.length === 0 && (
+                    <p className="text-xs text-muted-foreground text-center py-4 italic">No activity yet.</p>
+                  )}
+                  {storeActivity.map((a, i) => (
                     <div key={a.id} className="flex items-start gap-3 py-2.5 relative">
-                      {i < MOCK_ACTIVITY.length - 1 && (
+                      {i < storeActivity.length - 1 && (
                         <div className="absolute left-2 top-7 bottom-0 w-px bg-border" />
                       )}
                       <div className="size-4 mt-0.5 rounded-full bg-muted border border-border shrink-0 flex items-center justify-center">
                         <div className="size-1.5 rounded-full bg-muted-foreground/40" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <span className="text-xs text-muted-foreground">{a.text}</span>
-                        <span className="text-xs text-muted-foreground/60 ml-2">{a.time}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {a.actor ? (a.actor.displayName ?? a.actor.email) : "System"}
+                          {" "}
+                          <span className="font-medium text-foreground">{a.action.replaceAll("_", " ").toLowerCase()}</span>
+                          {a.oldValue && a.newValue && (
+                            <span> from <span className="text-muted-foreground">{a.oldValue}</span> to <span className="text-foreground">{a.newValue}</span></span>
+                          )}
+                        </span>
+                        <span className="text-xs text-muted-foreground/60 ml-2">{formatActivityTime(a.createdAt)}</span>
                       </div>
                     </div>
                   ))}
@@ -645,7 +833,11 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="min-w-36">
                   {(Object.keys(PRIORITY_CONFIG) as IssuePriority[]).map((p) => (
-                    <DropdownMenuItem key={p} className="flex items-center gap-2 text-xs" onClick={() => { setPriority(p); toast.success(`Priority → ${PRIORITY_CONFIG[p].label}`) }}>
+                    <DropdownMenuItem key={p} className="flex items-center gap-2 text-xs" onClick={async () => {
+                      setPriority(p)
+                      await callUpdate({ priority: p })
+                      toast.success(`Priority → ${PRIORITY_CONFIG[p].label}`)
+                    }}>
                       <div className={cn("size-2 rounded-full", PRIORITY_CONFIG[p].dot)} />
                       {PRIORITY_CONFIG[p].label}
                       {priority === p ? <CheckIcon className="ml-auto size-3 text-primary" /> : null}
@@ -674,20 +866,33 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="min-w-40">
-                  <DropdownMenuItem className="flex items-center gap-2 text-xs" onClick={() => { setAssignee(null); toast.success("Unassigned") }}>
+                  <DropdownMenuItem className="flex items-center gap-2 text-xs" onClick={async () => {
+                    setAssignee(null)
+                    await callUpdate({ assigneeId: null })
+                    toast.success("Unassigned")
+                  }}>
                     <span className="size-4 inline-block shrink-0" />
                     <span className="text-muted-foreground">No assignee</span>
                     {noAssignee && <CheckIcon className="ml-auto size-3 text-primary" />}
                   </DropdownMenuItem>
-                  {TEAM_MEMBERS.map((m) => (
-                    <DropdownMenuItem key={m.name} className="flex items-center gap-2 text-xs" onClick={() => { setAssignee(m); toast.success(`Assigned to ${m.name}`) }}>
-                      <Avatar className="size-4 shrink-0">
-                        <AvatarFallback className={cn("text-[8px] text-white", m.color)}>{m.initials}</AvatarFallback>
-                      </Avatar>
-                      {m.name}
-                      {assignee?.name === m.name ? <CheckIcon className="ml-auto size-3 text-primary" /> : null}
-                    </DropdownMenuItem>
-                  ))}
+                  {projectMembers.map((m) => {
+                    const initials = memberInitials(m)
+                    const color    = memberColor(m.userId)
+                    const name     = m.displayName ?? m.email
+                    return (
+                      <DropdownMenuItem key={m.userId} className="flex items-center gap-2 text-xs" onClick={async () => {
+                        setAssignee({ initials, color, name, userId: m.userId })
+                        await callUpdate({ assigneeId: m.userId })
+                        toast.success(`Assigned to ${name}`)
+                      }}>
+                        <Avatar className="size-4 shrink-0">
+                          <AvatarFallback className={cn("text-[8px] text-white", color)}>{initials}</AvatarFallback>
+                        </Avatar>
+                        {name}
+                        {assignee?.userId === m.userId ? <CheckIcon className="ml-auto size-3 text-primary" /> : null}
+                      </DropdownMenuItem>
+                    )
+                  })}
                 </DropdownMenuContent>
               </DropdownMenu>
             </MetaRow>
@@ -697,8 +902,9 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
               issueLabels={labels}
               issuePriority={priority}
               currentAssignee={assignee}
-              onAssign={(m) => {
-                setAssignee({ initials: m.initials, color: m.color, name: m.name })
+              onAssign={async (m) => {
+                setAssignee({ initials: m.initials, color: m.color, name: m.name, userId: 0 })
+                await callUpdate({ assigneeId: undefined })
                 toast.success(`Assigned to ${m.name}`)
               }}
             />
