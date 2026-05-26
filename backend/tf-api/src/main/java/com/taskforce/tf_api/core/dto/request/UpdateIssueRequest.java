@@ -1,5 +1,7 @@
 package com.taskforce.tf_api.core.dto.request;
 
+import java.util.List;
+
 import com.taskforce.tf_api.core.enums.IssuePriority;
 
 import jakarta.validation.constraints.Size;
@@ -30,4 +32,7 @@ public class UpdateIssueRequest {
 
     /** Position dans la colonne kanban (kanban drag & drop) */
     private Integer position;
+
+    /** null = pas de changement des labels ; liste vide = retirer tous les labels */
+    private List<Long> labelIds;
 }
