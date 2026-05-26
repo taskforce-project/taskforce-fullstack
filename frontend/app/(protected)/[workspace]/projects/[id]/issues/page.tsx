@@ -436,6 +436,8 @@ export default function ProjectIssuesPage() {
         issue={selectedIssue ? toSheetIssue(selectedIssue) : null}
         open={selectedIssue !== null}
         onOpenChange={(open) => { if (!open) setSelectedIssue(null) }}
+        workspaceSlug={workspace}
+        projectId={projectId}
       />
     </div>
   )
