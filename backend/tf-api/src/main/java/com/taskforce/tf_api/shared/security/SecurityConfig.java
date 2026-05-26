@@ -21,7 +21,9 @@ public class SecurityConfig {
         "/api/stripe/**",
         "/actuator/**",
         "/swagger-ui/**",
-        "/v3/api-docs/**"
+        "/v3/api-docs/**",
+        "/ws/**",        // WebSocket upgrade — auth gérée au niveau STOMP
+        "/ws-sockjs/**"  // SockJS fallback
     };
 
     /**
