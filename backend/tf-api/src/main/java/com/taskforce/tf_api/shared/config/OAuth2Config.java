@@ -43,6 +43,21 @@ public class OAuth2Config {
     }
 
     /**
+     * RestTemplate générique pour les intégrations tierces (GitHub, Slack, Webhooks)
+     * Timeout: 10 secondes
+     */
+    @Bean
+    @org.springframework.context.annotation.Primary
+    public RestTemplate restTemplate() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(10000);
+        factory.setReadTimeout(10000);
+        RestTemplate restTemplate = new RestTemplate();
+        restTemplate.setRequestFactory(factory);
+        return restTemplate;
+    }
+
+    /**
      * Configuration des timeouts pour les requêtes Keycloak
      */
     private ClientHttpRequestFactory clientHttpRequestFactory() {
