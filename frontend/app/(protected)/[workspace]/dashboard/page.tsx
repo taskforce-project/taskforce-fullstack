@@ -64,7 +64,7 @@ const STATUS_DOT: Record<string, string> = {
 const stagger = { animate: { transition: { staggerChildren: 0.04 } } }
 const row = {
   initial: { opacity: 0, y: 6 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.22, ease: [0.16, 1, 0.3, 1] } },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.22, ease: "easeOut" as const } },
 }
 
 // ─── Primitives ───────────────────────────────────────────────────────────────
@@ -156,7 +156,7 @@ export default function DashboardPage() {
     velocity: 0,
     daysLeft: 0,
     status:   "on_track" as const,
-  })
+  }))
 
   const firstName = user?.firstName ?? "—"
   const hour = new Date().getHours()
