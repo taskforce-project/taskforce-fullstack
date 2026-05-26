@@ -27,6 +27,13 @@ export interface BurndownPoint {
   ideal: number;
 }
 
+export interface MemberCapacity {
+  userId: number;
+  displayName: string;
+  avatarUrl: string | null;
+  openIssues: number;
+}
+
 // ---------------------------------------------------------------------------
 // API calls
 // ---------------------------------------------------------------------------
@@ -43,5 +50,10 @@ export async function getAnalyticsThroughput(slug: string): Promise<ThroughputPo
 
 export async function getAnalyticsBurndown(slug: string): Promise<BurndownPoint[]> {
   const res = await apiClient.get<{ data: BurndownPoint[] }>(ANALYTICS_ROUTES.BURNDOWN(slug));
+  return res.data.data;
+}
+
+export async function getAnalyticsCapacity(slug: string): Promise<MemberCapacity[]> {
+  const res = await apiClient.get<{ data: MemberCapacity[] }>(ANALYTICS_ROUTES.CAPACITY(slug));
   return res.data.data;
 }
