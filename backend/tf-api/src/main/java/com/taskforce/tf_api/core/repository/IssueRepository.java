@@ -107,4 +107,16 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
     List<Issue> findCompletedBetween(@Param("projectIds") List<Long> projectIds,
                                      @Param("start") LocalDateTime start,
                                      @Param("end") LocalDateTime end);
+
+    /** Issues planifiées (avec startDate ou dueDate) pour tous les projets du workspace — utilisé par la roadmap */
+    @Query("""
+        SELECT i FROM Issue i
+        LEFT JOIN FETCH i.status
+        LEFT JOIN FETCH i.type
+        LEFT JOIN FETCH i.assignee
+        WHERE i.project.workspace.slug = :slug
+          AND (i.startDate IS NOT NULL OR i.dueDate IS NOT NULL)
+        ORDER BY COALESCE(i.startDate, i.dueDate) ASC
+        """)
+    List<Issue> findScheduledByWorkspaceSlug(@Param("slug") String slug);
 }
