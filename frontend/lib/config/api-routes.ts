@@ -168,6 +168,20 @@ export const TEAM_ROUTES = {
 } as const;
 
 /**
+ * Routes discussions
+ * Backend: /api/workspaces/{slug}/discussions
+ */
+export const DISCUSSION_ROUTES = {
+  LIST:    (slug: string) => `/api/workspaces/${slug}/discussions`,
+  CREATE:  (slug: string) => `/api/workspaces/${slug}/discussions`,
+  BY_ID:   (slug: string, id: number) => `/api/workspaces/${slug}/discussions/${id}`,
+  UPDATE:  (slug: string, id: number) => `/api/workspaces/${slug}/discussions/${id}`,
+  DELETE:  (slug: string, id: number) => `/api/workspaces/${slug}/discussions/${id}`,
+  PIN:     (slug: string, id: number) => `/api/workspaces/${slug}/discussions/${id}/pin`,
+  LOCK:    (slug: string, id: number) => `/api/workspaces/${slug}/discussions/${id}/lock`,
+} as const;
+
+/**
  * Toutes les routes groupées (export par défaut)
  */
 export const API_ROUTES = {
