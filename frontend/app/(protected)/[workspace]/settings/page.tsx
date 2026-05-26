@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { useSearchParams } from "next/navigation"
 import {
   User, Bell, CreditCard, Users, Check, Zap, Globe, Key, Palette, Webhook,
-  X as XIcon, Plus, Upload, Camera,
+  X as XIcon, Plus, Upload, Camera, Link2, Trash2,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/lib/contexts/auth-context"
 import { useUserStore } from "@/lib/store/user-store"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
+import { useIntegrationStore } from "@/lib/store/integration-store"
 import { getAvatarUrl } from "@/lib/utils/avatar"
 import { apiClient } from "@/lib/api/client"
 import { USER_ROUTES } from "@/lib/config/api-routes"
@@ -825,45 +826,239 @@ function TeamPanel() {
 }
 
 function IntegrationsPanel() {
-  const [webhookUrl, setWebhookUrl] = useState("")
+  const { activeWorkspace } = useWorkspaceStore()
+  const slug = activeWorkspace?.slug ?? ""
+  const {
+    githubStatus, slackStatus, slackChannels, webhooks,
+    fetchGitHubStatus, connectGitHub, disconnectGitHub,
+    fetchSlackStatus, connectSlack, disconnectSlack,
+    fetchSlackChannels, addSlackChannel, removeSlackChannel,
+    fetchWebhooks, addWebhook, removeWebhook,
+  } = useIntegrationStore()
 
-  const INTEGRATIONS = [
-    { key: "github", name: "GitHub", desc: "Link issues to pull requests and commits.",    icon: "GH", connected: true  },
-    { key: "slack",  name: "Slack",  desc: "Get notifications directly in your channels.", icon: "SL", connected: false },
-    { key: "figma",  name: "Figma",  desc: "Attach Figma designs to issues.",              icon: "FG", connected: false },
-  ]
+  // Slack channel form
+  const [channelId,   setChannelId]   = useState("")
+  const [channelName, setChannelName] = useState("")
+  const [addingChannel, setAddingChannel] = useState(false)
+
+  // Webhook form
+  const [webhookUrl,    setWebhookUrl]    = useState("")
+  const [webhookEvents, setWebhookEvents] = useState<string[]>(["issue.created"])
+  const [addingWebhook, setAddingWebhook] = useState(false)
+
+  const ALL_EVENTS = ["issue.created", "issue.updated", "issue.deleted", "cycle.completed", "comment.created"]
+
+  useEffect(() => {
+    if (!slug) return
+    fetchGitHubStatus(slug).catch(() => null)
+    fetchSlackStatus(slug).catch(() => null)
+    fetchWebhooks(slug).catch(() => null)
+  }, [slug, fetchGitHubStatus, fetchSlackStatus, fetchWebhooks])
+
+  useEffect(() => {
+    if (slug && slackStatus?.connected) {
+      fetchSlackChannels(slug).catch(() => null)
+    }
+  }, [slug, slackStatus?.connected, fetchSlackChannels])
+
+  async function handleDisconnectGitHub() {
+    try {
+      await disconnectGitHub(slug)
+      toast.success("GitHub déconnecté")
+    } catch {
+      toast.error("Impossible de déconnecter GitHub")
+    }
+  }
+
+  async function handleDisconnectSlack() {
+    try {
+      await disconnectSlack(slug)
+      toast.success("Slack déconnecté")
+    } catch {
+      toast.error("Impossible de déconnecter Slack")
+    }
+  }
+
+  async function handleAddChannel() {
+    if (!channelId.trim() || !channelName.trim()) return
+    setAddingChannel(true)
+    try {
+      await addSlackChannel(slug, { channelId: channelId.trim(), channelName: channelName.trim(), eventTypes: ["issue.created"] })
+      setChannelId("")
+      setChannelName("")
+      toast.success("Canal Slack ajouté")
+    } catch {
+      toast.error("Impossible d'ajouter le canal")
+    } finally {
+      setAddingChannel(false)
+    }
+  }
+
+  async function handleAddWebhook() {
+    if (!webhookUrl.trim()) return
+    setAddingWebhook(true)
+    try {
+      await addWebhook(slug, { url: webhookUrl.trim(), eventTypes: webhookEvents })
+      setWebhookUrl("")
+      toast.success("Webhook ajouté")
+    } catch {
+      toast.error("URL invalide ou inaccessible")
+    } finally {
+      setAddingWebhook(false)
+    }
+  }
+
+  function toggleEvent(event: string) {
+    setWebhookEvents((prev) =>
+      prev.includes(event) ? prev.filter((e) => e !== event) : [...prev, event]
+    )
+  }
 
   return (
     <div className="flex flex-col gap-4">
-      <SectionCard title="Connected apps" description="Manage your third-party integrations.">
-        <div className="flex flex-col divide-y divide-border/50">
-          {INTEGRATIONS.map((integration) => (
-            <div key={integration.key} className="flex items-center gap-4 py-4 first:pt-0 last:pb-0">
-              <div className="h-10 w-10 rounded-lg border border-border bg-muted flex items-center justify-center text-xs font-bold text-foreground shrink-0">
-                {integration.icon}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground">{integration.name}</p>
-                <p className="text-xs text-muted-foreground">{integration.desc}</p>
-              </div>
-              {integration.connected ? (
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="text-xs text-emerald-400 border-emerald-500/20 bg-emerald-500/10">Connected</Badge>
-                  <Button variant="outline" size="sm" className="h-7 text-xs text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => toast.success(`${integration.name} disconnected`)}>
-                    Disconnect
-                  </Button>
-                </div>
-              ) : (
-                <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => toast.info(`Connecting ${integration.name}...`)}>
-                  Connect
-                </Button>
-              )}
+      {/* ---- GitHub ---- */}
+      <SectionCard title="GitHub" description="Link issues to pull requests and commits.">
+        <div className="flex items-center gap-4">
+          <div className="h-10 w-10 rounded-lg border border-border bg-muted flex items-center justify-center text-xs font-bold text-foreground shrink-0">
+            GH
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-foreground">GitHub</p>
+            {githubStatus?.connected && githubStatus.meta?.login && (
+              <p className="text-xs text-muted-foreground">Connected as <span className="font-medium">@{githubStatus.meta.login}</span></p>
+            )}
+            {!githubStatus?.connected && (
+              <p className="text-xs text-muted-foreground">Not connected</p>
+            )}
+          </div>
+          {githubStatus?.connected ? (
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="text-xs text-emerald-400 border-emerald-500/20 bg-emerald-500/10">Connected</Badge>
+              <Button variant="outline" size="sm" className="h-7 text-xs text-destructive border-destructive/30 hover:bg-destructive/10" onClick={handleDisconnectGitHub}>
+                Disconnect
+              </Button>
             </div>
-          ))}
+          ) : (
+            <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => connectGitHub(slug)}>
+              <Link2 className="h-3 w-3 mr-1.5" />Connect
+            </Button>
+          )}
         </div>
       </SectionCard>
+
+      {/* ---- Slack ---- */}
+      <SectionCard title="Slack" description="Get notifications directly in your Slack channels.">
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-4">
+            <div className="h-10 w-10 rounded-lg border border-border bg-muted flex items-center justify-center text-xs font-bold text-foreground shrink-0">
+              SL
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-foreground">Slack</p>
+              {slackStatus?.connected && slackStatus.meta?.teamName && (
+                <p className="text-xs text-muted-foreground">Connected to <span className="font-medium">{slackStatus.meta.teamName}</span></p>
+              )}
+              {!slackStatus?.connected && (
+                <p className="text-xs text-muted-foreground">Not connected</p>
+              )}
+            </div>
+            {slackStatus?.connected ? (
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="text-xs text-emerald-400 border-emerald-500/20 bg-emerald-500/10">Connected</Badge>
+                <Button variant="outline" size="sm" className="h-7 text-xs text-destructive border-destructive/30 hover:bg-destructive/10" onClick={handleDisconnectSlack}>
+                  Disconnect
+                </Button>
+              </div>
+            ) : (
+              <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => connectSlack(slug)}>
+                <Link2 className="h-3 w-3 mr-1.5" />Connect
+              </Button>
+            )}
+          </div>
+
+          {/* Slack channels — shown only when connected */}
+          {slackStatus?.connected && (
+            <>
+              <Separator />
+              <div className="flex flex-col gap-2">
+                <p className="text-xs font-medium text-foreground">Notification channels</p>
+                {slackChannels.length === 0 && (
+                  <p className="text-xs text-muted-foreground">No channels configured yet.</p>
+                )}
+                {slackChannels.map((ch) => (
+                  <div key={ch.id} className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">#{ch.channelName}</p>
+                      <p className="text-xs text-muted-foreground">{ch.eventTypes.join(", ")}</p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-destructive hover:bg-destructive/10"
+                      onClick={async () => {
+                        try { await removeSlackChannel(slug, ch.id); toast.success("Canal supprimé") }
+                        catch { toast.error("Impossible de supprimer le canal") }
+                      }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))}
+                {/* Add channel form */}
+                <div className="flex gap-2 mt-1">
+                  <StyledInput
+                    placeholder="Channel ID (e.g. C0123456789)"
+                    value={channelId}
+                    onChange={(e) => setChannelId(e.target.value)}
+                  />
+                  <StyledInput
+                    placeholder="Channel name"
+                    value={channelName}
+                    onChange={(e) => setChannelName(e.target.value)}
+                  />
+                  <Button size="sm" className="h-9 text-xs shrink-0" onClick={handleAddChannel} disabled={addingChannel || !channelId || !channelName}>
+                    {addingChannel ? "Adding…" : "Add"}
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </SectionCard>
+
+      {/* ---- Webhooks ---- */}
       <SectionCard title="Webhooks" description="Receive HTTP POST events for workspace activity.">
         <div className="flex flex-col gap-3">
+          {webhooks.length > 0 && (
+            <div className="flex flex-col gap-2 mb-1">
+              {webhooks.map((wh) => (
+                <div key={wh.id} className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+                  <div className="min-w-0 mr-2">
+                    <p className="text-sm font-mono text-foreground truncate">{wh.url}</p>
+                    <p className="text-xs text-muted-foreground">{wh.eventTypes.join(", ")}</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {wh.lastStatus && (
+                      <Badge variant="outline" className={cn("text-xs", wh.lastStatus < 300 ? "text-emerald-400 border-emerald-500/20" : "text-destructive border-destructive/20")}>
+                        {wh.lastStatus}
+                      </Badge>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-destructive hover:bg-destructive/10"
+                      onClick={async () => {
+                        try { await removeWebhook(slug, wh.id); toast.success("Webhook supprimé") }
+                        catch { toast.error("Impossible de supprimer le webhook") }
+                      }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
           <div className="flex gap-2">
             <StyledInput
               type="url"
@@ -871,16 +1066,27 @@ function IntegrationsPanel() {
               value={webhookUrl}
               onChange={(e) => setWebhookUrl(e.target.value)}
             />
-            <Button
-              size="sm"
-              className="h-9 text-xs shrink-0"
-              disabled={!webhookUrl}
-              onClick={() => { toast.success("Webhook saved"); setWebhookUrl("") }}
-            >
-              Add webhook
+            <Button size="sm" className="h-9 text-xs shrink-0" disabled={!webhookUrl || addingWebhook} onClick={handleAddWebhook}>
+              {addingWebhook ? "Adding…" : "Add webhook"}
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground">Events: issue.created, issue.updated, issue.deleted, cycle.completed</p>
+          <div className="flex flex-wrap gap-2">
+            {ALL_EVENTS.map((event) => (
+              <button
+                key={event}
+                type="button"
+                onClick={() => toggleEvent(event)}
+                className={cn(
+                  "rounded-full border px-2.5 py-0.5 text-xs transition-colors",
+                  webhookEvents.includes(event)
+                    ? "border-primary/50 bg-primary/10 text-primary"
+                    : "border-border text-muted-foreground hover:border-primary/30"
+                )}
+              >
+                {event}
+              </button>
+            ))}
+          </div>
         </div>
       </SectionCard>
     </div>
@@ -899,6 +1105,14 @@ export default function SettingsPage() {
   })
 
   const activeSection = SECTIONS.find((s) => s.key === active)
+
+  // Afficher un toast après retour OAuth GitHub/Slack
+  useEffect(() => {
+    const github = searchParams.get("github")
+    const slack  = searchParams.get("slack")
+    if (github === "connected") toast.success("GitHub connecté avec succès !")
+    if (slack  === "connected") toast.success("Slack connecté avec succès !")
+  }, [searchParams])
 
   return (
     <div className="flex gap-8 max-w-5xl mx-auto w-full min-h-0">
