@@ -216,6 +216,28 @@ export const ATTACHMENT_ROUTES = {
 } as const;
 
 /**
+ * Routes intégrations (GitHub, Slack, Webhooks)
+ * Backend: /api/workspaces/{slug}/integrations & /api/integrations
+ */
+export const INTEGRATION_ROUTES = {
+  // GitHub
+  GITHUB_STATUS:   (slug: string) => `/api/workspaces/${slug}/integrations/github/status`,
+  GITHUB_CONNECT:  (slug: string) => `/api/workspaces/${slug}/integrations/github/connect`,
+  GITHUB_DISCONNECT: (slug: string) => `/api/workspaces/${slug}/integrations/github`,
+  GITHUB_LINKS:    (slug: string, issueId: number) => `/api/workspaces/${slug}/integrations/github/issues/${issueId}/links`,
+  GITHUB_LINK:     (slug: string, linkId: number) => `/api/workspaces/${slug}/integrations/github/links/${linkId}`,
+  // Slack
+  SLACK_STATUS:    (slug: string) => `/api/workspaces/${slug}/integrations/slack/status`,
+  SLACK_CONNECT:   (slug: string) => `/api/workspaces/${slug}/integrations/slack/connect`,
+  SLACK_DISCONNECT:(slug: string) => `/api/workspaces/${slug}/integrations/slack`,
+  SLACK_CHANNELS:  (slug: string) => `/api/workspaces/${slug}/integrations/slack/channels`,
+  SLACK_CHANNEL:   (slug: string, channelId: number) => `/api/workspaces/${slug}/integrations/slack/channels/${channelId}`,
+  // Webhooks
+  WEBHOOKS:  (slug: string) => `/api/workspaces/${slug}/webhooks`,
+  WEBHOOK:   (slug: string, id: number) => `/api/workspaces/${slug}/webhooks/${id}`,
+} as const;
+
+/**
  * Toutes les routes groupées (export par défaut)
  */
 export const API_ROUTES = {
