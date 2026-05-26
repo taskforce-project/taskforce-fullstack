@@ -138,9 +138,14 @@ const LABEL_COLORS: Record<string, string> = {
 // IssueRow
 // ─────────────────────────────────────────────────────────────────────────────
 
-function IssueRow({ issue }: Readonly<{ issue: Issue }>) {
+function IssueRow({ issue, slug }: Readonly<{ issue: Issue; slug: string }>) {
   const status   = STATUS_CONFIG[issue.status]
   const priority = PRIORITY_CONFIG[issue.priority]
+  const { deleteIssue } = useIssueStore()
+
+  async function handleDelete() {
+    await deleteIssue(slug, Number.parseInt(issue.project.id, 10), Number.parseInt(issue.id, 10))
+  }
 
   return (
     <div className="group flex items-center gap-3 px-4 py-2.5 hover:bg-muted/30 border-b border-border/50 last:border-0 transition-colors cursor-pointer">
@@ -226,7 +231,7 @@ function IssueRow({ issue }: Readonly<{ issue: Issue }>) {
           <DropdownMenuItem>Edit</DropdownMenuItem>
           <DropdownMenuItem>Assign to me</DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem className="text-destructive focus:text-destructive">Delete</DropdownMenuItem>
+          <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={handleDelete}>Delete</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
@@ -237,7 +242,7 @@ function IssueRow({ issue }: Readonly<{ issue: Issue }>) {
 // GroupedSection
 // ─────────────────────────────────────────────────────────────────────────────
 
-function GroupedSection({ status, issues }: Readonly<{ status: IssueStatus; issues: Issue[] }>) {
+function GroupedSection({ status, issues, slug }: Readonly<{ status: IssueStatus; issues: Issue[]; slug: string }>) {
   const [open, setOpen] = useState(true)
   const cfg = STATUS_CONFIG[status]
 
@@ -257,7 +262,7 @@ function GroupedSection({ status, issues }: Readonly<{ status: IssueStatus; issu
       {open && (
         <div>
           {issues.map((issue) => (
-            <IssueRow key={issue.id} issue={issue} />
+            <IssueRow key={issue.id} issue={issue} slug={slug} />
           ))}
         </div>
       )}
@@ -279,7 +284,7 @@ export default function IssuesPage() {
   const params  = useParams()
   const slug    = typeof params?.workspace === "string" ? params.workspace : ""
 
-  const { projects, fetchProjects } = useProjectStore()
+  const { fetchProjects } = useProjectStore()
   const { fetchIssues, isLoading }  = useIssueStore()
 
   const [allIssues, setAllIssues] = useState<Issue[]>([])
@@ -478,7 +483,7 @@ export default function IssuesPage() {
         <div className="flex flex-col gap-3">
           {groupBy === "status"
             ? grouped.map((g) => (
-                <GroupedSection key={g.key} status={g.key as IssueStatus} issues={g.issues} />
+                <GroupedSection key={g.key} status={g.key as IssueStatus} issues={g.issues} slug={slug} />
               ))
             : grouped.map((g) => (
                 <div key={g.key} className="border border-border rounded-xl overflow-hidden">
@@ -496,7 +501,7 @@ export default function IssuesPage() {
                       {g.issues.length}
                     </Badge>
                   </div>
-                  {g.issues.map((issue) => <IssueRow key={issue.id} issue={issue} />)}
+                  {g.issues.map((issue) => <IssueRow key={issue.id} issue={issue} slug={slug} />)}
                 </div>
               ))
           }
