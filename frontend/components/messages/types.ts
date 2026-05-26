@@ -28,6 +28,8 @@ export interface Reaction {
 export interface Message {
   id: string
   authorId: string
+  authorName?: string
+  authorInitials?: string
   content: string
   ts: Date
   reactions?: Reaction[]

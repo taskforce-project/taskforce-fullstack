@@ -27,7 +27,10 @@ interface MessageBubbleProps {
 
 export function MessageBubble({ message, showHeader, onReact, onEdit, onDelete }: MessageBubbleProps) {
   const [emojiPicker, setEmojiPicker] = useState(false)
-  const author = MEMBERS[message.authorId]
+  const author      = MEMBERS[message.authorId]
+  const displayName = message.authorName     ?? author?.name     ?? message.authorId
+  const initials    = message.authorInitials ?? author?.initials ?? "?"
+  const color       = author?.color ?? "bg-slate-500"
 
   return (
     <div className={cn(
@@ -39,9 +42,9 @@ export function MessageBubble({ message, showHeader, onReact, onEdit, onDelete }
         {showHeader ? (
           <div className={cn(
             "h-9 w-9 rounded-full flex items-center justify-center text-xs font-bold text-white mt-0.5",
-            author?.color ?? "bg-muted"
+            color
           )}>
-            {author?.initials ?? "?"}
+            {initials}
           </div>
         ) : (
           <span className="block text-[10px] text-transparent group-hover:text-muted-foreground/60 leading-6 text-right pr-1 tabular-nums select-none transition-colors">
@@ -55,7 +58,7 @@ export function MessageBubble({ message, showHeader, onReact, onEdit, onDelete }
         {showHeader && (
           <div className="flex items-baseline gap-2 mb-1">
             <span className="text-sm font-semibold text-foreground">
-              {author?.name ?? message.authorId}
+              {displayName}
             </span>
             <span className="text-[11px] text-muted-foreground">{formatTime(message.ts)}</span>
             {message.pinned && (
