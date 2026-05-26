@@ -17,6 +17,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
+import { useRouter } from "next/navigation"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -95,9 +96,19 @@ function formatDate(date: string): string {
 // CycleCard
 // ─────────────────────────────────────────────────────────────────────────────
 
-function CycleCard({ cycle }: Readonly<{ cycle: Cycle }>) {
+function CycleCard({ cycle, slug }: Readonly<{ cycle: Cycle; slug: string }>) {
   const pct  = progress(cycle.issues)
   const left = daysLeft(cycle.endDate)
+  const router = useRouter()
+  const { deleteCycle } = useCycleStore()
+
+  async function handleDelete() {
+    await deleteCycle(slug, Number.parseInt(cycle.project.id, 10), Number.parseInt(cycle.id, 10))
+  }
+
+  function handleViewIssues() {
+    router.push(`/${slug}/projects/${cycle.project.id}/issues`)
+  }
 
   function statusLabel(): string {
     if (cycle.status === "active")   return "Active"
@@ -156,10 +167,10 @@ function CycleCard({ cycle }: Readonly<{ cycle: Cycle }>) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem className="gap-2"><BarChart3 className="h-4 w-4" />View issues</DropdownMenuItem>
+            <DropdownMenuItem className="gap-2" onClick={handleViewIssues}><BarChart3 className="h-4 w-4" />View issues</DropdownMenuItem>
             <DropdownMenuItem>Edit cycle</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive focus:text-destructive">Delete</DropdownMenuItem>
+            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={handleDelete}>Delete</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -228,10 +239,11 @@ function CycleCard({ cycle }: Readonly<{ cycle: Cycle }>) {
 // Section
 // ─────────────────────────────────────────────────────────────────────────────
 
-function CycleSection({ title, cycles, defaultOpen = true }: Readonly<{
+function CycleSection({ title, cycles, defaultOpen = true, slug }: Readonly<{
   title: string
   cycles: Cycle[]
   defaultOpen?: boolean
+  slug: string
 }>) {
   const [open, setOpen] = useState(defaultOpen)
 
@@ -250,7 +262,7 @@ function CycleSection({ title, cycles, defaultOpen = true }: Readonly<{
 
       {open && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {cycles.map((cycle) => <CycleCard key={cycle.id} cycle={cycle} />)}
+          {cycles.map((cycle) => <CycleCard key={cycle.id} cycle={cycle} slug={slug} />)}
         </div>
       )}
     </div>
@@ -334,18 +346,18 @@ export default function CyclesPage() {
 
       {/* Active cycles */}
       {active.length > 0 && (
-        <CycleSection title="Active" cycles={active} defaultOpen />
+        <CycleSection title="Active" cycles={active} defaultOpen slug={slug} />
       )}
 
       {/* Upcoming cycles */}
       {upcoming.length > 0 && (
-        <CycleSection title="Upcoming" cycles={upcoming} defaultOpen />
+        <CycleSection title="Upcoming" cycles={upcoming} defaultOpen slug={slug} />
       )}
 
       {/* Completed cycles */}
       {completed.length > 0 && (
-        <CycleSection title="Completed" cycles={completed} defaultOpen={false} />
-      )}
+        <CycleSection title="Completed" cycles={completed} defaultOpen={false} slug={slug} />
+      )}  
 
       {/* Empty state */}
       {!isLoading && cycles.length === 0 && (
