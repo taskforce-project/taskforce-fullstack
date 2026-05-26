@@ -1,10 +1,11 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import {
   X, RefreshCw, Clock, CheckCircle2, AlertTriangle, CircleDot,
   Flag, Tag, Calendar, Layers, GitBranch, MessageSquare, Activity,
   ChevronDown, Send, ExternalLink, Pencil, Check as CheckIcon,
+  Paperclip, Upload, Trash2, FileText,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -21,6 +22,13 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
 import { SmartAssignPanel } from "@/components/smart-assign/smart-assign-panel"
+import {
+  listAttachments,
+  uploadAttachment,
+  deleteAttachment,
+  formatFileSize,
+  type Attachment,
+} from "@/lib/api/attachment-service"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -163,6 +171,133 @@ function CommentsTab({ comment, onChange, onSend }: Readonly<CommentsTabProps>) 
 }
 
 // ---------------------------------------------------------------------------
+// Sub-component: attachments tab
+// ---------------------------------------------------------------------------
+
+interface AttachmentsTabProps {
+  issueId: number
+  projectId: number
+  workspaceSlug: string
+}
+
+function AttachmentsTab({ issueId, projectId, workspaceSlug }: Readonly<AttachmentsTabProps>) {
+  const [attachments, setAttachments] = useState<Attachment[]>([])
+  const [loading, setLoading] = useState(true)
+  const [uploading, setUploading] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const load = useCallback(async () => {
+    try {
+      const data = await listAttachments(workspaceSlug, projectId, issueId)
+      setAttachments(data)
+    } catch {
+      toast.error("Could not load attachments")
+    } finally {
+      setLoading(false)
+    }
+  }, [workspaceSlug, projectId, issueId])
+
+  useEffect(() => { void load() }, [load])
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    try {
+      const created = await uploadAttachment(workspaceSlug, projectId, issueId, file)
+      setAttachments((prev) => [created, ...prev])
+      toast.success(`${file.name} uploaded`)
+    } catch {
+      toast.error("Upload failed")
+    } finally {
+      setUploading(false)
+      if (fileRef.current) fileRef.current.value = ""
+    }
+  }
+
+  async function handleDelete(attachment: Attachment) {
+    try {
+      await deleteAttachment(workspaceSlug, projectId, issueId, attachment.id)
+      setAttachments((prev) => prev.filter((a) => a.id !== attachment.id))
+      toast.success("Attachment deleted")
+    } catch {
+      toast.error("Could not delete attachment")
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Upload button */}
+      <div>
+        <input
+          ref={fileRef}
+          type="file"
+          className="hidden"
+          onChange={handleFileChange}
+          accept="*/*"
+        />
+        <button
+          type="button"
+          disabled={uploading}
+          onClick={() => fileRef.current?.click()}
+          className="flex items-center gap-2 rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground hover:border-primary/50 hover:text-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full justify-center"
+        >
+          <Upload className="size-3.5" />
+          {uploading ? "Uploading…" : "Attach a file (max 25 MB)"}
+        </button>
+      </div>
+
+      {/* List */}
+      {loading && (
+        <p className="text-xs text-muted-foreground text-center py-4">Loading…</p>
+      )}
+      {!loading && attachments.length === 0 && (
+        <p className="text-xs text-muted-foreground text-center py-4 italic">No attachments yet.</p>
+      )}
+      {!loading && attachments.length > 0 && (
+        <div className="flex flex-col gap-2">
+          {attachments.map((a) => (
+            <div
+              key={a.id}
+              className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 px-3 py-2"
+            >
+              <FileText className="size-4 shrink-0 text-muted-foreground" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium truncate text-foreground">{a.originalName}</p>
+                <p className="text-[10px] text-muted-foreground">
+                  {formatFileSize(a.fileSize)} · {a.uploadedByName}
+                </p>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                {a.downloadUrl && (
+                  <a
+                    href={a.downloadUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="p-1 rounded hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
+                    title="Download"
+                  >
+                    <ExternalLink className="size-3.5" />
+                  </a>
+                )}
+                <button
+                  type="button"
+                  onClick={() => void handleDelete(a)}
+                  className="p-1 rounded hover:bg-red-500/10 transition-colors text-muted-foreground hover:text-red-400"
+                  title="Delete"
+                >
+                  <Trash2 className="size-3.5" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
@@ -193,12 +328,16 @@ interface IssueSheetProps {
   issue: SheetIssue | null
   open: boolean
   onOpenChange: (open: boolean) => void
+  /** Slug du workspace — requis pour les pièces jointes */
+  workspaceSlug?: string
+  /** ID numérique du projet — requis pour les pièces jointes */
+  projectId?: number
 }
 
-export function IssueSheet({ issue, open, onOpenChange }: Readonly<IssueSheetProps>) {
+export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId }: Readonly<IssueSheetProps>) {
   const initDescription = issue?.description ?? ""
   const [comment, setComment] = useState("")
-  const [tab, setTab] = useState<"comments" | "activity">("comments")
+  const [tab, setTab] = useState<"comments" | "activity" | "attachments">("comments")
   const [status, setStatus] = useState<IssueStatus>(issue?.status ?? "todo")
 
   // Main content editing
@@ -411,7 +550,7 @@ export function IssueSheet({ issue, open, onOpenChange }: Readonly<IssueSheetPro
 
             <Separator />
 
-            {/* Comments / Activity tabs */}
+            {/* Comments / Activity / Attachments tabs */}
             <div>
               <div className="flex gap-4 mb-4 border-b border-border">
                 <button
@@ -440,6 +579,21 @@ export function IssueSheet({ issue, open, onOpenChange }: Readonly<IssueSheetPro
                   <Activity className="size-3.5" />
                   Activity
                 </button>
+                {workspaceSlug && projectId && (
+                  <button
+                    type="button"
+                    onClick={() => setTab("attachments")}
+                    className={cn(
+                      "flex items-center gap-1.5 text-xs font-medium pb-2.5 border-b-2 -mb-px transition-colors",
+                      tab === "attachments"
+                        ? "border-foreground text-foreground"
+                        : "border-transparent text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <Paperclip className="size-3.5" />
+                    Attachments
+                  </button>
+                )}
               </div>
 
               {tab === "comments" && (
@@ -463,6 +617,14 @@ export function IssueSheet({ issue, open, onOpenChange }: Readonly<IssueSheetPro
                     </div>
                   ))}
                 </div>
+              )}
+
+              {tab === "attachments" && workspaceSlug && projectId && (
+                <AttachmentsTab
+                  issueId={Number(issue.id)}
+                  projectId={projectId}
+                  workspaceSlug={workspaceSlug}
+                />
               )}
             </div>
           </div>
