@@ -92,30 +92,26 @@ function isDueDateOverdue(iso: string | null): boolean {
 /** Convertit une Issue API en SheetIssue (format attendu par IssueSheet) */
 function toSheetIssue(issue: Issue): SheetIssue {
   const priorityMap: Record<IssuePriority, SheetIssue["priority"]> = {
-    NONE: "none", URGENT: "urgent", HIGH: "high", MEDIUM: "medium", LOW: "low",
-  }
-  const statusMap: Record<IssueStatusCategory, SheetIssue["status"]> = {
-    BACKLOG:   "todo",
-    UNSTARTED: "todo",
-    STARTED:   "in_progress",
-    COMPLETED: "done",
-    CANCELLED: "cancelled",
+    NONE: "NONE", URGENT: "URGENT", HIGH: "HIGH", MEDIUM: "MEDIUM", LOW: "LOW",
   }
   return {
-    id:          String(issue.id),
-    identifier:  issue.identifier,
-    title:       issue.title,
-    description: issue.description ?? undefined,
-    priority:    priorityMap[issue.priority],
-    status:      statusMap[issue.status.category],
-    assignee:    issue.assignee
-      ? { initials: emailInitials(issue.assignee.email), color: emailColor(issue.assignee.id), name: issue.assignee.email }
+    id:             String(issue.id),
+    identifier:     issue.identifier,
+    title:          issue.title,
+    description:    issue.description ?? undefined,
+    priority:       priorityMap[issue.priority],
+    statusId:       issue.status.id,
+    statusName:     issue.status.name,
+    statusCategory: issue.status.category,
+    assignee:       issue.assignee
+      ? { initials: emailInitials(issue.assignee.email), color: emailColor(issue.assignee.id), name: issue.assignee.email, userId: issue.assignee.id }
       : null,
-    labels:      issue.labels.map((l) => l.name),
-    dueDate:     formatDate(issue.dueDate),
-    storyPoints: null,
-    cycle:       null,
-    createdAt:   formatDate(issue.createdAt) ?? issue.createdAt,
+    assigneeId:     issue.assignee?.id ?? null,
+    labels:         issue.labels.map((l) => l.name),
+    dueDate:        formatDate(issue.dueDate),
+    storyPoints:    null,
+    cycle:          null,
+    createdAt:      formatDate(issue.createdAt) ?? issue.createdAt,
   }
 }
 
