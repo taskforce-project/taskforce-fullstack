@@ -97,6 +97,26 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Gère les interdictions métier (403)
+     */
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<ErrorResponse> handleForbiddenException(
+            ForbiddenException ex,
+            HttpServletRequest request) {
+
+        log.error("Forbidden: {}", ex.getMessage());
+
+        ErrorResponse error = ErrorResponse.of(
+                HttpStatus.FORBIDDEN.value(),
+                "Forbidden",
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
+    }
+
+    /**
      * Gère les erreurs d'accès refusé (403)
      */
     @ExceptionHandler(AccessDeniedException.class)
