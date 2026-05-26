@@ -126,6 +126,8 @@ services:
         condition: service_healthy
       keycloak:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     networks:
       - taskforce-network
     volumes:
@@ -226,6 +228,55 @@ services:
     restart: unless-stopped
 
   # ================================
+  # RabbitMQ — broker STOMP pour WebSocket
+  # ================================
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    container_name: taskforce-rabbitmq-dev
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"        # AMQP
+      - "${RABBITMQ_MGMT_PORT:-15672}:15672" # Management UI
+      - "${RABBITMQ_STOMP_PORT:-61613}:61613" # STOMP
+    volumes:
+      - rabbitmq_dev_data:/var/lib/rabbitmq
+      - ./rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+    networks:
+      - taskforce-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  # ================================
+  # Minio — stockage objet local (S3-compatible)
+  # ================================
+  minio:
+    image: minio/minio:latest
+    container_name: taskforce-minio-dev
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"      # API S3
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"  # Console web
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_dev_data:/data
+    networks:
+      - taskforce-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  # ================================
   # pgAdmin (optionnel - pour gérer la DB)
   # ================================
   pgadmin:
@@ -258,6 +309,10 @@ volumes:
   postgres_dev_data:
     driver: local
   pgadmin_dev_data:
+    driver: local
+  rabbitmq_dev_data:
+    driver: local
+  minio_dev_data:
     driver: local
 
 # ================================
