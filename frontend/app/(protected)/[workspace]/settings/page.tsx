@@ -26,6 +26,7 @@ type SettingsSection =
   | "appearance"
   | "notifications"
   | "security"
+  | "workspace"
   | "billing"
   | "team"
   | "integrations"
@@ -43,6 +44,7 @@ const SECTIONS: SectionConfig[] = [
   { key: "appearance",    label: "Appearance",     icon: <Palette className="h-4 w-4" />,    group: "Personal" },
   { key: "notifications", label: "Notifications",  icon: <Bell className="h-4 w-4" />,       group: "Personal" },
   { key: "security",      label: "Security",       icon: <Key className="h-4 w-4" />,        group: "Personal" },
+  { key: "workspace",     label: "General",        icon: <Globe className="h-4 w-4" />,      group: "Workspace" },
   { key: "billing",       label: "Billing & Plan", icon: <CreditCard className="h-4 w-4" />, group: "Workspace" },
   { key: "team",          label: "Members",        icon: <Users className="h-4 w-4" />,      group: "Workspace" },
   { key: "integrations",  label: "Integrations",   icon: <Webhook className="h-4 w-4" />,    group: "Workspace" },
@@ -56,7 +58,7 @@ const PLAN_FEATURES: Record<string, string[]> = {
 
 const SECTION_GROUPS = [
   { label: "Personal",  keys: ["profile", "account", "appearance", "notifications", "security"] as const },
-  { label: "Workspace", keys: ["billing", "team", "integrations"] as const },
+  { label: "Workspace", keys: ["workspace", "billing", "team", "integrations"] as const },
 ]
 
 const SKILL_OPTIONS = [
@@ -625,6 +627,69 @@ function BillingPanel() {
   )
 }
 
+function WorkspacePanel() {
+  const { activeWorkspace, updateWorkspaceInfo } = useWorkspaceStore()
+  const [name,        setName]        = useState(activeWorkspace?.name ?? "")
+  const [description, setDescription] = useState(activeWorkspace?.description ?? "")
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (activeWorkspace) {
+      setName(activeWorkspace.name)
+      setDescription(activeWorkspace.description ?? "")
+    }
+  }, [activeWorkspace])
+
+  async function handleSave() {
+    setSaving(true)
+    try {
+      const payload: { name?: string; description?: string } = {}
+      if (name !== activeWorkspace?.name)                       payload.name        = name
+      if (description !== (activeWorkspace?.description ?? "")) payload.description = description
+      if (Object.keys(payload).length === 0) { toast.info("No changes to save"); return }
+      await updateWorkspaceInfo(payload)
+      toast.success("Workspace updated")
+    } catch {
+      toast.error("Failed to update workspace")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <SectionCard title="Workspace settings" description="Manage your workspace name and description.">
+        <div className="flex flex-col gap-5">
+          <FormField label="Workspace name">
+            <StyledInput
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="My Workspace"
+            />
+          </FormField>
+          <FormField label="Description" hint="Optional — shown to workspace members.">
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Describe your workspace…"
+              rows={3}
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all resize-none"
+            />
+          </FormField>
+          <FormField label="Slug">
+            <StyledInput value={activeWorkspace?.slug ?? ""} readOnly />
+          </FormField>
+          <div className="flex justify-end">
+            <Button size="sm" className="h-8 text-xs" disabled={saving || !name.trim()} onClick={handleSave}>
+              {saving ? "Saving…" : "Save changes"}
+            </Button>
+          </div>
+        </div>
+      </SectionCard>
+    </div>
+  )
+}
+
 function TeamPanel() {
   const [invited, setInvited] = useState("")
   const [inviting, setInviting] = useState(false)
@@ -850,6 +915,7 @@ export default function SettingsPage() {
         {active === "appearance"    && <AppearancePanel />}
         {active === "notifications" && <NotificationsPanel />}
         {active === "security"      && <SecurityPanel />}
+        {active === "workspace"     && <WorkspacePanel />}
         {active === "billing"       && <BillingPanel />}
         {active === "team"          && <TeamPanel />}
         {active === "integrations"  && <IntegrationsPanel />}
