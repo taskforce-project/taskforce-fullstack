@@ -120,6 +120,8 @@ export interface UpdateIssuePayload {
   startDate?: string | null;
   dueDate?: string | null;
   position?: number;
+  /** null = pas de changement ; [] = retirer tous les labels */
+  labelIds?: number[];
 }
 
 export interface StatusPosition {
