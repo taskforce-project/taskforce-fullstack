@@ -18,6 +18,8 @@ import { useAuth } from "@/lib/contexts/auth-context"
 import { useUserStore } from "@/lib/store/user-store"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { getAvatarUrl } from "@/lib/utils/avatar"
+import { apiClient } from "@/lib/api/client"
+import { USER_ROUTES } from "@/lib/config/api-routes"
 import { cn } from "@/lib/utils"
 
 type SettingsSection =
@@ -198,6 +200,7 @@ function ProfilePanel() {
   const [role, setRole] = useState("")
   const [skills, setSkills] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
 
   useEffect(() => {
     if (user) {
@@ -217,16 +220,30 @@ function ProfilePanel() {
   })
   const hasCustomAvatar = Boolean(avatarUrl)
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error("Image too large — max 2 MB")
+    if (file.size > 3 * 1024 * 1024) {
+      toast.error("Image trop volumineuse — max 3 Mo")
       return
     }
-    const reader = new FileReader()
-    reader.onload = () => setAvatarUrl(reader.result as string)
-    reader.readAsDataURL(file)
+    setUploadingAvatar(true)
+    try {
+      const formData = new FormData()
+      formData.append("file", file)
+      const res = await apiClient.post<{ data: { avatarUrl: string } }>(USER_ROUTES.AVATAR, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+      const newUrl = res.data.data.avatarUrl ?? ""
+      setAvatarUrl(newUrl)
+      toast.success("Avatar mis à jour")
+    } catch {
+      toast.error("Impossible d'uploader l'avatar")
+    } finally {
+      setUploadingAvatar(false)
+      // reset input so the same file can be re-selected
+      e.target.value = ""
+    }
   }
 
   const handleSave = async () => {
@@ -291,9 +308,11 @@ function ProfilePanel() {
                     size="sm"
                     className="h-7 text-xs gap-1.5"
                     onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingAvatar}
                   >
-                    <Upload className="h-3 w-3" />
-                    Upload image
+                    {uploadingAvatar
+                      ? <><span className="h-3 w-3 animate-spin rounded-full border border-current border-t-transparent" />Uploading…</>
+                      : <><Upload className="h-3 w-3" />Upload image</>}
                   </Button>
                   {hasCustomAvatar && (
                     <Button
@@ -312,7 +331,7 @@ function ProfilePanel() {
                   onChange={(e) => setAvatarUrl(e.target.value)}
                   placeholder="Or paste a URL…"
                 />
-                <p className="text-xs text-muted-foreground">JPG, PNG, GIF, WEBP — max 2 MB</p>
+                <p className="text-xs text-muted-foreground">JPG, PNG, GIF, WEBP — max 3 Mo</p>
               </div>
             </div>
           </FormField>
