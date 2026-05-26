@@ -119,4 +119,15 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
         ORDER BY COALESCE(i.startDate, i.dueDate) ASC
         """)
     List<Issue> findScheduledByWorkspaceSlug(@Param("slug") String slug);
+
+    /** Nombre d'issues ouvertes par assignee dans une liste de projets */
+    @Query("""
+        SELECT i.assignee.id, COUNT(i)
+        FROM Issue i
+        WHERE i.project.id IN :projectIds
+          AND i.assignee IS NOT NULL
+          AND i.status.category NOT IN ('COMPLETED', 'CANCELLED')
+        GROUP BY i.assignee.id
+        """)
+    List<Object[]> countOpenIssuesGroupedByAssignee(@Param("projectIds") List<Long> projectIds);
 }
