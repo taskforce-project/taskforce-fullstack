@@ -45,45 +45,47 @@ type FilterTab = "all" | "active" | "archived"
 
 type HealthLevel = "healthy" | "at-risk" | "critical" | "paused"
 
-// ─── Operational signal derivation ───────────────────────────────────────────
-
-const RISK_SIGNALS = [
-  "No updates in 5 days",
-  "Blocker issue unresolved",
-  "Sprint overloaded (+34%)",
-  "Key member inactive",
-  "Deadline approaching",
-  "3 issues past due",
-  "Velocity dropped 28%",
-  "Awaiting client sign-off",
-  null,
-  null,
-  null,
-  null,
-]
+// ─── Operational signal derivation (from real project data) ──────────────────
 
 function deriveHealth(project: Project): HealthLevel {
-  if (project.status === "PAUSED") return "paused"
-  if (project.status === "ARCHIVED") return "paused"
-  const ratio = project.totalIssues > 0
-    ? project.openIssues / project.totalIssues
-    : 0
-  const seed = project.id % 10
-  if (seed < 2) return "critical"
-  if (seed < 4 || ratio > 0.7) return "at-risk"
+  if (project.status === "PAUSED" || project.status === "ARCHIVED") return "paused"
+  if (project.totalIssues === 0) return "healthy"
+  const ratio = project.openIssues / project.totalIssues
+  if (ratio > 0.85) return "critical"
+  if (ratio > 0.55) return "at-risk"
   return "healthy"
 }
 
-function deriveVelocity(project: Project): number {
-  // Deterministic pseudo-delta from project id
-  const vals = [-28, -12, -5, 0, 8, 15, 22, 34, -18, 6]
-  return vals[project.id % vals.length]
+function deriveVelocity(project: Project): number | null {
+  if (project.totalIssues === 0) return null
+  const completedIssues = project.totalIssues - project.openIssues
+  const createdAt = new Date(project.createdAt)
+  const updatedAt = new Date(project.updatedAt)
+  const ageWeeks = Math.max(1, (Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24 * 7))
+  // Completion rate: issues closed per week
+  const rate = completedIssues / ageWeeks
+  // Compare to a healthy target of 2 issues/week per 10 total
+  const target = (project.totalIssues / 10) * 2
+  if (target === 0) return null
+  const pct = Math.round(((rate - target) / target) * 100)
+  // Staleness penalty: if not updated in 7+ days, cap positive velocity
+  const daysSinceUpdate = (Date.now() - updatedAt.getTime()) / (1000 * 60 * 60 * 24)
+  if (daysSinceUpdate > 7 && pct > 0) return 0
+  return Math.max(-99, Math.min(99, pct))
 }
 
 function deriveRiskSignal(project: Project): string | null {
   const health = deriveHealth(project)
-  if (health === "healthy") return null
-  return RISK_SIGNALS[project.id % RISK_SIGNALS.length]
+  if (health === "healthy" || health === "paused") return null
+
+  const ratio = project.totalIssues > 0 ? project.openIssues / project.totalIssues : 0
+  const daysSinceUpdate = (Date.now() - new Date(project.updatedAt).getTime()) / (1000 * 60 * 60 * 24)
+
+  if (ratio > 0.85) return `${Math.round(ratio * 100)}% of issues still open`
+  if (daysSinceUpdate > 14) return `No updates in ${Math.round(daysSinceUpdate)} days`
+  if (daysSinceUpdate > 7) return "No updates in 7+ days"
+  if (ratio > 0.7) return "High open-issue ratio"
+  return "Sprint at risk"
 }
 
 function progressPct(project: Project): number {
@@ -133,7 +135,13 @@ function HealthChip({ level }: { level: HealthLevel }) {
   )
 }
 
-function VelocityBadge({ delta }: { delta: number }) {
+function VelocityBadge({ delta }: { delta: number | null }) {
+  if (delta === null) return (
+    <span className="inline-flex items-center gap-0.5 text-[11px]" style={{ color: "var(--label-quaternary)" }}>
+      <Minus className="size-3" />
+      <span>N/A</span>
+    </span>
+  )
   if (delta === 0) return (
     <span className="inline-flex items-center gap-0.5 text-[11px]" style={{ color: "var(--label-quaternary)" }}>
       <Minus className="size-3" />
