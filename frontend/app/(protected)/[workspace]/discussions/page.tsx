@@ -48,6 +48,19 @@ type FilterCategory = "all" | DiscussionCategory
 // Config
 // ---------------------------------------------------------------------------
 
+const AVATAR_COLORS = [
+  "bg-violet-500", "bg-blue-500", "bg-emerald-500", "bg-orange-500",
+  "bg-pink-500", "bg-cyan-500", "bg-amber-500", "bg-indigo-500",
+]
+
+function authorColor(id: number | null): string {
+  return AVATAR_COLORS[(id ?? 0) % AVATAR_COLORS.length]
+}
+
+// ---------------------------------------------------------------------------
+// Config
+// ---------------------------------------------------------------------------
+
 const CATEGORY_CONFIG: Record<DiscussionCategory, { label: string; badgeClass: string; emoji: string }> = {
   GENERAL:      { label: "General",      badgeClass: "bg-muted text-muted-foreground border-border",             emoji: "💬" },
   ANNOUNCEMENT: { label: "Announcement", badgeClass: "bg-primary/10 text-primary border-primary/20",             emoji: "📣" },
@@ -223,12 +236,12 @@ function DiscussionRow({ discussion, slug }: DiscussionRowProps) {
               <h3 className="text-sm font-medium text-foreground group-hover:text-primary transition-colors line-clamp-1">
                 {discussion.title}
               </h3>
-              {discussion.state === "answered" && (
+              {discussion.state === "ANSWERED" && (
                 <Badge variant="outline" className="text-xs border-0 bg-emerald-500/15 text-emerald-400 px-1.5 py-0 h-4 flex items-center gap-1 shrink-0">
                   <CheckCircle2 className="size-3" /> Answered
                 </Badge>
               )}
-              {discussion.state === "closed" && (
+              {discussion.state === "CLOSED" && (
                 <Badge variant="outline" className="text-xs border border-border text-muted-foreground px-1.5 py-0 h-4 shrink-0">
                   Closed
                 </Badge>
@@ -269,14 +282,14 @@ function DiscussionRow({ discussion, slug }: DiscussionRowProps) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem className="gap-2">
+              <DropdownMenuItem className="gap-2" onClick={() => togglePin(slug, discussion.id)}>
                 <Pin className="size-4" /> {discussion.isPinned ? "Unpin" : "Pin discussion"}
               </DropdownMenuItem>
-              <DropdownMenuItem className="gap-2">
+              <DropdownMenuItem className="gap-2" onClick={() => toggleLock(slug, discussion.id)}>
                 <Lock className="size-4" /> {discussion.isLocked ? "Unlock" : "Lock discussion"}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive focus:text-destructive">
+              <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => deleteDiscussion(slug, discussion.id)}>
                 Delete
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -286,13 +299,13 @@ function DiscussionRow({ discussion, slug }: DiscussionRowProps) {
         {/* Footer meta */}
         <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
           <Avatar className="size-4">
-            <AvatarFallback className={cn("text-[8px] text-white", discussion.author.color)}>
-              {discussion.author.initials}
+            <AvatarFallback className={cn("text-[8px] text-white", authorColor(discussion.authorId))}>
+              {discussion.authorInitials}
             </AvatarFallback>
           </Avatar>
-          <span>{discussion.author.name}</span>
+          <span>{discussion.authorName}</span>
           <span>·</span>
-          <span>{discussion.createdAt}</span>
+          <span>{new Date(discussion.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
           <span className="hidden xs:inline">·</span>
           <span className="hidden xs:flex items-center gap-1">
             <MessageSquare className="size-3" />
@@ -303,7 +316,7 @@ function DiscussionRow({ discussion, slug }: DiscussionRowProps) {
             {discussion.reactionCount}
           </span>
           <span className="ml-auto text-muted-foreground/70">
-            Active {discussion.lastActivityAt}
+            Updated {new Date(discussion.updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
           </span>
         </div>
       </div>
@@ -316,21 +329,30 @@ function DiscussionRow({ discussion, slug }: DiscussionRowProps) {
 // ---------------------------------------------------------------------------
 
 export default function DiscussionsPage() {
+  const params = useParams()
+  const slug = typeof params?.workspace === "string" ? params.workspace : ""
+
+  const { discussions, fetchDiscussions } = useDiscussionStore()
   const [search, setSearch] = useState("")
   const [categoryFilter, setCategoryFilter] = useState<FilterCategory>("all")
 
+  useEffect(() => {
+    if (slug) fetchDiscussions(slug)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug])
+
   const filtered = useMemo(() => {
-    let list = DISCUSSIONS
+    let list = discussions
     if (categoryFilter !== "all") list = list.filter((d) => d.category === categoryFilter)
     if (search.trim()) {
       const q = search.toLowerCase()
-      list = list.filter((d) => d.title.toLowerCase().includes(q) || d.body.toLowerCase().includes(q))
+      list = list.filter((d) => d.title.toLowerCase().includes(q) || (d.body ?? "").toLowerCase().includes(q))
     }
     // Pinned first
     return [...list.filter((d) => d.isPinned), ...list.filter((d) => !d.isPinned)]
-  }, [search, categoryFilter])
+  }, [discussions, search, categoryFilter])
 
-  const openCount = DISCUSSIONS.filter((d) => d.state === "open").length
+  const openCount = discussions.filter((d) => d.state === "OPEN").length
 
   return (
     <div className="flex flex-col gap-6 max-w-4xl mx-auto w-full">
@@ -339,10 +361,10 @@ export default function DiscussionsPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Discussions</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {openCount} open · {DISCUSSIONS.length} total · Team conversations and announcements
+            {openCount} open · {discussions.length} total · Team conversations and announcements
           </p>
         </div>
-        <NewDiscussionDialog />
+        <NewDiscussionDialog slug={slug} />
       </div>
 
       {/* Toolbar */}
@@ -397,7 +419,7 @@ export default function DiscussionsPage() {
       ) : (
         <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
           {filtered.map((discussion) => (
-            <DiscussionRow key={discussion.id} discussion={discussion} />
+            <DiscussionRow key={discussion.id} discussion={discussion} slug={slug} />
           ))}
         </div>
       )}
