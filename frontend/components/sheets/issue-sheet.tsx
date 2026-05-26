@@ -30,8 +30,9 @@ import {
   type Attachment,
 } from "@/lib/api/attachment-service"
 import { useIssueStore } from "@/lib/store/issue-store"
+import { useLabelStore } from "@/lib/store/label-store"
 import { listProjectMembers, type ProjectMember } from "@/lib/api/project-service"
-import type { IssueComment } from "@/lib/api/issue-service"
+import type { IssueComment, IssueLabel } from "@/lib/api/issue-service"
 import type { IssueStatus as ApiIssueStatus } from "@/lib/api/issue-service"
 
 // ---------------------------------------------------------------------------
@@ -51,7 +52,7 @@ export interface SheetIssue {
   statusCategory: IssueStatusCategory
   assignee: { initials: string; color: string; name: string; userId: number } | null
   assigneeId: number | null
-  labels: string[]
+  labels: IssueLabel[]
   dueDate: string | null
   storyPoints: number | null
   cycle: string | null
@@ -379,6 +380,7 @@ interface IssueSheetProps {
 export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId }: Readonly<IssueSheetProps>) {
   const { fetchComments, addComment, deleteComment, fetchActivity, updateIssue, fetchStatuses,
           comments: storeComments, activity: storeActivity, statuses: storeStatuses } = useIssueStore()
+  const { labelsByProject, fetchLabels } = useLabelStore()
 
   const initDescription = issue?.description ?? ""
   const [comment, setComment] = useState("")
@@ -408,7 +410,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
   // Sidebar editable state
   const [priority, setPriority] = useState<IssuePriority>(issue?.priority ?? "NONE")
   const [assignee, setAssignee] = useState(issue?.assignee ?? null)
-  const [labels, setLabels] = useState<string[]>(issue?.labels ?? [])
+  const [labels, setLabels] = useState<IssueLabel[]>(issue?.labels ?? [])
   const [points, setPoints] = useState<number | null>(issue?.storyPoints ?? null)
   const [editingPoints, setEditingPoints] = useState(false)
   const [pointsDraft, setPointsDraft] = useState(String(issue?.storyPoints ?? ""))
@@ -446,7 +448,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
     setStatusCategory(issue.statusCategory)
   }, [issue])
 
-  // Load project members + statuses when sheet opens
+  // Load project members + statuses + labels when sheet opens
   useEffect(() => {
     if (!open || !workspaceSlug || !projectId) return
     listProjectMembers(workspaceSlug, projectId)
@@ -454,7 +456,9 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
       .catch(() => { /* silent */ })
     fetchStatuses(workspaceSlug, projectId)
       .catch(() => { /* silent */ })
-  }, [open, workspaceSlug, projectId, fetchStatuses])
+    fetchLabels(workspaceSlug, projectId)
+      .catch(() => { /* silent */ })
+  }, [open, workspaceSlug, projectId, fetchStatuses, fetchLabels])
 
   // Load comments when tab = comments
   useEffect(() => {
@@ -519,8 +523,13 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
   const onCycleKey   = makeKeyHandler(saveCycle,   () => setEditingCycle(false))
   const onDueDateKey = makeKeyHandler(saveDueDate, () => setEditingDueDate(false))
 
-  function toggleLabel(l: string) {
-    setLabels(prev => toggleLabels(prev, l))
+  function toggleLabel(l: IssueLabel) {
+    setLabels((prev) => {
+      const exists = prev.some((x) => x.id === l.id)
+      const next = exists ? prev.filter((x) => x.id !== l.id) : [...prev, l]
+      void callUpdate({ labelIds: next.map((x) => x.id) })
+      return next
+    })
   }
 
   function onPointsClick() { setPointsDraft(String(points ?? "")); setEditingPoints(true) }
@@ -917,20 +926,43 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                     <div className="flex flex-wrap gap-1 flex-1">
                       {labels.length > 0
                         ? labels.map((l) => (
-                            <Badge key={l} variant="secondary" className="text-[10px] px-1.5 h-4 bg-muted/60 border-0 text-muted-foreground">{l}</Badge>
+                            <Badge
+                              key={l.id}
+                              variant="secondary"
+                              className="text-[10px] px-1.5 h-4 border-0"
+                              style={{ backgroundColor: `${l.color}22`, color: l.color }}
+                            >
+                              {l.name}
+                            </Badge>
                           ))
                         : <span className="text-xs text-muted-foreground">Add label</span>}
                     </div>
                     <ChevronDown className="size-3 opacity-40 shrink-0 mt-0.5" />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="min-w-32">
-                  {ALL_LABELS.map((l) => (
-                    <DropdownMenuItem key={l} className="flex items-center gap-2 text-xs" onSelect={(e) => { e.preventDefault(); toggleLabel(l) }}>
-                      {l}
-                      {labels.includes(l) ? <CheckIcon className="ml-auto size-3 text-primary" /> : null}
-                    </DropdownMenuItem>
-                  ))}
+                <DropdownMenuContent align="end" className="min-w-40">
+                  {(labelsByProject[projectId ?? 0] ?? []).length === 0 && (
+                    <div className="px-2 py-1.5 text-xs text-muted-foreground italic">
+                      No labels — create some in project settings
+                    </div>
+                  )}
+                  {(labelsByProject[projectId ?? 0] ?? []).map((l) => {
+                    const active = labels.some((x) => x.id === l.id)
+                    return (
+                      <DropdownMenuItem
+                        key={l.id}
+                        className="flex items-center gap-2 text-xs"
+                        onSelect={(e) => { e.preventDefault(); toggleLabel(l) }}
+                      >
+                        <span
+                          className="size-2.5 rounded-full shrink-0"
+                          style={{ backgroundColor: l.color }}
+                        />
+                        {l.name}
+                        {active ? <CheckIcon className="ml-auto size-3 text-primary" /> : null}
+                      </DropdownMenuItem>
+                    )
+                  })}
                 </DropdownMenuContent>
               </DropdownMenu>
             </MetaRow>
