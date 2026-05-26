@@ -908,7 +908,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
 
             {/* Smart Auto-Assign */}
             <SmartAssignPanel
-              issueLabels={labels}
+              issueLabels={labels.map((l) => l.name)}
               issuePriority={priority}
               currentAssignee={assignee}
               onAssign={async (m) => {
