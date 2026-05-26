@@ -63,7 +63,7 @@ function toSheetIssue(issue: Issue): SheetIssue {
       ? { initials: emailInitials(issue.assignee.email), color: assigneeColor(issue.assignee.id), name: issue.assignee.displayName ?? issue.assignee.email, userId: issue.assignee.id }
       : null,
     assigneeId:     issue.assignee?.id ?? null,
-    labels:         issue.labels.map((l) => l.name),
+    labels:         issue.labels,
     dueDate:        formatDate(issue.dueDate),
     storyPoints:    null,
     cycle:          null,
