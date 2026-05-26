@@ -154,6 +154,8 @@ export default function ProjectBacklogPage() {
         issue={selectedIssue}
         open={selectedIssue !== null}
         onOpenChange={(open) => { if (!open) setSelectedIssue(null) }}
+        workspaceSlug={workspace}
+        projectId={projectId}
       />
     </div>
   )
