@@ -14,9 +14,12 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * Controller REST pour les opérations sur l'utilisateur courant.
@@ -57,5 +60,20 @@ public class UserController {
         log.debug("PATCH /api/users/me — email={}", email);
         UserResponse response = userService.updateUserByEmail(email, request);
         return ResponseEntity.ok(ApiResponse.success("Profil mis à jour", response));
+    }
+
+    /**
+     * Upload l'avatar de l'utilisateur vers Minio.
+     * POST /api/users/me/avatar  (multipart/form-data, champ "file")
+     */
+    @PostMapping(value = "/me/avatar", consumes = "multipart/form-data")
+    public ResponseEntity<ApiResponse<UserResponse>> uploadAvatar(
+        @RequestParam("file") MultipartFile file,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        String email = jwt.getClaim("sub");
+        log.debug("POST /api/users/me/avatar — email={}", email);
+        UserResponse response = userService.uploadAvatar(email, file);
+        return ResponseEntity.ok(ApiResponse.success("Avatar mis à jour", response));
     }
 }
