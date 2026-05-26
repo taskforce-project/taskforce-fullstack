@@ -32,8 +32,7 @@ import {
 import { useIssueStore } from "@/lib/store/issue-store"
 import { useLabelStore } from "@/lib/store/label-store"
 import { listProjectMembers, type ProjectMember } from "@/lib/api/project-service"
-import type { IssueComment, IssueLabel } from "@/lib/api/issue-service"
-import type { IssueStatus as ApiIssueStatus } from "@/lib/api/issue-service"
+import type { IssueComment, IssueLabel, IssueStatus as ApiIssueStatus } from "@/lib/api/issue-service"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -83,8 +82,6 @@ const STATUS_CATEGORY_CONFIG: Record<IssueStatusCategory, { icon: React.ReactNod
 function getStatusCfg(category: IssueStatusCategory) {
   return STATUS_CATEGORY_CONFIG[category] ?? STATUS_CATEGORY_CONFIG.BACKLOG
 }
-
-const ALL_LABELS = ["bug", "feature", "ui", "backend", "auth", "perf", "docs", "test", "design"]
 
 const AVATAR_COLORS = [
   "bg-violet-500", "bg-blue-500", "bg-emerald-500", "bg-orange-500",
@@ -343,10 +340,6 @@ function AttachmentsTab({ issueId, projectId, workspaceSlug }: Readonly<Attachme
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
-
-function toggleLabels(prev: string[], l: string): string[] {
-  return prev.includes(l) ? prev.filter((x) => x !== l) : [...prev, l]
-}
 
 function makeKeyHandler(
   onEnter?: () => void,
