@@ -4,7 +4,7 @@
  */
 
 import { apiClient } from "./client";
-import { ISSUE_ROUTES } from "../config/api-routes";
+import { ISSUE_ROUTES, ROADMAP_ROUTES } from "../config/api-routes";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -165,6 +165,14 @@ export interface UpdateIssueStatusPayload {
 
 export async function listIssues(slug: string, projectId: number): Promise<Issue[]> {
   const res = await apiClient.get<{ data: Issue[] }>(ISSUE_ROUTES.LIST(slug, projectId));
+  return res.data.data;
+}
+
+/**
+ * Retourne les issues planifiées (startDate ou dueDate renseigné) du workspace — roadmap.
+ */
+export async function getScheduledIssues(slug: string): Promise<Issue[]> {
+  const res = await apiClient.get<{ data: Issue[] }>(ROADMAP_ROUTES.SCHEDULED(slug));
   return res.data.data;
 }
 
