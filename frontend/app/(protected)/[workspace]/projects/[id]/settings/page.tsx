@@ -295,6 +295,101 @@ export default function ProjectSettingsPage() {
 
       <Separator />
 
+      {/* ── Labels ── */}
+      <section>
+        <SectionTitle icon={Tag} title="Labels" description="Labels personnalisés pour catégoriser les issues" />
+        <div className="flex flex-col gap-2">
+          {projectLabels.length === 0 && (
+            <p className="text-xs text-muted-foreground italic py-2">Aucun label — ajoutez-en ci-dessous.</p>
+          )}
+          {projectLabels.map((l) => editingLabelId === l.id ? (
+            <div key={l.id} className="flex items-center gap-2 py-2 px-3 rounded-lg border border-border bg-card">
+              <input
+                type="color"
+                value={editLabelColor}
+                onChange={(e) => setEditLabelColor(e.target.value)}
+                className="h-7 w-7 rounded cursor-pointer border border-border bg-transparent p-0.5"
+                title="Couleur"
+              />
+              <Input
+                value={editLabelName}
+                onChange={(e) => setEditLabelName(e.target.value)}
+                className="h-7 text-xs flex-1"
+                placeholder="Nom"
+              />
+              <Input
+                value={editLabelDesc}
+                onChange={(e) => setEditLabelDesc(e.target.value)}
+                className="h-7 text-xs flex-1"
+                placeholder="Description (optionnel)"
+              />
+              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleSaveEditLabel(l.id)} title="Sauvegarder">
+                <Check className="h-3.5 w-3.5 text-emerald-400" />
+              </Button>
+              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setEditingLabelId(null)} title="Annuler">
+                <X className="h-3.5 w-3.5 text-muted-foreground" />
+              </Button>
+            </div>
+          ) : (
+            <div key={l.id} className="flex items-center gap-3 py-2.5 px-3 rounded-lg border border-border bg-card">
+              <span
+                className="h-3.5 w-3.5 rounded-full shrink-0"
+                style={{ backgroundColor: l.color }}
+              />
+              <span
+                className="text-xs font-medium px-2 py-0.5 rounded-full shrink-0"
+                style={{ backgroundColor: `${l.color}22`, color: l.color }}
+              >
+                {l.name}
+              </span>
+              <span className="text-xs text-muted-foreground flex-1 truncate">{l.description}</span>
+              <Button size="sm" variant="ghost" className="h-7 w-7 p-0 shrink-0" onClick={() => startEditLabel(l)} title="Modifier">
+                <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 w-7 p-0 shrink-0 hover:text-red-400"
+                onClick={() => handleDeleteLabel(l.id)}
+                title="Supprimer"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          ))}
+
+          {/* Create form */}
+          <form onSubmit={handleAddLabel} className="flex items-center gap-2 mt-2">
+            <input
+              type="color"
+              value={newLabelColor}
+              onChange={(e) => setNewLabelColor(e.target.value)}
+              className="h-7 w-7 rounded cursor-pointer border border-border bg-transparent p-0.5 shrink-0"
+              title="Couleur"
+            />
+            <Input
+              value={newLabelName}
+              onChange={(e) => setNewLabelName(e.target.value)}
+              className="h-7 text-xs flex-1"
+              placeholder="Nom du label"
+              required
+            />
+            <Input
+              value={newLabelDesc}
+              onChange={(e) => setNewLabelDesc(e.target.value)}
+              className="h-7 text-xs flex-1"
+              placeholder="Description (optionnel)"
+            />
+            <Button type="submit" size="sm" className="h-7 text-xs shrink-0 gap-1.5" disabled={addingLabel || !newLabelName.trim()}>
+              {addingLabel ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+              Ajouter
+            </Button>
+          </form>
+        </div>
+      </section>
+
+      <Separator />
+
       {/* ── Integrations ── */}
       <section>
         <SectionTitle icon={GitBranch} title="Intégrations" description="Connectez des services externes" />
