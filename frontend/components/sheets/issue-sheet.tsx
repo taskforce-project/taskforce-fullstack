@@ -5,7 +5,7 @@ import {
   X, RefreshCw, Clock, CheckCircle2, AlertTriangle, CircleDot,
   Flag, Tag, Calendar, Layers, GitBranch, MessageSquare, Activity,
   ChevronDown, Send, ExternalLink, Pencil, Check as CheckIcon,
-  Paperclip, Upload, Trash2, FileText,
+  Paperclip, Upload, Trash2, FileText, Link2, Plus,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -31,6 +31,7 @@ import {
 } from "@/lib/api/attachment-service"
 import { useIssueStore } from "@/lib/store/issue-store"
 import { useLabelStore } from "@/lib/store/label-store"
+import { useIntegrationStore } from "@/lib/store/integration-store"
 import { listProjectMembers, type ProjectMember } from "@/lib/api/project-service"
 import type { IssueComment, IssueLabel, IssueStatus as ApiIssueStatus } from "@/lib/api/issue-service"
 
@@ -121,6 +122,206 @@ function MetaRow({ icon, label, children }: Readonly<{ icon: React.ReactNode; la
         <span className="text-xs text-muted-foreground">{label}</span>
       </div>
       <div className="flex-1 text-sm">{children}</div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Sub-component: GitHub links tab
+// ---------------------------------------------------------------------------
+
+function GitHubTab({ issueId, workspaceSlug }: Readonly<{ issueId: number; workspaceSlug: string }>) {
+  const { githubStatus, githubLinks, fetchGitHubLinks, addGitHubLink, removeGitHubLink } = useIntegrationStore()
+  const links = githubLinks[issueId] ?? []
+  const [loading, setLoading] = useState(false)
+
+  // Add-link form state
+  const [showForm, setShowForm] = useState(false)
+  const [linkType,      setLinkType]      = useState<"PR" | "COMMIT">("PR")
+  const [repoFullName,  setRepoFullName]  = useState("")
+  const [prNumber,      setPrNumber]      = useState("")
+  const [prUrl,         setPrUrl]         = useState("")
+  const [commitSha,     setCommitSha]     = useState("")
+  const [commitUrl,     setCommitUrl]     = useState("")
+  const [linkTitle,     setLinkTitle]     = useState("")
+  const [submitting,    setSubmitting]    = useState(false)
+
+  useEffect(() => {
+    setLoading(true)
+    fetchGitHubLinks(workspaceSlug, issueId).catch(() => null).finally(() => setLoading(false))
+  }, [workspaceSlug, issueId, fetchGitHubLinks])
+
+  async function handleAdd() {
+    setSubmitting(true)
+    try {
+      await addGitHubLink(workspaceSlug, issueId, {
+        linkType,
+        repoFullName: repoFullName.trim(),
+        prNumber:    linkType === "PR"     ? Number(prNumber)  : undefined,
+        prUrl:       linkType === "PR"     ? prUrl.trim()      : undefined,
+        commitSha:   linkType === "COMMIT" ? commitSha.trim()  : undefined,
+        commitUrl:   linkType === "COMMIT" ? commitUrl.trim()  : undefined,
+        title: linkTitle.trim() || undefined,
+      })
+      toast.success("Lien GitHub ajouté")
+      setShowForm(false)
+      setRepoFullName(""); setPrNumber(""); setPrUrl(""); setCommitSha(""); setCommitUrl(""); setLinkTitle("")
+    } catch {
+      toast.error("Impossible d'ajouter le lien")
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (!githubStatus?.connected) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-8 text-center">
+        <GitBranch className="size-8 text-muted-foreground/40" />
+        <p className="text-sm text-muted-foreground">GitHub not connected</p>
+        <p className="text-xs text-muted-foreground/60">Connect GitHub in Workspace Settings → Integrations.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      {loading && <p className="text-xs text-muted-foreground text-center py-4">Loading…</p>}
+
+      {!loading && links.length === 0 && (
+        <p className="text-xs text-muted-foreground text-center py-4 italic">No GitHub links yet.</p>
+      )}
+
+      {links.map((link) => (
+        <div key={link.id} className="flex items-center justify-between rounded-md border border-border px-3 py-2.5 gap-2">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <GitBranch className="size-3.5 text-muted-foreground shrink-0" />
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <Badge variant="outline" className="text-xs px-1.5 py-0 h-4 text-muted-foreground">{link.linkType}</Badge>
+                {link.status && (
+                  <Badge variant="outline" className={cn("text-xs px-1.5 py-0 h-4",
+                    link.status === "OPEN"   ? "text-emerald-400 border-emerald-500/20 bg-emerald-500/10" :
+                    link.status === "MERGED" ? "text-purple-400 border-purple-500/20 bg-purple-500/10" :
+                    "text-muted-foreground"
+                  )}>{link.status}</Badge>
+                )}
+                <span className="text-xs font-mono text-muted-foreground truncate">{link.repoFullName}</span>
+                {link.prNumber && <span className="text-xs text-muted-foreground">#{link.prNumber}</span>}
+                {link.commitSha && <span className="text-xs font-mono text-muted-foreground">{link.commitSha.slice(0,7)}</span>}
+              </div>
+              {link.title && <p className="text-xs text-foreground mt-0.5 truncate">{link.title}</p>}
+            </div>
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            {(link.prUrl ?? link.commitUrl) && (
+              <a
+                href={link.prUrl ?? link.commitUrl ?? "#"}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <ExternalLink className="size-3.5" />
+              </a>
+            )}
+            <button
+              type="button"
+              className="text-muted-foreground hover:text-destructive transition-colors"
+              onClick={async () => {
+                try { await removeGitHubLink(workspaceSlug, issueId, link.id); toast.success("Lien supprimé") }
+                catch { toast.error("Impossible de supprimer le lien") }
+              }}
+            >
+              <Trash2 className="size-3.5" />
+            </button>
+          </div>
+        </div>
+      ))}
+
+      {/* Add link button / form */}
+      {!showForm && (
+        <button
+          type="button"
+          onClick={() => setShowForm(true)}
+          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
+        >
+          <Plus className="size-3.5" />
+          Add GitHub link
+        </button>
+      )}
+
+      {showForm && (
+        <div className="flex flex-col gap-2 rounded-md border border-border p-3">
+          {/* Type toggle */}
+          <div className="flex gap-1">
+            {(["PR", "COMMIT"] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setLinkType(t)}
+                className={cn(
+                  "rounded-full border px-2.5 py-0.5 text-xs transition-colors",
+                  linkType === t
+                    ? "border-primary/50 bg-primary/10 text-primary"
+                    : "border-border text-muted-foreground hover:border-primary/30"
+                )}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+          <input
+            className="h-8 w-full rounded-md border border-border bg-muted px-3 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+            placeholder="owner/repo"
+            value={repoFullName}
+            onChange={(e) => setRepoFullName(e.target.value)}
+          />
+          {linkType === "PR" && (
+            <>
+              <input
+                className="h-8 w-full rounded-md border border-border bg-muted px-3 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+                placeholder="PR number"
+                type="number"
+                value={prNumber}
+                onChange={(e) => setPrNumber(e.target.value)}
+              />
+              <input
+                className="h-8 w-full rounded-md border border-border bg-muted px-3 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+                placeholder="PR URL (optional)"
+                value={prUrl}
+                onChange={(e) => setPrUrl(e.target.value)}
+              />
+            </>
+          )}
+          {linkType === "COMMIT" && (
+            <>
+              <input
+                className="h-8 w-full rounded-md border border-border bg-muted px-3 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+                placeholder="Commit SHA"
+                value={commitSha}
+                onChange={(e) => setCommitSha(e.target.value)}
+              />
+              <input
+                className="h-8 w-full rounded-md border border-border bg-muted px-3 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+                placeholder="Commit URL (optional)"
+                value={commitUrl}
+                onChange={(e) => setCommitUrl(e.target.value)}
+              />
+            </>
+          )}
+          <input
+            className="h-8 w-full rounded-md border border-border bg-muted px-3 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+            placeholder="Title (optional)"
+            value={linkTitle}
+            onChange={(e) => setLinkTitle(e.target.value)}
+          />
+          <div className="flex justify-end gap-2 mt-1">
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setShowForm(false)}>Cancel</Button>
+            <Button size="sm" className="h-7 text-xs" disabled={!repoFullName || submitting} onClick={handleAdd}>
+              {submitting ? "Adding…" : "Add"}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -377,7 +578,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
 
   const initDescription = issue?.description ?? ""
   const [comment, setComment] = useState("")
-  const [tab, setTab] = useState<"comments" | "activity" | "attachments">("comments")
+  const [tab, setTab] = useState<"comments" | "activity" | "attachments" | "github">("comments")
 
   // Status (real IDs from API)
   const [statusId, setStatusId]             = useState<number>(issue?.statusId ?? 0)
@@ -764,6 +965,26 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                     Attachments
                   </button>
                 )}
+                {workspaceSlug && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTab("github")
+                      if (workspaceSlug && issue?.id) {
+                        useIntegrationStore.getState().fetchGitHubLinks(workspaceSlug, Number(issue.id)).catch(() => null)
+                      }
+                    }}
+                    className={cn(
+                      "flex items-center gap-1.5 text-xs font-medium pb-2.5 border-b-2 -mb-px transition-colors",
+                      tab === "github"
+                        ? "border-foreground text-foreground"
+                        : "border-transparent text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <GitBranch className="size-3.5" />
+                    GitHub
+                  </button>
+                )}
               </div>
 
               {tab === "comments" && (
@@ -815,6 +1036,10 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                   projectId={projectId}
                   workspaceSlug={workspaceSlug}
                 />
+              )}
+
+              {tab === "github" && workspaceSlug && (
+                <GitHubTab issueId={Number(issue.id)} workspaceSlug={workspaceSlug} />
               )}
             </div>
           </div>
