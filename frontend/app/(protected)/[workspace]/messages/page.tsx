@@ -7,7 +7,7 @@ import { ChatSidebar }   from "@/components/messages/chat-sidebar"
 import { ChannelHeader } from "@/components/messages/channel-header"
 import { MessageList }   from "@/components/messages/message-list"
 import { MessageInput }  from "@/components/messages/message-input"
-import { findChannel, MOCK_MESSAGES } from "@/components/messages/data"
+import { findChannel } from "@/components/messages/data"
 import { applyReact }    from "@/components/messages/helpers"
 import { useMessageStore }   from "@/lib/store/message-store"
 import { useStomp }          from "@/lib/hooks/use-stomp"
@@ -45,7 +45,7 @@ export default function MessagesPage() {
   } = useMessageStore()
 
   const [localActiveId, setLocalActiveId] = useState("general")
-  const [localMessages, setLocalMessages]  = useState<Record<string, Message[]>>(() => ({ ...MOCK_MESSAGES }))
+  const [localMessages, setLocalMessages]  = useState<Record<string, Message[]>>({})
 
   const channelIds = useMemo(() => channels.map((c) => c.id), [channels])
   useStomp(channelIds)
