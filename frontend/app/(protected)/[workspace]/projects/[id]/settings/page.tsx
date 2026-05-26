@@ -13,6 +13,10 @@ import {
   Save,
   Archive,
   Loader2,
+  Tag,
+  Pencil,
+  Check,
+  X,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -40,6 +44,7 @@ import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { useProjectStore } from "@/lib/store/project-store"
 import { useUserStore } from "@/lib/store/user-store"
+import { useLabelStore } from "@/lib/store/label-store"
 import type { ProjectStatus } from "@/lib/api/project-service"
 
 // ---------------------------------------------------------------------------
@@ -82,10 +87,21 @@ export default function ProjectSettingsPage() {
 
   const { activeProject, updateProject, archiveProject, deleteProject } = useProjectStore()
   const { user } = useUserStore()
+  const { labelsByProject, fetchLabels, addLabel, editLabel, removeLabel } = useLabelStore()
 
   const [name,          setName]          = useState("")
   const [description,   setDescription]   = useState("")
   const [status,        setStatus]        = useState<ProjectStatus>("ACTIVE")
+
+  // Labels state
+  const [newLabelName,  setNewLabelName]  = useState("")
+  const [newLabelColor, setNewLabelColor] = useState("#6366f1")
+  const [newLabelDesc,  setNewLabelDesc]  = useState("")
+  const [addingLabel,   setAddingLabel]   = useState(false)
+  const [editingLabelId, setEditingLabelId] = useState<number | null>(null)
+  const [editLabelName,  setEditLabelName]  = useState("")
+  const [editLabelColor, setEditLabelColor] = useState("")
+  const [editLabelDesc,  setEditLabelDesc]  = useState("")
   const [isSaving,      setIsSaving]      = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState("")
   const [deleteOpen,    setDeleteOpen]    = useState(false)
@@ -98,6 +114,11 @@ export default function ProjectSettingsPage() {
       setStatus(activeProject.status)
     }
   }, [activeProject])
+
+  // Load labels when project is known
+  useEffect(() => {
+    if (workspace && projectId) fetchLabels(workspace, projectId).catch(() => {})
+  }, [workspace, projectId, fetchLabels])
 
   if (!activeProject) {
     return (
@@ -137,6 +158,37 @@ export default function ProjectSettingsPage() {
   }
 
   const members = activeProject.members ?? []
+  const projectLabels = labelsByProject[projectId] ?? []
+
+  async function handleAddLabel(e: React.FormEvent) {
+    e.preventDefault()
+    if (!newLabelName.trim()) return
+    setAddingLabel(true)
+    await addLabel(workspace, projectId, { name: newLabelName.trim(), color: newLabelColor, description: newLabelDesc.trim() || undefined })
+    setNewLabelName("")
+    setNewLabelColor("#6366f1")
+    setNewLabelDesc("")
+    setAddingLabel(false)
+    toast.success("Label créé")
+  }
+
+  function startEditLabel(l: typeof projectLabels[0]) {
+    setEditingLabelId(l.id)
+    setEditLabelName(l.name)
+    setEditLabelColor(l.color)
+    setEditLabelDesc(l.description ?? "")
+  }
+
+  async function handleSaveEditLabel(labelId: number) {
+    await editLabel(workspace, projectId, labelId, { name: editLabelName.trim() || undefined, color: editLabelColor || undefined, description: editLabelDesc.trim() || undefined })
+    setEditingLabelId(null)
+    toast.success("Label modifié")
+  }
+
+  async function handleDeleteLabel(labelId: number) {
+    await removeLabel(workspace, projectId, labelId)
+    toast.success("Label supprimé")
+  }
 
   return (
     <div className="flex flex-col gap-10 max-w-2xl mx-auto w-full">
