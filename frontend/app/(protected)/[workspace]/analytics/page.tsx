@@ -89,9 +89,9 @@ interface KpiMetric {
   deltaInverse?: boolean
 }
 
-// ─── Chart style ───────────────────────────────────────────────────────────────
+// ─── KpiCard component ────────────────────────────────────────────────────────
 
-const TOOLTIP_STYLE = {
+function KpiCard({ metric, index }: { metric: KpiMetric; index: number }) {
   const positive = metric.delta > 0
   const isGood = metric.deltaInverse ? !positive : positive
   const deltaColor = metric.delta === 0 ? "var(--label-quaternary)" : isGood ? "#34d399" : "#f87171"
