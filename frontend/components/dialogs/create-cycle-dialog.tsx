@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { format } from "date-fns"
+import { useParams } from "next/navigation"
 import {
   RefreshCw,
   CalendarIcon,
@@ -33,6 +34,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
+import { useProjectStore } from "@/lib/store/project-store"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -52,30 +54,35 @@ interface CreateCycleDialogProps {
 }
 
 // ---------------------------------------------------------------------------
-// Config
-// ---------------------------------------------------------------------------
-
-const PROJECTS = [
-  { id: "1", name: "Website Redesign", emoji: "🎨" },
-  { id: "2", name: "Mobile App", emoji: "📱" },
-  { id: "3", name: "API v2", emoji: "⚡" },
-]
-
-// ---------------------------------------------------------------------------
 // CreateCycleDialog
 // ---------------------------------------------------------------------------
 
 export function CreateCycleDialog({ children, onCreated }: CreateCycleDialogProps) {
+  const params = useParams()
+  const slug = typeof params?.workspace === "string" ? params.workspace : ""
+  const { projects, fetchProjects } = useProjectStore()
+
   const [open, setOpen] = useState(false)
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
-  const [projectId, setProjectId] = useState<string>(PROJECTS[0].id)
+  const [projectId, setProjectId] = useState<string>("")
   const [startDate, setStartDate] = useState<Date | undefined>(undefined)
   const [endDate, setEndDate] = useState<Date | undefined>(undefined)
   const [startOpen, setStartOpen] = useState(false)
   const [endOpen, setEndOpen] = useState(false)
 
-  const selectedProject = PROJECTS.find((p) => p.id === projectId) ?? PROJECTS[0]
+  // Load projects when dialog opens
+  useEffect(() => {
+    if (open && slug) fetchProjects(slug)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, slug])
+
+  // Set default project once projects are loaded
+  useEffect(() => {
+    if (projects.length > 0 && !projectId) setProjectId(String(projects[0].id))
+  }, [projects, projectId])
+
+  const selectedProject = projects.find((p) => String(p.id) === projectId) ?? projects[0]
   const canCreate = name.trim().length > 0 && startDate !== undefined && endDate !== undefined
 
   function handleCreate() {
@@ -94,7 +101,7 @@ export function CreateCycleDialog({ children, onCreated }: CreateCycleDialogProp
   function resetForm() {
     setName("")
     setDescription("")
-    setProjectId(PROJECTS[0].id)
+    setProjectId(projects.length > 0 ? String(projects[0].id) : "")
     setStartDate(undefined)
     setEndDate(undefined)
     setStartOpen(false)
@@ -161,19 +168,22 @@ export function CreateCycleDialog({ children, onCreated }: CreateCycleDialogProp
                 <Button variant="outline" size="sm" className="justify-between w-full font-normal">
                   <span className="flex items-center gap-2">
                     <FolderKanban className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span>{selectedProject.emoji} {selectedProject.name}</span>
+                    <span>{selectedProject ? `${selectedProject.identifier.slice(0, 2)} ${selectedProject.name}` : "Select project…"}</span>
                   </span>
                   <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-56">
-                {PROJECTS.map((p) => (
+                {projects.length === 0 && (
+                  <DropdownMenuItem disabled>No projects found</DropdownMenuItem>
+                )}
+                {projects.map((p) => (
                   <DropdownMenuItem
                     key={p.id}
-                    onClick={() => setProjectId(p.id)}
-                    className={cn("gap-2", p.id === projectId && "bg-accent")}
+                    onClick={() => setProjectId(String(p.id))}
+                    className={cn("gap-2", String(p.id) === projectId && "bg-accent")}
                   >
-                    <span>{p.emoji}</span>
+                    <span className="font-mono text-xs text-muted-foreground">{p.identifier.slice(0, 2)}</span>
                     {p.name}
                   </DropdownMenuItem>
                 ))}
