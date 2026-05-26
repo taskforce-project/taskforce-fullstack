@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.taskforce.tf_api.core.dto.request.AddProjectMemberRequest;
 import com.taskforce.tf_api.core.dto.request.CreateLabelRequest;
+import com.taskforce.tf_api.core.dto.request.UpdateLabelRequest;
 import com.taskforce.tf_api.core.dto.request.CreateProjectRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateProjectRequest;
 import com.taskforce.tf_api.core.dto.response.ProjectLabelResponse;
@@ -333,6 +334,37 @@ public class ProjectService {
             .description(request.getDescription())
             .build();
 
+        return toLabelResponse(projectLabelRepository.save(label));
+    }
+
+    /**
+     * Modifie un label existant (nom, couleur, description).
+     */
+    @Transactional
+    public ProjectLabelResponse updateLabel(String workspaceSlug, Long projectId, Long labelId,
+                                             Long requestingUserId, UpdateLabelRequest request) {
+        Workspace workspace = resolveWorkspaceAndAssertMember(workspaceSlug, requestingUserId);
+        Project project = resolveProject(projectId, workspace.getId());
+        assertCanManageProject(project, workspace, requestingUserId);
+
+        ProjectLabel label = projectLabelRepository.findById(labelId)
+            .orElseThrow(() -> new ResourceNotFoundException("Label introuvable"));
+
+        if (!label.getProject().getId().equals(projectId)) {
+            throw new IllegalArgumentException("Ce label n'appartient pas à ce projet");
+        }
+        if (request.getName() != null && !request.getName().equals(label.getName())) {
+            if (projectLabelRepository.existsByProjectIdAndName(projectId, request.getName())) {
+                throw new BusinessException("Un label avec ce nom existe déjà dans ce projet");
+            }
+            label.setName(request.getName());
+        }
+        if (request.getColor() != null) {
+            label.setColor(request.getColor());
+        }
+        if (request.getDescription() != null) {
+            label.setDescription(request.getDescription());
+        }
         return toLabelResponse(projectLabelRepository.save(label));
     }
 

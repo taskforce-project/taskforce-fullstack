@@ -2,7 +2,10 @@ package com.taskforce.tf_api.core.service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -36,6 +39,7 @@ import com.taskforce.tf_api.core.model.IssueSequenceCounter;
 import com.taskforce.tf_api.core.model.IssueStatus;
 import com.taskforce.tf_api.core.model.IssueType;
 import com.taskforce.tf_api.core.model.Project;
+import com.taskforce.tf_api.core.model.ProjectLabel;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.IssueActivityRepository;
 import com.taskforce.tf_api.core.repository.IssueCommentRepository;
@@ -44,6 +48,7 @@ import com.taskforce.tf_api.core.repository.IssueRepository;
 import com.taskforce.tf_api.core.repository.IssueSequenceCounterRepository;
 import com.taskforce.tf_api.core.repository.IssueStatusRepository;
 import com.taskforce.tf_api.core.repository.IssueTypeRepository;
+import com.taskforce.tf_api.core.repository.ProjectLabelRepository;
 import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
@@ -73,6 +78,7 @@ public class IssueService {
     private final WorkspaceMemberRepository     workspaceMemberRepository;
     private final UserRepository                userRepository;
     private final NotificationService           notificationService;
+    private final ProjectLabelRepository        projectLabelRepository;
 
     public IssueService(
         IssueRepository issueRepository,
@@ -86,7 +92,8 @@ public class IssueService {
         WorkspaceRepository workspaceRepository,
         WorkspaceMemberRepository workspaceMemberRepository,
         UserRepository userRepository,
-        @org.springframework.context.annotation.Lazy NotificationService notificationService
+        @org.springframework.context.annotation.Lazy NotificationService notificationService,
+        ProjectLabelRepository projectLabelRepository
     ) {
         this.issueRepository = issueRepository;
         this.issueStatusRepository = issueStatusRepository;
@@ -100,6 +107,7 @@ public class IssueService {
         this.workspaceMemberRepository = workspaceMemberRepository;
         this.userRepository = userRepository;
         this.notificationService = notificationService;
+        this.projectLabelRepository = projectLabelRepository;
     }
 
     // =========================================================================
@@ -352,6 +360,22 @@ public class IssueService {
         }
         if (request.getPosition() != null) {
             issue.setPosition(request.getPosition());
+        }
+        if (request.getLabelIds() != null) {
+            List<ProjectLabel> newLabels = new ArrayList<>(projectLabelRepository.findAllById(request.getLabelIds()));
+            Set<Long> oldIds = issue.getLabels().stream().map(ProjectLabel::getId).collect(Collectors.toSet());
+            Set<Long> newIds = newLabels.stream().map(ProjectLabel::getId).collect(Collectors.toSet());
+            for (ProjectLabel added : newLabels) {
+                if (!oldIds.contains(added.getId())) {
+                    logActivity(issue, actor, IssueActivityType.LABEL_ADDED, null, added.getName());
+                }
+            }
+            for (ProjectLabel removed : issue.getLabels()) {
+                if (!newIds.contains(removed.getId())) {
+                    logActivity(issue, actor, IssueActivityType.LABEL_REMOVED, removed.getName(), null);
+                }
+            }
+            issue.setLabels(newLabels);
         }
 
         issue = issueRepository.save(issue);
