@@ -168,6 +168,14 @@ export const TEAM_ROUTES = {
 } as const;
 
 /**
+ * Routes roadmap
+ * Backend: /api/workspaces/{slug}/roadmap
+ */
+export const ROADMAP_ROUTES = {
+  SCHEDULED: (slug: string) => `/api/workspaces/${slug}/roadmap`,
+} as const;
+
+/**
  * Routes discussions
  * Backend: /api/workspaces/{slug}/discussions
  */
