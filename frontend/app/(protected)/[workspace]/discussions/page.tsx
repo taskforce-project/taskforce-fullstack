@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
+import { useParams } from "next/navigation"
 import {
   Search,
   Plus,
@@ -34,149 +35,61 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
+import { useDiscussionStore } from "@/lib/store/discussion-store"
+import type { Discussion, DiscussionCategory } from "@/lib/api/discussion-service"
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-type DiscussionCategory = "general" | "announcement" | "idea" | "question" | "show"
-type DiscussionState = "open" | "answered" | "closed"
 type FilterCategory = "all" | DiscussionCategory
-
-interface Discussion {
-  id: string
-  title: string
-  body: string
-  category: DiscussionCategory
-  state: DiscussionState
-  author: { name: string; initials: string; color: string }
-  replyCount: number
-  reactionCount: number
-  isPinned: boolean
-  isLocked: boolean
-  createdAt: string
-  lastActivityAt: string
-  tags: string[]
-}
 
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
 
 const CATEGORY_CONFIG: Record<DiscussionCategory, { label: string; badgeClass: string; emoji: string }> = {
-  general: { label: "General", badgeClass: "bg-muted text-muted-foreground border-border", emoji: "💬" },
-  announcement: { label: "Announcement", badgeClass: "bg-primary/10 text-primary border-primary/20", emoji: "📣" },
-  idea: { label: "Idea", badgeClass: "bg-amber-500/15 text-amber-400 border-amber-500/20", emoji: "💡" },
-  question: { label: "Question", badgeClass: "bg-blue-500/15 text-blue-400 border-blue-500/20", emoji: "❓" },
-  show: { label: "Show & Tell", badgeClass: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20", emoji: "✨" },
+  GENERAL:      { label: "General",      badgeClass: "bg-muted text-muted-foreground border-border",             emoji: "💬" },
+  ANNOUNCEMENT: { label: "Announcement", badgeClass: "bg-primary/10 text-primary border-primary/20",             emoji: "📣" },
+  IDEA:         { label: "Idea",         badgeClass: "bg-amber-500/15 text-amber-400 border-amber-500/20",       emoji: "💡" },
+  QUESTION:     { label: "Question",     badgeClass: "bg-blue-500/15 text-blue-400 border-blue-500/20",          emoji: "❓" },
+  SHOW:         { label: "Show & Tell",  badgeClass: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20", emoji: "✨" },
 }
 
 const FILTER_TABS: { key: FilterCategory; label: string }[] = [
-  { key: "all", label: "All" },
-  { key: "announcement", label: "Announcements" },
-  { key: "idea", label: "Ideas" },
-  { key: "question", label: "Questions" },
-  { key: "show", label: "Show & Tell" },
-  { key: "general", label: "General" },
-]
-
-// ---------------------------------------------------------------------------
-// Mock data
-// ---------------------------------------------------------------------------
-
-const DISCUSSIONS: Discussion[] = [
-  {
-    id: "1",
-    title: "Taskforce v1.1 — Release notes & what's next",
-    body: "We just shipped v1.1 with improved analytics, cycle management improvements, and a ton of performance optimizations. Here's a full breakdown of what changed and our Q2 roadmap.",
-    category: "announcement",
-    state: "open",
-    author: { name: "You", initials: "ME", color: "bg-primary" },
-    replyCount: 7,
-    reactionCount: 12,
-    isPinned: true,
-    isLocked: false,
-    createdAt: "Mar 28, 2026",
-    lastActivityAt: "2 hours ago",
-    tags: ["release", "roadmap"],
-  },
-  {
-    id: "2",
-    title: "Proposal: Replace PostgreSQL with CockroachDB for horizontal scaling",
-    body: "As we plan for enterprise-scale workloads, I wanted to open a discussion on migrating from PostgreSQL to CockroachDB. Pros: native horizontal sharding, multi-region active-active. Cons: SQL dialect differences, migration complexity...",
-    category: "idea",
-    state: "open",
-    author: { name: "Thomas Bernard", initials: "TB", color: "bg-orange-500" },
-    replyCount: 14,
-    reactionCount: 6,
-    isPinned: false,
-    isLocked: false,
-    createdAt: "Mar 25, 2026",
-    lastActivityAt: "Yesterday",
-    tags: ["database", "infrastructure", "performance"],
-  },
-  {
-    id: "3",
-    title: "Best approach for real-time issue updates?",
-    body: "We're evaluating WebSockets vs Server-Sent Events for live kanban board updates. What are your thoughts? SSE seems simpler for our current use case but WebSockets would give us bi-directional comms for the future.",
-    category: "question",
-    state: "answered",
-    author: { name: "Emma Petit", initials: "EP", color: "bg-emerald-500" },
-    replyCount: 9,
-    reactionCount: 4,
-    isPinned: false,
-    isLocked: false,
-    createdAt: "Mar 20, 2026",
-    lastActivityAt: "Mar 22, 2026",
-    tags: ["architecture", "realtime"],
-  },
-  {
-    id: "4",
-    title: "Showing off TF-001: JWT refresh rotation is now live! 🔐",
-    body: "After 2 sprints of work, the JWT refresh token rotation feature is finally merged and deployed. Here's a quick walkthrough of how it works and why it matters for security...",
-    category: "show",
-    state: "open",
-    author: { name: "Sophie Martin", initials: "SM", color: "bg-violet-500" },
-    replyCount: 5,
-    reactionCount: 18,
-    isPinned: false,
-    isLocked: false,
-    createdAt: "Mar 18, 2026",
-    lastActivityAt: "Mar 19, 2026",
-    tags: ["security", "auth", "backend"],
-  },
-  {
-    id: "5",
-    title: "Monthly retro — March 2026",
-    body: "High points: shipped 3 major features, reduced bug count by 40%. Low points: sprint planning still feels rushed, we need more time for estimation. Let's discuss improvements for April.",
-    category: "general",
-    state: "closed",
-    author: { name: "You", initials: "ME", color: "bg-primary" },
-    replyCount: 11,
-    reactionCount: 3,
-    isPinned: false,
-    isLocked: true,
-    createdAt: "Mar 31, 2026",
-    lastActivityAt: "Mar 31, 2026",
-    tags: ["retrospective", "team"],
-  },
+  { key: "all",          label: "All" },
+  { key: "ANNOUNCEMENT", label: "Announcements" },
+  { key: "IDEA",         label: "Ideas" },
+  { key: "QUESTION",     label: "Questions" },
+  { key: "SHOW",         label: "Show & Tell" },
+  { key: "GENERAL",      label: "General" },
 ]
 
 // ---------------------------------------------------------------------------
 // NewDiscussionDialog
 // ---------------------------------------------------------------------------
 
-function NewDiscussionDialog() {
+interface NewDiscussionDialogProps {
+  readonly slug: string
+}
+
+function NewDiscussionDialog({ slug }: NewDiscussionDialogProps) {
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState("")
   const [body, setBody] = useState("")
-  const [category, setCategory] = useState<DiscussionCategory>("general")
+  const [category, setCategory] = useState<DiscussionCategory>("GENERAL")
+  const [tagsInput, setTagsInput] = useState("")
 
-  function handleCreate() {
+  const { createDiscussion } = useDiscussionStore()
+
+  async function handleCreate() {
     if (!title.trim()) return
+    const tags = tagsInput.split(",").map((t) => t.trim()).filter(Boolean)
+    await createDiscussion(slug, { title: title.trim(), body: body || undefined, category, tags: tags.length ? tags : undefined })
     setTitle("")
     setBody("")
-    setCategory("general")
+    setCategory("GENERAL")
+    setTagsInput("")
     setOpen(false)
   }
 
@@ -246,6 +159,20 @@ function NewDiscussionDialog() {
               className="w-full rounded-md border border-border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground resize-none outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all min-h-30"
             />
           </div>
+
+          {/* Tags */}
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="discussion-tags" className="text-sm font-medium text-foreground">
+              Tags <span className="text-muted-foreground font-normal">(comma-separated, optional)</span>
+            </label>
+            <Input
+              id="discussion-tags"
+              value={tagsInput}
+              onChange={(e) => setTagsInput(e.target.value)}
+              placeholder="e.g. backend, security, release"
+              className="h-9"
+            />
+          </div>
         </div>
 
         <DialogFooter className="gap-2">
@@ -266,8 +193,14 @@ function NewDiscussionDialog() {
 // DiscussionRow
 // ---------------------------------------------------------------------------
 
-function DiscussionRow({ discussion }: { readonly discussion: Discussion }) {
+interface DiscussionRowProps {
+  readonly discussion: Discussion
+  readonly slug: string
+}
+
+function DiscussionRow({ discussion, slug }: DiscussionRowProps) {
   const cat = CATEGORY_CONFIG[discussion.category]
+  const { togglePin, toggleLock, deleteDiscussion } = useDiscussionStore()
 
   return (
     <div className="group flex gap-4 px-5 py-4 border-b border-border/50 last:border-0 hover:bg-muted/20 transition-colors cursor-pointer">
