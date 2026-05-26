@@ -38,6 +38,7 @@ export const STRIPE_ROUTES = {
  */
 export const USER_ROUTES = {
   ME: "/api/users/me",
+  AVATAR: "/api/users/me/avatar",
 } as const;
 
 /**
@@ -118,6 +119,7 @@ export const ANALYTICS_ROUTES = {
   KPIS:       (slug: string) => `/api/workspaces/${slug}/analytics/kpis`,
   THROUGHPUT: (slug: string) => `/api/workspaces/${slug}/analytics/throughput`,
   BURNDOWN:   (slug: string) => `/api/workspaces/${slug}/analytics/burndown`,
+  CAPACITY:   (slug: string) => `/api/workspaces/${slug}/analytics/capacity`,
 } as const;
 
 /**
