@@ -4,6 +4,7 @@ import com.taskforce.tf_api.core.dto.request.UpdateUserRequest;
 import com.taskforce.tf_api.core.dto.response.UserResponse;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
+import com.taskforce.tf_api.modules.ged.service.MinioService;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import lombok.RequiredArgsConstructor;
@@ -11,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -26,6 +28,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final KeycloakService keycloakService;
+    private final MinioService minioService;
 
     /**
      * Récupère le profil complet de l'utilisateur par son email (claim "sub" du JWT Keycloak).
@@ -89,6 +92,45 @@ public class UserService {
         log.info("Profil mis à jour pour email={}", email);
 
         UserRepresentation keycloakUser = keycloakService.getUserById(keycloakId);
+        return buildUserResponse(user, keycloakUser);
+    }
+
+    /**
+     * Upload l'avatar de l'utilisateur vers Minio et met à jour son avatarUrl.
+     * L'URL stockée pointe vers le proxy interne /api/files/avatars/{userId}.
+     */
+    @Transactional
+    public UserResponse uploadAvatar(String email, MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("Fichier avatar vide");
+        }
+        if (file.getSize() > 3 * 1024 * 1024) {
+            throw new IllegalArgumentException("Avatar trop volumineux — max 3 Mo");
+        }
+
+        User user = userRepository.findByEmail(email)
+            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+
+        String extension = "jpg";
+        String originalFilename = file.getOriginalFilename();
+        if (originalFilename != null && originalFilename.contains(".")) {
+            extension = originalFilename.substring(originalFilename.lastIndexOf('.') + 1).toLowerCase();
+        }
+        String objectKey = "avatars/" + user.getId() + "/avatar";
+
+        try {
+            minioService.upload(objectKey, file.getInputStream(), file.getSize(), file.getContentType());
+        } catch (Exception e) {
+            throw new RuntimeException("Échec de l'upload avatar : " + e.getMessage(), e);
+        }
+
+        String proxyUrl = "/api/files/avatars/" + user.getId();
+        user.setAvatarUrl(proxyUrl);
+        userRepository.save(user);
+
+        log.info("Avatar uploadé pour userId={} → {}", user.getId(), proxyUrl);
+
+        UserRepresentation keycloakUser = keycloakService.getUserById(user.getKeycloakId());
         return buildUserResponse(user, keycloakUser);
     }
 
