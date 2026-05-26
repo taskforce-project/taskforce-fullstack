@@ -176,6 +176,17 @@ export const ROADMAP_ROUTES = {
 } as const;
 
 /**
+ * Routes Messages / Chat
+ * Backend: /api/workspaces/{slug}/channels
+ */
+export const MESSAGE_ROUTES = {
+  CHANNELS:  (slug: string) => `/api/workspaces/${slug}/channels`,
+  MESSAGES:  (slug: string, channelId: number) => `/api/workspaces/${slug}/channels/${channelId}/messages`,
+  EDIT_MSG:  (slug: string, channelId: number, msgId: number) => `/api/workspaces/${slug}/channels/${channelId}/messages/${msgId}`,
+  DELETE_MSG:(slug: string, channelId: number, msgId: number) => `/api/workspaces/${slug}/channels/${channelId}/messages/${msgId}`,
+} as const;
+
+/**
  * Routes discussions
  * Backend: /api/workspaces/{slug}/discussions
  */
@@ -187,6 +198,19 @@ export const DISCUSSION_ROUTES = {
   DELETE:  (slug: string, id: number) => `/api/workspaces/${slug}/discussions/${id}`,
   PIN:     (slug: string, id: number) => `/api/workspaces/${slug}/discussions/${id}/pin`,
   LOCK:    (slug: string, id: number) => `/api/workspaces/${slug}/discussions/${id}/lock`,
+} as const;
+
+/**
+ * Routes pièces jointes (attachments)
+ * Backend: /api/workspaces/{slug}/projects/{projectId}/issues/{issueId}/attachments
+ */
+export const ATTACHMENT_ROUTES = {
+  LIST:   (slug: string, projectId: number, issueId: number) =>
+    `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/attachments`,
+  UPLOAD: (slug: string, projectId: number, issueId: number) =>
+    `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/attachments`,
+  DELETE: (slug: string, projectId: number, issueId: number, attachmentId: number) =>
+    `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/attachments/${attachmentId}`,
 } as const;
 
 /**
