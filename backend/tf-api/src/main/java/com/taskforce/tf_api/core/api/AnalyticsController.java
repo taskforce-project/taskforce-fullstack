@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.taskforce.tf_api.core.dto.response.AnalyticsKpisResponse;
 import com.taskforce.tf_api.core.dto.response.BurndownPointResponse;
+import com.taskforce.tf_api.core.dto.response.MemberCapacityResponse;
 import com.taskforce.tf_api.core.dto.response.ThroughputPointResponse;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
@@ -62,6 +63,19 @@ public class AnalyticsController {
         return ResponseEntity.ok(ApiResponse.success(
             "Burndown récupéré",
             analyticsService.getBurndown(slug, userId)
+        ));
+    }
+
+    @GetMapping("/capacity")
+    public ResponseEntity<ApiResponse<List<MemberCapacityResponse>>> getCapacity(
+        @PathVariable String slug,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        // userId unused for capacity but kept for consistency / future auth checks
+        resolveUserId(jwt);
+        return ResponseEntity.ok(ApiResponse.success(
+            "Capacité récupérée",
+            analyticsService.getCapacity(slug)
         ));
     }
 
