@@ -6,8 +6,8 @@ import {
 } from "recharts"
 import {
   TrendingUp, TrendingDown, Zap, AlertTriangle, Brain,
-  Activity, Clock, CheckCircle2, ArrowUpRight, Lock,
-  ShieldAlert, Flame, Minus,
+  Activity, Lock,
+  Flame, Minus,
 } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useParams } from "next/navigation"
@@ -18,22 +18,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { useAuth } from "@/lib/contexts/auth-context"
 import { cn } from "@/lib/utils"
 import {
-  getAnalyticsKpis,
-  getAnalyticsThroughput,
-  getAnalyticsBurndown,
-  type AnalyticsKpis,
-  type ThroughputPoint,
-  type BurndownPoint,
+  getAnalyticsCapacity,
+  type MemberCapacity,
 } from "@/lib/api/analytics-service"
 
 // ─── Static data (AI anomalies kept as mock - complex ML feature) ─────────────
-
-const CAPACITY_DATA = [
-  { name: "You",       utilization: 85, capacity: 100 },
-  { name: "Sophie M.", utilization: 62, capacity: 100 },
-  { name: "Emma P.",   utilization: 54, capacity: 100 },
-  { name: "Thomas B.", utilization: 41, capacity: 100 },
-]
 
 const AI_ANOMALIES: {
   id: number
@@ -274,9 +263,19 @@ function ProBadge() {
 
 export default function AnalyticsPage() {
   const { user } = useAuth()
+  const params = useParams()
+  const slug = params.workspace as string
   const [upgradeOpen, setUpgradeOpen] = useState(false)
+  const [capacityData, setCapacityData] = useState<MemberCapacity[]>([])
 
   const isPro = user?.planType === "PRO" || user?.planType === "ENTERPRISE"
+
+  useEffect(() => {
+    if (!slug) return
+    getAnalyticsCapacity(slug)
+      .then(setCapacityData)
+      .catch(() => { /* silently ignore — not critical */ })
+  }, [slug])
 
   const overallHealth = 78
   const healthDelta = -4
@@ -473,25 +472,30 @@ export default function AnalyticsPage() {
               {!isPro && <ProBadge />}
             </div>
             <GlassCard className="overflow-hidden">
-              {CAPACITY_DATA.map((member, i) => {
-                const overloaded = member.utilization > 80
-                const barColor = overloaded ? "#f87171" : member.utilization > 60 ? "#fbbf24" : "#34d399"
+              {capacityData.length === 0 ? (
+                <div className="px-3 py-4 text-center text-xs" style={{ color: "var(--label-quaternary)" }}>
+                  Aucun membre trouvé
+                </div>
+              ) : capacityData.map((member, i) => {
+                const utilization = Math.min(Math.round((member.openIssues / 10) * 100), 100)
+                const overloaded = utilization > 80
+                const barColor = overloaded ? "#f87171" : utilization > 60 ? "#fbbf24" : "#34d399"
                 return (
                   <div
-                    key={member.name}
+                    key={member.userId}
                     className={cn("flex items-center gap-3 px-3 py-2.5")}
                     style={{
-                      borderBottom: i < CAPACITY_DATA.length - 1 ? "1px solid var(--separator)" : "none",
+                      borderBottom: i < capacityData.length - 1 ? "1px solid var(--separator)" : "none",
                     }}
                   >
                     <span className="text-xs w-20 shrink-0 truncate" style={{ color: "var(--label-secondary)" }}>
-                      {member.name}
+                      {member.displayName}
                     </span>
                     <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: "var(--fill-secondary)" }}>
                       {isPro ? (
                         <div
                           className="h-full rounded-full transition-all"
-                          style={{ width: `${member.utilization}%`, background: barColor }}
+                          style={{ width: `${utilization}%`, background: barColor }}
                         />
                       ) : (
                         <div className="h-full w-full" style={{ background: "var(--fill-secondary)" }} />
@@ -501,7 +505,7 @@ export default function AnalyticsPage() {
                       className="text-[10px] font-medium tabular-nums w-8 text-right shrink-0"
                       style={{ color: isPro ? barColor : "var(--label-quaternary)" }}
                     >
-                      {isPro ? `${member.utilization}%` : "—"}
+                      {isPro ? `${member.openIssues}` : "—"}
                     </span>
                   </div>
                 )
