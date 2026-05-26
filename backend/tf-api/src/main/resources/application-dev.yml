@@ -163,7 +163,14 @@ app:
   name: ${APP_NAME:TaskForce}
   url: ${APP_URL:http://localhost:3000}
   frontend-url: ${FRONTEND_URL:http://localhost:3000}
-
+# Integrations tierces
+integrations:
+  github:
+    client-id: ${GITHUB_CLIENT_ID:}
+    client-secret: ${GITHUB_CLIENT_SECRET:}
+  slack:
+    client-id: ${SLACK_CLIENT_ID:}
+    client-secret: ${SLACK_CLIENT_SECRET:}
 # JWT Configuration
 jwt:
   secret: ${JWT_SECRET:myVerySecretKeyForJWTTokenGenerationThatIsLongEnoughToBeSecure256Bits}
