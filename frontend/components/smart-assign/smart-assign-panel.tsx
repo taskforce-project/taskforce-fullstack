@@ -99,11 +99,11 @@ function scoreMembers(
   priority: IssuePriority
 ): ScoredMember[] {
   const PRIORITY_WEIGHT: Record<IssuePriority, number> = {
-    urgent: 0.4,
-    high:   0.3,
-    medium: 0.2,
-    low:    0.1,
-    none:   0.1,
+    URGENT: 0.4,
+    HIGH:   0.3,
+    MEDIUM: 0.2,
+    LOW:    0.1,
+    NONE:   0.1,
   }
 
   const priorityWeight = PRIORITY_WEIGHT[priority]
