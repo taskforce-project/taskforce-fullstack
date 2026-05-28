@@ -318,49 +318,6 @@ public class IssueController {
     }
 
     // =========================================================================
-    // Relations
-    // =========================================================================
-
-    @GetMapping("/{issueId}/relations")
-    public ResponseEntity<ApiResponse<List<IssueRelationResponse>>> listRelations(
-        @PathVariable String slug,
-        @PathVariable Long projectId,
-        @PathVariable Long issueId,
-        @AuthenticationPrincipal Jwt jwt
-    ) {
-        Long userId = resolveUserId(jwt);
-        List<IssueRelationResponse> relations = issueService.listRelations(slug, projectId, issueId, userId);
-        return ResponseEntity.ok(ApiResponse.success("Relations récupérées", relations));
-    }
-
-    @PostMapping("/{issueId}/relations")
-    public ResponseEntity<ApiResponse<IssueRelationResponse>> addRelation(
-        @PathVariable String slug,
-        @PathVariable Long projectId,
-        @PathVariable Long issueId,
-        @Valid @RequestBody CreateIssueRelationRequest request,
-        @AuthenticationPrincipal Jwt jwt
-    ) {
-        Long userId = resolveUserId(jwt);
-        IssueRelationResponse relation = issueService.addRelation(slug, projectId, issueId, request, userId);
-        return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.success("Relation créée", relation));
-    }
-
-    @DeleteMapping("/{issueId}/relations/{relationId}")
-    public ResponseEntity<ApiResponse<Void>> deleteRelation(
-        @PathVariable String slug,
-        @PathVariable Long projectId,
-        @PathVariable Long issueId,
-        @PathVariable Long relationId,
-        @AuthenticationPrincipal Jwt jwt
-    ) {
-        Long userId = resolveUserId(jwt);
-        issueService.deleteRelation(slug, projectId, issueId, relationId, userId);
-        return ResponseEntity.ok(ApiResponse.success("Relation supprimée", null));
-    }
-
-    // =========================================================================
     // Utilitaires
     // =========================================================================
 
