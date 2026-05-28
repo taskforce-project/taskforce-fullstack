@@ -124,8 +124,11 @@ public class ChatMessageService {
         String name     = "";
         String initials = "?";
         if (m.getAuthor() != null) {
-            name     = m.getAuthor().getFirstName() + " " + m.getAuthor().getLastName();
-            initials = initials(m.getAuthor().getFirstName(), m.getAuthor().getLastName());
+            String dn = m.getAuthor().getDisplayName();
+            if (dn == null || dn.isBlank()) dn = m.getAuthor().getEmail();
+            name = dn != null ? dn : "";
+            String[] parts = name.split(" ", 2);
+            initials = initials(parts[0], parts.length > 1 ? parts[1] : "");
         }
         return ChatMessageResponse.builder()
                 .id(m.getId())
