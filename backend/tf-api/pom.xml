@@ -29,13 +29,13 @@
 	<properties>
 		<java.version>21</java.version>
 		<keycloak.version>25.0.6</keycloak.version>
-		<springdoc.version>2.3.0</springdoc.version>
+		<springdoc.version>3.0.3</springdoc.version>
 		<dotenv.version>3.2.0</dotenv.version>
 		<flyway.version>11.20.0</flyway.version>
 		<stripe.version>31.2.0</stripe.version>
 		<jjwt.version>0.12.6</jjwt.version>
 		<lombok.version>1.18.36</lombok.version>
-		<minio.version>8.5.11</minio.version>
+		<minio.version>8.6.0</minio.version>
 	</properties>
 	<dependencies>
 		<!-- Core Dependencies -->
@@ -112,6 +112,11 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-websocket</artifactId>
 		</dependency>
+		<!-- Reactor Netty requis par StompBrokerRelayMessageHandler (Spring Framework 7) -->
+		<dependency>
+			<groupId>io.projectreactor.netty</groupId>
+			<artifactId>reactor-netty-core</artifactId>
+		</dependency>
 
 		<!-- Minio — stockage objet S3-compatible -->
 		<dependency>
@@ -119,11 +124,11 @@
 			<artifactId>minio</artifactId>
 			<version>${minio.version}</version>
 		</dependency>
-
-		<!-- Reactor Netty — TCP client for STOMP broker relay -->
+		<!-- OkHttp requis par minio -->
 		<dependency>
-			<groupId>io.projectreactor.netty</groupId>
-			<artifactId>reactor-netty-all</artifactId>
+			<groupId>com.squareup.okhttp3</groupId>
+			<artifactId>okhttp</artifactId>
+			<version>4.12.0</version>
 		</dependency>
 
 		<!-- Email (JavaMail for Mailtrap) -->
@@ -224,6 +229,7 @@
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
 				<configuration>
+					<release>${java.version}</release>
 					<annotationProcessorPaths>
 						<path>
 							<groupId>org.projectlombok</groupId>
