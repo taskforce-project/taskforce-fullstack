@@ -22,6 +22,7 @@ public class SecurityConfig {
         "/actuator/**",
         "/swagger-ui/**",
         "/v3/api-docs/**",
+        "/api-docs/**",
         "/ws/**",                           // WebSocket upgrade — auth gérée au niveau STOMP
         "/ws-sockjs/**",                    // SockJS fallback
         "/api/integrations/github/callback", // GitHub OAuth callback (appelé par GitHub)
