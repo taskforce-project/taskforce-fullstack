@@ -7,6 +7,10 @@ import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+
 /**
  * Configuration OAuth2/OpenID Connect pour Keycloak
  *
@@ -97,5 +101,17 @@ public class OAuth2Config {
     @Bean
     public String keycloakIntrospectEndpoint() {
         return keycloakUrl + "/realms/" + realm + "/protocol/openid-connect/token/introspect";
+    }
+
+    /**
+     * ObjectMapper partagé pour la sérialisation/désérialisation JSON
+     */
+    @Bean
+    @org.springframework.context.annotation.Primary
+    public ObjectMapper objectMapper() {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.registerModule(new JavaTimeModule());
+        mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        return mapper;
     }
 }
