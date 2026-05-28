@@ -98,6 +98,10 @@ mail:
     mail:
       smtp:
         auth: true
+        starttls:
+          enable: true
+          required: true
+      debug: true
 
 # Minio — stockage objet S3-compatible
 minio:
@@ -105,10 +109,6 @@ minio:
   access-key: ${MINIO_ROOT_USER:minioadmin}
   secret-key: ${MINIO_ROOT_PASSWORD:minioadmin}
   bucket: ${MINIO_BUCKET:taskforce-attachments}
-        starttls:
-          enable: true
-          required: true
-      debug: true
 
 # CORS Configuration
 cors:
