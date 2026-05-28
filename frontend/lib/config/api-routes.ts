@@ -38,7 +38,6 @@ export const STRIPE_ROUTES = {
  */
 export const USER_ROUTES = {
   ME: "/api/users/me",
-  AVATAR: "/api/users/me/avatar",
 } as const;
 
 /**
@@ -119,7 +118,6 @@ export const ANALYTICS_ROUTES = {
   KPIS:       (slug: string) => `/api/workspaces/${slug}/analytics/kpis`,
   THROUGHPUT: (slug: string) => `/api/workspaces/${slug}/analytics/throughput`,
   BURNDOWN:   (slug: string) => `/api/workspaces/${slug}/analytics/burndown`,
-  CAPACITY:   (slug: string) => `/api/workspaces/${slug}/analytics/capacity`,
 } as const;
 
 /**
@@ -170,25 +168,6 @@ export const TEAM_ROUTES = {
 } as const;
 
 /**
- * Routes roadmap
- * Backend: /api/workspaces/{slug}/roadmap
- */
-export const ROADMAP_ROUTES = {
-  SCHEDULED: (slug: string) => `/api/workspaces/${slug}/roadmap`,
-} as const;
-
-/**
- * Routes Messages / Chat
- * Backend: /api/workspaces/{slug}/channels
- */
-export const MESSAGE_ROUTES = {
-  CHANNELS:  (slug: string) => `/api/workspaces/${slug}/channels`,
-  MESSAGES:  (slug: string, channelId: number) => `/api/workspaces/${slug}/channels/${channelId}/messages`,
-  EDIT_MSG:  (slug: string, channelId: number, msgId: number) => `/api/workspaces/${slug}/channels/${channelId}/messages/${msgId}`,
-  DELETE_MSG:(slug: string, channelId: number, msgId: number) => `/api/workspaces/${slug}/channels/${channelId}/messages/${msgId}`,
-} as const;
-
-/**
  * Routes discussions
  * Backend: /api/workspaces/{slug}/discussions
  */
@@ -200,41 +179,6 @@ export const DISCUSSION_ROUTES = {
   DELETE:  (slug: string, id: number) => `/api/workspaces/${slug}/discussions/${id}`,
   PIN:     (slug: string, id: number) => `/api/workspaces/${slug}/discussions/${id}/pin`,
   LOCK:    (slug: string, id: number) => `/api/workspaces/${slug}/discussions/${id}/lock`,
-} as const;
-
-/**
- * Routes pièces jointes (attachments)
- * Backend: /api/workspaces/{slug}/projects/{projectId}/issues/{issueId}/attachments
- */
-export const ATTACHMENT_ROUTES = {
-  LIST:   (slug: string, projectId: number, issueId: number) =>
-    `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/attachments`,
-  UPLOAD: (slug: string, projectId: number, issueId: number) =>
-    `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/attachments`,
-  DELETE: (slug: string, projectId: number, issueId: number, attachmentId: number) =>
-    `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/attachments/${attachmentId}`,
-} as const;
-
-/**
- * Routes intégrations (GitHub, Slack, Webhooks)
- * Backend: /api/workspaces/{slug}/integrations & /api/integrations
- */
-export const INTEGRATION_ROUTES = {
-  // GitHub
-  GITHUB_STATUS:   (slug: string) => `/api/workspaces/${slug}/integrations/github/status`,
-  GITHUB_CONNECT:  (slug: string) => `/api/workspaces/${slug}/integrations/github/connect`,
-  GITHUB_DISCONNECT: (slug: string) => `/api/workspaces/${slug}/integrations/github`,
-  GITHUB_LINKS:    (slug: string, issueId: number) => `/api/workspaces/${slug}/integrations/github/issues/${issueId}/links`,
-  GITHUB_LINK:     (slug: string, linkId: number) => `/api/workspaces/${slug}/integrations/github/links/${linkId}`,
-  // Slack
-  SLACK_STATUS:    (slug: string) => `/api/workspaces/${slug}/integrations/slack/status`,
-  SLACK_CONNECT:   (slug: string) => `/api/workspaces/${slug}/integrations/slack/connect`,
-  SLACK_DISCONNECT:(slug: string) => `/api/workspaces/${slug}/integrations/slack`,
-  SLACK_CHANNELS:  (slug: string) => `/api/workspaces/${slug}/integrations/slack/channels`,
-  SLACK_CHANNEL:   (slug: string, channelId: number) => `/api/workspaces/${slug}/integrations/slack/channels/${channelId}`,
-  // Webhooks
-  WEBHOOKS:  (slug: string) => `/api/workspaces/${slug}/webhooks`,
-  WEBHOOK:   (slug: string, id: number) => `/api/workspaces/${slug}/webhooks/${id}`,
 } as const;
 
 /**
