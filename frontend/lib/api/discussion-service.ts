@@ -1,4 +1,4 @@
-import apiClient from "@/lib/api/api-client"
+import { apiClient } from "@/lib/api/client"
 import { DISCUSSION_ROUTES } from "@/lib/config/api-routes"
 
 // ---------------------------------------------------------------------------
