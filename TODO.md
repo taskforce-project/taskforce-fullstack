@@ -21,17 +21,19 @@
 
 | # | Tâche | Statut | Notes |
 | --- | --- | --- | --- |
-| X.1 | Verrouiller les subscriptions STOMP par appartenance au canal | ⏳ | L'auth CONNECT existe, pas le contrôle d'accès sur SUBSCRIBE |
-| X.2 | Vérifier le scope `workspace / project / issue` dans les endpoints attachments | ⏳ | Empêcher l'accès par simple `issueId` ou `attachmentId` |
-| X.3 | Fiabiliser les avatars Minio en multi-origin | ⏳ | URL relative backend à rendre robuste côté frontend |
-| X.4 | Repasser le chat temps réel en revue côté sécurité et fallback | ⏳ | RabbitMQ relay, broker in-memory, erreurs WS |
-| X.5 | QA ciblée GED / avatar / chat avant fermeture du lot | ⏳ | Vérification manuelle avant E2E |
+| X.1 | Verrouiller les subscriptions STOMP par appartenance au canal | ✅ | Contrôle ajouté dans `StompAuthInterceptor` sur `SUBSCRIBE /topic/channel.{id}` |
+| X.2 | Vérifier le scope `workspace / project / issue` dans les endpoints attachments | ✅ | Scope appliqué dans `AttachmentService` pour upload/list/delete |
+| X.3 | Fiabiliser les avatars Minio en multi-origin | ✅ | Les `avatarUrl` relatives sont résolues vers l'API publique |
+| X.4 | Repasser le chat temps réel en revue côté sécurité et fallback | ✅ | `SEND` STOMP verrouillé par appartenance au canal, fallback frontend WebSocket → SockJS, état temps réel visible dans l'UI |
+| X.5 | QA ciblée GED / avatar / chat avant fermeture du lot | 🔄 | Compile backend OK, lint frontend OK, tests ciblés OK ; smoke manuel à exécuter stack levée avant E2E |
 
 ---
 
 ## Phase 4 — Implémentation IA
 
 > Choix définitif : orchestration métier en Java, service IA interne en Python, stockage vectoriel dans PostgreSQL via pgvector, inférence LLM via Groq.
+>
+> Plan d'exécution détaillé (ordre, livrables, validations, risques) : `docs/phase4-ia-execution-plan.md`
 
 ### 4A — Infra IA
 
@@ -97,9 +99,9 @@
 | QA.1 | Smart Assign sur issue backend / frontend / ops / no-label | ⏳ | Vérifier ranking, fallback et alternatives |
 | QA.2 | Assistant IA sur workspace réel | ⏳ | Streaming, citations, filtres de scope |
 | QA.3 | AI Insights dashboard | ⏳ | Cohérence avec les analytics réelles |
-| QA.4 | Chat temps réel après durcissement sécurité | ⏳ | SUBSCRIBE, SEND, reconnect |
-| QA.5 | Upload pièce jointe + suppression + téléchargement | ⏳ | Scope, Minio, droits |
-| QA.6 | Avatar utilisateur uploadé et affiché partout | ⏳ | Frontend, sidebar, settings |
+| QA.4 | Chat temps réel après durcissement sécurité | 🔄 | Vérifier `SUBSCRIBE` refusé hors canal, `SEND` refusé hors canal, reconnect WebSocket, bascule SockJS et bandeau d'état |
+| QA.5 | Upload pièce jointe + suppression + téléchargement | 🔄 | Vérifier scope `workspace/project/issue`, URL signée Minio et refus de suppression hors propriétaire |
+| QA.6 | Avatar utilisateur uploadé et affiché partout | 🔄 | Vérifier URL relative backend, affichage sidebar/settings et compat multi-origin |
 
 ---
 
