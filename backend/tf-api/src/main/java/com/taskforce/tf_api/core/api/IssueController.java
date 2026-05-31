@@ -28,9 +28,11 @@ import com.taskforce.tf_api.core.dto.response.IssueRelationResponse;
 import com.taskforce.tf_api.core.dto.response.IssueResponse;
 import com.taskforce.tf_api.core.dto.response.IssueStatusResponse;
 import com.taskforce.tf_api.core.dto.response.IssueTypeResponse;
+import com.taskforce.tf_api.core.dto.response.SmartAssignResponse;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.service.IssueService;
+import com.taskforce.tf_api.core.service.SmartAssignService;
 import com.taskforce.tf_api.shared.dto.ApiResponse;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
@@ -50,6 +52,7 @@ import lombok.extern.slf4j.Slf4j;
 public class IssueController {
 
     private final IssueService   issueService;
+    private final SmartAssignService smartAssignService;
     private final UserRepository userRepository;
 
     // =========================================================================
@@ -272,6 +275,22 @@ public class IssueController {
         Long userId = resolveUserId(jwt);
         List<IssueActivityResponse> activities = issueService.listActivity(slug, projectId, issueId, userId);
         return ResponseEntity.ok(ApiResponse.success("Activité récupérée", activities));
+    }
+
+    // =========================================================================
+    // Smart Assign
+    // =========================================================================
+
+    @PostMapping("/{issueId}/smart-assign")
+    public ResponseEntity<ApiResponse<SmartAssignResponse>> smartAssign(
+        @PathVariable String slug,
+        @PathVariable Long projectId,
+        @PathVariable Long issueId,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long userId = resolveUserId(jwt);
+        SmartAssignResponse result = smartAssignService.recommend(slug, projectId, issueId, userId);
+        return ResponseEntity.ok(ApiResponse.success("Recommandation Smart Assign générée", result));
     }
 
     // =========================================================================
