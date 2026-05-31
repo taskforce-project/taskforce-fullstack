@@ -1125,16 +1125,24 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
             </MetaRow>
 
             {/* Smart Auto-Assign */}
-            <SmartAssignPanel
-              issueLabels={labels.map((l) => l.name)}
-              issuePriority={priority}
-              currentAssignee={assignee}
-              onAssign={async (m) => {
-                setAssignee({ initials: m.initials, color: m.color, name: m.name, userId: 0 })
-                await callUpdate({ assigneeId: undefined })
-                toast.success(`Assigned to ${m.name}`)
-              }}
-            />
+            {workspaceSlug && projectId && (
+              <SmartAssignPanel
+                workspaceSlug={workspaceSlug}
+                projectId={projectId}
+                issueId={issueId}
+                issueLabels={labels.map((l) => l.name)}
+                issuePriority={priority}
+                currentAssignee={assignee}
+                onAssign={async (m) => {
+                  const initials = (m.displayName ?? m.email).slice(0, 2).toUpperCase()
+                  const color = memberColor(m.userId)
+                  const name = m.displayName ?? m.email
+                  setAssignee({ initials, color, name, userId: m.userId })
+                  await callUpdate({ assigneeId: m.userId })
+                  toast.success(`Assigned to ${name}`)
+                }}
+              />
+            )}
 
             {/* Labels — multi-select */}
             <MetaRow icon={<Tag className="size-3.5" />} label="Labels">
