@@ -16,7 +16,7 @@ services:
   # PostgreSQL Database
   # ================================
   postgres:
-    image: postgres:16-alpine
+    image: ${POSTGRES_IMAGE:-pgvector/pgvector:pg18}
     container_name: taskforce-postgres-dev
     environment:
       TZ: UTC
@@ -93,6 +93,12 @@ services:
       # Keycloak (utilise le nom du service docker)
       KEYCLOAK_URL: http://keycloak:8080
 
+      # IA interne
+      AI_SERVICE_URL: ${AI_SERVICE_URL:-http://ai-service:8000}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-llama-3.1-8b-instant}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
+
       # Email Configuration (Mailtrap)
       MAIL_HOST: ${MAILTRAP_HOST:-sandbox.smtp.mailtrap.io}
       MAIL_PORT: ${MAILTRAP_PORT:-2525}
@@ -135,6 +141,8 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      ai-service:
+        condition: service_healthy
     networks:
       - taskforce-network
     volumes:
@@ -150,6 +158,32 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
+    restart: unless-stopped
+
+  # ================================
+  # AI Service (FastAPI interne)
+  # ================================
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    container_name: taskforce-ai-service-dev
+    env_file:
+      - .env.dev
+    environment:
+      TZ: ${TZ:-America/New_York}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-llama-3.1-8b-instant}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
+      LOG_LEVEL: ${AI_SERVICE_LOG_LEVEL:-INFO}
+    networks:
+      - taskforce-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8000/health || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     restart: unless-stopped
 
   # ================================
