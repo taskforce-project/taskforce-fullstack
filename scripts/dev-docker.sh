@@ -86,7 +86,7 @@ start_services() {
         echo "  - Keycloak:      http://localhost:8180 (admin/admin)"
         echo "  - Backend API:   http://localhost:8080/api"
         echo "  - Frontend:      http://localhost:3000"
-        echo "  - Landing Page:  http://localhost:4321"
+        echo "  - Landing Page:  http://localhost:18081"
         echo "  - pgAdmin:       http://localhost:5050"
         echo ""
     else

@@ -48,7 +48,7 @@ if [ $? -eq 0 ]; then
     echo "  - Swagger UI:       http://localhost:8080/api/swagger-ui.html"
     echo "  - Keycloak Admin:   http://localhost:8180 (admin/admin)"
     echo "  - Frontend:         http://localhost:3000"
-    echo "  - Landing Page:     http://localhost:4321"
+    echo "  - Landing Page:     http://localhost:18081"
     echo "  - pgAdmin:          http://localhost:5050 (admin@taskforce.dev/admin)"
     echo "  - PostgreSQL:       localhost:5432 (postgres/PostgreSQLP54!)"
     echo ""
