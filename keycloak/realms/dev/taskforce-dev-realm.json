@@ -103,6 +103,196 @@
       "realmRoles": [
         "user"
       ]
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000001",
+      "username": "user01@taskforce.dev",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "User",
+      "lastName": "01",
+      "email": "user01@taskforce.dev",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Taskforce@2024",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "user"
+      ]
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000002",
+      "username": "user02@taskforce.dev",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "User",
+      "lastName": "02",
+      "email": "user02@taskforce.dev",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Taskforce@2024",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "user"
+      ]
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000003",
+      "username": "user03@taskforce.dev",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "User",
+      "lastName": "03",
+      "email": "user03@taskforce.dev",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Taskforce@2024",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "user"
+      ]
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000004",
+      "username": "user04@taskforce.dev",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "User",
+      "lastName": "04",
+      "email": "user04@taskforce.dev",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Taskforce@2024",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "user"
+      ]
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000005",
+      "username": "user05@taskforce.dev",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "User",
+      "lastName": "05",
+      "email": "user05@taskforce.dev",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Taskforce@2024",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "user"
+      ]
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000006",
+      "username": "user06@taskforce.dev",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "User",
+      "lastName": "06",
+      "email": "user06@taskforce.dev",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Taskforce@2024",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "user"
+      ]
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000007",
+      "username": "user07@taskforce.dev",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "User",
+      "lastName": "07",
+      "email": "user07@taskforce.dev",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Taskforce@2024",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "user"
+      ]
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000008",
+      "username": "user08@taskforce.dev",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "User",
+      "lastName": "08",
+      "email": "user08@taskforce.dev",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Taskforce@2024",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "user"
+      ]
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000009",
+      "username": "user09@taskforce.dev",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "User",
+      "lastName": "09",
+      "email": "user09@taskforce.dev",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Taskforce@2024",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "user"
+      ]
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000010",
+      "username": "user10@taskforce.dev",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "User",
+      "lastName": "10",
+      "email": "user10@taskforce.dev",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Taskforce@2024",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "user"
+      ]
     }
   ],
   "roles": {
