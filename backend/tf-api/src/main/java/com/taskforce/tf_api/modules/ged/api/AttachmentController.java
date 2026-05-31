@@ -47,7 +47,7 @@ public class AttachmentController {
             @AuthenticationPrincipal Jwt jwt
     ) {
         Long userId = resolveUserId(jwt);
-        AttachmentResponse response = attachmentService.upload(issueId, file, userId);
+        AttachmentResponse response = attachmentService.upload(slug, projectId, issueId, file, userId);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Fichier uploadé", response));
     }
@@ -59,7 +59,7 @@ public class AttachmentController {
             @PathVariable Long issueId,
             @AuthenticationPrincipal Jwt jwt
     ) {
-        List<AttachmentResponse> attachments = attachmentService.listByIssue(issueId);
+        List<AttachmentResponse> attachments = attachmentService.listByIssue(slug, projectId, issueId);
         return ResponseEntity.ok(ApiResponse.success("Pièces jointes récupérées", attachments));
     }
 
@@ -72,7 +72,7 @@ public class AttachmentController {
             @AuthenticationPrincipal Jwt jwt
     ) {
         Long userId = resolveUserId(jwt);
-        attachmentService.delete(attachmentId, userId);
+        attachmentService.delete(slug, projectId, issueId, attachmentId, userId);
         return ResponseEntity.ok(ApiResponse.success("Pièce jointe supprimée", null));
     }
 
