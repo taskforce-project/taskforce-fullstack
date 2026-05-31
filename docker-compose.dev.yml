@@ -101,6 +101,9 @@ services:
       MAIL_FROM: ${MAIL_FROM:-noreply@taskforce.com}
       MAIL_FROM_NAME: ${MAIL_FROM_NAME:-TaskForce}
 
+      # RabbitMQ — nom du service Docker pour le STOMP relay
+      RABBITMQ_HOST: rabbitmq
+
       # Flyway : lire les migrations depuis le volume src monté (évite un rebuild après changement de migration)
       SPRING_FLYWAY_LOCATIONS: filesystem:/app/src/main/resources/db/migration
 
@@ -208,7 +211,7 @@ services:
     environment:
       NODE_ENV: development
     ports:
-      - "${LANDING_PORT:-4321}:4321"
+      - "${LANDING_PORT:-18081}:4321"
     networks:
       - taskforce-network
     volumes:
