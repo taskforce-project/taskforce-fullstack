@@ -27,7 +27,7 @@ services:
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - postgres_dev_data:/var/lib/postgresql/data
+      - postgres_dev_data:/var/lib/postgresql
       - ./backend/tf-api/src/main/resources/db/init:/docker-entrypoint-initdb.d
     networks:
       - taskforce-network
@@ -152,7 +152,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget --no-verbose --tries=1 --spider http://localhost:8080/api/actuator/health || exit 1",
+          "code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/api/actuator/health); [ \"$code\" = \"200\" ] || [ \"$code\" = \"401\" ]",
         ]
       interval: 30s
       timeout: 10s
@@ -179,7 +179,11 @@ services:
     networks:
       - taskforce-network
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8000/health || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)\" || exit 1",
+        ]
       interval: 20s
       timeout: 5s
       retries: 5
