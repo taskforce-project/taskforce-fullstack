@@ -105,7 +105,11 @@ services:
       RABBITMQ_HOST: rabbitmq
 
       # Flyway : lire les migrations depuis le volume src monté (évite un rebuild après changement de migration)
-      SPRING_FLYWAY_LOCATIONS: filesystem:/app/src/main/resources/db/migration
+      # classpath couvre les migrations embarquées dans le JAR
+      # filesystem couvre les migrations modifiées en dev via volume monté
+      SPRING_FLYWAY_ENABLED: "true"
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: "true"
+      SPRING_FLYWAY_LOCATIONS: classpath:db/migration,filesystem:/app/src/main/resources/db/migration
 
       # JVM Options
       JAVA_OPTS: "-Xmx512m -Xms256m -Duser.timezone=UTC -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
