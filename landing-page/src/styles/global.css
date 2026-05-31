@@ -1,115 +1,50 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@custom-variant dark (&:is(.dark, .dark *));
-
+/* ─── Light mode tokens ─── */
 :root {
   --background: oklch(1 0 0);
-  --foreground: oklch(0.1450 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.1450 0 0);
+  --foreground: oklch(0.09 0 0);
+  --card: oklch(0.98 0 0);
+  --card-foreground: oklch(0.09 0 0);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.1450 0 0);
-  --primary: oklch(0.2050 0 0);
-  --primary-foreground: oklch(0.9850 0 0);
-  --secondary: oklch(0.9700 0 0);
-  --secondary-foreground: oklch(0.2050 0 0);
-  --muted: oklch(0.9700 0 0);
-  --muted-foreground: oklch(0.5560 0 0);
-  --accent: oklch(0.9700 0 0);
-  --accent-foreground: oklch(0.2050 0 0);
-  --destructive: oklch(0.5770 0.2450 27.3250);
+  --popover-foreground: oklch(0.09 0 0);
+  --primary: oklch(0.73 0.14 78);          /* Premium gold */
+  --primary-foreground: oklch(0.09 0 0);   /* dark text on gold */
+  --secondary: oklch(0.96 0 0);
+  --secondary-foreground: oklch(0.09 0 0);
+  --muted: oklch(0.96 0 0);
+  --muted-foreground: oklch(0.45 0 0);
+  --accent: oklch(0.96 0 0);
+  --accent-foreground: oklch(0.09 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(1 0 0);
-  --border: oklch(0.9220 0 0);
-  --input: oklch(0.9220 0 0);
-  --ring: oklch(0.7080 0 0);
-  --chart-1: oklch(0.8100 0.1000 252);
-  --chart-2: oklch(0.6200 0.1900 260);
-  --chart-3: oklch(0.5500 0.2200 263);
-  --chart-4: oklch(0.4900 0.2200 264);
-  --chart-5: oklch(0.4200 0.1800 266);
-  --sidebar: oklch(0.9850 0 0);
-  --sidebar-foreground: oklch(0.1450 0 0);
-  --sidebar-primary: oklch(0.2050 0 0);
-  --sidebar-primary-foreground: oklch(0.9850 0 0);
-  --sidebar-accent: oklch(0.9700 0 0);
-  --sidebar-accent-foreground: oklch(0.2050 0 0);
-  --sidebar-border: oklch(0.9220 0 0);
-  --sidebar-ring: oklch(0.7080 0 0);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  --border: oklch(0.91 0 0);
+  --input: oklch(0.91 0 0);
+  --ring: oklch(0.5 0 0);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.09 0 0);
+  --sidebar-primary: oklch(0.73 0.14 78);
+  --sidebar-primary-foreground: oklch(0.09 0 0);
+  --sidebar-accent: oklch(0.96 0 0);
+  --sidebar-accent-foreground: oklch(0.09 0 0);
+  --sidebar-border: oklch(0.91 0 0);
+  --sidebar-ring: oklch(0.5 0 0);
+  --brand-blue: #006399;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  --radius: 0.625rem;
-  --shadow-x: 0;
-  --shadow-y: 1px;
-  --shadow-blur: 3px;
-  --shadow-spread: 0px;
-  --shadow-opacity: 0.1;
-  --shadow-color: oklch(0 0 0);
-  --shadow-2xs: 0 2px 6px 0px rgba(236,72,153,0.22), 0 0 12px 0px rgba(255,122,0,0.18);
-  --shadow-xs: 0 2px 6px 0px rgba(168,85,247,0.22), 0 0 16px 0px rgba(255,0,85,0.18);
-  --shadow-sm: 0 4px 16px 0px rgba(255,0,85,0.22), 0 2px 4px -2px rgba(251,191,36,0.18);
-  --shadow: 0 4px 24px 0px rgba(236,72,153,0.28), 0 2px 4px -2px rgba(168,85,247,0.18);
-  --shadow-md: 0 8px 32px 0px rgba(251,191,36,0.22), 0 4px 8px -2px rgba(255,0,85,0.18);
-  --shadow-lg: 0 16px 48px 0px rgba(255,122,0,0.22), 0 8px 12px -2px rgba(236,72,153,0.18);
-  --shadow-xl: 0 24px 64px 0px rgba(168,85,247,0.28), 0 16px 20px -2px rgba(255,0,85,0.18);
-  --shadow-2xl: 0 40px 80px 0px rgba(255,0,85,0.32), 0 2px 6px 0px rgba(251,191,36,0.22);
-  --tracking-normal: 0em;
+  --radius: 0.5rem;
+  --shadow-sm: 0 1px 2px 0 rgba(0,0,0,0.05);
+  --shadow: 0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px -1px rgba(0,0,0,0.1);
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1);
+  --shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1);
+  --tracking-normal: -0.011em;
   --spacing: 0.25rem;
 }
 
-.dark {
-  --background: oklch(0.1450 0 0);
-  --foreground: oklch(0.9850 0 0);
-  --card: oklch(0.2050 0 0);
-  --card-foreground: oklch(0.9850 0 0);
-  --popover: oklch(0.2690 0 0);
-  --popover-foreground: oklch(0.9850 0 0);
-  --primary: oklch(0.9220 0 0);
-  --primary-foreground: oklch(0.2050 0 0);
-  --secondary: oklch(0.2690 0 0);
-  --secondary-foreground: oklch(0.9850 0 0);
-  --muted: oklch(0.2690 0 0);
-  --muted-foreground: oklch(0.7080 0 0);
-  --accent: oklch(0.3710 0 0);
-  --accent-foreground: oklch(0.9850 0 0);
-  --destructive: oklch(0.7040 0.1910 22.2160);
-  --destructive-foreground: oklch(0.9850 0 0);
-  --border: oklch(0.2750 0 0);
-  --input: oklch(0.3250 0 0);
-  --ring: oklch(0.5560 0 0);
-  --chart-1: oklch(0.8100 0.1000 252);
-  --chart-2: oklch(0.6200 0.1900 260);
-  --chart-3: oklch(0.5500 0.2200 263);
-  --chart-4: oklch(0.4900 0.2200 264);
-  --chart-5: oklch(0.4200 0.1800 266);
-  --sidebar: oklch(0.2050 0 0);
-  --sidebar-foreground: oklch(0.9850 0 0);
-  --sidebar-primary: oklch(0.4880 0.2430 264.3760);
-  --sidebar-primary-foreground: oklch(0.9850 0 0);
-  --sidebar-accent: oklch(0.2690 0 0);
-  --sidebar-accent-foreground: oklch(0.9850 0 0);
-  --sidebar-border: oklch(0.2750 0 0);
-  --sidebar-ring: oklch(0.4390 0 0);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
-  --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  --radius: 0.625rem;
-  --shadow-x: 0;
-  --shadow-y: 1px;
-  --shadow-blur: 3px;
-  --shadow-spread: 0px;
-  --shadow-opacity: 0.1;
-  --shadow-color: oklch(0 0 0);
-  --shadow-2xs: 0 2px 6px 0px rgba(236,72,153,0.22), 0 0 12px 0px rgba(255,122,0,0.18);
-  --shadow-xs: 0 2px 6px 0px rgba(168,85,247,0.22), 0 0 16px 0px rgba(255,0,85,0.18);
-  --shadow-sm: 0 4px 16px 0px rgba(255,0,85,0.22), 0 2px 4px -2px rgba(251,191,36,0.18);
-  --shadow: 0 4px 24px 0px rgba(236,72,153,0.28), 0 2px 4px -2px rgba(168,85,247,0.18);
-  --shadow-md: 0 8px 32px 0px rgba(251,191,36,0.22), 0 4px 8px -2px rgba(255,0,85,0.18);
-  --shadow-lg: 0 16px 48px 0px rgba(255,122,0,0.22), 0 8px 12px -2px rgba(236,72,153,0.18);
-  --shadow-xl: 0 24px 64px 0px rgba(168,85,247,0.28), 0 16px 20px -2px rgba(255,0,85,0.18);
-  --shadow-2xl: 0 40px 80px 0px rgba(255,0,85,0.32), 0 2px 6px 0px rgba(251,191,36,0.22);
-}
+
 
 @theme inline {
   --color-background: var(--background);
@@ -131,11 +66,6 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -144,16 +74,13 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
   --font-serif: var(--font-serif);
-
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 6px);
   --shadow-2xs: var(--shadow-2xs);
   --shadow-xs: var(--shadow-xs);
   --shadow-sm: var(--shadow-sm);
@@ -166,30 +93,230 @@
 
 body {
   letter-spacing: var(--tracking-normal);
+  font-feature-settings: "rlig" 1, "calt" 1;
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
-
   body {
     @apply bg-background text-foreground;
   }
 }
 
-@keyframes fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
+/* ═══════════════════════════════════════════════════════
+   VERCEL-STYLE DARK LANDING UTILITIES
+   Colors: black/white base + 3 accent palettes from docs cards
+   • Accent A: Blue/Cyan   (from-blue-500/20 to-cyan-500/20)
+   • Accent B: Purple/Pink (from-purple-500/20 to-pink-500/20)
+   • Accent C: Orange/Amber(from-orange-500/20 to-yellow-500/20)
+═══════════════════════════════════════════════════════ */
 
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* ── Gradient text ── */
+/* Gold premium — both modes */
+.gradient-text {
+  background: linear-gradient(135deg, #C9A84C 0%, #D4AF37 60%, #E8C96B 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
-.animate-fade-in {
-  animation: fade-in 0.6s ease-out forwards;
+
+/* Blue/Cyan variant (Accent A) */
+.gradient-text-blue {
+  background: linear-gradient(135deg, #60a5fa 0%, #22d3ee 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Purple/Pink variant (Accent B) */
+.gradient-text-purple {
+  background: linear-gradient(135deg, #c084fc 0%, #f472b6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Orange/Yellow variant (Accent C) */
+.gradient-text-warm {
+  background: linear-gradient(135deg, #fb923c 0%, #fbbf24 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Card hover gradients (from docs cards) ── */
+.card-hover-blue {
+  background: linear-gradient(135deg, rgba(59,130,246,0.08), rgba(6,182,212,0.06));
+}
+.card-hover-purple {
+  background: linear-gradient(135deg, rgba(168,85,247,0.08), rgba(236,72,153,0.06));
+}
+.card-hover-warm {
+  background: linear-gradient(135deg, rgba(249,115,22,0.08), rgba(234,179,8,0.06));
+}
+
+/* ── Base card ── */
+.card-dark {
+  background: #0a0a0a;
+  border: 1px solid rgba(255,255,255,0.07);
+  transition: border-color 200ms ease, background 200ms ease;
+}
+.card-dark:hover {
+  border-color: rgba(255,255,255,0.14);
+}
+
+/* ── Section badge ── */
+.badge-dark {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.5);
+}
+
+/* ── Section divider ── */
+.section-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.06) 50%, transparent 100%);
+}
+
+/* ── Subtle grid ── */
+.bg-grid {
+  background-image:
+    linear-gradient(rgba(0,0,0,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+
+/* ── Noise overlay ── */
+.noise-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Animations ── */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+.animate-float { animation: float 6s ease-in-out infinite; }
+
+@keyframes mega-blob {
+  0%, 100% { transform: translateY(0) scale(1);   opacity: 0.07; }
+  50%       { transform: translateY(-18px) scale(1.08); opacity: 0.12; }
+}
+
+/* ── Testimonial column infinite scroll ── */
+@keyframes scroll-up {
+  0%   { transform: translateY(0); }
+  100% { transform: translateY(-50%); }
+}
+@keyframes scroll-up-reverse {
+  0%   { transform: translateY(-50%); }
+  100% { transform: translateY(0); }
+}
+.animate-scroll-up {
+  animation: scroll-up linear infinite;
+}
+.animate-scroll-up-reverse {
+  animation: scroll-up-reverse linear infinite;
+}
+.animate-scroll-up:hover,
+.animate-scroll-up-reverse:hover {
+  animation-play-state: paused;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in { animation: fade-in 0.5s ease-out forwards; }
+
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+.animate-shimmer {
+  background: linear-gradient(90deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 100%);
+  background-size: 200% auto;
+  animation: shimmer 2s linear infinite;
+}
+
+/* ── Status dot ── */
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #22c55e;
+  animation: pulse-green 2s ease-in-out infinite;
+}
+@keyframes pulse-green {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.4); }
+  50%       { box-shadow: 0 0 0 4px rgba(34,197,94,0); }
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #000; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
+
+/* ── Selection ── */
+::selection { background: rgba(0, 99, 153, 0.18); color: inherit; }
+
+/* ── Glass ── */
+.glass {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+  backdrop-filter: blur(16px);
+}
+
+/* ── Animated glow card borders ── */
+@keyframes border-spin {
+  0%   { --angle: 0deg; }
+  100% { --angle: 360deg; }
+}
+
+@property --angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.glow-card-border {
+  background: conic-gradient(
+    from var(--angle, 0deg),
+    transparent 0%,
+    var(--glow-color, rgba(255,255,255,0.15)) 10%,
+    transparent 20%
+  );
+  animation: border-spin 4s linear infinite;
+  padding: 1px;
+  border-radius: inherit;
+}
+
+.glow-card-wrapper:hover .glow-card-border {
+  opacity: 1;
+}
+
+.glow-card-border::before {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  background: #0a0a0a;
+  border-radius: inherit;
 }
