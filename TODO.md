@@ -39,7 +39,7 @@
 
 | # | Tâche | Statut | Notes |
 | --- | --- | --- | --- |
-| 4.1 | Basculer PostgreSQL dev vers une image avec extension pgvector | ✅ | `docker-compose.dev.yml` basculé sur `pgvector/pgvector:pg16` |
+| 4.1 | Basculer PostgreSQL dev vers une image avec extension pgvector | ✅ | `docker-compose.dev.yml` bascule sur `pgvector/pgvector:pg18` + montage volume compatible PG18 |
 | 4.2 | Ajouter `CREATE EXTENSION IF NOT EXISTS vector` au bootstrap DB | ✅ | Ajout de `backend/tf-api/src/main/resources/db/init/02-init-pgvector.sql` |
 | 4.3 | Créer le service interne `ai-service` (FastAPI) dans le compose dev | ✅ | Service `ai-service` ajouté en réseau interne + healthcheck |
 | 4.4 | Ajouter la config IA (`AI_SERVICE_URL`, `GROQ_*`, `EMBEDDING_MODEL`) | ✅ | Variables ajoutées dans compose et fichiers `.env*.example`, config Spring `ai.*` en dev |
@@ -48,10 +48,10 @@
 
 | # | Tâche | Statut | Notes |
 | --- | --- | --- | --- |
-| 4.5 | Migration `ai_documents` + embeddings pgvector | ⏳ | Chunks RAG multi-sources |
-| 4.6 | Migration `member_skill_profiles` + embedding de profil | ⏳ | Compétences et contexte membre |
-| 4.7 | Migration `assignment_events` + feedback d'assignation | ⏳ | Historique pour ranking |
-| 4.8 | Migration `ai_insight_snapshots` + `ai_runs` | ⏳ | Audit, coût, cache, observabilité |
+| 4.5 | Migration `ai_documents` + embeddings pgvector | ✅ | `V32__ai_documents.sql` (chunks RAG, contraintes source, index B-Tree + HNSW) |
+| 4.6 | Migration `member_skill_profiles` + embedding de profil | ✅ | `V33__member_skill_profiles.sql` (profil membre, JSON skills/stats, index HNSW) |
+| 4.7 | Migration `assignment_events` + feedback d'assignation | ✅ | `V34__assignment_events.sql` (decision_source, feedback, features JSON) |
+| 4.8 | Migration `ai_insight_snapshots` + `ai_runs` | ✅ | `V35__ai_runs_and_insight_snapshots.sql` (audit/cout/latence + snapshots cache + expires_at) |
 
 ### 4C — Smart Assign
 
