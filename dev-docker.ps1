@@ -124,7 +124,7 @@ function Show-Services {
     
     Write-ColorMessage "`n📋 Services disponibles :" $COLOR_SUCCESS
     Write-Host "  🌐 Frontend:        http://localhost:3000" -ForegroundColor White
-    Write-Host "  🎨 Landing Page:    http://localhost:4321" -ForegroundColor White
+    Write-Host "  🎨 Landing Page:    http://localhost:18081" -ForegroundColor White
     Write-Host "  🔌 API Backend:     http://localhost:8080/api" -ForegroundColor White
     Write-Host "  📚 Swagger UI:      http://localhost:8080/swagger-ui.html" -ForegroundColor White
     Write-Host "  🔐 Keycloak Admin:  http://localhost:8180 (admin/admin)" -ForegroundColor White
