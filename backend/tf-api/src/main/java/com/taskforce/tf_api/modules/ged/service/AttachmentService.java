@@ -31,7 +31,7 @@ public class AttachmentService {
     private final MinioService minioService;
 
     @Transactional
-    public AttachmentResponse upload(Long issueId, MultipartFile file, Long userId) {
+    public AttachmentResponse upload(String slug, Long projectId, Long issueId, MultipartFile file, Long userId) {
         if (file.isEmpty()) {
             throw new IllegalArgumentException("File is empty");
         }
@@ -39,14 +39,16 @@ public class AttachmentService {
             throw new IllegalArgumentException("File exceeds 25 MB limit");
         }
 
-        Issue issue = issueRepository.findById(issueId)
-                .orElseThrow(() -> new ResourceNotFoundException("Issue not found: " + issueId));
+        Issue issue = findScopedIssue(slug, projectId, issueId);
 
         User uploader = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
 
-        String originalName = file.getOriginalFilename() != null ? file.getOriginalFilename() : "unknown";
-        String ext = originalName.contains(".") ? originalName.substring(originalName.lastIndexOf('.')) : "";
+        String rawOriginalName = file.getOriginalFilename();
+        String originalName = rawOriginalName != null && !rawOriginalName.isBlank() ? rawOriginalName : "unknown";
+        String ext = rawOriginalName != null && rawOriginalName.contains(".")
+            ? rawOriginalName.substring(rawOriginalName.lastIndexOf('.'))
+            : "";
         String storedKey = "issues/" + issueId + "/" + UUID.randomUUID() + ext;
         String contentType = file.getContentType() != null ? file.getContentType() : "application/octet-stream";
 
@@ -70,10 +72,8 @@ public class AttachmentService {
     }
 
     @Transactional(readOnly = true)
-    public List<AttachmentResponse> listByIssue(Long issueId) {
-        if (!issueRepository.existsById(issueId)) {
-            throw new ResourceNotFoundException("Issue not found: " + issueId);
-        }
+    public List<AttachmentResponse> listByIssue(String slug, Long projectId, Long issueId) {
+        findScopedIssue(slug, projectId, issueId);
         return attachmentRepository.findByIssueIdOrderByCreatedAtDesc(issueId)
                 .stream()
                 .map(this::toResponse)
@@ -81,9 +81,8 @@ public class AttachmentService {
     }
 
     @Transactional
-    public void delete(Long attachmentId, Long userId) {
-        Attachment attachment = attachmentRepository.findById(attachmentId)
-                .orElseThrow(() -> new ResourceNotFoundException("Attachment not found: " + attachmentId));
+    public void delete(String slug, Long projectId, Long issueId, Long attachmentId, Long userId) {
+        Attachment attachment = findScopedAttachment(slug, projectId, issueId, attachmentId);
 
         User requester = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
@@ -96,6 +95,38 @@ public class AttachmentService {
 
         minioService.delete(attachment.getStoredKey());
         attachmentRepository.delete(attachment);
+    }
+
+    private Issue findScopedIssue(String slug, Long projectId, Long issueId) {
+        Issue issue = issueRepository.findById(issueId)
+                .orElseThrow(() -> new ResourceNotFoundException("Issue not found: " + issueId));
+
+        boolean inExpectedProject = issue.getProject() != null && projectId.equals(issue.getProject().getId());
+        boolean inExpectedWorkspace = inExpectedProject
+                && issue.getProject().getWorkspace() != null
+                && slug.equals(issue.getProject().getWorkspace().getSlug());
+
+        if (!inExpectedWorkspace) {
+            throw new ResourceNotFoundException("Issue not found in requested project/workspace: " + issueId);
+        }
+
+        return issue;
+    }
+
+    private Attachment findScopedAttachment(String slug, Long projectId, Long issueId, Long attachmentId) {
+        Attachment attachment = attachmentRepository.findById(attachmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Attachment not found: " + attachmentId));
+
+        if (attachment.getIssue() == null || !issueId.equals(attachment.getIssue().getId())) {
+            throw new ResourceNotFoundException("Attachment not found for issue: " + attachmentId);
+        }
+
+        Issue scopedIssue = findScopedIssue(slug, projectId, issueId);
+        if (!scopedIssue.getId().equals(attachment.getIssue().getId())) {
+            throw new ResourceNotFoundException("Attachment not found in requested scope: " + attachmentId);
+        }
+
+        return attachment;
     }
 
     private AttachmentResponse toResponse(Attachment a) {
