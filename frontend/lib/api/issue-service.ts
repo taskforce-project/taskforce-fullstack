@@ -97,6 +97,28 @@ export interface IssueActivity {
   createdAt: string;
 }
 
+export interface SmartAssignCandidate {
+  userId: number;
+  email: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  score: number;
+  semanticScore: number;
+  historicalScore: number;
+  workloadScore: number;
+  availability: number;
+  openIssues: number;
+  labelMatchCount: number;
+  factors: string[];
+}
+
+export interface SmartAssignResult {
+  recommended: SmartAssignCandidate | null;
+  alternatives: SmartAssignCandidate[];
+  strategy: string;
+  fallbackUsed: boolean;
+}
+
 export interface CreateIssuePayload {
   title: string;
   description?: string;
@@ -314,6 +336,21 @@ export async function listActivity(
   issueId: number
 ): Promise<IssueActivity[]> {
   const res = await apiClient.get<{ data: IssueActivity[] }>(ISSUE_ROUTES.ACTIVITY(slug, projectId, issueId));
+  return res.data.data;
+}
+
+// ---------------------------------------------------------------------------
+// Smart Assign
+// ---------------------------------------------------------------------------
+
+export async function smartAssignIssue(
+  slug: string,
+  projectId: number,
+  issueId: number
+): Promise<SmartAssignResult> {
+  const res = await apiClient.post<{ data: SmartAssignResult }>(
+    ISSUE_ROUTES.SMART_ASSIGN(slug, projectId, issueId)
+  );
   return res.data.data;
 }
 
