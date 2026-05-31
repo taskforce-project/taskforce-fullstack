@@ -1,143 +1,32 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState } from "react"
 import { Sparkles, Loader2, Check, X, ChevronDown, AlertCircle } from "lucide-react"
+import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import type { IssuePriority } from "@/components/sheets/issue-sheet"
+import {
+  smartAssignIssue,
+  type SmartAssignCandidate,
+  type SmartAssignResult,
+} from "@/lib/api/issue-service"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
-export interface TeamMemberProfile {
-  initials: string
-  color: string
-  name: string
-  role: string
-  skills: string[]
-  openIssues: number    // current workload
-  availability: number  // 0-100% free capacity
-}
-
 interface SmartAssignProps {
+  workspaceSlug: string
+  projectId: number
+  issueId: number
   issueLabels: string[]
   issuePriority: IssuePriority
-  currentAssignee: { name: string; initials: string; color: string } | null
-  onAssign: (member: TeamMemberProfile) => void
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Mock team with skills & workload
-// ─────────────────────────────────────────────────────────────────────────────
-
-const TEAM_PROFILES: TeamMemberProfile[] = [
-  {
-    name: "Sophie Martin",
-    initials: "SM",
-    color: "bg-violet-500",
-    role: "Frontend Engineer",
-    skills: ["react", "typescript", "ui", "design", "ux", "css", "feature"],
-    openIssues: 4,
-    availability: 60,
-  },
-  {
-    name: "Emma Petit",
-    initials: "EP",
-    color: "bg-emerald-500",
-    role: "Full-stack Engineer",
-    skills: ["react", "typescript", "backend", "api", "test", "feature", "ux", "mobile"],
-    openIssues: 3,
-    availability: 75,
-  },
-  {
-    name: "Thomas Bernard",
-    initials: "TB",
-    color: "bg-orange-500",
-    role: "Backend Engineer",
-    skills: ["java", "backend", "api", "db", "performance", "security", "devops", "monitoring"],
-    openIssues: 6,
-    availability: 35,
-  },
-  {
-    name: "Lucas Dufour",
-    initials: "LD",
-    color: "bg-blue-500",
-    role: "DevOps / SRE",
-    skills: ["devops", "monitoring", "ci", "docker", "security", "performance", "db"],
-    openIssues: 2,
-    availability: 85,
-  },
-  {
-    name: "You",
-    initials: "ME",
-    color: "bg-primary",
-    role: "Lead Engineer",
-    skills: ["react", "typescript", "java", "backend", "api", "security", "auth", "feature", "bug"],
-    openIssues: 5,
-    availability: 50,
-  },
-]
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Scoring algorithm
-// ─────────────────────────────────────────────────────────────────────────────
-
-interface ScoredMember {
-  member: TeamMemberProfile
-  score: number              // 0-100
-  skillMatch: number         // matched labels count
-  factors: string[]
-}
-
-function scoreMembers(
-  members: TeamMemberProfile[],
-  labels: string[],
-  priority: IssuePriority
-): ScoredMember[] {
-  const PRIORITY_WEIGHT: Record<IssuePriority, number> = {
-    URGENT: 0.4,
-    HIGH:   0.3,
-    MEDIUM: 0.2,
-    LOW:    0.1,
-    NONE:   0.1,
-  }
-
-  const priorityWeight = PRIORITY_WEIGHT[priority]
-
-  return members
-    .map((member) => {
-      const normalizedLabels = labels.map((l) => l.toLowerCase())
-      const matchedSkills = normalizedLabels.filter((l) => member.skills.includes(l))
-      const skillScore = normalizedLabels.length > 0
-        ? (matchedSkills.length / normalizedLabels.length) * 100
-        : 50 // no labels → neutral
-
-      // Workload: fewer open issues = better
-      const workloadScore = Math.max(0, 100 - member.openIssues * 10)
-
-      // Availability
-      const availabilityScore = member.availability
-
-      // Weighted sum — for urgent issues, availability matters more
-      const score =
-        skillScore * 0.45 +
-        workloadScore * (0.3 - priorityWeight * 0.1) +
-        availabilityScore * (0.25 + priorityWeight * 0.1)
-
-      const factors: string[] = []
-      if (matchedSkills.length > 0) factors.push(`${matchedSkills.length} skill match${matchedSkills.length > 1 ? "es" : ""}`)
-      if (member.availability >= 70) factors.push("High availability")
-      else if (member.availability < 40) factors.push("Low availability")
-      if (member.openIssues <= 2) factors.push("Low workload")
-      else if (member.openIssues >= 6) factors.push("High workload")
-
-      return { member, score: Math.round(score), skillMatch: matchedSkills.length, factors }
-    })
-    .sort((a, b) => b.score - a.score)
+  currentAssignee: { userId: number; name: string; initials: string; color: string } | null
+  onAssign: (member: SmartAssignCandidate) => void
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -162,11 +51,33 @@ function WorkloadBar({ value }: Readonly<{ value: number }>) {
   )
 }
 
+function initialsFromCandidate(c: SmartAssignCandidate): string {
+  const base = c.displayName?.trim() || c.email
+  return base.slice(0, 2).toUpperCase()
+}
+
+function colorFromUserId(userId: number): string {
+  const colors = [
+    "bg-violet-500",
+    "bg-blue-500",
+    "bg-emerald-500",
+    "bg-orange-500",
+    "bg-pink-500",
+    "bg-cyan-500",
+    "bg-amber-500",
+    "bg-indigo-500",
+  ]
+  return colors[userId % colors.length]
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // SmartAssignPanel
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function SmartAssignPanel({
+  workspaceSlug,
+  projectId,
+  issueId,
   issueLabels,
   issuePriority,
   currentAssignee,
@@ -176,25 +87,30 @@ export function SmartAssignPanel({
   const [loading, setLoading] = useState(false)
   const [ran, setRan] = useState(false)
   const [showAll, setShowAll] = useState(false)
+  const [result, setResult] = useState<SmartAssignResult | null>(null)
 
-  const scored = useMemo(
-    () => scoreMembers(TEAM_PROFILES, issueLabels, issuePriority),
-    [issueLabels, issuePriority]
-  )
+  const top = result?.recommended ?? null
+  const rest = result?.alternatives ?? []
 
-  const top = scored[0]
-  const rest = scored.slice(1)
-
-  function handleAnalyze() {
+  async function handleAnalyze() {
     setLoading(true)
     setRan(false)
-    setTimeout(() => {
-      setLoading(false)
+    try {
+      const data = await smartAssignIssue(workspaceSlug, projectId, issueId)
+      setResult(data)
       setRan(true)
-    }, 1200)
+      if (!data.recommended) {
+        toast.warning("Aucune recommandation disponible pour cette issue")
+      }
+    } catch {
+      toast.error("Impossible de générer Smart Assign")
+      setResult(null)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  function handleConfirm(member: TeamMemberProfile) {
+  function handleConfirm(member: SmartAssignCandidate) {
     onAssign(member)
     setOpen(false)
     setRan(false)
@@ -233,6 +149,9 @@ export function SmartAssignPanel({
       <div className="px-3 py-3 flex flex-col gap-3">
         {/* Context chips */}
         <div className="flex flex-wrap gap-1">
+          <Badge variant="secondary" className="text-[9px] h-4 px-1.5 bg-muted/60 border-0 text-muted-foreground">
+            priority:{issuePriority.toLowerCase()}
+          </Badge>
           {issueLabels.length > 0
             ? issueLabels.map((l) => (
                 <Badge key={l} variant="secondary" className="text-[9px] h-4 px-1.5 bg-muted/60 border-0 text-muted-foreground">
@@ -277,38 +196,38 @@ export function SmartAssignPanel({
 
               <div className="flex items-center gap-2">
                 <Avatar className="size-6 shrink-0">
-                  <AvatarFallback className={cn("text-[9px] text-white", top.member.color)}>
-                    {top.member.initials}
+                  <AvatarFallback className={cn("text-[9px] text-white", colorFromUserId(top.userId))}>
+                    {initialsFromCandidate(top)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-foreground truncate">{top.member.name}</p>
-                  <p className="text-[10px] text-muted-foreground">{top.member.role}</p>
+                  <p className="text-xs font-medium text-foreground truncate">{top.displayName ?? top.email}</p>
+                  <p className="text-[10px] text-muted-foreground">semantic {top.semanticScore}% · history {top.historicalScore}%</p>
                 </div>
               </div>
 
               {/* Availability bar */}
               <div>
                 <p className="text-[10px] text-muted-foreground mb-1">Availability</p>
-                <WorkloadBar value={top.member.availability} />
+                <WorkloadBar value={top.availability} />
               </div>
 
               <div className="flex items-center gap-1.5">
-                <span className="text-[10px] text-muted-foreground">{top.member.openIssues} open issues</span>
+                <span className="text-[10px] text-muted-foreground">{top.openIssues} open issues</span>
                 {top.factors.map((f) => (
                   <Badge key={f} variant="outline" className="text-[9px] h-3.5 px-1 border-primary/20 text-primary/70">{f}</Badge>
                 ))}
               </div>
 
-              {currentAssignee?.name === top.member.name ? (
+              {currentAssignee?.userId === top.userId ? (
                 <div className="flex items-center gap-1 text-[10px] text-emerald-400">
                   <Check className="size-3" />
                   Already assigned
                 </div>
               ) : (
-                <Button size="sm" className="h-6 text-[10px] gap-1 mt-0.5" onClick={() => handleConfirm(top.member)}>
+                <Button size="sm" className="h-6 text-[10px] gap-1 mt-0.5" onClick={() => handleConfirm(top)}>
                   <Check className="size-3" />
-                  Assign {top.member.name.split(" ")[0]}
+                  Assign {(top.displayName ?? top.email).split(" ")[0]}
                 </Button>
               )}
             </div>
@@ -327,31 +246,38 @@ export function SmartAssignPanel({
 
                 {showAll && (
                   <div className="flex flex-col gap-1.5 mt-1.5">
-                    {rest.map(({ member, score, factors }) => (
+                    {rest.map((candidate) => (
                       <button
-                        key={member.name}
+                        key={candidate.userId}
                         type="button"
                         className="flex items-center gap-2 p-2 rounded-md hover:bg-muted/40 transition-colors cursor-pointer group w-full text-left"
-                        onClick={() => handleConfirm(member)}
+                        onClick={() => handleConfirm(candidate)}
                       >
                         <Avatar className="size-5 shrink-0">
-                          <AvatarFallback className={cn("text-[8px] text-white", member.color)}>
-                            {member.initials}
+                          <AvatarFallback className={cn("text-[8px] text-white", colorFromUserId(candidate.userId))}>
+                            {initialsFromCandidate(candidate)}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
-                          <p className="text-[10px] font-medium text-foreground truncate">{member.name}</p>
+                          <p className="text-[10px] font-medium text-foreground truncate">{candidate.displayName ?? candidate.email}</p>
                           <div className="flex items-center gap-1 mt-0.5">
-                            {factors.slice(0, 2).map((f) => (
+                            {candidate.factors.slice(0, 2).map((f) => (
                               <span key={f} className="text-[9px] text-muted-foreground">{f}</span>
                             ))}
                           </div>
                         </div>
-                        <span className="text-[10px] font-semibold text-muted-foreground shrink-0 group-hover:text-foreground">{score}%</span>
+                        <span className="text-[10px] font-semibold text-muted-foreground shrink-0 group-hover:text-foreground">{candidate.score}%</span>
                       </button>
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+
+            {result?.fallbackUsed && (
+              <div className="flex items-start gap-1.5 text-[10px] text-amber-400 bg-amber-500/10 rounded-md px-2 py-1.5">
+                <AlertCircle className="size-3 shrink-0 mt-0.5" />
+                AI fallback active — recommendation generated from Java rules.
               </div>
             )}
 
