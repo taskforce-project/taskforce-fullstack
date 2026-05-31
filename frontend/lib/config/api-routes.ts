@@ -92,6 +92,7 @@ export const ISSUE_ROUTES = {
   COMMENTS:         (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/comments`,
   COMMENT:          (slug: string, projectId: number, issueId: number, commentId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/comments/${commentId}`,
   ACTIVITY:         (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/activity`,
+  SMART_ASSIGN:     (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/smart-assign`,
   RELATIONS:        (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/relations`,
   RELATION:         (slug: string, projectId: number, issueId: number, relationId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/relations/${relationId}`,
 } as const;
