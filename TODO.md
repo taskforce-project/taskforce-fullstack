@@ -39,10 +39,10 @@
 
 | # | Tâche | Statut | Notes |
 | --- | --- | --- | --- |
-| 4.1 | Basculer PostgreSQL dev vers une image avec extension pgvector | ⏳ | `pgvector/pgvector:pg18` ou image custom équivalente |
-| 4.2 | Ajouter `CREATE EXTENSION IF NOT EXISTS vector` au bootstrap DB | ⏳ | Init SQL + documentation d'env |
-| 4.3 | Créer le service interne `ai-service` (FastAPI) dans le compose dev | ⏳ | Service non exposé publiquement |
-| 4.4 | Ajouter la config IA (`AI_SERVICE_URL`, `GROQ_*`, `EMBEDDING_MODEL`) | ⏳ | Backend Java + Python |
+| 4.1 | Basculer PostgreSQL dev vers une image avec extension pgvector | ✅ | `docker-compose.dev.yml` basculé sur `pgvector/pgvector:pg16` |
+| 4.2 | Ajouter `CREATE EXTENSION IF NOT EXISTS vector` au bootstrap DB | ✅ | Ajout de `backend/tf-api/src/main/resources/db/init/02-init-pgvector.sql` |
+| 4.3 | Créer le service interne `ai-service` (FastAPI) dans le compose dev | ✅ | Service `ai-service` ajouté en réseau interne + healthcheck |
+| 4.4 | Ajouter la config IA (`AI_SERVICE_URL`, `GROQ_*`, `EMBEDDING_MODEL`) | ✅ | Variables ajoutées dans compose et fichiers `.env*.example`, config Spring `ai.*` en dev |
 
 ### 4B — Modèle de données IA
 
