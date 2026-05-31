@@ -66,7 +66,15 @@ const canonicalURL = Astro.site
     <!-- Manifest -->
     <link rel="manifest" href="/manifest.json" />
 
-    <!-- Daltonism SVG Filters -->
+    <!-- Theme init: apply saved preference before first paint to avoid flash -->
+  <script is:inline>
+    (function () {
+      const saved = localStorage.getItem('tf-theme');
+      if (saved === 'dark') document.documentElement.classList.add('dark');
+    })();
+  </script>
+
+  <!-- Daltonism SVG Filters -->
   </head><svg style="display: none;">
     <defs>
       <!-- Protanopia (Red-blind) Filter -->

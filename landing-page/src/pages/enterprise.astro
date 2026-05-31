@@ -1,0 +1,28 @@
+---
+import "@/styles/global.css";
+import "@/styles/accessibility.css";
+import EnterprisePage from "@/components/EnterprisePage";
+import { Header, Footer } from "@/components/layout/";
+
+const title = "Enterprise - Taskforce";
+const description = "Enterprise-grade project management. SOC 2, ISO 27001, SAML SSO, SCIM, air-gap deployment, and dedicated support.";
+---
+
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+  </head>
+  <body class="min-h-screen bg-[#0a0a0a] font-sans antialiased">
+    <Header client:load />
+    <EnterprisePage client:load />
+    <Footer client:load />
+  </body>
+</html>

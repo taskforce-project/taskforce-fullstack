@@ -1,0 +1,28 @@
+---
+import "@/styles/global.css";
+import "@/styles/accessibility.css";
+import BlogPage from "@/components/BlogPage";
+import { Header, Footer } from "@/components/layout/";
+
+const title = "Blog - Taskforce";
+const description = "Product updates, engineering deep-dives, and how-to guides for teams that want to get more done.";
+---
+
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+  </head>
+  <body class="min-h-screen bg-[#0a0a0a] font-sans antialiased">
+    <Header client:load />
+    <BlogPage client:load />
+    <Footer client:load />
+  </body>
+</html>

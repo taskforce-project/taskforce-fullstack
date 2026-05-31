@@ -1,0 +1,25 @@
+---
+import "@/styles/global.css";
+import "@/styles/accessibility.css";
+import SelfHost from "@/components/SelfHost";
+import { Header, Footer } from "@/components/layout/";
+
+const title = "Self-host Taskforce - Open Source";
+const description = "Deploy Taskforce on your own infrastructure with Docker Compose or Kubernetes. Free, open source under AGPL-3.0.";
+---
+
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  </head>
+  <body class="min-h-screen bg-[#0a0a0a] font-sans antialiased">
+    <Header client:load />
+    <SelfHost client:load />
+    <Footer client:load />
+  </body>
+</html>
