@@ -27,6 +27,7 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class StompAuthInterceptor implements ChannelInterceptor {
 
+    private static final String CHANNEL_SEND_PREFIX = "/app/channel/";
     private static final String CHANNEL_TOPIC_PREFIX = "/topic/channel.";
 
     private final JwtDecoder     jwtDecoder;
@@ -48,6 +49,10 @@ public class StompAuthInterceptor implements ChannelInterceptor {
 
         if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
             authorizeSubscription(accessor);
+        }
+
+        if (StompCommand.SEND.equals(accessor.getCommand())) {
+            authorizeSend(accessor);
         }
 
         return message;
@@ -84,18 +89,52 @@ public class StompAuthInterceptor implements ChannelInterceptor {
         }
 
         try {
-            Long channelId = Long.parseLong(destination.substring(CHANNEL_TOPIC_PREFIX.length()));
-            Long userId = Long.parseLong(accessor.getUser().getName());
-
-            if (!channelMemberRepository.existsById_ChannelIdAndId_UserId(channelId, userId)) {
-                log.warn("STOMP SUBSCRIBE refusé : userId={} n'est pas membre du canal {}", userId, channelId);
-                throw new AccessDeniedException("Accès refusé à ce canal");
-            }
+            assertChannelMembership(parseChannelIdFromTopicDestination(destination), extractUserId(accessor), "SUBSCRIBE");
         } catch (AccessDeniedException e) {
             throw e;
         } catch (Exception e) {
             log.warn("STOMP SUBSCRIBE refusé : destination={} — {}", destination, e.getMessage());
             throw new AccessDeniedException("Souscription STOMP invalide");
         }
+    }
+
+    private void authorizeSend(StompHeaderAccessor accessor) {
+        String destination = accessor.getDestination();
+        if (destination == null || !destination.startsWith(CHANNEL_SEND_PREFIX) || !destination.endsWith("/send")) {
+            return;
+        }
+
+        try {
+            assertChannelMembership(parseChannelIdFromSendDestination(destination), extractUserId(accessor), "SEND");
+        } catch (AccessDeniedException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn("STOMP SEND refusé : destination={} — {}", destination, e.getMessage());
+            throw new AccessDeniedException("Envoi STOMP invalide");
+        }
+    }
+
+    private void assertChannelMembership(Long channelId, Long userId, String commandName) {
+        if (!channelMemberRepository.existsById_ChannelIdAndId_UserId(channelId, userId)) {
+            log.warn("STOMP {} refusé : userId={} n'est pas membre du canal {}", commandName, userId, channelId);
+            throw new AccessDeniedException("Accès refusé à ce canal");
+        }
+    }
+
+    private Long extractUserId(StompHeaderAccessor accessor) {
+        var principal = accessor.getUser();
+        if (principal == null || principal.getName() == null) {
+            throw new AccessDeniedException("Utilisateur STOMP non authentifié");
+        }
+
+        return Long.parseLong(principal.getName());
+    }
+
+    private Long parseChannelIdFromTopicDestination(String destination) {
+        return Long.parseLong(destination, CHANNEL_TOPIC_PREFIX.length(), destination.length(), 10);
+    }
+
+    private Long parseChannelIdFromSendDestination(String destination) {
+        return Long.parseLong(destination, CHANNEL_SEND_PREFIX.length(), destination.length() - "/send".length(), 10);
     }
 }
