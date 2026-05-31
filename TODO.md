@@ -1,377 +1,126 @@
-# 📋 Taskforce — Suivi d'implémentation
+# Taskforce — Backlog actif
 
-> Dernière mise à jour : 2026-05-26  
-> Objectif : 100% d'implémentation + QA + tests
-
----
-
-## Légende
-
-| Icône | Statut |
-|-------|--------|
-| ✅ | Fait |
-| 🔄 | En cours |
-| ⏳ | À faire |
-| 🐛 | Bug identifié en QA |
-| ❌ | Bloqué |
+> Dernière mise à jour : 2026-05-31  
+> Ce fichier ne garde que le reste à faire. Les phases terminées à 100% sont sorties du backlog courant.
 
 ---
 
-## PHASE 1 — Complétion des features scaffoldées (Frontend)
+## Résumé
 
-> Connecter ce qui existe déjà côté backend mais pas encore côté frontend
-
-| # | Tâche | Statut | Notes |
-|---|-------|--------|-------|
-| 1.1 | Connecter `/[workspace]/members` (list, invite, remove) | ✅ | useWorkspaceStore (fetchMembers, invite, kick, changeRole) |
-| 1.2 | Connecter `/[workspace]/teams` (CRUD teams + membres) | ✅ | useTeamStore (fetchTeams, create, delete) |
-| 1.3 | Connecter `/[workspace]/settings` (update nom/logo, delete workspace) | ✅ | useWorkspaceStore + useUserStore |
-| 1.4 | Connecter `/[workspace]/projects/[id]/settings` (update/delete project) | ✅ | useProjectStore (updateProject, archiveProject, deleteProject) |
-| 1.5 | Connecter `/[workspace]/inbox` (notifs réelles via notificationService) | ✅ | useNotificationStore |
-| 1.6 | Connecter `/[workspace]/my-work` (issues assignées au user connecté) | ✅ | useProjectStore + useIssueStore + useCycleStore + useUserStore |
-| 1.7 | Compléter `/[workspace]/projects/[id]/cycles/[cycleId]` (détail + issues) | ✅ | useCycleStore |
+| Bloc | Statut | Notes |
+| --- | --- | --- |
+| Phases 1, 2, 2.5, 3 | ✅ Terminé | Retirées du backlog actif |
+| Correctifs transverses | 🔄 À traiter | Sécurité chat, scope GED, avatars |
+| Phase 4 — IA | ⏳ Priorité haute | Spec figée dans `docs/phase4-ia-architecture.md` |
+| QA manuelle | ⏳ Après Phase 4 | Parcours critiques |
+| Tests automatisés | ⏳ À compléter | Backend + frontend + E2E |
 
 ---
 
-## PHASE 2 — Features manquantes (Backend + Frontend)
-
-### 2A — Messages / Chat
+## Correctifs transverses avant QA finale
 
 | # | Tâche | Statut | Notes |
-|---|-------|--------|-------|
-| 2.1 | Entité `Message` + `Channel` + migration Flyway | ✅ | V28__chat.sql |
-| 2.2 | `MessageService` + `ChannelService` | ✅ | |
-| 2.3 | `MessageController` (CRUD messages, channels) | ✅ | |
-| 2.4 | WebSocket STOMP/SockJS — config + broker | ✅ | RabbitMQ relay + fallback in-memory |
-| 2.5 | `messageService.ts` côté frontend | ✅ | + message-store.ts + use-stomp.ts |
-| 2.6 | Connecter `MessageList`, `MessageInput`, `ChatSidebar` | ✅ | |
-| 2.7 | Temps réel côté frontend (WebSocket client) | ✅ | @stomp/stompjs |
-
-### 2B — Roadmap
-
-| # | Tâche | Statut | Notes |
-|---|-------|--------|-------|
-| 2.8 | Endpoint GET roadmap (issues avec dates start/due par projet) | ✅ | |
-| 2.9 | Connecter `/roadmap` avec vrai Gantt/timeline | ✅ | |
-
-### 2C — Upload fichiers / Pièces jointes
-
-| # | Tâche | Statut | Notes |
-|---|-------|--------|-------|
-| 2.10 | Config stockage (S3 / Minio local) | ✅ | Minio docker + env + application-dev.yml + MinioConfig + MinioService |
-| 2.11 | `AttachmentService` + endpoints upload/download | ✅ | V29__attachments.sql + Attachment entity/repo/DTO + AttachmentController |
-| 2.12 | UI upload dans `IssueSheet` + commentaires | ✅ | Onglet Attachments dans IssueSheet (upload/list/download/delete) |
+| --- | --- | --- | --- |
+| X.1 | Verrouiller les subscriptions STOMP par appartenance au canal | ⏳ | L'auth CONNECT existe, pas le contrôle d'accès sur SUBSCRIBE |
+| X.2 | Vérifier le scope `workspace / project / issue` dans les endpoints attachments | ⏳ | Empêcher l'accès par simple `issueId` ou `attachmentId` |
+| X.3 | Fiabiliser les avatars Minio en multi-origin | ⏳ | URL relative backend à rendre robuste côté frontend |
+| X.4 | Repasser le chat temps réel en revue côté sécurité et fallback | ⏳ | RabbitMQ relay, broker in-memory, erreurs WS |
+| X.5 | QA ciblée GED / avatar / chat avant fermeture du lot | ⏳ | Vérification manuelle avant E2E |
 
 ---
 
-## PHASE 2.5 — Finition & connexion des recoinss de l'app (audit post-Phase 2)
+## Phase 4 — Implémentation IA
 
-> Identifié lors de l'audit complet — à terminer AVANT Phase 3
+> Choix définitif : orchestration métier en Java, service IA interne en Python, stockage vectoriel dans PostgreSQL via pgvector, inférence LLM via Groq.
 
-### 2.5A — IssueSheet (critique)
-
-| # | Tâche | Statut | Notes |
-|---|-------|--------|-------|
-| 2.13 | Connecter mutations `updateIssue()` : status, priority, assignee, title, description, points, cycle, due date | ✅ | API connectée — statuts réels, membres réels, dueDate |
-| 2.14 | Remplacer `TEAM_MEMBERS` hardcodés par vrais membres du projet (API) | ✅ | `listProjectMembers()` + `fetchStatuses()` au chargement |
-| 2.15 | Remplacer `ALL_LABELS` hardcodés par labels du projet (API ou config) | ✅ | Labels CRUD complet : backend (`ProjectLabel`, `PUT /labels/{id}`), `label-service`, `label-store`, section Labels dans settings, issue-sheet utilise le store |
-| 2.16 | Implémenter les commentaires : backend `IssueComment` + `CommentService` + endpoint | ✅ | Déjà implanté en backend |
-| 2.17 | Connecter les commentaires côté frontend (`fetchComments`, `addComment`) | ✅ | CommentsTab avec store réel + delete |
-| 2.18 | Implémenter l'activité (`IssueActivity`) : backend + frontend | ✅ | ActivityTab avec store réel + formatage acteur/valeurs |
-
-### 2.5B — Actions manquantes sur les pages
+### 4A — Infra IA
 
 | # | Tâche | Statut | Notes |
-|---|-------|--------|-------|
-| 2.19 | `create-cycle-dialog.tsx` : remplacer `PROJECTS` hardcodés par `useProjectStore()` | ✅ | `useParams` + `fetchProjects` on open |
-| 2.20 | `discussions/page.tsx` : connecter Pin / Lock / Delete aux actions du store | ✅ | `togglePin`, `toggleLock`, `deleteDiscussion` connectés + store réel |
-| 2.21 | `/[workspace]/issues/page.tsx` : connecter Edit / Assign / Delete sur chaque issue | ✅ | Delete connecté (`deleteIssue`), Edit/Assign laisssés |
-| 2.22 | `/[workspace]/cycles/page.tsx` : connecter View / Edit / Delete sur chaque cycle | ✅ | View → router.push, Delete → `deleteCycle` |
+| --- | --- | --- | --- |
+| 4.1 | Basculer PostgreSQL dev vers une image avec extension pgvector | ⏳ | `pgvector/pgvector:pg18` ou image custom équivalente |
+| 4.2 | Ajouter `CREATE EXTENSION IF NOT EXISTS vector` au bootstrap DB | ⏳ | Init SQL + documentation d'env |
+| 4.3 | Créer le service interne `ai-service` (FastAPI) dans le compose dev | ⏳ | Service non exposé publiquement |
+| 4.4 | Ajouter la config IA (`AI_SERVICE_URL`, `GROQ_*`, `EMBEDDING_MODEL`) | ⏳ | Backend Java + Python |
 
-### 2.5C — Données statiques résiduelles
+### 4B — Modèle de données IA
 
 | # | Tâche | Statut | Notes |
-|---|-------|--------|-------|
-| 2.23 | `settings/page.tsx` : upload avatar via API (Minio déjà dispo) | ✅ | Upload multipart → `POST /api/users/me/avatar` → proxy `/api/files/avatars/{id}` |
-| 2.24 | `analytics/page.tsx` : `CAPACITY_DATA` depuis API (membres + charge réelle) | ✅ | `GET /analytics/capacity` — open issues par membre via `WorkspaceMemberRepository` |
-| 2.25 | `projects/page.tsx` : `RISK_SIGNALS` + `deriveVelocity()` depuis données réelles | ✅ | Dérivé de `totalIssues`, `openIssues`, `updatedAt`, `createdAt` |
-| 2.26 | `messages/page.tsx` : supprimer fallback `MOCK_MESSAGES` quand API opérationnelle | ✅ | Import supprimé, `useState({})` |
+| --- | --- | --- | --- |
+| 4.5 | Migration `ai_documents` + embeddings pgvector | ⏳ | Chunks RAG multi-sources |
+| 4.6 | Migration `member_skill_profiles` + embedding de profil | ⏳ | Compétences et contexte membre |
+| 4.7 | Migration `assignment_events` + feedback d'assignation | ⏳ | Historique pour ranking |
+| 4.8 | Migration `ai_insight_snapshots` + `ai_runs` | ⏳ | Audit, coût, cache, observabilité |
+
+### 4C — Smart Assign
+
+| # | Tâche | Statut | Notes |
+| --- | --- | --- | --- |
+| 4.9 | Implémenter le moteur de décision Java (règles, workload, garde-fous) | ⏳ | Score final décidé côté Spring Boot |
+| 4.10 | Implémenter le scoring sémantique Python (embeddings + cosine) | ⏳ | `sentence-transformers` + pgvector |
+| 4.11 | Ajouter le ranking historique ML dans `ai-service` | ⏳ | V1: LightGBM/XGBoost ou MLP léger |
+| 4.12 | Exposer `POST /api/workspaces/{slug}/projects/{projectId}/issues/{issueId}/smart-assign` | ⏳ | Réponse avec score, explication, alternatives |
+| 4.13 | Remplacer le mock de `SmartAssignPanel` par l'endpoint réel | ⏳ | Supprimer `TEAM_PROFILES` et `setTimeout` |
+
+### 4D — Assistant IA & RAG
+
+| # | Tâche | Statut | Notes |
+| --- | --- | --- | --- |
+| 4.14 | Construire le pipeline d'indexation RAG (issues, pages, discussions, analytics) | ⏳ | Pas de messages chat en V1 |
+| 4.15 | Ajouter le retrieval Python filtré par workspace et source | ⏳ | `top-k` vectoriel + filtres metadata |
+| 4.16 | Exposer `POST /api/workspaces/{slug}/assistant/stream` en SSE | ⏳ | Streaming frontend via backend Java |
+| 4.17 | Connecter `agents/page.tsx` au streaming backend réel | ⏳ | Remplacer l'adapter local mock |
+| 4.18 | Connecter `assistant-fab.tsx` au même backend IA | ⏳ | Un seul runtime réel |
+
+### 4E — AI Insights
+
+| # | Tâche | Statut | Notes |
+| --- | --- | --- | --- |
+| 4.19 | Exposer `GET /api/workspaces/{slug}/analytics/ai-insights` | ⏳ | KPIs + blocages + résumé |
+| 4.20 | Générer et mettre en cache les insights par snapshot | ⏳ | On-demand puis pré-calcul |
+| 4.21 | Brancher dashboard sur les insights réels | ⏳ | Remplacer `AI_INSIGHTS`, `EXCEPTIONS`, `AGENTS` statiques |
+
+### 4F — Qualité & exploitation
+
+| # | Tâche | Statut | Notes |
+| --- | --- | --- | --- |
+| 4.22 | Journaliser prompts, coûts, latence, fallback, score final | ⏳ | `ai_runs` + logs applicatifs |
+| 4.23 | Ajouter feature flags IA (`enabled`, `smartAssign`, `assistant`, `insights`) | ⏳ | Désactivation granulaire |
+| 4.24 | Ajouter garde-fous de quota et timeout | ⏳ | Groq, ai-service, vector search |
+| 4.25 | Ajouter dataset de seed / fixtures pour tests IA | ⏳ | Démo locale reproductible |
 
 ---
 
-## PHASE 3 — Intégrations tierces
+## QA manuelle
 
-### 3A — GitHub
-
-| # | Tâche | Statut | Notes |
-|---|-------|--------|-------|
-| 3.1 | Entité `Integration` + migration Flyway | ✅ | V30__integrations.sql |
-| 3.2 | `GitHubIntegrationService` (OAuth App, repos, branches, PRs) | ✅ | |
-| 3.3 | Endpoint `/integrations/github/connect` (redirect OAuth) | ✅ | |
-| 3.4 | Endpoint `/integrations/github/callback` (code → token) | ✅ | PUBLIC_MATCHERS |
-| 3.5 | Lier PR/commit à une issue (`IssueGitHubLink`) | ✅ | |
-| 3.6 | Page settings intégrations + bouton "Connect GitHub" | ✅ | |
-| 3.7 | Afficher PRs/commits liés dans le détail d'une issue | ✅ | Tab GitHub dans IssueSheet |
-
-### 3B — Slack
-
-| # | Tâche | Statut | Notes |
-|---|-------|--------|-------|
-| 3.8 | `SlackIntegrationService` (OAuth, envoyer notifs) | ✅ | |
-| 3.9 | Endpoint `/integrations/slack/connect` + callback | ✅ | |
-| 3.10 | Config canal Slack par workspace (quel channel reçoit quoi) | ✅ | |
-| 3.11 | Bouton "Connect Slack" dans settings + config canaux | ✅ | IntegrationsPanel |
-
-### 3C — Webhooks génériques
-
-| # | Tâche | Statut | Notes |
-|---|-------|--------|-------|
-| 3.12 | `WebhookService` — events HTTP sortants | ✅ | @Async |
-| 3.13 | CRUD webhooks dans settings workspace | ✅ | IntegrationsPanel |
+| # | Scénario | Statut | Notes |
+| --- | --- | --- | --- |
+| QA.1 | Smart Assign sur issue backend / frontend / ops / no-label | ⏳ | Vérifier ranking, fallback et alternatives |
+| QA.2 | Assistant IA sur workspace réel | ⏳ | Streaming, citations, filtres de scope |
+| QA.3 | AI Insights dashboard | ⏳ | Cohérence avec les analytics réelles |
+| QA.4 | Chat temps réel après durcissement sécurité | ⏳ | SUBSCRIBE, SEND, reconnect |
+| QA.5 | Upload pièce jointe + suppression + téléchargement | ⏳ | Scope, Minio, droits |
+| QA.6 | Avatar utilisateur uploadé et affiché partout | ⏳ | Frontend, sidebar, settings |
 
 ---
 
-## PHASE 4 — Smart Assign / IA
+## Tests automatisés
 
 | # | Tâche | Statut | Notes |
-|---|-------|--------|-------|
-| 4.1 | Algorithme Smart Assign (charge, compétence, historique) | ⏳ | `TEAM_PROFILES` fictifs + setTimeout actuellement |
-| 4.2 | Endpoint `POST /issues/{id}/smart-assign` | ⏳ | |
-| 4.3 | Connecter `SmartAssignPanel` à l'endpoint réel | ⏳ | |
-| 4.4 | CommandPalette / Assistant IA (intégration LLM) | ⏳ | |
-| 4.5 | `agents/page.tsx` : remplacer adapter mock par vrai backend IA | ⏳ | Streaming via setTimeout actuellement |
-| 4.6 | `dashboard/page.tsx` : `AI_INSIGHTS`, `EXCEPTIONS`, `AGENTS` depuis API | ⏳ | Tout statique actuellement |
+| --- | --- | --- | --- |
+| T.1 | Tests unitaires moteur Smart Assign Java | ⏳ | Pondérations, hard rules, fallback |
+| T.2 | Tests Python `ai-service` (embeddings, retrieval, ranking) | ⏳ | FastAPI + pytest |
+| T.3 | Tests controllers IA backend | ⏳ | Smart Assign, Assistant SSE, Insights |
+| T.4 | Tests frontend `SmartAssignPanel` et assistant runtime | ⏳ | Vitest + RTL |
+| T.5 | Tests intégration pgvector / migrations | ⏳ | DB dev avec extension vector |
+| T.6 | E2E Playwright sur parcours IA critiques | ⏳ | Smart Assign, assistant, insights |
 
 ---
 
-## PHASE QA — Tests manuels
+## Ordre d'exécution recommandé
 
-> À remplir au fil des tests
-
-| # | Scénario | Statut | Bugs trouvés |
-|---|----------|--------|--------------|
-| QA-1 | Inscription complète (3 étapes) | ⏳ | |
-| QA-2 | Login / logout / refresh token | ⏳ | |
-| QA-3 | Reset password | ⏳ | |
-| QA-4 | Créer workspace, inviter membre | ⏳ | |
-| QA-5 | Créer projet, modifier, supprimer | ⏳ | |
-| QA-6 | CRUD issues (assigner, statut, commentaires, relations) | ⏳ | |
-| QA-7 | Créer cycle, assigner issues, fermer cycle | ⏳ | |
-| QA-8 | Analytics (KPIs, burndown, velocity) | ⏳ | |
-| QA-9 | Discussions (créer, commenter, pin, lock) | ⏳ | |
-| QA-10 | Notifications (réception, lecture) | ⏳ | |
-| QA-11 | Profil utilisateur (modifier, avatar) | ⏳ | |
-| QA-12 | Paiement Stripe (mode test) | ⏳ | |
-| QA-13 | Navigation mobile / responsive | ⏳ | |
-| QA-14 | Intégration GitHub | ⏳ | |
-| QA-15 | Intégration Slack | ⏳ | |
-| QA-16 | Messages / Chat | ⏳ | |
-| QA-17 | Roadmap (timeline) | ⏳ | |
-| QA-18 | Upload pièce jointe sur une issue | ⏳ | |
-
----
-
-## PHASE Fix — Bugs QA
-
-> Rempli après les sessions de test
-
-| # | Description | Sévérité | Statut | Lié à |
-|---|-------------|----------|--------|-------|
-| — | *à compléter après QA* | — | — | — |
-
----
-
-## PHASE 5 — Tests automatisés
-
-| # | Tâche | Statut | Notes |
-|---|-------|--------|-------|
-| 5.1 | Tests unitaires : `IssueService`, `ProjectService`, `WorkspaceService` | ⏳ | |
-| 5.2 | Tests unitaires : `CycleService`, `DiscussionService`, `PageService` | ⏳ | |
-| 5.3 | Tests unitaires : `AnalyticsService`, `NotificationService` | ⏳ | |
-| 5.4 | Tests controllers (`@WebMvcTest`) endpoints critiques | ⏳ | |
-| 5.5 | Tests frontend composants clés (LoginForm, RegisterForm, IssueSheet) | ⏳ | |
-| 5.6 | Tests E2E Playwright sur scénarios QA critiques | ⏳ | |
-
----
-
-## Avancement global
-
-| Phase | Progression | Statut |
-|-------|------------|--------|
-| Phase 1 — Features scaffoldées | 7 / 7 | ✅ |
-| Phase 2 — Features manquantes | 12 / 12 | ✅ |
-| Phase 2.5 — Finition recoinss (audit) | 14 / 14 | ✅ |
-| Phase 3 — Intégrations | 13 / 13 | ✅ |
-| Phase 4 — Smart Assign / IA | 0 / 6 | ⏳ |
-| Phase QA — Tests manuels | 0 / 18 | ⏳ |
-| Phase Fix — Bugs | 0 | ⏳ |
-| Phase 5 — Tests automatisés | 0 / 6 | ⏳ |
-| **TOTAL** | **46 / 76** | 🔄 |
-
-
----
-
-## Légende
-
-| Icône | Statut |
-|-------|--------|
-| ✅ | Fait |
-| 🔄 | En cours |
-| ⏳ | À faire |
-| 🐛 | Bug identifié en QA |
-| ❌ | Bloqué |
-
----
-
-## PHASE 1 — Complétion des features scaffoldées (Frontend)
-
-> Connecter ce qui existe déjà côté backend mais pas encore côté frontend
-
-| # | Tâche | Statut | Notes |
-|---|-------|--------|-------|
-| 1.1 | Connecter `/[workspace]/members` (list, invite, remove) | ✅ | useWorkspaceStore (fetchMembers, invite, kick, changeRole) |
-| 1.2 | Connecter `/[workspace]/teams` (CRUD teams + membres) | ✅ | useTeamStore (fetchTeams, create, delete) |
-| 1.3 | Connecter `/[workspace]/settings` (update nom/logo, delete workspace) | ✅ | useWorkspaceStore + useUserStore |
-| 1.4 | Connecter `/[workspace]/projects/[id]/settings` (update/delete project) | ✅ | useProjectStore (updateProject, archiveProject, deleteProject) |
-| 1.5 | Connecter `/[workspace]/inbox` (notifs réelles via notificationService) | ✅ | useNotificationStore |
-| 1.6 | Connecter `/[workspace]/my-work` (issues assignées au user connecté) | ✅ | useProjectStore + useIssueStore + useCycleStore + useUserStore |
-| 1.7 | Compléter `/[workspace]/projects/[id]/cycles/[cycleId]` (détail + issues) | ✅ | useCycleStore |
-
----
-
-## PHASE 2 — Features manquantes (Backend + Frontend)
-
-### 2A — Messages / Chat
-
-| # | Tâche | Statut | Notes |
-|---|-------|--------|-------|
-| 2.1 | Entité `Message` + `Channel` + migration Flyway | ✅ | V28__chat.sql |
-| 2.2 | `MessageService` + `ChannelService` | ✅ | |
-| 2.3 | `MessageController` (CRUD messages, channels) | ✅ | |
-| 2.4 | WebSocket STOMP/SockJS — config + broker | ✅ | RabbitMQ relay + fallback in-memory |
-| 2.5 | `messageService.ts` côté frontend | ✅ | + message-store.ts + use-stomp.ts |
-| 2.6 | Connecter `MessageList`, `MessageInput`, `ChatSidebar` | ✅ | |
-| 2.7 | Temps réel côté frontend (WebSocket client) | ✅ | @stomp/stompjs |
-
-### 2B — Roadmap
-
-| # | Tâche | Statut | Notes |
-|---|-------|--------|-------|
-| 2.8 | Endpoint GET roadmap (issues avec dates start/due par projet) | ✅ | |
-| 2.9 | Connecter `/roadmap` avec vrai Gantt/timeline | ✅ | |
-
-### 2C — Upload fichiers / Pièces jointes
-
-| # | Tâche | Statut | Notes |
-|---|-------|--------|-------|
-| 2.10 | Config stockage (S3 / Minio local) | ✅ | Minio docker + env + application-dev.yml + MinioConfig + MinioService |
-| 2.11 | `AttachmentService` + endpoints upload/download | ✅ | V29__attachments.sql + Attachment entity/repo/DTO + AttachmentController |
-| 2.12 | UI upload dans `IssueSheet` + commentaires | ✅ | Onglet Attachments dans IssueSheet (upload/list/download/delete) |
-
----
-
-## PHASE 3 — Intégrations tierces
-
-### 3A — GitHub
-
-| # | Tâche | Statut | Notes |
-|---|-------|--------|-------|
-| 3.1 | Entité `Integration` + migration Flyway | ✅ | V30__integrations.sql |
-| 3.2 | `GitHubIntegrationService` (OAuth App, repos, branches, PRs) | ✅ | |
-| 3.3 | Endpoint `/integrations/github/connect` (redirect OAuth) | ✅ | |
-| 3.4 | Endpoint `/integrations/github/callback` (code → token) | ✅ | PUBLIC_MATCHERS |
-| 3.5 | Lier PR/commit à une issue (`IssueGitHubLink`) | ✅ | |
-| 3.6 | Page settings intégrations + bouton "Connect GitHub" | ✅ | |
-| 3.7 | Afficher PRs/commits liés dans le détail d'une issue | ✅ | Tab GitHub dans IssueSheet |
-
-### 3B — Slack
-
-| # | Tâche | Statut | Notes |
-|---|-------|--------|-------|
-| 3.8 | `SlackIntegrationService` (OAuth, envoyer notifs) | ✅ | |
-| 3.9 | Endpoint `/integrations/slack/connect` + callback | ✅ | |
-| 3.10 | Config canal Slack par workspace (quel channel reçoit quoi) | ✅ | |
-| 3.11 | Bouton "Connect Slack" dans settings + config canaux | ✅ | IntegrationsPanel |
-
-### 3C — Webhooks génériques
-
-| # | Tâche | Statut | Notes |
-|---|-------|--------|-------|
-| 3.12 | `WebhookService` — events HTTP sortants | ✅ | @Async |
-| 3.13 | CRUD webhooks dans settings workspace | ✅ | IntegrationsPanel |
-
----
-
-## PHASE 4 — Smart Assign / IA
-
-| # | Tâche | Statut | Notes |
-|---|-------|--------|-------|
-| 4.1 | Algorithme Smart Assign (charge, compétence, historique) | ⏳ | |
-| 4.2 | Endpoint `POST /issues/{id}/smart-assign` | ⏳ | |
-| 4.3 | Connecter `SmartAssignPanel` à l'endpoint réel | ⏳ | |
-| 4.4 | CommandPalette / Assistant IA (intégration LLM) | ⏳ | |
-
----
-
-## PHASE QA — Tests manuels
-
-> À remplir au fil des tests
-
-| # | Scénario | Statut | Bugs trouvés |
-|---|----------|--------|--------------|
-| QA-1 | Inscription complète (3 étapes) | ⏳ | |
-| QA-2 | Login / logout / refresh token | ⏳ | |
-| QA-3 | Reset password | ⏳ | |
-| QA-4 | Créer workspace, inviter membre | ⏳ | |
-| QA-5 | Créer projet, modifier, supprimer | ⏳ | |
-| QA-6 | CRUD issues (assigner, statut, commentaires, relations) | ⏳ | |
-| QA-7 | Créer cycle, assigner issues, fermer cycle | ⏳ | |
-| QA-8 | Analytics (KPIs, burndown, velocity) | ⏳ | |
-| QA-9 | Discussions (créer, commenter, pin, lock) | ⏳ | |
-| QA-10 | Notifications (réception, lecture) | ⏳ | |
-| QA-11 | Profil utilisateur (modifier, avatar) | ⏳ | |
-| QA-12 | Paiement Stripe (mode test) | ⏳ | |
-| QA-13 | Navigation mobile / responsive | ⏳ | |
-| QA-14 | Intégration GitHub | ⏳ | |
-| QA-15 | Intégration Slack | ⏳ | |
-| QA-16 | Messages / Chat | ⏳ | |
-| QA-17 | Roadmap (timeline) | ⏳ | |
-| QA-18 | Upload pièce jointe sur une issue | ⏳ | |
-
----
-
-## PHASE Fix — Bugs QA
-
-> Rempli après les sessions de test
-
-| # | Description | Sévérité | Statut | Lié à |
-|---|-------------|----------|--------|-------|
-| — | *à compléter après QA* | — | — | — |
-
----
-
-## PHASE 5 — Tests automatisés
-
-| # | Tâche | Statut | Notes |
-|---|-------|--------|-------|
-| 5.1 | Tests unitaires : `IssueService`, `ProjectService`, `WorkspaceService` | ⏳ | |
-| 5.2 | Tests unitaires : `CycleService`, `DiscussionService`, `PageService` | ⏳ | |
-| 5.3 | Tests unitaires : `AnalyticsService`, `NotificationService` | ⏳ | |
-| 5.4 | Tests controllers (`@WebMvcTest`) endpoints critiques | ⏳ | |
-| 5.5 | Tests frontend composants clés (LoginForm, RegisterForm, IssueSheet) | ⏳ | |
-| 5.6 | Tests E2E Playwright sur scénarios QA critiques | ⏳ | |
-
----
-
-## Avancement global
-
-| Phase | Progression | Statut |
-|-------|------------|--------|
-| Phase 1 — Features scaffoldées | 0 / 7 | ⏳ |
-| Phase 2 — Features manquantes | 0 / 13 | ⏳ |
-| Phase 3 — Intégrations | 0 / 13 | ⏳ |
-| Phase 4 — Smart Assign / IA | 0 / 4 | ⏳ |
-| Phase QA — Tests manuels | 0 / 18 | ⏳ |
-| Phase Fix — Bugs | 0 | ⏳ |
-| Phase 5 — Tests automatisés | 0 / 6 | ⏳ |
-| **TOTAL** | **0 / 61** | ⏳ |
+1. Corriger X.1 à X.3.
+2. Livrer 4.1 à 4.8 pour poser le socle IA.
+3. Implémenter Smart Assign 4.9 à 4.13.
+4. Implémenter Assistant et RAG 4.14 à 4.18.
+5. Implémenter AI Insights 4.19 à 4.21.
+6. Fermer qualité, QA et tests automatiques.
