@@ -4,6 +4,7 @@ import com.taskforce.tf_api.core.dto.request.UpdateUserRequest;
 import com.taskforce.tf_api.core.dto.response.UserResponse;
 import com.taskforce.tf_api.core.service.UserService;
 import com.taskforce.tf_api.shared.dto.ApiResponse;
+import com.taskforce.tf_api.shared.security.JwtIdentityResolver;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +33,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class UserController {
 
     private final UserService userService;
+    private final JwtIdentityResolver identityResolver;
 
     /**
      * Retourne le profil complet de l'utilisateur authentifié.
@@ -41,7 +43,7 @@ public class UserController {
     public ResponseEntity<ApiResponse<UserResponse>> getMe(
         @AuthenticationPrincipal Jwt jwt
     ) {
-        String email = jwt.getClaim("sub");
+        String email = identityResolver.resolveEmail(jwt);
         log.debug("GET /api/users/me — email={}", email);
         UserResponse response = userService.getByEmail(email);
         return ResponseEntity.ok(ApiResponse.success("Utilisateur récupéré", response));
@@ -56,7 +58,7 @@ public class UserController {
         @AuthenticationPrincipal Jwt jwt,
         @Valid @RequestBody UpdateUserRequest request
     ) {
-        String email = jwt.getClaim("sub");
+        String email = identityResolver.resolveEmail(jwt);
         log.debug("PATCH /api/users/me — email={}", email);
         UserResponse response = userService.updateUserByEmail(email, request);
         return ResponseEntity.ok(ApiResponse.success("Profil mis à jour", response));
@@ -71,7 +73,7 @@ public class UserController {
         @RequestParam("file") MultipartFile file,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        String email = jwt.getClaim("sub");
+        String email = identityResolver.resolveEmail(jwt);
         log.debug("POST /api/users/me/avatar — email={}", email);
         UserResponse response = userService.uploadAvatar(email, file);
         return ResponseEntity.ok(ApiResponse.success("Avatar mis à jour", response));
