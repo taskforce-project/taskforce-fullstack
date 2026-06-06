@@ -182,7 +182,7 @@ public class IntegrationController {
     // ====================================================================
 
     private User resolveUser(Jwt jwt) {
-        String email = jwt.getClaim("sub");
+        String email = jwt.getClaimAsString("email");
         return userRepository.findByEmail(email)
             .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
     }
