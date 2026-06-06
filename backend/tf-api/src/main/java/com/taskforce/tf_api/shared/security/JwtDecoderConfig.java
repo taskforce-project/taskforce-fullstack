@@ -12,17 +12,14 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
 /**
- * Configure le décodeur JWT pour Spring Security.
+ * Décodeur JWT HMAC optionnel (legacy).
  *
- * Le backend émet ses propres tokens signés en HS512 (via JwtService).
- * Spring Security doit valider ces tokens avec la même clé secrète,
- * et NON pas via le JWKS Keycloak (RS256).
- *
- * Actif uniquement quand keycloak.enabled=true (sinon la filter chain
- * est en permitAll et ce décodeur n'est pas utilisé).
+ * En mode Keycloak (resource server), Spring doit utiliser le décodeur
+ * auto-configuré depuis issuer-uri/jwk-set-uri (RS256). Ce bean ne doit
+ * donc pas être actif par défaut pour éviter d'écraser la config Keycloak.
  */
 @Configuration
-@ConditionalOnProperty(name = "keycloak.enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(name = "jwt.hmac-decoder.enabled", havingValue = "true")
 public class JwtDecoderConfig {
 
     @Value("${jwt.secret:myVerySecretKeyForJWTTokenGenerationThatIsLongEnough}")
