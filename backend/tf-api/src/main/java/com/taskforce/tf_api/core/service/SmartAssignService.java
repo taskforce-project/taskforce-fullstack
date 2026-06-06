@@ -7,16 +7,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestTemplate;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -51,14 +46,11 @@ public class SmartAssignService {
     private final ProjectRepository projectRepository;
     private final ProjectMemberRepository projectMemberRepository;
     private final IssueRepository issueRepository;
-    private final RestTemplate restTemplate;
+    private final GroqService groqService;
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
 
-    @Value("${ai.service-url:http://localhost:8000}")
-    private String aiServiceUrl;
-
-    @Value("${ai.groq.model:llama-3.1-8b-instant}")
+    @Value("${ai.groq.smart-assign-model:llama-3.1-8b-instant}")
     private String modelName;
 
     @Transactional(readOnly = true)
@@ -97,11 +89,10 @@ public class SmartAssignService {
         boolean fallbackUsed = false;
 
         try {
-            semanticScores = fetchSemanticScores(issueText, candidates, metricsByUser);
-            historicalScores = fetchHistoricalScores(candidates, metricsByUser);
+            semanticScores = fetchGroqScores(issueText, issue, candidates, metricsByUser);
         } catch (Exception ex) {
             fallbackUsed = true;
-            log.warn("Smart assign AI fallback triggered: {}", ex.getMessage());
+            log.warn("Smart assign Groq fallback triggered: {}", ex.getMessage());
         }
 
         List<SmartAssignCandidateResponse> ranked = rankCandidates(candidates, metricsByUser, semanticScores, historicalScores);
@@ -236,92 +227,57 @@ public class SmartAssignService {
         return rows.isEmpty() ? new HistoryStats(0, 0.0, 0.0) : rows.getFirst();
     }
 
-    @SuppressWarnings("unchecked")
-    private Map<Long, Double> fetchSemanticScores(String issueText, List<User> candidates, Map<Long, CandidateMetrics> metricsByUser) {
-        List<Map<String, Object>> payloadCandidates = candidates.stream()
-            .map(u -> {
-                CandidateMetrics m = metricsByUser.get(u.getId());
-                String candidateText = String.format(
-                    "%s %s skills:%s",
-                    Objects.toString(u.getDisplayName(), u.getEmail()),
-                    u.getEmail(),
-                    String.join(",", m.profileSkills())
-                );
-                return Map.<String, Object>of(
-                    "candidate_id", u.getId(),
-                    "text", candidateText
-                );
-            })
-            .toList();
+    /**
+     * Envoie l'issue + les candidats pré-filtrés à Groq et récupère un score
+     * sémantique (0.0-1.0) pour chaque candidat.
+     *
+     * Le LLM retourne un JSON de la forme :
+     * { "scores": [ { "candidate_id": 42, "score": 0.87, "reason": "..." }, ... ] }
+     */
+    private Map<Long, Double> fetchGroqScores(String issueText, Issue issue,
+                                               List<User> candidates,
+                                               Map<Long, CandidateMetrics> metricsByUser) {
+        String systemPrompt = """
+            You are a project management assistant.
+            Given an issue and a list of team members, score each candidate
+            on their suitability to be assigned this issue (score between 0.0 and 1.0).
+            Consider their skills, current workload, and past performance.
+            Respond ONLY with valid JSON in this exact format:
+            {"scores":[{"candidate_id":1,"score":0.85,"reason":"Short explanation"},{...}]}
+            """;
 
-        Map<String, Object> payload = Map.of(
-            "issue_text", issueText,
-            "candidates", payloadCandidates
-        );
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        HttpEntity<Map<String, Object>> request = new HttpEntity<>(payload, headers);
-
-        Map<String, Object> response = restTemplate.postForObject(
-            aiServiceUrl + "/v1/smart-assign/semantic-score",
-            request,
-            Map.class
-        );
-
-        if (response == null || !response.containsKey("scores")) {
-            return Collections.emptyMap();
+        StringBuilder userMsg = new StringBuilder();
+        userMsg.append("Issue: ").append(issueText).append("\n");
+        userMsg.append("Priority: ").append(issue.getPriority()).append("\n\n");
+        userMsg.append("Team members:\n");
+        for (User u : candidates) {
+            CandidateMetrics m = metricsByUser.get(u.getId());
+            userMsg.append(String.format(
+                "- id:%d name:%s skills:%s openIssues:%d acceptRate:%.0f%%\n",
+                u.getId(),
+                Objects.toString(u.getDisplayName(), u.getEmail()),
+                String.join(",", m.profileSkills()),
+                m.openIssues(),
+                m.historyStats().acceptedRate() * 100
+            ));
         }
 
-        List<Map<String, Object>> scores = (List<Map<String, Object>>) response.get("scores");
-        return scores.stream().collect(Collectors.toMap(
-            s -> Long.valueOf(String.valueOf(s.get("candidate_id"))),
-            s -> Double.valueOf(String.valueOf(s.get("score"))),
-            (a, b) -> a
-        ));
-    }
+        String raw = groqService.chatCompletion(modelName, systemPrompt, userMsg.toString(), true);
 
-    @SuppressWarnings("unchecked")
-    private Map<Long, Double> fetchHistoricalScores(List<User> candidates, Map<Long, CandidateMetrics> metricsByUser) {
-        List<Map<String, Object>> payloadCandidates = candidates.stream()
-            .map(u -> {
-                CandidateMetrics m = metricsByUser.get(u.getId());
-                return Map.<String, Object>of(
-                    "candidate_id", u.getId(),
-                    "features", Map.of(
-                        "past_assignments", m.historyStats().totalAssignments(),
-                        "accepted_rate", m.historyStats().acceptedRate(),
-                        "resolved_rate", m.historyStats().resolvedRate(),
-                        "workload_score", m.workloadScore(),
-                        "availability", m.availability(),
-                        "label_match_score", m.labelScore()
-                    )
-                );
-            })
-            .toList();
-
-        Map<String, Object> payload = Map.of("candidates", payloadCandidates);
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        HttpEntity<Map<String, Object>> request = new HttpEntity<>(payload, headers);
-
-        Map<String, Object> response = restTemplate.postForObject(
-            aiServiceUrl + "/v1/smart-assign/history-rank",
-            request,
-            Map.class
-        );
-
-        if (response == null || !response.containsKey("scores")) {
+        try {
+            JsonNode root   = objectMapper.readTree(raw);
+            JsonNode scores = root.path("scores");
+            Map<Long, Double> result = new LinkedHashMap<>();
+            for (JsonNode node : scores) {
+                long   candidateId = node.path("candidate_id").asLong();
+                double score       = node.path("score").asDouble(0.0);
+                result.put(candidateId, Math.min(1.0, Math.max(0.0, score)));
+            }
+            return result;
+        } catch (Exception ex) {
+            log.warn("Cannot parse Groq scores response: {}", ex.getMessage());
             return Collections.emptyMap();
         }
-
-        List<Map<String, Object>> scores = (List<Map<String, Object>>) response.get("scores");
-        return scores.stream().collect(Collectors.toMap(
-            s -> Long.valueOf(String.valueOf(s.get("candidate_id"))),
-            s -> Double.valueOf(String.valueOf(s.get("score"))),
-            (a, b) -> a
-        ));
     }
 
     private List<SmartAssignCandidateResponse> rankCandidates(
@@ -333,16 +289,15 @@ public class SmartAssignService {
         return candidates.stream()
             .map(u -> {
                 CandidateMetrics m = metricsByUser.get(u.getId());
+                // semanticScores contient le score Groq qui intègre déjà sémantique + historique
                 int semantic = toScore(semanticScores.getOrDefault(u.getId(), 0.0));
-                int historical = toScore(historicalScores.getOrDefault(u.getId(), 0.0));
 
                 int finalScore = clamp(
                     (int) Math.round(
-                        semantic * 0.45
-                            + m.workloadScore() * 0.2
-                            + m.availability() * 0.15
-                            + m.labelScore() * 0.1
-                            + historical * 0.1
+                        semantic    * 0.55
+                            + m.workloadScore()  * 0.25
+                            + m.availability()   * 0.15
+                            + m.labelScore()     * 0.05
                     )
                 );
 
