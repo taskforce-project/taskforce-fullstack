@@ -4,12 +4,13 @@ import {
   useState, useRef, useCallback, createContext,
   useContext, useMemo,
 } from "react"
+import { useParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   useLocalRuntime, AssistantRuntimeProvider,
   ThreadPrimitive, MessagePrimitive,
   useThreadRuntime, useThread,
-  type ChatModelAdapter, type ChatModelRunOptions,
+  type ChatModelAdapter,
 } from "@assistant-ui/react"
 import {
   Plus, Send, ArrowLeft, Activity,
@@ -144,27 +145,73 @@ const AGENTS: Agent[] = [
   },
 ]
 
-// ─── Mock adapter ─────────────────────────────────────────────────────────────
+// ─── API adapter (Groq via backend SSE) ──────────────────────────────────────
 
-function getAgentResponse(agentId: AgentId, messages: ChatModelRunOptions["messages"]): string {
-  const agent   = AGENTS.find(a => a.id === agentId) ?? AGENTS[2]
-  const userCnt = messages.filter(m => m.role === "user").length
-  return agent.responses[Math.max(0, userCnt - 1) % agent.responses.length]
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
+
+function getLastUserMessage(messages: { role: string; content: unknown[] }[]): string {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i]
+    if (msg.role === "user") {
+      const parts = msg.content as { type: string; text?: string }[]
+      return parts.map(p => p.text ?? "").join(" ")
+    }
+  }
+  return ""
 }
 
-function createAdapter(agentId: AgentId): ChatModelAdapter {
+function createAdapter(workspaceSlug: string, agentPersona: string): ChatModelAdapter {
   return {
     async *run({ messages, abortSignal }) {
-      await new Promise<void>(r => setTimeout(r, 400))
-      if (abortSignal.aborted) return
-      const text  = getAgentResponse(agentId, messages)
-      const words = text.split(" ")
-      let acc = ""
-      for (const word of words) {
-        if (abortSignal.aborted) return
-        acc += (acc ? " " : "") + word
-        yield { content: [{ type: "text" as const, text: acc }] }
-        await new Promise<void>(r => setTimeout(r, 25))
+      const userMessage = getLastUserMessage(
+        messages as { role: string; content: { type: string; text?: string }[] }[]
+      )
+      const prompt = agentPersona
+        ? `[You are the ${agentPersona}] ${userMessage}`
+        : userMessage
+
+      // Récupérer le token JWT depuis le localStorage (pattern du projet)
+      const token = typeof window !== "undefined"
+        ? (localStorage.getItem("access_token") ?? "")
+        : ""
+
+      const res = await fetch(
+        `${API_BASE}/api/workspaces/${workspaceSlug}/assistant`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "text/event-stream",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ message: prompt }),
+          signal: abortSignal,
+        }
+      )
+
+      if (!res.ok || !res.body) {
+        throw new Error(`Assistant API error: ${res.status}`)
+      }
+
+      const reader  = res.body.getReader()
+      const decoder = new TextDecoder()
+      let   acc     = ""
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const text = decoder.decode(value, { stream: true })
+        // Parse SSE lines: "data: ..."
+        for (const line of text.split("\n")) {
+          if (!line.startsWith("data:")) continue
+          const data = line.slice(5).trim()
+          if (data === "[DONE]") break
+          if (data) {
+            acc += data
+            yield { content: [{ type: "text" as const, text: acc }] }
+          }
+        }
       }
     },
   }
@@ -303,8 +350,11 @@ function ComposerInput({ placeholder }: { placeholder: string }) {
 
 // ─── Agent Thread ─────────────────────────────────────────────────────────────
 
-function AgentThread({ agent, visible }: { agent: Agent; visible: boolean }) {
-  const adapter = useMemo(() => createAdapter(agent.id), [agent.id])
+function AgentThread({ agent, visible, workspaceSlug }: { agent: Agent; visible: boolean; workspaceSlug: string }) {
+  const adapter = useMemo(
+    () => createAdapter(workspaceSlug, `${agent.title} (${agent.role})`),
+    [workspaceSlug, agent.title, agent.role]
+  )
   const runtime = useLocalRuntime(adapter)
   return (
     <div className={cn("flex flex-col h-full", visible ? "flex" : "hidden")}>
@@ -404,6 +454,8 @@ function OverviewCard({ agent, onSelect }: { agent: Agent; onSelect: () => void 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function AgentsPage() {
+  const params = useParams()
+  const workspaceSlug = params.workspace as string
   const [selectedId, setSelectedId] = useState<AgentId | null>(null)
   const [mode, setMode] = useState<Mode>("overview")
   const selectedAgent = selectedId ? AGENTS.find(a => a.id === selectedId) ?? null : null
@@ -571,7 +623,7 @@ export default function AgentsPage() {
                 transition={{ duration: 0.18 }}
                 className="h-full">
                 {AGENTS.map(agent => (
-                  <AgentThread key={agent.id} agent={agent} visible={agent.id === selectedId} />
+                  <AgentThread key={agent.id} agent={agent} visible={agent.id === selectedId} workspaceSlug={workspaceSlug} />
                 ))}
               </motion.div>
             )}
