@@ -35,6 +35,7 @@ import com.taskforce.tf_api.core.service.IssueService;
 import com.taskforce.tf_api.core.service.SmartAssignService;
 import com.taskforce.tf_api.shared.dto.ApiResponse;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
+import com.taskforce.tf_api.shared.security.JwtIdentityResolver;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -54,6 +55,7 @@ public class IssueController {
     private final IssueService   issueService;
     private final SmartAssignService smartAssignService;
     private final UserRepository userRepository;
+    private final JwtIdentityResolver identityResolver;
 
     // =========================================================================
     // Issues
@@ -341,8 +343,9 @@ public class IssueController {
     // =========================================================================
 
     private Long resolveUserId(Jwt jwt) {
-        String keycloakId = jwt.getSubject();
-        User user = userRepository.findByKeycloakId(keycloakId)
+        String email = identityResolver.resolveEmail(jwt);
+
+        User user = userRepository.findByEmail(email)
             .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
         return user.getId();
     }
