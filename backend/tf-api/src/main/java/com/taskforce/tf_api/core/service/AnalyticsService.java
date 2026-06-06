@@ -8,8 +8,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.taskforce.tf_api.core.dto.response.AiInsightResponse;
 import com.taskforce.tf_api.core.dto.response.AnalyticsKpisResponse;
 import com.taskforce.tf_api.core.dto.response.BurndownPointResponse;
 import com.taskforce.tf_api.core.dto.response.MemberCapacityResponse;
@@ -39,6 +43,11 @@ public class AnalyticsService {
     private final IssueRepository            issueRepository;
     private final CycleRepository            cycleRepository;
     private final CycleIssueRepository       cycleIssueRepository;
+    private final GroqService                groqService;
+    private final ObjectMapper               objectMapper;
+
+    @Value("${ai.groq.assistant-model:llama-3.3-70b-versatile}")
+    private String assistantModel;
 
     // -------------------------------------------------------------------------
     // KPIs
@@ -180,6 +189,86 @@ public class AnalyticsService {
                 openCounts.getOrDefault(m.getUser().getId(), 0L)
             ))
             .toList();
+    }
+
+    // -------------------------------------------------------------------------
+    // AI Insights (Groq)
+    // -------------------------------------------------------------------------
+
+    public List<AiInsightResponse> generateInsights(String slug) {
+        Workspace ws = findWorkspace(slug);
+        List<Long> projectIds = getProjectIds(ws.getId());
+
+        // Build context for the LLM
+        long memberCount = workspaceMemberRepository.findByWorkspaceId(ws.getId()).size();
+        long projectCount = projectIds.size();
+
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime w0  = now.minusDays(7);
+        LocalDateTime w1  = w0.minusDays(7);
+        LocalDateTime m0  = now.withDayOfMonth(1).truncatedTo(ChronoUnit.DAYS);
+
+        long openIssues    = projectIds.stream()
+            .mapToLong(issueRepository::countOpenIssues)
+            .sum();
+        long resolvedMonth = projectIds.isEmpty() ? 0 : issueRepository.countCompletedBetween(projectIds, m0, now);
+        long velocityThis  = projectIds.isEmpty() ? 0 : issueRepository.countCompletedBetween(projectIds, w0, now);
+        long velocityLast  = projectIds.isEmpty() ? 0 : issueRepository.countCompletedBetween(projectIds, w1, w0);
+        long activeCycles  = cycleRepository.findActiveByWorkspaceSlug(slug).size();
+
+        String context = String.format(
+            "Workspace: %s | Members: %d | Projects: %d | Open issues: %d | Resolved this month: %d | " +
+            "Sprint velocity this week: %d | Last week: %d | Active cycles: %d",
+            ws.getName(), memberCount, projectCount, openIssues, resolvedMonth,
+            velocityThis, velocityLast, activeCycles
+        );
+
+        String systemPrompt =
+            "You are a C-suite AI advisor embedded in a project management tool. " +
+            "Analyze the workspace metrics and generate exactly 3 actionable insights. " +
+            "Each insight must be from a different executive perspective (operations, product, engineering) " +
+            "and include a concrete recommendation. " +
+            "Respond ONLY with valid JSON in this exact schema:\n" +
+            "{\"insights\":[{" +
+            "\"agent\":\"COO\",\"agentColor\":\"#0a84ff\"," +
+            "\"category\":\"Operations\",\"urgency\":\"high\"," +
+            "\"confidence\":85,\"action\":\"Adjust sprint scope\"," +
+            "\"insight\":\"...\"" +
+            "}]}\n" +
+            "Urgency must be one of: low, medium, high. Confidence is 50-95. Keep insight under 150 chars.";
+
+        try {
+            String raw = groqService.chatCompletion(assistantModel, systemPrompt, context, true);
+            JsonNode root = objectMapper.readTree(raw);
+            JsonNode arr  = root.path("insights");
+            if (!arr.isArray() || arr.isEmpty()) return fallbackInsights();
+
+            List<AiInsightResponse> result = new ArrayList<>();
+            for (JsonNode n : arr) {
+                result.add(AiInsightResponse.builder()
+                    .agent(n.path("agent").asText("AI"))
+                    .agentColor(n.path("agentColor").asText("#a78bfa"))
+                    .category(n.path("category").asText("General"))
+                    .urgency(n.path("urgency").asText("medium"))
+                    .confidence(Math.max(50, Math.min(95, n.path("confidence").asInt(70))))
+                    .action(n.path("action").asText("Review"))
+                    .insight(n.path("insight").asText(""))
+                    .build());
+            }
+            return result;
+        } catch (Exception e) {
+            return fallbackInsights();
+        }
+    }
+
+    private List<AiInsightResponse> fallbackInsights() {
+        return List.of(
+            AiInsightResponse.builder()
+                .agent("COO").agentColor("#0a84ff").category("Operations")
+                .urgency("medium").confidence(70)
+                .action("Review open issues").insight("Check open issues and team workload to optimize sprint delivery.")
+                .build()
+        );
     }
 
     // -------------------------------------------------------------------------
