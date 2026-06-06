@@ -57,3 +57,18 @@ export async function getAnalyticsCapacity(slug: string): Promise<MemberCapacity
   const res = await apiClient.get<{ data: MemberCapacity[] }>(ANALYTICS_ROUTES.CAPACITY(slug));
   return res.data.data;
 }
+
+export interface AiInsight {
+  agent: string;
+  agentColor: string;
+  category: string;
+  urgency: "low" | "medium" | "high";
+  confidence: number;
+  action: string;
+  insight: string;
+}
+
+export async function getAiInsights(slug: string): Promise<AiInsight[]> {
+  const res = await apiClient.get<{ data: AiInsight[] }>(ANALYTICS_ROUTES.INSIGHTS(slug));
+  return res.data.data;
+}
