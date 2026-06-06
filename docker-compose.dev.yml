@@ -92,6 +92,9 @@ services:
 
       # Keycloak (utilise le nom du service docker)
       KEYCLOAK_URL: http://keycloak:8080
+      # Validation JWT: issuer public (token navigateur) + JWKS interne (réseau Docker)
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:-http://localhost:8180/realms/taskforce-dev}
+      KEYCLOAK_JWK_SET_URI: ${KEYCLOAK_JWK_SET_URI:-http://keycloak:8080/realms/taskforce-dev/protocol/openid-connect/certs}
 
       # IA interne
       AI_SERVICE_URL: ${AI_SERVICE_URL:-http://ai-service:8000}
