@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.taskforce.tf_api.core.dto.response.AiInsightResponse;
 import com.taskforce.tf_api.core.dto.response.AnalyticsKpisResponse;
 import com.taskforce.tf_api.core.dto.response.BurndownPointResponse;
 import com.taskforce.tf_api.core.dto.response.MemberCapacityResponse;
@@ -79,8 +80,20 @@ public class AnalyticsController {
         ));
     }
 
+    @GetMapping("/insights")
+    public ResponseEntity<ApiResponse<List<AiInsightResponse>>> getInsights(
+        @PathVariable String slug,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        resolveUserId(jwt);
+        return ResponseEntity.ok(ApiResponse.success(
+            "Insights générés",
+            analyticsService.generateInsights(slug)
+        ));
+    }
+
     private Long resolveUserId(Jwt jwt) {
-        String email = jwt.getClaim("sub");
+        String email = jwt.getClaimAsString("email");
         User user = userRepository.findByEmail(email)
             .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
         return user.getId();
