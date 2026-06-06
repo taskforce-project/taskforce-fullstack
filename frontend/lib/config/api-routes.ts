@@ -119,6 +119,8 @@ export const ANALYTICS_ROUTES = {
   KPIS:       (slug: string) => `/api/workspaces/${slug}/analytics/kpis`,
   THROUGHPUT: (slug: string) => `/api/workspaces/${slug}/analytics/throughput`,
   BURNDOWN:   (slug: string) => `/api/workspaces/${slug}/analytics/burndown`,
+  CAPACITY:   (slug: string) => `/api/workspaces/${slug}/analytics/capacity`,
+  INSIGHTS:   (slug: string) => `/api/workspaces/${slug}/analytics/insights`,
 } as const;
 
 /**
