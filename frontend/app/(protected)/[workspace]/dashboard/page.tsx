@@ -7,10 +7,11 @@ import { motion, AnimatePresence } from "framer-motion"
 import {
   ArrowUpRight, ArrowUp, ArrowDown, Minus,
   AlertTriangle, CheckCircle2, ChevronRight,
-  Zap, TrendingUp, TrendingDown, Clock,
+  Zap, TrendingUp, TrendingDown, Clock, Loader2,
 } from "lucide-react"
 import { useAuth } from "@/lib/contexts/auth-context"
 import { useProjectStore } from "@/lib/store/project-store"
+import { getAiInsights, type AiInsight } from "@/lib/api/analytics-service"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -25,15 +26,6 @@ const PULSE_STATIC = [
 const EXCEPTIONS = [
   { id: "1", severity: "critical" as const, source: "COO",    message: "Mobile App sprint velocity −31% — delivery at risk",  age: "2h" },
   { id: "2", severity: "warning"  as const, source: "System", message: "TF-38 overdue by 2 days — no assignee update",        age: "5h" },
-]
-
-const AI_INSIGHTS = [
-  { id: "1", agent: "CFO", agentColor: "#30d158", category: "Finance",    urgency: "medium" as const, confidence: 74, action: "Review financial model", href: "./agents",
-    insight: "Cash runway extends 18 months at current burn. Deploy €40K into paid acquisition before Q3 to hit revenue targets." },
-  { id: "2", agent: "COO", agentColor: "#0a84ff", category: "Operations", urgency: "high"   as const, confidence: 91, action: "Adjust sprint scope",   href: "./agents",
-    insight: "Mobile App sprint velocity dropped 31% vs last cycle. Remove 3 scope items now or ETA slips 8 days." },
-  { id: "3", agent: "CPO", agentColor: "#ff9f0a", category: "Product",    urgency: "medium" as const, confidence: 68, action: "Update roadmap",        href: "./agents",
-    insight: "Advanced Filters has 47 upvotes and is blocking 3 enterprise trials. Reprioritizing could unlock ~€12K MRR." },
 ]
 
 const AGENTS = [
@@ -132,9 +124,21 @@ export default function DashboardPage() {
   const { user } = useAuth()
   const { fetchProjects, projects } = useProjectStore()
 
+  const [aiInsights, setAiInsights] = useState<AiInsight[]>([])
+  const [insightsLoading, setInsightsLoading] = useState(false)
+
   useEffect(() => {
     if (slug) void fetchProjects(slug)
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug])
+
+  useEffect(() => {
+    if (!slug) return
+    setInsightsLoading(true)
+    getAiInsights(slug)
+      .then(setAiInsights)
+      .catch(() => setAiInsights([]))
+      .finally(() => setInsightsLoading(false))
   }, [slug])
 
   const activeOps  = projects.filter((p) => p.status === "ACTIVE").length
@@ -165,7 +169,7 @@ export default function DashboardPage() {
   else if (hour < 12) greeting = "Good morning,"
   else if (hour < 18) greeting = "Good afternoon,"
   const criticals = EXCEPTIONS.filter(e => e.severity === "critical").length
-  const decisions  = AI_INSIGHTS.filter(i => i.urgency === "high").length
+  const decisions  = aiInsights.filter(i => i.urgency === "high").length
 
   return (
     <motion.div className="flex flex-col gap-6" variants={stagger} initial="initial" animate="animate">
@@ -312,9 +316,20 @@ export default function DashboardPage() {
           <motion.section variants={row}>
             <SectionLabel href="./agents">AI recommendations</SectionLabel>
             <div className="space-y-2">
-              {AI_INSIGHTS.map(ins => (
+              {insightsLoading && (
+                <div className="ai-card flex items-center gap-2 text-[12px] text-muted-foreground">
+                  <Loader2 className="size-3 animate-spin" />
+                  Generating AI insights…
+                </div>
+              )}
+              {!insightsLoading && aiInsights.length === 0 && (
+                <div className="ai-card text-[12px] text-muted-foreground">
+                  No insights available — AI analysis will run once your workspace has data.
+                </div>
+              )}
+              {aiInsights.map((ins, idx) => (
                 <div
-                  key={ins.id}
+                  key={idx}
                   className={cn("ai-card", ins.urgency === "high" && "ai-card--high")}
                 >
                   {/* Header */}
@@ -344,7 +359,7 @@ export default function DashboardPage() {
                       className="h-7 px-3 text-xs shrink-0 rounded-lg border"
                       style={{ borderColor: "var(--separator)" }}
                       asChild>
-                      <Link href={ins.href} className="flex items-center gap-1.5">
+                      <Link href="./agents" className="flex items-center gap-1.5">
                         {ins.action}<ArrowUpRight className="size-3" />
                       </Link>
                     </Button>
