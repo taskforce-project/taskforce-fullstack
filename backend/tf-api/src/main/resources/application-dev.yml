@@ -36,9 +36,9 @@ spring:
       resourceserver:
         jwt:
           # Issuer : Vérifie que le token vient bien de Keycloak
-          issuer-uri: ${KEYCLOAK_URL:http://localhost:8180}/realms/${KEYCLOAK_REALM:taskforce-dev}
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:${KEYCLOAK_URL:http://localhost:8180}/realms/${KEYCLOAK_REALM:taskforce-dev}}
           # JWK Set : Clés publiques pour vérifier la signature des tokens
-          jwk-set-uri: ${KEYCLOAK_URL:http://localhost:8180}/realms/${KEYCLOAK_REALM:taskforce-dev}/protocol/openid-connect/certs
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:${KEYCLOAK_URL:http://localhost:8180}/realms/${KEYCLOAK_REALM:taskforce-dev}/protocol/openid-connect/certs}
 
       # OAuth2 Client : Pour l'authentification Password Grant
       client:
@@ -203,10 +203,8 @@ server:
 
 # AI Configuration (Phase 4)
 ai:
-  service-url: ${AI_SERVICE_URL:http://localhost:8000}
   groq:
     api-key: ${GROQ_API_KEY:}
-    model: ${GROQ_MODEL:llama-3.1-8b-instant}
-  embedding:
-    model: ${EMBEDDING_MODEL:sentence-transformers/all-MiniLM-L6-v2}
+    smart-assign-model: ${GROQ_SMART_ASSIGN_MODEL:llama-3.1-8b-instant}
+    assistant-model: ${GROQ_ASSISTANT_MODEL:llama-3.3-70b-versatile}
 
