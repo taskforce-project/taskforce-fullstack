@@ -196,7 +196,7 @@ public class WorkspaceController {
     // -------------------------------------------------------------------------
 
     private Long resolveUserId(Jwt jwt) {
-        String email = jwt.getClaim("sub");
+        String email = jwt.getClaimAsString("email");
         User user = userRepository.findByEmail(email)
             .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
         return user.getId();
