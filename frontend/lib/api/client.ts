@@ -80,24 +80,29 @@ apiClient.interceptors.response.use(
       try {
         // Tentative de refresh du token
         const refreshToken = globalThis.window !== undefined ? localStorage.getItem("refreshToken") : null;
-        
+
         if (refreshToken) {
-          const response = await axios.post(`${API_URL}/api/auth/refresh`, {
+          const response = await axios.post(`${API_URL}/api/auth/refresh-token`, {
             refreshToken,
           });
-          
-          const { accessToken } = response.data;
-          
-          // Sauvegarder le nouveau token
+
+          // Le backend retourne ApiResponse<AuthResponse> : les tokens sont dans response.data.data
+          const authData = response.data?.data ?? response.data;
+          const { accessToken, refreshToken: newRefreshToken } = authData;
+
+          // Sauvegarder les nouveaux tokens (rotation)
           if (globalThis.window !== undefined) {
             localStorage.setItem("accessToken", accessToken);
+            if (newRefreshToken) {
+              localStorage.setItem("refreshToken", newRefreshToken);
+            }
           }
-          
+
           // Retry la requête originale avec le nouveau token
           if (originalRequest.headers) {
             originalRequest.headers.Authorization = `Bearer ${accessToken}`;
           }
-          
+
           return apiClient(originalRequest);
         }
       } catch (refreshError) {
