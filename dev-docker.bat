@@ -1,3 +1,0 @@
-@echo off
-echo Lancement du menu Docker...
-"C:\Program Files\Git\bin\bash.exe" scripts/dev-docker.sh
