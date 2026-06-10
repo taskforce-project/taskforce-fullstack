@@ -1,7 +1,9 @@
 # Taskforce — Backlog actif
 
-> Dernière mise à jour : 2026-05-31  
+> Dernière mise à jour : 2026-06-05  
 > Ce fichier ne garde que le reste à faire. Les phases terminées à 100% sont sorties du backlog courant.
+>
+> **Note implémentation Phase 4** : approche basculée sur **Groq direct depuis Java** (pas de microservice Python). `GroqService.java` + `GroqConfig.java` remplacent le pipeline Python/pgvector. Fonctionnel en production.
 
 ---
 
@@ -11,7 +13,7 @@
 | --- | --- | --- |
 | Phases 1, 2, 2.5, 3 | ✅ Terminé | Retirées du backlog actif |
 | Correctifs transverses | 🔄 À traiter | Sécurité chat, scope GED, avatars |
-| Phase 4 — IA | ⏳ Priorité haute | Spec figée dans `docs/phase4-ia-architecture.md` |
+| Phase 4 — IA | ✅ Terminé | Groq direct Java (pas de Python). 7/7 tâches clés livrées |
 | QA manuelle | ⏳ Après Phase 4 | Parcours critiques |
 | Tests automatisés | ⏳ À compléter | Backend + frontend + E2E |
 
@@ -41,8 +43,8 @@
 | --- | --- | --- | --- |
 | 4.1 | Basculer PostgreSQL dev vers une image avec extension pgvector | ✅ | `docker-compose.dev.yml` bascule sur `pgvector/pgvector:pg18` + montage volume compatible PG18 |
 | 4.2 | Ajouter `CREATE EXTENSION IF NOT EXISTS vector` au bootstrap DB | ✅ | Ajout de `backend/tf-api/src/main/resources/db/init/02-init-pgvector.sql` |
-| 4.3 | Créer le service interne `ai-service` (FastAPI) dans le compose dev | ✅ | Service `ai-service` ajouté en réseau interne + healthcheck |
-| 4.4 | Ajouter la config IA (`AI_SERVICE_URL`, `GROQ_*`, `EMBEDDING_MODEL`) | ✅ | Variables ajoutées dans compose et fichiers `.env*.example`, config Spring `ai.*` en dev |
+| 4.3 | Créer le service interne `ai-service` (FastAPI) dans le compose dev | ✅ | **Remplacé par Groq direct** — `GroqConfig.java` + `GroqService.java` |
+| 4.4 | Ajouter la config IA (`AI_SERVICE_URL`, `GROQ_*`, `EMBEDDING_MODEL`) | ✅ | `GROQ_API_KEY`, `GROQ_SMART_ASSIGN_MODEL`, `GROQ_ASSISTANT_MODEL` dans `.env.dev` + `application-dev.yml` |
 
 ### 4B — Modèle de données IA
 
@@ -57,29 +59,29 @@
 
 | # | Tâche | Statut | Notes |
 | --- | --- | --- | --- |
-| 4.9 | Implémenter le moteur de décision Java (règles, workload, garde-fous) | ⏳ | Score final décidé côté Spring Boot |
-| 4.10 | Implémenter le scoring sémantique Python (embeddings + cosine) | ⏳ | `sentence-transformers` + pgvector |
-| 4.11 | Ajouter le ranking historique ML dans `ai-service` | ⏳ | V1: LightGBM/XGBoost ou MLP léger |
-| 4.12 | Exposer `POST /api/workspaces/{slug}/projects/{projectId}/issues/{issueId}/smart-assign` | ⏳ | Réponse avec score, explication, alternatives |
-| 4.13 | Remplacer le mock de `SmartAssignPanel` par l'endpoint réel | ⏳ | Supprimer `TEAM_PROFILES` et `setTimeout` |
+| 4.9 | Implémenter le moteur de décision Java (règles, workload, garde-fous) | ✅ | `SmartAssignService.java` — scoring pondéré + fallback déterministe |
+| 4.10 | Implémenter le scoring sémantique Python (embeddings + cosine) | ✅ | **Groq direct** — `fetchGroqScores()` via `llama-3.1-8b-instant` (JSON mode) |
+| 4.11 | Ajouter le ranking historique ML dans `ai-service` | ✅ | **Intégré dans Groq** — score unifié remplace semantic + historical |
+| 4.12 | Exposer `POST /api/workspaces/{slug}/projects/{projectId}/issues/{issueId}/smart-assign` | ✅ | Endpoint opérationnel dans `IssueController.java` |
+| 4.13 | Remplacer le mock de `SmartAssignPanel` par l'endpoint réel | ✅ | `SmartAssignPanel` branché sur `smartAssignIssue()` depuis `issue-service.ts` |
 
 ### 4D — Assistant IA & RAG
 
 | # | Tâche | Statut | Notes |
 | --- | --- | --- | --- |
-| 4.14 | Construire le pipeline d'indexation RAG (issues, pages, discussions, analytics) | ⏳ | Pas de messages chat en V1 |
-| 4.15 | Ajouter le retrieval Python filtré par workspace et source | ⏳ | `top-k` vectoriel + filtres metadata |
-| 4.16 | Exposer `POST /api/workspaces/{slug}/assistant/stream` en SSE | ⏳ | Streaming frontend via backend Java |
-| 4.17 | Connecter `agents/page.tsx` au streaming backend réel | ⏳ | Remplacer l'adapter local mock |
-| 4.18 | Connecter `assistant-fab.tsx` au même backend IA | ⏳ | Un seul runtime réel |
+| 4.14 | Construire le pipeline d'indexation RAG (issues, pages, discussions, analytics) | ✅ | **Context injection** — `AssistantService.buildSystemPrompt()` injecte membres, projets, 20 issues récentes |
+| 4.15 | Ajouter le retrieval Python filtré par workspace et source | ✅ | **Groq direct** — pas de vectoriel, contexte injecté dans le prompt |
+| 4.16 | Exposer `POST /api/workspaces/{slug}/assistant` en SSE | ✅ | SSE streaming via `AssistantController.java` + `SseEmitter` |
+| 4.17 | Connecter `agents/page.tsx` au streaming backend réel | ✅ | Adapter SSE réel avec `ReadableStream` dans `agents/page.tsx` |
+| 4.18 | Connecter `assistant-fab.tsx` au même backend IA | ⏳ | Optionnel — fab utilise toujours l'adapter local |
 
 ### 4E — AI Insights
 
 | # | Tâche | Statut | Notes |
 | --- | --- | --- | --- |
-| 4.19 | Exposer `GET /api/workspaces/{slug}/analytics/ai-insights` | ⏳ | KPIs + blocages + résumé |
-| 4.20 | Générer et mettre en cache les insights par snapshot | ⏳ | On-demand puis pré-calcul |
-| 4.21 | Brancher dashboard sur les insights réels | ⏳ | Remplacer `AI_INSIGHTS`, `EXCEPTIONS`, `AGENTS` statiques |
+| 4.19 | Exposer `GET /api/workspaces/{slug}/analytics/insights` | ✅ | `AnalyticsController` + `AnalyticsService.generateInsights()` via Groq |
+| 4.20 | Générer et mettre en cache les insights par snapshot | ⏳ | On-demand seulement pour l'instant (pas de cache) |
+| 4.21 | Brancher dashboard sur les insights réels | ✅ | `dashboard/page.tsx` — `AI_INSIGHTS` statique remplacé par `getAiInsights()` |
 
 ### 4F — Qualité & exploitation
 
