@@ -220,8 +220,11 @@ public class AuthController {
         log.info("Requête de rafraîchissement de token");
 
         try {
-            // TODO: Implémenter le rafraîchissement du token
-            throw new UnsupportedOperationException("Fonctionnalité en cours d'implémentation");
+            AuthResponse response = authService.refreshToken(request.getRefreshToken());
+
+            return ResponseEntity.ok(
+                ApiResponse.success("Token rafraîchi avec succès", response)
+            );
 
         } catch (Exception e) {
             log.error("Erreur lors du rafraîchissement du token : {}", e.getMessage());
@@ -231,7 +234,7 @@ public class AuthController {
     }
 
     /**
-     * Déconnexion (révoque le refresh token)
+     * Déconnexion (révoque tous les refresh tokens de l'utilisateur)
      * POST /api/auth/logout
      */
     @PostMapping("/logout")
@@ -241,7 +244,9 @@ public class AuthController {
         log.info("Requête de déconnexion");
 
         try {
-            // TODO: Extraire le userId du token et révoquer les refresh tokens
+            String token = authorization.startsWith("Bearer ") ? authorization.substring(7) : authorization;
+            authService.logout(token);
+
             return ResponseEntity.ok(
                 ApiResponse.<Void>success("Déconnexion réussie", null)
             );
