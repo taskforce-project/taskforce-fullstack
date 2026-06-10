@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { useSearchParams } from "next/navigation"
 import {
   User, Bell, CreditCard, Users, Check, Zap, Globe, Key, Palette, Webhook,
-  X as XIcon, Plus, Upload, Camera, Link2, Trash2,
+  X as XIcon, Plus, Upload, Camera, Link2, Trash2, Shield,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -33,6 +33,7 @@ type SettingsSection =
   | "billing"
   | "team"
   | "integrations"
+  | "privacy"
 
 interface SectionConfig {
   key: SettingsSection
@@ -51,6 +52,7 @@ const SECTIONS: SectionConfig[] = [
   { key: "billing",       label: "Billing & Plan", icon: <CreditCard className="h-4 w-4" />, group: "Workspace" },
   { key: "team",          label: "Members",        icon: <Users className="h-4 w-4" />,      group: "Workspace" },
   { key: "integrations",  label: "Integrations",   icon: <Webhook className="h-4 w-4" />,    group: "Workspace" },
+  { key: "privacy",       label: "Privacy & Data", icon: <Shield className="h-4 w-4" />,     group: "Personal" },
 ]
 
 const PLAN_FEATURES: Record<string, string[]> = {
@@ -60,7 +62,7 @@ const PLAN_FEATURES: Record<string, string[]> = {
 }
 
 const SECTION_GROUPS = [
-  { label: "Personal",  keys: ["profile", "account", "appearance", "notifications", "security"] as const },
+  { label: "Personal",  keys: ["profile", "account", "appearance", "notifications", "security", "privacy"] as const },
   { label: "Workspace", keys: ["workspace", "billing", "team", "integrations"] as const },
 ]
 
@@ -1094,6 +1096,114 @@ function IntegrationsPanel() {
 }
 
 // ---------------------------------------------------------------------------
+// Privacy & Data Panel (RGPD)
+// ---------------------------------------------------------------------------
+
+function PrivacyPanel() {
+  const { user } = useAuth()
+  const [loading, setLoading] = useState<"ACCESS" | "DELETION" | null>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState(false)
+
+  const submitRequest = async (type: "ACCESS" | "DELETION") => {
+    setLoading(type)
+    try {
+      await apiClient.post(USER_ROUTES.DATA_REQUEST, { type })
+      if (type === "ACCESS") {
+        toast.success("Data export requested. You will receive an email within 30 days.")
+      } else {
+        toast.success("Account deletion initiated. Your account has been deactivated.")
+      }
+    } catch {
+      toast.error("Request failed. Please try again or contact privacy@taskforce.dev.")
+    } finally {
+      setLoading(null)
+      setDeleteConfirm(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <SectionCard title="Your data" description="Understand what personal data TaskForce stores about you.">
+        <ul className="text-sm text-muted-foreground space-y-1.5">
+          <li>• <strong className="text-foreground">Account</strong>: name, email, profile picture</li>
+          <li>• <strong className="text-foreground">Workspace activity</strong>: issues, projects, comments, pages</li>
+          <li>• <strong className="text-foreground">Authentication tokens</strong>: stored in your browser&apos;s local storage (never shared)</li>
+          <li>• <strong className="text-foreground">Billing</strong>: subscription plan status (card details are held by Stripe only)</li>
+        </ul>
+        <p className="text-xs text-muted-foreground mt-3">
+          Read our full{" "}
+          <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 text-foreground hover:text-primary">
+            Privacy Policy
+          </a>
+          .
+        </p>
+      </SectionCard>
+
+      <SectionCard title="Request your data" description="Receive a full export of all personal data we hold about you.">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-foreground">Export my data</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              We will send an email to <span className="font-medium">{user?.email}</span> with your data within 30 days, as required by GDPR Art. 20.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="shrink-0 h-8 text-xs"
+            disabled={loading === "ACCESS"}
+            onClick={() => submitRequest("ACCESS")}
+          >
+            {loading === "ACCESS" ? "Sending…" : "Request export"}
+          </Button>
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Delete account" description="Permanently remove your account and all associated data.">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-foreground">Delete my account</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Your account will be deactivated immediately. All workspace data will be purged within 30 days. This action is irreversible.
+            </p>
+          </div>
+          {!deleteConfirm ? (
+            <Button
+              variant="destructive"
+              size="sm"
+              className="shrink-0 h-8 text-xs"
+              onClick={() => setDeleteConfirm(true)}
+            >
+              Delete account
+            </Button>
+          ) : (
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs"
+                onClick={() => setDeleteConfirm(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                className="h-8 text-xs"
+                disabled={loading === "DELETION"}
+                onClick={() => submitRequest("DELETION")}
+              >
+                {loading === "DELETION" ? "Processing…" : "Confirm deletion"}
+              </Button>
+            </div>
+          )}
+        </div>
+      </SectionCard>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
@@ -1152,6 +1262,7 @@ export default function SettingsPage() {
         {active === "billing"       && <BillingPanel />}
         {active === "team"          && <TeamPanel />}
         {active === "integrations"  && <IntegrationsPanel />}
+        {active === "privacy"       && <PrivacyPanel />}
       </div>
     </div>
   )
