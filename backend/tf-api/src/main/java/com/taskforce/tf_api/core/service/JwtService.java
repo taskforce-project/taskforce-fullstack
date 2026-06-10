@@ -186,6 +186,23 @@ public class JwtService {
     }
 
     /**
+     * Parse les claims d'un token, même si celui-ci est expiré.
+     * Utilisé pour le logout : on accepte un token expiré mais on vérifie quand même la signature.
+     */
+    public Claims parseClaimsAllowExpired(String token) {
+        SecretKey key = Keys.hmacShaKeyFor(jwtSecret.getBytes());
+        try {
+            return Jwts.parser()
+                .verifyWith(key)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+        } catch (io.jsonwebtoken.ExpiredJwtException e) {
+            return e.getClaims();
+        }
+    }
+
+    /**
      * Nettoie les refresh tokens expirés (à appeler périodiquement)
      */
     @Transactional
