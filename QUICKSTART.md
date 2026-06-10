@@ -7,7 +7,7 @@
 cd C:\taskforce-project\taskforce-fullstack
 
 # 2. Démarrer tous les services
-.\dev-docker.ps1
+.\tf.ps1 up
 
 # 3. Ouvrir le frontend
 start http://localhost:3000
@@ -169,7 +169,7 @@ SELECT email, otp_code, otp_type, is_used, expires_at, created_at FROM otp_codes
 ## 🛑 Arrêter les services
 
 ```powershell
-.\stop-dev.ps1
+.\tf.ps1 down
 ```
 
 Ou :
@@ -257,7 +257,7 @@ Pour plus de détails, voir :
 - [ ] Docker Desktop est lancé
 - [ ] Aucun autre service n'utilise les ports 3000, 8080, 8180, 5432, 5050
 - [ ] Fichier `.env.dev` présent à la racine
-- [ ] Exécution de `.\dev-docker.ps1`
+- [ ] Exécution de `.\tf.ps1 up`
 - [ ] Attendre 2-3 minutes que tous les services démarrent
 - [ ] Vérifier `docker ps` → 5 containers running
 - [ ] Ouvrir http://localhost:3000

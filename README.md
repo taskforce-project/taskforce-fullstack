@@ -203,6 +203,7 @@ backend/tf-api/
 - **Docker Desktop** 4.x+ (avec Docker Compose V2)
 - **Git** 2.x+
 - **PowerShell** 5.1+ (Windows) ou **Bash** (Linux/Mac)
+- **make** — entrée unique des commandes (Windows : `choco install make`)
 
 Pour le développement local :
 - **Java JDK** 21+
@@ -216,14 +217,11 @@ Pour le développement local :
 git clone https://github.com/taskforce-project/taskforce-fullstack.git
 cd taskforce-fullstack
 
-# 2. Initialiser l'environnement
-bash scripts/init-dev.sh
+# 2. Initialiser l'environnement (.env + vérif Docker)
+make init-dev
 
-# 3. Démarrer tous les services (menu interactif)
-bash scripts/dev-docker.sh
-
-# Ou démarrage rapide direct
-bash scripts/start-dev.sh
+# 3. Démarrer tous les services
+make dev-up           # menu interactif : make menu   (ou .\tf.ps1)
 
 # 4. Accéder à l'application
 # Frontend:    http://localhost:3000
@@ -310,10 +308,11 @@ npm run dev
 #### Windows (PowerShell)
 
 ```powershell
-.\start-dev.ps1        # Démarrer tous les services
-.\stop-dev.ps1         # Arrêter tous les services
-.\dev-docker.ps1       # Menu interactif dev
-.\prod-docker.ps1      # Menu interactif prod
+.\tf.ps1               # Menu interactif (centre de commande)
+.\tf.ps1 up            # Démarrer la stack dev   (prod : .\tf.ps1 pup)
+.\tf.ps1 down          # Arrêter
+.\tf.ps1 logs          # Voir les logs
+.\tf.ps1 help          # Liste de toutes les clés
 ```
 
 #### Linux/Mac (Bash)
@@ -321,7 +320,7 @@ npm run dev
 ```bash
 make dev-up            # Démarrer tous les services
 make dev-down          # Arrêter tous les services
-make logs              # Voir les logs
+make dev-logs          # Voir les logs
 make clean             # Nettoyer les volumes
 ```
 
