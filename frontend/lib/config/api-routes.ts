@@ -38,6 +38,8 @@ export const STRIPE_ROUTES = {
  */
 export const USER_ROUTES = {
   ME: "/api/users/me",
+  AVATAR: "/api/users/me/avatar",
+  DATA_REQUEST: "/api/users/me/data-request",
 } as const;
 
 /**
