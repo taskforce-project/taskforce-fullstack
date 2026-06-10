@@ -16,7 +16,7 @@ export const AUTH_ROUTES = {
   RESEND_OTP: "/api/auth/resend-otp",
   FORGOT_PASSWORD: "/api/auth/forgot-password",
   RESET_PASSWORD: "/api/auth/reset-password",
-  REFRESH_TOKEN: "/api/auth/refresh",
+  REFRESH_TOKEN: "/api/auth/refresh-token",
   LOGOUT: "/api/auth/logout",
 } as const;
 
