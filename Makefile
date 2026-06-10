@@ -1,139 +1,119 @@
-# ===============================
-# MAKEFILE - Taskforce Project
-# Commandes simplifiées pour Docker
-# ===============================
+# ===============================================================
+#  Makefile - TaskForce  (ENTREE UNIQUE)
+#  Delegue aux scripts PowerShell de scripts/  (une seule implementation).
+#  Prerequis Windows : installer make  ->  choco install make
+#  (Docker Desktop fournit "docker compose" v2.)
+# ===============================================================
 
-.PHONY: help dev-up dev-down dev-logs dev-build prod-up prod-down prod-logs prod-build clean
+# Recipe prefix = ">" au lieu de TAB (robuste, evite les pieges de tabulation)
+.RECIPEPREFIX := >
 
-# Couleurs
-GREEN  := $(shell tput -Txterm setaf 2)
-YELLOW := $(shell tput -Txterm setaf 3)
-RESET  := $(shell tput -Txterm sgr0)
+PS       := powershell -NoProfile -ExecutionPolicy Bypass -File
+DOCKER   := $(PS) scripts/docker.ps1
+QUALITY  := $(PS) scripts/quality.ps1
+SECURITY := $(PS) scripts/security-scan.ps1
+DB       := $(PS) scripts/db.ps1
 
-help: ## Afficher l'aide
-	@echo "${GREEN}Taskforce - Commandes Docker${RESET}"
-	@echo ""
-	@echo "${YELLOW}Développement:${RESET}"
-	@echo "  make dev-up          Démarrer les services en DEV"
-	@echo "  make dev-down        Arrêter les services DEV"
-	@echo "  make dev-logs        Afficher les logs DEV"
-	@echo "  make dev-build       Rebuild les services DEV"
-	@echo "  make dev-clean       Supprimer volumes DEV"
-	@echo ""
-	@echo "${YELLOW}Production:${RESET}"
-	@echo "  make prod-up         Démarrer les services en PROD"
-	@echo "  make prod-down       Arrêter les services PROD"
-	@echo "  make prod-logs       Afficher les logs PROD"
-	@echo "  make prod-build      Rebuild les services PROD"
-	@echo "  make prod-clean      Supprimer volumes PROD"
-	@echo ""
-	@echo "${YELLOW}Utilitaires:${RESET}"
-	@echo "  make clean           Nettoyer tous les conteneurs et volumes"
-	@echo "  make ps              Lister les conteneurs actifs"
+.DEFAULT_GOAL := help
+.PHONY: help menu setup init-dev init-prod \
+        dev-up dev-up-d dev-down dev-restart dev-build dev-rebuild dev-logs dev-logs-backend dev-clean \
+        prod-up prod-down prod-rebuild prod-clean \
+        obs obs-down ps urls clean \
+        test-fe test-be cov-fe cov-be lint build-fe build-be \
+        scan trivy semgrep \
+        exec-db exec-backend exec-keycloak
 
-# ================================
-# DÉVELOPPEMENT
-# ================================
+help:
+> @echo TaskForce - cibles make :
+> @echo   DEV      : dev-up  dev-up-d  dev-down  dev-restart  dev-build  dev-rebuild  dev-clean
+> @echo   LOGS     : dev-logs  dev-logs-backend
+> @echo   PROD     : prod-up  prod-down  prod-rebuild  prod-clean
+> @echo   OUTILS   : obs  obs-down  trivy  semgrep  scan
+> @echo   QUALITE  : test-fe  test-be  cov-fe  cov-be  lint  build-fe  build-be
+> @echo   DB/SHELL : exec-db  exec-backend  exec-keycloak
+> @echo   SYSTEME  : setup  init-prod  ps  urls  clean  menu
+> @echo   Menu interactif : make menu
 
-dev-up: ## Démarrer en mode développement
-	@echo "${GREEN}Démarrage des services DEV...${RESET}"
-	docker-compose -f docker-compose.dev.yml --env-file backend/tf-api/.env.dev up
+# --- Initialisation / launcher interactif ---
+menu:
+> @$(PS) tf.ps1
+setup:
+> @$(DOCKER) setup
+init-dev:
+> @$(DOCKER) setup
+init-prod:
+> @$(DOCKER) setup-prod
 
-dev-up-d: ## Démarrer en mode développement (arrière-plan)
-	@echo "${GREEN}Démarrage des services DEV (background)...${RESET}"
-	docker-compose -f docker-compose.dev.yml --env-file backend/tf-api/.env.dev up -d
+# --- Developpement ---
+dev-up:
+> @$(DOCKER) up
+dev-up-d:
+> @$(DOCKER) upd
+dev-down:
+> @$(DOCKER) down
+dev-restart:
+> @$(DOCKER) restart
+dev-build:
+> @$(DOCKER) build
+dev-rebuild:
+> @$(DOCKER) rebuild
+dev-logs:
+> @$(DOCKER) logs
+dev-logs-backend:
+> @$(DOCKER) logs backend
+dev-clean:
+> @$(DOCKER) clean-dev
 
-dev-down: ## Arrêter les services DEV
-	@echo "${YELLOW}Arrêt des services DEV...${RESET}"
-	docker-compose -f docker-compose.dev.yml down
+# --- Production ---
+prod-up:
+> @$(DOCKER) prod-up
+prod-down:
+> @$(DOCKER) prod-down
+prod-rebuild:
+> @$(DOCKER) prod-rebuild
+prod-clean:
+> @$(DOCKER) prod-clean
 
-dev-logs: ## Afficher les logs DEV
-	docker-compose -f docker-compose.dev.yml logs -f
+# --- Outils ---
+obs:
+> @$(DOCKER) obs
+obs-down:
+> @$(DOCKER) obs-down
+ps:
+> @$(DOCKER) ps
+urls:
+> @$(DOCKER) urls
+clean:
+> @$(DOCKER) clean
 
-dev-logs-backend: ## Logs backend uniquement
-	docker-compose -f docker-compose.dev.yml logs -f backend
+# --- Qualite ---
+test-fe:
+> @$(QUALITY) test-fe
+test-be:
+> @$(QUALITY) test-be
+cov-fe:
+> @$(QUALITY) cov-fe
+cov-be:
+> @$(QUALITY) cov-be
+lint:
+> @$(QUALITY) lint
+build-fe:
+> @$(QUALITY) build-fe
+build-be:
+> @$(QUALITY) build-be
 
-dev-build: ## Rebuild les services DEV
-	@echo "${GREEN}Build des services DEV...${RESET}"
-	docker-compose -f docker-compose.dev.yml build --no-cache
+# --- Securite ---
+scan:
+> @$(SECURITY)
+trivy:
+> @$(SECURITY) -Source
+semgrep:
+> @$(SECURITY) -Static
 
-dev-restart: ## Redémarrer les services DEV
-	@echo "${YELLOW}Redémarrage des services DEV...${RESET}"
-	docker-compose -f docker-compose.dev.yml restart
-
-dev-clean: ## Supprimer les volumes DEV
-	@echo "${YELLOW}Suppression des volumes DEV...${RESET}"
-	docker-compose -f docker-compose.dev.yml down -v
-
-# ================================
-# PRODUCTION
-# ================================
-
-prod-up: ## Démarrer en mode production
-	@echo "${GREEN}Démarrage des services PROD...${RESET}"
-	docker-compose -f docker-compose.prod.yml --env-file backend/tf-api/.env.prod up -d
-
-prod-down: ## Arrêter les services PROD
-	@echo "${YELLOW}Arrêt des services PROD...${RESET}"
-	docker-compose -f docker-compose.prod.yml down
-
-prod-logs: ## Afficher les logs PROD
-	docker-compose -f docker-compose.prod.yml logs -f
-
-prod-logs-backend: ## Logs backend PROD uniquement
-	docker-compose -f docker-compose.prod.yml logs -f backend
-
-prod-build: ## Rebuild les services PROD
-	@echo "${GREEN}Build des services PROD...${RESET}"
-	docker-compose -f docker-compose.prod.yml build --no-cache
-
-prod-restart: ## Redémarrer les services PROD
-	@echo "${YELLOW}Redémarrage des services PROD...${RESET}"
-	docker-compose -f docker-compose.prod.yml restart
-
-prod-clean: ## Supprimer les volumes PROD
-	@echo "${YELLOW}Suppression des volumes PROD...${RESET}"
-	docker-compose -f docker-compose.prod.yml down -v
-
-# ================================
-# UTILITAIRES
-# ================================
-
-ps: ## Lister les conteneurs actifs
-	docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-
-clean: ## Nettoyer tout
-	@echo "${YELLOW}Nettoyage complet...${RESET}"
-	docker-compose -f docker-compose.dev.yml down -v
-	docker-compose -f docker-compose.prod.yml down -v
-	docker system prune -f
-
-exec-backend: ## Accéder au shell du backend DEV
-	docker exec -it taskforce-backend-dev sh
-
-exec-db: ## Accéder à PostgreSQL DEV
-	docker exec -it taskforce-postgres-dev psql -U postgres -d taskforce_dev
-
-exec-keycloak: ## Accéder au shell Keycloak DEV
-	docker exec -it taskforce-keycloak-dev sh
-
-# ================================
-# INITIALISATION
-# ================================
-
-init-dev: ## Initialiser l'environnement DEV
-	@echo "${GREEN}Initialisation DEV...${RESET}"
-	@if [ ! -f backend/tf-api/.env.dev ]; then \
-		echo "${YELLOW}Création de .env.dev...${RESET}"; \
-		cp backend/tf-api/.env.dev.example backend/tf-api/.env.dev; \
-	fi
-	@echo "${GREEN}Fichiers prêts. Lancez 'make dev-up'${RESET}"
-
-init-prod: ## Initialiser l'environnement PROD
-	@echo "${GREEN}Initialisation PROD...${RESET}"
-	@if [ ! -f backend/tf-api/.env.prod ]; then \
-		echo "${YELLOW}Création de .env.prod...${RESET}"; \
-		cp backend/tf-api/.env.prod.example backend/tf-api/.env.prod; \
-		echo "${YELLOW}⚠️  ATTENTION: Modifiez .env.prod avec vos vraies valeurs !${RESET}"; \
-	fi
-
+# --- Base de donnees / shells ---
+exec-db:
+> @$(DB) psql
+exec-backend:
+> @$(DB) sh-be
+exec-keycloak:
+> @$(DB) sh-kc
