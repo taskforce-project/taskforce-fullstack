@@ -1,4 +1,4 @@
-import apiClient from "./api-client";
+import { apiClient } from "./client";
 import { PROFILE_ROUTES } from "../config/api-routes";
 
 // ---------------------------------------------------------------------------
