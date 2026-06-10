@@ -30,7 +30,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
-@RequestMapping("/workspaces/{slug}/projects/{projectId}/cycles")
+@RequestMapping("/api/workspaces/{slug}/projects/{projectId}/cycles")
 @RequiredArgsConstructor
 public class CycleController {
 
