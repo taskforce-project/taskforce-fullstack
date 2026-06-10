@@ -21,9 +21,13 @@ import com.taskforce.tf_api.core.enums.OtpType;
 import com.taskforce.tf_api.core.enums.PlanStatus;
 import com.taskforce.tf_api.core.enums.PlanType;
 import com.taskforce.tf_api.core.model.OtpVerification;
+import com.taskforce.tf_api.core.model.RefreshToken;
 import com.taskforce.tf_api.core.model.User;
+import com.taskforce.tf_api.core.repository.RefreshTokenRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.service.WorkspaceService;
+
+import io.jsonwebtoken.Claims;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,6 +48,7 @@ public class AuthService {
     private final StripeService stripeService;
     private final EmailService emailService;
     private final UserRepository userRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
     private final JwtService jwtService;
     private final WorkspaceService workspaceService;
 
@@ -547,6 +552,53 @@ public class AuthService {
             .userCreated(true)
             .message("Inscription finalisée avec succès. Votre abonnement est actif.")
             .build();
+    }
+
+    /**
+     * Rafraîchit l'access token via le refresh token stocké en DB.
+     * Applique la rotation : l'ancien token est révoqué, un nouveau est émis.
+     */
+    @Transactional
+    public AuthResponse refreshToken(String refreshTokenValue) {
+        log.info("Tentative de rafraîchissement du token");
+
+        RefreshToken refreshToken = refreshTokenRepository.findByToken(refreshTokenValue)
+            .orElseThrow(() -> new RuntimeException("Refresh token invalide"));
+
+        if (!refreshToken.isValid()) {
+            throw new RuntimeException("Refresh token expiré ou révoqué");
+        }
+
+        User user = userRepository.findById(refreshToken.getUserId())
+            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+        if (!user.getIsActive()) {
+            throw new RuntimeException("Ce compte est désactivé");
+        }
+
+        UserRepresentation keycloakUser = keycloakService.getUserByEmail(user.getEmail());
+
+        // Rotation : on révoque l'ancien avant d'en créer un nouveau
+        refreshToken.revoke();
+        refreshTokenRepository.save(refreshToken);
+
+        log.info("Token rafraîchi avec rotation pour : {}", user.getEmail());
+        return jwtService.generateTokens(user, keycloakUser);
+    }
+
+    /**
+     * Déconnexion : révoque tous les refresh tokens DB de l'utilisateur.
+     * Accepte un access token potentiellement expiré (l'utilisateur peut se déconnecter après expiry).
+     */
+    @Transactional
+    public void logout(String accessToken) {
+        log.info("Déconnexion en cours");
+
+        Claims claims = jwtService.parseClaimsAllowExpired(accessToken);
+        Long userId = ((Number) claims.get("userId")).longValue();
+
+        jwtService.revokeAllUserTokens(userId);
+        log.info("Tous les refresh tokens révoqués pour userId : {}", userId);
     }
 
     private String buildDisplayName(String firstName, String lastName) {
