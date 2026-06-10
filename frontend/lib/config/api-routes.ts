@@ -184,6 +184,57 @@ export const DISCUSSION_ROUTES = {
   LOCK:    (slug: string, id: number) => `/api/workspaces/${slug}/discussions/${id}/lock`,
 } as const;
 
+// Base backend pour les redirections navigateur (OAuth) — PAS pour les appels Axios.
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+
+/**
+ * Routes messagerie / chat
+ * Backend: /api/workspaces/{slug}/channels (ChannelController)
+ */
+export const MESSAGE_ROUTES = {
+  CHANNELS:   (slug: string) => `/api/workspaces/${slug}/channels`,
+  MESSAGES:   (slug: string, channelId: number) => `/api/workspaces/${slug}/channels/${channelId}/messages`,
+  EDIT_MSG:   (slug: string, channelId: number, messageId: number) => `/api/workspaces/${slug}/channels/${channelId}/messages/${messageId}`,
+  DELETE_MSG: (slug: string, channelId: number, messageId: number) => `/api/workspaces/${slug}/channels/${channelId}/messages/${messageId}`,
+} as const;
+
+/**
+ * Routes intégrations (GitHub / Slack / Webhooks)
+ * Backend: IntegrationController + WebhookController
+ */
+export const INTEGRATION_ROUTES = {
+  GITHUB_STATUS:     (slug: string) => `/api/workspaces/${slug}/integrations/github/status`,
+  GITHUB_CONNECT:    (slug: string) => `${API_BASE}/api/workspaces/${slug}/integrations/github/connect`,
+  GITHUB_DISCONNECT: (slug: string) => `/api/workspaces/${slug}/integrations/github`,
+  GITHUB_LINKS:      (slug: string, issueId: number) => `/api/workspaces/${slug}/integrations/github/issues/${issueId}/links`,
+  GITHUB_LINK:       (slug: string, linkId: number) => `/api/workspaces/${slug}/integrations/github/links/${linkId}`,
+  SLACK_STATUS:      (slug: string) => `/api/workspaces/${slug}/integrations/slack/status`,
+  SLACK_CONNECT:     (slug: string) => `${API_BASE}/api/workspaces/${slug}/integrations/slack/connect`,
+  SLACK_DISCONNECT:  (slug: string) => `/api/workspaces/${slug}/integrations/slack`,
+  SLACK_CHANNELS:    (slug: string) => `/api/workspaces/${slug}/integrations/slack/channels`,
+  SLACK_CHANNEL:     (slug: string, channelId: number) => `/api/workspaces/${slug}/integrations/slack/channels/${channelId}`,
+  WEBHOOKS:          (slug: string) => `/api/workspaces/${slug}/webhooks`,
+  WEBHOOK:           (slug: string, id: number) => `/api/workspaces/${slug}/webhooks/${id}`,
+} as const;
+
+/**
+ * Routes pièces jointes (attachments d'issue)
+ * Backend: /api/workspaces/{slug}/projects/{projectId}/issues/{issueId}/attachments
+ */
+export const ATTACHMENT_ROUTES = {
+  LIST:   (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/attachments`,
+  UPLOAD: (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/attachments`,
+  DELETE: (slug: string, projectId: number, issueId: number, attachmentId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/attachments/${attachmentId}`,
+} as const;
+
+/**
+ * Routes roadmap (issues planifiées)
+ * Backend: /api/workspaces/{slug}/roadmap
+ */
+export const ROADMAP_ROUTES = {
+  SCHEDULED: (slug: string) => `/api/workspaces/${slug}/roadmap`,
+} as const;
+
 /**
  * Toutes les routes groupées (export par défaut)
  */
