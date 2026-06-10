@@ -6,6 +6,7 @@ import { I18nProvider } from "@/lib/i18n";
 import { ThemeProvider } from "next-themes";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorBoundary } from "@/components/providers/error-boundary";
+import { CookieBanner } from "@/components/common/cookie-banner";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -44,6 +45,7 @@ export default function RootLayout({
               <ErrorBoundary>
                 <AuthProvider>
                   {children}
+                  <CookieBanner />
                 </AuthProvider>
               </ErrorBoundary>
             </TooltipProvider>
