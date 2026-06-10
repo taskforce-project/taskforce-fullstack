@@ -19,6 +19,11 @@ import java.util.UUID;
 public interface SubscriptionHistoryRepository extends JpaRepository<SubscriptionHistory, UUID> {
 
     /**
+     * Vérifie si un événement Stripe a déjà été traité (idempotence)
+     */
+    boolean existsByStripeEventId(String stripeEventId);
+
+    /**
      * Trouve l'historique d'un utilisateur, trié par date décroissante
      */
     Page<SubscriptionHistory> findByUserIdOrderByCreatedAtDesc(Long userId, Pageable pageable);
