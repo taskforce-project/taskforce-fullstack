@@ -112,6 +112,38 @@ public class EmailService {
     }
 
     /**
+     * Envoie une confirmation de demande RGPD (accès aux données ou suppression de compte)
+     */
+    public void sendDataRequestEmail(String toEmail, String firstName, String requestType) {
+        try {
+            boolean isDeletion = "DELETION".equalsIgnoreCase(requestType);
+            String subject = isDeletion
+                ? String.format("[%s] Confirmation de suppression de compte", fromName)
+                : String.format("[%s] Confirmation de demande d'accès aux données", fromName);
+
+            String actionLine = isDeletion
+                ? "Votre compte a été désactivé et vos données seront supprimées dans 30 jours conformément au RGPD."
+                : "Nous avons bien reçu votre demande. Vous recevrez une copie de vos données dans un délai de 30 jours.";
+
+            String html = """
+                <!DOCTYPE html><html><body style="font-family:sans-serif;color:#333;max-width:600px;margin:0 auto;padding:24px">
+                <h2 style="color:#111">Bonjour %s,</h2>
+                <p>%s</p>
+                <p>Type de demande : <strong>%s</strong></p>
+                <p>Si vous n'êtes pas à l'origine de cette demande, contactez-nous immédiatement à <a href="mailto:privacy@taskforce.dev">privacy@taskforce.dev</a>.</p>
+                <hr style="margin:24px 0;border:none;border-top:1px solid #eee"/>
+                <p style="font-size:12px;color:#999">%s — %s</p>
+                </body></html>
+                """.formatted(firstName, actionLine, isDeletion ? "Suppression de compte" : "Accès aux données", fromName, appUrl);
+
+            sendHtmlEmail(toEmail, subject, html);
+            log.info("Email de demande RGPD ({}) envoyé à : {}", requestType, toEmail);
+        } catch (Exception e) {
+            log.error("Erreur lors de l'envoi de l'email RGPD à {}: {}", toEmail, e.getMessage());
+        }
+    }
+
+    /**
      * Méthode privée pour envoyer un email HTML
      */
     private void sendHtmlEmail(String toEmail, String subject, String htmlContent) throws MessagingException {

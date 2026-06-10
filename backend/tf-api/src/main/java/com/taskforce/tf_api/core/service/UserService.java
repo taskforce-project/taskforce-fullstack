@@ -29,6 +29,20 @@ public class UserService {
     private final UserRepository userRepository;
     private final KeycloakService keycloakService;
     private final MinioService minioService;
+    private final EmailService emailService;
+
+    @Transactional
+    public void processDataRequest(String email, String requestType) {
+        User user = userRepository.findByEmail(email)
+            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+        if ("DELETION".equalsIgnoreCase(requestType)) {
+            user.setIsActive(false);
+            userRepository.save(user);
+            log.info("Compte désactivé suite à demande RGPD — email={}", email);
+        }
+        String firstName = keycloakService.getUserById(user.getKeycloakId()).getFirstName();
+        emailService.sendDataRequestEmail(user.getEmail(), firstName, requestType);
+    }
 
     /**
      * Récupère le profil complet de l'utilisateur par son email (claim "sub" du JWT Keycloak).
