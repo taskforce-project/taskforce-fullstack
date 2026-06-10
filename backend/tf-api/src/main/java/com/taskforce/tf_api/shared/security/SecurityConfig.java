@@ -9,6 +9,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 
 @Configuration
 @EnableWebSecurity
@@ -23,19 +24,42 @@ public class SecurityConfig {
         "/swagger-ui/**",
         "/v3/api-docs/**",
         "/api-docs/**",
-        "/ws/**",                           // WebSocket upgrade — auth gérée au niveau STOMP
-        "/ws-sockjs/**",                    // SockJS fallback
-        "/api/integrations/github/callback", // GitHub OAuth callback (appelé par GitHub)
-        "/api/integrations/slack/callback"   // Slack OAuth callback (appelé par Slack)
+        "/ws/**",
+        "/ws-sockjs/**",
+        "/api/integrations/github/callback",
+        "/api/integrations/slack/callback"
     };
 
+    // CSP stricte pour une API REST (pas de HTML servi — aucune ressource active autorisée)
+    private static final String API_CSP =
+        "default-src 'none'; frame-ancestors 'none'; form-action 'none'";
+
+    private static void applySecurityHeaders(HttpSecurity http) throws Exception {
+        http.headers(headers -> headers
+            .httpStrictTransportSecurity(hsts -> hsts
+                .includeSubDomains(true)
+                .maxAgeInSeconds(31_536_000)
+                .preload(true)
+            )
+            .frameOptions(frame -> frame.deny())
+            .contentTypeOptions(Customizer.withDefaults())
+            .referrerPolicy(referrer -> referrer
+                .policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN)
+            )
+            .contentSecurityPolicy(csp -> csp.policyDirectives(API_CSP))
+            .permissionsPolicy(permissions -> permissions
+                .policy("camera=(), microphone=(), geolocation=(), payment=(), usb=(), screen-wake-lock=()")
+            )
+        );
+    }
+
     /**
-     * Configuration de sécurité SANS OAuth2/Keycloak
-     * Utilisé uniquement quand keycloak.enabled=false
+     * Configuration de sécurité SANS OAuth2/Keycloak (dev local).
      */
     @Bean
     @ConditionalOnProperty(name = "keycloak.enabled", havingValue = "false")
     public SecurityFilterChain securityFilterChainWithoutOAuth(HttpSecurity http) throws Exception {
+        applySecurityHeaders(http);
         http
             .cors(Customizer.withDefaults())
             .authorizeHttpRequests(authz -> authz.anyRequest().permitAll())
@@ -47,13 +71,12 @@ public class SecurityConfig {
 
     /**
      * Filter chain prioritaire pour les endpoints publics.
-     * N'applique PAS oauth2ResourceServer : un token expiré/invalide envoyé
-     * par erreur ne déclenche pas de 401 sur ces routes.
      */
     @Bean
     @Order(1)
     @ConditionalOnProperty(name = "keycloak.enabled", havingValue = "true", matchIfMissing = true)
     public SecurityFilterChain publicEndpointsFilterChain(HttpSecurity http) throws Exception {
+        applySecurityHeaders(http);
         http
             .securityMatcher(PUBLIC_MATCHERS)
             .cors(Customizer.withDefaults())
@@ -66,12 +89,12 @@ public class SecurityConfig {
 
     /**
      * Filter chain pour les endpoints authentifiés.
-     * Applique oauth2ResourceServer (validation JWT Keycloak).
      */
     @Bean
     @Order(2)
     @ConditionalOnProperty(name = "keycloak.enabled", havingValue = "true", matchIfMissing = true)
     public SecurityFilterChain protectedEndpointsFilterChain(HttpSecurity http) throws Exception {
+        applySecurityHeaders(http);
         http
             .cors(Customizer.withDefaults())
             .authorizeHttpRequests(authz -> authz.anyRequest().authenticated())
@@ -83,3 +106,4 @@ public class SecurityConfig {
         return http.build();
     }
 }
+
