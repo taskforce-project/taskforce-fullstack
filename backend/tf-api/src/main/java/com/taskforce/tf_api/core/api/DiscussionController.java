@@ -30,7 +30,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
-@RequestMapping("/workspaces/{slug}/discussions")
+@RequestMapping("/api/workspaces/{slug}/discussions")
 @RequiredArgsConstructor
 public class DiscussionController {
 
