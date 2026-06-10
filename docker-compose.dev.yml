@@ -131,6 +131,11 @@ services:
       OTEL_EXPORTER_OTLP_PROTOCOL: grpc
       # Désactivé par défaut - passer à "false" pour exporter vers SigNoz
       OTEL_SDK_DISABLED: "${OTEL_SDK_DISABLED:-true}"
+      # Force les exporters à none quand SigNoz n'est pas disponible
+      # (OTEL_SDK_DISABLED seul ne suffit pas sur certaines versions de l'agent)
+      OTEL_TRACES_EXPORTER: "${OTEL_TRACES_EXPORTER:-none}"
+      OTEL_METRICS_EXPORTER: "${OTEL_METRICS_EXPORTER:-none}"
+      OTEL_LOGS_EXPORTER: "${OTEL_LOGS_EXPORTER:-none}"
       # Agent Java OTel - active l'instrumentation automatique (traces, métriques, logs)
       # Le JAR est téléchargé au build du Dockerfile. OTEL_SDK_DISABLED contrôle l'export.
       OTEL_JAVA_AGENT: "-javaagent:/otel/opentelemetry-javaagent.jar"
