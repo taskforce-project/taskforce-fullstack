@@ -31,7 +31,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
-@RequestMapping("/workspaces/{slug}/channels")
+@RequestMapping("/api/workspaces/{slug}/channels")
 @RequiredArgsConstructor
 public class ChannelController {
 
