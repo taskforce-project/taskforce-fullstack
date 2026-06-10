@@ -30,7 +30,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
-@RequestMapping("/workspaces/{slug}/teams")
+@RequestMapping("/api/workspaces/{slug}/teams")
 @RequiredArgsConstructor
 public class TeamController {
 
