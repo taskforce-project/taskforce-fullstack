@@ -28,7 +28,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
-@RequestMapping("/workspaces/{slug}/projects/{projectId}/pages")
+@RequestMapping("/api/workspaces/{slug}/projects/{projectId}/pages")
 @RequiredArgsConstructor
 public class PageController {
 
