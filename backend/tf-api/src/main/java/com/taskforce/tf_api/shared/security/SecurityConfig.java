@@ -1,5 +1,6 @@
 package com.taskforce.tf_api.shared.security;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -8,12 +9,35 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
+
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
+
+    @Value("${jwt.secret:myVerySecretKeyForJWTTokenGenerationThatIsLongEnoughToBeSecure256Bits}")
+    private String jwtSecret;
+
+    /**
+     * JwtDecoder utilisant HS512 pour valider les tokens custom générés par JwtService.
+     * Remplace le décodeur auto-configuré par Spring (qui cible les tokens RS256 de Keycloak).
+     */
+    @Bean
+    @ConditionalOnProperty(name = "keycloak.enabled", havingValue = "true", matchIfMissing = true)
+    public JwtDecoder jwtDecoder() {
+        byte[] keyBytes = jwtSecret.getBytes(StandardCharsets.UTF_8);
+        SecretKeySpec keySpec = new SecretKeySpec(keyBytes, "HmacSHA512");
+        return NimbusJwtDecoder.withSecretKey(keySpec)
+                .macAlgorithm(MacAlgorithm.HS512)
+                .build();
+    }
 
     // Endpoints publics partagés entre les deux configurations
     private static final String[] PUBLIC_MATCHERS = {

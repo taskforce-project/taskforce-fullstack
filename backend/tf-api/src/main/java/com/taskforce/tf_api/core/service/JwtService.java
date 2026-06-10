@@ -123,33 +123,6 @@ public class JwtService {
     }
 
     /**
-     * Rafraîchit l'access token à partir d'un refresh token
-     */
-    @Transactional
-    public AuthResponse refreshAccessToken(String refreshTokenValue, UserRepresentation keycloakUser) {
-        log.info("Rafraîchissement du token d'accès");
-
-        // Récupérer le refresh token
-        RefreshToken refreshToken = refreshTokenRepository.findByToken(refreshTokenValue)
-            .orElseThrow(() -> new RuntimeException("Refresh token invalide"));
-
-        // Vérifier sa validité
-        if (!refreshToken.isValid()) {
-            throw new RuntimeException("Refresh token expiré ou révoqué");
-        }
-
-        // Mettre à jour la dernière utilisation
-        refreshToken.updateLastUsed();
-        refreshTokenRepository.save(refreshToken);
-
-        // Récupérer l'utilisateur
-        // Note: Il faudrait ajouter une méthode pour récupérer l'utilisateur depuis le refresh token
-
-        // Pour l'instant, on retourne juste un message
-        throw new UnsupportedOperationException("Implémentation en cours");
-    }
-
-    /**
      * Révoque un refresh token
      */
     @Transactional
