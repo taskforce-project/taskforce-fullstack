@@ -67,6 +67,12 @@ public class SubscriptionHistory {
     private String stripeSubscriptionId;
 
     /**
+     * ID de l'événement Stripe — utilisé pour garantir l'idempotence (traitement unique par event).
+     */
+    @Column(name = "stripe_event_id", unique = true, length = 100)
+    private String stripeEventId;
+
+    /**
      * ID de la facture Stripe (si applicable)
      */
     @Column(name = "stripe_invoice_id")
