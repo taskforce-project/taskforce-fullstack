@@ -3,6 +3,7 @@ package com.taskforce.tf_api.core.api;
 import com.taskforce.tf_api.core.dto.request.DataRequestRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateUserRequest;
 import com.taskforce.tf_api.core.dto.response.UserResponse;
+import com.taskforce.tf_api.core.dto.response.UserSearchResult;
 import com.taskforce.tf_api.core.service.UserService;
 import com.taskforce.tf_api.shared.dto.ApiResponse;
 import com.taskforce.tf_api.shared.security.JwtIdentityResolver;
@@ -22,6 +23,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
 
 /**
  * Controller REST pour les opérations sur l'utilisateur courant.
@@ -78,6 +81,19 @@ public class UserController {
         log.debug("POST /api/users/me/avatar — email={}", email);
         UserResponse response = userService.uploadAvatar(email, file);
         return ResponseEntity.ok(ApiResponse.success("Avatar mis à jour", response));
+    }
+
+    /**
+     * Recherche d'utilisateurs par email ou displayName (insensible à la casse).
+     * GET /api/users/search?q=xxx  — retourne max 10 résultats.
+     */
+    @GetMapping("/search")
+    public ResponseEntity<ApiResponse<List<UserSearchResult>>> searchUsers(
+        @RequestParam String q,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        List<UserSearchResult> results = userService.searchUsers(q);
+        return ResponseEntity.ok(ApiResponse.success("Résultats de recherche", results));
     }
 
     /**

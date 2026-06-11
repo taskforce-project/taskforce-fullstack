@@ -40,6 +40,7 @@ export const USER_ROUTES = {
   ME: "/api/users/me",
   AVATAR: "/api/users/me/avatar",
   DATA_REQUEST: "/api/users/me/data-request",
+  SEARCH: (q: string) => `/api/users/search?q=${encodeURIComponent(q)}`,
 } as const;
 
 /**

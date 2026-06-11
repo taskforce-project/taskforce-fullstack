@@ -14,6 +14,13 @@ export interface UpdateUserPayload {
   avatarUrl?: string;
 }
 
+export interface UserSearchResult {
+  id: number;
+  email: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+}
+
 /**
  * Récupère le profil de l'utilisateur connecté depuis le backend.
  */
@@ -27,5 +34,14 @@ export async function getMe(): Promise<AuthUser> {
  */
 export async function updateMe(payload: UpdateUserPayload): Promise<AuthUser> {
   const response = await apiClient.patch<{ data: AuthUser }>(USER_ROUTES.ME, payload);
+  return response.data.data;
+}
+
+/**
+ * Recherche des utilisateurs par email ou displayName (max 10 résultats).
+ */
+export async function searchUsers(q: string): Promise<UserSearchResult[]> {
+  if (!q.trim()) return [];
+  const response = await apiClient.get<{ data: UserSearchResult[] }>(USER_ROUTES.SEARCH(q));
   return response.data.data;
 }

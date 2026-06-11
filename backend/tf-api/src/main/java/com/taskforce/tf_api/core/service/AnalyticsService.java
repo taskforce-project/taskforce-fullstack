@@ -10,6 +10,7 @@ import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -169,6 +170,7 @@ public class AnalyticsService {
     // Capacity (issues ouvertes par membre)
     // -------------------------------------------------------------------------
 
+    @Transactional(readOnly = true)
     public List<MemberCapacityResponse> getCapacity(String slug) {
         Workspace ws = findWorkspace(slug);
         List<Long> projectIds = getProjectIds(ws.getId());

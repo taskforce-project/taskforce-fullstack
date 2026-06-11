@@ -47,9 +47,9 @@ export const useUserStore = create<UserState>((set) => ({
       const user = await updateMe(payload);
       set({ user, isLoading: false });
       return user;
-    } catch {
+    } catch (err) {
       set({ isLoading: false });
-      return null;
+      throw err;
     }
   },
 }));

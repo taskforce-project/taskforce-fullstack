@@ -13,7 +13,8 @@ import com.taskforce.tf_api.core.model.WorkspaceMember;
 @Repository
 public interface WorkspaceMemberRepository extends JpaRepository<WorkspaceMember, Long> {
 
-    List<WorkspaceMember> findByWorkspaceId(Long workspaceId);
+    @Query("SELECT m FROM WorkspaceMember m JOIN FETCH m.user WHERE m.workspace.id = :workspaceId")
+    List<WorkspaceMember> findByWorkspaceId(@Param("workspaceId") Long workspaceId);
 
     Optional<WorkspaceMember> findByWorkspaceIdAndUserId(Long workspaceId, Long userId);
 

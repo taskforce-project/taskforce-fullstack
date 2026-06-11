@@ -2,6 +2,7 @@ package com.taskforce.tf_api.core.service;
 
 import com.taskforce.tf_api.core.dto.request.UpdateUserRequest;
 import com.taskforce.tf_api.core.dto.response.UserResponse;
+import com.taskforce.tf_api.core.dto.response.UserSearchResult;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.modules.ged.service.MinioService;
@@ -10,12 +11,14 @@ import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.keycloak.representations.idm.UserRepresentation;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 /**
  * Service pour les opérations sur l'utilisateur courant.
@@ -173,6 +176,15 @@ public class UserService {
             .isActive(user.getIsActive())
             .createdAt(user.getCreatedAt())
             .build();
+    }
+
+    @Transactional(readOnly = true)
+    public List<UserSearchResult> searchUsers(String q) {
+        if (q == null || q.isBlank()) return List.of();
+        return userRepository.searchByQuery(q.trim(), PageRequest.of(0, 10))
+            .stream()
+            .map(u -> new UserSearchResult(u.getId(), u.getEmail(), u.getDisplayName(), u.getAvatarUrl()))
+            .toList();
     }
 
     private String buildRawDisplayName(String firstName, String lastName) {

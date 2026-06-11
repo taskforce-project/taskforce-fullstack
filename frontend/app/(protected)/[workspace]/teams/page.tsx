@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useRef } from "react"
 import { useParams } from "next/navigation"
 import {
   Search,
@@ -10,6 +10,7 @@ import {
   Crown,
   X,
   Settings,
+  UserPlus,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -42,6 +43,7 @@ import {
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { useTeamStore } from "@/lib/store/team-store"
+import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import type { Team, TeamMember } from "@/lib/api/team-service"
 
 // ---------------------------------------------------------------------------
@@ -141,9 +143,31 @@ function TeamSettingsSheet({
 }) {
   const [name, setName] = useState(team.name)
   const [description, setDescription] = useState(team.description ?? "")
+  const [memberSearch, setMemberSearch] = useState("")
+  const [addingMemberId, setAddingMemberId] = useState<number | null>(null)
   const updateTeam = useTeamStore((s) => s.updateTeam)
   const deleteTeam = useTeamStore((s) => s.deleteTeam)
   const removeMember = useTeamStore((s) => s.removeMember)
+  const addMember = useTeamStore((s) => s.addMember)
+  const { members: workspaceMembers, fetchMembers } = useWorkspaceStore()
+
+  useEffect(() => {
+    if (open) fetchMembers()
+  }, [open, fetchMembers])
+
+  const existingMemberIds = new Set(team.members.map((m) => m.userId))
+  const filteredWorkspaceMembers = useMemo(() => {
+    const q = memberSearch.toLowerCase()
+    return workspaceMembers
+      .filter((m) => !existingMemberIds.has(m.userId))
+      .filter((m) =>
+        !q ||
+        (m.displayName ?? "").toLowerCase().includes(q) ||
+        (m.email ?? "").toLowerCase().includes(q)
+      )
+      .slice(0, 10)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspaceMembers, memberSearch, team.members])
 
   async function handleSave() {
     try {
@@ -171,6 +195,19 @@ function TeamSettingsSheet({
       toast.success(`${member.displayName} a été retiré de l'équipe`)
     } catch {
       toast.error("Erreur lors du retrait du membre")
+    }
+  }
+
+  async function handleAddMember(userId: number, displayName: string) {
+    setAddingMemberId(userId)
+    try {
+      await addMember(slug, team.id, { userId })
+      toast.success(`${displayName} a été ajouté à l'équipe`)
+      setMemberSearch("")
+    } catch {
+      toast.error("Impossible d'ajouter ce membre")
+    } finally {
+      setAddingMemberId(null)
     }
   }
 
@@ -235,6 +272,55 @@ function TeamSettingsSheet({
                 )}
               </div>
             ))}
+          </div>
+
+          <Separator />
+
+          {/* Add member */}
+          <div className="flex flex-col gap-3">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Ajouter un membre</h3>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
+              <Input
+                value={memberSearch}
+                onChange={(e) => setMemberSearch(e.target.value)}
+                placeholder="Rechercher par nom ou email…"
+                className="pl-8 h-8 text-sm"
+              />
+            </div>
+            {filteredWorkspaceMembers.length === 0 && memberSearch && (
+              <p className="text-xs text-muted-foreground px-1">Aucun membre trouvé</p>
+            )}
+            {filteredWorkspaceMembers.length === 0 && !memberSearch && workspaceMembers.length > 0 && (
+              <p className="text-xs text-muted-foreground px-1">Tous les membres du workspace sont déjà dans cette équipe</p>
+            )}
+            <div className="flex flex-col gap-1">
+              {filteredWorkspaceMembers.map((m) => {
+                const label = m.displayName ?? m.email
+                const initials = label.slice(0, 2).toUpperCase()
+                return (
+                  <div key={m.userId} className="flex items-center gap-3 rounded-md px-2 py-1.5 hover:bg-muted/50 transition-colors">
+                    <Avatar className="h-7 w-7">
+                      <AvatarFallback className="text-[10px] text-white bg-primary">{initials}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{label}</p>
+                      {m.displayName && <p className="text-xs text-muted-foreground truncate">{m.email}</p>}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs gap-1"
+                      disabled={addingMemberId === m.userId}
+                      onClick={() => handleAddMember(m.userId, label)}
+                    >
+                      <UserPlus className="size-3" />
+                      Ajouter
+                    </Button>
+                  </div>
+                )
+              })}
+            </div>
           </div>
 
           <Separator />

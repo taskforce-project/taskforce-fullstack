@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { useSearchParams } from "next/navigation"
 import {
   User, Bell, CreditCard, Users, Check, Zap, Globe, Key, Palette, Webhook,
-  X as XIcon, Plus, Upload, Camera, Link2, Trash2, Shield,
+  X as XIcon, Plus, Upload, Camera, Link2, Trash2, Shield, Search,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -21,6 +21,7 @@ import { useIntegrationStore } from "@/lib/store/integration-store"
 import { getAvatarUrl } from "@/lib/utils/avatar"
 import { apiClient } from "@/lib/api/client"
 import { USER_ROUTES } from "@/lib/config/api-routes"
+import { searchUsers, type UserSearchResult } from "@/lib/api/user-service"
 import { cn } from "@/lib/utils"
 
 type SettingsSection =
@@ -192,7 +193,7 @@ function StyledInput(props: Readonly<React.InputHTMLAttributes<HTMLInputElement>
 // ---------------------------------------------------------------------------
 
 function ProfilePanel() {
-  const { user } = useAuth()
+  const { user, refreshUser } = useAuth()
   const { updateProfile } = useUserStore()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -264,6 +265,7 @@ function ProfilePanel() {
       }
 
       await updateProfile(payload)
+      await refreshUser()
       toast.success("Profile updated")
     } catch {
       toast.error("Failed to update profile")
@@ -713,8 +715,11 @@ function WorkspacePanel() {
 }
 
 function TeamPanel() {
-  const [invited, setInvited] = useState("")
-  const [inviting, setInviting] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [searchResults, setSearchResults] = useState<UserSearchResult[]>([])
+  const [searching, setSearching] = useState(false)
+  const [inviting, setInviting] = useState<number | null>(null)
+  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { members, membersLoading, fetchMembers, invite, changeRole, kick } = useWorkspaceStore()
   const currentUser = useUserStore((s) => s.user)
 
@@ -724,16 +729,36 @@ function TeamPanel() {
   const isOwner = currentMember?.role === "OWNER"
   const canManage = isOwner || currentMember?.role === "ADMIN"
 
-  async function handleInvite() {
-    if (!invited.trim()) return
-    setInviting(true)
-    const result = await invite({ email: invited.trim() })
-    setInviting(false)
-    if (result) {
-      toast.success(`${invited} ajouté au workspace`)
-      setInvited("")
-    } else {
-      toast.error("Impossible d'ajouter ce membre")
+  const existingEmails = new Set(members.map((m) => m.email))
+
+  useEffect(() => {
+    if (searchTimeout.current) clearTimeout(searchTimeout.current)
+    if (!searchQuery.trim()) { setSearchResults([]); return }
+    setSearching(true)
+    searchTimeout.current = setTimeout(async () => {
+      try {
+        const results = await searchUsers(searchQuery)
+        setSearchResults(results.filter((r) => !existingEmails.has(r.email)))
+      } catch { setSearchResults([]) }
+      finally { setSearching(false) }
+    }, 300)
+    return () => { if (searchTimeout.current) clearTimeout(searchTimeout.current) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery])
+
+  async function handleInvite(user: UserSearchResult) {
+    setInviting(user.id)
+    try {
+      const result = await invite({ email: user.email })
+      if (result) {
+        toast.success(`${user.displayName ?? user.email} ajouté au workspace`)
+        setSearchQuery("")
+        setSearchResults([])
+      } else {
+        toast.error("Impossible d'ajouter ce membre")
+      }
+    } finally {
+      setInviting(null)
     }
   }
 
@@ -803,23 +828,46 @@ function TeamPanel() {
         </div>
       </SectionCard>
       {canManage && (
-        <SectionCard title="Invite member" description="Add an existing Taskforce user by email.">
-          <div className="flex gap-2">
-            <StyledInput
-              type="email"
-              placeholder="colleague@company.com"
-              value={invited}
-              onChange={(e) => setInvited(e.target.value)}
-              onKeyDown={(e: React.KeyboardEvent) => e.key === "Enter" && handleInvite()}
-            />
-            <Button
-              size="sm"
-              className="h-9 text-xs shrink-0"
-              onClick={handleInvite}
-              disabled={!invited || inviting}
-            >
-              {inviting ? "Adding…" : "Add member"}
-            </Button>
+        <SectionCard title="Invite member" description="Search an existing Taskforce user by name or email.">
+          <div className="flex flex-col gap-2">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <StyledInput
+                placeholder="Name or email…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8"
+              />
+            </div>
+            {searching && (
+              <p className="text-xs text-muted-foreground px-1">Searching…</p>
+            )}
+            {!searching && searchQuery && searchResults.length === 0 && (
+              <p className="text-xs text-muted-foreground px-1">No users found</p>
+            )}
+            {searchResults.length > 0 && (
+              <div className="flex flex-col gap-0.5 rounded-md border border-border bg-background overflow-hidden">
+                {searchResults.map((u) => (
+                  <div key={u.id} className="flex items-center gap-3 px-3 py-2 hover:bg-muted/50 transition-colors">
+                    <div className="h-7 w-7 rounded-full bg-primary flex items-center justify-center text-[10px] font-semibold text-white shrink-0">
+                      {(u.displayName ?? u.email).slice(0, 2).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{u.displayName ?? u.email}</p>
+                      {u.displayName && <p className="text-xs text-muted-foreground truncate">{u.email}</p>}
+                    </div>
+                    <Button
+                      size="sm"
+                      className="h-7 text-xs shrink-0"
+                      onClick={() => handleInvite(u)}
+                      disabled={inviting === u.id}
+                    >
+                      {inviting === u.id ? "Adding…" : "Add"}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </SectionCard>
       )}
