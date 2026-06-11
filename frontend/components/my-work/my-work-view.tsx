@@ -444,6 +444,7 @@ export function MyWorkView({ defaultTab = "issues" }: Readonly<MyWorkViewProps>)
   useEffect(() => {
     if (!slug || !user) return
     const baseUrl = `/${slug}`
+    const userEmail = user.email
 
     async function load() {
       const projs = await fetchProjects(slug)
@@ -453,7 +454,7 @@ export function MyWorkView({ defaultTab = "issues" }: Readonly<MyWorkViewProps>)
         Promise.all(projs.map(async (p) => ({ proj: p, pages: await pageService.list(slug, String(p.id)) }))),
       ])
 
-      setMyIssues(flattenIssues(issueResults, user.email, baseUrl))
+      setMyIssues(flattenIssues(issueResults, userEmail, baseUrl))
       setMyCycles(flattenCycles(cycleResults, baseUrl))
       setMyPages(flattenPages(pageResults, baseUrl))
     }

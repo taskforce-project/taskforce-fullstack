@@ -21,7 +21,7 @@ COPY src ./src
 
 # Build de l'application (skip tests pour plus de rapidité en dev)
 ARG SKIP_TESTS=true
-RUN mvn clean package -DskipTests=${SKIP_TESTS}
+RUN mvn clean package -Dmaven.test.skip=${SKIP_TESTS}
 
 # ================================
 # Stage 2: Runtime

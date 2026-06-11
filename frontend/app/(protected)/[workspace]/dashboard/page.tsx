@@ -37,6 +37,12 @@ const AGENTS = [
   { id: "chro", acronym: "CHRO", status: "idle"    as const, task: "Last active yesterday",           ago: "1d",  color: "#f472b6" },
 ]
 
+const AI_INSIGHTS = [
+  { id: "1", urgency: "high" as const, href: "./agents", agentColor: "#30d158", agent: "CFO", action: "Approve Q2 budget reallocation (+12k)", confidence: 87 },
+  { id: "2", urgency: "high" as const, href: "./agents", agentColor: "#0a84ff", agent: "COO", action: "Reassign TF-38 before sprint close",     confidence: 92 },
+  { id: "3", urgency: "low"  as const, href: "./agents", agentColor: "#a78bfa", agent: "CEO", action: "Review strategic overview draft",        confidence: 74 },
+]
+
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 const STATUS_CFG = {

@@ -32,6 +32,7 @@ import { cn } from "@/lib/utils"
 import { getAvatarUrl } from "@/lib/utils/avatar"
 import { useIssueStore } from "@/lib/store/issue-store"
 import type { Issue, IssuePriority, IssueStatusCategory } from "@/lib/api/issue-service"
+import { CreateIssueDialog } from "@/components/dialogs/create-issue-dialog"
 
 // ---------------------------------------------------------------------------
 // Mapping helpers
@@ -408,10 +409,12 @@ export default function ProjectIssuesPage() {
               {hasFilters ? "Try adjusting your filters" : "Create the first issue for this project"}
             </p>
             {!hasFilters && (
-              <Button size="sm" className="mt-4 gap-2" variant="outline">
-                <Plus className="size-4" />
-                New issue
-              </Button>
+              <CreateIssueDialog workspaceSlug={workspace} projectId={projectId}>
+                <Button size="sm" className="mt-4 gap-2" variant="outline">
+                  <Plus className="size-4" />
+                  New issue
+                </Button>
+              </CreateIssueDialog>
             )}
           </div>
         )}
@@ -422,10 +425,12 @@ export default function ProjectIssuesPage() {
         )}
 
         {/* Add issue row */}
-        <div className="flex items-center gap-2 px-4 py-2.5 text-muted-foreground hover:bg-muted/20 transition-colors cursor-pointer">
-          <Plus className="size-3.5" />
-          <span className="text-xs">Add issue</span>
-        </div>
+        <CreateIssueDialog workspaceSlug={workspace} projectId={projectId}>
+          <button type="button" className="flex w-full items-center gap-2 px-4 py-2.5 text-muted-foreground hover:bg-muted/20 transition-colors cursor-pointer">
+            <Plus className="size-3.5" />
+            <span className="text-xs">Add issue</span>
+          </button>
+        </CreateIssueDialog>
       </div>
 
       <IssueSheet

@@ -113,6 +113,8 @@ public class SecurityConfig {
 
     /**
      * Filter chain pour les endpoints authentifiés.
+     * Le JwtDecoder HS512 est injecté explicitement pour éviter que Spring
+     * n'utilise le décodeur RS256 auto-configuré depuis l'issuer Keycloak.
      */
     @Bean
     @Order(2)
@@ -122,8 +124,7 @@ public class SecurityConfig {
         http
             .cors(Customizer.withDefaults())
             .authorizeHttpRequests(authz -> authz.anyRequest().authenticated())
-            .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> {}))
-            .oauth2Client(oauth2 -> {})
+            .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(jwtDecoder())))
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 

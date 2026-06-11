@@ -46,8 +46,8 @@ public class RoadmapController {
     }
 
     private Long resolveUserId(Jwt jwt) {
-        String keycloakId = jwt.getSubject();
-        User user = userRepository.findByKeycloakId(keycloakId)
+        String email = jwt.getClaimAsString("email");
+        User user = userRepository.findByEmail(email)
             .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
         return user.getId();
     }

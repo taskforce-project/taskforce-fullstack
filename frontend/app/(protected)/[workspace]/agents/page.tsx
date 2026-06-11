@@ -164,7 +164,7 @@ function createAdapter(workspaceSlug: string, agentPersona: string): ChatModelAd
   return {
     async *run({ messages, abortSignal }) {
       const userMessage = getLastUserMessage(
-        messages as { role: string; content: { type: string; text?: string }[] }[]
+        messages as unknown as { role: string; content: { type: string; text?: string }[] }[]
       )
       const prompt = agentPersona
         ? `[You are the ${agentPersona}] ${userMessage}`

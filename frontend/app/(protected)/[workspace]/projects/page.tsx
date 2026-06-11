@@ -170,7 +170,7 @@ function MemberStack({ project }: { project: Project }) {
   return (
     <div className="flex items-center -space-x-1.5 shrink-0">
       {visible.map((m) => (
-        <Avatar key={m.id} className="h-5 w-5 ring-1" style={{ ringColor: "var(--background)" }}>
+        <Avatar key={m.id} className="h-5 w-5 ring-1 ring-background" style={{}}>
           <AvatarImage src={getAvatarUrl({ email: m.email, avatarUrl: m.avatarUrl })} />
           <AvatarFallback className="text-[8px] bg-violet-500/30 text-violet-200">
             {(m.displayName ?? m.email).slice(0, 2).toUpperCase()}

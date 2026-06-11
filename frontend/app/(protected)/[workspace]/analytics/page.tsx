@@ -22,6 +22,81 @@ import {
   type MemberCapacity,
 } from "@/lib/api/analytics-service"
 
+// ─── Primitives ───────────────────────────────────────────────────────────────
+
+interface KpiMetric {
+  label: string
+  value: string
+  delta: number
+  unit: string
+  icon: React.ElementType
+  color: string
+  deltaInverse?: boolean
+}
+
+function GlassCard({ className, children }: { className?: string; children: React.ReactNode }) {
+  return (
+    <div
+      className={cn("rounded-xl border", className)}
+      style={{ background: "var(--fill-secondary)", borderColor: "var(--separator)" }}
+    >
+      {children}
+    </div>
+  )
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <h3 className="text-xs font-semibold" style={{ color: "var(--label-secondary)" }}>
+      {children}
+    </h3>
+  )
+}
+
+// ─── Static data ──────────────────────────────────────────────────────────────
+
+const TOOLTIP_STYLE: React.CSSProperties = {
+  background: "var(--background)",
+  border: "1px solid var(--separator)",
+  borderRadius: "8px",
+  fontSize: "11px",
+  color: "var(--label-primary)",
+}
+
+const KPI_METRICS: KpiMetric[] = [
+  { label: "Tasks completed", value: "47",   delta: 12, unit: "this week",   icon: TrendingUp,   color: "#34d399" },
+  { label: "Cycle time",      value: "2.4d", delta: -8, unit: "avg",         icon: Activity,     color: "#60a5fa", deltaInverse: true },
+  { label: "Blocked tasks",   value: "3",    delta: 1,  unit: "active",      icon: AlertTriangle,color: "#f87171", deltaInverse: true },
+  { label: "Sprint velocity", value: "73%",  delta: -5, unit: "on target",   icon: Flame,        color: "#fbbf24", deltaInverse: true },
+]
+
+const THROUGHPUT_DATA = [
+  { week: "W1", opened: 18, resolved: 14 },
+  { week: "W2", opened: 22, resolved: 19 },
+  { week: "W3", opened: 15, resolved: 21 },
+  { week: "W4", opened: 27, resolved: 23 },
+]
+
+const HEALTH_TIMELINE = [
+  { day: "Mon", score: 82 },
+  { day: "Tue", score: 79 },
+  { day: "Wed", score: 74 },
+  { day: "Thu", score: 78 },
+  { day: "Fri", score: 81 },
+  { day: "Sat", score: 83 },
+  { day: "Sun", score: 78 },
+]
+
+const BURNDOWN_DATA = [
+  { day: "D1", ideal: 34, remaining: 34 },
+  { day: "D2", ideal: 28, remaining: 30 },
+  { day: "D3", ideal: 22, remaining: 25 },
+  { day: "D4", ideal: 17, remaining: 22 },
+  { day: "D5", ideal: 11, remaining: 16 },
+  { day: "D6", ideal: 6,  remaining: 12 },
+  { day: "D7", ideal: 0,  remaining: 8  },
+]
+
 // ─── Static data (AI anomalies kept as mock - complex ML feature) ─────────────
 
 const AI_ANOMALIES: {
@@ -65,18 +140,6 @@ const AI_ANOMALIES: {
     detectedAt: "3h ago",
   },
 ]
-
-// ─── KpiCard — accepts dynamic data ───────────────────────────────────────────
-
-interface KpiMetric {
-  label: string
-  value: string
-  delta: number
-  unit: string
-  icon: React.ElementType
-  color: string
-  deltaInverse?: boolean
-}
 
 // ─── KpiCard component ────────────────────────────────────────────────────────
 

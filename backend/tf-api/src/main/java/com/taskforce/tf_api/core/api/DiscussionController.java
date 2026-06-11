@@ -65,7 +65,7 @@ public class DiscussionController {
             @Valid @RequestBody CreateDiscussionRequest req,
             @AuthenticationPrincipal Jwt jwt
     ) {
-        User user = userRepository.findByKeycloakId(jwt.getSubject())
+        User user = userRepository.findByEmail(jwt.getClaimAsString("email"))
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         DiscussionResponse created = discussionService.createDiscussion(slug, user.getId(), req);
         return ResponseEntity.status(HttpStatus.CREATED)

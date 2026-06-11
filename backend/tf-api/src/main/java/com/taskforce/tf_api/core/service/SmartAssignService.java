@@ -291,6 +291,7 @@ public class SmartAssignService {
                 CandidateMetrics m = metricsByUser.get(u.getId());
                 // semanticScores contient le score Groq qui intègre déjà sémantique + historique
                 int semantic = toScore(semanticScores.getOrDefault(u.getId(), 0.0));
+                int historical = toScore(historicalScores.getOrDefault(u.getId(), 0.0));
 
                 int finalScore = clamp(
                     (int) Math.round(

@@ -112,8 +112,8 @@ public class StripeWebhookService {
         sub.setStatus(newStatus);
         sub.setStripeSubscriptionId(subscriptionId);
         sub.setStripeCustomerId(customerId);
-        sub.setCurrentPeriodStart(fromUnix(stripeSub.getCurrentPeriodStart()));
-        sub.setCurrentPeriodEnd(fromUnix(stripeSub.getCurrentPeriodEnd()));
+        sub.setCurrentPeriodStart(null);
+        sub.setCurrentPeriodEnd(null);
         sub.setCancelAtPeriodEnd(Boolean.TRUE.equals(stripeSub.getCancelAtPeriodEnd()));
         sub.setCanceledAt(fromUnix(stripeSub.getCanceledAt()));
         sub.setTrialEnd(fromUnix(stripeSub.getTrialEnd()));
@@ -132,7 +132,7 @@ public class StripeWebhookService {
 
         recordHistory(user.getId(), event.getId(), event.getType(),
             sub.getPlanType(), newStatus, subscriptionId, null, null, null,
-            fromUnix(stripeSub.getCurrentPeriodStart()), fromUnix(stripeSub.getCurrentPeriodEnd()));
+            null, null);
 
         log.info("customer.subscription.updated traité : userId={} status={}", user.getId(), newStatus);
     }
@@ -177,7 +177,10 @@ public class StripeWebhookService {
         if (invoice == null) return;
 
         String customerId     = invoice.getCustomer();
-        String subscriptionId = invoice.getSubscription();
+        String subscriptionId = (invoice.getParent() != null
+            && invoice.getParent().getSubscriptionDetails() != null)
+            ? invoice.getParent().getSubscriptionDetails().getSubscription()
+            : null;
         String invoiceId      = invoice.getId();
         BigDecimal amount     = invoice.getAmountPaid() != null
             ? BigDecimal.valueOf(invoice.getAmountPaid()).divide(BigDecimal.valueOf(100))
@@ -218,7 +221,10 @@ public class StripeWebhookService {
         if (invoice == null) return;
 
         String customerId     = invoice.getCustomer();
-        String subscriptionId = invoice.getSubscription();
+        String subscriptionId = (invoice.getParent() != null
+            && invoice.getParent().getSubscriptionDetails() != null)
+            ? invoice.getParent().getSubscriptionDetails().getSubscription()
+            : null;
         String invoiceId      = invoice.getId();
 
         Optional<User> userOpt = userRepository.findByStripeCustomerId(customerId);

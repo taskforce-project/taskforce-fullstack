@@ -43,7 +43,7 @@ export default function ProjectPagesPage() {
       })
       router.push(`/${slug}/projects/${projectId}/pages/${created.id}`)
     } catch {
-      // erreur silencieuse — le store gère le state
+      // erreur silencieuse â€” le store gÃ¨re le state
     }
   }
 
@@ -68,7 +68,7 @@ export default function ProjectPagesPage() {
       </div>
 
       {loading && (
-        <div className="text-sm text-muted-foreground py-8 text-center">Loading pages…</div>
+        <div className="text-sm text-muted-foreground py-8 text-center">Loading pagesâ€¦</div>
       )}
 
       {!loading && filtered.length === 0 && (
@@ -102,7 +102,7 @@ export default function ProjectPagesPage() {
                   </AvatarFallback>
                 </Avatar>
                 <span>{page.createdByName}</span>
-                <span>·</span>
+                <span>Â·</span>
                 <span>
                   {formatDistanceToNow(new Date(page.updatedAt), { addSuffix: true })}
                 </span>

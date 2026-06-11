@@ -93,7 +93,9 @@ public class AssistantService {
             sb.append("Recent issues (last 20):\n");
             recentIssues.forEach(i -> sb.append(String.format(
                 "- [%s] %s (priority: %s, status: %s)\n",
-                i.getIdentifier() != null ? i.getIdentifier() : "?",
+                (i.getProject() != null && i.getProject().getIdentifier() != null)
+                    ? i.getProject().getIdentifier() + "-" + i.getSequenceNumber()
+                    : "?",
                 i.getTitle(),
                 i.getPriority(),
                 i.getStatus() != null ? i.getStatus().getName() : "?"

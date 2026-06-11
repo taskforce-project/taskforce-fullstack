@@ -1,6 +1,6 @@
 ﻿"use client"
 
-import { useEffect, useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useParams } from "next/navigation"
 import {
   Circle,
@@ -16,6 +16,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
 import { useIssueStore } from "@/lib/store/issue-store"
 import { CreateIssueDialog } from "@/components/dialogs/create-issue-dialog"
+import { IssueSheet, type SheetIssue } from "@/components/sheets/issue-sheet"
 import type { Issue, IssueStatus, IssueStatusCategory } from "@/lib/api/issue-service"
 
 // ---------------------------------------------------------------------------
@@ -67,12 +68,42 @@ function extractParam(p: string | string[] | undefined): string {
 }
 
 // ---------------------------------------------------------------------------
+// toSheetIssue
+// ---------------------------------------------------------------------------
+
+function toSheetIssue(issue: Issue): SheetIssue {
+  return {
+    id:             String(issue.id),
+    identifier:     issue.identifier,
+    title:          issue.title,
+    description:    issue.description ?? undefined,
+    priority:       issue.priority as SheetIssue["priority"],
+    statusId:       issue.status.id,
+    statusName:     issue.status.name,
+    statusCategory: issue.status.category,
+    assignee:       issue.assignee
+      ? { initials: issue.assignee.email.slice(0, 2).toUpperCase(), color: AVATAR_COLORS[issue.assignee.id % AVATAR_COLORS.length], name: issue.assignee.displayName ?? issue.assignee.email, userId: issue.assignee.id }
+      : null,
+    assigneeId:     issue.assignee?.id ?? null,
+    labels:         issue.labels,
+    dueDate:        issue.dueDate,
+    storyPoints:    null,
+    cycle:          null,
+    createdAt:      issue.createdAt,
+  }
+}
+
+// ---------------------------------------------------------------------------
 // IssueRow
 // ---------------------------------------------------------------------------
 
-function IssueRow({ issue }: { readonly issue: Issue }) {
+function IssueRow({ issue, onOpen }: { readonly issue: Issue; readonly onOpen: (issue: Issue) => void }) {
   return (
-    <div className="group flex items-center gap-3 px-4 py-2.5 hover:bg-muted/40 transition-colors border-b border-border/50 last:border-0">
+    <button
+      type="button"
+      onClick={() => onOpen(issue)}
+      className="group flex w-full items-center gap-3 px-4 py-2.5 hover:bg-muted/40 transition-colors border-b border-border/50 last:border-0 text-left"
+    >
       <div className={cn("h-2 w-2 rounded-full shrink-0", PRIORITY_DOT[issue.priority as IssuePriority] ?? "bg-muted-foreground/30")} />
       <div className="shrink-0">{getCategoryIcon(issue.status.category, issue.status.color)}</div>
       <span className="text-xs text-muted-foreground font-mono w-14 shrink-0">{issue.identifier}</span>
@@ -104,7 +135,7 @@ function IssueRow({ issue }: { readonly issue: Issue }) {
         )}
       </div>
       <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-    </div>
+    </button>
   )
 }
 
@@ -117,11 +148,13 @@ function StatusGroup({
   issues,
   workspaceSlug,
   projectId,
+  onOpenIssue,
 }: {
   readonly status: IssueStatus
   readonly issues: Issue[]
   readonly workspaceSlug: string
   readonly projectId: number
+  readonly onOpenIssue: (issue: Issue) => void
 }) {
   return (
     <div>
@@ -134,7 +167,7 @@ function StatusGroup({
       </div>
 
       {issues.map((issue) => (
-        <IssueRow key={issue.id} issue={issue} />
+        <IssueRow key={issue.id} issue={issue} onOpen={onOpenIssue} />
       ))}
 
       {/* Add issue in this group */}
@@ -158,6 +191,7 @@ export default function ProjectListPage() {
   const projectId = Number(extractParam(params.id))
 
   const { issues, statuses, isLoading, fetchIssues, fetchStatuses } = useIssueStore()
+  const [selectedIssue, setSelectedIssue] = useState<SheetIssue | null>(null)
 
   useEffect(() => {
     if (!workspace || !projectId) return
@@ -211,9 +245,18 @@ export default function ProjectListPage() {
             issues={groupIssues}
             workspaceSlug={workspace}
             projectId={projectId}
+            onOpenIssue={(issue) => setSelectedIssue(toSheetIssue(issue))}
           />
         )
       })}
+
+      <IssueSheet
+        issue={selectedIssue}
+        open={selectedIssue !== null}
+        onOpenChange={(open) => { if (!open) setSelectedIssue(null) }}
+        workspaceSlug={workspace}
+        projectId={projectId}
+      />
     </div>
   )
 }

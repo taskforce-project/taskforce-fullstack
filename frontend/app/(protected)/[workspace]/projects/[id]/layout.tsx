@@ -97,7 +97,7 @@ export default function ProjectLayout({ children }: { readonly children: React.R
   const workspace = extractParam(params.workspace)
   const projectId = extractParam(params.id) || "0"
 
-  const { projects, fetchProjects, archiveProject, updateProject } = useProjectStore()
+  const { projects, fetchProjects, archiveProject, updateProject, setActiveProject } = useProjectStore()
 
   useEffect(() => {
     if (workspace && projects.length === 0) {
@@ -106,6 +106,10 @@ export default function ProjectLayout({ children }: { readonly children: React.R
   }, [workspace, projects.length, fetchProjects])
 
   const project = projects.find((p) => p.id === Number(projectId))
+
+  useEffect(() => {
+    if (project) setActiveProject(project)
+  }, [project, setActiveProject])
   const basePath = `/${workspace}/projects/${projectId}`
 
   function isTabActive(suffix: string): boolean {

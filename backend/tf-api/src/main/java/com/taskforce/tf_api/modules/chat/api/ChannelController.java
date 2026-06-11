@@ -127,7 +127,7 @@ public class ChannelController {
     // =========================================================================
 
     private Long resolveUserId(Jwt jwt) {
-        return userRepository.findByKeycloakId(jwt.getSubject())
+        return userRepository.findByEmail(jwt.getClaimAsString("email"))
                 .map(User::getId)
                 .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
     }

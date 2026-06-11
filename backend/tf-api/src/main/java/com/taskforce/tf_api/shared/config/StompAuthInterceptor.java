@@ -67,7 +67,8 @@ public class StompAuthInterceptor implements ChannelInterceptor {
 
         try {
             Jwt jwt = jwtDecoder.decode(authorization.substring(7));
-            userRepository.findByKeycloakId(jwt.getSubject()).ifPresentOrElse(
+            String email = jwt.getClaimAsString("email");
+            userRepository.findByEmail(email).ifPresentOrElse(
                     user -> {
                         var auth = new UsernamePasswordAuthenticationToken(
                                 user.getId().toString(), null, java.util.List.of()
@@ -75,7 +76,7 @@ public class StompAuthInterceptor implements ChannelInterceptor {
                         accessor.setUser(auth);
                         log.debug("STOMP CONNECT authentifié : userId={}", user.getId());
                     },
-                    () -> log.warn("STOMP CONNECT : user Keycloak {} introuvable en base", jwt.getSubject())
+                    () -> log.warn("STOMP CONNECT : user email {} introuvable en base", email)
             );
         } catch (Exception e) {
             log.warn("STOMP CONNECT : token JWT invalide — {}", e.getMessage());

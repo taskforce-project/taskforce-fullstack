@@ -32,15 +32,9 @@ spring:
   # Security Configuration OAuth2/OIDC
   security:
     oauth2:
-      # Resource Server : Pour valider les tokens JWT Keycloak
-      resourceserver:
-        jwt:
-          # Issuer : Vérifie que le token vient bien de Keycloak
-          issuer-uri: ${KEYCLOAK_ISSUER_URI:${KEYCLOAK_URL:http://localhost:8180}/realms/${KEYCLOAK_REALM:taskforce-dev}}
-          # JWK Set : Clés publiques pour vérifier la signature des tokens
-          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:${KEYCLOAK_URL:http://localhost:8180}/realms/${KEYCLOAK_REALM:taskforce-dev}/protocol/openid-connect/certs}
-
       # OAuth2 Client : Pour l'authentification Password Grant
+      # Note: pas de resourceserver.jwt ici — on utilise notre propre JwtDecoder HS512
+      # défini dans SecurityConfig, pas le décodeur auto-configuré RS256 de Keycloak.
       client:
         registration:
           keycloak:

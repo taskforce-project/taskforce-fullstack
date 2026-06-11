@@ -11,6 +11,7 @@ import {
 } from "lucide-react"
 
 import { IssueSheet, type SheetIssue } from "@/components/sheets/issue-sheet"
+import { CreateIssueDialog } from "@/components/dialogs/create-issue-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
@@ -64,7 +65,7 @@ function toSheetIssue(issue: Issue): SheetIssue {
       : null,
     assigneeId:     issue.assignee?.id ?? null,
     labels:         issue.labels,
-    dueDate:        formatDate(issue.dueDate),
+    dueDate:        formatDate(issue.dueDate) ?? null,
     storyPoints:    null,
     cycle:          null,
     createdAt:      formatDate(issue.createdAt) ?? issue.createdAt,
@@ -140,10 +141,12 @@ export default function ProjectBacklogPage() {
           </button>
         ))}
 
-        <div className="flex items-center gap-2 px-4 py-2.5 text-muted-foreground hover:bg-muted/20 transition-colors cursor-pointer">
-          <Plus className="h-3.5 w-3.5" />
-          <span className="text-xs">Add to backlog</span>
-        </div>
+        <CreateIssueDialog workspaceSlug={workspace} projectId={projectId} defaultStatusId={undefined}>
+          <button type="button" className="flex w-full items-center gap-2 px-4 py-2.5 text-muted-foreground hover:bg-muted/20 transition-colors cursor-pointer">
+            <Plus className="h-3.5 w-3.5" />
+            <span className="text-xs">Add to backlog</span>
+          </button>
+        </CreateIssueDialog>
       </div>
 
       <IssueSheet

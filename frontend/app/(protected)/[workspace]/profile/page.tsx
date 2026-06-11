@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   Clock,
   Settings,
+  Star,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"

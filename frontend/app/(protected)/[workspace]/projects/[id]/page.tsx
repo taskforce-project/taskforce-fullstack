@@ -13,6 +13,7 @@ import {
 } from "lucide-react"
 
 import { CreateIssueDialog } from "@/components/dialogs/create-issue-dialog"
+import { IssueSheet, type SheetIssue } from "@/components/sheets/issue-sheet"
 import { useTranslation } from "@/lib/i18n"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -85,6 +86,31 @@ function extractParam(p: string | string[] | undefined): string {
   if (typeof p === "string") return p
   if (Array.isArray(p)) return p[0] ?? ""
   return ""
+}
+
+function toSheetIssue(issue: Issue): SheetIssue {
+  const priorityMap: Record<IssuePriority, SheetIssue["priority"]> = {
+    NONE: "NONE", URGENT: "URGENT", HIGH: "HIGH", MEDIUM: "MEDIUM", LOW: "LOW",
+  }
+  return {
+    id:             String(issue.id),
+    identifier:     issue.identifier,
+    title:          issue.title,
+    description:    issue.description ?? undefined,
+    priority:       priorityMap[issue.priority],
+    statusId:       issue.status.id,
+    statusName:     issue.status.name,
+    statusCategory: issue.status.category,
+    assignee:       issue.assignee
+      ? { initials: issue.assignee.email.slice(0, 2).toUpperCase(), color: AVATAR_COLORS[issue.assignee.id % AVATAR_COLORS.length], name: issue.assignee.displayName ?? issue.assignee.email, userId: issue.assignee.id }
+      : null,
+    assigneeId:     issue.assignee?.id ?? null,
+    labels:         issue.labels,
+    dueDate:        issue.dueDate,
+    storyPoints:    null,
+    cycle:          null,
+    createdAt:      issue.createdAt,
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -170,13 +196,21 @@ function IssueCard({
   issue,
   statuses,
   onStatusChange,
+  onOpen,
 }: {
   readonly issue: Issue
   readonly statuses: IssueStatus[]
   readonly onStatusChange: (issueId: number, statusId: number) => void
+  readonly onOpen: (issue: Issue) => void
 }) {
   return (
-    <div className="group/card rounded-lg border border-border bg-card p-3 hover:border-primary/30 hover:shadow-md transition-all cursor-pointer">
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpen(issue)}
+      onKeyDown={(e) => e.key === "Enter" && onOpen(issue)}
+      className="group/card rounded-lg border border-border bg-card p-3 hover:border-primary/30 hover:shadow-md transition-all cursor-pointer"
+    >
       {issue.labels.length > 0 && (
         <div className="flex flex-wrap gap-1 mb-2">
           {issue.labels.map((label) => (
@@ -206,7 +240,7 @@ function IssueCard({
           {issue.assignee && (
             <Avatar className="size-5">
               {issue.assignee.avatarUrl && <AvatarImage src={issue.assignee.avatarUrl} />}
-              <AvatarFallback className={cn("text-[9px] text-white", getMemberColor(Number(issue.assignee.id)))}>
+              <AvatarFallback className={cn("text-[9px] text-white", getMemberColor(issue.assignee.id))}>
                 {getMemberInitials(issue.assignee.displayName, issue.assignee.email)}
               </AvatarFallback>
             </Avatar>
@@ -217,6 +251,7 @@ function IssueCard({
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
+                onClick={(e) => e.stopPropagation()}
                 className="opacity-0 group-hover/card:opacity-100 transition-opacity flex items-center gap-0.5 text-muted-foreground hover:text-foreground px-1 py-0.5 rounded hover:bg-muted/60"
                 title="Changer le statut"
               >
@@ -257,6 +292,7 @@ function BoardColumn({
   onStatusChange,
   onDeleteStatus,
   onRenameStatus,
+  onOpenIssue,
   t,
 }: {
   readonly status: IssueStatus
@@ -267,6 +303,7 @@ function BoardColumn({
   readonly onStatusChange: (issueId: number, statusId: number) => void
   readonly onDeleteStatus: (statusId: number) => void
   readonly onRenameStatus: (statusId: number, name: string) => void
+  readonly onOpenIssue: (issue: Issue) => void
   readonly t: (k: string) => string
 }) {
   const [editing, setEditing] = useState(false)
@@ -369,6 +406,7 @@ function BoardColumn({
             issue={issue}
             statuses={statuses}
             onStatusChange={onStatusChange}
+            onOpen={onOpenIssue}
           />
         ))}
 
@@ -482,8 +520,8 @@ export default function ProjectBoardPage() {
 
   const { issues, statuses, error, fetchIssues, fetchStatuses, createStatus, clearIssues, updateIssue, deleteStatus, updateStatus } = useIssueStore()
 
-  // Local state to track the full initialization sequence
   const [initializing, setInitializing] = useState(true)
+  const [selectedIssue, setSelectedIssue] = useState<SheetIssue | null>(null)
 
   useEffect(() => {
     if (!workspace || !projectId) return
@@ -589,12 +627,21 @@ export default function ProjectBoardPage() {
               onStatusChange={handleStatusChange}
               onDeleteStatus={handleDeleteStatus}
               onRenameStatus={handleRenameStatus}
+              onOpenIssue={(issue) => setSelectedIssue(toSheetIssue(issue))}
               t={t}
             />
           ))}
           <AddColumnPopover workspaceSlug={workspace} projectId={projectId} />
         </div>
       )}
+
+      <IssueSheet
+        issue={selectedIssue}
+        open={selectedIssue !== null}
+        onOpenChange={(open) => { if (!open) setSelectedIssue(null) }}
+        workspaceSlug={workspace}
+        projectId={projectId}
+      />
     </div>
   )
 }
