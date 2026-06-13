@@ -1,0 +1,61 @@
+---
+description: Conventions Git, commits, branches et Pull Requests pour le projet Taskforce
+alwaysApply: true
+---
+
+# Git Conventions - Taskforce
+
+## Branches
+
+| Type    | Nomenclature          | Depuis |
+| ------- | --------------------- | ------ |
+| Feature | `feature/nom-feature` | `dev`  |
+| Fix     | `fix/nom-bug`         | `dev`  |
+| Hotfix  | `hotfix/nom-fix`      | `main` |
+
+- `main` : Production stable (`v1.0.0`)
+- `dev` : Développement avec Release Candidates (`v1.0.0-rc1`)
+
+## Format de Commits (OBLIGATOIRE)
+
+`<type>(<scope>): <description>`
+
+| Type       | Usage                                   |
+| ---------- | --------------------------------------- |
+| `feat`     | Nouvelle fonctionnalité                 |
+| `fix`      | Correction de bug                       |
+| `refactor` | Refactoring sans changement fonctionnel |
+| `docs`     | Documentation uniquement                |
+| `style`    | Formatage, indentation                  |
+| `test`     | Ajout/modification de tests             |
+| `chore`    | Tâches de maintenance                   |
+| `ci`       | CI/CD                                   |
+| `perf`     | Optimisation performance                |
+| `build`    | Modifications de build                  |
+| `config`   | Modifications de configuration          |
+
+### Scopes
+
+- Backend : `api`, `auth`, `user`, `subscription`, `db`, `security`
+- Frontend : `ui`, `auth`, `dashboard`, `components`, `api-client`
+- Infra : `docker`, `keycloak`, `postgres`, `nginx`
+- Global : `config`, `env`, `deps`
+
+### ❌ À éviter
+
+```bash
+git commit -m "fix stuff"      # trop vague
+git commit -m "update"         # pas de type
+git commit -m "feat: fix bug"  # type incorrect
+```
+
+## Pull Requests
+
+**Labels OBLIGATOIRES (UN SEUL)** :
+- `release:major` - Breaking changes
+- `release:minor` - Nouvelles features
+- `release:patch` - Bug fixes
+
+**Labels optionnels** : `type:feature`, `type:bugfix`, `backend`, `frontend`, `priority:critical`
+
+**Titre de PR** : Suivre les mêmes conventions que les commits.
