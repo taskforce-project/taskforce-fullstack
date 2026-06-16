@@ -124,6 +124,10 @@ public class Issue {
     @Column(name = "due_date")
     private LocalDate dueDate;
 
+    /** Estimation d'effort (story points), null si non estimé */
+    @Column(name = "story_points")
+    private Integer storyPoints;
+
     /** Renseigné quand le statut passe en catégorie COMPLETED */
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
