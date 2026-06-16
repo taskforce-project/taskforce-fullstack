@@ -50,8 +50,20 @@ const nextConfig: NextConfig = {
     "assistant-stream",
     "assistant-cloud",
   ],
-  webpack(config, { isServer }) {
+  webpack(config, { isServer, dev }) {
     config.resolve.conditionNames = ["import", "require", "node", "default", "browser"]
+
+    // Dev sous Docker/Windows : le polling (WATCHPACK_POLLING/CHOKIDAR_USEPOLLING)
+    // re-détecte les écritures que Next fait dans .next/ → boucle compile/render.
+    // On ignore .next/node_modules/.git du watcher et on calme l'intervalle de poll.
+    if (dev) {
+      config.watchOptions = {
+        ...config.watchOptions,
+        poll: 1000,
+        aggregateTimeout: 300,
+        ignored: ["**/node_modules", "**/.next", "**/.git"],
+      }
+    }
 
     config.plugins.push(
       new webpack.NormalModuleReplacementPlugin(/^node:/, (resource: { request: string }) => {
