@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import {
   X, RefreshCw, Clock, CheckCircle2, AlertTriangle, CircleDot,
   Flag, Tag, Calendar, Layers, GitBranch, MessageSquare, Activity,
@@ -552,9 +553,8 @@ function makeKeyHandler(
   }
 }
 
-function parsePointsDraft(draft: string): number | null {
-  return draft.trim() === "" ? null : Number(draft.trim())
-}
+/** Presets d'estimation (story points, façon Fibonacci) ; null = aucune estimation */
+const STORY_POINT_PRESETS: (number | null)[] = [null, 1, 2, 3, 5, 8, 13]
 
 function formatDueDateDraft(dueDate: string | null): string {
   if (!dueDate || dueDate === "Overdue") return ""
@@ -572,6 +572,7 @@ interface IssueSheetProps {
 }
 
 export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId }: Readonly<IssueSheetProps>) {
+  const router = useRouter()
   const { fetchComments, addComment, deleteComment, fetchActivity, updateIssue, fetchStatuses,
           comments: storeComments, activity: storeActivity, statuses: storeStatuses } = useIssueStore()
   const { labelsByProject, fetchLabels } = useLabelStore()
@@ -606,21 +607,17 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
   const [assignee, setAssignee] = useState(issue?.assignee ?? null)
   const [labels, setLabels] = useState<IssueLabel[]>(issue?.labels ?? [])
   const [points, setPoints] = useState<number | null>(issue?.storyPoints ?? null)
-  const [editingPoints, setEditingPoints] = useState(false)
-  const [pointsDraft, setPointsDraft] = useState(String(issue?.storyPoints ?? ""))
   const [cycle, setCycle] = useState<string | null>(issue?.cycle ?? null)
   const [editingCycle, setEditingCycle] = useState(false)
   const [cycleDraft, setCycleDraft] = useState(issue?.cycle ?? "")
   const [dueDate, setDueDate] = useState<string | null>(issue?.dueDate ?? null)
   const [editingDueDate, setEditingDueDate] = useState(false)
   const [dueDateDraft, setDueDateDraft] = useState("")
-  const pointsRef = useRef<HTMLInputElement>(null)
   const cycleRef  = useRef<HTMLInputElement>(null)
   const dueDateRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { if (editingTitle)   titleRef.current?.focus() }, [editingTitle])
   useEffect(() => { if (editingDesc)    descRef.current?.focus()  }, [editingDesc])
-  useEffect(() => { if (editingPoints)  pointsRef.current?.focus() }, [editingPoints])
   useEffect(() => { if (editingCycle)   cycleRef.current?.focus()  }, [editingCycle])
   useEffect(() => { if (editingDueDate) dueDateRef.current?.focus() }, [editingDueDate])
 
@@ -682,6 +679,8 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
 
   // Use real statuses from store if loaded, fallback to category-based config
   const displayStatuses: ApiIssueStatus[] = storeStatuses
+  // Couleur réelle de la colonne courante (reflète la couleur personnalisée du board)
+  const currentStatusColor = displayStatuses.find((s) => s.id === statusId)?.color ?? "#94a3b8"
 
   async function callUpdate(payload: Parameters<typeof updateIssue>[3]) {
     if (!workspaceSlug || !projectId) return
@@ -690,13 +689,6 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
     } catch {
       toast.error("Failed to save")
     }
-  }
-
-  function savePoints() {
-    const val = parsePointsDraft(pointsDraft)
-    setPoints(val)
-    setEditingPoints(false)
-    toast.success("Points updated")
   }
 
   function saveCycle() {
@@ -713,7 +705,6 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
     toast.success("Due date updated")
   }
 
-  const onPointsKey  = makeKeyHandler(savePoints,  () => setEditingPoints(false))
   const onCycleKey   = makeKeyHandler(saveCycle,   () => setEditingCycle(false))
   const onDueDateKey = makeKeyHandler(saveDueDate, () => setEditingDueDate(false))
 
@@ -726,7 +717,6 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
     })
   }
 
-  function onPointsClick() { setPointsDraft(String(points ?? "")); setEditingPoints(true) }
   function onCycleClick()  { setCycleDraft(cycle ?? ""); setEditingCycle(true) }
   function onDueDateClick() { setDueDateDraft(formatDueDateDraft(dueDate)); setEditingDueDate(true) }
 
@@ -791,19 +781,17 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
           <span className="text-muted-foreground/40 text-xs">·</span>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button type="button" className={cn("flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium hover:bg-muted/60 transition-colors", statusCfg.color)}>
-                {statusCfg.icon}
-                <span className="ml-1">{statusName || statusCfg.label}</span>
+              <button type="button" className="flex items-center gap-1.5 rounded px-1.5 py-0.5 text-xs font-medium text-foreground hover:bg-muted/60 transition-colors">
+                <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: currentStatusColor }} />
+                <span>{statusName || statusCfg.label}</span>
                 <ChevronDown className="size-3 ml-0.5 opacity-60" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="min-w-48">
-              {displayStatuses.length > 0 ? displayStatuses.map((s) => {
-                const cfg = getStatusCfg(s.category)
-                return (
+              {displayStatuses.length > 0 ? displayStatuses.map((s) => (
                   <DropdownMenuItem
                     key={s.id}
-                    className={cn("flex items-center gap-2 text-xs", cfg.color)}
+                    className="flex items-center gap-2 text-xs"
                     onClick={async () => {
                       setStatusId(s.id)
                       setStatusName(s.name)
@@ -812,12 +800,11 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                       toast.success(`Status → ${s.name}`)
                     }}
                   >
-                    {cfg.icon}
+                    <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
                     {s.name}
                     {statusId === s.id && <CheckIcon className="ml-auto size-3 text-primary" />}
                   </DropdownMenuItem>
-                )
-              }) : (Object.keys(STATUS_CATEGORY_CONFIG) as IssueStatusCategory[]).map((cat) => (
+              )) : (Object.keys(STATUS_CATEGORY_CONFIG) as IssueStatusCategory[]).map((cat) => (
                 <DropdownMenuItem
                   key={cat}
                   className={cn("flex items-center gap-2 text-xs", STATUS_CATEGORY_CONFIG[cat].color)}
@@ -841,7 +828,13 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
             variant="ghost"
             size="sm"
             className="h-7 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-            onClick={() => toast.info("Opening full page…")}
+            onClick={() => {
+              if (workspaceSlug && projectId) {
+                router.push(`/${workspaceSlug}/projects/${projectId}/issues/${issue.id}`)
+                onOpenChange(false)
+              }
+            }}
+            title="Ouvrir l'issue en page pleine"
           >
             <ExternalLink className="size-3.5" />
             Open
@@ -1193,22 +1186,34 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
               </DropdownMenu>
             </MetaRow>
 
-            {/* Points — inline editable */}
+            {/* Points — select de presets (estimation d'effort), persiste en base */}
             <MetaRow icon={<Layers className="size-3.5" />} label="Points">
-              {editingPoints ? (
-                <input ref={pointsRef} type="number" min={0} max={99} value={pointsDraft}
-                  onChange={(e) => setPointsDraft(e.target.value)}
-                  onBlur={savePoints}
-                  onKeyDown={onPointsKey}
-                  className="w-16 h-5 text-xs bg-transparent border-b border-primary outline-none"
-                />
-              ) : (
-                <button type="button" onClick={onPointsClick}
-                  className="flex items-center gap-1 text-xs hover:bg-muted/50 rounded px-1 -mx-1 py-0.5 w-full text-left transition-colors group">
-                  <span className="flex-1 text-foreground">{points === null ? "—" : `${points} pts`}</span>
-                  <Pencil className="size-3 opacity-0 group-hover:opacity-40 shrink-0" />
-                </button>
-              )}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button type="button" className="flex items-center gap-1 text-xs hover:bg-muted/50 rounded px-1 -mx-1 py-0.5 w-full text-left transition-colors">
+                    <span className="flex-1 text-foreground">{points === null ? "—" : `${points} pts`}</span>
+                    <ChevronDown className="size-3 opacity-40 shrink-0" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-32">
+                  {STORY_POINT_PRESETS.map((pt) => (
+                    <DropdownMenuItem
+                      key={pt ?? "none"}
+                      className="flex items-center gap-2 text-xs"
+                      onSelect={async (e) => {
+                        e.preventDefault()
+                        setPoints(pt)
+                        // 0 = retirer l'estimation côté backend
+                        await callUpdate({ storyPoints: pt ?? 0 })
+                        toast.success("Points updated")
+                      }}
+                    >
+                      {pt === null ? "Aucune estimation" : `${pt} pts`}
+                      {points === pt ? <CheckIcon className="ml-auto size-3 text-primary" /> : null}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </MetaRow>
 
             {/* Cycle — inline editable */}
