@@ -176,10 +176,14 @@ public class AnalyticsService {
         List<Long> projectIds = getProjectIds(ws.getId());
 
         // Build map: userId → open issue count
+        // Cast via Number to handle both Long and Integer returns from JPQL aggregates
         Map<Long, Long> openCounts = new HashMap<>();
         if (!projectIds.isEmpty()) {
             issueRepository.countOpenIssuesGroupedByAssignee(projectIds)
-                .forEach(row -> openCounts.put((Long) row[0], (Long) row[1]));
+                .forEach(row -> openCounts.put(
+                    ((Number) row[0]).longValue(),
+                    ((Number) row[1]).longValue()
+                ));
         }
 
         List<WorkspaceMember> members = workspaceMemberRepository.findByWorkspaceId(ws.getId());
