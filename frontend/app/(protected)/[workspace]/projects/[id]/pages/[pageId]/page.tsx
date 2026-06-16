@@ -45,7 +45,7 @@ export default function ProjectPageDetailPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64 text-sm text-muted-foreground">
-        Loading…
+        Loadingâ€¦
       </div>
     )
   }
@@ -79,7 +79,7 @@ export default function ProjectPageDetailPage() {
           className="gap-1.5 shrink-0"
         >
           <Save className="h-3.5 w-3.5" />
-          {saving ? "Saving…" : "Save"}
+          {saving ? "Savingâ€¦" : "Save"}
         </Button>
       </div>
 
@@ -91,7 +91,7 @@ export default function ProjectPageDetailPage() {
           </AvatarFallback>
         </Avatar>
         <span>{currentPage.createdByName}</span>
-        <span>·</span>
+        <span>Â·</span>
         <span>
           {formatDistanceToNow(new Date(currentPage.updatedAt), { addSuffix: true })}
         </span>

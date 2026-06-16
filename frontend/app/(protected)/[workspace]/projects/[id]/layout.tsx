@@ -15,7 +15,6 @@ import {
   ChevronRight,
   MoreHorizontal,
   Star,
-  CircleDot,
 } from "lucide-react"
 
 import { useTranslation } from "@/lib/i18n"
@@ -78,7 +77,6 @@ const PROJECT_TABS: ProjectTab[] = [
   { key: "detail.board", icon: LayoutGrid, pathSuffix: "" },
   { key: "detail.list", icon: List, pathSuffix: "/list" },
   { key: "detail.backlog", icon: AlignLeft, pathSuffix: "/backlog" },
-  { key: "detail.issues", icon: CircleDot, pathSuffix: "/issues" },
   { key: "detail.cycles", icon: RefreshCw, pathSuffix: "/cycles" },
   { key: "detail.pages", icon: FileText, pathSuffix: "/pages" },
   { key: "detail.members", icon: Users, pathSuffix: "/members" },
@@ -97,7 +95,7 @@ export default function ProjectLayout({ children }: { readonly children: React.R
   const workspace = extractParam(params.workspace)
   const projectId = extractParam(params.id) || "0"
 
-  const { projects, fetchProjects, archiveProject, updateProject, setActiveProject } = useProjectStore()
+  const { projects, fetchProjects, archiveProject, updateProject, setActiveProject, toggleFavorite } = useProjectStore()
 
   useEffect(() => {
     if (workspace && projects.length === 0) {
@@ -161,8 +159,15 @@ export default function ProjectLayout({ children }: { readonly children: React.R
               )}
             </div>
 
-            <Button size="sm" variant="ghost" className="h-8 w-8 p-0 hidden sm:flex">
-              <Star className="h-4 w-4" />
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8 w-8 p-0 hidden sm:flex"
+              disabled={!project}
+              onClick={() => project && toggleFavorite(workspace, project.id, !project.isFavorite)}
+              title={project?.isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}
+            >
+              <Star className={cn("h-4 w-4", project?.isFavorite && "fill-yellow-400 text-yellow-400")} />
             </Button>
 
             <CreateIssueDialog projectId={Number(projectId)} workspaceSlug={workspace}>
@@ -179,12 +184,6 @@ export default function ProjectLayout({ children }: { readonly children: React.R
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem asChild>
-                  <Link href={`${basePath}/settings`}>
-                    <Settings className="h-4 w-4 mr-2" />
-                    {t("projects.detail.settings")}
-                  </Link>
-                </DropdownMenuItem>
                 {project?.status === "ARCHIVED" ? (
                   <DropdownMenuItem
                     onClick={() => updateProject(workspace, Number(projectId), { status: "ACTIVE" } as UpdateProjectPayload)}

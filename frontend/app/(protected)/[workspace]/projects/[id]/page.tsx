@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useEffect, useMemo, useState, useRef } from "react"
 import { useParams } from "next/navigation"
@@ -11,17 +11,32 @@ import {
   MoreHorizontal,
   ChevronDown,
 } from "lucide-react"
+import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  useDraggable,
+  useDroppable,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core"
+import { CSS } from "@dnd-kit/utilities"
 
-import { CreateIssueDialog } from "@/components/dialogs/create-issue-dialog"
 import { IssueSheet, type SheetIssue } from "@/components/sheets/issue-sheet"
 import { useTranslation } from "@/lib/i18n"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
+import { ColorPicker } from "@/components/ui/color-picker"
+import { IssueFilters } from "@/components/issues/issue-filters"
+import { type IssueFilterState, EMPTY_ISSUE_FILTERS, applyIssueFilters } from "@/lib/issue-filters"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
@@ -107,89 +122,14 @@ function toSheetIssue(issue: Issue): SheetIssue {
     assigneeId:     issue.assignee?.id ?? null,
     labels:         issue.labels,
     dueDate:        issue.dueDate,
-    storyPoints:    null,
+    storyPoints:    issue.storyPoints,
     cycle:          null,
     createdAt:      issue.createdAt,
   }
 }
 
 // ---------------------------------------------------------------------------
-// Inline quick-add row
-// ---------------------------------------------------------------------------
-
-function QuickAddRow({
-  statusId,
-  workspaceSlug,
-  projectId,
-}: {
-  readonly statusId: number
-  readonly workspaceSlug: string
-  readonly projectId: number
-}) {
-  const [active, setActive] = useState(false)
-  const [title, setTitle] = useState("")
-  const inputRef = useRef<HTMLInputElement>(null)
-  const { createIssue } = useIssueStore()
-
-  function activate() {
-    setActive(true)
-    setTimeout(() => inputRef.current?.focus(), 50)
-  }
-
-  async function submit() {
-    const trimmed = title.trim()
-    if (!trimmed) { setActive(false); setTitle(""); return }
-    await createIssue(workspaceSlug, projectId, { title: trimmed, statusId })
-    setTitle("")
-    inputRef.current?.focus()
-  }
-
-  function onKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "Enter") { e.preventDefault(); submit() }
-    if (e.key === "Escape") { setActive(false); setTitle("") }
-  }
-
-  if (!active) {
-    return (
-      <button
-        type="button"
-        onClick={activate}
-        className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-lg transition-colors mt-1"
-      >
-        <Plus className="size-3.5 shrink-0" />
-        Ajouter une issue
-      </button>
-    )
-  }
-
-  return (
-    <div className="mt-1 rounded-lg border border-primary/40 bg-background p-2 shadow-sm">
-      <Input
-        ref={inputRef}
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        onKeyDown={onKeyDown}
-        onBlur={() => { if (!title.trim()) { setActive(false) } }}
-        placeholder="Titre de l'issue…"
-        className="h-7 text-sm border-0 bg-transparent px-0 focus-visible:ring-0 placeholder:text-muted-foreground/60"
-      />
-      <div className="flex items-center justify-between mt-1.5">
-        <span className="text-[10px] text-muted-foreground">Entrée pour créer · Échap pour annuler</span>
-        <div className="flex gap-1">
-          <Button size="sm" variant="ghost" className="h-5 text-[10px] px-2" onClick={() => { setActive(false); setTitle("") }}>
-            Annuler
-          </Button>
-          <Button size="sm" className="h-5 text-[10px] px-2" onClick={submit} disabled={!title.trim()}>
-            Créer
-          </Button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// IssueCard
+// IssueCard (draggable)
 // ---------------------------------------------------------------------------
 
 function IssueCard({
@@ -203,13 +143,29 @@ function IssueCard({
   readonly onStatusChange: (issueId: number, statusId: number) => void
   readonly onOpen: (issue: Issue) => void
 }) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `card-${issue.id}`,
+    data: { issueId: issue.id, statusId: issue.status.id },
+  })
+
+  const style = transform
+    ? { transform: CSS.Translate.toString(transform), zIndex: 50 }
+    : undefined
+
   return (
     <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
       role="button"
       tabIndex={0}
       onClick={() => onOpen(issue)}
       onKeyDown={(e) => e.key === "Enter" && onOpen(issue)}
-      className="group/card rounded-lg border border-border bg-card p-3 hover:border-primary/30 hover:shadow-md transition-all cursor-pointer"
+      className={cn(
+        "group/card rounded-lg border border-border bg-card p-3 transition-all cursor-grab active:cursor-grabbing",
+        isDragging ? "opacity-50 shadow-lg" : "hover:border-primary/30 hover:shadow-md"
+      )}
     >
       {issue.labels.length > 0 && (
         <div className="flex flex-wrap gap-1 mb-2">
@@ -252,6 +208,7 @@ function IssueCard({
               <button
                 type="button"
                 onClick={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
                 className="opacity-0 group-hover/card:opacity-100 transition-opacity flex items-center gap-0.5 text-muted-foreground hover:text-foreground px-1 py-0.5 rounded hover:bg-muted/60"
                 title="Changer le statut"
               >
@@ -280,35 +237,37 @@ function IssueCard({
 }
 
 // ---------------------------------------------------------------------------
-// BoardColumn
+// BoardColumn (droppable)
 // ---------------------------------------------------------------------------
 
 function BoardColumn({
   status,
   issues,
   statuses,
-  workspaceSlug,
-  projectId,
   onStatusChange,
   onDeleteStatus,
   onRenameStatus,
+  onChangeColor,
   onOpenIssue,
+  isOver,
   t,
 }: {
   readonly status: IssueStatus
   readonly issues: Issue[]
   readonly statuses: IssueStatus[]
-  readonly workspaceSlug: string
-  readonly projectId: number
   readonly onStatusChange: (issueId: number, statusId: number) => void
   readonly onDeleteStatus: (statusId: number) => void
   readonly onRenameStatus: (statusId: number, name: string) => void
+  readonly onChangeColor: (statusId: number, color: string) => void
   readonly onOpenIssue: (issue: Issue) => void
+  readonly isOver: boolean
   readonly t: (k: string) => string
 }) {
   const [editing, setEditing] = useState(false)
   const [editName, setEditName] = useState(status.name)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  const { setNodeRef } = useDroppable({ id: `col-${status.id}`, data: { statusId: status.id } })
 
   function startEdit() {
     setEditName(status.name)
@@ -359,16 +318,6 @@ function BoardColumn({
         </div>
 
         <div className="flex items-center gap-1">
-          <CreateIssueDialog projectId={projectId} workspaceSlug={workspaceSlug} defaultStatusId={status.id}>
-            <button
-              type="button"
-              className="size-6 flex items-center justify-center rounded hover:bg-muted/60 text-muted-foreground hover:text-foreground transition-colors"
-              title="Ajouter une issue"
-            >
-              <Plus className="size-3.5" />
-            </button>
-          </CreateIssueDialog>
-
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
@@ -378,17 +327,25 @@ function BoardColumn({
                 <MoreHorizontal className="size-3.5" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="w-52">
               <DropdownMenuItem className="gap-2 text-xs" onClick={startEdit}>
                 Renommer
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="text-[10px] font-normal text-muted-foreground">Couleur</DropdownMenuLabel>
+              <div className="px-2 py-1.5" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                <ColorPicker value={status.color} onChange={(c) => onChangeColor(status.id, c)} />
+              </div>
               {!status.isDefault && (
-                <DropdownMenuItem
-                  className="gap-2 text-xs text-destructive focus:text-destructive"
-                  onClick={() => onDeleteStatus(status.id)}
-                >
-                  Supprimer
-                </DropdownMenuItem>
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="gap-2 text-xs text-destructive focus:text-destructive"
+                    onClick={() => onDeleteStatus(status.id)}
+                  >
+                    Supprimer
+                  </DropdownMenuItem>
+                </>
               )}
             </DropdownMenuContent>
           </DropdownMenu>
@@ -398,8 +355,14 @@ function BoardColumn({
       {/* Divider with status color */}
       <div className="h-0.5 w-full rounded-full mb-3 opacity-60" style={{ backgroundColor: status.color }} />
 
-      {/* Cards */}
-      <div className="flex flex-col gap-2 flex-1 min-h-20">
+      {/* Cards (droppable) */}
+      <div
+        ref={setNodeRef}
+        className={cn(
+          "flex flex-col gap-2 flex-1 min-h-20 rounded-lg transition-colors",
+          isOver && "bg-primary/5 ring-1 ring-primary/30"
+        )}
+      >
         {issues.map((issue) => (
           <IssueCard
             key={issue.id}
@@ -415,8 +378,6 @@ function BoardColumn({
             <p className="text-xs text-muted-foreground/60">{t("projects.detail.noIssues")}</p>
           </div>
         )}
-
-        <QuickAddRow statusId={status.id} workspaceSlug={workspaceSlug} projectId={projectId} />
       </div>
     </div>
   )
@@ -436,23 +397,19 @@ function AddColumnPopover({
   const [open, setOpen] = useState(false)
   const [name, setName] = useState("")
   const [category, setCategory] = useState<IssueStatusCategory>("UNSTARTED")
+  const [color, setColor] = useState("#6366f1")
   const [loading, setLoading] = useState(false)
   const { createStatus } = useIssueStore()
-
-  const selectedCat = CATEGORY_OPTIONS.find((c) => c.value === category)!
 
   async function handleCreate() {
     const trimmed = name.trim()
     if (!trimmed) return
     setLoading(true)
-    await createStatus(workspaceSlug, projectId, {
-      name: trimmed,
-      category,
-      color: selectedCat.color,
-    })
+    await createStatus(workspaceSlug, projectId, { name: trimmed, category, color })
     setLoading(false)
     setName("")
     setCategory("UNSTARTED")
+    setColor("#6366f1")
     setOpen(false)
   }
 
@@ -499,6 +456,10 @@ function AddColumnPopover({
               ))}
             </div>
           </div>
+          <div>
+            <p className="text-xs text-muted-foreground mb-1.5">Couleur</p>
+            <ColorPicker value={color} onChange={setColor} />
+          </div>
           <Button size="sm" className="w-full" onClick={handleCreate} disabled={!name.trim() || loading}>
             {loading ? "Création…" : "Créer"}
           </Button>
@@ -522,6 +483,13 @@ export default function ProjectBoardPage() {
 
   const [initializing, setInitializing] = useState(true)
   const [selectedIssue, setSelectedIssue] = useState<SheetIssue | null>(null)
+  const [overColumnId, setOverColumnId] = useState<number | null>(null)
+  const [filters, setFilters] = useState<IssueFilterState>(EMPTY_ISSUE_FILTERS)
+
+  const sensors = useSensors(
+    // Distance d'activation : un simple clic ouvre l'issue, un glissé > 6px déclenche le drag
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
+  )
 
   useEffect(() => {
     if (!workspace || !projectId) return
@@ -557,12 +525,12 @@ export default function ProjectBoardPage() {
   const issuesByStatus = useMemo(() => {
     const map = new Map<number, Issue[]>()
     for (const s of statuses) map.set(s.id, [])
-    for (const issue of issues) {
+    for (const issue of applyIssueFilters(issues, filters)) {
       const col = map.get(issue.status.id)
       if (col) col.push(issue)
     }
     return map
-  }, [issues, statuses])
+  }, [issues, statuses, filters])
 
   async function handleStatusChange(issueId: number, statusId: number) {
     if (!workspace) return
@@ -579,14 +547,35 @@ export default function ProjectBoardPage() {
     await updateStatus(workspace, projectId, statusId, { name })
   }
 
+  async function handleChangeColor(statusId: number, color: string) {
+    if (!workspace) return
+    await updateStatus(workspace, projectId, statusId, { color })
+  }
+
+  function handleDragStart(_event: DragStartEvent) {
+    setOverColumnId(null)
+  }
+
+  function handleDragOver(event: DragEndEvent) {
+    const overData = event.over?.data.current as { statusId?: number } | undefined
+    setOverColumnId(overData?.statusId ?? null)
+  }
+
+  async function handleDragEnd(event: DragEndEvent) {
+    setOverColumnId(null)
+    const activeData = event.active.data.current as { issueId?: number; statusId?: number } | undefined
+    const overData = event.over?.data.current as { statusId?: number } | undefined
+    if (!workspace || !activeData?.issueId || !overData?.statusId) return
+    if (activeData.statusId === overData.statusId) return
+    // updateIssue met à jour le store de façon optimiste (la card se déplace immédiatement)
+    await updateIssue(workspace, projectId, activeData.issueId, { statusId: overData.statusId })
+  }
+
   return (
     <div className="flex flex-col gap-0 h-full">
       {/* Toolbar */}
       <div className="flex items-center gap-2 mb-4">
-        <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5">
-          <MoreHorizontal className="size-3.5" />
-          Filtres
-        </Button>
+        <IssueFilters issues={issues} value={filters} onChange={setFilters} />
       </div>
 
       {/* Error banner */}
@@ -615,24 +604,31 @@ export default function ProjectBoardPage() {
           </div>
         </div>
       ) : (
-        <div className="flex gap-5 overflow-x-auto pb-6 -mx-4 md:-mx-6 px-4 md:px-6 items-start">
-          {sortedStatuses.map((status) => (
-            <BoardColumn
-              key={status.id}
-              status={status}
-              issues={issuesByStatus.get(status.id) ?? []}
-              statuses={sortedStatuses}
-              workspaceSlug={workspace}
-              projectId={projectId}
-              onStatusChange={handleStatusChange}
-              onDeleteStatus={handleDeleteStatus}
-              onRenameStatus={handleRenameStatus}
-              onOpenIssue={(issue) => setSelectedIssue(toSheetIssue(issue))}
-              t={t}
-            />
-          ))}
-          <AddColumnPopover workspaceSlug={workspace} projectId={projectId} />
-        </div>
+        <DndContext
+          sensors={sensors}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="flex gap-5 overflow-x-auto pb-6 -mx-4 md:-mx-6 px-4 md:px-6 items-start">
+            {sortedStatuses.map((status) => (
+              <BoardColumn
+                key={status.id}
+                status={status}
+                issues={issuesByStatus.get(status.id) ?? []}
+                statuses={sortedStatuses}
+                onStatusChange={handleStatusChange}
+                onDeleteStatus={handleDeleteStatus}
+                onRenameStatus={handleRenameStatus}
+                onChangeColor={handleChangeColor}
+                onOpenIssue={(issue) => setSelectedIssue(toSheetIssue(issue))}
+                isOver={overColumnId === status.id}
+                t={t}
+              />
+            ))}
+            <AddColumnPopover workspaceSlug={workspace} projectId={projectId} />
+          </div>
+        </DndContext>
       )}
 
       <IssueSheet
