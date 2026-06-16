@@ -90,11 +90,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const login = async (credentials: LoginCredentials) => {
     try {
       const response = await authService.login(credentials);
-      // Enrichir avec le profil complet depuis le backend
-      const remoteUser = await fetchMe();
-      const resolvedUser = remoteUser ?? response.user;
-      setUser(resolvedUser);
-      setStoreUser(resolvedUser);
+      // Setter immédiat depuis la réponse login → redirection rapide, pas de blocage réseau
+      setUser(response.user);
+      setStoreUser(response.user);
+      // Enrichir avec le profil complet en arrière-plan (non bloquant)
+      void fetchMe().then((remoteUser) => {
+        if (remoteUser) {
+          setUser(remoteUser);
+          setStoreUser(remoteUser);
+        }
+      });
       // La redirection est gérée par le composant appelant
     } catch (error) {
       setUser(null);
