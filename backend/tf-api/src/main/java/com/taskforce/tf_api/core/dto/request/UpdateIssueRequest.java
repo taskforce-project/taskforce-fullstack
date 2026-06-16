@@ -33,6 +33,9 @@ public class UpdateIssueRequest {
     /** Position dans la colonne kanban (kanban drag & drop) */
     private Integer position;
 
+    /** Story points : null = pas de changement ; 0 = retirer l'estimation ; >0 = valeur */
+    private Integer storyPoints;
+
     /** null = pas de changement des labels ; liste vide = retirer tous les labels */
     private List<Long> labelIds;
 }
