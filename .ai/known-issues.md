@@ -5,6 +5,39 @@
 > Each issue: **Priority · Impact · Effort · Confidence**, with the fix locus (not applied here).
 > Effort scale: S ≤2h · M ½–1d · L 1–3d · XL >3d. Confidence = how sure the finding is true.
 
+## ✅ Recently fixed — 2026-06-15 (branche `feat/dashboard`, QA gestion de projet)
+
+| Sujet | Cause racine | Correctif | Fichier |
+| ----- | ------------ | --------- | ------- |
+| Build error `stream did not contain valid UTF-8` sur la page projet | Fichier encodé **Windows-1252** (`…`, `·`) au lieu d'UTF-8 | Reconverti en UTF-8 ; scan complet du front : aucun autre fichier touché | `projects/[id]/pages/[pageId]/page.tsx` |
+| Boucle compile/render infinie en dev (Docker/Windows) | Polling re-détecte les écritures de Next dans `.next/` | `watchOptions.ignored` (`.next`/`node_modules`/`.git`) + `poll:1000` | `frontend/next.config.ts` |
+| Timeout au login / la page ne render pas seule | `login()` bloquait sur `fetchMe()` séquentiel sous timeout axios 10 s + redirection indirecte | Timeout → 30 s ; `fetchMe()` non bloquant ; `router.replace("/")` explicite | `lib/api/client.ts`, `lib/contexts/auth-context.tsx`, `components/auth/login/login-form.tsx` |
+| **500** à la création de Cycle | `Cycle.status` manquait `@JdbcTypeCode(NAMED_ENUM)` alors que la colonne est l'enum natif PG `cycle_status` (seul des 7 enums du modèle à l'oublier) | Annotation ajoutée (rebuild image backend requis) | `core/model/Cycle.java` |
+| **500** au changement de Label d'une issue | `issue.setLabels(newLabels)` remplaçait le PersistentBag → DELETE+INSERT violant la PK de `issue_label_assignments` | `clear()/addAll()` (mutation de collection) | `core/service/IssueService.java` |
+| Gestion de projet (board) : création inline en double, pas de drag&drop, couleurs de colonnes non éditables, Settings en double, onglet Issues redondant | UI incomplète | Bouton de création unique (suppression des quick-add board+list) ; drag&drop des cards via `@dnd-kit/core` ; color-picker (presets+hex) à la création **et** l'édition de colonne ; Settings retiré du menu ⋯ (reste en onglet) ; onglet **Issues** retiré (doublon de List, façon GitHub) | `projects/[id]/page.tsx`, `.../list/page.tsx`, `.../layout.tsx`, `components/ui/color-picker.tsx` |
+
+> ⚠️ **Gotcha dev** : le backend tourne depuis un **JAR pré-buildé** (`java -jar app.jar`) ; le volume `src` ne sert qu'à Flyway. Toute modif de code Java exige `docker compose -f docker-compose.dev.yml up -d --build backend`.
+
+### Phase frontend — fait 2026-06-15 (suite)
+- **Filtres** du board : popover priorité/assigné/label (options dérivées des issues), badge de compteur + reset. `components/issues/issue-filters.tsx` + `lib/issue-filters.ts`, câblé dans `projects/[id]/page.tsx`. (List/Backlog n'ont pas de bouton Filtres → non câblés.)
+- **Cycle date picker** : inputs `type="date"` natifs remplacés par un `DatePicker` shadcn (Calendar/Popover, ISO `yyyy-MM-dd`). `components/ui/date-picker.tsx` + `cycles/page.tsx`.
+
+### Phase BACKEND — fait 2026-06-15 (full-stack)
+- **Favoris projet** : migration `V37__project_favorites.sql` (table user-scoped) + entité `ProjectFavorite` + repo + endpoints `POST/DELETE /api/workspaces/{slug}/projects/{id}/favorite` + `isFavorite` dans `ProjectResponse` (`@JsonProperty`). Front : `toggleFavorite` (store optimiste) + bouton Star câblé dans le layout projet.
+- **Story points** : migration `V38__issue_story_points.sql` (colonne `story_points`) + `Issue.storyPoints` + `UpdateIssueRequest`/`IssueResponse` (convention : null = pas de changement, 0 = retirer). Front : input remplacé par un **select de presets** (1,2,3,5,8,13) dans l'issue-sheet, qui **persiste** désormais (avant : state local uniquement).
+- **My Work** : nouvel endpoint cross-projets `GET /api/workspaces/{slug}/my-issues` (`MyWorkController` + `IssueService.listMyIssues` + query repo) — supprime le **N+1** côté front. `IssueResponse` enrichi de `projectId`/`projectName`. `my-work-view` refactoré (1 appel au lieu de N×3).
+- **Inbox** : ack unitaire — endpoint `PATCH /api/workspaces/{slug}/notifications/{id}/acknowledge` + `NotificationService.acknowledge` ; front : `acknowledgeLocal` (client-only, perdu au refetch) remplacé par un vrai `acknowledge` (API + optimiste).
+
+### Phase finale — fait 2026-06-15 (reste de la QA)
+- **Pièces jointes (MinIO)** : le code était complet des 2 côtés ; seule la **config** manquait. Ajout des vars `MINIO_*` au service `backend` dans `docker-compose.dev.yml` (joint par nom `http://minio:9000`) + `depends_on: minio` + limite `spring.servlet.multipart` (25 MB) dans `application-dev.yml`. Upload/liste/download/delete fonctionnels.
+- **Mentions** : `IssueService.addComment` parse désormais les `@…` (format : `@email` ou `@partie-locale-email`, ex. `@pierre.michel`), les résout contre les **membres du workspace** et appelle `notifyMentions` → l'onglet Mentions se remplit.
+- **Alerts dueSoon/overdue** : `@EnableScheduling` activé + `DueDateAlertScheduler` (cron quotidien `0 0 8 * * *`, surchargeable via `taskforce.alerts.due-date-cron`) → `NotificationService.notifyDueDate` avec **dédup** (`existsByRecipientIdAndIssueIdentifierAndTypeAndAcknowledgedFalse`). Fenêtre dueSoon = 2 jours.
+- **« link open »** : le bouton « Open » de l'issue-sheet (placeholder `toast.info`) navigue maintenant vers `issues/[issueId]` (page pleine).
+- **Reflet couleur de statut** : le badge + le dropdown de statut de l'issue-sheet utilisent désormais la vraie `status.color` (via `displayStatuses` + `statusId`) au lieu d'une couleur figée par catégorie → reflète les couleurs de colonnes personnalisées.
+- **My Work édition inline** : non ajouté — décision = éditer dans la gestion de projet (les lignes My Work cliquent déjà vers l'issue via `<Link>`).
+
+> Toutes les tâches de la QA gestion de projet sont traitées. Restent hors-scope explicitement reportés : **intégration GitHub** (l'utilisateur a dit « pour l'instant j'ai pas encore »).
+
 ## Priority queue (do in this order)
 
 | ID     | Priority | Title                                                                        | Impact                                       | Effort | Conf. |
