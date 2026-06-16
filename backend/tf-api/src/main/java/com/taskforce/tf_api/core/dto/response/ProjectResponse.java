@@ -3,6 +3,7 @@ package com.taskforce.tf_api.core.dto.response;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.taskforce.tf_api.core.enums.ProjectStatus;
 
 import lombok.AllArgsConstructor;
@@ -25,6 +26,10 @@ public class ProjectResponse {
     private String description;
     private ProjectStatus status;
     private boolean isPublic;
+
+    /** Vrai si le projet est dans les favoris de l'utilisateur courant */
+    @JsonProperty("isFavorite")
+    private boolean isFavorite;
 
     /** Résumé du workspace */
     private Long workspaceId;
