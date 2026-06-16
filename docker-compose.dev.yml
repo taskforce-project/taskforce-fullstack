@@ -113,6 +113,12 @@ services:
       # RabbitMQ — nom du service Docker pour le STOMP relay
       RABBITMQ_HOST: rabbitmq
 
+      # MinIO — joint par nom de service (pas localhost, cf. règle d'or #9)
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-taskforce-attachments}
+
       # Flyway : lire les migrations depuis le volume src monté (évite un rebuild après changement de migration)
       # classpath couvre les migrations embarquées dans le JAR
       # filesystem couvre les migrations modifiées en dev via volume monté
@@ -148,6 +154,8 @@ services:
       keycloak:
         condition: service_healthy
       rabbitmq:
+        condition: service_healthy
+      minio:
         condition: service_healthy
       ai-service:
         condition: service_healthy
