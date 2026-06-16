@@ -86,6 +86,23 @@ public class NotificationService {
     }
 
     /**
+     * Acquitte (dismiss) une notification unique : read=true + acknowledged=true.
+     */
+    @Transactional
+    public NotificationResponse acknowledge(Long notificationId, Long userId) {
+        Notification notif = notificationRepository.findById(notificationId)
+            .orElseThrow(() -> new ResourceNotFoundException("Notification introuvable"));
+
+        if (!notif.getRecipient().getId().equals(userId)) {
+            throw new ResourceNotFoundException("Notification introuvable");
+        }
+
+        notif.setRead(true);
+        notif.setAcknowledged(true);
+        return toResponse(notificationRepository.save(notif));
+    }
+
+    /**
      * Marque toutes les notifications d'un workspace comme lues.
      */
     @Transactional
@@ -168,6 +185,31 @@ public class NotificationService {
                 issue.getTitle(), truncate(commentBody, 200));
             notificationRepository.save(notif);
         }
+    }
+
+    /**
+     * Notifie l'assignee qu'une issue arrive à échéance (dueSoon) ou l'a dépassée (overdue).
+     * Idempotent par jour : ne reposte pas si une alerte du même type non acquittée existe déjà.
+     */
+    @Transactional
+    public void notifyDueDate(Issue issue, boolean overdue) {
+        User assignee = issue.getAssignee();
+        if (assignee == null) return;
+
+        String type       = overdue ? "overdue" : "dueSoon";
+        String identifier = issue.getProject().getIdentifier() + "-" + issue.getSequenceNumber();
+
+        // Dédup : pas de doublon tant que l'utilisateur n'a pas acquitté l'alerte précédente
+        if (notificationRepository.existsByRecipientIdAndIssueIdentifierAndTypeAndAcknowledgedFalse(
+                assignee.getId(), identifier, type)) {
+            return;
+        }
+
+        String urgency = overdue ? "critical" : "warning";
+        String title   = issue.getTitle() + (overdue ? " — échéance dépassée" : " — échéance proche");
+        // Alerte système : pas d'acteur (actor null)
+        Notification notif = buildNotification(issue, null, assignee, type, urgency, title, null);
+        notificationRepository.save(notif);
     }
 
     // =========================================================================
