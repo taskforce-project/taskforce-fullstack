@@ -3,8 +3,11 @@ package com.taskforce.tf_api.core.service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.springframework.context.annotation.Lazy;
@@ -41,6 +44,7 @@ import com.taskforce.tf_api.core.model.IssueType;
 import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.model.ProjectLabel;
 import com.taskforce.tf_api.core.model.User;
+import com.taskforce.tf_api.core.model.WorkspaceMember;
 import com.taskforce.tf_api.core.repository.IssueActivityRepository;
 import com.taskforce.tf_api.core.repository.IssueCommentRepository;
 import com.taskforce.tf_api.core.repository.IssueRelationRepository;
@@ -192,6 +196,19 @@ public class IssueService {
             .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
         assertWorkspaceMember(ws.getId(), userId);
         return issueRepository.findScheduledByWorkspaceSlug(slug).stream()
+            .map(this::toResponse)
+            .toList();
+    }
+
+    /**
+     * Retourne toutes les issues assignées à l'utilisateur courant sur l'ensemble du workspace (vue My Work).
+     */
+    @Transactional(readOnly = true)
+    public List<IssueResponse> listMyIssues(String slug, Long userId) {
+        var ws = workspaceRepository.findBySlug(slug)
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
+        assertWorkspaceMember(ws.getId(), userId);
+        return issueRepository.findByWorkspaceSlugAndAssigneeId(slug, userId).stream()
             .map(this::toResponse)
             .toList();
     }
@@ -361,6 +378,10 @@ public class IssueService {
         if (request.getPosition() != null) {
             issue.setPosition(request.getPosition());
         }
+        if (request.getStoryPoints() != null) {
+            // 0 = retirer l'estimation (null en base) ; >0 = valeur
+            issue.setStoryPoints(request.getStoryPoints() == 0 ? null : request.getStoryPoints());
+        }
         if (request.getLabelIds() != null) {
             List<ProjectLabel> newLabels = new ArrayList<>(projectLabelRepository.findAllById(request.getLabelIds()));
             Set<Long> oldIds = issue.getLabels().stream().map(ProjectLabel::getId).collect(Collectors.toSet());
@@ -375,7 +396,12 @@ public class IssueService {
                     logActivity(issue, actor, IssueActivityType.LABEL_REMOVED, removed.getName(), null);
                 }
             }
-            issue.setLabels(newLabels);
+            // Muter la collection gérée par Hibernate (clear/addAll) au lieu de la
+            // remplacer par une nouvelle liste : remplacer le PersistentBag déclenche
+            // un DELETE+INSERT dont l'ordre de flush peut violer la PK composite de
+            // issue_label_assignments (cause du 500 au changement de label).
+            issue.getLabels().clear();
+            issue.getLabels().addAll(newLabels);
         }
 
         issue = issueRepository.save(issue);
@@ -530,7 +556,38 @@ public class IssueService {
         comment = commentRepository.save(comment);
         logActivity(issue, author, IssueActivityType.COMMENT_ADDED, null, null);
         notificationService.notifyCommented(issue, author, comment);
+
+        // Mentions : @email ou @partie-locale-email, résolues contre les membres du workspace
+        List<User> mentioned = resolveMentions(request.getContent(), project.getWorkspace().getId());
+        if (!mentioned.isEmpty()) {
+            notificationService.notifyMentions(issue, author, mentioned, request.getContent());
+        }
         return toCommentResponse(comment);
+    }
+
+    /** Motif de mention : @ suivi d'un token email ou de sa partie locale (ex. @pierre.michel ou @a@b.com) */
+    private static final Pattern MENTION_PATTERN = Pattern.compile("@([A-Za-z0-9._%+-]+(?:@[A-Za-z0-9.-]+\\.[A-Za-z]{2,})?)");
+
+    /** Résout les @mentions d'un texte contre les membres du workspace (par email complet ou partie locale). */
+    private List<User> resolveMentions(String content, Long workspaceId) {
+        if (content == null || content.indexOf('@') < 0) return List.of();
+        Matcher matcher = MENTION_PATTERN.matcher(content);
+        Set<String> tokens = new HashSet<>();
+        while (matcher.find()) tokens.add(matcher.group(1).toLowerCase());
+        if (tokens.isEmpty()) return List.of();
+
+        List<User> result = new ArrayList<>();
+        Set<Long> seen = new HashSet<>();
+        for (WorkspaceMember wm : workspaceMemberRepository.findByWorkspaceId(workspaceId)) {
+            User u = wm.getUser();
+            if (u.getEmail() == null) continue;
+            String email = u.getEmail().toLowerCase();
+            String local = email.contains("@") ? email.substring(0, email.indexOf('@')) : email;
+            if ((tokens.contains(email) || tokens.contains(local)) && seen.add(u.getId())) {
+                result.add(u);
+            }
+        }
+        return result;
     }
 
     @Transactional
@@ -693,6 +750,8 @@ public class IssueService {
             .id(issue.getId())
             .sequenceNumber(issue.getSequenceNumber())
             .identifier(issue.getProject().getIdentifier() + "-" + issue.getSequenceNumber())
+            .projectId(issue.getProject().getId())
+            .projectName(issue.getProject().getName())
             .title(issue.getTitle())
             .description(issue.getDescription())
             .priority(issue.getPriority())
@@ -706,6 +765,7 @@ public class IssueService {
             .dueDate(issue.getDueDate())
             .completedAt(issue.getCompletedAt())
             .position(issue.getPosition())
+            .storyPoints(issue.getStoryPoints())
             .labels(issue.getLabels().stream()
                 .map(l -> ProjectLabelResponse.builder()
                     .id(l.getId())
