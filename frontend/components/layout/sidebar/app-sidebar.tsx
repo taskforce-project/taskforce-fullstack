@@ -22,7 +22,6 @@ import {
 
 import { NavUser } from "@/components/layout/sidebar/nav-user"
 import { WorkspaceSwitcher } from "@/components/layout/sidebar/team-switcher"
-import { CreateProjectDialog } from "@/components/dialogs/create-project-dialog"
 import { getAvatarUrl } from "@/lib/utils/avatar"
 import { useAuth } from "@/lib/contexts/auth-context"
 import { useTranslation } from "@/lib/i18n"
@@ -274,12 +273,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarGroup className="group-data-[collapsible=icon]:hidden mt-auto">
           <SidebarMenu>
             <SidebarMenuItem>
-              <CreateProjectDialog>
-                <SidebarMenuButton className="text-muted-foreground">
+              <SidebarMenuButton asChild className="text-muted-foreground">
+                <Link href={`/${activeWorkspace?.slug}/projects/new`}>
                   <Plus className="size-4" />
                   <span>{t("nav.createProject")}</span>
-                </SidebarMenuButton>
-              </CreateProjectDialog>
+                </Link>
+              </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroup>
