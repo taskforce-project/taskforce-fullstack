@@ -2,6 +2,12 @@
 # ENVIRONNEMENT DÉVELOPPEMENT
 # ===============================
 spring:
+  # Upload de fichiers (pièces jointes) — défaut Spring = 1 MB, on aligne sur la limite service (25 MB)
+  servlet:
+    multipart:
+      max-file-size: 25MB
+      max-request-size: 30MB
+
   # Database Configuration
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:taskforce-db}
