@@ -23,7 +23,7 @@ export const apiClient: AxiosInstance = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
-  timeout: 10000, // 10 secondes
+  timeout: 30000, // 30s — backend dev (JVM froide + debug JDWP) dépasse souvent 10s au login
   withCredentials: true, // Activé pour accepter les cookies HttpOnly JWT
 });
 
