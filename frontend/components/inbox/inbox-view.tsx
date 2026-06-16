@@ -323,7 +323,7 @@ export function InboxView({ defaultTab = "all" }: Readonly<InboxViewProps>) {
   const params = useParams()
   const slug = params?.workspace as string | undefined
 
-  const { signals, fetchNotifications, markAsRead, markAllAsRead, acknowledgeAll, acknowledgeLocal } =
+  const { signals, fetchNotifications, markAsRead, markAllAsRead, acknowledgeAll, acknowledge: acknowledgeNotif } =
     useNotificationStore()
 
   const [activeTab, setActiveTab] = useState<NotifTab>(defaultTab)
@@ -341,7 +341,7 @@ export function InboxView({ defaultTab = "all" }: Readonly<InboxViewProps>) {
   }
 
   function acknowledge(id: string) {
-    acknowledgeLocal(id)
+    if (slug) acknowledgeNotif(slug, id)
   }
 
   function markAllRead() {
