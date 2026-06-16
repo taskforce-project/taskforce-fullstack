@@ -78,6 +78,21 @@ public class NotificationController {
     }
 
     /**
+     * PATCH /api/workspaces/{slug}/notifications/{id}/acknowledge
+     * Acquitte (dismiss) une notification unique.
+     */
+    @PatchMapping("/{id}/acknowledge")
+    public ResponseEntity<ApiResponse<NotificationResponse>> acknowledge(
+        @PathVariable String slug,
+        @PathVariable Long id,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long userId = resolveUserId(jwt);
+        NotificationResponse response = notificationService.acknowledge(id, userId);
+        return ResponseEntity.ok(ApiResponse.success("Notification acquittée", response));
+    }
+
+    /**
      * PATCH /api/workspaces/{slug}/notifications/read-all
      * Marque toutes les notifications comme lues.
      */
