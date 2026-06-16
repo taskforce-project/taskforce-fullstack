@@ -24,6 +24,10 @@ public class IssueResponse {
     /** ex: "WEB-42" */
     private String identifier;
 
+    /** Projet d'appartenance (utile pour les vues cross-projets comme My Work) */
+    private Long projectId;
+    private String projectName;
+
     private String title;
     private String description;
     private IssuePriority priority;
@@ -43,6 +47,9 @@ public class IssueResponse {
 
     /** Position dans la colonne kanban */
     private Integer position;
+
+    /** Estimation d'effort (story points), null si non estimé */
+    private Integer storyPoints;
 
     private List<ProjectLabelResponse> labels;
 
