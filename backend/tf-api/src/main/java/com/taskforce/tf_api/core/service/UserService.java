@@ -99,11 +99,15 @@ public class UserService {
 
         userRepository.save(user);
 
-        // Propagation des noms vers Keycloak si fournis
+        // Propagation des noms vers Keycloak si fournis (non-bloquant : un échec Keycloak ne rollback pas le save DB)
         String keycloakId = user.getKeycloakId();
         boolean namesChanged = request.getFirstName() != null || request.getLastName() != null;
         if (namesChanged) {
-            keycloakService.updateUserNames(keycloakId, request.getFirstName(), request.getLastName());
+            try {
+                keycloakService.updateUserNames(keycloakId, request.getFirstName(), request.getLastName());
+            } catch (Exception e) {
+                log.warn("Échec de la mise à jour des noms Keycloak pour keycloakId={} — les noms ne sont pas synchronisés : {}", keycloakId, e.getMessage());
+            }
         }
 
         log.info("Profil mis à jour pour email={}", email);
