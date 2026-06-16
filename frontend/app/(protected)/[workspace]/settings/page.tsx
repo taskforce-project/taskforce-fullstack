@@ -725,7 +725,7 @@ function TeamPanel() {
 
   useEffect(() => { fetchMembers() }, [fetchMembers])
 
-  const currentMember = members.find((m) => String(m.userId) === currentUser?.id)
+  const currentMember = members.find((m) => m.userId === Number(currentUser?.id))
   const isOwner = currentMember?.role === "OWNER"
   const canManage = isOwner || currentMember?.role === "ADMIN"
 
