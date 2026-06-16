@@ -129,6 +129,36 @@ public class ProjectController {
     }
 
     /**
+     * POST /api/workspaces/{slug}/projects/{id}/favorite
+     * Ajoute le projet aux favoris de l'utilisateur courant.
+     */
+    @PostMapping("/{id}/favorite")
+    public ResponseEntity<ApiResponse<ProjectResponse>> favoriteProject(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String slug,
+        @PathVariable Long id
+    ) {
+        Long userId = resolveUserId(jwt);
+        ProjectResponse project = projectService.favoriteProject(slug, id, userId);
+        return ResponseEntity.ok(ApiResponse.success("Projet ajouté aux favoris", project));
+    }
+
+    /**
+     * DELETE /api/workspaces/{slug}/projects/{id}/favorite
+     * Retire le projet des favoris de l'utilisateur courant.
+     */
+    @DeleteMapping("/{id}/favorite")
+    public ResponseEntity<ApiResponse<ProjectResponse>> unfavoriteProject(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String slug,
+        @PathVariable Long id
+    ) {
+        Long userId = resolveUserId(jwt);
+        ProjectResponse project = projectService.unfavoriteProject(slug, id, userId);
+        return ResponseEntity.ok(ApiResponse.success("Projet retiré des favoris", project));
+    }
+
+    /**
      * DELETE /api/workspaces/{slug}/projects/{id}
      * Supprime définitivement un projet.
      */
