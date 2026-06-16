@@ -10,6 +10,7 @@ import {
   countUnread as countUnreadApi,
   markAsRead as markAsReadApi,
   markAllAsRead as markAllAsReadApi,
+  acknowledge as acknowledgeApi,
   acknowledgeAll as acknowledgeAllApi,
 } from "../api/notification-service";
 
@@ -111,8 +112,8 @@ interface NotificationState {
   markAllAsRead: (slug: string) => Promise<void>;
   /** Acquitte toutes les notifications (dismiss) + refetch */
   acknowledgeAll: (slug: string) => Promise<void>;
-  /** Marque localement acknowledged (pour le bouton "Ack" individuel) */
-  acknowledgeLocal: (id: string) => void;
+  /** Acquitte (dismiss) une notification unique (API + optimistic) */
+  acknowledge: (slug: string, id: string) => Promise<void>;
 }
 
 export const useNotificationStore = create<NotificationState>((set, get) => ({
@@ -177,12 +178,18 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     }
   },
 
-  acknowledgeLocal: (id) => {
+  acknowledge: async (slug, id) => {
+    const wasUnread = Boolean(get().signals.find((s) => s.id === id && !s.read));
+    // Optimistic : retire de la liste (le backend filtre les notifications acquittées)
     set((state) => ({
-      signals: state.signals.map((s) =>
-        s.id === id ? { ...s, read: true, acknowledged: true } : s
-      ),
-      unreadCount: Math.max(0, state.unreadCount - (state.signals.find((s) => s.id === id && !s.read) ? 1 : 0)),
+      signals: state.signals.filter((s) => s.id !== id),
+      unreadCount: Math.max(0, state.unreadCount - (wasUnread ? 1 : 0)),
     }));
+    try {
+      await acknowledgeApi(slug, Number(id));
+    } catch {
+      // Resync en cas d'échec
+      await get().fetchNotifications(slug);
+    }
   },
 }));

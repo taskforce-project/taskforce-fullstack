@@ -10,6 +10,8 @@ import {
   updateProject as updateProjectApi,
   archiveProject as archiveProjectApi,
   deleteProject as deleteProjectApi,
+  favoriteProject as favoriteProjectApi,
+  unfavoriteProject as unfavoriteProjectApi,
 } from "../api/project-service";
 
 // ---------------------------------------------------------------------------
@@ -35,6 +37,9 @@ interface ProjectState {
 
   /** Archive un projet dans le store */
   archiveProject: (slug: string, id: number) => Promise<Project | null>;
+
+  /** Bascule l'état favori d'un projet (optimiste) */
+  toggleFavorite: (slug: string, id: number, next: boolean) => Promise<Project | null>;
 
   /** Supprime un projet du store */
   deleteProject: (slug: string, id: number) => Promise<void>;
@@ -110,6 +115,31 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       return updated;
     } catch (err) {
       const message = err instanceof Error ? err.message : "Erreur lors de l'archivage du projet";
+      set({ error: message });
+      return null;
+    }
+  },
+
+  toggleFavorite: async (slug, id, next) => {
+    // Mise à jour optimiste
+    set((state) => ({
+      projects: state.projects.map((p) => (p.id === id ? { ...p, isFavorite: next } : p)),
+      activeProject: state.activeProject?.id === id ? { ...state.activeProject, isFavorite: next } : state.activeProject,
+    }));
+    try {
+      const updated = next ? await favoriteProjectApi(slug, id) : await unfavoriteProjectApi(slug, id);
+      set((state) => ({
+        projects: state.projects.map((p) => (p.id === id ? updated : p)),
+        activeProject: state.activeProject?.id === id ? updated : state.activeProject,
+      }));
+      return updated;
+    } catch (err) {
+      // Revert en cas d'échec
+      set((state) => ({
+        projects: state.projects.map((p) => (p.id === id ? { ...p, isFavorite: !next } : p)),
+        activeProject: state.activeProject?.id === id ? { ...state.activeProject, isFavorite: !next } : state.activeProject,
+      }));
+      const message = err instanceof Error ? err.message : "Erreur lors de la mise à jour des favoris";
       set({ error: message });
       return null;
     }
