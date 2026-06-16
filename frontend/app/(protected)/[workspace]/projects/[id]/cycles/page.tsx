@@ -23,6 +23,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { DatePicker } from "@/components/ui/date-picker"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
@@ -111,11 +112,11 @@ function NewCycleDialog({ open, onClose, onCreate }: NewCycleDialogProps) {
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="cycle-start">Start date</Label>
-              <Input id="cycle-start" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+              <DatePicker id="cycle-start" value={startDate} onChange={setStartDate} placeholder="Début" />
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="cycle-end">End date</Label>
-              <Input id="cycle-end" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+              <DatePicker id="cycle-end" value={endDate} onChange={setEndDate} placeholder="Fin" />
             </div>
           </div>
           <DialogFooter>
