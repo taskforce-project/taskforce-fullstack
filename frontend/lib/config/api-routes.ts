@@ -71,6 +71,7 @@ export const PROJECT_ROUTES = {
   BY_ID:   (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}`,
   UPDATE:  (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}`,
   ARCHIVE: (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/archive`,
+  FAVORITE: (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/favorite`,
   DELETE:  (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}`,
   MEMBERS: (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/members`,
   MEMBER:  (slug: string, id: number, memberId: number) => `/api/workspaces/${slug}/projects/${id}/members/${memberId}`,
@@ -83,6 +84,8 @@ export const PROJECT_ROUTES = {
  * Backend: /api/workspaces/{slug}/projects/{projectId}/issues
  */
 export const ISSUE_ROUTES = {
+  /** Vue My Work — issues assignées à l'utilisateur, tous projets du workspace */
+  MY_ISSUES: (slug: string) => `/api/workspaces/${slug}/my-issues`,
   LIST:    (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues`,
   CREATE:  (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues`,
   BY_ID:   (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}`,
@@ -135,6 +138,7 @@ export const NOTIFICATION_ROUTES = {
   UNREAD_COUNT:    (slug: string) => `/api/workspaces/${slug}/notifications/unread-count`,
   MARK_READ:       (slug: string, id: number) => `/api/workspaces/${slug}/notifications/${id}/read`,
   MARK_ALL_READ:   (slug: string) => `/api/workspaces/${slug}/notifications/read-all`,
+  ACKNOWLEDGE:     (slug: string, id: number) => `/api/workspaces/${slug}/notifications/${id}/acknowledge`,
   ACKNOWLEDGE_ALL: (slug: string) => `/api/workspaces/${slug}/notifications/acknowledge-all`,
 } as const;
 
