@@ -61,6 +61,8 @@ export interface Issue {
   id: number;
   sequenceNumber: number;
   identifier: string;
+  projectId: number;
+  projectName: string;
   title: string;
   description: string | null;
   priority: IssuePriority;
@@ -73,6 +75,7 @@ export interface Issue {
   startDate: string | null;
   dueDate: string | null;
   completedAt: string | null;
+  storyPoints: number | null;
   labels: IssueLabel[];
   commentCount: number;
   createdAt: string;
@@ -142,6 +145,8 @@ export interface UpdateIssuePayload {
   startDate?: string | null;
   dueDate?: string | null;
   position?: number;
+  /** Story points : undefined = pas de changement ; 0 = retirer l'estimation ; >0 = valeur */
+  storyPoints?: number;
   /** null = pas de changement ; [] = retirer tous les labels */
   labelIds?: number[];
 }
@@ -189,6 +194,12 @@ export interface UpdateIssueStatusPayload {
 
 export async function listIssues(slug: string, projectId: number): Promise<Issue[]> {
   const res = await apiClient.get<{ data: Issue[] }>(ISSUE_ROUTES.LIST(slug, projectId));
+  return res.data.data;
+}
+
+/** Vue My Work : issues assignées à l'utilisateur courant, tous projets du workspace */
+export async function listMyIssues(slug: string): Promise<Issue[]> {
+  const res = await apiClient.get<{ data: Issue[] }>(ISSUE_ROUTES.MY_ISSUES(slug));
   return res.data.data;
 }
 

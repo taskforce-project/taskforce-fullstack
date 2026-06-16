@@ -59,6 +59,12 @@ export async function markAllAsRead(slug: string): Promise<void> {
   await apiClient.patch(NOTIFICATION_ROUTES.MARK_ALL_READ(slug));
 }
 
+/** Acquitte (dismiss) une notification unique */
+export async function acknowledge(slug: string, id: number): Promise<NotificationResponse> {
+  const response = await apiClient.patch<{ data: NotificationResponse }>(NOTIFICATION_ROUTES.ACKNOWLEDGE(slug, id));
+  return response.data.data;
+}
+
 /** Acquitte (dismiss) toutes les notifications */
 export async function acknowledgeAll(slug: string): Promise<void> {
   await apiClient.patch(NOTIFICATION_ROUTES.ACKNOWLEDGE_ALL(slug));

@@ -38,6 +38,7 @@ export interface Project {
   description: string | null;
   status: ProjectStatus;
   isPublic: boolean;
+  isFavorite: boolean;
   workspaceId: number;
   workspaceSlug: string;
   createdById: number;
@@ -110,6 +111,18 @@ export async function updateProject(slug: string, id: number, payload: UpdatePro
 /** Archive un projet */
 export async function archiveProject(slug: string, id: number): Promise<Project> {
   const response = await apiClient.post<{ data: Project }>(PROJECT_ROUTES.ARCHIVE(slug, id));
+  return response.data.data;
+}
+
+/** Ajoute le projet aux favoris de l'utilisateur courant */
+export async function favoriteProject(slug: string, id: number): Promise<Project> {
+  const response = await apiClient.post<{ data: Project }>(PROJECT_ROUTES.FAVORITE(slug, id));
+  return response.data.data;
+}
+
+/** Retire le projet des favoris de l'utilisateur courant */
+export async function unfavoriteProject(slug: string, id: number): Promise<Project> {
+  const response = await apiClient.delete<{ data: Project }>(PROJECT_ROUTES.FAVORITE(slug, id));
   return response.data.data;
 }
 
