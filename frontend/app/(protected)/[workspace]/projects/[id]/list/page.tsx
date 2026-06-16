@@ -9,13 +9,11 @@ import {
   XCircle,
   ArrowUpRight,
   ChevronDown,
-  Plus,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
 import { useIssueStore } from "@/lib/store/issue-store"
-import { CreateIssueDialog } from "@/components/dialogs/create-issue-dialog"
 import { IssueSheet, type SheetIssue } from "@/components/sheets/issue-sheet"
 import type { Issue, IssueStatus, IssueStatusCategory } from "@/lib/api/issue-service"
 
@@ -146,14 +144,10 @@ function IssueRow({ issue, onOpen }: { readonly issue: Issue; readonly onOpen: (
 function StatusGroup({
   status,
   issues,
-  workspaceSlug,
-  projectId,
   onOpenIssue,
 }: {
   readonly status: IssueStatus
   readonly issues: Issue[]
-  readonly workspaceSlug: string
-  readonly projectId: number
   readonly onOpenIssue: (issue: Issue) => void
 }) {
   return (
@@ -169,14 +163,6 @@ function StatusGroup({
       {issues.map((issue) => (
         <IssueRow key={issue.id} issue={issue} onOpen={onOpenIssue} />
       ))}
-
-      {/* Add issue in this group */}
-      <CreateIssueDialog projectId={projectId} workspaceSlug={workspaceSlug} defaultStatusId={status.id}>
-        <div className="flex items-center gap-2 px-4 py-2 text-muted-foreground hover:bg-muted/20 transition-colors cursor-pointer border-b border-border/50">
-          <Plus className="h-3.5 w-3.5" />
-          <span className="text-xs">Add issue</span>
-        </div>
-      </CreateIssueDialog>
     </div>
   )
 }
@@ -243,8 +229,6 @@ export default function ProjectListPage() {
             key={status.id}
             status={status}
             issues={groupIssues}
-            workspaceSlug={workspace}
-            projectId={projectId}
             onOpenIssue={(issue) => setSelectedIssue(toSheetIssue(issue))}
           />
         )
