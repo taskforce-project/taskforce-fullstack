@@ -1,32 +1,36 @@
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
-import Link from "next/link"
-import { useParams } from "next/navigation"
-import { motion, AnimatePresence } from "framer-motion"
+import { useParams, useRouter } from "next/navigation"
 import {
   Plus,
   Search,
-  FolderKanban,
   TrendingUp,
   TrendingDown,
   Minus,
   Zap,
   AlertTriangle,
-  Archive,
   MoreHorizontal,
   Loader2,
-  ChevronRight,
-  Users,
   CircleDot,
-  PauseCircle,
 } from "lucide-react"
 
 import { CreateProjectDialog } from "@/components/dialogs/create-project-dialog"
 import { ProjectIcon } from "@/components/ui/project-icon"
-import { useTranslation } from "@/lib/i18n"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
+import { Card, CardContent } from "@/components/ui/card"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   DropdownMenu,
@@ -42,10 +46,9 @@ import type { Project } from "@/lib/api/project-service"
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type FilterTab = "all" | "active" | "archived"
-
 type HealthLevel = "healthy" | "at-risk" | "critical" | "paused"
 
-// ─── Operational signal derivation (from real project data) ──────────────────
+// ─── Signal derivation (from real project data) ───────────────────────────────
 
 function deriveHealth(project: Project): HealthLevel {
   if (project.status === "PAUSED" || project.status === "ARCHIVED") return "paused"
@@ -59,17 +62,12 @@ function deriveHealth(project: Project): HealthLevel {
 function deriveVelocity(project: Project): number | null {
   if (project.totalIssues === 0) return null
   const completedIssues = project.totalIssues - project.openIssues
-  const createdAt = new Date(project.createdAt)
-  const updatedAt = new Date(project.updatedAt)
-  const ageWeeks = Math.max(1, (Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24 * 7))
-  // Completion rate: issues closed per week
+  const ageWeeks = Math.max(1, (Date.now() - new Date(project.createdAt).getTime()) / (1000 * 60 * 60 * 24 * 7))
   const rate = completedIssues / ageWeeks
-  // Compare to a healthy target of 2 issues/week per 10 total
   const target = (project.totalIssues / 10) * 2
   if (target === 0) return null
   const pct = Math.round(((rate - target) / target) * 100)
-  // Staleness penalty: if not updated in 7+ days, cap positive velocity
-  const daysSinceUpdate = (Date.now() - updatedAt.getTime()) / (1000 * 60 * 60 * 24)
+  const daysSinceUpdate = (Date.now() - new Date(project.updatedAt).getTime()) / (1000 * 60 * 60 * 24)
   if (daysSinceUpdate > 7 && pct > 0) return 0
   return Math.max(-99, Math.min(99, pct))
 }
@@ -77,10 +75,8 @@ function deriveVelocity(project: Project): number | null {
 function deriveRiskSignal(project: Project): string | null {
   const health = deriveHealth(project)
   if (health === "healthy" || health === "paused") return null
-
   const ratio = project.totalIssues > 0 ? project.openIssues / project.totalIssues : 0
   const daysSinceUpdate = (Date.now() - new Date(project.updatedAt).getTime()) / (1000 * 60 * 60 * 24)
-
   if (ratio > 0.85) return `${Math.round(ratio * 100)}% of issues still open`
   if (daysSinceUpdate > 14) return `No updates in ${Math.round(daysSinceUpdate)} days`
   if (daysSinceUpdate > 7) return "No updates in 7+ days"
@@ -94,94 +90,57 @@ function progressPct(project: Project): number {
     : 0
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-const HEALTH_CONFIG: Record<HealthLevel, { label: string; color: string; dot: string }> = {
-  healthy: {
-    label: "Healthy",
-    color: "rgba(52,211,153,0.15)",
-    dot: "#34d399",
-  },
-  "at-risk": {
-    label: "At Risk",
-    color: "rgba(251,191,36,0.15)",
-    dot: "#fbbf24",
-  },
-  critical: {
-    label: "Critical",
-    color: "rgba(248,113,113,0.15)",
-    dot: "#f87171",
-  },
-  paused: {
-    label: "Paused",
-    color: "rgba(148,163,184,0.10)",
-    dot: "#94a3b8",
-  },
+const HEALTH_META: Record<HealthLevel, { label: string; dot: string }> = {
+  healthy:   { label: "Healthy",  dot: "bg-emerald-500" },
+  "at-risk": { label: "At risk",  dot: "bg-amber-500" },
+  critical:  { label: "Critical", dot: "bg-rose-500" },
+  paused:    { label: "Paused",   dot: "bg-muted-foreground" },
 }
 
-function HealthChip({ level }: { level: HealthLevel }) {
-  const cfg = HEALTH_CONFIG[level]
+// ─── Small cells ──────────────────────────────────────────────────────────────
+
+function HealthBadge({ level }: { readonly level: HealthLevel }) {
+  const meta = HEALTH_META[level]
   return (
-    <span
-      className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium shrink-0"
-      style={{ background: cfg.color, color: cfg.dot }}
-    >
-      <span
-        className="inline-block h-1.5 w-1.5 rounded-full"
-        style={{ background: cfg.dot }}
-      />
-      {cfg.label}
-    </span>
+    <Badge variant="secondary" className="gap-1.5 font-normal text-muted-foreground">
+      <span className={cn("size-1.5 rounded-full", meta.dot)} />
+      {meta.label}
+    </Badge>
   )
 }
 
-function VelocityBadge({ delta }: { delta: number | null }) {
-  if (delta === null) return (
-    <span className="inline-flex items-center gap-0.5 text-[11px]" style={{ color: "var(--label-quaternary)" }}>
-      <Minus className="size-3" />
-      <span>N/A</span>
-    </span>
-  )
-  if (delta === 0) return (
-    <span className="inline-flex items-center gap-0.5 text-[11px]" style={{ color: "var(--label-quaternary)" }}>
-      <Minus className="size-3" />
-      <span>—</span>
-    </span>
-  )
+function VelocityCell({ delta }: { readonly delta: number | null }) {
+  if (delta === null || delta === 0) {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+        <Minus className="size-3" /> {delta === null ? "N/A" : "—"}
+      </span>
+    )
+  }
   const positive = delta > 0
   return (
-    <span
-      className="inline-flex items-center gap-0.5 text-[11px] font-medium tabular-nums"
-      style={{ color: positive ? "#34d399" : "#f87171" }}
-    >
+    <span className={cn("inline-flex items-center gap-1 text-xs font-medium tabular-nums", positive ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
       {positive ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
       {positive ? "+" : ""}{delta}%
     </span>
   )
 }
 
-function MemberStack({ project }: { project: Project }) {
-  const sorted = [...project.members].sort((a, b) =>
-    a.userId === project.createdById ? -1 : b.userId === project.createdById ? 1 : 0
-  )
-  const visible = sorted.slice(0, 3)
-  const extra = sorted.length - 3
-
+function MemberStack({ project }: { readonly project: Project }) {
+  const visible = project.members.slice(0, 3)
+  const extra = project.members.length - 3
   return (
-    <div className="flex items-center -space-x-1.5 shrink-0">
+    <div className="flex items-center -space-x-1.5">
       {visible.map((m) => (
-        <Avatar key={m.id} className="h-5 w-5 ring-1 ring-background" style={{}}>
+        <Avatar key={m.id} className="size-5 ring-1 ring-background">
           <AvatarImage src={getAvatarUrl({ email: m.email, avatarUrl: m.avatarUrl })} />
-          <AvatarFallback className="text-[8px] bg-violet-500/30 text-violet-200">
+          <AvatarFallback className="text-[8px]">
             {(m.displayName ?? m.email).slice(0, 2).toUpperCase()}
           </AvatarFallback>
         </Avatar>
       ))}
       {extra > 0 && (
-        <div
-          className="h-5 w-5 rounded-full flex items-center justify-center text-[8px] font-medium ring-1"
-          style={{ background: "var(--fill-secondary)", color: "var(--label-tertiary)" }}
-        >
+        <div className="flex size-5 items-center justify-center rounded-full bg-muted text-[8px] font-medium text-muted-foreground ring-1 ring-background">
           +{extra}
         </div>
       )}
@@ -189,17 +148,41 @@ function MemberStack({ project }: { project: Project }) {
   )
 }
 
-// ─── Operation row (Linear-style) ─────────────────────────────────────────────
+// ─── Stats strip ──────────────────────────────────────────────────────────────
 
-function OperationRow({
-  project,
-  slug,
-  index,
-}: {
-  project: Project
-  slug: string
-  index: number
-}) {
+function StatsStrip({ projects }: { readonly projects: Project[] }) {
+  const total = projects.length
+  const active = projects.filter((p) => p.status === "ACTIVE").length
+  const critical = projects.filter((p) => deriveHealth(p) === "critical").length
+  const atRisk = projects.filter((p) => deriveHealth(p) === "at-risk").length
+  const avgProgress = total > 0 ? Math.round(projects.reduce((acc, p) => acc + progressPct(p), 0) / total) : 0
+
+  const stats = [
+    { label: "Total operations", value: total },
+    { label: "Active", value: active },
+    { label: "At risk", value: atRisk },
+    { label: "Critical", value: critical },
+    { label: "Avg progress", value: `${avgProgress}%` },
+  ]
+
+  return (
+    <Card>
+      <CardContent className="flex flex-wrap items-center gap-x-10 gap-y-4">
+        {stats.map((s) => (
+          <div key={s.label} className="flex flex-col gap-1">
+            <span className="text-xl font-semibold tabular-nums text-foreground">{s.value}</span>
+            <span className="text-xs text-muted-foreground">{s.label}</span>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  )
+}
+
+// ─── Row ──────────────────────────────────────────────────────────────────────
+
+function OperationRow({ project, slug }: { readonly project: Project; readonly slug: string }) {
+  const router = useRouter()
   const archiveProject = useProjectStore((s) => s.archiveProject)
   const updateProject = useProjectStore((s) => s.updateProject)
 
@@ -209,276 +192,109 @@ function OperationRow({
   const pct = progressPct(project)
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -4 }}
-      transition={{ duration: 0.18, delay: index * 0.04 }}
+    <TableRow
+      className="cursor-pointer"
+      onClick={() => router.push(`/${slug}/projects/${project.id}`)}
     >
-      <Link
-        href={`/${slug}/projects/${project.id}`}
-        className="group flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors relative"
-        style={{ background: "transparent" }}
-        onMouseEnter={(e) => {
-          (e.currentTarget as HTMLElement).style.background = "var(--fill-tertiary)"
-        }}
-        onMouseLeave={(e) => {
-          (e.currentTarget as HTMLElement).style.background = "transparent"
-        }}
-      >
-        {/* Status dot */}
-        <span
-          className="shrink-0 h-2 w-2 rounded-full"
-          style={{ background: HEALTH_CONFIG[health].dot }}
-        />
-
-        {/* Project icon + name */}
-        <div className="flex items-center gap-2 w-[200px] min-w-0 shrink-0">
-          <ProjectIcon iconUrl={project.iconUrl} name={project.name} size={20} className="rounded shrink-0" />
-          <span
-            className="text-sm font-medium truncate transition-colors"
-            style={{ color: "var(--label-primary)" }}
-          >
-            {project.name}
+      <TableCell>
+        <div className="flex items-center gap-2.5">
+          <span className={cn("size-2 shrink-0 rounded-full", HEALTH_META[health].dot)} />
+          <ProjectIcon iconUrl={project.iconUrl} name={project.name} size={20} className="shrink-0 rounded" />
+          <span className="font-medium text-foreground">{project.name}</span>
+        </div>
+      </TableCell>
+      <TableCell><HealthBadge level={health} /></TableCell>
+      <TableCell className="hidden md:table-cell">
+        {riskSignal ? (
+          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+            <AlertTriangle className="size-3 shrink-0 text-amber-500" />
+            {riskSignal}
           </span>
+        ) : (
+          <span className="text-xs text-muted-foreground/60">No signals</span>
+        )}
+      </TableCell>
+      <TableCell className="hidden lg:table-cell">
+        <div className="flex items-center gap-2">
+          <Progress value={pct} className="h-1.5 w-16" />
+          <span className="text-xs tabular-nums text-muted-foreground">{pct}%</span>
         </div>
-
-        {/* Health chip */}
-        <div className="w-[80px] shrink-0">
-          <HealthChip level={health} />
-        </div>
-
-        {/* Risk signal */}
-        <div className="flex-1 min-w-0">
-          {riskSignal ? (
-            <span
-              className="inline-flex items-center gap-1 text-[11px] truncate"
-              style={{ color: "var(--label-tertiary)" }}
+      </TableCell>
+      <TableCell className="hidden lg:table-cell"><VelocityCell delta={velocity} /></TableCell>
+      <TableCell className="hidden xl:table-cell"><MemberStack project={project} /></TableCell>
+      <TableCell className="text-right">
+        <span className="inline-flex items-center gap-1 text-sm tabular-nums text-muted-foreground">
+          <CircleDot className="size-3.5" />
+          {project.openIssues}
+        </span>
+      </TableCell>
+      <TableCell className="text-right">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="text-muted-foreground"
+              onClick={(e) => e.stopPropagation()}
             >
-              <AlertTriangle className="size-3 shrink-0 text-amber-400/70" />
-              {riskSignal}
-            </span>
-          ) : (
-            <span className="text-[11px]" style={{ color: "var(--label-quaternary)" }}>
-              No signals
-            </span>
-          )}
-        </div>
-
-        {/* Progress bar */}
-        <div className="w-[80px] shrink-0 hidden md:flex flex-col gap-1">
-          <div
-            className="h-1 rounded-full overflow-hidden"
-            style={{ background: "var(--fill-secondary)" }}
-          >
-            <div
-              className="h-full rounded-full transition-all"
-              style={{
-                width: `${pct}%`,
-                background: health === "critical"
-                  ? "#f87171"
-                  : health === "at-risk"
-                  ? "#fbbf24"
-                  : "rgba(167,139,250,0.8)",
-              }}
-            />
-          </div>
-          <span className="text-[10px] tabular-nums" style={{ color: "var(--label-quaternary)" }}>
-            {pct}%
-          </span>
-        </div>
-
-        {/* Velocity */}
-        <div className="w-[56px] shrink-0 hidden lg:flex justify-end">
-          <VelocityBadge delta={velocity} />
-        </div>
-
-        {/* Members */}
-        <div className="w-[64px] shrink-0 hidden xl:flex justify-center">
-          <MemberStack project={project} />
-        </div>
-
-        {/* Open issues */}
-        <div className="w-[52px] shrink-0 flex items-center justify-end gap-1">
-          <CircleDot className="size-3" style={{ color: "var(--label-quaternary)" }} />
-          <span className="text-xs tabular-nums" style={{ color: "var(--label-tertiary)" }}>
-            {project.openIssues}
-          </span>
-        </div>
-
-        {/* Chevron / actions */}
-        <div className="w-8 shrink-0 flex items-center justify-end">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                className="h-6 w-6 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                style={{ background: "var(--fill-primary)" }}
-                onClick={(e) => e.preventDefault()}
-              >
-                <MoreHorizontal className="size-3.5" style={{ color: "var(--label-secondary)" }} />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="text-sm">
-              <DropdownMenuItem>Edit operation</DropdownMenuItem>
-              {project.status === "ARCHIVED" ? (
-                <DropdownMenuItem
-                  onClick={async (e) => {
-                    e.preventDefault()
-                    await updateProject(slug, project.id, { status: "ACTIVE" })
-                  }}
-                >
-                  Reactivate
-                </DropdownMenuItem>
-              ) : (
-                <DropdownMenuItem
-                  onClick={async (e) => {
-                    e.preventDefault()
-                    await archiveProject(slug, project.id)
-                  }}
-                >
-                  Archive
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </Link>
-    </motion.div>
-  )
-}
-
-// ─── Section header ───────────────────────────────────────────────────────────
-
-function SectionHeader() {
-  return (
-    <div
-      className="flex items-center gap-3 px-4 py-1.5 sticky top-0 z-10"
-      style={{
-        background: "var(--background)",
-        borderBottom: "1px solid var(--separator)",
-      }}
-    >
-      <span className="w-2 shrink-0" />
-      <span className="w-[200px] text-[10px] font-semibold uppercase tracking-widest shrink-0"
-        style={{ color: "var(--label-quaternary)" }}>
-        Operation
-      </span>
-      <span className="w-[80px] text-[10px] font-semibold uppercase tracking-widest shrink-0"
-        style={{ color: "var(--label-quaternary)" }}>
-        Health
-      </span>
-      <span className="flex-1 text-[10px] font-semibold uppercase tracking-widest"
-        style={{ color: "var(--label-quaternary)" }}>
-        Signal
-      </span>
-      <span className="w-[80px] text-[10px] font-semibold uppercase tracking-widest shrink-0 hidden md:block"
-        style={{ color: "var(--label-quaternary)" }}>
-        Progress
-      </span>
-      <span className="w-[56px] text-[10px] font-semibold uppercase tracking-widest text-right shrink-0 hidden lg:block"
-        style={{ color: "var(--label-quaternary)" }}>
-        Velocity
-      </span>
-      <span className="w-[64px] text-[10px] font-semibold uppercase tracking-widest text-center shrink-0 hidden xl:block"
-        style={{ color: "var(--label-quaternary)" }}>
-        Team
-      </span>
-      <span className="w-[52px] text-[10px] font-semibold uppercase tracking-widest text-right shrink-0"
-        style={{ color: "var(--label-quaternary)" }}>
-        Open
-      </span>
-      <span className="w-8 shrink-0" />
-    </div>
+              <MoreHorizontal className="size-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+            <DropdownMenuItem onClick={() => router.push(`/${slug}/projects/${project.id}/settings`)}>
+              Edit operation
+            </DropdownMenuItem>
+            {project.status === "ARCHIVED" ? (
+              <DropdownMenuItem onClick={() => updateProject(slug, project.id, { status: "ACTIVE" })}>
+                Reactivate
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem onClick={() => archiveProject(slug, project.id)}>
+                Archive
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </TableCell>
+    </TableRow>
   )
 }
 
 // ─── Empty state ──────────────────────────────────────────────────────────────
 
-function EmptyState({ isSearch }: { isSearch: boolean }) {
-  if (isSearch) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <Search className="size-8 mb-3" style={{ color: "var(--label-quaternary)" }} />
-        <p className="text-sm font-medium" style={{ color: "var(--label-secondary)" }}>
-          No operations match your search
-        </p>
-      </div>
-    )
-  }
+function EmptyState({ isSearch }: { readonly isSearch: boolean }) {
   return (
-    <div className="flex flex-col items-center justify-center py-20 text-center">
-      <div
-        className="h-12 w-12 rounded-xl flex items-center justify-center mb-4"
-        style={{ background: "var(--fill-secondary)" }}
-      >
-        <Zap className="size-5" style={{ color: "var(--label-tertiary)" }} />
-      </div>
-      <p className="text-sm font-semibold mb-1" style={{ color: "var(--label-primary)" }}>
-        No active operations
-      </p>
-      <p className="text-xs mb-5" style={{ color: "var(--label-tertiary)" }}>
-        Create your first operation to start tracking work
-      </p>
-      <CreateProjectDialog>
-        <Button size="sm" className="gap-1.5 h-8 text-xs">
-          <Plus className="size-3.5" />
-          New Operation
-        </Button>
-      </CreateProjectDialog>
-    </div>
-  )
-}
-
-// ─── Stats strip ──────────────────────────────────────────────────────────────
-
-function StatsStrip({ projects }: { projects: Project[] }) {
-  const total = projects.length
-  const active = projects.filter((p) => p.status === "ACTIVE").length
-  const critical = projects.filter((p) => deriveHealth(p) === "critical").length
-  const atRisk = projects.filter((p) => deriveHealth(p) === "at-risk").length
-  const avgProgress = total > 0
-    ? Math.round(projects.reduce((acc, p) => acc + progressPct(p), 0) / total)
-    : 0
-
-  const stats = [
-    { label: "Total operations", value: total, color: "var(--label-primary)" },
-    { label: "Active", value: active, color: "#34d399" },
-    { label: "At risk", value: atRisk, color: "#fbbf24" },
-    { label: "Critical", value: critical, color: "#f87171" },
-    { label: "Avg progress", value: `${avgProgress}%`, color: "var(--label-secondary)" },
-  ]
-
-  return (
-    <div className="flex items-center gap-6 flex-wrap">
-      {stats.map((s) => (
-        <div key={s.label} className="flex flex-col gap-0.5">
-          <span className="text-xs tabular-nums font-semibold" style={{ color: s.color }}>
-            {s.value}
-          </span>
-          <span className="text-[10px]" style={{ color: "var(--label-quaternary)" }}>
-            {s.label}
-          </span>
-        </div>
-      ))}
+    <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+      {isSearch ? (
+        <>
+          <Search className="size-8 text-muted-foreground/50" />
+          <p className="text-sm font-medium text-muted-foreground">No operations match your search</p>
+        </>
+      ) : (
+        <>
+          <div className="flex size-12 items-center justify-center rounded-xl bg-muted">
+            <Zap className="size-5 text-muted-foreground" />
+          </div>
+          <div className="space-y-1">
+            <p className="text-sm font-semibold text-foreground">No active operations</p>
+            <p className="text-xs text-muted-foreground">Create your first operation to start tracking work</p>
+          </div>
+          <CreateProjectDialog>
+            <Button size="sm" className="gap-1.5"><Plus className="size-3.5" /> New Operation</Button>
+          </CreateProjectDialog>
+        </>
+      )}
     </div>
   )
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-const FILTER_TABS: { key: FilterTab; label: string }[] = [
-  { key: "all", label: "All" },
-  { key: "active", label: "Active" },
-  { key: "archived", label: "Archived" },
-]
-
 export default function ProjectsPage() {
-  const { t } = useTranslation()
   const params = useParams<{ workspace: string }>()
   const slug = params.workspace
 
   const { projects, isLoading, fetchProjects } = useProjectStore()
-
   const [filter, setFilter] = useState<FilterTab>("active")
   const [search, setSearch] = useState("")
 
@@ -492,141 +308,88 @@ export default function ProjectsPage() {
     if (filter === "archived") list = list.filter((p) => p.status === "ARCHIVED")
     if (search.trim()) {
       const q = search.toLowerCase()
-      list = list.filter(
-        (p) => p.name.toLowerCase().includes(q) || (p.description ?? "").toLowerCase().includes(q)
-      )
+      list = list.filter((p) => p.name.toLowerCase().includes(q) || (p.description ?? "").toLowerCase().includes(q))
     }
-    // Sort: critical first, then at-risk, then healthy
     const order: Record<HealthLevel, number> = { critical: 0, "at-risk": 1, healthy: 2, paused: 3 }
     return [...list].sort((a, b) => order[deriveHealth(a)] - order[deriveHealth(b)])
   }, [projects, filter, search])
 
-  // Totals for the active filter only (for stats strip)
   const activeProjects = useMemo(
     () => projects.filter((p) => p.status === "ACTIVE" || p.status === "PAUSED"),
     [projects]
   )
 
   return (
-    <div className="flex flex-col gap-0 w-full min-h-0">
-      {/* ── Page header ── */}
-      <div className="flex items-start justify-between mb-5 gap-4">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight" style={{ color: "var(--label-primary)" }}>
-            Active Operations
-          </h1>
-          <p className="text-xs mt-0.5" style={{ color: "var(--label-tertiary)" }}>
-            Real-time health and velocity across all workstreams
-          </p>
+    <div className="flex w-full flex-col gap-5">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight">Active Operations</h1>
+          <p className="text-sm text-muted-foreground">Real-time health and velocity across all workstreams</p>
         </div>
         <CreateProjectDialog>
-          <Button size="sm" className="gap-1.5 h-8 text-xs shrink-0">
-            <Plus className="size-3.5" />
-            New Operation
-          </Button>
+          <Button size="sm" className="gap-1.5"><Plus className="size-4" /> New Operation</Button>
         </CreateProjectDialog>
       </div>
 
-      {/* ── Stats strip ── */}
-      {!isLoading && activeProjects.length > 0 && (
-        <div
-          className="rounded-xl px-4 py-3 mb-4"
-          style={{
-            background: "var(--card)",
-            border: "1px solid var(--separator)",
-            boxShadow: "0 1px 0 0 rgba(255,255,255,0.04) inset",
-          }}
-        >
-          <StatsStrip projects={activeProjects} />
-        </div>
-      )}
+      {/* Stats */}
+      {!isLoading && activeProjects.length > 0 && <StatsStrip projects={activeProjects} />}
 
-      {/* ── Toolbar ── */}
-      <div className="flex items-center gap-3 mb-3 flex-wrap">
-        {/* Filter tabs */}
-        <div
-          className="flex items-center rounded-lg p-0.5 gap-0.5"
-          style={{ background: "var(--fill-secondary)" }}
-        >
-          {FILTER_TABS.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setFilter(tab.key)}
-              className="px-3 py-1 text-xs rounded-md transition-all font-medium"
-              style={
-                filter === tab.key
-                  ? {
-                      background: "var(--fill-primary)",
-                      color: "var(--label-primary)",
-                      boxShadow: "0 1px 2px rgba(0,0,0,0.4)",
-                    }
-                  : { color: "var(--label-tertiary)" }
-              }
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Search */}
-        <div className="relative flex-1 max-w-xs">
-          <Search
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 pointer-events-none"
-            style={{ color: "var(--label-quaternary)" }}
-          />
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center gap-3">
+        <Tabs value={filter} onValueChange={(v) => setFilter(v as FilterTab)}>
+          <TabsList>
+            <TabsTrigger value="all">All</TabsTrigger>
+            <TabsTrigger value="active">Active</TabsTrigger>
+            <TabsTrigger value="archived">Archived</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        <div className="relative w-full max-w-xs">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search operations…"
-            className="pl-8 h-8 text-xs border-0"
-            style={{
-              background: "var(--fill-secondary)",
-              color: "var(--label-primary)",
-            }}
+            className="h-9 pl-8"
           />
         </div>
-
-        {/* Result count */}
         {!isLoading && (
-          <span className="text-xs ml-auto" style={{ color: "var(--label-quaternary)" }}>
+          <span className="ml-auto text-sm text-muted-foreground">
             {filtered.length} operation{filtered.length !== 1 ? "s" : ""}
           </span>
         )}
       </div>
 
-      {/* ── List container ── */}
-      <div
-        className="rounded-xl overflow-hidden"
-        style={{
-          background: "var(--card)",
-          border: "1px solid var(--separator)",
-          boxShadow: "0 1px 0 0 rgba(255,255,255,0.04) inset",
-        }}
-      >
+      {/* Table */}
+      <Card className="gap-0 overflow-hidden py-0">
         {isLoading ? (
           <div className="flex justify-center py-16">
-            <Loader2 className="size-6 animate-spin" style={{ color: "var(--label-quaternary)" }} />
+            <Loader2 className="size-6 animate-spin text-muted-foreground" />
           </div>
         ) : filtered.length === 0 ? (
           <EmptyState isSearch={search.trim().length > 0} />
         ) : (
-          <>
-            <SectionHeader />
-            <div className="divide-y" style={{ borderColor: "var(--separator)" }}>
-              <AnimatePresence mode="popLayout">
-                {filtered.map((project, i) => (
-                  <OperationRow
-                    key={project.id}
-                    project={project}
-                    slug={slug}
-                    index={i}
-                  />
-                ))}
-              </AnimatePresence>
-            </div>
-          </>
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead>Operation</TableHead>
+                <TableHead>Health</TableHead>
+                <TableHead className="hidden md:table-cell">Signal</TableHead>
+                <TableHead className="hidden lg:table-cell">Progress</TableHead>
+                <TableHead className="hidden lg:table-cell">Velocity</TableHead>
+                <TableHead className="hidden xl:table-cell">Team</TableHead>
+                <TableHead className="text-right">Open</TableHead>
+                <TableHead className="w-10" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((project) => (
+                <OperationRow key={project.id} project={project} slug={slug} />
+              ))}
+            </TableBody>
+          </Table>
         )}
-      </div>
+      </Card>
     </div>
   )
 }
