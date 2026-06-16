@@ -28,6 +28,11 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     /** Compte les non-lues */
     long countByRecipientIdAndWorkspaceIdAndReadFalse(Long recipientId, Long workspaceId);
 
+    /** Dédup des alertes d'échéance : une alerte du même type non acquittée existe-t-elle déjà pour cette issue ? */
+    boolean existsByRecipientIdAndIssueIdentifierAndTypeAndAcknowledgedFalse(
+        Long recipientId, String issueIdentifier, String type
+    );
+
     /** Marque toutes les notifications d'un user/workspace comme lues */
     @Modifying
     @Query("""

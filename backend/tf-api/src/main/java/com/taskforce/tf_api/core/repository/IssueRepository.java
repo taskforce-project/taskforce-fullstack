@@ -74,6 +74,31 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
         """)
     List<Issue> findForKanban(@Param("projectId") Long projectId);
 
+    /** Issues assignées à un utilisateur sur TOUT le workspace (vue My Work) — évite le N+1 côté front */
+    @Query("""
+        SELECT DISTINCT i FROM Issue i
+        LEFT JOIN FETCH i.status
+        LEFT JOIN FETCH i.type
+        LEFT JOIN FETCH i.assignee
+        LEFT JOIN FETCH i.labels
+        WHERE i.project.workspace.slug = :slug
+          AND i.assignee.id = :assigneeId
+        ORDER BY i.sequenceNumber DESC
+        """)
+    List<Issue> findByWorkspaceSlugAndAssigneeId(@Param("slug") String slug,
+                                                 @Param("assigneeId") Long assigneeId);
+
+    /** Issues ouvertes, assignées, dont l'échéance est <= horizon (job d'alertes dueSoon/overdue) */
+    @Query("""
+        SELECT i FROM Issue i
+        LEFT JOIN FETCH i.assignee
+        WHERE i.assignee IS NOT NULL
+          AND i.dueDate IS NOT NULL
+          AND i.dueDate <= :horizon
+          AND i.status.category NOT IN ('COMPLETED', 'CANCELLED')
+        """)
+    List<Issue> findOpenAssignedDueOnOrBefore(@Param("horizon") java.time.LocalDate horizon);
+
     // -------------------------------------------------------------------------
     // Analytics
     // -------------------------------------------------------------------------
