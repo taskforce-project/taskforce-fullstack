@@ -1,6 +1,8 @@
 package com.taskforce.tf_api.core.service;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
@@ -17,10 +19,12 @@ import com.taskforce.tf_api.core.dto.response.ProjectResponse;
 import com.taskforce.tf_api.core.enums.ProjectRole;
 import com.taskforce.tf_api.core.enums.ProjectStatus;
 import com.taskforce.tf_api.core.model.Project;
+import com.taskforce.tf_api.core.model.ProjectFavorite;
 import com.taskforce.tf_api.core.model.ProjectLabel;
 import com.taskforce.tf_api.core.model.ProjectMember;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
+import com.taskforce.tf_api.core.repository.ProjectFavoriteRepository;
 import com.taskforce.tf_api.core.repository.ProjectLabelRepository;
 import com.taskforce.tf_api.core.repository.ProjectMemberRepository;
 import com.taskforce.tf_api.core.repository.ProjectRepository;
@@ -47,6 +51,7 @@ public class ProjectService {
     private final ProjectRepository        projectRepository;
     private final ProjectMemberRepository  projectMemberRepository;
     private final ProjectLabelRepository   projectLabelRepository;
+    private final ProjectFavoriteRepository projectFavoriteRepository;
     private final WorkspaceRepository      workspaceRepository;
     private final WorkspaceMemberRepository workspaceMemberRepository;
     private final UserRepository           userRepository;
@@ -63,9 +68,10 @@ public class ProjectService {
     @Transactional(readOnly = true)
     public List<ProjectResponse> listProjects(String workspaceSlug, Long requestingUserId) {
         Workspace workspace = resolveWorkspaceAndAssertMember(workspaceSlug, requestingUserId);
+        Set<Long> favoriteIds = new HashSet<>(projectFavoriteRepository.findProjectIdsByUserId(requestingUserId));
         return projectRepository.findByWorkspaceIdOrderByCreatedAtDesc(workspace.getId())
             .stream()
-            .map(this::toResponse)
+            .map(project -> toResponse(project, favoriteIds.contains(project.getId())))
             .collect(Collectors.toList());
     }
 
@@ -77,7 +83,7 @@ public class ProjectService {
     public ProjectResponse getProject(String workspaceSlug, Long projectId, Long requestingUserId) {
         Workspace workspace = resolveWorkspaceAndAssertMember(workspaceSlug, requestingUserId);
         Project project = resolveProject(projectId, workspace.getId());
-        return toResponse(project);
+        return toResponse(project, projectFavoriteRepository.existsByUserIdAndProjectId(requestingUserId, project.getId()));
     }
 
     // -------------------------------------------------------------------------
@@ -130,7 +136,7 @@ public class ProjectService {
         // Seed labels par défaut
         seedDefaultLabels(project);
 
-        return toResponse(project);
+        return toResponse(project, false);
     }
 
     private void seedDefaultLabels(Project project) {
@@ -180,7 +186,8 @@ public class ProjectService {
             project.setIconUrl(request.getIconUrl());
         }
 
-        return toResponse(projectRepository.save(project));
+        return toResponse(projectRepository.save(project),
+            projectFavoriteRepository.existsByUserIdAndProjectId(requestingUserId, project.getId()));
     }
 
     /**
@@ -196,7 +203,8 @@ public class ProjectService {
 
         project.setStatus(ProjectStatus.ARCHIVED);
         log.info("Projet {} archivé par l'utilisateur {}", projectId, requestingUserId);
-        return toResponse(projectRepository.save(project));
+        return toResponse(projectRepository.save(project),
+            projectFavoriteRepository.existsByUserIdAndProjectId(requestingUserId, project.getId()));
     }
 
     /**
@@ -211,6 +219,39 @@ public class ProjectService {
 
         projectRepository.delete(project);
         log.info("Projet {} supprimé par l'utilisateur {}", projectId, requestingUserId);
+    }
+
+    // -------------------------------------------------------------------------
+    // Favoris (scopés par utilisateur)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Ajoute le projet aux favoris de l'utilisateur courant (idempotent).
+     */
+    @Transactional
+    public ProjectResponse favoriteProject(String workspaceSlug, Long projectId, Long requestingUserId) {
+        Workspace workspace = resolveWorkspaceAndAssertMember(workspaceSlug, requestingUserId);
+        Project project = resolveProject(projectId, workspace.getId());
+
+        if (!projectFavoriteRepository.existsByUserIdAndProjectId(requestingUserId, projectId)) {
+            projectFavoriteRepository.save(ProjectFavorite.builder()
+                .userId(requestingUserId)
+                .projectId(projectId)
+                .build());
+        }
+        return toResponse(project, true);
+    }
+
+    /**
+     * Retire le projet des favoris de l'utilisateur courant (idempotent).
+     */
+    @Transactional
+    public ProjectResponse unfavoriteProject(String workspaceSlug, Long projectId, Long requestingUserId) {
+        Workspace workspace = resolveWorkspaceAndAssertMember(workspaceSlug, requestingUserId);
+        Project project = resolveProject(projectId, workspace.getId());
+
+        projectFavoriteRepository.deleteByUserIdAndProjectId(requestingUserId, projectId);
+        return toResponse(project, false);
     }
 
     // -------------------------------------------------------------------------
@@ -436,7 +477,7 @@ public class ProjectService {
     // Mappers
     // -------------------------------------------------------------------------
 
-    private ProjectResponse toResponse(Project project) {
+    private ProjectResponse toResponse(Project project, boolean isFavorite) {
         List<ProjectMember> members = projectMemberRepository.findByProjectId(project.getId());
         List<ProjectLabel>  labels  = projectLabelRepository.findByProjectIdOrderByNameAsc(project.getId());
 
@@ -457,6 +498,7 @@ public class ProjectService {
             .description(project.getDescription())
             .status(project.getStatus())
             .isPublic(project.isPublic())
+            .isFavorite(isFavorite)
             .workspaceId(project.getWorkspace().getId())
             .workspaceSlug(project.getWorkspace().getSlug())
             .createdById(creator.getId())
