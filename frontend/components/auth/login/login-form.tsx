@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { toast } from "sonner"
 import Link from "next/link"
@@ -16,6 +17,7 @@ import { FloatingPaths } from "@/components/auth/floating-paths"
 
 export function LoginForm({ className, ...props }: React.ComponentProps<"div">) {
   const { login } = useAuth()
+  const router = useRouter()
   const { t } = usePreferencesStore()
   const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({ email: "", password: "" })
@@ -45,6 +47,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
       await login({ email: sanitizedEmail, password: sanitizedPassword })
       globalRateLimiter.reset("login")
       toast.success(t.auth.success.loginSuccess)
+      router.replace("/")
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
       toast.error(t.common.error, { description: errorMessage || t.auth.errors.loginFailed })
