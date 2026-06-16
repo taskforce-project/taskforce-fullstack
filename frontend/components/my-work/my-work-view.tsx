@@ -13,10 +13,10 @@ import { useTranslation } from "@/lib/i18n"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { cn } from "@/lib/utils"
 import { useProjectStore } from "@/lib/store/project-store"
-import { useIssueStore } from "@/lib/store/issue-store"
 import { useCycleStore } from "@/lib/store/cycle-store"
 import { useUserStore } from "@/lib/store/user-store"
 import { pageService, type PageSummary } from "@/lib/api/page-service"
+import { listMyIssues } from "@/lib/api/issue-service"
 import type { IssueStatusCategory, IssuePriority as ApiPriority, Issue as ApiIssue } from "@/lib/api/issue-service"
 import type { CycleStatus as ApiCycleStatus, Cycle as ApiCycle } from "@/lib/api/cycle-service"
 
@@ -346,18 +346,17 @@ function EmptyState({ tab }: Readonly<{ tab: MyWorkTab }>) {
 
 import type { Project } from "@/lib/api/project-service"
 
-function mapApiIssue(i: ApiIssue, proj: Project, userEmail: string, baseUrl: string): Issue | null {
-  if (i.assignee?.email !== userEmail) return null
+function mapMyIssue(i: ApiIssue, baseUrl: string): Issue {
   return {
     id:         String(i.id),
-    identifier: `${proj.identifier}-${i.id}`,
+    identifier: i.identifier,
     title:      i.title,
     priority:   PRIORITY_MAP[i.priority],
     status:     STATUS_MAP[i.status.category],
-    project:    proj.name,
-    projectId:  String(proj.id),
+    project:    i.projectName,
+    projectId:  String(i.projectId),
     dueDate:    i.dueDate ? new Date(i.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null,
-    url:        `${baseUrl}/projects/${proj.id}/issues/${i.id}`,
+    url:        `${baseUrl}/projects/${i.projectId}/issues/${i.id}`,
   }
 }
 
@@ -377,12 +376,6 @@ function mapApiCycle(c: ApiCycle, proj: Project, baseUrl: string): Cycle {
     daysLeft:        daysLeftMs !== null && daysLeftMs > 0 ? daysLeftMs : null,
     url:             `${baseUrl}/projects/${proj.id}/cycles/${c.id}`,
   }
-}
-
-function flattenIssues(results: { proj: Project; issues: ApiIssue[] }[], userEmail: string, baseUrl: string): Issue[] {
-  return results.flatMap(({ proj, issues }) =>
-    issues.map((i) => mapApiIssue(i, proj, userEmail, baseUrl)).filter((x): x is Issue => x !== null)
-  )
 }
 
 function flattenCycles(results: { proj: Project; cycles: ApiCycle[] }[], baseUrl: string): Cycle[] {
@@ -429,7 +422,6 @@ export function MyWorkView({ defaultTab = "issues" }: Readonly<MyWorkViewProps>)
 
   const { user, fetchMe }           = useUserStore()
   const { fetchProjects }           = useProjectStore()
-  const { fetchIssues }             = useIssueStore()
   const { fetchCycles }             = useCycleStore()
 
   const [myIssues, setMyIssues] = useState<Issue[]>([])
@@ -444,17 +436,21 @@ export function MyWorkView({ defaultTab = "issues" }: Readonly<MyWorkViewProps>)
   useEffect(() => {
     if (!slug || !user) return
     const baseUrl = `/${slug}`
-    const userEmail = user.email
 
     async function load() {
-      const projs = await fetchProjects(slug)
-      const [issueResults, cycleResults, pageResults] = await Promise.all([
-        Promise.all(projs.map(async (p) => ({ proj: p, issues: await fetchIssues(slug, p.id) }))),
+      // Issues : un seul appel cross-projets (mes issues assignées) — plus de N+1
+      const [myIssuesRaw, projs] = await Promise.all([
+        listMyIssues(slug),
+        fetchProjects(slug),
+      ])
+      setMyIssues(myIssuesRaw.map((i) => mapMyIssue(i, baseUrl)))
+
+      // Cycles & pages restent agrégés par projet
+      const [cycleResults, pageResults] = await Promise.all([
         Promise.all(projs.map(async (p) => ({ proj: p, cycles: await fetchCycles(slug, p.id) }))),
         Promise.all(projs.map(async (p) => ({ proj: p, pages: await pageService.list(slug, String(p.id)) }))),
       ])
 
-      setMyIssues(flattenIssues(issueResults, userEmail, baseUrl))
       setMyCycles(flattenCycles(cycleResults, baseUrl))
       setMyPages(flattenPages(pageResults, baseUrl))
     }
