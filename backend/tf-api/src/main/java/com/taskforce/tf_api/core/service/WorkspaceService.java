@@ -236,10 +236,15 @@ public class WorkspaceService {
         User inviter = userRepository.findById(requestingUserId)
             .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
 
+        WorkspaceRole role = request.getRole() != null ? request.getRole() : WorkspaceRole.MEMBER;
+        if (role == WorkspaceRole.OWNER) {
+            throw new IllegalStateException("Impossible d'inviter quelqu'un en tant que OWNER");
+        }
+
         WorkspaceMember member = WorkspaceMember.builder()
             .workspace(workspace)
             .user(invitee)
-            .role(WorkspaceRole.MEMBER)
+            .role(role)
             .invitedBy(inviter)
             .build();
 
