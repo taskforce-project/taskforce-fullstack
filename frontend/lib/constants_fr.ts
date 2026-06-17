@@ -209,7 +209,7 @@ export const CONSTANTS_FR: TranslationKeys = {
     cycles: "Sprints",
     roadmap: "Feuille de route",
     teams: "Équipes",
-    members: "Équipe",
+    members: "Membres",
     skills: "Compétences",
     analytics: "Intelligence",
     agents: "Agents",
