@@ -33,8 +33,8 @@ function segmentLabel(segment: string): string {
     inbox: "Signal Center",
     "my-work": "My Queue",
     projects: "Operations",
-    teams: "Squads",
-    members: "Team",
+    teams: "Teams",
+    members: "Members",
     skills: "Skills",
     analytics: "Intelligence",
     agents: "Agents",
@@ -113,7 +113,7 @@ export function AppTopbar() {
   }, [])
 
   return (
-    <header className="topbar">
+    <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background px-4">
       {/* Left: sidebar trigger + breadcrumb */}
       <div className="flex flex-1 items-center gap-2">
         <SidebarTrigger className="-ml-1" />
@@ -145,7 +145,7 @@ export function AppTopbar() {
       <div className="flex items-center gap-1">
         {/* Global search button — desktop */}
         <button
-          className="topbar-search"
+          className="hidden h-8 cursor-pointer items-center gap-2 rounded-md border border-border bg-muted/40 px-2 text-xs text-muted-foreground transition-colors hover:bg-muted/60 sm:flex"
           onClick={() => setCmdOpen(true)}
           aria-label="Open command palette"
         >

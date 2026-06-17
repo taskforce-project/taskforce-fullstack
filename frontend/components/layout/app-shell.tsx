@@ -23,7 +23,7 @@ export function AppShell({ children }: AppShellProps) {
         <AnimatePresence mode="wait" initial={false}>
           <motion.main
             key={pathname}
-            className="page-content"
+            className="flex flex-1 flex-col gap-6 overflow-y-auto p-6 md:p-8"
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
