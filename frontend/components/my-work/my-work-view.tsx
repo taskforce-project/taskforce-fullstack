@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
-import { motion } from "framer-motion"
 import {
   CircleDot, CheckCircle2, Clock, AlertTriangle,
   RefreshCw, FileText, ArrowUpRight, Layers,
@@ -11,6 +10,9 @@ import {
 
 import { useTranslation } from "@/lib/i18n"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
+import { SectionCard, CardSubSection } from "@/components/ui/section-card"
 import { cn } from "@/lib/utils"
 import { useProjectStore } from "@/lib/store/project-store"
 import { useCycleStore } from "@/lib/store/cycle-store"
@@ -19,6 +21,7 @@ import { pageService, type PageSummary } from "@/lib/api/page-service"
 import { listMyIssues } from "@/lib/api/issue-service"
 import type { IssueStatusCategory, IssuePriority as ApiPriority, Issue as ApiIssue } from "@/lib/api/issue-service"
 import type { CycleStatus as ApiCycleStatus, Cycle as ApiCycle } from "@/lib/api/cycle-service"
+import type { Project } from "@/lib/api/project-service"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -63,11 +66,10 @@ interface Page {
   lastEditedAt: string
   lastEditedBy: string
   lastEditedByInitials: string
-  lastEditedByColor: string
   url: string
 }
 
-// ─── Mapping helpers ──────────────────────────────────────────────────────────
+// ─── API → local mapping ────────────────────────────────────────────────────
 
 const STATUS_MAP: Record<IssueStatusCategory, IssueStatus> = {
   BACKLOG:   "todo",
@@ -78,273 +80,116 @@ const STATUS_MAP: Record<IssueStatusCategory, IssueStatus> = {
 }
 
 const PRIORITY_MAP: Record<ApiPriority, IssuePriority> = {
-  NONE:   "none",
-  URGENT: "urgent",
-  HIGH:   "high",
-  MEDIUM: "medium",
-  LOW:    "low",
+  NONE: "none", URGENT: "urgent", HIGH: "high", MEDIUM: "medium", LOW: "low",
 }
 
 const CYCLE_STATUS_MAP: Record<ApiCycleStatus, CycleStatus> = {
-  ACTIVE:    "active",
-  DRAFT:     "upcoming",
-  COMPLETED: "completed",
+  ACTIVE: "active", DRAFT: "upcoming", COMPLETED: "completed",
 }
 
-// ─── Config ───────────────────────────────────────────────────────────────────
+// ─── Presentation config (Tailwind utilities only) ───────────────────────────
 
 const PRIORITY_DOT: Record<IssuePriority, string> = {
-  urgent: "#f87171",
-  high:   "#fb923c",
-  medium: "#fbbf24",
-  low:    "var(--label-quaternary)",
-  none:   "var(--fill-primary)",
+  urgent: "bg-rose-500",
+  high:   "bg-orange-500",
+  medium: "bg-amber-500",
+  low:    "bg-muted-foreground/40",
+  none:   "bg-muted-foreground/20",
 }
 
-const STATUS_CONFIG: Record<IssueStatus, { icon: React.ReactNode; color: string }> = {
-  todo:        { icon: <CircleDot  className="size-3.5" />, color: "var(--label-quaternary)" },
-  in_progress: { icon: <RefreshCw  className="size-3.5" />, color: "#60a5fa" },
-  in_review:   { icon: <Clock      className="size-3.5" />, color: "#fbbf24" },
-  done:        { icon: <CheckCircle2 className="size-3.5" />, color: "#34d399" },
-  cancelled:   { icon: <CheckCircle2 className="size-3.5" />, color: "var(--label-quaternary)" },
+const STATUS_ICON: Record<IssueStatus, React.ReactNode> = {
+  todo:        <CircleDot className="size-3.5 text-muted-foreground" />,
+  in_progress: <RefreshCw className="size-3.5 text-blue-500" />,
+  in_review:   <Clock className="size-3.5 text-amber-500" />,
+  done:        <CheckCircle2 className="size-3.5 text-emerald-500" />,
+  cancelled:   <CheckCircle2 className="size-3.5 text-muted-foreground" />,
 }
 
-const CYCLE_STATUS: Record<CycleStatus, { label: string; color: string; bg: string }> = {
-  active:    { label: "Active",    color: "#34d399", bg: "rgba(52,211,153,0.12)" },
-  upcoming:  { label: "Upcoming",  color: "#60a5fa", bg: "rgba(96,165,250,0.12)" },
-  completed: { label: "Completed", color: "var(--label-tertiary)", bg: "var(--fill-secondary)" },
+const CYCLE_STATUS: Record<CycleStatus, { label: string; dot: string }> = {
+  active:    { label: "Active",    dot: "bg-emerald-500" },
+  upcoming:  { label: "Upcoming",  dot: "bg-blue-500" },
+  completed: { label: "Completed", dot: "bg-muted-foreground" },
 }
 
-function useTabHref(): Record<MyWorkTab, string> {
-  const params = useParams()
-  const ws = params?.workspace as string | undefined
-  const base = ws ? `/${ws}` : ""
-  return {
-    issues: `${base}/my-work/issues`,
-    cycles: `${base}/my-work/cycles`,
-    pages:  `${base}/my-work/pages`,
-  }
-}
+const ROW = "group flex items-center gap-3 px-4 py-2.5 border-b border-border last:border-0 hover:bg-muted/50 transition-colors"
 
-// ─── Row components ───────────────────────────────────────────────────────────
+// ─── Rows ──────────────────────────────────────────────────────────────────
 
-function IssueRow({ issue, index }: Readonly<{ issue: Issue; index: number }>) {
-  const sc = STATUS_CONFIG[issue.status]
+function IssueRow({ issue }: Readonly<{ issue: Issue }>) {
   const isOverdue = issue.dueDate === "Overdue"
-
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.15, delay: index * 0.04 }}
-    >
-      <Link
-        href={issue.url}
-        className="group flex items-center gap-3 px-4 py-2.5 transition-colors"
-        style={{ borderBottom: "1px solid var(--separator)" }}
-        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--fill-tertiary)" }}
-        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent" }}
-      >
-        {/* Priority dot */}
-        <span className="h-2 w-2 rounded-full shrink-0" style={{ background: PRIORITY_DOT[issue.priority] }} />
-
-        {/* Status icon */}
-        <span className="shrink-0" style={{ color: sc.color }}>
-          {sc.icon}
-        </span>
-
-        {/* Identifier */}
-        <span
-          className="text-[10px] shrink-0 w-12 tabular-nums"
-          style={{ color: "var(--label-quaternary)", fontFamily: "var(--font-mono)" }}
-        >
-          {issue.identifier}
-        </span>
-
-        {/* Title */}
-        <span className="flex-1 text-sm truncate" style={{ color: "var(--label-primary)" }}>
-          {issue.title}
-        </span>
-
-        {/* Project */}
-        <span
-          className="hidden sm:flex items-center gap-1 text-[11px] shrink-0"
-          style={{ color: "var(--label-tertiary)" }}
-        >
-          <Layers className="size-3" />
-          {issue.project}
-        </span>
-
-        {/* Due date */}
-        <span
-          className={cn("text-[11px] shrink-0 hidden md:flex items-center gap-1")}
-          style={{ color: isOverdue ? "#f87171" : "var(--label-quaternary)" }}
-        >
-          {isOverdue && <AlertTriangle className="size-3" />}
-          {issue.dueDate ?? "—"}
-        </span>
-
-        <ArrowUpRight className="size-3.5 opacity-0 group-hover:opacity-60 transition-opacity shrink-0" style={{ color: "var(--label-secondary)" }} />
-      </Link>
-    </motion.div>
+    <Link href={issue.url} className={ROW}>
+      <span className={cn("size-2 shrink-0 rounded-full", PRIORITY_DOT[issue.priority])} />
+      <span className="shrink-0">{STATUS_ICON[issue.status]}</span>
+      <span className="w-14 shrink-0 truncate font-mono text-xs tabular-nums text-muted-foreground">{issue.identifier}</span>
+      <span className="flex-1 truncate text-sm text-foreground">{issue.title}</span>
+      <span className="hidden items-center gap-1 text-xs text-muted-foreground sm:flex">
+        <Layers className="size-3" /> {issue.project}
+      </span>
+      <span className={cn("hidden items-center gap-1 text-xs md:flex", isOverdue ? "text-rose-500" : "text-muted-foreground")}>
+        {isOverdue && <AlertTriangle className="size-3" />} {issue.dueDate ?? "—"}
+      </span>
+      <ArrowUpRight className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-60" />
+    </Link>
   )
 }
 
-function CycleRow({ cycle, index }: Readonly<{ cycle: Cycle; index: number }>) {
+function CycleRow({ cycle }: Readonly<{ cycle: Cycle }>) {
   const sc = CYCLE_STATUS[cycle.status]
-
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.15, delay: index * 0.04 }}
-    >
-      <Link
-        href={cycle.url}
-        className="group flex items-center gap-3 px-4 py-3 transition-colors"
-        style={{ borderBottom: "1px solid var(--separator)" }}
-        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--fill-tertiary)" }}
-        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent" }}
-      >
-        {/* Icon */}
-        <div
-          className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0"
-          style={{ background: sc.bg }}
-        >
-          <RefreshCw className="size-3.5" style={{ color: sc.color }} />
-        </div>
-
-        {/* Meta */}
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate" style={{ color: "var(--label-primary)" }}>
-            {cycle.title}
-          </p>
-          <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-[10px]" style={{ color: "var(--label-quaternary)" }}>
-              {cycle.project}
-            </span>
-            <span style={{ color: "var(--label-quaternary)" }}>·</span>
-            <span className="text-[10px]" style={{ color: "var(--label-quaternary)" }}>
-              {cycle.startDate} → {cycle.endDate}
-            </span>
-            {cycle.daysLeft !== null && (
-              <>
-                <span style={{ color: "var(--label-quaternary)" }}>·</span>
-                <span className="text-[10px] font-medium" style={{ color: "#fbbf24" }}>
-                  {cycle.daysLeft}d left
-                </span>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Status chip */}
-        <span
-          className="text-[10px] font-semibold px-2 py-0.5 rounded-md shrink-0 hidden sm:block"
-          style={{ background: sc.bg, color: sc.color }}
-        >
-          {sc.label}
-        </span>
-
-        {/* Progress */}
-        {cycle.status !== "upcoming" && (
-          <div className="items-center gap-2 shrink-0 w-28 hidden md:flex">
-            <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: "var(--fill-secondary)" }}>
-              <div
-                className="h-full rounded-full transition-all"
-                style={{
-                  width: `${cycle.progress}%`,
-                  background: cycle.progress === 100 ? "#34d399" : "#a78bfa",
-                }}
-              />
-            </div>
-            <span className="text-[10px] tabular-nums w-8 text-right" style={{ color: "var(--label-quaternary)" }}>
-              {cycle.progress}%
-            </span>
-          </div>
-        )}
-
-        {/* Issues count */}
-        <span className="text-[11px] shrink-0 hidden lg:block" style={{ color: "var(--label-quaternary)" }}>
-          {cycle.completedIssues}/{cycle.totalIssues}
-        </span>
-
-        <ArrowUpRight className="size-3.5 opacity-0 group-hover:opacity-60 transition-opacity shrink-0" style={{ color: "var(--label-secondary)" }} />
-      </Link>
-    </motion.div>
-  )
-}
-
-function PageRow({ page, index }: Readonly<{ page: Page; index: number }>) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.15, delay: index * 0.04 }}
-    >
-      <Link
-        href={page.url}
-        className="group flex items-center gap-3 px-4 py-2.5 transition-colors"
-        style={{ borderBottom: "1px solid var(--separator)" }}
-        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--fill-tertiary)" }}
-        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent" }}
-      >
-        <FileText className="size-4 shrink-0" style={{ color: "var(--label-tertiary)" }} />
-
-        <span className="flex-1 text-sm truncate" style={{ color: "var(--label-primary)" }}>
-          {page.title}
-        </span>
-
-        <span className="hidden sm:flex items-center gap-1 text-[11px] shrink-0" style={{ color: "var(--label-tertiary)" }}>
-          <Layers className="size-3" />
-          {page.project}
-        </span>
-
-        <div className="hidden md:flex items-center gap-1.5 shrink-0">
-          <Avatar className="h-5 w-5">
-            <AvatarFallback
-              className="text-[8px] font-semibold"
-              style={{
-                background: `${page.lastEditedByColor}22`,
-                color: page.lastEditedByColor,
-              }}
-            >
-              {page.lastEditedByInitials}
-            </AvatarFallback>
-          </Avatar>
-          <span className="text-[10px]" style={{ color: "var(--label-quaternary)" }}>
-            {page.lastEditedAt}
-          </span>
-        </div>
-
-        <ArrowUpRight className="size-3.5 opacity-0 group-hover:opacity-60 transition-opacity shrink-0" style={{ color: "var(--label-secondary)" }} />
-      </Link>
-    </motion.div>
-  )
-}
-
-// ─── Empty state ──────────────────────────────────────────────────────────────
-
-function EmptyState({ tab }: Readonly<{ tab: MyWorkTab }>) {
-  const cfg: Record<MyWorkTab, { icon: React.ElementType; title: string; sub: string }> = {
-    issues: { icon: CircleDot,  title: "No open issues",  sub: "Issues assigned to you will appear here." },
-    cycles: { icon: RefreshCw,  title: "No active sprints", sub: "Your sprint memberships will appear here." },
-    pages:  { icon: FileText,   title: "No recent pages",  sub: "Pages you've edited will appear here." },
-  }
-  const { icon: Icon, title, sub } = cfg[tab]
-
-  return (
-    <div className="flex flex-col items-center justify-center py-20 text-center">
-      <div className="h-12 w-12 rounded-xl flex items-center justify-center mb-4" style={{ background: "var(--fill-secondary)" }}>
-        <Icon className="size-5" style={{ color: "var(--label-tertiary)" }} />
+    <Link href={cycle.url} className={cn(ROW, "py-3")}>
+      <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+        <RefreshCw className="size-3.5 text-muted-foreground" />
       </div>
-      <p className="text-sm font-semibold mb-1" style={{ color: "var(--label-primary)" }}>{title}</p>
-      <p className="text-xs" style={{ color: "var(--label-tertiary)" }}>{sub}</p>
-    </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-foreground">{cycle.title}</p>
+        <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+          <span>{cycle.project}</span>
+          <span>·</span>
+          <span>{cycle.startDate} → {cycle.endDate}</span>
+          {cycle.daysLeft !== null && (
+            <>
+              <span>·</span>
+              <span className="font-medium text-amber-500">{cycle.daysLeft}d left</span>
+            </>
+          )}
+        </div>
+      </div>
+      <Badge variant="secondary" className="hidden gap-1.5 font-normal text-muted-foreground sm:flex">
+        <span className={cn("size-1.5 rounded-full", sc.dot)} /> {sc.label}
+      </Badge>
+      {cycle.status !== "upcoming" && (
+        <div className="hidden w-28 items-center gap-2 md:flex">
+          <Progress value={cycle.progress} className="h-1.5 flex-1" />
+          <span className="w-8 text-right text-xs tabular-nums text-muted-foreground">{cycle.progress}%</span>
+        </div>
+      )}
+      <span className="hidden shrink-0 text-xs text-muted-foreground lg:block">{cycle.completedIssues}/{cycle.totalIssues}</span>
+      <ArrowUpRight className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-60" />
+    </Link>
   )
 }
 
-import type { Project } from "@/lib/api/project-service"
+function PageRow({ page }: Readonly<{ page: Page }>) {
+  return (
+    <Link href={page.url} className={ROW}>
+      <FileText className="size-4 shrink-0 text-muted-foreground" />
+      <span className="flex-1 truncate text-sm text-foreground">{page.title}</span>
+      <span className="hidden items-center gap-1 text-xs text-muted-foreground sm:flex">
+        <Layers className="size-3" /> {page.project}
+      </span>
+      <div className="hidden shrink-0 items-center gap-1.5 md:flex">
+        <Avatar className="size-5">
+          <AvatarFallback className="text-[8px] font-semibold">{page.lastEditedByInitials}</AvatarFallback>
+        </Avatar>
+        <span className="text-xs text-muted-foreground">{page.lastEditedAt}</span>
+      </div>
+      <ArrowUpRight className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-60" />
+    </Link>
+  )
+}
+
+// ─── Data mapping ─────────────────────────────────────────────────────────────
 
 function mapMyIssue(i: ApiIssue, baseUrl: string): Issue {
   return {
@@ -391,7 +236,6 @@ function mapApiPage(p: PageSummary, proj: Project, baseUrl: string): Page {
     lastEditedAt:         new Date(p.updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
     lastEditedBy:         p.createdByName,
     lastEditedByInitials: p.createdByInitials,
-    lastEditedByColor:    "#a78bfa",
     url:                  `${baseUrl}/projects/${proj.id}/pages/${p.id}`,
   }
 }
@@ -400,33 +244,25 @@ function flattenPages(results: { proj: Project; pages: PageSummary[] }[], baseUr
   return results.flatMap(({ proj, pages }) => pages.map((p) => mapApiPage(p, proj, baseUrl)))
 }
 
-const TAB_KEYS: { key: MyWorkTab; icon: React.ElementType; label: string }[] = [
-  { key: "issues", icon: CircleDot, label: "Issues"  },
-  { key: "cycles", icon: RefreshCw, label: "Sprints" },
-  { key: "pages",  icon: FileText,  label: "Pages"   },
-]
-
 // ─── Main component ───────────────────────────────────────────────────────────
 
 interface MyWorkViewProps {
-  defaultTab?: MyWorkTab
+  readonly defaultTab?: MyWorkTab
 }
 
-export function MyWorkView({ defaultTab = "issues" }: Readonly<MyWorkViewProps>) {
+export function MyWorkView(_props: MyWorkViewProps) {
   useTranslation()
-  const TAB_HREF = useTabHref()
-  const activeTab = defaultTab
 
   const params = useParams()
-  const slug   = typeof params?.workspace === "string" ? params.workspace : ""
+  const slug = typeof params?.workspace === "string" ? params.workspace : ""
 
-  const { user, fetchMe }           = useUserStore()
-  const { fetchProjects }           = useProjectStore()
-  const { fetchCycles }             = useCycleStore()
+  const { user, fetchMe } = useUserStore()
+  const { fetchProjects } = useProjectStore()
+  const { fetchCycles } = useCycleStore()
 
   const [myIssues, setMyIssues] = useState<Issue[]>([])
   const [myCycles, setMyCycles] = useState<Cycle[]>([])
-  const [myPages,  setMyPages]  = useState<Page[]>([])
+  const [myPages, setMyPages] = useState<Page[]>([])
 
   useEffect(() => {
     fetchMe()
@@ -439,10 +275,7 @@ export function MyWorkView({ defaultTab = "issues" }: Readonly<MyWorkViewProps>)
 
     async function load() {
       // Issues : un seul appel cross-projets (mes issues assignées) — plus de N+1
-      const [myIssuesRaw, projs] = await Promise.all([
-        listMyIssues(slug),
-        fetchProjects(slug),
-      ])
+      const [myIssuesRaw, projs] = await Promise.all([listMyIssues(slug), fetchProjects(slug)])
       setMyIssues(myIssuesRaw.map((i) => mapMyIssue(i, baseUrl)))
 
       // Cycles & pages restent agrégés par projet
@@ -450,114 +283,41 @@ export function MyWorkView({ defaultTab = "issues" }: Readonly<MyWorkViewProps>)
         Promise.all(projs.map(async (p) => ({ proj: p, cycles: await fetchCycles(slug, p.id) }))),
         Promise.all(projs.map(async (p) => ({ proj: p, pages: await pageService.list(slug, String(p.id)) }))),
       ])
-
       setMyCycles(flattenCycles(cycleResults, baseUrl))
       setMyPages(flattenPages(pageResults, baseUrl))
     }
-
     void load()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug, user])
 
-  function tabCount(key: MyWorkTab): number {
-    if (key === "issues") return myIssues.length
-    if (key === "cycles") return myCycles.filter((c) => c.status === "active").length
-    if (key === "pages")  return myPages.length
-    return 0
-  }
-  const TABS = TAB_KEYS.map((tk) => ({ ...tk, count: tabCount(tk.key) }))
+  const activeSprints = myCycles.filter((c) => c.status === "active").length
 
   return (
-    <div className="flex flex-col gap-0 max-w-4xl mx-auto w-full">
-
-      {/* ── Header ── */}
-      <div className="mb-5">
-        <h1 className="text-xl font-semibold tracking-tight" style={{ color: "var(--label-primary)" }}>
-          My Queue
-        </h1>
-        <p className="text-xs mt-0.5" style={{ color: "var(--label-tertiary)" }}>
+    <div className="mx-auto flex w-full max-w-4xl flex-col gap-5">
+      <header className="space-y-1">
+        <h1 className="text-2xl font-semibold tracking-tight">My Queue</h1>
+        <p className="text-sm text-muted-foreground">
           Issues, sprints, and pages assigned to or recently edited by you
         </p>
-      </div>
+      </header>
 
-      {/* ── Panel ── */}
-      <div
-        className="rounded-xl overflow-hidden"
-        style={{
-          background: "var(--card)",
-          border: "1px solid var(--separator)",
-          boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset, var(--shadow)",
-          backdropFilter: "blur(16px) saturate(180%)",
-          WebkitBackdropFilter: "blur(16px) saturate(180%)",
-        }}
-      >
-        {/* Tab bar */}
-        <div
-          className="flex items-center overflow-x-auto"
-          style={{ borderBottom: "1px solid var(--separator)", background: "var(--fill-tertiary)" }}
-        >
-          {TABS.map(({ key, icon: Icon, label, count }) => {
-            const isActive = activeTab === key
-            return (
-              <Link
-                key={key}
-                href={TAB_HREF[key]}
-                className="flex items-center gap-2 px-4 py-2.5 text-xs font-medium transition-all border-b-2 -mb-px whitespace-nowrap"
-                style={{
-                  borderBottomColor: isActive ? "var(--label-primary)" : "transparent",
-                  color: isActive ? "var(--label-primary)" : "var(--label-tertiary)",
-                }}
-              >
-                <Icon className="size-3.5" />
-                {label}
-                {count > 0 && (
-                  <span
-                    className="h-4 min-w-4 px-1 rounded text-[9px] font-bold flex items-center justify-center"
-                    style={{ background: "var(--fill-primary)", color: "var(--label-secondary)" }}
-                  >
-                    {count}
-                  </span>
-                )}
-              </Link>
-            )
-          })}
-        </div>
-
-        {/* Column header — issues only */}
-        {activeTab === "issues" && (
-          <div
-            className="flex items-center gap-3 px-4 py-1.5"
-            style={{ borderBottom: "1px solid var(--separator)", background: "var(--fill-tertiary)" }}
-          >
-            <span className="w-2 shrink-0" />
-            <span className="w-3.5 shrink-0" />
-            <span className="w-12 text-[9px] font-semibold uppercase tracking-widest shrink-0" style={{ color: "var(--label-quaternary)" }}>ID</span>
-            <span className="flex-1 text-[9px] font-semibold uppercase tracking-widest" style={{ color: "var(--label-quaternary)" }}>Task</span>
-            <span className="hidden sm:block text-[9px] font-semibold uppercase tracking-widest shrink-0" style={{ color: "var(--label-quaternary)" }}>Operation</span>
-            <span className="hidden md:block text-[9px] font-semibold uppercase tracking-widest shrink-0" style={{ color: "var(--label-quaternary)" }}>Due</span>
-            <span className="w-3.5 shrink-0" />
-          </div>
-        )}
-
-        {/* Content */}
-        <div>
-          {activeTab === "issues" && (
-            myIssues.length === 0
-              ? <EmptyState tab="issues" />
-              : myIssues.map((issue, i) => <IssueRow key={issue.id} issue={issue} index={i} />)
-          )}
-          {activeTab === "cycles" && (
-            myCycles.length === 0
-              ? <EmptyState tab="cycles" />
-              : myCycles.map((cycle, i) => <CycleRow key={cycle.id} cycle={cycle} index={i} />)
-          )}
-          {activeTab === "pages" && (
-            myPages.length === 0
-              ? <EmptyState tab="pages" />
-              : myPages.map((page, i) => <PageRow key={page.id} page={page} index={i} />)
-          )}
-        </div>
-      </div>
+      <SectionCard title="My Queue" bodyClassName="p-0">
+        <CardSubSection label="Issues" count={myIssues.length}>
+          {myIssues.length === 0
+            ? <p className="px-4 py-3 text-sm text-muted-foreground">No open issues assigned to you.</p>
+            : myIssues.map((i) => <IssueRow key={i.id} issue={i} />)}
+        </CardSubSection>
+        <CardSubSection label="Sprints" count={activeSprints}>
+          {myCycles.length === 0
+            ? <p className="px-4 py-3 text-sm text-muted-foreground">No active sprints.</p>
+            : myCycles.map((c) => <CycleRow key={c.id} cycle={c} />)}
+        </CardSubSection>
+        <CardSubSection label="Pages" count={myPages.length}>
+          {myPages.length === 0
+            ? <p className="px-4 py-3 text-sm text-muted-foreground">No recent pages.</p>
+            : myPages.map((p) => <PageRow key={p.id} page={p} />)}
+        </CardSubSection>
+      </SectionCard>
     </div>
   )
 }
