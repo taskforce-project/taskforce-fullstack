@@ -201,7 +201,9 @@ public class AnalyticsService {
     // AI Insights (Groq)
     // -------------------------------------------------------------------------
 
+    @Transactional(readOnly = true)
     public List<AiInsightResponse> generateInsights(String slug) {
+      try {
         Workspace ws = findWorkspace(slug);
         List<Long> projectIds = getProjectIds(ws.getId());
 
@@ -265,6 +267,12 @@ public class AnalyticsService {
         } catch (Exception e) {
             return fallbackInsights();
         }
+      } catch (ResourceNotFoundException e) {
+        throw e; // 404 légitime (workspace introuvable)
+      } catch (Exception e) {
+        // Toute autre erreur (DB, lazy, Groq…) → fallback gracieux, jamais de 500
+        return fallbackInsights();
+      }
     }
 
     private List<AiInsightResponse> fallbackInsights() {
