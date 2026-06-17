@@ -1,5 +1,7 @@
 package com.taskforce.tf_api.core.dto.request;
 
+import com.taskforce.tf_api.core.enums.WorkspaceRole;
+
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
@@ -19,4 +21,7 @@ public class InviteMemberRequest {
     @NotBlank(message = "L'email est obligatoire")
     @Email(message = "Format d'email invalide")
     private String email;
+
+    /** Rôle attribué (MEMBER par défaut ; OWNER refusé côté service) */
+    private WorkspaceRole role;
 }
