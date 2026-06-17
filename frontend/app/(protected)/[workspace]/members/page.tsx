@@ -9,7 +9,6 @@ import {
   User,
   MoreHorizontal,
   Mail,
-  Check,
   X,
   Filter,
   Loader2,
@@ -36,9 +35,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { useUserStore } from "@/lib/store/user-store"
+import { searchUsers, type UserSearchResult } from "@/lib/api/user-service"
 import type { WorkspaceMember, WorkspaceRole } from "@/lib/api/workspace-service"
 
 // ---------------------------------------------------------------------------
@@ -78,31 +85,52 @@ const ROLE_FILTER_TABS: { key: RoleFilter; label: string }[] = [
 
 function InviteMemberDialog() {
   const [open, setOpen] = useState(false)
-  const [email, setEmail] = useState("")
+  const [query, setQuery] = useState("")
+  const [results, setResults] = useState<UserSearchResult[]>([])
+  const [searching, setSearching] = useState(false)
+  const [selected, setSelected] = useState<UserSearchResult | null>(null)
+  const [role, setRole] = useState<WorkspaceRole>("MEMBER")
   const [loading, setLoading] = useState(false)
-  const [sent, setSent] = useState(false)
   const invite = useWorkspaceStore((s) => s.invite)
+  const existingMembers = useWorkspaceStore((s) => s.members)
+
+  // Recherche débouncée (par email ou nom)
+  useEffect(() => {
+    if (selected || query.trim().length < 2) { setResults([]); return }
+    setSearching(true)
+    const id = setTimeout(async () => {
+      try {
+        const found = await searchUsers(query.trim())
+        const memberIds = new Set(existingMembers.map((m) => m.userId))
+        setResults(found.filter((u) => !memberIds.has(u.id)))
+      } finally {
+        setSearching(false)
+      }
+    }, 300)
+    return () => clearTimeout(id)
+  }, [query, selected, existingMembers])
+
+  function reset() {
+    setQuery(""); setResults([]); setSelected(null); setRole("MEMBER")
+  }
 
   async function handleInvite() {
-    if (!email.trim()) return
+    const email = selected?.email ?? query.trim()
+    if (!email) return
     setLoading(true)
-    const result = await invite({ email: email.trim() })
+    const result = await invite({ email, role })
     setLoading(false)
     if (result) {
-      setSent(true)
-      toast.success(`${email} ajouté au workspace`)
-      setTimeout(() => {
-        setSent(false)
-        setEmail("")
-        setOpen(false)
-      }, 1200)
+      toast.success(`${selected?.displayName ?? email} ajouté au workspace`)
+      reset()
+      setOpen(false)
     } else {
-      toast.error("Impossible d'inviter ce membre. Vérifiez que l'email correspond à un compte existant.")
+      toast.error("Impossible d'inviter ce membre. L'email doit correspondre à un compte Taskforce existant.")
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset() }}>
       <DialogTrigger asChild>
         <Button size="sm" className="gap-2 h-9">
           <UserPlus className="size-4" />
@@ -112,38 +140,88 @@ function InviteMemberDialog() {
 
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Invite team member</DialogTitle>
+          <DialogTitle>Invite member</DialogTitle>
           <DialogDescription>
-            Add an existing Taskforce user to your workspace by their email address.
+            Search an existing Taskforce user by name or email and pick their role.
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-4 py-2">
+          {/* Recherche utilisateur */}
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="invite-email" className="text-sm font-medium text-foreground">Email address</label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
-              <Input
-                id="invite-email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="colleague@company.com"
-                className="pl-9 h-9"
-                onKeyDown={(e) => e.key === "Enter" && handleInvite()}
-              />
-            </div>
+            <label htmlFor="invite-search" className="text-sm font-medium">User</label>
+            {selected ? (
+              <div className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-2.5 py-1.5">
+                <Avatar className="size-6">
+                  <AvatarImage src={selected.avatarUrl ?? undefined} />
+                  <AvatarFallback className="text-[9px]">{selected.email.slice(0, 2).toUpperCase()}</AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm">{selected.displayName ?? selected.email}</p>
+                  {selected.displayName && <p className="truncate text-xs text-muted-foreground">{selected.email}</p>}
+                </div>
+                <Button variant="ghost" size="icon-sm" onClick={() => { setSelected(null); setQuery("") }}>
+                  <X className="size-4" />
+                </Button>
+              </div>
+            ) : (
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="invite-search"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Name or email…"
+                  className="pl-9 h-9"
+                  autoComplete="off"
+                />
+                {searching && <Loader2 className="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground" />}
+                {results.length > 0 && (
+                  <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-md border border-border bg-popover shadow-md">
+                    {results.map((u) => (
+                      <button
+                        key={u.id}
+                        type="button"
+                        onClick={() => { setSelected(u); setResults([]) }}
+                        className="flex w-full items-center gap-2 px-2.5 py-2 text-left hover:bg-accent"
+                      >
+                        <Avatar className="size-6">
+                          <AvatarImage src={u.avatarUrl ?? undefined} />
+                          <AvatarFallback className="text-[9px]">{u.email.slice(0, 2).toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm">{u.displayName ?? u.email}</p>
+                          {u.displayName && <p className="truncate text-xs text-muted-foreground">{u.email}</p>}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {!searching && query.trim().length >= 2 && results.length === 0 && (
+                  <p className="mt-1.5 text-xs text-muted-foreground">No existing user matches — invitations for new emails are coming soon.</p>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Rôle */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium">Role</label>
+            <Select value={role} onValueChange={(v) => setRole(v as WorkspaceRole)}>
+              <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="MEMBER">Member</SelectItem>
+                <SelectItem value="ADMIN">Admin</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
         <DialogFooter className="gap-2">
-          <Button variant="outline" size="sm" onClick={() => setOpen(false)}>
-            Cancel
-          </Button>
-          <Button size="sm" onClick={handleInvite} disabled={!email.trim() || loading} className="gap-2">
-            {loading && <Loader2 className="size-4 animate-spin" />}
-            {!loading && sent && <><Check className="size-4" /> Added!</>}
-            {!loading && !sent && <><Mail className="size-4" /> Add member</>}
+          <Button variant="outline" size="sm" onClick={() => setOpen(false)}>Cancel</Button>
+          <Button size="sm" onClick={handleInvite} disabled={!selected || loading} className="gap-2">
+            {loading ? <Loader2 className="size-4 animate-spin" /> : <UserPlus className="size-4" />}
+            Add member
           </Button>
         </DialogFooter>
       </DialogContent>
