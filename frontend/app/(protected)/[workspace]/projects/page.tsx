@@ -21,7 +21,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card } from "@/components/ui/card"
+import { SectionCard, MetricSplit, Metric } from "@/components/ui/section-card"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Table,
@@ -157,25 +158,16 @@ function StatsStrip({ projects }: { readonly projects: Project[] }) {
   const atRisk = projects.filter((p) => deriveHealth(p) === "at-risk").length
   const avgProgress = total > 0 ? Math.round(projects.reduce((acc, p) => acc + progressPct(p), 0) / total) : 0
 
-  const stats = [
-    { label: "Total operations", value: total },
-    { label: "Active", value: active },
-    { label: "At risk", value: atRisk },
-    { label: "Critical", value: critical },
-    { label: "Avg progress", value: `${avgProgress}%` },
-  ]
-
   return (
-    <Card>
-      <CardContent className="flex flex-wrap items-center gap-x-10 gap-y-4">
-        {stats.map((s) => (
-          <div key={s.label} className="flex flex-col gap-1">
-            <span className="text-xl font-semibold tabular-nums text-foreground">{s.value}</span>
-            <span className="text-xs text-muted-foreground">{s.label}</span>
-          </div>
-        ))}
-      </CardContent>
-    </Card>
+    <SectionCard title="Overview" bodyClassName="p-0">
+      <MetricSplit>
+        <Metric label="Total operations" value={total} />
+        <Metric label="Active" value={active} valueClassName="text-emerald-600 dark:text-emerald-400" />
+        <Metric label="At risk" value={atRisk} valueClassName={atRisk > 0 ? "text-amber-600 dark:text-amber-400" : undefined} />
+        <Metric label="Critical" value={critical} valueClassName={critical > 0 ? "text-rose-600 dark:text-rose-400" : undefined} />
+        <Metric label="Avg progress" value={`${avgProgress}%`} />
+      </MetricSplit>
+    </SectionCard>
   )
 }
 
