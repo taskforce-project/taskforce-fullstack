@@ -38,6 +38,22 @@
 
 > Toutes les tâches de la QA gestion de projet sont traitées. Restent hors-scope explicitement reportés : **intégration GitHub** (l'utilisateur a dit « pour l'instant j'ai pas encore »).
 
+## ✅ Fait 2026-06-16 (QA gestion de projet — lot 2) + audit
+
+- **500 `/analytics/insights`** → corrigé : `try/catch` élargi à tout le corps de `AnalyticsService.generateInsights` + `@Transactional(readOnly=true)` (relance le 404 légitime, sinon fallback gracieux — plus jamais de 500). Cache V35 (`ai_insight_snapshots`) toujours non branché (latence persiste, non bloquant).
+- **`ERR_EMPTY_RESPONSE` sur /users/me + /workspaces** au chargement dashboard = **transitoire** (backend en redémarrage lors d'un rebuild), pas un bug.
+- **Invitation workspace avec rôle + recherche** → `InviteMemberRequest.role` (backend honore le rôle, OWNER refusé) + dialog `members/page.tsx` refait : recherche d'utilisateur (`searchUsers`, débouncée) + `Select` de rôle (Member/Admin).
+- **Teams/Squads dé-ambiguïsé** : nav « Squads »→« Teams », « Team »→« Members » (EN/FR + `app-topbar`). Techniquement teams=squads (un seul concept, V26).
+- **Refonte style Cloudflare flat** (lot précédent) + page **Operations** reconstruite en shadcn pur (Card/Tabs/Table/Badge/Progress) — gabarit de référence pour migrer les autres pages hors du CSS custom (`@layer components`).
+
+### Audit PM — restant à faire (priorisé, décision/ampleur)
+1. **Chargement dynamique des onglets** (Signals, My Queue, onglets projet Board/List/Backlog…) : aujourd'hui chaque onglet = **route séparée** → remount + refetch complet (effet « nouvelle page »). Fix = page unique + `Tabs` shadcn client-side + stores cache-first. Refactor moyen, multi-pages.
+2. **Inviter un email SANS compte** (vrai GitHub-like) : nécessite système d'invitation (table `workspace_invitations` token+email + EmailService existant) OU user « pending ». Décision auth requise.
+3. **Auto-assignation** : fonctionne (règles + Groq fallback, `SmartAssignService`), mais l'endpoint **recommande** seulement. Pour tester : projet avec ≥2 membres actifs + issues ; optionnel `member_skill_profiles` (aucune UI pour saisir les compétences). pgvector V33 défini mais mort. → seed de test possible.
+4. **Champs custom typés** sur issues (comme demandé) = **feature à construire** (n'existe pas) : modèle `custom_field` + valeurs + UI de création de type de champ.
+5. **Migrer le reste des pages** (Dashboard, Signals, My Queue, Intelligence, Agents, détail projet) vers shadcn pur et **supprimer le bloc `@layer components`** custom de `globals.css`.
+6. **Membres de projet** : `addMember` exige déjà membre du workspace (ok), mais UI sans recherche + rôle hardcodé MEMBER + changement de rôle = stub.
+
 ## Priority queue (do in this order)
 
 | ID     | Priority | Title                                                                        | Impact                                       | Effort | Conf. |
