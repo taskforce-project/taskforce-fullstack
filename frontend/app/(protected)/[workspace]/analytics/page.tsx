@@ -2,27 +2,25 @@
 
 import {
   BarChart, Bar, LineChart, Line, AreaChart, Area,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts"
 import {
   TrendingUp, TrendingDown, Zap, AlertTriangle, Brain,
-  Activity, Lock,
-  Flame, Minus,
+  Activity, Lock, Flame, Minus,
 } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useParams } from "next/navigation"
-import { motion } from "framer-motion"
 
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Card, CardContent } from "@/components/ui/card"
+import { SectionCard } from "@/components/ui/section-card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { useAuth } from "@/lib/contexts/auth-context"
 import { cn } from "@/lib/utils"
-import {
-  getAnalyticsCapacity,
-  type MemberCapacity,
-} from "@/lib/api/analytics-service"
+import { getAnalyticsCapacity, type MemberCapacity } from "@/lib/api/analytics-service"
 
-// ─── Primitives ───────────────────────────────────────────────────────────────
+// ─── Types & data ─────────────────────────────────────────────────────────────
 
 interface KpiMetric {
   label: string
@@ -30,44 +28,25 @@ interface KpiMetric {
   delta: number
   unit: string
   icon: React.ElementType
-  color: string
   deltaInverse?: boolean
 }
 
-function GlassCard({ className, children }: { className?: string; children: React.ReactNode }) {
-  return (
-    <div
-      className={cn("rounded-xl border", className)}
-      style={{ background: "var(--fill-secondary)", borderColor: "var(--separator)" }}
-    >
-      {children}
-    </div>
-  )
-}
-
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <h3 className="text-xs font-semibold" style={{ color: "var(--label-secondary)" }}>
-      {children}
-    </h3>
-  )
-}
-
-// ─── Static data ──────────────────────────────────────────────────────────────
-
+// Couleurs de séries via tokens de thème (neutres + 1 accent)
+const C1 = "var(--chart-1)"
+const C2 = "var(--chart-2)"
 const TOOLTIP_STYLE: React.CSSProperties = {
-  background: "var(--background)",
-  border: "1px solid var(--separator)",
+  background: "var(--popover)",
+  border: "1px solid var(--border)",
   borderRadius: "8px",
   fontSize: "11px",
-  color: "var(--label-primary)",
+  color: "var(--popover-foreground)",
 }
 
 const KPI_METRICS: KpiMetric[] = [
-  { label: "Tasks completed", value: "47",   delta: 12, unit: "this week",   icon: TrendingUp,   color: "#34d399" },
-  { label: "Cycle time",      value: "2.4d", delta: -8, unit: "avg",         icon: Activity,     color: "#60a5fa", deltaInverse: true },
-  { label: "Blocked tasks",   value: "3",    delta: 1,  unit: "active",      icon: AlertTriangle,color: "#f87171", deltaInverse: true },
-  { label: "Sprint velocity", value: "73%",  delta: -5, unit: "on target",   icon: Flame,        color: "#fbbf24", deltaInverse: true },
+  { label: "Tasks completed", value: "47",   delta: 12, unit: "this week", icon: TrendingUp },
+  { label: "Cycle time",      value: "2.4d", delta: -8, unit: "avg",       icon: Activity,     deltaInverse: true },
+  { label: "Blocked tasks",   value: "3",    delta: 1,  unit: "active",    icon: AlertTriangle, deltaInverse: true },
+  { label: "Sprint velocity", value: "73%",  delta: -5, unit: "on target", icon: Flame,        deltaInverse: true },
 ]
 
 const THROUGHPUT_DATA = [
@@ -78,190 +57,86 @@ const THROUGHPUT_DATA = [
 ]
 
 const HEALTH_TIMELINE = [
-  { day: "Mon", score: 82 },
-  { day: "Tue", score: 79 },
-  { day: "Wed", score: 74 },
-  { day: "Thu", score: 78 },
-  { day: "Fri", score: 81 },
-  { day: "Sat", score: 83 },
-  { day: "Sun", score: 78 },
+  { day: "Mon", score: 82 }, { day: "Tue", score: 79 }, { day: "Wed", score: 74 },
+  { day: "Thu", score: 78 }, { day: "Fri", score: 81 }, { day: "Sat", score: 83 }, { day: "Sun", score: 78 },
 ]
 
 const BURNDOWN_DATA = [
-  { day: "D1", ideal: 34, remaining: 34 },
-  { day: "D2", ideal: 28, remaining: 30 },
-  { day: "D3", ideal: 22, remaining: 25 },
-  { day: "D4", ideal: 17, remaining: 22 },
-  { day: "D5", ideal: 11, remaining: 16 },
-  { day: "D6", ideal: 6,  remaining: 12 },
-  { day: "D7", ideal: 0,  remaining: 8  },
+  { day: "D1", ideal: 34, remaining: 34 }, { day: "D2", ideal: 28, remaining: 30 },
+  { day: "D3", ideal: 22, remaining: 25 }, { day: "D4", ideal: 17, remaining: 22 },
+  { day: "D5", ideal: 11, remaining: 16 }, { day: "D6", ideal: 6, remaining: 12 }, { day: "D7", ideal: 0, remaining: 8 },
 ]
-
-// ─── Static data (AI anomalies kept as mock - complex ML feature) ─────────────
 
 const AI_ANOMALIES: {
-  id: number
-  severity: "critical" | "warning" | "info"
-  title: string
-  detail: string
-  operation: string
-  detectedAt: string
+  id: number; severity: "critical" | "warning" | "info"; title: string; detail: string; operation: string; detectedAt: string
 }[] = [
-  {
-    id: 1,
-    severity: "critical",
-    title: "Velocity collapse detected",
-    detail: "Website Redesign dropped from 13 → 4 tasks/week. Sprint at risk.",
-    operation: "Website Redesign",
-    detectedAt: "2h ago",
-  },
-  {
-    id: 2,
-    severity: "warning",
-    title: "Scope creep pattern",
-    detail: "API v2 has 8 new tasks opened this week with no corresponding closures.",
-    operation: "API v2",
-    detectedAt: "6h ago",
-  },
-  {
-    id: 3,
-    severity: "warning",
-    title: "Key contributor inactive",
-    detail: "Thomas B. hasn't logged any activity in 3 days across assigned tasks.",
-    operation: "Mobile App",
-    detectedAt: "1d ago",
-  },
-  {
-    id: 4,
-    severity: "info",
-    title: "Sprint overcommitment predicted",
-    detail: "Current velocity suggests 68% chance of incomplete sprint by Friday.",
-    operation: "Website Redesign",
-    detectedAt: "3h ago",
-  },
+  { id: 1, severity: "critical", title: "Velocity collapse detected", detail: "Website Redesign dropped from 13 → 4 tasks/week. Sprint at risk.", operation: "Website Redesign", detectedAt: "2h ago" },
+  { id: 2, severity: "warning",  title: "Scope creep pattern",        detail: "API v2 has 8 new tasks opened this week with no corresponding closures.", operation: "API v2", detectedAt: "6h ago" },
+  { id: 3, severity: "warning",  title: "Key contributor inactive",   detail: "Thomas B. hasn't logged any activity in 3 days across assigned tasks.", operation: "Mobile App", detectedAt: "1d ago" },
+  { id: 4, severity: "info",     title: "Sprint overcommitment predicted", detail: "Current velocity suggests 68% chance of incomplete sprint by Friday.", operation: "Website Redesign", detectedAt: "3h ago" },
 ]
 
-// ─── KpiCard component ────────────────────────────────────────────────────────
+const SEVERITY_META: Record<"critical" | "warning" | "info", { wrap: string; icon: React.ElementType; iconColor: string }> = {
+  critical: { wrap: "border-rose-500/30 bg-rose-500/10",  icon: Flame,         iconColor: "text-rose-500" },
+  warning:  { wrap: "border-amber-500/30 bg-amber-500/10", icon: AlertTriangle, iconColor: "text-amber-500" },
+  info:     { wrap: "border-blue-500/30 bg-blue-500/10",   icon: Brain,         iconColor: "text-blue-500" },
+}
 
-function KpiCard({ metric, index }: { metric: KpiMetric; index: number }) {
+// ─── Small components ─────────────────────────────────────────────────────────
+
+function KpiCard({ metric }: { readonly metric: KpiMetric }) {
   const positive = metric.delta > 0
   const isGood = metric.deltaInverse ? !positive : positive
-  const deltaColor = metric.delta === 0 ? "var(--label-quaternary)" : isGood ? "#34d399" : "#f87171"
-
+  const deltaClass = metric.delta === 0 ? "text-muted-foreground" : isGood ? "text-emerald-500" : "text-rose-500"
+  const DeltaIcon = metric.delta === 0 ? Minus : positive ? TrendingUp : TrendingDown
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.22, delay: index * 0.06 }}
-    >
-      <GlassCard className="p-4 flex flex-col gap-3">
+    <Card className="gap-0 py-0">
+      <CardContent className="flex flex-col gap-3 p-4">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] font-medium uppercase tracking-wider" style={{ color: "var(--label-tertiary)" }}>
-            {metric.label}
-          </span>
-          <metric.icon className="size-3.5" style={{ color: metric.color }} />
+          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{metric.label}</span>
+          <metric.icon className="size-3.5 text-muted-foreground" />
         </div>
         <div>
           <div className="flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold tabular-nums" style={{ color: "var(--label-primary)" }}>
-              {metric.value}
-            </span>
-            <span className="text-[10px]" style={{ color: "var(--label-quaternary)" }}>
-              {metric.unit}
-            </span>
+            <span className="text-2xl font-bold tabular-nums text-foreground">{metric.value}</span>
+            <span className="text-[10px] text-muted-foreground">{metric.unit}</span>
           </div>
-          <div className="flex items-center gap-1 mt-1">
-            {metric.delta === 0 ? (
-              <Minus className="size-3" style={{ color: "var(--label-quaternary)" }} />
-            ) : positive ? (
-              <TrendingUp className="size-3" style={{ color: deltaColor }} />
-            ) : (
-              <TrendingDown className="size-3" style={{ color: deltaColor }} />
-            )}
-            <span className="text-[10px] font-medium tabular-nums" style={{ color: deltaColor }}>
-              {metric.delta > 0 ? "+" : ""}{metric.delta} vs last month
-            </span>
+          <div className={cn("mt-1 flex items-center gap-1 text-[10px] font-medium tabular-nums", deltaClass)}>
+            <DeltaIcon className="size-3" />
+            {metric.delta > 0 ? "+" : ""}{metric.delta} vs last month
           </div>
         </div>
-      </GlassCard>
-    </motion.div>
+      </CardContent>
+    </Card>
   )
 }
 
-const SEVERITY_CONFIG = {
-  critical: {
-    bg: "rgba(248,113,113,0.08)",
-    border: "rgba(248,113,113,0.20)",
-    dot: "#f87171",
-    icon: Flame,
-    label: "Critical",
-  },
-  warning: {
-    bg: "rgba(251,191,36,0.08)",
-    border: "rgba(251,191,36,0.18)",
-    dot: "#fbbf24",
-    icon: AlertTriangle,
-    label: "Warning",
-  },
-  info: {
-    bg: "rgba(96,165,250,0.08)",
-    border: "rgba(96,165,250,0.15)",
-    dot: "#60a5fa",
-    icon: Brain,
-    label: "Info",
-  },
-}
-
-function AnomalyRow({ anomaly, index }: { anomaly: typeof AI_ANOMALIES[0]; index: number }) {
-  const cfg = SEVERITY_CONFIG[anomaly.severity]
-  const Icon = cfg.icon
-
+function AnomalyRow({ anomaly }: { readonly anomaly: typeof AI_ANOMALIES[0] }) {
+  const meta = SEVERITY_META[anomaly.severity]
+  const Icon = meta.icon
   return (
-    <motion.div
-      initial={{ opacity: 0, x: -6 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.18, delay: index * 0.05 }}
-      className="flex items-start gap-3 p-3 rounded-lg"
-      style={{ background: cfg.bg, border: `1px solid ${cfg.border}` }}
-    >
-      <div className="mt-0.5 shrink-0">
-        <Icon className="size-3.5" style={{ color: cfg.dot }} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-0.5">
-          <span className="text-xs font-semibold" style={{ color: "var(--label-primary)" }}>
-            {anomaly.title}
-          </span>
-          <span
-            className="text-[10px] px-1.5 py-0.5 rounded"
-            style={{
-              background: "var(--fill-secondary)",
-              color: "var(--label-tertiary)",
-              fontFamily: "var(--font-mono)",
-            }}
-          >
-            {anomaly.operation}
-          </span>
+    <div className={cn("flex items-start gap-3 rounded-lg border p-3", meta.wrap)}>
+      <Icon className={cn("mt-0.5 size-3.5 shrink-0", meta.iconColor)} />
+      <div className="min-w-0 flex-1">
+        <div className="mb-0.5 flex items-center gap-2">
+          <span className="text-xs font-semibold text-foreground">{anomaly.title}</span>
+          <Badge variant="secondary" className="h-4 px-1.5 font-mono text-[10px] font-normal">{anomaly.operation}</Badge>
         </div>
-        <p className="text-[11px] leading-relaxed" style={{ color: "var(--label-secondary)" }}>
-          {anomaly.detail}
-        </p>
+        <p className="text-xs leading-relaxed text-muted-foreground">{anomaly.detail}</p>
       </div>
-      <span className="text-[10px] shrink-0 mt-0.5" style={{ color: "var(--label-quaternary)" }}>
-        {anomaly.detectedAt}
-      </span>
-    </motion.div>
+      <span className="mt-0.5 shrink-0 text-[10px] text-muted-foreground">{anomaly.detectedAt}</span>
+    </div>
   )
 }
 
-function UpgradeDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+function UpgradeDialog({ open, onClose }: { readonly open: boolean; readonly onClose: () => void }) {
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <div className="flex items-center gap-2 mb-1">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full" style={{ background: "rgba(251,191,36,0.12)" }}>
-              <Zap className="h-4 w-4" style={{ color: "#fbbf24" }} />
+          <div className="mb-1 flex items-center gap-2">
+            <div className="flex size-8 items-center justify-center rounded-full bg-amber-500/15">
+              <Zap className="size-4 text-amber-500" />
             </div>
             <DialogTitle>Pro feature</DialogTitle>
           </div>
@@ -269,56 +144,24 @@ function UpgradeDialog({ open, onClose }: { open: boolean; onClose: () => void }
             Advanced operational intelligence is a Pro feature — unlock detailed throughput analysis, AI anomaly detection history, and team capacity forecasting.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col gap-2 mt-2">
-          <Button className="w-full gap-1.5" size="sm" onClick={onClose}>
-            <Zap className="h-3.5 w-3.5" />
-            Upgrade to Pro
-          </Button>
-          <Button variant="ghost" size="sm" className="w-full" onClick={onClose}>
-            Maybe later
-          </Button>
+        <div className="mt-2 flex flex-col gap-2">
+          <Button className="w-full gap-1.5" size="sm" onClick={onClose}><Zap className="size-3.5" /> Upgrade to Pro</Button>
+          <Button variant="ghost" size="sm" className="w-full" onClick={onClose}>Maybe later</Button>
         </div>
       </DialogContent>
     </Dialog>
   )
 }
 
-function ProGate({ children, onUpgrade }: { children: React.ReactNode; onUpgrade: () => void }) {
+function ProGate({ children, onUpgrade }: { readonly children: React.ReactNode; readonly onUpgrade: () => void }) {
   return (
-    <div className="relative group">
-      {children}
-      <button
-        type="button"
-        className="absolute inset-0 w-full cursor-pointer bg-transparent"
-        onClick={onUpgrade}
-        aria-label="Upgrade to Pro"
-      />
-      <div
-        className="absolute top-3 right-3 flex items-center gap-1.5 rounded-full px-2.5 py-1 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
-        style={{
-          background: "rgba(251,191,36,0.12)",
-          border: "1px solid rgba(251,191,36,0.22)",
-        }}
-      >
-        <Lock className="h-3 w-3" style={{ color: "#fbbf24" }} />
-        <span className="text-xs font-semibold" style={{ color: "#fbbf24" }}>Pro</span>
-      </div>
+    <div className="group relative">
+      <div className="opacity-60">{children}</div>
+      <button type="button" className="absolute inset-0 w-full cursor-pointer bg-transparent" onClick={onUpgrade} aria-label="Upgrade to Pro" />
+      <Badge variant="secondary" className="pointer-events-none absolute right-3 top-3 gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+        <Lock className="size-3" /> Pro
+      </Badge>
     </div>
-  )
-}
-
-function ProBadge() {
-  return (
-    <span
-      className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md"
-      style={{
-        background: "rgba(251,191,36,0.12)",
-        border: "1px solid rgba(251,191,36,0.20)",
-        color: "#fbbf24",
-      }}
-    >
-      Pro
-    </span>
   )
 }
 
@@ -335,258 +178,136 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     if (!slug) return
-    getAnalyticsCapacity(slug)
-      .then(setCapacityData)
-      .catch(() => { /* silently ignore — not critical */ })
+    getAnalyticsCapacity(slug).then(setCapacityData).catch(() => { /* non-critical */ })
   }, [slug])
 
   const overallHealth = 78
   const healthDelta = -4
+  const healthBad = healthDelta < 0
+  const proBadge = !isPro ? <Badge variant="secondary" className="text-amber-600 dark:text-amber-400">Pro</Badge> : undefined
 
   return (
-    <div className="flex flex-col gap-6 max-w-5xl mx-auto w-full">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       <UpgradeDialog open={upgradeOpen} onClose={() => setUpgradeOpen(false)} />
 
-      {/* ── Page header ── */}
+      {/* Header */}
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight" style={{ color: "var(--label-primary)" }}>
-            Operational Intelligence
-          </h1>
-          <p className="text-xs mt-0.5" style={{ color: "var(--label-tertiary)" }}>
-            AI-derived signals and performance patterns across all operations
-          </p>
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight">Operational Intelligence</h1>
+          <p className="text-sm text-muted-foreground">AI-derived signals and performance patterns across all operations</p>
         </div>
-
-        {/* System health badge */}
-        <div
-          className="flex items-center gap-2 px-3 py-1.5 rounded-xl shrink-0"
-          style={{
-            background: healthDelta < 0 ? "rgba(251,191,36,0.10)" : "rgba(52,211,153,0.10)",
-            border: `1px solid ${healthDelta < 0 ? "rgba(251,191,36,0.20)" : "rgba(52,211,153,0.20)"}`,
-          }}
-        >
-          <Activity className="size-3.5" style={{ color: healthDelta < 0 ? "#fbbf24" : "#34d399" }} />
-          <span className="text-xs font-semibold tabular-nums" style={{ color: healthDelta < 0 ? "#fbbf24" : "#34d399" }}>
-            Health {overallHealth}
-          </span>
-          <span className="text-[10px]" style={{ color: "var(--label-quaternary)" }}>
-            {healthDelta}% vs last week
-          </span>
-        </div>
+        <Badge variant="secondary" className={cn("gap-1.5 shrink-0", healthBad ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400")}>
+          <Activity className="size-3.5" /> Health {overallHealth}
+          <span className="text-muted-foreground">· {healthDelta}% vs last week</span>
+        </Badge>
       </div>
 
-      {/* ── KPI strip ── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {KPI_METRICS.map((m, i) => (
-          <KpiCard key={m.label} metric={m} index={i} />
-        ))}
+      {/* KPI strip */}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        {KPI_METRICS.map((m) => <KpiCard key={m.label} metric={m} />)}
       </div>
 
-      {/* ── Two column layout ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+      {/* Two-column layout */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+        {/* Charts */}
+        <div className="flex flex-col gap-4 lg:col-span-3">
+          <SectionCard title="Weekly throughput" action={proBadge}>
+            <MaybeGate gated={!isPro} onUpgrade={() => setUpgradeOpen(true)}>
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={THROUGHPUT_DATA} barGap={3} margin={{ top: 0, right: 0, left: -24, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                  <XAxis dataKey="week" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: "var(--muted)" }} />
+                  <Legend wrapperStyle={{ fontSize: 10 }} />
+                  <Bar dataKey="opened" name="Opened" fill={C2} radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="resolved" name="Resolved" fill={C1} radius={[3, 3, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </MaybeGate>
+          </SectionCard>
 
-        {/* Left: charts (3/5) */}
-        <div className="lg:col-span-3 flex flex-col gap-4">
+          <SectionCard title="System health timeline (7d)" action={proBadge}>
+            <MaybeGate gated={!isPro} onUpgrade={() => setUpgradeOpen(true)}>
+              <ResponsiveContainer width="100%" height={140}>
+                <AreaChart data={HEALTH_TIMELINE} margin={{ top: 0, right: 0, left: -24, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="healthGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={C1} stopOpacity={0.25} />
+                      <stop offset="95%" stopColor={C1} stopOpacity={0.02} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                  <XAxis dataKey="day" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
+                  <YAxis domain={[60, 100]} tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={TOOLTIP_STYLE} />
+                  <Area type="monotone" dataKey="score" name="Health" stroke={C1} strokeWidth={2} fill="url(#healthGrad)" dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </MaybeGate>
+          </SectionCard>
 
-          {/* Throughput chart */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <SectionLabel>Weekly Throughput</SectionLabel>
-              {!isPro && <ProBadge />}
-            </div>
-            {isPro ? (
-              <GlassCard className="p-4">
-                <ResponsiveContainer width="100%" height={180}>
-                  <BarChart data={THROUGHPUT_DATA} barGap={3} margin={{ top: 0, right: 0, left: -24, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--separator)" vertical={false} />
-                    <XAxis dataKey="week" tick={{ fontSize: 10, fill: "var(--label-quaternary)" }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 10, fill: "var(--label-quaternary)" }} axisLine={false} tickLine={false} />
-                    <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: "var(--fill-tertiary)" }} />
-                    <Legend wrapperStyle={{ fontSize: 10, color: "var(--label-tertiary)" }} />
-                    <Bar dataKey="opened"   name="Opened"   fill="rgba(96,165,250,0.50)"  radius={[3, 3, 0, 0]} />
-                    <Bar dataKey="resolved" name="Resolved" fill="rgba(167,139,250,0.80)" radius={[3, 3, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </GlassCard>
-            ) : (
-              <ProGate onUpgrade={() => setUpgradeOpen(true)}>
-                <GlassCard className="p-4">
-                  <ResponsiveContainer width="100%" height={180}>
-                    <BarChart data={THROUGHPUT_DATA} barGap={3} margin={{ top: 0, right: 0, left: -24, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="var(--separator)" vertical={false} />
-                      <XAxis dataKey="week" tick={{ fontSize: 10, fill: "var(--label-quaternary)" }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 10, fill: "var(--label-quaternary)" }} axisLine={false} tickLine={false} />
-                      <Legend wrapperStyle={{ fontSize: 10, color: "var(--label-tertiary)" }} />
-                      <Bar dataKey="opened"   name="Opened"   fill="rgba(96,165,250,0.30)"  radius={[3, 3, 0, 0]} />
-                      <Bar dataKey="resolved" name="Resolved" fill="rgba(167,139,250,0.50)" radius={[3, 3, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </GlassCard>
-              </ProGate>
-            )}
-          </div>
-
-          {/* System health timeline */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <SectionLabel>System Health Timeline (7d)</SectionLabel>
-              {!isPro && <ProBadge />}
-            </div>
-            {isPro ? (
-              <GlassCard className="p-4">
-                <ResponsiveContainer width="100%" height={140}>
-                  <AreaChart data={HEALTH_TIMELINE} margin={{ top: 0, right: 0, left: -24, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="healthGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%"  stopColor="#a78bfa" stopOpacity={0.25} />
-                        <stop offset="95%" stopColor="#a78bfa" stopOpacity={0.02} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--separator)" vertical={false} />
-                    <XAxis dataKey="day" tick={{ fontSize: 10, fill: "var(--label-quaternary)" }} axisLine={false} tickLine={false} />
-                    <YAxis domain={[60, 100]} tick={{ fontSize: 10, fill: "var(--label-quaternary)" }} axisLine={false} tickLine={false} />
-                    <Tooltip contentStyle={TOOLTIP_STYLE} />
-                    <Area type="monotone" dataKey="score" name="Health" stroke="#a78bfa" strokeWidth={2} fill="url(#healthGrad)" dot={{ r: 3, fill: "#a78bfa" }} activeDot={{ r: 5 }} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </GlassCard>
-            ) : (
-              <ProGate onUpgrade={() => setUpgradeOpen(true)}>
-                <GlassCard className="p-4">
-                  <ResponsiveContainer width="100%" height={140}>
-                    <AreaChart data={HEALTH_TIMELINE} margin={{ top: 0, right: 0, left: -24, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="var(--separator)" vertical={false} />
-                      <XAxis dataKey="day" tick={{ fontSize: 10, fill: "var(--label-quaternary)" }} axisLine={false} tickLine={false} />
-                      <YAxis domain={[60, 100]} tick={{ fontSize: 10, fill: "var(--label-quaternary)" }} axisLine={false} tickLine={false} />
-                      <Area type="monotone" dataKey="score" name="Health" stroke="rgba(167,139,250,0.3)" strokeWidth={2} fill="rgba(167,139,250,0.05)" />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </GlassCard>
-              </ProGate>
-            )}
-          </div>
-
-          {/* Sprint burndown */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <SectionLabel>Sprint Burndown</SectionLabel>
-              {!isPro && <ProBadge />}
-            </div>
-            {isPro ? (
-              <GlassCard className="p-4">
-                <ResponsiveContainer width="100%" height={160}>
-                  <LineChart data={BURNDOWN_DATA} margin={{ top: 0, right: 0, left: -24, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--separator)" vertical={false} />
-                    <XAxis dataKey="day" tick={{ fontSize: 10, fill: "var(--label-quaternary)" }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 10, fill: "var(--label-quaternary)" }} axisLine={false} tickLine={false} />
-                    <Tooltip contentStyle={TOOLTIP_STYLE} />
-                    <Legend wrapperStyle={{ fontSize: 10, color: "var(--label-tertiary)" }} />
-                    <Line type="monotone" dataKey="ideal"     name="Ideal"     stroke="var(--label-quaternary)" strokeDasharray="4 4" strokeWidth={1.5} dot={false} />
-                    <Line type="monotone" dataKey="remaining" name="Remaining" stroke="#a78bfa" strokeWidth={2} dot={{ r: 3, fill: "#a78bfa" }} activeDot={{ r: 5 }} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </GlassCard>
-            ) : (
-              <ProGate onUpgrade={() => setUpgradeOpen(true)}>
-                <GlassCard className="p-4">
-                  <ResponsiveContainer width="100%" height={160}>
-                    <LineChart data={BURNDOWN_DATA} margin={{ top: 0, right: 0, left: -24, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="var(--separator)" vertical={false} />
-                      <XAxis dataKey="day" tick={{ fontSize: 10, fill: "var(--label-quaternary)" }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 10, fill: "var(--label-quaternary)" }} axisLine={false} tickLine={false} />
-                      <Legend wrapperStyle={{ fontSize: 10, color: "var(--label-tertiary)" }} />
-                      <Line type="monotone" dataKey="ideal"     stroke="rgba(148,163,184,0.3)" strokeDasharray="4 4" strokeWidth={1.5} dot={false} />
-                      <Line type="monotone" dataKey="remaining" stroke="rgba(167,139,250,0.3)" strokeWidth={2} dot={false} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </GlassCard>
-              </ProGate>
-            )}
-          </div>
+          <SectionCard title="Sprint burndown" action={proBadge}>
+            <MaybeGate gated={!isPro} onUpgrade={() => setUpgradeOpen(true)}>
+              <ResponsiveContainer width="100%" height={160}>
+                <LineChart data={BURNDOWN_DATA} margin={{ top: 0, right: 0, left: -24, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                  <XAxis dataKey="day" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={TOOLTIP_STYLE} />
+                  <Legend wrapperStyle={{ fontSize: 10 }} />
+                  <Line type="monotone" dataKey="ideal" name="Ideal" stroke={C2} strokeDasharray="4 4" strokeWidth={1.5} dot={false} />
+                  <Line type="monotone" dataKey="remaining" name="Remaining" stroke={C1} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </MaybeGate>
+          </SectionCard>
         </div>
 
-        {/* Right: signals + capacity (2/5) */}
-        <div className="lg:col-span-2 flex flex-col gap-4">
+        {/* Signals + capacity */}
+        <div className="flex flex-col gap-4 lg:col-span-2">
+          <SectionCard
+            title="AI anomaly detection"
+            action={<span className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground"><Brain className="size-3" /> {AI_ANOMALIES.length} signals</span>}
+            bodyClassName="p-4 space-y-2"
+          >
+            {AI_ANOMALIES.map((a) => <AnomalyRow key={a.id} anomaly={a} />)}
+          </SectionCard>
 
-          {/* AI anomaly detection */}
           <div>
-            <div className="flex items-center justify-between mb-3">
-              <SectionLabel>AI Anomaly Detection</SectionLabel>
-              <span
-                className="text-[10px] font-medium flex items-center gap-1"
-                style={{ color: "var(--label-secondary)" }}
-              >
-                <Brain className="size-3" />
-                {AI_ANOMALIES.length} signals
-              </span>
-            </div>
-            <div className="flex flex-col gap-2">
-              {AI_ANOMALIES.map((a, i) => (
-                <AnomalyRow key={a.id} anomaly={a} index={i} />
-              ))}
-            </div>
-          </div>
-
-          {/* Team capacity */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <SectionLabel>Team Capacity</SectionLabel>
-              {!isPro && <ProBadge />}
-            </div>
-            <GlassCard className="overflow-hidden">
+            <SectionCard title="Team capacity" action={proBadge} bodyClassName="p-0">
               {capacityData.length === 0 ? (
-                <div className="px-3 py-4 text-center text-xs" style={{ color: "var(--label-quaternary)" }}>
-                  Aucun membre trouvé
-                </div>
-              ) : capacityData.map((member, i) => {
+                <p className="px-3 py-4 text-center text-xs text-muted-foreground">Aucun membre trouvé</p>
+              ) : capacityData.map((member) => {
                 const utilization = Math.min(Math.round((member.openIssues / 10) * 100), 100)
-                const overloaded = utilization > 80
-                const barColor = overloaded ? "#f87171" : utilization > 60 ? "#fbbf24" : "#34d399"
+                const barClass = utilization > 80 ? "bg-rose-500" : utilization > 60 ? "bg-amber-500" : "bg-emerald-500"
                 return (
-                  <div
-                    key={member.userId}
-                    className={cn("flex items-center gap-3 px-3 py-2.5")}
-                    style={{
-                      borderBottom: i < capacityData.length - 1 ? "1px solid var(--separator)" : "none",
-                    }}
-                  >
-                    <span className="text-xs w-20 shrink-0 truncate" style={{ color: "var(--label-secondary)" }}>
-                      {member.displayName}
-                    </span>
-                    <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: "var(--fill-secondary)" }}>
-                      {isPro ? (
-                        <div
-                          className="h-full rounded-full transition-all"
-                          style={{ width: `${utilization}%`, background: barColor }}
-                        />
-                      ) : (
-                        <div className="h-full w-full" style={{ background: "var(--fill-secondary)" }} />
-                      )}
+                  <div key={member.userId} className="flex items-center gap-3 border-b border-border px-3 py-2.5 last:border-0">
+                    <span className="w-20 shrink-0 truncate text-xs text-muted-foreground">{member.displayName}</span>
+                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                      {isPro && <div className={cn("h-full rounded-full", barClass)} style={{ width: `${utilization}%` }} />}
                     </div>
-                    <span
-                      className="text-[10px] font-medium tabular-nums w-8 text-right shrink-0"
-                      style={{ color: isPro ? barColor : "var(--label-quaternary)" }}
-                    >
-                      {isPro ? `${member.openIssues}` : "—"}
+                    <span className={cn("w-8 shrink-0 text-right text-[10px] font-medium tabular-nums", isPro ? "text-foreground" : "text-muted-foreground")}>
+                      {isPro ? member.openIssues : "—"}
                     </span>
                   </div>
                 )
               })}
-            </GlassCard>
+            </SectionCard>
             {!isPro && (
-              <button
-                onClick={() => setUpgradeOpen(true)}
-                className="mt-2 w-full text-center text-[10px] flex items-center justify-center gap-1 py-1.5 rounded-lg transition-colors"
-                style={{ color: "#fbbf24", background: "rgba(251,191,36,0.06)", border: "1px solid rgba(251,191,36,0.15)" }}
-              >
-                <Zap className="size-3" />
-                Unlock capacity data with Pro
-              </button>
+              <Button variant="outline" size="sm" className="mt-2 w-full gap-1.5 text-amber-600 dark:text-amber-400" onClick={() => setUpgradeOpen(true)}>
+                <Zap className="size-3" /> Unlock capacity data with Pro
+              </Button>
             )}
           </div>
         </div>
       </div>
     </div>
   )
+}
+
+// Affiche le contenu, gaté derrière un ProGate si `gated`
+function MaybeGate({ gated, onUpgrade, children }: { readonly gated: boolean; readonly onUpgrade: () => void; readonly children: React.ReactNode }) {
+  if (!gated) return <>{children}</>
+  return <ProGate onUpgrade={onUpgrade}>{children}</ProGate>
 }
