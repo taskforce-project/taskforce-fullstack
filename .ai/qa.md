@@ -652,3 +652,34 @@ C26. Industrialiser le développement de la partie back-end d’une application 
     -      Une gestion des dépendances est mise en oeuvre			
     -      La chaine de build permet effectivement d’améliorer les performances et la sécurité du back-end de			
     l’application (web, hybride, mobile ou desktop) réalisée.			
+
+
+
+Le cœur du CDC est couvert : répartition auto par compétences/charge/dispo (SmartAssignService), suivi temps réel (dashboard/board/analytics), alertes surcharge (notifications + job d'échéance), interface collaborative (workspaces/rôles), rapports (Intelligence). Tu dépasses même le CDC (agents IA, Stripe, vision wrapper GitHub).
+
+2 vrais trous fonctionnels CDC :
+
+Saisie des compétences : la table member_skill_profiles existe mais aucune UI pour les renseigner — or c'est LE cœur du CDC. À exposer (sinon l'auto-assign tourne sans données de compétences).
+RGPD : explicitement demandé par le CDC, non fait.
+Topo certif (grille RNCP) — le strict nécessaire, par ordre
+La certif évalue la grille C1–C26, pas que l'app. Voici ce qui te manque, classé.
+
+🔴 Bloquants CODE (à implémenter) :
+
+Tests ≥ 50% front (Vitest/RTL) et back (JUnit) — seuil chiffré explicite (C18, C25). Le plus urgent, non négociable.
+RGPD (C11) : bannière cookies, page politique de confidentialité, formulaire accès/suppression données, double opt-in.
+SEO landing ≥ 70% (C20) : meta, sitemap, OG, outil de mesure — sur la landing-page (l'app authentifiée est hors-scope, à justifier).
+🟠 Bloquants DOSSIER (docs mémoire — rapides, pas de code) :
+4. Wireframes (C6) — Figma, même rétro-actifs sur les vues clés.
+5. Dossier de conception : cas d'usage UML (C7), diagramme de classes + MCD (C8), archi logicielle (C10 — déjà ~OK via Brain OS).
+6. Planning + budget prévisionnel (C3), méthode agile + trame de CR (C4), méthodo de veille (C12). → en grande partie déjà dans taskforce-docs, à formaliser.
+
+🟡 Renforcement (partiel → complet) :
+7. CI (C19/C26) : pipeline lint + tests + build + scan (GitHub Actions).
+8. Sécurité en profondeur (C21/C24) : audit logs, RBAC granulaire, chiffrement données sensibles, SSL prod.
+
+Verdict
+Fonctionnel / app : tu es largement bon (C13–C17, C21–C24 ✅).
+Ce qui te ferait rater des points : tests (50%), RGPD, et les dossiers de conception (wireframes/UML/STB) — beaucoup sont du doc, donc rapides.
+Ordre malin : 1) tests → 2) RGPD → 3) dossiers conception/UML → 4) CI → 5) SEO landing. Avec ça tu coches l'essentiel de la grille.
+Tout est détaillé compétence par compétence dans la grille remplie (Grille_evaluation_TaskForce_REMPLIE) et la roadmap. Je commence par les tests si tu veux.
