@@ -19,6 +19,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { ProjectIconPicker } from "@/components/ui/project-icon-picker"
+import { ColorPalettePicker, PROJECT_COLORS } from "@/components/ui/color-palette-picker"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { useProjectStore } from "@/lib/store/project-store"
 import type { Project } from "@/lib/api/project-service"
@@ -30,22 +31,25 @@ import type { Project } from "@/lib/api/project-service"
 interface CreateProjectDialogProps {
   readonly children?: React.ReactNode
   readonly onCreated?: (project: Project) => void
+  /** Ouvre le modal d'emblée (ex : arrivée via « New project » de la sidebar — PROD-8.7). */
+  readonly defaultOpen?: boolean
 }
 
 // ---------------------------------------------------------------------------
 // CreateProjectDialog
 // ---------------------------------------------------------------------------
 
-export function CreateProjectDialog({ children, onCreated }: CreateProjectDialogProps) {
+export function CreateProjectDialog({ children, onCreated, defaultOpen = false }: CreateProjectDialogProps) {
   const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug)
   const createProject = useProjectStore((s) => s.createProject)
 
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(defaultOpen)
   const [isLoading, setIsLoading] = useState(false)
   const [name, setName] = useState("")
   const [identifier, setIdentifier] = useState("")
   const [description, setDescription] = useState("")
   const [iconUrl, setIconUrl] = useState<string | null>(null)
+  const [color, setColor] = useState<string>(PROJECT_COLORS[0])
 
   function handleNameChange(value: string) {
     setName(value)
@@ -65,6 +69,7 @@ export function CreateProjectDialog({ children, onCreated }: CreateProjectDialog
         identifier: identifier.trim().toUpperCase(),
         description: description.trim() || undefined,
         iconUrl: iconUrl ?? undefined,
+        color,
       })
       if (project) {
         onCreated?.(project)
@@ -81,10 +86,11 @@ export function CreateProjectDialog({ children, onCreated }: CreateProjectDialog
     setIdentifier("")
     setDescription("")
     setIconUrl(null)
+    setColor(PROJECT_COLORS[0])
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) resetForm() }} modal={false}>
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) resetForm() }}>
       <DialogTrigger asChild>
         {children ?? (
           <Button size="sm" className="gap-2">
@@ -148,6 +154,12 @@ export function CreateProjectDialog({ children, onCreated }: CreateProjectDialog
               placeholder="What is this project about?"
               className="w-full rounded-md border border-border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground resize-none outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all min-h-18"
             />
+          </div>
+
+          {/* Color */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-foreground">Color</label>
+            <ColorPalettePicker value={color} onChange={setColor} />
           </div>
         </div>
 
