@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.taskforce.tf_api.core.dto.request.AddProjectMemberRequest;
+import com.taskforce.tf_api.core.dto.request.AttachProjectTeamRequest;
 import com.taskforce.tf_api.core.dto.request.CreateLabelRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateLabelRequest;
 import com.taskforce.tf_api.core.dto.request.CreateProjectRequest;
@@ -24,6 +25,7 @@ import com.taskforce.tf_api.core.dto.request.UpdateProjectRequest;
 import com.taskforce.tf_api.core.dto.response.ProjectLabelResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectMemberResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectResponse;
+import com.taskforce.tf_api.core.dto.response.ProjectTeamResponse;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.service.ProjectService;
@@ -220,6 +222,49 @@ public class ProjectController {
         Long userId = resolveUserId(jwt);
         projectService.removeMember(slug, id, userId, memberId);
         return ResponseEntity.ok(ApiResponse.success("Membre retiré", null));
+    }
+
+    // -------------------------------------------------------------------------
+    // Équipes associées (PROD-3.6b)
+    // -------------------------------------------------------------------------
+
+    /** GET /api/workspaces/{slug}/projects/{id}/teams */
+    @GetMapping("/{id}/teams")
+    public ResponseEntity<ApiResponse<List<ProjectTeamResponse>>> listProjectTeams(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String slug,
+        @PathVariable Long id
+    ) {
+        Long userId = resolveUserId(jwt);
+        return ResponseEntity.ok(ApiResponse.success(
+            "Équipes du projet", projectService.listProjectTeams(slug, id, userId)));
+    }
+
+    /** POST /api/workspaces/{slug}/projects/{id}/teams */
+    @PostMapping("/{id}/teams")
+    public ResponseEntity<ApiResponse<ProjectTeamResponse>> attachTeam(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String slug,
+        @PathVariable Long id,
+        @Valid @RequestBody AttachProjectTeamRequest request
+    ) {
+        Long userId = resolveUserId(jwt);
+        ProjectTeamResponse team = projectService.attachTeam(slug, id, request.getTeamId(), userId);
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(ApiResponse.success("Équipe associée", team));
+    }
+
+    /** DELETE /api/workspaces/{slug}/projects/{id}/teams/{teamId} */
+    @DeleteMapping("/{id}/teams/{teamId}")
+    public ResponseEntity<ApiResponse<Void>> detachTeam(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String slug,
+        @PathVariable Long id,
+        @PathVariable Long teamId
+    ) {
+        Long userId = resolveUserId(jwt);
+        projectService.detachTeam(slug, id, teamId, userId);
+        return ResponseEntity.ok(ApiResponse.success("Équipe dissociée", null));
     }
 
     // -------------------------------------------------------------------------
