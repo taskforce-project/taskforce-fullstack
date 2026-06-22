@@ -18,6 +18,7 @@ import {
   HelpCircle,
   Plus,
   ChevronRight,
+  Lock,
 } from "lucide-react"
 
 import { NavUser } from "@/components/layout/sidebar/nav-user"
@@ -55,6 +56,7 @@ type NavItem = {
   readonly url: string
   readonly icon: React.ElementType
   readonly badge?: string
+  readonly comingSoon?: boolean
   readonly requiresRole?: readonly string[]
   readonly requiresPlan?: readonly string[]
   readonly items?: readonly {
@@ -109,6 +111,7 @@ const NAV_WORK: readonly NavItem[] = [
     key: "nav.agents",
     url: "/agents",
     icon: Cpu,
+    comingSoon: true,
   },
 ]
 
@@ -135,6 +138,7 @@ const NAV_COMMS: readonly NavItem[] = [
     key: "nav.discussions",
     url: "/discussions",
     icon: MessageSquare,
+    comingSoon: true,
   },
 ]
 
@@ -183,6 +187,25 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   }
 
   const renderItem = (item: NavItem) => {
+    if (item.comingSoon) {
+      return (
+        <SidebarMenuItem key={item.key}>
+          <SidebarMenuButton
+            tooltip={`${t(item.key)} — ${t("nav.comingSoon")}`}
+            aria-disabled
+            className="cursor-not-allowed opacity-60 hover:bg-transparent"
+          >
+            <item.icon />
+            <span>{t(item.key)}</span>
+            <span className="ml-auto flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground group-data-[collapsible=icon]:hidden">
+              <Lock className="size-3" />
+              {t("nav.comingSoon")}
+            </span>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      )
+    }
+
     if (item.items) {
       return (
         <Collapsible
@@ -274,7 +297,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton asChild className="text-muted-foreground">
-                <Link href={`/${activeWorkspace?.slug}/projects/new`}>
+                <Link href={`/${activeWorkspace?.slug}/projects?new=1`}>
                   <Plus className="size-4" />
                   <span>{t("nav.createProject")}</span>
                 </Link>
