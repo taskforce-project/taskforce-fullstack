@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Bell, Search } from "lucide-react"
+import { Bell, Search, Sparkles } from "lucide-react"
 
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
@@ -22,6 +22,11 @@ import { useTranslation } from "@/lib/i18n"
 import { CommandPalette } from "@/components/command-palette"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { useProjectStore } from "@/lib/store/project-store"
+import { usePanelStore } from "@/lib/store/panel-store"
+import { useUserStore } from "@/lib/store/user-store"
+import { planHasFeature } from "@/lib/config/plan-features"
+import { AssistantConversation } from "@/components/assistant/assistant-fab"
+import { toast } from "sonner"
 
 /**
  * Map a URL segment (slug) to a display label.
@@ -99,6 +104,23 @@ export function AppTopbar() {
   const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug)
   const breadcrumbs = useBreadcrumbs()
   const [cmdOpen, setCmdOpen] = React.useState(false)
+  const togglePanel = usePanelStore((s) => s.togglePanel)
+  const planType = useUserStore((s) => s.user?.planType)
+  const aiEntitled = planHasFeature(planType, "AI_ASSISTANT")
+
+  const openAssistant = React.useCallback(() => {
+    if (!aiEntitled) {
+      toast.info("L'assistant IA est une fonctionnalité Pro. Passez à Pro pour l'activer.")
+      return
+    }
+    togglePanel({
+      id: "assistant",
+      side: "right",
+      title: "Taskforce AI",
+      icon: <Sparkles className="size-4 text-primary" />,
+      content: <AssistantConversation />,
+    })
+  }, [togglePanel, aiEntitled])
 
   // Global Ctrl+K / Cmd+K shortcut
   React.useEffect(() => {
@@ -165,6 +187,18 @@ export function AppTopbar() {
           onClick={() => setCmdOpen(true)}
         >
           <Search className="size-4" />
+        </Button>
+
+        {/* Ask AI — ouvre l'assistant en panneau latéral (PROD-8.9) */}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="hidden gap-1.5 text-xs sm:inline-flex"
+          onClick={openAssistant}
+          aria-label="Ouvrir l'assistant IA"
+        >
+          <Sparkles className="size-4 text-primary" />
+          <span className="hidden lg:inline">Ask AI</span>
         </Button>
 
         {/* Notifications */}
