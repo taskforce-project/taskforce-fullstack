@@ -24,4 +24,10 @@ public class UpdateProjectRequest {
 
     @Size(max = 500)
     private String iconUrl;
+
+    @Size(max = 50)
+    private String color;
+
+    /** Mode « montée en compétence » (PROD-1.8 Phase 3). */
+    private Boolean growthMode;
 }
