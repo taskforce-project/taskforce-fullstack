@@ -399,6 +399,36 @@ export async function deleteChecklistItem(slug: string, projectId: number, issue
   await apiClient.delete(ISSUE_ROUTES.CHECKLIST_ITEM(slug, projectId, issueId, itemId));
 }
 
+// --- Time tracking / worklogs (BE-ISS-012) ---
+export interface Worklog {
+  id: number;
+  user: UserSummary;
+  minutes: number;
+  description: string | null;
+  loggedAt: string;   // ISO date
+  createdAt: string;
+}
+
+export interface LogWorkPayload {
+  minutes: number;
+  description?: string | null;
+  loggedAt?: string | null;   // ISO yyyy-MM-dd ; défaut = aujourd'hui côté back
+}
+
+export async function listWorklogs(slug: string, projectId: number, issueId: number): Promise<Worklog[]> {
+  const res = await apiClient.get<{ data: Worklog[] }>(ISSUE_ROUTES.WORKLOGS(slug, projectId, issueId));
+  return res.data.data;
+}
+
+export async function addWorklog(slug: string, projectId: number, issueId: number, payload: LogWorkPayload): Promise<Worklog> {
+  const res = await apiClient.post<{ data: Worklog }>(ISSUE_ROUTES.WORKLOGS(slug, projectId, issueId), payload);
+  return res.data.data;
+}
+
+export async function deleteWorklog(slug: string, projectId: number, issueId: number, worklogId: number): Promise<void> {
+  await apiClient.delete(ISSUE_ROUTES.WORKLOG(slug, projectId, issueId, worklogId));
+}
+
 /** Sous-tâches (issues enfants) d'une issue. */
 export async function listChildIssues(
   slug: string,
