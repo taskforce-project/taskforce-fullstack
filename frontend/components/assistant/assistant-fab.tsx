@@ -174,6 +174,35 @@ function FABEmptyState() {
   )
 }
 
+// ─── Conversation réutilisable (embarquable dans un panneau, PROD-8.9) ─────────
+/**
+ * Thread + composer de l'assistant, sans header ni modal — destiné à être monté
+ * dans un panneau latéral (PanelDock) ou tout autre conteneur flex.
+ */
+export function AssistantConversation() {
+  const adapter = useMemo(() => createTaskforceAdapter(), [])
+  const runtime = useLocalRuntime(adapter)
+
+  return (
+    <AssistantRuntimeProvider runtime={runtime}>
+      <ThreadPrimitive.Root className="flex flex-1 min-h-0 flex-col">
+        <ThreadPrimitive.Viewport className="flex-1 overflow-y-auto px-4 py-4 scroll-smooth">
+          <ThreadPrimitive.Empty>
+            <FABEmptyState />
+          </ThreadPrimitive.Empty>
+          <ThreadPrimitive.Messages
+            components={{
+              UserMessage: FABUserMessage,
+              AssistantMessage: FABAssistantMessage,
+            }}
+          />
+        </ThreadPrimitive.Viewport>
+        <FABComposer />
+      </ThreadPrimitive.Root>
+    </AssistantRuntimeProvider>
+  )
+}
+
 // ─── FAB principal ────────────────────────────────────────────────────────────
 export function AssistantFAB() {
   const adapter = useMemo(() => createTaskforceAdapter(), [])
