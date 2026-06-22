@@ -1,7 +1,7 @@
 "use client"
 
 import {
-  BarChart, Bar, LineChart, Line, AreaChart, Area,
+  BarChart, Bar, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts"
 import {
@@ -24,10 +24,12 @@ import {
   getAnalyticsKpis,
   getAnalyticsThroughput,
   getAnalyticsBurndown,
+  getAiInsights,
   type MemberCapacity,
   type AnalyticsKpis,
   type ThroughputPoint,
   type BurndownPoint,
+  type AiInsight,
 } from "@/lib/api/analytics-service"
 import { listProjects, type Project } from "@/lib/api/project-service"
 
@@ -67,11 +69,6 @@ const THROUGHPUT_DATA = [
   { week: "W2", opened: 22, resolved: 19 },
   { week: "W3", opened: 15, resolved: 21 },
   { week: "W4", opened: 27, resolved: 23 },
-]
-
-const HEALTH_TIMELINE = [
-  { day: "Mon", score: 82 }, { day: "Tue", score: 79 }, { day: "Wed", score: 74 },
-  { day: "Thu", score: 78 }, { day: "Fri", score: 81 }, { day: "Sat", score: 83 }, { day: "Sun", score: 78 },
 ]
 
 const BURNDOWN_DATA = [
