@@ -5,15 +5,16 @@
 
 ## Source de vérité — LIRE avant d'agir
 
-Le **Brain OS** décrit la **réalité du code** (pas l'intention) :
+Le **Brain OS** est un **repo frère éditable** : `C:\taskforce-project\taskforce-docs` (= `../taskforce-docs`, hors du workspace mais bien accessible — **l'éditer fait partie de la Definition of Done**). Il décrit la **réalité du code** (pas l'intention) :
 
-- Hub : `taskforce-docs/Brain_OS.md`
-- Archi / API / Modules : `taskforce-docs/technique/{Architecture,API,Modules}.md`
-- Dette / problèmes connus : `taskforce-docs/technique/{Dette_Technique,Problemes_Connus}.md`
-- État produit & tâches : `taskforce-docs/produit/` + `taskforce-docs/technique/Roadmap_Backlog.md`
-- **Version compacte locale (ce repo)** : `.ai/` + `.ai/P0-fix-plan.md`
+- Hub : `../taskforce-docs/Brain_OS.md` · **Contrat d'agent + DoD** : `../taskforce-docs/AGENTS.md` §2
+- Archi / Modules : `../taskforce-docs/v1/03-architecture/{Architecture,Modules}.md` · API : `../taskforce-docs/v1/05-api/API.md`
+- Problèmes connus : `../taskforce-docs/v1/09-audits/Problemes_Connus.md`
+- État produit & fiches domaine : `../taskforce-docs/v1/02-produit/{README,Frontend,Backend,IA,Infra,Landing}.md`
+- Backlog / roadmap : `../taskforce-docs/v1/13-roadmap/Roadmap_Backlog.md`
+- **Version compacte locale (ce repo)** : `.ai/` + `.ai/roadmap.md` (roadmap maître) + `.ai/P0-fix-plan.md`
 
-Avant toute modification, lire la fiche du domaine concerné dans `.ai/` (ou `taskforce-docs/` si disponible dans le workspace).
+Avant toute modification, lire la fiche du domaine concerné dans `.ai/` **et** la fiche `../taskforce-docs/v1/02-produit/*` correspondante.
 
 ## Démarrage de session
 
@@ -24,9 +25,9 @@ Lire `.ai/P0-fix-plan.md` ou `taskforce-docs/produit/README.md`. Calculer la pro
 
 1. **Lire** le Brain OS (hub → fiche du domaine concerné) ; vérifier dans le code.
 2. **Coder** en respectant les règles d'or ci-dessous.
-3. **Tracer** : tâche issue du backlog (ID `TF-…` / `FE-…` / `BE-…`). Besoin back côté front → `[besoin-backend:: BE-xxx]` dans `produit/Frontend.md` + item miroir dans `produit/Backend.md`.
+3. **Tracer** : tâche issue du backlog (ID `TF-…` / `FE-…` / `BE-…` / `PROD-…`). Besoin back côté front → `[besoin-backend:: BE-xxx]` dans `v1/02-produit/Frontend.md` + item miroir dans `v1/02-produit/Backend.md`.
 4. **Tester** (couverture ≥ 50 %) + linter avant commit.
-5. **Mettre à jour** la fiche produit (`statut`), le Brain OS si l'archi/contrat change, le changelog.
+5. **Mettre à jour le Brain OS frère** (`../taskforce-docs`) selon la DoD `AGENTS.md` §2 : fiche produit `v1/02-produit/*` (`[statut::]`), Architecture/API si le contrat change, bloc « ▶ Prochaine action », changelog. **+ MAJ `.ai/roadmap.md`** (statut de l'item).
 
 ## Règles d'or
 
