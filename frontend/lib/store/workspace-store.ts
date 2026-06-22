@@ -16,6 +16,7 @@ import {
   inviteMember,
   updateMemberRole,
   removeMember,
+  deleteWorkspace as deleteWorkspaceApi,
 } from "../api/workspace-service";
 
 interface WorkspaceState {
@@ -40,6 +41,9 @@ interface WorkspaceState {
 
   /** Met à jour les infos du workspace actif */
   updateWorkspaceInfo: (payload: UpdateWorkspacePayload) => Promise<Workspace | null>;
+
+  /** Supprime un workspace (OWNER) et le retire de l'état. Retourne le slug d'un workspace restant. */
+  deleteCurrentWorkspace: (slug: string) => Promise<string | null>;
 
   /** Charge la liste des membres du workspace actif */
   fetchMembers: () => Promise<WorkspaceMember[]>;
@@ -138,6 +142,20 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       set({ isLoading: false });
       return null;
     }
+  },
+
+  deleteCurrentWorkspace: async (slug) => {
+    await deleteWorkspaceApi(slug);
+    const remaining = get().workspaces.filter((w) => w.slug !== slug);
+    const wasActive = get().activeWorkspace?.slug === slug;
+    const nextActive = wasActive ? (remaining[0] ?? null) : get().activeWorkspace;
+    set({
+      workspaces: remaining,
+      activeWorkspace: nextActive,
+      workspace: nextActive,
+      members: wasActive ? [] : get().members,
+    });
+    return remaining[0]?.slug ?? null;
   },
 
   fetchMembers: async () => {
