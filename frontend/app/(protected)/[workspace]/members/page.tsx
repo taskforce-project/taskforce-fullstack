@@ -17,7 +17,7 @@ import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import { Input } from "@/components/ui/input"
 import {
   DropdownMenu,
@@ -42,11 +42,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import Link from "next/link"
 import { cn } from "@/lib/utils"
+import { planLimit } from "@/lib/config/plan-limits"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { useUserStore } from "@/lib/store/user-store"
 import { searchUsers, type UserSearchResult } from "@/lib/api/user-service"
 import type { WorkspaceMember, WorkspaceRole } from "@/lib/api/workspace-service"
+import {
+  createInvitation,
+  listPendingInvitations,
+  revokeInvitation,
+  type Invitation,
+} from "@/lib/api/invitation-service"
+import { listSkillProfiles, type MemberSkillProfile } from "@/lib/api/skill-service"
+
+const SENIORITY_LABEL: Record<string, string> = {
+  JUNIOR: "Junior", MID: "Confirmé", SENIOR: "Senior", LEAD: "Lead",
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 // ---------------------------------------------------------------------------
 // Config
@@ -83,49 +98,86 @@ const ROLE_FILTER_TABS: { key: RoleFilter; label: string }[] = [
 // InviteMemberDialog
 // ---------------------------------------------------------------------------
 
-function InviteMemberDialog() {
+function InviteMemberDialog({ onInvited }: { readonly onInvited?: () => void }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<UserSearchResult[]>([])
   const [searching, setSearching] = useState(false)
-  const [selected, setSelected] = useState<UserSearchResult | null>(null)
+  const [selectedUsers, setSelectedUsers] = useState<UserSearchResult[]>([])
   const [role, setRole] = useState<WorkspaceRole>("MEMBER")
   const [loading, setLoading] = useState(false)
+  const [emailInviting, setEmailInviting] = useState(false)
   const invite = useWorkspaceStore((s) => s.invite)
   const existingMembers = useWorkspaceStore((s) => s.members)
+  const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug)
 
   // Recherche débouncée (par email ou nom)
   useEffect(() => {
-    if (selected || query.trim().length < 2) { setResults([]); return }
+    if (query.trim().length < 2) { setResults([]); return }
     setSearching(true)
     const id = setTimeout(async () => {
       try {
         const found = await searchUsers(query.trim())
         const memberIds = new Set(existingMembers.map((m) => m.userId))
-        setResults(found.filter((u) => !memberIds.has(u.id)))
+        const selectedIds = new Set(selectedUsers.map((u) => u.id))
+        setResults(found.filter((u) => !memberIds.has(u.id) && !selectedIds.has(u.id)))
       } finally {
         setSearching(false)
       }
     }, 300)
     return () => clearTimeout(id)
-  }, [query, selected, existingMembers])
+  }, [query, selectedUsers, existingMembers])
 
   function reset() {
-    setQuery(""); setResults([]); setSelected(null); setRole("MEMBER")
+    setQuery(""); setResults([]); setSelectedUsers([]); setRole("MEMBER")
+  }
+
+  function addUser(u: UserSearchResult) {
+    setSelectedUsers((prev) => prev.some((p) => p.id === u.id) ? prev : [...prev, u])
+    setQuery("")
+    setResults([])
+  }
+
+  function removeUser(id: number) {
+    setSelectedUsers((prev) => prev.filter((u) => u.id !== id))
+  }
+
+  async function handleInviteByEmail() {
+    const email = query.trim().toLowerCase()
+    if (!slug || !EMAIL_RE.test(email) || emailInviting) return
+    setEmailInviting(true)
+    try {
+      await createInvitation(slug, { email, role })
+      toast.success(`Invitation envoyée à ${email}`)
+      setQuery("")
+      setResults([])
+      onInvited?.()
+    } catch {
+      toast.error("Impossible d'envoyer l'invitation")
+    } finally {
+      setEmailInviting(false)
+    }
   }
 
   async function handleInvite() {
-    const email = selected?.email ?? query.trim()
-    if (!email) return
+    if (selectedUsers.length === 0) return
     setLoading(true)
-    const result = await invite({ email, role })
+    const results = await Promise.all(selectedUsers.map((u) => invite({ email: u.email, role })))
     setLoading(false)
-    if (result) {
-      toast.success(`${selected?.displayName ?? email} ajouté au workspace`)
+
+    const added = results.filter(Boolean).length
+    const failed = selectedUsers.length - added
+    if (added > 0) {
+      toast.success(added === 1 ? "1 membre ajouté au workspace" : `${added} membres ajoutés au workspace`)
+    }
+    if (failed > 0) {
+      toast.error(failed === 1
+        ? "1 invitation a échoué (compte Taskforce introuvable)."
+        : `${failed} invitations ont échoué (comptes Taskforce introuvables).`)
+    }
+    if (added > 0) {
       reset()
       setOpen(false)
-    } else {
-      toast.error("Impossible d'inviter ce membre. L'email doit correspondre à un compte Taskforce existant.")
     }
   }
 
@@ -149,59 +201,83 @@ function InviteMemberDialog() {
         <div className="flex flex-col gap-4 py-2">
           {/* Recherche utilisateur */}
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="invite-search" className="text-sm font-medium">User</label>
-            {selected ? (
-              <div className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-2.5 py-1.5">
-                <Avatar className="size-6">
-                  <AvatarImage src={selected.avatarUrl ?? undefined} />
-                  <AvatarFallback className="text-[9px]">{selected.email.slice(0, 2).toUpperCase()}</AvatarFallback>
-                </Avatar>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm">{selected.displayName ?? selected.email}</p>
-                  {selected.displayName && <p className="truncate text-xs text-muted-foreground">{selected.email}</p>}
-                </div>
-                <Button variant="ghost" size="icon-sm" onClick={() => { setSelected(null); setQuery("") }}>
-                  <X className="size-4" />
-                </Button>
-              </div>
-            ) : (
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="invite-search"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Name or email…"
-                  className="pl-9 h-9"
-                  autoComplete="off"
-                />
-                {searching && <Loader2 className="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground" />}
-                {results.length > 0 && (
-                  <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-md border border-border bg-popover shadow-md">
-                    {results.map((u) => (
-                      <button
-                        key={u.id}
-                        type="button"
-                        onClick={() => { setSelected(u); setResults([]) }}
-                        className="flex w-full items-center gap-2 px-2.5 py-2 text-left hover:bg-accent"
-                      >
-                        <Avatar className="size-6">
-                          <AvatarImage src={u.avatarUrl ?? undefined} />
-                          <AvatarFallback className="text-[9px]">{u.email.slice(0, 2).toUpperCase()}</AvatarFallback>
-                        </Avatar>
-                        <div className="min-w-0">
-                          <p className="truncate text-sm">{u.displayName ?? u.email}</p>
-                          {u.displayName && <p className="truncate text-xs text-muted-foreground">{u.email}</p>}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {!searching && query.trim().length >= 2 && results.length === 0 && (
-                  <p className="mt-1.5 text-xs text-muted-foreground">No existing user matches — invitations for new emails are coming soon.</p>
-                )}
+            <label htmlFor="invite-search" className="text-sm font-medium">Users</label>
+
+            {/* Chips des utilisateurs sélectionnés */}
+            {selectedUsers.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {selectedUsers.map((u) => (
+                  <span
+                    key={u.id}
+                    className="flex items-center gap-1.5 rounded-full border border-border bg-muted/40 py-0.5 pl-1 pr-1.5 text-xs"
+                  >
+                    <UserAvatar
+                      email={u.email}
+                      name={u.displayName ?? u.email}
+                      avatarUrl={u.avatarUrl}
+                      className="size-5"
+                      fallbackClassName="text-[8px]"
+                    />
+                    <span className="max-w-[140px] truncate">{u.displayName ?? u.email}</span>
+                    <button type="button" onClick={() => removeUser(u.id)} className="text-muted-foreground hover:text-foreground">
+                      <X className="size-3" />
+                    </button>
+                  </span>
+                ))}
               </div>
             )}
+
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                id="invite-search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Name or email…"
+                className="pl-9 h-9"
+                autoComplete="off"
+              />
+              {searching && <Loader2 className="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground" />}
+              {results.length > 0 && (
+                <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-md border border-border bg-popover shadow-md">
+                  {results.map((u) => (
+                    <button
+                      key={u.id}
+                      type="button"
+                      onClick={() => addUser(u)}
+                      className="flex w-full items-center gap-2 px-2.5 py-2 text-left hover:bg-accent"
+                    >
+                      <UserAvatar
+                        email={u.email}
+                        name={u.displayName ?? u.email}
+                        avatarUrl={u.avatarUrl}
+                        className="size-6"
+                        fallbackClassName="text-[9px]"
+                      />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm">{u.displayName ?? u.email}</p>
+                        {u.displayName && <p className="truncate text-xs text-muted-foreground">{u.email}</p>}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {!searching && query.trim().length >= 2 && results.length === 0 && (
+                EMAIL_RE.test(query.trim()) ? (
+                  <button
+                    type="button"
+                    onClick={handleInviteByEmail}
+                    disabled={emailInviting}
+                    className="mt-1.5 flex w-full items-center gap-2 rounded-md border border-dashed border-border px-2.5 py-2 text-left text-sm hover:bg-accent disabled:opacity-60"
+                  >
+                    {emailInviting ? <Loader2 className="size-4 animate-spin" /> : <Mail className="size-4 text-muted-foreground" />}
+                    <span>Aucun compte — inviter <strong>{query.trim()}</strong> par email</span>
+                  </button>
+                ) : (
+                  <p className="mt-1.5 text-xs text-muted-foreground">Aucun compte ne correspond. Saisissez un email complet pour inviter une personne sans compte.</p>
+                )
+              )}
+            </div>
           </div>
 
           {/* Rôle */}
@@ -219,9 +295,9 @@ function InviteMemberDialog() {
 
         <DialogFooter className="gap-2">
           <Button variant="outline" size="sm" onClick={() => setOpen(false)}>Cancel</Button>
-          <Button size="sm" onClick={handleInvite} disabled={!selected || loading} className="gap-2">
+          <Button size="sm" onClick={handleInvite} disabled={selectedUsers.length === 0 || loading} className="gap-2">
             {loading ? <Loader2 className="size-4 animate-spin" /> : <UserPlus className="size-4" />}
-            Add member
+            {selectedUsers.length > 1 ? `Add ${selectedUsers.length} members` : "Add member"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -238,25 +314,16 @@ interface MemberRowProps {
   readonly isYou: boolean
   readonly canManage: boolean
   readonly isOwner: boolean
+  readonly profile?: MemberSkillProfile
 }
 
-function MemberRow({ member, isYou, canManage, isOwner }: MemberRowProps) {
+function MemberRow({ member, isYou, canManage, isOwner, profile }: MemberRowProps) {
   const role = ROLE_CONFIG[member.role]
   const changeRole = useWorkspaceStore((s) => s.changeRole)
   const kick = useWorkspaceStore((s) => s.kick)
+  const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug)
 
   const displayLabel = member.displayName ?? member.email
-  const isEmail = !member.displayName
-  let initials: string
-  if (isEmail) {
-    // fallback email : utiliser les 2 premiers chars de la partie locale
-    const localPart = member.email.split("@")[0] ?? ""
-    initials = localPart.slice(0, 2).toUpperCase() || "?"
-  } else {
-    const nameParts = displayLabel.split(" ")
-    initials = `${nameParts[0]?.charAt(0) ?? ""}${nameParts[1]?.charAt(0) ?? ""}`.toUpperCase() || "?"
-  }
-  const avatarSrc = member.avatarUrl ?? `/api/avatar?initials=${encodeURIComponent(initials)}&seed=${encodeURIComponent(member.email.toLowerCase())}`
 
   async function handleChangeRole(newRole: WorkspaceRole) {
     const result = await changeRole(member.id, { role: newRole })
@@ -283,31 +350,50 @@ function MemberRow({ member, isYou, canManage, isOwner }: MemberRowProps) {
     <div className="group flex items-center gap-4 px-5 py-3.5 border-b border-border/50 last:border-0 hover:bg-muted/20 transition-colors">
       {/* Avatar */}
       <div className="relative shrink-0">
-        <Avatar className="size-9">
-          <AvatarImage src={avatarSrc} alt={displayLabel} />
-          <AvatarFallback className="text-xs font-semibold">
-            {displayLabel.slice(0, 2).toUpperCase()}
-          </AvatarFallback>
-        </Avatar>
+        <UserAvatar
+          email={member.email}
+          name={displayLabel}
+          avatarUrl={member.avatarUrl}
+          className="size-9"
+          fallbackClassName="text-xs font-semibold"
+        />
         <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full bg-emerald-400 ring-2 ring-card" />
       </div>
 
       {/* Info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm font-medium text-foreground">
-            {displayLabel}
-            {isYou && <span className="ml-1 text-xs text-muted-foreground font-normal">(you)</span>}
-          </span>
+          {slug ? (
+            <Link href={`/${slug}/members/${member.id}`} className="text-sm font-medium text-foreground hover:underline">
+              {displayLabel}
+            </Link>
+          ) : (
+            <span className="text-sm font-medium text-foreground">{displayLabel}</span>
+          )}
+          {isYou && <span className="text-xs text-muted-foreground font-normal">(you)</span>}
           <Badge variant="outline" className={cn("text-xs border px-1.5 py-0 h-4 flex items-center gap-1", role.badgeClass)}>
             {role.icon}
             {role.label}
           </Badge>
+          {profile?.seniority && (
+            <Badge variant="outline" className="text-xs px-1.5 py-0 h-4">{SENIORITY_LABEL[profile.seniority] ?? profile.seniority}</Badge>
+          )}
         </div>
         <div className="flex items-center gap-1.5 mt-0.5 text-xs text-muted-foreground">
           <Mail className="size-3" />
           {member.email}
         </div>
+        {/* Compétences (aperçu) — alimentent le Smart Assign */}
+        {profile && profile.skills.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1 mt-1.5">
+            {profile.skills.slice(0, 6).map((skill) => (
+              <span key={skill} className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{skill}</span>
+            ))}
+            {profile.skills.length > 6 && (
+              <span className="text-[10px] text-muted-foreground">+{profile.skills.length - 6}</span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Joined */}
@@ -357,9 +443,66 @@ function MemberRow({ member, isYou, canManage, isOwner }: MemberRowProps) {
 // Page
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// PendingInvitations (PROD-3.5)
+// ---------------------------------------------------------------------------
+
+function PendingInvitations({ slug, refreshKey }: { readonly slug: string; readonly refreshKey: number }) {
+  const [invitations, setInvitations] = useState<Invitation[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let active = true
+    listPendingInvitations(slug)
+      .then((list) => { if (active) setInvitations(list) })
+      .catch(() => { if (active) setInvitations([]) })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [slug, refreshKey])
+
+  async function handleRevoke(id: number) {
+    try {
+      await revokeInvitation(slug, id)
+      setInvitations((prev) => prev.filter((i) => i.id !== id))
+      toast.success("Invitation annulée")
+    } catch {
+      toast.error("Impossible d'annuler l'invitation")
+    }
+  }
+
+  if (loading || invitations.length === 0) return null
+
+  return (
+    <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+      <div className="px-5 py-2.5 border-b border-border bg-muted/20 text-xs text-muted-foreground">
+        Invitations en attente ({invitations.length})
+      </div>
+      {invitations.map((inv) => (
+        <div key={inv.id} className="flex items-center gap-4 px-5 py-3 border-b border-border/50 last:border-0">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted">
+            <Mail className="size-4 text-muted-foreground" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="truncate text-sm font-medium text-foreground">{inv.email}</p>
+            <p className="text-xs text-muted-foreground">
+              {inv.role} · invité {inv.invitedByName ? `par ${inv.invitedByName}` : ""}
+            </p>
+          </div>
+          <Badge variant="outline" className="text-xs">En attente</Badge>
+          <Button variant="ghost" size="sm" onClick={() => handleRevoke(inv.id)} className="text-destructive">
+            Annuler
+          </Button>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function MembersPage() {
   const [search, setSearch] = useState("")
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all")
+  const [invitationRefresh, setInvitationRefresh] = useState(0)
+  const [profilesByUser, setProfilesByUser] = useState<Record<number, MemberSkillProfile>>({})
 
   const { members, membersLoading, fetchMembers, workspace } = useWorkspaceStore()
   const currentUser = useUserStore((s) => s.user)
@@ -367,6 +510,20 @@ export default function MembersPage() {
   useEffect(() => {
     fetchMembers()
   }, [fetchMembers])
+
+  // Profils de compétences (aperçu sur la liste — PROD-1.2/1.8)
+  useEffect(() => {
+    const slug = workspace?.slug
+    if (!slug) return
+    let active = true
+    listSkillProfiles(slug)
+      .then((profiles) => {
+        if (!active) return
+        setProfilesByUser(Object.fromEntries(profiles.map((p) => [p.userId, p])))
+      })
+      .catch(() => { /* non bloquant */ })
+    return () => { active = false }
+  }, [workspace?.slug])
 
   const currentMember = members.find((m) => String(m.userId) === currentUser?.id)
   const canManage = currentMember?.role === "OWNER" || currentMember?.role === "ADMIN"
@@ -400,7 +557,29 @@ export default function MembersPage() {
             {memberCountLabel}
           </p>
         </div>
-        {canManage && <InviteMemberDialog />}
+        {canManage && (() => {
+          const limit = planLimit(currentUser?.planType, "members")
+          const atLimit = members.length >= limit
+          const slug = workspace?.slug
+          return (
+            <div className="flex flex-col items-end gap-1.5">
+              {Number.isFinite(limit) && (
+                <span className={cn("text-xs", atLimit ? "text-amber-500 font-medium" : "text-muted-foreground")}>
+                  {members.length}/{limit} membres
+                </span>
+              )}
+              {atLimit && slug ? (
+                <Button size="sm" variant="outline" asChild className="gap-1.5">
+                  <Link href={`/${slug}/settings`}>
+                    <Crown className="size-3.5 text-amber-500" /> Passer à un plan supérieur
+                  </Link>
+                </Button>
+              ) : (
+                <InviteMemberDialog onInvited={() => setInvitationRefresh((n) => n + 1)} />
+              )}
+            </div>
+          )
+        })()}
       </div>
 
       {/* Toolbar */}
@@ -470,9 +649,15 @@ export default function MembersPage() {
               isYou={String(member.userId) === currentUser?.id}
             canManage={canManage}
             isOwner={isOwner}
+            profile={profilesByUser[member.userId]}
           />
         ))}
       </div>
+
+      {/* Invitations en attente (PROD-3.5) */}
+      {canManage && workspace?.slug && (
+        <PendingInvitations slug={workspace.slug} refreshKey={invitationRefresh} />
+      )}
 
       {/* Plan info */}
       {workspace && (
