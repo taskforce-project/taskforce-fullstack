@@ -48,7 +48,7 @@ import { planLimit } from "@/lib/config/plan-limits"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { useUserStore } from "@/lib/store/user-store"
 import { searchUsers, type UserSearchResult } from "@/lib/api/user-service"
-import type { WorkspaceMember, WorkspaceRole } from "@/lib/api/workspace-service"
+import { getWorkspaceUsage, type WorkspaceMember, type WorkspaceRole, type WorkspaceUsage } from "@/lib/api/workspace-service"
 import {
   createInvitation,
   listPendingInvitations,
@@ -503,6 +503,7 @@ export default function MembersPage() {
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all")
   const [invitationRefresh, setInvitationRefresh] = useState(0)
   const [profilesByUser, setProfilesByUser] = useState<Record<number, MemberSkillProfile>>({})
+  const [usage, setUsage] = useState<WorkspaceUsage | null>(null)
 
   const { members, membersLoading, fetchMembers, workspace } = useWorkspaceStore()
   const currentUser = useUserStore((s) => s.user)
@@ -522,6 +523,9 @@ export default function MembersPage() {
         setProfilesByUser(Object.fromEntries(profiles.map((p) => [p.userId, p])))
       })
       .catch(() => { /* non bloquant */ })
+    getWorkspaceUsage(slug)
+      .then((u) => { if (active) setUsage(u) })
+      .catch(() => { /* non bloquant — fallback plan-limits.ts */ })
     return () => { active = false }
   }, [workspace?.slug])
 
@@ -558,14 +562,17 @@ export default function MembersPage() {
           </p>
         </div>
         {canManage && (() => {
-          const limit = planLimit(currentUser?.planType, "members")
-          const atLimit = members.length >= limit
+          // Source de vérité = endpoint usage back (PROD-4.2) ; fallback plan-limits.ts si non chargé.
+          const used = usage?.membersUsed ?? members.length
+          const rawLimit = usage ? usage.membersLimit : planLimit(currentUser?.planType, "members")
+          const unlimited = rawLimit === -1 || !Number.isFinite(rawLimit)
+          const atLimit = !unlimited && used >= rawLimit
           const slug = workspace?.slug
           return (
             <div className="flex flex-col items-end gap-1.5">
-              {Number.isFinite(limit) && (
+              {!unlimited && (
                 <span className={cn("text-xs", atLimit ? "text-amber-500 font-medium" : "text-muted-foreground")}>
-                  {members.length}/{limit} membres
+                  {used}/{rawLimit} membres
                 </span>
               )}
               {atLimit && slug ? (
