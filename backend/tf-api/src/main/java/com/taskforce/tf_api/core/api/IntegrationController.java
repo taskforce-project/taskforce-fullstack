@@ -18,7 +18,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.taskforce.tf_api.core.dto.request.GitHubLinkRequest;
 import com.taskforce.tf_api.core.dto.request.SlackChannelRequest;
+import com.taskforce.tf_api.core.dto.response.GitHubIssueResponse;
 import com.taskforce.tf_api.core.dto.response.GitHubLinkResponse;
+import com.taskforce.tf_api.core.dto.response.GitHubRepoResponse;
 import com.taskforce.tf_api.core.dto.response.IntegrationStatusResponse;
 import com.taskforce.tf_api.core.dto.response.SlackChannelResponse;
 import com.taskforce.tf_api.core.model.User;
@@ -48,6 +50,19 @@ public class IntegrationController {
         @PathVariable String slug
     ) {
         return ResponseEntity.ok(ApiResponse.success(gitHubService.getStatus(slug)));
+    }
+
+    @GetMapping("/api/workspaces/{slug}/integrations/github/repos")
+    public ResponseEntity<ApiResponse<List<GitHubRepoResponse>>> githubRepos(@PathVariable String slug) {
+        return ResponseEntity.ok(ApiResponse.success(gitHubService.listRepositories(slug)));
+    }
+
+    @GetMapping("/api/workspaces/{slug}/integrations/github/issues")
+    public ResponseEntity<ApiResponse<List<GitHubIssueResponse>>> githubRepoIssues(
+        @PathVariable String slug,
+        @RequestParam String repo
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(gitHubService.listRepoIssues(slug, repo)));
     }
 
     @GetMapping("/api/workspaces/{slug}/integrations/github/connect")
