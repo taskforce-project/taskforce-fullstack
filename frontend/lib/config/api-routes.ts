@@ -33,6 +33,14 @@ export const STRIPE_ROUTES = {
 } as const;
 
 /**
+ * Routes facturation self-service (Stripe Customer Portal) — chemin protégé.
+ * Backend: @RequestMapping("/api/billing")
+ */
+export const BILLING_ROUTES = {
+  PORTAL: "/api/billing/portal",
+} as const;
+
+/**
  * Routes utilisateur (profil)
  * Backend: @RequestMapping("/api/users")
  */
@@ -57,8 +65,31 @@ export const WORKSPACE_ROUTES = {
   INVITE: (slug: string) => `/api/workspaces/${slug}/members/invite`,
   MEMBER_ROLE: (slug: string, memberId: number) => `/api/workspaces/${slug}/members/${memberId}/role`,
   MEMBER: (slug: string, memberId: number) => `/api/workspaces/${slug}/members/${memberId}`,
+  // Invitations par email (PROD-3.5)
+  INVITATIONS: (slug: string) => `/api/workspaces/${slug}/invitations`,
+  INVITATION: (slug: string, invitationId: number) => `/api/workspaces/${slug}/invitations/${invitationId}`,
   // Rétrocompatibilité
   CURRENT: "/api/workspaces/current",
+} as const;
+
+/**
+ * Routes d'invitation par token (PROD-3.5)
+ * Backend: InvitationController
+ */
+export const INVITATION_ROUTES = {
+  PREVIEW: (token: string) => `/api/invitations/${token}`,
+  ACCEPT: (token: string) => `/api/invitations/${token}/accept`,
+} as const;
+
+/**
+ * Routes profils de compétences (Smart Assign)
+ * Backend: MemberSkillController
+ */
+export const SKILL_ROUTES = {
+  /** Tous les profils de compétences du workspace */
+  LIST:   (slug: string) => `/api/workspaces/${slug}/skills`,
+  /** Profil de compétences d'un membre (GET) / upsert (PUT) */
+  MEMBER: (slug: string, userId: number) => `/api/workspaces/${slug}/members/${userId}/skills`,
 } as const;
 
 /**
@@ -77,6 +108,9 @@ export const PROJECT_ROUTES = {
   MEMBER:  (slug: string, id: number, memberId: number) => `/api/workspaces/${slug}/projects/${id}/members/${memberId}`,
   LABELS:  (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/labels`,
   LABEL:   (slug: string, id: number, labelId: number) => `/api/workspaces/${slug}/projects/${id}/labels/${labelId}`,
+  // Équipes associées (PROD-3.6b)
+  TEAMS:   (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/teams`,
+  TEAM:    (slug: string, id: number, teamId: number) => `/api/workspaces/${slug}/projects/${id}/teams/${teamId}`,
 } as const;
 
 /**
@@ -99,6 +133,11 @@ export const ISSUE_ROUTES = {
   COMMENT:          (slug: string, projectId: number, issueId: number, commentId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/comments/${commentId}`,
   ACTIVITY:         (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/activity`,
   SMART_ASSIGN:     (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/smart-assign`,
+  SMART_ASSIGN_PREVIEW: (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/smart-assign/preview`,
+  SMART_ASSIGN_BULK: (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/smart-assign/bulk`,
+  CHILDREN:         (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/children`,
+  CHECKLIST:        (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/checklist`,
+  CHECKLIST_ITEM:   (slug: string, projectId: number, issueId: number, itemId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/checklist/${itemId}`,
   RELATIONS:        (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/relations`,
   RELATION:         (slug: string, projectId: number, issueId: number, relationId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/relations/${relationId}`,
 } as const;
