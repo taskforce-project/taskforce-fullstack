@@ -153,6 +153,22 @@ public class StripeService {
     }
 
     /**
+     * Crée une session Stripe Customer Portal (gestion self-service de l'abonnement + factures).
+     * PROD-4.5. Retourne l'URL de redirection.
+     */
+    public String createBillingPortalSession(String customerId, String returnUrl) throws StripeException {
+        com.stripe.param.billingportal.SessionCreateParams params =
+            com.stripe.param.billingportal.SessionCreateParams.builder()
+                .setCustomer(customerId)
+                .setReturnUrl(returnUrl)
+                .build();
+        com.stripe.model.billingportal.Session session =
+            com.stripe.model.billingportal.Session.create(params);
+        log.info("Session Customer Portal créée pour le client : {}", customerId);
+        return session.getUrl();
+    }
+
+    /**
      * Récupère une session Checkout par son ID
      */
     public Session getCheckoutSession(String sessionId) throws StripeException {
