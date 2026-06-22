@@ -49,6 +49,9 @@ export interface Project {
   members: ProjectMember[];
   labels: ProjectLabel[];
   iconUrl: string | null;
+  color: string;
+  /** Mode « montée en compétence » (PROD-1.8 Phase 3) */
+  growthMode: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -59,6 +62,7 @@ export interface CreateProjectPayload {
   description?: string;
   isPublic?: boolean;
   iconUrl?: string;
+  color?: string;
 }
 
 export interface UpdateProjectPayload {
@@ -67,6 +71,8 @@ export interface UpdateProjectPayload {
   status?: ProjectStatus;
   isPublic?: boolean;
   iconUrl?: string;
+  color?: string;
+  growthMode?: boolean;
 }
 
 export interface AddProjectMemberPayload {
@@ -150,6 +156,35 @@ export async function addProjectMember(slug: string, id: number, payload: AddPro
 /** Retire un membre du projet */
 export async function removeProjectMember(slug: string, id: number, memberId: number): Promise<void> {
   await apiClient.delete(PROJECT_ROUTES.MEMBER(slug, id, memberId));
+}
+
+// ---------------------------------------------------------------------------
+// API calls — Équipes associées (PROD-3.6b)
+// ---------------------------------------------------------------------------
+
+export interface ProjectTeam {
+  teamId: number;
+  name: string;
+  emoji: string;
+  color: string;
+  memberCount: number;
+}
+
+/** Liste les équipes associées à un projet */
+export async function listProjectTeams(slug: string, id: number): Promise<ProjectTeam[]> {
+  const response = await apiClient.get<{ data: ProjectTeam[] }>(PROJECT_ROUTES.TEAMS(slug, id));
+  return response.data.data;
+}
+
+/** Associe une équipe au projet */
+export async function attachProjectTeam(slug: string, id: number, teamId: number): Promise<ProjectTeam> {
+  const response = await apiClient.post<{ data: ProjectTeam }>(PROJECT_ROUTES.TEAMS(slug, id), { teamId });
+  return response.data.data;
+}
+
+/** Dissocie une équipe du projet */
+export async function detachProjectTeam(slug: string, id: number, teamId: number): Promise<void> {
+  await apiClient.delete(PROJECT_ROUTES.TEAM(slug, id, teamId));
 }
 
 // ---------------------------------------------------------------------------
