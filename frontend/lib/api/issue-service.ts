@@ -113,6 +113,10 @@ export interface SmartAssignCandidate {
   openIssues: number;
   labelMatchCount: number;
   factors: string[];
+  /** Explication en langage naturel (Groq) ou synthèse (repli). */
+  reason: string | null;
+  /** Compétences du membre recoupant les labels de l'issue. */
+  matchedSkills: string[];
 }
 
 export interface SmartAssignResult {
@@ -361,6 +365,84 @@ export async function smartAssignIssue(
 ): Promise<SmartAssignResult> {
   const res = await apiClient.post<{ data: SmartAssignResult }>(
     ISSUE_ROUTES.SMART_ASSIGN(slug, projectId, issueId)
+  );
+  return res.data.data;
+}
+
+// --- Checklist (PROD-2.3) ---
+export interface ChecklistItem {
+  id: number;
+  content: string;
+  done: boolean;
+  position: number;
+}
+
+export async function listChecklist(slug: string, projectId: number, issueId: number): Promise<ChecklistItem[]> {
+  const res = await apiClient.get<{ data: ChecklistItem[] }>(ISSUE_ROUTES.CHECKLIST(slug, projectId, issueId));
+  return res.data.data;
+}
+
+export async function addChecklistItem(slug: string, projectId: number, issueId: number, content: string): Promise<ChecklistItem> {
+  const res = await apiClient.post<{ data: ChecklistItem }>(ISSUE_ROUTES.CHECKLIST(slug, projectId, issueId), { content });
+  return res.data.data;
+}
+
+export async function updateChecklistItem(
+  slug: string, projectId: number, issueId: number, itemId: number,
+  payload: { content?: string; done?: boolean; position?: number }
+): Promise<ChecklistItem> {
+  const res = await apiClient.patch<{ data: ChecklistItem }>(ISSUE_ROUTES.CHECKLIST_ITEM(slug, projectId, issueId, itemId), payload);
+  return res.data.data;
+}
+
+export async function deleteChecklistItem(slug: string, projectId: number, issueId: number, itemId: number): Promise<void> {
+  await apiClient.delete(ISSUE_ROUTES.CHECKLIST_ITEM(slug, projectId, issueId, itemId));
+}
+
+/** Sous-tâches (issues enfants) d'une issue. */
+export async function listChildIssues(
+  slug: string,
+  projectId: number,
+  issueId: number
+): Promise<Issue[]> {
+  const res = await apiClient.get<{ data: Issue[] }>(ISSUE_ROUTES.CHILDREN(slug, projectId, issueId));
+  return res.data.data;
+}
+
+/** Brouillon d'issue pour une suggestion Smart Assign à la création (dry-run). */
+export interface SmartAssignDraft {
+  title: string;
+  description?: string;
+  labels?: string[];
+  priority?: IssuePriority;
+}
+
+export async function smartAssignPreview(
+  slug: string,
+  projectId: number,
+  draft: SmartAssignDraft
+): Promise<SmartAssignResult> {
+  const res = await apiClient.post<{ data: SmartAssignResult }>(
+    ISSUE_ROUTES.SMART_ASSIGN_PREVIEW(slug, projectId),
+    draft
+  );
+  return res.data.data;
+}
+
+/** Recommandation Smart Assign en lot (multi-assign). */
+export interface BulkSmartAssignItem {
+  issueId: number;
+  recommended: SmartAssignCandidate | null;
+}
+
+export async function smartAssignBulk(
+  slug: string,
+  projectId: number,
+  issueIds: number[]
+): Promise<BulkSmartAssignItem[]> {
+  const res = await apiClient.post<{ data: BulkSmartAssignItem[] }>(
+    ISSUE_ROUTES.SMART_ASSIGN_BULK(slug, projectId),
+    { issueIds }
   );
   return res.data.data;
 }
