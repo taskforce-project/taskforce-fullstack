@@ -10,6 +10,7 @@ import {
   Plus,
   MoreHorizontal,
   ChevronDown,
+  Download,
 } from "lucide-react"
 import {
   DndContext,
@@ -26,10 +27,11 @@ import { CSS } from "@dnd-kit/utilities"
 import { IssueSheet, type SheetIssue } from "@/components/sheets/issue-sheet"
 import { useTranslation } from "@/lib/i18n"
 import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import { Input } from "@/components/ui/input"
 import { ColorPicker } from "@/components/ui/color-picker"
 import { IssueFilters } from "@/components/issues/issue-filters"
+import { BulkAssignDialog } from "@/components/dialogs/bulk-assign-dialog"
 import { type IssueFilterState, EMPTY_ISSUE_FILTERS, applyIssueFilters } from "@/lib/issue-filters"
 import {
   DropdownMenu,
@@ -46,6 +48,8 @@ import {
 } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 import { useIssueStore } from "@/lib/store/issue-store"
+import { useProjectRealtime } from "@/lib/hooks/use-project-realtime"
+import { exportIssuesToCsv } from "@/lib/utils/export-issues-csv"
 import type { Issue, IssueStatus, IssueStatusCategory, IssuePriority } from "@/lib/api/issue-service"
 
 // ---------------------------------------------------------------------------
@@ -72,19 +76,6 @@ const CATEGORY_OPTIONS: { value: IssueStatusCategory; label: string; color: stri
   { value: "COMPLETED", label: "Terminé",    color: "#10b981" },
   { value: "CANCELLED", label: "Annulé",     color: "#ef4444" },
 ]
-
-function getMemberColor(userId: number): string {
-  return AVATAR_COLORS[userId % AVATAR_COLORS.length]
-}
-
-function getMemberInitials(displayName: string | null, email: string): string {
-  if (displayName) {
-    const parts = displayName.trim().split(/\s+/)
-    if (parts.length >= 2) return ((parts[0][0] ?? "") + (parts.at(-1)![0] ?? "")).toUpperCase()
-    return parts[0].slice(0, 2).toUpperCase()
-  }
-  return email.slice(0, 2).toUpperCase()
-}
 
 function getCategoryIcon(category: IssueStatusCategory, color: string, size = "size-3.5") {
   const cls = `${size} shrink-0`
@@ -117,7 +108,7 @@ function toSheetIssue(issue: Issue): SheetIssue {
     statusName:     issue.status.name,
     statusCategory: issue.status.category,
     assignee:       issue.assignee
-      ? { initials: issue.assignee.email.slice(0, 2).toUpperCase(), color: AVATAR_COLORS[issue.assignee.id % AVATAR_COLORS.length], name: issue.assignee.displayName ?? issue.assignee.email, userId: issue.assignee.id }
+      ? { initials: issue.assignee.email.slice(0, 2).toUpperCase(), color: AVATAR_COLORS[issue.assignee.id % AVATAR_COLORS.length], name: issue.assignee.displayName ?? issue.assignee.email, userId: issue.assignee.id, email: issue.assignee.email }
       : null,
     assigneeId:     issue.assignee?.id ?? null,
     labels:         issue.labels,
@@ -194,12 +185,13 @@ function IssueCard({
 
         <div className="flex items-center gap-1.5">
           {issue.assignee && (
-            <Avatar className="size-5">
-              {issue.assignee.avatarUrl && <AvatarImage src={issue.assignee.avatarUrl} />}
-              <AvatarFallback className={cn("text-[9px] text-white", getMemberColor(issue.assignee.id))}>
-                {getMemberInitials(issue.assignee.displayName, issue.assignee.email)}
-              </AvatarFallback>
-            </Avatar>
+            <UserAvatar
+              email={issue.assignee.email}
+              name={issue.assignee.displayName ?? issue.assignee.email}
+              avatarUrl={issue.assignee.avatarUrl}
+              className="size-5"
+              fallbackClassName="text-[9px]"
+            />
           )}
 
           {/* Status change dropdown */}
@@ -481,6 +473,9 @@ export default function ProjectBoardPage() {
 
   const { issues, statuses, error, fetchIssues, fetchStatuses, createStatus, clearIssues, updateIssue, deleteStatus, updateStatus } = useIssueStore()
 
+  // Temps réel : le board se met à jour en direct sur les events d'issues (PROD-1.6)
+  useProjectRealtime(projectId || null)
+
   const [initializing, setInitializing] = useState(true)
   const [selectedIssue, setSelectedIssue] = useState<SheetIssue | null>(null)
   const [overColumnId, setOverColumnId] = useState<number | null>(null)
@@ -576,6 +571,19 @@ export default function ProjectBoardPage() {
       {/* Toolbar */}
       <div className="flex items-center gap-2 mb-4">
         <IssueFilters issues={issues} value={filters} onChange={setFilters} />
+        <div className="ml-auto flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-1.5 text-xs"
+            disabled={issues.length === 0}
+            onClick={() => exportIssuesToCsv(applyIssueFilters(issues, filters), `issues-p${projectId}`)}
+          >
+            <Download className="size-3.5" />
+            Export CSV
+          </Button>
+          <BulkAssignDialog slug={workspace} projectId={projectId} issues={issues} />
+        </div>
       </div>
 
       {/* Error banner */}
