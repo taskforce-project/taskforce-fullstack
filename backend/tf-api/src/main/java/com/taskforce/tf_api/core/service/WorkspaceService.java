@@ -43,6 +43,8 @@ public class WorkspaceService {
     // Limites de workspaces par plan
     private static final long MAX_WORKSPACES_FREE = 2;
     private static final long MAX_WORKSPACES_PRO = 10;
+    private static final long MAX_MEMBERS_FREE = 5;
+    private static final long MAX_MEMBERS_PRO = 50;
 
     // -------------------------------------------------------------------------
     // Création automatique à l'inscription
@@ -151,6 +153,19 @@ public class WorkspaceService {
         return toResponse(workspace);
     }
 
+    private void checkMemberLimit(PlanType plan, long current) {
+        long limit = switch (plan) {
+            case FREE -> MAX_MEMBERS_FREE;
+            case PRO -> MAX_MEMBERS_PRO;
+            default -> Long.MAX_VALUE;
+        };
+        if (current >= limit) {
+            throw new IllegalStateException(
+                "Limite de membres atteinte pour ce plan (" + limit + " max). "
+                + "Passez à un plan supérieur pour inviter plus de membres.");
+        }
+    }
+
     private void checkWorkspaceLimit(PlanType plan, long current) {
         long limit = switch (plan) {
             case FREE -> MAX_WORKSPACES_FREE;
@@ -233,6 +248,9 @@ public class WorkspaceService {
             throw new IllegalStateException("Cet utilisateur est déjà membre du workspace");
         }
 
+        long memberCount = workspaceMemberRepository.findByWorkspaceId(workspaceId).size();
+        checkMemberLimit(workspace.getOwner().getPlanType(), memberCount);
+
         User inviter = userRepository.findById(requestingUserId)
             .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
 
@@ -281,6 +299,18 @@ public class WorkspaceService {
 
         member.setRole(request.getRole());
         return toMemberResponse(workspaceMemberRepository.save(member));
+    }
+
+    /**
+     * Supprime définitivement un workspace et toutes ses données (cascade DB via les FK
+     * {@code ON DELETE CASCADE}). Seul l'OWNER peut le faire.
+     */
+    @Transactional
+    public void deleteWorkspace(Long workspaceId, Long requestingUserId) {
+        Workspace workspace = workspaceRepository.findById(workspaceId)
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
+        assertIsOwner(workspace, requestingUserId);
+        workspaceRepository.delete(workspace);
     }
 
     /**
