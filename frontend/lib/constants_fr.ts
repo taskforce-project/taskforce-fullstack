@@ -218,6 +218,7 @@ export const CONSTANTS_FR: TranslationKeys = {
     settings: "Paramètres",
     help: "Aide",
     createProject: "Nouveau projet",
+    comingSoon: "Bientôt",
     sub: {
       myIssues: "Tâches",
       myCycles: "Sprints",

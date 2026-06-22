@@ -216,6 +216,7 @@ export const CONSTANTS_EN = {
     settings: "Settings",
     help: "Help",
     createProject: "New Project",
+    comingSoon: "Soon",
     sub: {
       myIssues: "Issues",
       myCycles: "Sprints",
