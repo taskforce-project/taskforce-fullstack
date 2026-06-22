@@ -288,10 +288,15 @@ header[class*="sticky"],
    SCROLLBAR
    ============================================================================ */
 
-::-webkit-scrollbar        { width: 8px; height: 8px; }
-::-webkit-scrollbar-track  { background: var(--fill-tertiary); }
-::-webkit-scrollbar-thumb  { background: var(--fill-primary); border-radius: 4px; }
+::-webkit-scrollbar        { width: 6px; height: 6px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: var(--fill-primary); border-radius: 9999px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--fill-secondary); }
+
+/* Sidebar : scrollbar encore plus discrète (n'apparaît qu'au survol) */
+[data-slot="sidebar"] ::-webkit-scrollbar       { width: 4px; }
+[data-slot="sidebar"] ::-webkit-scrollbar-thumb { background: transparent; }
+[data-slot="sidebar"]:hover ::-webkit-scrollbar-thumb { background: var(--fill-primary); }
 
 /* ============================================================================
    CURSORS
