@@ -2,6 +2,7 @@ package com.taskforce.tf_api.core.service;
 
 import java.text.Normalizer;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -14,14 +15,17 @@ import com.taskforce.tf_api.core.dto.request.UpdateMemberRoleRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateWorkspaceRequest;
 import com.taskforce.tf_api.core.dto.response.WorkspaceMemberResponse;
 import com.taskforce.tf_api.core.dto.response.WorkspaceResponse;
+import com.taskforce.tf_api.core.dto.response.WorkspaceUsageResponse;
 import com.taskforce.tf_api.core.enums.PlanType;
 import com.taskforce.tf_api.core.enums.WorkspaceRole;
 import com.taskforce.tf_api.core.model.User;
+import com.taskforce.tf_api.core.dto.response.AuditLogResponse;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.model.WorkspaceMember;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.shared.exception.ForbiddenException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import lombok.RequiredArgsConstructor;
@@ -39,6 +43,7 @@ public class WorkspaceService {
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceMemberRepository workspaceMemberRepository;
     private final UserRepository userRepository;
+    private final AuditService auditService;
 
     // Limites de workspaces par plan
     private static final long MAX_WORKSPACES_FREE = 2;
@@ -153,12 +158,26 @@ public class WorkspaceService {
         return toResponse(workspace);
     }
 
-    private void checkMemberLimit(PlanType plan, long current) {
-        long limit = switch (plan) {
+    /** Limite de membres pour un plan (Long.MAX_VALUE = illimité). */
+    private long memberLimitFor(PlanType plan) {
+        return switch (plan) {
             case FREE -> MAX_MEMBERS_FREE;
             case PRO -> MAX_MEMBERS_PRO;
             default -> Long.MAX_VALUE;
         };
+    }
+
+    /** Limite de workspaces pour un plan (Long.MAX_VALUE = illimité). */
+    private long workspaceLimitFor(PlanType plan) {
+        return switch (plan) {
+            case FREE -> MAX_WORKSPACES_FREE;
+            case PRO -> MAX_WORKSPACES_PRO;
+            default -> Long.MAX_VALUE;
+        };
+    }
+
+    private void checkMemberLimit(PlanType plan, long current) {
+        long limit = memberLimitFor(plan);
         if (current >= limit) {
             throw new IllegalStateException(
                 "Limite de membres atteinte pour ce plan (" + limit + " max). "
@@ -167,15 +186,59 @@ public class WorkspaceService {
     }
 
     private void checkWorkspaceLimit(PlanType plan, long current) {
-        long limit = switch (plan) {
-            case FREE -> MAX_WORKSPACES_FREE;
-            case PRO -> MAX_WORKSPACES_PRO;
-            default -> Long.MAX_VALUE;
-        };
+        long limit = workspaceLimitFor(plan);
         if (current >= limit) {
             throw new IllegalStateException(
                 "Limite de workspaces atteinte pour votre plan (" + limit + " max)");
         }
+    }
+
+    /**
+     * Usage vs limites pour un workspace (PROD-4.2). Source de vérité unique côté back
+     * (le front consomme cet endpoint au lieu de dupliquer les limites). -1 = illimité.
+     */
+    @Transactional(readOnly = true)
+    public WorkspaceUsageResponse getUsage(String slug, Long requestingUserId) {
+        Workspace workspace = workspaceRepository.findBySlug(slug)
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
+        assertIsMember(workspace, requestingUserId);
+
+        User requester = userRepository.findById(requestingUserId)
+            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+
+        PlanType ownerPlan = workspace.getOwner().getPlanType();
+        long membersUsed     = workspaceMemberRepository.findByWorkspaceId(workspace.getId()).size();
+        long workspacesUsed  = workspaceRepository.countByMemberId(requestingUserId);
+
+        return WorkspaceUsageResponse.builder()
+            .plan(ownerPlan != null ? ownerPlan.name() : PlanType.FREE.name())
+            .membersUsed(membersUsed)
+            .membersLimit(unlimitedToMinusOne(memberLimitFor(ownerPlan)))
+            .workspacesUsed(workspacesUsed)
+            .workspacesLimit(unlimitedToMinusOne(workspaceLimitFor(requester.getPlanType())))
+            .build();
+    }
+
+    private long unlimitedToMinusOne(long limit) {
+        return limit == Long.MAX_VALUE ? -1 : limit;
+    }
+
+    /**
+     * Journal d'audit du workspace (RGPD C11.1 / sécurité C21) — réservé OWNER/ADMIN.
+     */
+    @Transactional(readOnly = true)
+    public List<AuditLogResponse> listAuditLogs(String slug, Long requestingUserId) {
+        Workspace workspace = workspaceRepository.findBySlug(slug)
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
+        WorkspaceMember member = workspaceMemberRepository
+            .findByWorkspaceIdAndUserId(workspace.getId(), requestingUserId)
+            .orElseThrow(() -> new ForbiddenException("Accès refusé au workspace"));
+        if (member.getRole() != WorkspaceRole.OWNER && member.getRole() != WorkspaceRole.ADMIN) {
+            throw new ForbiddenException("Le journal d'audit est réservé aux administrateurs");
+        }
+        return auditService.listForWorkspace(workspace.getId(), 100).stream()
+            .map(AuditLogResponse::from)
+            .toList();
     }
 
     /**
@@ -298,7 +361,10 @@ public class WorkspaceService {
         }
 
         member.setRole(request.getRole());
-        return toMemberResponse(workspaceMemberRepository.save(member));
+        WorkspaceMemberResponse saved = toMemberResponse(workspaceMemberRepository.save(member));
+        auditService.record(workspaceId, requestingUserId, AuditService.ROLE_CHANGED,
+            "WorkspaceMember", String.valueOf(memberId), Map.of("role", request.getRole().name()));
+        return saved;
     }
 
     /**
@@ -310,6 +376,8 @@ public class WorkspaceService {
         Workspace workspace = workspaceRepository.findById(workspaceId)
             .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
         assertIsOwner(workspace, requestingUserId);
+        auditService.record(null, requestingUserId, AuditService.WORKSPACE_DELETED,
+            "Workspace", String.valueOf(workspaceId), Map.of("name", workspace.getName()));
         workspaceRepository.delete(workspace);
     }
 
@@ -349,6 +417,9 @@ public class WorkspaceService {
         }
 
         workspaceMemberRepository.delete(target);
+        auditService.record(workspaceId, requestingUserId, AuditService.MEMBER_REMOVED,
+            "WorkspaceMember", String.valueOf(memberId),
+            Map.of("removedUserId", String.valueOf(target.getUser().getId())));
         log.info("Membre {} retiré du workspace {}", target.getUser().getId(), workspaceId);
     }
 
