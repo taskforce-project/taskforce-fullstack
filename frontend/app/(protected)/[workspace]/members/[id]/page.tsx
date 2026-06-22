@@ -19,9 +19,10 @@ import {
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
+import { MemberSkillsCard } from "@/components/members/member-skills-card"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { useUserStore } from "@/lib/store/user-store"
 import { useProjectStore } from "@/lib/store/project-store"
@@ -126,10 +127,9 @@ export default function MemberProfilePage() {
   }
 
   const isYou    = user?.email === member.email
+  const myRole   = members.find((m) => m.email === user?.email)?.role
+  const canEdit  = isYou || myRole === "OWNER" || myRole === "ADMIN"
   const role     = ROLE_CONFIG[member.role]
-  const initials = member.displayName
-    ? member.displayName.trim().split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase()
-    : member.email.slice(0, 2).toUpperCase()
   const color      = MEMBER_COLORS[member.userId % MEMBER_COLORS.length]
   const doneCount  = assignedIssues.filter((i) => i.status.category === "COMPLETED").length
   const inProgress = assignedIssues.filter((i) => i.status.category === "STARTED").length
@@ -163,11 +163,13 @@ export default function MemberProfilePage() {
         {/* Content */}
         <div className="px-6 pb-6 -mt-10">
           <div className="flex items-end gap-4 mb-4">
-            <Avatar className="h-20 w-20 ring-4 ring-background">
-              <AvatarFallback className={cn("text-2xl font-semibold text-white", color)}>
-                {initials}
-              </AvatarFallback>
-            </Avatar>
+            <UserAvatar
+              email={member.email}
+              name={member.displayName ?? member.email}
+              avatarUrl={member.avatarUrl}
+              className="h-20 w-20 ring-4 ring-background"
+              fallbackClassName="text-2xl font-semibold"
+            />
             <div className="mb-1">
               <div className="flex items-center gap-2">
                 <h1 className="text-xl font-semibold text-foreground">
@@ -215,6 +217,9 @@ export default function MemberProfilePage() {
       </div>
 
       <Separator />
+
+      {/* Skills profile — feeds Smart Assign (PROD-1.2) */}
+      <MemberSkillsCard slug={slug} userId={member.userId} canEdit={canEdit} />
 
       {/* Recent issues */}
       <section>
