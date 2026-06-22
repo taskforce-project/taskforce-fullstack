@@ -22,7 +22,9 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
+import com.taskforce.tf_api.core.dto.response.GitHubIssueResponse;
 import com.taskforce.tf_api.core.dto.response.GitHubLinkResponse;
+import com.taskforce.tf_api.core.dto.response.GitHubRepoResponse;
 import com.taskforce.tf_api.core.dto.response.IntegrationStatusResponse;
 import com.taskforce.tf_api.core.dto.request.GitHubLinkRequest;
 import com.taskforce.tf_api.core.enums.GitHubLinkStatus;
@@ -37,6 +39,7 @@ import com.taskforce.tf_api.core.repository.IntegrationRepository;
 import com.taskforce.tf_api.core.repository.IssueGitHubLinkRepository;
 import com.taskforce.tf_api.core.repository.IssueRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import lombok.RequiredArgsConstructor;
@@ -170,6 +173,67 @@ public class GitHubIntegrationService {
     @Transactional
     public void deleteLink(Long linkId) {
         issueGitHubLinkRepository.deleteById(linkId);
+    }
+
+    // ----------------------------------------------------------------
+    // Sync read (PROD-5.1) : lecture des dépôts / issues / PR via l'API GitHub
+    // ----------------------------------------------------------------
+
+    /** Liste les dépôts accessibles via le token connecté du workspace. */
+    public List<GitHubRepoResponse> listRepositories(String workspaceSlug) {
+        String token = requireAccessToken(workspaceSlug);
+        List<Map<String, Object>> repos = githubGetList(token,
+            "https://api.github.com/user/repos?per_page=100&sort=updated");
+        return repos.stream().map(r -> new GitHubRepoResponse(
+            str(r.get("full_name")),
+            str(r.get("name")),
+            Boolean.TRUE.equals(r.get("private")),
+            str(r.get("html_url")),
+            r.get("open_issues_count") instanceof Number n ? n.intValue() : 0
+        )).toList();
+    }
+
+    /** Liste les issues + PR d'un dépôt (l'API GitHub renvoie les deux ; PR = champ {@code pull_request}). */
+    @SuppressWarnings("unchecked")
+    public List<GitHubIssueResponse> listRepoIssues(String workspaceSlug, String repoFullName) {
+        String token = requireAccessToken(workspaceSlug);
+        List<Map<String, Object>> issues = githubGetList(token,
+            "https://api.github.com/repos/" + repoFullName + "/issues?state=all&per_page=50&sort=updated");
+        return issues.stream().map(i -> {
+            Map<String, Object> user = i.get("user") instanceof Map<?, ?> m ? (Map<String, Object>) m : null;
+            return new GitHubIssueResponse(
+                i.get("number") instanceof Number n ? n.intValue() : 0,
+                str(i.get("title")),
+                str(i.get("state")),
+                str(i.get("html_url")),
+                i.get("pull_request") != null,
+                user != null ? str(user.get("login")) : null,
+                str(i.get("updated_at"))
+            );
+        }).toList();
+    }
+
+    private String requireAccessToken(String workspaceSlug) {
+        Workspace workspace = workspaceRepository.findBySlug(workspaceSlug)
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found: " + workspaceSlug));
+        return integrationRepository
+            .findByWorkspaceIdAndProvider(workspace.getId(), IntegrationProvider.GITHUB)
+            .map(Integration::getAccessToken)
+            .orElseThrow(() -> new BusinessException("GitHub n'est pas connecté pour ce workspace"));
+    }
+
+    private List<Map<String, Object>> githubGetList(String token, String url) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(token);
+        headers.set("Accept", "application/vnd.github+json");
+        ResponseEntity<List<Map<String, Object>>> resp = restTemplate.exchange(
+            url, HttpMethod.GET, new HttpEntity<>(headers),
+            new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+        return resp.getBody() != null ? resp.getBody() : List.of();
+    }
+
+    private String str(Object o) {
+        return o != null ? String.valueOf(o) : null;
     }
 
     // ----------------------------------------------------------------
