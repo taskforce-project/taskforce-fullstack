@@ -3,17 +3,25 @@
 `dev_seed.sql` peuple un **workspace de démo réaliste** rattaché à `admin@taskforce.dev`
 (le « CEO »), pour tester Smart Assign, l'UI/UX, les rôles, les équipes, etc.
 
-## Contenu
+## Contenu (seed QA complet — couvre tous les écrans)
 
 - **Workspace** `taskforce-demo` (« TaskForce HQ »), owner = admin.
-- **8 coéquipiers** avec profils de compétences variés (Sarah/Frontend, Marcus/Backend,
-  Aïcha/Fullstack, Tom/DevOps, Lina/Design, Omar/QA, Nina/Data-IA, Diego/Junior).
-- **3 projets** : Web Application (WEB), API Platform (API), Infrastructure (OPS) — chacun
-  avec statuts/types/labels + membres.
-- **22 issues** : story points, priorités, statuts variés, labels qui matchent les compétences,
-  et **beaucoup de non assignées** pour tester Smart Assign.
-- **3 équipes** (Frontend Guild / Backend Guild / Platform & QA) associées aux projets.
-- **Historique d'assignations** (`assignment_events`) → alimente le score historique.
+- **8 coéquipiers** avec profils compétences (capacité h/sem + séniorité + growth ciblé pour Diego).
+- **3 projets** (WEB / API / OPS) avec statuts/types/labels + membres.
+- **27 issues** : tous statuts (dont **Cancelled**), toutes priorités (dont **URGENT**), story points,
+  **dates en retard / dues demain / futures**, descriptions, **sous-tâches** (épopée WEB-11), labels,
+  beaucoup de non-assignées (Smart Assign).
+- **Sous-ressources d'issue** : commentaires (dont **@mention**), **checklist**, **relations** (blocks/relates),
+  **worklogs** (time tracking).
+- **3 cycles** WEB (terminé / **actif** pour le burndown / brouillon) + issues du sprint actif.
+- **Notifications** (inbox admin) : assigned/mention/commented/dueSoon/overdue/statusChanged/overload, mix lu/non-lu.
+- **Favoris projet**, **pages** (doc projet), **invitations en attente** (email sans compte).
+- **Abonnement PRO** (admin) + **historique** Stripe → page Billing peuplée *sans Stripe réel*.
+- **Demandes Enterprise** (sales).
+- **3 équipes** + association projets · **historique d'assignations** (score Smart Assign).
+
+> ⚠️ Requiert les migrations **V41→V48** appliquées (rebuild backend récent).
+> Le flux Stripe *réel* (checkout depuis la landing / portail) nécessite tes **vraies clés Stripe** (config `.env`) — le seed ne couvre que l'affichage de l'abonnement.
 
 ## Lancer
 
