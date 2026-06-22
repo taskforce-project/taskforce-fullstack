@@ -49,6 +49,8 @@ interface IssueState {
   activity: IssueActivity[];
   isLoading: boolean;
   error: string | null;
+  /** Projet dont les issues sont en cache (évite le refetch au changement d'onglet — PROD-2.7). */
+  loadedProjectId: number | null;
 
   // Issues
   fetchIssues: (slug: string, projectId: number) => Promise<Issue[]>;
@@ -57,6 +59,10 @@ interface IssueState {
   updateIssue: (slug: string, projectId: number, issueId: number, payload: UpdateIssuePayload) => Promise<Issue | null>;
   deleteIssue: (slug: string, projectId: number, issueId: number) => Promise<void>;
   setActiveIssue: (issue: Issue | null) => void;
+  /** Patch local (événement temps réel STOMP) — insère ou met à jour sans appel API. */
+  upsertIssueLocal: (issue: Issue) => void;
+  /** Retrait local (événement temps réel STOMP). */
+  removeIssueLocal: (issueId: number) => void;
 
   // Statuts & types
   fetchStatuses: (slug: string, projectId: number) => Promise<IssueStatus[]>;
@@ -90,16 +96,23 @@ export const useIssueStore = create<IssueState>((set, get) => ({
   activity: [],
   isLoading: false,
   error: null,
+  loadedProjectId: null,
 
-  clearIssues: () => set({ issues: [], activeIssue: null, statuses: [], types: [], comments: [], activity: [], error: null }),
+  clearIssues: () => set({ issues: [], activeIssue: null, statuses: [], types: [], comments: [], activity: [], error: null, loadedProjectId: null }),
 
   setActiveIssue: (issue) => set({ activeIssue: issue }),
 
   fetchIssues: async (slug, projectId) => {
+    // Cache-first : si les issues de ce projet sont déjà chargées, on évite le refetch
+    // (bascule Board/List/Backlog instantanée). Le temps réel + les mutations gardent le cache à jour.
+    const state = get();
+    if (state.loadedProjectId === projectId) {
+      return state.issues;
+    }
     set({ isLoading: true, error: null });
     try {
       const issues = await listIssues(slug, projectId);
-      set({ issues, isLoading: false });
+      set({ issues, isLoading: false, loadedProjectId: projectId });
       return issues;
     } catch (err) {
       const message = extractError(err, "Erreur lors du chargement des issues");
@@ -159,6 +172,23 @@ export const useIssueStore = create<IssueState>((set, get) => ({
       set({ error: message });
     }
   },
+
+  upsertIssueLocal: (issue) =>
+    set((state) => {
+      const exists = state.issues.some((i) => i.id === issue.id);
+      return {
+        issues: exists
+          ? state.issues.map((i) => (i.id === issue.id ? issue : i))
+          : [issue, ...state.issues],
+        activeIssue: state.activeIssue?.id === issue.id ? issue : state.activeIssue,
+      };
+    }),
+
+  removeIssueLocal: (issueId) =>
+    set((state) => ({
+      issues: state.issues.filter((i) => i.id !== issueId),
+      activeIssue: state.activeIssue?.id === issueId ? null : state.activeIssue,
+    })),
 
   fetchStatuses: async (slug, projectId) => {
     try {
