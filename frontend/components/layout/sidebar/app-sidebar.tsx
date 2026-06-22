@@ -133,6 +133,7 @@ const NAV_COMMS: readonly NavItem[] = [
     key: "nav.messages",
     url: "/messages",
     icon: MessagesSquare,
+    comingSoon: true, // chat 100% mock (components/messages/data.ts) — verrouillé tant que non câblé au backend réel
   },
   {
     key: "nav.discussions",
