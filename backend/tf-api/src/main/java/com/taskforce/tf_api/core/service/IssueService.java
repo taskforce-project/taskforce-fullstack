@@ -26,6 +26,10 @@ import com.taskforce.tf_api.core.dto.response.IssueActivityResponse;
 import com.taskforce.tf_api.core.dto.response.IssueCommentResponse;
 import com.taskforce.tf_api.core.dto.response.IssueRelationResponse;
 import com.taskforce.tf_api.core.dto.request.CreateChecklistItemRequest;
+import com.taskforce.tf_api.core.dto.request.LogWorkRequest;
+import com.taskforce.tf_api.core.dto.response.WorklogResponse;
+import com.taskforce.tf_api.core.model.IssueWorklog;
+import com.taskforce.tf_api.core.repository.IssueWorklogRepository;
 import com.taskforce.tf_api.core.dto.request.UpdateChecklistItemRequest;
 import com.taskforce.tf_api.core.dto.response.ChecklistItemResponse;
 import com.taskforce.tf_api.core.dto.response.IssueRealtimeEvent;
@@ -92,6 +96,7 @@ public class IssueService {
     private final ProjectLabelRepository        projectLabelRepository;
     private final SimpMessagingTemplate         messagingTemplate;
     private final IssueChecklistItemRepository  checklistRepository;
+    private final IssueWorklogRepository        worklogRepository;
 
     public IssueService(
         IssueRepository issueRepository,
@@ -108,7 +113,8 @@ public class IssueService {
         @org.springframework.context.annotation.Lazy NotificationService notificationService,
         ProjectLabelRepository projectLabelRepository,
         SimpMessagingTemplate messagingTemplate,
-        IssueChecklistItemRepository checklistRepository
+        IssueChecklistItemRepository checklistRepository,
+        IssueWorklogRepository worklogRepository
     ) {
         this.issueRepository = issueRepository;
         this.issueStatusRepository = issueStatusRepository;
@@ -125,6 +131,7 @@ public class IssueService {
         this.projectLabelRepository = projectLabelRepository;
         this.messagingTemplate = messagingTemplate;
         this.checklistRepository = checklistRepository;
+        this.worklogRepository = worklogRepository;
     }
 
     // =========================================================================
@@ -492,6 +499,48 @@ public class IssueService {
         Project project = resolveProject(slug, projectId);
         assertWorkspaceMember(project.getWorkspace().getId(), userId);
         resolveIssue(issueId, project.getId());
+    }
+
+    // =========================================================================
+    // Time tracking — worklogs (BE-ISS-012)
+    // =========================================================================
+
+    @Transactional(readOnly = true)
+    public List<WorklogResponse> listWorklogs(String slug, Long projectId, Long issueId, Long userId) {
+        resolveChecklistScope(slug, projectId, issueId, userId);
+        return worklogRepository.findByIssueIdOrderByLoggedAtDescIdDesc(issueId).stream()
+            .map(w -> WorklogResponse.from(w, toUserSummary(w.getUser())))
+            .toList();
+    }
+
+    @Transactional
+    public WorklogResponse addWorklog(String slug, Long projectId, Long issueId, Long userId, LogWorkRequest request) {
+        resolveChecklistScope(slug, projectId, issueId, userId);
+        User author = resolveUser(userId);
+        LocalDate loggedAt = (request.getLoggedAt() != null && !request.getLoggedAt().isBlank())
+            ? LocalDate.parse(request.getLoggedAt())
+            : LocalDate.now();
+        IssueWorklog worklog = IssueWorklog.builder()
+            .issueId(issueId)
+            .user(author)
+            .minutes(request.getMinutes())
+            .description(request.getDescription() != null && !request.getDescription().isBlank()
+                ? request.getDescription().trim() : null)
+            .loggedAt(loggedAt)
+            .build();
+        return WorklogResponse.from(worklogRepository.save(worklog), toUserSummary(author));
+    }
+
+    @Transactional
+    public void deleteWorklog(String slug, Long projectId, Long issueId, Long worklogId, Long userId) {
+        resolveChecklistScope(slug, projectId, issueId, userId);
+        IssueWorklog worklog = worklogRepository.findByIdAndIssueId(worklogId, issueId)
+            .orElseThrow(() -> new ResourceNotFoundException("Entrée de temps introuvable"));
+        // Seul l'auteur de l'entrée peut la supprimer (cohérent avec les commentaires).
+        if (!worklog.getUser().getId().equals(userId)) {
+            throw new BusinessException("Vous ne pouvez supprimer que vos propres entrées de temps");
+        }
+        worklogRepository.delete(worklog);
     }
 
     /**
