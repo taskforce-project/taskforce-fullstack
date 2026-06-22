@@ -17,9 +17,8 @@ import {
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import { cn } from "@/lib/utils"
-import { getAvatarUrl } from "@/lib/utils/avatar"
 import { useCycleStore } from "@/lib/store/cycle-store"
 import type { CycleStatus } from "@/lib/api/cycle-service"
 import type { Issue, IssuePriority, IssueStatusCategory } from "@/lib/api/issue-service"
@@ -74,13 +73,6 @@ function daysLeft(endDate: string | null | undefined): number | null {
   return diff > 0 ? Math.ceil(diff / 86400000) : null
 }
 
-const AVATAR_COLORS = [
-  "bg-violet-500", "bg-blue-500", "bg-emerald-500", "bg-orange-500",
-  "bg-pink-500", "bg-cyan-500", "bg-amber-500", "bg-indigo-500",
-]
-function emailInitials(email: string) { return email.slice(0, 2).toUpperCase() }
-function emailColor(id: number)       { return AVATAR_COLORS[id % AVATAR_COLORS.length] }
-
 // ---------------------------------------------------------------------------
 // IssueRow
 // ---------------------------------------------------------------------------
@@ -93,12 +85,13 @@ function IssueRow({ issue }: { readonly issue: Issue }) {
       <span className="text-xs text-muted-foreground font-mono shrink-0 w-16">{issue.identifier}</span>
       <span className="text-sm text-foreground flex-1 min-w-0 truncate">{issue.title}</span>
       {issue.assignee ? (
-        <Avatar className="h-6 w-6 shrink-0">
-          <AvatarImage src={getAvatarUrl({ email: issue.assignee.email })} alt={issue.assignee.email} />
-          <AvatarFallback className={cn("text-[9px] text-white", emailColor(issue.assignee.id))}>
-            {emailInitials(issue.assignee.email)}
-          </AvatarFallback>
-        </Avatar>
+        <UserAvatar
+          email={issue.assignee.email}
+          name={issue.assignee.displayName ?? issue.assignee.email}
+          avatarUrl={issue.assignee.avatarUrl}
+          className="h-6 w-6 shrink-0"
+          fallbackClassName="text-[9px]"
+        />
       ) : (
         <div className="size-6 rounded-full border border-dashed border-border shrink-0" />
       )}
