@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import {
   User, Bell, CreditCard, Users, Check, Zap, Globe, Key, Palette, Webhook,
-  X as XIcon, Plus, Upload, Camera, Link2, Trash2, Shield, Search,
+  X as XIcon, Plus, Upload, Camera, Link2, Trash2, Shield, Search, Loader2,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -20,6 +20,8 @@ import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { DeleteConfirmDialog } from "@/components/dialogs/delete-confirm-dialog"
 import { stripeService } from "@/lib/api/stripe-service"
 import { useIntegrationStore } from "@/lib/store/integration-store"
+import { getGitHubRepos, getGitHubRepoIssues, type GitHubRepo, type GitHubRepoIssue } from "@/lib/api/integration-service"
+import { exportMyData, deleteMyAccount } from "@/lib/api/gdpr-service"
 import { apiClient } from "@/lib/api/client"
 import { USER_ROUTES } from "@/lib/config/api-routes"
 import { searchUsers, type UserSearchResult } from "@/lib/api/user-service"
@@ -942,13 +944,86 @@ function TeamPanel() {
   )
 }
 
+/** Parcours des dépôts GitHub connectés + leurs issues/PR (PROD-5.1 sync read). */
+function GitHubRepoBrowser({ slug }: { readonly slug: string }) {
+  const [repos, setRepos] = useState<GitHubRepo[]>([])
+  const [repo, setRepo] = useState<string>("")
+  const [issues, setIssues] = useState<GitHubRepoIssue[]>([])
+  const [loadingRepos, setLoadingRepos] = useState(false)
+  const [loadingIssues, setLoadingIssues] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    setLoadingRepos(true)
+    getGitHubRepos(slug)
+      .then((r) => { if (active) setRepos(r) })
+      .catch(() => { if (active) toast.error("Impossible de charger les dépôts GitHub") })
+      .finally(() => { if (active) setLoadingRepos(false) })
+    return () => { active = false }
+  }, [slug])
+
+  function selectRepo(full: string) {
+    setRepo(full)
+    setIssues([])
+    if (!full) return
+    setLoadingIssues(true)
+    getGitHubRepoIssues(slug, full)
+      .then(setIssues)
+      .catch(() => toast.error("Impossible de charger les issues du dépôt"))
+      .finally(() => setLoadingIssues(false))
+  }
+
+  return (
+    <div className="mt-4 flex flex-col gap-3 border-t border-border/50 pt-4">
+      <div className="flex items-center gap-2">
+        <p className="text-xs font-medium text-muted-foreground">Parcourir un dépôt</p>
+        {loadingRepos && <Loader2 className="size-3.5 animate-spin text-muted-foreground" />}
+      </div>
+      <Select value={repo} onValueChange={selectRepo}>
+        <SelectTrigger className="h-9"><SelectValue placeholder="Choisir un dépôt…" /></SelectTrigger>
+        <SelectContent>
+          {repos.map((r) => (
+            <SelectItem key={r.fullName} value={r.fullName}>
+              {r.fullName}{r.isPrivate ? " 🔒" : ""}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {loadingIssues && <p className="text-xs text-muted-foreground">Chargement des issues…</p>}
+      {!loadingIssues && repo && issues.length === 0 && (
+        <p className="text-xs text-muted-foreground italic">Aucune issue / PR.</p>
+      )}
+      {issues.length > 0 && (
+        <div className="max-h-64 divide-y divide-border/50 overflow-y-auto rounded-lg border border-border">
+          {issues.map((i) => (
+            <a
+              key={i.number}
+              href={i.htmlUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-muted/40"
+            >
+              <Badge variant="outline" className={cn("h-4 px-1.5 text-[10px]", i.pullRequest ? "text-violet-400 border-violet-500/30" : "text-muted-foreground")}>
+                {i.pullRequest ? "PR" : "Issue"} #{i.number}
+              </Badge>
+              <span className="flex-1 truncate text-foreground">{i.title}</span>
+              <span className={cn("text-[10px]", i.state === "open" ? "text-emerald-400" : "text-muted-foreground")}>{i.state}</span>
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function IntegrationsPanel() {
   const { activeWorkspace } = useWorkspaceStore()
   const slug = activeWorkspace?.slug ?? ""
   const {
     githubStatus, slackStatus, slackChannels, webhooks,
     fetchGitHubStatus, connectGitHub, disconnectGitHub,
-    fetchSlackStatus, connectSlack, disconnectSlack,
+    fetchSlackStatus, disconnectSlack,
     fetchSlackChannels, addSlackChannel, removeSlackChannel,
     fetchWebhooks, addWebhook, removeWebhook,
   } = useIntegrationStore()
@@ -1061,10 +1136,11 @@ function IntegrationsPanel() {
             </Button>
           )}
         </div>
+        {githubStatus?.connected && <GitHubRepoBrowser slug={slug} />}
       </SectionCard>
 
       {/* ---- Slack ---- */}
-      <SectionCard title="Slack" description="Get notifications directly in your Slack channels.">
+      <SectionCard title="Slack" description="Notifications Slack — bientôt disponible.">
         <div className="flex flex-col gap-4">
           <div className="flex items-center gap-4">
             <div className="h-10 w-10 rounded-lg border border-border bg-muted flex items-center justify-center text-xs font-bold text-foreground shrink-0">
@@ -1087,9 +1163,7 @@ function IntegrationsPanel() {
                 </Button>
               </div>
             ) : (
-              <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => connectSlack(slug)}>
-                <Link2 className="h-3 w-3 mr-1.5" />Connect
-              </Button>
+              <Badge variant="secondary" className="text-xs text-muted-foreground">Bientôt disponible</Badge>
             )}
           </div>
 
@@ -1215,22 +1289,36 @@ function IntegrationsPanel() {
 // ---------------------------------------------------------------------------
 
 function PrivacyPanel() {
-  const { user } = useAuth()
   const [loading, setLoading] = useState<"ACCESS" | "DELETION" | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
 
-  const submitRequest = async (type: "ACCESS" | "DELETION") => {
-    setLoading(type)
+  const handleExport = async () => {
+    setLoading("ACCESS")
     try {
-      await apiClient.post(USER_ROUTES.DATA_REQUEST, { type })
-      if (type === "ACCESS") {
-        toast.success("Data export requested. You will receive an email within 30 days.")
-      } else {
-        toast.success("Account deletion initiated. Your account has been deactivated.")
-      }
+      const data = await exportMyData()
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = "taskforce-mes-donnees.json"
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success("Vos données ont été exportées (téléchargement JSON).")
     } catch {
-      toast.error("Request failed. Please try again or contact privacy@taskforce.dev.")
+      toast.error("Échec de l'export. Réessayez ou contactez privacy@taskforce.dev.")
     } finally {
+      setLoading(null)
+    }
+  }
+
+  const handleDelete = async () => {
+    setLoading("DELETION")
+    try {
+      await deleteMyAccount()
+      toast.success("Compte anonymisé. Déconnexion…")
+      setTimeout(() => { window.location.href = "/login" }, 1200)
+    } catch {
+      toast.error("Échec de la suppression. Réessayez ou contactez privacy@taskforce.dev.")
       setLoading(null)
       setDeleteConfirm(false)
     }
@@ -1259,7 +1347,7 @@ function PrivacyPanel() {
           <div>
             <p className="text-sm font-medium text-foreground">Export my data</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              We will send an email to <span className="font-medium">{user?.email}</span> with your data within 30 days, as required by GDPR Art. 20.
+              Téléchargez immédiatement un export JSON de vos données personnelles (RGPD Art. 20 — portabilité).
             </p>
           </div>
           <Button
@@ -1267,9 +1355,9 @@ function PrivacyPanel() {
             size="sm"
             className="shrink-0 h-8 text-xs"
             disabled={loading === "ACCESS"}
-            onClick={() => submitRequest("ACCESS")}
+            onClick={handleExport}
           >
-            {loading === "ACCESS" ? "Sending…" : "Request export"}
+            {loading === "ACCESS" ? "Export…" : "Exporter mes données"}
           </Button>
         </div>
       </SectionCard>
@@ -1279,7 +1367,7 @@ function PrivacyPanel() {
           <div>
             <p className="text-sm font-medium text-foreground">Delete my account</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Your account will be deactivated immediately. All workspace data will be purged within 30 days. This action is irreversible.
+              Vos données personnelles seront anonymisées et votre accès coupé immédiatement (RGPD Art. 17 — droit à l&apos;effacement). Action irréversible.
             </p>
           </div>
           {!deleteConfirm ? (
@@ -1306,9 +1394,9 @@ function PrivacyPanel() {
                 size="sm"
                 className="h-8 text-xs"
                 disabled={loading === "DELETION"}
-                onClick={() => submitRequest("DELETION")}
+                onClick={handleDelete}
               >
-                {loading === "DELETION" ? "Processing…" : "Confirm deletion"}
+                {loading === "DELETION" ? "Traitement…" : "Confirmer la suppression"}
               </Button>
             </div>
           )}
