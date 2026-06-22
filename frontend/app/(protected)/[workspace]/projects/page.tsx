@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
 import {
   Plus,
   Search,
@@ -16,6 +16,7 @@ import {
 } from "lucide-react"
 
 import { CreateProjectDialog } from "@/components/dialogs/create-project-dialog"
+import { EditProjectDialog } from "@/components/dialogs/edit-project-dialog"
 import { ProjectIcon } from "@/components/ui/project-icon"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -177,6 +178,7 @@ function OperationRow({ project, slug }: { readonly project: Project; readonly s
   const router = useRouter()
   const archiveProject = useProjectStore((s) => s.archiveProject)
   const updateProject = useProjectStore((s) => s.updateProject)
+  const [editOpen, setEditOpen] = useState(false)
 
   const health = deriveHealth(project)
   const velocity = deriveVelocity(project)
@@ -184,6 +186,7 @@ function OperationRow({ project, slug }: { readonly project: Project; readonly s
   const pct = progressPct(project)
 
   return (
+    <>
     <TableRow
       className="cursor-pointer"
       onClick={() => router.push(`/${slug}/projects/${project.id}`)}
@@ -191,7 +194,7 @@ function OperationRow({ project, slug }: { readonly project: Project; readonly s
       <TableCell>
         <div className="flex items-center gap-2.5">
           <span className={cn("size-2 shrink-0 rounded-full", HEALTH_META[health].dot)} />
-          <ProjectIcon iconUrl={project.iconUrl} name={project.name} size={20} className="shrink-0 rounded" />
+          <ProjectIcon iconUrl={project.iconUrl} name={project.name} color={project.color} size={20} className="shrink-0 rounded" />
           <span className="font-medium text-foreground">{project.name}</span>
         </div>
       </TableCell>
@@ -233,8 +236,11 @@ function OperationRow({ project, slug }: { readonly project: Project; readonly s
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-            <DropdownMenuItem onClick={() => router.push(`/${slug}/projects/${project.id}/settings`)}>
+            <DropdownMenuItem onClick={() => setEditOpen(true)}>
               Edit operation
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => router.push(`/${slug}/projects/${project.id}/settings`)}>
+              Settings
             </DropdownMenuItem>
             {project.status === "ARCHIVED" ? (
               <DropdownMenuItem onClick={() => updateProject(slug, project.id, { status: "ACTIVE" })}>
@@ -249,6 +255,8 @@ function OperationRow({ project, slug }: { readonly project: Project; readonly s
         </DropdownMenu>
       </TableCell>
     </TableRow>
+    <EditProjectDialog project={project} slug={slug} open={editOpen} onOpenChange={setEditOpen} />
+    </>
   )
 }
 
@@ -285,6 +293,8 @@ function EmptyState({ isSearch }: { readonly isSearch: boolean }) {
 export default function ProjectsPage() {
   const params = useParams<{ workspace: string }>()
   const slug = params.workspace
+  // « New project » depuis la sidebar → ?new=1 ouvre le modal d'emblée (PROD-8.7)
+  const autoNew = useSearchParams().get("new") === "1"
 
   const { projects, isLoading, fetchProjects } = useProjectStore()
   const [filter, setFilter] = useState<FilterTab>("active")
@@ -319,7 +329,7 @@ export default function ProjectsPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Active Operations</h1>
           <p className="text-sm text-muted-foreground">Real-time health and velocity across all workstreams</p>
         </div>
-        <CreateProjectDialog>
+        <CreateProjectDialog defaultOpen={autoNew}>
           <Button size="sm" className="gap-1.5"><Plus className="size-4" /> New Operation</Button>
         </CreateProjectDialog>
       </div>
