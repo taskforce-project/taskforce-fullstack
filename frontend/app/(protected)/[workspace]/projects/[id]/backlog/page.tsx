@@ -12,8 +12,10 @@ import {
 
 import { IssueSheet, type SheetIssue } from "@/components/sheets/issue-sheet"
 import { CreateIssueDialog } from "@/components/dialogs/create-issue-dialog"
+import { IssueFilters } from "@/components/issues/issue-filters"
+import { type IssueFilterState, EMPTY_ISSUE_FILTERS, applyIssueFilters } from "@/lib/issue-filters"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import { cn } from "@/lib/utils"
 import { useIssueStore } from "@/lib/store/issue-store"
 import type { Issue, IssuePriority } from "@/lib/api/issue-service"
@@ -61,7 +63,7 @@ function toSheetIssue(issue: Issue): SheetIssue {
     statusName:     issue.status.name,
     statusCategory: issue.status.category,
     assignee:       issue.assignee
-      ? { initials: emailInitials(issue.assignee.email), color: assigneeColor(issue.assignee.id), name: issue.assignee.displayName ?? issue.assignee.email, userId: issue.assignee.id }
+      ? { initials: emailInitials(issue.assignee.email), color: assigneeColor(issue.assignee.id), name: issue.assignee.displayName ?? issue.assignee.email, email: issue.assignee.email, userId: issue.assignee.id }
       : null,
     assigneeId:     issue.assignee?.id ?? null,
     labels:         issue.labels,
@@ -83,14 +85,18 @@ export default function ProjectBacklogPage() {
 
   const { fetchIssues, issues, isLoading } = useIssueStore()
   const [selectedIssue, setSelectedIssue] = useState<SheetIssue | null>(null)
+  const [filters, setFilters] = useState<IssueFilterState>(EMPTY_ISSUE_FILTERS)
 
   useEffect(() => {
     if (!workspace || !projectId) return
     fetchIssues(workspace, projectId)
   }, [workspace, projectId, fetchIssues])
 
-  // Backlog = issues with BACKLOG status category
-  const backlogIssues = issues.filter((i) => i.status.category === "BACKLOG")
+  // Backlog = issues with BACKLOG status category (puis filtres avancés)
+  const backlogIssues = applyIssueFilters(
+    issues.filter((i) => i.status.category === "BACKLOG"),
+    filters
+  )
 
   if (isLoading && backlogIssues.length === 0) {
     return (
@@ -102,8 +108,9 @@ export default function ProjectBacklogPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Stats bar */}
-      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+      {/* Stats bar + filtres */}
+      <div className="flex items-center gap-3 text-sm text-muted-foreground">
+        <IssueFilters issues={issues} value={filters} onChange={setFilters} />
         <span><span className="font-medium text-foreground">{backlogIssues.length}</span> issues</span>
       </div>
 
@@ -130,11 +137,12 @@ export default function ProjectBacklogPage() {
 
             <div className="hidden lg:flex items-center justify-center w-8">
               {issue.assignee && (
-                <Avatar className="h-5 w-5">
-                  <AvatarFallback className={cn("text-[9px] text-white", assigneeColor(issue.assignee.id))}>
-                    {emailInitials(issue.assignee.email)}
-                  </AvatarFallback>
-                </Avatar>
+                <UserAvatar
+                  email={issue.assignee.email}
+                  name={issue.assignee.displayName ?? issue.assignee.email}
+                  className="h-5 w-5"
+                  fallbackClassName="text-[9px]"
+                />
               )}
             </div>
             <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
