@@ -11,6 +11,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.springframework.context.annotation.Lazy;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,7 +25,13 @@ import com.taskforce.tf_api.core.dto.request.UpdateIssueStatusRequest;
 import com.taskforce.tf_api.core.dto.response.IssueActivityResponse;
 import com.taskforce.tf_api.core.dto.response.IssueCommentResponse;
 import com.taskforce.tf_api.core.dto.response.IssueRelationResponse;
+import com.taskforce.tf_api.core.dto.request.CreateChecklistItemRequest;
+import com.taskforce.tf_api.core.dto.request.UpdateChecklistItemRequest;
+import com.taskforce.tf_api.core.dto.response.ChecklistItemResponse;
+import com.taskforce.tf_api.core.dto.response.IssueRealtimeEvent;
 import com.taskforce.tf_api.core.dto.response.IssueResponse;
+import com.taskforce.tf_api.core.model.IssueChecklistItem;
+import com.taskforce.tf_api.core.repository.IssueChecklistItemRepository;
 import com.taskforce.tf_api.core.dto.response.IssueStatusResponse;
 import com.taskforce.tf_api.core.dto.response.IssueTypeResponse;
 import com.taskforce.tf_api.core.dto.response.IssueSummaryResponse;
@@ -83,6 +90,8 @@ public class IssueService {
     private final UserRepository                userRepository;
     private final NotificationService           notificationService;
     private final ProjectLabelRepository        projectLabelRepository;
+    private final SimpMessagingTemplate         messagingTemplate;
+    private final IssueChecklistItemRepository  checklistRepository;
 
     public IssueService(
         IssueRepository issueRepository,
@@ -97,7 +106,9 @@ public class IssueService {
         WorkspaceMemberRepository workspaceMemberRepository,
         UserRepository userRepository,
         @org.springframework.context.annotation.Lazy NotificationService notificationService,
-        ProjectLabelRepository projectLabelRepository
+        ProjectLabelRepository projectLabelRepository,
+        SimpMessagingTemplate messagingTemplate,
+        IssueChecklistItemRepository checklistRepository
     ) {
         this.issueRepository = issueRepository;
         this.issueStatusRepository = issueStatusRepository;
@@ -112,6 +123,8 @@ public class IssueService {
         this.userRepository = userRepository;
         this.notificationService = notificationService;
         this.projectLabelRepository = projectLabelRepository;
+        this.messagingTemplate = messagingTemplate;
+        this.checklistRepository = checklistRepository;
     }
 
     // =========================================================================
@@ -296,7 +309,9 @@ public class IssueService {
             notificationService.notifyAssigned(issue, reporter);
         }
 
-        return toResponse(issue);
+        IssueResponse created = toResponse(issue);
+        publishIssueEvent("created", issue.getProject().getId(), issue.getId(), created);
+        return created;
     }
 
     /**
@@ -405,7 +420,78 @@ public class IssueService {
         }
 
         issue = issueRepository.save(issue);
-        return toResponse(issue);
+        IssueResponse updated = toResponse(issue);
+        publishIssueEvent("updated", issue.getProject().getId(), issue.getId(), updated);
+        return updated;
+    }
+
+    /** Liste les sous-tâches (issues enfants) d'une issue. */
+    @Transactional
+    public List<IssueResponse> listChildren(String workspaceSlug, Long projectId, Long issueId, Long userId) {
+        Project project = resolveProject(workspaceSlug, projectId);
+        assertWorkspaceMember(project.getWorkspace().getId(), userId);
+        resolveIssue(issueId, project.getId()); // valide l'appartenance au projet
+        return issueRepository.findByParentIdOrderBySequenceNumberAsc(issueId).stream()
+            .map(this::toResponse)
+            .toList();
+    }
+
+    // =========================================================================
+    // Checklist (PROD-2.3)
+    // =========================================================================
+
+    @Transactional
+    public List<ChecklistItemResponse> listChecklist(String slug, Long projectId, Long issueId, Long userId) {
+        resolveChecklistScope(slug, projectId, issueId, userId);
+        return checklistRepository.findByIssueIdOrderByPositionAscIdAsc(issueId).stream()
+            .map(ChecklistItemResponse::from)
+            .toList();
+    }
+
+    @Transactional
+    public ChecklistItemResponse addChecklistItem(String slug, Long projectId, Long issueId, Long userId,
+                                                  CreateChecklistItemRequest request) {
+        resolveChecklistScope(slug, projectId, issueId, userId);
+        IssueChecklistItem item = IssueChecklistItem.builder()
+            .issueId(issueId)
+            .content(request.getContent().trim())
+            .done(false)
+            .position((int) checklistRepository.countByIssueId(issueId))
+            .build();
+        return ChecklistItemResponse.from(checklistRepository.save(item));
+    }
+
+    @Transactional
+    public ChecklistItemResponse updateChecklistItem(String slug, Long projectId, Long issueId, Long itemId,
+                                                     Long userId, UpdateChecklistItemRequest request) {
+        resolveChecklistScope(slug, projectId, issueId, userId);
+        IssueChecklistItem item = checklistRepository.findByIdAndIssueId(itemId, issueId)
+            .orElseThrow(() -> new ResourceNotFoundException("Item de checklist introuvable"));
+        if (request.getContent() != null && !request.getContent().isBlank()) {
+            item.setContent(request.getContent().trim());
+        }
+        if (request.getDone() != null) {
+            item.setDone(request.getDone());
+        }
+        if (request.getPosition() != null) {
+            item.setPosition(request.getPosition());
+        }
+        return ChecklistItemResponse.from(checklistRepository.save(item));
+    }
+
+    @Transactional
+    public void deleteChecklistItem(String slug, Long projectId, Long issueId, Long itemId, Long userId) {
+        resolveChecklistScope(slug, projectId, issueId, userId);
+        IssueChecklistItem item = checklistRepository.findByIdAndIssueId(itemId, issueId)
+            .orElseThrow(() -> new ResourceNotFoundException("Item de checklist introuvable"));
+        checklistRepository.delete(item);
+    }
+
+    /** Vérifie projet + appartenance workspace + issue, pour les opérations de checklist. */
+    private void resolveChecklistScope(String slug, Long projectId, Long issueId, Long userId) {
+        Project project = resolveProject(slug, projectId);
+        assertWorkspaceMember(project.getWorkspace().getId(), userId);
+        resolveIssue(issueId, project.getId());
     }
 
     /**
@@ -417,7 +503,25 @@ public class IssueService {
         assertWorkspaceMember(project.getWorkspace().getId(), userId);
         Issue issue = resolveIssue(issueId, project.getId());
         issueRepository.delete(issue);
+        publishIssueEvent("deleted", project.getId(), issueId, null);
         log.info("Issue {} supprimée du projet {}", issueId, projectId);
+    }
+
+    /** Diffuse un événement issue en temps réel sur le topic projet (best-effort). */
+    private void publishIssueEvent(String action, Long projectId, Long issueId, IssueResponse issue) {
+        try {
+            messagingTemplate.convertAndSend(
+                "/topic/projects." + projectId,
+                IssueRealtimeEvent.builder()
+                    .action(action)
+                    .projectId(projectId)
+                    .issueId(issueId)
+                    .issue(issue)
+                    .build()
+            );
+        } catch (Exception ex) {
+            log.warn("Publication temps réel issue échouée (projet {}): {}", projectId, ex.getMessage());
+        }
     }
 
     // =========================================================================
