@@ -61,8 +61,11 @@ public class StripeWebhookController {
             }
         } catch (Exception e) {
             log.error("Erreur lors du traitement du webhook {} : {}", event.getType(), e.getMessage(), e);
-            // On retourne 200 pour éviter que Stripe rétente indéfiniment sur une erreur applicative
-            return ResponseEntity.ok("Webhook received with processing error");
+            // Erreur de traitement (souvent transitoire : DB indisponible…) → 500 pour que Stripe
+            // RÉ-ESSAIE (backoff ~3j). Le traitement est idempotent (alreadyProcessed via
+            // stripe_event_id unique), donc un retry ne double jamais l'effet. Renvoyer 200 ici
+            // perdrait l'événement sur un échec transitoire (FIX-005).
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Webhook processing error");
         }
 
         return ResponseEntity.ok("Webhook received");
