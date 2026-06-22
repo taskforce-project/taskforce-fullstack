@@ -62,6 +62,7 @@ export const WORKSPACE_ROUTES = {
   // Par slug
   BY_SLUG: (slug: string) => `/api/workspaces/${slug}`,
   MEMBERS: (slug: string) => `/api/workspaces/${slug}/members`,
+  USAGE: (slug: string) => `/api/workspaces/${slug}/usage`,
   INVITE: (slug: string) => `/api/workspaces/${slug}/members/invite`,
   MEMBER_ROLE: (slug: string, memberId: number) => `/api/workspaces/${slug}/members/${memberId}/role`,
   MEMBER: (slug: string, memberId: number) => `/api/workspaces/${slug}/members/${memberId}`,
@@ -140,6 +141,8 @@ export const ISSUE_ROUTES = {
   CHECKLIST_ITEM:   (slug: string, projectId: number, issueId: number, itemId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/checklist/${itemId}`,
   RELATIONS:        (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/relations`,
   RELATION:         (slug: string, projectId: number, issueId: number, relationId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/relations/${relationId}`,
+  WORKLOGS:         (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/worklogs`,
+  WORKLOG:          (slug: string, projectId: number, issueId: number, worklogId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/worklogs/${worklogId}`,
 } as const;
 
 /**
@@ -250,6 +253,8 @@ export const MESSAGE_ROUTES = {
  */
 export const INTEGRATION_ROUTES = {
   GITHUB_STATUS:     (slug: string) => `/api/workspaces/${slug}/integrations/github/status`,
+  GITHUB_REPOS:      (slug: string) => `/api/workspaces/${slug}/integrations/github/repos`,
+  GITHUB_ISSUES:     (slug: string, repo: string) => `/api/workspaces/${slug}/integrations/github/issues?repo=${encodeURIComponent(repo)}`,
   GITHUB_CONNECT:    (slug: string) => `${API_BASE}/api/workspaces/${slug}/integrations/github/connect`,
   GITHUB_DISCONNECT: (slug: string) => `/api/workspaces/${slug}/integrations/github`,
   GITHUB_LINKS:      (slug: string, issueId: number) => `/api/workspaces/${slug}/integrations/github/issues/${issueId}/links`,
@@ -261,6 +266,12 @@ export const INTEGRATION_ROUTES = {
   SLACK_CHANNEL:     (slug: string, channelId: number) => `/api/workspaces/${slug}/integrations/slack/channels/${channelId}`,
   WEBHOOKS:          (slug: string) => `/api/workspaces/${slug}/webhooks`,
   WEBHOOK:           (slug: string, id: number) => `/api/workspaces/${slug}/webhooks/${id}`,
+} as const;
+
+/** Routes RGPD — droits des personnes (CERT-C11). */
+export const GDPR_ROUTES = {
+  EXPORT:  () => `/api/gdpr/export`,
+  ACCOUNT: () => `/api/gdpr/account`,
 } as const;
 
 /**
