@@ -30,17 +30,6 @@ const plans = [
     badge: "Most popular",
   },
   {
-    id: "business",
-    name: "Business",
-    desc: "For scaling organisations with advanced workflows.",
-    monthlyPrice: 24,
-    yearlyPrice: 19,
-    cta: "Start free trial",
-    ctaHref: "http://localhost:3000/auth/register",
-    highlighted: false,
-    badge: null,
-  },
-  {
     id: "enterprise",
     name: "Enterprise",
     desc: "Custom deployment, SLA, and dedicated support.",
@@ -62,11 +51,19 @@ const featureGroups = [
     label: "Core features",
     features: [
       {
+        id: "workspaces",
+        label: "Workspaces",
+        free: "2",
+        pro: "10",
+        business: "10",
+        enterprise: "Unlimited",
+      },
+      {
         id: "members",
         label: "Team members",
         free: "Up to 5",
-        pro: "Unlimited",
-        business: "Unlimited",
+        pro: "Up to 50",
+        business: "Up to 50",
         enterprise: "Unlimited",
       },
       {
@@ -328,7 +325,7 @@ export default function Pricing() {
 
       {/* ---------- Plan cards ---------- */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {plans.map((plan) => {
             const resolvedPrice = annual ? plan.yearlyPrice : plan.monthlyPrice;
             const price = plan.monthlyPrice === null ? null : resolvedPrice;
@@ -423,7 +420,7 @@ export default function Pricing() {
                 <>
                   <tr key={group.id} className="border-t border-white/6 bg-white/2">
                     <td
-                      colSpan={5}
+                      colSpan={4}
                       className="py-2.5 px-4"
                     >
                       <button
@@ -448,7 +445,6 @@ export default function Pricing() {
                         <td className="py-3.5 px-4 text-sm text-white/70">{feat.label}</td>
                         <FeatureCell value={feat.free} />
                         <FeatureCell value={feat.pro} />
-                        <FeatureCell value={feat.business} />
                         <FeatureCell value={feat.enterprise} />
                       </tr>
                     ))}
