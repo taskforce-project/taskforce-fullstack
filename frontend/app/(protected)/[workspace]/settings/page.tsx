@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, useRouter } from "next/navigation"
 import {
   User, Bell, CreditCard, Users, Check, Zap, Globe, Key, Palette, Webhook,
   X as XIcon, Plus, Upload, Camera, Link2, Trash2, Shield, Search,
@@ -10,15 +10,16 @@ import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarImage } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useAuth } from "@/lib/contexts/auth-context"
 import { useUserStore } from "@/lib/store/user-store"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
+import { DeleteConfirmDialog } from "@/components/dialogs/delete-confirm-dialog"
+import { stripeService } from "@/lib/api/stripe-service"
 import { useIntegrationStore } from "@/lib/store/integration-store"
-import { getAvatarUrl } from "@/lib/utils/avatar"
 import { apiClient } from "@/lib/api/client"
 import { USER_ROUTES } from "@/lib/config/api-routes"
 import { searchUsers, type UserSearchResult } from "@/lib/api/user-service"
@@ -89,11 +90,17 @@ function FormField({ label, hint, children }: Readonly<{ label: string; hint?: s
   )
 }
 
-function SectionCard({ title, description, children }: Readonly<{ title: string; description?: string; children: React.ReactNode }>) {
+function SectionCard({ title, description, children, danger = false }: Readonly<{ title: string; description?: string; children: React.ReactNode; danger?: boolean }>) {
   return (
-    <div className="rounded-xl border border-border bg-card [box-shadow:var(--shadow-sm)]">
-      <div className="px-5 py-4 border-b border-border/70">
-        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+    <div className={cn(
+      "rounded-xl border bg-card [box-shadow:var(--shadow-sm)]",
+      danger ? "border-destructive/40" : "border-border"
+    )}>
+      <div className={cn(
+        "px-5 py-4 border-b",
+        danger ? "border-destructive/30 bg-destructive/5" : "border-border/70"
+      )}>
+        <h3 className={cn("text-sm font-semibold", danger ? "text-destructive" : "text-foreground")}>{title}</h3>
         {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
       </div>
       <div className="px-5 py-5">{children}</div>
@@ -215,13 +222,6 @@ function ProfilePanel() {
     }
   }, [user])
 
-  // Utilise l'avatar custom si défini, sinon l'API route qui génère le SVG gradient
-  const effectiveAvatar = getAvatarUrl({
-    firstName,
-    lastName,
-    email: user?.email ?? "",
-    avatarUrl: avatarUrl || null,
-  })
   const hasCustomAvatar = Boolean(avatarUrl)
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -284,9 +284,15 @@ function ProfilePanel() {
             <div className="flex items-center gap-4">
               {/* Avatar preview */}
               <div className="relative group shrink-0">
-                <Avatar className="h-14 w-14">
-                  <AvatarImage src={effectiveAvatar} alt={displayName} className="object-cover" />
-                </Avatar>
+                <UserAvatar
+                  email={user?.email}
+                  name={displayName}
+                  firstName={firstName}
+                  lastName={lastName}
+                  avatarUrl={avatarUrl || null}
+                  className="h-14 w-14"
+                  imageClassName="object-cover"
+                />
                 {/* Overlay camera au hover */}
                 <button
                   type="button"
@@ -413,7 +419,7 @@ function AccountPanel() {
           </FormField>
         </div>
       </SectionCard>
-      <SectionCard title="Danger zone" description="Irreversible actions. Proceed with caution.">
+      <SectionCard danger title="Danger zone" description="Irreversible actions. Proceed with caution.">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-medium text-foreground">Delete your account</p>
@@ -576,6 +582,17 @@ function SecurityPanel() {
 function BillingPanel() {
   const { user } = useAuth()
   const plan = (user?.planType ?? "FREE") as string
+  const [portalLoading, setPortalLoading] = useState(false)
+
+  async function handleManageBilling() {
+    setPortalLoading(true)
+    try {
+      await stripeService.openBillingPortal() // redirige vers Stripe
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Impossible d'ouvrir le portail de facturation")
+      setPortalLoading(false)
+    }
+  }
 
   const PLANS = [
     { key: "FREE",       label: "Free",       price: "$0",     features: PLAN_FEATURES.free,       highlight: false },
@@ -601,8 +618,14 @@ function BillingPanel() {
             </p>
           </div>
           {plan !== "FREE" && (
-            <Button variant="outline" size="sm" className="h-8 text-xs text-destructive border-destructive/30 hover:bg-destructive/10">
-              Cancel plan
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs"
+              onClick={handleManageBilling}
+              disabled={portalLoading}
+            >
+              {portalLoading ? "Ouverture…" : "Gérer la facturation"}
             </Button>
           )}
         </div>
@@ -652,10 +675,25 @@ function BillingPanel() {
 }
 
 function WorkspacePanel() {
-  const { activeWorkspace, updateWorkspaceInfo } = useWorkspaceStore()
+  const router = useRouter()
+  const { activeWorkspace, updateWorkspaceInfo, deleteCurrentWorkspace } = useWorkspaceStore()
+  const currentUser = useUserStore((s) => s.user)
   const [name,        setName]        = useState(activeWorkspace?.name ?? "")
   const [description, setDescription] = useState(activeWorkspace?.description ?? "")
   const [saving, setSaving] = useState(false)
+
+  const isOwner = !!activeWorkspace && activeWorkspace.ownerId === Number(currentUser?.id)
+
+  async function handleDeleteWorkspace() {
+    if (!activeWorkspace) return
+    try {
+      const next = await deleteCurrentWorkspace(activeWorkspace.slug)
+      toast.success("Workspace supprimé")
+      router.push(next ? `/${next}/dashboard` : "/")
+    } catch {
+      toast.error("Impossible de supprimer le workspace (réservé au propriétaire)")
+    }
+  }
 
   useEffect(() => {
     if (activeWorkspace) {
@@ -710,6 +748,29 @@ function WorkspacePanel() {
           </div>
         </div>
       </SectionCard>
+
+      {isOwner && (
+        <SectionCard danger title="Danger zone" description="Actions irréversibles. À utiliser avec précaution.">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-foreground">Supprimer ce workspace</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Supprime définitivement le workspace et toutes ses données (projets, issues, équipes…).
+              </p>
+            </div>
+            <DeleteConfirmDialog
+              title="Supprimer le workspace ?"
+              description={`« ${activeWorkspace?.name} » et toutes ses données seront définitivement supprimés. Cette action est irréversible.`}
+              confirmLabel="Supprimer le workspace"
+              onConfirm={handleDeleteWorkspace}
+            >
+              <Button variant="destructive" size="sm" className="h-8 shrink-0 text-xs">
+                Supprimer
+              </Button>
+            </DeleteConfirmDialog>
+          </div>
+        </SectionCard>
+      )}
     </div>
   )
 }
@@ -772,13 +833,15 @@ function TeamPanel() {
           {!membersLoading && members.map((m) => {
             const isYou = String(m.userId) === currentUser?.id
             const displayLabel = m.displayName ?? m.email
-            const nameParts = displayLabel.split(" ")
-            const initials = `${nameParts[0]?.charAt(0) ?? ""}${nameParts[1]?.charAt(0) ?? ""}`.toUpperCase() || "?"
             return (
               <div key={m.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-                <div className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-semibold text-white bg-primary shrink-0">
-                  {initials}
-                </div>
+                <UserAvatar
+                  email={m.email}
+                  name={displayLabel}
+                  avatarUrl={m.avatarUrl}
+                  className="h-8 w-8 shrink-0"
+                  fallbackClassName="text-xs font-semibold"
+                />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-foreground">
                     {displayLabel}{isYou && <span className="ml-1 text-xs text-muted-foreground font-normal">(you)</span>}
@@ -849,9 +912,13 @@ function TeamPanel() {
               <div className="flex flex-col gap-0.5 rounded-md border border-border bg-background overflow-hidden">
                 {searchResults.map((u) => (
                   <div key={u.id} className="flex items-center gap-3 px-3 py-2 hover:bg-muted/50 transition-colors">
-                    <div className="h-7 w-7 rounded-full bg-primary flex items-center justify-center text-[10px] font-semibold text-white shrink-0">
-                      {(u.displayName ?? u.email).slice(0, 2).toUpperCase()}
-                    </div>
+                    <UserAvatar
+                      email={u.email}
+                      name={u.displayName ?? u.email}
+                      avatarUrl={u.avatarUrl}
+                      className="h-7 w-7 shrink-0"
+                      fallbackClassName="text-[10px] font-semibold"
+                    />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{u.displayName ?? u.email}</p>
                       {u.displayName && <p className="text-xs text-muted-foreground truncate">{u.email}</p>}
