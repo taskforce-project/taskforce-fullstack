@@ -21,7 +21,7 @@ import {
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -103,24 +103,6 @@ const ACTIVITY_LABELS: Partial<Record<string, string>> = {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-const AVATAR_COLORS = [
-  "bg-violet-500", "bg-blue-500", "bg-emerald-500", "bg-orange-500",
-  "bg-pink-500", "bg-cyan-500", "bg-amber-500", "bg-indigo-500",
-]
-
-function userInitials(u: { email: string; displayName: string | null }): string {
-  if (u.displayName) {
-    const parts = u.displayName.trim().split(" ")
-    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
-    return u.displayName.slice(0, 2).toUpperCase()
-  }
-  return u.email.slice(0, 2).toUpperCase()
-}
-
-function userColor(id: number): string {
-  return AVATAR_COLORS[id % AVATAR_COLORS.length]
-}
 
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return "—"
@@ -236,14 +218,6 @@ export default function IssueDetailPage() {
       new Date(a.data.createdAt).getTime() - new Date(b.data.createdAt).getTime()
     )
   }, [comments, activity])
-
-  // Current user initials for comment input
-  let meInitials = "ME"
-  if (user?.displayName) {
-    meInitials = user.displayName.slice(0, 2).toUpperCase()
-  } else if (user?.email) {
-    meInitials = user.email.slice(0, 2).toUpperCase()
-  }
 
   if (isLoading && !activeIssue) {
     return (
@@ -366,11 +340,12 @@ export default function IssueDetailPage() {
                     const isMe = user?.email === c.author.email
                     return (
                       <div key={`comment-${c.id}`} className="flex gap-3">
-                        <Avatar className="h-7 w-7 shrink-0 mt-0.5">
-                          <AvatarFallback className={cn("text-[10px] text-white font-medium", userColor(c.author.id))}>
-                            {userInitials(c.author)}
-                          </AvatarFallback>
-                        </Avatar>
+                        <UserAvatar
+                          email={c.author.email}
+                          name={c.author.displayName ?? c.author.email}
+                          className="h-7 w-7 shrink-0 mt-0.5"
+                          fallbackClassName="text-[10px] font-medium"
+                        />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1.5">
                             <span className="text-xs font-medium text-foreground">
@@ -399,16 +374,15 @@ export default function IssueDetailPage() {
 
                   // event entry
                   const a = entry.data
-                  const actorName     = a.actor ? (a.actor.displayName ?? a.actor.email) : "System"
-                  const actorInitials = a.actor ? userInitials(a.actor) : "SY"
-                  const actorColor    = a.actor ? userColor(a.actor.id) : "bg-muted"
+                  const actorName = a.actor ? (a.actor.displayName ?? a.actor.email) : "System"
                   return (
                     <div key={`event-${a.id}`} className="flex gap-3">
-                      <Avatar className="h-7 w-7 shrink-0 mt-0.5">
-                        <AvatarFallback className={cn("text-[10px] text-white font-medium", actorColor)}>
-                          {actorInitials}
-                        </AvatarFallback>
-                      </Avatar>
+                      <UserAvatar
+                        email={a.actor?.email}
+                        name={actorName}
+                        className="h-7 w-7 shrink-0 mt-0.5"
+                        fallbackClassName="text-[10px] font-medium"
+                      />
                       <div className="flex items-center gap-2 py-1 flex-1 min-w-0">
                         <span className="text-xs font-medium text-foreground">{actorName}</span>
                         <span className="text-xs text-muted-foreground truncate">{getActivityText(a)}</span>
@@ -422,9 +396,12 @@ export default function IssueDetailPage() {
 
             {/* Comment input */}
             <div className="flex gap-3 mt-2">
-              <Avatar className="h-7 w-7 shrink-0 mt-0.5">
-                <AvatarFallback className="text-[10px] text-white font-medium bg-primary">{meInitials}</AvatarFallback>
-              </Avatar>
+              <UserAvatar
+                email={user?.email}
+                name={user?.displayName ?? user?.email}
+                className="h-7 w-7 shrink-0 mt-0.5"
+                fallbackClassName="text-[10px] font-medium"
+              />
               <div className="flex-1 flex flex-col gap-2">
                 <textarea
                   className="w-full rounded-lg border border-border bg-muted/20 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground resize-none outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all min-h-20"
@@ -471,11 +448,12 @@ export default function IssueDetailPage() {
           <SidebarSection label="Assignee">
             {issue.assignee ? (
               <div className="flex items-center gap-2">
-                <Avatar className="h-6 w-6">
-                  <AvatarFallback className={cn("text-[9px] text-white font-medium", userColor(issue.assignee.id))}>
-                    {userInitials(issue.assignee)}
-                  </AvatarFallback>
-                </Avatar>
+                <UserAvatar
+                  email={issue.assignee.email}
+                  name={issue.assignee.displayName ?? issue.assignee.email}
+                  className="h-6 w-6"
+                  fallbackClassName="text-[9px] font-medium"
+                />
                 <span className="text-sm text-foreground">{issue.assignee.displayName ?? issue.assignee.email}</span>
               </div>
             ) : (
@@ -488,11 +466,12 @@ export default function IssueDetailPage() {
 
           <SidebarSection label="Reporter">
             <div className="flex items-center gap-2">
-              <Avatar className="h-6 w-6">
-                <AvatarFallback className={cn("text-[9px] text-white font-medium", userColor(issue.reporter.id))}>
-                  {userInitials(issue.reporter)}
-                </AvatarFallback>
-              </Avatar>
+              <UserAvatar
+                email={issue.reporter.email}
+                name={issue.reporter.displayName ?? issue.reporter.email}
+                className="h-6 w-6"
+                fallbackClassName="text-[9px] font-medium"
+              />
               <span className="text-sm text-foreground">{issue.reporter.displayName ?? issue.reporter.email}</span>
             </div>
           </SidebarSection>
