@@ -186,4 +186,16 @@ public class JwtService {
         log.info("{} refresh tokens expirés supprimés", deleted);
         return deleted;
     }
+
+    /**
+     * Nettoie les refresh tokens révoqués depuis plus de 30 jours (à appeler périodiquement).
+     */
+    @Transactional
+    public int cleanupRevokedTokens() {
+        log.info("Nettoyage des refresh tokens révoqués...");
+        LocalDateTime cutoffDate = LocalDateTime.now().minusDays(30);
+        int deleted = refreshTokenRepository.deleteRevokedTokens(cutoffDate);
+        log.info("{} refresh tokens révoqués supprimés", deleted);
+        return deleted;
+    }
 }
