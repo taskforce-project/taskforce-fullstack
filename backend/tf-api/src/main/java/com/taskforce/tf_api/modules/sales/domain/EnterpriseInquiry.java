@@ -1,6 +1,7 @@
 package com.taskforce.tf_api.modules.sales.domain;
 
 import com.taskforce.tf_api.shared.audit.AuditableEntity;
+import com.taskforce.tf_api.shared.security.EncryptedStringConverter;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -33,6 +34,7 @@ public class EnterpriseInquiry extends AuditableEntity {
     @Column(name = "team_size", nullable = false, length = 50)
     private String teamSize; // "1-10", "11-50", "51-200", "200+"
 
+    @Convert(converter = EncryptedStringConverter.class)
     @Column(name = "message", columnDefinition = "TEXT")
     private String message;
 
@@ -51,8 +53,9 @@ public class EnterpriseInquiry extends AuditableEntity {
     @Column(name = "assigned_to", length = 100)
     private String assignedTo; // ID ou email du commercial
 
+    @Convert(converter = EncryptedStringConverter.class)
     @Column(name = "notes", columnDefinition = "TEXT")
-    private String notes; // Notes internes de l'équipe sales
+    private String notes; // Notes internes de l'équipe sales (chiffré au repos — RGPD C11.2)
 
     @Column(name = "contacted_at")
     private LocalDateTime contactedAt;
