@@ -20,6 +20,8 @@ import com.taskforce.tf_api.core.dto.request.CreateIssueRelationRequest;
 import com.taskforce.tf_api.core.dto.request.CreateIssueRequest;
 import com.taskforce.tf_api.core.dto.request.CreateIssueStatusRequest;
 import com.taskforce.tf_api.core.dto.request.CreateChecklistItemRequest;
+import com.taskforce.tf_api.core.dto.request.LogWorkRequest;
+import com.taskforce.tf_api.core.dto.response.WorklogResponse;
 import com.taskforce.tf_api.core.dto.request.UpdateChecklistItemRequest;
 import com.taskforce.tf_api.core.dto.request.BulkSmartAssignRequest;
 import com.taskforce.tf_api.core.dto.request.ReorderStatusesRequest;
@@ -396,6 +398,48 @@ public class IssueController {
         Long userId = resolveUserId(jwt);
         issueService.deleteChecklistItem(slug, projectId, issueId, itemId, userId);
         return ResponseEntity.ok(ApiResponse.success("Item supprimé", null));
+    }
+
+    // =========================================================================
+    // Time tracking — worklogs (BE-ISS-012)
+    // =========================================================================
+
+    @GetMapping("/{issueId}/worklogs")
+    public ResponseEntity<ApiResponse<List<WorklogResponse>>> listWorklogs(
+        @PathVariable String slug,
+        @PathVariable Long projectId,
+        @PathVariable Long issueId,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long userId = resolveUserId(jwt);
+        return ResponseEntity.ok(ApiResponse.success(
+            "Temps récupéré", issueService.listWorklogs(slug, projectId, issueId, userId)));
+    }
+
+    @PostMapping("/{issueId}/worklogs")
+    public ResponseEntity<ApiResponse<WorklogResponse>> addWorklog(
+        @PathVariable String slug,
+        @PathVariable Long projectId,
+        @PathVariable Long issueId,
+        @Valid @RequestBody LogWorkRequest request,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long userId = resolveUserId(jwt);
+        WorklogResponse worklog = issueService.addWorklog(slug, projectId, issueId, userId, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Temps enregistré", worklog));
+    }
+
+    @DeleteMapping("/{issueId}/worklogs/{worklogId}")
+    public ResponseEntity<ApiResponse<Void>> deleteWorklog(
+        @PathVariable String slug,
+        @PathVariable Long projectId,
+        @PathVariable Long issueId,
+        @PathVariable Long worklogId,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long userId = resolveUserId(jwt);
+        issueService.deleteWorklog(slug, projectId, issueId, worklogId, userId);
+        return ResponseEntity.ok(ApiResponse.success("Entrée supprimée", null));
     }
 
     // =========================================================================
