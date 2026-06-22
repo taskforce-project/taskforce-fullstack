@@ -9,6 +9,7 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ProjectIconPicker } from "@/components/ui/project-icon-picker"
+import { ColorPalettePicker, PROJECT_COLORS } from "@/components/ui/color-palette-picker"
 import { useProjectStore } from "@/lib/store/project-store"
 
 export default function NewProjectPage() {
@@ -22,6 +23,7 @@ export default function NewProjectPage() {
   const [identifier, setIdentifier] = useState("")
   const [description, setDescription] = useState("")
   const [iconUrl, setIconUrl] = useState<string | null>(null)
+  const [color, setColor] = useState<string>(PROJECT_COLORS[0])
 
   function handleNameChange(value: string) {
     setName(value)
@@ -41,6 +43,7 @@ export default function NewProjectPage() {
         identifier: identifier.trim().toUpperCase(),
         description: description.trim() || undefined,
         iconUrl: iconUrl ?? undefined,
+        color,
       })
       if (project) {
         toast.success(`Projet "${project.name}" créé`)
@@ -126,6 +129,12 @@ export default function NewProjectPage() {
             rows={3}
             className="w-full rounded-md border border-border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground resize-none outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
           />
+        </div>
+
+        {/* Color */}
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-foreground">Color</label>
+          <ColorPalettePicker value={color} onChange={setColor} />
         </div>
       </div>
 
