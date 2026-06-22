@@ -1,192 +1,358 @@
-# Roadmap maître TaskForce — Certification + V1
+# Roadmap maître TaskForce — Produit complet + Certification RNCP
 
-**État au 17/06/2026.** La grille RNCP est à **38,9 % de critères au vert** (≈ 60 % en pondéré). L'infrastructure technique est solide (auth, billing, stack Docker, en-têtes sécurité, JaCoCo/Vitest configurés) mais **inerte** sur les critères de certification : les tests couvrent le silo auth/billing et ignorent le cœur métier ; aucun RGPD applicatif (droits des personnes, chiffrement, audit) ; pas de landing publique indexable ; CI fragmentée et non bloquante ; dossier de conception sans UML/MCD réels ; artefacts de pilotage projet absents. Le **Jalon 1 (CERTIF-READY)** vise à faire passer au vert tous les critères Cxx bloquants avant les rendus bloc 2&3 (20/07/2026). Le **Jalon 2 (V1 PRODUIT)** câble les différenciateurs (smart-assign, agents, intégrations) dont le backend est largement déjà écrit.
-
-> Source des items produit détaillés : `.ai/qa.md`. Grille remplie : `taskforce-docs/memoire/Grille_evaluation_TaskForce_REMPLIE_DFS_25-26.xlsx`.
-
----
-
-## Ordre de priorité (chemin critique)
-
-1. **Tests cœur métier (C18/C25)** — _fondation_. Les seuils JaCoCo (50 %/package) et Vitest (60 % global) sont déjà posés mais **échouent aujourd'hui** car le métier n'est pas testé. Rien ne sert d'industrialiser une CI qui sera rouge d'entrée. → **Tests avant CI.**
-2. **RGPD & Sécurité (C11/C24/C21/C16)** — critère **obligatoire** de la grille, fort volume (9 j·h), touche le backend (audit, chiffrement, droits) qui doit être stable avant de figer la CI sécurité. Le socle audit conditionne RBAC et droits des personnes.
-3. **CI & Industrialisation (C19/C26)** — _après tests + sécu_ : elle **active et rend bloquants** les seuils de tests (jacoco:check, thresholds Vitest) et branche les scans sécurité (OWASP/CodeQL/Trivy) produits par le chantier RGPD.
-4. **Conception & Modélisation (C6–C10)** — _documentaire, parallélisable_ : dérive UML/MCD du **code réel** (entités JPA, migrations Flyway), à faire après stabilisation du schéma (nouvelles migrations audit/chiffrement).
-5. **SEO & Landing (C20)** — _indépendant front_, parallélisable. Seule contrainte : CSP à ajuster pour l'analytics (cohérent avec le cookie-banner RGPD).
-6. **Doc Gestion de Projet (C2/C3/C4/C12)** — _pur cadrage_, parallélisable immédiatement, sans dépendance code. À lancer en fond dès J1.
-
-> Parallélisation réelle : **Conception**, **SEO** et **Doc Projet** n'ont aucune dépendance code bloquante → exécutables en fond pendant Tests → RGPD → CI sur le chemin critique.
+> **Réécriture complète au 20/06/2026** (branche `feat/dashboard`).
+> Objectif : couvrir **100 %** de ce qu'il reste à faire, sur deux axes parallèles —
+> **(A) PRODUIT** (terminer le CDC de base, puis les différenciateurs et l'infra) et
+> **(B) CERTIFICATION** (grille RNCP C1–C26 : tests, RGPD, sécurité, accessibilité, SEO, conception, CI, gestion de projet).
+>
+> Cette roadmap est **longue par design**. Elle sert de référentiel maître. On **itère ensuite step by step** :
+> à chaque lot livré → on met à jour le **Brain OS** (`taskforce-docs/`), **cette roadmap** (statut), et l'**Excel grille** (`Grille_evaluation_TaskForce_REMPLIE_DFS_25-26.xlsx`). Voir §6.
+>
+> Sources : `.ai/qa.md` (QA produit détaillée), `.ai/known-issues.md` (bugs vérifiés), `.ai/module-map.md` (domaines↔code), `.ai/architecture-map.md` (archi réelle), `.ai/P0-fix-plan.md` (correctifs P0 paste-ready).
 
 ---
 
-## Jalon 1 — CERTIF-READY
+## 0. Légende & conventions
 
-### Chantier A · Tests cœur métier — _C18, C25_
+**Statuts :**
 
-| #   | Tâche                                                                                                                         | Effort | Critère d'acceptation                                                                          |
-| --- | ----------------------------------------------------------------------------------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------- |
-| A0  | Plan de tests aligné specs (matrice CDC→TC-xx→fichier) → `taskforce-docs/memoire/Plan_de_tests.md`                            | 0,25   | Aucune exigence CDC cœur sans ligne ; chaque test porte un id `TC-xx`                          |
-| A1  | Back : socle Testcontainers Postgres (`AbstractIntegrationTest`, `application-test.yml`, externes `@MockBean`)                | 0,5    | `mvn test` démarre le conteneur, Flyway applique V1..V38 sans erreur                           |
-| A2  | Back : tests services métier (SmartAssign, Issue+labels, Project/Workspace nom dupliqué, Cycle enum, Notification, Analytics) | 1,25   | ≥1 nominal + ≥1 cas erreur/autz par service ; 3 bugs known-issues en non-régression rouge→vert |
-| A3  | Back : tests controllers (`/api`, `ApiResponse<T>`, `@Valid` 400) + atteindre seuil JaCoCo (excludes justifiés)               | 0,5    | `mvn verify` passe `jacoco:check` ≥0,50/package non exclu                                      |
-| A4  | Front : recalibrer scope coverage, retirer doublon `jsdom`                                                                    | 0,25   | `npm run test:coverage` sans échec de seuil ; include/exclude reflètent le périmètre réel      |
-| A5  | Front : tests stores + services métier (project/issue/workspace/team, mock `apiClient`, `response.data.data`)                 | 0,5    | Chaque store/service visé : nominal + cas erreur ; seuils par-fichier respectés                |
-| A6  | Rapports exploitables (LCOV/HTML/JaCoCo archivés pour mémoire)                                                                | 0,25   | Couverture lignes ≥50 % (cible 70 %) front **et** back, captures insérables                    |
+| Symbole | Sens                                                             |
+| ------- | ---------------------------------------------------------------- |
+| ✅      | Fait et vérifié                                                  |
+| 🟡      | Partiel (fonctionne mais incomplet / non poli)                   |
+| 🟧      | Back prêt, **UI manquante ou non câblée**                        |
+| 🔲      | À faire (rien n'existe)                                          |
+| 🔒      | À **verrouiller** dans l'UI (« coming soon ») tant que non livré |
 
-**Sous-total : 3,5 j·h** → **C18 ✅ · C25 ✅** (+ renfort C19/C26).
+**Priorités :** `P0` cassé / bloquant · `P1` haute (CDC ou certif obligatoire) · `P2` moyenne · `P3` basse / nice-to-have.
 
-### Chantier B · RGPD & Sécurité — _C11, C24, C21, C16_
+**IDs :** `PROD-x.y` (produit) · `CERT-Cxx` (critère grille RNCP) · `FIX-xxx` (correctif P0). Effort en **j·h** (jours-homme, mono-exécutant).
 
-| #   | Tâche                                                                                                    | Effort | Critère d'acceptation                                                                                                          |
-| --- | -------------------------------------------------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------ |
-| B1  | Journal d'audit sécurité (`AuditLog` + `V39__audit_log.sql` + hooks login/rôle/suppression)              | 1,0    | Connexion + changement rôle + suppression → 1 ligne `audit_log` chacune (test vert)                                            |
-| B2  | RBAC granulaire centralisé (`AuthorizationService`, combler Analytics/Issue/Project/Cycle) — _dépend B1_ | 1,5    | MEMBER → 403, ADMIN/OWNER → OK ; aucun endpoint authentifié sans contrôle d'appartenance                                       |
-| B3  | Chiffrement au repos (`EncryptedStringConverter` AES-GCM, `@Convert` sur PII/tokens, `V40__`)            | 1,5    | Token inséré illisible en base, relu en clair par l'app ; round-trip vert                                                      |
-| B4  | Droits des personnes (`GdprService` export/suppression OTP/anonymisation, `/api/gdpr`) — _dépend B1,B2_  | 2,0    | `GET /api/gdpr/export` JSON complet ; suppression OTP → anonymisation + audit                                                  |
-| B5  | Front : consentement granulaire + page droits + privacy enrichie (FR/EN) — _dépend B4_                   | 1,5    | Accept/refus par catégorie + ré-ouverture ; export/suppression depuis settings ; privacy = bases légales/durées/sous-traitants |
-| B6  | Audit deps automatisé (OWASP back, `npm audit` front, workflow) — _parallélisable_                       | 0,5    | CVE High volontaire fait échouer le job ; rapport HTML généré                                                                  |
-| B7  | Durcissement prod (JWT secret sans fallback, TLS actif nginx, sslmode=require) — _parallélisable_        | 0,5    | Démarrage sans `jwt.secret` → échec explicite ; `curl -I` → HSTS+CSP une fois, TLS 1.3                                         |
-
-**Sous-total : 9,0 j·h** → **C11 ✅ · C24 ✅ · C21 ✅ · C16 ✅**.
-_Ordre : B1 → (B3+B6+B7 //) → B2 → B4 → B5._
-
-### Chantier C · CI & Industrialisation — _C19, C26_ (+ active C18/C25/C20)
-
-| #   | Tâche                                                                                                                           | Effort | Critère d'acceptation                                                     |
-| --- | ------------------------------------------------------------------------------------------------------------------------------- | ------ | ------------------------------------------------------------------------- |
-| C1  | Workflow `ci.yml` agrégé (paths-filter, `workflow_call`, job `ci-success` = check unique requis)                                | 0,5    | 1 PR → 1 check `ci-success` agrégeant tout ; un job rouge le fait échouer |
-| C2  | Rendre lint + seuils bloquants (ESLint sans `continue-on-error`, Node 22 partout, `mvn verify`+jacoco:check, thresholds Vitest) | 0,5    | Lint error ou couverture < seuil fait échouer la CI                       |
-| C3  | Lint/format Java (Spotless en profil `ci`) — _commit `spotless:apply` à part_                                                   | 0,5    | `spotless:check` vert sur code formaté, rouge sinon                       |
-| C4  | Qualité SonarQube/SonarCloud (jacoco.xml + lcov, Quality Gate en check PR)                                                      | 1,0    | Dashboard Sonar par service alimenté ; Quality Gate bloque si rouge       |
-| C5  | Sécurité code (OWASP cache NVD, dependency-review, CodeQL java+ts, Trivy images) — _réutilise B6_                               | 1,0    | CVE critique injectée → job rouge ; CodeQL remonte dans l'onglet Security |
-| C6  | Dependabot (maven/npm×2/actions/docker, groupé hebdo) — _parallélisable_                                                        | 0,25   | Dependabot ouvre des PR validées par `ci-success`                         |
-| C7  | Builds optimisés (`clean verify`, cache GHA/`.next/cache`, images build sans push sur PR, push GHCR dev/main) — _dépend C5_     | 1,0    | Cache hit visible ; images back+front buildées+scannées sans push sur PR  |
-| C8  | Protection de branche + badges README + PR template                                                                             | 0,25   | Merge impossible si un gate échoue ; badges à jour                        |
-
-**Sous-total : 5,0 j·h** (mutualisé avec B6) → **C19 ✅ · C26 ✅** (+ rend réellement bloquants C18/C25, renforce C20).
-
-### Chantier D · Conception & Modélisation — _C6–C10_
-
-| #   | Tâche                                                                                                    | Effort | Critère d'acceptation                                                                    |
-| --- | -------------------------------------------------------------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------- |
-| D1  | Table de réconciliation domaine↔code (29 entités, 38 migrations, CDC→entité→migration)                   | 0,5    | Chaque UC01–10 pointe ≥1 entité réelle ; concepts non implémentés marqués backlog        |
-| D2  | Diagramme de cas d'usage UML (acteurs + include/extend, Mermaid+PNG) — remplace les placeholders CdCF §7 | 1,0    | 100 % UC01–10 + cas secondaires ; chaque acteur présent ; 0 `[Diagramme à intégrer]`     |
-| D3  | Diagramme de classes (analyse + conception reflet JPA réel)                                              | 1,0    | 29 entités, cardinalités cohérentes avec les `@ManyToOne/@OneToMany` (sondage 5 entités) |
-| D4  | MCD / MLD dérivés du schéma Flyway réel (+ règles de gestion, pgvector)                                  | 1,0    | MLD = miroir fidèle des migrations ; règles reliées à contraintes SQL réelles            |
-| D5  | Wireframes annotés des vues clés (liés UC + route front réelle) — _dépend D2_                            | 1,5    | Chaque vue note de cadrage : wireframe annoté + route+UC ; UX justifiée                  |
-| D6  | STB consolidé + dossier conception assemblé + Bloc1 coché                                                | 1,0    | C6–C10 cochés avec lien preuve ; dossier navigable ; aucun placeholder résiduel          |
-
-**Sous-total : 6,0 j·h** → **C6 ✅ · C7 ✅ · C8 ✅ · C9 ✅ · C10 ✅**.
-_Chemin : D1 → D2 → D5 → D6 ; D3/D4 // après D1._
-
-### Chantier E · SEO & Landing — _C20_
-
-| #   | Tâche                                                                                          | Effort | Critère d'acceptation                                                  |
-| --- | ---------------------------------------------------------------------------------------------- | ------ | ---------------------------------------------------------------------- |
-| E1  | Groupe `(public)/` + landing `/` server-rendered (sections marketing, i18n, footer légal)      | 1,0    | `GET /` non auth → 200 HTML server-rendered ; ≥1 `<h1>` dans le source |
-| E2  | Metadata globale + par-page (metadataBase, canonical, robots, lang dynamique, noindex protégé) | 0,5    | Accueil : title/description/canonical ; pages protégées : `noindex`    |
-| E3  | `robots.ts` + `sitemap.ts` (publiques only) — _dépend E2_                                      | 0,3    | `/robots.txt` + `/sitemap.xml` 200 valides ; aucune URL auth/workspace |
-| E4  | Open Graph / Twitter + image OG + manifest/favicons — _dépend E2_                              | 0,5    | `og:*` + `twitter:card` présents ; image OG 1200×630 valide            |
-| E5  | JSON-LD (SoftwareApplication/Organization/WebSite) — _dépend E2_                               | 0,3    | Bloc `ld+json` valide (0 erreur Rich Results) dans le source           |
-| E6  | Performance landing (`next/image`+`sharp`, lazy-load, server components) — _dépend E1_         | 0,7    | Lighthouse mobile SEO ≥90 et Perf ≥90 ; LCP<2,5s, CLS<0,1              |
-| E7  | Analytics RGPD-safe (Plausible/Umami, CSP ajustée, consentement)                               | 0,5    | Pageview remonté ; aucun blocage CSP ; cookies après consentement      |
-| E8  | Vérif indexabilité bout-en-bout (redirects, noindex, sitemap)                                  | 0,2    | Lighthouse SEO ≥70 (cible ≥90) ; aucune page protégée au sitemap       |
-
-**Sous-total : 4,2 j·h** → **C20 ✅** (+ renfort RGPD via analytics sans cookies).
-
-### Chantier F · Doc Gestion de Projet — _C2, C3, C4, C12_
-
-| #   | Tâche                                                                              | Effort | Critère d'acceptation                                                |
-| --- | ---------------------------------------------------------------------------------- | ------ | -------------------------------------------------------------------- |
-| F1  | Index chantier `v1/12-gestion-projet/` + lien Brain_OS                             | 0,25   | README liste 5 livrables + table C2/C3/C4/C12 ; lien résout          |
-| F2  | Planning prévisionnel (Gantt Mermaid, jalons DFS, chemin critique, mono-exécutant) | 0,5    | Chaque jalon DFS rattaché ; chemin critique identifié                |
-| F3  | Budget prévisionnel (infra réelle, tiers, charge j·h×TJM, scénarios) — _dépend F2_ | 0,5    | Tableau coûts par poste réel de la stack ; hypothèses explicites     |
-| F4  | Méthode agile + trame CR + 1 CR exemple — _dépend F2_                              | 0,75   | Trame opérationnelle référençant board/sprints réels + instanciée 1× |
-| F5  | Méthodologie de veille (sources/fréquence/compilation/actualisation + Brain OS)    | 0,5    | 4 items C12 couverts ; ≥3 entrées de veille tracées avec impact code |
-| F6  | Éco-conception & inclusion (leviers réels repo + RGAA/WCAG)                        | 0,5    | 2 sections ≥5 leviers chacune rattachés à des éléments réels         |
-| F7  | Bouclage grille (Bloc1 + xlsx via skill xlsx) — _dépend F2–F6_                     | 0,25   | Lignes C2/C3/C4/C12 pointent un artefact existant                    |
-
-**Sous-total : 3,75 j·h** → **C2 ✅ · C3 ✅ · C4 ✅ · C12 ✅**.
+**Règle d'or de chaque lot (DoD) :** respecter `CLAUDE.md` (préfixe `/api`, `apiClient` nommé, `response.data.data`, store Zustand par domaine, TS strict, Flyway pour la DB, `@Valid`/Zod) **+** tests pour ne pas dégrader la couverture **+** MAJ Brain OS / roadmap / grille.
 
 ---
 
-### Total Jalon 1
+## 1. État des lieux (synthèse vérifiée)
 
-**Effort : 3,5 + 9,0 + 5,0 + 6,0 + 4,2 + 3,75 ≈ 31,5 j·h.**
-**Critères passés au vert : C2, C3, C4, C6, C7, C8, C9, C10, C11, C12, C16, C18, C19, C20, C21, C24, C25, C26** = **18 critères**.
+**Ce qui marche (cœur CDC déjà couvert) :** répartition auto par compétences/charge/dispo (`SmartAssignService` + Groq fallback), suivi (dashboard/board/analytics), alertes d'échéance (`DueDateAlertScheduler` quotidien + dédup), collaboration (workspaces/projets/issues/cycles, rôles, invitations avec rôle + recherche), rapports (Analytics + AI insights). Le produit **dépasse** le CDC (agents IA, Stripe, MinIO, vision wrapper GitHub/Slack). Pièces jointes MinIO, mentions, story points, favoris projet, My Work cross-projets, board drag&drop + filtres : ✅.
 
-**Projection grille :** de 38,9 % à **~85 % de critères au vert** ; en pondéré, de ~60 % à **~90–92 %**. Les critères restants relèvent du déroulé de soutenance et de la réalisation produit (Jalon 2), non d'un manque technique bloquant.
+**2 trous fonctionnels CDC (cf. `qa.md`) :**
 
----
+1. **Saisie des compétences membres** — la table `member_skill_profiles` (V33) existe, **aucune UI** → l'auto-assign tourne sans données. C'est _le_ cœur du CDC. → **PROD-1.2**.
+2. **RGPD** — explicitement demandé par le CDC, **non implémenté**. → **CERT-C11**.
 
-## Jalon 2 — V1 PRODUIT
+**Cassé / fragile :** **vérifié le 20/06** — FIX-001 (`/api` × 5 contrôleurs), FIX-002 (4 routes front), FIX-003 (import `profile-service`) sont **déjà faits** (le board `known-issues.md` du 05/06 était périmé). FIX-006 (écritures en tx readOnly) corrigé. **Restent** : FIX-004 (refresh/logout token) et FIX-005 (webhooks Stripe) — _design requis_. FIX-007 = clé Groq (config user, faite). → **§2.0**.
 
-> Backend souvent **déjà écrit, non câblé UI** → l'essentiel est front/câblage. DoD de chaque item : tests Vitest/JUnit pour ne pas dégrader la couverture acquise au Jalon 1.
-
-### Priorité HAUTE (différenciateurs + fondations)
-
-| #    | Tâche                                                             | Effort | Note                                     |
-| ---- | ----------------------------------------------------------------- | ------ | ---------------------------------------- |
-| P0.1 | PageShell unifié (gabarit + audit modals focus-trap)              | 1,5    | Débloque l'intégration visuelle du reste |
-| P0.2 | Footer Cloudflare-like + suppression bandeaux « operational »     | 0,5    |                                          |
-| P2.1 | Persister compétences membres (`member_skill_profiles` vivant)    | 1,5    | Prérequis qualité smart-assign           |
-| P1.1 | Smart-assign à la **création** d'issue (endpoint preview dry-run) | 1,0    | Différenciateur cœur                     |
-| P1.2 | Smart-assign **visible** dans l'issue-sheet                       | 0,5    |                                          |
-| P3.1 | Sous-tâches (back prêt, UI manquante)                             | 0,75   |                                          |
-| P3.2 | Liens entre issues / relations (back prêt)                        | 0,75   |                                          |
-| P8.1 | RBAC UI (changer rôle, retirer, inviter par rôle)                 | 1,0    |                                          |
-| P9.1 | Delete workspace + Danger zone (endpoint manquant)                | 0,75   |                                          |
-
-**Sous-total HAUTE : 8,25 j·h.**
-
-### Priorité MOYENNE (intégrations + valeur produit)
-
-| #    | Tâche                                              | Effort     | Note                      |
-| ---- | -------------------------------------------------- | ---------- | ------------------------- |
-| P3.3 | Checklist d'issues (option A back / B markdown)    | 1,0 / 0,25 |                           |
-| P9.2 | 500→400 nom workspace dupliqué + limites de plan   | 0,5        |                           |
-| P4.1 | Finaliser wrapper GitHub (OAuth + sync PR/commits) | 2,0        | back majoritairement prêt |
-| P7.1 | Discussions : réparer pin/lock + centre d'annonces | 0,75       |                           |
-| P7.2 | Messages : connexion Slack bidirectionnelle        | 2,0        | back Slack présent        |
-| P6.1 | Personnalisation projet (icône + couleur + upload) | 0,75       |                           |
-
-**Sous-total MOYENNE : ~7,75 j·h.**
-
-### Priorité BASSE (construction lourde / nice-to-have)
-
-| #    | Tâche                                                               | Effort | Note                              |
-| ---- | ------------------------------------------------------------------- | ------ | --------------------------------- |
-| P6.2 | Templates de projet / board                                         | 2,0    | back neuf                         |
-| P5.1 | Configuration des agents (modèle persistant + CRUD + seed Brain OS) | 2,5    | chantier le plus lourd, back neuf |
-
-**Sous-total BASSE : 4,5 j·h.**
-
-**Total Jalon 2 ≈ 20,5 j·h.**
+**Dette transverse :** layout incohérent entre pages, dashboard « mort » (pas de signal vivant), `ai-service` Python vestigial, mock chat résiduel, pas de RBAC UI, pas d'audit/logs/export, pas de landing indexable, CI fragmentée non bloquante, dossier de conception sans UML/MCD réels.
 
 ---
 
-## Récapitulatif effort & couverture
+# AXE A — PRODUIT
 
-| Chantier                       | Effort (j·h) | Gain grille                                  |
-| ------------------------------ | ------------ | -------------------------------------------- |
-| **JALON 1 — CERTIF-READY**     |              |                                              |
-| A · Tests cœur métier          | 3,5          | C18, C25                                     |
-| B · RGPD & Sécurité            | 9,0          | C11, C24, C21, C16                           |
-| C · CI & Industrialisation     | 5,0          | C19, C26 (active C18/C25/C20)                |
-| D · Conception & Modélisation  | 6,0          | C6, C7, C8, C9, C10                          |
-| E · SEO & Landing              | 4,2          | C20                                          |
-| F · Doc Gestion de Projet      | 3,75         | C2, C3, C4, C12                              |
-| **Sous-total Jalon 1**         | **31,5**     | **18 critères → ~85 % vert / ~90 % pondéré** |
-| **JALON 2 — V1 PRODUIT**       |              |                                              |
-| Priorité HAUTE                 | 8,25         | fondations + différenciateurs                |
-| Priorité MOYENNE               | 7,75         | intégrations tierces                         |
-| Priorité BASSE                 | 4,5          | différenciateurs soutenance                  |
-| **Sous-total Jalon 2**         | **~20,5**    | valeur démo / réalisation produit            |
-| **TOTAL 100 % vert (J1 + J2)** | **~52 j·h**  | grille complète + produit V1                 |
+> Ordre logique : **stabiliser le socle (§2.0)** → **finir le CDC de base + verrou menu (§2.1)** → gestion fine, rôles/plans, monétisation, intégrations, IA, infra, UI (§2.2→2.8).
 
-**Minimum certif (chemin critique seul, RGPD obligatoire) :** Chantiers **A + B + C** = **17,5 j·h** pour sécuriser les critères techniques bloquants (tests, RGPD, industrialisation). En ajoutant **D + E + F** (parallélisables, faible risque) on atteint le Jalon 1 complet à **31,5 j·h** pour ~90 % pondéré.
-**Pour 100 % vert + produit V1 démontrable : ~52 j·h.**
+## 2.0 — Stabilisation du socle (P0) — `FIX`
+
+Débloque tout le reste. Détail paste-ready dans `.ai/P0-fix-plan.md`. **Reconfirmer chaque point dans le code avant d'agir** (le board known-issues date du 05/06, des fixes ont pu passer depuis).
+
+| ID      | Tâche                                                                                                                                                                                                                                                                                                                                                                                                                 | Stat. | Prio | Effort |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :---: | :--: | :----: |
+| FIX-001 | Préfixe `/api` sur les 5 contrôleurs (Cycle/Team/Page/Discussion/Channel) — **vérifié fait** : les 5 renvoient 401 (routes OK), 20/06                                                                                                                                                                                                                                                                                 |  ✅   |  P0  |  0,25  |
+| FIX-002 | Déclarer les 4 groupes de routes front (MESSAGE/INTEGRATION/ATTACHMENT/ROADMAP) — **vérifié déjà présent** dans `api-routes.ts` (20/06)                                                                                                                                                                                                                                                                               |  ✅   |  P0  |  0,25  |
+| FIX-003 | Corriger l'import `profile-service.ts` (`apiClient` nommé) — **vérifié déjà correct** (20/06)                                                                                                                                                                                                                                                                                                                         |  ✅   |  P0  |  0,1   |
+| FIX-004 | Refresh token + logout (révocation Keycloak + purge `RefreshToken`) — _design d'abord_                                                                                                                                                                                                                                                                                                                                |  🔲   |  P1  |  1,0   |
+| FIX-005 | Webhooks Stripe lifecycle (subscription/invoice + signature + idempotence) — _design d'abord_                                                                                                                                                                                                                                                                                                                         |  🔲   |  P1  |  1,0   |
+| FIX-006 | **Écritures dans des tx `readOnly`** (root-causé via logs 20/06) : (a) 500 `/analytics/insights` (`UnexpectedRollbackException`) → `@Transactional(readOnly)` retiré de `generateInsights` ; (b) `SmartAssignService.recommend`/`preview` étaient `readOnly` → `ai_runs`/`assignment_events` **jamais persistés** (SQLSTATE 25006 silencieux) → passés en `@Transactional` read-write. Backend compile. ✅ 20/06/2026 |  ✅   |  P1  |  0,25  |
+| FIX-007 | **Clé Groq absente** : `GROQ_API_KEY` non définie dans `.env` → smart-assign/insights/assistant tournent en **fallback Java** (pas d'IA réelle). **Action utilisateur** : ajouter `GROQ_API_KEY=gsk_…` (gratuit sur console.groq.com) dans `.env` puis redémarrer le backend. Pas de code.                                                                                                                            |  🔲   |  P1  |  0,1   |
+
+**Sous-total : ~3,0 j·h.** DoD : `grep '@RequestMapping("/workspaces'` → 0 ; `tsc --noEmit` OK ; domaines Cycles/Teams/Pages/Discussions/Chat/Intégrations/PJ/Roadmap passent de ❌ à ✅.
+
+## 2.1 — CDC de base « tout doit fonctionner » — `PROD-1`
+
+Le minimum pour que l'app tienne la promesse du CDC de bout en bout, **et** que le menu n'expose pas de fausses promesses.
+
+| ID        | Tâche                                                                                                                                                                                                                                                                                                                                                                                                                             | Stat. | Prio | Effort |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :---: | :--: | :----: |
+| PROD-1.1  | **Verrou menu « coming soon » 🔒** : flag `comingSoon` sur `NavItem` (`app-sidebar.tsx`), entrée **non cliquable** (pas de `<Link>`), cadenas + badge + tooltip, i18n `nav.comingSoon` FR/EN. **Verrouillés : Agents + Discussions.** ✅ 20/06/2026                                                                                                                                                                               |  ✅   |  P1  |  0,5   |
+| PROD-1.2  | **Saisie des compétences membres** (TROU CDC #1) : CRUD sur `member_skill_profiles` (skills + texte d'expertise), service `MemberSkillProfileService` + controller + service/store front + carte éditable sur le profil membre (autz : soi-même ou ADMIN/OWNER). **Alimente Smart Assign.** Back+front compilent ✅. ⚠️ rebuild image backend requis pour run. ✅ 20/06/2026                                                      |  ✅   |  P1  |  1,5   |
+| PROD-1.3  | **Smart-assign à la création d'issue** : endpoint `POST …/issues/smart-assign/preview` (dry-run, sans issue persistée) + `SmartAssignService.preview` (cœur de scoring partagé avec `recommend`) + bouton « Suggest assignee » dans le modal de création (best match + alternatives cliquables). Back compile + front type-check ✅. ⚠️ rebuild backend requis. ✅ 20/06/2026                                                     |  ✅   |  P1  |  1,0   |
+| PROD-1.4  | **Smart-assign visible** dans l'issue-sheet : bouton CTA primaire (au lieu du tiny dashed) + panneau **auto-ouvert quand l'issue n'a pas d'assigné**. Front-only, type-check ✅ (pas de rebuild). ✅ 20/06/2026                                                                                                                                                                                                                   |  ✅   |  P1  |  0,5   |
+| PROD-1.5  | **Alertes de surcharge** : `OverloadAlertScheduler` (cron quotidien) détecte les membres au-dessus du seuil (`taskforce.alerts.overload-threshold`, défaut 8 tâches ouvertes) via `countOpenIssuesGroupedByAssignee` → `NotificationService.notifyOverload` notifie les OWNER/ADMIN (dédup, lien profil membre → rendu inbox sans modif front). Backend compile ✅. ✅ 20/06/2026                                                 |  ✅   |  P2  |  1,0   |
+| PROD-1.6  | **Suivi temps réel (board)** — exigence CDC. `IssueService` publie `IssueRealtimeEvent` sur `/topic/projects.{id}` (create/update/delete) + hook `useProjectRealtime` qui patche le store (upsert/remove, idempotent). Back compile + front type-check ✅. ✅ 20/06/2026                                                                                                                                                          |  ✅   |  P2  |  1,0   |
+| PROD-1.7  | **Rapports & export**. ✅ **Export CSV (20/06)**. 🟡 **(22/06)** **Back** : filtre `?projectId` ajouté aux endpoints analytics (kpis/throughput/burndown/capacity) + `resolveProjectIds` (mvn ✅). ⚠️ **Découverte** : page analytics ~80% mock (recoupe dette « dashboard mort » §1). ✅ **(22/06)** **Page analytics dé-mockée** : KPIs + throughput + burndown + capacité + **insights IA** câblés aux vrais endpoints (`getAiInsights` remplace `AI_ANOMALIES` ; health timeline factice retirée faute d'endpoint) + **sélecteur de projet** (re-fetch filtré `?projectId`). **Page analytics = 100% données réelles, zéro mock** (constantes mock supprimées, fallbacks → zéros/états vides). Front tsc **0 erreur** + eslint ✅. **Reste (optionnel, P3)** : filtres **agent/cycle/type** (nouvelles requêtes WHERE backend). |  ✅   |  P2  |  1,0   |
+| PROD-1.10 | **Liveness dashboard/analytics** (nice-to-have) : topic workspace `/topic/workspaces.{slug}` + refetch des agrégats à la réception. Les agrégats n'exigent pas de temps réel sous-seconde → basse priorité.                                                                                                                                                                                                                       |  🔲   |  P3  |  0,75  |
+| PROD-1.9  | **Multi-assign (bulk smart-assign)** : endpoint `POST …/issues/smart-assign/bulk` + `SmartAssignService.bulkRecommend` (réutilise `computeRecommendation`) + dialog « Auto-assign (N) » dans la toolbar du board → recommande pour chaque issue non assignée, sélection cochable, assignation en lot. Back compile + front type-check ✅. ✅ 20/06/2026                                                                           |  ✅   |  P1  |  1,0   |
+| PROD-1.8  | **Enrichir les signaux du Smart Assign** (fit ultra-précis). _Cœur du différenciateur._ ✅ **Story points** (20/06). ✅ **Phase 1 (21/06)** : charge **cross-projets** (`buildCandidateMetrics` via `findByWorkspaceSlugAndAssigneeId`, plus seulement par-projet) + **historique activé** dans la formule (`resolvedRate`, auparavant pondéré 0 ; nouveaux poids semantic .45/workload .22/historical .15/dispo .10/labels .08). mvn ✅. ✅ **Phase 2 (21/06)** : **capacité déclarée** (h/sem) + **séniorité** sur `member_skill_profiles` (migration `V44`) — la capacité raffine la dispo (40h = réf., facteur de charge scalé), les deux nourrissent le prompt Groq ; DTO/service back + UI carte profil (`member-skills-card`) + seed rempli. mvn ✅ + front tsc ✅. ✅ **Phase 3 Inc B (21/06)** : **montée en compétence** — migration `V45` (`projects.growth_mode`) + `SmartAssignService` (`usualComplexity` = moy. SP complétés du candidat ; `growthScore` avec **garde-fous** : mode ON · issue estimée · pas URGENT · dispo ≥60 · skill adjacent · stretch ∈ [habituel+1, +3]) ; **bonus borné +12** (nudge, ne domine pas) + facteur « 🌱 stretch » ; toggle **Mode montée en compétence** en project settings ; seed WEB `growth_mode=true` (Diego junior). mvn ✅ + front tsc ✅. ✅ **Phase 3 Inc C+D (21/06)** : **Inc C** — migration `V46` (`growth_enabled` + `growth_target_skills` sur `member_skill_profiles`) + DTO/service + UI carte profil (switch « En développement » + compétences cibles) ; le `growthScore` exige désormais l'**adjacence aux compétences cibles** pour un membre opt-in (score 100 → bonus +15) vs adjacence générique en mode projet auto (80 → +12). **Inc D** — prompt Groq enrichi (`growthStretch` + `targets` par candidat + consigne système « favoriser modérément l'apprentissage, jamais sur l'urgent »). Seed : Diego `growth_enabled` + cibles `[typescript,react]`. mvn ✅ + front tsc/eslint ✅. **PROD-1.8 = cœur du différenciateur LIVRÉ** (Story points + Phases 1/2/3). **Séparé** : time tracking (worklogs, BE-ISS-012) — son propre lot. |  ✅   |  P2  |  2,5   |
+
+**Sous-total : ~9,5 j·h.**
+
+> **Décision PROD-1.1 (verrou menu) — à valider.** Entrées candidates au cadenas tant que non livrées : **Agents** (pas de vraie gestion d'agents), **Messages** (chat partiel), **Discussions** (rôle flou, pin/lock cassés). Recommandation : verrouiller **Agents + Discussions** (Messages reste si le chat fonctionne après FIX-001/002). À trancher ensemble avant code.
+
+## 2.2 — Gestion de projet fine (issues, board, projets) — `PROD-2`
+
+| ID        | Tâche                                                                                                                                                                                                                                                                                                                                       | Stat. | Prio | Effort |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :---: | :--: | :----: |
+| PROD-2.1  | **Sous-tâches d'issue** : endpoint `GET /issues/{id}/children` + `listChildren` (parentId en create/update existait déjà) ; onglet **Sub-tasks** dans l'issue-sheet (liste enfants + quick-add `parentId`). Back compile + front type-check ✅. ✅ 20/06/2026                                                                               |  ✅   |  P2  |  0,75  |
+| PROD-2.2  | **Liens / relations entre issues** : onglet Relations (liste + ajout type/cible + suppression) ; endpoints back déjà prêts. Front-only, type-check ✅. ✅ 20/06/2026                                                                                                                                                                        |  ✅   |  P2  |  0,75  |
+| PROD-2.3  | **Checklist d'issue (option A — table dédiée)** : migration `V39__issue_checklist_items` + entité + repo + DTOs + 4 endpoints (CRUD) + onglet Checklist (cases à cocher, % d'avancement, add/delete, optimiste). Back compile + front type-check ✅. ✅ 20/06/2026                                                                          |  ✅   |  P2  |  1,0   |
+| PROD-2.4  | **Supprimer une issue** : action Supprimer (+ confirmation `DeleteConfirmDialog`) dans l'en-tête de l'issue-sheet (endpoint delete déjà prêt). « Archiver » = passer au statut Cancelled, déjà possible via le dropdown de statut. Front-only ✅. ✅ 20/06/2026                                                                             |  ✅   |  P2  |  0,5   |
+| PROD-2.5  | **Cycles clarifiés** : texte explicatif en tête de page + indice « Aucune issue — à remplir » sur les cycles vides + empty state FR. Front-only ✅. ✅ 20/06/2026                                                                                                                                                                           |  ✅   |  P2  |  0,5   |
+| PROD-2.6  | **Filtres avancés** : `IssueFilters` (priorité/assigné/label, dérivés + compteur + reset) câblé sur **List** et **Backlog** (en plus du board). Front-only ✅. ✅ 20/06/2026                                                                                                                                                                |  ✅   |  P1  |  1,5   |
+| PROD-2.7  | Onglets projet **fluides** : le layout/onglets persiste déjà entre routes (Next.js) ; le coût réel était le **refetch** par page → `fetchIssues` rendu **cache-first par projet** (`loadedProjectId`) → bascule Board/List/Backlog instantanée. Front-only ✅. ✅ 20/06/2026 (NB : pas de réécriture en tabs client-side — non nécessaire). |  ✅   |  P2  |  1,5   |
+| PROD-2.8  | Personnalisation projet : icône + **upload** + **couleur**. ✅ **(21/06)** `ProjectIconPicker` (lucide + upload base64→`iconUrl`) câblé dans `EditProjectDialog` (avant : création seule). Front-only, back `iconUrl` déjà accepté. Couleur → **PROD-2.8b ✅**.                                                                                                                                                                                                                                  |  ✅   |  P2  |  0,5  |
+| PROD-2.8b | **Couleur projet** : ✅ **(21/06)** migration `V41__projects_color.sql` (`color VARCHAR(50) DEFAULT 'bg-primary'`) + champ `Project.color` + `Create/UpdateProjectRequest` + `ProjectResponse` + `ProjectService` (create/update/toResponse). Front : `ColorPalettePicker` partagé (palette alignée Teams) dans create-dialog/edit-dialog/page `new` + accent couleur dans `ProjectIcon` (liste + header projet). Back compile (mvn ✅) + front tsc ✅. ⚠️ **rebuild image backend requis** pour appliquer V41. |  ✅   |  P2  |  0,75  |
+| PROD-2.9  | Templates de projet / board (réutiliser structure listes/colonnes, façon GitHub)                                                                                                                                                                                                                                                            |  🔲   |  P3  |  2,0   |
+| PROD-2.10 | **Édition projet via modal** : `EditProjectDialog` (nom + description) ouvert depuis « Edit operation » (au lieu de naviguer vers Settings, désormais un item séparé). Front-only ✅. ✅ 20/06/2026 — refonte UX                                                                                                                                                                                                                                             |  🟡   |  P2  |  0,75  |
+| PROD-2.11 | Méthodo de gestion au choix à la création (kanban/scrum/…) — _à discuter (Linear/GitHub ne le font pas)_                                                                                                                                                                                                                                    |  🔲   |  P3  |  2,0   |
+
+**Sous-total (sans P3 à discuter) : ~7,5 j·h.**
+
+## 2.3 — Workspace, rôles (RBAC) & Keycloak — `PROD-3`
+
+| ID       | Tâche                                                                                                                                                                                                                                                                                                                                           | Stat. | Prio | Effort |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :---: | :--: | :----: |
+| PROD-3.1 | **RBAC UI** : **déjà fait** (vérifié 20/06) — `MemberRow` : promote/demote (OWNER), remove (canManage), invite par rôle. Store `changeRole`/`kick`.                                                                                                                                                                                              |  ✅   |  P1  |  1,0   |
+| PROD-3.2 | **RBAC back centralisé (membership)** — _recoupe CERT-C24_. ✅ **(20/06)** : `AuthorizationService` (`requireMember`/`requireRole`/`requireManager`) + **`WorkspaceAccessInterceptor`** qui exige l'appartenance pour tout `/api/workspaces/{slug}/…` → **ferme les IDOR Team/Page/Discussion/Analytics + futurs endpoints** (fail-open si user/workspace indéterminé → ne casse jamais un membre). Défense en profondeur conservée (Issue/Cycle/Project + Analytics). ⚠️ garde globale → **vérifier les flux normaux après rebuild**. | ✅ | P1 | 1,5 |
+| PROD-3.3 | **Delete workspace + Danger zone** : endpoint `DELETE /api/workspaces/{slug}` (OWNER-only, cascade DB confirmée) + `WorkspaceService.deleteWorkspace` + store `deleteCurrentWorkspace` + Danger zone dans settings/General (OWNER only, confirmation, redirect). Back compile + front type-check ✅. ✅ 20/06/2026                              |  ✅   |  P2  |  0,75  |
+| PROD-3.4 | **Recherche & invitation façon GitHub**. ✅ **(21/06)** **Slice 1** — dialog workspace (`members/page.tsx`) passé en **multi-sélection** (chips + invite en lot via `Promise.all`, rôle commun, toast succès/échecs). **Slice 2** — nouveau `ProjectInviteDialog` (`components/dialogs/project-invite-dialog.tsx`) : recherche dynamique → sélection → rôle projet ; **ajout workspace auto** si l'invité n'y est pas (prérequis back confirmé dans `ProjectService.addMember`) avec notice ; **proposition d'équipe** (existante ou création inline → `teamService.create`+`addMember`). Front-only (endpoints existants), tsc ✅. ⚠️ test E2E nécessite backend up. |  ✅   |  P2  |  1,5   |
+| PROD-3.5 | Inviter un **email sans compte**. ✅ **(21/06)** **Back** : migration `V42__workspace_invitations` (token+email+status+expiry, index unique partiel sur PENDING) + entité/enum/repo + `WorkspaceInvitationService` (create/list/revoke/preview/accept + **`acceptPendingInvitations`** auto à l'inscription **et** au login, hooks dans `AuthService`) + `InvitationController` (admin scopé + token public/authentifié) + `EmailService.sendWorkspaceInvitationEmail` (best-effort). **Front** : `invitation-service` + routes ; entrée « inviter par email » dans le dialog workspace (remplace le « coming soon ») + section **invitations en attente** (revoke) ; page publique `/invitations/[token]` (preview → redirige signup pré-rempli `?email=` / login / accept si connecté) ; prefill email sur `register`. Back mvn ✅ + front tsc/eslint ✅. ⚠️ E2E (Keycloak signup + SMTP) à valider après rebuild. Flux retenu : **token → signup pré-rempli → auto-join**. |  ✅   |  P2  |  1,5   |
+| PROD-3.6 | **Teams** : ✅ **(20/06)** couleur/icône à la création (emoji + palette) + Manage/Settings **consolidé** en un seul « Gérer l'équipe ». Front-only. Association team↔opération → **PROD-3.6b ✅**. | ✅ | P2 | 1,5 |
+| PROD-3.6b | **Association team ↔ opération** : ✅ **(21/06)** migration `V43__project_teams` (M2M unique) + entité `ProjectTeam`/repo + `ProjectService` (listProjectTeams/attachTeam/detachTeam, authz `assertCanManageProject`) + endpoints `ProjectController` (`GET/POST /{id}/teams`, `DELETE /{id}/teams/{teamId}`). Front : `project-service` (3 fns + type) + routes + `ProjectTeamsSection` (chips + associer/dissocier) sur la page membres projet. Back mvn ✅ + front tsc/eslint ✅. ⚠️ rebuild backend (V43) requis. | ✅ | P2 | 1,5 |
+| PROD-3.7 | **Keycloak** : finaliser rôles realm/client mappés aux `WorkspaceRole`/`ProjectRole` ; cohérence refresh/logout (recoupe FIX-004)                                                                                                                                                                                                               |  🟡   |  P2  |  1,0   |
+| PROD-3.8 | Avatars : système unique **DiceBear** pour tous (seed = email). ✅ **(21/06)** composant `UserAvatar` (`components/ui/user-avatar.tsx`) + helper `getInitials` ; **sweep de 16 fichiers** (suppression des `AVATAR_COLORS`/`memberColor`/`colorFor` ad-hoc) ; route morte `app/api/avatar/route.ts` supprimée ; tests `getInitials`. → règle « les PDP changent à chaque page ». |  ✅   |  P3  |  1,0   |
+| PROD-3.9 | **RBAC granulaire façon GitHub** (demande user 20/06) : permissions fines au-delà de OWNER/ADMIN/MEMBER — rôles custom, permissions par **team** et par **membre** (read/write/admin sur projets, issues, settings…), matrice de permissions. Modèle de données (tables `role`/`permission`/assignations) + UI de gestion. *Épic — à cadrer.* | 🔲 | P2 | 5,0 |
+| PROD-3.10 | **Config entreprise / on-premise** (demande user 20/06) : **realm Keycloak dédié** (`keycloak/realm-enterprise.json`) — SSO/OIDC, groupes↔rôles, provisioning, déploiement single-premise. Doc d'install on-prem. *Épic — à cadrer.* | 🔲 | P3 | 4,0 |
+
+**Sous-total : ~17,75 j·h** (dont épics RBAC granulaire + entreprise).
+
+## 2.4 — Monétisation Stripe & plans — `PROD-4` (recoupe CERT-C23)
+
+| ID       | Tâche                                                                                                                | Stat. | Prio |      Effort      |
+| -------- | -------------------------------------------------------------------------------------------------------------------- | :---: | :--: | :--------------: |
+| PROD-4.1 | Webhooks lifecycle complets (recoupe FIX-005)                                                                        |  🟡   |  P1  | — (voir FIX-005) |
+| PROD-4.2 | **Limites par plan** : ✅ **(20/06)** workspaces (FREE 2/PRO 10) **+ membres** (FREE 5/PRO 50) enforced back (→ 409 clair) ; `plan-limits.ts` front (aligné) + CTA usage (membres + workspaces switcher). Reste : limites teams/agents + endpoint d'usage back (anti-drift). |  🟡   |  P1  |       1,5        |
+| PROD-4.3 | **CTA upgrade contextuels** : ✅ **(20/06)** CTA usage **membres** (page Members) + **workspaces** (switcher : `X/Y` + « Limite atteinte — Améliorer »). Reste : CTA invite/analytics (mineur). |  ✅   |  P2  |       0,75       |
+| PROD-4.4 | **Feature gating** par plan ✅ **(20/06)** : `PlanFeature` + `PlanFeatureService` (back) + `plan-features.ts` (front). **Politique** (décidée) : smart-assign FREE ; IA/analytics avancées/intégrations PRO+. **Appliqué** : AI insights gatés (back → message upgrade pour FREE), assistant « Ask AI » gaté (front → toast upgrade). Admin dev passé **PRO** (migration V40) pour tout voir en dev. Reste (mécanisme prêt) : enforcement analytics avancées + intégrations. |  🟡   |  P2  |       1,0        |
+| PROD-4.5 | **Stripe Customer Portal** ✅ **(20/06)** : `StripeService.createBillingPortalSession` + `BillingController` `POST /api/billing/portal` (chemin **protégé** ≠ /api/stripe public ; OWNER user → sa subscription → customerId) + `stripeService.openBillingPortal` + bouton « Gérer la facturation » (settings/Billing, non-FREE). Back compile + front type-check ✅. ⚠️ nécessite des **clés Stripe réelles** + portal activé côté dashboard. ✅ 20/06/2026 |  ✅   |  P2  |       1,0        |
+| PROD-4.6 | Page **Pricing** alignée plans ✅ **(20/06)** : landing passée à **3 tiers** (Business retiré : objet plan + colonne table + grid-cols-3 + colSpan), ligne **Workspaces** ajoutée (2/10), membres Pro aligné (**Up to 50**). App register/plan déjà cohérente (FREE/PRO/ENTERPRISE). Reste mineur (marketing) : projets « 3 active » / « 2 integrations » / storage annoncés mais non enforced → soit enforcer, soit ajuster le copy. |  🟡   |  P2  |       0,75       |
+| PROD-4.7 | **Enterprise inquiry → notif équipe** ✅ **(20/06)** : `EmailService.sendInternalNotification` (best-effort) + `SalesService` envoie un mail à `app.sales-email` à chaque demande (KI-008 résolu). Back compile ✅. ⚠️ envoi réel = config SMTP/Mailtrap. |  ✅   |  P3  |       0,25       |
+| PROD-4.8 | **Erreurs métier 500→4xx** : cause réelle = `IllegalStateException`/`IllegalArgumentException` (limite de plan, doublons, transitions interdites) sans handler → 500. Ajout handlers `GlobalExceptionHandler` → **409**/**400** avec message. Corrige le cas workspace + équipes/issues. Back compile ✅. ✅ 20/06/2026                                                           |  ✅   |  P2  |       0,5        |
+
+**Sous-total : ~5,75 j·h.**
+
+## 2.5 — Intégrations tierces (vision « wrapper ») — `PROD-5`
+
+> Vision produit : TaskForce wrappe GitHub/Linear/Asana — on récupère issues/PR/commits/comments/membres et on superpose smart-assign + agents. Évite de gérer les migrations des utilisateurs.
+
+| ID       | Tâche                                                                                                        | Stat. | Prio | Effort |
+| -------- | ------------------------------------------------------------------------------------------------------------ | :---: | :--: | :----: |
+| PROD-5.1 | **GitHub** : finaliser wrapper (OAuth + sync issues/PR/commits/comments/membres) — back majoritairement prêt |  🟧   |  P1  |  2,5   |
+| PROD-5.2 | **Slack** : messages bidirectionnels (recevoir dans l'app, répondre vers Slack) — back Slack présent         |  🟧   |  P2  |  2,0   |
+| PROD-5.3 | **Asana** : nouveau provider (OAuth + sync tâches/projets)                                                   |  🔲   |  P3  |  3,0   |
+| PROD-5.4 | Webhooks sortants configurables (`WebhookController` prêt) : UI de gestion                                   |  🟧   |  P3  |  1,0   |
+| PROD-5.5 | Centre d'intégrations dans Settings (style GitHub : sidebar, API, MCP, connexions)                           |  🔲   |  P3  |  1,5   |
+
+**Sous-total : ~10 j·h** (PROD-5.1+5.2 prioritaires = 4,5 j·h).
+
+## 2.6 — IA, agents & différenciateurs — `PROD-6`
+
+| ID       | Tâche                                                                                                                                          | Stat. | Prio |   Effort   |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | :---: | :--: | :--------: |
+| PROD-6.1 | **Configuration des agents** : modèle persistant + CRUD + compétences/outils/tâches + seed depuis Brain OS (https://bos-landing.onrender.com/) |  🔲   |  P2  |    2,5     |
+| PROD-6.2 | **UI/UX agents** : trancher chat classique vs agent orchestrateur global vs UI innovante (avantage compétitif) — _à discuter_                  |  🔲   |  P2  | — (design) |
+| PROD-6.3 | **Brain OS branché dans Pages** : doc projet vivante (étapes/décisions/actions des agents) — _décision technique : in-app vs lien Obsidian_    |  🔲   |  P2  |    2,0     |
+| PROD-6.4 | **Assistant global** (FAB header permanent, façon Cloudflare) : Q&R contextuelle sur projets/tâches                                            |  🟡   |  P2  |    1,5     |
+| PROD-6.5 | Streaming réel de l'assistant (SSE Groq au lieu de chunking simulé — KI-009)                                                                   |  🟡   |  P3  |    0,75    |
+| PROD-6.6 | Insights cachés (`ai_runs`/`insight_snapshots` V35) + guards quota/timeout Groq (KI-007)                                                       |  🟡   |  P2  |    0,75    |
+| PROD-6.7 | **Discussions = centre d'annonces** : réparer pin/lock + redéfinir le rôle (releases, Q&R, show&tell, idées, infos scrappées par agents)       |  🟡   |  P2  |    1,0     |
+| PROD-6.8 | Feature flags IA (`enabled`/`smartAssign`/`assistant`/`insights` — KI-014)                                                                     |  🔲   |  P3  |    0,5     |
+| PROD-6.9 | Nettoyer `ai-service` Python vestigial (KI-012) : décision garder/supprimer                                                                    |  🔲   |  P3  |    0,5     |
+
+**Sous-total : ~10 j·h.**
+
+## 2.7 — Infrastructure, stockage & déploiement — `PROD-7`
+
+| ID       | Tâche                                                                                                                                                                                                                                                  | Stat. | Prio |      Effort       |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | :---: | :--: | :---------------: |
+| PROD-7.1 | **MinIO** : retention policy + legal hold + tags sur les objets (QA), avatars persistés                                                                                                                                                                |  🟡   |  P3  |        1,0        |
+| PROD-7.2 | **RabbitMQ** : valider le relais STOMP en charge + fallback SimpleBroker ; healthcheck                                                                                                                                                                 |  🟡   |  P3  |       0,75        |
+| PROD-7.3 | **Docker prod** : `docker-compose.prod.yml` complet (nginx TLS, images temurin), parité dev/prod                                                                                                                                                       |  🟡   |  P2  |        1,5        |
+| PROD-7.4 | Push images GHCR (back+front) + tags semver (recoupe CERT-C26)                                                                                                                                                                                         |  🟡   |  P2  | — (voir CERT-C26) |
+| PROD-7.5 | Observabilité optionnelle (SigNoz via `docker-compose.tools.yml`)                                                                                                                                                                                      |  🟡   |  P3  |        1,0        |
+| PROD-7.6 | **Seed « équipe d'entreprise » de test** : pré-enregistrer plusieurs users (realm Keycloak + seed DB) avec **séniorité + compétences distinctes** (lead/senior/junior · front/back/QA/design/PM) pour exercer Smart Assign et la recherche de membres. |  🔲   |  P2  |        1,0        |
+
+**Sous-total : ~5,25 j·h.**
+
+## 2.8 — Cohérence UI/UX (niveau Cloudflare) — `PROD-8`
+
+| ID        | Tâche                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Stat. | Prio | Effort |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :---: | :--: | :----: |
+| PROD-8.1  | **PageShell unifié** (gabarit commun : layout cohérent toutes pages — QA « jamais le même layout »)                                                                                                                                                                                                                                                                                                                                                                                                      |  🔲   |  P1  |  1,5   |
+| PROD-8.2  | Suppression du bandeau « All systems operational / v1.0 » du dashboard ✅ 20/06. Reste (séparé) : footer Cloudflare-like + toast d'événements.                                                                                                                                                                                                                                                                                                                                                            |  🟡   |  P2  |  0,5   |
+| PROD-8.3  | **Dashboard vivant** : KPI business, sparklines/velocity/burndown, deltas (↑/↓ %), CTA principal `+ Create Operation`, header informatif                                                                                                                                                                                                                                                                                                                                                                 |  🔲   |  P2  |  2,0   |
+| PROD-8.4  | Désambiguïser **agents vs humains** : préfixe « AI · » sur les titres d'agents (page agents) + badge « AI » dans l'activité agents du dashboard. Front-only ✅. ✅ 20/06/2026                                                                                                                                                                                                                                                                                                                              |  ✅   |  P2  |  0,5   |
+| PROD-8.5  | Modals : **cause trouvée** — `modal={false}` sur create-issue/create-project désactivait overlay + focus-trap (plainte QA « je peux cliquer à côté »). Retiré → modal Radix par défaut (overlay assombri + focus-trap + click-outside). Front-only ✅. ✅ 20/06/2026                                                                                                                                                                                                                                        |  ✅   |  P2  |  0,5   |
+| PROD-8.6  | Scrollbar sidebar plus discrète (6px global + 4px sidebar au survol) + retrait du badge « 1 critical » du dashboard. Front-only ✅. ✅ 20/06/2026                                                                                                                                                                                                                                                                                                                                                          |  ✅   |  P3  |  0,25  |
+| PROD-8.7  | « New project » sidebar → `/projects?new=1` qui **ouvre le modal** (`CreateProjectDialog` `defaultOpen`) au lieu du form `/projects/new`. Front-only ✅. ✅ 20/06/2026                                                                                                                                                                                                                                                                                                                                     |  ✅   |  P3  |  0,25  |
+| PROD-8.8  | Migrer pages restantes vers shadcn pur + supprimer le bloc `@layer components` custom de `globals.css`                                                                                                                                                                                                                                                                                                                                                                                                   |  🟡   |  P2  |  1,5   |
+| PROD-8.9  | **Système de panneaux « à la Claude/Cloudflare »**. ✅ **Socle v1 (20/06)** : `panel-store` (pile gauche/droite, empilable, redimensionnable, toggle/focus par id) + `PanelDock` (pousse le contenu dans le shell, poignée de resize) + 1er consommateur réel = **Assistant en panneau droit** (bouton « Ask AI » topbar, `AssistantConversation` réutilisable). Front-only, type-check ✅. Reste : migrer l'issue-sheet vers le socle, usages gauche (brain-os), persistance largeur, mobile (overlay). |  🟡   |  P2  |  1,5   |
+| PROD-8.10 | **« Wow » du Smart Assign**. ✅ **1ʳᵉ itération (20/06)** : back expose `reason` (explication Groq, avant jetée) + `matchedSkills` + `historicalScore` réel (`assignment_events`) ; front (panneau + modal création) affiche le **pourquoi** (chips compétences qui matchent + raison) + **breakdown du score** (sémantique/charge/dispo/historique), avec synthèse de repli si pas de Groq. Reste : comparaison côte-à-côte, animation/score live, « explain » détaillé, intégration dans le bulk.      |  🟡   |  P1  |  1,0   |
+
+**Sous-total : ~11,5 j·h.**
 
 ---
 
-**Séquence recommandée :** lancer **F + D + E** en fond dès J1 (aucune dépendance code) ; sur le chemin critique enchaîner **A → B → C** ; puis attaquer le Jalon 2 par les fondations (P0.1/P0.2) avant smart-assign/skills.
+# AXE B — CERTIFICATION (Grille RNCP C1–C26)
+
+> Reprend et complète la roadmap certif existante. Beaucoup de critères = **documentaire** (parallélisable, sans dépendance code). Les bloquants code : **tests (C18/C25)**, **RGPD (C11)**, **sécurité (C21/C24)**, **SEO landing (C20)**, **accessibilité (C13/C15)**.
+
+## CERT-Bloc 1 — Conception & modélisation (C1–C12)
+
+| ID          | Critère                                                 | Tâche                                                                                                 | Stat. | Effort |
+| ----------- | ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | :---: | :----: |
+| CERT-C1/C2  | Analyse demande + expertise/innovation                  | Formaliser analyse besoin client + distance critique (éco-resp/inclusion) — _doc_                     |  🔲   |  0,5   |
+| CERT-C3     | Caractéristiques projet (public/SEO/sécu/délais/budget) | Doc cadrage + planning + budget prévisionnel réalistes                                                |  🔲   |  1,0   |
+| CERT-C4     | Méthode agile + trame CR                                | Méthode agile documentée + trame compte-rendu + 1 CR exemple                                          |  🔲   |  0,75  |
+| CERT-C5     | Env. dev collaboratif (Git/IDE/virtualisation)          | Procédure mise en œuvre (déjà ~OK : Git + Docker) — _doc_                                             |  🟡   |  0,25  |
+| CERT-C6     | Wireframes                                              | Wireframes annotés des vues clés (liés UC + route réelle)                                             |  🔲   |  1,5   |
+| CERT-C7/C10 | STB + dossier conception + archi logicielle             | STB consolidé + dossier conception assemblé (archi ~OK via Brain OS)                                  |  🔲   |  1,0   |
+| CERT-C8     | Modélisation (classes)                                  | Diagramme de classes (analyse + conception, reflet JPA réel, ~29 entités)                             |  🔲   |  1,0   |
+| CERT-C8/C9  | MCD/MLD + cycle de vie données                          | MCD/MLD dérivés du schéma Flyway réel (V1–V38, pgvector) + règles de gestion + persistance/sauvegarde |  🔲   |  1,0   |
+| CERT-C7     | Cas d'usage UML                                         | Diagramme de cas d'usage (acteurs + include/extend) couvrant 100 % des UC du CDC                      |  🔲   |  1,0   |
+| CERT-C7     | Réconciliation domaine↔code                             | Table UC↔entité↔migration (concepts non implémentés marqués backlog)                                  |  🔲   |  0,5   |
+| CERT-C11    | **RGPD** (obligatoire)                                  | Voir chantier RGPD ci-dessous                                                                         |  🔲   |  5,5   |
+| CERT-C12    | Veille techno                                           | Méthodologie de veille (sources/fréquence/compilation/actualisation) + ≥3 entrées tracées             |  🔲   |  0,5   |
+
+**RGPD (CERT-C11 détaillé) — bloquant CDC + certif :**
+
+| ID    | Tâche                                                                                                                                                                                   | Effort |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :----: |
+| C11.1 | Journal d'audit (`AuditLog` + `V39__audit_log.sql` + hooks login/rôle/suppression)                                                                                                      |  1,0   |
+| C11.2 | Chiffrement au repos (`EncryptedStringConverter` AES-GCM sur PII/tokens, `V40__`)                                                                                                       |  1,5   |
+| C11.3 | Droits des personnes (`GdprService` : export JSON + suppression/anonymisation OTP, `/api/gdpr`)                                                                                         |  2,0   |
+| C11.4 | Front : bannière consentement **granulaire** (double opt-in) + page politique de confidentialité (bases légales/durées/sous-traitants) + page « mes droits » (export/suppression) FR/EN |  1,5   |
+
+**Sous-total Bloc 1 : ~11,5 j·h.** → C1–C12 ✅.
+
+## CERT-Bloc 2 — Front-end (C13–C20)
+
+| ID           | Critère                                | Tâche                                                                                                                                                | Stat. | Effort |
+| ------------ | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | :---: | :----: |
+| CERT-C13/C15 | UI accessible + UX + couverture des UC | **Accessibilité RGAA/WCAG** : audit + corrections (contrastes, focus, ARIA, navigation clavier, alt) + parcours utilisateur fluide                   |  🔲   |  2,5   |
+| CERT-C14     | Identité visuelle / charte             | Documenter charte graphique + cohérence (recoupe PROD-8)                                                                                             |  🟡   |  0,25  |
+| CERT-C16     | Qualité/sécu/écoconception front       | Analyse statique (ESLint strict bloquant), en-têtes HTTP sécu + CSP + CORS, SSL, deps sans CVE (`npm audit`), écoconception/perf, compat navigateurs |  🟡   |  1,0   |
+| CERT-C17     | Consommer une API sécurisée            | Format adapté (REST/`ApiResponse<T>`) + auth robuste (JWT) — ~OK, à documenter                                                                       |  🟡   |  0,25  |
+| CERT-C18     | **Tests front ≥50 %**                  | Voir chantier Tests ci-dessous                                                                                                                       |  🔲   |   —    |
+| CERT-C19     | Industrialisation front                | Voir chantier CI ci-dessous                                                                                                                          |  🔲   |   —    |
+| CERT-C20     | **SEO landing ≥70 %**                  | Voir chantier SEO ci-dessous                                                                                                                         |  🔲   |  4,2   |
+
+**SEO & Landing (CERT-C20 détaillé) :** landing publique server-rendered (`(public)/`), metadata (title/description/canonical/robots/lang), `robots.ts` + `sitemap.ts` (publiques only, app authentifiée `noindex`), Open Graph/Twitter + image OG, JSON-LD, perf (`next/image`+`sharp`, Lighthouse SEO≥90 & Perf≥90), analytics RGPD-safe (Plausible/Umami, CSP ajustée, consentement). → C20 ✅.
+
+## CERT-Bloc 3 — Back-end (C21–C26)
+
+| ID       | Critère                                        | Tâche                                                                                                                                                 | Stat. |     Effort      |
+| -------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | :---: | :-------------: |
+| CERT-C21 | Persistance sécurisée (sécurité en profondeur) | Filtrage entrées/sorties, auth forte, **journalisation** (recoupe C11.1), monitoring, validation config, **contrôle d'accès** (recoupe PROD-3.2/RBAC) |  🟡   |       1,5       |
+| CERT-C22 | Qualité/écoconception back                     | Couverture des UC, code conforme (Spotless), deps à jour sans CVE (OWASP), perf, compat — _en grande partie OK_                                       |  🟡   |       0,5       |
+| CERT-C23 | **Système de paiement**                        | Stripe fonctionnel + sécurisé + monétisation pertinente (recoupe PROD-4)                                                                              |  🟡   | — (voir PROD-4) |
+| CERT-C24 | **API sécurisée**                              | Auth/autz solides, **toutes entrées validées/filtrées** (`@Valid`), **données sensibles chiffrées** (recoupe C11.2 + RBAC)                            |  🟡   |       1,0       |
+| CERT-C25 | **Tests back ≥50 %**                           | Voir chantier Tests ci-dessous                                                                                                                        |  🔲   |        —        |
+| CERT-C26 | Industrialisation back                         | Voir chantier CI ci-dessous                                                                                                                           |  🔲   |        —        |
+
+## QA finale & UI/UX — **avant** la rédaction des tests
+
+> Décision user (21/06) : deux passes de QA se font **juste avant** le chantier Tests (C18/C25), dans cet ordre. La rédaction des tests des derniers fix vient **après** ces deux passes (on teste ce qui est figé).
+
+| ID   | Tâche                                                                                                                                                                                                                                                                                                       | Stat. | Prio | Effort |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :---: | :--: | :----: |
+| QA-1 | **QA produit finale** sur jeu de données réaliste **étoffé** : enrichir `backend/tf-api/seed/dev_seed.sql` (beaucoup plus d'**issues**, **alertes/notifications**, **discussions/messages**, cycles, activité) pour exercer tous les écrans en volume → recenser les **derniers fix** (bugs/incohérences). Sortie : liste de fix priorisés. | 🔲 | P1 | 1,5 |
+| QA-2 | **QA UI/UX** (juste après QA-1) : passe ergonomie/cohérence visuelle sur l'app peuplée (layout, états vides, responsive, micro-interactions, copies) → liste de fix UI/UX priorisés. | 🔲 | P1 | 1,0 |
+| QA-3 | **Application des derniers fix** issus de QA-1/QA-2, **puis** rédaction des tests correspondants (enchaîne sur le chantier Tests C18/C25 ci-dessous). | 🔲 | P1 | — |
+
+> NB : le seed de base existe déjà (`taskforce-demo` : 8 membres, 3 projets, 22 issues, 3 équipes, historique). QA-1 = le **densifier** (volume + modules notifications/discussions encore peu peuplés).
+
+## CERT — Tests (C18 + C25) — fondation, fait avant CI
+
+| ID  | Tâche                                                                                                                                        | Effort |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------- | :----: |
+| T.1 | Plan de tests aligné specs (matrice CDC→TC-xx→fichier)                                                                                       |  0,25  |
+| T.2 | Back : socle Testcontainers Postgres (`AbstractIntegrationTest`, Flyway V1–V40, externes `@MockBean`)                                        |  0,5   |
+| T.3 | Back : tests services métier (SmartAssign, Issue+labels, Project/Workspace, Cycle, Notification, Analytics) + non-régression des bugs connus |  1,25  |
+| T.4 | Back : tests controllers (`/api`, `ApiResponse<T>`, `@Valid` 400) + seuil JaCoCo ≥0,50/package                                               |  0,5   |
+| T.5 | Front : recalibrer scope coverage + tests stores/services métier (mock `apiClient`, `response.data.data`)                                    |  0,75  |
+| T.6 | Rapports exploitables (LCOV/HTML/JaCoCo archivés pour mémoire, ≥50 % lignes, cible 70 %)                                                     |  0,25  |
+
+**Sous-total Tests : ~3,5 j·h.** → C18 ✅ · C25 ✅.
+
+## CERT — CI & industrialisation (C19 + C26) — après tests + sécu
+
+| ID   | Tâche                                                                                                                | Effort |
+| ---- | -------------------------------------------------------------------------------------------------------------------- | :----: |
+| CI.1 | Workflow `ci.yml` agrégé (paths-filter, `workflow_call`, check unique `ci-success`)                                  |  0,5   |
+| CI.2 | Lint + seuils **bloquants** (ESLint sans `continue-on-error`, `mvn verify`+jacoco:check, thresholds Vitest, Node 22) |  0,5   |
+| CI.3 | Lint/format Java (Spotless profil `ci`)                                                                              |  0,5   |
+| CI.4 | Qualité SonarQube/SonarCloud (jacoco.xml + lcov, Quality Gate en check PR)                                           |  1,0   |
+| CI.5 | Sécurité code (OWASP+NVD cache, dependency-review, CodeQL java+ts, Trivy images)                                     |  1,0   |
+| CI.6 | Dependabot (maven/npm×2/actions/docker, groupé hebdo)                                                                |  0,25  |
+| CI.7 | Builds optimisés (cache GHA/`.next/cache`, images build sur PR, push GHCR dev/main)                                  |  1,0   |
+| CI.8 | Protection de branche + badges README + PR template                                                                  |  0,25  |
+
+**Sous-total CI : ~5 j·h** (mutualisé avec C11/sécu). → C19 ✅ · C26 ✅.
+
+## CERT — Gestion de projet (artefacts pilotage)
+
+Planning prévisionnel (Gantt, jalons DFS, chemin critique), budget prévisionnel (infra réelle + charge×TJM), méthode agile + CR, méthodo de veille, éco-conception & inclusion (RGAA/WCAG), bouclage Excel grille. → renforce C2/C3/C4/C12. **~3,75 j·h.**
+
+---
+
+## 3. Récapitulatif effort
+
+| Axe / chantier                               |        Effort (j·h)         |
+| -------------------------------------------- | :-------------------------: |
+| **A — PRODUIT**                              |                             |
+| 2.0 Stabilisation P0                         |             2,6             |
+| 2.1 CDC de base + verrou menu                |             6,5             |
+| 2.2 Gestion fine                             |             7,5             |
+| 2.3 Workspace/RBAC/Keycloak                  |            8,75             |
+| 2.4 Stripe & plans                           |            5,75             |
+| 2.5 Intégrations (GitHub/Slack prioritaires) | 4,5 (–10 avec Asana/extras) |
+| 2.6 IA & différenciateurs                    |             10              |
+| 2.7 Infra & stockage                         |            4,25             |
+| 2.8 Cohérence UI/UX                          |              7              |
+| **B — CERTIFICATION**                        |                             |
+| Bloc 1 Conception + RGPD                     |            11,5             |
+| Bloc 2 Front (accessibilité/SEO/qualité)     |      ~8 (dont SEO 4,2)      |
+| Bloc 3 Back (sécu/qualité)                   |             ~3              |
+| Tests (C18/C25)                              |             3,5             |
+| CI (C19/C26)                                 |              5              |
+| Gestion projet (doc)                         |            3,75             |
+| **TOTAL indicatif**                          |       **~95–105 j·h**       |
+
+> Les efforts sont indicatifs (mono-exécutant). Beaucoup de recoupements PRODUIT↔CERTIF (RBAC=C24, Stripe=C23, MinIO/audit=C21) : faire une fois, cocher des deux côtés.
+
+## 4. Séquencement recommandé
+
+1. **Débloquer** : §2.0 (FIX-001→003 immédiat ; FIX-004/005 après design).
+2. **CDC tient debout + honnêteté UI** : PROD-1.1 (verrou menu) → PROD-1.2 (compétences) → PROD-1.3/1.4 (smart-assign).
+3. **Certif chemin critique** : Tests (T.x) → RGPD/sécu (C11 + RBAC PROD-3.2/C21/C24) → CI (CI.x).
+4. **En fond, parallélisable (zéro dépendance code)** : Conception (C6–C10), SEO (C20), Doc gestion projet (C2/C3/C4/C12), accessibilité (C13/C15).
+5. **Produit V1 différenciateurs** : UI cohérence (PROD-8), plans/limites (PROD-4), intégrations GitHub/Slack (PROD-5.1/5.2), agents/Brain OS (PROD-6), gestion fine (PROD-2).
+6. **Plus tard** : Asana, templates projet, méthodo de gestion configurable, observabilité.
+
+---
+
+## 5. Boucle d'itération (process)
+
+À **chaque lot** livré (`step by step`) :
+
+1. **Coder** le lot (1 branche `feature/*` ou `fix/*` depuis `dev`, 1 label `release:*`), respecter la DoD (§0).
+2. **Tester** (≥50 %) + linter avant commit. Demander confirmation avant tout commit/push.
+3. **MAJ Brain OS** (`taskforce-docs/` — _hors de ce workspace, Obsidian local_) : fiche du domaine touché + `known-issues`/`technical-debt` si pertinent.
+4. **MAJ cette roadmap** : passer le statut de l'item (🔲/🟧/🟡 → ✅) + dater.
+5. **MAJ Excel grille** (`Grille_evaluation_TaskForce_REMPLIE_DFS_25-26.xlsx` — _hors workspace_ ; via skill `xlsx`) : cocher le critère Cxx + lien preuve.
+
+> ⚠️ `taskforce-docs/` et l'Excel ne sont **pas** dans ce repo (workspace = `taskforce-fullstack`). Pour les mettre à jour automatiquement, soit les ouvrir dans le workspace, soit me donner le chemin. Sinon je fournis le contenu à coller.
+
+---
+
+**Maj :** 20/06/2026 · Réécriture complète (produit + certification). Détail QA → `.ai/qa.md` · Bugs → `.ai/known-issues.md` · P0 → `.ai/P0-fix-plan.md`.
