@@ -23,9 +23,11 @@ import {
   getAnalyticsCapacity,
   getAnalyticsKpis,
   getAnalyticsThroughput,
+  getAnalyticsBurndown,
   type MemberCapacity,
   type AnalyticsKpis,
   type ThroughputPoint,
+  type BurndownPoint,
 } from "@/lib/api/analytics-service"
 import { listProjects, type Project } from "@/lib/api/project-service"
 
@@ -186,6 +188,7 @@ export default function AnalyticsPage() {
   const [capacityData, setCapacityData] = useState<MemberCapacity[]>([])
   const [kpis, setKpis] = useState<AnalyticsKpis | null>(null)
   const [throughput, setThroughput] = useState<ThroughputPoint[]>([])
+  const [burndown, setBurndown] = useState<BurndownPoint[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [projectFilter, setProjectFilter] = useState<string>(ALL_PROJECTS)
 
@@ -203,6 +206,7 @@ export default function AnalyticsPage() {
     const projectId = projectFilter === ALL_PROJECTS ? undefined : Number(projectFilter)
     getAnalyticsKpis(slug, projectId).then(setKpis).catch(() => { /* non-critical */ })
     getAnalyticsThroughput(slug, projectId).then(setThroughput).catch(() => { /* non-critical */ })
+    getAnalyticsBurndown(slug, projectId).then(setBurndown).catch(() => { /* non-critical */ })
     getAnalyticsCapacity(slug, projectId).then(setCapacityData).catch(() => { /* non-critical */ })
   }, [slug, projectFilter])
 
@@ -294,7 +298,7 @@ export default function AnalyticsPage() {
           <SectionCard title="Sprint burndown" action={proBadge}>
             <MaybeGate gated={!isPro} onUpgrade={() => setUpgradeOpen(true)}>
               <ResponsiveContainer width="100%" height={160}>
-                <LineChart data={BURNDOWN_DATA} margin={{ top: 0, right: 0, left: -24, bottom: 0 }}>
+                <LineChart data={burndown.length > 0 ? burndown : BURNDOWN_DATA} margin={{ top: 0, right: 0, left: -24, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                   <XAxis dataKey="day" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
