@@ -45,15 +45,6 @@ const STATUS_DOT: Record<string, string> = {
 
 // ─── Primitives ───────────────────────────────────────────────────────────────
 
-function LiveClock() {
-  const [t, setT] = useState("")
-  useEffect(() => {
-    const tick = () => setT(new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }))
-    tick(); const id = setInterval(tick, 1000); return () => clearInterval(id)
-  }, [])
-  return <span className="font-mono text-xs tabular-nums text-muted-foreground">{t}</span>
-}
-
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
@@ -97,26 +88,10 @@ export default function DashboardPage() {
   if (hour < 5) greeting = "Still up,"
   else if (hour < 12) greeting = "Good morning,"
   else if (hour < 18) greeting = "Good afternoon,"
-  const criticals = EXCEPTIONS.filter((e) => e.severity === "critical").length
   const decisions = aiInsights.filter((i) => i.urgency === "high").length
 
   return (
     <div className="flex flex-col gap-6">
-      {/* System strip */}
-      <div className="flex items-center justify-between border-b border-border pb-3">
-        <div className="flex items-center gap-2">
-          <span className="relative flex size-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-60" />
-            <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
-          </span>
-          <span className="text-xs text-muted-foreground">All systems operational</span>
-        </div>
-        <div className="flex items-center gap-4">
-          <LiveClock />
-          <span className="font-mono text-xs text-muted-foreground">Taskforce OS · v1.0</span>
-        </div>
-      </div>
-
       {/* Header */}
       <div className="flex items-end justify-between gap-4">
         <div className="space-y-1">
@@ -124,9 +99,6 @@ export default function DashboardPage() {
           <h1 className="text-3xl font-semibold tracking-tight">{firstName}</h1>
         </div>
         <div className="flex items-center gap-2 pb-0.5">
-          {criticals > 0 && (
-            <Badge variant="destructive" className="gap-1"><AlertTriangle className="size-3" /> {criticals} critical</Badge>
-          )}
           {decisions > 0 && (
             <Badge variant="secondary" className="gap-1"><Zap className="size-3" /> {decisions} decision{decisions > 1 ? "s" : ""} pending</Badge>
           )}
@@ -264,7 +236,10 @@ export default function DashboardPage() {
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline justify-between gap-2">
-                      <span className="text-xs font-semibold text-foreground">{agent.acronym}</span>
+                      <span className="flex items-center gap-1.5">
+                        <span className="rounded bg-primary/10 px-1 py-px text-[8px] font-bold uppercase tracking-wide text-primary">AI</span>
+                        <span className="text-xs font-semibold text-foreground">{agent.acronym}</span>
+                      </span>
                       <span className="font-mono text-[10px] tabular-nums text-muted-foreground">{agent.ago}</span>
                     </div>
                     <p className="mt-0.5 truncate text-xs text-muted-foreground">{agent.task}</p>
