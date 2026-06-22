@@ -144,8 +144,53 @@ public class EmailService {
     }
 
     /**
+     * Envoie une invitation à rejoindre un workspace (PROD-3.5). Best-effort :
+     * en cas d'échec SMTP on logue sans propager (l'invitation reste créée en DB).
+     */
+    public void sendWorkspaceInvitationEmail(String toEmail, String inviterName,
+                                             String workspaceName, String acceptUrl) {
+        try {
+            String subject = String.format("[%s] Vous êtes invité à rejoindre %s", fromName, workspaceName);
+            String html = """
+                <!DOCTYPE html><html><body style="font-family:sans-serif;color:#333;max-width:600px;margin:0 auto;padding:24px">
+                <h2 style="color:#111">Invitation à rejoindre %s</h2>
+                <p><strong>%s</strong> vous invite à rejoindre l'espace de travail <strong>%s</strong> sur %s.</p>
+                <p style="margin:28px 0">
+                  <a href="%s" style="background:#6366f1;color:#fff;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:600">
+                    Rejoindre %s
+                  </a>
+                </p>
+                <p style="font-size:13px;color:#666">Si vous n'avez pas encore de compte, vous pourrez en créer un — votre invitation sera appliquée automatiquement.</p>
+                <p style="font-size:13px;color:#666">Ce lien expire dans 7 jours.</p>
+                <hr style="margin:24px 0;border:none;border-top:1px solid #eee"/>
+                <p style="font-size:12px;color:#999">%s — <a href="%s">%s</a></p>
+                </body></html>
+                """.formatted(workspaceName, inviterName, workspaceName, fromName,
+                              acceptUrl, workspaceName, fromName, appUrl, appUrl);
+
+            sendHtmlEmail(toEmail, subject, html);
+            log.info("Email d'invitation workspace envoyé à : {}", toEmail);
+        } catch (Exception e) {
+            log.error("Échec de l'envoi de l'email d'invitation à {} : {}", toEmail, e.getMessage());
+        }
+    }
+
+    /**
      * Méthode privée pour envoyer un email HTML
      */
+    /**
+     * Envoi générique d'une notification interne (ex : équipe sales). Best-effort :
+     * en cas d'échec on logue sans propager (ne casse jamais l'action métier appelante).
+     */
+    public void sendInternalNotification(String toEmail, String subject, String htmlContent) {
+        try {
+            sendHtmlEmail(toEmail, subject, htmlContent);
+            log.info("Notification interne envoyée à : {}", toEmail);
+        } catch (Exception e) {
+            log.error("Échec de l'envoi de la notification interne à {} : {}", toEmail, e.getMessage());
+        }
+    }
+
     private void sendHtmlEmail(String toEmail, String subject, String htmlContent) throws MessagingException {
         MimeMessage message = mailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
