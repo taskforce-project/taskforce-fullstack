@@ -53,6 +53,12 @@ public class ProjectResponse {
     /** URL de l'icône/logo du projet (image uploadée ou emoji unicode) */
     private String iconUrl;
 
+    /** Couleur d'accent (classe Tailwind, ex: "bg-violet-500") */
+    private String color;
+
+    /** Mode « montée en compétence » (PROD-1.8 Phase 3) */
+    private boolean growthMode;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
