@@ -202,6 +202,33 @@ Le minimum pour que l'app tienne la promesse du CDC de bout en bout, **et** que 
 
 **Sous-total : ~11,5 j·h.**
 
+## 2.9 — Landing page (refonte style « Nodus / AI-agent ») — `PROD-9` (recoupe CERT-C20 SEO)
+
+> Projet **Astro** dans `landing-page/` (îlots React + Tailwind + blocks shadcn/aceternity + magicui + i18n fr/en). Refonte orientée **agents IA / minimal / microinteractions**, autour de la phrase YC :
+> *« Describe the outcome. TaskForce orchestrates the execution. From planning and assignments to AI agents, meetings, reports and delivery. »*
+> Méthode : **page principale (home) d'abord, en sections réutilisables**, puis duplication des patterns aux autres pages.
+
+**Architecture menu (cible, ancrée sur les features réelles de l'app) :**
+- **Product** (méga-menu) — Cœur : Smart Assign (répartition IA + montée en compétence), Projets & Issues (board/list/backlog/cycles), AI Insights & Assistant. Capacités : Analytics, Time tracking, Teams & RBAC, Intégrations (GitHub), Sécurité & RGPD.
+- **Solutions** — par usage (Engineering / Product / Agences-Ops) + par taille (Startups / Growing / Enterprise).
+- **Pricing** · **Resources** (Docs, Changelog, Blog, Security, Self-host) · **Enterprise**.
+
+**Pages** (la plupart existent déjà en `.astro` — à refondre au nouveau style) : `index` (home), `pricing`, `about`, `contact`, `customers`, `enterprise`, `self-host`, `security`, `docs`, `blog`, `changelog`, `accessibility`, `privacy-policy`, `terms`, `sitemap`. Nouvelles éventuelles : `features/*`, `compare/*` (vs Linear/Jira), `solutions/*`.
+
+| ID      | Tâche                                                                                                                                                                                                 | Stat. | Prio | Effort |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :---: | :--: | :----: |
+| PROD-9.1 | **Hero** = phrase YC (« Describe the outcome / TaskForce orchestrates the execution » + sous-titre planning→delivery + CTA Get started / Talk to sales). ✅ **(22/06)** copie posée dans `Hero.tsx`. Reste : restyle visuel Nodus (dark, fond grille/aurora, microinteractions). | 🟡 | P1 | 0,5 |
+| PROD-9.2 | **Bande « outcome → execution »** : pipeline visuel animé (planning · assignments · AI agents · meetings · reports · delivery) — traduit la phrase YC. | 🔲 | P1 | 1,0 |
+| PROD-9.3 | **Section Smart Assign / orchestration IA** (le différenciateur) : bento + explication du « pourquoi » (compétences, charge, growth). | 🔲 | P1 | 1,0 |
+| PROD-9.4 | **Capacités cœur** : projets/board/cycles, analytics, time tracking — feature grid au style Nodus. | 🔲 | P2 | 1,0 |
+| PROD-9.5 | **AI agents & assistant** (vision) + **Intégrations** (GitHub wrapper) + **Sécurité & RGPD / Enterprise** + **Self-host**. | 🔲 | P2 | 1,5 |
+| PROD-9.6 | **Testimonials · Pricing teaser · CTA finale · Footer** au nouveau style. | 🔲 | P2 | 1,0 |
+| PROD-9.7 | **Header/méga-menu** réaligné sur l'archi ci-dessus (items = vraies features) + thème (dark/Nodus) + i18n fr/en. | 🔲 | P2 | 1,0 |
+| PROD-9.8 | **Duplication des patterns** aux autres pages (pricing, about, enterprise, self-host, security…) au nouveau design. | 🔲 | P2 | 2,0 |
+| PROD-9.9 | **SEO** (recoupe CERT-C20) : metadata/canonical/OG par page, `robots.ts`/`sitemap`, JSON-LD, perf images, Lighthouse ≥90. | 🔲 | P1 | — (voir C20) |
+
+**Sous-total : ~9 j·h** (recoupe SEO C20).
+
 ---
 
 # AXE B — CERTIFICATION (Grille RNCP C1–C26)
