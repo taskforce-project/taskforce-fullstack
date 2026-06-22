@@ -57,26 +57,6 @@ const TOOLTIP_STYLE: React.CSSProperties = {
   color: "var(--popover-foreground)",
 }
 
-const KPI_METRICS: KpiMetric[] = [
-  { label: "Tasks completed", value: "47",   delta: 12, unit: "this week", icon: TrendingUp },
-  { label: "Cycle time",      value: "2.4d", delta: -8, unit: "avg",       icon: Activity,     deltaInverse: true },
-  { label: "Blocked tasks",   value: "3",    delta: 1,  unit: "active",    icon: AlertTriangle, deltaInverse: true },
-  { label: "Sprint velocity", value: "73%",  delta: -5, unit: "on target", icon: Flame,        deltaInverse: true },
-]
-
-const THROUGHPUT_DATA = [
-  { week: "W1", opened: 18, resolved: 14 },
-  { week: "W2", opened: 22, resolved: 19 },
-  { week: "W3", opened: 15, resolved: 21 },
-  { week: "W4", opened: 27, resolved: 23 },
-]
-
-const BURNDOWN_DATA = [
-  { day: "D1", ideal: 34, remaining: 34 }, { day: "D2", ideal: 28, remaining: 30 },
-  { day: "D3", ideal: 22, remaining: 25 }, { day: "D4", ideal: 17, remaining: 22 },
-  { day: "D5", ideal: 11, remaining: 16 }, { day: "D6", ideal: 6, remaining: 12 }, { day: "D7", ideal: 0, remaining: 8 },
-]
-
 const SEVERITY_META: Record<"critical" | "warning" | "info", { wrap: string; icon: React.ElementType; iconColor: string }> = {
   critical: { wrap: "border-rose-500/30 bg-rose-500/10",  icon: Flame,         iconColor: "text-rose-500" },
   warning:  { wrap: "border-amber-500/30 bg-amber-500/10", icon: AlertTriangle, iconColor: "text-amber-500" },
@@ -206,17 +186,15 @@ export default function AnalyticsPage() {
     getAnalyticsCapacity(slug, projectId).then(setCapacityData).catch(() => { /* non-critical */ })
   }, [slug, projectFilter])
 
-  // KPIs réels → cartes (remplace les mocks ; PROD-1.7)
-  const kpiMetrics: KpiMetric[] = kpis ? [
-    { label: "Tasks completed", value: String(kpis.tasksResolved),     delta: kpis.tasksResolvedDelta,      unit: "this month", icon: TrendingUp },
-    { label: "Cycle time",      value: `${kpis.avgResolutionDays}d`,   delta: Math.round(kpis.avgResolutionDaysDelta), unit: "avg",  icon: Activity, deltaInverse: true },
-    { label: "Sprint velocity", value: String(kpis.velocity),          delta: kpis.velocityDelta,           unit: "last 7d",    icon: Flame },
-    { label: "Active cycles",   value: String(kpis.activeCycles),      delta: 0,                            unit: "running",    icon: Zap },
-  ] : KPI_METRICS
+  // KPIs réels → cartes (zéros tant que non chargés ; aucun mock — PROD-1.7)
+  const k = kpis ?? { tasksResolved: 0, tasksResolvedDelta: 0, avgResolutionDays: 0, avgResolutionDaysDelta: 0, velocity: 0, velocityDelta: 0, activeCycles: 0 }
+  const kpiMetrics: KpiMetric[] = [
+    { label: "Tasks completed", value: String(k.tasksResolved),   delta: k.tasksResolvedDelta,                 unit: "this month", icon: TrendingUp },
+    { label: "Cycle time",      value: `${k.avgResolutionDays}d`, delta: Math.round(k.avgResolutionDaysDelta), unit: "avg",        icon: Activity, deltaInverse: true },
+    { label: "Sprint velocity", value: String(k.velocity),        delta: k.velocityDelta,                      unit: "last 7d",    icon: Flame },
+    { label: "Active cycles",   value: String(k.activeCycles),    delta: 0,                                    unit: "running",    icon: Zap },
+  ]
 
-  const overallHealth = 78
-  const healthDelta = -4
-  const healthBad = healthDelta < 0
   const proBadge = !isPro ? <Badge variant="secondary" className="text-amber-600 dark:text-amber-400">Pro</Badge> : undefined
 
   return (
@@ -229,21 +207,15 @@ export default function AnalyticsPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Operational Intelligence</h1>
           <p className="text-sm text-muted-foreground">AI-derived signals and performance patterns across all operations</p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <Select value={projectFilter} onValueChange={setProjectFilter}>
-            <SelectTrigger className="h-8 w-44 text-xs"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL_PROJECTS}>Tous les projets</SelectItem>
-              {projects.map((p) => (
-                <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Badge variant="secondary" className={cn("gap-1.5", healthBad ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400")}>
-            <Activity className="size-3.5" /> Health {overallHealth}
-            <span className="text-muted-foreground">· {healthDelta}% vs last week</span>
-          </Badge>
-        </div>
+        <Select value={projectFilter} onValueChange={setProjectFilter}>
+          <SelectTrigger className="h-8 w-44 text-xs shrink-0"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL_PROJECTS}>Tous les projets</SelectItem>
+            {projects.map((p) => (
+              <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* KPI strip */}
@@ -258,7 +230,7 @@ export default function AnalyticsPage() {
           <SectionCard title="Weekly throughput" action={proBadge}>
             <MaybeGate gated={!isPro} onUpgrade={() => setUpgradeOpen(true)}>
               <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={throughput.length > 0 ? throughput : THROUGHPUT_DATA} barGap={3} margin={{ top: 0, right: 0, left: -24, bottom: 0 }}>
+                <BarChart data={throughput} barGap={3} margin={{ top: 0, right: 0, left: -24, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                   <XAxis dataKey="week" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
@@ -271,30 +243,10 @@ export default function AnalyticsPage() {
             </MaybeGate>
           </SectionCard>
 
-          <SectionCard title="System health timeline (7d)" action={proBadge}>
-            <MaybeGate gated={!isPro} onUpgrade={() => setUpgradeOpen(true)}>
-              <ResponsiveContainer width="100%" height={140}>
-                <AreaChart data={HEALTH_TIMELINE} margin={{ top: 0, right: 0, left: -24, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="healthGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={C1} stopOpacity={0.25} />
-                      <stop offset="95%" stopColor={C1} stopOpacity={0.02} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                  <XAxis dataKey="day" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
-                  <YAxis domain={[60, 100]} tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
-                  <Tooltip contentStyle={TOOLTIP_STYLE} />
-                  <Area type="monotone" dataKey="score" name="Health" stroke={C1} strokeWidth={2} fill="url(#healthGrad)" dot={{ r: 3 }} activeDot={{ r: 5 }} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </MaybeGate>
-          </SectionCard>
-
           <SectionCard title="Sprint burndown" action={proBadge}>
             <MaybeGate gated={!isPro} onUpgrade={() => setUpgradeOpen(true)}>
               <ResponsiveContainer width="100%" height={160}>
-                <LineChart data={burndown.length > 0 ? burndown : BURNDOWN_DATA} margin={{ top: 0, right: 0, left: -24, bottom: 0 }}>
+                <LineChart data={burndown} margin={{ top: 0, right: 0, left: -24, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                   <XAxis dataKey="day" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
@@ -311,11 +263,13 @@ export default function AnalyticsPage() {
         {/* Signals + capacity */}
         <div className="flex flex-col gap-4 lg:col-span-2">
           <SectionCard
-            title="AI anomaly detection"
-            action={<span className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground"><Brain className="size-3" /> {AI_ANOMALIES.length} signals</span>}
+            title="AI insights"
+            action={<span className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground"><Brain className="size-3" /> {insights.length} signals</span>}
             bodyClassName="p-4 space-y-2"
           >
-            {AI_ANOMALIES.map((a) => <AnomalyRow key={a.id} anomaly={a} />)}
+            {insights.length === 0 ? (
+              <p className="px-1 py-3 text-center text-xs text-muted-foreground">Aucun insight pour le moment.</p>
+            ) : insights.map((ins, i) => <InsightRow key={`${ins.agent}-${i}`} insight={ins} />)}
           </SectionCard>
 
           <div>
