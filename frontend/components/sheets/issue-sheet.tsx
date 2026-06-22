@@ -36,9 +36,10 @@ import { useIssueStore } from "@/lib/store/issue-store"
 import { useLabelStore } from "@/lib/store/label-store"
 import { useIntegrationStore } from "@/lib/store/integration-store"
 import { listProjectMembers, type ProjectMember } from "@/lib/api/project-service"
-import type { IssueComment, IssueLabel, IssueStatus as ApiIssueStatus, Issue, IssueRelation, IssueRelationType, ChecklistItem } from "@/lib/api/issue-service"
+import type { IssueComment, IssueLabel, IssueStatus as ApiIssueStatus, Issue, IssueRelation, IssueRelationType, ChecklistItem, Worklog } from "@/lib/api/issue-service"
 import { listChildIssues, listRelations, addRelation, deleteRelation,
-         listChecklist, addChecklistItem, updateChecklistItem, deleteChecklistItem } from "@/lib/api/issue-service"
+         listChecklist, addChecklistItem, updateChecklistItem, deleteChecklistItem,
+         listWorklogs, addWorklog, deleteWorklog } from "@/lib/api/issue-service"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -758,6 +759,126 @@ function ChecklistTab({
   )
 }
 
+// ─── Time tracking / worklogs (BE-ISS-012) ─────────────────────────────────────
+function formatMinutes(total: number): string {
+  const h = Math.floor(total / 60)
+  const m = total % 60
+  if (h > 0 && m > 0) return `${h}h${m.toString().padStart(2, "0")}`
+  if (h > 0) return `${h}h`
+  return `${m}m`
+}
+
+function WorklogTab({
+  issueId, projectId, workspaceSlug,
+}: Readonly<{ issueId: number; projectId: number; workspaceSlug: string }>) {
+  const [entries, setEntries] = useState<Worklog[]>([])
+  const [loading, setLoading] = useState(false)
+  const [minutes, setMinutes] = useState("")
+  const [description, setDescription] = useState("")
+  const [adding, setAdding] = useState(false)
+
+  const refresh = useCallback(() => {
+    setLoading(true)
+    listWorklogs(workspaceSlug, projectId, issueId)
+      .then(setEntries)
+      .catch(() => null)
+      .finally(() => setLoading(false))
+  }, [workspaceSlug, projectId, issueId])
+
+  useEffect(() => { refresh() }, [refresh])
+
+  const total = entries.reduce((s, e) => s + e.minutes, 0)
+
+  async function add() {
+    const m = Number(minutes)
+    if (!Number.isFinite(m) || m <= 0 || adding) return
+    setAdding(true)
+    try {
+      const entry = await addWorklog(workspaceSlug, projectId, issueId, {
+        minutes: Math.round(m),
+        description: description.trim() || null,
+      })
+      setEntries((prev) => [entry, ...prev])
+      setMinutes("")
+      setDescription("")
+    } catch {
+      // client toast
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  async function remove(entry: Worklog) {
+    setEntries((prev) => prev.filter((e) => e.id !== entry.id))
+    try {
+      await deleteWorklog(workspaceSlug, projectId, issueId, entry.id)
+    } catch {
+      refresh()
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {entries.length > 0 && (
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-muted-foreground">Total enregistré</span>
+          <span className="font-semibold text-foreground">{formatMinutes(total)}</span>
+        </div>
+      )}
+      {loading && <p className="text-xs text-muted-foreground text-center py-3">Chargement…</p>}
+      {!loading && entries.length === 0 && (
+        <p className="text-xs text-muted-foreground italic py-2">Aucun temps enregistré.</p>
+      )}
+      {entries.map((e) => (
+        <div key={e.id} className="group flex items-center gap-2 border-b border-border/50 py-1.5 last:border-0">
+          <UserAvatar
+            email={e.user.email}
+            name={e.user.displayName ?? e.user.email}
+            avatarUrl={e.user.avatarUrl}
+            className="size-5"
+            fallbackClassName="text-[8px]"
+          />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-medium text-foreground">{formatMinutes(e.minutes)}</span>
+              <span className="text-[10px] text-muted-foreground">· {e.loggedAt}</span>
+            </div>
+            {e.description && <p className="truncate text-[11px] text-muted-foreground">{e.description}</p>}
+          </div>
+          <button
+            type="button"
+            onClick={() => remove(e)}
+            aria-label="Supprimer l'entrée"
+            className="flex size-6 items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground group-hover:opacity-100"
+          >
+            <Trash2 className="size-3.5" />
+          </button>
+        </div>
+      ))}
+      <div className="mt-1 flex items-center gap-2">
+        <input
+          type="number"
+          min={1}
+          value={minutes}
+          onChange={(e) => setMinutes(e.target.value)}
+          placeholder="Min."
+          className="h-8 w-16 rounded-md border border-border bg-transparent px-2 text-xs outline-none focus:border-primary/50"
+        />
+        <input
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add() } }}
+          placeholder="Description (optionnel)"
+          className="h-8 flex-1 rounded-md border border-border bg-transparent px-2 text-xs outline-none focus:border-primary/50"
+        />
+        <Button size="sm" className="h-8 gap-1 text-xs" onClick={add} disabled={!minutes || adding}>
+          <Plus className="size-3.5" /> Logger
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 // ─── Relations entre issues (PROD-2.2) ─────────────────────────────────────────
 const RELATION_LABELS: Record<IssueRelationType, string> = {
   BLOCKS: "Blocks",
@@ -878,7 +999,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
 
   const initDescription = issue?.description ?? ""
   const [comment, setComment] = useState("")
-  const [tab, setTab] = useState<"comments" | "activity" | "attachments" | "github" | "subtasks" | "relations" | "checklist">("comments")
+  const [tab, setTab] = useState<"comments" | "activity" | "attachments" | "github" | "subtasks" | "relations" | "checklist" | "time">("comments")
 
   // Status (real IDs from API)
   const [statusId, setStatusId]             = useState<number>(issue?.statusId ?? 0)
@@ -1343,6 +1464,21 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                     Checklist
                   </button>
                 )}
+                {workspaceSlug && projectId && (
+                  <button
+                    type="button"
+                    onClick={() => setTab("time")}
+                    className={cn(
+                      "flex items-center gap-1.5 text-xs font-medium pb-2.5 border-b-2 -mb-px transition-colors",
+                      tab === "time"
+                        ? "border-foreground text-foreground"
+                        : "border-transparent text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <Clock className="size-3.5" />
+                    Time
+                  </button>
+                )}
               </div>
 
               {tab === "comments" && (
@@ -1418,6 +1554,14 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
 
               {tab === "checklist" && workspaceSlug && projectId && (
                 <ChecklistTab
+                  issueId={Number(issue.id)}
+                  projectId={projectId}
+                  workspaceSlug={workspaceSlug}
+                />
+              )}
+
+              {tab === "time" && workspaceSlug && projectId && (
+                <WorklogTab
                   issueId={Number(issue.id)}
                   projectId={projectId}
                   workspaceSlug={workspaceSlug}
