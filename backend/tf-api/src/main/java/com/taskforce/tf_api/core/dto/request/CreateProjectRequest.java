@@ -32,4 +32,8 @@ public class CreateProjectRequest {
 
     /** URL de l'icône/logo (image uploadée, emoji unicode ou lucide:IconName). Optionnel. */
     private String iconUrl;
+
+    /** Couleur d'accent (classe Tailwind, ex: "bg-violet-500"). Optionnel. */
+    @Size(max = 50, message = "La couleur ne peut pas dépasser 50 caractères")
+    private String color;
 }
