@@ -19,7 +19,7 @@ import {
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import { Separator } from "@/components/ui/separator"
 import { useAuth } from "@/lib/contexts/auth-context"
 import { cn } from "@/lib/utils"
@@ -139,7 +139,6 @@ export default function ProfilePage() {
   }, [slug, fetchProjects, fetchProfile])
 
   const displayName  = user?.displayName ?? (user ? `${user.firstName} ${user.lastName}` : "Your Name")
-  const initials     = user ? `${user.firstName[0]}${user.lastName[0]}`.toUpperCase() : "ME"
   const email        = user?.email ?? "you@taskforce.io"
   const plan         = user?.planType ?? "FREE"
   const isPro        = plan === "PRO" || plan === "ENTERPRISE"
@@ -150,11 +149,15 @@ export default function ProfilePage() {
       <div className="rounded-xl border border-border bg-card [box-shadow:var(--shadow-sm)] p-6">
         <div className="flex items-start gap-5">
           {/* Avatar */}
-          <Avatar className="h-20 w-20 shrink-0">
-            <AvatarFallback className="text-2xl font-bold bg-primary text-primary-foreground">
-              {initials}
-            </AvatarFallback>
-          </Avatar>
+          <UserAvatar
+            email={email}
+            name={displayName}
+            firstName={user?.firstName}
+            lastName={user?.lastName}
+            avatarUrl={user?.avatarUrl}
+            className="h-20 w-20 shrink-0"
+            fallbackClassName="text-2xl font-bold"
+          />
 
           {/* Info */}
           <div className="flex-1 min-w-0">
