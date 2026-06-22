@@ -51,6 +51,7 @@ public class AuthService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final JwtService jwtService;
     private final WorkspaceService workspaceService;
+    private final WorkspaceInvitationService workspaceInvitationService;
 
     @Value("${stripe.success-url}")
     private String stripeSuccessUrl;
@@ -270,6 +271,9 @@ public class AuthService {
         // Créer automatiquement un workspace pour le nouvel utilisateur
         workspaceService.createWorkspace(user, keycloakUser.getFirstName());
 
+        // Appliquer les invitations en attente pour cet email (PROD-3.5, best-effort)
+        workspaceInvitationService.acceptPendingInvitations(user);
+
         // Envoyer l'email de bienvenue
         emailService.sendWelcomeEmail(request.getEmail(), keycloakUser.getFirstName());
 
@@ -336,6 +340,9 @@ public class AuthService {
         if (!user.getIsActive()) {
             throw new RuntimeException("Ce compte est désactivé");
         }
+
+        // Appliquer d'éventuelles invitations workspace en attente (PROD-3.5, best-effort)
+        workspaceInvitationService.acceptPendingInvitations(user);
 
         // Générer les tokens JWT
         AuthResponse authResponse = jwtService.generateTokens(user, keycloakUser);
