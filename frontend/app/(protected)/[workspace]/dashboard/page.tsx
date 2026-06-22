@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import {
-  ArrowUpRight, AlertTriangle, CheckCircle2, ChevronRight,
+  ArrowUpRight, Clock,
   Zap, Loader2, Layers, Activity,
 } from "lucide-react"
 import { useAuth } from "@/lib/contexts/auth-context"
@@ -16,34 +16,18 @@ import { SectionCard, MetricSplit, Metric } from "@/components/ui/section-card"
 import { Progress } from "@/components/ui/progress"
 import { cn } from "@/lib/utils"
 
-// ─── Static demo data ─────────────────────────────────────────────────────────
-
-const EXCEPTIONS = [
-  { id: "1", severity: "critical" as const, source: "COO",    message: "Mobile App sprint velocity −31% — delivery at risk", age: "2h" },
-  { id: "2", severity: "warning"  as const, source: "System", message: "TF-38 overdue by 2 days — no assignee update",       age: "5h" },
-]
-
-const AGENTS = [
-  { id: "ceo",  acronym: "CEO",  status: "standby" as const, task: "Strategic overview updated",      ago: "2h"  },
-  { id: "cfo",  acronym: "CFO",  status: "active"  as const, task: "Generating Q2 burn analysis…",    ago: "now" },
-  { id: "coo",  acronym: "COO",  status: "active"  as const, task: "Sprint risk assessment complete", ago: "4m"  },
-  { id: "cto",  acronym: "CTO",  status: "standby" as const, task: "Architecture review complete",    ago: "1d"  },
-  { id: "cpo",  acronym: "CPO",  status: "standby" as const, task: "Roadmap prioritization updated",  ago: "3h"  },
-  { id: "chro", acronym: "CHRO", status: "idle"    as const, task: "Last active yesterday",           ago: "1d"  },
-]
-
-const PENDING_DECISIONS = [
-  { id: "1", href: "./agents", agent: "CFO", action: "Approve Q2 budget reallocation (+12k)", confidence: 87 },
-  { id: "2", href: "./agents", agent: "COO", action: "Reassign TF-38 before sprint close",     confidence: 92 },
-]
-
-const STATUS_DOT: Record<string, string> = {
-  active:  "bg-emerald-500",
-  standby: "bg-amber-500",
-  idle:    "bg-muted-foreground/50",
-}
-
 // ─── Primitives ───────────────────────────────────────────────────────────────
+
+/** Corps de panneau « bientôt disponible » — pour les sections non encore câblées (pas de mock). */
+function ComingSoonBody({ label }: { readonly label?: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-1.5 px-4 py-10 text-center">
+      <Clock className="size-5 text-muted-foreground/50" />
+      <p className="text-sm font-medium text-muted-foreground">Bientôt disponible</p>
+      {label && <p className="text-xs text-muted-foreground/70">{label}</p>}
+    </div>
+  )
+}
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -117,7 +101,7 @@ export default function DashboardPage() {
         <SectionCard title="Activity" icon={<Activity className="size-4" />} bodyClassName="p-0">
           <MetricSplit>
             <Metric label="My queue" value={0} />
-            <Metric label="Agents active" value={2} />
+            <Metric label="Agents active" value={0} />
           </MetricSplit>
         </SectionCard>
       </div>
@@ -126,32 +110,10 @@ export default function DashboardPage() {
       <div className="grid gap-5 lg:grid-cols-3">
         {/* Left 2/3 */}
         <div className="space-y-5 lg:col-span-2">
-          {/* Needs attention */}
-          {EXCEPTIONS.length > 0 && (
-            <SectionCard title="Needs attention" bodyClassName="p-4 space-y-2">
-                {EXCEPTIONS.map((ex) => {
-                  const critical = ex.severity === "critical"
-                  return (
-                    <Link
-                      key={ex.id}
-                      href="./projects"
-                      className={cn(
-                        "group flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors",
-                        critical
-                          ? "border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/15"
-                          : "border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/15"
-                      )}
-                    >
-                      <AlertTriangle className={cn("size-4 shrink-0", critical ? "text-rose-500" : "text-amber-500")} />
-                      <p className="flex-1 text-sm font-medium text-foreground">{ex.message}</p>
-                      <Badge variant="secondary" className="font-mono text-[10px]">{ex.source}</Badge>
-                      <span className="text-xs text-muted-foreground">{ex.age}</span>
-                      <ChevronRight className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-60" />
-                    </Link>
-                  )
-                })}
-            </SectionCard>
-          )}
+          {/* Needs attention — bientôt disponible (alertes/exceptions à câbler) */}
+          <SectionCard title="Needs attention" bodyClassName="p-0">
+            <ComingSoonBody label="Alertes & exceptions" />
+          </SectionCard>
 
           {/* Active operations */}
           <SectionCard title="Active operations" href="./projects" bodyClassName="p-0">
@@ -222,48 +184,14 @@ export default function DashboardPage() {
 
         {/* Right 1/3 */}
         <div className="space-y-5">
-          {/* Agent activity */}
-          <SectionCard title="Agent activity" href="./agents" bodyClassName="p-0">
-              {AGENTS.map((agent) => (
-                <Link
-                  key={agent.id}
-                  href="./agents"
-                  className="flex items-center gap-3 border-b border-border px-4 py-3 transition-colors last:border-0 hover:bg-muted/50"
-                >
-                  <span className="relative flex size-2 shrink-0">
-                    {agent.status === "active" && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-60" />}
-                    <span className={cn("relative inline-flex size-2 rounded-full", STATUS_DOT[agent.status])} />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="flex items-center gap-1.5">
-                        <span className="rounded bg-primary/10 px-1 py-px text-[8px] font-bold uppercase tracking-wide text-primary">AI</span>
-                        <span className="text-xs font-semibold text-foreground">{agent.acronym}</span>
-                      </span>
-                      <span className="font-mono text-[10px] tabular-nums text-muted-foreground">{agent.ago}</span>
-                    </div>
-                    <p className="mt-0.5 truncate text-xs text-muted-foreground">{agent.task}</p>
-                  </div>
-                </Link>
-              ))}
+          {/* Agent activity — bientôt disponible (feature Agents IA coming-soon) */}
+          <SectionCard title="Agent activity" bodyClassName="p-0">
+            <ComingSoonBody label="Activité des agents IA" />
           </SectionCard>
 
-          {/* Pending decisions */}
+          {/* Pending decisions — bientôt disponible */}
           <SectionCard title="Pending decisions" bodyClassName="p-0">
-              {PENDING_DECISIONS.length === 0 ? (
-                <div className="flex items-center gap-2 px-4 py-3 text-sm text-muted-foreground">
-                  <CheckCircle2 className="size-4 text-emerald-500" /> No decisions pending
-                </div>
-              ) : PENDING_DECISIONS.map((d) => (
-                <Link key={d.id} href={d.href} className="group flex items-center gap-3 border-b border-border px-4 py-3 transition-colors last:border-0 hover:bg-muted/50">
-                  <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-[10px] font-semibold">{d.agent}</div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-medium text-foreground">{d.action}</p>
-                    <p className="mt-0.5 text-[10px] text-muted-foreground">{d.confidence}% confidence</p>
-                  </div>
-                  <ChevronRight className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-60" />
-                </Link>
-              ))}
+            <ComingSoonBody label="Décisions à valider" />
           </SectionCard>
         </div>
       </div>
