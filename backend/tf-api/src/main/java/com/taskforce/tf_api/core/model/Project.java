@@ -89,6 +89,16 @@ public class Project {
     @Column(name = "icon_url", columnDefinition = "TEXT")
     private String iconUrl;
 
+    /** Couleur d'accent (classe Tailwind, ex: "bg-violet-500"). Défaut neutre. */
+    @Column(nullable = false, length = 50)
+    @Builder.Default
+    private String color = "bg-primary";
+
+    /** Mode « montée en compétence » : autorise le bonus stretch du Smart Assign (PROD-1.8 Phase 3). */
+    @Column(name = "growth_mode", nullable = false)
+    @Builder.Default
+    private boolean growthMode = false;
+
     /** Utilisateur ayant créé le projet */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", nullable = false)
