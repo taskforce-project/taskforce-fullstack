@@ -77,15 +77,6 @@ const BURNDOWN_DATA = [
   { day: "D5", ideal: 11, remaining: 16 }, { day: "D6", ideal: 6, remaining: 12 }, { day: "D7", ideal: 0, remaining: 8 },
 ]
 
-const AI_ANOMALIES: {
-  id: number; severity: "critical" | "warning" | "info"; title: string; detail: string; operation: string; detectedAt: string
-}[] = [
-  { id: 1, severity: "critical", title: "Velocity collapse detected", detail: "Website Redesign dropped from 13 → 4 tasks/week. Sprint at risk.", operation: "Website Redesign", detectedAt: "2h ago" },
-  { id: 2, severity: "warning",  title: "Scope creep pattern",        detail: "API v2 has 8 new tasks opened this week with no corresponding closures.", operation: "API v2", detectedAt: "6h ago" },
-  { id: 3, severity: "warning",  title: "Key contributor inactive",   detail: "Thomas B. hasn't logged any activity in 3 days across assigned tasks.", operation: "Mobile App", detectedAt: "1d ago" },
-  { id: 4, severity: "info",     title: "Sprint overcommitment predicted", detail: "Current velocity suggests 68% chance of incomplete sprint by Friday.", operation: "Website Redesign", detectedAt: "3h ago" },
-]
-
 const SEVERITY_META: Record<"critical" | "warning" | "info", { wrap: string; icon: React.ElementType; iconColor: string }> = {
   critical: { wrap: "border-rose-500/30 bg-rose-500/10",  icon: Flame,         iconColor: "text-rose-500" },
   warning:  { wrap: "border-amber-500/30 bg-amber-500/10", icon: AlertTriangle, iconColor: "text-amber-500" },
