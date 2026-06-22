@@ -11,10 +11,12 @@ import {
   ChevronDown,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import { cn } from "@/lib/utils"
 import { useIssueStore } from "@/lib/store/issue-store"
 import { IssueSheet, type SheetIssue } from "@/components/sheets/issue-sheet"
+import { IssueFilters } from "@/components/issues/issue-filters"
+import { type IssueFilterState, EMPTY_ISSUE_FILTERS, applyIssueFilters } from "@/lib/issue-filters"
 import type { Issue, IssueStatus, IssueStatusCategory } from "@/lib/api/issue-service"
 
 // ---------------------------------------------------------------------------
@@ -35,19 +37,6 @@ const AVATAR_COLORS = [
   "bg-violet-500", "bg-blue-500", "bg-emerald-500", "bg-orange-500",
   "bg-pink-500", "bg-cyan-500", "bg-amber-500", "bg-indigo-500",
 ]
-
-function getMemberColor(userId: number): string {
-  return AVATAR_COLORS[userId % AVATAR_COLORS.length]
-}
-
-function getMemberInitials(displayName: string | null, email: string): string {
-  if (displayName) {
-    const parts = displayName.trim().split(/\s+/)
-    if (parts.length >= 2) return ((parts[0][0] ?? "") + (parts.at(-1)![0] ?? "")).toUpperCase()
-    return parts[0].slice(0, 2).toUpperCase()
-  }
-  return email.slice(0, 2).toUpperCase()
-}
 
 function getCategoryIcon(category: IssueStatusCategory, color: string) {
   switch (category) {
@@ -80,7 +69,7 @@ function toSheetIssue(issue: Issue): SheetIssue {
     statusName:     issue.status.name,
     statusCategory: issue.status.category,
     assignee:       issue.assignee
-      ? { initials: issue.assignee.email.slice(0, 2).toUpperCase(), color: AVATAR_COLORS[issue.assignee.id % AVATAR_COLORS.length], name: issue.assignee.displayName ?? issue.assignee.email, userId: issue.assignee.id }
+      ? { initials: issue.assignee.email.slice(0, 2).toUpperCase(), color: AVATAR_COLORS[issue.assignee.id % AVATAR_COLORS.length], name: issue.assignee.displayName ?? issue.assignee.email, email: issue.assignee.email, userId: issue.assignee.id }
       : null,
     assigneeId:     issue.assignee?.id ?? null,
     labels:         issue.labels,
@@ -124,12 +113,13 @@ function IssueRow({ issue, onOpen }: { readonly issue: Issue; readonly onOpen: (
       </span>
       <div className="hidden lg:flex items-center justify-center w-8 shrink-0">
         {issue.assignee && (
-          <Avatar className="h-5 w-5">
-            {issue.assignee.avatarUrl && <AvatarImage src={issue.assignee.avatarUrl} />}
-            <AvatarFallback className={cn("text-[9px] text-white", getMemberColor(Number(issue.assignee.id)))}>
-              {getMemberInitials(issue.assignee.displayName, issue.assignee.email)}
-            </AvatarFallback>
-          </Avatar>
+          <UserAvatar
+            email={issue.assignee.email}
+            name={issue.assignee.displayName ?? issue.assignee.email}
+            avatarUrl={issue.assignee.avatarUrl}
+            className="h-5 w-5"
+            fallbackClassName="text-[9px]"
+          />
         )}
       </div>
       <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
@@ -178,6 +168,7 @@ export default function ProjectListPage() {
 
   const { issues, statuses, isLoading, fetchIssues, fetchStatuses } = useIssueStore()
   const [selectedIssue, setSelectedIssue] = useState<SheetIssue | null>(null)
+  const [filters, setFilters] = useState<IssueFilterState>(EMPTY_ISSUE_FILTERS)
 
   useEffect(() => {
     if (!workspace || !projectId) return
@@ -193,12 +184,12 @@ export default function ProjectListPage() {
   const issuesByStatus = useMemo(() => {
     const map = new Map<number, Issue[]>()
     for (const s of statuses) map.set(s.id, [])
-    for (const issue of issues) {
+    for (const issue of applyIssueFilters(issues, filters)) {
       const col = map.get(issue.status.id)
       if (col) col.push(issue)
     }
     return map
-  }, [issues, statuses])
+  }, [issues, statuses, filters])
 
   if (isLoading && statuses.length === 0) {
     return (
@@ -209,7 +200,9 @@ export default function ProjectListPage() {
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card overflow-hidden [box-shadow:var(--shadow-sm)]">
+    <div className="flex flex-col gap-4">
+      <IssueFilters issues={issues} value={filters} onChange={setFilters} />
+      <div className="rounded-xl border border-border bg-card overflow-hidden [box-shadow:var(--shadow-sm)]">
       {/* Header row */}
       <div className="flex items-center gap-3 px-4 py-2.5 border-b border-border bg-muted/20 text-xs text-muted-foreground">
         <div className="w-2 shrink-0" />
@@ -241,6 +234,7 @@ export default function ProjectListPage() {
         workspaceSlug={workspace}
         projectId={projectId}
       />
+      </div>
     </div>
   )
 }
