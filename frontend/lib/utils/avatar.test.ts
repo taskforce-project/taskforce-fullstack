@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { getAvatarUrl } from './avatar';
+import { getAvatarUrl, getInitials } from './avatar';
 
 describe('avatar helper', () => {
   const previousApiUrl = process.env.NEXT_PUBLIC_API_URL;
@@ -35,5 +35,32 @@ describe('avatar helper', () => {
   it('falls back to DiceBear when no avatar exists', () => {
     expect(getAvatarUrl({ email: 'alice@example.com', avatarUrl: null }))
       .toContain('https://api.dicebear.com/9.x/identicon/svg?seed=alice%40example.com');
+  });
+});
+
+describe('getInitials', () => {
+  it('prefers first/last name initials', () => {
+    expect(getInitials({ firstName: 'Jean', lastName: 'Dupont' })).toBe('JD');
+  });
+
+  it('handles a single provided name part', () => {
+    expect(getInitials({ firstName: 'Jean' })).toBe('J');
+  });
+
+  it('derives two initials from a multi-word display name', () => {
+    expect(getInitials({ name: 'Marie Claire Martin' })).toBe('MC');
+  });
+
+  it('uses the first two letters of a single-word name', () => {
+    expect(getInitials({ name: 'Madonna' })).toBe('MA');
+  });
+
+  it('splits the local part of an email when no name is given', () => {
+    expect(getInitials({ email: 'jean.dupont@example.com' })).toBe('JD');
+  });
+
+  it('falls back to "?" when nothing is provided', () => {
+    expect(getInitials({})).toBe('?');
+    expect(getInitials({ email: null, name: '   ' })).toBe('?');
   });
 });

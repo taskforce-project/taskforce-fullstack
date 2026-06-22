@@ -27,3 +27,33 @@ export function getAvatarUrl({
   if (avatarUrl) return resolveApiAvatarUrl(avatarUrl)
   return `https://api.dicebear.com/9.x/identicon/svg?seed=${encodeURIComponent(email)}`
 }
+
+/**
+ * Initiales déterministes pour le fallback d'avatar (1 à 2 lettres, majuscules).
+ * Priorité : nom affiché → prénom/nom → partie locale de l'email.
+ */
+export function getInitials({
+  email,
+  name,
+  firstName,
+  lastName,
+}: {
+  email?: string | null
+  name?: string | null
+  firstName?: string | null
+  lastName?: string | null
+}): string {
+  if (firstName || lastName) {
+    return `${firstName?.[0] ?? ""}${lastName?.[0] ?? ""}`.toUpperCase() || "?"
+  }
+
+  const source = (name ?? email ?? "").trim()
+  if (!source) return "?"
+
+  const parts = source.split(/[\s@._-]+/).filter(Boolean)
+  if (parts.length >= 2) {
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase()
+  }
+
+  return source.slice(0, 2).toUpperCase()
+}
