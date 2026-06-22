@@ -19,7 +19,7 @@ import {
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import { Input } from "@/components/ui/input"
 import {
   DropdownMenu,
@@ -29,7 +29,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
-import { getAvatarUrl } from "@/lib/utils/avatar"
 import { useIssueStore } from "@/lib/store/issue-store"
 import type { Issue, IssuePriority, IssueStatusCategory } from "@/lib/api/issue-service"
 import { CreateIssueDialog } from "@/components/dialogs/create-issue-dialog"
@@ -105,7 +104,7 @@ function toSheetIssue(issue: Issue): SheetIssue {
     statusName:     issue.status.name,
     statusCategory: issue.status.category,
     assignee:       issue.assignee
-      ? { initials: emailInitials(issue.assignee.email), color: emailColor(issue.assignee.id), name: issue.assignee.email, userId: issue.assignee.id }
+      ? { initials: emailInitials(issue.assignee.email), color: emailColor(issue.assignee.id), name: issue.assignee.email, email: issue.assignee.email, userId: issue.assignee.id }
       : null,
     assigneeId:     issue.assignee?.id ?? null,
     labels:         issue.labels,
@@ -181,12 +180,12 @@ function IssueRow({ issue, onOpen }: { readonly issue: Issue; readonly onOpen: (
       {/* Assignee */}
       <div className="hidden lg:flex items-center justify-center w-8 shrink-0">
         {issue.assignee ? (
-          <Avatar className="size-5">
-            <AvatarImage src={getAvatarUrl({ email: issue.assignee.email })} alt={issue.assignee.email} />
-            <AvatarFallback className={cn("text-[9px] text-white", emailColor(issue.assignee.id))}>
-              {emailInitials(issue.assignee.email)}
-            </AvatarFallback>
-          </Avatar>
+          <UserAvatar
+            email={issue.assignee.email}
+            name={issue.assignee.email}
+            className="size-5"
+            fallbackClassName="text-[9px]"
+          />
         ) : (
           <div className="size-5 rounded-full border border-dashed border-border" />
         )}
