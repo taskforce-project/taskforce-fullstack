@@ -256,7 +256,7 @@ function AssistantMessage() {
         {agent.acronym}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-[10px] font-semibold mb-1.5" style={{ color: agent.color }}>{agent.title}</p>
+        <p className="text-[10px] font-semibold mb-1.5" style={{ color: agent.color }}>AI · {agent.title}</p>
         <div className="rounded-2xl rounded-tl-sm border px-4 py-3 text-sm leading-relaxed"
           style={{ background: "var(--card)", borderColor: "var(--separator)" }}>
           <MessagePrimitive.Content />
@@ -280,7 +280,7 @@ function EmptyState({ agent }: { agent: Agent }) {
       <motion.div
         initial={{ y: 6, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.08 }} className="space-y-1 mb-8">
-        <p className="text-sm font-semibold">{agent.title}</p>
+        <p className="text-sm font-semibold">AI · {agent.title}</p>
         <p className="text-xs max-w-[220px] mx-auto leading-relaxed"
           style={{ color: "var(--label-tertiary)" }}>{agent.description}</p>
       </motion.div>
