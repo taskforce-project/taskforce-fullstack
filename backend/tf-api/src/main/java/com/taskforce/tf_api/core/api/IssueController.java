@@ -19,7 +19,11 @@ import com.taskforce.tf_api.core.dto.request.CreateIssueCommentRequest;
 import com.taskforce.tf_api.core.dto.request.CreateIssueRelationRequest;
 import com.taskforce.tf_api.core.dto.request.CreateIssueRequest;
 import com.taskforce.tf_api.core.dto.request.CreateIssueStatusRequest;
+import com.taskforce.tf_api.core.dto.request.CreateChecklistItemRequest;
+import com.taskforce.tf_api.core.dto.request.UpdateChecklistItemRequest;
+import com.taskforce.tf_api.core.dto.request.BulkSmartAssignRequest;
 import com.taskforce.tf_api.core.dto.request.ReorderStatusesRequest;
+import com.taskforce.tf_api.core.dto.request.SmartAssignPreviewRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateIssueRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateIssueStatusRequest;
 import com.taskforce.tf_api.core.dto.response.IssueActivityResponse;
@@ -28,6 +32,8 @@ import com.taskforce.tf_api.core.dto.response.IssueRelationResponse;
 import com.taskforce.tf_api.core.dto.response.IssueResponse;
 import com.taskforce.tf_api.core.dto.response.IssueStatusResponse;
 import com.taskforce.tf_api.core.dto.response.IssueTypeResponse;
+import com.taskforce.tf_api.core.dto.response.BulkSmartAssignItemResponse;
+import com.taskforce.tf_api.core.dto.response.ChecklistItemResponse;
 import com.taskforce.tf_api.core.dto.response.SmartAssignResponse;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
@@ -293,6 +299,103 @@ public class IssueController {
         Long userId = resolveUserId(jwt);
         SmartAssignResponse result = smartAssignService.recommend(slug, projectId, issueId, userId);
         return ResponseEntity.ok(ApiResponse.success("Recommandation Smart Assign générée", result));
+    }
+
+    @PostMapping("/smart-assign/preview")
+    public ResponseEntity<ApiResponse<SmartAssignResponse>> smartAssignPreview(
+        @PathVariable String slug,
+        @PathVariable Long projectId,
+        @Valid @RequestBody SmartAssignPreviewRequest request,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long userId = resolveUserId(jwt);
+        SmartAssignResponse result = smartAssignService.preview(slug, projectId, userId, request);
+        return ResponseEntity.ok(ApiResponse.success("Suggestion Smart Assign (prévisualisation) générée", result));
+    }
+
+    @PostMapping("/smart-assign/bulk")
+    public ResponseEntity<ApiResponse<List<BulkSmartAssignItemResponse>>> smartAssignBulk(
+        @PathVariable String slug,
+        @PathVariable Long projectId,
+        @Valid @RequestBody BulkSmartAssignRequest request,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long userId = resolveUserId(jwt);
+        List<BulkSmartAssignItemResponse> result =
+            smartAssignService.bulkRecommend(slug, projectId, userId, request.getIssueIds());
+        return ResponseEntity.ok(ApiResponse.success("Recommandations Smart Assign (lot) générées", result));
+    }
+
+    // =========================================================================
+    // Sous-tâches
+    // =========================================================================
+
+    @GetMapping("/{issueId}/children")
+    public ResponseEntity<ApiResponse<List<IssueResponse>>> listChildren(
+        @PathVariable String slug,
+        @PathVariable Long projectId,
+        @PathVariable Long issueId,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long userId = resolveUserId(jwt);
+        List<IssueResponse> children = issueService.listChildren(slug, projectId, issueId, userId);
+        return ResponseEntity.ok(ApiResponse.success("Sous-tâches récupérées", children));
+    }
+
+    // =========================================================================
+    // Checklist (PROD-2.3)
+    // =========================================================================
+
+    @GetMapping("/{issueId}/checklist")
+    public ResponseEntity<ApiResponse<List<ChecklistItemResponse>>> listChecklist(
+        @PathVariable String slug,
+        @PathVariable Long projectId,
+        @PathVariable Long issueId,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long userId = resolveUserId(jwt);
+        return ResponseEntity.ok(ApiResponse.success(
+            "Checklist récupérée", issueService.listChecklist(slug, projectId, issueId, userId)));
+    }
+
+    @PostMapping("/{issueId}/checklist")
+    public ResponseEntity<ApiResponse<ChecklistItemResponse>> addChecklistItem(
+        @PathVariable String slug,
+        @PathVariable Long projectId,
+        @PathVariable Long issueId,
+        @Valid @RequestBody CreateChecklistItemRequest request,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long userId = resolveUserId(jwt);
+        ChecklistItemResponse item = issueService.addChecklistItem(slug, projectId, issueId, userId, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Item ajouté", item));
+    }
+
+    @PatchMapping("/{issueId}/checklist/{itemId}")
+    public ResponseEntity<ApiResponse<ChecklistItemResponse>> updateChecklistItem(
+        @PathVariable String slug,
+        @PathVariable Long projectId,
+        @PathVariable Long issueId,
+        @PathVariable Long itemId,
+        @Valid @RequestBody UpdateChecklistItemRequest request,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long userId = resolveUserId(jwt);
+        ChecklistItemResponse item = issueService.updateChecklistItem(slug, projectId, issueId, itemId, userId, request);
+        return ResponseEntity.ok(ApiResponse.success("Item mis à jour", item));
+    }
+
+    @DeleteMapping("/{issueId}/checklist/{itemId}")
+    public ResponseEntity<ApiResponse<Void>> deleteChecklistItem(
+        @PathVariable String slug,
+        @PathVariable Long projectId,
+        @PathVariable Long issueId,
+        @PathVariable Long itemId,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long userId = resolveUserId(jwt);
+        issueService.deleteChecklistItem(slug, projectId, issueId, itemId, userId);
+        return ResponseEntity.ok(ApiResponse.success("Item supprimé", null));
     }
 
     // =========================================================================
