@@ -20,7 +20,7 @@ import {
 import { useTranslation } from "@/lib/i18n"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import { ProjectIcon } from "@/components/ui/project-icon"
 import {
   DropdownMenu,
@@ -36,26 +36,6 @@ import type { UpdateProjectPayload } from "@/lib/api/project-service"
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-const AVATAR_COLORS = [
-  "bg-violet-500", "bg-blue-500", "bg-emerald-500", "bg-orange-500",
-  "bg-pink-500", "bg-cyan-500", "bg-amber-500", "bg-indigo-500",
-]
-
-function getMemberInitials(displayName: string | null, email: string): string {
-  if (displayName) {
-    const parts = displayName.trim().split(/\s+/)
-    if (parts.length >= 2) {
-      return ((parts.at(0)?.at(0) ?? "") + (parts.at(-1)?.at(0) ?? "")).toUpperCase()
-    }
-    return parts[0].slice(0, 2).toUpperCase()
-  }
-  return email.slice(0, 2).toUpperCase()
-}
-
-function getMemberColor(id: number): string {
-  return AVATAR_COLORS[id % AVATAR_COLORS.length]
-}
 
 function extractParam(p: string | string[] | undefined): string {
   if (typeof p === "string") return p
@@ -134,7 +114,7 @@ export default function ProjectLayout({ children }: { readonly children: React.R
         {/* Project name + actions */}
         <div className="flex items-center justify-between gap-4 mb-3">
           <div className="flex items-center gap-3 min-w-0">
-            <ProjectIcon iconUrl={project?.iconUrl ?? null} size={36} />
+            <ProjectIcon iconUrl={project?.iconUrl ?? null} color={project?.color ?? null} size={36} />
             <div className="min-w-0">
               <h1 className="text-xl font-semibold text-foreground truncate">{project?.name ?? "…"}</h1>
               <p className="text-xs text-muted-foreground truncate">{project?.description ?? ""}</p>
@@ -145,12 +125,14 @@ export default function ProjectLayout({ children }: { readonly children: React.R
             {/* Members avatars */}
             <div className="hidden sm:flex -space-x-2 mr-1">
               {(project?.members ?? []).slice(0, 3).map((m) => (
-                <Avatar key={m.id} className="h-7 w-7 ring-2 ring-background">
-                  {m.avatarUrl && <AvatarImage src={m.avatarUrl} alt={m.displayName ?? m.email} />}
-                  <AvatarFallback className={cn("text-[9px] text-white", getMemberColor(m.userId))}>
-                    {getMemberInitials(m.displayName, m.email)}
-                  </AvatarFallback>
-                </Avatar>
+                <UserAvatar
+                  key={m.userId}
+                  email={m.email}
+                  name={m.displayName ?? m.email}
+                  avatarUrl={m.avatarUrl}
+                  className="h-7 w-7 ring-2 ring-background"
+                  fallbackClassName="text-[9px]"
+                />
               ))}
               {(project?.members?.length ?? 0) > 3 && (
                 <div className="h-7 w-7 rounded-full bg-muted ring-2 ring-background flex items-center justify-center">
