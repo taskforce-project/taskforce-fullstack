@@ -174,6 +174,20 @@ public class WorkspaceController {
         return ResponseEntity.ok(ApiResponse.success("Membre retiré", null));
     }
 
+    /**
+     * DELETE /api/workspaces/:slug — supprime le workspace (OWNER uniquement).
+     */
+    @DeleteMapping("/{slug}")
+    public ResponseEntity<ApiResponse<Void>> deleteWorkspace(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String slug
+    ) {
+        Long userId = resolveUserId(jwt);
+        WorkspaceResponse ws = workspaceService.getWorkspaceBySlug(slug, userId);
+        workspaceService.deleteWorkspace(ws.getId(), userId);
+        return ResponseEntity.ok(ApiResponse.success("Workspace supprimé", null));
+    }
+
     // -------------------------------------------------------------------------
     // Rétrocompatibilité
     // -------------------------------------------------------------------------
