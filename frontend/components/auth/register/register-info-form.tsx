@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { usePreferencesStore } from "@/lib/store/preferences-store";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -36,6 +36,14 @@ export function SignupForm({
     password: "",
     confirmPassword: "",
   });
+
+  // Pré-remplissage de l'email depuis une invitation (?email=…, PROD-3.5)
+  useEffect(() => {
+    const invitedEmail = new URLSearchParams(window.location.search).get("email");
+    if (invitedEmail) {
+      setFormData((prev) => ({ ...prev, email: invitedEmail }));
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
