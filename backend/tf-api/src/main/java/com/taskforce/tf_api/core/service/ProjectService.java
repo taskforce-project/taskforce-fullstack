@@ -18,16 +18,22 @@ import com.taskforce.tf_api.core.dto.response.ProjectMemberResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectResponse;
 import com.taskforce.tf_api.core.enums.ProjectRole;
 import com.taskforce.tf_api.core.enums.ProjectStatus;
+import com.taskforce.tf_api.core.dto.response.ProjectTeamResponse;
 import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.model.ProjectFavorite;
 import com.taskforce.tf_api.core.model.ProjectLabel;
 import com.taskforce.tf_api.core.model.ProjectMember;
+import com.taskforce.tf_api.core.model.ProjectTeam;
+import com.taskforce.tf_api.core.model.Team;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.ProjectFavoriteRepository;
 import com.taskforce.tf_api.core.repository.ProjectLabelRepository;
 import com.taskforce.tf_api.core.repository.ProjectMemberRepository;
 import com.taskforce.tf_api.core.repository.ProjectRepository;
+import com.taskforce.tf_api.core.repository.ProjectTeamRepository;
+import com.taskforce.tf_api.core.repository.TeamMemberRepository;
+import com.taskforce.tf_api.core.repository.TeamRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
@@ -55,6 +61,9 @@ public class ProjectService {
     private final WorkspaceRepository      workspaceRepository;
     private final WorkspaceMemberRepository workspaceMemberRepository;
     private final UserRepository           userRepository;
+    private final TeamRepository           teamRepository;
+    private final TeamMemberRepository     teamMemberRepository;
+    private final ProjectTeamRepository    projectTeamRepository;
     private final IssueService             issueService;
 
     // -------------------------------------------------------------------------
@@ -114,6 +123,7 @@ public class ProjectService {
             .status(ProjectStatus.ACTIVE)
             .isPublic(request.isPublic())
             .iconUrl(request.getIconUrl())
+            .color(request.getColor() != null ? request.getColor() : "bg-primary")
             .createdBy(creator)
             .build();
 
@@ -184,6 +194,12 @@ public class ProjectService {
         }
         if (request.getIconUrl() != null) {
             project.setIconUrl(request.getIconUrl());
+        }
+        if (request.getColor() != null && !request.getColor().isBlank()) {
+            project.setColor(request.getColor());
+        }
+        if (request.getGrowthMode() != null) {
+            project.setGrowthMode(request.getGrowthMode());
         }
 
         return toResponse(projectRepository.save(project),
@@ -307,6 +323,54 @@ public class ProjectService {
             .build();
 
         return toMemberResponse(projectMemberRepository.save(member));
+    }
+
+    // -------------------------------------------------------------------------
+    // Équipes associées au projet (PROD-3.6b)
+    // -------------------------------------------------------------------------
+
+    /** Liste les équipes associées à un projet. */
+    @Transactional(readOnly = true)
+    public List<ProjectTeamResponse> listProjectTeams(String workspaceSlug, Long projectId, Long requestingUserId) {
+        Workspace workspace = resolveWorkspaceAndAssertMember(workspaceSlug, requestingUserId);
+        resolveProject(projectId, workspace.getId());
+
+        return projectTeamRepository.findByProjectId(projectId).stream()
+            .map(pt -> ProjectTeamResponse.from(pt.getTeam(), teamMemberRepository.countByTeamId(pt.getTeam().getId())))
+            .collect(Collectors.toList());
+    }
+
+    /** Associe une équipe (du même workspace) à un projet. LEAD/ADMIN/OWNER uniquement. */
+    @Transactional
+    public ProjectTeamResponse attachTeam(String workspaceSlug, Long projectId, Long teamId, Long requestingUserId) {
+        Workspace workspace = resolveWorkspaceAndAssertMember(workspaceSlug, requestingUserId);
+        Project project = resolveProject(projectId, workspace.getId());
+        assertCanManageProject(project, workspace, requestingUserId);
+
+        Team team = teamRepository.findById(teamId)
+            .orElseThrow(() -> new ResourceNotFoundException("Équipe introuvable"));
+        if (!team.getWorkspace().getId().equals(workspace.getId())) {
+            throw new BusinessException("Cette équipe n'appartient pas à ce workspace");
+        }
+        if (projectTeamRepository.existsByProjectIdAndTeamId(projectId, teamId)) {
+            throw new BusinessException("Cette équipe est déjà associée au projet");
+        }
+
+        projectTeamRepository.save(ProjectTeam.builder().project(project).team(team).build());
+        return ProjectTeamResponse.from(team, teamMemberRepository.countByTeamId(teamId));
+    }
+
+    /** Retire l'association équipe ↔ projet. LEAD/ADMIN/OWNER uniquement. */
+    @Transactional
+    public void detachTeam(String workspaceSlug, Long projectId, Long teamId, Long requestingUserId) {
+        Workspace workspace = resolveWorkspaceAndAssertMember(workspaceSlug, requestingUserId);
+        Project project = resolveProject(projectId, workspace.getId());
+        assertCanManageProject(project, workspace, requestingUserId);
+
+        if (!projectTeamRepository.existsByProjectIdAndTeamId(projectId, teamId)) {
+            throw new ResourceNotFoundException("Cette équipe n'est pas associée au projet");
+        }
+        projectTeamRepository.deleteByProjectIdAndTeamId(projectId, teamId);
     }
 
     /**
@@ -509,6 +573,8 @@ public class ProjectService {
             .members(members.stream().map(this::toMemberResponse).collect(Collectors.toList()))
             .labels(labels.stream().map(this::toLabelResponse).collect(Collectors.toList()))
             .iconUrl(project.getIconUrl())
+            .color(project.getColor())
+            .growthMode(project.isGrowthMode())
             .createdAt(project.getCreatedAt())
             .updatedAt(project.getUpdatedAt())
             .build();
