@@ -51,6 +51,7 @@ public class AuthService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final JwtService jwtService;
     private final WorkspaceService workspaceService;
+    private final AuditService auditService;
     private final WorkspaceInvitationService workspaceInvitationService;
 
     @Value("${stripe.success-url}")
@@ -346,6 +347,8 @@ public class AuthService {
 
         // Générer les tokens JWT
         AuthResponse authResponse = jwtService.generateTokens(user, keycloakUser);
+
+        auditService.record(null, user.getId(), AuditService.USER_LOGIN);
 
         log.info("Connexion réussie pour : {}", request.getEmail());
         return authResponse;
