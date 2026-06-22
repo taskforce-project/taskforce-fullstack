@@ -38,23 +38,28 @@ export interface MemberCapacity {
 // API calls
 // ---------------------------------------------------------------------------
 
-export async function getAnalyticsKpis(slug: string): Promise<AnalyticsKpis> {
-  const res = await apiClient.get<{ data: AnalyticsKpis }>(ANALYTICS_ROUTES.KPIS(slug));
+/** Suffixe `?projectId=` optionnel (filtre PROD-1.7). */
+function projectQuery(projectId?: number | null): string {
+  return projectId != null ? `?projectId=${projectId}` : "";
+}
+
+export async function getAnalyticsKpis(slug: string, projectId?: number | null): Promise<AnalyticsKpis> {
+  const res = await apiClient.get<{ data: AnalyticsKpis }>(ANALYTICS_ROUTES.KPIS(slug) + projectQuery(projectId));
   return res.data.data;
 }
 
-export async function getAnalyticsThroughput(slug: string): Promise<ThroughputPoint[]> {
-  const res = await apiClient.get<{ data: ThroughputPoint[] }>(ANALYTICS_ROUTES.THROUGHPUT(slug));
+export async function getAnalyticsThroughput(slug: string, projectId?: number | null): Promise<ThroughputPoint[]> {
+  const res = await apiClient.get<{ data: ThroughputPoint[] }>(ANALYTICS_ROUTES.THROUGHPUT(slug) + projectQuery(projectId));
   return res.data.data;
 }
 
-export async function getAnalyticsBurndown(slug: string): Promise<BurndownPoint[]> {
-  const res = await apiClient.get<{ data: BurndownPoint[] }>(ANALYTICS_ROUTES.BURNDOWN(slug));
+export async function getAnalyticsBurndown(slug: string, projectId?: number | null): Promise<BurndownPoint[]> {
+  const res = await apiClient.get<{ data: BurndownPoint[] }>(ANALYTICS_ROUTES.BURNDOWN(slug) + projectQuery(projectId));
   return res.data.data;
 }
 
-export async function getAnalyticsCapacity(slug: string): Promise<MemberCapacity[]> {
-  const res = await apiClient.get<{ data: MemberCapacity[] }>(ANALYTICS_ROUTES.CAPACITY(slug));
+export async function getAnalyticsCapacity(slug: string, projectId?: number | null): Promise<MemberCapacity[]> {
+  const res = await apiClient.get<{ data: MemberCapacity[] }>(ANALYTICS_ROUTES.CAPACITY(slug) + projectQuery(projectId));
   return res.data.data;
 }
 
