@@ -72,11 +72,10 @@ public class AnalyticsController {
         @PathVariable String slug,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        // userId unused for capacity but kept for consistency / future auth checks
-        resolveUserId(jwt);
+        Long userId = resolveUserId(jwt);
         return ResponseEntity.ok(ApiResponse.success(
             "Capacité récupérée",
-            analyticsService.getCapacity(slug)
+            analyticsService.getCapacity(slug, userId)
         ));
     }
 
@@ -85,10 +84,10 @@ public class AnalyticsController {
         @PathVariable String slug,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        resolveUserId(jwt);
+        Long userId = resolveUserId(jwt);
         return ResponseEntity.ok(ApiResponse.success(
             "Insights générés",
-            analyticsService.generateInsights(slug)
+            analyticsService.generateInsights(slug, userId)
         ));
     }
 
