@@ -90,6 +90,36 @@ export async function disconnectGitHub(slug: string): Promise<void> {
   await apiClient.delete(INTEGRATION_ROUTES.GITHUB_DISCONNECT(slug));
 }
 
+export interface GitHubRepo {
+  fullName: string;
+  name: string;
+  isPrivate: boolean;
+  htmlUrl: string;
+  openIssues: number;
+}
+
+export interface GitHubRepoIssue {
+  number: number;
+  title: string;
+  state: string;
+  htmlUrl: string;
+  pullRequest: boolean;
+  author: string | null;
+  updatedAt: string;
+}
+
+/** Dépôts accessibles via le token connecté (PROD-5.1 sync read). */
+export async function getGitHubRepos(slug: string): Promise<GitHubRepo[]> {
+  const res = await apiClient.get<{ data: GitHubRepo[] }>(INTEGRATION_ROUTES.GITHUB_REPOS(slug));
+  return res.data.data;
+}
+
+/** Issues + PR d'un dépôt GitHub. */
+export async function getGitHubRepoIssues(slug: string, repo: string): Promise<GitHubRepoIssue[]> {
+  const res = await apiClient.get<{ data: GitHubRepoIssue[] }>(INTEGRATION_ROUTES.GITHUB_ISSUES(slug, repo));
+  return res.data.data;
+}
+
 export async function getGitHubLinks(slug: string, issueId: number): Promise<GitHubLink[]> {
   const res = await apiClient.get<{ data: GitHubLink[] }>(INTEGRATION_ROUTES.GITHUB_LINKS(slug, issueId));
   return res.data.data;
