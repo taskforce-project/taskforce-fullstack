@@ -14,6 +14,8 @@ interface ProjectIconProps {
   className?: string
   /** Size in pixels for the container (default 40) */
   size?: number
+  /** Accent color (Tailwind `bg-*` class). Tints the tile for lucide/emoji/default renders. */
+  color?: string | null
 }
 
 // ---------------------------------------------------------------------------
@@ -45,17 +47,21 @@ function getLucideIcon(name: string): React.ElementType | null {
  * - emoji / short text    → plain text render
  * - `data:...` or URL     → <img> element
  */
-export function ProjectIcon({ iconUrl, className, size = 40 }: ProjectIconProps) {
+export function ProjectIcon({ iconUrl, className, size = 40, color }: ProjectIconProps) {
   const containerStyle = { width: size, height: size }
+  const tinted = Boolean(color) && color !== "bg-primary"
   const baseClass = cn(
-    "rounded-lg flex items-center justify-center shrink-0 bg-muted border border-border overflow-hidden",
+    "rounded-lg flex items-center justify-center shrink-0 border overflow-hidden",
+    tinted ? cn(color, "border-transparent") : "bg-muted border-border",
     className
   )
+  // Sur fond teinté, l'icône passe en blanc ; sinon teinte neutre.
+  const glyphClass = tinted ? "text-white" : "text-muted-foreground"
 
   // Image (base64 or URL)
   if (iconUrl && (iconUrl.startsWith("data:") || iconUrl.startsWith("http"))) {
     return (
-      <div className={baseClass} style={containerStyle}>
+      <div className={cn(baseClass, "bg-muted")} style={containerStyle}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={iconUrl}
@@ -73,7 +79,7 @@ export function ProjectIcon({ iconUrl, className, size = 40 }: ProjectIconProps)
     if (Icon) {
       return (
         <div className={baseClass} style={containerStyle}>
-          <Icon style={{ width: size * 0.5, height: size * 0.5 }} className="text-muted-foreground" />
+          <Icon style={{ width: size * 0.5, height: size * 0.5 }} className={glyphClass} />
         </div>
       )
     }
@@ -91,7 +97,7 @@ export function ProjectIcon({ iconUrl, className, size = 40 }: ProjectIconProps)
   // Default fallback
   return (
     <div className={baseClass} style={containerStyle}>
-      <FolderKanban style={{ width: size * 0.5, height: size * 0.5 }} className="text-muted-foreground" />
+      <FolderKanban style={{ width: size * 0.5, height: size * 0.5 }} className={glyphClass} />
     </div>
   )
 }
