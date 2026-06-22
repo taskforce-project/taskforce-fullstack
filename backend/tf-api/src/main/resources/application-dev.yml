@@ -163,6 +163,9 @@ app:
   name: ${APP_NAME:TaskForce}
   url: ${APP_URL:http://localhost:3000}
   frontend-url: ${FRONTEND_URL:http://localhost:3000}
+# Chiffrement au repos des PII (RGPD C11.2). En prod : clé forte via env, jamais en dur.
+security:
+  encryption-key: ${TF_ENCRYPTION_KEY:dev-only-encryption-key-change-me}
 # Integrations tierces
 integrations:
   github:
