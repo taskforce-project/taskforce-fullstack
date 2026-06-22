@@ -16,9 +16,20 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { SectionCard } from "@/components/ui/section-card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useAuth } from "@/lib/contexts/auth-context"
 import { cn } from "@/lib/utils"
-import { getAnalyticsCapacity, type MemberCapacity } from "@/lib/api/analytics-service"
+import {
+  getAnalyticsCapacity,
+  getAnalyticsKpis,
+  getAnalyticsThroughput,
+  type MemberCapacity,
+  type AnalyticsKpis,
+  type ThroughputPoint,
+} from "@/lib/api/analytics-service"
+import { listProjects, type Project } from "@/lib/api/project-service"
+
+const ALL_PROJECTS = "all"
 
 // ─── Types & data ─────────────────────────────────────────────────────────────
 
@@ -173,13 +184,35 @@ export default function AnalyticsPage() {
   const slug = params.workspace as string
   const [upgradeOpen, setUpgradeOpen] = useState(false)
   const [capacityData, setCapacityData] = useState<MemberCapacity[]>([])
+  const [kpis, setKpis] = useState<AnalyticsKpis | null>(null)
+  const [throughput, setThroughput] = useState<ThroughputPoint[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
+  const [projectFilter, setProjectFilter] = useState<string>(ALL_PROJECTS)
 
   const isPro = user?.planType === "PRO" || user?.planType === "ENTERPRISE"
 
+  // Liste des projets pour le filtre
   useEffect(() => {
     if (!slug) return
-    getAnalyticsCapacity(slug).then(setCapacityData).catch(() => { /* non-critical */ })
+    listProjects(slug).then(setProjects).catch(() => { /* non-critical */ })
   }, [slug])
+
+  // Données analytics (re-fetch au changement de filtre projet — PROD-1.7)
+  useEffect(() => {
+    if (!slug) return
+    const projectId = projectFilter === ALL_PROJECTS ? undefined : Number(projectFilter)
+    getAnalyticsKpis(slug, projectId).then(setKpis).catch(() => { /* non-critical */ })
+    getAnalyticsThroughput(slug, projectId).then(setThroughput).catch(() => { /* non-critical */ })
+    getAnalyticsCapacity(slug, projectId).then(setCapacityData).catch(() => { /* non-critical */ })
+  }, [slug, projectFilter])
+
+  // KPIs réels → cartes (remplace les mocks ; PROD-1.7)
+  const kpiMetrics: KpiMetric[] = kpis ? [
+    { label: "Tasks completed", value: String(kpis.tasksResolved),     delta: kpis.tasksResolvedDelta,      unit: "this month", icon: TrendingUp },
+    { label: "Cycle time",      value: `${kpis.avgResolutionDays}d`,   delta: Math.round(kpis.avgResolutionDaysDelta), unit: "avg",  icon: Activity, deltaInverse: true },
+    { label: "Sprint velocity", value: String(kpis.velocity),          delta: kpis.velocityDelta,           unit: "last 7d",    icon: Flame },
+    { label: "Active cycles",   value: String(kpis.activeCycles),      delta: 0,                            unit: "running",    icon: Zap },
+  ] : KPI_METRICS
 
   const overallHealth = 78
   const healthDelta = -4
@@ -196,15 +229,26 @@ export default function AnalyticsPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Operational Intelligence</h1>
           <p className="text-sm text-muted-foreground">AI-derived signals and performance patterns across all operations</p>
         </div>
-        <Badge variant="secondary" className={cn("gap-1.5 shrink-0", healthBad ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400")}>
-          <Activity className="size-3.5" /> Health {overallHealth}
-          <span className="text-muted-foreground">· {healthDelta}% vs last week</span>
-        </Badge>
+        <div className="flex items-center gap-2 shrink-0">
+          <Select value={projectFilter} onValueChange={setProjectFilter}>
+            <SelectTrigger className="h-8 w-44 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_PROJECTS}>Tous les projets</SelectItem>
+              {projects.map((p) => (
+                <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Badge variant="secondary" className={cn("gap-1.5", healthBad ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400")}>
+            <Activity className="size-3.5" /> Health {overallHealth}
+            <span className="text-muted-foreground">· {healthDelta}% vs last week</span>
+          </Badge>
+        </div>
       </div>
 
       {/* KPI strip */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        {KPI_METRICS.map((m) => <KpiCard key={m.label} metric={m} />)}
+        {kpiMetrics.map((m) => <KpiCard key={m.label} metric={m} />)}
       </div>
 
       {/* Two-column layout */}
@@ -214,7 +258,7 @@ export default function AnalyticsPage() {
           <SectionCard title="Weekly throughput" action={proBadge}>
             <MaybeGate gated={!isPro} onUpgrade={() => setUpgradeOpen(true)}>
               <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={THROUGHPUT_DATA} barGap={3} margin={{ top: 0, right: 0, left: -24, bottom: 0 }}>
+                <BarChart data={throughput.length > 0 ? throughput : THROUGHPUT_DATA} barGap={3} margin={{ top: 0, right: 0, left: -24, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                   <XAxis dataKey="week" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
