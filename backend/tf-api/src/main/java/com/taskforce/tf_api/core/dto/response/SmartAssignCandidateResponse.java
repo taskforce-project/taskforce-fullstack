@@ -27,4 +27,9 @@ public class SmartAssignCandidateResponse {
     private Integer labelMatchCount;
 
     private List<String> factors;
+
+    /** Explication en langage naturel (Groq), ou synthèse Java en repli. */
+    private String reason;
+    /** Compétences du membre qui recoupent les labels de l'issue (le « pourquoi » concret). */
+    private List<String> matchedSkills;
 }
