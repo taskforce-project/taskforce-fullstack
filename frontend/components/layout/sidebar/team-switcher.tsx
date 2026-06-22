@@ -1,8 +1,10 @@
 "use client"
 
 import * as React from "react"
-import { ChevronsUpDown, Plus, Building2 } from "lucide-react"
+import { ChevronsUpDown, Plus, Building2, Crown } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { useUserStore } from "@/lib/store/user-store"
+import { planLimit } from "@/lib/config/plan-limits"
 
 import {
   DropdownMenu,
@@ -44,6 +46,7 @@ export function WorkspaceSwitcher() {
 
   const workspaces = useWorkspaceStore((s) => s.workspaces)
   const activeWorkspace = useWorkspaceStore((s) => s.activeWorkspace)
+  const planType = useUserStore((s) => s.user?.planType)
   const fetchWorkspaces = useWorkspaceStore((s) => s.fetchWorkspaces)
   const createWorkspace = useWorkspaceStore((s) => s.createWorkspace)
 
@@ -135,15 +138,40 @@ export function WorkspaceSwitcher() {
                 </DropdownMenuItem>
               ))}
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="gap-2 p-2 cursor-pointer"
-                onClick={() => setDialogOpen(true)}
-              >
-                <div className="flex size-6 items-center justify-center rounded-md border bg-transparent">
-                  <Plus className="size-4" />
-                </div>
-                <span className="font-medium text-muted-foreground">Nouveau workspace</span>
-              </DropdownMenuItem>
+              {(() => {
+                const limit = planLimit(planType, "workspaces")
+                const atLimit = workspaces.length >= limit
+                return (
+                  <>
+                    {Number.isFinite(limit) && (
+                      <div className="px-2 py-1 text-[11px] text-muted-foreground">
+                        {workspaces.length}/{limit} workspaces
+                      </div>
+                    )}
+                    {atLimit ? (
+                      <DropdownMenuItem
+                        className="gap-2 p-2 cursor-pointer"
+                        onClick={() => activeWorkspace && router.push(`/${activeWorkspace.slug}/settings`)}
+                      >
+                        <div className="flex size-6 items-center justify-center rounded-md border bg-transparent">
+                          <Crown className="size-4 text-amber-500" />
+                        </div>
+                        <span className="font-medium text-amber-500">Limite atteinte — Améliorer</span>
+                      </DropdownMenuItem>
+                    ) : (
+                      <DropdownMenuItem
+                        className="gap-2 p-2 cursor-pointer"
+                        onClick={() => setDialogOpen(true)}
+                      >
+                        <div className="flex size-6 items-center justify-center rounded-md border bg-transparent">
+                          <Plus className="size-4" />
+                        </div>
+                        <span className="font-medium text-muted-foreground">Nouveau workspace</span>
+                      </DropdownMenuItem>
+                    )}
+                  </>
+                )
+              })()}
             </DropdownMenuContent>
           </DropdownMenu>
         </SidebarMenuItem>
