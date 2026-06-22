@@ -212,6 +212,46 @@ public class NotificationService {
         notificationRepository.save(notif);
     }
 
+    /**
+     * Alerte de <b>surcharge</b> d'un membre (PROD-1.5). Centrée membre (pas d'issue) :
+     * {@code issueUrl} pointe vers le profil du membre pour réutiliser le rendu de l'inbox.
+     * Dédup par (destinataire, clé membre, type) tant que l'alerte n'est pas acquittée.
+     */
+    @Transactional
+    public void notifyOverload(Workspace workspace, User member, int openCount, int threshold,
+                               List<User> recipients) {
+        String slug       = workspace.getSlug();
+        String memberName = member.getDisplayName() != null ? member.getDisplayName() : member.getEmail();
+        String type       = "overload";
+        String dedupKey   = "overload-" + member.getId();
+        String memberUrl  = "/" + slug + "/members/" + member.getId();
+        String membersUrl = "/" + slug + "/members";
+        String title      = memberName + " est en surcharge (" + openCount + " tâches ouvertes)";
+        String body       = "Charge au-dessus du seuil (" + threshold + "). Pensez à rééquilibrer les assignations.";
+
+        for (User recipient : recipients) {
+            if (recipient == null) continue;
+            if (notificationRepository.existsByRecipientIdAndIssueIdentifierAndTypeAndAcknowledgedFalse(
+                    recipient.getId(), dedupKey, type)) {
+                continue;
+            }
+            Notification notif = Notification.builder()
+                .recipient(recipient)
+                .workspace(workspace)
+                .actor(null)
+                .type(type)
+                .urgency("warning")
+                .title(title)
+                .body(body)
+                .issueIdentifier(dedupKey)
+                .issueUrl(memberUrl)
+                .projectName(workspace.getName())
+                .projectUrl(membersUrl)
+                .build();
+            notificationRepository.save(notif);
+        }
+    }
+
     // =========================================================================
     // Helpers privés
     // =========================================================================
