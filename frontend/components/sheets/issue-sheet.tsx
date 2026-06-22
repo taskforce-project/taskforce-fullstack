@@ -17,12 +17,14 @@ import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import { Separator } from "@/components/ui/separator"
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
 import { SmartAssignPanel } from "@/components/smart-assign/smart-assign-panel"
+import { DeleteConfirmDialog } from "@/components/dialogs/delete-confirm-dialog"
 import {
   listAttachments,
   uploadAttachment,
@@ -34,7 +36,9 @@ import { useIssueStore } from "@/lib/store/issue-store"
 import { useLabelStore } from "@/lib/store/label-store"
 import { useIntegrationStore } from "@/lib/store/integration-store"
 import { listProjectMembers, type ProjectMember } from "@/lib/api/project-service"
-import type { IssueComment, IssueLabel, IssueStatus as ApiIssueStatus } from "@/lib/api/issue-service"
+import type { IssueComment, IssueLabel, IssueStatus as ApiIssueStatus, Issue, IssueRelation, IssueRelationType, ChecklistItem } from "@/lib/api/issue-service"
+import { listChildIssues, listRelations, addRelation, deleteRelation,
+         listChecklist, addChecklistItem, updateChecklistItem, deleteChecklistItem } from "@/lib/api/issue-service"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -51,7 +55,7 @@ export interface SheetIssue {
   statusId: number
   statusName: string
   statusCategory: IssueStatusCategory
-  assignee: { initials: string; color: string; name: string; userId: number } | null
+  assignee: { initials: string; color: string; name: string; userId: number; email?: string | null } | null
   assigneeId: number | null
   labels: IssueLabel[]
   dueDate: string | null
@@ -353,15 +357,15 @@ function CommentsTab({ comments, loading, comment, onChange, onSend, onDelete }:
         <p className="text-xs text-muted-foreground text-center py-4 italic">No comments yet. Be the first!</p>
       )}
       {comments.map((c) => {
-        const initials = c.author.displayName
-          ? c.author.displayName.slice(0, 2).toUpperCase()
-          : c.author.email.slice(0, 2).toUpperCase()
-        const color = memberColor(c.author.id)
         return (
           <div key={c.id} className="flex gap-3">
-            <Avatar className="size-7 shrink-0 mt-0.5">
-              <AvatarFallback className={cn("text-[9px] text-white", color)}>{initials}</AvatarFallback>
-            </Avatar>
+            <UserAvatar
+              email={c.author.email}
+              name={c.author.displayName ?? c.author.email}
+              avatarUrl={c.author.avatarUrl}
+              className="size-7 shrink-0 mt-0.5"
+              fallbackClassName="text-[9px]"
+            />
             <div className="flex-1 min-w-0 rounded-lg border border-border bg-muted/20 overflow-hidden">
               <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 bg-muted/30">
                 <span className="text-xs font-semibold text-foreground">
@@ -561,6 +565,301 @@ function formatDueDateDraft(dueDate: string | null): string {
   return dueDate
 }
 
+// ─── Sous-tâches (PROD-2.1) ────────────────────────────────────────────────────
+function SubtasksTab({
+  issueId, projectId, workspaceSlug,
+}: Readonly<{ issueId: number; projectId: number; workspaceSlug: string }>) {
+  const createIssue = useIssueStore((s) => s.createIssue)
+  const statuses = useIssueStore((s) => s.statuses)
+  const [children, setChildren] = useState<Issue[]>([])
+  const [loading, setLoading] = useState(false)
+  const [title, setTitle] = useState("")
+  const [adding, setAdding] = useState(false)
+
+  const refresh = useCallback(() => {
+    setLoading(true)
+    listChildIssues(workspaceSlug, projectId, issueId)
+      .then(setChildren)
+      .catch(() => null)
+      .finally(() => setLoading(false))
+  }, [workspaceSlug, projectId, issueId])
+
+  useEffect(() => { refresh() }, [refresh])
+
+  function defaultStatusId(): number | undefined {
+    const s = statuses.find((x) => x.isDefault) ?? [...statuses].sort((a, b) => a.position - b.position)[0]
+    return s?.id
+  }
+
+  async function add() {
+    const trimmed = title.trim()
+    if (!trimmed || adding) return
+    setAdding(true)
+    try {
+      const created = await createIssue(workspaceSlug, projectId, {
+        title: trimmed,
+        parentId: issueId,
+        statusId: defaultStatusId(),
+      })
+      if (created) {
+        setTitle("")
+        refresh()
+        toast.success("Sous-tâche créée")
+      }
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {loading && <p className="text-xs text-muted-foreground text-center py-3">Chargement…</p>}
+      {!loading && children.length === 0 && (
+        <p className="text-xs text-muted-foreground italic py-2">Aucune sous-tâche.</p>
+      )}
+      {children.map((c) => (
+        <div key={c.id} className="flex items-center gap-2 rounded-md border border-border px-2.5 py-1.5">
+          <CircleDot className="size-3.5 shrink-0" style={{ color: c.status?.color }} />
+          <span className="w-16 shrink-0 truncate font-mono text-[10px] text-muted-foreground">{c.identifier}</span>
+          <span className="flex-1 truncate text-xs text-foreground">{c.title}</span>
+          {c.assignee && (
+            <UserAvatar
+              email={c.assignee.email}
+              name={c.assignee.displayName ?? c.assignee.email}
+              avatarUrl={c.assignee.avatarUrl}
+              className="size-5 shrink-0"
+              fallbackClassName="text-[8px]"
+            />
+          )}
+        </div>
+      ))}
+      <div className="mt-1 flex items-center gap-2">
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add() } }}
+          placeholder="Nouvelle sous-tâche…"
+          className="h-8 flex-1 rounded-md border border-border bg-transparent px-2 text-xs outline-none focus:border-primary/50"
+        />
+        <Button size="sm" className="h-8 gap-1 text-xs" onClick={add} disabled={!title.trim() || adding}>
+          <Plus className="size-3.5" /> Ajouter
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Checklist (PROD-2.3) ───────────────────────────────────────────────────────
+function ChecklistTab({
+  issueId, projectId, workspaceSlug,
+}: Readonly<{ issueId: number; projectId: number; workspaceSlug: string }>) {
+  const [items, setItems] = useState<ChecklistItem[]>([])
+  const [loading, setLoading] = useState(false)
+  const [content, setContent] = useState("")
+  const [adding, setAdding] = useState(false)
+
+  const refresh = useCallback(() => {
+    setLoading(true)
+    listChecklist(workspaceSlug, projectId, issueId)
+      .then(setItems)
+      .catch(() => null)
+      .finally(() => setLoading(false))
+  }, [workspaceSlug, projectId, issueId])
+
+  useEffect(() => { refresh() }, [refresh])
+
+  const doneCount = items.filter((i) => i.done).length
+  const pct = items.length > 0 ? Math.round((doneCount / items.length) * 100) : 0
+
+  async function add() {
+    const c = content.trim()
+    if (!c || adding) return
+    setAdding(true)
+    try {
+      const item = await addChecklistItem(workspaceSlug, projectId, issueId, c)
+      setItems((prev) => [...prev, item])
+      setContent("")
+    } catch {
+      // client toast
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  async function toggle(item: ChecklistItem) {
+    setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, done: !i.done } : i)))
+    try {
+      await updateChecklistItem(workspaceSlug, projectId, issueId, item.id, { done: !item.done })
+    } catch {
+      refresh()
+    }
+  }
+
+  async function remove(item: ChecklistItem) {
+    setItems((prev) => prev.filter((i) => i.id !== item.id))
+    try {
+      await deleteChecklistItem(workspaceSlug, projectId, issueId, item.id)
+    } catch {
+      refresh()
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {items.length > 0 && (
+        <div className="flex items-center gap-2">
+          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+            <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${pct}%` }} />
+          </div>
+          <span className="text-[10px] text-muted-foreground">{doneCount}/{items.length}</span>
+        </div>
+      )}
+      {loading && <p className="text-xs text-muted-foreground text-center py-3">Chargement…</p>}
+      {!loading && items.length === 0 && (
+        <p className="text-xs text-muted-foreground italic py-2">Aucun item de checklist.</p>
+      )}
+      {items.map((item) => (
+        <div key={item.id} className="group flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => toggle(item)}
+            aria-label={item.done ? "Décocher" : "Cocher"}
+            className={cn(
+              "flex size-4 shrink-0 items-center justify-center rounded border transition-colors",
+              item.done ? "border-emerald-500 bg-emerald-500 text-white" : "border-border hover:border-foreground/40"
+            )}
+          >
+            {item.done && <CheckIcon className="size-3" />}
+          </button>
+          <span className={cn("flex-1 text-xs", item.done && "text-muted-foreground line-through")}>{item.content}</span>
+          <button
+            type="button"
+            onClick={() => remove(item)}
+            aria-label="Supprimer l'item"
+            className="flex size-6 items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground group-hover:opacity-100"
+          >
+            <Trash2 className="size-3.5" />
+          </button>
+        </div>
+      ))}
+      <div className="mt-1 flex items-center gap-2">
+        <input
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add() } }}
+          placeholder="Ajouter un item…"
+          className="h-8 flex-1 rounded-md border border-border bg-transparent px-2 text-xs outline-none focus:border-primary/50"
+        />
+        <Button size="sm" className="h-8 gap-1 text-xs" onClick={add} disabled={!content.trim() || adding}>
+          <Plus className="size-3.5" /> Ajouter
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Relations entre issues (PROD-2.2) ─────────────────────────────────────────
+const RELATION_LABELS: Record<IssueRelationType, string> = {
+  BLOCKS: "Blocks",
+  BLOCKED_BY: "Blocked by",
+  DUPLICATE: "Duplicate of",
+  RELATES_TO: "Relates to",
+}
+
+function RelationsTab({
+  issueId, projectId, workspaceSlug,
+}: Readonly<{ issueId: number; projectId: number; workspaceSlug: string }>) {
+  const issues = useIssueStore((s) => s.issues)
+  const [relations, setRelations] = useState<IssueRelation[]>([])
+  const [loading, setLoading] = useState(false)
+  const [type, setType] = useState<IssueRelationType>("RELATES_TO")
+  const [targetId, setTargetId] = useState<number | undefined>(undefined)
+  const [adding, setAdding] = useState(false)
+
+  const refresh = useCallback(() => {
+    setLoading(true)
+    listRelations(workspaceSlug, projectId, issueId)
+      .then(setRelations)
+      .catch(() => null)
+      .finally(() => setLoading(false))
+  }, [workspaceSlug, projectId, issueId])
+
+  useEffect(() => { refresh() }, [refresh])
+
+  const candidates = issues.filter((i) => i.id !== issueId)
+
+  async function add() {
+    if (!targetId || adding) return
+    setAdding(true)
+    try {
+      await addRelation(workspaceSlug, projectId, issueId, { targetIssueId: targetId, relationType: type })
+      setTargetId(undefined)
+      refresh()
+      toast.success("Relation ajoutée")
+    } catch {
+      // erreur déjà notifiée par le client HTTP
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  async function remove(relationId: number) {
+    try {
+      await deleteRelation(workspaceSlug, projectId, issueId, relationId)
+      refresh()
+    } catch {
+      // client toast
+    }
+  }
+
+  const selectClass = "h-8 rounded-md border border-border bg-transparent px-2 text-xs outline-none focus:border-primary/50"
+
+  return (
+    <div className="flex flex-col gap-2">
+      {loading && <p className="text-xs text-muted-foreground text-center py-3">Chargement…</p>}
+      {!loading && relations.length === 0 && (
+        <p className="text-xs text-muted-foreground italic py-2">Aucune relation.</p>
+      )}
+      {relations.map((r) => (
+        <div key={r.id} className="flex items-center gap-2 rounded-md border border-border px-2.5 py-1.5">
+          <Badge variant="outline" className="text-[9px] shrink-0">{RELATION_LABELS[r.relationType]}</Badge>
+          <span className="w-16 shrink-0 truncate font-mono text-[10px] text-muted-foreground">{r.relatedIssue.identifier}</span>
+          <span className="flex-1 truncate text-xs text-foreground">{r.relatedIssue.title}</span>
+          <button
+            type="button"
+            onClick={() => remove(r.id)}
+            aria-label="Supprimer la relation"
+            className="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <Trash2 className="size-3.5" />
+          </button>
+        </div>
+      ))}
+
+      <div className="mt-1 flex items-center gap-2">
+        <select value={type} onChange={(e) => setType(e.target.value as IssueRelationType)} className={selectClass}>
+          {(Object.keys(RELATION_LABELS) as IssueRelationType[]).map((t) => (
+            <option key={t} value={t}>{RELATION_LABELS[t]}</option>
+          ))}
+        </select>
+        <select
+          value={targetId ?? ""}
+          onChange={(e) => setTargetId(e.target.value ? Number(e.target.value) : undefined)}
+          className={cn(selectClass, "flex-1 min-w-0")}
+        >
+          <option value="">Choisir une issue…</option>
+          {candidates.map((i) => (
+            <option key={i.id} value={i.id}>{i.identifier} — {i.title}</option>
+          ))}
+        </select>
+        <Button size="sm" className="h-8 gap-1 text-xs" onClick={add} disabled={!targetId || adding}>
+          <Plus className="size-3.5" /> Lier
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 interface IssueSheetProps {
   issue: SheetIssue | null
   open: boolean
@@ -573,13 +872,13 @@ interface IssueSheetProps {
 
 export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId }: Readonly<IssueSheetProps>) {
   const router = useRouter()
-  const { fetchComments, addComment, deleteComment, fetchActivity, updateIssue, fetchStatuses,
+  const { fetchComments, addComment, deleteComment, fetchActivity, updateIssue, deleteIssue, fetchStatuses,
           comments: storeComments, activity: storeActivity, statuses: storeStatuses } = useIssueStore()
   const { labelsByProject, fetchLabels } = useLabelStore()
 
   const initDescription = issue?.description ?? ""
   const [comment, setComment] = useState("")
-  const [tab, setTab] = useState<"comments" | "activity" | "attachments" | "github">("comments")
+  const [tab, setTab] = useState<"comments" | "activity" | "attachments" | "github" | "subtasks" | "relations" | "checklist">("comments")
 
   // Status (real IDs from API)
   const [statusId, setStatusId]             = useState<number>(issue?.statusId ?? 0)
@@ -695,6 +994,17 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
     setCycle(cycleDraft.trim() || null)
     setEditingCycle(false)
     toast.success("Cycle updated")
+  }
+
+  async function handleDelete() {
+    if (!workspaceSlug || !projectId) return
+    try {
+      await deleteIssue(workspaceSlug, projectId, issueId)
+      toast.success("Issue supprimée")
+      onOpenChange(false)
+    } catch {
+      toast.error("Échec de la suppression")
+    }
   }
 
   async function saveDueDate() {
@@ -839,6 +1149,16 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
             <ExternalLink className="size-3.5" />
             Open
           </Button>
+          <DeleteConfirmDialog
+            title="Supprimer l'issue ?"
+            description={`« ${issue.title} » sera définitivement supprimée. Cette action est irréversible.`}
+            confirmLabel="Supprimer"
+            onConfirm={handleDelete}
+          >
+            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" title="Supprimer l'issue">
+              <Trash2 className="size-4" />
+            </Button>
+          </DeleteConfirmDialog>
           <SheetClose asChild>
             <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground">
               <X className="size-4" />
@@ -978,6 +1298,51 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                     GitHub
                   </button>
                 )}
+                {workspaceSlug && projectId && (
+                  <button
+                    type="button"
+                    onClick={() => setTab("subtasks")}
+                    className={cn(
+                      "flex items-center gap-1.5 text-xs font-medium pb-2.5 border-b-2 -mb-px transition-colors",
+                      tab === "subtasks"
+                        ? "border-foreground text-foreground"
+                        : "border-transparent text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <Layers className="size-3.5" />
+                    Sub-tasks
+                  </button>
+                )}
+                {workspaceSlug && projectId && (
+                  <button
+                    type="button"
+                    onClick={() => setTab("relations")}
+                    className={cn(
+                      "flex items-center gap-1.5 text-xs font-medium pb-2.5 border-b-2 -mb-px transition-colors",
+                      tab === "relations"
+                        ? "border-foreground text-foreground"
+                        : "border-transparent text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <Link2 className="size-3.5" />
+                    Relations
+                  </button>
+                )}
+                {workspaceSlug && projectId && (
+                  <button
+                    type="button"
+                    onClick={() => setTab("checklist")}
+                    className={cn(
+                      "flex items-center gap-1.5 text-xs font-medium pb-2.5 border-b-2 -mb-px transition-colors",
+                      tab === "checklist"
+                        ? "border-foreground text-foreground"
+                        : "border-transparent text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <CheckCircle2 className="size-3.5" />
+                    Checklist
+                  </button>
+                )}
               </div>
 
               {tab === "comments" && (
@@ -1034,6 +1399,30 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
               {tab === "github" && workspaceSlug && (
                 <GitHubTab issueId={Number(issue.id)} workspaceSlug={workspaceSlug} />
               )}
+
+              {tab === "subtasks" && workspaceSlug && projectId && (
+                <SubtasksTab
+                  issueId={Number(issue.id)}
+                  projectId={projectId}
+                  workspaceSlug={workspaceSlug}
+                />
+              )}
+
+              {tab === "relations" && workspaceSlug && projectId && (
+                <RelationsTab
+                  issueId={Number(issue.id)}
+                  projectId={projectId}
+                  workspaceSlug={workspaceSlug}
+                />
+              )}
+
+              {tab === "checklist" && workspaceSlug && projectId && (
+                <ChecklistTab
+                  issueId={Number(issue.id)}
+                  projectId={projectId}
+                  workspaceSlug={workspaceSlug}
+                />
+              )}
             </div>
           </div>
 
@@ -1074,9 +1463,12 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                   <button type="button" className="flex items-center gap-1.5 hover:bg-muted/50 rounded px-1 -mx-1 py-0.5 w-full text-left transition-colors">
                     {assignee ? (
                       <>
-                        <Avatar className="size-4 shrink-0">
-                          <AvatarFallback className={cn("text-[8px] text-white", assignee.color)}>{assignee.initials}</AvatarFallback>
-                        </Avatar>
+                        <UserAvatar
+                          email={assignee.email}
+                          name={assignee.name}
+                          className="size-4 shrink-0"
+                          fallbackClassName="text-[8px]"
+                        />
                         <span className="text-xs flex-1 truncate">{assignee.name}</span>
                       </>
                     ) : (
@@ -1101,13 +1493,17 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                     const name     = m.displayName ?? m.email
                     return (
                       <DropdownMenuItem key={m.userId} className="flex items-center gap-2 text-xs" onClick={async () => {
-                        setAssignee({ initials, color, name, userId: m.userId })
+                        setAssignee({ initials, color, name, userId: m.userId, email: m.email })
                         await callUpdate({ assigneeId: m.userId })
                         toast.success(`Assigned to ${name}`)
                       }}>
-                        <Avatar className="size-4 shrink-0">
-                          <AvatarFallback className={cn("text-[8px] text-white", color)}>{initials}</AvatarFallback>
-                        </Avatar>
+                        <UserAvatar
+                          email={m.email}
+                          name={name}
+                          avatarUrl={m.avatarUrl}
+                          className="size-4 shrink-0"
+                          fallbackClassName="text-[8px]"
+                        />
                         {name}
                         {assignee?.userId === m.userId ? <CheckIcon className="ml-auto size-3 text-primary" /> : null}
                       </DropdownMenuItem>
@@ -1126,11 +1522,12 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                 issueLabels={labels.map((l) => l.name)}
                 issuePriority={priority}
                 currentAssignee={assignee}
+                defaultOpen={noAssignee}
                 onAssign={async (m) => {
                   const initials = (m.displayName ?? m.email).slice(0, 2).toUpperCase()
                   const color = memberColor(m.userId)
                   const name = m.displayName ?? m.email
-                  setAssignee({ initials, color, name, userId: m.userId })
+                  setAssignee({ initials, color, name, userId: m.userId, email: m.email })
                   await callUpdate({ assigneeId: m.userId })
                   toast.success(`Assigned to ${name}`)
                 }}
