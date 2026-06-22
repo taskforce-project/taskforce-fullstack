@@ -22,8 +22,12 @@ import com.taskforce.tf_api.core.dto.response.ThroughputPointResponse;
 import com.taskforce.tf_api.core.model.Cycle;
 import com.taskforce.tf_api.core.model.CycleIssue;
 import com.taskforce.tf_api.core.model.Issue;
+import com.taskforce.tf_api.core.enums.PlanFeature;
+import com.taskforce.tf_api.core.enums.PlanType;
+import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.model.WorkspaceMember;
+import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.CycleIssueRepository;
 import com.taskforce.tf_api.core.repository.CycleRepository;
 import com.taskforce.tf_api.core.repository.IssueRepository;
@@ -46,16 +50,39 @@ public class AnalyticsService {
     private final CycleIssueRepository       cycleIssueRepository;
     private final GroqService                groqService;
     private final ObjectMapper               objectMapper;
+    private final AuthorizationService       authorizationService;
+    private final PlanFeatureService         planFeatureService;
+    private final UserRepository             userRepository;
 
     @Value("${ai.groq.assistant-model:llama-3.3-70b-versatile}")
     private String assistantModel;
+
+    /** Résout le workspace par slug ET vérifie que l'appelant en est membre (RBAC, PROD-3.2). */
+    private Workspace requireWorkspaceMember(String slug, Long userId) {
+        Workspace ws = findWorkspace(slug);
+        authorizationService.requireMember(ws.getId(), userId);
+        return ws;
+    }
+
+    /** Réponse "upgrade" quand le plan ne couvre pas les AI insights (PROD-4.4). */
+    private List<AiInsightResponse> upgradeInsights() {
+        return List.of(AiInsightResponse.builder()
+            .agent("Taskforce")
+            .agentColor("#a78bfa")
+            .category("Upgrade")
+            .urgency("low")
+            .confidence(100)
+            .action("Passer à Pro")
+            .insight("Les AI insights sont disponibles à partir du plan Pro. Passez à Pro pour activer les recommandations IA.")
+            .build());
+    }
 
     // -------------------------------------------------------------------------
     // KPIs
     // -------------------------------------------------------------------------
 
     public AnalyticsKpisResponse getKpis(String slug, Long userId) {
-        Workspace ws = findWorkspace(slug);
+        Workspace ws = requireWorkspaceMember(slug, userId);
         List<Long> projectIds = getProjectIds(ws.getId());
 
         if (projectIds.isEmpty()) {
@@ -99,7 +126,7 @@ public class AnalyticsService {
     // -------------------------------------------------------------------------
 
     public List<ThroughputPointResponse> getThroughput(String slug, Long userId) {
-        Workspace ws = findWorkspace(slug);
+        Workspace ws = requireWorkspaceMember(slug, userId);
         List<Long> projectIds = getProjectIds(ws.getId());
 
         List<ThroughputPointResponse> result = new ArrayList<>();
@@ -126,6 +153,7 @@ public class AnalyticsService {
     // -------------------------------------------------------------------------
 
     public List<BurndownPointResponse> getBurndown(String slug, Long userId) {
+        requireWorkspaceMember(slug, userId);
         List<Cycle> activeCycles = cycleRepository.findActiveByWorkspaceSlug(slug);
         if (activeCycles.isEmpty()) {
             return List.of();
@@ -171,8 +199,8 @@ public class AnalyticsService {
     // -------------------------------------------------------------------------
 
     @Transactional(readOnly = true)
-    public List<MemberCapacityResponse> getCapacity(String slug) {
-        Workspace ws = findWorkspace(slug);
+    public List<MemberCapacityResponse> getCapacity(String slug, Long userId) {
+        Workspace ws = requireWorkspaceMember(slug, userId);
         List<Long> projectIds = getProjectIds(ws.getId());
 
         // Build map: userId → open issue count
@@ -201,10 +229,19 @@ public class AnalyticsService {
     // AI Insights (Groq)
     // -------------------------------------------------------------------------
 
-    @Transactional(readOnly = true)
-    public List<AiInsightResponse> generateInsights(String slug) {
+    // Pas de @Transactional englobante : lectures indépendantes + appel Groq.
+    // Une tx readOnly se faisait marquer rollback-only par une écriture interne → 500 au commit (FIX-006).
+    public List<AiInsightResponse> generateInsights(String slug, Long userId) {
+      // Résolution + autz HORS du try : un 404/403 ne doit pas être avalé par le fallback.
+      Workspace ws = requireWorkspaceMember(slug, userId);
+
+      // Feature gating (PROD-4.4) : les AI insights sont une fonctionnalité PRO+.
+      PlanType plan = userRepository.findById(userId).map(User::getPlanType).orElse(PlanType.FREE);
+      if (!planFeatureService.has(plan, PlanFeature.AI_INSIGHTS)) {
+        return upgradeInsights();
+      }
+
       try {
-        Workspace ws = findWorkspace(slug);
         List<Long> projectIds = getProjectIds(ws.getId());
 
         // Build context for the LLM
