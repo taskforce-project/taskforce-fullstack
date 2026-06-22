@@ -5,7 +5,7 @@ import { Sparkles, Loader2, Check, X, ChevronDown, AlertCircle } from "lucide-re
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import type { IssuePriority } from "@/components/sheets/issue-sheet"
@@ -27,6 +27,8 @@ interface SmartAssignProps {
   issuePriority: IssuePriority
   currentAssignee: { userId: number; name: string; initials: string; color: string } | null
   onAssign: (member: SmartAssignCandidate) => void
+  /** Ouvre le panneau d'emblée (ex : issue sans assigné) pour mettre en avant la reco. */
+  defaultOpen?: boolean
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -51,23 +53,38 @@ function WorkloadBar({ value }: Readonly<{ value: number }>) {
   )
 }
 
-function initialsFromCandidate(c: SmartAssignCandidate): string {
-  const base = c.displayName?.trim() || c.email
-  return base.slice(0, 2).toUpperCase()
+/** Ligne « label + barre » du breakdown de score. */
+function LabeledBar({ label, value }: Readonly<{ label: string; value: number }>) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-[10px] text-muted-foreground w-16 shrink-0">{label}</span>
+      <WorkloadBar value={value} />
+    </div>
+  )
 }
 
-function colorFromUserId(userId: number): string {
-  const colors = [
-    "bg-violet-500",
-    "bg-blue-500",
-    "bg-emerald-500",
-    "bg-orange-500",
-    "bg-pink-500",
-    "bg-cyan-500",
-    "bg-amber-500",
-    "bg-indigo-500",
-  ]
-  return colors[userId % colors.length]
+/** « Pourquoi » : compétences qui matchent + explication en langage naturel. */
+export function MatchReasoning({
+  matchedSkills,
+  reason,
+}: Readonly<{ matchedSkills?: string[]; reason?: string | null }>) {
+  const skills = matchedSkills ?? []
+  if (skills.length === 0 && !reason) return null
+  return (
+    <div className="flex flex-col gap-1.5 rounded-md bg-background/60 p-2">
+      {skills.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1">
+          <span className="text-[9px] uppercase tracking-wide text-muted-foreground">Matches</span>
+          {skills.map((s) => (
+            <Badge key={s} className="h-4 px-1.5 text-[9px] bg-emerald-500/15 text-emerald-400 border-0">{s}</Badge>
+          ))}
+        </div>
+      )}
+      {reason && (
+        <p className="text-[10px] leading-snug text-muted-foreground italic">“{reason}”</p>
+      )}
+    </div>
+  )
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -82,8 +99,9 @@ export function SmartAssignPanel({
   issuePriority,
   currentAssignee,
   onAssign,
+  defaultOpen = false,
 }: Readonly<SmartAssignProps>) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(defaultOpen)
   const [loading, setLoading] = useState(false)
   const [ran, setRan] = useState(false)
   const [showAll, setShowAll] = useState(false)
@@ -121,9 +139,9 @@ export function SmartAssignPanel({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors border border-dashed border-border mt-1 w-full"
+        className="mt-1 flex w-full items-center justify-center gap-1.5 rounded-md border border-primary/30 bg-primary/10 px-2 py-1.5 text-xs font-medium text-primary hover:bg-primary/15 transition-colors"
       >
-        <Sparkles className="size-3 text-primary/70" />
+        <Sparkles className="size-3.5" />
         Smart assign
       </button>
     )
@@ -195,29 +213,39 @@ export function SmartAssignPanel({
               </div>
 
               <div className="flex items-center gap-2">
-                <Avatar className="size-6 shrink-0">
-                  <AvatarFallback className={cn("text-[9px] text-white", colorFromUserId(top.userId))}>
-                    {initialsFromCandidate(top)}
-                  </AvatarFallback>
-                </Avatar>
+                <UserAvatar
+                  email={top.email}
+                  name={top.displayName ?? top.email}
+                  avatarUrl={top.avatarUrl}
+                  className="size-6 shrink-0"
+                  fallbackClassName="text-[9px]"
+                />
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium text-foreground truncate">{top.displayName ?? top.email}</p>
-                  <p className="text-[10px] text-muted-foreground">semantic {top.semanticScore}% · history {top.historicalScore}%</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {top.openIssues} open · {top.matchedSkills?.length ?? 0} skill match{(top.matchedSkills?.length ?? 0) === 1 ? "" : "es"}
+                  </p>
                 </div>
               </div>
 
-              {/* Availability bar */}
-              <div>
-                <p className="text-[10px] text-muted-foreground mb-1">Availability</p>
-                <WorkloadBar value={top.availability} />
+              {/* Pourquoi : compétences qui matchent + explication en langage naturel */}
+              <MatchReasoning matchedSkills={top.matchedSkills} reason={top.reason} />
+
+              {/* Breakdown du score */}
+              <div className="flex flex-col gap-1">
+                <LabeledBar label="Semantic"  value={top.semanticScore} />
+                <LabeledBar label="Workload"  value={top.workloadScore} />
+                <LabeledBar label="Available"  value={top.availability} />
+                {top.historicalScore > 0 && <LabeledBar label="History" value={top.historicalScore} />}
               </div>
 
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] text-muted-foreground">{top.openIssues} open issues</span>
-                {top.factors.map((f) => (
-                  <Badge key={f} variant="outline" className="text-[9px] h-3.5 px-1 border-primary/20 text-primary/70">{f}</Badge>
-                ))}
-              </div>
+              {top.factors.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1">
+                  {top.factors.map((f) => (
+                    <Badge key={f} variant="outline" className="text-[9px] h-3.5 px-1 border-primary/20 text-primary/70">{f}</Badge>
+                  ))}
+                </div>
+              )}
 
               {currentAssignee?.userId === top.userId ? (
                 <div className="flex items-center gap-1 text-[10px] text-emerald-400">
@@ -253,11 +281,13 @@ export function SmartAssignPanel({
                         className="flex items-center gap-2 p-2 rounded-md hover:bg-muted/40 transition-colors cursor-pointer group w-full text-left"
                         onClick={() => handleConfirm(candidate)}
                       >
-                        <Avatar className="size-5 shrink-0">
-                          <AvatarFallback className={cn("text-[8px] text-white", colorFromUserId(candidate.userId))}>
-                            {initialsFromCandidate(candidate)}
-                          </AvatarFallback>
-                        </Avatar>
+                        <UserAvatar
+                          email={candidate.email}
+                          name={candidate.displayName ?? candidate.email}
+                          avatarUrl={candidate.avatarUrl}
+                          className="size-5 shrink-0"
+                          fallbackClassName="text-[8px]"
+                        />
                         <div className="flex-1 min-w-0">
                           <p className="text-[10px] font-medium text-foreground truncate">{candidate.displayName ?? candidate.email}</p>
                           <div className="flex items-center gap-1 mt-0.5">
