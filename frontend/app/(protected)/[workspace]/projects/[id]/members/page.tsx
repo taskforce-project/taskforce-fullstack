@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from "react"
 import { useParams } from "next/navigation"
 import {
-  UserPlus,
   Crown,
   Shield,
   User,
@@ -14,26 +13,18 @@ import {
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Input } from "@/components/ui/input"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+import { ProjectInviteDialog } from "@/components/dialogs/project-invite-dialog"
+import { ProjectTeamsSection } from "@/components/projects/project-teams-section"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
-import { listProjectMembers, addProjectMember, removeProjectMember } from "@/lib/api/project-service"
+import { listProjectMembers, removeProjectMember } from "@/lib/api/project-service"
 import type { ProjectMember, ProjectRole } from "@/lib/api/project-service"
 import { useUserStore } from "@/lib/store/user-store"
 
@@ -59,21 +50,6 @@ const ROLE_CONFIG: Record<ProjectRole, { label: string; badgeClass: string; icon
   },
 }
 
-const AVATAR_COLORS = ["bg-violet-500","bg-blue-500","bg-emerald-500","bg-orange-500","bg-pink-500","bg-cyan-500","bg-amber-500","bg-indigo-500"]
-
-function memberInitials(m: ProjectMember): string {
-  if (m.displayName) {
-    const parts = m.displayName.trim().split(" ")
-    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
-    return m.displayName.slice(0, 2).toUpperCase()
-  }
-  return m.email.slice(0, 2).toUpperCase()
-}
-
-function memberColor(m: ProjectMember): string {
-  return AVATAR_COLORS[m.userId % AVATAR_COLORS.length]
-}
-
 function formatDate(iso: string): string {
   try {
     return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
@@ -95,9 +71,13 @@ export default function ProjectMembersPage() {
 
   const [members,   setMembers]   = useState<ProjectMember[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [inviteOpen, setInviteOpen] = useState(false)
-  const [inviteEmail, setInviteEmail] = useState("")
-  const [isInviting, setIsInviting] = useState(false)
+
+  const refreshMembers = useCallback(() => {
+    if (!workspace || !projectId) return
+    listProjectMembers(workspace, projectId)
+      .then(setMembers)
+      .catch(() => toast.error("Erreur lors du chargement des membres"))
+  }, [workspace, projectId])
 
   useEffect(() => {
     if (!workspace || !projectId) return
@@ -107,23 +87,6 @@ export default function ProjectMembersPage() {
       .catch(() => toast.error("Erreur lors du chargement des membres"))
       .finally(() => setIsLoading(false))
   }, [workspace, projectId])
-
-  const handleInvite = useCallback(async () => {
-    if (!inviteEmail.trim()) return
-    setIsInviting(true)
-    try {
-      await addProjectMember(workspace, projectId, { email: inviteEmail.trim(), role: "MEMBER" })
-      const updated = await listProjectMembers(workspace, projectId)
-      setMembers(updated)
-      toast.success("Membre invité")
-      setInviteEmail("")
-      setInviteOpen(false)
-    } catch {
-      toast.error("Erreur lors de l'invitation")
-    } finally {
-      setIsInviting(false)
-    }
-  }, [workspace, projectId, inviteEmail])
 
   const handleRemove = useCallback(async (memberId: number, memberEmail: string) => {
     try {
@@ -150,34 +113,7 @@ export default function ProjectMembersPage() {
         <p className="text-sm text-muted-foreground">
           {members.length} membre{members.length === 1 ? "" : "s"}
         </p>
-        <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="gap-1.5 h-8 text-xs">
-              <UserPlus className="h-3.5 w-3.5" />
-              Inviter un membre
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Inviter un membre</DialogTitle>
-              <DialogDescription>Entrez l&apos;email du membre à inviter au projet.</DialogDescription>
-            </DialogHeader>
-            <Input
-              placeholder="email@example.com"
-              type="email"
-              value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") handleInvite() }}
-            />
-            <DialogFooter>
-              <Button variant="outline" onClick={() => { setInviteOpen(false); setInviteEmail("") }}>Annuler</Button>
-              <Button onClick={handleInvite} disabled={isInviting || !inviteEmail.trim()}>
-                {isInviting && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />}
-                Inviter
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <ProjectInviteDialog workspace={workspace} projectId={projectId} onInvited={refreshMembers} />
       </div>
 
       {/* Members list */}
@@ -190,11 +126,13 @@ export default function ProjectMembersPage() {
               key={member.id}
               className="flex items-center gap-4 px-4 py-3.5 border-b border-border/50 last:border-0 hover:bg-muted/20 transition-colors"
             >
-              <Avatar className="h-9 w-9">
-                <AvatarFallback className={cn("text-xs text-white font-medium", memberColor(member))}>
-                  {memberInitials(member)}
-                </AvatarFallback>
-              </Avatar>
+              <UserAvatar
+                email={member.email}
+                name={member.displayName ?? member.email}
+                avatarUrl={member.avatarUrl}
+                className="h-9 w-9"
+                fallbackClassName="text-xs font-medium"
+              />
 
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -242,6 +180,9 @@ export default function ProjectMembersPage() {
           )
         })}
       </div>
+
+      {/* Équipes associées (PROD-3.6b) */}
+      <ProjectTeamsSection workspace={workspace} projectId={projectId} />
     </div>
   )
 }
