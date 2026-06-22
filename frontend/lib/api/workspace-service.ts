@@ -95,6 +95,20 @@ export async function inviteMember(slug: string, payload: InviteMemberPayload): 
   return response.data.data;
 }
 
+/** Usage vs limites du plan (PROD-4.2, source de vérité back). `-1` = illimité. */
+export interface WorkspaceUsage {
+  plan: string;
+  membersUsed: number;
+  membersLimit: number;
+  workspacesUsed: number;
+  workspacesLimit: number;
+}
+
+export async function getWorkspaceUsage(slug: string): Promise<WorkspaceUsage> {
+  const response = await apiClient.get<{ data: WorkspaceUsage }>(WORKSPACE_ROUTES.USAGE(slug));
+  return response.data.data;
+}
+
 /** Change le rôle d'un membre */
 export async function updateMemberRole(
   slug: string,
