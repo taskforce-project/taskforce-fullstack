@@ -8,6 +8,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.taskforce.tf_api.core.dto.response.AiInsightResponse;
@@ -34,48 +35,52 @@ public class AnalyticsController {
     @GetMapping("/kpis")
     public ResponseEntity<ApiResponse<AnalyticsKpisResponse>> getKpis(
         @PathVariable String slug,
+        @RequestParam(required = false) Long projectId,
         @AuthenticationPrincipal Jwt jwt
     ) {
         Long userId = resolveUserId(jwt);
         return ResponseEntity.ok(ApiResponse.success(
             "KPIs récupérés",
-            analyticsService.getKpis(slug, userId)
+            analyticsService.getKpis(slug, userId, projectId)
         ));
     }
 
     @GetMapping("/throughput")
     public ResponseEntity<ApiResponse<List<ThroughputPointResponse>>> getThroughput(
         @PathVariable String slug,
+        @RequestParam(required = false) Long projectId,
         @AuthenticationPrincipal Jwt jwt
     ) {
         Long userId = resolveUserId(jwt);
         return ResponseEntity.ok(ApiResponse.success(
             "Throughput récupéré",
-            analyticsService.getThroughput(slug, userId)
+            analyticsService.getThroughput(slug, userId, projectId)
         ));
     }
 
     @GetMapping("/burndown")
     public ResponseEntity<ApiResponse<List<BurndownPointResponse>>> getBurndown(
         @PathVariable String slug,
+        @RequestParam(required = false) Long projectId,
         @AuthenticationPrincipal Jwt jwt
     ) {
         Long userId = resolveUserId(jwt);
         return ResponseEntity.ok(ApiResponse.success(
             "Burndown récupéré",
-            analyticsService.getBurndown(slug, userId)
+            analyticsService.getBurndown(slug, userId, projectId)
         ));
     }
 
     @GetMapping("/capacity")
     public ResponseEntity<ApiResponse<List<MemberCapacityResponse>>> getCapacity(
         @PathVariable String slug,
+        @RequestParam(required = false) Long projectId,
         @AuthenticationPrincipal Jwt jwt
     ) {
         Long userId = resolveUserId(jwt);
         return ResponseEntity.ok(ApiResponse.success(
             "Capacité récupérée",
-            analyticsService.getCapacity(slug, userId)
+            analyticsService.getCapacity(slug, userId, projectId)
         ));
     }
 
