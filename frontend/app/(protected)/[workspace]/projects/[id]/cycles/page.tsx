@@ -162,10 +162,12 @@ function CycleCard({ cycle, href }: { readonly cycle: Cycle; readonly href: stri
         </p>
       </div>
 
-      {cycle.issueCount > 0 && (
+      {cycle.issueCount > 0 ? (
         <span className="text-xs text-muted-foreground hidden md:block shrink-0">
           {cycle.issueCount} issue{cycle.issueCount !== 1 ? "s" : ""}
         </span>
+      ) : (
+        <span className="text-xs text-amber-400/80 hidden md:block shrink-0">Aucune issue — à remplir</span>
       )}
 
       <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
@@ -219,6 +221,10 @@ export default function ProjectCyclesPage() {
 
   return (
     <div className="flex flex-col gap-4">
+      <p className="text-xs text-muted-foreground">
+        Les <span className="font-medium text-foreground">cycles</span> (sprints) sont des itérations limitées dans le temps :
+        regroupez-y des issues pour suivre la vélocité, la charge et les échéances de l'équipe.
+      </p>
       <div className="flex items-center justify-between">
         {error ? (
           <p className="flex items-center gap-1.5 text-sm text-destructive">
@@ -237,7 +243,7 @@ export default function ProjectCyclesPage() {
       {cycles.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-3 py-24 text-muted-foreground">
           <RefreshCw className="h-8 w-8 opacity-30" />
-          <p className="text-sm">No cycles yet. Create the first one.</p>
+          <p className="text-sm">Aucun cycle. Créez un sprint pour planifier vos issues dans le temps.</p>
         </div>
       ) : (
         <div className="flex flex-col gap-3">
