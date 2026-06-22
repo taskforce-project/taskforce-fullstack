@@ -183,15 +183,17 @@ export default function AnalyticsPage() {
   const [kpis, setKpis] = useState<AnalyticsKpis | null>(null)
   const [throughput, setThroughput] = useState<ThroughputPoint[]>([])
   const [burndown, setBurndown] = useState<BurndownPoint[]>([])
+  const [insights, setInsights] = useState<AiInsight[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [projectFilter, setProjectFilter] = useState<string>(ALL_PROJECTS)
 
   const isPro = user?.planType === "PRO" || user?.planType === "ENTERPRISE"
 
-  // Liste des projets pour le filtre
+  // Liste des projets pour le filtre + insights IA (workspace-wide)
   useEffect(() => {
     if (!slug) return
     listProjects(slug).then(setProjects).catch(() => { /* non-critical */ })
+    getAiInsights(slug).then(setInsights).catch(() => { /* non-critical */ })
   }, [slug])
 
   // Données analytics (re-fetch au changement de filtre projet — PROD-1.7)
