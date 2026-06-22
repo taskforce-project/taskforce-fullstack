@@ -4,9 +4,11 @@ import com.taskforce.tf_api.modules.sales.domain.EnterpriseInquiry;
 import com.taskforce.tf_api.modules.sales.dto.request.EnterpriseInquiryRequest;
 import com.taskforce.tf_api.modules.sales.dto.response.EnterpriseInquiryResponse;
 import com.taskforce.tf_api.modules.sales.repository.EnterpriseInquiryRepository;
+import com.taskforce.tf_api.core.service.EmailService;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +23,10 @@ import java.util.List;
 public class SalesService {
 
     private final EnterpriseInquiryRepository inquiryRepository;
+    private final EmailService emailService;
+
+    @Value("${app.sales-email:sales@taskforce.dev}")
+    private String salesEmail;
 
     /**
      * Crée une nouvelle demande de contact ENTERPRISE.
@@ -53,7 +59,20 @@ public class SalesService {
         inquiry = inquiryRepository.save(inquiry);
         log.info("✅ Demande ENTERPRISE créée avec ID: {}", inquiry.getId());
 
-        // TODO: Envoyer email de confirmation + notification à l'équipe sales
+        // Notifier l'équipe sales (best-effort — n'échoue jamais la création de la demande)
+        String html = """
+            <h2>Nouvelle demande Enterprise</h2>
+            <p><b>Nom :</b> %s</p>
+            <p><b>Email :</b> %s</p>
+            <p><b>Taille d'équipe :</b> %s</p>
+            <p><b>Message :</b><br/>%s</p>
+            """.formatted(esc(inquiry.getFullName()), esc(inquiry.getEmail()),
+                          esc(inquiry.getTeamSize()), esc(inquiry.getMessage()));
+        emailService.sendInternalNotification(
+            salesEmail,
+            "[TaskForce] Nouvelle demande Enterprise — " + inquiry.getFullName(),
+            html
+        );
 
         return EnterpriseInquiryResponse.builder()
                 .inquiryId(inquiry.getId())
@@ -64,6 +83,12 @@ public class SalesService {
                 .createdAt(inquiry.getCreatedAt())
                 .message("Votre demande a été envoyée avec succès. Notre équipe vous contactera sous 48h.")
                 .build();
+    }
+
+    /** Échappement HTML minimal pour le contenu utilisateur dans l'email de notification. */
+    private static String esc(String value) {
+        if (value == null) return "";
+        return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 
     /**
