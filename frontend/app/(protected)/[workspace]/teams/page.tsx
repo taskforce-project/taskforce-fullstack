@@ -50,19 +50,26 @@ import type { Team, TeamMember } from "@/lib/api/team-service"
 // CreateTeamDialog
 // ---------------------------------------------------------------------------
 
+const TEAM_EMOJIS = ["👥", "🚀", "🎨", "🛠️", "📊", "💡", "🔧", "🧪", "📦", "🎯"]
+const TEAM_COLORS = ["bg-primary", "bg-violet-500", "bg-emerald-500", "bg-orange-500", "bg-blue-500", "bg-pink-500", "bg-cyan-500", "bg-amber-500"]
+
 function CreateTeamDialog({ slug }: { readonly slug: string }) {
   const [open, setOpen] = useState(false)
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
+  const [emoji, setEmoji] = useState(TEAM_EMOJIS[0])
+  const [color, setColor] = useState(TEAM_COLORS[0])
   const createTeam = useTeamStore((s) => s.createTeam)
 
   async function handleCreate() {
     if (!name.trim()) return
     try {
-      await createTeam(slug, { name: name.trim(), description: description.trim() || undefined })
+      await createTeam(slug, { name: name.trim(), description: description.trim() || undefined, emoji, color })
       toast.success("Équipe créée", { description: `${name} a été créée.` })
       setName("")
       setDescription("")
+      setEmoji(TEAM_EMOJIS[0])
+      setColor(TEAM_COLORS[0])
       setOpen(false)
     } catch {
       toast.error("Erreur lors de la création de l'équipe")
@@ -97,6 +104,39 @@ function CreateTeamDialog({ slug }: { readonly slug: string }) {
               className="h-9"
               autoFocus
             />
+          </div>
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-medium text-foreground">Icône & couleur</label>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {TEAM_EMOJIS.map((e) => (
+                <button
+                  key={e}
+                  type="button"
+                  onClick={() => setEmoji(e)}
+                  className={cn(
+                    "flex size-8 items-center justify-center rounded-md border text-base transition-colors",
+                    emoji === e ? "border-primary bg-primary/10" : "border-border hover:bg-muted/50"
+                  )}
+                >
+                  {e}
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {TEAM_COLORS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  aria-label={c}
+                  onClick={() => setColor(c)}
+                  className={cn(
+                    "size-6 rounded-full border-2 transition-transform",
+                    c,
+                    color === c ? "border-foreground scale-110" : "border-transparent hover:scale-105"
+                  )}
+                />
+              ))}
+            </div>
           </div>
           <div className="flex flex-col gap-1.5">
             <label htmlFor="team-description" className="text-sm font-medium text-foreground">
@@ -393,10 +433,7 @@ function TeamCard({ team, slug }: { readonly team: Team; readonly slug: string }
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem className="gap-2" onClick={() => setSettingsOpen(true)}>
-              <Settings className="size-4" /> Team settings
-            </DropdownMenuItem>
-            <DropdownMenuItem className="gap-2" onClick={() => setSettingsOpen(true)}>
-              <Users className="size-4" /> Manage members
+              <Settings className="size-4" /> Gérer l'équipe
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={handleDelete}>
