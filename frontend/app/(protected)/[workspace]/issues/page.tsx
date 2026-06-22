@@ -22,7 +22,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import { Input } from "@/components/ui/input"
 import {
   DropdownMenu,
@@ -51,7 +51,7 @@ interface Issue {
   status: IssueStatus
   priority: IssuePriority
   project: { id: string; name: string; color: string; emoji: string }
-  assignee: { name: string; initials: string; color: string } | null
+  assignee: { name: string; email: string } | null
   labels: string[]
   dueDate: string | null
 }
@@ -67,15 +67,6 @@ const PROJECT_COLORS = [
 
 function projectColor(id: number): string {
   return PROJECT_COLORS[id % PROJECT_COLORS.length]
-}
-
-const AVATAR_COLORS = [
-  "bg-violet-500", "bg-blue-500", "bg-emerald-500", "bg-orange-500",
-  "bg-pink-500", "bg-cyan-500", "bg-amber-500", "bg-indigo-500",
-]
-
-function userColor(id: number): string {
-  return AVATAR_COLORS[id % AVATAR_COLORS.length]
 }
 
 const STATUS_MAP: Record<IssueStatusCategory, IssueStatus> = {
@@ -210,11 +201,12 @@ function IssueRow({ issue, slug }: Readonly<{ issue: Issue; slug: string }>) {
       {/* Assignee */}
       <div className="shrink-0 w-7">
         {issue.assignee ? (
-          <Avatar className="h-6 w-6">
-            <AvatarFallback className={cn("text-[9px] text-white font-semibold", issue.assignee.color)}>
-              {issue.assignee.initials}
-            </AvatarFallback>
-          </Avatar>
+          <UserAvatar
+            email={issue.assignee.email}
+            name={issue.assignee.name}
+            className="h-6 w-6"
+            fallbackClassName="text-[9px] font-semibold"
+          />
         ) : (
           <div className="h-6 w-6 rounded-full border-2 border-dashed border-border/60" />
         )}
@@ -314,9 +306,8 @@ export default function IssuesPage() {
             },
             assignee: issue.assignee
               ? {
-                  name:     issue.assignee.displayName ?? issue.assignee.email,
-                  initials: issue.assignee.email.slice(0, 2).toUpperCase(),
-                  color:    userColor(issue.assignee.id),
+                  name:  issue.assignee.displayName ?? issue.assignee.email,
+                  email: issue.assignee.email,
                 }
               : null,
             labels:  issue.labels.map((l) => l.name.toLowerCase()),
