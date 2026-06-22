@@ -112,20 +112,26 @@ function KpiCard({ metric }: { readonly metric: KpiMetric }) {
   )
 }
 
-function AnomalyRow({ anomaly }: { readonly anomaly: typeof AI_ANOMALIES[0] }) {
-  const meta = SEVERITY_META[anomaly.severity]
+const URGENCY_SEVERITY: Record<AiInsight["urgency"], "critical" | "warning" | "info"> = {
+  high: "critical", medium: "warning", low: "info",
+}
+
+function InsightRow({ insight }: { readonly insight: AiInsight }) {
+  const meta = SEVERITY_META[URGENCY_SEVERITY[insight.urgency] ?? "info"]
   const Icon = meta.icon
   return (
     <div className={cn("flex items-start gap-3 rounded-lg border p-3", meta.wrap)}>
       <Icon className={cn("mt-0.5 size-3.5 shrink-0", meta.iconColor)} />
       <div className="min-w-0 flex-1">
         <div className="mb-0.5 flex items-center gap-2">
-          <span className="text-xs font-semibold text-foreground">{anomaly.title}</span>
-          <Badge variant="secondary" className="h-4 px-1.5 font-mono text-[10px] font-normal">{anomaly.operation}</Badge>
+          <span className="text-xs font-semibold text-foreground">{insight.action}</span>
+          <Badge variant="secondary" className="h-4 px-1.5 text-[10px] font-normal" style={{ color: insight.agentColor }}>
+            {insight.agent}
+          </Badge>
         </div>
-        <p className="text-xs leading-relaxed text-muted-foreground">{anomaly.detail}</p>
+        <p className="text-xs leading-relaxed text-muted-foreground">{insight.insight}</p>
       </div>
-      <span className="mt-0.5 shrink-0 text-[10px] text-muted-foreground">{anomaly.detectedAt}</span>
+      <span className="mt-0.5 shrink-0 text-[10px] text-muted-foreground">{insight.confidence}%</span>
     </div>
   )
 }
