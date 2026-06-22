@@ -21,6 +21,7 @@ import {
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
@@ -92,6 +93,7 @@ export default function ProjectSettingsPage() {
   const [name,          setName]          = useState("")
   const [description,   setDescription]   = useState("")
   const [status,        setStatus]        = useState<ProjectStatus>("ACTIVE")
+  const [growthMode,    setGrowthMode]    = useState(false)
 
   // Labels state
   const [newLabelName,  setNewLabelName]  = useState("")
@@ -112,6 +114,7 @@ export default function ProjectSettingsPage() {
       setName(activeProject.name)
       setDescription(activeProject.description ?? "")
       setStatus(activeProject.status)
+      setGrowthMode(activeProject.growthMode)
     }
   }, [activeProject])
 
@@ -131,7 +134,7 @@ export default function ProjectSettingsPage() {
   async function handleSaveGeneral(e: React.FormEvent) {
     e.preventDefault()
     setIsSaving(true)
-    const result = await updateProject(workspace, projectId, { name, description, status })
+    const result = await updateProject(workspace, projectId, { name, description, status, growthMode })
     setIsSaving(false)
     if (result) {
       toast.success("Paramètres sauvegardés", { description: "Les modifications ont été appliquées." })
@@ -250,6 +253,18 @@ export default function ProjectSettingsPage() {
                 </SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Mode montée en compétence (PROD-1.8 Phase 3) */}
+          <div className="flex items-start justify-between gap-4 rounded-lg border border-border p-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">🌱 Mode montée en compétence</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Le Smart Assign peut proposer une tâche un cran au-dessus de l&apos;habitude d&apos;un membre
+                (jamais sur l&apos;urgent, seulement si capacité dispo). Bonus borné — n&apos;écrase pas le meilleur fit.
+              </p>
+            </div>
+            <Switch checked={growthMode} onCheckedChange={setGrowthMode} />
           </div>
 
           <div className="flex justify-end">
