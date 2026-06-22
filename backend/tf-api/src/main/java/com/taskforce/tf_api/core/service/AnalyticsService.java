@@ -81,9 +81,9 @@ public class AnalyticsService {
     // KPIs
     // -------------------------------------------------------------------------
 
-    public AnalyticsKpisResponse getKpis(String slug, Long userId) {
+    public AnalyticsKpisResponse getKpis(String slug, Long userId, Long projectId) {
         Workspace ws = requireWorkspaceMember(slug, userId);
-        List<Long> projectIds = getProjectIds(ws.getId());
+        List<Long> projectIds = resolveProjectIds(ws.getId(), projectId);
 
         if (projectIds.isEmpty()) {
             return new AnalyticsKpisResponse(0, 0, 0.0, 0.0, 0, 0, 0);
@@ -125,9 +125,9 @@ public class AnalyticsService {
     // Throughput (8 dernières semaines)
     // -------------------------------------------------------------------------
 
-    public List<ThroughputPointResponse> getThroughput(String slug, Long userId) {
+    public List<ThroughputPointResponse> getThroughput(String slug, Long userId, Long projectId) {
         Workspace ws = requireWorkspaceMember(slug, userId);
-        List<Long> projectIds = getProjectIds(ws.getId());
+        List<Long> projectIds = resolveProjectIds(ws.getId(), projectId);
 
         List<ThroughputPointResponse> result = new ArrayList<>();
         LocalDateTime now = LocalDateTime.now();
@@ -152,9 +152,14 @@ public class AnalyticsService {
     // Burndown (cycle actif)
     // -------------------------------------------------------------------------
 
-    public List<BurndownPointResponse> getBurndown(String slug, Long userId) {
+    public List<BurndownPointResponse> getBurndown(String slug, Long userId, Long projectId) {
         requireWorkspaceMember(slug, userId);
         List<Cycle> activeCycles = cycleRepository.findActiveByWorkspaceSlug(slug);
+        if (projectId != null) {
+            activeCycles = activeCycles.stream()
+                .filter(c -> c.getProject() != null && c.getProject().getId().equals(projectId))
+                .toList();
+        }
         if (activeCycles.isEmpty()) {
             return List.of();
         }
@@ -199,9 +204,9 @@ public class AnalyticsService {
     // -------------------------------------------------------------------------
 
     @Transactional(readOnly = true)
-    public List<MemberCapacityResponse> getCapacity(String slug, Long userId) {
+    public List<MemberCapacityResponse> getCapacity(String slug, Long userId, Long projectId) {
         Workspace ws = requireWorkspaceMember(slug, userId);
-        List<Long> projectIds = getProjectIds(ws.getId());
+        List<Long> projectIds = resolveProjectIds(ws.getId(), projectId);
 
         // Build map: userId → open issue count
         // Cast via Number to handle both Long and Integer returns from JPQL aggregates
@@ -334,6 +339,15 @@ public class AnalyticsService {
     private List<Long> getProjectIds(Long workspaceId) {
         return projectRepository.findByWorkspaceIdOrderByCreatedAtDesc(workspaceId)
             .stream().map(p -> p.getId()).toList();
+    }
+
+    /** Filtre analytics par projet (PROD-1.7) : si projectId valide du workspace → ce seul projet, sinon tous. */
+    private List<Long> resolveProjectIds(Long workspaceId, Long projectId) {
+        List<Long> all = getProjectIds(workspaceId);
+        if (projectId != null && all.contains(projectId)) {
+            return List.of(projectId);
+        }
+        return all;
     }
 
     private double avgResolutionDays(List<Issue> issues) {
