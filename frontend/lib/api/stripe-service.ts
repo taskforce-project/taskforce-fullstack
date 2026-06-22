@@ -4,7 +4,7 @@
  */
 
 import { apiClient, getErrorMessage } from "./client";
-import { STRIPE_ROUTES } from "../config/api-routes";
+import { STRIPE_ROUTES, BILLING_ROUTES } from "../config/api-routes";
 
 /**
  * Réponse de création de session Stripe
@@ -81,6 +81,20 @@ export const stripeService = {
     try {
       const response = await apiClient.post(STRIPE_ROUTES.CANCEL_SUBSCRIPTION, { immediately });
       return response.data;
+    } catch (error) {
+      throw new Error(getErrorMessage(error));
+    }
+  },
+
+  /**
+   * Ouvre le Stripe Customer Portal (gestion abonnement + factures) et redirige.
+   */
+  async openBillingPortal(): Promise<void> {
+    try {
+      const returnUrl = typeof window !== "undefined" ? window.location.href : undefined;
+      const response = await apiClient.post<{ data: { url: string } }>(BILLING_ROUTES.PORTAL, { returnUrl });
+      const url = response.data.data.url;
+      if (typeof window !== "undefined" && url) window.location.href = url;
     } catch (error) {
       throw new Error(getErrorMessage(error));
     }
