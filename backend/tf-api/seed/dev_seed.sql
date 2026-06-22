@@ -39,6 +39,9 @@ DECLARE
     v_tf_front BIGINT;
     v_tf_back  BIGINT;
     v_tf_plat  BIGINT;
+    -- enrichissement QA
+    v_parent_web  BIGINT;
+    v_cycle_active BIGINT;
 BEGIN
     -- ----------------------------------------------------------------
     -- 0. Admin (« CEO »)
@@ -52,6 +55,9 @@ BEGIN
     -- 1. Reset du workspace démo (cascade : projets, issues, équipes, profils…)
     -- ----------------------------------------------------------------
     DELETE FROM workspaces WHERE slug = 'taskforce-demo';
+    -- Données non rattachées au workspace (purge re-run dédiée)
+    DELETE FROM subscription_history WHERE stripe_event_id LIKE 'seed_%';
+    DELETE FROM enterprise_inquiries WHERE email LIKE '%@seedlead.example';
 
     -- ----------------------------------------------------------------
     -- 2. Coéquipiers (data-only). Upsert par email ; keycloak_id factice unique.
@@ -309,6 +315,124 @@ BEGIN
         (v_ws, NULL,                                                                 v_omar,   v_admin, 'MANUAL',       true, true),
         (v_ws, NULL,                                                                 v_diego,  v_admin, 'SMART_ASSIGN', true, false);
 
-    RAISE NOTICE 'Seed terminé : workspace "taskforce-demo" (id=%) avec 8 coéquipiers, 3 projets, 22 issues, 3 équipes.', v_ws;
+    -- ================================================================
+    -- ENRICHISSEMENT QA — couvre tous les écrans / détails
+    -- ================================================================
+
+    -- 11. Descriptions + dates sur des issues existantes (détail + indicateurs board)
+    UPDATE issues SET description = 'Repenser la page d''accueil selon la nouvelle identité visuelle (maquettes Figma de Lina).',
+        start_date = CURRENT_DATE - 8, due_date = CURRENT_DATE - 2
+        WHERE project_id = v_web AND sequence_number = 3;
+    UPDATE issues SET description = 'Le dark mode ne s''applique pas correctement aux cartes du dashboard.',
+        due_date = CURRENT_DATE + 1
+        WHERE project_id = v_web AND sequence_number = 4;
+    UPDATE issues SET description = 'Rate limiting (bucket4j) sur /api/auth pour contrer le brute force.',
+        start_date = CURRENT_DATE - 1, due_date = CURRENT_DATE + 10
+        WHERE project_id = v_api AND sequence_number = 4;
+    UPDATE issues SET description = 'Prometheus + Grafana pour le monitoring des pods.', due_date = CURRENT_DATE + 5
+        WHERE project_id = v_ops AND sequence_number = 4;
+
+    -- 12. Nouvelles issues WEB : URGENT en retard, Cancelled, épopée + sous-tâches
+    INSERT INTO issues (project_id, sequence_number, title, description, status_id, type_id, priority, story_points, assignee_id, reporter_id, due_date) VALUES
+        (v_web, 9, 'URGENT : connexion en production cassée', 'Plus aucune connexion possible depuis le déploiement de ce matin — régression critique.',
+            (SELECT id FROM issue_statuses WHERE project_id=v_web AND name='In Progress'), (SELECT id FROM issue_types WHERE project_id=v_web AND name='Bug'),
+            'URGENT'::issue_priority, 5, v_sarah, v_admin, CURRENT_DATE - 1),
+        (v_web, 10, 'Ancien widget météo (abandonné)', 'Feature abandonnée suite à la réorientation produit.',
+            (SELECT id FROM issue_statuses WHERE project_id=v_web AND name='Cancelled'), (SELECT id FROM issue_types WHERE project_id=v_web AND name='Feature'),
+            'LOW'::issue_priority, 3, NULL, v_admin, NULL);
+
+    INSERT INTO issues (project_id, sequence_number, title, description, status_id, type_id, priority, story_points, assignee_id, reporter_id)
+        VALUES (v_web, 11, 'Épopée : refonte du design system', 'Chantier transverse : tokens, composants, doc Storybook.',
+            (SELECT id FROM issue_statuses WHERE project_id=v_web AND name='Todo'), (SELECT id FROM issue_types WHERE project_id=v_web AND name='Feature'),
+            'HIGH'::issue_priority, 13, v_sarah, v_admin)
+        RETURNING id INTO v_parent_web;
+
+    INSERT INTO issues (project_id, sequence_number, title, status_id, type_id, priority, story_points, assignee_id, reporter_id, parent_id) VALUES
+        (v_web, 12, 'Design tokens (couleurs, espacements)', (SELECT id FROM issue_statuses WHERE project_id=v_web AND name='Todo'),    (SELECT id FROM issue_types WHERE project_id=v_web AND name='Task'), 'MEDIUM'::issue_priority, 3, v_diego, v_admin, v_parent_web),
+        (v_web, 13, 'Composants Button/Input unifiés',       (SELECT id FROM issue_statuses WHERE project_id=v_web AND name='Backlog'), (SELECT id FROM issue_types WHERE project_id=v_web AND name='Task'), 'MEDIUM'::issue_priority, 5, NULL,    v_admin, v_parent_web);
+
+    UPDATE issue_sequence_counters SET last_number = 13 WHERE project_id = v_web;
+
+    INSERT INTO issue_label_assignments (issue_id, label_id)
+    SELECT i.id, l.id FROM issues i JOIN project_labels l ON l.project_id = i.project_id
+    WHERE i.project_id = v_web AND (i.sequence_number, l.name) IN ((9,'react'),(9,'ui'),(11,'ui'),(11,'design'),(12,'css'),(13,'react'));
+
+    -- 13. Commentaires (dont une @mention) + checklist + relations + worklogs
+    INSERT INTO issue_comments (issue_id, author_id, content) VALUES
+        ((SELECT id FROM issues WHERE project_id=v_web AND sequence_number=3), v_sarah, 'Première version poussée, à relire.'),
+        ((SELECT id FROM issues WHERE project_id=v_web AND sequence_number=3), v_admin, '@diego.santos peux-tu regarder les tokens stp ?'),
+        ((SELECT id FROM issues WHERE project_id=v_web AND sequence_number=9), v_sarah, 'Rollback fait, je cherche la cause racine.'),
+        ((SELECT id FROM issues WHERE project_id=v_api AND sequence_number=3), v_marcus, 'Webhook signature vérifiée, reste l''idempotence.');
+
+    INSERT INTO issue_checklist_items (issue_id, content, is_done, position) VALUES
+        ((SELECT id FROM issues WHERE project_id=v_web AND sequence_number=3), 'Maquettes validées',       true,  0),
+        ((SELECT id FROM issues WHERE project_id=v_web AND sequence_number=3), 'Intégration responsive',    false, 1),
+        ((SELECT id FROM issues WHERE project_id=v_web AND sequence_number=3), 'Tests visuels cross-browser',false, 2);
+
+    INSERT INTO issue_relations (source_id, target_id, relation_type, created_by) VALUES
+        ((SELECT id FROM issues WHERE project_id=v_web AND sequence_number=9), (SELECT id FROM issues WHERE project_id=v_web AND sequence_number=3), 'BLOCKS'::issue_relation_type, v_admin),
+        ((SELECT id FROM issues WHERE project_id=v_web AND sequence_number=5), (SELECT id FROM issues WHERE project_id=v_web AND sequence_number=11), 'RELATES_TO'::issue_relation_type, v_admin);
+
+    INSERT INTO issue_worklogs (issue_id, user_id, minutes, description, logged_at) VALUES
+        ((SELECT id FROM issues WHERE project_id=v_web AND sequence_number=1), v_sarah,  180, 'Maquettes + intégration', CURRENT_DATE - 6),
+        ((SELECT id FROM issues WHERE project_id=v_web AND sequence_number=3), v_sarah,  240, 'Base du composant DataTable', CURRENT_DATE - 1),
+        ((SELECT id FROM issues WHERE project_id=v_web AND sequence_number=3), v_diego,   90, 'Aide sur le responsive', CURRENT_DATE),
+        ((SELECT id FROM issues WHERE project_id=v_api AND sequence_number=2), v_marcus, 300, 'Investigation N+1 + correctif', CURRENT_DATE - 3),
+        ((SELECT id FROM issues WHERE project_id=v_ops AND sequence_number=1), v_tom,    150, 'Debug pipeline CI', CURRENT_DATE - 5);
+
+    -- 14. Cycles (sprints) + issues du sprint actif (burndown)
+    INSERT INTO cycles (project_id, name, description, start_date, end_date, status, created_by) VALUES
+        (v_web, 'Sprint 1 — Fondations', 'Mise en place initiale', CURRENT_DATE - 20, CURRENT_DATE - 6, 'COMPLETED'::cycle_status, v_admin);
+    INSERT INTO cycles (project_id, name, description, start_date, end_date, status, created_by)
+        VALUES (v_web, 'Sprint 2 — Dashboard', 'Refonte dashboard + dark mode', CURRENT_DATE - 5, CURRENT_DATE + 9, 'ACTIVE'::cycle_status, v_admin)
+        RETURNING id INTO v_cycle_active;
+    INSERT INTO cycles (project_id, name, description, start_date, end_date, status, created_by) VALUES
+        (v_web, 'Sprint 3 — Profil & accessibilité', NULL, CURRENT_DATE + 10, CURRENT_DATE + 24, 'DRAFT'::cycle_status, v_admin);
+
+    INSERT INTO cycle_issues (cycle_id, issue_id, added_by)
+    SELECT v_cycle_active, i.id, v_admin FROM issues i
+    WHERE i.project_id = v_web AND i.sequence_number IN (3, 4, 5, 12, 13);
+
+    -- 15. Notifications (inbox) — pour l'admin, types variés, mix lu/non-lu
+    INSERT INTO notifications (recipient_id, workspace_id, actor_id, type, urgency, read, title, body, issue_identifier, project_name) VALUES
+        (v_admin, v_ws, v_sarah,  'assigned',      'info',     false, 'Nouvelle assignation', 'Sarah vous a assigné WEB-9',                'WEB-9', 'Web Application'),
+        (v_admin, v_ws, v_admin,  'mention',       'info',     false, 'Vous avez été mentionné', 'Mention sur WEB-3',                       'WEB-3', 'Web Application'),
+        (v_admin, v_ws, v_marcus, 'commented',     'info',     true,  'Nouveau commentaire', 'Marcus a commenté API-3',                    'API-3', 'API Platform'),
+        (v_admin, v_ws, NULL,     'dueSoon',       'warning',  false, 'Échéance proche', 'WEB-4 arrive à échéance demain',                 'WEB-4', 'Web Application'),
+        (v_admin, v_ws, NULL,     'overdue',       'critical', false, 'Issue en retard', 'WEB-3 est en retard',                            'WEB-3', 'Web Application'),
+        (v_admin, v_ws, v_tom,    'statusChanged', 'info',     true,  'Changement de statut', 'OPS-1 marquée Done',                        'OPS-1', 'Infrastructure'),
+        (v_admin, v_ws, NULL,     'overload',      'warning',  false, 'Surcharge détectée', 'Sarah a beaucoup de tâches ouvertes',         NULL,    NULL);
+
+    -- 16. Favoris projet + pages (doc projet) + invitations en attente
+    INSERT INTO project_favorites (user_id, project_id) VALUES (v_admin, v_web), (v_admin, v_api);
+
+    INSERT INTO pages (project_id, created_by, title, emoji, content) VALUES
+        (v_web, v_admin, 'Spécifications produit', '📘', 'Vision, personas, parcours clés, métriques de succès.'),
+        (v_web, v_sarah, 'Guide du design system', '🎨', 'Tokens, composants, règles d''accessibilité, do/don''t.');
+
+    INSERT INTO workspace_invitations (workspace_id, invited_by, email, role, token, status, expires_at) VALUES
+        (v_ws, v_admin, 'nouvelle.recrue@example.com', 'MEMBER', 'seed-invite-token-001', 'PENDING', NOW() + INTERVAL '7 days'),
+        (v_ws, v_admin, 'consultant.ext@example.com',  'ADMIN',  'seed-invite-token-002', 'PENDING', NOW() + INTERVAL '14 days');
+
+    -- 17. Abonnement Stripe (admin PRO) + historique — pour la page Billing (sans Stripe réel)
+    UPDATE users SET stripe_customer_id = 'cus_seed_admin' WHERE id = v_admin;
+    INSERT INTO subscriptions (user_id, plan_type, status, stripe_customer_id, stripe_subscription_id, stripe_price_id,
+                               amount, currency, billing_interval, current_period_start, current_period_end, started_at)
+    VALUES (v_admin, 'PRO', 'ACTIVE'::plan_status, 'cus_seed_admin', 'sub_seed_admin', 'price_seed_pro',
+            12.00, 'EUR', 'month', NOW() - INTERVAL '10 days', NOW() + INTERVAL '20 days', NOW() - INTERVAL '40 days')
+    ON CONFLICT (user_id) DO UPDATE SET plan_type = EXCLUDED.plan_type, status = EXCLUDED.status,
+        stripe_customer_id = EXCLUDED.stripe_customer_id, stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+        current_period_start = EXCLUDED.current_period_start, current_period_end = EXCLUDED.current_period_end;
+
+    INSERT INTO subscription_history (user_id, plan_type, plan_status, stripe_subscription_id, stripe_event_id, stripe_invoice_id, amount_paid, currency, event_type, event_data, period_start, period_end) VALUES
+        (v_admin, 'PRO', 'ACTIVE'::plan_status, 'sub_seed_admin', 'seed_evt_checkout', NULL,        NULL,  'EUR', 'checkout.session.completed', '{"seed":true}'::jsonb, NOW() - INTERVAL '40 days', NOW() - INTERVAL '10 days'),
+        (v_admin, 'PRO', 'ACTIVE'::plan_status, 'sub_seed_admin', 'seed_evt_invoice1', 'in_seed_1', 12.00, 'EUR', 'invoice.payment_succeeded', '{"seed":true}'::jsonb, NOW() - INTERVAL '10 days', NOW() + INTERVAL '20 days');
+
+    -- 18. Demandes Enterprise (sales/admin)
+    INSERT INTO enterprise_inquiries (full_name, email, team_size, message, status) VALUES
+        ('Claire Dubois', 'claire.dubois@seedlead.example', '51-200', 'Nous cherchons une solution pour 80 personnes avec SSO.', 'NEW'),
+        ('Yann Leroy',    'yann.leroy@seedlead.example',    '11-50',  'Intéressé par le plan Enterprise, un rappel serait apprécié.', 'CONTACTED');
+
+    RAISE NOTICE 'Seed QA complet : workspace "taskforce-demo" (id=%) — 8 membres, 3 projets, 27 issues (sous-tâches/URGENT/cancelled), commentaires, checklist, relations, worklogs, 3 cycles, notifications, favoris, pages, invitations, abonnement PRO + historique, demandes enterprise.', v_ws;
 END
 $seed$;
