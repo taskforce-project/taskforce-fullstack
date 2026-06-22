@@ -181,10 +181,14 @@ export default function AnalyticsPage() {
     if (!slug) return
     const projectId = projectFilter === ALL_PROJECTS ? undefined : Number(projectFilter)
     getAnalyticsKpis(slug, projectId).then(setKpis).catch(() => { /* non-critical */ })
-    getAnalyticsThroughput(slug, projectId).then(setThroughput).catch(() => { /* non-critical */ })
-    getAnalyticsBurndown(slug, projectId).then(setBurndown).catch(() => { /* non-critical */ })
-    getAnalyticsCapacity(slug, projectId).then(setCapacityData).catch(() => { /* non-critical */ })
-  }, [slug, projectFilter])
+    // Analytics avancées gatées PRO (PROD-4.4) : on ne les fetch pas pour les plans FREE
+    // (l'UI affiche déjà le ProGate ; évite des 409 inutiles côté back).
+    if (isPro) {
+      getAnalyticsThroughput(slug, projectId).then(setThroughput).catch(() => { /* non-critical */ })
+      getAnalyticsBurndown(slug, projectId).then(setBurndown).catch(() => { /* non-critical */ })
+      getAnalyticsCapacity(slug, projectId).then(setCapacityData).catch(() => { /* non-critical */ })
+    }
+  }, [slug, projectFilter, isPro])
 
   // KPIs réels → cartes (zéros tant que non chargés ; aucun mock — PROD-1.7)
   const k = kpis ?? { tasksResolved: 0, tasksResolvedDelta: 0, avgResolutionDays: 0, avgResolutionDaysDelta: 0, velocity: 0, velocityDelta: 0, activeCycles: 0 }
