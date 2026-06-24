@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { StripedPattern } from "@/components/magicui/striped-pattern";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, FolderKanban } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
 export default function NotFound() {
   const router = useRouter();
@@ -25,8 +26,14 @@ export default function NotFound() {
       {/* Content */}
       <div className="relative z-30 flex flex-col items-center gap-8 px-6 text-center">
         {/* Logo */}
-        <div className="flex items-center gap-2 text-muted-foreground/60">
-          <FolderKanban className="h-5 w-5" />
+        <div className="flex items-center gap-2 text-muted-foreground/80">
+          <Image
+            src="/assets/logo/logo_taskforce_tp.png"
+            alt="TaskForce"
+            width={20}
+            height={20}
+            className="h-5 w-5 object-contain"
+          />
           <span className="text-sm font-medium tracking-widest uppercase">
             TaskForce
           </span>
