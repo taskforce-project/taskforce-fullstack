@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +20,7 @@ import com.taskforce.tf_api.core.dto.response.AnalyticsKpisResponse;
 import com.taskforce.tf_api.core.dto.response.BurndownPointResponse;
 import com.taskforce.tf_api.core.dto.response.MemberCapacityResponse;
 import com.taskforce.tf_api.core.dto.response.ThroughputPointResponse;
+import com.taskforce.tf_api.core.dto.response.WorkloadResponse;
 import com.taskforce.tf_api.core.model.Cycle;
 import com.taskforce.tf_api.core.model.CycleIssue;
 import com.taskforce.tf_api.core.model.Issue;
@@ -53,6 +55,7 @@ public class AnalyticsService {
     private final AuthorizationService       authorizationService;
     private final PlanFeatureService         planFeatureService;
     private final UserRepository             userRepository;
+    private final JdbcTemplate               jdbcTemplate;
 
     @Value("${ai.groq.assistant-model:llama-3.3-70b-versatile}")
     private String assistantModel;
@@ -237,6 +240,92 @@ public class AnalyticsService {
                 openCounts.getOrDefault(m.getUser().getId(), 0L)
             ))
             .toList();
+    }
+
+    // -------------------------------------------------------------------------
+    // Workload heatmap (US-022) — charge par échéance, membre × jour
+    // -------------------------------------------------------------------------
+
+    private static final int WORKLOAD_DEFAULT_DAYS = 14;
+    private static final int WORKLOAD_MIN_DAYS     = 1;
+    private static final int WORKLOAD_MAX_DAYS     = 30;
+
+    @Transactional(readOnly = true)
+    public WorkloadResponse getWorkload(String slug, Long userId, Integer days) {
+        Workspace ws = requireWorkspaceMember(slug, userId);
+        requireFeature(userId, PlanFeature.ADVANCED_ANALYTICS);
+
+        // Fenêtre [from, to) bornée 1..30 jours (défaut 14).
+        int window = days == null ? WORKLOAD_DEFAULT_DAYS
+            : Math.max(WORKLOAD_MIN_DAYS, Math.min(WORKLOAD_MAX_DAYS, days));
+        LocalDate from = LocalDate.now();
+        LocalDate to   = from.plusDays(window);
+
+        List<Long> projectIds = getProjectIds(ws.getId());
+
+        // counts[userId][date] = nb d'échéances ouvertes ce jour-là
+        Map<Long, Map<String, Long>> counts = new HashMap<>();
+        Map<Long, Long> totals = new HashMap<>();
+        if (!projectIds.isEmpty()) {
+            issueRepository.countOpenIssuesByAssigneeAndDueDate(projectIds, from, to)
+                .forEach(row -> {
+                    Long   uid   = ((Number) row[0]).longValue();
+                    String day   = (String) row[1];
+                    long   count = ((Number) row[2]).longValue();
+                    counts.computeIfAbsent(uid, k -> new HashMap<>()).put(day, count);
+                    totals.merge(uid, count, Long::sum);
+                });
+        }
+
+        // Capacité h/sem par membre depuis member_skill_profiles (accès JDBC, table non mappée JPA).
+        Map<Long, Integer> capacities = loadCapacities(ws.getId());
+
+        // Série de dates continue (toutes les dates de [from, to)).
+        List<String> dateSeries = new ArrayList<>();
+        for (int d = 0; d < window; d++) {
+            dateSeries.add(from.plusDays(d).toString());
+        }
+
+        List<WorkspaceMember> members = workspaceMemberRepository.findByWorkspaceId(ws.getId());
+        List<WorkloadResponse.MemberWorkload> memberLoads = members.stream()
+            .map(m -> {
+                Long uid = m.getUser().getId();
+                Map<String, Long> byDay = counts.getOrDefault(uid, Map.of());
+                List<WorkloadResponse.DayLoad> daySeries = dateSeries.stream()
+                    .map(date -> new WorkloadResponse.DayLoad(date, byDay.getOrDefault(date, 0L)))
+                    .toList();
+                return new WorkloadResponse.MemberWorkload(
+                    uid,
+                    m.getUser().getDisplayName() != null ? m.getUser().getDisplayName() : m.getUser().getEmail(),
+                    m.getUser().getAvatarUrl(),
+                    totals.getOrDefault(uid, 0L),
+                    capacities.get(uid),
+                    daySeries
+                );
+            })
+            .toList();
+
+        return new WorkloadResponse(from.toString(), to.toString(), memberLoads);
+    }
+
+    /** Capacité hebdo déclarée par membre (member_skill_profiles), cf. MemberSkillProfileService. */
+    private Map<Long, Integer> loadCapacities(Long workspaceId) {
+        Map<Long, Integer> map = new HashMap<>();
+        try {
+            jdbcTemplate.query(
+                "SELECT user_id, capacity_hours_per_week FROM member_skill_profiles WHERE workspace_id = ?",
+                rs -> {
+                    Integer cap = rs.getObject("capacity_hours_per_week", Integer.class);
+                    if (cap != null) {
+                        map.put(rs.getLong("user_id"), cap);
+                    }
+                },
+                workspaceId
+            );
+        } catch (Exception e) {
+            // Profils indisponibles → capacité null pour tous (non bloquant).
+        }
+        return map;
     }
 
     // -------------------------------------------------------------------------
