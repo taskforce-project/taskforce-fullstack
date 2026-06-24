@@ -7,7 +7,6 @@ import {
   Plus,
   ArrowUpRight,
   GripVertical,
-  Loader2,
 } from "lucide-react"
 
 import { IssueSheet, type SheetIssue } from "@/components/sheets/issue-sheet"
@@ -16,6 +15,7 @@ import { InlineIssueFilters } from "@/components/issues/issue-filters"
 import { type IssueFilterState, EMPTY_ISSUE_FILTERS, applyIssueFilters } from "@/lib/issue-filters"
 import { Badge } from "@/components/ui/badge"
 import { UserAvatar } from "@/components/ui/user-avatar"
+import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import { useIssueStore } from "@/lib/store/issue-store"
 import type { Issue, IssuePriority } from "@/lib/api/issue-service"
@@ -83,14 +83,21 @@ export default function ProjectBacklogPage() {
   const workspace = typeof params.workspace === "string" ? params.workspace : ""
   const projectId = typeof params.id        === "string" ? Number(params.id)  : 0
 
-  const { fetchIssues, issues, isLoading } = useIssueStore()
+  const { fetchIssues, issues, isLoading, statuses, fetchStatuses, updateIssue } = useIssueStore()
   const [selectedIssue, setSelectedIssue] = useState<SheetIssue | null>(null)
   const [filters, setFilters] = useState<IssueFilterState>(EMPTY_ISSUE_FILTERS)
 
   useEffect(() => {
     if (!workspace || !projectId) return
+    if (statuses.length === 0) fetchStatuses(workspace, projectId)
     fetchIssues(workspace, projectId)
-  }, [workspace, projectId, fetchIssues])
+  }, [workspace, projectId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // QA3-9 : clic sur l'icône → marque la tâche terminée (sort du backlog)
+  async function handleToggleDone(issue: Issue) {
+    const done = statuses.find((s) => s.category === "COMPLETED")
+    if (done) await updateIssue(workspace, projectId, issue.id, { statusId: done.id })
+  }
 
   // Backlog = issues with BACKLOG status category (puis filtres avancés)
   const backlogIssues = applyIssueFilters(
@@ -100,8 +107,18 @@ export default function ProjectBacklogPage() {
 
   if (isLoading && backlogIssues.length === 0) {
     return (
-      <div className="flex items-center justify-center py-24">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      <div className="flex flex-col gap-4">
+        <Skeleton className="h-7 w-40" />
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3 border-b border-border/50 px-4 py-3 last:border-0">
+              <Skeleton className="size-3.5 rounded-full" />
+              <Skeleton className="size-2 rounded-full" />
+              <Skeleton className="h-4 w-12" />
+              <Skeleton className="h-4 flex-1 max-w-md" />
+            </div>
+          ))}
+        </div>
       </div>
     )
   }
@@ -117,19 +134,28 @@ export default function ProjectBacklogPage() {
       {/* List */}
       <div className="rounded-xl border border-border bg-card overflow-hidden [box-shadow:var(--shadow-sm)]">
         {backlogIssues.map((issue) => (
-          <button
+          <div
             key={issue.id}
-            type="button"
+            role="button"
+            tabIndex={0}
             onClick={() => setSelectedIssue(toSheetIssue(issue))}
-            className="group flex w-full items-center gap-3 px-4 py-2.5 hover:bg-muted/40 transition-colors border-b border-border/50 last:border-0 text-left"
+            onKeyDown={(e) => e.key === "Enter" && setSelectedIssue(toSheetIssue(issue))}
+            className="group flex w-full cursor-pointer items-center gap-3 px-4 py-2.5 hover:bg-muted/40 transition-colors border-b border-border/50 last:border-0 text-left"
           >
             <GripVertical className="h-3.5 w-3.5 text-muted-foreground/30 group-hover:text-muted-foreground/60 shrink-0 transition-colors" />
             <div className={cn("h-2 w-2 rounded-full shrink-0", PRIORITY_DOT[issue.priority])} />
-            <CircleDot className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); handleToggleDone(issue) }}
+              title="Marquer comme terminée"
+              className="shrink-0 text-muted-foreground transition-colors hover:text-emerald-500"
+            >
+              <CircleDot className="h-3.5 w-3.5" />
+            </button>
             <span className="text-xs text-muted-foreground font-mono w-14 shrink-0">{issue.identifier}</span>
             <span className="flex-1 text-sm text-foreground truncate group-hover:text-primary transition-colors">{issue.title}</span>
 
-            <div className="hidden md:flex gap-1">
+            <div className="hidden md:flex w-36 shrink-0 justify-end gap-1 overflow-hidden">
               {issue.labels.slice(0, 2).map((l) => (
                 <Badge key={l.id} variant="secondary" className="text-[10px] px-1.5 h-4 bg-muted/60 border-0 text-muted-foreground">{l.name}</Badge>
               ))}
@@ -146,7 +172,7 @@ export default function ProjectBacklogPage() {
               )}
             </div>
             <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-          </button>
+          </div>
         ))}
 
         <CreateIssueDialog workspaceSlug={workspace} projectId={projectId} defaultStatusId={undefined}>
