@@ -10,8 +10,8 @@ import {
   Layers,
   Activity,
   Cpu,
+  User,
   Users,
-  UsersRound,
   MessagesSquare,
   MessageSquare,
   Settings2,
@@ -89,6 +89,7 @@ const NAV_COMMAND: readonly NavItem[] = [
     url: "/my-work",
     icon: ListTodo,
     items: [
+      { key: "nav.sub.myAll",    url: "/my-work" },
       { key: "nav.sub.myIssues", url: "/my-work/issues" },
       { key: "nav.sub.myCycles", url: "/my-work/cycles" },
       { key: "nav.sub.myPages",  url: "/my-work/pages" },
@@ -119,12 +120,12 @@ const NAV_PEOPLE: readonly NavItem[] = [
   {
     key: "nav.members",
     url: "/members",
-    icon: Users,
+    icon: User,
   },
   {
     key: "nav.teams",
     url: "/teams",
-    icon: UsersRound,
+    icon: Users,
   },
 ]
 
@@ -253,7 +254,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   return (
     <Sidebar collapsible="icon" className="overflow-x-hidden" {...props}>
-      <SidebarHeader>
+      {/* QA2-27 : hauteur alignée sur la topbar (h-14) → le séparateur tombe au même niveau que la bordure du breadcrumb */}
+      <SidebarHeader className="h-14 justify-center py-0">
         <WorkspaceSwitcher />
       </SidebarHeader>
 
