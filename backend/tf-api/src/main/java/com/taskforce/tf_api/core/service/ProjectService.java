@@ -14,6 +14,7 @@ import com.taskforce.tf_api.core.dto.request.UpdateLabelRequest;
 import com.taskforce.tf_api.core.dto.request.CreateProjectRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateProjectRequest;
 import com.taskforce.tf_api.core.dto.response.ProjectLabelResponse;
+import com.taskforce.tf_api.core.dto.response.ProjectActivityPointResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectMemberResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectResponse;
 import com.taskforce.tf_api.core.enums.ProjectRole;
@@ -95,6 +96,34 @@ public class ProjectService {
         Workspace workspace = resolveWorkspaceAndAssertMember(workspaceSlug, requestingUserId);
         Project project = resolveProject(projectId, workspace.getId());
         return toResponse(project, projectFavoriteRepository.existsByUserIdAndProjectId(requestingUserId, project.getId()));
+    }
+
+    /**
+     * Activité quotidienne d'un projet (QA2-32) sur les `days` derniers jours.
+     * Série continue : chaque jour de la fenêtre est présent (count = 0 si rien).
+     */
+    @Transactional(readOnly = true)
+    public List<ProjectActivityPointResponse> getProjectActivity(String workspaceSlug, Long projectId,
+                                                                 Long requestingUserId, int days) {
+        Workspace workspace = resolveWorkspaceAndAssertMember(workspaceSlug, requestingUserId);
+        Project project = resolveProject(projectId, workspace.getId());
+
+        int window = Math.min(Math.max(days, 1), 90);
+        java.time.LocalDate today = java.time.LocalDate.now();
+        java.time.LocalDate from = today.minusDays(window - 1L);
+
+        java.util.Map<String, Long> counts = new java.util.HashMap<>();
+        for (Object[] row : issueRepository.countCreatedByDay(project.getId(), from.atStartOfDay())) {
+            counts.put((String) row[0], ((Number) row[1]).longValue());
+        }
+
+        List<ProjectActivityPointResponse> series = new java.util.ArrayList<>(window);
+        for (int i = 0; i < window; i++) {
+            java.time.LocalDate day = from.plusDays(i);
+            String key = day.toString(); // ISO 'YYYY-MM-DD'
+            series.add(new ProjectActivityPointResponse(key, counts.getOrDefault(key, 0L)));
+        }
+        return series;
     }
 
     // -------------------------------------------------------------------------
