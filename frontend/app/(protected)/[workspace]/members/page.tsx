@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react"
 import {
   Search,
   UserPlus,
+  UserMinus,
   Crown,
   Shield,
   User,
@@ -16,7 +17,9 @@ import {
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
+import { PageContainer } from "@/components/layout/page-shell"
 import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { Input } from "@/components/ui/input"
 import {
@@ -427,9 +430,10 @@ function MemberRow({ member, isYou, canManage, isOwner, profile }: MemberRowProp
             )}
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              className="text-destructive focus:text-destructive"
+              className="text-destructive focus:text-destructive [&_svg]:text-destructive"
               onClick={handleRemove}
             >
+              <UserMinus className="size-4" />
               Remove from workspace
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -552,7 +556,7 @@ export default function MembersPage() {
   const memberCountLabel = membersLoading ? "Loading…" : `${memberCount} member${memberSuffix}`
 
   return (
-    <div className="flex flex-col gap-6 max-w-4xl mx-auto w-full">
+    <PageContainer>
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -638,9 +642,17 @@ export default function MembersPage() {
         </div>
 
         {membersLoading && (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="size-6 animate-spin text-muted-foreground" />
-          </div>
+          Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-4 px-5 py-4 border-b border-border/50 last:border-0">
+              <Skeleton className="size-9 rounded-full" />
+              <div className="flex-1 space-y-1.5">
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-3 w-56" />
+              </div>
+              <Skeleton className="hidden lg:block h-4 w-24" />
+              <Skeleton className="size-8 rounded-md" />
+            </div>
+          ))
         )}
         {!membersLoading && filtered.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -666,28 +678,55 @@ export default function MembersPage() {
         <PendingInvitations slug={workspace.slug} refreshKey={invitationRefresh} />
       )}
 
-      {/* Plan info */}
-      {workspace && (
-        <div className="rounded-xl border border-border bg-card p-4 shadow-sm flex items-center justify-between gap-4">
-          <div>
-            <p className="text-sm font-medium text-foreground">
-              {memberCount} member{memberCount === 1 ? "" : "s"} in <span className="font-semibold">{workspace.name}</span>
-            </p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Free plan includes up to 5 members. Upgrade for unlimited.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-32 h-1.5 rounded-full bg-muted overflow-hidden">
-              <div
-                className="h-full rounded-full bg-primary transition-all"
-                style={{ width: `${Math.min((memberCount / 5) * 100, 100)}%` }}
-              />
+      {/* Plan info — limite réelle selon le plan (QA2-20 : plus de « /5 » codé en dur) */}
+      {workspace && (() => {
+        const rawLimit = usage ? usage.membersLimit : planLimit(currentUser?.planType, "members")
+        const unlimited = rawLimit === -1 || !Number.isFinite(rawLimit)
+        const planLabel =
+          currentUser?.planType === "ENTERPRISE" ? "Enterprise"
+          : currentUser?.planType === "PRO" ? "Pro"
+          : "Free"
+        const atLimit = !unlimited && memberCount >= rawLimit
+        const slug = workspace.slug
+        return (
+          <div className="rounded-xl border border-border bg-card p-4 shadow-sm flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-foreground">
+                {memberCount} member{memberCount === 1 ? "" : "s"} in <span className="font-semibold">{workspace.name}</span>
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {unlimited
+                  ? `Plan ${planLabel} — membres illimités.`
+                  : `Plan ${planLabel} — jusqu'à ${rawLimit} membres.${atLimit ? " Limite atteinte." : ""}`}
+              </p>
             </div>
-            <span className="text-xs text-muted-foreground shrink-0">{memberCount}/5</span>
+            {unlimited ? (
+              <Badge variant="secondary" className="gap-1.5 shrink-0">
+                <Crown className="size-3.5 text-amber-500" /> {planLabel}
+              </Badge>
+            ) : (
+              <div className="flex items-center gap-3 shrink-0">
+                <div className="flex items-center gap-2">
+                  <div className="w-32 h-1.5 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className={cn("h-full rounded-full transition-all", atLimit ? "bg-amber-500" : "bg-primary")}
+                      style={{ width: `${Math.min((memberCount / rawLimit) * 100, 100)}%` }}
+                    />
+                  </div>
+                  <span className="text-xs text-muted-foreground">{memberCount}/{rawLimit}</span>
+                </div>
+                {atLimit && slug && (
+                  <Button size="sm" variant="outline" asChild className="gap-1.5">
+                    <Link href={`/${slug}/settings?section=billing`}>
+                      <Crown className="size-3.5 text-amber-500" /> Améliorer
+                    </Link>
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
-        </div>
-      )}
-    </div>
+        )
+      })()}
+    </PageContainer>
   )
 }
