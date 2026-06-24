@@ -54,7 +54,26 @@ public class AssistantService {
         String systemPrompt = buildSystemPrompt(workspace);
         log.debug("Assistant chat — workspace={} model={}", slug, assistantModel);
 
-        return groqService.chatCompletion(assistantModel, systemPrompt, message, false);
+        // Jamais de 500 : si Groq est indisponible (clé absente/invalide, réseau, quota),
+        // on renvoie une réponse de repli utile au lieu de propager l'erreur.
+        try {
+            return groqService.chatCompletion(assistantModel, systemPrompt, message, false);
+        } catch (Exception ex) {
+            log.warn("Assistant Groq indisponible (workspace={}): {}", slug, ex.getMessage());
+            return fallbackAnswer(workspace);
+        }
+    }
+
+    /** Réponse de repli lorsque l'IA n'est pas joignable (reste informative). */
+    private String fallbackAnswer(Workspace workspace) {
+        long projects = projectRepository.findByWorkspaceIdOrderByCreatedAtDesc(workspace.getId()).size();
+        long members  = workspaceMemberRepository.findByWorkspaceId(workspace.getId()).size();
+        return String.format(
+            "L'assistant IA est momentanément indisponible. En attendant, voici un aperçu de « %s » : "
+            + "%d projet(s) et %d membre(s). "
+            + "Si le problème persiste, vérifiez la configuration de la clé Groq (GROQ_API_KEY).",
+            workspace.getName(), projects, members
+        );
     }
 
     // -------------------------------------------------------------------------
