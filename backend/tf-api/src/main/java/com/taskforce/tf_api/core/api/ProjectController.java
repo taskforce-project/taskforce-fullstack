@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.taskforce.tf_api.core.dto.request.AddProjectMemberRequest;
@@ -22,6 +23,7 @@ import com.taskforce.tf_api.core.dto.request.CreateLabelRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateLabelRequest;
 import com.taskforce.tf_api.core.dto.request.CreateProjectRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateProjectRequest;
+import com.taskforce.tf_api.core.dto.response.ProjectActivityPointResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectLabelResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectMemberResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectResponse;
@@ -97,6 +99,23 @@ public class ProjectController {
         Long userId = resolveUserId(jwt);
         ProjectResponse project = projectService.getProject(slug, id, userId);
         return ResponseEntity.ok(ApiResponse.success("Projet récupéré", project));
+    }
+
+    /**
+     * GET /api/workspaces/{slug}/projects/{id}/activity?days=14
+     * Activité quotidienne du projet (issues créées/jour) — alimente la sparkline (QA2-32).
+     */
+    @GetMapping("/{id}/activity")
+    public ResponseEntity<ApiResponse<List<ProjectActivityPointResponse>>> getProjectActivity(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String slug,
+        @PathVariable Long id,
+        @RequestParam(name = "days", defaultValue = "14") int days
+    ) {
+        Long userId = resolveUserId(jwt);
+        List<ProjectActivityPointResponse> activity =
+            projectService.getProjectActivity(slug, id, userId, days);
+        return ResponseEntity.ok(ApiResponse.success("Activité récupérée", activity));
     }
 
     /**
