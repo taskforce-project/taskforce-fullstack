@@ -15,7 +15,8 @@ import { UserAvatar } from "@/components/ui/user-avatar"
 import { cn } from "@/lib/utils"
 import { useIssueStore } from "@/lib/store/issue-store"
 import { IssueSheet, type SheetIssue } from "@/components/sheets/issue-sheet"
-import { IssueFilters } from "@/components/issues/issue-filters"
+import { InlineIssueFilters } from "@/components/issues/issue-filters"
+import { Skeleton } from "@/components/ui/skeleton"
 import { type IssueFilterState, EMPTY_ISSUE_FILTERS, applyIssueFilters } from "@/lib/issue-filters"
 import type { Issue, IssueStatus, IssueStatusCategory } from "@/lib/api/issue-service"
 
@@ -143,7 +144,7 @@ function StatusGroup({
   return (
     <div>
       {/* Group header */}
-      <div className="flex items-center gap-2 px-4 py-2 bg-muted/10 border-b border-border/50 sticky top-0 z-10">
+      <div className="flex items-center gap-2 px-4 py-2 bg-muted border-b border-border/50 sticky top-9 z-10">
         <ChevronDown className="size-3.5 text-muted-foreground" />
         {getCategoryIcon(status.category, status.color)}
         <span className="text-xs font-medium" style={{ color: status.color }}>{status.name}</span>
@@ -193,18 +194,32 @@ export default function ProjectListPage() {
 
   if (isLoading && statuses.length === 0) {
     return (
-      <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
-        Loading…
+      <div className="flex flex-col gap-4">
+        <Skeleton className="h-7 w-20" />
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3 border-b border-border/50 px-4 py-3 last:border-0">
+              <Skeleton className="size-2 rounded-full" />
+              <Skeleton className="size-3.5 rounded-full" />
+              <Skeleton className="h-4 w-12" />
+              <Skeleton className="h-4 flex-1 max-w-md" />
+              <Skeleton className="ml-auto size-5 rounded-full" />
+            </div>
+          ))}
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <IssueFilters issues={issues} value={filters} onChange={setFilters} />
-      <div className="rounded-xl border border-border bg-card overflow-hidden [box-shadow:var(--shadow-sm)]">
-      {/* Header row */}
-      <div className="flex items-center gap-3 px-4 py-2.5 border-b border-border bg-muted/20 text-xs text-muted-foreground">
+    <div className="flex h-full min-h-0 flex-col gap-4">
+      {/* Filtres en ligne — restent fixes pendant le scroll (QA2-30) */}
+      <div className="flex flex-wrap items-center gap-2 shrink-0">
+        <InlineIssueFilters issues={issues} value={filters} onChange={setFilters} />
+      </div>
+      <div className="flex-1 min-h-0 overflow-y-auto rounded-xl border border-border bg-card [box-shadow:var(--shadow-sm)]">
+      {/* Header row — sticky en haut du scroll */}
+      <div className="sticky top-0 z-20 flex items-center gap-3 px-4 py-2.5 border-b border-border bg-card text-xs text-muted-foreground">
         <div className="w-2 shrink-0" />
         <div className="w-3.5 shrink-0" />
         <div className="w-14 shrink-0">ID</div>
