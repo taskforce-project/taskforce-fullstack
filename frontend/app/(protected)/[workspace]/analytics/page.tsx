@@ -180,8 +180,6 @@ export default function AnalyticsPage() {
 
   return (
     <PageContainer>
-      <UpgradeDialog open={upgradeOpen} onClose={() => setUpgradeOpen(false)} />
-
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1">
@@ -209,7 +207,7 @@ export default function AnalyticsPage() {
         {/* Charts */}
         <div className="flex flex-col gap-4 lg:col-span-3">
           <SectionCard title="Weekly throughput" action={proBadge}>
-            <MaybeGate gated={!isPro} onUpgrade={() => setUpgradeOpen(true)}>
+            <MaybeGate gated={!isPro} onUpgrade={openUpgrade}>
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={throughput} barGap={3} margin={{ top: 0, right: 0, left: -24, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
@@ -225,7 +223,7 @@ export default function AnalyticsPage() {
           </SectionCard>
 
           <SectionCard title="Sprint burndown" action={proBadge}>
-            <MaybeGate gated={!isPro} onUpgrade={() => setUpgradeOpen(true)}>
+            <MaybeGate gated={!isPro} onUpgrade={openUpgrade}>
               <ResponsiveContainer width="100%" height={160}>
                 <LineChart data={burndown} margin={{ top: 0, right: 0, left: -24, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
@@ -274,7 +272,7 @@ export default function AnalyticsPage() {
               })}
             </SectionCard>
             {!isPro && (
-              <Button variant="outline" size="sm" className="mt-2 w-full gap-1.5 text-amber-600 dark:text-amber-400" onClick={() => setUpgradeOpen(true)}>
+              <Button variant="outline" size="sm" className="mt-2 w-full gap-1.5 text-amber-600 dark:text-amber-400" onClick={openUpgrade}>
                 <Zap className="size-3" /> Unlock capacity data with Pro
               </Button>
             )}
