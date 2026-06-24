@@ -5,6 +5,7 @@ import java.util.List;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,6 +39,7 @@ public class NotificationService {
     private final NotificationRepository notificationRepository;
     private final WorkspaceRepository    workspaceRepository;
     private final UserRepository         userRepository;
+    private final SimpMessagingTemplate  messagingTemplate;
 
     // =========================================================================
     // Lecture
@@ -134,7 +136,7 @@ public class NotificationService {
 
         Notification notif = buildNotification(issue, actor, issue.getAssignee(), "assigned", "info",
             issue.getTitle(), null);
-        notificationRepository.save(notif);
+        persistAndPush(notif);
     }
 
     /**
@@ -148,7 +150,7 @@ public class NotificationService {
         for (User recipient : recipients) {
             Notification notif = buildNotification(issue, actor, recipient, "commented", "low",
                 issue.getTitle(), body);
-            notificationRepository.save(notif);
+            persistAndPush(notif);
         }
     }
 
@@ -169,7 +171,7 @@ public class NotificationService {
             }
             Notification notif = buildNotification(issue, actor, recipient, type, urgency,
                 title + " — moved to " + newStatusName, null);
-            notificationRepository.save(notif);
+            persistAndPush(notif);
         }
     }
 
@@ -183,7 +185,7 @@ public class NotificationService {
             if (mentioned.getId().equals(actor.getId())) continue;
             Notification notif = buildNotification(issue, actor, mentioned, "mention", "warning",
                 issue.getTitle(), truncate(commentBody, 200));
-            notificationRepository.save(notif);
+            persistAndPush(notif);
         }
     }
 
@@ -209,7 +211,7 @@ public class NotificationService {
         String title   = issue.getTitle() + (overdue ? " — échéance dépassée" : " — échéance proche");
         // Alerte système : pas d'acteur (actor null)
         Notification notif = buildNotification(issue, null, assignee, type, urgency, title, null);
-        notificationRepository.save(notif);
+        persistAndPush(notif);
     }
 
     /**
@@ -248,13 +250,31 @@ public class NotificationService {
                 .projectName(workspace.getName())
                 .projectUrl(membersUrl)
                 .build();
-            notificationRepository.save(notif);
+            persistAndPush(notif);
         }
     }
 
     // =========================================================================
     // Helpers privés
     // =========================================================================
+
+    /**
+     * Persiste la notification puis la pousse en temps réel au destinataire (best-effort).
+     * Centralise TOUS les chemins de création : le push ne doit jamais casser la transaction métier.
+     * Destination : {@code /topic/notifications.{recipientId}} (même payload que le REST).
+     */
+    private void persistAndPush(Notification notif) {
+        Notification saved = notificationRepository.save(notif);
+        try {
+            messagingTemplate.convertAndSend(
+                "/topic/notifications." + saved.getRecipient().getId(),
+                toResponse(saved)
+            );
+        } catch (Exception ex) {
+            log.warn("Publication temps réel notification échouée (destinataire {}): {}",
+                saved.getRecipient().getId(), ex.getMessage());
+        }
+    }
 
     private Notification buildNotification(Issue issue, User actor, User recipient,
                                            String type, String urgency, String title, String body) {
