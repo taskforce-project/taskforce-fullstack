@@ -327,6 +327,7 @@ textarea:not([disabled]) { cursor: text; }
 @keyframes scale-in { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
 @keyframes fadeIn   { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes pulse    { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+@keyframes tf-shimmer { to { background-position: -200% 0; } }
 
 .animate-fade-in  { animation: fade-in  0.30s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 .animate-fade-up  { animation: fade-up  0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
