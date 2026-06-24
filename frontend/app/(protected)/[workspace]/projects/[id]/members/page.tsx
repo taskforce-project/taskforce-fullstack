@@ -8,6 +8,7 @@ import {
   User,
   MoreHorizontal,
   Mail,
+  UserMinus,
   Loader2,
 } from "lucide-react"
 
@@ -107,7 +108,7 @@ export default function ProjectMembersPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4 w-full max-w-4xl mx-auto">
+    <div className="flex flex-col gap-4 w-full">
       {/* Header */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
@@ -168,9 +169,10 @@ export default function ProjectMembersPage() {
                       Changer le rôle
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      className="text-destructive"
+                      className="text-destructive focus:text-destructive [&_svg]:text-destructive"
                       onClick={() => handleRemove(member.id, member.email)}
                     >
+                      <UserMinus className="size-4" />
                       Retirer du projet
                     </DropdownMenuItem>
                   </DropdownMenuContent>
