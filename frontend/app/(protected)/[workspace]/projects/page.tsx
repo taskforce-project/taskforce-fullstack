@@ -11,8 +11,13 @@ import {
   Zap,
   AlertTriangle,
   MoreHorizontal,
-  Loader2,
+  Archive,
+  ArchiveRestore,
   CircleDot,
+  Star,
+  LayoutGrid,
+  List as ListIcon,
+  ArrowUpDown,
 } from "lucide-react"
 
 import { CreateProjectDialog } from "@/components/dialogs/create-project-dialog"
@@ -23,7 +28,9 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Card } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
 import { SectionCard, MetricSplit, Metric } from "@/components/ui/section-card"
+import { PageContainer, PageHeader } from "@/components/layout/page-shell"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Table,
@@ -40,15 +47,26 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { ResponsiveContainer, AreaChart, Area } from "recharts"
 import { cn } from "@/lib/utils"
 import { getAvatarUrl } from "@/lib/utils/avatar"
 import { useProjectStore } from "@/lib/store/project-store"
+import { getAnalyticsThroughput } from "@/lib/api/analytics-service"
 import type { Project } from "@/lib/api/project-service"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type FilterTab = "all" | "active" | "archived"
 type HealthLevel = "healthy" | "at-risk" | "critical" | "paused"
+type SortKey = "health" | "recent" | "name" | "progress" | "open"
+
+const SORT_LABEL: Record<SortKey, string> = {
+  health: "Santé",
+  recent: "Récent",
+  name: "Nom",
+  progress: "Progression",
+  open: "Tâches ouvertes",
+}
 
 // ─── Signal derivation (from real project data) ───────────────────────────────
 
@@ -178,6 +196,7 @@ function OperationRow({ project, slug }: { readonly project: Project; readonly s
   const router = useRouter()
   const archiveProject = useProjectStore((s) => s.archiveProject)
   const updateProject = useProjectStore((s) => s.updateProject)
+  const toggleFavorite = useProjectStore((s) => s.toggleFavorite)
   const [editOpen, setEditOpen] = useState(false)
 
   const health = deriveHealth(project)
@@ -224,39 +243,182 @@ function OperationRow({ project, slug }: { readonly project: Project; readonly s
         </span>
       </TableCell>
       <TableCell className="text-right">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+        <div className="flex items-center justify-end gap-0.5">
+          {/* Pin (favori) — épinglé en tête de liste (QA2-22) */}
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className={cn(project.isFavorite ? "text-amber-500" : "text-muted-foreground")}
+            title={project.isFavorite ? "Désépingler" : "Épingler"}
+            onClick={(e) => { e.stopPropagation(); toggleFavorite(slug, project.id, !project.isFavorite) }}
+          >
+            <Star className={cn("size-4", project.isFavorite && "fill-amber-400 text-amber-400")} />
+          </Button>
+          {/* Archive / Réactiver — action directe (QA2-22 : plus cachée dans le « … ») */}
+          {project.status === "ARCHIVED" ? (
             <Button
               variant="ghost"
               size="icon-sm"
               className="text-muted-foreground"
-              onClick={(e) => e.stopPropagation()}
+              title="Réactiver le projet"
+              onClick={(e) => { e.stopPropagation(); updateProject(slug, project.id, { status: "ACTIVE" }) }}
             >
-              <MoreHorizontal className="size-4" />
+              <ArchiveRestore className="size-4" />
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-            <DropdownMenuItem onClick={() => setEditOpen(true)}>
-              Edit operation
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => router.push(`/${slug}/projects/${project.id}/settings`)}>
-              Settings
-            </DropdownMenuItem>
-            {project.status === "ARCHIVED" ? (
-              <DropdownMenuItem onClick={() => updateProject(slug, project.id, { status: "ACTIVE" })}>
-                Reactivate
+          ) : (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="text-muted-foreground"
+              title="Archiver le projet"
+              onClick={(e) => { e.stopPropagation(); archiveProject(slug, project.id) }}
+            >
+              <Archive className="size-4" />
+            </Button>
+          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="text-muted-foreground"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <MoreHorizontal className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+              <DropdownMenuItem onClick={() => setEditOpen(true)}>
+                Edit operation
               </DropdownMenuItem>
-            ) : (
-              <DropdownMenuItem onClick={() => archiveProject(slug, project.id)}>
-                Archive
+              <DropdownMenuItem onClick={() => router.push(`/${slug}/projects/${project.id}/settings`)}>
+                Settings
               </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </TableCell>
     </TableRow>
     <EditProjectDialog project={project} slug={slug} open={editOpen} onOpenChange={setEditOpen} />
     </>
+  )
+}
+
+// ─── Card (cards view) ──────────────────────────────────────────────────────────
+
+function ProjectCard({ project, slug }: { readonly project: Project; readonly slug: string }) {
+  const router = useRouter()
+  const toggleFavorite = useProjectStore((s) => s.toggleFavorite)
+  const health = deriveHealth(project)
+  const pct = progressPct(project)
+
+  // Activité du projet (réel) — throughput hebdo (ouvertes + résolues), façon GitHub.
+  const [activity, setActivity] = useState<{ week: string; activity: number }[]>([])
+  useEffect(() => {
+    let alive = true
+    getAnalyticsThroughput(slug, project.id)
+      .then((pts) => { if (alive) setActivity(pts.map((p) => ({ week: p.week, activity: p.opened + p.resolved }))) })
+      .catch(() => { /* gated Pro / indispo → pas de sparkline */ })
+    return () => { alive = false }
+  }, [slug, project.id])
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => router.push(`/${slug}/projects/${project.id}`)}
+      onKeyDown={(e) => e.key === "Enter" && router.push(`/${slug}/projects/${project.id}`)}
+      className="group flex cursor-pointer flex-col gap-3 rounded-xl border border-border bg-card p-4 text-left shadow-sm transition-all hover:border-foreground/15 hover:shadow-md"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className={cn("size-2 shrink-0 rounded-full", HEALTH_META[health].dot)} />
+          <ProjectIcon iconUrl={project.iconUrl} name={project.name} color={project.color} size={28} className="shrink-0 rounded" />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-foreground">{project.name}</p>
+            <HealthBadge level={health} />
+          </div>
+        </div>
+        <button
+          type="button"
+          title={project.isFavorite ? "Désépingler" : "Épingler"}
+          onClick={(e) => { e.stopPropagation(); toggleFavorite(slug, project.id, !project.isFavorite) }}
+          className={cn(
+            "shrink-0 rounded p-1 transition-colors hover:bg-muted",
+            project.isFavorite ? "text-amber-500" : "text-muted-foreground/50 hover:text-foreground"
+          )}
+        >
+          <Star className={cn("size-4", project.isFavorite && "fill-amber-400 text-amber-400")} />
+        </button>
+      </div>
+
+      {project.description && (
+        <p className="line-clamp-2 text-xs text-muted-foreground">{project.description}</p>
+      )}
+
+      {/* Activité (sparkline bleu, façon GitHub) — remplace la barre de progression */}
+      <div className="mt-auto">
+        <p className="mb-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70">Activité</p>
+        {activity.length > 0 ? (
+          <ResponsiveContainer width="100%" height={36}>
+            <AreaChart data={activity} margin={{ top: 2, right: 0, left: 0, bottom: 2 }}>
+              <defs>
+                <linearGradient id={`act-${project.id}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.25} />
+                  <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <Area type="monotone" dataKey="activity" stroke="#3b82f6" strokeWidth={1.5} fill={`url(#act-${project.id})`} dot={false} />
+            </AreaChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="flex h-9 items-center text-[10px] text-muted-foreground/50">Pas d&apos;activité récente</div>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between border-t border-border/60 pt-2.5">
+        <MemberStack project={project} />
+        <div className="flex items-center gap-3 text-xs tabular-nums text-muted-foreground">
+          <span title="Progression">{pct}%</span>
+          <span className="inline-flex items-center gap-1" title="Tâches ouvertes">
+            <CircleDot className="size-3.5" /> {project.openIssues}
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Skeleton loaders ─────────────────────────────────────────────────────────
+
+function ProjectsSkeleton({ cards }: { readonly cards: boolean }) {
+  if (cards) {
+    return (
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4">
+            <div className="flex items-center gap-2.5">
+              <Skeleton className="size-7 rounded" />
+              <Skeleton className="h-4 w-32" />
+            </div>
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-1.5 w-full" />
+            <Skeleton className="h-3 w-20" />
+          </div>
+        ))}
+      </div>
+    )
+  }
+  return (
+    <Card className="gap-0 overflow-hidden py-0">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div key={i} className="flex items-center gap-3 border-b border-border px-4 py-4 last:border-0">
+          <Skeleton className="size-5 rounded" />
+          <Skeleton className="h-4 w-40" />
+          <Skeleton className="ml-auto h-4 w-16" />
+        </div>
+      ))}
+    </Card>
   )
 }
 
@@ -299,6 +461,8 @@ export default function ProjectsPage() {
   const { projects, isLoading, fetchProjects } = useProjectStore()
   const [filter, setFilter] = useState<FilterTab>("active")
   const [search, setSearch] = useState("")
+  const [view, setView] = useState<"list" | "cards">("list")
+  const [sortBy, setSortBy] = useState<SortKey>("health")
 
   useEffect(() => {
     if (slug) fetchProjects(slug)
@@ -312,9 +476,24 @@ export default function ProjectsPage() {
       const q = search.toLowerCase()
       list = list.filter((p) => p.name.toLowerCase().includes(q) || (p.description ?? "").toLowerCase().includes(q))
     }
-    const order: Record<HealthLevel, number> = { critical: 0, "at-risk": 1, healthy: 2, paused: 3 }
-    return [...list].sort((a, b) => order[deriveHealth(a)] - order[deriveHealth(b)])
+    return list
   }, [projects, filter, search])
+
+  const sorted = useMemo(() => {
+    const healthOrder: Record<HealthLevel, number> = { critical: 0, "at-risk": 1, healthy: 2, paused: 3 }
+    const comparators: Record<SortKey, (a: Project, b: Project) => number> = {
+      health: (a, b) => healthOrder[deriveHealth(a)] - healthOrder[deriveHealth(b)],
+      recent: (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+      name: (a, b) => a.name.localeCompare(b.name),
+      progress: (a, b) => progressPct(b) - progressPct(a),
+      open: (a, b) => b.openIssues - a.openIssues,
+    }
+    // Épinglés (favoris) toujours en tête, puis tri choisi.
+    return [...filtered].sort((a, b) => {
+      if (a.isFavorite !== b.isFavorite) return a.isFavorite ? -1 : 1
+      return comparators[sortBy](a, b)
+    })
+  }, [filtered, sortBy])
 
   const activeProjects = useMemo(
     () => projects.filter((p) => p.status === "ACTIVE" || p.status === "PAUSED"),
@@ -322,17 +501,16 @@ export default function ProjectsPage() {
   )
 
   return (
-    <div className="flex w-full flex-col gap-5">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Active Operations</h1>
-          <p className="text-sm text-muted-foreground">Real-time health and velocity across all workstreams</p>
-        </div>
-        <CreateProjectDialog defaultOpen={autoNew}>
-          <Button size="sm" className="gap-1.5"><Plus className="size-4" /> New Operation</Button>
-        </CreateProjectDialog>
-      </div>
+    <PageContainer>
+      <PageHeader
+        title="Active Operations"
+        description="Real-time health and velocity across all workstreams"
+        actions={
+          <CreateProjectDialog defaultOpen={autoNew}>
+            <Button size="sm" className="gap-1.5"><Plus className="size-4" /> New Operation</Button>
+          </CreateProjectDialog>
+        }
+      />
 
       {/* Stats */}
       {!isLoading && activeProjects.length > 0 && <StatsStrip projects={activeProjects} />}
@@ -355,22 +533,64 @@ export default function ProjectsPage() {
             className="h-9 pl-8"
           />
         </div>
-        {!isLoading && (
-          <span className="ml-auto text-sm text-muted-foreground">
-            {filtered.length} operation{filtered.length !== 1 ? "s" : ""}
-          </span>
-        )}
+        <div className="ml-auto flex items-center gap-2">
+          {!isLoading && (
+            <span className="hidden text-sm text-muted-foreground sm:inline">
+              {sorted.length} operation{sorted.length !== 1 ? "s" : ""}
+            </span>
+          )}
+          {/* Tri */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9 gap-1.5 text-xs">
+                <ArrowUpDown className="size-3.5" /> {SORT_LABEL[sortBy]}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {(Object.keys(SORT_LABEL) as SortKey[]).map((k) => (
+                <DropdownMenuItem key={k} onClick={() => setSortBy(k)}>
+                  {SORT_LABEL[k]}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {/* Vue liste / cartes */}
+          <div className="flex items-center rounded-md border border-border p-0.5">
+            <button
+              type="button"
+              onClick={() => setView("list")}
+              aria-label="Vue liste"
+              className={cn("flex size-7 items-center justify-center rounded transition-colors", view === "list" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground")}
+            >
+              <ListIcon className="size-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setView("cards")}
+              aria-label="Vue cartes"
+              className={cn("flex size-7 items-center justify-center rounded transition-colors", view === "cards" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground")}
+            >
+              <LayoutGrid className="size-4" />
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* Table */}
-      <Card className="gap-0 overflow-hidden py-0">
-        {isLoading ? (
-          <div className="flex justify-center py-16">
-            <Loader2 className="size-6 animate-spin text-muted-foreground" />
-          </div>
-        ) : filtered.length === 0 ? (
+      {/* Liste / cartes */}
+      {isLoading ? (
+        <ProjectsSkeleton cards={view === "cards"} />
+      ) : sorted.length === 0 ? (
+        <Card className="gap-0 overflow-hidden py-0">
           <EmptyState isSearch={search.trim().length > 0} />
-        ) : (
+        </Card>
+      ) : view === "cards" ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {sorted.map((project) => (
+            <ProjectCard key={project.id} project={project} slug={slug} />
+          ))}
+        </div>
+      ) : (
+        <Card className="gap-0 overflow-hidden py-0">
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
@@ -385,13 +605,13 @@ export default function ProjectsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((project) => (
+              {sorted.map((project) => (
                 <OperationRow key={project.id} project={project} slug={slug} />
               ))}
             </TableBody>
           </Table>
-        )}
-      </Card>
-    </div>
+        </Card>
+      )}
+    </PageContainer>
   )
 }
