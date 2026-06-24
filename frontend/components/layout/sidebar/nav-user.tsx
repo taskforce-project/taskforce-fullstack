@@ -10,11 +10,8 @@ import {
   Sparkles,
 } from "lucide-react"
 
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/ui/user-avatar"
+import { Badge } from "@/components/ui/badge"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,6 +29,7 @@ import {
 } from "@/components/ui/sidebar"
 import { useAuth } from "@/lib/contexts/auth-context"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
+import { useUpgradeStore } from "@/lib/store/upgrade-store"
 
 export function NavUser({
   user,
@@ -46,6 +44,7 @@ export function NavUser({
   const { logout, user: authUser } = useAuth()
   const router = useRouter()
   const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug)
+  const openUpgrade = useUpgradeStore((s) => s.openUpgrade)
 
   const isPro = authUser?.planType === "PRO" || authUser?.planType === "ENTERPRISE"
 
@@ -63,9 +62,12 @@ export function NavUser({
               size="lg"
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
-              <Avatar className="h-8 w-8 rounded-lg">
-                <AvatarImage src={user.avatar} alt={user.name} />
-              </Avatar>
+              <UserAvatar
+                email={user.email}
+                name={user.name}
+                avatarUrl={user.avatar}
+                className="h-8 w-8"
+              />
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{user.name}</span>
                 <span className="truncate text-xs">{user.email}</span>
@@ -81,28 +83,42 @@ export function NavUser({
           >
             <DropdownMenuLabel className="p-0 font-normal">
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                <Avatar className="h-8 w-8 rounded-lg">
-                  <AvatarImage src={user.avatar} alt={user.name} />
-                </Avatar>
+                <UserAvatar
+                  email={user.email}
+                  name={user.name}
+                  avatarUrl={user.avatar}
+                  className="h-8 w-8"
+                />
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-medium">{user.name}</span>
-                  <span className="truncate text-xs">{user.email}</span>
+                  <span className="truncate text-xs text-muted-foreground">{user.email}</span>
                 </div>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              {!isPro && (
-                <DropdownMenuItem onClick={() => router.push(`/${slug}/settings?section=billing`)}>
-                  Upgrade to Pro
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
+            {/* CTA upgrade — uniquement si le plan n'est pas Pro (évite le séparateur orphelin) */}
+            {!isPro && (
+              <>
+                <DropdownMenuGroup>
+                  <DropdownMenuItem
+                    onClick={openUpgrade}
+                    className="gap-2 text-amber-600 focus:text-amber-600 dark:text-amber-500 dark:focus:text-amber-500"
+                  >
+                    <Sparkles className="size-4" />
+                    <span className="font-medium">Passer à Pro</span>
+                    <Badge variant="secondary" className="ml-auto h-5 px-1.5 text-[10px]">Free</Badge>
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+                <DropdownMenuSeparator />
+              </>
+            )}
             <DropdownMenuGroup>
               <DropdownMenuItem onClick={() => router.push(`/${slug}/profile`)}>
                 <BadgeCheck />
                 Account
+                {isPro && (
+                  <Badge className="ml-auto h-5 bg-primary px-1.5 text-[10px] text-primary-foreground">Pro</Badge>
+                )}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => router.push(`/${slug}/settings?section=billing`)}>
                 <CreditCard />
