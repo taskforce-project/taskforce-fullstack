@@ -12,6 +12,7 @@ import { useState, useEffect } from "react"
 import { useParams } from "next/navigation"
 
 import { Button } from "@/components/ui/button"
+import { PageContainer } from "@/components/layout/page-shell"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { SectionCard } from "@/components/ui/section-card"
@@ -202,7 +203,7 @@ export default function AnalyticsPage() {
   const proBadge = !isPro ? <Badge variant="secondary" className="text-amber-600 dark:text-amber-400">Pro</Badge> : undefined
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+    <PageContainer>
       <UpgradeDialog open={upgradeOpen} onClose={() => setUpgradeOpen(false)} />
 
       {/* Header */}
@@ -304,7 +305,7 @@ export default function AnalyticsPage() {
           </div>
         </div>
       </div>
-    </div>
+    </PageContainer>
   )
 }
 
