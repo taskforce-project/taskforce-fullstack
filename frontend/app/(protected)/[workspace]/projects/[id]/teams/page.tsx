@@ -15,9 +15,9 @@ export default function ProjectTeamsPage() {
   return (
     <div className="flex w-full flex-col gap-4">
       <div className="space-y-0.5">
-        <h2 className="text-sm font-semibold text-foreground">Équipes du projet</h2>
+        <h2 className="text-sm font-semibold text-foreground">Équipes</h2>
         <p className="text-xs text-muted-foreground">
-          Associez des équipes existantes ou créez-en une. Les membres individuels se gèrent dans les Paramètres.
+          Créez des équipes, gérez leurs membres et associez-les à cette opération.
         </p>
       </div>
       <ProjectTeamsSection workspace={workspace} projectId={projectId} />
