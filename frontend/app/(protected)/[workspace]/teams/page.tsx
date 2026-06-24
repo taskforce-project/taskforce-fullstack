@@ -14,6 +14,7 @@ import {
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { PageContainer } from "@/components/layout/page-shell"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
 import {
@@ -433,7 +434,7 @@ function TeamCard({ team, slug }: { readonly team: Team; readonly slug: string }
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem className="gap-2" onClick={() => setSettingsOpen(true)}>
-              <Settings className="size-4" /> Gérer l'équipe
+              <Settings className="size-4" /> Gérer l&apos;équipe
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={handleDelete}>
@@ -508,7 +509,7 @@ export default function TeamsPage() {
   }, [search, teams])
 
   return (
-    <div className="flex flex-col gap-6 max-w-4xl mx-auto w-full">
+    <PageContainer>
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -572,6 +573,6 @@ export default function TeamsPage() {
           ))}
         </div>
       )}
-    </div>
+    </PageContainer>
   )
 }
