@@ -69,8 +69,8 @@ export function NavProjects({
                   <span>Share Project</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                  <Trash2 className="text-muted-foreground" />
+                <DropdownMenuItem className="text-destructive focus:text-destructive [&_svg]:text-destructive">
+                  <Trash2 />
                   <span>Delete Project</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
