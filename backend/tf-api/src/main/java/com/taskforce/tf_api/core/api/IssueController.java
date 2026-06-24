@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.taskforce.tf_api.core.dto.request.CreateIssueCommentRequest;
@@ -42,6 +43,7 @@ import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.service.IssueService;
 import com.taskforce.tf_api.core.service.SmartAssignService;
 import com.taskforce.tf_api.shared.dto.ApiResponse;
+import com.taskforce.tf_api.shared.dto.PageResponse;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 import com.taskforce.tf_api.shared.security.JwtIdentityResolver;
 
@@ -78,6 +80,26 @@ public class IssueController {
         Long userId = resolveUserId(jwt);
         List<IssueResponse> issues = issueService.listIssues(slug, projectId, userId);
         return ResponseEntity.ok(ApiResponse.success("Issues récupérées", issues));
+    }
+
+    /**
+     * GET /api/workspaces/{slug}/projects/{projectId}/issues/paged?page=0&size=30
+     * Liste paginée des issues (QA2-33) — pour l'infinite-scroll du backlog.
+     * Additif : le board/kanban continue d'utiliser GET (toutes les issues).
+     */
+    @GetMapping("/paged")
+    public ResponseEntity<ApiResponse<PageResponse<IssueResponse>>> listIssuesPaged(
+        @PathVariable String slug,
+        @PathVariable Long projectId,
+        @RequestParam(name = "page", defaultValue = "0") int page,
+        @RequestParam(name = "size", defaultValue = "30") int size,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long userId = resolveUserId(jwt);
+        int safeSize = Math.min(Math.max(size, 1), 100);
+        var pageable = org.springframework.data.domain.PageRequest.of(Math.max(page, 0), safeSize);
+        PageResponse<IssueResponse> result = issueService.listIssuesPaged(slug, projectId, userId, pageable);
+        return ResponseEntity.ok(ApiResponse.success("Issues récupérées", result));
     }
 
     @PostMapping
