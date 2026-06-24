@@ -106,8 +106,13 @@ export function BulkAssignDialog({ slug, projectId, issues }: BulkAssignDialogPr
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" disabled={unassigned.length === 0}>
-          <Sparkles className="size-3.5 text-primary" />
+        <Button
+          variant={unassigned.length > 0 ? "default" : "outline"}
+          size="sm"
+          className="h-8 gap-1.5 text-xs"
+          disabled={unassigned.length === 0}
+        >
+          <Sparkles className={`size-3.5 ${unassigned.length > 0 ? "" : "text-primary"}`} />
           Auto-assign{unassigned.length > 0 ? ` (${unassigned.length})` : ""}
         </Button>
       </DialogTrigger>
