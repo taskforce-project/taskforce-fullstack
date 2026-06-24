@@ -7,12 +7,19 @@ import {
   ArrowUpRight, Clock,
   Zap, Loader2, Layers, Activity,
 } from "lucide-react"
+import {
+  ResponsiveContainer, AreaChart, Area, Tooltip,
+} from "recharts"
 import { useAuth } from "@/lib/contexts/auth-context"
 import { useProjectStore } from "@/lib/store/project-store"
-import { getAiInsights, type AiInsight } from "@/lib/api/analytics-service"
+import {
+  getAiInsights, getAnalyticsThroughput,
+  type AiInsight, type ThroughputPoint,
+} from "@/lib/api/analytics-service"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { SectionCard, MetricSplit, Metric } from "@/components/ui/section-card"
+import { SectionCard, MetricSplit, Metric, SegmentBar } from "@/components/ui/section-card"
+import { PageContainer } from "@/components/layout/page-shell"
 import { Progress } from "@/components/ui/progress"
 import { cn } from "@/lib/utils"
 
@@ -40,6 +47,7 @@ export default function DashboardPage() {
 
   const [aiInsights, setAiInsights] = useState<AiInsight[]>([])
   const [insightsLoading, setInsightsLoading] = useState(false)
+  const [throughput, setThroughput] = useState<ThroughputPoint[]>([])
 
   useEffect(() => {
     if (slug) void fetchProjects(slug)
@@ -53,10 +61,32 @@ export default function DashboardPage() {
       .then(setAiInsights)
       .catch(() => setAiInsights([]))
       .finally(() => setInsightsLoading(false))
+    // Throughput hebdo (réel) — gated Pro : en cas de 409/erreur, on masque simplement le graphe.
+    getAnalyticsThroughput(slug)
+      .then(setThroughput)
+      .catch(() => setThroughput([]))
   }, [slug])
 
   const activeOps = projects.filter((p) => p.status === "ACTIVE").length
   const openIssues = projects.reduce((s, p) => s + p.openIssues, 0)
+
+  // Agrégats réels pour les insight cards (QA2-13) — aucune donnée fabriquée.
+  const totalOps = projects.length
+  const totalIssues = projects.reduce((s, p) => s + p.totalIssues, 0)
+  const doneIssues = totalIssues - openIssues
+  const completion = totalIssues > 0 ? Math.round((doneIssues / totalIssues) * 100) : 0
+
+  const healthOf = (p: (typeof projects)[number]): "healthy" | "atRisk" | "critical" | "paused" => {
+    if (p.status === "PAUSED" || p.status === "ARCHIVED") return "paused"
+    if (p.totalIssues === 0) return "healthy"
+    const ratio = p.openIssues / p.totalIssues
+    if (ratio > 0.85) return "critical"
+    if (ratio > 0.55) return "atRisk"
+    return "healthy"
+  }
+  const health = { healthy: 0, atRisk: 0, critical: 0, paused: 0 }
+  for (const p of projects) health[healthOf(p)]++
+  const atRisk = health.atRisk + health.critical
 
   const OPERATIONS = projects.map((p) => ({
     id: String(p.id),
@@ -75,7 +105,7 @@ export default function DashboardPage() {
   const decisions = aiInsights.filter((i) => i.urgency === "high").length
 
   return (
-    <div className="flex flex-col gap-6">
+    <PageContainer>
       {/* Header */}
       <div className="flex items-end justify-between gap-4">
         <div className="space-y-1">
@@ -89,20 +119,82 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* KPI groupés en cartes à en-tête (façon carte « Security » de Cloudflare) */}
+      {/* KPI groupés en cartes à en-tête (style Cloudflare) — agrégats réels, plus d'insight dans le corps */}
       <div className="grid gap-4 lg:grid-cols-2">
         <SectionCard title="Operations" icon={<Layers className="size-4" />} href="./projects" bodyClassName="p-0">
           <MetricSplit>
-            <Metric label="Active ops" value={activeOps} />
+            <Metric label="Active ops" value={`${activeOps}/${totalOps}`} />
             <Metric label="Open issues" value={openIssues} />
-            <Metric label="At risk" value={0} />
+            <Metric
+              label="At risk"
+              value={atRisk}
+              valueClassName={atRisk > 0 ? "text-amber-600 dark:text-amber-400" : undefined}
+            />
           </MetricSplit>
+          <div className="space-y-1.5 border-t border-border px-5 py-3">
+            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+              <span>Santé des opérations</span>
+              <span className="tabular-nums">{health.healthy} sain · {atRisk} à risque · {health.paused} en pause</span>
+            </div>
+            <SegmentBar
+              segments={[
+                { value: health.healthy, className: "bg-emerald-500" },
+                { value: health.atRisk, className: "bg-amber-500" },
+                { value: health.critical, className: "bg-rose-500" },
+                { value: health.paused, className: "bg-muted-foreground/40" },
+              ]}
+            />
+          </div>
         </SectionCard>
-        <SectionCard title="Activity" icon={<Activity className="size-4" />} bodyClassName="p-0">
+
+        <SectionCard title="Throughput" icon={<Activity className="size-4" />} href="./analytics" bodyClassName="p-0">
           <MetricSplit>
-            <Metric label="My queue" value={0} />
-            <Metric label="Agents active" value={0} />
+            <Metric label="Resolved" value={doneIssues} />
+            <Metric label="Total issues" value={totalIssues} />
+            <Metric
+              label="Completion"
+              value={`${completion}%`}
+              valueClassName={completion >= 70 ? "text-emerald-600 dark:text-emerald-400" : undefined}
+            />
           </MetricSplit>
+          <div className="border-t border-border px-5 py-3">
+            <p className="mb-1 text-[11px] text-muted-foreground">Tâches résolues / semaine</p>
+            {throughput.length > 0 ? (
+              <ResponsiveContainer width="100%" height={64}>
+                <AreaChart data={throughput} margin={{ top: 4, right: 0, left: 0, bottom: 10 }}>
+                  <defs>
+                    <linearGradient id="thr-fade" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.28} />
+                      <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <Tooltip
+                    contentStyle={{
+                      background: "var(--popover)",
+                      border: "1px solid var(--border)",
+                      borderRadius: "var(--radius)",
+                      fontSize: 11,
+                      padding: "2px 8px",
+                    }}
+                    labelStyle={{ display: "none" }}
+                    cursor={false}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="resolved"
+                    stroke="#3b82f6"
+                    strokeWidth={2}
+                    fill="url(#thr-fade)"
+                    fillOpacity={1}
+                    dot={false}
+                    activeDot={{ r: 3, fill: "#3b82f6" }}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="py-4 text-center text-xs text-muted-foreground/60">Pas encore assez de données</p>
+            )}
+          </div>
         </SectionCard>
       </div>
 
@@ -195,6 +287,6 @@ export default function DashboardPage() {
           </SectionCard>
         </div>
       </div>
-    </div>
+    </PageContainer>
   )
 }
