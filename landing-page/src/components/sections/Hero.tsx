@@ -6,18 +6,18 @@ export function Hero() {
       className="bg-background pt-16"
       heading={
         <>
-          Manage work at speed
+          Describe the outcome.
           <br />
           <span className="bg-linear-to-r from-orange-500 via-red-500 to-violet-600 bg-clip-text text-transparent">
-            from idea to delivery
+            TaskForce orchestrates the execution.
           </span>
         </>
       }
-      description="Taskforce unifies projects, docs, AI workflows, and analytics so your teams ship faster with less context switching."
-      byline="In beta · 5,000+ teams"
+      description="From planning and assignments to AI agents, meetings, reports and delivery."
+      byline="AI-native project execution"
       buttons={{
         primary: {
-          text: "Try Taskforce Pro for 14 days",
+          text: "Get started free",
           url: "http://localhost:3000/auth/register",
         },
         secondary: {
