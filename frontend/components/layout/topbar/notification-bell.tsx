@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/popover"
 import { useNotificationStore, type Urgency } from "@/lib/store/notification-store"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
+import { useNotificationsRealtime } from "@/lib/hooks/use-notifications-realtime"
 import { cn } from "@/lib/utils"
 
 const URGENCY_DOT: Record<Urgency, string> = {
