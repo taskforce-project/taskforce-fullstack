@@ -135,7 +135,7 @@ export default function AnalyticsPage() {
   const { user } = useAuth()
   const params = useParams()
   const slug = params.workspace as string
-  const [upgradeOpen, setUpgradeOpen] = useState(false)
+  const openUpgrade = useUpgradeStore((s) => s.openUpgrade)
   const [capacityData, setCapacityData] = useState<MemberCapacity[]>([])
   const [kpis, setKpis] = useState<AnalyticsKpis | null>(null)
   const [throughput, setThroughput] = useState<ThroughputPoint[]>([])
