@@ -218,6 +218,7 @@ export const CONSTANTS_EN = {
     createProject: "New Project",
     comingSoon: "Soon",
     sub: {
+      myAll: "All",
       myIssues: "Issues",
       myCycles: "Sprints",
       myPages: "Pages",

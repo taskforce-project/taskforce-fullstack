@@ -220,6 +220,7 @@ export const CONSTANTS_FR: TranslationKeys = {
     createProject: "Nouveau projet",
     comingSoon: "Bientôt",
     sub: {
+      myAll: "Tout",
       myIssues: "Tâches",
       myCycles: "Sprints",
       myPages: "Pages",
