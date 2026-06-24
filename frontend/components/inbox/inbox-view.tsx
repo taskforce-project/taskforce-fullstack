@@ -17,7 +17,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PageContainer } from "@/components/layout/page-shell"
 import { cn } from "@/lib/utils"
 import { useNotificationStore } from "@/lib/store/notification-store"
-import type { Signal, NotifType, Urgency } from "@/lib/store/notification-store"
+import type { Signal, Urgency } from "@/lib/store/notification-store"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -39,7 +39,9 @@ const URGENCY_BAR: Record<Urgency, string> = {
   low:      "bg-transparent",
 }
 
-const TYPE_CONFIG: Record<NotifType, { icon: React.ElementType; label: string; color: string }> = {
+type TypeCfg = { icon: React.ElementType; label: string; color: string }
+
+const TYPE_CONFIG: Partial<Record<string, TypeCfg>> = {
   overdue:       { icon: Flame,         label: "Deadline breached", color: "text-rose-500" },
   dueSoon:       { icon: Clock,         label: "Deadline risk",     color: "text-amber-500" },
   mention:       { icon: AtSign,        label: "Mentioned you",     color: "text-violet-500" },
@@ -47,10 +49,14 @@ const TYPE_CONFIG: Record<NotifType, { icon: React.ElementType; label: string; c
   commented:     { icon: MessageSquare, label: "Commented",         color: "text-muted-foreground" },
   statusChanged: { icon: ArrowRight,    label: "Status updated",    color: "text-muted-foreground" },
   completed:     { icon: CheckCircle2,  label: "Completed",         color: "text-emerald-500" },
+  overload:      { icon: AlertTriangle, label: "Overload",          color: "text-amber-500" },
 }
 
+// Fallback pour tout type non mappé → évite le crash si le backend renvoie un type inconnu.
+const FALLBACK_TYPE: TypeCfg = { icon: Radio, label: "Notification", color: "text-muted-foreground" }
+
 const TABS: { key: NotifTab; icon: React.ElementType; label: string; filter: (s: Signal) => boolean }[] = [
-  { key: "all",         icon: Radio,         label: "All Signals", filter: () => true },
+  { key: "all",         icon: Radio,         label: "All", filter: () => true },
   { key: "alerts",      icon: ShieldAlert,   label: "Alerts",      filter: (s) => s.type === "dueSoon" || s.type === "overdue" },
   { key: "mentions",    icon: AtSign,        label: "Mentions",    filter: (s) => s.type === "mention" },
   { key: "assignments", icon: ClipboardList, label: "Assignments", filter: (s) => s.type === "assigned" },
@@ -68,7 +74,7 @@ function SignalRow({
   readonly onAcknowledge: (id: string) => void
 }) {
   const router = useRouter()
-  const tcfg = TYPE_CONFIG[signal.type]
+  const tcfg = TYPE_CONFIG[signal.type] ?? FALLBACK_TYPE
   const TypeIcon = tcfg.icon
 
   function handleClick() {
