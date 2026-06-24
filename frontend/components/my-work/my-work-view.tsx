@@ -13,6 +13,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { SectionCard, CardSubSection } from "@/components/ui/section-card"
+import { PageContainer, PageHeader } from "@/components/layout/page-shell"
 import { cn } from "@/lib/utils"
 import { useProjectStore } from "@/lib/store/project-store"
 import { useCycleStore } from "@/lib/store/cycle-store"
@@ -293,13 +294,11 @@ export function MyWorkView(_props: MyWorkViewProps) {
   const activeSprints = myCycles.filter((c) => c.status === "active").length
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-5">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">My Queue</h1>
-        <p className="text-sm text-muted-foreground">
-          Issues, sprints, and pages assigned to or recently edited by you
-        </p>
-      </header>
+    <PageContainer>
+      <PageHeader
+        title="My Queue"
+        description="Issues, sprints, and pages assigned to or recently edited by you"
+      />
 
       <SectionCard title="My Queue" bodyClassName="p-0">
         <CardSubSection label="Issues" count={myIssues.length}>
@@ -318,6 +317,6 @@ export function MyWorkView(_props: MyWorkViewProps) {
             : myPages.map((p) => <PageRow key={p.id} page={p} />)}
         </CardSubSection>
       </SectionCard>
-    </div>
+    </PageContainer>
   )
 }
