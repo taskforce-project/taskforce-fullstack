@@ -5,6 +5,7 @@ import { Loader2, X, Users } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import {
   Select,
   SelectContent,
@@ -34,6 +35,8 @@ export function ProjectTeamsSection({ workspace, projectId }: ProjectTeamsSectio
   const [loading, setLoading] = useState(true)
   const [selectedTeam, setSelectedTeam] = useState<string>("")
   const [attaching, setAttaching] = useState(false)
+  const [newName, setNewName] = useState("")
+  const [creating, setCreating] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -66,6 +69,24 @@ export function ProjectTeamsSection({ workspace, projectId }: ProjectTeamsSectio
       toast.error("Impossible d'associer cette équipe")
     } finally {
       setAttaching(false)
+    }
+  }
+
+  async function handleCreateAndAttach() {
+    const name = newName.trim()
+    if (!name || creating) return
+    setCreating(true)
+    try {
+      const team = await teamService.create(workspace, { name })
+      const linked = await attachProjectTeam(workspace, projectId, team.id)
+      setAllTeams((prev) => [...prev, team])
+      setTeams((prev) => [...prev, linked])
+      setNewName("")
+      toast.success(`Équipe « ${team.name} » créée et associée`)
+    } catch {
+      toast.error("Impossible de créer l'équipe")
+    } finally {
+      setCreating(false)
     }
   }
 
@@ -138,6 +159,21 @@ export function ProjectTeamsSection({ workspace, projectId }: ProjectTeamsSectio
           </Button>
         </div>
       )}
+
+      {/* Créer une nouvelle équipe (la gestion des équipes vit dans le projet — QA2-21) */}
+      <div className="flex items-center gap-2 border-t border-border/50 px-4 py-3">
+        <Input
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleCreateAndAttach()}
+          placeholder="Créer une nouvelle équipe…"
+          className="h-9 flex-1"
+        />
+        <Button size="sm" variant="outline" onClick={handleCreateAndAttach} disabled={!newName.trim() || creating} className="gap-1.5">
+          {creating && <Loader2 className="size-3.5 animate-spin" />}
+          Créer
+        </Button>
+      </div>
     </div>
   )
 }
