@@ -101,10 +101,14 @@ public class AssistantService {
         }
 
         // Projets actifs
-        List<?> projects = projectRepository.findByWorkspaceIdOrderByCreatedAtDesc(workspace.getId());
+        List<com.taskforce.tf_api.core.model.Project> projects =
+            projectRepository.findByWorkspaceIdOrderByCreatedAtDesc(workspace.getId());
         if (!projects.isEmpty()) {
-            sb.append("Projects: ").append(projects.size()).append(" total\n\n");
+            sb.append("Projects: ").append(projects.size()).append(" total\n");
         }
+
+        // Métriques analytiques réelles (QA2-17) — le LLM peut répondre aux questions chiffrées
+        appendMetrics(sb, projects, members);
 
         // Issues récentes (20 max) pour donner du contexte
         List<Issue> recentIssues = findRecentIssues(workspace.getId());
@@ -122,6 +126,73 @@ public class AssistantService {
         }
 
         return sb.toString();
+    }
+
+    /**
+     * Injecte un bloc de métriques chiffrées (réelles) pour permettre à l'assistant
+     * de répondre aux questions analytiques : volumes, throughput, charge (QA2-17).
+     */
+    private void appendMetrics(StringBuilder sb,
+                               List<com.taskforce.tf_api.core.model.Project> projects,
+                               List<WorkspaceMember> members) {
+        if (projects.isEmpty()) return;
+        try {
+            List<Long> ids = projects.stream()
+                .map(com.taskforce.tf_api.core.model.Project::getId)
+                .toList();
+
+            java.time.LocalDateTime now = java.time.LocalDateTime.now();
+            java.time.LocalDateTime d7  = now.minusDays(7);
+            java.time.LocalDateTime d30 = now.minusDays(30);
+
+            long totalIssues  = ids.stream().mapToLong(issueRepository::countByProjectId).sum();
+            long openIssues   = ids.stream().mapToLong(issueRepository::countOpenIssues).sum();
+            long createdLast7 = issueRepository.countCreatedBetween(ids, d7, now);
+            long doneLast7    = issueRepository.countCompletedBetween(ids, d7, now);
+            long doneLast30   = issueRepository.countCompletedBetween(ids, d30, now);
+
+            sb.append("\nWorkspace metrics (real-time, use these exact numbers when asked):\n");
+            sb.append("- Total issues: ").append(totalIssues)
+              .append(" (open: ").append(openIssues)
+              .append(", closed: ").append(Math.max(0, totalIssues - openIssues)).append(")\n");
+            sb.append("- Issues created in the last 7 days: ").append(createdLast7).append("\n");
+            sb.append("- Issues completed in the last 7 days: ").append(doneLast7)
+              .append(" (velocity ≈ ").append(doneLast7).append("/week)\n");
+            sb.append("- Issues completed in the last 30 days: ").append(doneLast30).append("\n");
+
+            // Détail par projet (ouvertes / total)
+            sb.append("Per project (open/total):\n");
+            projects.stream().limit(12).forEach(p -> sb.append("- ")
+                .append(p.getName())
+                .append(": ").append(issueRepository.countOpenIssues(p.getId()))
+                .append("/").append(issueRepository.countByProjectId(p.getId()))
+                .append("\n"));
+
+            // Charge : issues ouvertes assignées par membre (top 8)
+            java.util.Map<Long, String> nameByUserId = new java.util.HashMap<>();
+            for (WorkspaceMember wm : members) {
+                if (wm.getUser() != null) {
+                    nameByUserId.put(wm.getUser().getId(),
+                        Objects.toString(wm.getUser().getDisplayName(), wm.getUser().getEmail()));
+                }
+            }
+            List<Object[]> load = issueRepository.countOpenIssuesGroupedByAssignee(ids);
+            if (!load.isEmpty()) {
+                sb.append("Current workload (open assigned issues per member):\n");
+                load.stream()
+                    .sorted((a, b) -> Long.compare(((Number) b[1]).longValue(), ((Number) a[1]).longValue()))
+                    .limit(8)
+                    .forEach(row -> {
+                        Long uid = ((Number) row[0]).longValue();
+                        long cnt = ((Number) row[1]).longValue();
+                        sb.append("- ").append(nameByUserId.getOrDefault(uid, "User #" + uid))
+                          .append(": ").append(cnt).append(" open issue(s)\n");
+                    });
+            }
+            sb.append("\n");
+        } catch (Exception ex) {
+            log.warn("Cannot build assistant metrics block: {}", ex.getMessage());
+        }
     }
 
     /**
