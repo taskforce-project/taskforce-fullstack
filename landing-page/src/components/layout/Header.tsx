@@ -49,17 +49,17 @@ function GitHubMark(props: Readonly<{ className?: string; style?: React.CSSPrope
 /* --- Data --------------------------------------------- */
 
 const productCore: NavItem[] = [
-  { id: "tasks", icon: CheckSquare2, label: "Tasks & Projects", desc: "Issues, sprints, roadmaps",    color: "#60a5fa" },
-  { id: "wiki",  icon: BookOpen,     label: "Team Wiki",         desc: "Docs, knowledge base",         color: "#c084fc" },
-  { id: "ai",    icon: Sparkles,     label: "AI Co-pilot",       desc: "Smart automations & agents",   color: "#fb923c", badge: "New" },
+  { id: "smart-assign", icon: Sparkles,     label: "Smart Assign",         desc: "AI routing by skills, load & growth", color: "#fb923c", badge: "AI" },
+  { id: "projects",     icon: CheckSquare2, label: "Projects & Issues",    desc: "Board, list, backlog, cycles",        color: "#60a5fa" },
+  { id: "assistant",    icon: MessageSquare,label: "AI Insights & Assistant", desc: "Reports, risk detection, Q&A",     color: "#c084fc", badge: "AI" },
 ];
 
 const productFeatures: NavItem[] = [
-  { id: "analytics",    icon: BarChart3,  label: "Analytics",             desc: "Velocity, burndown, WIP limits",      color: "#4ade80" },
-  { id: "integrations", icon: Plug,       label: "Integrations",          desc: "GitHub, Slack, Figma & 40+ more",     color: "#94a3b8" },
-  { id: "cycles",       icon: RefreshCw,  label: "Cycles & Sprints",      desc: "Time-boxed iterations, burndowns",    color: "#60a5fa" },
-  { id: "teamspaces",   icon: Users,      label: "Teamspaces",            desc: "Isolated spaces, shared governance",  color: "#c084fc" },
-  { id: "security",     icon: Shield,     label: "Security & Compliance", desc: "SOC 2, SSO, RBAC, audit logs",        color: "#fb923c" },
+  { id: "analytics",    icon: BarChart3,  label: "Analytics & Insights", desc: "Velocity, burndown, AI insights",  color: "#4ade80" },
+  { id: "time",         icon: History,    label: "Time tracking",        desc: "Worklogs par issue & membre",       color: "#60a5fa" },
+  { id: "teams",        icon: Users,      label: "Teams & RBAC",         desc: "Équipes, rôles, accès fin",         color: "#c084fc" },
+  { id: "integrations", icon: Plug,       label: "Integrations",         desc: "Wrapper GitHub & plus",             color: "#94a3b8" },
+  { id: "security",     icon: Shield,     label: "Security & RGPD",      desc: "Audit logs, chiffrement, RGPD",     color: "#fb923c" },
 ];
 
 const solutionsUsecases: NavItem[] = [
