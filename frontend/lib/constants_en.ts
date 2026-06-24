@@ -297,6 +297,7 @@ export const CONSTANTS_EN = {
       cycles: "Cycles",
       pages: "Pages",
       members: "Members",
+      teams: "Teams",
       settings: "Settings",
       newIssue: "New Issue",
       noIssues: "No issues in this column",

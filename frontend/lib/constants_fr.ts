@@ -299,6 +299,7 @@ export const CONSTANTS_FR: TranslationKeys = {
       cycles: "Cycles",
       pages: "Pages",
       members: "Membres",
+      teams: "Équipes",
       settings: "Paramètres",
       newIssue: "Nouvelle tâche",
       noIssues: "Aucune tâche dans cette colonne",
