@@ -42,6 +42,19 @@ DECLARE
     -- enrichissement QA
     v_parent_web  BIGINT;
     v_cycle_active BIGINT;
+    -- générateur de volume (issues étalées sur plusieurs semaines)
+    v_proj           BIGINT;
+    v_seq            INT;
+    v_created        TIMESTAMP;
+    v_done           TIMESTAMP;
+    v_members        BIGINT[];
+    v_done_status    BIGINT;
+    v_todo_status    BIGINT;
+    v_prog_status    BIGINT;
+    v_backlog_status BIGINT;
+    v_task_type      BIGINT;
+    v_prio           issue_priority;
+    i                INT;
 BEGIN
     -- ----------------------------------------------------------------
     -- 0. Admin (« CEO »)
@@ -433,6 +446,72 @@ BEGIN
         ('Claire Dubois', 'claire.dubois@seedlead.example', '51-200', 'Nous cherchons une solution pour 80 personnes avec SSO.', 'NEW'),
         ('Yann Leroy',    'yann.leroy@seedlead.example',    '11-50',  'Intéressé par le plan Enterprise, un rappel serait apprécié.', 'CONTACTED');
 
-    RAISE NOTICE 'Seed QA complet : workspace "taskforce-demo" (id=%) — 8 membres, 3 projets, 27 issues (sous-tâches/URGENT/cancelled), commentaires, checklist, relations, worklogs, 3 cycles, notifications, favoris, pages, invitations, abonnement PRO + historique, demandes enterprise.', v_ws;
+    -- ================================================================
+    -- 19. VOLUME — ~90 issues étalées sur ~9 semaines (par projet).
+    --     Alimente : throughput (created_at/completed_at par semaine),
+    --     KPIs (cycle time/vélocité), capacité (issues ouvertes/membre),
+    --     et un board bien rempli. created_at est surchargé explicitement.
+    -- ================================================================
+    FOREACH v_proj IN ARRAY ARRAY[v_web, v_api, v_ops] LOOP
+        SELECT id INTO v_done_status    FROM issue_statuses WHERE project_id = v_proj AND name = 'Done';
+        SELECT id INTO v_todo_status    FROM issue_statuses WHERE project_id = v_proj AND name = 'Todo';
+        SELECT id INTO v_prog_status    FROM issue_statuses WHERE project_id = v_proj AND name = 'In Progress';
+        SELECT id INTO v_backlog_status FROM issue_statuses WHERE project_id = v_proj AND name = 'Backlog';
+        SELECT id INTO v_task_type      FROM issue_types    WHERE project_id = v_proj AND name = 'Task';
+        SELECT COALESCE(MAX(sequence_number), 0) INTO v_seq FROM issues WHERE project_id = v_proj;
+        SELECT array_agg(user_id) INTO v_members FROM project_members WHERE project_id = v_proj;
+
+        FOR i IN 1..30 LOOP
+            v_seq := v_seq + 1;
+            -- création répartie de ~60 jours (i=1) à ~2 jours (i=30)
+            v_created := NOW() - (INTERVAL '1 day' * (62 - i * 2));
+            v_prio := (ARRAY['LOW','MEDIUM','MEDIUM','HIGH','LOW']::issue_priority[])[1 + (i % 5)];
+
+            IF (i % 3) <> 0 THEN
+                -- ~2/3 résolues : completed_at quelques jours après création, borné à maintenant
+                v_done := LEAST(v_created + (INTERVAL '1 day' * (2 + (i % 6))), NOW() - INTERVAL '1 hour');
+                INSERT INTO issues (project_id, sequence_number, title, description, status_id, type_id, priority, story_points, assignee_id, reporter_id, created_at, completed_at)
+                VALUES (v_proj, v_seq, 'Itération #' || v_seq, 'Tâche de backlog livrée durant le cycle.',
+                        v_done_status, v_task_type, v_prio, 1 + (i % 8),
+                        v_members[1 + (i % array_length(v_members, 1))], v_admin, v_created, v_done);
+            ELSE
+                -- ~1/3 ouvertes : Backlog / Todo / In Progress en rotation ; ~1/4 non assignée (Smart Assign)
+                INSERT INTO issues (project_id, sequence_number, title, description, status_id, type_id, priority, story_points, assignee_id, reporter_id, created_at)
+                VALUES (v_proj, v_seq, 'Itération #' || v_seq, 'Tâche planifiée.',
+                        CASE ((i / 3) % 3) WHEN 0 THEN v_backlog_status WHEN 1 THEN v_todo_status ELSE v_prog_status END,
+                        v_task_type, v_prio, 1 + (i % 8),
+                        CASE WHEN (i % 4) = 0 THEN NULL ELSE v_members[1 + (i % array_length(v_members, 1))] END,
+                        v_admin, v_created);
+            END IF;
+        END LOOP;
+
+        UPDATE issue_sequence_counters SET last_number = v_seq WHERE project_id = v_proj;
+    END LOOP;
+
+    -- Burndown : rattacher au sprint actif les issues WEB complétées dans sa fenêtre
+    INSERT INTO cycle_issues (cycle_id, issue_id, added_by)
+    SELECT v_cycle_active, i.id, v_admin FROM issues i
+    WHERE i.project_id = v_web AND i.completed_at IS NOT NULL
+      AND i.completed_at >= (CURRENT_DATE - 5)::timestamp
+      AND NOT EXISTS (SELECT 1 FROM cycle_issues ci WHERE ci.cycle_id = v_cycle_active AND ci.issue_id = i.id);
+
+    -- 20. Notifications supplémentaires (inbox en volume, mix lu/non-lu)
+    INSERT INTO notifications (recipient_id, workspace_id, actor_id, type, urgency, read, title, body, issue_identifier, project_name) VALUES
+        (v_admin, v_ws, v_marcus, 'assigned',      'info',     false, 'Nouvelle assignation', 'Marcus vous a assigné API-3',        'API-3', 'API Platform'),
+        (v_admin, v_ws, v_aicha,  'commented',     'info',     false, 'Nouveau commentaire',  'Aïcha a commenté WEB-3',             'WEB-3', 'Web Application'),
+        (v_admin, v_ws, v_nina,   'mention',       'info',     false, 'Mention',              'Nina vous a mentionné sur API-7',    'API-7', 'API Platform'),
+        (v_admin, v_ws, NULL,     'dueSoon',       'warning',  false, 'Échéance proche',      'Une tâche arrive à échéance',        'OPS-4', 'Infrastructure'),
+        (v_admin, v_ws, NULL,     'overdue',       'critical', false, 'Issue en retard',      'WEB-9 est en retard',                'WEB-9', 'Web Application'),
+        (v_admin, v_ws, v_tom,    'completed',     'info',     true,  'Tâche terminée',       'Tom a terminé OPS-2',                'OPS-2', 'Infrastructure'),
+        (v_admin, v_ws, v_sarah,  'statusChanged', 'info',     true,  'Changement de statut', 'WEB-1 marquée Done',                 'WEB-1', 'Web Application'),
+        (v_admin, v_ws, v_diego,  'assigned',      'low',      false, 'Nouvelle assignation', 'Diego a pris WEB-12',                'WEB-12','Web Application');
+
+    -- 21. Pages & worklogs supplémentaires (volume doc / temps passé)
+    INSERT INTO pages (project_id, created_by, title, emoji, content) VALUES
+        (v_api, v_marcus, 'Architecture API',     '🏗️', 'Couches, conventions REST, ApiResponse<T>, sécurité.'),
+        (v_ops, v_tom,    'Runbook déploiement',  '🚀', 'Étapes de release, rollback, checklist post-deploy.'),
+        (v_web, v_lina,   'Charte UI / tokens',   '🎨', 'Palette, typographie, espacements, composants.');
+
+    RAISE NOTICE 'Seed QA ULTRA-complet : workspace "taskforce-demo" (id=%) — 9 membres, 3 projets, ~117 issues étalées sur ~9 semaines (throughput/KPIs/capacité/burndown remplis), sous-tâches/URGENT/cancelled, commentaires, checklist, relations, worklogs, 3 cycles + sprint actif peuplé, ~15 notifications, favoris, 5 pages, invitations, abonnement PRO + historique, demandes enterprise.', v_ws;
 END
 $seed$;
