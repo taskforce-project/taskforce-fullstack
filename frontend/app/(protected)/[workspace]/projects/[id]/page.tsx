@@ -29,6 +29,7 @@ import { useTranslation } from "@/lib/i18n"
 import { Button } from "@/components/ui/button"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { Input } from "@/components/ui/input"
+import { Skeleton } from "@/components/ui/skeleton"
 import { ColorPicker } from "@/components/ui/color-picker"
 import { InlineIssueFilters } from "@/components/issues/issue-filters"
 import { BulkAssignDialog } from "@/components/dialogs/bulk-assign-dialog"
@@ -645,11 +646,16 @@ export default function ProjectBoardPage() {
       )}
 
       {initializing ? (
-        <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
-          <div className="flex flex-col items-center gap-2">
-            <div className="size-5 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-            <span className="text-xs">Chargement du tableau…</span>
-          </div>
+        <div className="flex min-h-0 flex-1 gap-5 overflow-hidden">
+          {Array.from({ length: 4 }).map((_, c) => (
+            <div key={c} className="flex w-70 shrink-0 flex-col gap-2">
+              <Skeleton className="h-6 w-28" />
+              <Skeleton className="mb-1 h-0.5 w-full" />
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-20 w-full rounded-lg" />
+              ))}
+            </div>
+          ))}
         </div>
       ) : (
         <DndContext
