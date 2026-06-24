@@ -109,6 +109,23 @@ export async function getWorkspaceUsage(slug: string): Promise<WorkspaceUsage> {
   return response.data.data;
 }
 
+/** Entrée du journal d'audit (RGPD C11.1 / sécurité C21, OWNER/ADMIN). */
+export interface AuditLogEntry {
+  id: number;
+  action: string;
+  entityType: string | null;
+  entityId: string | null;
+  actorUserId: number | null;
+  details: string | null;
+  createdAt: string;
+}
+
+/** Journal d'audit du workspace (réservé OWNER/ADMIN côté back). */
+export async function getAuditLogs(slug: string): Promise<AuditLogEntry[]> {
+  const response = await apiClient.get<{ data: AuditLogEntry[] }>(WORKSPACE_ROUTES.AUDIT(slug));
+  return response.data.data;
+}
+
 /** Change le rôle d'un membre */
 export async function updateMemberRole(
   slug: string,
