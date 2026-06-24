@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation"
 import {
   User, Bell, CreditCard, Users, Check, Zap, Globe, Key, Palette, Webhook,
   X as XIcon, Plus, Upload, Camera, Link2, Trash2, Shield, Search, Loader2,
+  Activity, CheckCircle2, AlertTriangle,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -19,6 +20,7 @@ import { useUserStore } from "@/lib/store/user-store"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { DeleteConfirmDialog } from "@/components/dialogs/delete-confirm-dialog"
 import { stripeService } from "@/lib/api/stripe-service"
+import { useUpgradeStore } from "@/lib/store/upgrade-store"
 import { useIntegrationStore } from "@/lib/store/integration-store"
 import { getGitHubRepos, getGitHubRepoIssues, type GitHubRepo, type GitHubRepoIssue } from "@/lib/api/integration-service"
 import { exportMyData, deleteMyAccount } from "@/lib/api/gdpr-service"
@@ -35,7 +37,7 @@ type SettingsSection =
   | "security"
   | "workspace"
   | "billing"
-  | "team"
+  | "status"
   | "integrations"
   | "privacy"
 
@@ -54,20 +56,20 @@ const SECTIONS: SectionConfig[] = [
   { key: "security",      label: "Security",       icon: <Key className="h-4 w-4" />,        group: "Personal" },
   { key: "workspace",     label: "General",        icon: <Globe className="h-4 w-4" />,      group: "Workspace" },
   { key: "billing",       label: "Billing & Plan", icon: <CreditCard className="h-4 w-4" />, group: "Workspace" },
-  { key: "team",          label: "Members",        icon: <Users className="h-4 w-4" />,      group: "Workspace" },
   { key: "integrations",  label: "Integrations",   icon: <Webhook className="h-4 w-4" />,    group: "Workspace" },
+  { key: "status",        label: "Status",         icon: <Activity className="h-4 w-4" />,    group: "Workspace" },
   { key: "privacy",       label: "Privacy & Data", icon: <Shield className="h-4 w-4" />,     group: "Personal" },
 ]
 
 const PLAN_FEATURES: Record<string, string[]> = {
-  free:       ["Up to 3 projects", "Up to 5 members", "1 active cycle", "100 issues total", "Community support"],
-  pro:        ["Unlimited projects", "Unlimited members", "Unlimited cycles", "Advanced analytics", "Burndown charts", "Priority support"],
-  enterprise: ["Everything in Pro", "SSO / SAML", "Audit logs", "Custom roles & permissions", "Dedicated SLA", "Custom onboarding"],
+  free:       ["2 workspaces", "Jusqu'à 5 membres", "Board, List & Cycles", "Smart Assign de base", "Support communauté"],
+  pro:        ["10 workspaces", "Jusqu'à 50 membres", "Analytics avancées + burndown", "Assistant IA & insights", "Intégrations (GitHub)", "Support prioritaire"],
+  enterprise: ["Tout de Pro", "Membres illimités", "SSO / Keycloak", "Audit & RGPD avancés", "Déploiement on-premise", "SLA dédié"],
 }
 
 const SECTION_GROUPS = [
   { label: "Personal",  keys: ["profile", "account", "appearance", "notifications", "security", "privacy"] as const },
-  { label: "Workspace", keys: ["workspace", "billing", "team", "integrations"] as const },
+  { label: "Workspace", keys: ["workspace", "billing", "integrations", "status"] as const },
 ]
 
 const SKILL_OPTIONS = [
@@ -585,6 +587,7 @@ function BillingPanel() {
   const { user } = useAuth()
   const plan = (user?.planType ?? "FREE") as string
   const [portalLoading, setPortalLoading] = useState(false)
+  const openUpgrade = useUpgradeStore((s) => s.openUpgrade)
 
   async function handleManageBilling() {
     setPortalLoading(true)
@@ -659,14 +662,20 @@ function BillingPanel() {
                 ))}
               </ul>
               {plan !== p.key && (
-                <Button
-                  size="sm"
-                  variant={p.highlight ? "default" : "outline"}
-                  className="h-7 text-xs mt-auto"
-                  onClick={() => toast.info(`Upgrading to ${p.label}...`)}
-                >
-                  {p.key === "enterprise" ? "Contact sales" : "Upgrade"}
-                </Button>
+                p.key === "ENTERPRISE" ? (
+                  <Button asChild size="sm" variant="outline" className="h-7 text-xs mt-auto">
+                    <a href="mailto:sales@taskforce.dev?subject=Demande%20Enterprise%20TaskForce">Contact sales</a>
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant={p.highlight ? "default" : "outline"}
+                    className="h-7 text-xs mt-auto"
+                    onClick={() => openUpgrade()}
+                  >
+                    Upgrade
+                  </Button>
+                )
               )}
             </div>
           ))}
@@ -777,169 +786,55 @@ function WorkspacePanel() {
   )
 }
 
-function TeamPanel() {
-  const [searchQuery, setSearchQuery] = useState("")
-  const [searchResults, setSearchResults] = useState<UserSearchResult[]>([])
-  const [searching, setSearching] = useState(false)
-  const [inviting, setInviting] = useState<number | null>(null)
-  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const { members, membersLoading, fetchMembers, invite, changeRole, kick } = useWorkspaceStore()
-  const currentUser = useUserStore((s) => s.user)
 
-  useEffect(() => { fetchMembers() }, [fetchMembers])
-
-  const currentMember = members.find((m) => m.userId === Number(currentUser?.id))
-  const isOwner = currentMember?.role === "OWNER"
-  const canManage = isOwner || currentMember?.role === "ADMIN"
-
-  const existingEmails = new Set(members.map((m) => m.email))
+// ── Status (santé de l'app, façon status page) ──────────────────────────────
+function StatusPanel() {
+  const [api, setApi] = useState<"checking" | "ok" | "down">("checking")
 
   useEffect(() => {
-    if (searchTimeout.current) clearTimeout(searchTimeout.current)
-    if (!searchQuery.trim()) { setSearchResults([]); return }
-    setSearching(true)
-    searchTimeout.current = setTimeout(async () => {
-      try {
-        const results = await searchUsers(searchQuery)
-        setSearchResults(results.filter((r) => !existingEmails.has(r.email)))
-      } catch { setSearchResults([]) }
-      finally { setSearching(false) }
-    }, 300)
-    return () => { if (searchTimeout.current) clearTimeout(searchTimeout.current) }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery])
+    let alive = true
+    apiClient.get("/api/workspaces/current")
+      .then(() => { if (alive) setApi("ok") })
+      .catch(() => { if (alive) setApi("down") })
+    return () => { alive = false }
+  }, [])
 
-  async function handleInvite(user: UserSearchResult) {
-    setInviting(user.id)
-    try {
-      const result = await invite({ email: user.email })
-      if (result) {
-        toast.success(`${user.displayName ?? user.email} ajouté au workspace`)
-        setSearchQuery("")
-        setSearchResults([])
-      } else {
-        toast.error("Impossible d'ajouter ce membre")
-      }
-    } finally {
-      setInviting(null)
-    }
-  }
+  const rows: { name: string; ok: boolean; detail: string }[] = [
+    { name: "Application (interface)", ok: true,            detail: "Chargée" },
+    { name: "API Taskforce",          ok: api !== "down",   detail: api === "checking" ? "Vérification…" : api === "ok" ? "Opérationnelle" : "Injoignable" },
+    { name: "Temps réel (STOMP)",     ok: api !== "down",   detail: "Via l'API" },
+    { name: "Assistant IA (Groq)",    ok: true,             detail: "Configuré" },
+  ]
+  const allOk = rows.every((r) => r.ok)
 
   return (
-    <div className="flex flex-col gap-4">
-      <SectionCard title="Workspace members" description="Manage members, roles, and invitations.">
-        <div className="flex flex-col divide-y divide-border/50">
-          {membersLoading && (
-            <p className="text-sm text-muted-foreground py-3">Loading…</p>
-          )}
-          {!membersLoading && members.map((m) => {
-            const isYou = String(m.userId) === currentUser?.id
-            const displayLabel = m.displayName ?? m.email
-            return (
-              <div key={m.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-                <UserAvatar
-                  email={m.email}
-                  name={displayLabel}
-                  avatarUrl={m.avatarUrl}
-                  className="h-8 w-8 shrink-0"
-                  fallbackClassName="text-xs font-semibold"
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground">
-                    {displayLabel}{isYou && <span className="ml-1 text-xs text-muted-foreground font-normal">(you)</span>}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{m.email}</p>
-                </div>
-                {isOwner && !isYou && m.role !== "OWNER" && (
-                  <Select
-                    value={m.role}
-                    onValueChange={async (val) => {
-                      const result = await changeRole(m.id, { role: val as "ADMIN" | "MEMBER" })
-                      if (result) toast.success("Rôle mis à jour")
-                      else toast.error("Impossible de changer le rôle")
-                    }}
-                  >
-                    <SelectTrigger size="sm" className="w-28">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ADMIN">Admin</SelectItem>
-                      <SelectItem value="MEMBER">Member</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
-                {!isOwner && (
-                  <span className="text-xs text-muted-foreground capitalize">{m.role.toLowerCase()}</span>
-                )}
-                {isYou && (
-                  <span className="text-xs text-muted-foreground capitalize">{m.role.toLowerCase()}</span>
-                )}
-                {canManage && !isYou && m.role !== "OWNER" && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
-                    onClick={async () => {
-                      try { await kick(m.id); toast.success(`${displayLabel} retiré`) }
-                      catch { toast.error("Impossible de retirer ce membre") }
-                    }}
-                  >
-                    Remove
-                  </Button>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      </SectionCard>
-      {canManage && (
-        <SectionCard title="Invite member" description="Search an existing Taskforce user by name or email.">
-          <div className="flex flex-col gap-2">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-              <StyledInput
-                placeholder="Name or email…"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-8"
-              />
-            </div>
-            {searching && (
-              <p className="text-xs text-muted-foreground px-1">Searching…</p>
-            )}
-            {!searching && searchQuery && searchResults.length === 0 && (
-              <p className="text-xs text-muted-foreground px-1">No users found</p>
-            )}
-            {searchResults.length > 0 && (
-              <div className="flex flex-col gap-0.5 rounded-md border border-border bg-background overflow-hidden">
-                {searchResults.map((u) => (
-                  <div key={u.id} className="flex items-center gap-3 px-3 py-2 hover:bg-muted/50 transition-colors">
-                    <UserAvatar
-                      email={u.email}
-                      name={u.displayName ?? u.email}
-                      avatarUrl={u.avatarUrl}
-                      className="h-7 w-7 shrink-0"
-                      fallbackClassName="text-[10px] font-semibold"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{u.displayName ?? u.email}</p>
-                      {u.displayName && <p className="text-xs text-muted-foreground truncate">{u.email}</p>}
-                    </div>
-                    <Button
-                      size="sm"
-                      className="h-7 text-xs shrink-0"
-                      onClick={() => handleInvite(u)}
-                      disabled={inviting === u.id}
-                    >
-                      {inviting === u.id ? "Adding…" : "Add"}
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
+    <div className="flex flex-col gap-5 max-w-2xl">
+      <div>
+        <h2 className="text-sm font-semibold text-foreground">Statut de l&apos;application</h2>
+        <p className="text-xs text-muted-foreground mt-0.5">État des services en temps réel.</p>
+      </div>
+
+      <div className={cn(
+        "flex items-center gap-2 rounded-lg border px-4 py-3 text-sm font-medium",
+        allOk ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-500" : "border-amber-500/30 bg-amber-500/10 text-amber-500"
+      )}>
+        {allOk ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+        {allOk ? "Tous les systèmes sont opérationnels" : "Incident en cours sur un ou plusieurs services"}
+      </div>
+
+      <div className="rounded-xl border border-border bg-card overflow-hidden [box-shadow:var(--shadow-sm)]">
+        {rows.map((r, i) => (
+          <div key={r.name} className={cn("flex items-center gap-3 px-4 py-3", i < rows.length - 1 && "border-b border-border/50")}>
+            <span className={cn("size-2 rounded-full shrink-0", r.ok ? "bg-emerald-500" : "bg-amber-500")} />
+            <span className="flex-1 text-sm text-foreground">{r.name}</span>
+            <span className="text-xs text-muted-foreground">{r.detail}</span>
           </div>
-        </SectionCard>
-      )}
+        ))}
+      </div>
+
+      <p className="text-xs text-muted-foreground/70">
+        Journaux d&apos;audit et export par période arriveront avec la supervision serveur.
+      </p>
     </div>
   )
 }
@@ -1463,8 +1358,8 @@ export default function SettingsPage() {
         {active === "security"      && <SecurityPanel />}
         {active === "workspace"     && <WorkspacePanel />}
         {active === "billing"       && <BillingPanel />}
-        {active === "team"          && <TeamPanel />}
         {active === "integrations"  && <IntegrationsPanel />}
+        {active === "status"        && <StatusPanel />}
         {active === "privacy"       && <PrivacyPanel />}
       </div>
     </div>
