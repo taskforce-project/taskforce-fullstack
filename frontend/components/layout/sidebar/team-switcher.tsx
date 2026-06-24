@@ -4,6 +4,7 @@ import * as React from "react"
 import { ChevronsUpDown, Plus, Building2, Crown } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useUserStore } from "@/lib/store/user-store"
+import { useUpgradeStore } from "@/lib/store/upgrade-store"
 import { planLimit } from "@/lib/config/plan-limits"
 
 import {
@@ -30,15 +31,8 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
+import { WorkspaceAvatar } from "@/components/ui/workspace-avatar"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
-
-function getInitials(name: string): string {
-  return name
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? "")
-    .join("")
-}
 
 export function WorkspaceSwitcher() {
   const { isMobile } = useSidebar()
@@ -47,6 +41,7 @@ export function WorkspaceSwitcher() {
   const workspaces = useWorkspaceStore((s) => s.workspaces)
   const activeWorkspace = useWorkspaceStore((s) => s.activeWorkspace)
   const planType = useUserStore((s) => s.user?.planType)
+  const openUpgrade = useUpgradeStore((s) => s.openUpgrade)
   const fetchWorkspaces = useWorkspaceStore((s) => s.fetchWorkspaces)
   const createWorkspace = useWorkspaceStore((s) => s.createWorkspace)
 
@@ -80,7 +75,6 @@ export function WorkspaceSwitcher() {
   }
 
   const displayName = activeWorkspace?.name ?? "Workspace"
-  const initials = getInitials(displayName)
 
   return (
     <>
@@ -92,14 +86,12 @@ export function WorkspaceSwitcher() {
                 size="lg"
                 className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
               >
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground text-xs font-bold">
-                  {activeWorkspace?.logoUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={activeWorkspace.logoUrl} alt={displayName} className="size-8 rounded-lg object-cover" />
-                  ) : (
-                    initials
-                  )}
-                </div>
+                <WorkspaceAvatar
+                  name={displayName}
+                  seed={activeWorkspace?.uuid ?? activeWorkspace?.slug}
+                  logoUrl={activeWorkspace?.logoUrl}
+                  className="size-8"
+                />
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-medium">{displayName}</span>
                   <span className="truncate text-xs text-muted-foreground">{activeWorkspace?.slug ?? ""}</span>
@@ -123,14 +115,13 @@ export function WorkspaceSwitcher() {
                   className="gap-2 p-2"
                   data-active={ws.slug === activeWorkspace?.slug}
                 >
-                  <div className="flex size-6 items-center justify-center rounded-md border text-xs font-semibold">
-                    {ws.logoUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={ws.logoUrl} alt={ws.name} className="size-6 rounded-md object-cover" />
-                    ) : (
-                      getInitials(ws.name)
-                    )}
-                  </div>
+                  <WorkspaceAvatar
+                    name={ws.name}
+                    seed={ws.uuid ?? ws.slug}
+                    logoUrl={ws.logoUrl}
+                    className="size-6"
+                    textClassName="text-[10px]"
+                  />
                   <span className="flex-1 truncate">{ws.name}</span>
                   {ws.slug === activeWorkspace?.slug && (
                     <span className="ml-auto text-xs text-muted-foreground">actif</span>
@@ -151,7 +142,7 @@ export function WorkspaceSwitcher() {
                     {atLimit ? (
                       <DropdownMenuItem
                         className="gap-2 p-2 cursor-pointer"
-                        onClick={() => activeWorkspace && router.push(`/${activeWorkspace.slug}/settings`)}
+                        onClick={() => openUpgrade()}
                       >
                         <div className="flex size-6 items-center justify-center rounded-md border bg-transparent">
                           <Crown className="size-4 text-amber-500" />
