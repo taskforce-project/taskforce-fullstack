@@ -16,6 +16,7 @@ import com.taskforce.tf_api.core.dto.response.AnalyticsKpisResponse;
 import com.taskforce.tf_api.core.dto.response.BurndownPointResponse;
 import com.taskforce.tf_api.core.dto.response.MemberCapacityResponse;
 import com.taskforce.tf_api.core.dto.response.ThroughputPointResponse;
+import com.taskforce.tf_api.core.dto.response.WorkloadResponse;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.service.AnalyticsService;
@@ -81,6 +82,19 @@ public class AnalyticsController {
         return ResponseEntity.ok(ApiResponse.success(
             "Capacité récupérée",
             analyticsService.getCapacity(slug, userId, projectId)
+        ));
+    }
+
+    @GetMapping("/workload")
+    public ResponseEntity<ApiResponse<WorkloadResponse>> getWorkload(
+        @PathVariable String slug,
+        @RequestParam(required = false) Integer days,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long userId = resolveUserId(jwt);
+        return ResponseEntity.ok(ApiResponse.success(
+            "Charge de l'équipe récupérée",
+            analyticsService.getWorkload(slug, userId, days)
         ));
     }
 
