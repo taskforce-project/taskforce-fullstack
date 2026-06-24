@@ -280,7 +280,17 @@ export default function ProjectSettingsPage() {
 
       {/* ── Members ── */}
       <section>
-        <SectionTitle icon={Users} title="Membres" description="Gérer les accès au projet" />
+        <div className="flex items-start justify-between gap-4">
+          <SectionTitle icon={Users} title="Membres" description="Gérer les accès au projet" />
+          <Button
+            variant="outline"
+            size="sm"
+            className="shrink-0 gap-1.5"
+            onClick={() => router.push(`/${workspace}/projects/${projectId}/members`)}
+          >
+            <Users className="h-3.5 w-3.5" /> Gérer les membres
+          </Button>
+        </div>
         <div className="flex flex-col gap-2">
           {members.map((m) => {
             const isMe      = user?.email === m.email
