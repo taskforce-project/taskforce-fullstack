@@ -14,16 +14,15 @@ import {
 } from "@assistant-ui/react"
 import { Bot, X, Send, Sparkles, Minimize2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { Matrix, wave } from "@/components/ui/matrix"
+import { ShimmeringText } from "@/components/ui/shimmering-text"
+import { useWorkspaceStore } from "@/lib/store/workspace-store"
+import { sendAssistantMessage } from "@/lib/api/assistant-service"
 
-// ─── Mock adapter (word-by-word streaming) — remplacer par l'API réelle ───────
-const SYSTEM_RESPONSES: Record<string, string> = {
-  default:
-    "Je suis Taskforce AI, votre assistant exécutif. Je peux vous aider à analyser vos projets, rédiger des rapports, prioriser vos tâches ou répondre à toutes vos questions métier.",
-}
-
-function createTaskforceAdapter(): ChatModelAdapter {
+// ─── Adapter réel — appelle l'API assistant du backend (Groq / fallback Java) ───
+function createTaskforceAdapter(slug: string): ChatModelAdapter {
   return {
-    async run({ messages, abortSignal }: ChatModelRunOptions) {
+    async run({ messages }: ChatModelRunOptions) {
       const lastUser = [...messages].reverse().find((m) => m.role === "user")
       const userText =
         lastUser?.content
@@ -31,25 +30,20 @@ function createTaskforceAdapter(): ChatModelAdapter {
           .map((c) => ("text" in c ? c.text : ""))
           .join("") ?? ""
 
-      const suffix = userText.length > 60 ? "…" : ""
-      const response =
-        userText.length > 0
-          ? `Compris. Concernant "${userText.slice(0, 60)}${suffix}" — je travaille sur votre demande. Cette fonctionnalité sera connectée à l'API Taskforce prochainement. En attendant, je peux vous aider à structurer votre réflexion ou vous orienter vers la bonne ressource.`
-          : SYSTEM_RESPONSES.default
-
-      const words = response.split(" ")
-
-      return {
-        stream: new ReadableStream({
-          async start(controller) {
-            for (const word of words) {
-              if (abortSignal.aborted) break
-              await new Promise((r) => setTimeout(r, 45))
-              controller.enqueue({ type: "text", text: word + " " })
-            }
-            controller.close()
-          },
-        }),
+      try {
+        const text = slug
+          ? await sendAssistantMessage(slug, userText)
+          : "Sélectionnez un workspace pour discuter avec l'assistant."
+        return { content: [{ type: "text" as const, text }] }
+      } catch {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: "Désolé, je n'ai pas pu répondre pour le moment. Vérifiez votre connexion et réessayez.",
+            },
+          ],
+        }
       }
     },
   }
@@ -161,12 +155,13 @@ function FABEmptyState() {
       <div className="flex flex-col gap-1.5 w-full mt-2">
         {["Résume mes tâches du jour", "Quels sont mes projets actifs ?", "Aide-moi à rédiger un rapport"].map(
           (suggestion) => (
-            <button
-              key={suggestion}
-              className="text-xs text-muted-foreground hover:text-foreground border border-border rounded-lg px-3 py-2 hover:border-foreground/20 transition-colors text-left"
-            >
-              {suggestion}
-            </button>
+            <ThreadPrimitive.Suggestion key={suggestion} prompt={suggestion} method="replace" autoSend asChild>
+              <button
+                className="text-xs text-muted-foreground hover:text-foreground border border-border rounded-lg px-3 py-2 hover:border-foreground/20 transition-colors text-left cursor-pointer"
+              >
+                {suggestion}
+              </button>
+            </ThreadPrimitive.Suggestion>
           ),
         )}
       </div>
@@ -180,7 +175,8 @@ function FABEmptyState() {
  * dans un panneau latéral (PanelDock) ou tout autre conteneur flex.
  */
 export function AssistantConversation() {
-  const adapter = useMemo(() => createTaskforceAdapter(), [])
+  const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug) ?? ""
+  const adapter = useMemo(() => createTaskforceAdapter(slug), [slug])
   const runtime = useLocalRuntime(adapter)
 
   return (
@@ -205,7 +201,8 @@ export function AssistantConversation() {
 
 // ─── FAB principal ────────────────────────────────────────────────────────────
 export function AssistantFAB() {
-  const adapter = useMemo(() => createTaskforceAdapter(), [])
+  const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug) ?? ""
+  const adapter = useMemo(() => createTaskforceAdapter(slug), [slug])
   const runtime = useLocalRuntime(adapter)
 
   return (
