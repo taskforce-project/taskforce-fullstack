@@ -68,6 +68,7 @@ import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.shared.dto.PageResponse;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
@@ -205,6 +206,22 @@ public class IssueService {
         return issueRepository.findForKanban(project.getId()).stream()
             .map(this::toResponse)
             .toList();
+    }
+
+    /**
+     * Liste paginée des issues d'un projet (QA2-33) — triée par sequenceNumber desc.
+     * Additif : ne remplace pas {@link #listIssues} (utilisé par le board/kanban qui charge tout).
+     */
+    @Transactional(readOnly = true)
+    public PageResponse<IssueResponse> listIssuesPaged(String workspaceSlug, Long projectId,
+                                                       Long requestingUserId,
+                                                       org.springframework.data.domain.Pageable pageable) {
+        Project project = resolveProject(workspaceSlug, projectId);
+        assertWorkspaceMember(project.getWorkspace().getId(), requestingUserId);
+        return PageResponse.of(
+            issueRepository.findByProjectIdOrderBySequenceNumberDesc(project.getId(), pageable)
+                .map(this::toResponse)
+        );
     }
 
     /**
