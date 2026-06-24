@@ -143,8 +143,9 @@ function FABAssistantMessage() {
 function FABEmptyState() {
   return (
     <div className="flex-1 flex flex-col items-center justify-center gap-3 py-8 px-4 text-center">
-      <div className="size-10 rounded-xl bg-primary/10 flex items-center justify-center">
-        <Sparkles className="size-5 text-primary" />
+      {/* Animation dot-matrix ElevenLabs UI (QA3-10) */}
+      <div className="flex items-center justify-center text-primary">
+        <Matrix rows={7} cols={7} frames={wave} fps={10} size={6} gap={2} ariaLabel="Taskforce AI" />
       </div>
       <div>
         <p className="text-sm font-medium text-foreground">Taskforce AI</p>
@@ -153,7 +154,7 @@ function FABEmptyState() {
         </p>
       </div>
       <div className="flex flex-col gap-1.5 w-full mt-2">
-        {["Résume mes tâches du jour", "Quels sont mes projets actifs ?", "Aide-moi à rédiger un rapport"].map(
+        {["Combien d'issues ouvertes en ce moment ?", "Quelle est notre vélocité cette semaine ?", "Qui est le plus chargé dans l'équipe ?"].map(
           (suggestion) => (
             <ThreadPrimitive.Suggestion key={suggestion} prompt={suggestion} method="replace" autoSend asChild>
               <button
@@ -164,6 +165,23 @@ function FABEmptyState() {
             </ThreadPrimitive.Suggestion>
           ),
         )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Indicateur « réfléchit… » (shimmer ElevenLabs UI) ─────────────────────────
+function FABThinking() {
+  // eslint-disable-next-line @typescript-eslint/no-deprecated
+  const isRunning = useThread((s) => s.isRunning)
+  if (!isRunning) return null
+  return (
+    <div className="flex gap-2 mb-3">
+      <div className="size-6 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+        <Sparkles className="size-3 text-primary" />
+      </div>
+      <div className="rounded-2xl rounded-tl-sm bg-card border border-border px-3.5 py-2.5 text-sm">
+        <ShimmeringText>Taskforce AI réfléchit…</ShimmeringText>
       </div>
     </div>
   )
@@ -192,6 +210,7 @@ export function AssistantConversation() {
               AssistantMessage: FABAssistantMessage,
             }}
           />
+          <FABThinking />
         </ThreadPrimitive.Viewport>
         <FABComposer />
       </ThreadPrimitive.Root>
@@ -261,6 +280,7 @@ export function AssistantFAB() {
                   AssistantMessage: FABAssistantMessage,
                 }}
               />
+              <FABThinking />
             </ThreadPrimitive.Viewport>
             <FABComposer />
           </ThreadPrimitive.Root>
