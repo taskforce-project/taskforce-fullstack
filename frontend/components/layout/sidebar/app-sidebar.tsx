@@ -11,7 +11,6 @@ import {
   Activity,
   Cpu,
   User,
-  Users,
   MessagesSquare,
   MessageSquare,
   Settings2,
@@ -122,11 +121,7 @@ const NAV_PEOPLE: readonly NavItem[] = [
     url: "/members",
     icon: User,
   },
-  {
-    key: "nav.teams",
-    url: "/teams",
-    icon: Users,
-  },
+  // Teams retiré du menu (QA2-21) — désormais géré par opération (onglet Members du projet).
 ]
 
 const NAV_COMMS: readonly NavItem[] = [
