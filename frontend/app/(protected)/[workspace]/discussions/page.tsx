@@ -12,6 +12,8 @@ import {
   MoreHorizontal,
   X,
   CheckCircle2,
+  RotateCcw,
+  CircleSlash,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -200,7 +202,8 @@ interface DiscussionRowProps {
 
 function DiscussionRow({ discussion, slug }: DiscussionRowProps) {
   const cat = CATEGORY_CONFIG[discussion.category]
-  const { togglePin, toggleLock, deleteDiscussion } = useDiscussionStore()
+  const { togglePin, toggleLock, deleteDiscussion, updateDiscussion } = useDiscussionStore()
+  const isOpen = discussion.state === "OPEN"
 
   return (
     <div className="group flex gap-4 px-5 py-4 border-b border-border/50 last:border-0 hover:bg-muted/20 transition-colors cursor-pointer">
@@ -269,6 +272,22 @@ function DiscussionRow({ discussion, slug }: DiscussionRowProps) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              {/* État — rôle Q&R / annonces (PROD-6.7) */}
+              {discussion.category === "QUESTION" && discussion.state !== "ANSWERED" && (
+                <DropdownMenuItem className="gap-2" onClick={() => updateDiscussion(slug, discussion.id, { state: "ANSWERED" })}>
+                  <CheckCircle2 className="size-4 text-emerald-500" /> Mark as answered
+                </DropdownMenuItem>
+              )}
+              {isOpen ? (
+                <DropdownMenuItem className="gap-2" onClick={() => updateDiscussion(slug, discussion.id, { state: "CLOSED" })}>
+                  <CircleSlash className="size-4" /> Close discussion
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem className="gap-2" onClick={() => updateDiscussion(slug, discussion.id, { state: "OPEN" })}>
+                  <RotateCcw className="size-4" /> Reopen
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
               <DropdownMenuItem className="gap-2" onClick={() => togglePin(slug, discussion.id)}>
                 <Pin className="size-4" /> {discussion.isPinned ? "Unpin" : "Pin discussion"}
               </DropdownMenuItem>
