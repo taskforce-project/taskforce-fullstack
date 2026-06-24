@@ -58,7 +58,7 @@ const PROJECT_TABS: ProjectTab[] = [
   { key: "detail.backlog", icon: AlignLeft, pathSuffix: "/backlog" },
   { key: "detail.cycles", icon: RefreshCw, pathSuffix: "/cycles" },
   { key: "detail.pages", icon: FileText, pathSuffix: "/pages" },
-  { key: "detail.members", icon: Users, pathSuffix: "/members" },
+  { key: "detail.teams", icon: Users, pathSuffix: "/teams" },
   { key: "detail.settings", icon: Settings, pathSuffix: "/settings" },
 ]
 
