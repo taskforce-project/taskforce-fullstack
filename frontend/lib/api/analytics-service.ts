@@ -34,6 +34,29 @@ export interface MemberCapacity {
   openIssues: number;
 }
 
+/** Charge d'un jour pour un membre (US-022). */
+export interface WorkloadPoint {
+  date: string;
+  count: number;
+}
+
+/** Charge d'un membre sur la fenêtre : total ouvert + série jour par jour. */
+export interface MemberWorkload {
+  userId: number;
+  displayName: string;
+  avatarUrl: string | null;
+  openIssues: number;
+  capacityHoursPerWeek: number | null;
+  days: WorkloadPoint[];
+}
+
+/** Heatmap charge d'équipe : membres × jours sur [from, to). */
+export interface Workload {
+  from: string;
+  to: string;
+  members: MemberWorkload[];
+}
+
 // ---------------------------------------------------------------------------
 // API calls
 // ---------------------------------------------------------------------------
@@ -60,6 +83,11 @@ export async function getAnalyticsBurndown(slug: string, projectId?: number | nu
 
 export async function getAnalyticsCapacity(slug: string, projectId?: number | null): Promise<MemberCapacity[]> {
   const res = await apiClient.get<{ data: MemberCapacity[] }>(ANALYTICS_ROUTES.CAPACITY(slug) + projectQuery(projectId));
+  return res.data.data;
+}
+
+export async function getAnalyticsWorkload(slug: string, days = 14): Promise<Workload> {
+  const res = await apiClient.get<{ data: Workload }>(`${ANALYTICS_ROUTES.WORKLOAD(slug)}?days=${days}`);
   return res.data.data;
 }
 
