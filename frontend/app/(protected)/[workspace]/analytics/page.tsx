@@ -117,30 +117,6 @@ function InsightRow({ insight }: { readonly insight: AiInsight }) {
   )
 }
 
-function UpgradeDialog({ open, onClose }: { readonly open: boolean; readonly onClose: () => void }) {
-  return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <div className="mb-1 flex items-center gap-2">
-            <div className="flex size-8 items-center justify-center rounded-full bg-amber-500/15">
-              <Zap className="size-4 text-amber-500" />
-            </div>
-            <DialogTitle>Pro feature</DialogTitle>
-          </div>
-          <DialogDescription>
-            Advanced operational intelligence is a Pro feature — unlock detailed throughput analysis, AI anomaly detection history, and team capacity forecasting.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="mt-2 flex flex-col gap-2">
-          <Button className="w-full gap-1.5" size="sm" onClick={onClose}><Zap className="size-3.5" /> Upgrade to Pro</Button>
-          <Button variant="ghost" size="sm" className="w-full" onClick={onClose}>Maybe later</Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
 function ProGate({ children, onUpgrade }: { readonly children: React.ReactNode; readonly onUpgrade: () => void }) {
   return (
     <div className="group relative">
