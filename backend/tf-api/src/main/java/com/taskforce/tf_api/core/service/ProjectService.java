@@ -32,6 +32,7 @@ import com.taskforce.tf_api.core.repository.ProjectLabelRepository;
 import com.taskforce.tf_api.core.repository.ProjectMemberRepository;
 import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.ProjectTeamRepository;
+import com.taskforce.tf_api.core.repository.IssueRepository;
 import com.taskforce.tf_api.core.repository.TeamMemberRepository;
 import com.taskforce.tf_api.core.repository.TeamRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
@@ -64,6 +65,7 @@ public class ProjectService {
     private final TeamRepository           teamRepository;
     private final TeamMemberRepository     teamMemberRepository;
     private final ProjectTeamRepository    projectTeamRepository;
+    private final IssueRepository          issueRepository;
     private final IssueService             issueService;
 
     // -------------------------------------------------------------------------
@@ -568,8 +570,8 @@ public class ProjectService {
             .createdById(creator.getId())
             .createdByName(creatorName)
             .memberCount(members.size())
-            .totalIssues(0)   // Étape 3 — issues
-            .openIssues(0)    // Étape 3 — issues
+            .totalIssues((int) issueRepository.countByProjectId(project.getId()))
+            .openIssues((int) issueRepository.countOpenIssues(project.getId()))
             .members(members.stream().map(this::toMemberResponse).collect(Collectors.toList()))
             .labels(labels.stream().map(this::toLabelResponse).collect(Collectors.toList()))
             .iconUrl(project.getIconUrl())
