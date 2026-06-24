@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { Separator } from "@/components/ui/separator"
+import { PageContainer, PageHeader } from "@/components/layout/page-shell"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useAuth } from "@/lib/contexts/auth-context"
@@ -21,6 +22,7 @@ import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { DeleteConfirmDialog } from "@/components/dialogs/delete-confirm-dialog"
 import { stripeService } from "@/lib/api/stripe-service"
 import { useUpgradeStore } from "@/lib/store/upgrade-store"
+import { getAuditLogs, type AuditLogEntry } from "@/lib/api/workspace-service"
 import { useIntegrationStore } from "@/lib/store/integration-store"
 import { getGitHubRepos, getGitHubRepoIssues, type GitHubRepo, type GitHubRepoIssue } from "@/lib/api/integration-service"
 import { exportMyData, deleteMyAccount } from "@/lib/api/gdpr-service"
@@ -790,6 +792,8 @@ function WorkspacePanel() {
 // ── Status (santé de l'app, façon status page) ──────────────────────────────
 function StatusPanel() {
   const [api, setApi] = useState<"checking" | "ok" | "down">("checking")
+  const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug)
+  const [logs, setLogs] = useState<AuditLogEntry[]>([])
 
   useEffect(() => {
     let alive = true
@@ -798,6 +802,26 @@ function StatusPanel() {
       .catch(() => { if (alive) setApi("down") })
     return () => { alive = false }
   }, [])
+
+  useEffect(() => {
+    if (!slug) return
+    let alive = true
+    getAuditLogs(slug).then((l) => { if (alive) setLogs(l) }).catch(() => { /* OWNER/ADMIN only */ })
+    return () => { alive = false }
+  }, [slug])
+
+  function exportAuditCsv() {
+    const esc = (v: unknown) => `"${String(v ?? "").replaceAll('"', '""')}"`
+    const header = "date,action,entityType,entityId,actorUserId,details"
+    const lines = logs.map((l) => [l.createdAt, l.action, l.entityType, l.entityId, l.actorUserId, l.details].map(esc).join(","))
+    const blob = new Blob([[header, ...lines].join("\n")], { type: "text/csv;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `audit-${slug ?? "workspace"}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   const rows: { name: string; ok: boolean; detail: string }[] = [
     { name: "Application (interface)", ok: true,            detail: "Chargée" },
@@ -832,9 +856,32 @@ function StatusPanel() {
         ))}
       </div>
 
-      <p className="text-xs text-muted-foreground/70">
-        Journaux d&apos;audit et export par période arriveront avec la supervision serveur.
-      </p>
+      {/* Journal d'audit (OWNER/ADMIN) + export CSV */}
+      <div>
+        <div className="mb-2 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-foreground">Journal d&apos;audit</h3>
+          <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" onClick={exportAuditCsv} disabled={logs.length === 0}>
+            <Upload className="h-3.5 w-3.5" /> Exporter CSV
+          </Button>
+        </div>
+        <div className="rounded-xl border border-border bg-card overflow-hidden [box-shadow:var(--shadow-sm)]">
+          {logs.length === 0 ? (
+            <p className="px-4 py-6 text-center text-xs text-muted-foreground">Aucune entrée d&apos;audit (réservé aux administrateurs).</p>
+          ) : (
+            logs.slice(0, 30).map((l, i) => (
+              <div key={l.id} className={cn("flex items-center gap-3 px-4 py-2.5", i < Math.min(logs.length, 30) - 1 && "border-b border-border/50")}>
+                <Badge variant="secondary" className="shrink-0 font-mono text-[10px]">{l.action}</Badge>
+                <span className="flex-1 truncate text-xs text-muted-foreground">
+                  {l.entityType ? `${l.entityType}${l.entityId ? ` #${l.entityId}` : ""}` : (l.details ?? "—")}
+                </span>
+                <span className="shrink-0 text-[10px] text-muted-foreground/70">
+                  {new Date(l.createdAt).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
     </div>
   )
 }
@@ -1323,7 +1370,12 @@ export default function SettingsPage() {
   }, [searchParams])
 
   return (
-    <div className="flex gap-8 max-w-5xl mx-auto w-full min-h-0">
+    <PageContainer>
+      <PageHeader
+        title="Settings"
+        description="Profil, workspace, facturation, sécurité et confidentialité."
+      />
+      <div className="flex gap-8 w-full min-h-0">
       <nav className="flex flex-col gap-6 w-48 shrink-0">
         {SECTION_GROUPS.map((group) => (
           <div key={group.label} className="flex flex-col gap-0.5">
@@ -1362,6 +1414,7 @@ export default function SettingsPage() {
         {active === "status"        && <StatusPanel />}
         {active === "privacy"       && <PrivacyPanel />}
       </div>
-    </div>
+      </div>
+    </PageContainer>
   )
 }
