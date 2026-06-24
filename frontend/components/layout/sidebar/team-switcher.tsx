@@ -88,7 +88,7 @@ export function WorkspaceSwitcher() {
               >
                 <WorkspaceAvatar
                   name={displayName}
-                  seed={activeWorkspace?.uuid ?? activeWorkspace?.slug}
+                  seed={activeWorkspace?.slug ?? activeWorkspace?.uuid}
                   logoUrl={activeWorkspace?.logoUrl}
                   className="size-8"
                 />
@@ -117,7 +117,7 @@ export function WorkspaceSwitcher() {
                 >
                   <WorkspaceAvatar
                     name={ws.name}
-                    seed={ws.uuid ?? ws.slug}
+                    seed={ws.slug ?? ws.uuid}
                     logoUrl={ws.logoUrl}
                     className="size-6"
                     textClassName="text-[10px]"
