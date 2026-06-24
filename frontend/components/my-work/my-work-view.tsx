@@ -124,11 +124,11 @@ function IssueRow({ issue }: Readonly<{ issue: Issue }>) {
       <span className={cn("size-2 shrink-0 rounded-full", PRIORITY_DOT[issue.priority])} />
       <span className="shrink-0">{STATUS_ICON[issue.status]}</span>
       <span className="w-14 shrink-0 truncate font-mono text-xs tabular-nums text-muted-foreground">{issue.identifier}</span>
-      <span className="flex-1 truncate text-sm text-foreground">{issue.title}</span>
-      <span className="hidden items-center gap-1 text-xs text-muted-foreground sm:flex">
-        <Layers className="size-3" /> {issue.project}
+      <span className="min-w-0 flex-1 truncate text-sm text-foreground">{issue.title}</span>
+      <span className="hidden w-40 shrink-0 items-center gap-1 text-xs text-muted-foreground sm:flex">
+        <Layers className="size-3 shrink-0" /> <span className="truncate">{issue.project}</span>
       </span>
-      <span className={cn("hidden items-center gap-1 text-xs md:flex", isOverdue ? "text-rose-500" : "text-muted-foreground")}>
+      <span className={cn("hidden w-24 shrink-0 items-center justify-end gap-1 text-xs md:flex", isOverdue ? "text-rose-500" : "text-muted-foreground")}>
         {isOverdue && <AlertTriangle className="size-3" />} {issue.dueDate ?? "—"}
       </span>
       <ArrowUpRight className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-60" />
@@ -157,16 +157,20 @@ function CycleRow({ cycle }: Readonly<{ cycle: Cycle }>) {
           )}
         </div>
       </div>
-      <Badge variant="secondary" className="hidden gap-1.5 font-normal text-muted-foreground sm:flex">
-        <span className={cn("size-1.5 rounded-full", sc.dot)} /> {sc.label}
-      </Badge>
-      {cycle.status !== "upcoming" && (
-        <div className="hidden w-28 items-center gap-2 md:flex">
-          <Progress value={cycle.progress} className="h-1.5 flex-1" />
-          <span className="w-8 text-right text-xs tabular-nums text-muted-foreground">{cycle.progress}%</span>
-        </div>
-      )}
-      <span className="hidden shrink-0 text-xs text-muted-foreground lg:block">{cycle.completedIssues}/{cycle.totalIssues}</span>
+      <div className="hidden w-24 shrink-0 justify-start sm:flex">
+        <Badge variant="secondary" className="gap-1.5 font-normal text-muted-foreground">
+          <span className={cn("size-1.5 rounded-full", sc.dot)} /> {sc.label}
+        </Badge>
+      </div>
+      <div className="hidden w-28 shrink-0 items-center gap-2 md:flex">
+        {cycle.status !== "upcoming" ? (
+          <>
+            <Progress value={cycle.progress} className="h-1.5 flex-1" />
+            <span className="w-8 text-right text-xs tabular-nums text-muted-foreground">{cycle.progress}%</span>
+          </>
+        ) : null}
+      </div>
+      <span className="hidden w-12 shrink-0 text-right text-xs text-muted-foreground lg:block">{cycle.completedIssues}/{cycle.totalIssues}</span>
       <ArrowUpRight className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-60" />
     </Link>
   )
@@ -176,11 +180,11 @@ function PageRow({ page }: Readonly<{ page: Page }>) {
   return (
     <Link href={page.url} className={ROW}>
       <FileText className="size-4 shrink-0 text-muted-foreground" />
-      <span className="flex-1 truncate text-sm text-foreground">{page.title}</span>
-      <span className="hidden items-center gap-1 text-xs text-muted-foreground sm:flex">
-        <Layers className="size-3" /> {page.project}
+      <span className="min-w-0 flex-1 truncate text-sm text-foreground">{page.title}</span>
+      <span className="hidden w-40 shrink-0 items-center gap-1 text-xs text-muted-foreground sm:flex">
+        <Layers className="size-3 shrink-0" /> <span className="truncate">{page.project}</span>
       </span>
-      <div className="hidden shrink-0 items-center gap-1.5 md:flex">
+      <div className="hidden w-28 shrink-0 items-center justify-end gap-1.5 md:flex">
         <Avatar className="size-5">
           <AvatarFallback className="text-[8px] font-semibold">{page.lastEditedByInitials}</AvatarFallback>
         </Avatar>
