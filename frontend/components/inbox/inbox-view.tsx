@@ -89,14 +89,14 @@ function SignalRow({
     )}>
       <span className={cn("w-0.5 shrink-0 rounded-r-full", signal.read ? "bg-transparent" : URGENCY_BAR[signal.urgency])} />
 
-      <button type="button" onClick={handleClick} className="flex flex-1 items-start gap-3 px-4 py-3 text-left">
+      <button type="button" onClick={handleClick} className="flex flex-1 items-center gap-3 px-4 py-3 text-left min-w-0">
         {/* Unread dot */}
-        <div className="mt-1.5 flex size-2 shrink-0 items-center justify-center">
+        <div className="flex size-2 shrink-0 items-center justify-center">
           {!signal.read && <span className={cn("block size-1.5 rounded-full", URGENCY_DOT[signal.urgency])} />}
         </div>
 
         {/* Avatar or type icon */}
-        <div className="mt-0.5 shrink-0">
+        <div className="shrink-0">
           {signal.actor ? (
             <Avatar className="size-7">
               <AvatarFallback className="text-[9px] font-semibold">{signal.actor.initials}</AvatarFallback>
@@ -108,25 +108,31 @@ function SignalRow({
           )}
         </div>
 
-        {/* Content */}
-        <div className="min-w-0 flex-1">
-          <div className="mb-0.5 flex flex-wrap items-center gap-2">
-            <span className={cn("text-[10px] font-semibold uppercase tracking-wider", tcfg.color)}>{tcfg.label}</span>
-            <Badge variant="secondary" className="h-4 px-1.5 font-mono text-[10px] font-normal">{signal.operation}</Badge>
-            <span className="text-[10px] text-muted-foreground">{signal.issueId}</span>
-          </div>
-          <p className={cn("mb-1 truncate text-sm font-medium leading-snug", signal.read ? "text-muted-foreground" : "text-foreground")}>
+        {/* Type label (colonne fixe) */}
+        <span className={cn("hidden shrink-0 w-32 text-[10px] font-semibold uppercase tracking-wider sm:inline", tcfg.color)}>
+          {tcfg.label}
+        </span>
+
+        {/* Titre + extrait (flexible, occupe l'espace central) */}
+        <div className="flex min-w-0 flex-1 items-baseline gap-2">
+          <span className={cn("shrink-0 max-w-[55%] truncate text-sm font-medium leading-snug", signal.read ? "text-muted-foreground" : "text-foreground")}>
             {signal.title}
-          </p>
+          </span>
           {signal.body && (
-            <p className="mb-1.5 line-clamp-1 text-xs italic text-muted-foreground">&ldquo;{signal.body}&rdquo;</p>
+            <span className="hidden truncate text-xs italic text-muted-foreground md:inline">&ldquo;{signal.body}&rdquo;</span>
           )}
-          <span className="text-[10px] text-muted-foreground">{signal.timestamp}</span>
+        </div>
+
+        {/* Méta alignée à droite (projet · issue · heure) */}
+        <div className="ml-auto flex shrink-0 items-center gap-3 pl-2">
+          <Badge variant="secondary" className="hidden h-4 px-1.5 font-mono text-[10px] font-normal sm:inline-flex">{signal.operation}</Badge>
+          <span className="hidden w-14 text-right font-mono text-[10px] text-muted-foreground lg:inline">{signal.issueId}</span>
+          <span className="w-16 text-right text-[10px] text-muted-foreground">{signal.timestamp}</span>
         </div>
       </button>
 
       {/* Actions */}
-      <div className="flex shrink-0 items-center gap-1 pr-3 pt-3 opacity-0 transition-opacity group-hover:opacity-100">
+      <div className="flex shrink-0 items-center gap-1 pr-3 opacity-0 transition-opacity group-hover:opacity-100">
         {!signal.acknowledged && (
           <Button
             variant="secondary"
@@ -217,7 +223,7 @@ export function InboxView({ defaultTab = "all" }: InboxViewProps) {
   const acknowledgedCount = signals.filter((s) => s.acknowledged).length
 
   return (
-    <PageContainer size="narrow">
+    <PageContainer>
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1">
