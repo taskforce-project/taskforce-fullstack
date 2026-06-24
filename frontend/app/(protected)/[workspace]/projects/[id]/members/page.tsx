@@ -9,12 +9,12 @@ import {
   MoreHorizontal,
   Mail,
   UserMinus,
-  Loader2,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { UserAvatar } from "@/components/ui/user-avatar"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,7 +22,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { ProjectInviteDialog } from "@/components/dialogs/project-invite-dialog"
-import { ProjectTeamsSection } from "@/components/projects/project-teams-section"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { listProjectMembers, removeProjectMember } from "@/lib/api/project-service"
@@ -101,8 +100,19 @@ export default function ProjectMembersPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-24">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      <div className="flex flex-col gap-4 w-full">
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-4 px-4 py-3.5 border-b border-border/50 last:border-0">
+              <Skeleton className="size-9 rounded-full" />
+              <div className="flex-1 space-y-1.5">
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-3 w-56" />
+              </div>
+              <Skeleton className="size-7 rounded-md" />
+            </div>
+          ))}
+        </div>
       </div>
     )
   }
@@ -183,8 +193,6 @@ export default function ProjectMembersPage() {
         })}
       </div>
 
-      {/* Équipes associées (PROD-3.6b) */}
-      <ProjectTeamsSection workspace={workspace} projectId={projectId} />
     </div>
   )
 }
