@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Bell, Search, Sparkles } from "lucide-react"
+import { Search, Sparkles } from "lucide-react"
 
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
@@ -18,9 +18,8 @@ import {
 import { Button } from "@/components/ui/button"
 import { Kbd } from "@/components/ui/kbd"
 import { ThemeToggle } from "@/components/common/theme-toggle"
-import { useTranslation } from "@/lib/i18n"
 import { CommandPalette } from "@/components/command-palette"
-import { useWorkspaceStore } from "@/lib/store/workspace-store"
+import { NotificationBell } from "@/components/layout/topbar/notification-bell"
 import { useProjectStore } from "@/lib/store/project-store"
 import { usePanelStore } from "@/lib/store/panel-store"
 import { useUserStore } from "@/lib/store/user-store"
@@ -100,8 +99,6 @@ function useBreadcrumbs() {
 }
 
 export function AppTopbar() {
-  const { t } = useTranslation()
-  const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug)
   const breadcrumbs = useBreadcrumbs()
   const [cmdOpen, setCmdOpen] = React.useState(false)
   const togglePanel = usePanelStore((s) => s.togglePanel)
@@ -201,17 +198,8 @@ export function AppTopbar() {
           <span className="hidden lg:inline">Ask AI</span>
         </Button>
 
-        {/* Notifications */}
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label={t("common.notifications")}
-          asChild
-        >
-          <Link href={`/${slug}/inbox`}>
-            <Bell className="size-4" />
-          </Link>
-        </Button>
+        {/* Notifications — badge non-lus + popover preview (QA2-11) */}
+        <NotificationBell />
 
         {/* Theme toggle */}
         <ThemeToggle />
