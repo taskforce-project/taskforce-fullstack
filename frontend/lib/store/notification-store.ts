@@ -104,6 +104,8 @@ interface NotificationState {
 
   /** Charge les notifications depuis le backend */
   fetchNotifications: (slug: string) => Promise<void>;
+  /** Insère en tête une notification reçue en temps réel (STOMP). Dédup par id. */
+  pushSignal: (notification: NotificationResponse) => void;
   /** Charge uniquement le compteur non-lu (ex. badge header) */
   fetchUnreadCount: (slug: string) => Promise<void>;
   /** Marque une notification comme lue (API + optimistic) */
@@ -131,6 +133,18 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     } catch {
       set({ isLoading: false });
     }
+  },
+
+  pushSignal: (notification) => {
+    const signal = toSignal(notification);
+    set((state) => {
+      // Dédup : si l'id existe déjà, on ne ré-insère pas (évite doublon avec un fetch concurrent)
+      if (state.signals.some((s) => s.id === signal.id)) return state;
+      return {
+        signals:     sortByUrgency([signal, ...state.signals]),
+        unreadCount: signal.read ? state.unreadCount : state.unreadCount + 1,
+      };
+    });
   },
 
   fetchUnreadCount: async (slug) => {
