@@ -148,6 +148,23 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
         """)
     List<Issue> findScheduledByWorkspaceSlug(@Param("slug") String slug);
 
+    /**
+     * Activité quotidienne d'un projet (QA2-32) : nombre d'issues créées par jour
+     * sur les `since` derniers jours. Native (date_trunc Postgres).
+     * Retourne des lignes [day:String 'YYYY-MM-DD', count:Long].
+     */
+    @Query(value = """
+        SELECT to_char(date_trunc('day', created_at), 'YYYY-MM-DD') AS day,
+               COUNT(*) AS cnt
+        FROM issues
+        WHERE project_id = :projectId
+          AND created_at >= :since
+        GROUP BY 1
+        ORDER BY 1
+        """, nativeQuery = true)
+    List<Object[]> countCreatedByDay(@Param("projectId") Long projectId,
+                                     @Param("since") LocalDateTime since);
+
     /** Nombre d'issues ouvertes par assignee dans une liste de projets */
     @Query("""
         SELECT i.assignee.id, COUNT(i)
@@ -158,4 +175,28 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
         GROUP BY i.assignee.id
         """)
     List<Object[]> countOpenIssuesGroupedByAssignee(@Param("projectIds") List<Long> projectIds);
+
+    /**
+     * Charge de travail par échéance (US-022) : issues OUVERTES (statut hors COMPLETED/CANCELLED),
+     * assignées, dont la dueDate tombe dans [from, to), groupées par assignee + jour d'échéance.
+     * Native (Postgres) : le statut vit dans issue_statuses, jointure nécessaire.
+     * Retourne des lignes [userId:Long, day:String 'YYYY-MM-DD', count:Long].
+     */
+    @Query(value = """
+        SELECT i.assignee_id AS user_id,
+               to_char(i.due_date, 'YYYY-MM-DD') AS day,
+               COUNT(*) AS cnt
+        FROM issues i
+        JOIN issue_statuses s ON s.id = i.status_id
+        WHERE i.project_id IN (:projectIds)
+          AND i.assignee_id IS NOT NULL
+          AND i.due_date IS NOT NULL
+          AND i.due_date >= :from
+          AND i.due_date <  :to
+          AND s.category::text NOT IN ('COMPLETED', 'CANCELLED')
+        GROUP BY i.assignee_id, to_char(i.due_date, 'YYYY-MM-DD')
+        """, nativeQuery = true)
+    List<Object[]> countOpenIssuesByAssigneeAndDueDate(@Param("projectIds") List<Long> projectIds,
+                                                       @Param("from") java.time.LocalDate from,
+                                                       @Param("to") java.time.LocalDate to);
 }
