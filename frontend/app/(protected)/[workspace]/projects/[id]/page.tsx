@@ -14,6 +14,7 @@ import {
 } from "lucide-react"
 import {
   DndContext,
+  DragOverlay,
   PointerSensor,
   useSensor,
   useSensors,
@@ -22,7 +23,6 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core"
-import { CSS } from "@dnd-kit/utilities"
 
 import { IssueSheet, type SheetIssue } from "@/components/sheets/issue-sheet"
 import { useTranslation } from "@/lib/i18n"
@@ -30,7 +30,7 @@ import { Button } from "@/components/ui/button"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { Input } from "@/components/ui/input"
 import { ColorPicker } from "@/components/ui/color-picker"
-import { IssueFilters } from "@/components/issues/issue-filters"
+import { InlineIssueFilters } from "@/components/issues/issue-filters"
 import { BulkAssignDialog } from "@/components/dialogs/bulk-assign-dialog"
 import { type IssueFilterState, EMPTY_ISSUE_FILTERS, applyIssueFilters } from "@/lib/issue-filters"
 import {
@@ -134,19 +134,14 @@ function IssueCard({
   readonly onStatusChange: (issueId: number, statusId: number) => void
   readonly onOpen: (issue: Issue) => void
 }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `card-${issue.id}`,
     data: { issueId: issue.id, statusId: issue.status.id },
   })
 
-  const style = transform
-    ? { transform: CSS.Translate.toString(transform), zIndex: 50 }
-    : undefined
-
   return (
     <div
       ref={setNodeRef}
-      style={style}
       {...attributes}
       {...listeners}
       role="button"
@@ -155,7 +150,8 @@ function IssueCard({
       onKeyDown={(e) => e.key === "Enter" && onOpen(issue)}
       className={cn(
         "group/card rounded-lg border border-border bg-card p-3 transition-all cursor-grab active:cursor-grabbing",
-        isDragging ? "opacity-50 shadow-lg" : "hover:border-primary/30 hover:shadow-md"
+        // Le clone est rendu via <DragOverlay> → on laisse juste un placeholder estompé en place
+        isDragging ? "opacity-40" : "hover:border-primary/30 hover:shadow-md"
       )}
     >
       {issue.labels.length > 0 && (
@@ -229,6 +225,46 @@ function IssueCard({
 }
 
 // ---------------------------------------------------------------------------
+// IssueCardPreview — clone rendu dans le <DragOverlay> (suit le curseur, fluide)
+// ---------------------------------------------------------------------------
+
+function IssueCardPreview({ issue }: { readonly issue: Issue }) {
+  return (
+    <div className="w-64 rotate-2 cursor-grabbing rounded-lg border border-primary/40 bg-card p-3 shadow-xl">
+      {issue.labels.length > 0 && (
+        <div className="flex flex-wrap gap-1 mb-2">
+          {issue.labels.map((label) => (
+            <span
+              key={label.id}
+              className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full font-medium border"
+              style={{ color: label.color, borderColor: `${label.color}40`, backgroundColor: `${label.color}15` }}
+            >
+              {label.name}
+            </span>
+          ))}
+        </div>
+      )}
+      <p className="text-sm text-foreground leading-snug mb-3 line-clamp-2">{issue.title}</p>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5">
+          <div className={cn("size-2 rounded-full shrink-0", PRIORITY_DOT[issue.priority])} />
+          <span className="text-[10px] text-muted-foreground font-mono">{issue.identifier}</span>
+        </div>
+        {issue.assignee && (
+          <UserAvatar
+            email={issue.assignee.email}
+            name={issue.assignee.displayName ?? issue.assignee.email}
+            avatarUrl={issue.assignee.avatarUrl}
+            className="size-5"
+            fallbackClassName="text-[9px]"
+          />
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // BoardColumn (droppable)
 // ---------------------------------------------------------------------------
 
@@ -281,9 +317,9 @@ function BoardColumn({
   }
 
   return (
-    <div className="flex flex-col w-70 shrink-0">
+    <div className="flex h-full min-h-0 w-70 shrink-0 flex-col">
       {/* Column header */}
-      <div className="group/col flex items-center justify-between mb-2 px-1 py-1.5">
+      <div className="group/col flex items-center justify-between mb-2 px-1 py-1.5 shrink-0">
         <div className="flex items-center gap-2 min-w-0 flex-1">
           {getCategoryIcon(status.category, status.color)}
           {editing ? (
@@ -345,13 +381,13 @@ function BoardColumn({
       </div>
 
       {/* Divider with status color */}
-      <div className="h-0.5 w-full rounded-full mb-3 opacity-60" style={{ backgroundColor: status.color }} />
+      <div className="h-0.5 w-full rounded-full mb-3 opacity-60 shrink-0" style={{ backgroundColor: status.color }} />
 
-      {/* Cards (droppable) */}
+      {/* Cards (droppable) — scroll interne par colonne */}
       <div
         ref={setNodeRef}
         className={cn(
-          "flex flex-col gap-2 flex-1 min-h-20 rounded-lg transition-colors",
+          "flex flex-col gap-2 flex-1 min-h-0 overflow-y-auto rounded-lg pr-0.5 transition-colors",
           isOver && "bg-primary/5 ring-1 ring-primary/30"
         )}
       >
@@ -479,6 +515,7 @@ export default function ProjectBoardPage() {
   const [initializing, setInitializing] = useState(true)
   const [selectedIssue, setSelectedIssue] = useState<SheetIssue | null>(null)
   const [overColumnId, setOverColumnId] = useState<number | null>(null)
+  const [activeIssue, setActiveIssue] = useState<Issue | null>(null)
   const [filters, setFilters] = useState<IssueFilterState>(EMPTY_ISSUE_FILTERS)
 
   const sensors = useSensors(
@@ -547,8 +584,10 @@ export default function ProjectBoardPage() {
     await updateStatus(workspace, projectId, statusId, { color })
   }
 
-  function handleDragStart(_event: DragStartEvent) {
+  function handleDragStart(event: DragStartEvent) {
     setOverColumnId(null)
+    const data = event.active.data.current as { issueId?: number } | undefined
+    setActiveIssue(issues.find((i) => i.id === data?.issueId) ?? null)
   }
 
   function handleDragOver(event: DragEndEvent) {
@@ -558,6 +597,7 @@ export default function ProjectBoardPage() {
 
   async function handleDragEnd(event: DragEndEvent) {
     setOverColumnId(null)
+    setActiveIssue(null)
     const activeData = event.active.data.current as { issueId?: number; statusId?: number } | undefined
     const overData = event.over?.data.current as { statusId?: number } | undefined
     if (!workspace || !activeData?.issueId || !overData?.statusId) return
@@ -567,10 +607,10 @@ export default function ProjectBoardPage() {
   }
 
   return (
-    <div className="flex flex-col gap-0 h-full">
+    <div className="flex h-full min-h-0 flex-col gap-0">
       {/* Toolbar */}
-      <div className="flex items-center gap-2 mb-4">
-        <IssueFilters issues={issues} value={filters} onChange={setFilters} />
+      <div className="flex flex-wrap items-center gap-2 mb-4 shrink-0">
+        <InlineIssueFilters issues={issues} value={filters} onChange={setFilters} />
         <div className="ml-auto flex items-center gap-2">
           <Button
             variant="outline"
@@ -617,8 +657,9 @@ export default function ProjectBoardPage() {
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
+          onDragCancel={() => { setOverColumnId(null); setActiveIssue(null) }}
         >
-          <div className="flex gap-5 overflow-x-auto pb-6 -mx-4 md:-mx-6 px-4 md:px-6 items-start">
+          <div className="flex min-h-0 flex-1 items-stretch gap-5 overflow-x-auto pb-2">
             {sortedStatuses.map((status) => (
               <BoardColumn
                 key={status.id}
@@ -636,6 +677,11 @@ export default function ProjectBoardPage() {
             ))}
             <AddColumnPopover workspaceSlug={workspace} projectId={projectId} />
           </div>
+
+          {/* Clone qui suit le curseur — DnD fluide (QA2-14) */}
+          <DragOverlay dropAnimation={null}>
+            {activeIssue ? <IssueCardPreview issue={activeIssue} /> : null}
+          </DragOverlay>
         </DndContext>
       )}
 

@@ -12,7 +12,6 @@ import {
   Users,
   Settings,
   Plus,
-  ChevronRight,
   MoreHorizontal,
   Star,
 } from "lucide-react"
@@ -99,18 +98,9 @@ export default function ProjectLayout({ children }: { readonly children: React.R
   }
 
   return (
-    <div className="flex flex-col gap-0 w-full -m-4 md:-m-6 min-h-full">
-      {/* Project header */}
-      <div className="px-4 md:px-6 pt-4 md:pt-6 pb-0 border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-30">
-        {/* Breadcrumb */}
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-3">
-          <Link href={`/${workspace}/projects`} className="hover:text-foreground transition-colors">
-            {t("projects.title")}
-          </Link>
-          <ChevronRight className="h-3 w-3" />
-          <span className="text-foreground font-medium">{project?.name ?? "…"}</span>
-        </div>
-
+    <div className="mx-auto flex h-full w-full max-w-screen-2xl flex-col">
+      {/* Project header — pas de breadcrumb (le header de l'app suffit) ; largeur alignée sur le dashboard */}
+      <div className="shrink-0 border-b border-border">
         {/* Project name + actions */}
         <div className="flex items-center justify-between gap-4 mb-3">
           <div className="flex items-center gap-3 min-w-0">
@@ -215,8 +205,8 @@ export default function ProjectLayout({ children }: { readonly children: React.R
         </div>
       </div>
 
-      {/* Page content */}
-      <div className="flex-1 px-4 pt-5 pb-6 md:px-6 md:pt-6 md:pb-8">
+      {/* Page content — one-screen : scroll interne ici (et par colonne sur le board) */}
+      <div className="min-h-0 flex-1 overflow-y-auto pt-6">
         {children}
       </div>
     </div>
