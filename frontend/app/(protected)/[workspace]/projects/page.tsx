@@ -51,7 +51,7 @@ import { ResponsiveContainer, AreaChart, Area } from "recharts"
 import { cn } from "@/lib/utils"
 import { getAvatarUrl } from "@/lib/utils/avatar"
 import { useProjectStore } from "@/lib/store/project-store"
-import { getAnalyticsThroughput } from "@/lib/api/analytics-service"
+import { getProjectActivity } from "@/lib/api/project-service"
 import type { Project } from "@/lib/api/project-service"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -312,15 +312,17 @@ function ProjectCard({ project, slug }: { readonly project: Project; readonly sl
   const health = deriveHealth(project)
   const pct = progressPct(project)
 
-  // Activité du projet (réel) — throughput hebdo (ouvertes + résolues), façon GitHub.
-  const [activity, setActivity] = useState<{ week: string; activity: number }[]>([])
+  // Activité du projet (réel) — issues créées/jour sur 14 j, façon GitHub (QA2-32).
+  const [activity, setActivity] = useState<{ date: string; activity: number }[]>([])
   useEffect(() => {
     let alive = true
-    getAnalyticsThroughput(slug, project.id)
-      .then((pts) => { if (alive) setActivity(pts.map((p) => ({ week: p.week, activity: p.opened + p.resolved }))) })
-      .catch(() => { /* gated Pro / indispo → pas de sparkline */ })
+    getProjectActivity(slug, project.id, 14)
+      .then((pts) => { if (alive) setActivity(pts.map((p) => ({ date: p.date, activity: p.count }))) })
+      .catch(() => { /* indispo → pas de sparkline */ })
     return () => { alive = false }
   }, [slug, project.id])
+
+  const hasActivity = activity.some((p) => p.activity > 0)
 
   return (
     <div
@@ -359,7 +361,7 @@ function ProjectCard({ project, slug }: { readonly project: Project; readonly sl
       {/* Activité (sparkline bleu, façon GitHub) — remplace la barre de progression */}
       <div className="mt-auto">
         <p className="mb-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70">Activité</p>
-        {activity.length > 0 ? (
+        {hasActivity ? (
           <ResponsiveContainer width="100%" height={36}>
             <AreaChart data={activity} margin={{ top: 2, right: 0, left: 0, bottom: 2 }}>
               <defs>
