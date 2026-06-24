@@ -63,6 +63,7 @@ export const WORKSPACE_ROUTES = {
   BY_SLUG: (slug: string) => `/api/workspaces/${slug}`,
   MEMBERS: (slug: string) => `/api/workspaces/${slug}/members`,
   USAGE: (slug: string) => `/api/workspaces/${slug}/usage`,
+  AUDIT: (slug: string) => `/api/workspaces/${slug}/audit`,
   INVITE: (slug: string) => `/api/workspaces/${slug}/members/invite`,
   MEMBER_ROLE: (slug: string, memberId: number) => `/api/workspaces/${slug}/members/${memberId}/role`,
   MEMBER: (slug: string, memberId: number) => `/api/workspaces/${slug}/members/${memberId}`,
@@ -94,6 +95,17 @@ export const SKILL_ROUTES = {
 } as const;
 
 /**
+ * Routes disponibilité / congés (US-006)
+ * Backend: MemberLeaveController @RequestMapping("/api/workspaces/{slug}/members/{userId}/leaves")
+ */
+export const AVAILABILITY_ROUTES = {
+  /** Congés d'un membre (GET liste / POST création) */
+  LEAVES: (slug: string, userId: number) => `/api/workspaces/${slug}/members/${userId}/leaves`,
+  /** Un congé précis (DELETE) */
+  LEAVE:  (slug: string, userId: number, leaveId: number) => `/api/workspaces/${slug}/members/${userId}/leaves/${leaveId}`,
+} as const;
+
+/**
  * Routes projets
  * Backend: @RequestMapping("/api/workspaces/{slug}/projects")
  */
@@ -112,6 +124,8 @@ export const PROJECT_ROUTES = {
   // Équipes associées (PROD-3.6b)
   TEAMS:   (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/teams`,
   TEAM:    (slug: string, id: number, teamId: number) => `/api/workspaces/${slug}/projects/${id}/teams/${teamId}`,
+  // Activité quotidienne (QA2-32)
+  ACTIVITY: (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/activity`,
 } as const;
 
 /**
@@ -122,6 +136,8 @@ export const ISSUE_ROUTES = {
   /** Vue My Work — issues assignées à l'utilisateur, tous projets du workspace */
   MY_ISSUES: (slug: string) => `/api/workspaces/${slug}/my-issues`,
   LIST:    (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues`,
+  /** Liste paginée pour l'infinite-scroll du backlog (QA2-33) */
+  PAGED:   (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/paged`,
   CREATE:  (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues`,
   BY_ID:   (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}`,
   UPDATE:  (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}`,
@@ -169,6 +185,8 @@ export const ANALYTICS_ROUTES = {
   BURNDOWN:   (slug: string) => `/api/workspaces/${slug}/analytics/burndown`,
   CAPACITY:   (slug: string) => `/api/workspaces/${slug}/analytics/capacity`,
   INSIGHTS:   (slug: string) => `/api/workspaces/${slug}/analytics/insights`,
+  /** Heatmap charge équipe (US-022) : membre × jour, sur N jours */
+  WORKLOAD:   (slug: string) => `/api/workspaces/${slug}/analytics/workload`,
 } as const;
 
 /**
