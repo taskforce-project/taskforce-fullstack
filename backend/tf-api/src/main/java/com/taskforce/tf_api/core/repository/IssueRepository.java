@@ -53,6 +53,9 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
     /** Nombre d'issues d'un projet dans un statut donné (pour auto-assign position) */
     long countByProjectIdAndStatusId(Long projectId, Long statusId);
 
+    /** Nombre total d'issues d'un projet (pour les compteurs de ProjectResponse) */
+    long countByProjectId(Long projectId);
+
     /** Compte les issues ouvertes (non COMPLETED/CANCELLED) */
     @Query("""
         SELECT COUNT(i) FROM Issue i
