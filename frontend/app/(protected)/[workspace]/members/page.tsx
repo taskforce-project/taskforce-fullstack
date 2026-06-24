@@ -50,6 +50,7 @@ import { cn } from "@/lib/utils"
 import { planLimit } from "@/lib/config/plan-limits"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { useUserStore } from "@/lib/store/user-store"
+import { useUpgradeStore } from "@/lib/store/upgrade-store"
 import { searchUsers, type UserSearchResult } from "@/lib/api/user-service"
 import { getWorkspaceUsage, type WorkspaceMember, type WorkspaceRole, type WorkspaceUsage } from "@/lib/api/workspace-service"
 import {
@@ -511,6 +512,7 @@ export default function MembersPage() {
 
   const { members, membersLoading, fetchMembers, workspace } = useWorkspaceStore()
   const currentUser = useUserStore((s) => s.user)
+  const openUpgrade = useUpgradeStore((s) => s.openUpgrade)
 
   useEffect(() => {
     fetchMembers()
@@ -571,7 +573,6 @@ export default function MembersPage() {
           const rawLimit = usage ? usage.membersLimit : planLimit(currentUser?.planType, "members")
           const unlimited = rawLimit === -1 || !Number.isFinite(rawLimit)
           const atLimit = !unlimited && used >= rawLimit
-          const slug = workspace?.slug
           return (
             <div className="flex flex-col items-end gap-1.5">
               {!unlimited && (
@@ -579,11 +580,9 @@ export default function MembersPage() {
                   {used}/{rawLimit} membres
                 </span>
               )}
-              {atLimit && slug ? (
-                <Button size="sm" variant="outline" asChild className="gap-1.5">
-                  <Link href={`/${slug}/settings`}>
-                    <Crown className="size-3.5 text-amber-500" /> Passer à un plan supérieur
-                  </Link>
+              {atLimit ? (
+                <Button size="sm" variant="outline" className="gap-1.5" onClick={() => openUpgrade()}>
+                  <Crown className="size-3.5 text-amber-500" /> Passer à un plan supérieur
                 </Button>
               ) : (
                 <InviteMemberDialog onInvited={() => setInvitationRefresh((n) => n + 1)} />
@@ -687,7 +686,6 @@ export default function MembersPage() {
           : currentUser?.planType === "PRO" ? "Pro"
           : "Free"
         const atLimit = !unlimited && memberCount >= rawLimit
-        const slug = workspace.slug
         return (
           <div className="rounded-xl border border-border bg-card p-4 shadow-sm flex items-center justify-between gap-4">
             <div>
@@ -715,11 +713,9 @@ export default function MembersPage() {
                   </div>
                   <span className="text-xs text-muted-foreground">{memberCount}/{rawLimit}</span>
                 </div>
-                {atLimit && slug && (
-                  <Button size="sm" variant="outline" asChild className="gap-1.5">
-                    <Link href={`/${slug}/settings?section=billing`}>
-                      <Crown className="size-3.5 text-amber-500" /> Améliorer
-                    </Link>
+                {atLimit && (
+                  <Button size="sm" variant="outline" className="gap-1.5" onClick={() => openUpgrade()}>
+                    <Crown className="size-3.5 text-amber-500" /> Améliorer
                   </Button>
                 )}
               </div>
