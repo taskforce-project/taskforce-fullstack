@@ -1,6 +1,6 @@
 "use client"
 
-import { Filter, X } from "lucide-react"
+import { Filter, X, ChevronDown } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -41,14 +41,129 @@ function FilterRow({
   readonly children: React.ReactNode
 }) {
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onToggle}
-      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-foreground hover:bg-muted/60 transition-colors"
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggle() } }}
+      className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs text-foreground hover:bg-muted/60 transition-colors"
     >
       <Checkbox checked={checked} className="pointer-events-none" />
       <span className="flex items-center gap-1.5 min-w-0 flex-1 text-left">{children}</span>
-    </button>
+    </div>
+  )
+}
+
+// ─── Filtres EN LIGNE (plusieurs boutons, QA2-30) ─────────────────────────────
+
+function FilterDropdown({
+  label,
+  count,
+  children,
+}: {
+  readonly label: string
+  readonly count: number
+  readonly children: React.ReactNode
+}) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          className={cn("h-8 gap-1.5 text-xs", count > 0 && "border-primary/50 text-foreground")}
+        >
+          {label}
+          {count > 0 && (
+            <span className="flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
+              {count}
+            </span>
+          )}
+          <ChevronDown className="size-3.5 text-muted-foreground" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-56 p-1.5" align="start">
+        {children}
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+/**
+ * Filtres d'issues **en ligne** (un bouton par dimension : Priorité / Assigné / Label)
+ * + réinitialiser. Même état `IssueFilterState` que `IssueFilters`.
+ */
+export function InlineIssueFilters({
+  issues,
+  value,
+  onChange,
+}: {
+  readonly issues: Issue[]
+  readonly value: IssueFilterState
+  readonly onChange: (next: IssueFilterState) => void
+}) {
+  const assignees = deriveAssigneeOptions(issues)
+  const labels = deriveLabelOptions(issues)
+  const active = countActiveFilters(value)
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Filter className="size-3.5" /> Filtres
+      </span>
+
+      <FilterDropdown label="Priorité" count={value.priorities.length}>
+        {PRIORITY_META.map((p) => (
+          <FilterRow
+            key={p.value}
+            checked={value.priorities.includes(p.value)}
+            onToggle={() => onChange({ ...value, priorities: toggle(value.priorities, p.value) })}
+          >
+            <span className={cn("size-2 rounded-full shrink-0", p.dot)} />
+            {p.label}
+          </FilterRow>
+        ))}
+      </FilterDropdown>
+
+      {assignees.length > 0 && (
+        <FilterDropdown label="Assigné" count={value.assigneeIds.length}>
+          {assignees.map((a) => (
+            <FilterRow
+              key={a.id ?? "unassigned"}
+              checked={value.assigneeIds.includes(a.id)}
+              onToggle={() => onChange({ ...value, assigneeIds: toggle(value.assigneeIds, a.id) })}
+            >
+              <span className="truncate">{a.name}</span>
+            </FilterRow>
+          ))}
+        </FilterDropdown>
+      )}
+
+      {labels.length > 0 && (
+        <FilterDropdown label="Label" count={value.labelIds.length}>
+          {labels.map((l) => (
+            <FilterRow
+              key={l.id}
+              checked={value.labelIds.includes(l.id)}
+              onToggle={() => onChange({ ...value, labelIds: toggle(value.labelIds, l.id) })}
+            >
+              <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: l.color }} />
+              <span className="truncate">{l.name}</span>
+            </FilterRow>
+          ))}
+        </FilterDropdown>
+      )}
+
+      {active > 0 && (
+        <button
+          type="button"
+          onClick={() => onChange(EMPTY_ISSUE_FILTERS)}
+          className="flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <X className="size-3" /> Réinitialiser
+        </button>
+      )}
+    </div>
   )
 }
 
