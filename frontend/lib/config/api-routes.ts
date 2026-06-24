@@ -172,6 +172,14 @@ export const ANALYTICS_ROUTES = {
 } as const;
 
 /**
+ * Route assistant IA (QA2-16)
+ * Backend: POST /api/workspaces/{slug}/assistant (variante JSON → ApiResponse<{content}>)
+ */
+export const ASSISTANT_ROUTES = {
+  CHAT: (slug: string) => `/api/workspaces/${slug}/assistant`,
+} as const;
+
+/**
  * Routes notifications
  * Backend: /api/workspaces/{slug}/notifications
  */
