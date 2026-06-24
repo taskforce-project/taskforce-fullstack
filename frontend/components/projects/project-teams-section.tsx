@@ -1,18 +1,14 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Loader2, X, Users } from "lucide-react"
+import { Loader2, X, Users, Plus, Trash2, ChevronDown, Crown, Search, UserPlus } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { Badge } from "@/components/ui/badge"
+import { UserAvatar } from "@/components/ui/user-avatar"
+import { cn } from "@/lib/utils"
 import {
   listProjectTeams,
   attachProjectTeam,
@@ -20,6 +16,7 @@ import {
   type ProjectTeam,
 } from "@/lib/api/project-service"
 import { teamService, type Team } from "@/lib/api/team-service"
+import { searchUsers, type UserSearchResult } from "@/lib/api/user-service"
 
 interface ProjectTeamsSectionProps {
   readonly workspace: string
@@ -27,62 +24,58 @@ interface ProjectTeamsSectionProps {
 }
 
 /**
- * Gestion des équipes associées à un projet (PROD-3.6b).
+ * Gestion complète des équipes depuis l'opération (QA3-7/QA3-12) :
+ * créer une équipe, voir/ajouter/retirer ses membres, l'associer/dissocier du projet,
+ * la supprimer. Tout se gère ici (plus de page Teams globale).
  */
 export function ProjectTeamsSection({ workspace, projectId }: ProjectTeamsSectionProps) {
-  const [teams, setTeams] = useState<ProjectTeam[]>([])
-  const [allTeams, setAllTeams] = useState<Team[]>([])
+  const [teams, setTeams] = useState<Team[]>([])
+  const [linkedIds, setLinkedIds] = useState<Set<number>>(new Set())
   const [loading, setLoading] = useState(true)
-  const [selectedTeam, setSelectedTeam] = useState<string>("")
-  const [attaching, setAttaching] = useState(false)
+
   const [newName, setNewName] = useState("")
   const [creating, setCreating] = useState(false)
+  const [expanded, setExpanded] = useState<number | null>(null)
+
+  // Recherche d'utilisateurs à ajouter (scopée à l'équipe dépliée)
+  const [query, setQuery] = useState("")
+  const [results, setResults] = useState<UserSearchResult[]>([])
+
+  function reloadTeams() {
+    return teamService.list(workspace).then(setTeams)
+  }
 
   useEffect(() => {
     let active = true
-    Promise.all([listProjectTeams(workspace, projectId), teamService.list(workspace)])
-      .then(([linked, all]) => {
+    Promise.all([teamService.list(workspace), listProjectTeams(workspace, projectId)])
+      .then(([all, linked]: [Team[], ProjectTeam[]]) => {
         if (!active) return
-        setTeams(linked)
-        setAllTeams(all)
+        setTeams(all)
+        setLinkedIds(new Set(linked.map((t) => t.teamId)))
       })
       .catch(() => { if (active) toast.error("Erreur lors du chargement des équipes") })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
   }, [workspace, projectId])
 
-  const available = useMemo(() => {
-    const linkedIds = new Set(teams.map((t) => t.teamId))
-    return allTeams.filter((t) => !linkedIds.has(t.id))
-  }, [teams, allTeams])
+  // Recherche d'utilisateurs (déclenchée au changement de query)
+  useEffect(() => {
+    if (!query.trim()) { setResults([]); return }
+    let active = true
+    searchUsers(query).then((r) => { if (active) setResults(r) }).catch(() => {})
+    return () => { active = false }
+  }, [query])
 
-  async function handleAttach() {
-    const teamId = Number(selectedTeam)
-    if (!teamId || attaching) return
-    setAttaching(true)
-    try {
-      const linked = await attachProjectTeam(workspace, projectId, teamId)
-      setTeams((prev) => [...prev, linked])
-      setSelectedTeam("")
-      toast.success(`Équipe « ${linked.name} » associée`)
-    } catch {
-      toast.error("Impossible d'associer cette équipe")
-    } finally {
-      setAttaching(false)
-    }
-  }
-
-  async function handleCreateAndAttach() {
+  async function handleCreate() {
     const name = newName.trim()
     if (!name || creating) return
     setCreating(true)
     try {
       const team = await teamService.create(workspace, { name })
-      const linked = await attachProjectTeam(workspace, projectId, team.id)
-      setAllTeams((prev) => [...prev, team])
-      setTeams((prev) => [...prev, linked])
+      setTeams((prev) => [...prev, team])
       setNewName("")
-      toast.success(`Équipe « ${team.name} » créée et associée`)
+      setExpanded(team.id)
+      toast.success(`Équipe « ${team.name} » créée`)
     } catch {
       toast.error("Impossible de créer l'équipe")
     } finally {
@@ -90,90 +83,198 @@ export function ProjectTeamsSection({ workspace, projectId }: ProjectTeamsSectio
     }
   }
 
-  async function handleDetach(teamId: number, name: string) {
+  async function handleDelete(team: Team) {
     try {
-      await detachProjectTeam(workspace, projectId, teamId)
-      setTeams((prev) => prev.filter((t) => t.teamId !== teamId))
-      toast.success(`Équipe « ${name} » dissociée`)
+      await teamService.delete(workspace, team.id)
+      setTeams((prev) => prev.filter((t) => t.id !== team.id))
+      setLinkedIds((prev) => { const n = new Set(prev); n.delete(team.id); return n })
+      toast.success(`Équipe « ${team.name} » supprimée`)
     } catch {
-      toast.error("Impossible de dissocier cette équipe")
+      toast.error("Impossible de supprimer l'équipe")
     }
   }
 
+  async function toggleProject(team: Team) {
+    const linked = linkedIds.has(team.id)
+    try {
+      if (linked) {
+        await detachProjectTeam(workspace, projectId, team.id)
+        setLinkedIds((prev) => { const n = new Set(prev); n.delete(team.id); return n })
+      } else {
+        await attachProjectTeam(workspace, projectId, team.id)
+        setLinkedIds((prev) => new Set(prev).add(team.id))
+      }
+    } catch {
+      toast.error("Action impossible")
+    }
+  }
+
+  async function addMember(team: Team, user: UserSearchResult) {
+    try {
+      await teamService.addMember(workspace, team.id, { userId: user.id })
+      const fresh = await teamService.get(workspace, team.id)
+      setTeams((prev) => prev.map((t) => (t.id === team.id ? fresh : t)))
+      setQuery("")
+      setResults([])
+      toast.success(`${user.displayName ?? user.email} ajouté à « ${team.name} »`)
+    } catch {
+      toast.error("Impossible d'ajouter ce membre")
+    }
+  }
+
+  async function removeMember(team: Team, userId: number) {
+    try {
+      await teamService.removeMember(workspace, team.id, userId)
+      setTeams((prev) => prev.map((t) =>
+        t.id === team.id ? { ...t, members: t.members.filter((m) => m.userId !== userId) } : t
+      ))
+      toast.success("Membre retiré de l'équipe")
+    } catch {
+      toast.error("Impossible de retirer ce membre")
+    }
+  }
+
+  const memberIdsOfExpanded = useMemo(() => {
+    const t = teams.find((x) => x.id === expanded)
+    return new Set(t?.members.map((m) => m.userId) ?? [])
+  }, [teams, expanded])
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-8">
+      <div className="flex items-center justify-center py-10">
         <Loader2 className="size-5 animate-spin text-muted-foreground" />
       </div>
     )
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card overflow-hidden [box-shadow:var(--shadow-sm)]">
-      <div className="flex items-center gap-2 px-5 py-3 border-b border-border bg-muted/20">
-        <Users className="size-4 text-muted-foreground" />
-        <span className="text-sm font-medium">Équipes associées</span>
-        <span className="text-xs text-muted-foreground">({teams.length})</span>
-      </div>
-
-      {/* Liste */}
-      {teams.length > 0 ? (
-        <div className="flex flex-wrap gap-2 p-4">
-          {teams.map((t) => (
-            <span
-              key={t.teamId}
-              className="flex items-center gap-1.5 rounded-full border border-border bg-muted/40 py-1 pl-2.5 pr-1.5 text-sm"
-            >
-              <span>{t.emoji}</span>
-              <span>{t.name}</span>
-              <span className="text-xs text-muted-foreground">· {t.memberCount}</span>
-              <button
-                type="button"
-                onClick={() => handleDetach(t.teamId, t.name)}
-                className="ml-0.5 text-muted-foreground hover:text-foreground"
-                aria-label={`Dissocier ${t.name}`}
-              >
-                <X className="size-3.5" />
-              </button>
-            </span>
-          ))}
-        </div>
-      ) : (
-        <p className="px-5 py-4 text-sm text-muted-foreground">Aucune équipe associée à ce projet.</p>
-      )}
-
-      {/* Associer */}
-      {available.length > 0 && (
-        <div className="flex items-center gap-2 border-t border-border/50 px-4 py-3">
-          <Select value={selectedTeam} onValueChange={setSelectedTeam}>
-            <SelectTrigger className="h-9 flex-1"><SelectValue placeholder="Associer une équipe…" /></SelectTrigger>
-            <SelectContent>
-              {available.map((t) => (
-                <SelectItem key={t.id} value={String(t.id)}>{t.emoji} {t.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button size="sm" onClick={handleAttach} disabled={!selectedTeam || attaching} className="gap-1.5">
-            {attaching && <Loader2 className="size-3.5 animate-spin" />}
-            Associer
-          </Button>
-        </div>
-      )}
-
-      {/* Créer une nouvelle équipe (la gestion des équipes vit dans le projet — QA2-21) */}
-      <div className="flex items-center gap-2 border-t border-border/50 px-4 py-3">
+    <div className="flex flex-col gap-4">
+      {/* Créer une équipe */}
+      <div className="flex items-center gap-2 rounded-xl border border-border bg-card p-3 [box-shadow:var(--shadow-sm)]">
+        <Users className="size-4 shrink-0 text-muted-foreground" />
         <Input
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleCreateAndAttach()}
+          onKeyDown={(e) => e.key === "Enter" && handleCreate()}
           placeholder="Créer une nouvelle équipe…"
           className="h-9 flex-1"
         />
-        <Button size="sm" variant="outline" onClick={handleCreateAndAttach} disabled={!newName.trim() || creating} className="gap-1.5">
-          {creating && <Loader2 className="size-3.5 animate-spin" />}
+        <Button size="sm" onClick={handleCreate} disabled={!newName.trim() || creating} className="gap-1.5">
+          {creating ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
           Créer
         </Button>
       </div>
+
+      {/* Liste des équipes */}
+      {teams.length === 0 ? (
+        <p className="rounded-xl border border-border bg-card px-5 py-8 text-center text-sm text-muted-foreground">
+          Aucune équipe — créez-en une ci-dessus.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {teams.map((team) => {
+            const isOpen   = expanded === team.id
+            const isLinked = linkedIds.has(team.id)
+            return (
+              <div key={team.id} className="rounded-xl border border-border bg-card overflow-hidden [box-shadow:var(--shadow-sm)]">
+                {/* En-tête équipe */}
+                <div className="flex items-center gap-3 px-4 py-3">
+                  <span className="text-lg shrink-0">{team.emoji || "👥"}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-foreground">{team.name}</p>
+                    <p className="text-xs text-muted-foreground">{team.members.length} membre{team.members.length !== 1 ? "s" : ""}</p>
+                  </div>
+                  {/* Avatars */}
+                  <div className="hidden sm:flex -space-x-1.5">
+                    {team.members.slice(0, 4).map((m) => (
+                      <UserAvatar key={m.userId} email={m.displayName} name={m.displayName} avatarUrl={m.avatarUrl} className="size-6 ring-2 ring-card" fallbackClassName="text-[9px]" />
+                    ))}
+                  </div>
+                  <Button
+                    size="sm"
+                    variant={isLinked ? "secondary" : "outline"}
+                    className="h-7 shrink-0 gap-1 text-xs"
+                    onClick={() => toggleProject(team)}
+                  >
+                    {isLinked ? "Associée" : "Associer au projet"}
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={() => setExpanded(isOpen ? null : team.id)}
+                    className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    aria-label="Gérer les membres"
+                  >
+                    <ChevronDown className={cn("size-4 transition-transform", isOpen && "rotate-180")} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(team)}
+                    title="Supprimer l'équipe"
+                    className="shrink-0 rounded p-1 text-destructive transition-colors hover:bg-destructive/10"
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                </div>
+
+                {/* Membres (déplié) */}
+                {isOpen && (
+                  <div className="border-t border-border/60 bg-muted/10 px-4 py-3">
+                    <div className="flex flex-col gap-1.5">
+                      {team.members.length === 0 ? (
+                        <p className="py-1 text-xs text-muted-foreground">Aucun membre dans cette équipe.</p>
+                      ) : team.members.map((m) => (
+                        <div key={m.userId} className="flex items-center gap-2.5 rounded-md px-1 py-1">
+                          <UserAvatar email={m.displayName} name={m.displayName} avatarUrl={m.avatarUrl} className="size-6" fallbackClassName="text-[9px]" />
+                          <span className="flex-1 truncate text-sm text-foreground">{m.displayName}</span>
+                          {m.role === "LEAD" && <Badge variant="secondary" className="gap-1 text-[10px]"><Crown className="size-3 text-amber-500" /> Lead</Badge>}
+                          <button
+                            type="button"
+                            onClick={() => removeMember(team, m.userId)}
+                            title="Retirer de l'équipe"
+                            className="rounded p-1 text-destructive transition-colors hover:bg-destructive/10"
+                          >
+                            <X className="size-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Ajouter / inviter un membre */}
+                    <div className="relative mt-2">
+                      <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        value={isOpen ? query : ""}
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder="Ajouter un membre (nom ou email)…"
+                        className="h-8 pl-8 text-xs"
+                      />
+                      {query.trim() && results.length > 0 && (
+                        <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-md border border-border bg-popover shadow-md">
+                          {results
+                            .filter((u) => !memberIdsOfExpanded.has(u.id))
+                            .slice(0, 6)
+                            .map((u) => (
+                              <button
+                                key={u.id}
+                                type="button"
+                                onClick={() => addMember(team, u)}
+                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs transition-colors hover:bg-muted/60"
+                              >
+                                <UserPlus className="size-3.5 shrink-0 text-muted-foreground" />
+                                <span className="flex-1 truncate">{u.displayName ?? u.email}</span>
+                                <span className="truncate text-[10px] text-muted-foreground">{u.email}</span>
+                              </button>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
