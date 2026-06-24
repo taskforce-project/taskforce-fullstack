@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useParams } from "next/navigation"
 import {
   CircleDot,
@@ -74,6 +74,9 @@ function toSheetIssue(issue: Issue): SheetIssue {
   }
 }
 
+/** Taille de page pour l'infinite-scroll du backlog (QA2-33). */
+const PAGE_SIZE = 25
+
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
@@ -86,6 +89,8 @@ export default function ProjectBacklogPage() {
   const { fetchIssues, issues, isLoading, statuses, fetchStatuses, updateIssue } = useIssueStore()
   const [selectedIssue, setSelectedIssue] = useState<SheetIssue | null>(null)
   const [filters, setFilters] = useState<IssueFilterState>(EMPTY_ISSUE_FILTERS)
+  const [visible, setVisible] = useState(PAGE_SIZE)
+  const sentinelRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     if (!workspace || !projectId) return
@@ -104,6 +109,21 @@ export default function ProjectBacklogPage() {
     issues.filter((i) => i.status.category === "BACKLOG"),
     filters
   )
+  const visibleIssues = backlogIssues.slice(0, visible)
+  const hasMore = visible < backlogIssues.length
+
+  // Infinite-scroll : révèle la page suivante quand le sentinel entre dans le viewport (QA2-33)
+  useEffect(() => {
+    if (!hasMore) return
+    const node = sentinelRef.current
+    if (!node) return
+    const obs = new IntersectionObserver(
+      (entries) => { if (entries[0]?.isIntersecting) setVisible((v) => v + PAGE_SIZE) },
+      { rootMargin: "200px" }
+    )
+    obs.observe(node)
+    return () => obs.disconnect()
+  }, [hasMore, visibleIssues.length])
 
   if (isLoading && backlogIssues.length === 0) {
     return (
@@ -127,13 +147,13 @@ export default function ProjectBacklogPage() {
     <div className="flex flex-col gap-4">
       {/* Filtres en ligne + stats */}
       <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-        <InlineIssueFilters issues={issues} value={filters} onChange={setFilters} />
+        <InlineIssueFilters issues={issues} value={filters} onChange={(f) => { setFilters(f); setVisible(PAGE_SIZE) }} />
         <span className="ml-auto"><span className="font-medium text-foreground">{backlogIssues.length}</span> issues</span>
       </div>
 
       {/* List */}
       <div className="rounded-xl border border-border bg-card overflow-hidden [box-shadow:var(--shadow-sm)]">
-        {backlogIssues.map((issue) => (
+        {visibleIssues.map((issue) => (
           <div
             key={issue.id}
             role="button"
@@ -174,6 +194,14 @@ export default function ProjectBacklogPage() {
             <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
           </div>
         ))}
+
+        {/* Sentinel infinite-scroll (QA2-33) */}
+        {hasMore && (
+          <div ref={sentinelRef} className="flex items-center justify-center gap-2 px-4 py-3 text-xs text-muted-foreground/60 border-b border-border/50">
+            <span className="size-3 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-transparent" />
+            Chargement… ({visibleIssues.length}/{backlogIssues.length})
+          </div>
+        )}
 
         <CreateIssueDialog workspaceSlug={workspace} projectId={projectId} defaultStatusId={undefined}>
           <button type="button" className="flex w-full items-center gap-2 px-4 py-2.5 text-muted-foreground hover:bg-muted/20 transition-colors cursor-pointer">
