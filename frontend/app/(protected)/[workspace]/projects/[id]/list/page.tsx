@@ -85,17 +85,28 @@ function toSheetIssue(issue: Issue): SheetIssue {
 // IssueRow
 // ---------------------------------------------------------------------------
 
-function IssueRow({ issue, onOpen }: { readonly issue: Issue; readonly onOpen: (issue: Issue) => void }) {
+function IssueRow({ issue, onOpen, onToggleDone }: { readonly issue: Issue; readonly onOpen: (issue: Issue) => void; readonly onToggleDone: (issue: Issue) => void }) {
+  const isDone = issue.status.category === "COMPLETED"
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={() => onOpen(issue)}
-      className="group flex w-full items-center gap-3 px-4 py-2.5 hover:bg-muted/40 transition-colors border-b border-border/50 last:border-0 text-left"
+      onKeyDown={(e) => e.key === "Enter" && onOpen(issue)}
+      className="group flex w-full cursor-pointer items-center gap-3 px-4 py-2.5 hover:bg-muted/40 transition-colors border-b border-border/50 last:border-0 text-left"
     >
       <div className={cn("h-2 w-2 rounded-full shrink-0", PRIORITY_DOT[issue.priority as IssuePriority] ?? "bg-muted-foreground/30")} />
-      <div className="shrink-0">{getCategoryIcon(issue.status.category, issue.status.color)}</div>
+      {/* Icône cliquable → marque la tâche terminée (QA3-9) */}
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onToggleDone(issue) }}
+        title={isDone ? "Rouvrir la tâche" : "Marquer comme terminée"}
+        className={cn("shrink-0 rounded transition-colors", isDone ? "text-emerald-500" : "text-muted-foreground hover:text-emerald-500")}
+      >
+        {isDone ? <CheckCircle2 className="size-3.5" /> : getCategoryIcon(issue.status.category, issue.status.color)}
+      </button>
       <span className="text-xs text-muted-foreground font-mono w-14 shrink-0">{issue.identifier}</span>
-      <span className="flex-1 text-sm text-foreground truncate group-hover:text-primary transition-colors">{issue.title}</span>
+      <span className={cn("flex-1 text-sm truncate transition-colors group-hover:text-primary", isDone ? "text-muted-foreground line-through" : "text-foreground")}>{issue.title}</span>
       <div className="hidden md:flex gap-1 w-36 justify-end shrink-0">
         {issue.labels.slice(0, 2).map((l) => (
           <Badge
@@ -124,7 +135,7 @@ function IssueRow({ issue, onOpen }: { readonly issue: Issue; readonly onOpen: (
         )}
       </div>
       <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-    </button>
+    </div>
   )
 }
 
@@ -136,10 +147,12 @@ function StatusGroup({
   status,
   issues,
   onOpenIssue,
+  onToggleDone,
 }: {
   readonly status: IssueStatus
   readonly issues: Issue[]
   readonly onOpenIssue: (issue: Issue) => void
+  readonly onToggleDone: (issue: Issue) => void
 }) {
   return (
     <div>
@@ -152,7 +165,7 @@ function StatusGroup({
       </div>
 
       {issues.map((issue) => (
-        <IssueRow key={issue.id} issue={issue} onOpen={onOpenIssue} />
+        <IssueRow key={issue.id} issue={issue} onOpen={onOpenIssue} onToggleDone={onToggleDone} />
       ))}
     </div>
   )
@@ -167,9 +180,21 @@ export default function ProjectListPage() {
   const workspace = extractParam(params.workspace)
   const projectId = Number(extractParam(params.id))
 
-  const { issues, statuses, isLoading, fetchIssues, fetchStatuses } = useIssueStore()
+  const { issues, statuses, isLoading, fetchIssues, fetchStatuses, updateIssue } = useIssueStore()
   const [selectedIssue, setSelectedIssue] = useState<SheetIssue | null>(null)
   const [filters, setFilters] = useState<IssueFilterState>(EMPTY_ISSUE_FILTERS)
+
+  // QA3-9 : clic sur l'icône → bascule terminé / rouvert
+  async function handleToggleDone(issue: Issue) {
+    const done   = statuses.find((s) => s.category === "COMPLETED")
+    const reopen = statuses.find((s) => s.isDefault)
+      ?? statuses.find((s) => s.category === "UNSTARTED")
+      ?? statuses.find((s) => s.category === "BACKLOG")
+    const target = issue.status.category === "COMPLETED" ? reopen : done
+    if (target && target.id !== issue.status.id) {
+      await updateIssue(workspace, projectId, issue.id, { statusId: target.id })
+    }
+  }
 
   useEffect(() => {
     if (!workspace || !projectId) return
@@ -238,6 +263,7 @@ export default function ProjectListPage() {
             status={status}
             issues={groupIssues}
             onOpenIssue={(issue) => setSelectedIssue(toSheetIssue(issue))}
+            onToggleDone={handleToggleDone}
           />
         )
       })}
