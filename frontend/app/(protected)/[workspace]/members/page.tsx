@@ -12,6 +12,7 @@ import {
   Mail,
   X,
   Filter,
+  Layers,
   Loader2,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -51,6 +52,7 @@ import { planLimit } from "@/lib/config/plan-limits"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { useUserStore } from "@/lib/store/user-store"
 import { useUpgradeStore } from "@/lib/store/upgrade-store"
+import { useProjectStore } from "@/lib/store/project-store"
 import { searchUsers, type UserSearchResult } from "@/lib/api/user-service"
 import { getWorkspaceUsage, type WorkspaceMember, type WorkspaceRole, type WorkspaceUsage } from "@/lib/api/workspace-service"
 import {
@@ -319,9 +321,10 @@ interface MemberRowProps {
   readonly canManage: boolean
   readonly isOwner: boolean
   readonly profile?: MemberSkillProfile
+  readonly projects?: { id: number; name: string }[]
 }
 
-function MemberRow({ member, isYou, canManage, isOwner, profile }: MemberRowProps) {
+function MemberRow({ member, isYou, canManage, isOwner, profile, projects = [] }: MemberRowProps) {
   const role = ROLE_CONFIG[member.role]
   const changeRole = useWorkspaceStore((s) => s.changeRole)
   const kick = useWorkspaceStore((s) => s.kick)
@@ -395,6 +398,18 @@ function MemberRow({ member, isYou, canManage, isOwner, profile }: MemberRowProp
             ))}
             {profile.skills.length > 6 && (
               <span className="text-[10px] text-muted-foreground">+{profile.skills.length - 6}</span>
+            )}
+          </div>
+        )}
+        {/* Projets du membre (QA2-20) */}
+        {projects.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1 mt-1.5">
+            <Layers className="size-3 shrink-0 text-muted-foreground/60" />
+            {projects.slice(0, 4).map((p) => (
+              <span key={p.id} className="rounded-full border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">{p.name}</span>
+            ))}
+            {projects.length > 4 && (
+              <span className="text-[10px] text-muted-foreground">+{projects.length - 4}</span>
             )}
           </div>
         )}
@@ -506,17 +521,36 @@ function PendingInvitations({ slug, refreshKey }: { readonly slug: string; reado
 export default function MembersPage() {
   const [search, setSearch] = useState("")
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all")
+  const [projectFilter, setProjectFilter] = useState<string>("all")
   const [invitationRefresh, setInvitationRefresh] = useState(0)
   const [profilesByUser, setProfilesByUser] = useState<Record<number, MemberSkillProfile>>({})
   const [usage, setUsage] = useState<WorkspaceUsage | null>(null)
 
   const { members, membersLoading, fetchMembers, workspace } = useWorkspaceStore()
+  const { projects, fetchProjects } = useProjectStore()
   const currentUser = useUserStore((s) => s.user)
   const openUpgrade = useUpgradeStore((s) => s.openUpgrade)
 
   useEffect(() => {
     fetchMembers()
   }, [fetchMembers])
+
+  // Projets (incluent leurs membres) → savoir qui est dans quel projet + filtre (QA2-20)
+  useEffect(() => {
+    if (workspace?.slug) fetchProjects(workspace.slug)
+  }, [workspace?.slug, fetchProjects])
+
+  const projectsByUser = useMemo(() => {
+    const map = new Map<number, { id: number; name: string }[]>()
+    for (const p of projects) {
+      for (const m of p.members ?? []) {
+        const arr = map.get(m.userId) ?? []
+        arr.push({ id: p.id, name: p.name })
+        map.set(m.userId, arr)
+      }
+    }
+    return map
+  }, [projects])
 
   // Profils de compétences (aperçu sur la liste — PROD-1.2/1.8)
   useEffect(() => {
@@ -542,6 +576,11 @@ export default function MembersPage() {
   const filtered = useMemo(() => {
     let list = members
     if (roleFilter !== "all") list = list.filter((m) => m.role === roleFilter)
+    if (projectFilter !== "all") {
+      const pid = Number(projectFilter)
+      const ids = new Set((projects.find((p) => p.id === pid)?.members ?? []).map((m) => m.userId))
+      list = list.filter((m) => ids.has(m.userId))
+    }
     if (search.trim()) {
       const q = search.toLowerCase()
       list = list.filter(
@@ -551,7 +590,7 @@ export default function MembersPage() {
       )
     }
     return list
-  }, [members, search, roleFilter])
+  }, [members, search, roleFilter, projectFilter, projects])
 
   const memberCount = members.length
   const memberSuffix = memberCount === 1 ? "" : "s"
@@ -628,6 +667,19 @@ export default function MembersPage() {
             </button>
           )}
         </div>
+
+        {/* Filtre par projet (QA2-20) */}
+        {projects.length > 0 && (
+          <Select value={projectFilter} onValueChange={setProjectFilter}>
+            <SelectTrigger className="h-9 w-44 text-sm shrink-0"><SelectValue placeholder="Projet" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous les projets</SelectItem>
+              {projects.map((p) => (
+                <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {/* Members list */}
@@ -668,6 +720,7 @@ export default function MembersPage() {
             canManage={canManage}
             isOwner={isOwner}
             profile={profilesByUser[member.userId]}
+            projects={projectsByUser.get(member.userId) ?? []}
           />
         ))}
       </div>
