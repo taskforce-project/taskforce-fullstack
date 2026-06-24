@@ -121,13 +121,14 @@ function formatCommentTime(iso: string): string {
 // ---------------------------------------------------------------------------
 
 function MetaRow({ icon, label, children }: Readonly<{ icon: React.ReactNode; label: string; children: React.ReactNode }>) {
+  // Label au-dessus, valeur en dessous (façon GitHub) → lisible même en colonne étroite, aucune info coupée.
   return (
-    <div className="flex items-center gap-3 py-2.5 border-b border-border/50 last:border-0">
-      <div className="flex items-center gap-2 w-32 shrink-0 text-muted-foreground">
-        <span className="text-muted-foreground">{icon}</span>
-        <span className="text-xs text-muted-foreground">{label}</span>
+    <div className="flex flex-col gap-1 py-2.5 border-b border-border/50 last:border-0">
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <span className="shrink-0">{icon}</span>
+        <span>{label}</span>
       </div>
-      <div className="flex-1 text-sm">{children}</div>
+      <div className="min-w-0 text-sm">{children}</div>
     </div>
   )
 }
@@ -737,7 +738,7 @@ function ChecklistTab({
             type="button"
             onClick={() => remove(item)}
             aria-label="Supprimer l'item"
-            className="flex size-6 items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground group-hover:opacity-100"
+            className="flex size-6 items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
           >
             <Trash2 className="size-3.5" />
           </button>
@@ -849,7 +850,7 @@ function WorklogTab({
             type="button"
             onClick={() => remove(e)}
             aria-label="Supprimer l'entrée"
-            className="flex size-6 items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground group-hover:opacity-100"
+            className="flex size-6 items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
           >
             <Trash2 className="size-3.5" />
           </button>
@@ -950,7 +951,7 @@ function RelationsTab({
             type="button"
             onClick={() => remove(r.id)}
             aria-label="Supprimer la relation"
-            className="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
           >
             <Trash2 className="size-3.5" />
           </button>
@@ -1571,7 +1572,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
           </div>
 
           {/* Right: metadata sidebar (fully editable) — empilée sous le contenu en mobile */}
-          <div className="w-full shrink-0 border-t border-border px-4 py-5 sm:w-56 sm:border-t-0 sm:border-l sm:overflow-y-auto">
+          <div className="w-full shrink-0 border-t border-border px-4 py-5 sm:w-72 sm:border-t-0 sm:border-l sm:overflow-y-auto">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Details</p>
 
             {/* Priority */}
