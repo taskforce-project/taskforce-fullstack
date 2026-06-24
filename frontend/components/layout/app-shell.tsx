@@ -8,6 +8,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/layout/sidebar/app-sidebar"
 import { AppTopbar } from "@/components/layout/topbar/app-topbar"
 import { PanelDock } from "@/components/layout/panel-dock"
+import { UpgradeDialog } from "@/components/subscription/upgrade-dialog"
 
 interface AppShellProps {
   readonly children: React.ReactNode
@@ -38,6 +39,9 @@ export function AppShell({ children }: AppShellProps) {
           <PanelDock side="right" />
         </div>
       </SidebarInset>
+
+      {/* Modal d'upgrade global — ouvrable depuis n'importe quel CTA (QA2-19) */}
+      <UpgradeDialog />
     </SidebarProvider>
   )
 }
