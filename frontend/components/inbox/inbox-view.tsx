@@ -14,6 +14,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { PageContainer } from "@/components/layout/page-shell"
 import { cn } from "@/lib/utils"
 import { useNotificationStore } from "@/lib/store/notification-store"
 import type { Signal, NotifType, Urgency } from "@/lib/store/notification-store"
@@ -72,7 +73,7 @@ function SignalRow({
 
   function handleClick() {
     onMarkRead(signal.id)
-    router.push(signal.issueUrl)
+    if (signal.issueUrl) router.push(signal.issueUrl)
   }
 
   return (
@@ -131,11 +132,13 @@ function SignalRow({
             <CheckCheck className="size-3" /> Ack
           </Button>
         )}
-        <Button asChild variant="secondary" size="icon-sm" className="size-6">
-          <Link href={signal.issueUrl} onClick={(e) => { e.stopPropagation(); onMarkRead(signal.id) }} title="Open">
-            <ArrowUpRight className="size-3" />
-          </Link>
-        </Button>
+        {signal.issueUrl && (
+          <Button asChild variant="secondary" size="icon-sm" className="size-6">
+            <Link href={signal.issueUrl} onClick={(e) => { e.stopPropagation(); onMarkRead(signal.id) }} title="Open">
+              <ArrowUpRight className="size-3" />
+            </Link>
+          </Button>
+        )}
       </div>
     </div>
   )
@@ -208,7 +211,7 @@ export function InboxView({ defaultTab = "all" }: InboxViewProps) {
   const acknowledgedCount = signals.filter((s) => s.acknowledged).length
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
+    <PageContainer size="narrow">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1">
@@ -268,6 +271,6 @@ export function InboxView({ defaultTab = "all" }: InboxViewProps) {
           ))
         )}
       </Card>
-    </div>
+    </PageContainer>
   )
 }
