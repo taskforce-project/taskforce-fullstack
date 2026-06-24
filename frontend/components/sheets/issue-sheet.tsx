@@ -1200,7 +1200,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
       <SheetContent
         side="right"
         hideClose
-        className="w-full sm:max-w-3xl flex flex-col p-0 gap-0"
+        className="w-full sm:max-w-4xl flex flex-col p-0 gap-0"
       >
         <VisuallyHidden>
           <SheetTitle>{issue.title}</SheetTitle>
@@ -1287,11 +1287,11 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
           </SheetClose>
         </div>
 
-        {/* ── Main body: scrollable, two columns ── */}
-        <div className="flex flex-1 min-h-0 overflow-hidden">
+        {/* ── Main body: deux colonnes en desktop, empilées + scroll unique en mobile (QA2-15) ── */}
+        <div className="flex flex-1 min-h-0 flex-col overflow-y-auto sm:flex-row sm:overflow-hidden">
 
           {/* Left: title + description + comments (scrollable) */}
-          <div className="flex-1 min-w-0 overflow-y-auto px-6 py-5 flex flex-col gap-5">
+          <div className="flex-1 min-w-0 px-6 py-5 flex flex-col gap-5 sm:overflow-y-auto">
             {/* Title — inline editable */}
             {editingTitle ? (
               <input
@@ -1357,7 +1357,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
 
             {/* Comments / Activity / Attachments tabs */}
             <div>
-              <div className="flex gap-4 mb-4 border-b border-border">
+              <div className="flex flex-wrap gap-x-4 gap-y-1 mb-4 border-b border-border [&>button]:whitespace-nowrap">
                 <button
                   type="button"
                   onClick={() => setTab("comments")}
@@ -1570,8 +1570,8 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
             </div>
           </div>
 
-          {/* Right: metadata sidebar (fully editable) */}
-          <div className="w-56 shrink-0 border-l border-border overflow-y-auto px-4 py-5">
+          {/* Right: metadata sidebar (fully editable) — empilée sous le contenu en mobile */}
+          <div className="w-full shrink-0 border-t border-border px-4 py-5 sm:w-56 sm:border-t-0 sm:border-l sm:overflow-y-auto">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Details</p>
 
             {/* Priority */}
