@@ -188,6 +188,29 @@ export async function detachProjectTeam(slug: string, id: number, teamId: number
 }
 
 // ---------------------------------------------------------------------------
+// API calls — Activité (QA2-32)
+// ---------------------------------------------------------------------------
+
+/** Un point d'activité quotidienne (issues créées ce jour-là). */
+export interface ProjectActivityPoint {
+  date: string; // ISO 'YYYY-MM-DD'
+  count: number;
+}
+
+/** Activité quotidienne du projet sur les `days` derniers jours (série continue). */
+export async function getProjectActivity(
+  slug: string,
+  id: number,
+  days = 14,
+): Promise<ProjectActivityPoint[]> {
+  const response = await apiClient.get<{ data: ProjectActivityPoint[] }>(
+    PROJECT_ROUTES.ACTIVITY(slug, id),
+    { params: { days } },
+  );
+  return response.data.data;
+}
+
+// ---------------------------------------------------------------------------
 // API calls — Labels
 // ---------------------------------------------------------------------------
 
