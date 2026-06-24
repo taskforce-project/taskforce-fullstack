@@ -1,4 +1,5 @@
 export * from './Hero';
+export * from './OrchestrationPipeline';
 export * from '../logos3';
 export * from '../feature72';
 export * from '../testimonial4';
