@@ -12,7 +12,7 @@ import {
 
 import { IssueSheet, type SheetIssue } from "@/components/sheets/issue-sheet"
 import { CreateIssueDialog } from "@/components/dialogs/create-issue-dialog"
-import { IssueFilters } from "@/components/issues/issue-filters"
+import { InlineIssueFilters } from "@/components/issues/issue-filters"
 import { type IssueFilterState, EMPTY_ISSUE_FILTERS, applyIssueFilters } from "@/lib/issue-filters"
 import { Badge } from "@/components/ui/badge"
 import { UserAvatar } from "@/components/ui/user-avatar"
@@ -108,10 +108,10 @@ export default function ProjectBacklogPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Stats bar + filtres */}
-      <div className="flex items-center gap-3 text-sm text-muted-foreground">
-        <IssueFilters issues={issues} value={filters} onChange={setFilters} />
-        <span><span className="font-medium text-foreground">{backlogIssues.length}</span> issues</span>
+      {/* Filtres en ligne + stats */}
+      <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+        <InlineIssueFilters issues={issues} value={filters} onChange={setFilters} />
+        <span className="ml-auto"><span className="font-medium text-foreground">{backlogIssues.length}</span> issues</span>
       </div>
 
       {/* List */}
