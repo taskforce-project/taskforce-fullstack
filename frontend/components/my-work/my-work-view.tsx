@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { SectionCard, CardSubSection } from "@/components/ui/section-card"
 import { PageContainer, PageHeader } from "@/components/layout/page-shell"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
 import { useProjectStore } from "@/lib/store/project-store"
 import { useCycleStore } from "@/lib/store/cycle-store"
@@ -251,8 +252,14 @@ interface MyWorkViewProps {
   readonly defaultTab?: MyWorkTab
 }
 
-export function MyWorkView(_props: MyWorkViewProps) {
+type QueueTab = "all" | "issues" | "sprints" | "pages"
+
+export function MyWorkView({ defaultTab }: MyWorkViewProps) {
   useTranslation()
+
+  const initialTab: QueueTab =
+    defaultTab === "cycles" ? "sprints" : defaultTab === "issues" ? "issues" : defaultTab === "pages" ? "pages" : "all"
+  const [tab, setTab] = useState<QueueTab>(initialTab)
 
   const params = useParams()
   const slug = typeof params?.workspace === "string" ? params.workspace : ""
@@ -300,22 +307,38 @@ export function MyWorkView(_props: MyWorkViewProps) {
         description="Issues, sprints, and pages assigned to or recently edited by you"
       />
 
+      {/* Onglets de tri (All / Issues / Sprints / Pages) — QA2-23 */}
+      <Tabs value={tab} onValueChange={(v) => setTab(v as QueueTab)}>
+        <TabsList>
+          <TabsTrigger value="all">All</TabsTrigger>
+          <TabsTrigger value="issues" className="gap-1.5">Issues<span className="text-muted-foreground">{myIssues.length}</span></TabsTrigger>
+          <TabsTrigger value="sprints" className="gap-1.5">Sprints<span className="text-muted-foreground">{activeSprints}</span></TabsTrigger>
+          <TabsTrigger value="pages" className="gap-1.5">Pages<span className="text-muted-foreground">{myPages.length}</span></TabsTrigger>
+        </TabsList>
+      </Tabs>
+
       <SectionCard title="My Queue" bodyClassName="p-0">
-        <CardSubSection label="Issues" count={myIssues.length}>
-          {myIssues.length === 0
-            ? <p className="px-4 py-3 text-sm text-muted-foreground">No open issues assigned to you.</p>
-            : myIssues.map((i) => <IssueRow key={i.id} issue={i} />)}
-        </CardSubSection>
-        <CardSubSection label="Sprints" count={activeSprints}>
-          {myCycles.length === 0
-            ? <p className="px-4 py-3 text-sm text-muted-foreground">No active sprints.</p>
-            : myCycles.map((c) => <CycleRow key={c.id} cycle={c} />)}
-        </CardSubSection>
-        <CardSubSection label="Pages" count={myPages.length}>
-          {myPages.length === 0
-            ? <p className="px-4 py-3 text-sm text-muted-foreground">No recent pages.</p>
-            : myPages.map((p) => <PageRow key={p.id} page={p} />)}
-        </CardSubSection>
+        {(tab === "all" || tab === "issues") && (
+          <CardSubSection label="Issues" count={myIssues.length}>
+            {myIssues.length === 0
+              ? <p className="px-4 py-3 text-sm text-muted-foreground">Aucune tâche ouverte qui vous est assignée.</p>
+              : myIssues.map((i) => <IssueRow key={i.id} issue={i} />)}
+          </CardSubSection>
+        )}
+        {(tab === "all" || tab === "sprints") && (
+          <CardSubSection label="Sprints" count={activeSprints}>
+            {myCycles.length === 0
+              ? <p className="px-4 py-3 text-sm text-muted-foreground">Aucun sprint actif.</p>
+              : myCycles.map((c) => <CycleRow key={c.id} cycle={c} />)}
+          </CardSubSection>
+        )}
+        {(tab === "all" || tab === "pages") && (
+          <CardSubSection label="Pages" count={myPages.length}>
+            {myPages.length === 0
+              ? <p className="px-4 py-3 text-sm text-muted-foreground">Aucune page récente.</p>
+              : myPages.map((p) => <PageRow key={p.id} page={p} />)}
+          </CardSubSection>
+        )}
       </SectionCard>
     </PageContainer>
   )
