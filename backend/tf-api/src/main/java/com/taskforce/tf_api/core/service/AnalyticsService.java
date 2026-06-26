@@ -2,6 +2,7 @@ package com.taskforce.tf_api.core.service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -131,27 +132,36 @@ public class AnalyticsService {
     }
 
     // -------------------------------------------------------------------------
-    // Throughput (8 dernières semaines)
+    // Throughput — bucket "WEEK" (8 dernières semaines, défaut) ou "DAY"
+    // (30 derniers jours, pour la courbe « tendance sur 1 mois » du dashboard).
     // -------------------------------------------------------------------------
 
-    public List<ThroughputPointResponse> getThroughput(String slug, Long userId, Long projectId) {
+    private static final DateTimeFormatter DAY_LABEL = DateTimeFormatter.ofPattern("dd/MM");
+
+    public List<ThroughputPointResponse> getThroughput(String slug, Long userId, Long projectId, String bucket) {
         Workspace ws = requireWorkspaceMember(slug, userId);
         requireFeature(userId, PlanFeature.ADVANCED_ANALYTICS);
         List<Long> projectIds = resolveProjectIds(ws.getId(), projectId);
 
+        boolean daily = "DAY".equalsIgnoreCase(bucket);
+        return daily ? buildThroughput(projectIds, 30, true) : buildThroughput(projectIds, 8, false);
+    }
+
+    /** Construit {@code points} buckets glissants (jour ou semaine) du plus ancien au plus récent. */
+    private List<ThroughputPointResponse> buildThroughput(List<Long> projectIds, int points, boolean daily) {
         List<ThroughputPointResponse> result = new ArrayList<>();
         LocalDateTime now = LocalDateTime.now();
 
-        for (int i = 7; i >= 0; i--) {
-            LocalDateTime weekEnd   = now.minusWeeks(i);
-            LocalDateTime weekStart = weekEnd.minusWeeks(1);
-            String label = "S" + (8 - i);
+        for (int i = points - 1; i >= 0; i--) {
+            LocalDateTime end   = daily ? now.minusDays(i)      : now.minusWeeks(i);
+            LocalDateTime start = daily ? end.minusDays(1)      : end.minusWeeks(1);
+            String label = daily ? end.format(DAY_LABEL) : "S" + (points - i);
 
             if (projectIds.isEmpty()) {
                 result.add(new ThroughputPointResponse(label, 0, 0));
             } else {
-                long opened   = issueRepository.countCreatedBetween(projectIds, weekStart, weekEnd);
-                long resolved = issueRepository.countCompletedBetween(projectIds, weekStart, weekEnd);
+                long opened   = issueRepository.countCreatedBetween(projectIds, start, end);
+                long resolved = issueRepository.countCompletedBetween(projectIds, start, end);
                 result.add(new ThroughputPointResponse(label, opened, resolved));
             }
         }
