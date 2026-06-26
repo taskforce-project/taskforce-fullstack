@@ -73,7 +73,7 @@ export function useStomp(channelIds: number[]) {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080/api"
     const { wsUrl, sockJsUrl } = buildRealtimeUrls(apiUrl)
 
-    const connectHeaders = token ? { Authorization: `Bearer ${token}` } : {}
+    const connectHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {}
 
     function activateClient(useSockJs: boolean) {
       if (disposed) return
