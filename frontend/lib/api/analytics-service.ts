@@ -71,8 +71,17 @@ export async function getAnalyticsKpis(slug: string, projectId?: number | null):
   return res.data.data;
 }
 
-export async function getAnalyticsThroughput(slug: string, projectId?: number | null): Promise<ThroughputPoint[]> {
-  const res = await apiClient.get<{ data: ThroughputPoint[] }>(ANALYTICS_ROUTES.THROUGHPUT(slug) + projectQuery(projectId));
+/** Granularité du throughput : "week" (8 semaines, défaut) ou "day" (30 jours, tendance 1 mois). */
+export type ThroughputBucket = "week" | "day";
+
+export async function getAnalyticsThroughput(
+  slug: string,
+  projectId?: number | null,
+  bucket?: ThroughputBucket,
+): Promise<ThroughputPoint[]> {
+  let query = projectQuery(projectId);
+  if (bucket) query += `${query ? "&" : "?"}bucket=${bucket.toUpperCase()}`;
+  const res = await apiClient.get<{ data: ThroughputPoint[] }>(ANALYTICS_ROUTES.THROUGHPUT(slug) + query);
   return res.data.data;
 }
 
