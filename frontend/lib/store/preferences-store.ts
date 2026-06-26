@@ -15,7 +15,7 @@ interface PreferencesState {
   // Language
   language: Language;
   setLanguage: (language: Language) => void;
-  t: typeof CONSTANTS_EN; // Translations object
+  t: typeof CONSTANTS_EN | typeof CONSTANTS_FR; // Translations object (FR/EN — formes structurellement identiques)
 
   // Accessibility
   reducedMotion: boolean;
@@ -28,7 +28,7 @@ interface PreferencesState {
   setHighContrast: (value: boolean) => void;
 
   // Utility function to get translations
-  getTranslations: () => typeof CONSTANTS_EN;
+  getTranslations: () => typeof CONSTANTS_EN | typeof CONSTANTS_FR;
 }
 
 const getTranslations = (language: Language) => {
