@@ -25,14 +25,17 @@ import {
   getAnalyticsKpis,
   getAnalyticsThroughput,
   getAnalyticsBurndown,
+  getAnalyticsWorkload,
   getAiInsights,
   type MemberCapacity,
   type AnalyticsKpis,
   type ThroughputPoint,
   type BurndownPoint,
+  type Workload,
   type AiInsight,
 } from "@/lib/api/analytics-service"
 import { listProjects, type Project } from "@/lib/api/project-service"
+import { WorkloadHeatmap } from "@/components/analytics/workload-heatmap"
 
 const ALL_PROJECTS = "all"
 
@@ -137,6 +140,7 @@ export default function AnalyticsPage() {
   const slug = params.workspace as string
   const openUpgrade = useUpgradeStore((s) => s.openUpgrade)
   const [capacityData, setCapacityData] = useState<MemberCapacity[]>([])
+  const [workload, setWorkload] = useState<Workload | null>(null)
   const [kpis, setKpis] = useState<AnalyticsKpis | null>(null)
   const [throughput, setThroughput] = useState<ThroughputPoint[]>([])
   const [burndown, setBurndown] = useState<BurndownPoint[]>([])
@@ -164,6 +168,7 @@ export default function AnalyticsPage() {
       getAnalyticsThroughput(slug, projectId).then(setThroughput).catch(() => { /* non-critical */ })
       getAnalyticsBurndown(slug, projectId).then(setBurndown).catch(() => { /* non-critical */ })
       getAnalyticsCapacity(slug, projectId).then(setCapacityData).catch(() => { /* non-critical */ })
+      getAnalyticsWorkload(slug, 14).then(setWorkload).catch(() => { /* non-critical */ })
     }
   }, [slug, projectFilter, isPro])
 
@@ -279,6 +284,13 @@ export default function AnalyticsPage() {
           </div>
         </div>
       </div>
+
+      {/* Charge de l'équipe — heatmap membre × jour (US-022) */}
+      <SectionCard title="Charge de l'équipe" action={proBadge} bodyClassName="p-4">
+        <MaybeGate gated={!isPro} onUpgrade={openUpgrade}>
+          <WorkloadHeatmap data={workload} />
+        </MaybeGate>
+      </SectionCard>
     </PageContainer>
   )
 }
