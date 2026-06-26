@@ -82,7 +82,9 @@ export default function PixelBlast({
     container.appendChild(canvas)
     canvasRef.current = canvas
 
-    const gl = canvas.getContext("webgl", { alpha: transparent, premultipliedAlpha: false })
+    // `!` : le guard ci-dessous protège à l'exécution ; l'assertion évite que TS
+    // perde le narrowing non-null dans les closures (compileShader/resize).
+    const gl = canvas.getContext("webgl", { alpha: transparent, premultipliedAlpha: false })!
     if (!gl) return
     glRef.current = gl
 
