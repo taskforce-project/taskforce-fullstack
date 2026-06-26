@@ -1,5 +1,4 @@
 import type { NextConfig } from "next";
-import webpack from "webpack";
 
 // CSP adaptée App Router Next.js :
 // - unsafe-inline requis pour Tailwind (styles inline) et Next.js hydration
@@ -33,6 +32,10 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   output: 'standalone', // Pour Docker
+  // Next 16 : Turbopack est le bundler par défaut (build + dev). Config vide = on lève
+  // le conflit « webpack config sans turbopack config » ; le bloc webpack() ci-dessous
+  // n'est lu que si l'on force `--webpack`. Turbopack gère nativement `node:` + builtins navigateur.
+  turbopack: {},
   transpilePackages: [
     "@tiptap/react",
     "@tiptap/pm",
@@ -50,7 +53,7 @@ const nextConfig: NextConfig = {
     "assistant-stream",
     "assistant-cloud",
   ],
-  webpack(config, { isServer, dev }) {
+  webpack(config, { isServer, dev, webpack }) {
     config.resolve.conditionNames = ["import", "require", "node", "default", "browser"]
 
     // Dev sous Docker/Windows : le polling (WATCHPACK_POLLING/CHOKIDAR_USEPOLLING)
