@@ -50,12 +50,13 @@ public class AnalyticsController {
     public ResponseEntity<ApiResponse<List<ThroughputPointResponse>>> getThroughput(
         @PathVariable String slug,
         @RequestParam(required = false) Long projectId,
+        @RequestParam(required = false) String bucket,
         @AuthenticationPrincipal Jwt jwt
     ) {
         Long userId = resolveUserId(jwt);
         return ResponseEntity.ok(ApiResponse.success(
             "Throughput récupéré",
-            analyticsService.getThroughput(slug, userId, projectId)
+            analyticsService.getThroughput(slug, userId, projectId, bucket)
         ));
     }
 
