@@ -58,10 +58,10 @@ export const usePreferencesStore = create<PreferencesState>()(
       setLanguage: (language) => {
         set({ 
           language,
-          t: getTranslations(language),
+          t: getTranslations(language) as any,
         });
       },
-      t: CONSTANTS_FR, // Default to French
+      t: CONSTANTS_FR as any, // Default to French
 
       // Accessibility
       reducedMotion: false,
@@ -126,7 +126,7 @@ export const usePreferencesStore = create<PreferencesState>()(
             }
           }
           // Set translations based on saved language
-          state.t = getTranslations(state.language);
+          state.t = getTranslations(state.language) as typeof CONSTANTS_FR;
         }
       },
     }
