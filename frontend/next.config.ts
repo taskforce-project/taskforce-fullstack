@@ -32,6 +32,7 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  turbopack: {},
   output: 'standalone', // Pour Docker
   transpilePackages: [
     "@tiptap/react",
@@ -107,4 +108,3 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
-
