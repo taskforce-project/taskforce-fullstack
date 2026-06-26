@@ -61,8 +61,8 @@ export default function DashboardPage() {
       .then(setAiInsights)
       .catch(() => setAiInsights([]))
       .finally(() => setInsightsLoading(false))
-    // Throughput hebdo (réel) — gated Pro : en cas de 409/erreur, on masque simplement le graphe.
-    getAnalyticsThroughput(slug)
+    // Throughput journalier sur 30 jours (réel) — gated Pro : en cas de 409/erreur, on masque le graphe.
+    getAnalyticsThroughput(slug, null, "day")
       .then(setThroughput)
       .catch(() => setThroughput([]))
   }, [slug])
