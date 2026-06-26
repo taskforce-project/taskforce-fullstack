@@ -32,8 +32,11 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  turbopack: {},
   output: 'standalone', // Pour Docker
+  // Next 16 : Turbopack est le bundler par défaut (build + dev). Config vide = on lève
+  // le conflit « webpack config sans turbopack config » ; le bloc webpack() ci-dessous
+  // n'est lu que si l'on force `--webpack`. Turbopack gère nativement `node:` + builtins navigateur.
+  turbopack: {},
   transpilePackages: [
     "@tiptap/react",
     "@tiptap/pm",

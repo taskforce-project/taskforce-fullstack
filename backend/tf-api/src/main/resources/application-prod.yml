@@ -71,6 +71,21 @@ keycloak:
     username: ${KEYCLOAK_ADMIN_USERNAME}
     password: ${KEYCLOAK_ADMIN_PASSWORD}
 
+# Application URLs (OAuth callbacks, liens e-mail)
+app:
+  name: ${APP_NAME:TaskForce}
+  url: ${APP_URL}
+  frontend-url: ${FRONTEND_URL}
+
+# Intégrations tierces (OAuth) — vides si non configurées
+integrations:
+  github:
+    client-id: ${GITHUB_CLIENT_ID:}
+    client-secret: ${GITHUB_CLIENT_SECRET:}
+  slack:
+    client-id: ${SLACK_CLIENT_ID:}
+    client-secret: ${SLACK_CLIENT_SECRET:}
+
 # Logging Configuration
 logging:
   level:

@@ -8,6 +8,9 @@ import {
   Radio,
   ListTodo,
   Layers,
+  CircleDot,
+  Repeat,
+  CalendarRange,
   Activity,
   Cpu,
   User,
@@ -101,6 +104,21 @@ const NAV_WORK: readonly NavItem[] = [
     key: "nav.projects",
     url: "/projects",
     icon: Layers,
+  },
+  {
+    key: "nav.issues",
+    url: "/issues",
+    icon: CircleDot,
+  },
+  {
+    key: "nav.cycles",
+    url: "/cycles",
+    icon: Repeat,
+  },
+  {
+    key: "nav.roadmap",
+    url: "/roadmap",
+    icon: CalendarRange,
   },
   {
     key: "nav.analytics",

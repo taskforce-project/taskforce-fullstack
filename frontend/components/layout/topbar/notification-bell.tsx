@@ -35,8 +35,18 @@ export function NotificationBell() {
   const markAllAsRead = useNotificationStore((s) => s.markAllAsRead)
   const [open, setOpen] = React.useState(false)
 
+  // Push temps réel (US-023) : abonnement STOMP /topic/notifications.{userId}
+  useNotificationsRealtime(slug)
+
   React.useEffect(() => {
     if (slug) fetchNotifications(slug)
+  }, [slug, fetchNotifications])
+
+  // Filet de sécurité : rafraîchit toutes les 60 s si le push STOMP est indisponible.
+  React.useEffect(() => {
+    if (!slug) return
+    const id = setInterval(() => fetchNotifications(slug), 60_000)
+    return () => clearInterval(id)
   }, [slug, fetchNotifications])
 
   const recent = signals.slice(0, 6)

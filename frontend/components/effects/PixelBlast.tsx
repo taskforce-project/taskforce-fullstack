@@ -82,7 +82,9 @@ export default function PixelBlast({
     container.appendChild(canvas)
     canvasRef.current = canvas
 
-    const gl = canvas.getContext("webgl", { alpha: transparent, premultipliedAlpha: false })
+    // `!` : le guard ci-dessous protège à l'exécution ; l'assertion évite que TS
+    // perde le narrowing non-null dans les closures (compileShader/resize).
+    const gl = canvas.getContext("webgl", { alpha: transparent, premultipliedAlpha: false })!
     if (!gl) return
     glRef.current = gl
 
@@ -181,12 +183,12 @@ export default function PixelBlast({
     `
 
     function compileShader(type: number, src: string): WebGLShader | null {
-      const shader = gl!.createShader(type)
+      const shader = gl.createShader(type)
       if (!shader) return null
-      gl!.shaderSource(shader, src)
-      gl!.compileShader(shader)
-      if (!gl!.getShaderParameter(shader, gl!.COMPILE_STATUS)) {
-        gl!.deleteShader(shader)
+      gl.shaderSource(shader, src)
+      gl.compileShader(shader)
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        gl.deleteShader(shader)
         return null
       }
       return shader
@@ -231,7 +233,7 @@ export default function PixelBlast({
       const h = container.clientHeight
       canvas.width = Math.round(w * dpr)
       canvas.height = Math.round(h * dpr)
-      gl!.viewport(0, 0, canvas.width, canvas.height)
+      gl.viewport(0, 0, canvas.width, canvas.height)
     }
     window.addEventListener("resize", resize)
     resize()
@@ -323,4 +325,3 @@ export default function PixelBlast({
     />
   )
 }
-

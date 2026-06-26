@@ -15,7 +15,7 @@ interface PreferencesState {
   // Language
   language: Language;
   setLanguage: (language: Language) => void;
-  t: typeof CONSTANTS_EN; // Translations object
+  t: typeof CONSTANTS_EN | typeof CONSTANTS_FR; // Translations object (FR/EN — formes structurellement identiques)
 
   // Accessibility
   reducedMotion: boolean;
@@ -28,7 +28,7 @@ interface PreferencesState {
   setHighContrast: (value: boolean) => void;
 
   // Utility function to get translations
-  getTranslations: () => typeof CONSTANTS_EN;
+  getTranslations: () => typeof CONSTANTS_EN | typeof CONSTANTS_FR;
 }
 
 const getTranslations = (language: Language) => {
@@ -58,10 +58,10 @@ export const usePreferencesStore = create<PreferencesState>()(
       setLanguage: (language) => {
         set({ 
           language,
-          t: getTranslations(language) as any,
+          t: getTranslations(language),
         });
       },
-      t: CONSTANTS_FR as any, // Default to French
+      t: CONSTANTS_FR, // Default to French
 
       // Accessibility
       reducedMotion: false,
@@ -126,7 +126,7 @@ export const usePreferencesStore = create<PreferencesState>()(
             }
           }
           // Set translations based on saved language
-          state.t = getTranslations(state.language) as typeof CONSTANTS_FR;
+          state.t = getTranslations(state.language);
         }
       },
     }

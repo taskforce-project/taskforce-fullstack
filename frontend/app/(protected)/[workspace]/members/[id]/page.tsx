@@ -23,6 +23,7 @@ import { UserAvatar } from "@/components/ui/user-avatar"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 import { MemberSkillsCard } from "@/components/members/member-skills-card"
+import { MemberAvailabilityCard } from "@/components/members/member-availability-card"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { useUserStore } from "@/lib/store/user-store"
 import { useProjectStore } from "@/lib/store/project-store"
@@ -220,6 +221,9 @@ export default function MemberProfilePage() {
 
       {/* Skills profile — feeds Smart Assign (PROD-1.2) */}
       <MemberSkillsCard slug={slug} userId={member.userId} canEdit={canEdit} />
+
+      {/* Disponibilité — congés / indisponibilités (US-006) */}
+      <MemberAvailabilityCard slug={slug} userId={member.userId} canEdit={canEdit} />
 
       {/* Recent issues */}
       <section>
