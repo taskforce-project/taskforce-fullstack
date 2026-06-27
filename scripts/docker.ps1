@@ -31,8 +31,22 @@ switch ($Action) {
   'upd'      { Run 'dev up -d';             Invoke-Compose ($DEV + (DevEnv) + @('up','-d')); Show-Urls }
   'down'     { Run 'dev down';              Invoke-Compose ($DEV + @('down')) }
   'restart'  { Run 'dev restart';           Invoke-Compose ($DEV + @('down')); Invoke-Compose ($DEV + (DevEnv) + @('up','-d')) }
-  'rebuild'  { Run 'dev rebuild';           Invoke-Compose ($DEV + @('build','--no-cache')); Invoke-Compose ($DEV + (DevEnv) + @('up','-d')) }
-  'build'    { Run 'dev build --no-cache';  Invoke-Compose ($DEV + @('build','--no-cache')) }
+  # rebuild [service] : sans service = tout en --no-cache ; avec service = ciblé + cache (rapide)
+  'rebuild'  {
+    if ($Service) {
+      Run "dev rebuild $Service (cible)"
+      Invoke-Compose ($DEV + @('build', $Service))
+      Invoke-Compose ($DEV + (DevEnv) + @('up','-d', $Service))
+    } else {
+      Run 'dev rebuild (tout, --no-cache)'
+      Invoke-Compose ($DEV + @('build','--no-cache'))
+      Invoke-Compose ($DEV + (DevEnv) + @('up','-d'))
+    }
+  }
+  'build'    {
+    if ($Service) { Run "dev build $Service (cible)"; Invoke-Compose ($DEV + @('build', $Service)) }
+    else          { Run 'dev build --no-cache';       Invoke-Compose ($DEV + @('build','--no-cache')) }
+  }
   'clean-dev'{ Run 'dev down -v';           Invoke-Compose ($DEV + @('down','-v')) }
   'logs'     { if ($Service) { Invoke-Compose ($DEV + @('logs','-f',$Service)) } else { Invoke-Compose ($DEV + @('logs','-f')) } }
 
