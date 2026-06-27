@@ -573,6 +573,34 @@ public class IssueService {
         log.info("Issue {} supprimée du projet {}", issueId, projectId);
     }
 
+    /** Archive ou désarchive une issue (masquée des vues par défaut quand archivée). */
+    @Transactional
+    public IssueResponse setArchived(String workspaceSlug, Long projectId, Long issueId, boolean archived, Long userId) {
+        Project project = resolveProject(workspaceSlug, projectId);
+        assertWorkspaceMember(project.getWorkspace().getId(), userId);
+        Issue issue = resolveIssue(issueId, project.getId());
+        issue.setArchivedAt(archived ? java.time.LocalDateTime.now() : null);
+        // Une issue archivée ne reste pas épinglée.
+        if (archived) issue.setPinned(false);
+        issue = issueRepository.save(issue);
+        IssueResponse updated = toResponse(issue);
+        publishIssueEvent("updated", project.getId(), issueId, updated);
+        return updated;
+    }
+
+    /** Épingle / dépingle une issue (remontée en tête de board/liste). */
+    @Transactional
+    public IssueResponse setPinned(String workspaceSlug, Long projectId, Long issueId, boolean pinned, Long userId) {
+        Project project = resolveProject(workspaceSlug, projectId);
+        assertWorkspaceMember(project.getWorkspace().getId(), userId);
+        Issue issue = resolveIssue(issueId, project.getId());
+        issue.setPinned(pinned);
+        issue = issueRepository.save(issue);
+        IssueResponse updated = toResponse(issue);
+        publishIssueEvent("updated", project.getId(), issueId, updated);
+        return updated;
+    }
+
     /** Diffuse un événement issue en temps réel sur le topic projet (best-effort). */
     private void publishIssueEvent(String action, Long projectId, Long issueId, IssueResponse issue) {
         try {
@@ -944,6 +972,8 @@ public class IssueService {
                     .build())
                 .toList())
             .commentCount(issue.getComments().size())
+            .archived(issue.getArchivedAt() != null)
+            .pinned(Boolean.TRUE.equals(issue.getPinned()))
             .createdAt(issue.getCreatedAt())
             .updatedAt(issue.getUpdatedAt())
             .build();
