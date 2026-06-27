@@ -7,6 +7,7 @@ import {
   Flag, Tag, Calendar, Layers, GitBranch, MessageSquare, Activity,
   ChevronDown, Send, ExternalLink, Pencil, Check as CheckIcon,
   Paperclip, Upload, Trash2, FileText, Link2, Plus,
+  MoreHorizontal, Pin, PinOff, Archive, ArchiveRestore, Link as LinkIcon, Hash,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -19,9 +20,13 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { Separator } from "@/components/ui/separator"
+import { ScrollableTabs } from "@/components/ui/scrollable-tabs"
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
+import {
+  Select, SelectContent, SelectItem, SelectTrigger,
+} from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 import { SmartAssignPanel } from "@/components/smart-assign/smart-assign-panel"
 import { DeleteConfirmDialog } from "@/components/dialogs/delete-confirm-dialog"
@@ -33,6 +38,7 @@ import {
   type Attachment,
 } from "@/lib/api/attachment-service"
 import { useIssueStore } from "@/lib/store/issue-store"
+import { useUserStore } from "@/lib/store/user-store"
 import { useLabelStore } from "@/lib/store/label-store"
 import { useIntegrationStore } from "@/lib/store/integration-store"
 import { listProjectMembers, type ProjectMember } from "@/lib/api/project-service"
@@ -64,6 +70,8 @@ export interface SheetIssue {
   cycle: string | null
   createdAt: string
   description?: string
+  pinned?: boolean
+  archived?: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -347,6 +355,7 @@ interface CommentsTabProps {
 }
 
 function CommentsTab({ comments, loading, comment, onChange, onSend, onDelete }: Readonly<CommentsTabProps>) {
+  const currentUser = useUserStore((s) => s.user)
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter") onSend()
   }
@@ -392,9 +401,13 @@ function CommentsTab({ comments, loading, comment, onChange, onSend, onDelete }:
 
       {/* Comment input */}
       <div className="flex gap-3 mt-1">
-        <Avatar className="size-7 shrink-0">
-          <AvatarFallback className="text-[9px] text-white bg-primary">ME</AvatarFallback>
-        </Avatar>
+        <UserAvatar
+          email={currentUser?.email}
+          name={currentUser?.displayName ?? currentUser?.email}
+          avatarUrl={currentUser?.avatarUrl}
+          className="size-7 shrink-0"
+          fallbackClassName="text-[9px]"
+        />
         <div className="flex-1 rounded-lg border border-border overflow-hidden focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20 transition-all">
           <input
             type="text"
@@ -428,7 +441,7 @@ interface AttachmentsTabProps {
   workspaceSlug: string
 }
 
-function AttachmentsTab({ issueId, projectId, workspaceSlug }: Readonly<AttachmentsTabProps>) {
+export function AttachmentsTab({ issueId, projectId, workspaceSlug }: Readonly<AttachmentsTabProps>) {
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
@@ -568,7 +581,7 @@ function formatDueDateDraft(dueDate: string | null): string {
 }
 
 // ─── Sous-tâches (PROD-2.1) ────────────────────────────────────────────────────
-function SubtasksTab({
+export function SubtasksTab({
   issueId, projectId, workspaceSlug,
 }: Readonly<{ issueId: number; projectId: number; workspaceSlug: string }>) {
   const createIssue = useIssueStore((s) => s.createIssue)
@@ -994,13 +1007,18 @@ interface IssueSheetProps {
 
 export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId }: Readonly<IssueSheetProps>) {
   const router = useRouter()
-  const { fetchComments, addComment, deleteComment, fetchActivity, updateIssue, deleteIssue, fetchStatuses,
+  const { fetchComments, addComment, deleteComment, fetchActivity, updateIssue, deleteIssue,
+          archiveIssue, pinIssue, fetchStatuses,
           comments: storeComments, activity: storeActivity, statuses: storeStatuses } = useIssueStore()
   const { labelsByProject, fetchLabels } = useLabelStore()
 
   const initDescription = issue?.description ?? ""
   const [comment, setComment] = useState("")
   const [tab, setTab] = useState<"comments" | "activity" | "attachments" | "github" | "subtasks" | "relations" | "checklist" | "time">("comments")
+
+  // Archive / pin (façon GitHub)
+  const [pinned, setPinned] = useState<boolean>(issue?.pinned ?? false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
 
   // Status (real IDs from API)
   const [statusId, setStatusId]             = useState<number>(issue?.statusId ?? 0)
@@ -1055,9 +1073,9 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
     setPoints(issue.storyPoints)
     setCycle(issue.cycle)
     setStatusId(issue.statusId)
-    setStatusId(issue.statusId)
     setStatusName(issue.statusName)
     setStatusCategory(issue.statusCategory)
+    setPinned(issue.pinned ?? false)
   }, [issue])
 
   // Load project members + statuses + labels when sheet opens
@@ -1126,6 +1144,41 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
       onOpenChange(false)
     } catch {
       toast.error("Échec de la suppression")
+    }
+  }
+
+  function openFullPage() {
+    if (!workspaceSlug || !projectId) return
+    router.push(`/${workspaceSlug}/projects/${projectId}/issues/${issue!.id}`)
+    onOpenChange(false)
+  }
+
+  async function copyToClipboard(text: string, label: string) {
+    try {
+      await navigator.clipboard.writeText(text)
+      toast.success(label)
+    } catch {
+      toast.error("Copie impossible")
+    }
+  }
+
+  async function handleTogglePin() {
+    if (!workspaceSlug || !projectId) return
+    const next = !pinned
+    setPinned(next)
+    const res = await pinIssue(workspaceSlug, projectId, issueId, next)
+    if (res) toast.success(next ? "Issue épinglée" : "Issue dépinglée")
+    else setPinned(!next)
+  }
+
+  async function handleArchive() {
+    if (!workspaceSlug || !projectId) return
+    const res = await archiveIssue(workspaceSlug, projectId, issueId, !(issue!.archived ?? false))
+    if (res) {
+      toast.success(res.archived ? "Issue archivée" : "Issue désarchivée")
+      if (res.archived) onOpenChange(false)
+    } else {
+      toast.error("Échec de l'archivage")
     }
   }
 
@@ -1254,33 +1307,68 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
             </DropdownMenuContent>
           </DropdownMenu>
 
+          {pinned && (
+            <span className="flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-500">
+              <Pin className="size-3" /> Épinglée
+            </span>
+          )}
+
           <div className="flex-1" />
 
+          {/* Ouvrir en page pleine — accès direct conservé */}
           <Button
             variant="ghost"
             size="sm"
             className="h-7 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-            onClick={() => {
-              if (workspaceSlug && projectId) {
-                router.push(`/${workspaceSlug}/projects/${projectId}/issues/${issue.id}`)
-                onOpenChange(false)
-              }
-            }}
+            onClick={openFullPage}
             title="Ouvrir l'issue en page pleine"
           >
             <ExternalLink className="size-3.5" />
             Open
           </Button>
+
+          {/* Menu d'actions façon GitHub */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" title="Actions">
+                <MoreHorizontal className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-48">
+              <DropdownMenuItem className="gap-2 text-xs" onClick={() => copyToClipboard(`${window.location.origin}/${workspaceSlug}/projects/${projectId}/issues/${issue.id}`, "Lien copié")}>
+                <LinkIcon className="size-3.5" /> Copier le lien
+              </DropdownMenuItem>
+              <DropdownMenuItem className="gap-2 text-xs" onClick={() => copyToClipboard(issue.identifier, "Identifiant copié")}>
+                <Hash className="size-3.5" /> {`Copier l'ID (${issue.identifier})`}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="gap-2 text-xs" onClick={handleTogglePin}>
+                {pinned ? <PinOff className="size-3.5" /> : <Pin className="size-3.5" />}
+                {pinned ? "Désépingler" : "Épingler"}
+              </DropdownMenuItem>
+              <DropdownMenuItem className="gap-2 text-xs" onClick={handleArchive}>
+                {issue.archived ? <ArchiveRestore className="size-3.5" /> : <Archive className="size-3.5" />}
+                {issue.archived ? "Désarchiver" : "Archiver"}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="gap-2 text-xs text-destructive focus:text-destructive"
+                onSelect={(e) => { e.preventDefault(); setDeleteOpen(true) }}
+              >
+                <Trash2 className="size-3.5" /> Supprimer
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           <DeleteConfirmDialog
+            open={deleteOpen}
+            onOpenChange={setDeleteOpen}
             title="Supprimer l'issue ?"
             description={`« ${issue.title} » sera définitivement supprimée. Cette action est irréversible.`}
             confirmLabel="Supprimer"
             onConfirm={handleDelete}
-          >
-            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" title="Supprimer l'issue">
-              <Trash2 className="size-4" />
-            </Button>
-          </DeleteConfirmDialog>
+          />
+
           <SheetClose asChild>
             <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground">
               <X className="size-4" />
@@ -1356,131 +1444,40 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
 
             <Separator />
 
-            {/* Comments / Activity / Attachments tabs */}
+            {/* Comments / Activity / … — bande scrollable avec chevrons (QA3) */}
             <div>
-              <div className="flex flex-wrap gap-x-4 gap-y-1 mb-4 border-b border-border [&>button]:whitespace-nowrap">
-                <button
-                  type="button"
-                  onClick={() => setTab("comments")}
-                  className={cn(
-                    "flex items-center gap-1.5 text-xs font-medium pb-2.5 border-b-2 -mb-px transition-colors",
-                    tab === "comments"
-                      ? "border-foreground text-foreground"
-                      : "border-transparent text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <MessageSquare className="size-3.5" />
-                  Comments ({storeComments.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTab("activity")}
-                  className={cn(
-                    "flex items-center gap-1.5 text-xs font-medium pb-2.5 border-b-2 -mb-px transition-colors",
-                    tab === "activity"
-                      ? "border-foreground text-foreground"
-                      : "border-transparent text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Activity className="size-3.5" />
-                  Activity
-                </button>
-                {workspaceSlug && projectId && (
+              <ScrollableTabs className="mb-4" scrollClassName="gap-4 border-b border-border">
+                {([
+                  { key: "comments",    icon: MessageSquare, label: `Comments (${storeComments.length})`, show: true },
+                  { key: "activity",    icon: Activity,      label: "Activity",                            show: true },
+                  { key: "attachments", icon: Paperclip,     label: "Attachments", show: Boolean(workspaceSlug && projectId) },
+                  { key: "github",      icon: GitBranch,     label: "GitHub",      show: Boolean(workspaceSlug) },
+                  { key: "subtasks",    icon: Layers,        label: "Sub-tasks",   show: Boolean(workspaceSlug && projectId) },
+                  { key: "relations",   icon: Link2,         label: "Relations",   show: Boolean(workspaceSlug && projectId) },
+                  { key: "checklist",   icon: CheckCircle2,  label: "Checklist",   show: Boolean(workspaceSlug && projectId) },
+                  { key: "time",        icon: Clock,         label: "Time",        show: Boolean(workspaceSlug && projectId) },
+                ] as const).filter((t) => t.show).map(({ key, icon: Icon, label }) => (
                   <button
-                    type="button"
-                    onClick={() => setTab("attachments")}
-                    className={cn(
-                      "flex items-center gap-1.5 text-xs font-medium pb-2.5 border-b-2 -mb-px transition-colors",
-                      tab === "attachments"
-                        ? "border-foreground text-foreground"
-                        : "border-transparent text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    <Paperclip className="size-3.5" />
-                    Attachments
-                  </button>
-                )}
-                {workspaceSlug && (
-                  <button
+                    key={key}
                     type="button"
                     onClick={() => {
-                      setTab("github")
-                      if (workspaceSlug && issue?.id) {
+                      setTab(key)
+                      if (key === "github" && workspaceSlug && issue?.id) {
                         useIntegrationStore.getState().fetchGitHubLinks(workspaceSlug, Number(issue.id)).catch(() => null)
                       }
                     }}
                     className={cn(
-                      "flex items-center gap-1.5 text-xs font-medium pb-2.5 border-b-2 -mb-px transition-colors",
-                      tab === "github"
+                      "flex shrink-0 items-center gap-1.5 whitespace-nowrap text-xs font-medium pb-2.5 border-b-2 -mb-px transition-colors",
+                      tab === key
                         ? "border-foreground text-foreground"
                         : "border-transparent text-muted-foreground hover:text-foreground"
                     )}
                   >
-                    <GitBranch className="size-3.5" />
-                    GitHub
+                    <Icon className="size-3.5" />
+                    {label}
                   </button>
-                )}
-                {workspaceSlug && projectId && (
-                  <button
-                    type="button"
-                    onClick={() => setTab("subtasks")}
-                    className={cn(
-                      "flex items-center gap-1.5 text-xs font-medium pb-2.5 border-b-2 -mb-px transition-colors",
-                      tab === "subtasks"
-                        ? "border-foreground text-foreground"
-                        : "border-transparent text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    <Layers className="size-3.5" />
-                    Sub-tasks
-                  </button>
-                )}
-                {workspaceSlug && projectId && (
-                  <button
-                    type="button"
-                    onClick={() => setTab("relations")}
-                    className={cn(
-                      "flex items-center gap-1.5 text-xs font-medium pb-2.5 border-b-2 -mb-px transition-colors",
-                      tab === "relations"
-                        ? "border-foreground text-foreground"
-                        : "border-transparent text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    <Link2 className="size-3.5" />
-                    Relations
-                  </button>
-                )}
-                {workspaceSlug && projectId && (
-                  <button
-                    type="button"
-                    onClick={() => setTab("checklist")}
-                    className={cn(
-                      "flex items-center gap-1.5 text-xs font-medium pb-2.5 border-b-2 -mb-px transition-colors",
-                      tab === "checklist"
-                        ? "border-foreground text-foreground"
-                        : "border-transparent text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    <CheckCircle2 className="size-3.5" />
-                    Checklist
-                  </button>
-                )}
-                {workspaceSlug && projectId && (
-                  <button
-                    type="button"
-                    onClick={() => setTab("time")}
-                    className={cn(
-                      "flex items-center gap-1.5 text-xs font-medium pb-2.5 border-b-2 -mb-px transition-colors",
-                      tab === "time"
-                        ? "border-foreground text-foreground"
-                        : "border-transparent text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    <Clock className="size-3.5" />
-                    Time
-                  </button>
-                )}
-              </div>
+                ))}
+              </ScrollableTabs>
 
               {tab === "comments" && (
                 <CommentsTab
@@ -1577,85 +1574,73 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
 
             {/* Priority */}
             <MetaRow icon={<Flag className="size-3.5" />} label="Priority">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button type="button" className="flex items-center gap-1.5 hover:bg-muted/50 rounded px-1 -mx-1 py-0.5 w-full text-left transition-colors">
-                    <div className={cn("size-2 rounded-full shrink-0", priorityCfg.dot)} />
-                    <span className="text-xs flex-1">{priorityCfg.label}</span>
-                    <ChevronDown className="size-3 opacity-40 shrink-0" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="min-w-36">
+              <Select
+                value={priority}
+                onValueChange={async (p) => {
+                  setPriority(p as IssuePriority)
+                  await callUpdate({ priority: p as IssuePriority })
+                  toast.success(`Priority → ${PRIORITY_CONFIG[p as IssuePriority].label}`)
+                }}
+              >
+                <SelectTrigger size="sm" className="w-full">
+                  <span className="flex items-center gap-1.5">
+                    <span className={cn("size-2 rounded-full shrink-0", priorityCfg.dot)} />
+                    {priorityCfg.label}
+                  </span>
+                </SelectTrigger>
+                <SelectContent>
                   {(Object.keys(PRIORITY_CONFIG) as IssuePriority[]).map((p) => (
-                    <DropdownMenuItem key={p} className="flex items-center gap-2 text-xs" onClick={async () => {
-                      setPriority(p)
-                      await callUpdate({ priority: p })
-                      toast.success(`Priority → ${PRIORITY_CONFIG[p].label}`)
-                    }}>
-                      <div className={cn("size-2 rounded-full", PRIORITY_CONFIG[p].dot)} />
+                    <SelectItem key={p} value={p}>
+                      <span className={cn("size-2 rounded-full shrink-0", PRIORITY_CONFIG[p].dot)} />
                       {PRIORITY_CONFIG[p].label}
-                      {priority === p ? <CheckIcon className="ml-auto size-3 text-primary" /> : null}
-                    </DropdownMenuItem>
+                    </SelectItem>
                   ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                </SelectContent>
+              </Select>
             </MetaRow>
 
             {/* Assignee */}
             <MetaRow icon={<Avatar className="size-3.5"><AvatarFallback className="text-[7px]">?</AvatarFallback></Avatar>} label="Assignee">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button type="button" className="flex items-center gap-1.5 hover:bg-muted/50 rounded px-1 -mx-1 py-0.5 w-full text-left transition-colors">
-                    {assignee ? (
-                      <>
-                        <UserAvatar
-                          email={assignee.email}
-                          name={assignee.name}
-                          className="size-4 shrink-0"
-                          fallbackClassName="text-[8px]"
-                        />
-                        <span className="text-xs flex-1 truncate">{assignee.name}</span>
-                      </>
-                    ) : (
-                      <span className="text-xs flex-1 text-muted-foreground">Unassigned</span>
-                    )}
-                    <ChevronDown className="size-3 opacity-40 shrink-0" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="min-w-40">
-                  <DropdownMenuItem className="flex items-center gap-2 text-xs" onClick={async () => {
+              <Select
+                value={assignee ? String(assignee.userId) : "none"}
+                onValueChange={async (val) => {
+                  if (val === "none") {
                     setAssignee(null)
                     await callUpdate({ assigneeId: null })
                     toast.success("Unassigned")
-                  }}>
-                    <span className="size-4 inline-block shrink-0" />
-                    <span className="text-muted-foreground">No assignee</span>
-                    {noAssignee && <CheckIcon className="ml-auto size-3 text-primary" />}
-                  </DropdownMenuItem>
+                    return
+                  }
+                  const m = projectMembers.find((x) => String(x.userId) === val)
+                  if (!m) return
+                  const name = m.displayName ?? m.email
+                  setAssignee({ initials: memberInitials(m), color: memberColor(m.userId), name, userId: m.userId, email: m.email })
+                  await callUpdate({ assigneeId: m.userId })
+                  toast.success(`Assigned to ${name}`)
+                }}
+              >
+                <SelectTrigger size="sm" className="w-full">
+                  {assignee ? (
+                    <span className="flex items-center gap-1.5 min-w-0">
+                      <UserAvatar email={assignee.email} name={assignee.name} className="size-4 shrink-0" fallbackClassName="text-[8px]" />
+                      <span className="truncate">{assignee.name}</span>
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">Unassigned</span>
+                  )}
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none"><span className="text-muted-foreground">No assignee</span></SelectItem>
                   {projectMembers.map((m) => {
-                    const initials = memberInitials(m)
-                    const color    = memberColor(m.userId)
-                    const name     = m.displayName ?? m.email
+                    const name = m.displayName ?? m.email
                     return (
-                      <DropdownMenuItem key={m.userId} className="flex items-center gap-2 text-xs" onClick={async () => {
-                        setAssignee({ initials, color, name, userId: m.userId, email: m.email })
-                        await callUpdate({ assigneeId: m.userId })
-                        toast.success(`Assigned to ${name}`)
-                      }}>
-                        <UserAvatar
-                          email={m.email}
-                          name={name}
-                          avatarUrl={m.avatarUrl}
-                          className="size-4 shrink-0"
-                          fallbackClassName="text-[8px]"
-                        />
+                      <SelectItem key={m.userId} value={String(m.userId)}>
+                        <UserAvatar email={m.email} name={name} avatarUrl={m.avatarUrl} className="size-4 shrink-0" fallbackClassName="text-[8px]" />
                         {name}
-                        {assignee?.userId === m.userId ? <CheckIcon className="ml-auto size-3 text-primary" /> : null}
-                      </DropdownMenuItem>
+                      </SelectItem>
                     )
                   })}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                </SelectContent>
+              </Select>
             </MetaRow>
 
             {/* Smart Auto-Assign */}
@@ -1730,32 +1715,27 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
 
             {/* Points — select de presets (estimation d'effort), persiste en base */}
             <MetaRow icon={<Layers className="size-3.5" />} label="Points">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button type="button" className="flex items-center gap-1 text-xs hover:bg-muted/50 rounded px-1 -mx-1 py-0.5 w-full text-left transition-colors">
-                    <span className="flex-1 text-foreground">{points === null ? "—" : `${points} pts`}</span>
-                    <ChevronDown className="size-3 opacity-40 shrink-0" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="min-w-32">
+              <Select
+                value={points === null ? "none" : String(points)}
+                onValueChange={async (val) => {
+                  const pt = val === "none" ? null : Number(val)
+                  setPoints(pt)
+                  // 0 = retirer l'estimation côté backend
+                  await callUpdate({ storyPoints: pt ?? 0 })
+                  toast.success("Points updated")
+                }}
+              >
+                <SelectTrigger size="sm" className="w-full">
+                  <span>{points === null ? "—" : `${points} pts`}</span>
+                </SelectTrigger>
+                <SelectContent>
                   {STORY_POINT_PRESETS.map((pt) => (
-                    <DropdownMenuItem
-                      key={pt ?? "none"}
-                      className="flex items-center gap-2 text-xs"
-                      onSelect={async (e) => {
-                        e.preventDefault()
-                        setPoints(pt)
-                        // 0 = retirer l'estimation côté backend
-                        await callUpdate({ storyPoints: pt ?? 0 })
-                        toast.success("Points updated")
-                      }}
-                    >
+                    <SelectItem key={pt ?? "none"} value={pt === null ? "none" : String(pt)}>
                       {pt === null ? "Aucune estimation" : `${pt} pts`}
-                      {points === pt ? <CheckIcon className="ml-auto size-3 text-primary" /> : null}
-                    </DropdownMenuItem>
+                    </SelectItem>
                   ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                </SelectContent>
+              </Select>
             </MetaRow>
 
             {/* Cycle — inline editable */}
