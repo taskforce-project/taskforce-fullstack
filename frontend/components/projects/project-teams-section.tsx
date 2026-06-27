@@ -167,50 +167,85 @@ export function ProjectTeamsSection({ workspace, projectId }: ProjectTeamsSectio
 
       {/* Liste des équipes */}
       {teams.length === 0 ? (
-        <p className="rounded-xl border border-border bg-card px-5 py-8 text-center text-sm text-muted-foreground">
-          Aucune équipe — créez-en une ci-dessus.
-        </p>
+        <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card px-5 py-12 text-center">
+          <div className="flex size-12 items-center justify-center rounded-xl bg-muted">
+            <Users className="size-5 text-muted-foreground" />
+          </div>
+          <div className="space-y-0.5">
+            <p className="text-sm font-medium text-foreground">Aucune équipe</p>
+            <p className="text-xs text-muted-foreground">Créez-en une ci-dessus pour regrouper des membres et l&apos;associer à l&apos;opération.</p>
+          </div>
+        </div>
       ) : (
         <div className="flex flex-col gap-3">
           {teams.map((team) => {
             const isOpen   = expanded === team.id
             const isLinked = linkedIds.has(team.id)
+            const extra    = team.members.length - 5
             return (
-              <div key={team.id} className="rounded-xl border border-border bg-card overflow-hidden [box-shadow:var(--shadow-sm)]">
+              <div
+                key={team.id}
+                className={cn(
+                  "rounded-xl border bg-card overflow-hidden [box-shadow:var(--shadow-sm)] transition-colors",
+                  isLinked ? "border-primary/30" : "border-border hover:border-foreground/15"
+                )}
+              >
                 {/* En-tête équipe */}
-                <div className="flex items-center gap-3 px-4 py-3">
-                  <span className="text-lg shrink-0">{team.emoji || "👥"}</span>
+                <div className="flex items-center gap-3 px-4 py-3.5">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-lg">
+                    {team.emoji || "👥"}
+                  </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-foreground">{team.name}</p>
-                    <p className="text-xs text-muted-foreground">{team.members.length} membre{team.members.length !== 1 ? "s" : ""}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="truncate text-sm font-semibold text-foreground">{team.name}</p>
+                      {isLinked && (
+                        <Badge variant="secondary" className="shrink-0 gap-1 border-primary/20 bg-primary/10 text-[10px] text-primary">
+                          <span className="size-1.5 rounded-full bg-primary" /> Associée
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{team.members.length} membre{team.members.length !== 1 ? "s" : ""}</p>
                   </div>
                   {/* Avatars */}
-                  <div className="hidden sm:flex -space-x-1.5">
-                    {team.members.slice(0, 4).map((m) => (
-                      <UserAvatar key={m.userId} email={m.displayName} name={m.displayName} avatarUrl={m.avatarUrl} className="size-6 ring-2 ring-card" fallbackClassName="text-[9px]" />
-                    ))}
+                  <div className="hidden items-center sm:flex">
+                    <div className="flex -space-x-2">
+                      {team.members.slice(0, 5).map((m) => (
+                        <UserAvatar key={m.userId} email={m.displayName} name={m.displayName} avatarUrl={m.avatarUrl} className="size-7 ring-2 ring-card" fallbackClassName="text-[9px]" />
+                      ))}
+                    </div>
+                    {extra > 0 && (
+                      <div className="ml-1 flex size-7 items-center justify-center rounded-full bg-muted text-[10px] font-medium text-muted-foreground ring-2 ring-card">
+                        +{extra}
+                      </div>
+                    )}
                   </div>
+                </div>
+
+                {/* Barre d'actions */}
+                <div className="flex items-center gap-1.5 border-t border-border/60 bg-muted/20 px-3 py-2">
                   <Button
                     size="sm"
                     variant={isLinked ? "secondary" : "outline"}
-                    className="h-7 shrink-0 gap-1 text-xs"
+                    className="h-7 gap-1.5 text-xs"
                     onClick={() => toggleProject(team)}
                   >
-                    {isLinked ? "Associée" : "Associer au projet"}
+                    {isLinked ? "Dissocier" : "Associer à l'opération"}
                   </Button>
-                  <button
-                    type="button"
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 gap-1.5 text-xs text-muted-foreground"
                     onClick={() => setExpanded(isOpen ? null : team.id)}
-                    className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                    aria-label="Gérer les membres"
                   >
-                    <ChevronDown className={cn("size-4 transition-transform", isOpen && "rotate-180")} />
-                  </button>
+                    <Users className="size-3.5" /> Membres
+                    <ChevronDown className={cn("size-3.5 transition-transform", isOpen && "rotate-180")} />
+                  </Button>
+                  <div className="flex-1" />
                   <button
                     type="button"
                     onClick={() => handleDelete(team)}
                     title="Supprimer l'équipe"
-                    className="shrink-0 rounded p-1 text-destructive transition-colors hover:bg-destructive/10"
+                    className="shrink-0 rounded p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                   >
                     <Trash2 className="size-4" />
                   </button>
