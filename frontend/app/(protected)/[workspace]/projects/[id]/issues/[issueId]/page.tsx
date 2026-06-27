@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import {
@@ -17,6 +17,15 @@ import {
   Loader2,
   AlertCircle,
   X,
+  Pencil,
+  Check as CheckIcon,
+  Pin,
+  PinOff,
+  Archive,
+  ArchiveRestore,
+  Link as LinkIcon,
+  Hash,
+  Layers,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -27,8 +36,15 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
+import {
+  Select, SelectContent, SelectItem, SelectTrigger,
+} from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
+import { DeleteConfirmDialog } from "@/components/dialogs/delete-confirm-dialog"
+import { AttachmentsTab, SubtasksTab } from "@/components/sheets/issue-sheet"
+import { listProjectMembers, type ProjectMember } from "@/lib/api/project-service"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { useIssueStore } from "@/lib/store/issue-store"
@@ -169,6 +185,7 @@ export default function IssueDetailPage() {
   const {
     fetchIssue, fetchComments, fetchActivity,
     addComment, deleteComment, deleteIssue,
+    updateIssue, archiveIssue, pinIssue, fetchStatuses, statuses,
     activeIssue, comments, activity, isLoading, error,
   } = useIssueStore()
   const { activeProject } = useProjectStore()
@@ -177,12 +194,32 @@ export default function IssueDetailPage() {
   const [commentValue, setCommentValue] = useState("")
   const [isSaving, setIsSaving]         = useState(false)
 
+  // Édition inline (vue riche canonique)
+  const [projectMembers, setProjectMembers] = useState<ProjectMember[]>([])
+  const [editingTitle, setEditingTitle]     = useState(false)
+  const [titleDraft, setTitleDraft]         = useState("")
+  const [editingDesc, setEditingDesc]       = useState(false)
+  const [descDraft, setDescDraft]           = useState("")
+  const [editingDue, setEditingDue]         = useState(false)
+  const [deleteOpen, setDeleteOpen]         = useState(false)
+  const titleRef = useRef<HTMLInputElement>(null)
+
   useEffect(() => {
     if (!workspace || !projectId || !issueId) return
     fetchIssue(workspace, projectId, issueId)
     fetchComments(workspace, projectId, issueId)
     fetchActivity(workspace, projectId, issueId)
-  }, [workspace, projectId, issueId, fetchIssue, fetchComments, fetchActivity])
+    fetchStatuses(workspace, projectId).catch(() => null)
+    listProjectMembers(workspace, projectId).then(setProjectMembers).catch(() => null)
+  }, [workspace, projectId, issueId, fetchIssue, fetchComments, fetchActivity, fetchStatuses])
+
+  useEffect(() => { if (editingTitle) titleRef.current?.focus() }, [editingTitle])
+
+  const patch = useCallback(async (payload: Parameters<typeof updateIssue>[3]) => {
+    const res = await updateIssue(workspace, projectId, issueId, payload)
+    if (!res) toast.error("Échec de l'enregistrement")
+    return res
+  }, [workspace, projectId, issueId, updateIssue])
 
   const handleAddComment = useCallback(async () => {
     if (!commentValue.trim()) return
@@ -207,6 +244,24 @@ export default function IssueDetailPage() {
     await deleteComment(workspace, projectId, issueId, commentId)
     toast.success("Commentaire supprimé")
   }, [workspace, projectId, issueId, deleteComment])
+
+  const handleTogglePin = useCallback(async () => {
+    const res = await pinIssue(workspace, projectId, issueId, !(activeIssue?.pinned ?? false))
+    if (res) toast.success(res.pinned ? "Issue épinglée" : "Issue dépinglée")
+  }, [workspace, projectId, issueId, pinIssue, activeIssue?.pinned])
+
+  const handleArchive = useCallback(async () => {
+    const res = await archiveIssue(workspace, projectId, issueId, !(activeIssue?.archived ?? false))
+    if (res) {
+      toast.success(res.archived ? "Issue archivée" : "Issue désarchivée")
+      if (res.archived) router.push(`/${workspace}/projects/${projectId}/issues`)
+    }
+  }, [workspace, projectId, issueId, archiveIssue, activeIssue?.archived, router])
+
+  async function copyToClipboard(text: string, label: string) {
+    try { await navigator.clipboard.writeText(text); toast.success(label) }
+    catch { toast.error("Copie impossible") }
+  }
 
   // Merge comments + activity events, sorted chronologically
   const timeline: TimelineEntry[] = useMemo(() => {
@@ -264,21 +319,76 @@ export default function IssueDetailPage() {
           {/* Header */}
           <div className="flex flex-col gap-3">
             <div className="flex items-start gap-3">
-              <h1 className="flex-1 text-xl font-semibold text-foreground leading-snug">
-                {issue.title}
-              </h1>
+              {editingTitle ? (
+                <input
+                  ref={titleRef}
+                  value={titleDraft}
+                  onChange={(e) => setTitleDraft(e.target.value)}
+                  onBlur={async () => { setEditingTitle(false); if (titleDraft.trim() && titleDraft !== issue.title) { await patch({ title: titleDraft.trim() }); toast.success("Titre mis à jour") } }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") (e.target as HTMLInputElement).blur()
+                    if (e.key === "Escape") { setTitleDraft(issue.title); setEditingTitle(false) }
+                  }}
+                  className="flex-1 text-xl font-semibold text-foreground leading-snug bg-transparent border-b-2 border-primary outline-none pb-0.5"
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => { setTitleDraft(issue.title); setEditingTitle(true) }}
+                  className="group flex flex-1 items-start gap-2 text-left text-xl font-semibold text-foreground leading-snug rounded px-1 -mx-1 hover:bg-muted/50 transition-colors"
+                  title="Cliquer pour éditer"
+                >
+                  <span className="flex-1">{issue.title}</span>
+                  <Pencil className="size-3.5 mt-1 shrink-0 opacity-0 group-hover:opacity-40 transition-opacity" />
+                </button>
+              )}
+
+              {issue.pinned && (
+                <span className="flex shrink-0 items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-500">
+                  <Pin className="size-3" /> Épinglée
+                </span>
+              )}
+
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem className="gap-2 text-destructive" onClick={handleDeleteIssue}>
-                    <Trash2 className="h-3.5 w-3.5" /> Delete issue
+                <DropdownMenuContent align="end" className="min-w-48">
+                  <DropdownMenuItem className="gap-2 text-xs" onClick={() => copyToClipboard(window.location.href, "Lien copié")}>
+                    <LinkIcon className="size-3.5" /> Copier le lien
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="gap-2 text-xs" onClick={() => copyToClipboard(issue.identifier, "Identifiant copié")}>
+                    <Hash className="size-3.5" /> {`Copier l'ID (${issue.identifier})`}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="gap-2 text-xs" onClick={handleTogglePin}>
+                    {issue.pinned ? <PinOff className="size-3.5" /> : <Pin className="size-3.5" />}
+                    {issue.pinned ? "Désépingler" : "Épingler"}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="gap-2 text-xs" onClick={handleArchive}>
+                    {issue.archived ? <ArchiveRestore className="size-3.5" /> : <Archive className="size-3.5" />}
+                    {issue.archived ? "Désarchiver" : "Archiver"}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="gap-2 text-xs text-destructive focus:text-destructive"
+                    onSelect={(e) => { e.preventDefault(); setDeleteOpen(true) }}
+                  >
+                    <Trash2 className="size-3.5" /> Supprimer
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+
+              <DeleteConfirmDialog
+                open={deleteOpen}
+                onOpenChange={setDeleteOpen}
+                title="Supprimer l'issue ?"
+                description={`« ${issue.title} » sera définitivement supprimée. Cette action est irréversible.`}
+                confirmLabel="Supprimer"
+                onConfirm={handleDeleteIssue}
+              />
             </div>
 
             {/* Quick meta row */}
@@ -299,29 +409,57 @@ export default function IssueDetailPage() {
             </div>
           </div>
 
-          {/* Description */}
-          {issue.description && (
-            <div>
-              <div className="rounded-xl border border-border bg-card p-4 [box-shadow:var(--shadow-sm)]">
-                <div
-                  className="prose prose-sm prose-invert max-w-none text-sm text-foreground leading-relaxed"
-                  style={{ whiteSpace: "pre-wrap" }}
-                >
-                  {issue.description}
+          {/* Description — éditable inline */}
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Description</p>
+            {editingDesc ? (
+              <div className="flex flex-col gap-2">
+                <textarea
+                  value={descDraft}
+                  onChange={(e) => setDescDraft(e.target.value)}
+                  rows={6}
+                  autoFocus
+                  className="w-full rounded-md border border-primary/50 bg-background px-3 py-2 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary/20 resize-none"
+                  placeholder="Ajouter une description…"
+                />
+                <div className="flex gap-2">
+                  <Button size="sm" className="h-7 text-xs gap-1.5" onClick={async () => { setEditingDesc(false); await patch({ description: descDraft }); toast.success("Description mise à jour") }}>
+                    <CheckIcon className="size-3" /> Enregistrer
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditingDesc(false)}>Annuler</Button>
                 </div>
               </div>
-            </div>
-          )}
+            ) : (
+              <button
+                type="button"
+                onClick={() => { setDescDraft(issue.description ?? ""); setEditingDesc(true) }}
+                className="group relative w-full rounded-xl border border-border bg-card p-4 text-left [box-shadow:var(--shadow-sm)] hover:border-primary/30 transition-colors"
+                title="Cliquer pour éditer"
+              >
+                {issue.description
+                  ? <span className="prose prose-sm prose-invert max-w-none text-sm text-foreground leading-relaxed whitespace-pre-wrap">{issue.description}</span>
+                  : <span className="text-sm italic text-muted-foreground">Aucune description. Cliquer pour en ajouter une.</span>}
+                <Pencil className="size-3.5 absolute top-3 right-3 opacity-0 group-hover:opacity-40 transition-opacity" />
+              </button>
+            )}
+          </div>
 
-          {/* Attachments stub */}
+          {/* Sous-tâches */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Layers className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium text-muted-foreground">Sous-tâches</span>
+            </div>
+            <SubtasksTab issueId={issueId} projectId={projectId} workspaceSlug={workspace} />
+          </div>
+
+          {/* Pièces jointes — réelles */}
           <div>
             <div className="flex items-center gap-2 mb-2">
               <Paperclip className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium text-muted-foreground">Attachments</span>
+              <span className="text-sm font-medium text-muted-foreground">Pièces jointes</span>
             </div>
-            <div className="rounded-lg border border-dashed border-border py-6 text-center text-xs text-muted-foreground">
-              Drop files here or click to attach
-            </div>
+            <AttachmentsTab issueId={issueId} projectId={projectId} workspaceSlug={workspace} />
           </div>
 
           <Separator />
@@ -432,36 +570,88 @@ export default function IssueDetailPage() {
         ---------------------------------------------------------------- */}
         <aside className="w-56 shrink-0 flex flex-col gap-5 sticky top-32">
           <SidebarSection label="Status">
-            <div className={cn("flex items-center gap-2 text-sm rounded-md border px-2.5 py-1.5", statusConfig.badgeClass)}>
-              {statusConfig.icon}
-              {statusConfig.label}
-            </div>
+            <Select
+              value={String(issue.status.id)}
+              onValueChange={async (val) => {
+                const s = statuses.find((x) => String(x.id) === val)
+                if (!s) return
+                await patch({ statusId: s.id })
+                toast.success(`Status → ${s.name}`)
+              }}
+            >
+              <SelectTrigger size="sm" className="w-full">
+                <span className="flex items-center gap-2">
+                  <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: statuses.find((s) => s.id === issue.status.id)?.color ?? "#94a3b8" }} />
+                  {issue.status.name}
+                </span>
+              </SelectTrigger>
+              <SelectContent>
+                {statuses.map((s) => (
+                  <SelectItem key={s.id} value={String(s.id)}>
+                    <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                    {s.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </SidebarSection>
 
           <SidebarSection label="Priority">
-            <div className="flex items-center gap-2 text-sm text-foreground">
-              <div className={cn("h-2.5 w-2.5 rounded-full shrink-0", priorityConfig.dotClass)} />
-              {priorityConfig.label}
-            </div>
+            <Select
+              value={issue.priority}
+              onValueChange={async (p) => { await patch({ priority: p as IssuePriority }); toast.success(`Priority → ${PRIORITY_CONFIG[p as IssuePriority].label}`) }}
+            >
+              <SelectTrigger size="sm" className="w-full">
+                <span className="flex items-center gap-2">
+                  <span className={cn("size-2.5 rounded-full shrink-0", priorityConfig.dotClass)} />
+                  {priorityConfig.label}
+                </span>
+              </SelectTrigger>
+              <SelectContent>
+                {(Object.keys(PRIORITY_CONFIG) as IssuePriority[]).map((p) => (
+                  <SelectItem key={p} value={p}>
+                    <span className={cn("size-2.5 rounded-full shrink-0", PRIORITY_CONFIG[p].dotClass)} />
+                    {PRIORITY_CONFIG[p].label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </SidebarSection>
 
           <SidebarSection label="Assignee">
-            {issue.assignee ? (
-              <div className="flex items-center gap-2">
-                <UserAvatar
-                  email={issue.assignee.email}
-                  name={issue.assignee.displayName ?? issue.assignee.email}
-                  className="h-6 w-6"
-                  fallbackClassName="text-[9px] font-medium"
-                />
-                <span className="text-sm text-foreground">{issue.assignee.displayName ?? issue.assignee.email}</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <User className="h-4 w-4" />
-                Unassigned
-              </div>
-            )}
+            <Select
+              value={issue.assignee ? String(issue.assignee.id) : "none"}
+              onValueChange={async (val) => {
+                if (val === "none") { await patch({ assigneeId: null }); toast.success("Unassigned"); return }
+                const m = projectMembers.find((x) => String(x.userId) === val)
+                if (!m) return
+                await patch({ assigneeId: m.userId })
+                toast.success(`Assigned to ${m.displayName ?? m.email}`)
+              }}
+            >
+              <SelectTrigger size="sm" className="w-full">
+                {issue.assignee ? (
+                  <span className="flex items-center gap-2 min-w-0">
+                    <UserAvatar email={issue.assignee.email} name={issue.assignee.displayName ?? issue.assignee.email} className="size-5 shrink-0" fallbackClassName="text-[9px]" />
+                    <span className="truncate">{issue.assignee.displayName ?? issue.assignee.email}</span>
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2 text-muted-foreground"><User className="h-4 w-4" />Unassigned</span>
+                )}
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none"><span className="text-muted-foreground">No assignee</span></SelectItem>
+                {projectMembers.map((m) => {
+                  const name = m.displayName ?? m.email
+                  return (
+                    <SelectItem key={m.userId} value={String(m.userId)}>
+                      <UserAvatar email={m.email} name={name} avatarUrl={m.avatarUrl} className="size-5 shrink-0" fallbackClassName="text-[9px]" />
+                      {name}
+                    </SelectItem>
+                  )
+                })}
+              </SelectContent>
+            </Select>
           </SidebarSection>
 
           <SidebarSection label="Reporter">
@@ -477,13 +667,27 @@ export default function IssueDetailPage() {
           </SidebarSection>
 
           <SidebarSection label="Due date">
-            {issue.dueDate ? (
-              <div className="flex items-center gap-2 text-sm text-foreground">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                {formatDate(issue.dueDate)}
-              </div>
+            {editingDue ? (
+              <input
+                type="date"
+                defaultValue={issue.dueDate ? issue.dueDate.slice(0, 10) : ""}
+                autoFocus
+                onBlur={async (e) => { setEditingDue(false); await patch({ dueDate: e.target.value || null }); toast.success("Échéance mise à jour") }}
+                className="w-full text-sm bg-background border border-border rounded px-2 h-8 outline-none focus:border-primary/50 scheme-dark"
+              />
             ) : (
-              <span className="text-sm text-muted-foreground">No due date</span>
+              <button
+                type="button"
+                onClick={() => setEditingDue(true)}
+                className="group flex w-full items-center gap-2 text-left text-sm rounded px-1 -mx-1 py-0.5 hover:bg-muted/50 transition-colors"
+                title="Cliquer pour éditer"
+              >
+                <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className={cn("flex-1", issue.dueDate ? "text-foreground" : "text-muted-foreground")}>
+                  {issue.dueDate ? formatDate(issue.dueDate) : "No due date"}
+                </span>
+                <Pencil className="size-3 opacity-0 group-hover:opacity-40 shrink-0" />
+              </button>
             )}
           </SidebarSection>
 
