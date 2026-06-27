@@ -158,7 +158,7 @@ export default function DashboardPage() {
             />
           </MetricSplit>
           <div className="border-t border-border px-5 py-3">
-            <p className="mb-1 text-[11px] text-muted-foreground">Tâches résolues / semaine</p>
+            <p className="mb-1 text-[11px] text-muted-foreground">Tâches résolues / jour · 30 j</p>
             {throughput.length > 0 ? (
               <ResponsiveContainer width="100%" height={64}>
                 <AreaChart data={throughput} margin={{ top: 4, right: 0, left: 0, bottom: 10 }}>
