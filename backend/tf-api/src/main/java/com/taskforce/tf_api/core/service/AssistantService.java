@@ -5,6 +5,7 @@ import java.util.Objects;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.taskforce.tf_api.core.model.Issue;
 import com.taskforce.tf_api.core.model.User;
@@ -47,6 +48,7 @@ public class AssistantService {
      * @param message message envoyé par l'utilisateur
      * @return réponse textuelle du LLM
      */
+    @Transactional(readOnly = true)
     public String chat(String slug, String message) {
         Workspace workspace = workspaceRepository.findBySlug(slug)
             .orElseThrow(() -> new ResourceNotFoundException("Workspace not found: " + slug));
