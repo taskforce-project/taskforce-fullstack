@@ -16,12 +16,12 @@ DB       := $(PS) scripts/db.ps1
 
 .DEFAULT_GOAL := help
 .PHONY: help menu setup init-dev init-prod \
-        dev-up dev-up-d dev-down dev-restart dev-build dev-rebuild dev-logs dev-logs-backend dev-clean \
+        dev-up dev-up-d dev-down dev-restart dev-build dev-rebuild dev-rebuild-be dev-rebuild-fe dev-logs dev-logs-backend dev-clean \
         prod-up prod-down prod-rebuild prod-clean \
         obs obs-down ps urls clean \
         test-fe test-be cov-fe cov-be lint build-fe build-be \
         scan trivy semgrep \
-        exec-db exec-backend exec-keycloak
+        seed exec-db exec-backend exec-keycloak
 
 help:
 > @echo TaskForce - cibles make :
@@ -57,6 +57,10 @@ dev-build:
 > @$(DOCKER) build
 dev-rebuild:
 > @$(DOCKER) rebuild
+dev-rebuild-be:
+> @$(DOCKER) rebuild backend
+dev-rebuild-fe:
+> @$(DOCKER) rebuild frontend
 dev-logs:
 > @$(DOCKER) logs
 dev-logs-backend:
@@ -111,6 +115,8 @@ semgrep:
 > @$(SECURITY) -Static
 
 # --- Base de donnees / shells ---
+seed:
+> @$(DB) seed
 exec-db:
 > @$(DB) psql
 exec-backend:
