@@ -39,6 +39,9 @@ import {
 import { cn } from "@/lib/utils"
 import { useDiscussionStore } from "@/lib/store/discussion-store"
 import type { Discussion, DiscussionCategory } from "@/lib/api/discussion-service"
+import { DataTablePagination } from "@/components/ui/data-table-pagination"
+import { Spinner } from "@/components/ui/spinner"
+import { usePagination } from "@/hooks/use-pagination"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -358,6 +361,8 @@ export default function DiscussionsPage() {
     return [...list.filter((d) => d.isPinned), ...list.filter((d) => !d.isPinned)]
   }, [discussions, search, categoryFilter])
 
+  const { page, setPage, pageSize, setPageSize, pageCount, pageItems, total } = usePagination(filtered)
+
   const openCount = discussions.filter((d) => d.state === "OPEN").length
 
   return (
@@ -416,7 +421,7 @@ export default function DiscussionsPage() {
       {/* States */}
       {loading && (
         <div className="flex justify-center py-16">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <Spinner className="size-6 text-primary" />
         </div>
       )}
 
@@ -438,9 +443,17 @@ export default function DiscussionsPage() {
       ) : (
         !loading && !error && (
           <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-            {filtered.map((discussion) => (
+            {pageItems.map((discussion) => (
               <DiscussionRow key={discussion.id} discussion={discussion} slug={slug} />
             ))}
+            <DataTablePagination
+              page={page}
+              pageCount={pageCount}
+              pageSize={pageSize}
+              total={total}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+            />
           </div>
         )
       )}
