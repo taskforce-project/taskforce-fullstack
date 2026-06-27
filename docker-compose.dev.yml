@@ -98,7 +98,9 @@ services:
 
       # IA interne
       AI_SERVICE_URL: ${AI_SERVICE_URL:-http://ai-service:8000}
-      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      # GROQ_API_KEY : fourni par env_file (.env.dev). Ne PAS le redéclarer ici avec
+      # ${GROQ_API_KEY:-} : l'override 'environment' écrase env_file et, sans variable
+      # d'interpolation côté compose, le vide → clé perdue dans le conteneur (assistant en repli).
       GROQ_MODEL: ${GROQ_MODEL:-llama-3.1-8b-instant}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
 
