@@ -132,6 +132,15 @@ public class Issue {
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
+    /** Renseigné quand l'issue est archivée (masquée des vues par défaut) — null si active */
+    @Column(name = "archived_at")
+    private LocalDateTime archivedAt;
+
+    /** Épinglée en tête de liste/board */
+    @Column(name = "pinned", nullable = false)
+    @Builder.Default
+    private Boolean pinned = false;
+
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
         name = "issue_label_assignments",
