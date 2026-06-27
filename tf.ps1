@@ -21,7 +21,9 @@ $script:Cmds = @(
   [pscustomobject]@{K='upd';     G='DEV';      L='Demarrer (arriere-plan)';  S='docker.ps1';   A='upd'}
   [pscustomobject]@{K='down';    G='DEV';      L='Arreter';                  S='docker.ps1';   A='down'}
   [pscustomobject]@{K='restart'; G='DEV';      L='Redemarrer';               S='docker.ps1';   A='restart'}
-  [pscustomobject]@{K='rebuild'; G='DEV';      L='Rebuild + redemarrer';     S='docker.ps1';   A='rebuild'}
+  [pscustomobject]@{K='rebuild'; G='DEV';      L='Rebuild + redemarrer (tout)'; S='docker.ps1'; A='rebuild'}
+  [pscustomobject]@{K='rbe';     G='DEV';      L='Rebuild backend (cible)';  S='docker.ps1';   A='rebuild'; X='backend'}
+  [pscustomobject]@{K='rfe';     G='DEV';      L='Rebuild frontend (cible)'; S='docker.ps1';   A='rebuild'; X='frontend'}
 
   [pscustomobject]@{K='logs';    G='LOGS';     L='Tous les logs';            S='docker.ps1';   A='logs'}
   [pscustomobject]@{K='logbe';   G='LOGS';     L='Logs backend';             S='docker.ps1';   A='logs'; X='backend'}
@@ -46,6 +48,7 @@ $script:Cmds = @(
   [pscustomobject]@{K='bbe';     G='QUALITE';  L='Build backend (jar)';      S='quality.ps1';  A='build-be'}
 
   [pscustomobject]@{K='psql';    G='DB/SHELL'; L='Console PostgreSQL';       S='db.ps1';       A='psql'}
+  [pscustomobject]@{K='seed';    G='DB/SHELL'; L='Charger le seed demo (UTF-8 sur)'; S='db.ps1'; A='seed'}
   [pscustomobject]@{K='shbe';    G='DB/SHELL'; L='Shell backend';            S='db.ps1';       A='sh-be'}
   [pscustomobject]@{K='shkc';    G='DB/SHELL'; L='Shell Keycloak';           S='db.ps1';       A='sh-kc'}
 
