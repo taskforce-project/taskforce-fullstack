@@ -8,6 +8,7 @@ import {
   List,
   AlignLeft,
   RefreshCw,
+  CalendarRange,
   FileText,
   Users,
   Settings,
@@ -21,6 +22,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { ProjectIcon } from "@/components/ui/project-icon"
+import { ScrollableTabs } from "@/components/ui/scrollable-tabs"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -55,6 +57,7 @@ type ProjectTab = {
 const PROJECT_TABS: ProjectTab[] = [
   { key: "detail.board", icon: LayoutGrid, pathSuffix: "" },
   { key: "detail.list", icon: List, pathSuffix: "/list" },
+  { key: "detail.roadmap", icon: CalendarRange, pathSuffix: "/roadmap" },
   { key: "detail.backlog", icon: AlignLeft, pathSuffix: "/backlog" },
   { key: "detail.cycles", icon: RefreshCw, pathSuffix: "/cycles" },
   { key: "detail.pages", icon: FileText, pathSuffix: "/pages" },
@@ -174,8 +177,8 @@ export default function ProjectLayout({ children }: { readonly children: React.R
           </div>
         </div>
 
-        {/* Tab nav */}
-        <div className="flex items-center gap-0 overflow-x-auto scrollbar-hide">
+        {/* Tab nav — bande scrollable avec chevrons (l'onglet Settings restait hors écran, QA3) */}
+        <ScrollableTabs>
           {PROJECT_TABS.map(({ key, icon: Icon, pathSuffix }) => {
             const active = isTabActive(pathSuffix)
             return (
@@ -183,7 +186,7 @@ export default function ProjectLayout({ children }: { readonly children: React.R
                 key={key}
                 href={basePath + pathSuffix}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium transition-all border-b-2 whitespace-nowrap",
+                  "flex shrink-0 items-center gap-1.5 px-3 py-2.5 text-sm font-medium transition-all border-b-2 whitespace-nowrap",
                   active
                     ? "border-primary text-foreground"
                     : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
@@ -202,7 +205,7 @@ export default function ProjectLayout({ children }: { readonly children: React.R
               </Link>
             )
           })}
-        </div>
+        </ScrollableTabs>
       </div>
 
       {/* Page content — one-screen : scroll interne ici (et par colonne sur le board) */}
