@@ -24,6 +24,8 @@ import {
   createIssue as createIssueApi,
   updateIssue as updateIssueApi,
   deleteIssue as deleteIssueApi,
+  setIssueArchived as setIssueArchivedApi,
+  setIssuePinned as setIssuePinnedApi,
   listStatuses,
   createStatus as createStatusApi,
   updateStatus as updateStatusApi,
@@ -58,6 +60,10 @@ interface IssueState {
   createIssue: (slug: string, projectId: number, payload: CreateIssuePayload) => Promise<Issue | null>;
   updateIssue: (slug: string, projectId: number, issueId: number, payload: UpdateIssuePayload) => Promise<Issue | null>;
   deleteIssue: (slug: string, projectId: number, issueId: number) => Promise<void>;
+  /** Archive (true) / désarchive (false) — une issue archivée quitte les vues par défaut. */
+  archiveIssue: (slug: string, projectId: number, issueId: number, archived: boolean) => Promise<Issue | null>;
+  /** Épingle (true) / dépingle (false) — remonte en tête de board/liste. */
+  pinIssue: (slug: string, projectId: number, issueId: number, pinned: boolean) => Promise<Issue | null>;
   setActiveIssue: (issue: Issue | null) => void;
   /** Patch local (événement temps réel STOMP) — insère ou met à jour sans appel API. */
   upsertIssueLocal: (issue: Issue) => void;
@@ -170,6 +176,39 @@ export const useIssueStore = create<IssueState>((set, get) => ({
     } catch (err) {
       const message = extractError(err, "Erreur lors de la suppression de l'issue");
       set({ error: message });
+    }
+  },
+
+  archiveIssue: async (slug, projectId, issueId, archived) => {
+    try {
+      const updated = await setIssueArchivedApi(slug, projectId, issueId, archived);
+      set((state) => ({
+        // Une issue archivée disparaît des vues par défaut (board/list).
+        issues: archived
+          ? state.issues.filter((i) => i.id !== issueId)
+          : state.issues.map((i) => (i.id === updated.id ? updated : i)),
+        activeIssue: state.activeIssue?.id === updated.id ? updated : state.activeIssue,
+      }));
+      return updated;
+    } catch (err) {
+      const message = extractError(err, "Erreur lors de l'archivage de l'issue");
+      set({ error: message });
+      return null;
+    }
+  },
+
+  pinIssue: async (slug, projectId, issueId, pinned) => {
+    try {
+      const updated = await setIssuePinnedApi(slug, projectId, issueId, pinned);
+      set((state) => ({
+        issues: state.issues.map((i) => (i.id === updated.id ? updated : i)),
+        activeIssue: state.activeIssue?.id === updated.id ? updated : state.activeIssue,
+      }));
+      return updated;
+    } catch (err) {
+      const message = extractError(err, "Erreur lors de l'épinglage de l'issue");
+      set({ error: message });
+      return null;
     }
   },
 
