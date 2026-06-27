@@ -78,6 +78,10 @@ export interface Issue {
   storyPoints: number | null;
   labels: IssueLabel[];
   commentCount: number;
+  /** Archivée → masquée des vues par défaut (board/list) */
+  archived: boolean;
+  /** Épinglée en tête de board/liste */
+  pinned: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -245,6 +249,31 @@ export async function deleteIssue(
   issueId: number
 ): Promise<void> {
   await apiClient.delete(ISSUE_ROUTES.DELETE(slug, projectId, issueId));
+}
+
+/** Archive (true) ou désarchive (false) une issue. */
+export async function setIssueArchived(
+  slug: string,
+  projectId: number,
+  issueId: number,
+  archived: boolean
+): Promise<Issue> {
+  const route = archived
+    ? ISSUE_ROUTES.ARCHIVE(slug, projectId, issueId)
+    : ISSUE_ROUTES.UNARCHIVE(slug, projectId, issueId);
+  const res = await apiClient.patch<{ data: Issue }>(route, {});
+  return res.data.data;
+}
+
+/** Épingle (true) ou dépingle (false) une issue. */
+export async function setIssuePinned(
+  slug: string,
+  projectId: number,
+  issueId: number,
+  pinned: boolean
+): Promise<Issue> {
+  const res = await apiClient.patch<{ data: Issue }>(ISSUE_ROUTES.PIN(slug, projectId, issueId), { pinned });
+  return res.data.data;
 }
 
 // ---------------------------------------------------------------------------
