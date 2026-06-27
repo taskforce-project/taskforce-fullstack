@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback, type KeyboardEvent } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useParams } from "next/navigation"
 import {
   LayoutDashboard,
   Inbox,
@@ -90,6 +90,8 @@ interface CommandPaletteProps {
 
 export function CommandPalette({ open, onOpenChange }: Readonly<CommandPaletteProps>) {
   const router = useRouter()
+  const params = useParams()
+  const slug = typeof params?.workspace === "string" ? params.workspace : ""
   const { setTheme } = useTheme()
 
   // ─── État mode IA ──────────────────────────────────────────────────────────
@@ -126,7 +128,8 @@ export function CommandPalette({ open, onOpenChange }: Readonly<CommandPalettePr
   }, [aiInput, aiQuery, isRunning])
 
   // ─── Navigation ────────────────────────────────────────────────────────────
-  function go(path: string) { router.push(path); onOpenChange(false) }
+  // Les routes sont scopées au workspace (/{slug}/…) — on préfixe le slug courant. (QA Q-24)
+  function go(path: string) { router.push(slug ? `/${slug}${path}` : path); onOpenChange(false) }
 
   const ACTIONS: CommandAction[] = [
     // Navigation
