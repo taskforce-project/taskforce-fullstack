@@ -23,6 +23,8 @@ import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { Input } from "@/components/ui/input"
+import { DataTablePagination } from "@/components/ui/data-table-pagination"
+import { usePagination } from "@/hooks/use-pagination"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -354,7 +356,7 @@ function MemberRow({ member, isYou, canManage, isOwner, profile, projects = [] }
   })
 
   return (
-    <div className="group flex items-center gap-4 px-5 py-3.5 border-b border-border/50 last:border-0 hover:bg-muted/20 transition-colors">
+    <div className="group flex items-center gap-4 px-5 py-3 border-b border-border/50 last:border-0 hover:bg-muted/20 transition-colors">
       {/* Avatar */}
       <div className="relative shrink-0">
         <UserAvatar
@@ -367,57 +369,73 @@ function MemberRow({ member, isYou, canManage, isOwner, profile, projects = [] }
         <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full bg-emerald-400 ring-2 ring-card" />
       </div>
 
-      {/* Info */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
+      {/* Member (nom) */}
+      <div className="w-48 min-w-0 shrink-0">
+        <div className="flex items-center gap-1.5">
           {slug ? (
-            <Link href={`/${slug}/members/${member.id}`} className="text-sm font-medium text-foreground hover:underline">
+            <Link href={`/${slug}/members/${member.id}`} className="truncate text-sm font-medium text-foreground hover:underline">
               {displayLabel}
             </Link>
           ) : (
-            <span className="text-sm font-medium text-foreground">{displayLabel}</span>
+            <span className="truncate text-sm font-medium text-foreground">{displayLabel}</span>
           )}
-          {isYou && <span className="text-xs text-muted-foreground font-normal">(you)</span>}
-          <Badge variant="outline" className={cn("text-xs border px-1.5 py-0 h-4 flex items-center gap-1", role.badgeClass)}>
-            {role.icon}
-            {role.label}
-          </Badge>
-          {profile?.seniority && (
-            <Badge variant="outline" className="text-xs px-1.5 py-0 h-4">{SENIORITY_LABEL[profile.seniority] ?? profile.seniority}</Badge>
-          )}
+          {isYou && <span className="shrink-0 text-xs text-muted-foreground font-normal">(you)</span>}
         </div>
-        <div className="flex items-center gap-1.5 mt-0.5 text-xs text-muted-foreground">
-          <Mail className="size-3" />
-          {member.email}
-        </div>
-        {/* Compétences (aperçu) — alimentent le Smart Assign */}
-        {profile && profile.skills.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1 mt-1.5">
-            {profile.skills.slice(0, 6).map((skill) => (
+        {profile?.seniority && (
+          <span className="text-xs text-muted-foreground">{SENIORITY_LABEL[profile.seniority] ?? profile.seniority}</span>
+        )}
+      </div>
+
+      {/* Rôle */}
+      <div className="w-28 shrink-0">
+        <Badge variant="outline" className={cn("text-xs border px-1.5 py-0 h-5 inline-flex items-center gap-1", role.badgeClass)}>
+          {role.icon}
+          {role.label}
+        </Badge>
+      </div>
+
+      {/* Email */}
+      <div className="hidden md:flex flex-1 min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+        <Mail className="size-3 shrink-0" />
+        <span className="truncate">{member.email}</span>
+      </div>
+
+      {/* Compétences (aperçu) — alimentent le Smart Assign */}
+      <div className="hidden xl:flex w-52 shrink-0 flex-wrap items-center gap-1">
+        {profile && profile.skills.length > 0 ? (
+          <>
+            {profile.skills.slice(0, 3).map((skill) => (
               <span key={skill} className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{skill}</span>
             ))}
-            {profile.skills.length > 6 && (
-              <span className="text-[10px] text-muted-foreground">+{profile.skills.length - 6}</span>
+            {profile.skills.length > 3 && (
+              <span className="text-[10px] text-muted-foreground">+{profile.skills.length - 3}</span>
             )}
-          </div>
+          </>
+        ) : (
+          <span className="text-[10px] text-muted-foreground/40">—</span>
         )}
-        {/* Projets du membre (QA2-20) */}
-        {projects.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1 mt-1.5">
+      </div>
+
+      {/* Projets du membre (QA2-20) */}
+      <div className="hidden xl:flex w-44 shrink-0 flex-wrap items-center gap-1">
+        {projects.length > 0 ? (
+          <>
             <Layers className="size-3 shrink-0 text-muted-foreground/60" />
-            {projects.slice(0, 4).map((p) => (
-              <span key={p.id} className="rounded-full border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">{p.name}</span>
+            {projects.slice(0, 2).map((p) => (
+              <span key={p.id} className="max-w-[80px] truncate rounded-full border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">{p.name}</span>
             ))}
-            {projects.length > 4 && (
-              <span className="text-[10px] text-muted-foreground">+{projects.length - 4}</span>
+            {projects.length > 2 && (
+              <span className="text-[10px] text-muted-foreground">+{projects.length - 2}</span>
             )}
-          </div>
+          </>
+        ) : (
+          <span className="text-[10px] text-muted-foreground/40">—</span>
         )}
       </div>
 
       {/* Joined */}
-      <div className="hidden lg:flex flex-col items-end gap-0.5 shrink-0 text-xs text-muted-foreground">
-        <span>Joined {joinedDate}</span>
+      <div className="hidden lg:block w-28 shrink-0 text-right text-xs text-muted-foreground">
+        {joinedDate}
       </div>
 
       {/* Actions — only shown if current user can manage and target is not OWNER */}
@@ -455,6 +473,7 @@ function MemberRow({ member, isYou, canManage, isOwner, profile, projects = [] }
           </DropdownMenuContent>
         </DropdownMenu>
       )}
+      {!(!isYou && canManage && member.role !== "OWNER") && <div className="size-8 shrink-0" />}
     </div>
   )
 }
@@ -592,6 +611,8 @@ export default function MembersPage() {
     return list
   }, [members, search, roleFilter, projectFilter, projects])
 
+  const { page, setPage, pageSize, setPageSize, pageCount, pageItems, total } = usePagination(filtered)
+
   const memberCount = members.length
   const memberSuffix = memberCount === 1 ? "" : "s"
   const memberCountLabel = membersLoading ? "Loading…" : `${memberCount} member${memberSuffix}`
@@ -685,10 +706,14 @@ export default function MembersPage() {
       {/* Members list */}
       <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
         {/* Table header */}
-        <div className="flex items-center gap-4 px-5 py-2.5 border-b border-border bg-muted/20 text-xs text-muted-foreground">
+        <div className="flex items-center gap-4 px-5 py-2.5 border-b border-border bg-muted/20 text-xs font-medium uppercase tracking-wide text-muted-foreground">
           <div className="size-9 shrink-0" />
-          <div className="flex-1">Member</div>
-          <div className="hidden lg:block w-32 text-right">Joined</div>
+          <div className="w-48 shrink-0">Member</div>
+          <div className="w-28 shrink-0">Role</div>
+          <div className="hidden md:block flex-1">Email</div>
+          <div className="hidden xl:block w-52 shrink-0">Skills</div>
+          <div className="hidden xl:block w-44 shrink-0">Projects</div>
+          <div className="hidden lg:block w-28 shrink-0 text-right">Joined</div>
           <div className="size-8 shrink-0" />
         </div>
 
@@ -712,7 +737,7 @@ export default function MembersPage() {
             <p className="text-xs text-muted-foreground mt-1">Try adjusting your search or filter</p>
           </div>
         )}
-        {!membersLoading && filtered.length > 0 && filtered.map((member) => (
+        {!membersLoading && filtered.length > 0 && pageItems.map((member) => (
           <MemberRow
             key={member.id}
             member={member}
@@ -723,6 +748,17 @@ export default function MembersPage() {
             projects={projectsByUser.get(member.userId) ?? []}
           />
         ))}
+
+        {!membersLoading && total > 0 && (
+          <DataTablePagination
+            page={page}
+            pageCount={pageCount}
+            pageSize={pageSize}
+            total={total}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+        )}
       </div>
 
       {/* Invitations en attente (PROD-3.5) */}
