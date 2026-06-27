@@ -29,6 +29,8 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Card } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
+import { DataTablePagination } from "@/components/ui/data-table-pagination"
+import { usePagination } from "@/hooks/use-pagination"
 import { SectionCard, MetricSplit, Metric } from "@/components/ui/section-card"
 import { PageContainer, PageHeader } from "@/components/layout/page-shell"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -463,7 +465,7 @@ export default function ProjectsPage() {
   const { projects, isLoading, fetchProjects } = useProjectStore()
   const [filter, setFilter] = useState<FilterTab>("active")
   const [search, setSearch] = useState("")
-  const [view, setView] = useState<"list" | "cards">("list")
+  const [view, setView] = useState<"list" | "cards">("cards")
   const [sortBy, setSortBy] = useState<SortKey>("health")
 
   useEffect(() => {
@@ -501,6 +503,8 @@ export default function ProjectsPage() {
     () => projects.filter((p) => p.status === "ACTIVE" || p.status === "PAUSED"),
     [projects]
   )
+
+  const { page, setPage, pageSize, setPageSize, pageCount, pageItems, total } = usePagination(sorted)
 
   return (
     <PageContainer>
@@ -586,11 +590,26 @@ export default function ProjectsPage() {
           <EmptyState isSearch={search.trim().length > 0} />
         </Card>
       ) : view === "cards" ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {sorted.map((project) => (
-            <ProjectCard key={project.id} project={project} slug={slug} />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {pageItems.map((project) => (
+              <ProjectCard key={project.id} project={project} slug={slug} />
+            ))}
+          </div>
+          {total > pageSize && (
+            <Card className="gap-0 overflow-hidden py-0">
+              <DataTablePagination
+                page={page}
+                pageCount={pageCount}
+                pageSize={pageSize}
+                total={total}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+                className="border-t-0"
+              />
+            </Card>
+          )}
+        </>
       ) : (
         <Card className="gap-0 overflow-hidden py-0">
           <Table>
@@ -607,11 +626,19 @@ export default function ProjectsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sorted.map((project) => (
+              {pageItems.map((project) => (
                 <OperationRow key={project.id} project={project} slug={slug} />
               ))}
             </TableBody>
           </Table>
+          <DataTablePagination
+            page={page}
+            pageCount={pageCount}
+            pageSize={pageSize}
+            total={total}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         </Card>
       )}
     </PageContainer>
