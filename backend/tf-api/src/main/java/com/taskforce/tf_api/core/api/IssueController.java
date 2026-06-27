@@ -152,6 +152,46 @@ public class IssueController {
         return ResponseEntity.ok(ApiResponse.success("Issue supprimée", null));
     }
 
+    @PatchMapping("/{issueId}/archive")
+    public ResponseEntity<ApiResponse<IssueResponse>> archiveIssue(
+        @PathVariable String slug,
+        @PathVariable Long projectId,
+        @PathVariable Long issueId,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long userId = resolveUserId(jwt);
+        IssueResponse issue = issueService.setArchived(slug, projectId, issueId, true, userId);
+        return ResponseEntity.ok(ApiResponse.success("Issue archivée", issue));
+    }
+
+    @PatchMapping("/{issueId}/unarchive")
+    public ResponseEntity<ApiResponse<IssueResponse>> unarchiveIssue(
+        @PathVariable String slug,
+        @PathVariable Long projectId,
+        @PathVariable Long issueId,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long userId = resolveUserId(jwt);
+        IssueResponse issue = issueService.setArchived(slug, projectId, issueId, false, userId);
+        return ResponseEntity.ok(ApiResponse.success("Issue désarchivée", issue));
+    }
+
+    @PatchMapping("/{issueId}/pin")
+    public ResponseEntity<ApiResponse<IssueResponse>> pinIssue(
+        @PathVariable String slug,
+        @PathVariable Long projectId,
+        @PathVariable Long issueId,
+        @RequestBody PinIssueRequest request,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long userId = resolveUserId(jwt);
+        IssueResponse issue = issueService.setPinned(slug, projectId, issueId, request.pinned(), userId);
+        return ResponseEntity.ok(ApiResponse.success(request.pinned() ? "Issue épinglée" : "Issue dépinglée", issue));
+    }
+
+    /** Corps minimal du PATCH /pin */
+    public record PinIssueRequest(boolean pinned) {}
+
     // =========================================================================
     // Statuts
     // =========================================================================
