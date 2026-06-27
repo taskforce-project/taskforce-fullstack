@@ -22,7 +22,7 @@ public interface CycleRepository extends JpaRepository<Cycle, Long> {
     @Query("""
         SELECT c FROM Cycle c
         WHERE c.project.workspace.slug = :slug
-          AND c.status = com.taskforce.tf_api.core.enums.CycleStatus.ACTIVE
+          AND c.status = :#{T(com.taskforce.tf_api.core.enums.CycleStatus).ACTIVE}
         ORDER BY c.startDate ASC
         """)
     List<Cycle> findActiveByWorkspaceSlug(@Param("slug") String slug);
@@ -32,7 +32,7 @@ public interface CycleRepository extends JpaRepository<Cycle, Long> {
         SELECT COUNT(c) FROM Cycle c
         WHERE c.createdBy.id = :userId
           AND c.project.workspace.slug = :slug
-          AND c.status = com.taskforce.tf_api.core.enums.CycleStatus.COMPLETED
+          AND c.status = :#{T(com.taskforce.tf_api.core.enums.CycleStatus).COMPLETED}
         """)
     long countCompletedByCreatorIdAndWorkspaceSlug(
         @Param("userId") Long userId,
