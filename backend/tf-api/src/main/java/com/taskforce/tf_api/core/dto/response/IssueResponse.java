@@ -54,6 +54,12 @@ public class IssueResponse {
     private List<ProjectLabelResponse> labels;
 
     private int commentCount;
+
+    /** true si l'issue est archivée (masquée des vues par défaut) */
+    private boolean archived;
+    /** true si l'issue est épinglée en tête */
+    private boolean pinned;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
