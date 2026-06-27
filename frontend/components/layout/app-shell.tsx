@@ -8,6 +8,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/layout/sidebar/app-sidebar"
 import { AppTopbar } from "@/components/layout/topbar/app-topbar"
 import { PanelDock } from "@/components/layout/panel-dock"
+import { AppFooter } from "@/components/layout/app-footer"
 import { UpgradeDialog } from "@/components/subscription/upgrade-dialog"
 
 interface AppShellProps {
@@ -38,6 +39,7 @@ export function AppShell({ children }: AppShellProps) {
           </AnimatePresence>
           <PanelDock side="right" />
         </div>
+        <AppFooter />
       </SidebarInset>
 
       {/* Modal d'upgrade global — ouvrable depuis n'importe quel CTA (QA2-19) */}
