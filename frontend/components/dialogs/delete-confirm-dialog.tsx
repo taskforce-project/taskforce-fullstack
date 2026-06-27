@@ -28,6 +28,9 @@ interface DeleteConfirmDialogProps {
   readonly children?: React.ReactNode
   readonly onConfirm?: () => void
   readonly variant?: "danger" | "warning"
+  /** Mode contrôlé (ex. déclenché depuis un menu) — si fourni, le trigger interne est optionnel. */
+  readonly open?: boolean
+  readonly onOpenChange?: (open: boolean) => void
 }
 
 // ---------------------------------------------------------------------------
@@ -41,8 +44,16 @@ export function DeleteConfirmDialog({
   children,
   onConfirm,
   variant = "danger",
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
 }: DeleteConfirmDialogProps) {
-  const [open, setOpen] = useState(false)
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
+  const isControlled = controlledOpen !== undefined
+  const open = isControlled ? controlledOpen : uncontrolledOpen
+  const setOpen = (next: boolean) => {
+    if (isControlled) controlledOnOpenChange?.(next)
+    else setUncontrolledOpen(next)
+  }
 
   function handleConfirm() {
     onConfirm?.()
@@ -51,14 +62,11 @@ export function DeleteConfirmDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {children ?? (
-          <Button variant="destructive" size="sm" className="gap-2">
-            <Trash2 className="size-4" />
-            Delete
-          </Button>
-        )}
-      </DialogTrigger>
+      {children && (
+        <DialogTrigger asChild>
+          {children}
+        </DialogTrigger>
+      )}
 
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
