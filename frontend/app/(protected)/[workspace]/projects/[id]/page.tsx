@@ -11,6 +11,7 @@ import {
   MoreHorizontal,
   ChevronDown,
   Download,
+  Pin,
 } from "lucide-react"
 import {
   DndContext,
@@ -113,6 +114,8 @@ function toSheetIssue(issue: Issue): SheetIssue {
       : null,
     assigneeId:     issue.assignee?.id ?? null,
     labels:         issue.labels,
+    pinned:         issue.pinned,
+    archived:       issue.archived,
     dueDate:        issue.dueDate,
     storyPoints:    issue.storyPoints,
     cycle:          null,
@@ -170,6 +173,7 @@ function IssueCard({
       )}
 
       <p className="text-sm text-foreground leading-snug mb-3 line-clamp-2">
+        {issue.pinned && <Pin className="inline size-3 mr-1 -mt-0.5 text-amber-500 fill-amber-500" aria-label="Épinglée" />}
         {issue.title}
       </p>
 
