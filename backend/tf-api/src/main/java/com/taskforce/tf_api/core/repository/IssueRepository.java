@@ -18,8 +18,14 @@ import com.taskforce.tf_api.core.model.Issue;
 @Repository
 public interface IssueRepository extends JpaRepository<Issue, Long> {
 
-    /** Issues d'un projet (toutes), triées par sequence_number desc */
-    Page<Issue> findByProjectIdOrderBySequenceNumberDesc(Long projectId, Pageable pageable);
+    /** Issues actives d'un projet (hors archivées), épinglées d'abord puis sequence_number desc */
+    @Query("""
+        SELECT i FROM Issue i
+        WHERE i.project.id = :projectId
+          AND i.archivedAt IS NULL
+        ORDER BY i.pinned DESC, i.sequenceNumber DESC
+        """)
+    Page<Issue> findByProjectIdOrderBySequenceNumberDesc(@Param("projectId") Long projectId, Pageable pageable);
 
     /** Issues d'un projet avec un statut précis */
     List<Issue> findByProjectIdAndStatusIdOrderBySequenceNumberDesc(Long projectId, Long statusId);
@@ -73,7 +79,8 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
         LEFT JOIN FETCH i.labels
         WHERE i.project.id = :projectId
           AND i.parent IS NULL
-        ORDER BY i.status.position ASC, i.position ASC, i.sequenceNumber DESC
+          AND i.archivedAt IS NULL
+        ORDER BY i.pinned DESC, i.status.position ASC, i.position ASC, i.sequenceNumber DESC
         """)
     List<Issue> findForKanban(@Param("projectId") Long projectId);
 
