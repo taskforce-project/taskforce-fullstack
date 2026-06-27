@@ -11,7 +11,6 @@ import {
   CreditCard,
   Shield,
   Mail,
-  ChevronDown,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -136,20 +135,34 @@ const ARTICLES: readonly DocArticle[] = [
 export default function HelpPage() {
   const { t } = useTranslation()
   const [query, setQuery] = useState("")
-  const [activeCat, setActiveCat] = useState<string>("all")
-  const [openId, setOpenId] = useState<string | null>(null)
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    return ARTICLES.filter((a) => {
-      if (activeCat !== "all" && a.category !== activeCat) return false
-      if (!q) return true
-      return a.title.toLowerCase().includes(q) || a.body.toLowerCase().includes(q)
-    })
-  }, [query, activeCat])
+  const q = query.trim().toLowerCase()
+  const searching = q.length > 0
+
+  // Recherche → résultats à plat ; sinon doc complète groupée par catégorie.
+  const searchResults = useMemo(() => {
+    if (!searching) return []
+    return ARTICLES.filter(
+      (a) => a.title.toLowerCase().includes(q) || a.body.toLowerCase().includes(q)
+    )
+  }, [q, searching])
+
+  // Catégories non vides, dans l'ordre, avec leurs articles.
+  const sections = useMemo(
+    () =>
+      CATEGORIES.map((c) => ({
+        category: c,
+        articles: ARTICLES.filter((a) => a.category === c.id),
+      })).filter((s) => s.articles.length > 0),
+    []
+  )
+
+  function scrollTo(id: string) {
+    document.getElementById(`doc-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" })
+  }
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
       {/* Header */}
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">{t("help.title")}</h1>
@@ -157,7 +170,7 @@ export default function HelpPage() {
       </div>
 
       {/* Search */}
-      <div className="relative">
+      <div className="relative max-w-xl">
         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <input
           type="text"
@@ -168,77 +181,88 @@ export default function HelpPage() {
         />
       </div>
 
-      {/* Filtres par catégorie */}
-      <div className="flex flex-wrap items-center gap-1.5">
-        <button
-          type="button"
-          onClick={() => setActiveCat("all")}
-          className={cn(
-            "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-            activeCat === "all" ? "border-foreground/20 bg-muted text-foreground" : "border-border text-muted-foreground hover:text-foreground"
+      {searching ? (
+        /* ── Résultats de recherche (à plat) ─────────────────────────── */
+        <div className="flex flex-col gap-4">
+          <p className="text-xs text-muted-foreground">
+            {searchResults.length} résultat{searchResults.length !== 1 ? "s" : ""} pour « {query} »
+          </p>
+          {searchResults.length === 0 ? (
+            <p className="rounded-xl border border-border bg-card py-10 text-center text-sm text-muted-foreground">
+              Aucun article ne correspond à votre recherche.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-4">
+              {searchResults.map((a) => {
+                const cat = CATEGORIES.find((c) => c.id === a.category)
+                return (
+                  <article key={a.id} className="rounded-xl border border-border bg-card p-5 [box-shadow:var(--shadow-sm)]">
+                    <div className="mb-1.5 flex items-center gap-2">
+                      <span className={cn("flex size-6 items-center justify-center rounded-md border", cat?.color)}>{cat?.icon}</span>
+                      <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{cat?.label}</span>
+                    </div>
+                    <h3 className="text-sm font-semibold text-foreground">{a.title}</h3>
+                    <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{a.body}</p>
+                  </article>
+                )
+              })}
+            </div>
           )}
-        >
-          Tout
-        </button>
-        {CATEGORIES.map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            onClick={() => setActiveCat(c.id)}
-            className={cn(
-              "flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-              activeCat === c.id ? "border-foreground/20 bg-muted text-foreground" : "border-border text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {c.icon}
-            {c.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Articles (accordéon) */}
-      <div className="rounded-xl border border-border bg-card overflow-hidden [box-shadow:var(--shadow-sm)]">
-        {filtered.length === 0 ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">Aucun article ne correspond à votre recherche.</p>
-        ) : (
-          filtered.map((a) => {
-            const open = openId === a.id
-            const cat = CATEGORIES.find((c) => c.id === a.category)
-            return (
-              <div key={a.id} className="border-b border-border/60 last:border-0">
-                <button
-                  type="button"
-                  onClick={() => setOpenId(open ? null : a.id)}
-                  className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-muted/40"
-                >
-                  <span className={cn("flex size-7 shrink-0 items-center justify-center rounded-md border", cat?.color)}>
-                    {cat?.icon}
-                  </span>
-                  <span className="flex-1 text-sm font-medium text-foreground">{a.title}</span>
-                  <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />
-                </button>
-                {open && (
-                  <p className="px-4 pb-4 pl-14 text-sm leading-relaxed text-muted-foreground">{a.body}</p>
-                )}
-              </div>
-            )
-          })
-        )}
-      </div>
-
-      {/* Contact support */}
-      <div className="rounded-xl border border-border bg-card p-5 [box-shadow:var(--shadow-sm)] flex flex-col gap-4 sm:flex-row sm:items-center">
-        <div className="flex-1">
-          <p className="text-sm font-semibold text-foreground">{t("help.contactSupport")}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">{t("help.contactSupportDesc")}</p>
         </div>
-        <Button asChild variant="outline" size="sm" className="h-8 gap-1.5 text-xs shrink-0">
-          <a href="mailto:support@taskforce.dev?subject=Support%20TaskForce">
-            <Mail className="size-3.5" />
-            {t("help.sendEmail")}
-          </a>
-        </Button>
-      </div>
+      ) : (
+        /* ── Doc complète : sommaire + contenu ───────────────────────── */
+        <div className="flex gap-8">
+          {/* Sommaire (sticky) */}
+          <nav className="sticky top-0 hidden h-fit w-56 shrink-0 flex-col gap-0.5 lg:flex">
+            <p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Sommaire</p>
+            {sections.map(({ category }) => (
+              <button
+                key={category.id}
+                type="button"
+                onClick={() => scrollTo(category.id)}
+                className="flex items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+              >
+                <span className={cn("flex size-6 shrink-0 items-center justify-center rounded-md border", category.color)}>{category.icon}</span>
+                <span className="truncate">{category.label}</span>
+              </button>
+            ))}
+          </nav>
+
+          {/* Contenu */}
+          <div className="flex min-w-0 flex-1 flex-col gap-10">
+            {sections.map(({ category, articles }) => (
+              <section key={category.id} id={`doc-${category.id}`} className="scroll-mt-6">
+                <div className="mb-4 flex items-center gap-2.5 border-b border-border pb-2.5">
+                  <span className={cn("flex size-8 items-center justify-center rounded-lg border", category.color)}>{category.icon}</span>
+                  <h2 className="text-lg font-semibold tracking-tight text-foreground">{category.label}</h2>
+                </div>
+                <div className="flex flex-col gap-6">
+                  {articles.map((a) => (
+                    <div key={a.id}>
+                      <h3 className="text-sm font-semibold text-foreground">{a.title}</h3>
+                      <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{a.body}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ))}
+
+            {/* Contact support */}
+            <div className="flex flex-col gap-4 rounded-xl border border-border bg-card p-5 [box-shadow:var(--shadow-sm)] sm:flex-row sm:items-center">
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-foreground">{t("help.contactSupport")}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{t("help.contactSupportDesc")}</p>
+              </div>
+              <Button asChild variant="outline" size="sm" className="h-8 shrink-0 gap-1.5 text-xs">
+                <a href="mailto:support@taskforce.dev?subject=Support%20TaskForce">
+                  <Mail className="size-3.5" />
+                  {t("help.sendEmail")}
+                </a>
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
