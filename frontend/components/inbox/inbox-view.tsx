@@ -84,8 +84,7 @@ function SignalRow({
 
   return (
     <div className={cn(
-      "group relative flex items-stretch border-b border-border transition-colors last:border-0",
-      signal.read ? "hover:bg-muted/50" : "bg-muted/30"
+      "group relative flex items-stretch border-b border-border transition-colors last:border-0 hover:bg-muted/50"
     )}>
       <span className={cn("w-0.5 shrink-0 rounded-r-full", signal.read ? "bg-transparent" : URGENCY_BAR[signal.urgency])} />
 
