@@ -6,7 +6,6 @@ import {
   CircleDot,
   Plus,
   ArrowUpRight,
-  GripVertical,
 } from "lucide-react"
 
 import { IssueSheet, type SheetIssue } from "@/components/sheets/issue-sheet"
@@ -67,6 +66,8 @@ function toSheetIssue(issue: Issue): SheetIssue {
       : null,
     assigneeId:     issue.assignee?.id ?? null,
     labels:         issue.labels,
+    pinned:         issue.pinned,
+    archived:       issue.archived,
     dueDate:        formatDate(issue.dueDate) ?? null,
     storyPoints:    null,
     cycle:          null,
@@ -153,6 +154,16 @@ export default function ProjectBacklogPage() {
 
       {/* List */}
       <div className="rounded-xl border border-border bg-card overflow-hidden [box-shadow:var(--shadow-sm)]">
+        {/* Header de colonnes (QA3-9) */}
+        <div className="flex items-center gap-3 border-b border-border bg-muted/30 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          <span className="h-2 w-2 shrink-0" aria-hidden />
+          <span className="w-3.5 shrink-0" aria-hidden />
+          <span className="w-14 shrink-0">ID</span>
+          <span className="flex-1">Title</span>
+          <span className="hidden md:block w-36 shrink-0 text-right">Labels</span>
+          <span className="hidden lg:block w-8 shrink-0 text-center">Owner</span>
+          <span className="h-3.5 w-3.5 shrink-0" aria-hidden />
+        </div>
         {visibleIssues.map((issue) => (
           <div
             key={issue.id}
@@ -162,7 +173,6 @@ export default function ProjectBacklogPage() {
             onKeyDown={(e) => e.key === "Enter" && setSelectedIssue(toSheetIssue(issue))}
             className="group flex w-full cursor-pointer items-center gap-3 px-4 py-2.5 hover:bg-muted/40 transition-colors border-b border-border/50 last:border-0 text-left"
           >
-            <GripVertical className="h-3.5 w-3.5 text-muted-foreground/30 group-hover:text-muted-foreground/60 shrink-0 transition-colors" />
             <div className={cn("h-2 w-2 rounded-full shrink-0", PRIORITY_DOT[issue.priority])} />
             <button
               type="button"
