@@ -8,7 +8,9 @@ import {
   Activity, CheckCircle2, AlertTriangle,
 } from "lucide-react"
 import { toast } from "sonner"
+import { useTheme } from "next-themes"
 
+import { useTranslation } from "@/lib/i18n"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { UserAvatar } from "@/components/ui/user-avatar"
@@ -20,7 +22,7 @@ import { useAuth } from "@/lib/contexts/auth-context"
 import { useUserStore } from "@/lib/store/user-store"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { DeleteConfirmDialog } from "@/components/dialogs/delete-confirm-dialog"
-import { stripeService } from "@/lib/api/stripe-service"
+import { stripeService, type SubscriptionInfo } from "@/lib/api/stripe-service"
 import { useUpgradeStore } from "@/lib/store/upgrade-store"
 import { getAuditLogs, type AuditLogEntry } from "@/lib/api/workspace-service"
 import { useIntegrationStore } from "@/lib/store/integration-store"
@@ -389,8 +391,30 @@ function ProfilePanel() {
 
 function AccountPanel() {
   const { user } = useAuth()
-  const [timezone, setTimezone] = useState("Europe/Paris")
-  const [language, setLanguage] = useState("en")
+  const { locale, setLocale } = useTranslation()
+  // Timezone : pas d'endpoint dédié → préférence client persistée localement (init paresseuse).
+  const [timezone, setTimezone] = useState<string>(() => {
+    if (globalThis.window === undefined) return "Europe/Paris"
+    return localStorage.getItem("tf-timezone") ?? "Europe/Paris"
+  })
+  const [deleting, setDeleting] = useState(false)
+
+  function handleSave() {
+    localStorage.setItem("tf-timezone", timezone)
+    toast.success("Préférences du compte enregistrées")
+  }
+
+  async function handleDelete() {
+    if (globalThis.window !== undefined && !window.confirm("Supprimer définitivement votre compte ? Cette action est irréversible.")) return
+    setDeleting(true)
+    try {
+      await deleteMyAccount()
+      toast.success("Compte supprimé. Déconnexion…")
+    } catch {
+      toast.error("Échec de la suppression. Réessayez ou contactez privacy@taskforce.dev.")
+      setDeleting(false)
+    }
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -400,14 +424,14 @@ function AccountPanel() {
             <StyledInput type="email" value={user?.email ?? ""} readOnly />
           </FormField>
           <Separator />
-          <FormField label="Language">
-            <Select value={language} onValueChange={setLanguage}>
+          <FormField label="Language" hint="Applied immediately across the app.">
+            <Select value={locale} onValueChange={(v) => setLocale(v as "en" | "fr")}>
               <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="en">English</SelectItem>
-                <SelectItem value="fr">Francais</SelectItem>
+                <SelectItem value="fr">Français</SelectItem>
               </SelectContent>
             </Select>
           </FormField>
@@ -431,23 +455,30 @@ function AccountPanel() {
             <p className="text-sm font-medium text-foreground">Delete your account</p>
             <p className="text-xs text-muted-foreground mt-0.5">Permanently delete your account and all associated data.</p>
           </div>
-          <Button variant="destructive" size="sm" className="h-8 text-xs shrink-0">Delete account</Button>
+          <Button variant="destructive" size="sm" className="h-8 text-xs shrink-0" onClick={handleDelete} disabled={deleting}>
+            {deleting ? "Suppression…" : "Delete account"}
+          </Button>
         </div>
       </SectionCard>
       <div className="flex justify-end">
-        <Button size="sm" className="h-8 text-xs" onClick={() => toast.success("Account settings saved")}>Save changes</Button>
+        <Button size="sm" className="h-8 text-xs" onClick={handleSave}>Save changes</Button>
       </div>
     </div>
   )
 }
 
 function AppearancePanel() {
-  const [theme, setTheme] = useState<"system" | "light" | "dark">("system")
-  const [density, setDensity] = useState<"comfortable" | "compact">("comfortable")
+  // Source de vérité du thème = next-themes (cf. app/layout.tsx). Appliqué et persisté en direct.
+  const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+  // Pattern next-themes : on attend le montage pour éviter un mismatch d'hydratation.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => setMounted(true), [])
+  const current = mounted ? (theme ?? "system") : "system"
 
   return (
     <div className="flex flex-col gap-4">
-      <SectionCard title="Theme" description="Choose how Taskforce looks to you.">
+      <SectionCard title="Theme" description="S'applique immédiatement et reste mémorisé.">
         <div className="flex gap-3">
           {(["system", "light", "dark"] as const).map((opt) => (
             <button
@@ -455,7 +486,7 @@ function AppearancePanel() {
               onClick={() => setTheme(opt)}
               className={cn(
                 "flex flex-col items-center gap-2 rounded-lg border-2 p-3 transition-all capitalize",
-                theme === opt ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/30"
+                current === opt ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/30"
               )}
             >
               <div
@@ -463,7 +494,7 @@ function AppearancePanel() {
                   "h-8 w-12 rounded",
                   opt === "light" && "bg-white border border-border",
                   opt === "dark" && "bg-zinc-900",
-                  opt === "system" && "bg-muted"
+                  opt === "system" && "bg-gradient-to-r from-white to-zinc-900 border border-border"
                 )}
               />
               <span className="text-xs font-medium text-foreground">{opt}</span>
@@ -471,37 +502,27 @@ function AppearancePanel() {
           ))}
         </div>
       </SectionCard>
-      <SectionCard title="Density" description="Control how much content is shown.">
-        <div className="flex gap-3">
-          {(["comfortable", "compact"] as const).map((opt) => (
-            <button
-              key={opt}
-              onClick={() => setDensity(opt)}
-              className={cn(
-                "flex flex-col items-center gap-2 rounded-lg border-2 px-5 py-3 transition-all capitalize",
-                density === opt ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/30"
-              )}
-            >
-              <span className="text-xs font-medium text-foreground">{opt}</span>
-            </button>
-          ))}
-        </div>
-      </SectionCard>
-      <div className="flex justify-end">
-        <Button size="sm" className="h-8 text-xs" onClick={() => toast.success("Appearance saved")}>Save preferences</Button>
-      </div>
     </div>
   )
 }
 
+const NOTIF_DEFAULTS = {
+  mentions:      true,
+  assignments:   true,
+  comments:      true,
+  statusChanges: false,
+  dueSoon:       true,
+  weeklyDigest:  false,
+}
+
 function NotificationsPanel() {
-  const [prefs, setPrefs] = useState({
-    mentions:      true,
-    assignments:   true,
-    comments:      true,
-    statusChanges: false,
-    dueSoon:       true,
-    weeklyDigest:  false,
+  // Pas d'endpoint dédié → préférences persistées côté client (init paresseuse, restent après reload).
+  const [prefs, setPrefs] = useState<typeof NOTIF_DEFAULTS>(() => {
+    if (globalThis.window === undefined) return NOTIF_DEFAULTS
+    try {
+      const saved = localStorage.getItem("tf-notif-prefs")
+      return saved ? { ...NOTIF_DEFAULTS, ...JSON.parse(saved) } : NOTIF_DEFAULTS
+    } catch { return NOTIF_DEFAULTS }
   })
 
   const rows: { key: keyof typeof prefs; label: string; desc: string }[] = [
@@ -515,6 +536,11 @@ function NotificationsPanel() {
 
   function toggle(key: keyof typeof prefs) {
     setPrefs((prev) => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  function handleSave() {
+    localStorage.setItem("tf-notif-prefs", JSON.stringify(prefs))
+    toast.success("Préférences de notification enregistrées")
   }
 
   return (
@@ -533,50 +559,33 @@ function NotificationsPanel() {
         </div>
       </SectionCard>
       <div className="flex justify-end">
-        <Button size="sm" className="h-8 text-xs" onClick={() => toast.success("Notification preferences saved")}>Save preferences</Button>
+        <Button size="sm" className="h-8 text-xs" onClick={handleSave}>Save preferences</Button>
       </div>
     </div>
   )
 }
 
 function SecurityPanel() {
+  // Auth déléguée à Keycloak (OIDC) — pas de fabrication d'infos ici (QA Q-17).
+  const items = [
+    { icon: <Key className="size-4 text-muted-foreground" />,    title: "Mot de passe",                 desc: "Modifiable depuis la console « Mon compte » de Keycloak." },
+    { icon: <Shield className="size-4 text-muted-foreground" />, title: "Double authentification (2FA)", desc: "Activez un authenticator (TOTP) depuis votre compte Keycloak." },
+    { icon: <Globe className="size-4 text-muted-foreground" />,  title: "Sessions actives",              desc: "Vos sessions sont gérées de façon centralisée par Keycloak." },
+  ]
   return (
     <div className="flex flex-col gap-4">
-      <SectionCard title="Password" description="Your password is managed through Keycloak.">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-foreground">Change password</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Last changed: 3 weeks ago</p>
-          </div>
-          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => toast.info("Redirecting to Keycloak...")}>
-            Manage in Keycloak
-          </Button>
-        </div>
-      </SectionCard>
-      <SectionCard title="Two-factor authentication" description="Add an extra layer of security to your account.">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-foreground">Authenticator app</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Not configured</p>
-          </div>
-          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => toast.info("2FA setup via Keycloak")}>Set up</Button>
-        </div>
-      </SectionCard>
-      <SectionCard title="Active sessions" description="Manage where you are logged in.">
-        <div className="flex flex-col gap-3">
-          {[
-            { device: "MacBook Pro - Chrome", location: "Paris, France", active: true },
-            { device: "iPhone 15 - Safari",   location: "Paris, France", active: false },
-          ].map((s) => (
-            <div key={s.device} className="flex items-center justify-between">
+      <SectionCard
+        title="Authentification & sécurité"
+        description="Votre identité est gérée par Keycloak (fournisseur OIDC). Le mot de passe, la 2FA et les sessions se gèrent dans votre compte Keycloak."
+      >
+        <div className="flex flex-col divide-y divide-border/50">
+          {items.map((it) => (
+            <div key={it.title} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+              <span className="mt-0.5 shrink-0">{it.icon}</span>
               <div>
-                <p className="text-sm font-medium text-foreground">{s.device}</p>
-                <p className="text-xs text-muted-foreground">{s.location}</p>
+                <p className="text-sm font-medium text-foreground">{it.title}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{it.desc}</p>
               </div>
-              {s.active
-                ? <Badge variant="outline" className="text-xs text-emerald-400 border-emerald-500/20 bg-emerald-500/10">Current</Badge>
-                : <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:text-destructive" onClick={() => toast.success("Session revoked")}>Revoke</Button>
-              }
             </div>
           ))}
         </div>
@@ -589,7 +598,25 @@ function BillingPanel() {
   const { user } = useAuth()
   const plan = (user?.planType ?? "FREE") as string
   const [portalLoading, setPortalLoading] = useState(false)
+  const [sub, setSub] = useState<SubscriptionInfo | null>(null)
   const openUpgrade = useUpgradeStore((s) => s.openUpgrade)
+
+  // Vraie info d'abonnement (date de renouvellement réelle, pas codée en dur). QA Q-19
+  useEffect(() => {
+    if (plan === "FREE") return
+    let active = true
+    stripeService.getSubscriptionInfo()
+      .then((s) => { if (active) setSub(s) })
+      .catch(() => { /* non bloquant — fallback message générique */ })
+    return () => { active = false }
+  }, [plan])
+
+  const renewLabel = (() => {
+    if (plan === "FREE") return "No active subscription"
+    if (!sub?.currentPeriodEnd) return "Abonnement actif"
+    const date = new Date(sub.currentPeriodEnd).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })
+    return sub.cancelAtPeriodEnd ? `Se termine le ${date}` : `Renouvellement le ${date}`
+  })()
 
   async function handleManageBilling() {
     setPortalLoading(true)
@@ -620,9 +647,7 @@ function BillingPanel() {
                 </Badge>
               )}
             </div>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {plan === "FREE" ? "No active subscription" : "Billed monthly - renews Jan 15, 2026"}
-            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">{renewLabel}</p>
           </div>
           {plan !== "FREE" && (
             <Button
@@ -797,9 +822,21 @@ function StatusPanel() {
 
   useEffect(() => {
     let alive = true
-    apiClient.get("/api/workspaces/current")
-      .then(() => { if (alive) setApi("ok") })
-      .catch(() => { if (alive) setApi("down") })
+    // Probe robuste : on réessaie avant de déclarer l'API « injoignable »
+    // (évite un faux « Incident » lors d'un hiccup réseau / redémarrage). QA Q-20
+    async function probe() {
+      for (let attempt = 1; attempt <= 3 && alive; attempt++) {
+        try {
+          await apiClient.get("/api/workspaces/current")
+          if (alive) setApi("ok")
+          return
+        } catch {
+          if (attempt === 3) { if (alive) setApi("down"); return }
+          await new Promise((r) => setTimeout(r, 1500))
+        }
+      }
+    }
+    void probe()
     return () => { alive = false }
   }, [])
 
@@ -826,8 +863,8 @@ function StatusPanel() {
   const rows: { name: string; ok: boolean; detail: string }[] = [
     { name: "Application (interface)", ok: true,            detail: "Chargée" },
     { name: "API Taskforce",          ok: api !== "down",   detail: api === "checking" ? "Vérification…" : api === "ok" ? "Opérationnelle" : "Injoignable" },
-    { name: "Temps réel (STOMP)",     ok: api !== "down",   detail: "Via l'API" },
-    { name: "Assistant IA (Groq)",    ok: true,             detail: "Configuré" },
+    { name: "Temps réel (STOMP)",     ok: api !== "down",   detail: api === "checking" ? "Vérification…" : api === "ok" ? "Disponible via l'API" : "Indisponible" },
+    { name: "Assistant IA (Groq)",    ok: true,             detail: "Configuré (côté serveur)" },
   ]
   const allOk = rows.every((r) => r.ok)
 
@@ -896,6 +933,7 @@ function GitHubRepoBrowser({ slug }: { readonly slug: string }) {
 
   useEffect(() => {
     let active = true
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoadingRepos(true)
     getGitHubRepos(slug)
       .then((r) => { if (active) setRepos(r) })
@@ -1376,7 +1414,7 @@ export default function SettingsPage() {
         description="Profil, workspace, facturation, sécurité et confidentialité."
       />
       <div className="flex gap-8 w-full min-h-0">
-      <nav className="flex flex-col gap-6 w-48 shrink-0">
+      <nav className="sticky top-0 self-start flex flex-col gap-6 w-48 shrink-0">
         {SECTION_GROUPS.map((group) => (
           <div key={group.label} className="flex flex-col gap-0.5">
             <p className="px-3 mb-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">{group.label}</p>
