@@ -55,6 +55,24 @@ DECLARE
     v_task_type      BIGINT;
     v_prio           issue_priority;
     i                INT;
+    -- solos (contributeurs « loup solitaire » : membres du workspace, hors équipe)
+    v_solo        BIGINT;
+    v_solo_proj   BIGINT;
+    v_solo_done   BIGINT;
+    v_solo_todo   BIGINT;
+    v_solo_prog   BIGINT;
+    v_solo_backlog BIGINT;
+    v_solo_task   BIGINT;
+    v_solo_ids    BIGINT[];
+    v_first       TEXT;
+    v_last        TEXT;
+    v_email       TEXT;
+    v_name        TEXT;
+    j             INT;
+    v_firsts      TEXT[] := ARRAY['Léa','Hugo','Maya','Noah','Ivan','Sofia','Liam','Zoé','Adam','Nora','Elias','Jade','Yuki','Owen','Priya','Mateo','Anya','Kofi','Ines','Theo','Lucas','Amara','Felix','Rania'];
+    v_lasts       TEXT[] := ARRAY['Moreau','Nakamura','Okafor','Rossi','Ivanov','Garcia','Murphy','Dubois','Khan','Bergström','Costa','Haddad','Tanaka','Schmidt','Patel','Lopez','Petrov','Mensah','Fontaine','Andersson','Silva','Diop','Weber','Nasser'];
+    v_skillsets   TEXT[] := ARRAY['["react","typescript"]','["java","sql"]','["python","data"]','["docker","infra"]','["design","ui"]','["testing","qa"]'];
+    v_seniorities TEXT[] := ARRAY['JUNIOR','MID','SENIOR'];
 BEGIN
     -- ----------------------------------------------------------------
     -- 0. Admin (« CEO »)
@@ -512,6 +530,91 @@ BEGIN
         (v_ops, v_tom,    'Runbook déploiement',  '🚀', 'Étapes de release, rollback, checklist post-deploy.'),
         (v_web, v_lina,   'Charte UI / tokens',   '🎨', 'Palette, typographie, espacements, composants.');
 
-    RAISE NOTICE 'Seed QA ULTRA-complet : workspace "taskforce-demo" (id=%) — 9 membres, 3 projets, ~117 issues étalées sur ~9 semaines (throughput/KPIs/capacité/burndown remplis), sous-tâches/URGENT/cancelled, commentaires, checklist, relations, worklogs, 3 cycles + sprint actif peuplé, ~15 notifications, favoris, 5 pages, invitations, abonnement PRO + historique, demandes enterprise.', v_ws;
+    -- ================================================================
+    -- 22. SOLOS — 24 contributeurs « loup solitaire » : membres du workspace
+    --     mais d'AUCUNE équipe. Projet dédié « Solo Initiatives » + ~150 issues
+    --     étalées sur les 30 derniers jours → gonfle membres, capacité,
+    --     throughput JOURNALIER (courbe 1 mois) et tous les KPIs.
+    -- ================================================================
+    INSERT INTO projects (workspace_id, name, identifier, description, created_by, color, icon_url)
+    VALUES (v_ws, 'Solo Initiatives', 'SOLO', 'Initiatives portées en autonomie par des contributeurs solo.', v_admin, 'bg-amber-500', 'lucide:User')
+    RETURNING id INTO v_solo_proj;
+
+    INSERT INTO issue_statuses (project_id, name, color, category, position, is_default) VALUES
+        (v_solo_proj, 'Backlog',     '#94a3b8', 'BACKLOG'::issue_status_category,    0, false),
+        (v_solo_proj, 'Todo',        '#6366f1', 'UNSTARTED'::issue_status_category,  1, true),
+        (v_solo_proj, 'In Progress', '#f59e0b', 'STARTED'::issue_status_category,    2, false),
+        (v_solo_proj, 'Done',        '#10b981', 'COMPLETED'::issue_status_category,  3, false),
+        (v_solo_proj, 'Cancelled',   '#ef4444', 'CANCELLED'::issue_status_category,  4, false);
+    INSERT INTO issue_types (project_id, name, color, icon, is_default) VALUES
+        (v_solo_proj, 'Task',    '#6366f1', 'circle-dot', true),
+        (v_solo_proj, 'Bug',     '#ef4444', 'bug',        false),
+        (v_solo_proj, 'Feature', '#10b981', 'zap',        false);
+    INSERT INTO project_labels (project_id, name, color) VALUES
+        (v_solo_proj, 'react', '#06b6d4'), (v_solo_proj, 'java', '#ef4444'),
+        (v_solo_proj, 'data', '#8b5cf6'), (v_solo_proj, 'infra', '#10b981');
+
+    SELECT id INTO v_solo_done    FROM issue_statuses WHERE project_id=v_solo_proj AND name='Done';
+    SELECT id INTO v_solo_todo    FROM issue_statuses WHERE project_id=v_solo_proj AND name='Todo';
+    SELECT id INTO v_solo_prog    FROM issue_statuses WHERE project_id=v_solo_proj AND name='In Progress';
+    SELECT id INTO v_solo_backlog FROM issue_statuses WHERE project_id=v_solo_proj AND name='Backlog';
+    SELECT id INTO v_solo_task    FROM issue_types    WHERE project_id=v_solo_proj AND name='Task';
+
+    -- admin = LEAD du projet ; les solos = simples membres
+    INSERT INTO project_members (project_id, user_id, role, added_by)
+    VALUES (v_solo_proj, v_admin, 'LEAD'::project_role, NULL);
+
+    v_solo_ids := ARRAY[]::BIGINT[];
+    FOR j IN 1..24 LOOP
+        v_first := v_firsts[j];
+        v_last  := v_lasts[j];
+        v_name  := v_first || ' ' || v_last;
+        v_email := 'solo.' || LPAD(j::text, 2, '0') || '@seed.taskforce.dev';
+
+        -- upsert par email (persiste entre re-runs comme les autres coéquipiers)
+        INSERT INTO users (keycloak_id, email, display_name, plan_type, is_active)
+        VALUES ('seed-solo-' || LPAD(j::text, 2, '0'), v_email, v_name, 'FREE', true)
+        ON CONFLICT (email) DO UPDATE SET display_name = EXCLUDED.display_name
+        RETURNING id INTO v_solo;
+        v_solo_ids := array_append(v_solo_ids, v_solo);
+
+        -- membre du workspace MAIS d'aucune team_members → « solo »
+        INSERT INTO workspace_members (workspace_id, user_id, role, invited_by)
+        VALUES (v_ws, v_solo, 'MEMBER', v_admin);
+
+        -- profil de compétences (capacité 20→40h variée → KPI capacité d'équipe)
+        INSERT INTO member_skill_profiles (workspace_id, user_id, profile_text, skills_json, capacity_hours_per_week, seniority)
+        VALUES (v_ws, v_solo, 'Contributeur autonome.',
+                v_skillsets[1 + (j % 6)]::jsonb,
+                20 + ((j * 7) % 21),
+                v_seniorities[1 + (j % 3)]);
+
+        INSERT INTO project_members (project_id, user_id, role, added_by)
+        VALUES (v_solo_proj, v_solo, 'MEMBER'::project_role, v_admin);
+    END LOOP;
+
+    -- ~150 issues solo réparties sur les 30 derniers jours, ~2/3 résolues
+    v_seq := 0;
+    FOR i IN 1..150 LOOP
+        v_seq  := v_seq + 1;
+        v_solo := v_solo_ids[1 + (i % 24)];
+        v_created := NOW() - (INTERVAL '1 day' * (30 - (i % 30)));
+        v_prio := (ARRAY['LOW','MEDIUM','MEDIUM','HIGH','URGENT']::issue_priority[])[1 + (i % 5)];
+
+        IF (i % 3) <> 0 THEN
+            v_done := LEAST(v_created + (INTERVAL '1 day' * (1 + (i % 4))), NOW() - INTERVAL '1 hour');
+            INSERT INTO issues (project_id, sequence_number, title, description, status_id, type_id, priority, story_points, assignee_id, reporter_id, created_at, completed_at)
+            VALUES (v_solo_proj, v_seq, 'Solo #' || v_seq, 'Initiative menée en autonomie.',
+                    v_solo_done, v_solo_task, v_prio, 1 + (i % 5), v_solo, v_admin, v_created, v_done);
+        ELSE
+            INSERT INTO issues (project_id, sequence_number, title, description, status_id, type_id, priority, story_points, assignee_id, reporter_id, created_at)
+            VALUES (v_solo_proj, v_seq, 'Solo #' || v_seq, 'Initiative planifiée.',
+                    CASE ((i / 3) % 3) WHEN 0 THEN v_solo_backlog WHEN 1 THEN v_solo_todo ELSE v_solo_prog END,
+                    v_solo_task, v_prio, 1 + (i % 5), v_solo, v_admin, v_created);
+        END IF;
+    END LOOP;
+    INSERT INTO issue_sequence_counters (project_id, last_number) VALUES (v_solo_proj, v_seq);
+
+    RAISE NOTICE 'Seed QA ULTRA-complet : workspace "taskforce-demo" (id=%) — 9 membres + 24 solos (hors équipe), 4 projets, ~267 issues (throughput JOURNALIER 30 j + hebdo, KPIs/capacité/burndown remplis), sous-tâches/URGENT/cancelled, commentaires, checklist, relations, worklogs, 3 cycles + sprint actif peuplé, ~15 notifications, favoris, 5 pages, invitations, abonnement PRO + historique, demandes enterprise.', v_ws;
 END
 $seed$;
