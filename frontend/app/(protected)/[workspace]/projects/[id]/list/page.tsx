@@ -74,6 +74,8 @@ function toSheetIssue(issue: Issue): SheetIssue {
       : null,
     assigneeId:     issue.assignee?.id ?? null,
     labels:         issue.labels,
+    pinned:         issue.pinned,
+    archived:       issue.archived,
     dueDate:        issue.dueDate,
     storyPoints:    null,
     cycle:          null,
@@ -154,17 +156,23 @@ function StatusGroup({
   readonly onOpenIssue: (issue: Issue) => void
   readonly onToggleDone: (issue: Issue) => void
 }) {
+  // QA: groupes repliables (Backlog & co.)
+  const [open, setOpen] = useState(true)
   return (
     <div>
-      {/* Group header */}
-      <div className="flex items-center gap-2 px-4 py-2 bg-muted border-b border-border/50 sticky top-9 z-10">
-        <ChevronDown className="size-3.5 text-muted-foreground" />
+      {/* Group header — cliquable pour replier/déplier */}
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center gap-2 px-4 py-2 bg-muted border-b border-border/50 sticky top-9 z-10 text-left hover:bg-muted/80 transition-colors"
+      >
+        <ChevronDown className={cn("size-3.5 text-muted-foreground transition-transform", !open && "-rotate-90")} />
         {getCategoryIcon(status.category, status.color)}
         <span className="text-xs font-medium" style={{ color: status.color }}>{status.name}</span>
         <span className="text-xs text-muted-foreground ml-1">{issues.length}</span>
-      </div>
+      </button>
 
-      {issues.map((issue) => (
+      {open && issues.map((issue) => (
         <IssueRow key={issue.id} issue={issue} onOpen={onOpenIssue} onToggleDone={onToggleDone} />
       ))}
     </div>
