@@ -26,15 +26,15 @@ export default function NotFound() {
       {/* Content */}
       <div className="relative z-30 flex flex-col items-center gap-8 px-6 text-center">
         {/* Logo */}
-        <div className="flex items-center gap-2 text-muted-foreground/80">
+        <div className="flex items-center gap-3 text-foreground/90">
           <Image
             src="/assets/logo/logo_taskforce_tp.png"
             alt="TaskForce"
-            width={20}
-            height={20}
-            className="h-5 w-5 object-contain"
+            width={44}
+            height={44}
+            className="h-11 w-11 object-contain"
           />
-          <span className="text-sm font-medium tracking-widest uppercase">
+          <span className="text-lg font-semibold tracking-wide uppercase">
             TaskForce
           </span>
         </div>
