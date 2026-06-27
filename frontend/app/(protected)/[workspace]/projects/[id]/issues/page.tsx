@@ -32,6 +32,9 @@ import { cn } from "@/lib/utils"
 import { useIssueStore } from "@/lib/store/issue-store"
 import type { Issue, IssuePriority, IssueStatusCategory } from "@/lib/api/issue-service"
 import { CreateIssueDialog } from "@/components/dialogs/create-issue-dialog"
+import { DataTablePagination } from "@/components/ui/data-table-pagination"
+import { Spinner } from "@/components/ui/spinner"
+import { usePagination } from "@/hooks/use-pagination"
 
 // ---------------------------------------------------------------------------
 // Mapping helpers
@@ -108,6 +111,8 @@ function toSheetIssue(issue: Issue): SheetIssue {
       : null,
     assigneeId:     issue.assignee?.id ?? null,
     labels:         issue.labels,
+    pinned:         issue.pinned,
+    archived:       issue.archived,
     dueDate:        formatDate(issue.dueDate),
     storyPoints:    null,
     cycle:          null,
@@ -280,6 +285,8 @@ export default function ProjectIssuesPage() {
     return list
   }, [issues, search, categoryFilter, priorityFilter])
 
+  const { page, setPage, pageSize, setPageSize, pageCount, pageItems, total } = usePagination(filtered)
+
   const hasFilters = categoryFilter !== "all" || priorityFilter !== "all" || search.trim()
 
   function clearFilters() {
@@ -396,7 +403,7 @@ export default function ProjectIssuesPage() {
 
         {isLoading && (
           <div className="flex flex-col items-center justify-center py-12 text-center">
-            <RefreshCw className="size-6 text-muted-foreground/40 animate-spin mb-3" />
+            <Spinner className="size-6 text-muted-foreground/60 mb-3" />
             <p className="text-sm text-muted-foreground">Loading issues…</p>
           </div>
         )}
@@ -418,9 +425,20 @@ export default function ProjectIssuesPage() {
           </div>
         )}
         {!isLoading && filtered.length > 0 && (
-          filtered.map((issue) => (
+          pageItems.map((issue) => (
             <IssueRow key={issue.id} issue={issue} onOpen={setSelectedIssue} />
           ))
+        )}
+
+        {!isLoading && total > 0 && (
+          <DataTablePagination
+            page={page}
+            pageCount={pageCount}
+            pageSize={pageSize}
+            total={total}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         )}
 
         {/* Add issue row */}
