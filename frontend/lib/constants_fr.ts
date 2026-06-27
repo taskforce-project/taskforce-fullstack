@@ -220,7 +220,7 @@ export const CONSTANTS_FR: TranslationKeys = {
     createProject: "Nouveau projet",
     comingSoon: "Bientôt",
     sub: {
-      myAll: "Tout",
+      myAll: "Toutes mes files",
       myIssues: "Tâches",
       myCycles: "Sprints",
       myPages: "Pages",
@@ -297,6 +297,7 @@ export const CONSTANTS_FR: TranslationKeys = {
       backlog: "Backlog",
       issues: "Tâches",
       cycles: "Cycles",
+      roadmap: "Roadmap",
       pages: "Pages",
       members: "Membres",
       teams: "Équipes",

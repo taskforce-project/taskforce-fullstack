@@ -218,7 +218,7 @@ export const CONSTANTS_EN = {
     createProject: "New Project",
     comingSoon: "Soon",
     sub: {
-      myAll: "All",
+      myAll: "All my queues",
       myIssues: "Issues",
       myCycles: "Sprints",
       myPages: "Pages",
@@ -295,6 +295,7 @@ export const CONSTANTS_EN = {
       backlog: "Backlog",
       issues: "Issues",
       cycles: "Cycles",
+      roadmap: "Roadmap",
       pages: "Pages",
       members: "Members",
       teams: "Teams",
