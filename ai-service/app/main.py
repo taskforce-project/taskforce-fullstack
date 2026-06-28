@@ -1,14 +1,94 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import math
 import os
-from typing import List
+import re
+from typing import List, Optional
 
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 
-app = FastAPI(title="taskforce-ai-service", version="0.1.0")
+app = FastAPI(title="taskforce-ai-service", version="0.2.0")
+
+logger = logging.getLogger("ai-service")
+
+# Dimension de l'espace d'embedding (all-MiniLM-L6-v2 = 384). Doit rester aligné
+# avec la colonne pgvector `knowledge_nodes.embedding vector(384)` (migration V52).
+EMBEDDING_DIM = 384
+EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+
+# Chargement paresseux + singleton du modèle. Si fastembed/le modèle n'est pas
+# disponible (réseau, build), on bascule sur un vecteur déterministe de repli :
+# la recherche reste fonctionnelle (plomberie OK), juste sans qualité sémantique.
+_model = None
+_model_failed = False
+
+
+def _get_model():
+    global _model, _model_failed
+    if _model is not None or _model_failed:
+        return _model
+    try:
+        from fastembed import TextEmbedding  # import tardif (build léger si non utilisé)
+        logger.info("Chargement du modèle d'embedding %s…", EMBEDDING_MODEL_NAME)
+        _model = TextEmbedding(model_name=EMBEDDING_MODEL_NAME)
+        logger.info("Modèle d'embedding prêt.")
+    except Exception as exc:  # noqa: BLE001
+        _model_failed = True
+        logger.warning("Embeddings réels indisponibles (%s) — repli déterministe.", exc)
+    return _model
+
+
+def _embed_texts(texts: List[str]) -> tuple[List[List[float]], bool]:
+    """Retourne (vecteurs 384d, real?) ; real=False si repli déterministe utilisé."""
+    model = _get_model()
+    if model is not None:
+        try:
+            vectors = [list(map(float, v)) for v in model.embed(texts)]
+            return vectors, True
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Échec d'embedding réel (%s) — repli.", exc)
+    return [_lexical_embedding(t, EMBEDDING_DIM) for t in texts], False
+
+
+_TOKEN_RE = re.compile(r"[a-z0-9]{2,}")
+
+
+def _hash_bucket(token: str, dim: int) -> tuple[int, float]:
+    """Bucket + signe par feature hashing signé (réduit le biais de collision)."""
+    h = hashlib.md5(token.encode("utf-8")).digest()
+    bucket = int.from_bytes(h[:4], "big") % dim
+    sign = 1.0 if (h[4] & 1) == 0 else -1.0
+    return bucket, sign
+
+
+def _lexical_embedding(text: str, dim: int) -> List[float]:
+    """Embedding lexical offline (sans dépendance) : feature hashing de tokens + trigrammes
+    de caractères, pondéré tf-log et normalisé L2. La similarité cosinus reflète réellement
+    le recouvrement lexical (≈ mini-IR vectoriel), pas du bruit comme un hash global.
+    Remplaçable à chaud par un vrai modèle (fastembed) sur réseau propre — même interface 384d.
+    """
+    vec = [0.0] * dim
+    if not text:
+        return vec
+    tokens = _TOKEN_RE.findall(text.lower())
+    if not tokens:
+        return vec
+    tf: dict[str, int] = {}
+    for tok in tokens:
+        tf[tok] = tf.get(tok, 0) + 1
+    for tok, count in tf.items():
+        weight = 1.0 + math.log(count)
+        b, s = _hash_bucket("w:" + tok, dim)
+        vec[b] += s * weight
+        padded = f"#{tok}#"
+        for i in range(len(padded) - 2):  # trigrammes de caractères
+            tb, ts = _hash_bucket("c:" + padded[i : i + 3], dim)
+            vec[tb] += ts * 0.5
+    norm = math.sqrt(sum(v * v for v in vec))
+    return [v / norm for v in vec] if norm > 1e-12 else vec
 
 
 class EmbedRequest(BaseModel):
@@ -19,6 +99,7 @@ class EmbedResponse(BaseModel):
     model: str
     dimensions: int
     vectors: List[List[float]]
+    real: bool = True
 
 
 class CandidateText(BaseModel):
@@ -91,9 +172,13 @@ def health() -> dict:
 
 @app.post("/v1/embeddings")
 def embeddings(payload: EmbedRequest) -> EmbedResponse:
-    model = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
-    vectors = [_stable_vector(text) for text in payload.texts]
-    return EmbedResponse(model=model, dimensions=16, vectors=vectors)
+    vectors, real = _embed_texts(payload.texts)
+    return EmbedResponse(
+        model=EMBEDDING_MODEL_NAME if real else "lexical-hashing-384",
+        dimensions=EMBEDDING_DIM,
+        vectors=vectors,
+        real=real,
+    )
 
 
 @app.post("/v1/smart-assign/semantic-score")
