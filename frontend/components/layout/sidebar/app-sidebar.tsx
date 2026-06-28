@@ -9,6 +9,7 @@ import {
   ListTodo,
   Layers,
   Activity,
+  Brain,
   Cpu,
   User,
   MessagesSquare,
@@ -106,6 +107,11 @@ const NAV_WORK: readonly NavItem[] = [
     key: "nav.analytics",
     url: "/analytics",
     icon: Activity,
+  },
+  {
+    key: "nav.brain",
+    url: "/brain",
+    icon: Brain,
   },
   {
     key: "nav.agents",
