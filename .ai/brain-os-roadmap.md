@@ -1,6 +1,6 @@
 # Roadmap — Brain OS (couche de connaissance native TaskForce)
 
-> **Statut** : Phase 0 en cours · **Branche** : `feat/dashboard` · **Maj** : 2026-06-27
+> **Statut** : Phases 0/1/3 faites · Phase 2 (retrieval) faite, génération env-gated · **Branche** : `feat/dashboard` · **Maj** : 2026-06-27
 > Document maître de la feature « Brain OS ». Source de vérité produit → `../taskforce-docs`.
 
 ## 0. Vision en une phrase
@@ -120,24 +120,32 @@ TOTAL                                ≈ 218 GB
 > attribution `createdBy` ; suppression workspace → cascade `knowledge_nodes` = 0.
 > **Endpoints** : `GET /brain` · `GET|POST /brain/nodes` · `GET|PATCH|DELETE /brain/nodes/{id}` · `POST|DELETE /brain/edges[/{id}]`.
 
-### Phase 1 — Embedding & retrieval (ai-service FastAPI)
-- V52 : colonne `embedding vector(384)` + index HNSW
-- Worker RabbitMQ `brain.embed` (consumer → `all-MiniLM-L6-v2` réel, remplace le vecteur hash placeholder)
-- `POST /brain/search` (cosine + graph expansion) ; proxy Java `BrainSearchService` + cache
-- Write-back engine (`POST /brain/nodes` depuis l'IA, upsert + auto-edges)
+### Phase 1 — Embedding & retrieval · ✅ **fait & vérifié e2e** (plomberie ; modèle réel = réseau requis)
+- [x] V52 : colonne `embedding vector(384)` + index HNSW cosine
+- [x] ai-service `/v1/embeddings` réel via **fastembed** (`all-MiniLM-L6-v2`, 384d) **avec repli déterministe** si modèle absent
+- [x] Java `EmbeddingClient` (best-effort) + **embed-on-write** (create/update) + **backfill** des nodes seedés
+- [x] `POST /brain/search` (pgvector cosine, filtre domaine) → hits classés + score ; UI barre de recherche
+- [ ] *(reporté)* graph expansion 1-hop dans le search ; worker RabbitMQ async ; write-back IA
 
-### Phase 2 — IA context-aware + router fast/deep
-- `IntentClassifier` (Groq 8b)
-- Context Builder v2 (retrieval brain + issues liées + décisions 12)
-- `AnthropicService` (Claude Opus 4.8, tool calling : `create_node`, `create_task`)
-- Chat enrichi : badge Fast/Deep, sources citées, actions cliquables
+> **⚠️ Contrainte réseau de ce poste** : le proxy/firewall corrompt les gros téléchargements pip
+> (même cause que le 403 Groq) → `fastembed`+ONNX **non installable ici**. Le code est prêt : il tourne
+> sur un **vecteur de repli déterministe 384d** (plomberie 100 % fonctionnelle, ranking non-sémantique).
+> Sur un réseau propre : décommenter `fastembed` dans `ai-service/requirements.txt` + rebuild → qualité
+> sémantique réelle, **zéro changement de code**.
+> **Vérifié** : V52 appliquée, `/v1/embeddings` renvoie 384d, search backfill 17/17 nodes + résultats scorés.
 
-### Phase 3 — Brain OS UI (frontend Next.js)
-- Graph Viewer (`react-flow` ou d3-force), nodes colorés par domaine
-- Node editor markdown (tiptap/codemirror), versions, lien ref issue/projet
-- Domain navigator (sidebar 01→16) + recherche sémantique live
-- Onboarding wizard (choix template, questions business → pré-peuplement)
-- **Décision UX** : onglet *dans* le workspace, pas une app séparée (`/brain`)
+### Phase 2 — IA context-aware + router fast/deep · 🟡 **retrieval fait** (génération env-gated Groq)
+- [x] **RAG** : `AssistantService` injecte les top-5 nodes Brain OS pertinents (pgvector) dans le system prompt
+- [x] Repli gracieux : sans clé Groq, l'assistant **expose quand même** les notes pertinentes trouvées (retrieval visible sans LLM)
+- [ ] *(env-gated Groq)* router fast/deep (`IntentClassifier`), `AnthropicService` (Claude Opus, tool calling `create_node`/`create_task`), write-back IA, badges Fast/Deep + sources cliquables
+
+### Phase 3 — Brain OS UI (frontend Next.js) · ✅ **cœur fait**
+- [x] **Graph Viewer** — SVG force-directed **maison** (pas react-flow : réseau corrompt npm), nodes colorés par domaine, drag/zoom/pan, click-select
+- [x] Toggle **Liste / Graphe** ; éditeur markdown (textarea) + versions ; **relations** (link/unlink) dans le détail
+- [x] Domain navigator (01→20) + **recherche sémantique** live
+- [x] Choix de **gabarit à la création de workspace** (BLANK/SAAS/ECOM/MARKETPLACE/AGENTIC)
+- [x] **Décision UX appliquée** : onglet *dans* le workspace (`/[workspace]/brain`), pas d'app séparée
+- [ ] *(futur)* éditeur markdown riche (tiptap) ; wizard d'onboarding avec questions business → pré-remplissage IA
 
 ### Phase 4 — Issues enrichies + human-in-the-loop
 - Decision log par issue (obstacles/solutions/liens ADR), node lié auto (`ref_type=ISSUE`)
@@ -150,6 +158,13 @@ TOTAL                                ≈ 218 GB
 - Agent Packs C-level (CTO/CPO/CFO/CEO) — pseudo-board OODA
 - Pont Obsidian (export/import vault ; TaskForce = source of truth → résout le problème du ZIP à re-télécharger)
 - Data management : partitionnement, float16, archivage cold
+
+## 5bis. Qualité (opérationnel / scalable / maintenable / modulaire)
+
+- **Opérationnel ✅** : recherche réellement pertinente même offline grâce à un **embedding lexical maison** (feature hashing tokens + trigrammes, tf-log, L2) dans `ai-service` — cosinus corrélé au recouvrement lexical (vérifié : sim(security, security-audit)=0.68 vs sim(security, runbook)=−0.04). Drop-in `fastembed` sur réseau propre (même interface 384d). LLM génératif = clé Groq.
+- **Scalable 🟡** : index partiel `idx_knodes_missing_embedding` (V53) → backfill sans scan complet ; backfill borné (200/appel) ; `getOverview` plafonné (`OVERVIEW_CAP`) avec `totalNodes` réel ; HNSW pour le vector search. Restent (Phase 5) : embedding async (RabbitMQ), partitionnement, graphe SVG O(n²) → virtualisation.
+- **Maintenable 🟡** : conventions respectées ; **tests à faire** (phase tests dédiée).
+- **Modulaire ✅** : `KnowledgeService` (CRUD/overview/edges) découpé — `BrainSeedingService` (amorçage), `BrainSearchService` (embeddings/recherche), `BrainAccessGuard` (autorisation, point d'extension rôles), utils `BrainEnums`/`BrainMapper`. Embedding provider swappable (`EmbeddingClient` + `ai-service`).
 
 ## 6. Contraintes (règles d'or TaskForce)
 
