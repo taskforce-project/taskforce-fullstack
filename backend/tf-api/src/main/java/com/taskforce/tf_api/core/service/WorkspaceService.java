@@ -16,6 +16,7 @@ import com.taskforce.tf_api.core.dto.request.UpdateWorkspaceRequest;
 import com.taskforce.tf_api.core.dto.response.WorkspaceMemberResponse;
 import com.taskforce.tf_api.core.dto.response.WorkspaceResponse;
 import com.taskforce.tf_api.core.dto.response.WorkspaceUsageResponse;
+import com.taskforce.tf_api.core.enums.BrainTemplateType;
 import com.taskforce.tf_api.core.enums.PlanType;
 import com.taskforce.tf_api.core.enums.WorkspaceRole;
 import com.taskforce.tf_api.core.model.User;
@@ -44,6 +45,7 @@ public class WorkspaceService {
     private final WorkspaceMemberRepository workspaceMemberRepository;
     private final UserRepository userRepository;
     private final AuditService auditService;
+    private final KnowledgeService knowledgeService;
 
     // Limites de workspaces par plan
     private static final long MAX_WORKSPACES_FREE = 2;
@@ -84,6 +86,9 @@ public class WorkspaceService {
             .build();
 
         workspaceMemberRepository.save(ownerMember);
+
+        // Brain OS vierge (16 domaines) amorcé automatiquement à l'inscription.
+        knowledgeService.seedBrain(workspace, BrainTemplateType.BLANK, owner.getEmail());
 
         return workspace;
     }
@@ -155,7 +160,23 @@ public class WorkspaceService {
             .build();
         workspaceMemberRepository.save(ownerMember);
 
+        // Amorçage du Brain OS selon le gabarit choisi (BLANK par défaut).
+        knowledgeService.seedBrain(workspace, parseBrainTemplate(request.getBrainTemplate()), owner.getEmail());
+
         return toResponse(workspace);
+    }
+
+    /** Parse le gabarit de brain demandé ; tolère null/invalide → BLANK. */
+    private BrainTemplateType parseBrainTemplate(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return BrainTemplateType.BLANK;
+        }
+        try {
+            return BrainTemplateType.valueOf(raw.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            log.warn("Gabarit de brain inconnu '{}', repli sur BLANK", raw);
+            return BrainTemplateType.BLANK;
+        }
     }
 
     /** Limite de membres pour un plan (Long.MAX_VALUE = illimité). */
