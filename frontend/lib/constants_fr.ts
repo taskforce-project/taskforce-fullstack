@@ -213,6 +213,7 @@ export const CONSTANTS_FR: TranslationKeys = {
     skills: "Compétences",
     analytics: "Intelligence",
     agents: "Agents",
+    brain: "Brain OS",
     messages: "Messages",
     discussions: "Discussions",
     settings: "Paramètres",

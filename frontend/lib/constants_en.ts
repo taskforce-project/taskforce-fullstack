@@ -211,6 +211,7 @@ export const CONSTANTS_EN = {
     skills: "Skills",
     analytics: "Intelligence",
     agents: "Agents",
+    brain: "Brain OS",
     messages: "Messages",
     discussions: "Discussions",
     settings: "Settings",
