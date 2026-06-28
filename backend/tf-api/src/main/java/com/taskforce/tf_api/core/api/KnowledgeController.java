@@ -18,13 +18,16 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.taskforce.tf_api.core.dto.request.CreateKnowledgeEdgeRequest;
 import com.taskforce.tf_api.core.dto.request.CreateKnowledgeNodeRequest;
+import com.taskforce.tf_api.core.dto.request.SearchBrainRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateKnowledgeNodeRequest;
 import com.taskforce.tf_api.core.dto.response.BrainOverviewResponse;
 import com.taskforce.tf_api.core.dto.response.KnowledgeEdgeResponse;
 import com.taskforce.tf_api.core.dto.response.KnowledgeNodeResponse;
+import com.taskforce.tf_api.core.dto.response.KnowledgeSearchHit;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.service.KnowledgeService;
+import com.taskforce.tf_api.core.service.brain.BrainSearchService;
 import com.taskforce.tf_api.shared.dto.ApiResponse;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
@@ -41,8 +44,9 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class KnowledgeController {
 
-    private final KnowledgeService knowledgeService;
-    private final UserRepository   userRepository;
+    private final KnowledgeService   knowledgeService;
+    private final BrainSearchService brainSearchService;
+    private final UserRepository     userRepository;
 
     // ── Vue d'ensemble (graphe complet) ──────────────────────────────────────
 
@@ -54,6 +58,19 @@ public class KnowledgeController {
         Long userId = resolveUserId(jwt);
         return ResponseEntity.ok(ApiResponse.success("Brain récupéré",
             knowledgeService.getOverview(slug, userId)));
+    }
+
+    // ── Recherche sémantique ─────────────────────────────────────────────────
+
+    @PostMapping("/search")
+    public ResponseEntity<ApiResponse<List<KnowledgeSearchHit>>> search(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String slug,
+        @Valid @RequestBody SearchBrainRequest request
+    ) {
+        Long userId = resolveUserId(jwt);
+        return ResponseEntity.ok(ApiResponse.success("Résultats",
+            brainSearchService.search(slug, userId, request.getQuery(), request.getTopK(), request.getDomain())));
     }
 
     // ── Nodes ────────────────────────────────────────────────────────────────
