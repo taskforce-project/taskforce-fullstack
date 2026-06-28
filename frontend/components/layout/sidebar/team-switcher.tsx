@@ -29,6 +29,13 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { WorkspaceAvatar } from "@/components/ui/workspace-avatar"
@@ -47,6 +54,7 @@ export function WorkspaceSwitcher() {
 
   const [dialogOpen, setDialogOpen] = React.useState(false)
   const [newName, setNewName] = React.useState("")
+  const [newTemplate, setNewTemplate] = React.useState("BLANK")
   const [creating, setCreating] = React.useState(false)
 
   const workspacesLoaded = useWorkspaceStore((s) => s.workspacesLoaded)
@@ -65,11 +73,12 @@ export function WorkspaceSwitcher() {
   const handleCreate = async () => {
     if (!newName.trim()) return
     setCreating(true)
-    const workspace = await createWorkspace({ name: newName.trim() })
+    const workspace = await createWorkspace({ name: newName.trim(), brainTemplate: newTemplate })
     setCreating(false)
     if (workspace) {
       setDialogOpen(false)
       setNewName("")
+      setNewTemplate("BLANK")
       router.push(`/${workspace.slug}/dashboard`)
     }
   }
@@ -188,6 +197,24 @@ export function WorkspaceSwitcher() {
                 onKeyDown={(e) => e.key === "Enter" && handleCreate()}
                 autoFocus
               />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="workspace-template">Brain OS — gabarit de départ</Label>
+              <Select value={newTemplate} onValueChange={setNewTemplate}>
+                <SelectTrigger id="workspace-template">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="BLANK">Vierge (16 domaines)</SelectItem>
+                  <SelectItem value="SAAS">SaaS (expert)</SelectItem>
+                  <SelectItem value="ECOMMERCE">E-commerce (expert)</SelectItem>
+                  <SelectItem value="MARKETPLACE">Marketplace (expert)</SelectItem>
+                  <SelectItem value="AGENTIC">Produit agentique (expert)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Pré-remplit la mémoire de connaissance (ADR, SOP, décisions…) selon ton activité.
+              </p>
             </div>
           </div>
           <DialogFooter>
