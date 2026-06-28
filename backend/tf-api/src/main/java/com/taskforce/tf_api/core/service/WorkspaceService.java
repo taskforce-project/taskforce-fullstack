@@ -26,6 +26,7 @@ import com.taskforce.tf_api.core.model.WorkspaceMember;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.service.brain.BrainSeedingService;
 import com.taskforce.tf_api.shared.exception.ForbiddenException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
@@ -45,7 +46,7 @@ public class WorkspaceService {
     private final WorkspaceMemberRepository workspaceMemberRepository;
     private final UserRepository userRepository;
     private final AuditService auditService;
-    private final KnowledgeService knowledgeService;
+    private final BrainSeedingService brainSeedingService;
 
     // Limites de workspaces par plan
     private static final long MAX_WORKSPACES_FREE = 2;
@@ -88,7 +89,7 @@ public class WorkspaceService {
         workspaceMemberRepository.save(ownerMember);
 
         // Brain OS vierge (16 domaines) amorcé automatiquement à l'inscription.
-        knowledgeService.seedBrain(workspace, BrainTemplateType.BLANK, owner.getEmail());
+        brainSeedingService.seedBrain(workspace, BrainTemplateType.BLANK, owner.getEmail());
 
         return workspace;
     }
@@ -161,7 +162,7 @@ public class WorkspaceService {
         workspaceMemberRepository.save(ownerMember);
 
         // Amorçage du Brain OS selon le gabarit choisi (BLANK par défaut).
-        knowledgeService.seedBrain(workspace, parseBrainTemplate(request.getBrainTemplate()), owner.getEmail());
+        brainSeedingService.seedBrain(workspace, parseBrainTemplate(request.getBrainTemplate()), owner.getEmail());
 
         return toResponse(workspace);
     }
