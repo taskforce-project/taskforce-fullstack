@@ -22,4 +22,10 @@ public class CreateWorkspaceRequest {
 
     @Size(max = 500, message = "La description ne peut pas dépasser 500 caractères")
     private String description;
+
+    /**
+     * Gabarit d'amorçage du Brain OS : BLANK (défaut), SAAS, ECOMMERCE, MARKETPLACE, AGENTIC.
+     * Optionnel — null = BLANK (architecture vierge, 16 domaines).
+     */
+    private String brainTemplate;
 }
