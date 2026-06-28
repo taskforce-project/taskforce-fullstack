@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.taskforce.tf_api.core.model.Issue;
+import com.taskforce.tf_api.core.model.KnowledgeNode;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.model.WorkspaceMember;
@@ -15,6 +16,7 @@ import com.taskforce.tf_api.core.repository.IssueRepository;
 import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.service.brain.BrainSearchService;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import lombok.RequiredArgsConstructor;
@@ -36,6 +38,7 @@ public class AssistantService {
     private final ProjectRepository         projectRepository;
     private final IssueRepository           issueRepository;
     private final GroqService               groqService;
+    private final BrainSearchService        brainSearchService;
 
     @Value("${ai.groq.assistant-model:llama-3.3-70b-versatile}")
     private String assistantModel;
@@ -48,13 +51,16 @@ public class AssistantService {
      * @param message message envoyé par l'utilisateur
      * @return réponse textuelle du LLM
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public String chat(String slug, String message) {
         Workspace workspace = workspaceRepository.findBySlug(slug)
             .orElseThrow(() -> new ResourceNotFoundException("Workspace not found: " + slug));
 
-        String systemPrompt = buildSystemPrompt(workspace);
-        log.debug("Assistant chat — workspace={} model={}", slug, assistantModel);
+        // RAG : retrieval des nodes Brain OS les plus pertinents pour la question.
+        List<KnowledgeNode> relevant = brainSearchService.retrieveRelevant(workspace.getId(), message, 5);
+
+        String systemPrompt = buildSystemPrompt(workspace) + brainContextBlock(relevant);
+        log.debug("Assistant chat — workspace={} model={} brainNodes={}", slug, assistantModel, relevant.size());
 
         // Jamais de 500 : si Groq est indisponible (clé absente/invalide, réseau, quota),
         // on renvoie une réponse de repli utile au lieu de propager l'erreur.
@@ -62,20 +68,44 @@ public class AssistantService {
             return groqService.chatCompletion(assistantModel, systemPrompt, message, false);
         } catch (Exception ex) {
             log.warn("Assistant Groq indisponible (workspace={}): {}", slug, ex.getMessage());
-            return fallbackAnswer(workspace);
+            return fallbackAnswer(workspace, relevant);
         }
     }
 
-    /** Réponse de repli lorsque l'IA n'est pas joignable (reste informative). */
-    private String fallbackAnswer(Workspace workspace) {
+    /** Bloc de contexte injecté dans le system prompt : les notes Brain OS pertinentes. */
+    private String brainContextBlock(List<KnowledgeNode> nodes) {
+        if (nodes.isEmpty()) return "";
+        StringBuilder sb = new StringBuilder("\nRelevant Brain OS knowledge (use it to ground your answer):\n");
+        for (KnowledgeNode n : nodes) {
+            String content = n.getContent() != null ? n.getContent() : "";
+            if (content.length() > 600) content = content.substring(0, 600) + "…";
+            sb.append("- [").append(n.getType()).append(" · ").append(n.getDomain()).append("] ")
+              .append(n.getTitle()).append("\n");
+            if (!content.isBlank()) sb.append("  ").append(content.replace("\n", " ")).append("\n");
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Réponse de repli lorsque l'IA n'est pas joignable. Reste utile : expose les notes
+     * Brain OS pertinentes trouvées (le retrieval fonctionne même sans clé Groq).
+     */
+    private String fallbackAnswer(Workspace workspace, List<KnowledgeNode> relevant) {
         long projects = projectRepository.findByWorkspaceIdOrderByCreatedAtDesc(workspace.getId()).size();
         long members  = workspaceMemberRepository.findByWorkspaceId(workspace.getId()).size();
-        return String.format(
-            "L'assistant IA est momentanément indisponible. En attendant, voici un aperçu de « %s » : "
-            + "%d projet(s) et %d membre(s). "
-            + "Si le problème persiste, vérifiez la configuration de la clé Groq (GROQ_API_KEY).",
-            workspace.getName(), projects, members
-        );
+        StringBuilder sb = new StringBuilder();
+        sb.append(String.format(
+            "L'assistant IA (LLM) est momentanément indisponible — configurez GROQ_API_KEY pour des réponses génératives. "
+            + "Aperçu de « %s » : %d projet(s), %d membre(s).",
+            workspace.getName(), projects, members));
+        if (!relevant.isEmpty()) {
+            sb.append("\n\nNotes pertinentes trouvées dans votre Brain OS :");
+            for (KnowledgeNode n : relevant) {
+                sb.append("\n• ").append(n.getTitle())
+                  .append(" (").append(n.getDomain()).append(")");
+            }
+        }
+        return sb.toString();
     }
 
     // -------------------------------------------------------------------------
