@@ -44,6 +44,8 @@ export interface UpdateWorkspacePayload {
 export interface CreateWorkspacePayload {
   name: string;
   description?: string;
+  /** Gabarit d'amorçage du Brain OS : BLANK | SAAS | ECOMMERCE | MARKETPLACE | AGENTIC. */
+  brainTemplate?: string;
 }
 
 export interface InviteMemberPayload {
