@@ -2,6 +2,7 @@ package com.taskforce.tf_api.core.service.brain;
 
 import org.springframework.stereotype.Component;
 
+import com.taskforce.tf_api.core.enums.WorkspaceRole;
 import com.taskforce.tf_api.core.model.KnowledgeNode;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.KnowledgeNodeRepository;
@@ -33,6 +34,18 @@ public class BrainAccessGuard {
             .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
         if (!workspaceMemberRepository.existsByWorkspaceIdAndUserId(ws.getId(), userId)) {
             throw new ForbiddenException("Accès refusé : vous n'êtes pas membre de cet espace de travail");
+        }
+        return ws;
+    }
+
+    /** Comme {@link #resolveAndAuthorize} mais exige le rôle OWNER/ADMIN (actions destructives). */
+    public Workspace resolveAndAuthorizeOwner(String slug, Long userId) {
+        Workspace ws = resolveAndAuthorize(slug, userId);
+        WorkspaceRole role = workspaceMemberRepository.findByWorkspaceIdAndUserId(ws.getId(), userId)
+            .map(m -> m.getRole())
+            .orElseThrow(() -> new ForbiddenException("Accès refusé"));
+        if (role != WorkspaceRole.OWNER && role != WorkspaceRole.ADMIN) {
+            throw new ForbiddenException("Action réservée au propriétaire/administrateur de l'espace");
         }
         return ws;
     }
