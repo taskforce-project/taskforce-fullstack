@@ -13,6 +13,7 @@ import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
 import io.minio.RemoveObjectArgs;
+import io.minio.StatObjectArgs;
 import io.minio.http.Method;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
@@ -81,6 +82,17 @@ public class MinioService {
             );
         } catch (Exception e) {
             throw new RuntimeException("Minio delete failed: " + e.getMessage(), e);
+        }
+    }
+
+    /** Type MIME stocké de l'objet (pour servir avec le bon Content-Type). */
+    public String contentType(String objectKey) {
+        try {
+            return minioClient.statObject(
+                StatObjectArgs.builder().bucket(bucket).object(objectKey).build()
+            ).contentType();
+        } catch (Exception e) {
+            return "application/octet-stream";
         }
     }
 
