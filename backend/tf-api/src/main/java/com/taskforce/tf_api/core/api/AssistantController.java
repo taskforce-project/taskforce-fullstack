@@ -11,8 +11,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import com.taskforce.tf_api.core.service.AssistantService;
+import com.taskforce.tf_api.core.dto.response.AssistantAnswer;
+import com.taskforce.tf_api.core.model.User;
+import com.taskforce.tf_api.core.repository.UserRepository;
+import com.taskforce.tf_api.core.service.agent.AgentService;
 import com.taskforce.tf_api.shared.dto.ApiResponse;
+import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -34,7 +38,15 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class AssistantController {
 
-    private final AssistantService assistantService;
+    private final AgentService   agentService;
+    private final UserRepository userRepository;
+
+    private Long resolveUserId(Jwt jwt) {
+        String email = jwt.getClaimAsString("email");
+        User user = userRepository.findByEmail(email)
+            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+        return user.getId();
+    }
 
     // -------------------------------------------------------------------------
     // SSE endpoint — retourne la réponse LLM sous forme de Server-Sent Events
@@ -49,9 +61,10 @@ public class AssistantController {
         SseEmitter emitter = new SseEmitter(60_000L); // 60s timeout
 
         // Exécution dans un thread séparé pour ne pas bloquer le Tomcat worker
+        Long userId = resolveUserId(jwt);
         Thread.ofVirtual().start(() -> {
             try {
-                String response = assistantService.chat(slug, body.message());
+                String response = agentService.run(slug, userId, body.message()).answer();
 
                 // Simuler un streaming par mots (chunks de ~5 mots)
                 String[] words = response.split("(?<=\\s)|(?=\\s)");
@@ -103,13 +116,14 @@ public class AssistantController {
     // -------------------------------------------------------------------------
 
     @PostMapping(produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<ApiResponse<AssistantTextResponse>> chat(
+    public ResponseEntity<ApiResponse<AssistantAnswer>> chat(
         @PathVariable String slug,
         @Valid @RequestBody AssistantRequest body,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        String response = assistantService.chat(slug, body.message());
-        return ResponseEntity.ok(ApiResponse.success(new AssistantTextResponse(response)));
+        Long userId = resolveUserId(jwt);
+        AssistantAnswer answer = agentService.run(slug, userId, body.message());
+        return ResponseEntity.ok(ApiResponse.success(answer));
     }
 
     // -------------------------------------------------------------------------
@@ -119,6 +133,4 @@ public class AssistantController {
     public record AssistantRequest(
         @NotBlank @Size(max = 4000) String message
     ) {}
-
-    public record AssistantTextResponse(String content) {}
 }
