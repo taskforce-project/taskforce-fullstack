@@ -14,6 +14,7 @@ import com.taskforce.tf_api.core.model.BrainWorkspace;
 import com.taskforce.tf_api.core.model.KnowledgeNode;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.BrainWorkspaceRepository;
+import com.taskforce.tf_api.core.repository.KnowledgeEdgeRepository;
 import com.taskforce.tf_api.core.repository.KnowledgeNodeRepository;
 import com.taskforce.tf_api.core.service.BrainTemplateService;
 
@@ -32,7 +33,22 @@ public class BrainSeedingService {
 
     private final BrainWorkspaceRepository brainWorkspaceRepository;
     private final KnowledgeNodeRepository  nodeRepository;
+    private final KnowledgeEdgeRepository  edgeRepository;
     private final BrainTemplateService     templateService;
+    private final BrainLinkService         links;
+
+    /**
+     * Réinitialise complètement le brain d'un workspace puis le réamorce avec un gabarit.
+     * <b>Destructif</b> : purge nodes + arêtes + brain existants.
+     */
+    @Transactional
+    public void reseed(Workspace workspace, BrainTemplateType template, String actor) {
+        edgeRepository.deleteByWorkspaceId(workspace.getId());
+        nodeRepository.deleteByWorkspaceId(workspace.getId());
+        brainWorkspaceRepository.findByWorkspaceId(workspace.getId())
+            .ifPresent(brainWorkspaceRepository::delete);
+        seedBrain(workspace, template, actor);
+    }
 
     /** True si le workspace possède déjà un brain. */
     public boolean exists(Long workspaceId) {
@@ -55,6 +71,9 @@ public class BrainSeedingService {
 
         List<KnowledgeNode> nodes = new ArrayList<>();
         for (BrainTemplateService.SeedNode seed : templateService.nodesFor(brain.getTemplateType())) {
+            Map<String, Object> meta = new HashMap<>();
+            meta.put("seeded", true);
+            if (seed.system()) meta.put("system", true); // node du noyau (caché côté utilisateur)
             nodes.add(KnowledgeNode.builder()
                 .workspace(workspace)
                 .brain(brain)
@@ -64,10 +83,16 @@ public class BrainSeedingService {
                 .content(seed.content())
                 .status(NodeStatus.ACTIVE)
                 .versionLabel("v1")
-                .metadata(new HashMap<>(Map.of("seeded", true)))
+                .metadata(meta)
                 .build());
         }
         nodeRepository.saveAll(nodes);
+
+        // Tisse l'architecture : les [[wikilinks]] du hub/READMEs → arêtes auto (graphe connecté).
+        for (KnowledgeNode node : nodes) {
+            links.syncFromContent(node, null);
+        }
+
         log.info("Brain OS amorcé pour workspace '{}' (gabarit={}, {} nodes)",
             workspace.getSlug(), brain.getTemplateType(), nodes.size());
     }
