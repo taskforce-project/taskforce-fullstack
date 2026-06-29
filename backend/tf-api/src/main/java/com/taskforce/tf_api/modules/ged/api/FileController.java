@@ -57,4 +57,27 @@ public class FileController {
                 .build();
         }
     }
+
+    /**
+     * Sert une pièce jointe Brain OS (image/document) depuis Minio.
+     * Public (proxy par clé UUID inguessable) pour permettre l'affichage via &lt;img&gt; et
+     * l'ouverture directe des documents — cf. PUBLIC_MATCHERS "/api/files/brain/**".
+     */
+    @GetMapping("/brain/{workspaceId}/{name}")
+    public ResponseEntity<InputStreamResource> getBrainFile(
+        @PathVariable Long workspaceId,
+        @PathVariable String name
+    ) {
+        String objectKey = "brain/" + workspaceId + "/" + name;
+        try {
+            String ct = minioService.contentType(objectKey);
+            InputStream stream = minioService.getObjectStream(objectKey);
+            return ResponseEntity.ok()
+                .header(HttpHeaders.CACHE_CONTROL, "max-age=86400, public")
+                .contentType(MediaType.parseMediaType(ct != null && !ct.isBlank() ? ct : "application/octet-stream"))
+                .body(new InputStreamResource(stream));
+        } catch (Exception e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
 }
