@@ -42,6 +42,7 @@ public class SecurityConfig {
     // Endpoints publics partagés entre les deux configurations
     private static final String[] PUBLIC_MATCHERS = {
         "/api/auth/**",
+        "/api/files/brain/**",
         "/api/sales/**",
         "/api/stripe/**",
         "/actuator/**",
