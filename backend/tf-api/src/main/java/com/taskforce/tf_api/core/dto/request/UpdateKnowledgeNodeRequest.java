@@ -1,5 +1,6 @@
 package com.taskforce.tf_api.core.dto.request;
 
+import java.util.List;
 import java.util.Map;
 
 import jakarta.validation.constraints.Size;
@@ -23,5 +24,6 @@ public class UpdateKnowledgeNodeRequest {
     private String domain;        // NodeDomain
     private String status;        // NodeStatus
     private String versionLabel;
+    private List<String> tags;
     private Map<String, Object> metadata;
 }
