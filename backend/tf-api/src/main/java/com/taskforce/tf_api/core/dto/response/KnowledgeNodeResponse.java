@@ -1,6 +1,7 @@
 package com.taskforce.tf_api.core.dto.response;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 
 import lombok.AllArgsConstructor;
@@ -27,6 +28,9 @@ public class KnowledgeNodeResponse {
     private String versionLabel;
     private String refType;
     private Long refId;
+    private List<String> tags;
+    /** Node du noyau (kernel : hub règles/AGENTS) — masqué de l'explorateur utilisateur par défaut. */
+    private boolean system;
     private Map<String, Object> metadata;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
