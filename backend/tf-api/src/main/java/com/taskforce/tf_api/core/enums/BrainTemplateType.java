@@ -6,5 +6,6 @@ public enum BrainTemplateType {
     SAAS,
     ECOMMERCE,
     MARKETPLACE,
-    AGENTIC       // produit basé sur des agents IA
+    AGENTIC,      // produit basé sur des agents IA
+    TASKFORCE     // démo : brain pré-rempli avec la vraie histoire de TaskForce
 }
