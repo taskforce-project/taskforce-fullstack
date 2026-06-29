@@ -26,6 +26,7 @@ import com.taskforce.tf_api.core.repository.KnowledgeEdgeRepository;
 import com.taskforce.tf_api.core.repository.KnowledgeNodeRepository;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.core.service.brain.BrainEnums;
+import com.taskforce.tf_api.core.service.brain.BrainLinkService;
 import com.taskforce.tf_api.core.service.brain.BrainMapper;
 import com.taskforce.tf_api.core.service.brain.BrainSearchService;
 import com.taskforce.tf_api.core.service.brain.BrainSeedingService;
@@ -50,6 +51,7 @@ public class KnowledgeService {
     private final BrainAccessGuard         access;
     private final BrainSeedingService      seeding;
     private final BrainSearchService       search;
+    private final BrainLinkService         links;
 
     /** Plafond de nodes/arêtes renvoyés dans la vue d'ensemble (protège le payload + le rendu). */
     private static final int OVERVIEW_CAP = 1000;
@@ -91,6 +93,21 @@ public class KnowledgeService {
             .nodes(nodes.stream().map(BrainMapper::toNodeResponse).toList())
             .edges(edges.stream().map(BrainMapper::toEdgeResponse).toList())
             .build();
+    }
+
+    /** Réinitialise et réamorce le brain avec un gabarit (OWNER/ADMIN). Destructif. */
+    @Transactional
+    public void reseed(String slug, Long userId, String template) {
+        Workspace ws = access.resolveAndAuthorizeOwner(slug, userId);
+        BrainTemplateType type;
+        try {
+            type = template != null && !template.isBlank()
+                ? BrainTemplateType.valueOf(template.trim().toUpperCase())
+                : BrainTemplateType.BLANK;
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalArgumentException("Gabarit inconnu: " + template);
+        }
+        seeding.reseed(ws, type, String.valueOf(userId));
     }
 
     @Transactional(readOnly = true)
@@ -135,6 +152,7 @@ public class KnowledgeService {
         node.setUpdatedBy(String.valueOf(userId));
 
         KnowledgeNode saved = nodeRepository.save(node);
+        links.syncFromContent(saved, req.getTags()); // #tags + [[wikilinks]] → arêtes auto
         search.embedNode(saved); // index sémantique (best-effort)
         return BrainMapper.toNodeResponse(saved);
     }
@@ -154,6 +172,7 @@ public class KnowledgeService {
         node.setUpdatedBy(String.valueOf(userId));
 
         KnowledgeNode saved = nodeRepository.save(node);
+        links.syncFromContent(saved, req.getTags()); // re-sync #tags + [[wikilinks]]
         search.embedNode(saved); // recalcul de l'embedding après édition
         return BrainMapper.toNodeResponse(saved);
     }
