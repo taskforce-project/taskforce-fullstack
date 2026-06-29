@@ -17,4 +17,5 @@ public class KnowledgeEdgeResponse {
     private Long toNodeId;
     private String relationType;
     private Double weight;
+    private boolean auto;
 }
