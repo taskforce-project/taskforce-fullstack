@@ -1,5 +1,7 @@
 package com.taskforce.tf_api.core.service.brain;
 
+import java.util.List;
+
 import com.taskforce.tf_api.core.dto.response.KnowledgeEdgeResponse;
 import com.taskforce.tf_api.core.dto.response.KnowledgeNodeResponse;
 import com.taskforce.tf_api.core.model.KnowledgeEdge;
@@ -9,6 +11,16 @@ import com.taskforce.tf_api.core.model.KnowledgeNode;
 public final class BrainMapper {
 
     private BrainMapper() {}
+
+    /** Extrait les tags depuis metadata.tags (stockés par BrainLinkService). */
+    @SuppressWarnings("unchecked")
+    private static List<String> tagsOf(KnowledgeNode n) {
+        Object raw = n.getMetadata() != null ? n.getMetadata().get("tags") : null;
+        if (raw instanceof List<?> list) {
+            return list.stream().filter(o -> o != null).map(Object::toString).toList();
+        }
+        return List.of();
+    }
 
     public static KnowledgeNodeResponse toNodeResponse(KnowledgeNode n) {
         return KnowledgeNodeResponse.builder()
@@ -24,6 +36,8 @@ public final class BrainMapper {
             .versionLabel(n.getVersionLabel())
             .refType(n.getRefType() != null ? n.getRefType().name() : null)
             .refId(n.getRefId())
+            .tags(tagsOf(n))
+            .system(n.getMetadata() != null && Boolean.TRUE.equals(n.getMetadata().get("system")))
             .metadata(n.getMetadata())
             .createdAt(n.getCreatedAt())
             .updatedAt(n.getUpdatedAt())
@@ -38,6 +52,7 @@ public final class BrainMapper {
             .toNodeId(e.getToNode().getId())
             .relationType(e.getRelationType().name())
             .weight(e.getWeight())
+            .auto(Boolean.TRUE.equals(e.getAuto()))
             .build();
     }
 }
