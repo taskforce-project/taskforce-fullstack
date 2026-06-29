@@ -21,5 +21,11 @@ public interface KnowledgeNodeRepository extends JpaRepository<KnowledgeNode, Lo
 
     Optional<KnowledgeNode> findByIdAndWorkspaceId(Long id, Long workspaceId);
 
+    /** Résolution d'un [[wikilink]] : 1er node du workspace au titre donné (insensible à la casse). */
+    Optional<KnowledgeNode> findFirstByWorkspaceIdAndTitleIgnoreCase(Long workspaceId, String title);
+
     long countByWorkspaceId(Long workspaceId);
+
+    /** Purge tous les nodes d'un workspace (re-seed). Les arêtes tombent par cascade FK. */
+    void deleteByWorkspaceId(Long workspaceId);
 }
