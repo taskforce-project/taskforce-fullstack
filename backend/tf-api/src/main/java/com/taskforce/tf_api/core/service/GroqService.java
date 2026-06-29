@@ -101,6 +101,44 @@ public class GroqService {
         }
     }
 
+    /** Vrai si une clé Groq est configurée (sinon l'agent bascule en repli sans LLM). */
+    public boolean isConfigured() {
+        return apiKey != null && !apiKey.isBlank();
+    }
+
+    /**
+     * Complétion brute avec messages libres + outils (tool calling, format OpenAI/Groq).
+     * Retourne le message assistant (peut contenir {@code tool_calls}). Utilisé par l'agent
+     * pour la boucle de raisonnement/outils du deep-path.
+     */
+    public JsonNode rawChat(String model,
+                            List<Map<String, Object>> messages,
+                            List<Map<String, Object>> tools) {
+        assertApiKeyPresent();
+        Map<String, Object> body = new java.util.HashMap<>();
+        body.put("model", model);
+        body.put("messages", messages);
+        body.put("max_tokens", 1024);
+        body.put("temperature", 0.4);
+        if (tools != null && !tools.isEmpty()) {
+            body.put("tools", tools);
+            body.put("tool_choice", "auto");
+        }
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, buildHeaders());
+        try {
+            String raw = groqRestTemplate.postForObject(GROQ_BASE_URL + "/chat/completions", request, String.class);
+            JsonNode root = objectMapper.readTree(raw);
+            JsonNode choices = root.path("choices");
+            if (choices.isEmpty()) throw new GroqException("Groq response contains no choices");
+            return choices.get(0).path("message");
+        } catch (GroqException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            log.error("Groq rawChat error (model={}): {}", model, ex.getMessage());
+            throw new GroqException("Groq unavailable: " + ex.getMessage(), ex);
+        }
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
