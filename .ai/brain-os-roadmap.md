@@ -1,6 +1,13 @@
 # Roadmap — Brain OS (couche de connaissance native TaskForce)
 
-> **Statut** : Phases 0/1/3 faites · Phase 2 (retrieval) faite, génération env-gated · **Branche** : `feat/dashboard` · **Maj** : 2026-06-27
+> **Statut** : Phases 0→3 **faites** · deep-path agentique **code-complet** (génération env-gated LLM) · **Branche** : `feat/dashboard` · **Maj** : 2026-06-29
+>
+> **Synthèse** : le Brain OS est un produit complet et utilisable — graphe neural (tags + wikilinks),
+> éditeur riche (callouts/titres/couleurs/images MinIO/code, toolbar sticky), explorateur Obsidian
+> 2-panneaux animé, recherche sémantique, noyau caché (AGENTS), seed `TASKFORCE` pré-rempli, et un
+> **agent** (routing, tools, write-back, sources RAG) prêt à s'allumer dès qu'une clé LLM est fournie.
+> **Reste env-gated** : sémantique transformer (`fastembed`, réseau) ; génération + tool-calling (clé Groq/Anthropic).
+> **Reste à faire** : tests (couverture) + sécurité (revue) — phase soutenance.
 > Document maître de la feature « Brain OS ». Source de vérité produit → `../taskforce-docs`.
 
 ## 0. Vision en une phrase
@@ -58,6 +65,13 @@ CREATE INDEX … USING hnsw (embedding vector_cosine_ops);
 
 > On **sépare** volontairement le relationnel (V51) du vector (V52) : si pgvector/HNSW posait
 > problème, le boot du backend n'est jamais bloqué. Phase 0 reste démontrable sans IA.
+
+### Migrations Flyway (récap)
+
+`V51` tables (brain/nodes/edges) · `V52` `embedding vector(384)` + HNSW · `V53` index partiel
+`idx_knodes_missing_embedding` (backfill sans scan) · `V54` reset embeddings (algo changé) ·
+`V55` colonne `knowledge_edges.auto` (arêtes wikilink re-synchronisables).
+Tags et flag `system` vivent dans `metadata` JSONB (pas de colonne).
 
 ### Relations (`relation_type`)
 
@@ -134,18 +148,23 @@ TOTAL                                ≈ 218 GB
 > sémantique réelle, **zéro changement de code**.
 > **Vérifié** : V52 appliquée, `/v1/embeddings` renvoie 384d, search backfill 17/17 nodes + résultats scorés.
 
-### Phase 2 — IA context-aware + router fast/deep · 🟡 **retrieval fait** (génération env-gated Groq)
-- [x] **RAG** : `AssistantService` injecte les top-5 nodes Brain OS pertinents (pgvector) dans le system prompt
-- [x] Repli gracieux : sans clé Groq, l'assistant **expose quand même** les notes pertinentes trouvées (retrieval visible sans LLM)
-- [ ] *(env-gated Groq)* router fast/deep (`IntentClassifier`), `AnthropicService` (Claude Opus, tool calling `create_node`/`create_task`), write-back IA, badges Fast/Deep + sources cliquables
+### Phase 2 — Deep-path agentique · ✅ **structure complète** (génération env-gated LLM)
+- [x] **RAG réel** : retrieval top-5 Brain OS (pgvector) → sources citées, avec ou sans LLM
+- [x] **`AgentService`** (`core.service.agent`) : routing fast/deep (heuristique), étapes, **boucle de tool-calling** (`GroqService.rawChat` + `tools`, max 5 itér), repli gracieux (sources réelles)
+- [x] **Outils** : `search_brain` (read) · `create_note` (**write-back**, suit AGENTS) · registre extensible (`AgentToolRegistry`)
+- [x] **Réponse structurée** `AssistantAnswer` (answer/reasoning/mode/sources/steps/toolCalls) → `AssistantController`
+- [x] **Panneau agentique** (`components/agent/agent-chat.tsx`, « Ask AI ») rend le kit (Steps/Reasoning/Tool/Sources/FeedbackBar/ThinkingBar)
+- [ ] *(env-gated clé LLM)* allumage génération + tool-calling + write-back ; `AnthropicService` (à brancher) ; outils `create_issue`/`get_stats`/`web_search`
 
-### Phase 3 — Brain OS UI (frontend Next.js) · ✅ **cœur fait**
-- [x] **Graph Viewer** — SVG force-directed **maison** (pas react-flow : réseau corrompt npm), nodes colorés par domaine, drag/zoom/pan, click-select
-- [x] Toggle **Liste / Graphe** ; éditeur markdown (textarea) + versions ; **relations** (link/unlink) dans le détail
-- [x] Domain navigator (01→20) + **recherche sémantique** live
-- [x] Choix de **gabarit à la création de workspace** (BLANK/SAAS/ECOM/MARKETPLACE/AGENTIC)
-- [x] **Décision UX appliquée** : onglet *dans* le workspace (`/[workspace]/brain`), pas d'app séparée
-- [ ] *(futur)* éditeur markdown riche (tiptap) ; wizard d'onboarding avec questions business → pré-remplissage IA
+### Phase 3 — Brain OS UI (frontend Next.js) · ✅ **fait (riche)**
+- [x] **Layout Obsidian 2-panneaux** : explorateur (dossiers/domaines repliables = squelette + tags filtrants) **animé** (collapse smooth) | **éditeur central large**
+- [x] **Graph Viewer** SVG force-directed **maison** : nodes colorés/dimensionnés par degré, **tags comme nœuds** (notes reliées par tag = réseau neuronal), wikilinks, drag/zoom/pan
+- [x] **Moteur de liens** : `#tags` (metadata) + `[[wikilinks]]` → **arêtes auto** (re-sync à l'édition) — l'architecture est liée d'office au seed
+- [x] **Éditeur riche maison** (pas tiptap : npm corrompu) : callouts `[!tip/warning/danger]`, titres H1–H4, `==surlignage==`, **images + docs (upload MinIO)** + preview, blocs de code colorés, **toolbar sticky**
+- [x] **Noyau** : hub `Brain OS` (visible, lie tout) + `AGENTS` (caché `system`, lu par l'agent = moat) ; toggle « Afficher le noyau »
+- [x] **Seed** : gabarit à la création (BLANK/SAAS/…/AGENTIC) **+ `TASKFORCE`** (brain pré-rempli, vraie histoire) **+ endpoint `reseed`**
+- [x] recherche sémantique live · empty-state + insights · suppression confirmée · relations read-only · footer scroll-reveal
+- [ ] *(futur)* tiptap WYSIWYG inline (réseau propre) ; viewer PDF in-app ; wizard onboarding IA
 
 ### Phase 4 — Issues enrichies + human-in-the-loop
 - Decision log par issue (obstacles/solutions/liens ADR), node lié auto (`ref_type=ISSUE`)
