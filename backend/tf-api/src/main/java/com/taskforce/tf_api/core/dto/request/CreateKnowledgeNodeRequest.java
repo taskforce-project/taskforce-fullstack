@@ -1,5 +1,6 @@
 package com.taskforce.tf_api.core.dto.request;
 
+import java.util.List;
 import java.util.Map;
 
 import jakarta.validation.constraints.NotBlank;
@@ -32,6 +33,9 @@ public class CreateKnowledgeNodeRequest {
     /** Lien optionnel vers une entité TaskForce. */
     private String refType;     // NodeRefType
     private Long refId;
+
+    /** Tags explicites (les #tags du contenu sont aussi détectés automatiquement). */
+    private List<String> tags;
 
     private Map<String, Object> metadata;
 }
