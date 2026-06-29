@@ -22,8 +22,15 @@ import com.taskforce.tf_api.core.enums.NodeType;
 @Service
 public class BrainTemplateService {
 
-    /** Un node à créer lors de l'amorçage. */
-    public record SeedNode(NodeDomain domain, NodeType type, String title, String content) {}
+    /**
+     * Un node à créer lors de l'amorçage. {@code system=true} = node du noyau (kernel) :
+     * lu par l'agent, masqué de l'explorateur utilisateur par défaut (expertise/moat).
+     */
+    public record SeedNode(NodeDomain domain, NodeType type, String title, String content, boolean system) {
+        public SeedNode(NodeDomain domain, NodeType type, String title, String content) {
+            this(domain, type, title, content, false);
+        }
+    }
 
     /** Retourne les nodes d'amorçage pour un gabarit donné. */
     public List<SeedNode> nodesFor(BrainTemplateType template) {
@@ -33,6 +40,7 @@ public class BrainTemplateService {
             case ECOMMERCE   -> nodes.addAll(ecommerceExpert());
             case MARKETPLACE -> nodes.addAll(marketplaceExpert());
             case AGENTIC     -> nodes.addAll(agenticExpert());
+            case TASKFORCE   -> nodes.addAll(taskforceSeed());
             case BLANK       -> { /* scaffolding seul */ }
         }
         return nodes;
@@ -84,14 +92,75 @@ public class BrainTemplateService {
         purpose.put(NodeDomain.ARCHIVE,
             "Contenu obsolète conservé pour traçabilité. Rien ne se supprime, tout s'archive.");
 
+        // Titres des READMEs (utilisés pour les [[wikilinks]] depuis le hub).
+        Map<NodeDomain, String> readmeTitle = new LinkedHashMap<>();
+        purpose.keySet().forEach(d -> readmeTitle.put(d, d.getCode() + " · " + readableName(d)));
+
+        String agentsTitle = "AGENTS — contrat d'agent";
+
         List<SeedNode> nodes = new ArrayList<>();
+
+        // ── Hub (VISIBLE) : sommaire qui lie toute l'architecture ────────────────
+        StringBuilder hub = new StringBuilder();
+        hub.append("# 🧠 Brain OS\n\n")
+           .append("Mémoire de connaissance vivante de ce workspace. Point d'entrée unique : tout part d'ici.\n\n")
+           .append("> [!tip] Méthode\n")
+           .append("> Les règles de remplissage, mise à jour, versionnement et archivage sont décrites dans ")
+           .append("[[").append(agentsTitle).append("]]. L'agent IA les applique automatiquement.\n\n")
+           .append("## Domaines\n");
+        readmeTitle.values().forEach(t -> hub.append("- [[").append(t).append("]]\n"));
+        nodes.add(new SeedNode(NodeDomain.PROJET, NodeType.README, "Brain OS", hub.toString(), false));
+
+        // ── AGENTS (SYSTÈME, caché) : le contrat d'agent = l'expertise (moat) ────
+        nodes.add(new SeedNode(NodeDomain.PROJET, NodeType.SOP, agentsTitle, agentsContract(), true));
+
+        // ── READMEs de domaine (VISIBLES), avec backlinks vers le hub ────────────
         purpose.forEach((domain, text) -> nodes.add(new SeedNode(
             domain, NodeType.README,
-            domain.getCode() + " · " + readableName(domain),
+            readmeTitle.get(domain),
             "# " + domain.getCode() + " — " + readableName(domain) + "\n\n" + text
-            + "\n\n> Domaine vide. Ajoutez ici vos premiers nodes (note, ADR, SOP…)."
+            + "\n\n> Domaine vide. Les notes (note, ADR, SOP…) apparaîtront ici."
+            + "\n\n---\nHub : [[Brain OS]] · Règles : [[" + agentsTitle + "]]"
         )));
         return nodes;
+    }
+
+    /** Contrat d'agent : règles de tenue du cerveau (remplir / mettre à jour / versionner / archiver). */
+    private String agentsContract() {
+        return """
+            # AGENTS — contrat d'agent du Brain OS
+
+            Règles que l'agent IA (et l'humain) suivent pour garder ce cerveau **propre, daté, fiable**.
+            Ce node est système : lu par l'agent, masqué de l'explorateur par défaut.
+
+            ## Principes
+            - **Réalité, pas intention** : chaque note est datée et vérifiable. Le contexte ne ment jamais à l'IA.
+            - **Une note = une idée**, titre clair et court.
+            - **Lier plutôt que dupliquer** : `[[wikilinks]]` entre notes connexes + `#tags` transverses.
+
+            ## Remplir
+            - Choisir le bon **domaine** (01→16) et le bon **type** (ADR, DECISION, RUNBOOK, SOP, FINDING, SPEC, DOC…).
+            - Une **décision** → node `DECISION`/`ADR` dans `12-décisions` : Contexte · Options · Décision · Conséquences.
+            - Relier la note à son contexte avec `[[Titre exact]]` et la classer avec `#tags`.
+
+            ## Mettre à jour
+            - **Éditer** la note existante plutôt que créer un quasi-doublon.
+            - Si une décision en **remplace** une autre : nouvelle note + relation `SUPERSEDES` vers l'ancienne
+              (on ne réécrit pas l'histoire).
+
+            ## Versionner
+            - `versionLabel` : `v1` (actuel) / `v2` (cible). Garder `v1` jusqu'à bascule effective.
+            - Changement notable → entrée datée dans `16-historique` (boucle OODA) + `CHANGELOG`.
+
+            ## Supprimer / archiver
+            - **Rien ne se supprime de l'historique** : on **archive** (status `ARCHIVED`, domaine `20-archive`).
+            - La suppression dure est réservée aux brouillons / erreurs manifestes.
+
+            ## Boucle OODA (action de l'agent)
+            **Observe** (contexte récupéré) → **Orient** (options) → **Decide** (relier à une `DECISION`) →
+            **Act** (exécuter, idéalement réversible + validation humaine si impact) → **consigner le résultat**
+            (succès / obstacles / apprentissages) en mémoire.
+            """;
     }
 
     // =========================================================================
@@ -458,6 +527,374 @@ public class BrainTemplateService {
             - **Decide** : option retenue + pourquoi (relier à une DECISION).
             - **Act** : actions exécutées (+ validation humaine si impact).
             - **Résultat** : succès/obstacles/apprentissages → write-back mémoire.
+            """));
+
+        return n;
+    }
+
+    // =========================================================================
+    // TASKFORCE — brain pré-rempli avec la vraie histoire du produit (démo)
+    // =========================================================================
+
+    private List<SeedNode> taskforceSeed() {
+        List<SeedNode> n = new ArrayList<>();
+
+        // ── 01 · Projet ──────────────────────────────────────────────────────
+        n.add(new SeedNode(NodeDomain.PROJET, NodeType.DOC,
+            "TaskForce — charte de projet",
+            """
+            # TaskForce — charte de projet
+
+            **TaskForce** est un SaaS de gestion de projet **multi-tenant** (style Linear/Jira) avec
+            features **IA natives**, construit par une petite équipe produit/agence. #produit
+
+            ## Pourquoi plusieurs projets
+            Le code est un **polyrepo-in-a-monorepo** : 4 apps déployables + l'infra. Chaque app = un
+            « projet » avec sa stack et son cycle :
+            - [[Web Application (frontend)]] · [[API Platform (backend)]] · [[AI Service]] · [[Landing]] · [[Identity & Infra]]
+
+            ## Objectif
+            Un outil où la donnée de projet (issues, cycles, décisions) **et** la mémoire (Brain OS)
+            vivent ensemble, lisibles par l'humain et par l'IA. #vision
+            """));
+
+        // ── 02 · Produit ─────────────────────────────────────────────────────
+        n.add(new SeedNode(NodeDomain.PRODUIT, NodeType.DOC,
+            "État du produit — features",
+            """
+            # État du produit
+
+            Workspaces → projets → issues/cycles, plus : chat temps réel, discussions, pages wiki,
+            analytics, **assistant IA + smart-assign**, billing Stripe, intégrations GitHub/Slack,
+            et le **[[Brain OS]]** (graphe de connaissance). #produit
+
+            > [!note] Réalité, pas intention
+            > Cette fiche décrit ce qui marche aujourd'hui. Les manques sont tracés en
+            > [[Audit PM — issues connues]] et [[Dette technique]].
+            """));
+
+        // ── 03 · Architecture (vue + ADR + projets) ──────────────────────────
+        n.add(new SeedNode(NodeDomain.ARCHITECTURE, NodeType.DOC,
+            "Architecture système — vue d'ensemble",
+            """
+            # Architecture système
+
+            ```
+            Browser → Frontend (Next.js :3000) → Backend (Spring Boot :8080) → PostgreSQL 18 + pgvector
+                                   │  WS/STOMP via RabbitMQ        │→ MinIO (fichiers) · Groq (LLM) · Stripe
+                                   └→ Keycloak (OIDC, :8180)       │→ SMTP/Mailtrap · GitHub/Slack
+            ```
+            4 apps déployables + infra. Détail des briques : [[Web Application (frontend)]],
+            [[API Platform (backend)]], [[AI Service]], [[Landing]], [[Identity & Infra]]. #architecture
+
+            Backend en couches **shared ← core ← modules** (jamais l'inverse). Voir [[Conventions de code (règles d'or)]].
+            """));
+
+        n.add(new SeedNode(NodeDomain.ARCHITECTURE, NodeType.ADR,
+            "ADR-001 — Stack technique",
+            """
+            # ADR-001 — Stack
+
+            **Décision** : Next.js 16 / React 19 / TS / Tailwind 4 (front) · Spring Boot 4 / Java 21 (back) ·
+            PostgreSQL 18 + **pgvector** · Keycloak (OIDC) · Docker Compose.
+            **Conséquences** : polyrepo-in-monorepo, CI par app, `ddl-auto=validate` + Flyway. #decision #architecture
+            Lié à : [[DEC — pgvector pour les embeddings]].
+            """));
+
+        n.add(new SeedNode(NodeDomain.ARCHITECTURE, NodeType.ADR,
+            "ADR-002 — Temps réel via RabbitMQ (STOMP)",
+            """
+            # ADR-002 — Temps réel
+
+            **Décision** : WebSocket STOMP relayé par **RabbitMQ** (`/topic`,`/queue`,`/user`), fallback
+            `SimpleBroker` en mémoire si Rabbit down. Front via `@stomp/stompjs` (+ SockJS).
+            **Pourquoi** : scaler le fan-out hors JVM. #decision #infra #realtime
+            """));
+
+        // Projets = apps/repos
+        n.add(new SeedNode(NodeDomain.ARCHITECTURE, NodeType.DOC,
+            "Web Application (frontend)",
+            """
+            # Projet — Web Application (frontend) #frontend
+
+            Next.js 16 (App Router) · React 19 · Zustand (1 store/domaine) · shadcn/Radix · Axios
+            (`res.data.data`, 401→refresh→retry). Routes scopées `app/(protected)/[workspace]/…`.
+            Repo logique : `frontend/`. Lié : [[Design system — shadcn + Tailwind]], [[Conventions de code (règles d'or)]].
+            """));
+
+        n.add(new SeedNode(NodeDomain.ARCHITECTURE, NodeType.DOC,
+            "API Platform (backend)",
+            """
+            # Projet — API Platform (backend) #backend
+
+            Spring Boot 4 · Java 21 · Maven. `core` (≈18 controllers, ≈25 services, ≈35 entités) +
+            `modules` (chat, ged/MinIO, sales) + `shared`. Persistance Flyway (`V1…V55`), `ddl-auto=validate`.
+            Enveloppe `ApiResponse<T>`. Repo logique : `backend/tf-api/`.
+            """));
+
+        n.add(new SeedNode(NodeDomain.ARCHITECTURE, NodeType.DOC,
+            "AI Service",
+            """
+            # Projet — AI Service #ai
+
+            `ai-service/` (FastAPI). À l'origine un **stub** (vecteurs hash) ; en prod l'IA tourne en
+            **Java direct** via `GroqService` (Groq `llama-3.1-8b` smart-assign, `llama-3.3-70b` assistant).
+            Réactivé pour les **embeddings** du Brain OS — voir [[DEC — embedding lexical maison]].
+            """));
+
+        n.add(new SeedNode(NodeDomain.ARCHITECTURE, NodeType.DOC,
+            "Landing",
+            """
+            # Projet — Landing #frontend
+
+            Site vitrine **Astro 5** (`landing-page/`), déployé séparément (dev :18081).
+            """));
+
+        n.add(new SeedNode(NodeDomain.ARCHITECTURE, NodeType.DOC,
+            "Identity & Infra",
+            """
+            # Projet — Identity & Infra #infra #security
+
+            Keycloak (OIDC, realm custom), Docker Compose (dev/prod), PostgreSQL 18 + pgvector, **MinIO**
+            (S3), **RabbitMQ** (STOMP), Nginx (prod), SigNoz (observabilité optionnelle).
+            Voir [[Stack Docker (dev/prod)]], [[Auth — Keycloak OIDC + tokens HS512 (dev)]].
+            """));
+
+        // ── 04 · Engineering ─────────────────────────────────────────────────
+        n.add(new SeedNode(NodeDomain.ENGINEERING, NodeType.SOP,
+            "Conventions de code (règles d'or)",
+            """
+            # Conventions de code — règles d'or #backend #frontend
+
+            1. Tout contrôleur porte `/api`. 2. Routes front dans `lib/config/api-routes.ts` → service `lib/api/*`.
+            3. Client : `import { apiClient }`. 4. Lire `res.data.data`. 5. Couches `shared ← core ← modules`.
+            6. Changement DB = migration Flyway `V{n}__…`. 7. TS strict, 0 `any`, 1 store Zustand/domaine, 0 mock.
+            8. `@Valid` / Zod ; secrets en env. 9. Docker : nom de service, pas `localhost`.
+            """));
+
+        n.add(new SeedNode(NodeDomain.ENGINEERING, NodeType.SOP,
+            "Workflow Git & CI",
+            """
+            # Git & CI #devops
+
+            Branches depuis `dev` (`feature/*`,`fix/*`). Commits `type(scope): description`. PR = 1 label
+            `release:{major|minor|patch}`. CI par app (`backend-tests`, `frontend-tests`, `landing-tests`),
+            `release.yml` (images GHCR), `version-management.yml` (semver).
+            """));
+
+        // ── 05 · API ─────────────────────────────────────────────────────────
+        n.add(new SeedNode(NodeDomain.API, NodeType.SPEC,
+            "Contrats d'API — enveloppe ApiResponse",
+            """
+            # Contrats d'API #backend
+
+            Toutes les réponses : `ApiResponse<T> = { success, data, message, statusCode }`.
+            Erreurs normalisées par `GlobalExceptionHandler`. Auth : Bearer JWT. Routes publiques :
+            `/api/auth/**`, `/api/files/**`, `/api/stripe/**`, `/api/sales/**`, callbacks d'intégration.
+            """));
+
+        // ── 06 · Infra ───────────────────────────────────────────────────────
+        n.add(new SeedNode(NodeDomain.INFRA, NodeType.DOC,
+            "Stack Docker (dev/prod)",
+            """
+            # Stack Docker #infra
+
+            `docker-compose.dev.yml` : postgres(pgvector), keycloak(build), backend(hot reload),
+            frontend, ai-service, landing, rabbitmq, minio, pgadmin. `prod.yml` + nginx. `tools.yml` :
+            SigNoz + scanners (trivy/semgrep). Orchestration : `tf.ps1`, `scripts/*.ps1`, `Makefile`.
+            Runbooks : [[Runbook — rebuild backend / frontend]], [[Runbook — recharger le seed (UTF-8 safe)]].
+            """));
+
+        // ── 07 · Sécurité ────────────────────────────────────────────────────
+        n.add(new SeedNode(NodeDomain.SECURITE, NodeType.ADR,
+            "Auth — Keycloak OIDC + tokens HS512 (dev)",
+            """
+            # Auth #security #decision
+
+            **Prod** : Keycloak OIDC, backend = resource server JWT. **Dev local** : `keycloak.enabled=false`
+            + tokens **HS512** émis par `/api/auth/login` (décodeur `NimbusJwtDecoder.withSecretKey`).
+            > [!warning] Piège
+            > Les tokens Keycloak RS256 sont **rejetés** par le décodeur HS512 en dev — utiliser `/api/auth/login`.
+            """));
+
+        n.add(new SeedNode(NodeDomain.SECURITE, NodeType.FINDING,
+            "Sécurité — CSP, RGPD, secrets",
+            """
+            # Sécurité transverse #security
+
+            CSP stricte (front `next.config.ts` ; API `default-src 'none'`). RGPD : export/effacement
+            (module GDPR). Secrets en env (`.env.dev`), jamais en dur. Fichiers servis par proxy MinIO
+            (clé UUID), avatars + pièces jointes Brain OS publics par clé.
+            """));
+
+        // ── 08 · Opérations ──────────────────────────────────────────────────
+        n.add(new SeedNode(NodeDomain.OPERATIONS, NodeType.DOC,
+            "Observabilité (OpenTelemetry / SigNoz)",
+            """
+            # Observabilité #devops
+
+            Agent Java OTel (traces/métriques/logs) → collector SigNoz (profil `observability`, désactivé
+            par défaut via `OTEL_SDK_DISABLED`). Healthchecks Docker sur chaque service.
+            """));
+
+        // ── 09 · Audits (problèmes rencontrés — réels) ───────────────────────
+        n.add(new SeedNode(NodeDomain.AUDITS, NodeType.FINDING,
+            "Audit PM — issues connues",
+            """
+            # Audit — issues connues (KI) #problem
+
+            Audit produit (juin 2026). Top P0/P1 :
+            - **KI-001** 🔴 5 contrôleurs sans préfixe `/api` → Cycles/Teams/Pages/Discussions/Chat en 404.
+            - **KI-002** 🟠 constantes de routes front manquantes → Messages/Integrations/Attachments/Roadmap crash.
+            - **KI-004** 🟠 refresh de token cassé → re-login forcé. **KI-005** 🟠 webhooks Stripe stubbés.
+            - **KI-007/009** assistant : streaming simulé, pas de cache insights. **KI-010** tests à faire.
+            Détail/correctifs : [[Dette technique]]. #backlog
+            """));
+
+        n.add(new SeedNode(NodeDomain.AUDITS, NodeType.FINDING,
+            "Dette technique",
+            """
+            # Dette technique (TD) #problem
+
+            TD-001 (`/api` manquant), TD-002 (routes front), TD-004/007 (refresh/logout), TD-005 (Stripe
+            lifecycle), TD-008 (streaming simulé), TD-010 (`ai-service` stub superseded par Groq-direct),
+            TD-016/017/018 (cache insights, garde quota Groq, feature flags IA). #backlog
+            """));
+
+        n.add(new SeedNode(NodeDomain.AUDITS, NodeType.FINDING,
+            "Problème — corruption UTF-8 du seed (PowerShell)",
+            """
+            # Problème résolu — UTF-8 cassé #problem
+
+            **Symptôme** : `Itération` → `It??ration`, emojis `????` en base. **Cause** : chargement du
+            seed via `Get-Content | psql` (PowerShell ré-encode en codepage OEM → octet `0x3f`).
+            **Fix** : loader durci (`docker cp` + `psql -f`, zéro pipe hôte). Voir [[Runbook — recharger le seed (UTF-8 safe)]].
+            """));
+
+        n.add(new SeedNode(NodeDomain.AUDITS, NodeType.FINDING,
+            "Problème — réseau du poste corrompt npm/pip",
+            """
+            # Problème ouvert — proxy corrompt les téléchargements #problem
+
+            **Symptôme** : `npm install` / `pip install` échouent (« PACKAGES DO NOT MATCH THE HASHES »).
+            **Impact** : `tiptap`, `shiki`, `prompt-kit`, `fastembed` non installables ; **Groq 403** réseau.
+            **Contournement** : composants UI **vendus à la main** + embedding lexical maison.
+            Voir [[DEC — composants UI vendus à la main]], [[DEC — embedding lexical maison]].
+            """));
+
+        n.add(new SeedNode(NodeDomain.AUDITS, NodeType.FINDING,
+            "Problème — assistant IA (Groq) : 3 bugs",
+            """
+            # Problèmes résolus — assistant Groq #problem #ai
+
+            1. **500 systématique** : `AssistantService.chat()` lisait des associations lazy hors session →
+               fix `@Transactional(readOnly=true)`.
+            2. **Clé vidée** : `environment: GROQ_API_KEY: ${GROQ_API_KEY:-}` écrasait `env_file` → ligne retirée.
+            3. **Accents cassés** : réponse Groq lue en `String` via `StringHttpMessageConverter` (ISO-8859-1)
+               → forcé **UTF-8** sur `groqRestTemplate`.
+            Reste : 403 réseau (clé/poste) — externe.
+            """));
+
+        // ── 10 · Runbooks ────────────────────────────────────────────────────
+        n.add(new SeedNode(NodeDomain.RUNBOOKS, NodeType.RUNBOOK,
+            "Runbook — recharger le seed (UTF-8 safe)",
+            """
+            # Runbook — reseed UTF-8 #devops
+
+            1. `.\\scripts\\db.ps1 seed` (ou `make seed`) — fait `docker cp` du `dev_seed.sql` puis
+               `psql -f` **dans** le conteneur (`PGCLIENTENCODING=UTF8`).
+            2. Ne **jamais** faire `Get-Content seed.sql | psql` (corrompt l'UTF-8).
+            """));
+
+        n.add(new SeedNode(NodeDomain.RUNBOOKS, NodeType.RUNBOOK,
+            "Runbook — rebuild backend / frontend",
+            """
+            # Runbook — rebuild #devops
+
+            Backend : `docker compose -f docker-compose.dev.yml build backend && … up -d backend`
+            (ou `make dev-rebuild-be`). Frontend hot-reload ; `next.config.ts` modifié → **restart** du conteneur.
+            """));
+
+        // ── 12 · Décisions (ADR réels de la construction) ────────────────────
+        n.add(new SeedNode(NodeDomain.DECISIONS, NodeType.DECISION,
+            "DEC — pgvector pour les embeddings",
+            """
+            # DEC — pgvector (vs Pinecone/Weaviate) #decision #ai
+
+            **Décision** : `vector(384)` dans PostgreSQL + index **HNSW** cosine. **Pourquoi** : pas de
+            service vectoriel externe, `all-MiniLM-L6-v2` = 384d (4× plus léger qu'OpenAI). Migration V52.
+            """));
+
+        n.add(new SeedNode(NodeDomain.DECISIONS, NodeType.DECISION,
+            "DEC — embedding lexical maison",
+            """
+            # DEC — embedding lexical offline #decision #ai
+
+            **Contexte** : [[Problème — réseau du poste corrompt npm/pip]] bloque `fastembed`.
+            **Décision** : repli **feature-hashing** (tokens + trigrammes, tf-log, L2) dans `ai-service` →
+            similarité cosinus réellement pertinente, **sans dépendance**. Drop-in `fastembed` sur réseau propre.
+            """));
+
+        n.add(new SeedNode(NodeDomain.DECISIONS, NodeType.DECISION,
+            "DEC — composants UI vendus à la main",
+            """
+            # DEC — UI no-dep #decision #frontend
+
+            **Contexte** : réseau bloque `tiptap`/`shiki`/`prompt-kit`. **Décision** : éditeur markdown,
+            renderer (callouts/code/images), loader, kit chat agentique **écrits à la main** (cva+lucide+
+            framer-motion déjà présents). Swappables vers les vrais paquets sur réseau propre.
+            """));
+
+        n.add(new SeedNode(NodeDomain.DECISIONS, NodeType.DECISION,
+            "DEC — Brain OS : noyau caché (moat)",
+            """
+            # DEC — noyau Brain OS #decision
+
+            **Décision** : hub + READMEs **visibles** (« give the knowledge ») ; **AGENTS** (règles de tenue
+            du cerveau) **caché** (`system`), lu par l'agent (« sell the implementation »). L'architecture est
+            **liée d'office** via `[[wikilinks]]` au seed.
+            """));
+
+        // ── 13 · Roadmap ─────────────────────────────────────────────────────
+        n.add(new SeedNode(NodeDomain.ROADMAP, NodeType.DOC,
+            "Roadmap — fait / en cours / backlog",
+            """
+            # Roadmap #roadmap
+
+            > [!success] Fait
+            > Cœur PM (workspaces/projets/issues/cycles), temps réel, billing Stripe, intégrations,
+            > IA (smart-assign/assistant/insights), **Brain OS** (graphe, éditeur riche, recherche
+            > sémantique, MinIO, kit chat agentique), QA encodage/archive-pin/UI.
+
+            > [!warning] Backlog v2
+            > Deep-path agentique (tool-calling), tiptap réel, tests (couverture), feature flags IA,
+            > Stripe lifecycle complet, refresh token, cache insights. Voir [[Dette technique]].
+            """));
+
+        // ── 14 · Design ──────────────────────────────────────────────────────
+        n.add(new SeedNode(NodeDomain.DESIGN, NodeType.DOC,
+            "Design system — shadcn + Tailwind",
+            """
+            # Design system #design
+
+            shadcn/ui (Radix) + Tailwind 4. Thème clair/sombre via tokens CSS. Composants dans `components/ui/`.
+            """));
+
+        // ── 16 · Historique (TIMELINE) ───────────────────────────────────────
+        n.add(new SeedNode(NodeDomain.HISTORIQUE, NodeType.ACTION_OODA,
+            "Timeline — Déc. 2025 → Juin 2026",
+            """
+            # Timeline #historique
+
+            - **Déc. 2025** — Kickoff. [[ADR-001 — Stack technique]], monorepo, schéma initial (Flyway V1+), auth.
+            - **Janv. 2026** — Cœur : workspaces/projets/issues, board/list/backlog.
+            - **Févr. 2026** — Cycles, teams, **temps réel** ([[ADR-002 — Temps réel via RabbitMQ (STOMP)]]).
+            - **Mars 2026** — Billing Stripe, intégrations GitHub/Slack, GED/MinIO.
+            - **Avr. 2026** — IA : smart-assign, assistant, insights (Groq-direct). Analytics.
+            - **Mai 2026** — Audit PM ([[Audit PM — issues connues]]), correctifs P0/P1.
+            - **Juin 2026** — QA finale ; **Brain OS** (graphe neural, éditeur, recherche, MinIO) ;
+              correctifs encodage ([[Problème — corruption UTF-8 du seed (PowerShell)]],
+              [[Problème — assistant IA (Groq) : 3 bugs]]) ; contraintes réseau ([[DEC — composants UI vendus à la main]]).
             """));
 
         return n;
