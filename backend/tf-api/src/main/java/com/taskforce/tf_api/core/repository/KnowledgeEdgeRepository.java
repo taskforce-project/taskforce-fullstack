@@ -20,4 +20,10 @@ public interface KnowledgeEdgeRepository extends JpaRepository<KnowledgeEdge, Lo
 
     boolean existsByFromNodeIdAndToNodeIdAndRelationType(
         Long fromNodeId, Long toNodeId, com.taskforce.tf_api.core.enums.EdgeRelation relationType);
+
+    /** Arêtes auto (issues de [[wikilinks]]) sortant d'un node — à re-synchroniser à l'édition. */
+    List<KnowledgeEdge> findByFromNodeIdAndAutoTrue(Long fromNodeId);
+
+    /** Purge toutes les arêtes d'un workspace (re-seed). */
+    void deleteByWorkspaceId(Long workspaceId);
 }
