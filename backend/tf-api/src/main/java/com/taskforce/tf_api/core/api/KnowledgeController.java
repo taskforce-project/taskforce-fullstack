@@ -73,6 +73,21 @@ public class KnowledgeController {
             brainSearchService.search(slug, userId, request.getQuery(), request.getTopK(), request.getDomain())));
     }
 
+    // ── Re-seed (OWNER/ADMIN) ─────────────────────────────────────────────────
+
+    @PostMapping("/reseed")
+    public ResponseEntity<ApiResponse<Void>> reseed(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String slug,
+        @RequestBody ReseedRequest request
+    ) {
+        Long userId = resolveUserId(jwt);
+        knowledgeService.reseed(slug, userId, request.template());
+        return ResponseEntity.ok(ApiResponse.success("Brain réamorcé", null));
+    }
+
+    public record ReseedRequest(String template) {}
+
     // ── Nodes ────────────────────────────────────────────────────────────────
 
     @GetMapping("/nodes")
