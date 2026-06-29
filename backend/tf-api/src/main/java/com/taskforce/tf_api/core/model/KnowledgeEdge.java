@@ -67,6 +67,11 @@ public class KnowledgeEdge {
     @Builder.Default
     private Double weight = 1.0;
 
+    /** true = arête générée depuis un [[wikilink]] du contenu (re-synchronisée à l'édition). */
+    @Column(name = "auto", nullable = false)
+    @Builder.Default
+    private Boolean auto = false;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
