@@ -1,9 +1,12 @@
 package com.taskforce.tf_api.shared.config;
 
+import java.nio.charset.StandardCharsets;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.http.converter.StringHttpMessageConverter;
 import org.springframework.web.client.RestTemplate;
 
 /**
@@ -30,6 +33,10 @@ public class GroqConfig {
         factory.setReadTimeout(30_000); // 30s — modèles 70B peuvent être lents
         RestTemplate rt = new RestTemplate();
         rt.setRequestFactory(factory);
+        // Groq renvoie de l'UTF-8 mais souvent sans charset explicite → le StringHttpMessageConverter
+        // par défaut décode en ISO-8859-1 et casse les accents (é→Ã©). On force l'UTF-8.
+        rt.getMessageConverters().removeIf(c -> c instanceof StringHttpMessageConverter);
+        rt.getMessageConverters().add(0, new StringHttpMessageConverter(StandardCharsets.UTF_8));
         return rt;
     }
 
