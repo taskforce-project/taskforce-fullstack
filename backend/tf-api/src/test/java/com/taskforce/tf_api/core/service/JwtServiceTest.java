@@ -180,87 +180,9 @@ class JwtServiceTest {
         }
     }
 
-    @Nested
-    @DisplayName("Refresh Access Token Tests")
-    class RefreshAccessTokenTests {
-
-        @Test
-        @DisplayName("devrait lancer UnsupportedOperationException (en cours d'implémentation)")
-        void refreshAccessToken_shouldThrowUnsupportedOperationException() {
-            // Given
-            String refreshTokenValue = "valid-refresh-token";
-            RefreshToken refreshToken = RefreshToken.builder()
-                    .userId(testUser.getId())
-                    .token(refreshTokenValue)
-                    .expiresAt(LocalDateTime.now().plusDays(10))
-                    .revoked(false)
-                    .build();
-
-            when(refreshTokenRepository.findByToken(refreshTokenValue))
-                    .thenReturn(Optional.of(refreshToken));
-
-            // When/Then
-            assertThatThrownBy(() -> jwtService.refreshAccessToken(refreshTokenValue, keycloakUser))
-                    .isInstanceOf(UnsupportedOperationException.class)
-                    .hasMessageContaining("Implémentation en cours");
-        }
-
-        @Test
-        @DisplayName("devrait lancer exception si refresh token invalide")
-        void refreshAccessToken_withInvalidToken_shouldThrowException() {
-            // Given
-            String invalidToken = "invalid-token";
-            when(refreshTokenRepository.findByToken(invalidToken))
-                    .thenReturn(Optional.empty());
-
-            // When/Then
-            assertThatThrownBy(() -> jwtService.refreshAccessToken(invalidToken, keycloakUser))
-                    .isInstanceOf(RuntimeException.class)
-                    .hasMessageContaining("Refresh token invalide");
-        }
-
-        @Test
-        @DisplayName("devrait lancer exception si refresh token expiré")
-        void refreshAccessToken_withExpiredToken_shouldThrowException() {
-            // Given
-            String expiredTokenValue = "expired-token";
-            RefreshToken expiredToken = RefreshToken.builder()
-                    .userId(testUser.getId())
-                    .token(expiredTokenValue)
-                    .expiresAt(LocalDateTime.now().minusDays(1)) // Expiré
-                    .revoked(false)
-                    .build();
-
-            when(refreshTokenRepository.findByToken(expiredTokenValue))
-                    .thenReturn(Optional.of(expiredToken));
-
-            // When/Then
-            assertThatThrownBy(() -> jwtService.refreshAccessToken(expiredTokenValue, keycloakUser))
-                    .isInstanceOf(RuntimeException.class)
-                    .hasMessageContaining("expiré ou révoqué");
-        }
-
-        @Test
-        @DisplayName("devrait lancer exception si refresh token révoqué")
-        void refreshAccessToken_withRevokedToken_shouldThrowException() {
-            // Given
-            String revokedTokenValue = "revoked-token";
-            RefreshToken revokedToken = RefreshToken.builder()
-                    .userId(testUser.getId())
-                    .token(revokedTokenValue)
-                    .expiresAt(LocalDateTime.now().plusDays(10))
-                    .revoked(true) // Révoqué
-                    .build();
-
-            when(refreshTokenRepository.findByToken(revokedTokenValue))
-                    .thenReturn(Optional.of(revokedToken));
-
-            // When/Then
-            assertThatThrownBy(() -> jwtService.refreshAccessToken(revokedTokenValue, keycloakUser))
-                    .isInstanceOf(RuntimeException.class)
-                    .hasMessageContaining("expiré ou révoqué");
-        }
-    }
+    // NB (30/06) : bloc « Refresh Access Token Tests » retiré — `JwtService.refreshAccessToken`
+    // n'existe plus (le refresh/rotation vit désormais dans AuthService, couvert par AuthServiceTest).
+    // Ces tests ne compilaient plus et bloquaient tout le module test.
 
     @Nested
     @DisplayName("Refresh Token Generation Tests")
