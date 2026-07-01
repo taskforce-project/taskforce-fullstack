@@ -20,7 +20,7 @@
 | - | --- | --- | :--: |
 | B-T1 | `RedistributionService` (neuf, PROD-1.12) : plan sûr (movable/URGENT/seuil), pickTarget (pas de sur-charge), apply (IDOR skip, audit), authz manager | unit (Mockito) | ✅ **13/13 vert** |
 | B-T2 | `SmartAssignService` : scoring/ranking, fallback sans Groq, growth guards, availability/workload | unit | ✅ **18/18 vert** |
-| B-T3 | `AuthorizationService` : requireMember/requireRole/requireManager (403) | unit | 🔲 |
+| B-T3 | `AuthorizationService` : requireMember/requireRole/requireManager (403) | unit | ✅ **11/11 vert** |
 | B-T4 | Socle `AbstractIntegrationTest` (Testcontainers pg + Flyway) | infra | 🔲 |
 | B-T5 | `IssueService` (CRUD, labels, assignee, realtime publish mocké) + `WorkspaceService` | unit/intég | 🔲 |
 | B-T6 | Controllers critiques (`@WebMvcTest` : `/api`, `ApiResponse<T>`, `@Valid`→400, 401/403) | slice | 🔲 |
@@ -37,4 +37,9 @@
 
 - B-T1 : `RedistributionServiceTest` **13/13** (0 failure/error).
 - B-T2 : `SmartAssignServiceTest` **18/18** (0 failure/error) — 5 preview (ranking labels, dispo/charge, exclusion terminées/annulées + inactifs, no-candidate), 2 fallback (Groq down → java-fallback ; score sémantique Groq), 3 growth (bonus stretch OK / garde-fous URGENT + mode off), 3 recommend (persistance `assignment_events` + `ai_runs`, IDOR projet/issue), 2 autz (workspace introuvable, non-membre), 3 bulk/redistribution (skip issue étrangère, entrée vide, `rankForRedistribution` sans `assignment_events`). Vérifié via le résumé surefire par `@Nested` (le total racine affiche « 0 », artefact connu).
-- Coverage global à mesurer après B-T3 (`mvn test`, rapport `target/site/jacoco/index.html`).
+- B-T3 : `AuthorizationServiceTest` **11/11** (0 failure/error) — requireMember (membre / non-membre → `ForbiddenException`), requireRole (rôle autorisé / refusé « Permission insuffisante » / non-membre court-circuité / varargs vide), requireManager (`@ParameterizedTest` OWNER+ADMIN acceptés, MEMBER refusé), isMember (true/false sans exception).
+- Coverage global à mesurer après B-T4/B-T5 (`mvn test`, rapport `target/site/jacoco/index.html`).
+
+## Convention d'arborescence (confirmée 30/06)
+
+Le dossier `src/test/java/.../` **mirror** `src/main/java/.../` : chaque `*Test.java` vit dans le **même package** que la classe testée (`core/service/SmartAssignServiceTest` ↔ `core/service/SmartAssignService`), ce qui donne aussi accès au package-private. Seules exceptions volontaires (support de test, pas des packages applicatifs) : `config/TestConfig.java` et `util/TestDataBuilder.java`.
