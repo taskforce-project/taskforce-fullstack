@@ -188,4 +188,69 @@ class NotificationServiceTest {
                 .isInstanceOf(ResourceNotFoundException.class);
         }
     }
+
+    // =========================================================================
+    @Nested
+    @DisplayName("list / acknowledge / notify (autres)")
+    class More {
+
+        @Test
+        @DisplayName("listNotifications mappe la page du repository")
+        void should_list() {
+            when(workspaceRepository.findBySlug(SLUG)).thenReturn(Optional.of(workspace));
+            when(notificationRepository.findByRecipientIdAndWorkspaceIdAndAcknowledgedFalseOrderByCreatedAtDesc(
+                    eq(7L), eq(1L), any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(java.util.List.of()));
+
+            assertThat(service.listNotifications(SLUG, 7L)).isEmpty();
+        }
+
+        @Test
+        @DisplayName("markAllAsRead / acknowledgeAll délèguent au repository")
+        void should_mark_and_ack_all() {
+            when(workspaceRepository.findBySlug(SLUG)).thenReturn(Optional.of(workspace));
+            when(notificationRepository.markAllAsRead(7L, 1L)).thenReturn(3);
+            when(notificationRepository.acknowledgeAll(7L, 1L)).thenReturn(2);
+
+            assertThat(service.markAllAsRead(SLUG, 7L)).isEqualTo(3);
+            assertThat(service.acknowledgeAll(SLUG, 7L)).isEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("acknowledge marque lu + acquitté pour le destinataire")
+        void should_acknowledge() {
+            User owner = user(7L, "owner");
+            Notification n = Notification.builder().id(50L).recipient(owner).read(false).acknowledged(false).build();
+            when(notificationRepository.findById(50L)).thenReturn(Optional.of(n));
+            when(notificationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+            service.acknowledge(50L, 7L);
+
+            assertThat(n.isAcknowledged()).isTrue();
+            assertThat(n.isRead()).isTrue();
+        }
+
+        @Test
+        @DisplayName("notifyCommented notifie assigné + reporter (hors acteur)")
+        void should_notify_commented() {
+            when(notificationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+            service.notifyCommented(issue(user(20L, "a"), user(21L, "r")), user(30L, "actor"),
+                com.taskforce.tf_api.core.model.IssueComment.builder().content("hi").build());
+
+            verify(notificationRepository, times(2)).save(any());
+        }
+
+        @Test
+        @DisplayName("notifyStatusChanged notifie les parties concernées")
+        void should_notify_status_changed() {
+            User assignee = user(20L, "a");
+            User actor = user(30L, "actor");
+            when(notificationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+            service.notifyStatusChanged(issue(assignee, actor), actor, "Done");
+
+            verify(notificationRepository, org.mockito.Mockito.atLeastOnce()).save(any());
+        }
+    }
 }

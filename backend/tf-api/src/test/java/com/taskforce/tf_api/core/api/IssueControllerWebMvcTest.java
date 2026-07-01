@@ -29,7 +29,9 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -124,5 +126,93 @@ class IssueControllerWebMvcTest {
 
         mockMvc.perform(get(BASE + "/999").with(jwt().jwt(b -> b.claim("email", EMAIL))))
             .andExpect(status().isNotFound());
+    }
+
+    // ---- endpoints additionnels (couverture) -------------------------------
+    private org.springframework.test.web.servlet.request.RequestPostProcessor auth() {
+        return jwt().jwt(b -> b.claim("email", EMAIL));
+    }
+
+    @Test
+    @DisplayName("GET /statuses et /types → 200")
+    void list_statuses_and_types() throws Exception {
+        stubUser();
+        when(issueService.listStatuses(anyString(), anyLong(), anyLong())).thenReturn(List.of());
+        when(issueService.listTypes(anyString(), anyLong(), anyLong())).thenReturn(List.of());
+
+        mockMvc.perform(get(BASE + "/statuses").with(auth())).andExpect(status().isOk());
+        mockMvc.perform(get(BASE + "/types").with(auth())).andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("GET /paged, /{id}/comments, /{id}/activity, /{id}/children → 200")
+    void list_various() throws Exception {
+        stubUser();
+        when(issueService.listComments(anyString(), anyLong(), anyLong(), anyLong())).thenReturn(List.of());
+        when(issueService.listActivity(anyString(), anyLong(), anyLong(), anyLong())).thenReturn(List.of());
+        when(issueService.listChildren(anyString(), anyLong(), anyLong(), anyLong())).thenReturn(List.of());
+
+        mockMvc.perform(get(BASE + "/paged").with(auth())).andExpect(status().isOk());
+        mockMvc.perform(get(BASE + "/9/comments").with(auth())).andExpect(status().isOk());
+        mockMvc.perform(get(BASE + "/9/activity").with(auth())).andExpect(status().isOk());
+        mockMvc.perform(get(BASE + "/9/children").with(auth())).andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("POST /{id}/comments → 2xx")
+    void add_comment_2xx() throws Exception {
+        stubUser();
+        when(issueService.addComment(anyString(), anyLong(), anyLong(), any(), anyLong())).thenReturn(null);
+
+        mockMvc.perform(post(BASE + "/9/comments").with(auth())
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content("{\"content\":\"Salut\"}"))
+            .andExpect(status().is2xxSuccessful());
+    }
+
+    @Test
+    @DisplayName("POST /statuses → 2xx")
+    void create_status_2xx() throws Exception {
+        stubUser();
+        when(issueService.createStatus(anyString(), anyLong(), any(), anyLong())).thenReturn(null);
+
+        mockMvc.perform(post(BASE + "/statuses").with(auth())
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Review\",\"color\":\"#123456\",\"category\":\"STARTED\"}"))
+            .andExpect(status().is2xxSuccessful());
+    }
+
+    @Test
+    @DisplayName("PATCH /{id}/archive et /{id}/pin → 2xx")
+    void archive_and_pin() throws Exception {
+        stubUser();
+        when(issueService.setArchived(anyString(), anyLong(), anyLong(), org.mockito.ArgumentMatchers.anyBoolean(), anyLong()))
+            .thenReturn(issue(9L, "x"));
+        when(issueService.setPinned(anyString(), anyLong(), anyLong(), org.mockito.ArgumentMatchers.anyBoolean(), anyLong()))
+            .thenReturn(issue(9L, "x"));
+
+        mockMvc.perform(patch(BASE + "/9/archive").with(auth())).andExpect(status().is2xxSuccessful());
+        mockMvc.perform(patch(BASE + "/9/pin").with(auth())
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content("{\"pinned\":true}"))
+            .andExpect(status().is2xxSuccessful());
+    }
+
+    @Test
+    @DisplayName("DELETE /{id} → 2xx")
+    void delete_issue_2xx() throws Exception {
+        stubUser();
+
+        mockMvc.perform(delete(BASE + "/9").with(auth())).andExpect(status().is2xxSuccessful());
+    }
+
+    @Test
+    @DisplayName("POST /smart-assign/preview → 2xx")
+    void smart_assign_preview_2xx() throws Exception {
+        stubUser();
+        when(smartAssignService.preview(anyString(), anyLong(), anyLong(), any())).thenReturn(null);
+
+        mockMvc.perform(post(BASE + "/smart-assign/preview").with(auth())
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content("{\"title\":\"Bug\"}"))
+            .andExpect(status().is2xxSuccessful());
     }
 }
