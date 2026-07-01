@@ -28,6 +28,7 @@ public class KnowledgeNodeResponse {
     private String versionLabel;
     private String refType;
     private Long refId;
+    private Long parentNodeId;
     private List<String> tags;
     /** Node du noyau (kernel : hub règles/AGENTS) — masqué de l'explorateur utilisateur par défaut. */
     private boolean system;
