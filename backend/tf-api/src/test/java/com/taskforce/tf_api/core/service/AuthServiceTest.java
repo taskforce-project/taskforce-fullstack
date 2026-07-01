@@ -66,6 +66,20 @@ class AuthServiceTest {
     @Mock
     private JwtService jwtService;
 
+    // Dépendances ajoutées à AuthService (auto-join workspace + invitations) que le test
+    // ne mockait pas → @InjectMocks les laissait null → NPE dans login/verifyOtp. Cf. BT-P5.
+    @Mock
+    private WorkspaceService workspaceService;
+
+    @Mock
+    private WorkspaceInvitationService workspaceInvitationService;
+
+    @Mock
+    private AuditService auditService;
+
+    @Mock
+    private com.taskforce.tf_api.core.repository.RefreshTokenRepository refreshTokenRepository;
+
     @InjectMocks
     private AuthService authService;
 
