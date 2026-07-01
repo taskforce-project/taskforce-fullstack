@@ -70,6 +70,9 @@ export const WORKSPACE_ROUTES = {
   // Invitations par email (PROD-3.5)
   INVITATIONS: (slug: string) => `/api/workspaces/${slug}/invitations`,
   INVITATION: (slug: string, invitationId: number) => `/api/workspaces/${slug}/invitations/${invitationId}`,
+  // Redistribution de charge (PROD-1.12)
+  REDISTRIBUTE_PREVIEW: (slug: string) => `/api/workspaces/${slug}/redistribute/preview`,
+  REDISTRIBUTE_APPLY: (slug: string) => `/api/workspaces/${slug}/redistribute/apply`,
   // Rétrocompatibilité
   CURRENT: "/api/workspaces/current",
 } as const;
