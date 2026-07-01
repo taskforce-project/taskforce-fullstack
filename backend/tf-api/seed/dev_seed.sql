@@ -615,6 +615,63 @@ BEGIN
     END LOOP;
     INSERT INTO issue_sequence_counters (project_id, last_number) VALUES (v_solo_proj, v_seq);
 
-    RAISE NOTICE 'Seed QA ULTRA-complet : workspace "taskforce-demo" (id=%) — 9 membres + 24 solos (hors équipe), 4 projets, ~267 issues (throughput JOURNALIER 30 j + hebdo, KPIs/capacité/burndown remplis), sous-tâches/URGENT/cancelled, commentaires, checklist, relations, worklogs, 3 cycles + sprint actif peuplé, ~15 notifications, favoris, 5 pages, invitations, abonnement PRO + historique, demandes enterprise.', v_ws;
+    -- ================================================================
+    -- 23. QA-1 (30/06) — DENSIFICATION des écrans « fins » : commentaires,
+    --     worklogs et notifications en volume, pour exercer le détail d'issue,
+    --     l'onglet Temps et l'inbox sur un jeu de données réaliste.
+    -- ================================================================
+    -- 23a. Commentaires — fil réaliste sur ~1 issue sur 3 du workspace (auteurs variés)
+    INSERT INTO issue_comments (issue_id, author_id, content, created_at)
+    SELECT i.id,
+           (ARRAY[v_sarah, v_marcus, v_aicha, v_tom, v_omar, v_nina, v_diego])[1 + (i.id % 7)],
+           (ARRAY[
+             'Je prends, je regarde ça aujourd''hui.',
+             'Bloqué par une dépendance externe, je remonte le sujet au daily.',
+             'PR ouverte, review demandée 🙏',
+             'Corrigé et déployé en staging, à valider de votre côté.',
+             'Il manque un test sur ce cas limite, je complète.',
+             'Reproduit en local, cause racine identifiée.',
+             'On en reparle demain, besoin d''un avis produit.'
+           ])[1 + (i.id % 7)],
+           i.created_at + INTERVAL '3 hours'
+    FROM issues i JOIN projects p ON p.id = i.project_id
+    WHERE p.workspace_id = v_ws AND (i.id % 3) = 0;
+
+    -- 23b. 2e commentaire (thread) sur ~1 issue sur 6 → conversations
+    INSERT INTO issue_comments (issue_id, author_id, content, created_at)
+    SELECT i.id,
+           (ARRAY[v_admin, v_lina, v_marcus, v_sarah])[1 + (i.id % 4)],
+           (ARRAY[
+             'Merci, je valide dès que possible.',
+             'Bien vu, on part sur cette approche.',
+             'Attention à la rétro-compatibilité côté API.',
+             'Ajouté au prochain sprint.'
+           ])[1 + (i.id % 4)],
+           i.created_at + INTERVAL '1 day'
+    FROM issues i JOIN projects p ON p.id = i.project_id
+    WHERE p.workspace_id = v_ws AND (i.id % 6) = 0;
+
+    -- 23c. Worklogs — temps passé sur ~1 issue assignée sur 4 (onglet Temps)
+    INSERT INTO issue_worklogs (issue_id, user_id, minutes, description, logged_at)
+    SELECT i.id, i.assignee_id,
+           30 * (1 + (i.id % 8)),
+           (ARRAY['Développement','Investigation','Revue de code','Rédaction de tests','Correctif','Pairing'])[1 + (i.id % 6)],
+           COALESCE(i.completed_at::date, (i.created_at + INTERVAL '1 day')::date)
+    FROM issues i JOIN projects p ON p.id = i.project_id
+    WHERE p.workspace_id = v_ws AND i.assignee_id IS NOT NULL AND (i.id % 4) = 0;
+
+    -- 23d. Notifications — volume additionnel pour l'admin (inbox réaliste, mix lu/non-lu)
+    INSERT INTO notifications (recipient_id, workspace_id, actor_id, type, urgency, read, title, body, issue_identifier, project_name)
+    SELECT v_admin, v_ws,
+           (ARRAY[v_sarah, v_marcus, v_aicha, v_tom, v_nina])[1 + (n % 5)],
+           (ARRAY['assigned','commented','mention','statusChanged','completed'])[1 + (n % 5)],
+           (ARRAY['info','info','info','low','info'])[1 + (n % 5)],
+           (n % 4) = 0,
+           (ARRAY['Nouvelle assignation','Nouveau commentaire','Mention','Changement de statut','Tâche terminée'])[1 + (n % 5)],
+           'Activité sur votre workspace (#' || n || ')',
+           'WEB-' || (1 + (n % 8)), 'Web Application'
+    FROM generate_series(1, 20) AS n;
+
+    RAISE NOTICE 'Seed QA ULTRA-complet : workspace "taskforce-demo" (id=%) — 9 membres + 24 solos (hors équipe), 4 projets, ~267 issues (throughput JOURNALIER 30 j + hebdo, KPIs/capacité/burndown remplis), sous-tâches/URGENT/cancelled, commentaires, checklist, relations, worklogs (~70), 3 cycles + sprint actif peuplé, ~130 commentaires (fils), ~35 notifications (mix lu/non-lu), favoris, 5 pages, invitations, abonnement PRO + historique, demandes enterprise.', v_ws;
 END
 $seed$;
