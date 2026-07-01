@@ -15,9 +15,15 @@ import {
 import { Bot, X, Send, Sparkles, Minimize2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Matrix, wave } from "@/components/ui/matrix"
-import { ShimmeringText } from "@/components/ui/shimmering-text"
+import { ThinkingBar } from "@/components/chat"
+import { Markdown } from "@/components/ui/lightweight-markdown"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { sendAssistantMessage } from "@/lib/api/assistant-service"
+
+// Rendu Markdown des parties texte des messages de l'assistant.
+function MarkdownText({ text }: { text: string }) {
+  return <Markdown content={text} />
+}
 
 // ─── Adapter réel — appelle l'API assistant du backend (Groq / fallback Java) ───
 function createTaskforceAdapter(slug: string): ChatModelAdapter {
@@ -133,7 +139,13 @@ function FABAssistantMessage() {
         <Sparkles className="size-3 text-primary" />
       </div>
       <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-card border border-border px-3.5 py-2.5 text-sm leading-relaxed text-foreground">
-        <MessagePrimitive.Content />
+        {/* Pas encore de contenu = en cours de génération → un seul indicateur (pas de doublon) */}
+        <MessagePrimitive.If hasContent={false}>
+          <ThinkingBar />
+        </MessagePrimitive.If>
+        <MessagePrimitive.If hasContent>
+          <MessagePrimitive.Content components={{ Text: MarkdownText }} />
+        </MessagePrimitive.If>
       </div>
     </MessagePrimitive.Root>
   )
@@ -170,23 +182,6 @@ function FABEmptyState() {
   )
 }
 
-// ─── Indicateur « réfléchit… » (shimmer ElevenLabs UI) ─────────────────────────
-function FABThinking() {
-  // eslint-disable-next-line @typescript-eslint/no-deprecated
-  const isRunning = useThread((s) => s.isRunning)
-  if (!isRunning) return null
-  return (
-    <div className="flex gap-2 mb-3">
-      <div className="size-6 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-        <Sparkles className="size-3 text-primary" />
-      </div>
-      <div className="rounded-2xl rounded-tl-sm bg-card border border-border px-3.5 py-2.5 text-sm">
-        <ShimmeringText>Taskforce AI réfléchit…</ShimmeringText>
-      </div>
-    </div>
-  )
-}
-
 // ─── Conversation réutilisable (embarquable dans un panneau, PROD-8.9) ─────────
 /**
  * Thread + composer de l'assistant, sans header ni modal — destiné à être monté
@@ -210,7 +205,6 @@ export function AssistantConversation() {
               AssistantMessage: FABAssistantMessage,
             }}
           />
-          <FABThinking />
         </ThreadPrimitive.Viewport>
         <FABComposer />
       </ThreadPrimitive.Root>
@@ -280,8 +274,7 @@ export function AssistantFAB() {
                   AssistantMessage: FABAssistantMessage,
                 }}
               />
-              <FABThinking />
-            </ThreadPrimitive.Viewport>
+                </ThreadPrimitive.Viewport>
             <FABComposer />
           </ThreadPrimitive.Root>
         </AssistantModalPrimitive.Content>
