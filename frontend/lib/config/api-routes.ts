@@ -332,6 +332,7 @@ export const BRAIN_ROUTES = {
   NODE:        (slug: string, nodeId: number) => `/api/workspaces/${slug}/brain/nodes/${nodeId}`,
   EDGES:       (slug: string) => `/api/workspaces/${slug}/brain/edges`,
   EDGE:        (slug: string, edgeId: number) => `/api/workspaces/${slug}/brain/edges/${edgeId}`,
+  FILES:       (slug: string) => `/api/workspaces/${slug}/brain/files`,
 } as const;
 
 /**
