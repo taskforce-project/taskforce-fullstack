@@ -23,7 +23,7 @@
 | B-T3 | `AuthorizationService` : requireMember/requireRole/requireManager (403) | unit | ✅ **11/11 vert** |
 | B-T4 | Socle `AbstractIntegrationTest` (Postgres réel + Flyway) + smoke `IntegrationSocleTest` | infra | ✅ **3/3 vert** |
 | B-T5 | Intégration métier : `IssueRepository` (SQL réel) ✅ **4/4** + `IssueService` CRUD ✅ **7/7** + `WorkspaceService` (plan limits, delete cascade) ✅ **6/6** | intég | ✅ **17/17 vert** |
-| B-T6 | Controllers (`@WebMvcTest` : `/api`, `ApiResponse<T>`, `@Valid`→400, 401/403) — `RedistributionController` (recette établie) | slice | 🔄 **5/5 vert** |
+| B-T6 | Controllers (`@WebMvcTest` : `/api`, `ApiResponse<T>`, `@Valid`→400, 401/403/404) — `RedistributionController` + `IssueController` | slice | ✅ **10/10 vert** |
 | B-T7 | Notification/Analytics/Cycle + non-régression bugs connus | unit | 🔲 |
 
 ## Problèmes rencontrés
@@ -52,8 +52,8 @@
 - B-T5 (tranche 2) : `IssueServiceIntegrationTest` **7/7** — service chargé dans le slice `@DataJpaTest` via `@Import(IssueService.class)`, repos réels, `SimpMessagingTemplate` + `NotificationService` en **`@MockitoBean`** (Boot 4). Couvre le vrai chemin de persistance : createIssue (séquence atomique 1→2, statut défaut « Todo », position 0, notif assigné + publish `/topic/projects.`), sans-assigné (pas de notif mais publish), IDOR statut hors-projet → 404, non-membre → `BusinessException` ; updateIssue (statut→Done + réassignation persistés + 2e publish, issue inconnue → 404).
 - B-T5 (tranche 3) : `WorkspaceServiceIntegrationTest` **6/6** — createNewWorkspace (workspace + membre OWNER + `seedBrain`), **limite FREE** (2 max → 3e = `IllegalStateException`), PRO au-delà de la limite FREE, `getUsage` (plan/usage/limites 5 & 2), `deleteWorkspace` **cascade DB** (members) + audit, non-owner → `IllegalStateException`. ⚠️ piège testé : pour vérifier la cascade dans une seule tx, il faut `em.flush()+em.clear()` **avant** le delete (sinon le `WorkspaceMember` reste managé et pointe vers un workspace supprimé → `TransientPropertyValueException`).
 - **B-T5 complet : 17/17** (4 repo + 7 IssueService + 6 WorkspaceService). Lancer l'intégration : `.\scripts\it.ps1 -Test "IntegrationSocleTest,IssueRepositoryIntegrationTest,IssueServiceIntegrationTest,WorkspaceServiceIntegrationTest" [-Offline]`.
-- B-T6 : `RedistributionControllerWebMvcTest` **5/5** (contrat HTTP : `/api`, enveloppe `ApiResponse`, 401/403/400). Recette réutilisable établie pour les autres controllers.
-- **Suite unit + web (hors intégration) : 147 tests verts** (1 skip). `docker run … mvn -o test -Dtest=!*Integration*`. Suite **intégration** (Postgres) : 20 verts via `.\scripts\it.ps1`.
+- B-T6 : `RedistributionControllerWebMvcTest` **5/5** (200/401/403/400) + `IssueControllerWebMvcTest` **5/5** (201/400/401/200/404) = **10/10**. Recette réutilisable rodée sur 2 controllers.
+- **Suite unit + web (hors intégration) : 152 tests verts** (1 skip). `docker run … mvn -o test -Dtest=!*Integration*`. Suite **intégration** (Postgres) : 20 verts via `.\scripts\it.ps1`.
 - Coverage global à mesurer (JaCoCo) — les 2 suites tournent séparément (profils/DB différents) → agréger. Reste B-T7 (Notification/Analytics/Cycle) + éventuels controllers supplémentaires.
 
 ## Convention d'arborescence (confirmée 30/06)
