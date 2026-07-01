@@ -24,7 +24,7 @@
 | B-T4 | Socle `AbstractIntegrationTest` (Postgres réel + Flyway) + smoke `IntegrationSocleTest` | infra | ✅ **3/3 vert** |
 | B-T5 | Intégration métier : `IssueRepository` (SQL réel) ✅ **4/4** + `IssueService` CRUD ✅ **7/7** + `WorkspaceService` (plan limits, delete cascade) ✅ **6/6** | intég | ✅ **17/17 vert** |
 | B-T6 | Controllers (`@WebMvcTest` : `/api`, `ApiResponse<T>`, `@Valid`→400, 401/403/404) — `RedistributionController` + `IssueController` | slice | ✅ **10/10 vert** |
-| B-T7 | Notification/Analytics/Cycle + non-régression bugs connus | unit | 🔲 |
+| B-T7 | `NotificationService` (unit) ✅ **9/9** + `CycleService` (intég) ✅ **7/7** · reste : `AnalyticsService` (SQL-heavy) + non-régression bugs connus | unit/intég | 🔄 |
 
 ## Problèmes rencontrés
 
@@ -53,7 +53,8 @@
 - B-T5 (tranche 3) : `WorkspaceServiceIntegrationTest` **6/6** — createNewWorkspace (workspace + membre OWNER + `seedBrain`), **limite FREE** (2 max → 3e = `IllegalStateException`), PRO au-delà de la limite FREE, `getUsage` (plan/usage/limites 5 & 2), `deleteWorkspace` **cascade DB** (members) + audit, non-owner → `IllegalStateException`. ⚠️ piège testé : pour vérifier la cascade dans une seule tx, il faut `em.flush()+em.clear()` **avant** le delete (sinon le `WorkspaceMember` reste managé et pointe vers un workspace supprimé → `TransientPropertyValueException`).
 - **B-T5 complet : 17/17** (4 repo + 7 IssueService + 6 WorkspaceService). Lancer l'intégration : `.\scripts\it.ps1 -Test "IntegrationSocleTest,IssueRepositoryIntegrationTest,IssueServiceIntegrationTest,WorkspaceServiceIntegrationTest" [-Offline]`.
 - B-T6 : `RedistributionControllerWebMvcTest` **5/5** (200/401/403/400) + `IssueControllerWebMvcTest` **5/5** (201/400/401/200/404) = **10/10**. Recette réutilisable rodée sur 2 controllers.
-- **Suite unit + web (hors intégration) : 152 tests verts** (1 skip). `docker run … mvn -o test -Dtest=!*Integration*`. Suite **intégration** (Postgres) : 20 verts via `.\scripts\it.ps1`.
+- B-T7 : `NotificationServiceTest` **9/9** (unit — pas de self-notification / assigné nul, persist+push temps réel, markAsRead + IDOR + introuvable, countUnread + workspace introuvable, mentions hors acteur) + `CycleServiceIntegrationTest` **7/7** (intég — création DRAFT, nom unique, update statut + statut invalide, introuvable, add issue + doublon + IDOR hors projet). Reste `AnalyticsService` (JdbcTemplate + Groq, SQL-heavy → intégration dédiée).
+- **Suite unit + web (hors intégration) : 161 tests verts** (152 + 9 Notification ; 1 skip). Suite **intégration** (Postgres) : **27 verts** (20 + 7 Cycle) via `.\scripts\it.ps1`.
 - Coverage global à mesurer (JaCoCo) — les 2 suites tournent séparément (profils/DB différents) → agréger. Reste B-T7 (Notification/Analytics/Cycle) + éventuels controllers supplémentaires.
 
 ## Convention d'arborescence (confirmée 30/06)
