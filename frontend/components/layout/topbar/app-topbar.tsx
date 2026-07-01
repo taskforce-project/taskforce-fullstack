@@ -24,7 +24,7 @@ import { useProjectStore } from "@/lib/store/project-store"
 import { usePanelStore } from "@/lib/store/panel-store"
 import { useUserStore } from "@/lib/store/user-store"
 import { planHasFeature } from "@/lib/config/plan-features"
-import { AssistantConversation } from "@/components/assistant/assistant-fab"
+import { AgentChat } from "@/components/agent/agent-chat"
 import { toast } from "sonner"
 
 /**
@@ -113,9 +113,9 @@ export function AppTopbar() {
     togglePanel({
       id: "assistant",
       side: "right",
-      title: "Taskforce AI",
+      title: "Taskforce AI — Agent",
       icon: <Sparkles className="size-4 text-primary" />,
-      content: <AssistantConversation />,
+      content: <AgentChat />,
     })
   }, [togglePanel, aiEntitled])
 

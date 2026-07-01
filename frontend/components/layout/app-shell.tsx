@@ -35,11 +35,12 @@ export function AppShell({ children }: AppShellProps) {
               transition={{ duration: 0.20, ease: [0.16, 1, 0.3, 1] }}
             >
               {children}
+              {/* Footer dans le flux de scroll : révélé seulement quand on atteint le bas. */}
+              <AppFooter />
             </motion.main>
           </AnimatePresence>
           <PanelDock side="right" />
         </div>
-        <AppFooter />
       </SidebarInset>
 
       {/* Modal d'upgrade global — ouvrable depuis n'importe quel CTA (QA2-19) */}
