@@ -64,6 +64,7 @@ import {
   type Invitation,
 } from "@/lib/api/invitation-service"
 import { listSkillProfiles, type MemberSkillProfile } from "@/lib/api/skill-service"
+import { RedistributionDialog } from "@/components/dialogs/redistribution-dialog"
 
 const SENIORITY_LABEL: Record<string, string> = {
   JUNIOR: "Junior", MID: "Confirmé", SENIOR: "Senior", LEAD: "Lead",
@@ -588,7 +589,9 @@ export default function MembersPage() {
     return () => { active = false }
   }, [workspace?.slug])
 
-  const currentMember = members.find((m) => String(m.userId) === currentUser?.id)
+  // NB : `currentUser.id` est typé `string` mais l'API /users/me le sérialise en `number`.
+  // On compare donc les deux bords en String (sinon `"1" === 1` → false → canManage jamais vrai).
+  const currentMember = members.find((m) => String(m.userId) === String(currentUser?.id))
   const canManage = currentMember?.role === "OWNER" || currentMember?.role === "ADMIN"
   const isOwner = currentMember?.role === "OWNER"
 
@@ -701,6 +704,13 @@ export default function MembersPage() {
             </SelectContent>
           </Select>
         )}
+
+        {/* Redistribution de charge (PROD-1.12) — manager only */}
+        {canManage && workspace?.slug && (
+          <div className="ml-auto shrink-0">
+            <RedistributionDialog slug={workspace.slug} onApplied={() => fetchMembers()} />
+          </div>
+        )}
       </div>
 
       {/* Members list */}
@@ -741,7 +751,7 @@ export default function MembersPage() {
           <MemberRow
             key={member.id}
             member={member}
-              isYou={String(member.userId) === currentUser?.id}
+              isYou={String(member.userId) === String(currentUser?.id)}
             canManage={canManage}
             isOwner={isOwner}
             profile={profilesByUser[member.userId]}
