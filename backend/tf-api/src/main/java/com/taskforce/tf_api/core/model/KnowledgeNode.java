@@ -98,6 +98,10 @@ public class KnowledgeNode extends AuditableEntity {
     @Column(name = "ref_id")
     private Long refId;
 
+    /** Parent dans la hiérarchie récursive (projet → système → sous-système → … → note). */
+    @Column(name = "parent_node_id")
+    private Long parentNodeId;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "metadata", nullable = false, columnDefinition = "jsonb")
     @Builder.Default
