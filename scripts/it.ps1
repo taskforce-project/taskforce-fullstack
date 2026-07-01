@@ -26,7 +26,7 @@ if ($LASTEXITCODE -ne 0) { docker network create $net *>$null }
 docker rm -f $pg *>$null | Out-Null
 docker run -d --name $pg --network $net `
   -e POSTGRES_DB=tf -e POSTGRES_USER=tf -e POSTGRES_PASSWORD=tf `
-  pgvector/pgvector:pg16 | Out-Null
+  pgvector/pgvector:pg16 -c max_connections=300 | Out-Null
 
 Write-Host "==> Attente readiness Postgres"
 $ready = $false

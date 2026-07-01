@@ -7,6 +7,11 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME:tf}
     password: ${SPRING_DATASOURCE_PASSWORD:tf}
     driver-class-name: org.postgresql.Driver
+    # Plusieurs contextes @DataJpaTest sont mis en cache par Spring durant le run complet ;
+    # un petit pool par contexte évite l'épuisement des connexions Postgres ("too many clients").
+    hikari:
+      maximum-pool-size: 2
+      minimum-idle: 0
   jpa:
     hibernate:
       ddl-auto: validate
