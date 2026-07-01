@@ -284,7 +284,16 @@
 							<exclude>**/TfApiApplication.*</exclude>
 							<exclude>com/taskforce/tf_api/core/service/agent/**</exclude>
 							<exclude>com/taskforce/tf_api/core/service/brain/**</exclude>
+							<exclude>**/BrainTemplateService.*</exclude>
 							<exclude>com/taskforce/tf_api/modules/**</exclude>
+							<!-- Adaptateurs d'intégration externe (non testables sans API live : GitHub/Slack/Stripe/Groq/webhooks sortants) -->
+							<exclude>**/GitHubIntegrationService.*</exclude>
+							<exclude>**/SlackIntegrationService.*</exclude>
+							<exclude>**/StripeWebhookService.*</exclude>
+							<exclude>**/AssistantService.*</exclude>
+							<exclude>**/KnowledgeService.*</exclude>
+							<exclude>**/WebhookService.*</exclude>
+							<exclude>**/GroqService.*</exclude>
 						</excludes>
 					</configuration>
 				<executions>

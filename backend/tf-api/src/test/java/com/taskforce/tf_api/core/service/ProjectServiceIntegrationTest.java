@@ -51,6 +51,7 @@ class ProjectServiceIntegrationTest extends AbstractIntegrationTest {
     @Autowired private ProjectRepository projectRepository;
     @Autowired private ProjectMemberRepository projectMemberRepository;
     @Autowired private ProjectLabelRepository projectLabelRepository;
+    @Autowired private com.taskforce.tf_api.core.repository.ProjectFavoriteRepository projectFavoriteRepository;
 
     @org.springframework.test.context.bean.override.mockito.MockitoBean
     private IssueService issueService;
@@ -168,6 +169,74 @@ class ProjectServiceIntegrationTest extends AbstractIntegrationTest {
 
             assertThat(label.getName()).isEqualTo("Blocked");
             assertThat(projectLabelRepository.findByProjectIdOrderByNameAsc(project.getId())).hasSize(6); // 5 défaut + 1
+        }
+    }
+
+    // =========================================================================
+    @Nested
+    @DisplayName("archive / favoris / membres")
+    class MembersAndFlags {
+
+        @Test
+        @DisplayName("archiveProject passe le statut à ARCHIVED")
+        void should_archive() {
+            ProjectResponse created = projectService.createProject(SLUG, owner.getId(), req("Arch", "ARC"));
+
+            ProjectResponse res = projectService.archiveProject(SLUG, created.getId(), owner.getId());
+
+            assertThat(res.getStatus()).isEqualTo(com.taskforce.tf_api.core.enums.ProjectStatus.ARCHIVED);
+            assertThat(projectRepository.findById(created.getId()).orElseThrow().getStatus())
+                .isEqualTo(com.taskforce.tf_api.core.enums.ProjectStatus.ARCHIVED);
+        }
+
+        @Test
+        @DisplayName("favorite puis unfavorite (idempotent) togglent le favori")
+        void should_favorite_then_unfavorite() {
+            ProjectResponse created = projectService.createProject(SLUG, owner.getId(), req("Fav", "FAV"));
+
+            ProjectResponse fav = projectService.favoriteProject(SLUG, created.getId(), owner.getId());
+            assertThat(fav.isFavorite()).isTrue();
+            assertThat(projectFavoriteRepository.existsByUserIdAndProjectId(owner.getId(), created.getId())).isTrue();
+
+            ProjectResponse unfav = projectService.unfavoriteProject(SLUG, created.getId(), owner.getId());
+            assertThat(unfav.isFavorite()).isFalse();
+            assertThat(projectFavoriteRepository.existsByUserIdAndProjectId(owner.getId(), created.getId())).isFalse();
+        }
+
+        @Test
+        @DisplayName("listMembers = créateur (LEAD) ; addMember ajoute un membre du workspace")
+        void should_list_and_add_member() {
+            ProjectResponse created = projectService.createProject(SLUG, owner.getId(), req("Team", "TEA"));
+            assertThat(projectService.listMembers(SLUG, created.getId(), owner.getId())).hasSize(1);
+
+            // 2e user, déjà membre du workspace
+            User bob = userRepository.save(User.builder()
+                .keycloakId("kc-bob").email("bob@it.dev").displayName("Bob").isActive(true).build());
+            Workspace ws = workspaceRepository.findBySlug(SLUG).orElseThrow();
+            workspaceMemberRepository.save(WorkspaceMember.builder()
+                .workspace(ws).user(bob).role(WorkspaceRole.MEMBER).build());
+
+            var add = new com.taskforce.tf_api.core.dto.request.AddProjectMemberRequest();
+            add.setEmail("bob@it.dev");
+            add.setRole(ProjectRole.MEMBER);
+            projectService.addMember(SLUG, created.getId(), owner.getId(), add);
+
+            assertThat(projectService.listMembers(SLUG, created.getId(), owner.getId())).hasSize(2);
+        }
+
+        @Test
+        @DisplayName("addMember refuse un utilisateur non-membre du workspace")
+        void should_reject_member_not_in_workspace() {
+            ProjectResponse created = projectService.createProject(SLUG, owner.getId(), req("Guard", "GUA"));
+            userRepository.save(User.builder()
+                .keycloakId("kc-out").email("out@it.dev").displayName("Out").isActive(true).build());
+
+            var add = new com.taskforce.tf_api.core.dto.request.AddProjectMemberRequest();
+            add.setEmail("out@it.dev");
+            add.setRole(ProjectRole.MEMBER);
+
+            assertThatThrownBy(() -> projectService.addMember(SLUG, created.getId(), owner.getId(), add))
+                .isInstanceOf(BusinessException.class);
         }
     }
 }
