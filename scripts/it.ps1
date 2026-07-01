@@ -38,7 +38,8 @@ foreach ($i in 1..30) {
 if (-not $ready) { docker logs --tail 30 $pg; docker rm -f $pg | Out-Null; throw "Postgres non prêt" }
 
 try {
-  $mvnArgs = @("test", "-Dtest=$Test")
+  # -Test ALL → toute la suite (unit + web + intégration) en un run → un seul jacoco.exec (coverage agrégé).
+  if ($Test -eq "ALL") { $mvnArgs = @("test") } else { $mvnArgs = @("test", "-Dtest=$Test") }
   if ($Offline) { $mvnArgs = @("-o") + $mvnArgs }
   Write-Host "==> mvn $($mvnArgs -join ' ')"
   docker run --rm --network $net `

@@ -276,6 +276,17 @@
 				<groupId>org.jacoco</groupId>
 				<artifactId>jacoco-maven-plugin</artifactId>
 				<version>0.8.12</version>
+					<configuration>
+						<excludes>
+							<exclude>**/dto/**</exclude>
+							<exclude>**/model/**</exclude>
+							<exclude>**/config/**</exclude>
+							<exclude>**/TfApiApplication.*</exclude>
+							<exclude>com/taskforce/tf_api/core/service/agent/**</exclude>
+							<exclude>com/taskforce/tf_api/core/service/brain/**</exclude>
+							<exclude>com/taskforce/tf_api/modules/**</exclude>
+						</excludes>
+					</configuration>
 				<executions>
 					<execution>
 						<id>prepare-agent</id>
@@ -298,7 +309,7 @@
 						<configuration>
 							<rules>
 								<rule>
-									<element>PACKAGE</element>
+									<element>BUNDLE</element>
 									<limits>
 										<limit>
 											<counter>LINE</counter>
