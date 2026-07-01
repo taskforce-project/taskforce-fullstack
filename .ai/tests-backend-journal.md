@@ -24,7 +24,7 @@
 | B-T4 | Socle `AbstractIntegrationTest` (Postgres réel + Flyway) + smoke `IntegrationSocleTest` | infra | ✅ **3/3 vert** |
 | B-T5 | Intégration métier : `IssueRepository` (SQL réel) ✅ **4/4** + `IssueService` CRUD ✅ **7/7** + `WorkspaceService` (plan limits, delete cascade) ✅ **6/6** | intég | ✅ **17/17 vert** |
 | B-T6 | Controllers (`@WebMvcTest` : `/api`, `ApiResponse<T>`, `@Valid`→400, 401/403/404) — `RedistributionController` + `IssueController` | slice | ✅ **10/10 vert** |
-| B-T7 | `NotificationService` (unit) ✅ **9/9** + `CycleService` (intég) ✅ **7/7** · reste : `AnalyticsService` (SQL-heavy) + non-régression bugs connus | unit/intég | 🔄 |
+| B-T7 | `NotificationService` (unit) **9/9** + `CycleService` (intég) **7/7** + `AnalyticsService` (intég) **4/4** | unit/intég | ✅ **20/20 vert** |
 
 ## Problèmes rencontrés
 
@@ -53,9 +53,29 @@
 - B-T5 (tranche 3) : `WorkspaceServiceIntegrationTest` **6/6** — createNewWorkspace (workspace + membre OWNER + `seedBrain`), **limite FREE** (2 max → 3e = `IllegalStateException`), PRO au-delà de la limite FREE, `getUsage` (plan/usage/limites 5 & 2), `deleteWorkspace` **cascade DB** (members) + audit, non-owner → `IllegalStateException`. ⚠️ piège testé : pour vérifier la cascade dans une seule tx, il faut `em.flush()+em.clear()` **avant** le delete (sinon le `WorkspaceMember` reste managé et pointe vers un workspace supprimé → `TransientPropertyValueException`).
 - **B-T5 complet : 17/17** (4 repo + 7 IssueService + 6 WorkspaceService). Lancer l'intégration : `.\scripts\it.ps1 -Test "IntegrationSocleTest,IssueRepositoryIntegrationTest,IssueServiceIntegrationTest,WorkspaceServiceIntegrationTest" [-Offline]`.
 - B-T6 : `RedistributionControllerWebMvcTest` **5/5** (200/401/403/400) + `IssueControllerWebMvcTest` **5/5** (201/400/401/200/404) = **10/10**. Recette réutilisable rodée sur 2 controllers.
-- B-T7 : `NotificationServiceTest` **9/9** (unit — pas de self-notification / assigné nul, persist+push temps réel, markAsRead + IDOR + introuvable, countUnread + workspace introuvable, mentions hors acteur) + `CycleServiceIntegrationTest` **7/7** (intég — création DRAFT, nom unique, update statut + statut invalide, introuvable, add issue + doublon + IDOR hors projet). Reste `AnalyticsService` (JdbcTemplate + Groq, SQL-heavy → intégration dédiée).
-- **Suite unit + web (hors intégration) : 161 tests verts** (152 + 9 Notification ; 1 skip). Suite **intégration** (Postgres) : **27 verts** (20 + 7 Cycle) via `.\scripts\it.ps1`.
-- Coverage global à mesurer (JaCoCo) — les 2 suites tournent séparément (profils/DB différents) → agréger. Reste B-T7 (Notification/Analytics/Cycle) + éventuels controllers supplémentaires.
+- B-T7 : `NotificationServiceTest` **9/9** (unit — pas de self-notification / assigné nul, persist+push temps réel, markAsRead + IDOR + introuvable, countUnread + workspace introuvable, mentions hors acteur) + `CycleServiceIntegrationTest` **7/7** (intég — création DRAFT, nom unique, update statut + statut invalide, introuvable, add issue + doublon + IDOR hors projet). `AnalyticsServiceIntegrationTest` **4/4** (KPIs via `countCompletedBetween` SQL réel, throughput = 8 buckets semaine, **gating PRO** enforced via `PlanFeatureService` mocké ; `Authorization`/`Groq`/`ObjectMapper` mockés). **B-T7 = 20/20.**
+- **Suite complète en un run : 192 tests verts** (1 skip) via `.\scripts\it.ps1 -Test ALL` (unit + web + intégration dans le même JVM → un seul `jacoco.exec`). Détail : 161 unit/web + 31 intégration.
+
+## Coverage JaCoCo — baseline (01/07)
+
+- **Ligne globale : 26,8 %** (1835 couvertes / 6853). Le plugin `jacoco:check` (**PACKAGE LINE ≥ 0,50**, lié à `verify`) **échoue en l'état** — ne PAS lancer `mvn verify` en gate tant que le seuil n'est pas atteint (ou tant que les exclusions ne sont pas décidées).
+- **Bien couvert** (nos lots) : `core.service` 33 % mais les services testés (SmartAssign/Redistribution/Auth*/Issue/Workspace/Cycle/Notification/Analytics) sont eux beaucoup plus hauts — le 33 % est dilué par les services non testés.
+- **Trous majeurs** (0 % ou quasi) : modules `chat`/`ged`/`sales` (api+service), `core.service.agent`(+tools), `core.service.brain` (0,4 %), `core.api` (3,2 % — seuls Redistribution+Issue testés), `core.dto.request/response` (~0-2 %, data holders), `shared.config` (0 %), `shared.audit` (12,5 %).
+- **Décision (01/07) : exclusions + tests ciblés.** `<excludes>` JaCoCo posés dans le pom : `**/dto/**`, `**/model/**`, `**/config/**`, `TfApiApplication`, `core.service.agent/**`, `core.service.brain/**`, `modules/**` (chat/ged/sales — coming-soon/vestigial ; ged/sales à re-tester si on veut les recompter).
+- **Baseline après exclusions : 31,7 % ligne** (1789/5641). Ne restent que **5 packages < 50 %** à couvrir pour passer le gate `jacoco:check` :
+
+  | Package | Ligne | Effort |
+  | --- | --- | --- |
+  | `core.api` (controllers) | 3,2 % (23/716) | gros — @WebMvcTest sur les controllers (recette B-T6 prête) |
+  | `core.service` | 33,3 % (1499/4506) | gros — +~754 lignes à couvrir (services Project/Team/Page/Discussion/Member*/Integration/Gdpr/Assistant…) |
+  | `shared.security` | 30,5 % (43/141) | moyen — `JwtService`/`JwtIdentityResolver` |
+  | `shared.exception` | 47,9 % (34/71) | **quasi** — un test `GlobalExceptionHandler` suffit |
+  | `shared.audit` | 12,5 % (1/8) | **trivial** — couvrir `AuditService.record` |
+  - OK (≥50 %) : `core.enums` 99 %, `core.security` (interceptor) 64 %.
+- **Gate = GLOBAL (BUNDLE), pas par-package** (clarification user 01/07) : la règle `jacoco:check` est passée `<element>BUNDLE</element>` LINE. Objectif : coverage **total** du backend (cible ~**70 %**, plancher RNCP **50 %**). Conséquence stratégique : viser les **plus gros paquets de lignes non couvertes**, pas les petits packages.
+- **Cibles par lignes manquées** (core.service/api, après exclusions) : `IssueService` 356 (37 %→compléter list/status/type/comment/relation/checklist/worklog), `ProjectService` 281 (0 %), `StripeWebhookService` 180 (0 %), `AnalyticsService` 159, `WorkspaceService` 149, `GitHubIntegrationService` 124, `AssistantService` 123, `SlackIntegrationService` 108, `WorkspaceInvitationService` 107, `IssueController` 101, `KnowledgeService` 101, `UserService` 94, `MemberSkillProfileService` 92, `TeamService` 75, controllers `AuthController` 74 / `ProjectController` 67 / `WorkspaceController` 47…
+- **Estimation honnête** : ~5641 lignes en scope, 1789 couvertes (31,7 %). Pour **50 %** → +~1032 lignes (≈ ProjectService + reste IssueService + 3-4 services) ; pour **70 %** → +~2160 (sweep quasi complet core.service + core.api). Plusieurs lots. `mvn verify` (gate bloquant) à activer une fois la cible atteinte.
+- **Candidat exclusion supplémentaire** : `BrainTemplateService` (241 l, 0 %) est du Brain OS (coming-soon) mais vit dans `core.service` → à exclure aussi si on veut un ratio cohérent avec `core.service.brain/**` déjà exclu.
 
 ## Convention d'arborescence (confirmée 30/06)
 
