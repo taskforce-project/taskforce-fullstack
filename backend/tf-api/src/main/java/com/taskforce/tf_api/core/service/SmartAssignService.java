@@ -161,6 +161,23 @@ public class SmartAssignService {
     }
 
     /**
+     * Classe les candidats pour une issue <b>existante</b> dans le cadre d'une redistribution (PROD-1.12).
+     * Renvoie le meilleur candidat + alternatives, <b>sans persister d'{@code assignment_events}</b>
+     * (c'est un preview ; seul un {@code ai_runs} est tracé par {@link #computeRecommendation}).
+     *
+     * <p>L'autorisation est à la charge de l'appelant : {@code RedistributionService} vérifie le rôle
+     * manager (OWNER/ADMIN) avant d'invoquer cette méthode. Prend les entités déjà résolues pour
+     * éviter une re-résolution workspace/projet.</p>
+     */
+    public SmartAssignResponse rankForRedistribution(Workspace workspace, Project project, Issue issue) {
+        List<String> labels = issue.getLabels().stream()
+            .map(l -> l.getName().toLowerCase())
+            .toList();
+        return computeRecommendation(
+            workspace, project, buildIssueText(issue, labels), labels, issue.getPriority(), issue.getStoryPoints());
+    }
+
+    /**
      * Cœur partagé entre {@link #recommend} et {@link #preview} :
      * pré-filtre Java + scoring Groq (avec repli) + classement. Persiste un {@code ai_runs}.
      */

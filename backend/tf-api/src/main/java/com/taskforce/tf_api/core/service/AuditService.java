@@ -34,6 +34,7 @@ public class AuditService {
     public static final String WORKSPACE_DELETED = "WORKSPACE_DELETED";
     public static final String GDPR_EXPORT       = "GDPR_EXPORT";
     public static final String GDPR_DELETE       = "GDPR_DELETE";
+    public static final String REDISTRIBUTION_APPLY = "REDISTRIBUTION_APPLY";
 
     private final AuditLogRepository auditLogRepository;
     private final ObjectMapper objectMapper;
