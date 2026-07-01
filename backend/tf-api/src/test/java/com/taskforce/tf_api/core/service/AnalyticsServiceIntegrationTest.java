@@ -121,4 +121,23 @@ class AnalyticsServiceIntegrationTest extends AbstractIntegrationTest {
         assertThatThrownBy(() -> analyticsService.getThroughput(SLUG, owner.getId(), null, "WEEK"))
             .isInstanceOf(BusinessException.class);
     }
+
+    @Test
+    @DisplayName("getCapacity renvoie une ligne par membre (owner)")
+    void capacity_returns_member_rows() {
+        var capacity = analyticsService.getCapacity(SLUG, owner.getId(), null);
+        assertThat(capacity).hasSize(1); // seul l'owner est membre
+    }
+
+    @Test
+    @DisplayName("getBurndown sans cycle actif → liste vide")
+    void burndown_empty_without_active_cycle() {
+        assertThat(analyticsService.getBurndown(SLUG, owner.getId(), null)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("getWorkload renvoie une réponse non nulle")
+    void workload_not_null() {
+        assertThat(analyticsService.getWorkload(SLUG, owner.getId(), 7)).isNotNull();
+    }
 }

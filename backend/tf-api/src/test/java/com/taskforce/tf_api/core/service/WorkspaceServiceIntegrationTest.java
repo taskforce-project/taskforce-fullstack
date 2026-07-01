@@ -178,4 +178,67 @@ class WorkspaceServiceIntegrationTest extends AbstractIntegrationTest {
             assertThat(workspaceRepository.findById(wsId)).isPresent(); // toujours là
         }
     }
+
+    // =========================================================================
+    @Nested
+    @DisplayName("membres & update")
+    class Members {
+
+        private Long createWs() {
+            WorkspaceResponse ws = workspaceService.createNewWorkspace(owner.getId(), req("Members WS"));
+            return workspaceRepository.findBySlug(ws.getSlug()).orElseThrow().getId();
+        }
+
+        private User persistUser(String name) {
+            return userRepository.save(User.builder()
+                .keycloakId("kc-" + name).email(name + "@it.dev").displayName(name).isActive(true).build());
+        }
+
+        @Test
+        @DisplayName("getMembers renvoie l'owner ; updateWorkspace change le nom")
+        void should_get_members_and_update() {
+            Long wsId = createWs();
+
+            assertThat(workspaceService.getMembers(wsId, owner.getId())).hasSize(1);
+
+            var upd = new com.taskforce.tf_api.core.dto.request.UpdateWorkspaceRequest();
+            upd.setName("Renommé");
+            assertThat(workspaceService.updateWorkspace(wsId, owner.getId(), upd).getName()).isEqualTo("Renommé");
+        }
+
+        @Test
+        @DisplayName("inviteMember ajoute un membre existant ; refuse un doublon")
+        void should_invite_member() {
+            Long wsId = createWs();
+            persistUser("bob");
+
+            var invite = new com.taskforce.tf_api.core.dto.request.InviteMemberRequest();
+            invite.setEmail("bob@it.dev");
+            invite.setRole(WorkspaceRole.MEMBER);
+            workspaceService.inviteMember(wsId, owner.getId(), invite);
+
+            assertThat(workspaceService.getMembers(wsId, owner.getId())).hasSize(2);
+
+            assertThatThrownBy(() -> workspaceService.inviteMember(wsId, owner.getId(), invite))
+                .isInstanceOf(IllegalStateException.class);
+        }
+
+        @Test
+        @DisplayName("updateMemberRole promeut un membre MEMBER → ADMIN (OWNER only)")
+        void should_update_member_role() {
+            Long wsId = createWs();
+            User bob = persistUser("carol");
+            var invite = new com.taskforce.tf_api.core.dto.request.InviteMemberRequest();
+            invite.setEmail("carol@it.dev");
+            invite.setRole(WorkspaceRole.MEMBER);
+            workspaceService.inviteMember(wsId, owner.getId(), invite);
+            Long memberId = workspaceMemberRepository.findByWorkspaceIdAndUserId(wsId, bob.getId()).orElseThrow().getId();
+
+            var roleReq = new com.taskforce.tf_api.core.dto.request.UpdateMemberRoleRequest();
+            roleReq.setRole(WorkspaceRole.ADMIN);
+            var res = workspaceService.updateMemberRole(wsId, owner.getId(), memberId, roleReq);
+
+            assertThat(res.getRole()).isEqualTo(WorkspaceRole.ADMIN);
+        }
+    }
 }

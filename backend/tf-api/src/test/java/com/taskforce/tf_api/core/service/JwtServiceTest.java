@@ -232,4 +232,71 @@ class JwtServiceTest {
             }));
         }
     }
+
+    @Nested
+    @DisplayName("Validate / Revoke / Cleanup Tests")
+    class ValidateRevokeCleanup {
+
+        private String freshAccessToken() {
+            when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(i -> i.getArgument(0));
+            return jwtService.generateTokens(testUser, keycloakUser).getAccessToken();
+        }
+
+        @Test
+        @DisplayName("validateAccessToken renvoie les claims d'un token valide")
+        void validate_returns_claims() {
+            io.jsonwebtoken.Claims claims = jwtService.validateAccessToken(freshAccessToken());
+            assertThat(claims.getSubject()).isNotNull();
+        }
+
+        @Test
+        @DisplayName("validateAccessToken rejette un token invalide")
+        void validate_rejects_garbage() {
+            assertThatThrownBy(() -> jwtService.validateAccessToken("not.a.jwt"))
+                .isInstanceOf(Exception.class);
+        }
+
+        @Test
+        @DisplayName("parseClaimsAllowExpired lit les claims (signature vérifiée)")
+        void parse_allows_reading() {
+            assertThat(jwtService.parseClaimsAllowExpired(freshAccessToken())).isNotNull();
+        }
+
+        @Test
+        @DisplayName("revokeRefreshToken révoque et persiste le token trouvé")
+        void revoke_found() {
+            RefreshToken rt = RefreshToken.builder().userId(1L).token("tok").revoked(false)
+                .expiresAt(LocalDateTime.now().plusDays(1)).build();
+            when(refreshTokenRepository.findByToken("tok")).thenReturn(Optional.of(rt));
+
+            jwtService.revokeRefreshToken("tok");
+
+            assertThat(rt.getRevoked()).isTrue();
+            verify(refreshTokenRepository).save(rt);
+        }
+
+        @Test
+        @DisplayName("revokeRefreshToken lève une erreur si le token est introuvable")
+        void revoke_not_found() {
+            when(refreshTokenRepository.findByToken("x")).thenReturn(Optional.empty());
+            assertThatThrownBy(() -> jwtService.revokeRefreshToken("x")).isInstanceOf(RuntimeException.class);
+        }
+
+        @Test
+        @DisplayName("revokeAllUserTokens délègue au repository")
+        void revoke_all() {
+            jwtService.revokeAllUserTokens(1L);
+            verify(refreshTokenRepository).revokeAllUserTokens(org.mockito.ArgumentMatchers.eq(1L), any());
+        }
+
+        @Test
+        @DisplayName("cleanupExpiredTokens / cleanupRevokedTokens renvoient le nombre supprimé")
+        void cleanup_returns_counts() {
+            when(refreshTokenRepository.deleteExpiredTokens(any())).thenReturn(3);
+            when(refreshTokenRepository.deleteRevokedTokens(any())).thenReturn(2);
+
+            assertThat(jwtService.cleanupExpiredTokens()).isEqualTo(3);
+            assertThat(jwtService.cleanupRevokedTokens()).isEqualTo(2);
+        }
+    }
 }
