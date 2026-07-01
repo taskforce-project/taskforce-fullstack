@@ -22,7 +22,7 @@
 | B-T2 | `SmartAssignService` : scoring/ranking, fallback sans Groq, growth guards, availability/workload | unit | ✅ **18/18 vert** |
 | B-T3 | `AuthorizationService` : requireMember/requireRole/requireManager (403) | unit | ✅ **11/11 vert** |
 | B-T4 | Socle `AbstractIntegrationTest` (Postgres réel + Flyway) + smoke `IntegrationSocleTest` | infra | ✅ **3/3 vert** |
-| B-T5 | `IssueRepository` requêtes critiques en **intégration** (SQL réel des vues SmartAssign/Redistribution) ✅ **4/4** · reste : `IssueService` CRUD (labels/assignee, realtime mocké) + `WorkspaceService` (plan limits, delete cascade) via `@Import(service)+@MockitoBean` | intég | 🔄 |
+| B-T5 | Intégration métier : `IssueRepository` (SQL réel SmartAssign/Redistribution) ✅ **4/4** + `IssueService` CRUD via `@Import(service)+@MockitoBean` ✅ **7/7** · reste : `WorkspaceService` (plan limits, delete cascade) | intég | 🔄 |
 | B-T6 | Controllers critiques (`@WebMvcTest` : `/api`, `ApiResponse<T>`, `@Valid`→400, 401/403) | slice | 🔲 |
 | B-T7 | Notification/Analytics/Cycle + non-régression bugs connus | unit | 🔲 |
 
@@ -45,7 +45,8 @@
 - B-T3 : `AuthorizationServiceTest` **11/11** (0 failure/error) — requireMember (membre / non-membre → `ForbiddenException`), requireRole (rôle autorisé / refusé « Permission insuffisante » / non-membre court-circuité / varargs vide), requireManager (`@ParameterizedTest` OWNER+ADMIN acceptés, MEMBER refusé), isMember (true/false sans exception).
 - B-T4 : `IntegrationSocleTest` **3/3** (Flyway 56 migrations OK, extension `vector` présente, requête repository sur schéma réel, `ddl-auto=validate` OK). Lancer via **`.\scripts\it.ps1`** (1er run en ligne pour `spring-boot-data-jpa-test`, puis `-Offline`).
 - B-T5 (tranche 1) : `IssueRepositoryIntegrationTest` **4/4** — `findByWorkspaceSlugAndAssigneeId` (n'expose que l'assigné du bon workspace, tri seq DESC) + `countOpenIssuesGroupedByAssignee` (exclut COMPLETED/CANCELLED, regroupe par assigné, vide si tout terminé). ⇒ **valide en vrai SQL** les 2 requêtes que B-T1/B-T2 ne pouvaient que mocker. Fixtures persistées via repositories (timestamps OK grâce à `@CreationTimestamp` sur `User` et au `@PrePersist` de `AuditableEntity` → pas besoin de `@EnableJpaAuditing` dans le slice).
-- Coverage global à mesurer après B-T5/B-T6 (`mvn test`, rapport `target/site/jacoco/index.html`). NB : unitaires (B-T1/2/3) et intégration (B-T4/B-T5) tournent séparément (profils différents) → coverage à agréger.
+- B-T5 (tranche 2) : `IssueServiceIntegrationTest` **7/7** — service chargé dans le slice `@DataJpaTest` via `@Import(IssueService.class)`, repos réels, `SimpMessagingTemplate` + `NotificationService` en **`@MockitoBean`** (Boot 4). Couvre le vrai chemin de persistance : createIssue (séquence atomique 1→2, statut défaut « Todo », position 0, notif assigné + publish `/topic/projects.`), sans-assigné (pas de notif mais publish), IDOR statut hors-projet → 404, non-membre → `BusinessException` ; updateIssue (statut→Done + réassignation persistés + 2e publish, issue inconnue → 404).
+- Coverage global à mesurer après B-T5.3/B-T6 (`mvn test`, rapport `target/site/jacoco/index.html`). NB : unitaires (B-T1/2/3) et intégration (B-T4/B-T5) tournent séparément (profils différents) → coverage à agréger.
 
 ## Convention d'arborescence (confirmée 30/06)
 
