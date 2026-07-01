@@ -26,10 +26,22 @@ public class BrainTemplateService {
      * Un node à créer lors de l'amorçage. {@code system=true} = node du noyau (kernel) :
      * lu par l'agent, masqué de l'explorateur utilisateur par défaut (expertise/moat).
      */
-    public record SeedNode(NodeDomain domain, NodeType type, String title, String content, boolean system) {
+    public record SeedNode(NodeDomain domain, NodeType type, String title, String content, boolean system,
+                           Long projectRefId, String key, String parentKey) {
         public SeedNode(NodeDomain domain, NodeType type, String title, String content) {
-            this(domain, type, title, content, false);
+            this(domain, type, title, content, false, null, null, null);
         }
+        public SeedNode(NodeDomain domain, NodeType type, String title, String content, boolean system) {
+            this(domain, type, title, content, system, null, null, null);
+        }
+        public SeedNode(NodeDomain domain, NodeType type, String title, String content, boolean system, Long projectRefId) {
+            this(domain, type, title, content, system, projectRefId, null, null);
+        }
+    }
+
+    /** Référence légère vers un projet du workspace (+ titres d'issues réelles pour densifier). */
+    public record ProjectRef(Long id, String name, List<String> issues) {
+        public ProjectRef(Long id, String name) { this(id, name, List.of()); }
     }
 
     /** Retourne les nodes d'amorçage pour un gabarit donné. */
@@ -44,6 +56,264 @@ public class BrainTemplateService {
             case BLANK       -> { /* scaffolding seul */ }
         }
         return nodes;
+    }
+
+    /**
+     * Variante rangée <b>par projet</b> : 1 cluster = 1 projet (TaskForce-spécifique).
+     * Le hub central « Brain OS » porte le contexte global ; chaque projet a son README + ses notes
+     * (backlog, fait, problèmes, décisions, archi, runbook) rattachées via {@code refId}.
+     */
+    public List<SeedNode> nodesFor(BrainTemplateType template, List<ProjectRef> projects) {
+        if (template == BrainTemplateType.TASKFORCE && projects != null && !projects.isEmpty()) {
+            return taskforceProjectSeed(projects);
+        }
+        return nodesFor(template);
+    }
+
+    // =========================================================================
+    // TASKFORCE (par projet) — Brain OS global + 1 cluster de notes par projet
+    // =========================================================================
+
+    private List<SeedNode> taskforceProjectSeed(List<ProjectRef> projects) {
+        List<SeedNode> n = new ArrayList<>();
+        String agentsTitle = "AGENTS — contrat d'agent";
+
+        // ── Hub global : contexte workspace + un lien par projet ─────────────────
+        StringBuilder hub = new StringBuilder();
+        hub.append("# 🧠 Brain OS — TaskForce\n\n")
+           .append("Mémoire vivante du workspace. Le **contexte global** est ici ; chaque **projet** ouvre sa propre dimension.\n\n")
+           .append("> [!tip] Méthode\n> Règles de tenue dans [[").append(agentsTitle).append("]] (appliquées par l'agent IA).\n\n")
+           .append("## Global\n")
+           .append("- [[Charte & conventions]]\n- [[Architecture transverse]]\n- [[Sécurité — politique]]\n")
+           .append("- [[Stack & infra commune]]\n- [[Roadmap workspace]]\n\n")
+           .append("## Projets\n");
+        for (ProjectRef p : projects) hub.append("- [[").append(p.name()).append("]]\n");
+        n.add(new SeedNode(NodeDomain.PROJET, NodeType.README, "Brain OS", hub.toString(), false));
+        n.add(new SeedNode(NodeDomain.PROJET, NodeType.SOP, agentsTitle, agentsContract(), true));
+
+        // ── Docs globaux (refId null → cluster « global » autour du hub) ─────────
+        n.add(new SeedNode(NodeDomain.PROJET, NodeType.DOC, "Charte & conventions", """
+            # Charte & conventions #convention
+
+            Monorepo `taskforce-fullstack` : `backend/tf-api` (Spring Boot, couches `shared ← core ← modules`),
+            `frontend` (Next.js App Router, Zustand), `ai-service`. Règles d'or dans `CLAUDE.md`.
+
+            - API versionnée sous `/api`, enveloppe `ApiResponse<T>` (lecture `data.data`).
+            - DB = migrations Flyway `V{n}__…` ; `ddl-auto=validate`.
+            - Pas de mock, TS strict, un store Zustand par domaine.
+
+            Hub : [[Brain OS]] · Règles : [[%s]]""".formatted(agentsTitle)));
+        n.add(new SeedNode(NodeDomain.ARCHITECTURE, NodeType.DOC, "Architecture transverse", """
+            # Architecture transverse #archi
+
+            Services joints par nom Docker (`http://backend:8080`). Postgres + pgvector(384) pour le Brain OS.
+            Auth JWT, autorisation au niveau service (`WorkspaceMember`/`ProjectMember`).
+
+            Voir aussi : [[Stack & infra commune]] · [[Sécurité — politique]]"""));
+        n.add(new SeedNode(NodeDomain.SECURITE, NodeType.SOP, "Sécurité — politique", """
+            # Sécurité — politique #securite
+
+            Secrets via variables d'env (jamais en dur). Validation `@Valid` (back) / Zod (front).
+            Revue de sécurité avant release. Voir [[Architecture transverse]]."""));
+        n.add(new SeedNode(NodeDomain.INFRA, NodeType.DOC, "Stack & infra commune", """
+            # Stack & infra commune #infra
+
+            Docker Compose (dev) : `backend`, `frontend`, `postgres`, `minio`, `ai-service`.
+            MinIO pour les pièces jointes. Voir [[Architecture transverse]]."""));
+        n.add(new SeedNode(NodeDomain.ROADMAP, NodeType.DOC, "Roadmap workspace", """
+            # Roadmap workspace #roadmap
+
+            Jalons transverses. Le détail par projet vit dans chaque dimension projet.
+            Hub : [[Brain OS]]"""));
+
+        // ── Un ARBRE récursif par projet (système → sous-système → … → notes). ───
+        for (ProjectRef p : projects) n.addAll(projectTree(p));
+        return n;
+    }
+
+    /** Système de niveau 2 d'un projet + ses sous-systèmes. */
+    private record Sys(String name, NodeDomain domain, List<String> subs) {}
+
+    /**
+     * Arbre récursif d'un projet : galaxie (README) → systèmes (Produit/Eng/Ops/Finance/Marketing)
+     * → sous-systèmes → feuilles, avec une branche plus profonde (Finance › Budget › trimestres › lignes)
+     * et des wikilinks transverses inter-branches (le "chaos" qui crée les insights).
+     */
+    private List<SeedNode> projectTree(ProjectRef p) {
+        Long id = p.id();
+        String name = p.name();
+        String rootKey = "p" + id;
+        List<SeedNode> n = new ArrayList<>();
+        List<String> subTitles = new ArrayList<>();
+
+        n.add(new SeedNode(NodeDomain.PROJET, NodeType.README, name,
+            "# " + name + "\n\nGalaxie du projet **" + name + "**. Systèmes : Produit · Engineering · Ops · Finance · Marketing."
+            + "\n\nWorkspace : [[Brain OS]]", false, id, rootKey, null));
+
+        List<Sys> systems = List.of(
+            new Sys("Produit", NodeDomain.PRODUIT, List.of("Recherche", "Design", "Roadmap")),
+            new Sys("Engineering", NodeDomain.ENGINEERING, List.of("Frontend", "Backend", "API", "Tests")),
+            new Sys("Ops", NodeDomain.OPERATIONS, List.of("Infra", "Sécurité", "Runbooks", "Monitoring")),
+            new Sys("Finance", NodeDomain.DECISIONS, List.of("Budget", "Coûts", "Facturation")),
+            new Sys("Marketing", NodeDomain.PRODUIT, List.of("Contenu", "SEO", "Growth")));
+
+        for (Sys s : systems) {
+            String sysKey = rootKey + ":" + s.name();
+            String sysTitle = name + " › " + s.name();
+            n.add(new SeedNode(s.domain(), NodeType.DOC, sysTitle,
+                "# " + sysTitle + " #systeme\n\nSystème **" + s.name() + "** du projet **" + name + "**.",
+                false, id, sysKey, rootKey));
+            for (String sub : s.subs()) {
+                String subKey = sysKey + ":" + sub;
+                String subTitle = sysTitle + " › " + sub;
+                subTitles.add(subTitle);
+                n.add(new SeedNode(s.domain(), NodeType.DOC, subTitle,
+                    "# " + subTitle + " #soussysteme\n\nSous-système **" + sub + "** de " + s.name() + ".",
+                    false, id, subKey, sysKey));
+                for (int i = 1; i <= 7; i++) {
+                    NodeType lt = switch (i % 4) {
+                        case 0 -> NodeType.ADR; case 1 -> NodeType.FINDING; case 2 -> NodeType.SPEC; default -> NodeType.DOC;
+                    };
+                    String tag = switch (i % 4) {
+                        case 0 -> "#decision"; case 1 -> "#probleme"; case 2 -> "#spec"; default -> "#note";
+                    };
+                    String leafTitle = subTitle + " · " + i;
+                    String cross = subTitles.size() > 3 ? "\n\nLié à [[" + subTitles.get((i * 7 + sub.length()) % subTitles.size()) + "]]." : "";
+                    n.add(new SeedNode(s.domain(), lt, leafTitle, "# " + leafTitle + " " + tag + cross,
+                        false, id, subKey + ":" + i, subKey));
+                }
+            }
+        }
+
+        // Branche plus profonde : Finance › Budget › trimestre › lignes (démontre "et ainsi de suite").
+        String budgetKey = rootKey + ":Finance:Budget";
+        for (String q : List.of("Q1", "Q2", "Q3", "Q4")) {
+            String qKey = budgetKey + ":" + q;
+            String qTitle = name + " › Finance › Budget › " + q;
+            n.add(new SeedNode(NodeDomain.DECISIONS, NodeType.DOC, qTitle, "# " + qTitle + " #budget", false, id, qKey, budgetKey));
+            for (int i = 1; i <= 4; i++)
+                n.add(new SeedNode(NodeDomain.DECISIONS, NodeType.DOC, qTitle + " · ligne " + i,
+                    "# Ligne budgétaire " + i + " #finance", false, id, qKey + ":" + i, qKey));
+        }
+
+        // Vraies issues → feuilles sous Engineering › Backend.
+        String backendKey = rootKey + ":Engineering:Backend";
+        int k = 0;
+        for (String raw : p.issues()) {
+            String t = raw == null ? "" : (raw.length() > 60 ? raw.substring(0, 59) + "…" : raw);
+            if (t.isBlank()) continue;
+            k++;
+            n.add(new SeedNode(NodeDomain.ENGINEERING, NodeType.DOC, name + " › issue · " + k + " " + t,
+                "# " + t + " #issue #backlog", false, id, backendKey + ":i" + k, backendKey));
+        }
+        return n;
+    }
+
+    /** Le paquet de notes d'un projet (README hub + backlog/fait/problèmes/décisions/archi/runbook). */
+    private List<SeedNode> projectCluster(ProjectRef p) {
+        Long id = p.id();
+        String name = p.name();
+        List<SeedNode> n = new ArrayList<>();
+
+        n.add(new SeedNode(NodeDomain.PROJET, NodeType.README, name, ("""
+            # %s
+
+            README du projet. Tout ce qui concerne **%s** vit dans cette dimension.
+
+            ## Sommaire
+            - [[%s — Architecture]]
+            - [[%s — Backlog]]
+            - [[%s — Fait / livré]]
+            - [[%s — Problèmes connus]]
+            - [[%s — Décisions (ADR)]]
+            - [[%s — Runbook]]
+
+            ---
+            Workspace : [[Brain OS]]""").formatted(name, name, name, name, name, name, name, name),
+            false, id));
+
+        n.add(new SeedNode(NodeDomain.ARCHITECTURE, NodeType.DOC, name + " — Architecture", ("""
+            # %s — Architecture #archi
+
+            Vue technique du projet : composants, dépendances, points d'intégration.
+            Décisions structurantes → [[%s — Décisions (ADR)]]. Cf. [[Architecture transverse]].""").formatted(name, name),
+            false, id));
+
+        n.add(new SeedNode(NodeDomain.ROADMAP, NodeType.DOC, name + " — Backlog", ("""
+            # %s — Backlog #backlog
+
+            Travaux à venir, priorisés. Ce qui passe en cours/fait migre vers [[%s — Fait / livré]].""").formatted(name, name),
+            false, id));
+
+        n.add(new SeedNode(NodeDomain.HISTORIQUE, NodeType.DOC, name + " — Fait / livré", ("""
+            # %s — Fait / livré #done
+
+            Historique des livraisons et travaux terminés du projet.""").formatted(name),
+            false, id));
+
+        n.add(new SeedNode(NodeDomain.AUDITS, NodeType.FINDING, name + " — Problèmes connus", ("""
+            # %s — Problèmes connus #probleme
+
+            Bugs et limites identifiés, avec contournement. Une décision de fond → [[%s — Décisions (ADR)]].""").formatted(name, name),
+            false, id));
+
+        n.add(new SeedNode(NodeDomain.DECISIONS, NodeType.ADR, name + " — Décisions (ADR)", ("""
+            # %s — Décisions (ADR) #decision
+
+            Décisions d'architecture du projet : Contexte · Options · Décision · Conséquences.
+            Référence l'[[%s — Architecture]].""").formatted(name, name),
+            false, id));
+
+        n.add(new SeedNode(NodeDomain.RUNBOOKS, NodeType.RUNBOOK, name + " — Runbook", ("""
+            # %s — Runbook #runbook
+
+            Procédures d'exploitation : build, déploiement, incidents. Cf. [[Stack & infra commune]].""").formatted(name),
+            false, id));
+
+        // ── Stubs denses (refs/tags + wikilinks croisés) : réseau transverse riche. ──
+        int k = 0;
+        String lastIssue = "";
+        for (String raw : p.issues()) {
+            String t = raw == null ? "" : (raw.length() > 60 ? raw.substring(0, 59) + "…" : raw);
+            if (t.isBlank()) continue;
+            // Les issues se chaînent entre elles + au backlog → réseau dense.
+            String prev = k > 0 ? "\n\nSuit [[" + name + " · #" + k + " " + lastIssue + "]]." : "";
+            n.add(new SeedNode(NodeDomain.ROADMAP, NodeType.DOC, name + " · #" + (k + 1) + " " + t,
+                "# " + t + " #issue #backlog\n\nItem du projet **" + name + "**. Rattaché au [[" + name + " — Backlog]]." + prev,
+                false, id));
+            lastIssue = t; k++;
+        }
+        String[] adr = { "Choix de pile technique", "Stratégie de tests", "Gestion des erreurs",
+            "Modèle de données", "Stratégie de cache", "Versionnement d'API" };
+        for (int i = 0; i < adr.length; i++) n.add(new SeedNode(NodeDomain.DECISIONS, NodeType.ADR, name + " · ADR — " + adr[i],
+            "# ADR — " + adr[i] + " #decision #archi\n\nContexte · Options · Décision · Conséquences (projet **" + name + "**)."
+            + "\n\nVoir [[" + name + " — Décisions (ADR)]] · [[" + name + " — Architecture]] · [[Architecture transverse]].",
+            false, id));
+        String[] pb = { "Latence intermittente", "Dette technique", "Couverture de tests faible",
+            "Fuite mémoire suspectée", "Flakiness CI", "Documentation obsolète" };
+        for (int i = 0; i < pb.length; i++) n.add(new SeedNode(NodeDomain.AUDITS, NodeType.FINDING, name + " · Pb — " + pb[i],
+            "# " + pb[i] + " #probleme\n\nObservé sur le projet **" + name + "**."
+            + "\n\nVoir [[" + name + " — Problèmes connus]] · décision liée [[" + name + " · ADR — " + adr[i % adr.length] + "]].",
+            false, id));
+        String[] concepts = { "Performance", "Observabilité", "Qualité", "Scalabilité", "Sécurité applicative" };
+        for (String c : concepts) n.add(new SeedNode(NodeDomain.ARCHITECTURE, NodeType.DOC, name + " · Concept — " + c,
+            "# " + c + " #concept\n\nAxe transverse du projet **" + name + "**."
+            + "\n\nRelie [[" + name + " — Architecture]] · [[" + name + " — Problèmes connus]] · [[Architecture transverse]].",
+            false, id));
+
+        // ── Masse de stubs (×5) : chaque note rattachée à une section → réseau dense. ──
+        for (int i = 1; i <= 40; i++) n.add(new SeedNode(NodeDomain.ROADMAP, NodeType.DOC, name + " · Tâche-" + i,
+            "# Tâche " + i + " #task #backlog\n\nProjet **" + name + "**. Rattaché au [[" + name + " — Backlog]].", false, id));
+        for (int i = 1; i <= 24; i++) n.add(new SeedNode(NodeDomain.API, NodeType.SPEC, name + " · Spec-" + i,
+            "# Spec " + i + " #spec\n\nProjet **" + name + "**. Voir [[" + name + " — Architecture]].", false, id));
+        for (int i = 1; i <= 18; i++) n.add(new SeedNode(NodeDomain.AUDITS, NodeType.DOC, name + " · Test-" + i,
+            "# Test " + i + " #test\n\nProjet **" + name + "**. Couvre [[" + name + " — Problèmes connus]].", false, id));
+        for (int i = 1; i <= 14; i++) n.add(new SeedNode(NodeDomain.DECISIONS, NodeType.DOC, name + " · Réunion-" + i,
+            "# Réunion " + i + " #meeting\n\nProjet **" + name + "**. Acte [[" + name + " — Décisions (ADR)]].", false, id));
+        for (int i = 1; i <= 24; i++) n.add(new SeedNode(NodeDomain.PRODUIT, NodeType.DOC, name + " · Doc-" + i,
+            "# Doc " + i + " #doc\n\nProjet **" + name + "**. Décrit [[" + name + " — Architecture]].", false, id));
+
+        return n;
     }
 
     // =========================================================================
