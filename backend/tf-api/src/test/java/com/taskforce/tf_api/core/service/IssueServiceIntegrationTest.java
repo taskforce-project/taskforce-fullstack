@@ -67,6 +67,12 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
     @MockitoBean private SimpMessagingTemplate messagingTemplate;
     @MockitoBean private NotificationService notificationService;
 
+    @jakarta.persistence.PersistenceContext private jakarta.persistence.EntityManager em;
+
+    private Long newIssueId(String title) {
+        return issueService.createIssue(SLUG, project.getId(), createRequest(title, null), owner.getId()).getId();
+    }
+
     private static final String SLUG = "ws-issue-it";
 
     private User owner;
@@ -214,6 +220,166 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
 
             assertThatThrownBy(() -> issueService.updateIssue(SLUG, project.getId(), 999_999L, upd, owner.getId()))
                 .isInstanceOf(ResourceNotFoundException.class);
+        }
+    }
+
+    // =========================================================================
+    @Nested
+    @DisplayName("cycle de vie (list/get/delete/archive/pin/children)")
+    class Lifecycle {
+
+        @Test
+        @DisplayName("listIssues + getIssue reflètent les issues créées")
+        void should_list_and_get() {
+            Long id = newIssueId("A");
+            newIssueId("B");
+
+            assertThat(issueService.listIssues(SLUG, project.getId(), owner.getId())).hasSizeGreaterThanOrEqualTo(2);
+            assertThat(issueService.getIssue(SLUG, project.getId(), id, owner.getId()).getId()).isEqualTo(id);
+        }
+
+        @Test
+        @DisplayName("deleteIssue supprime l'issue (getIssue → 404 ensuite)")
+        void should_delete_issue() {
+            Long id = newIssueId("Doomed");
+            em.flush();
+            em.clear();
+
+            issueService.deleteIssue(SLUG, project.getId(), id, owner.getId());
+            em.flush();
+            em.clear();
+
+            assertThatThrownBy(() -> issueService.getIssue(SLUG, project.getId(), id, owner.getId()))
+                .isInstanceOf(ResourceNotFoundException.class);
+        }
+
+        @Test
+        @DisplayName("archive puis pin d'une issue sont persistés")
+        void should_archive_and_pin() {
+            Long id = newIssueId("Flags");
+
+            IssueResponse archived = issueService.setArchived(SLUG, project.getId(), id, true, owner.getId());
+            assertThat(archived.isArchived()).isTrue();
+
+            IssueResponse pinned = issueService.setPinned(SLUG, project.getId(), id, true, owner.getId());
+            assertThat(pinned.isPinned()).isTrue();
+        }
+
+        @Test
+        @DisplayName("listChildren renvoie les sous-tâches (parentId)")
+        void should_list_children() {
+            Long parent = newIssueId("Parent");
+            CreateIssueRequest childReq = createRequest("Child", null);
+            childReq.setParentId(parent);
+            issueService.createIssue(SLUG, project.getId(), childReq, owner.getId());
+
+            assertThat(issueService.listChildren(SLUG, project.getId(), parent, owner.getId())).hasSize(1);
+        }
+    }
+
+    // =========================================================================
+    @Nested
+    @DisplayName("statuts & types")
+    class StatusesAndTypes {
+
+        @Test
+        @DisplayName("listStatuses = 5 statuts par défaut ; listTypes = 3 types")
+        void should_list_defaults() {
+            assertThat(issueService.listStatuses(SLUG, project.getId(), owner.getId())).hasSize(5);
+            assertThat(issueService.listTypes(SLUG, project.getId(), owner.getId())).hasSize(3);
+        }
+
+        @Test
+        @DisplayName("createStatus ajoute un statut, updateStatus le renomme, deleteStatus le retire")
+        void should_crud_status() {
+            var create = new com.taskforce.tf_api.core.dto.request.CreateIssueStatusRequest();
+            create.setName("Review");
+            create.setColor("#8b5cf6");
+            create.setCategory("STARTED");
+            var created = issueService.createStatus(SLUG, project.getId(), create, owner.getId());
+            assertThat(issueService.listStatuses(SLUG, project.getId(), owner.getId())).hasSize(6);
+
+            var update = new com.taskforce.tf_api.core.dto.request.UpdateIssueStatusRequest();
+            update.setName("Reviewing");
+            var updated = issueService.updateStatus(SLUG, project.getId(), created.getId(), update, owner.getId());
+            assertThat(updated.getName()).isEqualTo("Reviewing");
+
+            issueService.deleteStatus(SLUG, project.getId(), created.getId(), owner.getId());
+            assertThat(issueService.listStatuses(SLUG, project.getId(), owner.getId())).hasSize(5);
+        }
+    }
+
+    // =========================================================================
+    @Nested
+    @DisplayName("commentaires / checklist / worklogs / relations")
+    class SubResources {
+
+        @Test
+        @DisplayName("addComment puis listComments")
+        void should_add_and_list_comment() {
+            Long id = newIssueId("Commented");
+            var req = new com.taskforce.tf_api.core.dto.request.CreateIssueCommentRequest();
+            req.setContent("Premier commentaire");
+
+            issueService.addComment(SLUG, project.getId(), id, req, owner.getId());
+
+            var comments = issueService.listComments(SLUG, project.getId(), id, owner.getId());
+            assertThat(comments).hasSize(1);
+            assertThat(comments.get(0).getContent()).isEqualTo("Premier commentaire");
+        }
+
+        @Test
+        @DisplayName("addChecklistItem + update (done) + list")
+        void should_manage_checklist() {
+            Long id = newIssueId("Checklist");
+            var add = new com.taskforce.tf_api.core.dto.request.CreateChecklistItemRequest();
+            add.setContent("Étape 1");
+            var item = issueService.addChecklistItem(SLUG, project.getId(), id, owner.getId(), add);
+
+            var upd = new com.taskforce.tf_api.core.dto.request.UpdateChecklistItemRequest();
+            upd.setDone(true);
+            var updated = issueService.updateChecklistItem(SLUG, project.getId(), id, item.getId(), owner.getId(), upd);
+            assertThat(updated.isDone()).isTrue();
+
+            assertThat(issueService.listChecklist(SLUG, project.getId(), id, owner.getId())).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("addWorklog + listWorklogs (minutes)")
+        void should_log_work() {
+            Long id = newIssueId("Timed");
+            var req = new com.taskforce.tf_api.core.dto.request.LogWorkRequest();
+            req.setMinutes(60);
+            req.setDescription("Dev");
+
+            issueService.addWorklog(SLUG, project.getId(), id, owner.getId(), req);
+
+            var logs = issueService.listWorklogs(SLUG, project.getId(), id, owner.getId());
+            assertThat(logs).hasSize(1);
+            assertThat(logs.get(0).getMinutes()).isEqualTo(60);
+        }
+
+        @Test
+        @DisplayName("addRelation (RELATES_TO) persiste la relation ; listRelations la renvoie ; doublon rejeté")
+        void should_add_relation() {
+            Long source = newIssueId("Source");
+            Long target = newIssueId("Target");
+
+            var req = new com.taskforce.tf_api.core.dto.request.CreateIssueRelationRequest();
+            req.setTargetIssueId(target);
+            req.setRelationType("RELATES_TO");
+
+            var created = issueService.addRelation(SLUG, project.getId(), source, req, owner.getId());
+            assertThat(created.getRelationType())
+                .isEqualTo(com.taskforce.tf_api.core.enums.IssueRelationType.RELATES_TO);
+            assertThat(created.getRelatedIssue().getId()).isEqualTo(target);
+
+            assertThat(issueService.listRelations(SLUG, project.getId(), source, owner.getId())).hasSize(1);
+
+            // doublon → BusinessException (chemin existsBy…RelationType contre l'enum Postgres natif)
+            assertThatThrownBy(() -> issueService.addRelation(SLUG, project.getId(), source, req, owner.getId()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("existe déjà");
         }
     }
 }

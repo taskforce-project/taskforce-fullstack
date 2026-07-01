@@ -3,6 +3,8 @@ package com.taskforce.tf_api.core.model;
 import java.time.LocalDateTime;
 
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import com.taskforce.tf_api.core.enums.IssueRelationType;
 
@@ -65,7 +67,8 @@ public class IssueRelation {
     private Issue target;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "relation_type", nullable = false, length = 20)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "relation_type", nullable = false)
     private IssueRelationType relationType;
 
     @ManyToOne(fetch = FetchType.LAZY)
