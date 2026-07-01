@@ -18,6 +18,10 @@ export interface KnowledgeNode {
   versionLabel: string
   refType: string | null
   refId: number | null
+  parentNodeId: number | null
+  tags: string[]
+  /** Node du noyau (hub règles/AGENTS) — masqué de l'explorateur par défaut. */
+  system: boolean
   metadata: Record<string, unknown>
   createdAt: string
   updatedAt: string
@@ -30,6 +34,7 @@ export interface KnowledgeEdge {
   toNodeId: number
   relationType: string
   weight: number
+  auto: boolean
 }
 
 export interface BrainOverview {
@@ -55,6 +60,7 @@ export interface CreateNodeInput {
   content?: string
   refType?: string
   refId?: number
+  tags?: string[]
   metadata?: Record<string, unknown>
 }
 
@@ -65,6 +71,7 @@ export interface UpdateNodeInput {
   domain?: string
   status?: string
   versionLabel?: string
+  tags?: string[]
   metadata?: Record<string, unknown>
 }
 
@@ -103,6 +110,30 @@ export async function updateNode(slug: string, nodeId: number, input: UpdateNode
 /** Supprime un node (les relations sont supprimées en cascade côté backend). */
 export async function deleteNode(slug: string, nodeId: number): Promise<void> {
   await apiClient.delete(BRAIN_ROUTES.NODE(slug, nodeId))
+}
+
+export interface BrainFile {
+  /** URL absolue prête à insérer dans le markdown (image ou lien doc). */
+  url: string
+  filename: string
+  contentType: string
+  size: number
+  image: boolean
+}
+
+/** Upload d'une pièce jointe (image/doc) vers MinIO. Renvoie l'URL absolue de service. */
+export async function uploadBrainFile(slug: string, file: File): Promise<BrainFile> {
+  const form = new FormData()
+  form.append("file", file)
+  const res = await apiClient.post<{ data: BrainFile }>(
+    BRAIN_ROUTES.FILES(slug),
+    form,
+    { headers: { "Content-Type": "multipart/form-data" } },
+  )
+  const data = res.data.data
+  const base = process.env.NEXT_PUBLIC_API_URL ?? ""
+  // Le backend renvoie un chemin relatif (/api/files/brain/…) → on préfixe l'host public.
+  return { ...data, url: data.url.startsWith("http") ? data.url : `${base}${data.url}` }
 }
 
 /** Crée une relation (arête) orientée entre deux nodes. */

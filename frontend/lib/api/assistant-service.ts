@@ -1,20 +1,46 @@
 /**
- * Service Assistant IA (QA2-16).
- * Appelle l'endpoint backend `POST /api/workspaces/{slug}/assistant` (variante JSON).
- * Le backend délègue à Groq (ou fallback Java si la clé n'est pas configurée).
+ * Service Assistant IA agentique.
+ * `POST /api/workspaces/{slug}/assistant` (JSON) renvoie une réponse **structurée**
+ * (réponse markdown + sources Brain OS + étapes + tool calls). Le backend délègue à l'agent
+ * (Groq tool-calling si une clé est configurée, sinon repli RAG : sources réelles).
  */
 import { apiClient } from "./client"
 import { ASSISTANT_ROUTES } from "../config/api-routes"
 
-interface AssistantTextResponse {
-  content: string
+export interface AssistantSource {
+  title: string
+  domain: string
+  score: number | null
+}
+export interface AssistantStep {
+  label: string
+  status: "pending" | "active" | "done" | "error"
+}
+export interface AssistantToolCall {
+  name: string
+  status: string
+  input: string | null
+  output: string | null
+}
+export interface AssistantAnswer {
+  answer: string
+  reasoning: string | null
+  mode: "fast" | "deep" | "fallback"
+  sources: AssistantSource[]
+  steps: AssistantStep[]
+  toolCalls: AssistantToolCall[]
 }
 
-/** Envoie un message à l'assistant et renvoie sa réponse texte. */
-export async function sendAssistantMessage(slug: string, message: string): Promise<string> {
-  const res = await apiClient.post<{ data: AssistantTextResponse }>(
+/** Envoie un message à l'agent et renvoie la réponse structurée complète. */
+export async function sendAgentMessage(slug: string, message: string): Promise<AssistantAnswer> {
+  const res = await apiClient.post<{ data: AssistantAnswer }>(
     ASSISTANT_ROUTES.CHAT(slug),
     { message },
   )
-  return res.data.data.content
+  return res.data.data
+}
+
+/** Variante texte (compat) : renvoie seulement la réponse markdown. */
+export async function sendAssistantMessage(slug: string, message: string): Promise<string> {
+  return (await sendAgentMessage(slug, message)).answer
 }
