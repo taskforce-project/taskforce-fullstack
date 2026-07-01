@@ -9,14 +9,20 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.taskforce.tf_api.core.enums.BrainTemplateType;
+import com.taskforce.tf_api.core.enums.NodeRefType;
 import com.taskforce.tf_api.core.enums.NodeStatus;
 import com.taskforce.tf_api.core.model.BrainWorkspace;
 import com.taskforce.tf_api.core.model.KnowledgeNode;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.BrainWorkspaceRepository;
 import com.taskforce.tf_api.core.repository.KnowledgeEdgeRepository;
+import com.taskforce.tf_api.core.repository.IssueRepository;
 import com.taskforce.tf_api.core.repository.KnowledgeNodeRepository;
+import com.taskforce.tf_api.core.repository.ProjectRepository;
+
+import org.springframework.data.domain.PageRequest;
 import com.taskforce.tf_api.core.service.BrainTemplateService;
+import com.taskforce.tf_api.core.service.BrainTemplateService.ProjectRef;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,6 +42,8 @@ public class BrainSeedingService {
     private final KnowledgeEdgeRepository  edgeRepository;
     private final BrainTemplateService     templateService;
     private final BrainLinkService         links;
+    private final ProjectRepository        projectRepository;
+    private final IssueRepository          issueRepository;
 
     /**
      * Réinitialise complètement le brain d'un workspace puis le réamorce avec un gabarit.
@@ -69,8 +77,19 @@ public class BrainSeedingService {
             .versionLabel("v1")
             .build());
 
-        List<KnowledgeNode> nodes = new ArrayList<>();
-        for (BrainTemplateService.SeedNode seed : templateService.nodesFor(brain.getTemplateType())) {
+        // Projets du workspace → seed rangé par projet (1 cluster = 1 projet) si dispo.
+        List<ProjectRef> projects = projectRepository
+            .findByWorkspaceIdOrderByCreatedAtDesc(workspace.getId()).stream()
+            .map(p -> new ProjectRef(p.getId(), p.getName(),
+                issueRepository.findByProjectIdOrderBySequenceNumberDesc(p.getId(), PageRequest.of(0, 50))
+                    .getContent().stream().map(i -> i.getTitle()).toList()))
+            .toList();
+
+        List<BrainTemplateService.SeedNode> seeds = templateService.nodesFor(brain.getTemplateType(), projects);
+        List<KnowledgeNode> nodes = new ArrayList<>(seeds.size());
+        Map<String, Integer> keyToIdx = new HashMap<>();
+        for (int i = 0; i < seeds.size(); i++) {
+            BrainTemplateService.SeedNode seed = seeds.get(i);
             Map<String, Object> meta = new HashMap<>();
             meta.put("seeded", true);
             if (seed.system()) meta.put("system", true); // node du noyau (caché côté utilisateur)
@@ -81,12 +100,25 @@ public class BrainSeedingService {
                 .domain(seed.domain())
                 .title(seed.title())
                 .content(seed.content())
+                .refType(seed.projectRefId() != null ? NodeRefType.PROJECT : null)
+                .refId(seed.projectRefId())
                 .status(NodeStatus.ACTIVE)
                 .versionLabel("v1")
                 .metadata(meta)
                 .build());
+            if (seed.key() != null) keyToIdx.put(seed.key(), i);
         }
         nodeRepository.saveAll(nodes);
+
+        // 2ᵉ passe : résoudre les parents (hiérarchie récursive projet → système → … → note).
+        List<KnowledgeNode> reparented = new ArrayList<>();
+        for (int i = 0; i < seeds.size(); i++) {
+            String pk = seeds.get(i).parentKey();
+            if (pk == null) continue;
+            Integer pidx = keyToIdx.get(pk);
+            if (pidx != null) { nodes.get(i).setParentNodeId(nodes.get(pidx).getId()); reparented.add(nodes.get(i)); }
+        }
+        if (!reparented.isEmpty()) nodeRepository.saveAll(reparented);
 
         // Tisse l'architecture : les [[wikilinks]] du hub/READMEs → arêtes auto (graphe connecté).
         for (KnowledgeNode node : nodes) {

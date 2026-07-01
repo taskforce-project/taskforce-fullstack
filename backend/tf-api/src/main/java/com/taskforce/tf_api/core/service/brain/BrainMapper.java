@@ -36,6 +36,7 @@ public final class BrainMapper {
             .versionLabel(n.getVersionLabel())
             .refType(n.getRefType() != null ? n.getRefType().name() : null)
             .refId(n.getRefId())
+            .parentNodeId(n.getParentNodeId())
             .tags(tagsOf(n))
             .system(n.getMetadata() != null && Boolean.TRUE.equals(n.getMetadata().get("system")))
             .metadata(n.getMetadata())
