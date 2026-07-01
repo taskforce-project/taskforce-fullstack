@@ -85,7 +85,9 @@ Le minimum pour que l'app tienne la promesse du CDC de bout en bout, **et** que 
 | PROD-1.8  | **Enrichir les signaux du Smart Assign** (fit ultra-précis). _Cœur du différenciateur._ ✅ **Story points** (20/06). ✅ **Phase 1 (21/06)** : charge **cross-projets** (`buildCandidateMetrics` via `findByWorkspaceSlugAndAssigneeId`, plus seulement par-projet) + **historique activé** dans la formule (`resolvedRate`, auparavant pondéré 0 ; nouveaux poids semantic .45/workload .22/historical .15/dispo .10/labels .08). mvn ✅. ✅ **Phase 2 (21/06)** : **capacité déclarée** (h/sem) + **séniorité** sur `member_skill_profiles` (migration `V44`) — la capacité raffine la dispo (40h = réf., facteur de charge scalé), les deux nourrissent le prompt Groq ; DTO/service back + UI carte profil (`member-skills-card`) + seed rempli. mvn ✅ + front tsc ✅. ✅ **Phase 3 Inc B (21/06)** : **montée en compétence** — migration `V45` (`projects.growth_mode`) + `SmartAssignService` (`usualComplexity` = moy. SP complétés du candidat ; `growthScore` avec **garde-fous** : mode ON · issue estimée · pas URGENT · dispo ≥60 · skill adjacent · stretch ∈ [habituel+1, +3]) ; **bonus borné +12** (nudge, ne domine pas) + facteur « 🌱 stretch » ; toggle **Mode montée en compétence** en project settings ; seed WEB `growth_mode=true` (Diego junior). mvn ✅ + front tsc ✅. ✅ **Phase 3 Inc C+D (21/06)** : **Inc C** — migration `V46` (`growth_enabled` + `growth_target_skills` sur `member_skill_profiles`) + DTO/service + UI carte profil (switch « En développement » + compétences cibles) ; le `growthScore` exige désormais l'**adjacence aux compétences cibles** pour un membre opt-in (score 100 → bonus +15) vs adjacence générique en mode projet auto (80 → +12). **Inc D** — prompt Groq enrichi (`growthStretch` + `targets` par candidat + consigne système « favoriser modérément l'apprentissage, jamais sur l'urgent »). Seed : Diego `growth_enabled` + cibles `[typescript,react]`. mvn ✅ + front tsc/eslint ✅. **PROD-1.8 = cœur du différenciateur LIVRÉ** (Story points + Phases 1/2/3). **Séparé** : time tracking (worklogs, BE-ISS-012) → **livré PROD-2.12** (exploitation comme signal Smart Assign à faire). |  ✅   |  P2  |  2,5   |
 | PROD-1.11 | **Chasse au mock résiduel** (dette §1). ✅ **(22/06)** **Messages verrouillé « coming soon »** (`app-sidebar`) — page chat 100% mock. **Dashboard dé-mocké** : panneaux `Needs attention`/`Agent activity`/`Pending decisions` (narration agents IA, feature `/agents` coming-soon) remplacés par un état **« Bientôt disponible »** (`ComingSoonBody`) ; constantes mock supprimées ; métrique « Agents active » 2→0. Ops + KPIs + AI insights du dashboard restent **réels**. Front tsc/eslint ✅. Plus aucun mock user-facing (hors fixtures de test). | ✅ | P2 | 0,75 |
 
-**Sous-total : ~9,5 j·h.**
+| PROD-1.12 | **Proposition de redistribution validée (TROU CDC #4 « ajustements dynamiques »)** : sur alerte de surcharge (`OverloadAlertScheduler`) ou à la demande, endpoint `POST …/redistribute/preview` → `SmartAssignService` calcule un **plan** (issues à déplacer d'un membre surchargé vers un mieux placé) ; UI panneau « Redistribution suggérée » (avant/après par membre) ; **OWNER/ADMIN valide en 1 clic (applique en lot) ou rejette**. Human-in-the-loop assumé (pas de réassignation silencieuse). Réutilise `bulkRecommend`. | 🔲 | P1 | 1,5 |
+
+**Sous-total : ~11,0 j·h.**
 
 > **Décision PROD-1.1 (verrou menu) — à valider.** Entrées candidates au cadenas tant que non livrées : **Agents** (pas de vraie gestion d'agents), **Messages** (chat partiel), **Discussions** (rôle flou, pin/lock cassés). Recommandation : verrouiller **Agents + Discussions** (Messages reste si le chat fonctionne après FIX-001/002). À trancher ensemble avant code.
 
@@ -405,6 +407,14 @@ Le minimum pour que l'app tienne la promesse du CDC de bout en bout, **et** que 
 
 **Sous-total Tests : ~3,5 j·h.** → C18 ✅ · C25 ✅.
 
+**Conventions de test (arrêtées 2026-06-30) :**
+- **Ordre** : back complet **d'abord** (jusqu'au seuil), puis front. Critiques **avant** le reste.
+- **Cible** : **≥60 %** lignes (marge +10 sur le requis 50), **gate JaCoCo par package** (back) / seuils Vitest (front). Prioriser les packages critiques via le rapport JaCoCo.
+- **Complétude par unité** (pas de test « 1+2=3 » isolé) : cas **nominal** + **valeurs limites** + **cas négatifs/erreur** + **idempotence** + **autorisation (401/403)**, avec **données variées** (chiffres, lettres, chaînes, vides/nulls, listes) et assertions **vrai *et* faux**.
+- **Nommage** : `should_…` / `given_…_when_…_then_…`. **Mocks** (`@MockBean`/`vi.mock`) pour les dépendances externes ; Testcontainers pour l'intégration réelle.
+- **Double effet = revue de code** : à chaque fichier testé, vérifier cohérence, **logs/audit présents**, garde-fous, sécu. Front : accessibilité, **component-first**, **≤500 lignes/fichier** (sinon extraire types/fonctions → pages = `return`).
+- **Traçage** : journaux `.ai/tests-backend-journal.md` + `.ai/tests-frontend-journal.md` (fait / reste / problèmes / coverage courant), créés au démarrage.
+
 ## CERT — CI & industrialisation (C19 + C26) — après tests + sécu
 
 | ID   | Tâche                                                                                                                | Effort |
@@ -451,14 +461,22 @@ Planning prévisionnel (Gantt, jalons DFS, chemin critique), budget prévisionne
 
 > Les efforts sont indicatifs (mono-exécutant). Beaucoup de recoupements PRODUIT↔CERTIF (RBAC=C24, Stripe=C23, MinIO/audit=C21) : faire une fois, cocher des deux côtés.
 
-## 4. Séquencement recommandé
+## 4. Séquencement recommandé — **PLAN DE CLÔTURE V1 (arrêté 2026-06-30)**
 
-1. **Débloquer** : §2.0 (FIX-001→003 immédiat ; FIX-004/005 après design).
-2. **CDC tient debout + honnêteté UI** : PROD-1.1 (verrou menu) → PROD-1.2 (compétences) → PROD-1.3/1.4 (smart-assign).
-3. **Certif chemin critique** : Tests (T.x) → RGPD/sécu (C11 + RBAC PROD-3.2/C21/C24) → CI (CI.x).
-4. **En fond, parallélisable (zéro dépendance code)** : Conception (C6–C10), SEO (C20), Doc gestion projet (C2/C3/C4/C12), accessibilité (C13/C15).
-5. **Produit V1 différenciateurs** : UI cohérence (PROD-8), plans/limites (PROD-4), intégrations GitHub/Slack (PROD-5.1/5.2), agents/Brain OS (PROD-6), gestion fine (PROD-2).
-6. **Plus tard** : Asana, templates projet, méthodo de gestion configurable, observabilité.
+> Décision : **on arrête le dev de features**. Focus **webapp** (la landing = roadmap à part, tout à la fin).
+> Brain OS = **stand-by** (cf. `brain-os-roadmap.md`). Les « plus » = `.ai/backlog-post-v1.md`.
+
+1. **Derniers correctifs + seed de soutenance** : QA-1 (densifier `dev_seed.sql`) + fix recensés + **PROD-1.12 (proposition de redistribution validée)** → ferme le CDC #4. Le seed sert **soutenance + tests**.
+2. **Tests BACKEND jusqu'au seuil** (C25) : unitaires critiques → intégration (Testcontainers) → controllers/slices. Piloté **JaCoCo par package**, cible **≥60 %** (marge +10 sur le requis 50). Critiques d'abord (`SmartAssignService`, `IssueService`, `WorkspaceService`, authz/sécu). Sert de **revue de code back** (cohérence, logs/audit, garde-fous, sécu).
+3. **Tests FRONTEND** (C18) : unitaires critiques → component (RTL) → **E2E Playwright**. Cible **≥60 %**. Sert de **revue de code front** : accessibilité, **component-first**, **fichiers ≤500 lignes** (extraire types/fonctions → pages = `return`).
+4. **RGPD** (C11) : valider après rebuild V48 (export/effacement/audit/cookies) + compléter export (skill profile/worklogs).
+5. **Config & « hors app »** : PCA/PRA **opérationnel** (cron `pg_dump` + restauration **testée**), audit sécu + **pentest** (OWASP ZAP baseline + revue IDOR/JWT/CSP/rate-limit), durcissement C21/C24.
+6. **CI (C19/C26)** : seuils tests **bloquants** en CI + scan CVE (OWASP/Trivy/CodeQL) + Sonar + Dependabot.
+7. **Déploiement (RNCP Bloc 4)** : Guacamole + VM école — provisioning, reverse-proxy + TLS, secrets, monitoring, **runbook de déploiement**.
+8. **Documentation complète** : conception C1–C12 (**parallélisable dès l'étape 2** : UML classes, MCD/MLD dérivés Flyway, cas d'usage, wireframes, veille) + manuel utilisateur + artefacts pilotage (Gantt/budget/CR).
+9. **Landing page** : roadmap dédiée, **en dernier** (recoupe SEO C20).
+
+> **Journaux de test** : deux fichiers dédiés créés au lancement de l'étape 2 — `.ai/tests-backend-journal.md` et `.ai/tests-frontend-journal.md` (parcours, problèmes, fait / reste à faire, coverage courant).
 
 ---
 

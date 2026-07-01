@@ -1,5 +1,10 @@
 # Roadmap — Brain OS (couche de connaissance native TaskForce)
 
+> **⏸ STAND-BY (décision 2026-06-30)** : socle **fonctionnellement complet**, on l'arrête là pour la V1.
+> Reste avant gel : **tests + revue sécu** du périmètre Brain OS (mutualisés avec le chantier Tests global de l'app).
+> Tout le reste (Phases 4/5, tiptap, async, marketplace, env-gated LLM) est parti en **backlog** : `.ai/backlog-post-v1.md` §1.
+> Priorité désormais = clôture V1 de l'app (voir `.ai/roadmap.md`).
+>
 > **Statut** : Phases 0→3 **faites** · deep-path agentique **code-complet** (génération env-gated LLM) · **Branche** : `feat/dashboard` · **Maj** : 2026-06-29
 >
 > **Synthèse** : le Brain OS est un produit complet et utilisable — graphe neural (tags + wikilinks),
