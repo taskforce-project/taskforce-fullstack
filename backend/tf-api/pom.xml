@@ -228,6 +228,13 @@
 			<artifactId>h2</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<!-- Intégration DB réelle (Postgres pgvector + Flyway) — B-T4. -->
+		<!-- Boot 4 : slice @DataJpaTest dans un artefact dédié (modularisation des slices de test). -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-data-jpa-test</artifactId>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 
 	<build>

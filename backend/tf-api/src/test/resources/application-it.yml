@@ -1,0 +1,24 @@
+# Profil « it » (integration test) — B-T4.
+# La datasource est fournie dynamiquement par Testcontainers (@ServiceConnection).
+# Flyway construit le schéma réel ; Hibernate se contente de le VALIDER (comme en prod).
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://tf-it-pg:5432/tf}
+    username: ${SPRING_DATASOURCE_USERNAME:tf}
+    password: ${SPRING_DATASOURCE_PASSWORD:tf}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    show-sql: false
+  flyway:
+    enabled: true
+  sql:
+    init:
+      mode: never
+
+logging:
+  level:
+    org.testcontainers: INFO
+    com.taskforce.tf_api: INFO
