@@ -9,7 +9,7 @@ const cspHeader = [
   "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline'",
   `connect-src 'self' ${API_ORIGIN} ws://localhost:8080 wss://localhost:8080`,
-  "img-src 'self' data: blob: https:",
+  `img-src 'self' data: blob: https: ${API_ORIGIN}`,
   "font-src 'self' data:",
   "media-src 'self'",
   "object-src 'none'",
