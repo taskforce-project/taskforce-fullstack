@@ -265,5 +265,137 @@ class WorkspaceServiceIntegrationTest extends AbstractIntegrationTest {
 
             assertThat(workspaceMemberRepository.findByWorkspaceIdAndUserId(wsId, dan.getId())).isEmpty();
         }
+
+        @Test
+        @DisplayName("getWorkspaceByUserId renvoie le workspace de l'utilisateur")
+        void should_get_by_user_id() {
+            createWs();
+            assertThat(workspaceService.getWorkspaceByUserId(owner.getId())).isNotNull();
+        }
+
+        @Test
+        @DisplayName("inviteMember en tant qu'OWNER est refusé")
+        void should_reject_invite_as_owner() {
+            Long wsId = createWs();
+            persistUser("eve");
+            var invite = new com.taskforce.tf_api.core.dto.request.InviteMemberRequest();
+            invite.setEmail("eve@it.dev");
+            invite.setRole(WorkspaceRole.OWNER);
+
+            assertThatThrownBy(() -> workspaceService.inviteMember(wsId, owner.getId(), invite))
+                .isInstanceOf(IllegalStateException.class);
+        }
+
+        @Test
+        @DisplayName("updateMemberRole vers OWNER est refusé")
+        void should_reject_promote_to_owner() {
+            Long wsId = createWs();
+            User frank = persistUser("frank");
+            var invite = new com.taskforce.tf_api.core.dto.request.InviteMemberRequest();
+            invite.setEmail("frank@it.dev");
+            invite.setRole(WorkspaceRole.MEMBER);
+            workspaceService.inviteMember(wsId, owner.getId(), invite);
+            Long memberId = workspaceMemberRepository.findByWorkspaceIdAndUserId(wsId, frank.getId()).orElseThrow().getId();
+
+            var roleReq = new com.taskforce.tf_api.core.dto.request.UpdateMemberRoleRequest();
+            roleReq.setRole(WorkspaceRole.OWNER);
+
+            assertThatThrownBy(() -> workspaceService.updateMemberRole(wsId, owner.getId(), memberId, roleReq))
+                .isInstanceOf(IllegalStateException.class);
+        }
+
+        @Test
+        @DisplayName("updateWorkspace par un simple MEMBER est refusé")
+        void should_reject_update_by_member() {
+            Long wsId = createWs();
+            User gwen = persistUser("gwen");
+            var invite = new com.taskforce.tf_api.core.dto.request.InviteMemberRequest();
+            invite.setEmail("gwen@it.dev");
+            invite.setRole(WorkspaceRole.MEMBER);
+            workspaceService.inviteMember(wsId, owner.getId(), invite);
+
+            var upd = new com.taskforce.tf_api.core.dto.request.UpdateWorkspaceRequest();
+            upd.setName("Interdit");
+
+            assertThatThrownBy(() -> workspaceService.updateWorkspace(wsId, gwen.getId(), upd))
+                .isInstanceOf(IllegalStateException.class);
+        }
+
+        @Test
+        @DisplayName("removeMember refuse de retirer le propriétaire (OWNER)")
+        void should_reject_remove_owner() {
+            Long wsId = createWs();
+            Long ownerMemberId = workspaceMemberRepository
+                .findByWorkspaceIdAndUserId(wsId, owner.getId()).orElseThrow().getId();
+
+            assertThatThrownBy(() -> workspaceService.removeMember(wsId, owner.getId(), ownerMemberId))
+                .isInstanceOf(IllegalStateException.class);
+        }
+
+        @Test
+        @DisplayName("removeMember par un simple MEMBER est refusé (droits insuffisants)")
+        void should_reject_remove_by_member() {
+            Long wsId = createWs();
+            User hugo = persistUser("hugo");
+            User ivan = persistUser("ivan");
+            var inviteHugo = new com.taskforce.tf_api.core.dto.request.InviteMemberRequest();
+            inviteHugo.setEmail("hugo@it.dev");
+            inviteHugo.setRole(WorkspaceRole.MEMBER);
+            workspaceService.inviteMember(wsId, owner.getId(), inviteHugo);
+            var inviteIvan = new com.taskforce.tf_api.core.dto.request.InviteMemberRequest();
+            inviteIvan.setEmail("ivan@it.dev");
+            inviteIvan.setRole(WorkspaceRole.MEMBER);
+            workspaceService.inviteMember(wsId, owner.getId(), inviteIvan);
+            Long ivanMemberId = workspaceMemberRepository.findByWorkspaceIdAndUserId(wsId, ivan.getId()).orElseThrow().getId();
+
+            assertThatThrownBy(() -> workspaceService.removeMember(wsId, hugo.getId(), ivanMemberId))
+                .isInstanceOf(IllegalStateException.class);
+        }
+
+        @Test
+        @DisplayName("getWorkspaceBySlug refuse un non-membre")
+        void should_reject_get_by_slug_for_non_member() {
+            WorkspaceResponse ws = workspaceService.createNewWorkspace(owner.getId(), req("Privé"));
+            User stranger = persistUser("stranger");
+
+            assertThatThrownBy(() -> workspaceService.getWorkspaceBySlug(ws.getSlug(), stranger.getId()))
+                .isInstanceOf(IllegalStateException.class);
+        }
+
+        @Test
+        @DisplayName("updateMemberRole refuse un memberId d'un autre workspace")
+        void should_reject_role_update_for_foreign_member() {
+            Long wsA = createWs();
+            WorkspaceResponse wsBResp = workspaceService.createNewWorkspace(owner.getId(), req("Autre WS"));
+            Long wsB = workspaceRepository.findBySlug(wsBResp.getSlug()).orElseThrow().getId();
+            Long ownerMemberInB = workspaceMemberRepository
+                .findByWorkspaceIdAndUserId(wsB, owner.getId()).orElseThrow().getId();
+
+            var roleReq = new com.taskforce.tf_api.core.dto.request.UpdateMemberRoleRequest();
+            roleReq.setRole(WorkspaceRole.ADMIN);
+
+            assertThatThrownBy(() -> workspaceService.updateMemberRole(wsA, owner.getId(), ownerMemberInB, roleReq))
+                .isInstanceOf(IllegalArgumentException.class);
+        }
+
+        @Test
+        @DisplayName("listAuditLogs renvoie les entrées pour un OWNER ; refuse un simple MEMBER")
+        void should_list_audit_logs_owner_only() {
+            WorkspaceResponse ws = workspaceService.createNewWorkspace(owner.getId(), req("Audit WS"));
+            Long wsId = workspaceRepository.findBySlug(ws.getSlug()).orElseThrow().getId();
+            User jane = persistUser("jane");
+            var invite = new com.taskforce.tf_api.core.dto.request.InviteMemberRequest();
+            invite.setEmail("jane@it.dev");
+            invite.setRole(WorkspaceRole.MEMBER);
+            workspaceService.inviteMember(wsId, owner.getId(), invite);
+
+            org.mockito.Mockito.when(auditService.listForWorkspace(eq(wsId), org.mockito.ArgumentMatchers.anyInt()))
+                .thenReturn(java.util.List.of());
+
+            assertThat(workspaceService.listAuditLogs(ws.getSlug(), owner.getId())).isEmpty();
+
+            assertThatThrownBy(() -> workspaceService.listAuditLogs(ws.getSlug(), jane.getId()))
+                .isInstanceOf(com.taskforce.tf_api.shared.exception.ForbiddenException.class);
+        }
     }
 }

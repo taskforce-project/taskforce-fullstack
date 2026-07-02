@@ -300,5 +300,156 @@ class ProjectServiceIntegrationTest extends AbstractIntegrationTest {
 
             assertThat(projectService.getProjectActivity(SLUG, project.getId(), owner.getId(), 14)).isNotEmpty();
         }
+
+        @Test
+        @DisplayName("updateProject applique tous les champs (desc/status/public/icon/couleur/growth)")
+        void should_update_all_fields() {
+            ProjectResponse created = projectService.createProject(SLUG, owner.getId(), req("Full", "FUL"));
+
+            var upd = new com.taskforce.tf_api.core.dto.request.UpdateProjectRequest();
+            upd.setName("Full Updated");
+            upd.setDescription("nouvelle desc");
+            upd.setStatus(com.taskforce.tf_api.core.enums.ProjectStatus.PAUSED);
+            upd.setIsPublic(true);
+            upd.setIconUrl("icon.png");
+            upd.setColor("bg-rose-500");
+            upd.setGrowthMode(true);
+
+            projectService.updateProject(SLUG, created.getId(), owner.getId(), upd);
+
+            var reloaded = projectRepository.findById(created.getId()).orElseThrow();
+            assertThat(reloaded.getName()).isEqualTo("Full Updated");
+            assertThat(reloaded.getStatus()).isEqualTo(com.taskforce.tf_api.core.enums.ProjectStatus.PAUSED);
+            assertThat(reloaded.isPublic()).isTrue();
+            assertThat(reloaded.isGrowthMode()).isTrue();
+        }
+    }
+
+    // =========================================================================
+    @Nested
+    @DisplayName("list / labels avancés / accès")
+    class ListsAndLabelsAndAccess {
+
+        @Test
+        @DisplayName("listProjects renvoie les projets du workspace (ordre desc de création)")
+        void should_list_projects() {
+            projectService.createProject(SLUG, owner.getId(), req("Alpha", "ALP"));
+            projectService.createProject(SLUG, owner.getId(), req("Beta", "BET"));
+
+            assertThat(projectService.listProjects(SLUG, owner.getId())).hasSize(2);
+        }
+
+        @Test
+        @DisplayName("listLabels renvoie les 5 labels par défaut du projet")
+        void should_list_labels() {
+            ProjectResponse project = projectService.createProject(SLUG, owner.getId(), req("Lbl", "LBL"));
+
+            assertThat(projectService.listLabels(SLUG, project.getId(), owner.getId())).hasSize(5);
+        }
+
+        @Test
+        @DisplayName("updateLabel modifie le nom et la couleur d'un label existant")
+        void should_update_label() {
+            ProjectResponse project = projectService.createProject(SLUG, owner.getId(), req("UL", "ULB"));
+            CreateLabelRequest create = new CreateLabelRequest();
+            create.setName("Temp");
+            create.setColor("#111111");
+            ProjectLabelResponse created = projectService.createLabel(SLUG, project.getId(), owner.getId(), create);
+
+            var upd = new com.taskforce.tf_api.core.dto.request.UpdateLabelRequest();
+            upd.setName("Renommé");
+            upd.setColor("#222222");
+            ProjectLabelResponse updated = projectService.updateLabel(
+                SLUG, project.getId(), created.getId(), owner.getId(), upd);
+
+            assertThat(updated.getName()).isEqualTo("Renommé");
+            assertThat(updated.getColor()).isEqualTo("#222222");
+        }
+
+        @Test
+        @DisplayName("deleteLabel retire un label du projet")
+        void should_delete_label() {
+            ProjectResponse project = projectService.createProject(SLUG, owner.getId(), req("DL", "DLB"));
+            CreateLabelRequest create = new CreateLabelRequest();
+            create.setName("Jetable");
+            create.setColor("#333333");
+            ProjectLabelResponse created = projectService.createLabel(SLUG, project.getId(), owner.getId(), create);
+            assertThat(projectLabelRepository.findByProjectIdOrderByNameAsc(project.getId())).hasSize(6);
+
+            projectService.deleteLabel(SLUG, project.getId(), created.getId(), owner.getId());
+
+            assertThat(projectLabelRepository.findByProjectIdOrderByNameAsc(project.getId())).hasSize(5);
+        }
+
+        @Test
+        @DisplayName("createLabel refuse un nom déjà pris dans le projet")
+        void should_reject_duplicate_label() {
+            ProjectResponse project = projectService.createProject(SLUG, owner.getId(), req("DupL", "DUL"));
+
+            CreateLabelRequest req = new CreateLabelRequest();
+            req.setName("Bug"); // déjà seedé par défaut
+            req.setColor("#444444");
+
+            assertThatThrownBy(() -> projectService.createLabel(SLUG, project.getId(), owner.getId(), req))
+                .isInstanceOf(BusinessException.class);
+        }
+
+        @Test
+        @DisplayName("getProject refuse un non-membre du workspace")
+        void should_reject_get_for_non_member() {
+            ProjectResponse project = projectService.createProject(SLUG, owner.getId(), req("Sec", "SEC"));
+            User outsider = userRepository.save(User.builder()
+                .keycloakId("kc-outsider").email("outsider@it.dev").displayName("Out").isActive(true).build());
+
+            assertThatThrownBy(() -> projectService.getProject(SLUG, project.getId(), outsider.getId()))
+                .isInstanceOf(BusinessException.class);
+        }
+
+        @Test
+        @DisplayName("addMember refuse un utilisateur déjà membre du projet")
+        void should_reject_duplicate_project_member() {
+            ProjectResponse project = projectService.createProject(SLUG, owner.getId(), req("DupM", "DUM"));
+            User kai = userRepository.save(User.builder()
+                .keycloakId("kc-kai").email("kai@it.dev").displayName("Kai").isActive(true).build());
+            Workspace ws = workspaceRepository.findBySlug(SLUG).orElseThrow();
+            workspaceMemberRepository.save(WorkspaceMember.builder()
+                .workspace(ws).user(kai).role(WorkspaceRole.MEMBER).build());
+
+            var add = new com.taskforce.tf_api.core.dto.request.AddProjectMemberRequest();
+            add.setEmail("kai@it.dev");
+            add.setRole(ProjectRole.MEMBER);
+            projectService.addMember(SLUG, project.getId(), owner.getId(), add);
+
+            assertThatThrownBy(() -> projectService.addMember(SLUG, project.getId(), owner.getId(), add))
+                .isInstanceOf(BusinessException.class);
+        }
+
+        @Test
+        @DisplayName("attachTeam refuse une équipe d'un autre workspace")
+        void should_reject_attach_foreign_team() {
+            ProjectResponse project = projectService.createProject(SLUG, owner.getId(), req("FT", "FTE"));
+
+            // Équipe rattachée à un AUTRE workspace
+            Workspace other = workspaceRepository.save(
+                Workspace.builder().name("Other WS").slug("other-ws-it").owner(owner).build());
+            com.taskforce.tf_api.core.model.Team foreign = teamRepository.save(
+                com.taskforce.tf_api.core.model.Team.builder().workspace(other).name("Foreign").createdBy(owner).build());
+
+            assertThatThrownBy(() -> projectService.attachTeam(SLUG, project.getId(), foreign.getId(), owner.getId()))
+                .isInstanceOf(BusinessException.class);
+        }
+
+        @Test
+        @DisplayName("detachTeam lève ResourceNotFoundException si l'équipe n'est pas associée")
+        void should_reject_detach_unlinked_team() {
+            ProjectResponse project = projectService.createProject(SLUG, owner.getId(), req("DT", "DTE"));
+            com.taskforce.tf_api.core.model.Team team = teamRepository.save(
+                com.taskforce.tf_api.core.model.Team.builder()
+                    .workspace(workspaceRepository.findBySlug(SLUG).orElseThrow())
+                    .name("Detached").createdBy(owner).build());
+
+            assertThatThrownBy(() -> projectService.detachTeam(SLUG, project.getId(), team.getId(), owner.getId()))
+                .isInstanceOf(ResourceNotFoundException.class);
+        }
     }
 }

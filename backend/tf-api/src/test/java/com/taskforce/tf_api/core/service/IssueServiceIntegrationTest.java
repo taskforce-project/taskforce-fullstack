@@ -465,5 +465,209 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
             assertThat(issueService.listMyIssues(SLUG, owner.getId())).isNotEmpty();
             assertThat(issueService.getScheduledIssues(SLUG, owner.getId())).isNotEmpty();
         }
+
+        @Test
+        @DisplayName("updateIssue applique tous les champs (title/desc/priorité/statut/assigné/dates/SP/type)")
+        void update_all_fields() {
+            Long id = newIssueId("full");
+            Long typeId = issueService.listTypes(SLUG, project.getId(), owner.getId()).get(0).getId();
+
+            UpdateIssueRequest u = new UpdateIssueRequest();
+            u.setTitle("Titre complet");
+            u.setDescription("desc complète");
+            u.setPriority(IssuePriority.HIGH);
+            u.setStatusId(doneStatus.getId());
+            u.setAssigneeId(owner.getId());
+            u.setTypeId(typeId);
+            u.setStartDate("2026-09-01");
+            u.setDueDate("2026-09-30");
+            u.setStoryPoints(5);
+
+            IssueResponse res = issueService.updateIssue(SLUG, project.getId(), id, u, owner.getId());
+
+            assertThat(res.getTitle()).isEqualTo("Titre complet");
+            assertThat(res.getStatus().getName()).isEqualTo("Done");
+            assertThat(res.getStoryPoints()).isEqualTo(5);
+        }
+
+        @Test
+        @DisplayName("listIssuesPaged renvoie une page")
+        void list_paged() {
+            newIssueId("p1");
+            newIssueId("p2");
+            var page = issueService.listIssuesPaged(SLUG, project.getId(), owner.getId(),
+                org.springframework.data.domain.PageRequest.of(0, 10));
+            assertThat(page).isNotNull();
+        }
+
+        // ---- Ajouts couverture (méthodes/branches non couvertes) ----
+
+        @Test
+        @DisplayName("listActivity renvoie le journal d'activité (au moins l'entrée CREATED)")
+        void should_list_activity() {
+            Long id = newIssueId("Activité");
+
+            var activity = issueService.listActivity(SLUG, project.getId(), id, owner.getId());
+
+            assertThat(activity).isNotEmpty();
+            assertThat(activity).anyMatch(a -> a.getAction()
+                == com.taskforce.tf_api.core.enums.IssueActivityType.CREATED);
+        }
+
+        @Test
+        @DisplayName("listActivity lève ResourceNotFoundException pour une issue inexistante")
+        void should_reject_activity_unknown_issue() {
+            assertThatThrownBy(() -> issueService.listActivity(SLUG, project.getId(), 999_999L, owner.getId()))
+                .isInstanceOf(ResourceNotFoundException.class);
+        }
+
+        @Test
+        @DisplayName("deleteRelation supprime la relation ; listRelations est alors vide")
+        void should_delete_relation() {
+            Long source = newIssueId("RelSource");
+            Long target = newIssueId("RelTarget");
+
+            var req = new com.taskforce.tf_api.core.dto.request.CreateIssueRelationRequest();
+            req.setTargetIssueId(target);
+            req.setRelationType("RELATES_TO");
+            var created = issueService.addRelation(SLUG, project.getId(), source, req, owner.getId());
+
+            issueService.deleteRelation(SLUG, project.getId(), source, created.getId(), owner.getId());
+
+            assertThat(issueService.listRelations(SLUG, project.getId(), source, owner.getId())).isEmpty();
+        }
+
+        @Test
+        @DisplayName("deleteRelation lève ResourceNotFoundException pour une relation inexistante")
+        void should_reject_delete_unknown_relation() {
+            Long id = newIssueId("RelNone");
+            assertThatThrownBy(() -> issueService.deleteRelation(SLUG, project.getId(), id, 999_999L, owner.getId()))
+                .isInstanceOf(ResourceNotFoundException.class);
+        }
+
+        @Test
+        @DisplayName("addRelation refuse un type de relation invalide (BusinessException)")
+        void should_reject_invalid_relation_type() {
+            Long source = newIssueId("BadRelSource");
+            Long target = newIssueId("BadRelTarget");
+            var req = new com.taskforce.tf_api.core.dto.request.CreateIssueRelationRequest();
+            req.setTargetIssueId(target);
+            req.setRelationType("NOT_A_TYPE");
+
+            assertThatThrownBy(() -> issueService.addRelation(SLUG, project.getId(), source, req, owner.getId()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Type de relation invalide");
+        }
+
+        @Test
+        @DisplayName("updateChecklistItem met à jour le contenu de l'item")
+        void should_update_checklist_content() {
+            Long id = newIssueId("CkContent");
+            var add = new com.taskforce.tf_api.core.dto.request.CreateChecklistItemRequest();
+            add.setContent("Ancien");
+            var item = issueService.addChecklistItem(SLUG, project.getId(), id, owner.getId(), add);
+
+            var upd = new com.taskforce.tf_api.core.dto.request.UpdateChecklistItemRequest();
+            upd.setContent("Nouveau contenu");
+            var updated = issueService.updateChecklistItem(SLUG, project.getId(), id, item.getId(), owner.getId(), upd);
+
+            assertThat(updated.getContent()).isEqualTo("Nouveau contenu");
+        }
+
+        @Test
+        @DisplayName("updateChecklistItem lève ResourceNotFoundException pour un item inexistant")
+        void should_reject_update_unknown_checklist_item() {
+            Long id = newIssueId("CkNone");
+            var upd = new com.taskforce.tf_api.core.dto.request.UpdateChecklistItemRequest();
+            upd.setDone(true);
+            assertThatThrownBy(() -> issueService.updateChecklistItem(
+                    SLUG, project.getId(), id, 999_999L, owner.getId(), upd))
+                .isInstanceOf(ResourceNotFoundException.class);
+        }
+
+        @Test
+        @DisplayName("updateComment refuse la modification par un non-auteur (BusinessException)")
+        void should_reject_update_comment_by_non_author() {
+            Long id = newIssueId("CmtOther");
+            var add = new com.taskforce.tf_api.core.dto.request.CreateIssueCommentRequest();
+            add.setContent("original");
+            var c = issueService.addComment(SLUG, project.getId(), id, add, owner.getId());
+
+            // Un autre membre du workspace
+            User other = userRepository.save(User.builder()
+                .keycloakId("kc-other-cmt").email("other@it.dev").displayName("Other").isActive(true).build());
+            workspaceMemberRepository.save(WorkspaceMember.builder()
+                .workspace(workspace).user(other).role(WorkspaceRole.MEMBER).build());
+
+            var upd = new com.taskforce.tf_api.core.dto.request.CreateIssueCommentRequest();
+            upd.setContent("tentative");
+            assertThatThrownBy(() -> issueService.updateComment(
+                    SLUG, project.getId(), id, c.getId(), upd, other.getId()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("vos propres commentaires");
+        }
+
+        @Test
+        @DisplayName("deleteWorklog refuse la suppression par un non-auteur (BusinessException)")
+        void should_reject_delete_worklog_by_non_author() {
+            Long id = newIssueId("WlOther");
+            var wl = new com.taskforce.tf_api.core.dto.request.LogWorkRequest();
+            wl.setMinutes(45);
+            var w = issueService.addWorklog(SLUG, project.getId(), id, owner.getId(), wl);
+
+            User other = userRepository.save(User.builder()
+                .keycloakId("kc-other-wl").email("otherwl@it.dev").displayName("OtherWl").isActive(true).build());
+            workspaceMemberRepository.save(WorkspaceMember.builder()
+                .workspace(workspace).user(other).role(WorkspaceRole.MEMBER).build());
+
+            assertThatThrownBy(() -> issueService.deleteWorklog(
+                    SLUG, project.getId(), id, w.getId(), other.getId()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("vos propres entrées");
+        }
+
+        @Test
+        @DisplayName("createStatus refuse un nom de statut déjà existant (BusinessException)")
+        void should_reject_duplicate_status_name() {
+            var create = new com.taskforce.tf_api.core.dto.request.CreateIssueStatusRequest();
+            create.setName("Done"); // existe déjà (statut par défaut)
+            create.setColor("#000000");
+            create.setCategory("COMPLETED");
+
+            assertThatThrownBy(() -> issueService.createStatus(SLUG, project.getId(), create, owner.getId()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("existe déjà");
+        }
+
+        @Test
+        @DisplayName("deleteStatus refuse la suppression du statut par défaut (BusinessException)")
+        void should_reject_delete_default_status() {
+            var defaultStatus = issueService.listStatuses(SLUG, project.getId(), owner.getId()).stream()
+                .filter(com.taskforce.tf_api.core.dto.response.IssueStatusResponse::isDefault)
+                .findFirst().orElseThrow();
+
+            assertThatThrownBy(() -> issueService.deleteStatus(
+                    SLUG, project.getId(), defaultStatus.getId(), owner.getId()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("statut par défaut");
+        }
+
+        @Test
+        @DisplayName("getScheduledIssues refuse un demandeur non-membre du workspace (BusinessException)")
+        void should_reject_scheduled_non_member() {
+            User stranger = userRepository.save(User.builder()
+                .keycloakId("kc-stranger-sched").email("strangersched@it.dev").displayName("StrangerS").isActive(true).build());
+
+            assertThatThrownBy(() -> issueService.getScheduledIssues(SLUG, stranger.getId()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Accès refusé");
+        }
+
+        @Test
+        @DisplayName("listMyIssues lève ResourceNotFoundException pour un workspace inexistant")
+        void should_reject_my_issues_unknown_workspace() {
+            assertThatThrownBy(() -> issueService.listMyIssues("slug-inexistant", owner.getId()))
+                .isInstanceOf(ResourceNotFoundException.class);
+        }
     }
 }
