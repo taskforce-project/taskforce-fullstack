@@ -41,9 +41,9 @@ if (-not $ready) { docker logs --tail 30 $pg; docker rm -f $pg | Out-Null; throw
 
 try {
   # -Full → suite complète + rapport sans exclusions. -Verify → mvn verify (gate). -Test ALL → toute la suite.
-  if ($Full)        { $mvnArgs = @("test", "-Pcov-full") }
-  elseif ($Verify)  { $mvnArgs = @("verify") }
-  elseif ($Test -eq "ALL") { $mvnArgs = @("test") }
+  if ($Full)        { $mvnArgs = @("clean", "test", "-Pcov-full") }
+  elseif ($Verify)  { $mvnArgs = @("clean", "verify") }
+  elseif ($Test -eq "ALL") { $mvnArgs = @("clean", "test") }  # clean → exec JaCoCo propre
   else              { $mvnArgs = @("test", "-Dtest=$Test") }
   if ($Offline) { $mvnArgs = @("-o") + $mvnArgs }
   Write-Host "==> mvn $($mvnArgs -join ' ')"
