@@ -95,6 +95,26 @@
 - **Estimation honnête** : ~5641 lignes en scope, 1789 couvertes (31,7 %). Pour **50 %** → +~1032 lignes (≈ ProjectService + reste IssueService + 3-4 services) ; pour **70 %** → +~2160 (sweep quasi complet core.service + core.api). Plusieurs lots. `mvn verify` (gate bloquant) à activer une fois la cible atteinte.
 - **Candidat exclusion supplémentaire** : `BrainTemplateService` (241 l, 0 %) est du Brain OS (coming-soon) mais vit dans `core.service` → à exclure aussi si on veut un ratio cohérent avec `core.service.brain/**` déjà exclu.
 
+## Objectif relevé (02/07) : ≥70 % sur le FULL (hors brain)
+
+- Le user veut **70 % sur tout le backend sauf le Brain OS**. Exclusions JaCoCo réduites à : `brain/**`, `BrainTemplateService`, `KnowledgeService`, `KnowledgeController`, `TfApiApplication` (main). Scope = **6226 lignes**.
+- **BT-P10 (infra critique)** : `jacoco:report` échouait « Unknown block type 15 » → **exec JaCoCo corrompu** car (a) `append=true` par défaut accumulait un exec abîmé par un fork-kill surefire, (b) le fork était tué 30s après `System.exit(0)`. Fix : `<append>false</append>` sur prepare-agent + `<forkedProcessExitTimeoutInSeconds>300</forkedProcessExitTimeoutInSeconds>` (surefire) + `clean` dans `it.ps1` (ALL/Verify/Full). ⇒ rapport stable.
+- Progression full-brain : 49,2 % (brut) → 56,9 % (chat/ged) → **60,3 %** (Groq/Webhook/GitHub/Slack + Misc controllers). 339 tests. Reste ~605 l : StompAuthInterceptor(61), branches service (Issue/Analytics/Workspace/Project ~288), config, controllers restants, + adaptateurs SDK durs (StripeWebhook/Assistant/Agent/Stripe ~435 — mock statique/LLM, en dernier).
+
 ## Convention d'arborescence (confirmée 30/06)
 
 Le dossier `src/test/java/.../` **mirror** `src/main/java/.../` : chaque `*Test.java` vit dans le **même package** que la classe testée (`core/service/SmartAssignServiceTest` ↔ `core/service/SmartAssignService`), ce qui donne aussi accès au package-private. Seules exceptions volontaires (support de test, pas des packages applicatifs) : `config/TestConfig.java` et `util/TestDataBuilder.java`.
+
+## ✅ OBJECTIF 70 % FULL (hors brain) ATTEINT (02/07) — gate strict 0.70 vert
+
+- **71,4 % ligne sur le scope full-minus-brain (4446/6226), 418 tests, 0 échec.** `mvn verify` avec `jacoco:check` BUNDLE LINE **≥ 0,70** → « All coverage checks have been met » (gate relevé de 0,68 → 0,70).
+- Lot final (+44 tests vs 374) :
+  - `GitHubIntegrationServiceIntegrationTest` +3 : statut connecté, `listRepositories`, `listRepoIssues` (RestTemplate mocké via `exchange(..., ParameterizedTypeReference)`). NB entité `Integration.meta` = `Map<String,String>` **NOT NULL** → `.meta(Map.of())` au build.
+  - `SlackIntegrationServiceIntegrationTest` +5 : statut connecté, `addChannel`/`getChannels`, `deleteChannel`, `sendNotification` no-op (sans intégration).
+  - `AssistantServiceTest` (unit) +2 : `buildSystemPrompt` enrichi (membres/projets/`appendMetrics` volumes+charge/issues récentes) + `brainContextBlock` ; fallback avec données+notes.
+  - `AgentServiceTest` (unit) +4 : fast (`runDirect`), deep (`runToolLoop` 1 outil→réponse), outil inconnu (status error), exception LLM→fallback. `groq.rawChat` renvoie des `JsonNode` construits via un vrai `ObjectMapper` en test.
+  - `AnalyticsServiceIntegrationTest` +3 : `generateInsights` upgrade (non-PRO), parse JSON Groq (3 insights, confidence bornée 50-95), fallback JSON vide. Astuce : le `@MockitoBean ObjectMapper` délègue `readTree` à un vrai parseur (`thenAnswer`).
+  - `IssueServiceIntegrationTest` +13 : `listActivity`, `deleteRelation` + branches négatives (non-auteur comment/worklog, doublon nom statut, statut défaut protégé, type relation invalide, checklist inconnue, non-membre scheduled, workspace inconnu my-issues).
+  - `WorkspaceServiceIntegrationTest` +6 : update/remove par MEMBER refusés, remove OWNER refusé, get non-membre, role member étranger, auditLogs OWNER-only.
+  - `ProjectServiceIntegrationTest` +8 : listProjects, labels CRUD (list/update/delete/doublon), get non-membre, doublon membre projet, attach team étrangère, detach non-liée.
+- Reste (hors scope volontaire) : adaptateurs SDK durs encore bas mais tolérés par le gate global (StripeService, StripeWebhookService, RateLimitFilter, OtpService partiel). Le scope global est **au-dessus de 70 %** — DoD couverture remplie.
