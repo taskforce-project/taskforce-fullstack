@@ -261,4 +261,131 @@ class IssueControllerWebMvcTest {
         mockMvc.perform(delete(BASE + "/9/worklogs/1").with(auth())).andExpect(status().is2xxSuccessful());
         mockMvc.perform(delete(BASE + "/9/relations/1").with(auth())).andExpect(status().is2xxSuccessful());
     }
+
+    // ---- endpoints additionnels (2e vague de couverture) -------------------
+
+    @Test
+    @DisplayName("PATCH /{id} (mise à jour issue) → 200 + enveloppe ApiResponse")
+    void update_issue_returns_200() throws Exception {
+        stubUser();
+        when(issueService.updateIssue(anyString(), anyLong(), anyLong(), any(), anyLong()))
+            .thenReturn(issue(9L, "Titre modifié"));
+
+        mockMvc.perform(patch(BASE + "/9").with(auth())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\":\"Titre modifié\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.title").value("Titre modifié"));
+    }
+
+    @Test
+    @DisplayName("PATCH /{id} sans JWT → 401")
+    void update_issue_unauthenticated_returns_401() throws Exception {
+        mockMvc.perform(patch(BASE + "/9")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"title\":\"x\"}"))
+            .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("PATCH et DELETE /statuses/{id} → 2xx")
+    void update_and_delete_status() throws Exception {
+        stubUser();
+        when(issueService.updateStatus(anyString(), anyLong(), anyLong(), any(), anyLong())).thenReturn(null);
+
+        mockMvc.perform(patch(BASE + "/statuses/3").with(auth())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"En cours\"}"))
+            .andExpect(status().is2xxSuccessful());
+        mockMvc.perform(delete(BASE + "/statuses/3").with(auth())).andExpect(status().is2xxSuccessful());
+    }
+
+    @Test
+    @DisplayName("POST /statuses/reorder → 2xx")
+    void reorder_statuses_2xx() throws Exception {
+        stubUser();
+        when(issueService.reorderStatuses(anyString(), anyLong(), any(), anyLong())).thenReturn(List.of());
+
+        mockMvc.perform(post(BASE + "/statuses/reorder").with(auth())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"statuses\":[{\"id\":1,\"position\":0},{\"id\":2,\"position\":1}]}"))
+            .andExpect(status().is2xxSuccessful());
+    }
+
+    @Test
+    @DisplayName("POST /statuses/reorder liste vide (@NotEmpty) → 400")
+    void reorder_statuses_empty_returns_400() throws Exception {
+        stubUser();
+
+        mockMvc.perform(post(BASE + "/statuses/reorder").with(auth())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"statuses\":[]}"))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("PATCH et DELETE /{id}/comments/{commentId} → 2xx")
+    void update_and_delete_comment() throws Exception {
+        stubUser();
+        when(issueService.updateComment(anyString(), anyLong(), anyLong(), anyLong(), any(), anyLong()))
+            .thenReturn(null);
+
+        mockMvc.perform(patch(BASE + "/9/comments/5").with(auth())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"content\":\"Corrigé\"}"))
+            .andExpect(status().is2xxSuccessful());
+        mockMvc.perform(delete(BASE + "/9/comments/5").with(auth())).andExpect(status().is2xxSuccessful());
+    }
+
+    @Test
+    @DisplayName("PATCH /{id}/comments/{commentId} contenu vide (@NotBlank) → 400")
+    void update_comment_blank_returns_400() throws Exception {
+        stubUser();
+
+        mockMvc.perform(patch(BASE + "/9/comments/5").with(auth())
+                .contentType(MediaType.APPLICATION_JSON).content("{}"))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("PATCH /{id}/checklist/{itemId} → 2xx")
+    void update_checklist_item_2xx() throws Exception {
+        stubUser();
+        when(issueService.updateChecklistItem(anyString(), anyLong(), anyLong(), anyLong(), anyLong(), any()))
+            .thenReturn(null);
+
+        mockMvc.perform(patch(BASE + "/9/checklist/2").with(auth())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"done\":true}"))
+            .andExpect(status().is2xxSuccessful());
+    }
+
+    @Test
+    @DisplayName("POST /{id}/smart-assign → 2xx")
+    void smart_assign_2xx() throws Exception {
+        stubUser();
+        when(smartAssignService.recommend(anyString(), anyLong(), anyLong(), anyLong())).thenReturn(null);
+
+        mockMvc.perform(post(BASE + "/9/smart-assign").with(auth()))
+            .andExpect(status().is2xxSuccessful());
+    }
+
+    @Test
+    @DisplayName("POST /smart-assign/bulk → 2xx")
+    void smart_assign_bulk_2xx() throws Exception {
+        stubUser();
+        when(smartAssignService.bulkRecommend(anyString(), anyLong(), anyLong(), any())).thenReturn(List.of());
+
+        mockMvc.perform(post(BASE + "/smart-assign/bulk").with(auth())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"issueIds\":[1,2,3]}"))
+            .andExpect(status().is2xxSuccessful());
+    }
+
+    @Test
+    @DisplayName("POST /smart-assign/bulk liste vide (@NotEmpty) → 400")
+    void smart_assign_bulk_empty_returns_400() throws Exception {
+        stubUser();
+
+        mockMvc.perform(post(BASE + "/smart-assign/bulk").with(auth())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"issueIds\":[]}"))
+            .andExpect(status().isBadRequest());
+    }
 }
