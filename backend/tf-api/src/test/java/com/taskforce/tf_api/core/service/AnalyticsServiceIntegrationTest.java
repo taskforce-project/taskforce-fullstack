@@ -184,4 +184,70 @@ class AnalyticsServiceIntegrationTest extends AbstractIntegrationTest {
 
         assertThat(analyticsService.getCapacity(SLUG, owner.getId(), null)).hasSize(1);
     }
+
+    @Test
+    @DisplayName("getKpis avec des issues complétées calcule résolutions, moyenne, vélocité")
+    void kpis_with_completed_data() {
+        // 3 complétées récemment (ce mois + cette semaine), séquences distinctes
+        var status = issueStatusRepository.save(com.taskforce.tf_api.core.model.IssueStatus.builder()
+            .project(project).name("Done").category(IssueStatusCategory.COMPLETED).build());
+        LocalDateTime[] when = { LocalDateTime.now().minusMinutes(1), LocalDateTime.now().minusHours(2), LocalDateTime.now().minusDays(1) };
+        for (int i = 0; i < when.length; i++) {
+            issueRepository.save(com.taskforce.tf_api.core.model.Issue.builder()
+                .project(project).status(status).reporter(owner).assignee(owner)
+                .sequenceNumber(i + 1).title("d" + i).completedAt(when[i]).build());
+        }
+
+        var kpis = analyticsService.getKpis(SLUG, owner.getId(), null);
+
+        assertThat(kpis.tasksResolved()).isGreaterThanOrEqualTo(3);
+        assertThat(kpis.velocity()).isGreaterThanOrEqualTo(3);
+        // getThroughput DAY exerce les buckets avec données
+        assertThat(analyticsService.getThroughput(SLUG, owner.getId(), null, "DAY")).hasSize(30);
+    }
+
+    @Test
+    @DisplayName("generateInsights sans plan PRO renvoie l'invite d'upgrade (non vide)")
+    void insights_upgrade_when_not_pro() {
+        // planFeatureService.has(...) → false par défaut (mock) → upgradeInsights()
+        var insights = analyticsService.generateInsights(SLUG, owner.getId());
+        assertThat(insights).isNotEmpty();
+    }
+
+    @Test
+    @DisplayName("generateInsights (PRO) parse le JSON Groq en 3 insights")
+    void insights_parsed_from_groq_json() throws Exception {
+        org.mockito.Mockito.when(planFeatureService.has(any(), any())).thenReturn(true);
+        String json = "{\"insights\":["
+            + "{\"agent\":\"COO\",\"agentColor\":\"#0a84ff\",\"category\":\"Operations\",\"urgency\":\"high\",\"confidence\":88,\"action\":\"Ajuster le scope\",\"insight\":\"Trop d'issues ouvertes\"},"
+            + "{\"agent\":\"CPO\",\"category\":\"Product\",\"urgency\":\"medium\",\"confidence\":40,\"action\":\"Prioriser\",\"insight\":\"Backlog large\"},"
+            + "{\"agent\":\"CTO\",\"category\":\"Engineering\",\"urgency\":\"low\",\"confidence\":99,\"action\":\"Revue\",\"insight\":\"Vélocité stable\"}"
+            + "]}";
+        org.mockito.Mockito.when(groqService.chatCompletion(any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean()))
+            .thenReturn(json);
+        // le mock ObjectMapper délègue à un vrai parseur pour readTree
+        org.mockito.Mockito.when(objectMapper.readTree(org.mockito.ArgumentMatchers.anyString()))
+            .thenAnswer(i -> new ObjectMapper().readTree((String) i.getArgument(0)));
+
+        var insights = analyticsService.generateInsights(SLUG, owner.getId());
+
+        assertThat(insights).hasSize(3);
+        // confidence borné dans [50,95]
+        assertThat(insights.get(1).getConfidence()).isEqualTo(50);
+        assertThat(insights.get(2).getConfidence()).isEqualTo(95);
+    }
+
+    @Test
+    @DisplayName("generateInsights (PRO) retombe sur le fallback si le JSON n'a pas d'insights")
+    void insights_fallback_on_empty_json() throws Exception {
+        org.mockito.Mockito.when(planFeatureService.has(any(), any())).thenReturn(true);
+        org.mockito.Mockito.when(groqService.chatCompletion(any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean()))
+            .thenReturn("{}");
+        org.mockito.Mockito.when(objectMapper.readTree(org.mockito.ArgumentMatchers.anyString()))
+            .thenAnswer(i -> new ObjectMapper().readTree((String) i.getArgument(0)));
+
+        var insights = analyticsService.generateInsights(SLUG, owner.getId());
+
+        assertThat(insights).hasSize(1); // fallbackInsights
+    }
 }
