@@ -245,6 +245,15 @@
 
 	<build>
 		<plugins>
+			<!-- Laisse la JVM forkée sortir proprement (le hook d'écriture de jacoco.exec s'exécute au
+			     shutdown) ; sinon surefire la force-kill après 30s → exec corrompu → jacoco:report « Unknown block type ». -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<configuration>
+					<forkedProcessExitTimeoutInSeconds>300</forkedProcessExitTimeoutInSeconds>
+				</configuration>
+			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
@@ -292,6 +301,7 @@
 						<goals>
 							<goal>prepare-agent</goal>
 						</goals>
+					    <configuration><append>false</append></configuration>
 					</execution>
 					<execution>
 						<id>report</id>
@@ -313,7 +323,7 @@
 										<limit>
 											<counter>LINE</counter>
 											<value>COVEREDRATIO</value>
-											<minimum>0.68</minimum>
+											<minimum>0.70</minimum>
 										</limit>
 									</limits>
 								</rule>
