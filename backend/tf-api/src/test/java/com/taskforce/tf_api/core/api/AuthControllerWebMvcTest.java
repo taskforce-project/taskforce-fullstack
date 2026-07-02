@@ -104,4 +104,47 @@ class AuthControllerWebMvcTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.refreshToken").value("r"));
     }
+
+    @Test
+    @DisplayName("POST /api/auth/select-plan valide → 2xx")
+    void select_plan_2xx() throws Exception {
+        when(authService.selectPlan(any())).thenReturn(null);
+
+        mockMvc.perform(post("/api/auth/select-plan").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"a@b.dev\",\"planType\":\"PRO\"}"))
+            .andExpect(status().is2xxSuccessful());
+    }
+
+    @Test
+    @DisplayName("POST /api/auth/resend-otp valide → 2xx")
+    void resend_otp_2xx() throws Exception {
+        when(authService.resendOtp(anyString())).thenReturn(null);
+
+        mockMvc.perform(post("/api/auth/resend-otp").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"a@b.dev\"}"))
+            .andExpect(status().is2xxSuccessful());
+    }
+
+    @Test
+    @DisplayName("POST /api/auth/forgot-password → 2xx")
+    void forgot_password_2xx() throws Exception {
+        mockMvc.perform(post("/api/auth/forgot-password").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"a@b.dev\"}"))
+            .andExpect(status().is2xxSuccessful());
+    }
+
+    @Test
+    @DisplayName("POST /api/auth/reset-password valide → 2xx")
+    void reset_password_2xx() throws Exception {
+        mockMvc.perform(post("/api/auth/reset-password").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"a@b.dev\",\"otpCode\":\"123456\",\"newPassword\":\"password1\"}"))
+            .andExpect(status().is2xxSuccessful());
+    }
+
+    @Test
+    @DisplayName("POST /api/auth/logout (header Bearer) → 2xx")
+    void logout_2xx() throws Exception {
+        mockMvc.perform(post("/api/auth/logout").header("Authorization", "Bearer tok"))
+            .andExpect(status().is2xxSuccessful());
+    }
 }

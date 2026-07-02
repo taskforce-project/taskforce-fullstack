@@ -215,4 +215,50 @@ class IssueControllerWebMvcTest {
                 .content("{\"title\":\"Bug\"}"))
             .andExpect(status().is2xxSuccessful());
     }
+
+    @Test
+    @DisplayName("GET checklist/worklogs/relations → 200")
+    void list_sub_resources() throws Exception {
+        stubUser();
+        when(issueService.listChecklist(anyString(), anyLong(), anyLong(), anyLong())).thenReturn(List.of());
+        when(issueService.listWorklogs(anyString(), anyLong(), anyLong(), anyLong())).thenReturn(List.of());
+        when(issueService.listRelations(anyString(), anyLong(), anyLong(), anyLong())).thenReturn(List.of());
+
+        mockMvc.perform(get(BASE + "/9/checklist").with(auth())).andExpect(status().isOk());
+        mockMvc.perform(get(BASE + "/9/worklogs").with(auth())).andExpect(status().isOk());
+        mockMvc.perform(get(BASE + "/9/relations").with(auth())).andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("POST checklist/worklogs/relations → 2xx")
+    void add_sub_resources() throws Exception {
+        stubUser();
+        when(issueService.addChecklistItem(anyString(), anyLong(), anyLong(), anyLong(), any())).thenReturn(null);
+        when(issueService.addWorklog(anyString(), anyLong(), anyLong(), anyLong(), any())).thenReturn(null);
+        when(issueService.addRelation(anyString(), anyLong(), anyLong(), any(), anyLong())).thenReturn(null);
+
+        mockMvc.perform(post(BASE + "/9/checklist").with(auth())
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content("{\"content\":\"x\"}"))
+            .andExpect(status().is2xxSuccessful());
+        mockMvc.perform(post(BASE + "/9/worklogs").with(auth())
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content("{\"minutes\":30}"))
+            .andExpect(status().is2xxSuccessful());
+        mockMvc.perform(post(BASE + "/9/relations").with(auth())
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content("{\"targetIssueId\":2,\"relationType\":\"RELATES_TO\"}"))
+            .andExpect(status().is2xxSuccessful());
+    }
+
+    @Test
+    @DisplayName("PATCH /{id}/unarchive et DELETEs sous-ressources → 2xx")
+    void unarchive_and_deletes() throws Exception {
+        stubUser();
+        when(issueService.setArchived(anyString(), anyLong(), anyLong(), org.mockito.ArgumentMatchers.anyBoolean(), anyLong()))
+            .thenReturn(issue(9L, "x"));
+
+        mockMvc.perform(patch(BASE + "/9/unarchive").with(auth())).andExpect(status().is2xxSuccessful());
+        mockMvc.perform(delete(BASE + "/9/checklist/1").with(auth())).andExpect(status().is2xxSuccessful());
+        mockMvc.perform(delete(BASE + "/9/worklogs/1").with(auth())).andExpect(status().is2xxSuccessful());
+        mockMvc.perform(delete(BASE + "/9/relations/1").with(auth())).andExpect(status().is2xxSuccessful());
+    }
 }
