@@ -10,11 +10,18 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.test.util.ReflectionTestUtils;
+
+import java.sql.ResultSet;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskforce.tf_api.core.dto.request.SmartAssignPreviewRequest;
@@ -27,6 +34,7 @@ import com.taskforce.tf_api.core.model.Issue;
 import com.taskforce.tf_api.core.model.IssueStatus;
 import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.model.ProjectLabel;
+import com.taskforce.tf_api.core.model.ProjectMember;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.model.WorkspaceMember;
@@ -48,6 +56,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -498,6 +507,255 @@ class SmartAssignServiceTest {
             assertThat(res.getRecommended().getUserId()).isEqualTo(10L);
             // preview de redistribution : ai_runs tracé, mais PAS d'assignment_events
             verify(jdbcTemplate, never()).update(contains("assignment_events"), any(), any(), any(), any(), any());
+        }
+    }
+
+    // =========================================================================
+    // ===== Branches profondes ajoutées (parsing JSON, profils, candidats, growth) =====
+    // =========================================================================
+
+    @Nested
+    @DisplayName("parseJsonStringArray & RowMapper de fetchProfileExtras")
+    class ProfileExtrasParsing {
+
+        /**
+         * Capture le {@link RowMapper} passé à {@code fetchProfileExtras} (SQL « capacity_hours_per_week »),
+         * l'exécute contre un {@link ResultSet} mocké, puis renvoie la {@code ProfileExtras} produite —
+         * le seul moyen d'exercer la lambda + {@code parseJsonStringArray} (record + méthode privés,
+         * jamais invoqués par un JdbcTemplate mocké).
+         */
+        @SuppressWarnings("unchecked")
+        private RowMapper<Object> captureExtrasRowMapper() {
+            User u = user(10L, "Alice");
+            stubResolvedContext();
+            stubWorkspaceMembers(u);
+
+            service.preview(SLUG, PROJECT_ID, REQUESTER, previewRequest(IssuePriority.MEDIUM));
+
+            ArgumentCaptor<RowMapper<Object>> captor = ArgumentCaptor.forClass(RowMapper.class);
+            verify(jdbcTemplate).query(contains("capacity_hours_per_week"), captor.capture(), eq(WS_ID), eq(10L));
+            return captor.getValue();
+        }
+
+        @ParameterizedTest(name = "growth_target_skills={0} → tags parsés={1}")
+        @CsvSource({
+            "'[\"java\",\"REACT\"]', 2",   // tableau valide → minusculisé, 2 tags
+            "'[]', 0",                      // tableau vide → 0 tag
+            "'{\"not\":\"array\"}', 0",     // JSON objet (pas un tableau) → 0 tag
+            "'not-json', 0"                 // JSON malformé → repli tolérant, 0 tag
+        })
+        @DisplayName("parseJsonStringArray tolère tableau valide / non-tableau / malformé sans lever")
+        void should_parse_target_skills_tolerantly(String targetJson, int expectedCount) throws Exception {
+            RowMapper<Object> rowMapper = captureExtrasRowMapper();
+
+            ResultSet rs = mock(ResultSet.class);
+            when(rs.getObject("capacity_hours_per_week", Integer.class)).thenReturn(32);
+            when(rs.getString("seniority")).thenReturn("senior");
+            when(rs.getBoolean("growth_enabled")).thenReturn(true);
+            when(rs.getString("growth_target_skills")).thenReturn(targetJson);
+
+            // Ne doit jamais lever, même sur JSON malformé ; targetSkills reflète le parsing tolérant.
+            Object extras = rowMapper.mapRow(rs, 0);
+            assertThat(extras).isNotNull();
+            // Vérification via le toString du record privé : liste vide "[]" vs liste non vide "[...]".
+            if (expectedCount == 0) {
+                assertThat(extras.toString()).contains("targetSkills=[]");
+            } else {
+                assertThat(extras.toString()).contains("targetSkills=[").doesNotContain("targetSkills=[]");
+            }
+        }
+
+        @ParameterizedTest(name = "growth_target_skills={0} (null/blank) → liste vide")
+        @NullAndEmptySource
+        @ValueSource(strings = {"   "})
+        @DisplayName("parseJsonStringArray renvoie une liste vide sur null / vide / blanc")
+        void should_return_empty_on_null_or_blank(String blank) throws Exception {
+            RowMapper<Object> rowMapper = captureExtrasRowMapper();
+
+            ResultSet rs = mock(ResultSet.class);
+            when(rs.getObject("capacity_hours_per_week", Integer.class)).thenReturn(null);
+            when(rs.getString("seniority")).thenReturn(null);
+            when(rs.getBoolean("growth_enabled")).thenReturn(false);
+            when(rs.getString("growth_target_skills")).thenReturn(blank);
+
+            Object extras = rowMapper.mapRow(rs, 0);
+            assertThat(extras).isNotNull();
+            assertThat(extras.toString()).contains("targetSkills=[]");
+        }
+    }
+
+    @Nested
+    @DisplayName("RowMapper de fetchHistoryStats")
+    class HistoryStatsParsing {
+
+        @SuppressWarnings("unchecked")
+        @Test
+        @DisplayName("agrège total / taux acceptés / taux résolus depuis assignment_events")
+        void should_map_history_stats_row() throws Exception {
+            User u = user(10L, "Alice");
+            stubResolvedContext();
+            stubWorkspaceMembers(u);
+
+            service.preview(SLUG, PROJECT_ID, REQUESTER, previewRequest(IssuePriority.MEDIUM));
+
+            ArgumentCaptor<RowMapper<Object>> captor = ArgumentCaptor.forClass(RowMapper.class);
+            verify(jdbcTemplate).query(contains("assignment_events"), captor.capture(), eq(WS_ID), eq(10L));
+            RowMapper<Object> rowMapper = captor.getValue();
+
+            ResultSet rs = mock(ResultSet.class);
+            when(rs.getInt("total")).thenReturn(7);
+            when(rs.getDouble("accepted_rate")).thenReturn(0.8);
+            when(rs.getDouble("resolved_rate")).thenReturn(0.9);
+
+            Object stats = rowMapper.mapRow(rs, 0);
+            assertThat(stats).isNotNull();
+            assertThat(stats.toString()).contains("7").contains("0.8").contains("0.9");
+        }
+    }
+
+    @Nested
+    @DisplayName("fetchProfileSkills — variantes JSON du profil")
+    class ProfileSkillsParsing {
+
+        /** Override du défaut vide : le profil renvoie un JSON brut arbitraire (objet, malformé…). */
+        private void stubSkillsRaw(long userId, String rawJson) {
+            doReturn(List.of(rawJson)).when(jdbcTemplate)
+                .query(contains("skills_json"), any(RowMapper.class), eq(WS_ID), eq(userId));
+        }
+
+        @Test
+        @DisplayName("un skills_json au format OBJET expose ses clés comme compétences (label match)")
+        void should_parse_object_form_skills() {
+            User alice = user(10L, "Alice");
+            stubResolvedContext();
+            stubWorkspaceMembers(alice);
+            // Forme objet : les NOMS de champs deviennent les skills → « java » matche le label.
+            stubSkillsRaw(10L, "{\"Java\":5,\"docker\":2}");
+
+            SmartAssignResponse res = service.preview(SLUG, PROJECT_ID, REQUESTER,
+                previewRequest(IssuePriority.MEDIUM, "java"));
+
+            assertThat(res.getRecommended().getUserId()).isEqualTo(10L);
+            assertThat(res.getRecommended().getMatchedSkills()).containsExactly("java");
+            assertThat(res.getRecommended().getLabelMatchCount()).isEqualTo(1);
+        }
+
+        @ParameterizedTest(name = "skills_json={0} → aucun skill (repli tolérant)")
+        @ValueSource(strings = {"not-json-at-all", "{ broken", "42"})
+        @DisplayName("un skills_json malformé/scalaire ne lève pas et ne matche aucun label")
+        void should_tolerate_malformed_skills_json(String rawJson) {
+            User alice = user(10L, "Alice");
+            stubResolvedContext();
+            stubWorkspaceMembers(alice);
+            stubSkillsRaw(10L, rawJson);
+
+            SmartAssignResponse res = service.preview(SLUG, PROJECT_ID, REQUESTER,
+                previewRequest(IssuePriority.MEDIUM, "java"));
+
+            // Candidat toujours retenu (parsing tolérant), mais sans compétence matchée.
+            assertThat(res.getRecommended().getUserId()).isEqualTo(10L);
+            assertThat(res.getRecommended().getMatchedSkills()).isEmpty();
+            assertThat(res.getRecommended().getLabelMatchCount()).isZero();
+        }
+    }
+
+    @Nested
+    @DisplayName("resolveCandidates — projet privé (membres du projet)")
+    class PrivateProjectCandidates {
+
+        private void stubPrivateContext() {
+            project.setPublic(false);
+            when(workspaceRepository.findBySlug(SLUG)).thenReturn(Optional.of(workspace));
+            when(workspaceMemberRepository.existsByWorkspaceIdAndUserId(WS_ID, REQUESTER)).thenReturn(true);
+            when(projectRepository.findById(PROJECT_ID)).thenReturn(Optional.of(project));
+        }
+
+        private ProjectMember projectMember(User u) {
+            return ProjectMember.builder().user(u).build();
+        }
+
+        @Test
+        @DisplayName("projet privé : source = membres du projet, l'inactif est filtré")
+        void should_use_project_members_and_filter_inactive() {
+            User active = user(10L, "Active");
+            User inactive = User.builder().id(11L).email("ghost@ex.dev").displayName("Ghost").isActive(false).build();
+            stubPrivateContext();
+            when(projectMemberRepository.findByProjectId(PROJECT_ID))
+                .thenReturn(List.of(projectMember(active), projectMember(inactive)));
+
+            SmartAssignResponse res = service.preview(SLUG, PROJECT_ID, REQUESTER,
+                previewRequest(IssuePriority.MEDIUM));
+
+            assertThat(res.getRecommended().getUserId()).isEqualTo(10L);
+            assertThat(res.getAlternatives()).isEmpty(); // l'inactif est écarté
+            // le repo workspace ne doit PAS être consulté sur un projet privé
+            verify(workspaceMemberRepository, never()).findByWorkspaceId(anyLong());
+        }
+
+        @Test
+        @DisplayName("projet privé sans membre actif : strategy=no-candidate")
+        void should_return_no_candidate_for_empty_private_project() {
+            stubPrivateContext();
+            when(projectMemberRepository.findByProjectId(PROJECT_ID)).thenReturn(List.of());
+
+            SmartAssignResponse res = service.preview(SLUG, PROJECT_ID, REQUESTER,
+                previewRequest(IssuePriority.MEDIUM));
+
+            assertThat(res.getRecommended()).isNull();
+            assertThat(res.getStrategy()).isEqualTo("no-candidate");
+            assertThat(res.isFallbackUsed()).isTrue();
+        }
+    }
+
+    @Nested
+    @DisplayName("computeGrowthScore — garde-fous additionnels")
+    class GrowthGuards {
+
+        private SmartAssignResponse previewGrowth(long userId, IssuePriority priority, int storyPoints,
+                                                  double usualComplexity, int openCrossPoints) {
+            User diego = user(userId, "Diego");
+            stubWorkspaceMembers(diego);
+            stubSkills(userId, "react"); // adjacence générique (mode projet, growth auto)
+            lenient().doReturn(usualComplexity).when(jdbcTemplate)
+                .queryForObject(contains("story_points"), eq(Double.class), eq(WS_ID), eq(userId));
+            if (openCrossPoints > 0) {
+                when(issueRepository.findByWorkspaceSlugAndAssigneeId(SLUG, userId))
+                    .thenReturn(List.of(openIssue(1L, openCrossPoints, IssueStatusCategory.STARTED)));
+            }
+            return service.rankForRedistribution(workspace, project,
+                Issue.builder().id(99L).title("Stretch task").description("Learn").project(project)
+                    .status(IssueStatus.builder().category(IssueStatusCategory.BACKLOG).build())
+                    .priority(priority).storyPoints(storyPoints)
+                    .labels(List.of(label("react"))).build());
+        }
+
+        @Test
+        @DisplayName("aucun bonus stretch si la disponibilité est insuffisante (< 60)")
+        void should_not_grow_when_availability_too_low() {
+            project.setGrowthMode(true);
+            // 12 pts ouverts × facteur 4 = 48 → dispo 52 < 60 → garde-fou marge de capacité.
+            SmartAssignResponse res = previewGrowth(12L, IssuePriority.MEDIUM, 4, 2.0, 12);
+
+            assertThat(res.getRecommended().getFactors()).noneMatch(f -> f.contains("stretch"));
+        }
+
+        @Test
+        @DisplayName("aucun bonus stretch si l'écart de complexité dépasse la fenêtre (saut, pas stretch)")
+        void should_not_grow_when_jump_too_big() {
+            project.setGrowthMode(true);
+            // usual=1 → fenêtre stretch [2,4] ; 8 pts > usual+3 → hors fenêtre.
+            SmartAssignResponse res = previewGrowth(13L, IssuePriority.MEDIUM, 8, 1.0, 0);
+
+            assertThat(res.getRecommended().getFactors()).noneMatch(f -> f.contains("stretch"));
+        }
+
+        @Test
+        @DisplayName("aucun bonus stretch si l'issue n'est pas estimée (story points nuls)")
+        void should_not_grow_when_unestimated() {
+            project.setGrowthMode(true);
+            SmartAssignResponse res = previewGrowth(14L, IssuePriority.MEDIUM, 0, 2.0, 0);
+
+            assertThat(res.getRecommended().getFactors()).noneMatch(f -> f.contains("stretch"));
         }
     }
 }
