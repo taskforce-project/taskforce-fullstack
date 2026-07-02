@@ -21,11 +21,13 @@ import com.taskforce.tf_api.core.enums.WorkspaceRole;
 import com.taskforce.tf_api.core.model.Issue;
 import com.taskforce.tf_api.core.model.IssueStatus;
 import com.taskforce.tf_api.core.model.Project;
+import com.taskforce.tf_api.core.model.ProjectLabel;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.model.WorkspaceMember;
 import com.taskforce.tf_api.core.repository.IssueRepository;
 import com.taskforce.tf_api.core.repository.IssueStatusRepository;
+import com.taskforce.tf_api.core.repository.ProjectLabelRepository;
 import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
@@ -63,6 +65,7 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
     @Autowired private ProjectRepository projectRepository;
     @Autowired private IssueStatusRepository issueStatusRepository;
     @Autowired private IssueRepository issueRepository;
+    @Autowired private ProjectLabelRepository projectLabelRepository;
 
     @MockitoBean private SimpMessagingTemplate messagingTemplate;
     @MockitoBean private NotificationService notificationService;
@@ -667,6 +670,450 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
         @DisplayName("listMyIssues lève ResourceNotFoundException pour un workspace inexistant")
         void should_reject_my_issues_unknown_workspace() {
             assertThatThrownBy(() -> issueService.listMyIssues("slug-inexistant", owner.getId()))
+                .isInstanceOf(ResourceNotFoundException.class);
+        }
+    }
+
+    // =========================================================================
+    // Ajouts couverture profonde — updateIssue (branches par champ), resolveMentions,
+    // createIssue (branches optionnelles), listStatuses/updateStatus.
+    // =========================================================================
+    @Nested
+    @DisplayName("branches profondes updateIssue (par champ)")
+    class DeepUpdate {
+
+        /** Crée un second membre du workspace, réutilisable comme assigné. */
+        private User newMember(String kc) {
+            User u = userRepository.save(User.builder()
+                .keycloakId(kc).email(kc + "@it.dev").displayName("M-" + kc).isActive(true).build());
+            workspaceMemberRepository.save(WorkspaceMember.builder()
+                .workspace(workspace).user(u).role(WorkspaceRole.MEMBER).build());
+            return u;
+        }
+
+        private ProjectLabel newLabel(String name) {
+            return projectLabelRepository.save(ProjectLabel.builder()
+                .project(project).name(name).color("#123456").build());
+        }
+
+        @Test
+        @DisplayName("assigner un nouvel assigné déclenche notifyAssigned et journalise ASSIGNEE_CHANGED")
+        void assign_triggers_notification() {
+            Long id = newIssueId("assign");
+            User member = newMember("kc-assignee");
+
+            UpdateIssueRequest u = new UpdateIssueRequest();
+            u.setAssigneeId(member.getId());
+
+            IssueResponse res = issueService.updateIssue(SLUG, project.getId(), id, u, owner.getId());
+
+            assertThat(res.getAssignee().getId()).isEqualTo(member.getId());
+            Issue reloaded = issueRepository.findById(id).orElseThrow();
+            assertThat(reloaded.getAssignee().getId()).isEqualTo(member.getId());
+            verify(notificationService).notifyAssigned(any(Issue.class), any(User.class));
+        }
+
+        @Test
+        @DisplayName("passer au statut COMPLETED renseigne completedAt et notifie le changement de statut")
+        void status_to_completed_sets_completedAt() {
+            Long id = newIssueId("toDone");
+
+            UpdateIssueRequest u = new UpdateIssueRequest();
+            u.setStatusId(doneStatus.getId());
+
+            IssueResponse res = issueService.updateIssue(SLUG, project.getId(), id, u, owner.getId());
+
+            assertThat(res.getStatus().getName()).isEqualTo("Done");
+            assertThat(res.getCompletedAt()).isNotNull();
+            Issue reloaded = issueRepository.findById(id).orElseThrow();
+            assertThat(reloaded.getCompletedAt()).isNotNull();
+            verify(notificationService).notifyStatusChanged(any(Issue.class), any(User.class), contains("Done"));
+        }
+
+        @Test
+        @DisplayName("rouvrir une issue terminée (statut non COMPLETED) remet completedAt à null")
+        void status_reopen_clears_completedAt() {
+            Long id = newIssueId("reopen");
+
+            // 1) terminer
+            UpdateIssueRequest done = new UpdateIssueRequest();
+            done.setStatusId(doneStatus.getId());
+            issueService.updateIssue(SLUG, project.getId(), id, done, owner.getId());
+            assertThat(issueRepository.findById(id).orElseThrow().getCompletedAt()).isNotNull();
+
+            // 2) rouvrir → statut UNSTARTED (Todo par défaut)
+            IssueStatus todo = issueStatusRepository.findByProjectIdOrderByPosition(project.getId()).stream()
+                .filter(s -> s.getCategory() == IssueStatusCategory.UNSTARTED)
+                .findFirst().orElseThrow();
+            UpdateIssueRequest reopen = new UpdateIssueRequest();
+            reopen.setStatusId(todo.getId());
+            IssueResponse res = issueService.updateIssue(SLUG, project.getId(), id, reopen, owner.getId());
+
+            assertThat(res.getCompletedAt()).isNull();
+            assertThat(issueRepository.findById(id).orElseThrow().getCompletedAt()).isNull();
+        }
+
+        @Test
+        @DisplayName("changer de parent journalise PARENT_CHANGED et persiste le nouveau parent")
+        void change_parent() {
+            Long parentA = newIssueId("parentA");
+            Long parentB = newIssueId("parentB");
+            Long child = newIssueId("child");
+
+            UpdateIssueRequest toA = new UpdateIssueRequest();
+            toA.setParentId(parentA);
+            issueService.updateIssue(SLUG, project.getId(), child, toA, owner.getId());
+
+            UpdateIssueRequest toB = new UpdateIssueRequest();
+            toB.setParentId(parentB);
+            IssueResponse res = issueService.updateIssue(SLUG, project.getId(), child, toB, owner.getId());
+
+            assertThat(res.getParent().getId()).isEqualTo(parentB);
+            Issue reloaded = issueRepository.findById(child).orElseThrow();
+            assertThat(reloaded.getParent().getId()).isEqualTo(parentB);
+        }
+
+        @Test
+        @DisplayName("changer les labels (ajout puis remplacement) journalise LABEL_ADDED/LABEL_REMOVED")
+        void change_labels() {
+            Long id = newIssueId("labels");
+            ProjectLabel l1 = newLabel("urgent");
+            ProjectLabel l2 = newLabel("backend");
+            ProjectLabel l3 = newLabel("frontend");
+
+            // 1) ajouter l1 + l2
+            UpdateIssueRequest add = new UpdateIssueRequest();
+            add.setLabelIds(List.of(l1.getId(), l2.getId()));
+            IssueResponse res1 = issueService.updateIssue(SLUG, project.getId(), id, add, owner.getId());
+            assertThat(res1.getLabels()).extracting(l -> l.getId())
+                .containsExactlyInAnyOrder(l1.getId(), l2.getId());
+
+            em.flush();
+            em.clear();
+
+            // 2) remplacer par l2 + l3 (retire l1, ajoute l3)
+            UpdateIssueRequest replace = new UpdateIssueRequest();
+            replace.setLabelIds(List.of(l2.getId(), l3.getId()));
+            IssueResponse res2 = issueService.updateIssue(SLUG, project.getId(), id, replace, owner.getId());
+            assertThat(res2.getLabels()).extracting(l -> l.getId())
+                .containsExactlyInAnyOrder(l2.getId(), l3.getId());
+
+            // journal contient bien un LABEL_ADDED et un LABEL_REMOVED
+            var actions = issueService.listActivity(SLUG, project.getId(), id, owner.getId()).stream()
+                .map(a -> a.getAction()).toList();
+            assertThat(actions).contains(
+                com.taskforce.tf_api.core.enums.IssueActivityType.LABEL_ADDED,
+                com.taskforce.tf_api.core.enums.IssueActivityType.LABEL_REMOVED);
+        }
+
+        @Test
+        @DisplayName("labelIds = liste vide retire tous les labels de l'issue")
+        void clear_labels_with_empty_list() {
+            Long id = newIssueId("clearLabels");
+            ProjectLabel l1 = newLabel("temp");
+
+            UpdateIssueRequest add = new UpdateIssueRequest();
+            add.setLabelIds(List.of(l1.getId()));
+            issueService.updateIssue(SLUG, project.getId(), id, add, owner.getId());
+
+            em.flush();
+            em.clear();
+
+            UpdateIssueRequest clear = new UpdateIssueRequest();
+            clear.setLabelIds(List.of());
+            IssueResponse res = issueService.updateIssue(SLUG, project.getId(), id, clear, owner.getId());
+
+            assertThat(res.getLabels()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("storyPoints = 0 retire l'estimation (null en base)")
+        void story_points_zero_clears_estimate() {
+            Long id = newIssueId("sp");
+
+            UpdateIssueRequest set = new UpdateIssueRequest();
+            set.setStoryPoints(13);
+            IssueResponse withSp = issueService.updateIssue(SLUG, project.getId(), id, set, owner.getId());
+            assertThat(withSp.getStoryPoints()).isEqualTo(13);
+
+            UpdateIssueRequest clear = new UpdateIssueRequest();
+            clear.setStoryPoints(0);
+            IssueResponse res = issueService.updateIssue(SLUG, project.getId(), id, clear, owner.getId());
+
+            assertThat(res.getStoryPoints()).isNull();
+            assertThat(issueRepository.findById(id).orElseThrow().getStoryPoints()).isNull();
+        }
+
+        @Test
+        @DisplayName("changer le type journalise TYPE_CHANGED et persiste le nouveau type")
+        void change_type() {
+            Long id = newIssueId("type");
+            var types = issueService.listTypes(SLUG, project.getId(), owner.getId());
+            Long typeId = types.get(types.size() - 1).getId();
+
+            UpdateIssueRequest u = new UpdateIssueRequest();
+            u.setTypeId(typeId);
+            IssueResponse res = issueService.updateIssue(SLUG, project.getId(), id, u, owner.getId());
+
+            assertThat(res.getType().getId()).isEqualTo(typeId);
+        }
+
+        @Test
+        @DisplayName("changer le titre pour une valeur identique ne journalise pas TITLE_CHANGED")
+        void same_title_no_activity() {
+            Long id = newIssueId("Titre stable");
+
+            UpdateIssueRequest u = new UpdateIssueRequest();
+            u.setTitle("Titre stable"); // identique à l'existant
+            issueService.updateIssue(SLUG, project.getId(), id, u, owner.getId());
+
+            var actions = issueService.listActivity(SLUG, project.getId(), id, owner.getId()).stream()
+                .map(a -> a.getAction()).toList();
+            assertThat(actions).doesNotContain(
+                com.taskforce.tf_api.core.enums.IssueActivityType.TITLE_CHANGED);
+        }
+
+        @Test
+        @DisplayName("changer le statut vers le même statut n'a aucun effet (pas de notification)")
+        void same_status_no_effect() {
+            IssueResponse created = issueService.createIssue(
+                SLUG, project.getId(), createRequest("sameStatus", null), owner.getId());
+            Long currentStatusId = created.getStatus().getId();
+
+            UpdateIssueRequest u = new UpdateIssueRequest();
+            u.setStatusId(currentStatusId);
+            issueService.updateIssue(SLUG, project.getId(), created.getId(), u, owner.getId());
+
+            verify(notificationService, never()).notifyStatusChanged(any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("statut d'un autre projet est rejeté (IDOR ResourceNotFoundException)")
+        void update_status_from_other_project_rejected() {
+            Long id = newIssueId("idorStatus");
+            Project other = projectRepository.save(Project.builder()
+                .workspace(workspace).name("Other2").identifier("OT2").createdBy(owner).build());
+            IssueStatus foreign = issueStatusRepository.save(IssueStatus.builder()
+                .project(other).name("Foreign").category(IssueStatusCategory.STARTED).position((short) 0).build());
+
+            UpdateIssueRequest u = new UpdateIssueRequest();
+            u.setStatusId(foreign.getId());
+
+            assertThatThrownBy(() -> issueService.updateIssue(SLUG, project.getId(), id, u, owner.getId()))
+                .isInstanceOf(ResourceNotFoundException.class);
+        }
+    }
+
+    // =========================================================================
+    @Nested
+    @DisplayName("résolution des @mentions (addComment)")
+    class Mentions {
+
+        @Test
+        @DisplayName("mention par partie locale de l'email d'un membre → notifyMentions appelé avec ce membre")
+        void mention_by_local_part_resolves() {
+            User bob = userRepository.save(User.builder()
+                .keycloakId("kc-bob").email("bob.martin@it.dev").displayName("Bob").isActive(true).build());
+            workspaceMemberRepository.save(WorkspaceMember.builder()
+                .workspace(workspace).user(bob).role(WorkspaceRole.MEMBER).build());
+
+            Long id = newIssueId("Mentioned");
+            var req = new com.taskforce.tf_api.core.dto.request.CreateIssueCommentRequest();
+            req.setContent("Salut @bob.martin peux-tu regarder ?");
+
+            issueService.addComment(SLUG, project.getId(), id, req, owner.getId());
+
+            @SuppressWarnings("unchecked")
+            org.mockito.ArgumentCaptor<List<User>> captor =
+                org.mockito.ArgumentCaptor.forClass(List.class);
+            verify(notificationService).notifyMentions(
+                any(Issue.class), any(User.class), captor.capture(), contains("@bob.martin"));
+            assertThat(captor.getValue()).extracting(User::getId).contains(bob.getId());
+        }
+
+        @Test
+        @DisplayName("mention par email complet d'un membre → résolue")
+        void mention_by_full_email_resolves() {
+            User carol = userRepository.save(User.builder()
+                .keycloakId("kc-carol").email("carol@it.dev").displayName("Carol").isActive(true).build());
+            workspaceMemberRepository.save(WorkspaceMember.builder()
+                .workspace(workspace).user(carol).role(WorkspaceRole.MEMBER).build());
+
+            Long id = newIssueId("MentionFull");
+            var req = new com.taskforce.tf_api.core.dto.request.CreateIssueCommentRequest();
+            req.setContent("cc @carol@it.dev");
+
+            issueService.addComment(SLUG, project.getId(), id, req, owner.getId());
+
+            @SuppressWarnings("unchecked")
+            org.mockito.ArgumentCaptor<List<User>> captor =
+                org.mockito.ArgumentCaptor.forClass(List.class);
+            verify(notificationService).notifyMentions(
+                any(Issue.class), any(User.class), captor.capture(), any(String.class));
+            assertThat(captor.getValue()).extracting(User::getId).contains(carol.getId());
+        }
+
+        @Test
+        @DisplayName("mention d'un non-membre / inconnu est ignorée (notifyMentions jamais appelé)")
+        void unknown_mention_ignored() {
+            // Utilisateur existant mais NON membre du workspace
+            userRepository.save(User.builder()
+                .keycloakId("kc-ext").email("externe@it.dev").displayName("Externe").isActive(true).build());
+
+            Long id = newIssueId("MentionUnknown");
+            var req = new com.taskforce.tf_api.core.dto.request.CreateIssueCommentRequest();
+            req.setContent("Merci @externe et @inexistant");
+
+            issueService.addComment(SLUG, project.getId(), id, req, owner.getId());
+
+            verify(notificationService, never()).notifyMentions(any(), any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("commentaire sans @ ne déclenche pas notifyMentions")
+        void no_at_no_mentions() {
+            Long id = newIssueId("NoMention");
+            var req = new com.taskforce.tf_api.core.dto.request.CreateIssueCommentRequest();
+            req.setContent("Commentaire simple sans mention");
+
+            issueService.addComment(SLUG, project.getId(), id, req, owner.getId());
+
+            verify(notificationService, never()).notifyMentions(any(), any(), any(), any());
+        }
+    }
+
+    // =========================================================================
+    @Nested
+    @DisplayName("branches profondes createIssue (options)")
+    class DeepCreate {
+
+        @Test
+        @DisplayName("createIssue avec statut/type/parent/dates explicites persiste tous les champs")
+        void create_with_all_optional_fields() {
+            Long parentId = newIssueId("Parent complet");
+            Long typeId = issueService.listTypes(SLUG, project.getId(), owner.getId()).get(0).getId();
+
+            CreateIssueRequest req = createRequest("Enfant complet", owner.getId());
+            req.setStatusId(doneStatus.getId());
+            req.setTypeId(typeId);
+            req.setParentId(parentId);
+            req.setStartDate("2026-08-01");
+            req.setDueDate("2026-08-31");
+
+            IssueResponse res = issueService.createIssue(SLUG, project.getId(), req, owner.getId());
+
+            assertThat(res.getStatus().getName()).isEqualTo("Done");
+            assertThat(res.getType().getId()).isEqualTo(typeId);
+            assertThat(res.getParent().getId()).isEqualTo(parentId);
+            assertThat(res.getStartDate()).isEqualTo(java.time.LocalDate.parse("2026-08-01"));
+            assertThat(res.getDueDate()).isEqualTo(java.time.LocalDate.parse("2026-08-31"));
+            assertThat(res.getAssignee().getId()).isEqualTo(owner.getId());
+        }
+
+        @Test
+        @DisplayName("createIssue sans priorité applique la priorité NONE par défaut")
+        void create_defaults_priority_none() {
+            CreateIssueRequest req = new CreateIssueRequest();
+            req.setTitle("Sans priorité");
+            // priority laissée null
+
+            IssueResponse res = issueService.createIssue(SLUG, project.getId(), req, owner.getId());
+
+            assertThat(res.getPriority()).isEqualTo(IssuePriority.NONE);
+        }
+
+        @Test
+        @DisplayName("createIssue avec un type d'un autre projet est rejeté (ResourceNotFoundException)")
+        void create_with_foreign_type_rejected() {
+            Project other = projectRepository.save(Project.builder()
+                .workspace(workspace).name("Other3").identifier("OT3").createdBy(owner).build());
+            issueService.seedDefaultStatusesAndTypes(other);
+            Long foreignTypeId = issueService.listTypes(SLUG, other.getId(), owner.getId()).get(0).getId();
+
+            CreateIssueRequest req = createRequest("bad type", null);
+            req.setTypeId(foreignTypeId);
+
+            assertThatThrownBy(() -> issueService.createIssue(SLUG, project.getId(), req, owner.getId()))
+                .isInstanceOf(ResourceNotFoundException.class);
+        }
+    }
+
+    // =========================================================================
+    @Nested
+    @DisplayName("branches profondes statuts (listStatuses / updateStatus)")
+    class DeepStatuses {
+
+        @Test
+        @DisplayName("listStatuses réamorce les statuts par défaut quand le projet n'en a aucun")
+        void list_statuses_reseeds_when_empty() {
+            Project fresh = projectRepository.save(Project.builder()
+                .workspace(workspace).name("Vierge").identifier("VRG").createdBy(owner).build());
+            // aucun seedDefaultStatusesAndTypes ici → doit être réamorcé par listStatuses
+
+            var statuses = issueService.listStatuses(SLUG, fresh.getId(), owner.getId());
+
+            assertThat(statuses).hasSize(5);
+        }
+
+        @Test
+        @DisplayName("updateStatus avec isDefault=true bascule le statut par défaut (l'ancien perd le flag)")
+        void update_status_changes_default() {
+            var statuses = issueService.listStatuses(SLUG, project.getId(), owner.getId());
+            var oldDefault = statuses.stream()
+                .filter(com.taskforce.tf_api.core.dto.response.IssueStatusResponse::isDefault)
+                .findFirst().orElseThrow();
+            var notDefault = statuses.stream()
+                .filter(s -> !s.isDefault())
+                .findFirst().orElseThrow();
+
+            var upd = new com.taskforce.tf_api.core.dto.request.UpdateIssueStatusRequest();
+            upd.setIsDefault(true);
+            var res = issueService.updateStatus(SLUG, project.getId(), notDefault.getId(), upd, owner.getId());
+
+            assertThat(res.isDefault()).isTrue();
+
+            em.flush();
+            em.clear();
+
+            var after = issueService.listStatuses(SLUG, project.getId(), owner.getId());
+            assertThat(after.stream().filter(com.taskforce.tf_api.core.dto.response.IssueStatusResponse::isDefault))
+                .hasSize(1);
+            assertThat(after.stream()
+                .filter(s -> s.getId().equals(oldDefault.getId()))
+                .findFirst().orElseThrow().isDefault()).isFalse();
+        }
+
+        @Test
+        @DisplayName("updateStatus applique nom/couleur/position simultanément")
+        void update_status_name_color_position() {
+            var status = issueService.listStatuses(SLUG, project.getId(), owner.getId()).stream()
+                .filter(s -> !s.isDefault())
+                .findFirst().orElseThrow();
+
+            var upd = new com.taskforce.tf_api.core.dto.request.UpdateIssueStatusRequest();
+            upd.setName("Renommé");
+            upd.setColor("#abcdef");
+            upd.setPosition((short) 9);
+            var res = issueService.updateStatus(SLUG, project.getId(), status.getId(), upd, owner.getId());
+
+            assertThat(res.getName()).isEqualTo("Renommé");
+            assertThat(res.getColor()).isEqualTo("#abcdef");
+            assertThat(res.getPosition()).isEqualTo((short) 9);
+        }
+
+        @Test
+        @DisplayName("updateStatus d'un statut d'un autre projet est rejeté (ResourceNotFoundException)")
+        void update_status_foreign_rejected() {
+            Project other = projectRepository.save(Project.builder()
+                .workspace(workspace).name("Other4").identifier("OT4").createdBy(owner).build());
+            IssueStatus foreign = issueStatusRepository.save(IssueStatus.builder()
+                .project(other).name("Etr").category(IssueStatusCategory.STARTED).position((short) 0).build());
+
+            var upd = new com.taskforce.tf_api.core.dto.request.UpdateIssueStatusRequest();
+            upd.setName("x");
+
+            assertThatThrownBy(() -> issueService.updateStatus(
+                    SLUG, project.getId(), foreign.getId(), upd, owner.getId()))
                 .isInstanceOf(ResourceNotFoundException.class);
         }
     }
