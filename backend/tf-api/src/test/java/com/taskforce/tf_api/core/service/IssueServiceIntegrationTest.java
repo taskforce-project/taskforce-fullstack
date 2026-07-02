@@ -382,4 +382,88 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
                 .hasMessageContaining("existe déjà");
         }
     }
+
+    // =========================================================================
+    @Nested
+    @DisplayName("branches update / comments / checklist / worklog / reorder / my-work")
+    class MoreBranches {
+
+        @Test
+        @DisplayName("updateIssue applique description/priorité/story points/échéance")
+        void update_many_fields() {
+            Long id = newIssueId("upd");
+            UpdateIssueRequest u = new UpdateIssueRequest();
+            u.setDescription("nouvelle description");
+            u.setPriority(IssuePriority.URGENT);
+            u.setStoryPoints(8);
+            u.setDueDate("2026-09-01");
+
+            IssueResponse r = issueService.updateIssue(SLUG, project.getId(), id, u, owner.getId());
+
+            assertThat(r.getStoryPoints()).isEqualTo(8);
+            assertThat(r.getPriority()).isEqualTo(IssuePriority.URGENT);
+        }
+
+        @Test
+        @DisplayName("addComment → updateComment → deleteComment")
+        void comments_update_delete() {
+            Long id = newIssueId("c");
+            var add = new com.taskforce.tf_api.core.dto.request.CreateIssueCommentRequest();
+            add.setContent("v1");
+            var c = issueService.addComment(SLUG, project.getId(), id, add, owner.getId());
+
+            var upd = new com.taskforce.tf_api.core.dto.request.CreateIssueCommentRequest();
+            upd.setContent("v2");
+            issueService.updateComment(SLUG, project.getId(), id, c.getId(), upd, owner.getId());
+            issueService.deleteComment(SLUG, project.getId(), id, c.getId(), owner.getId());
+
+            assertThat(issueService.listComments(SLUG, project.getId(), id, owner.getId())).isEmpty();
+        }
+
+        @Test
+        @DisplayName("deleteChecklistItem et deleteWorklog retirent les éléments")
+        void delete_checklist_and_worklog() {
+            Long id = newIssueId("cw");
+            var ck = new com.taskforce.tf_api.core.dto.request.CreateChecklistItemRequest();
+            ck.setContent("étape");
+            var item = issueService.addChecklistItem(SLUG, project.getId(), id, owner.getId(), ck);
+            issueService.deleteChecklistItem(SLUG, project.getId(), id, item.getId(), owner.getId());
+            assertThat(issueService.listChecklist(SLUG, project.getId(), id, owner.getId())).isEmpty();
+
+            var wl = new com.taskforce.tf_api.core.dto.request.LogWorkRequest();
+            wl.setMinutes(30);
+            var w = issueService.addWorklog(SLUG, project.getId(), id, owner.getId(), wl);
+            issueService.deleteWorklog(SLUG, project.getId(), id, w.getId(), owner.getId());
+            assertThat(issueService.listWorklogs(SLUG, project.getId(), id, owner.getId())).isEmpty();
+        }
+
+        @Test
+        @DisplayName("reorderStatuses renvoie la liste réordonnée")
+        void reorder_statuses() {
+            var statuses = issueService.listStatuses(SLUG, project.getId(), owner.getId());
+            var req = new com.taskforce.tf_api.core.dto.request.ReorderStatusesRequest();
+            var positions = new java.util.ArrayList<com.taskforce.tf_api.core.dto.request.ReorderStatusesRequest.StatusPosition>();
+            short pos = 0;
+            for (var s : statuses) {
+                var p = new com.taskforce.tf_api.core.dto.request.ReorderStatusesRequest.StatusPosition();
+                p.setId(s.getId());
+                p.setPosition(pos++);
+                positions.add(p);
+            }
+            req.setStatuses(positions);
+
+            assertThat(issueService.reorderStatuses(SLUG, project.getId(), req, owner.getId())).isNotEmpty();
+        }
+
+        @Test
+        @DisplayName("listMyIssues et getScheduledIssues remontent l'issue assignée/planifiée")
+        void my_work_and_scheduled() {
+            CreateIssueRequest cr = createRequest("mine", owner.getId());
+            cr.setDueDate("2026-09-15");
+            issueService.createIssue(SLUG, project.getId(), cr, owner.getId());
+
+            assertThat(issueService.listMyIssues(SLUG, owner.getId())).isNotEmpty();
+            assertThat(issueService.getScheduledIssues(SLUG, owner.getId())).isNotEmpty();
+        }
+    }
 }

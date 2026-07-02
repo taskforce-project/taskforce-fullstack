@@ -252,5 +252,45 @@ class NotificationServiceTest {
 
             verify(notificationRepository, org.mockito.Mockito.atLeastOnce()).save(any());
         }
+
+        @Test
+        @DisplayName("notifyDueDate crée une alerte si pas déjà présente, sinon déduplique")
+        void should_notify_due_date_with_dedup() {
+            User assignee = user(20L, "a");
+            Issue issue = issue(assignee, user(21L, "r"));
+            when(notificationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+            // 1er appel : pas de doublon → crée
+            when(notificationRepository.existsByRecipientIdAndIssueIdentifierAndTypeAndAcknowledgedFalse(anyLong(), anyString(), anyString()))
+                .thenReturn(false);
+            service.notifyDueDate(issue, true);
+            verify(notificationRepository, times(1)).save(any());
+
+            // 2e appel : alerte déjà présente → dédup (pas de nouveau save)
+            when(notificationRepository.existsByRecipientIdAndIssueIdentifierAndTypeAndAcknowledgedFalse(anyLong(), anyString(), anyString()))
+                .thenReturn(true);
+            service.notifyDueDate(issue, true);
+            verify(notificationRepository, times(1)).save(any()); // toujours 1
+        }
+
+        @Test
+        @DisplayName("notifyDueDate ne fait rien si l'issue n'a pas d'assigné")
+        void should_skip_due_date_without_assignee() {
+            service.notifyDueDate(issue(null, user(21L, "r")), false);
+            verify(notificationRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("notifyOverload notifie chaque destinataire (hors dédup)")
+        void should_notify_overload() {
+            when(notificationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+            when(notificationRepository.existsByRecipientIdAndIssueIdentifierAndTypeAndAcknowledgedFalse(anyLong(), anyString(), anyString()))
+                .thenReturn(false);
+
+            service.notifyOverload(workspace, user(20L, "member"), 12, 8,
+                java.util.List.of(user(1L, "owner"), user(2L, "admin")));
+
+            verify(notificationRepository, times(2)).save(any());
+        }
     }
 }

@@ -52,6 +52,7 @@ class ProjectServiceIntegrationTest extends AbstractIntegrationTest {
     @Autowired private ProjectMemberRepository projectMemberRepository;
     @Autowired private ProjectLabelRepository projectLabelRepository;
     @Autowired private com.taskforce.tf_api.core.repository.ProjectFavoriteRepository projectFavoriteRepository;
+    @Autowired private com.taskforce.tf_api.core.repository.TeamRepository teamRepository;
 
     @org.springframework.test.context.bean.override.mockito.MockitoBean
     private IssueService issueService;
@@ -237,6 +238,67 @@ class ProjectServiceIntegrationTest extends AbstractIntegrationTest {
 
             assertThatThrownBy(() -> projectService.addMember(SLUG, created.getId(), owner.getId(), add))
                 .isInstanceOf(BusinessException.class);
+        }
+    }
+
+    // =========================================================================
+    @Nested
+    @DisplayName("teams / removeMember / unfavorite")
+    class TeamsAndMore {
+
+        private com.taskforce.tf_api.core.model.Workspace ws() {
+            return workspaceRepository.findBySlug(SLUG).orElseThrow();
+        }
+
+        @Test
+        @DisplayName("attachTeam associe une équipe, listProjectTeams la voit, detachTeam la retire ; doublon refusé")
+        void should_attach_list_detach_team() {
+            ProjectResponse project = projectService.createProject(SLUG, owner.getId(), req("WithTeam", "WTE"));
+            com.taskforce.tf_api.core.model.Team team = teamRepository.save(
+                com.taskforce.tf_api.core.model.Team.builder().workspace(ws()).name("Backend").createdBy(owner).build());
+
+            projectService.attachTeam(SLUG, project.getId(), team.getId(), owner.getId());
+            assertThat(projectService.listProjectTeams(SLUG, project.getId(), owner.getId())).hasSize(1);
+
+            assertThatThrownBy(() -> projectService.attachTeam(SLUG, project.getId(), team.getId(), owner.getId()))
+                .isInstanceOf(BusinessException.class);
+
+            projectService.detachTeam(SLUG, project.getId(), team.getId(), owner.getId());
+            assertThat(projectService.listProjectTeams(SLUG, project.getId(), owner.getId())).isEmpty();
+        }
+
+        @Test
+        @DisplayName("removeMember retire un membre du projet")
+        void should_remove_member() {
+            ProjectResponse project = projectService.createProject(SLUG, owner.getId(), req("RM", "RMV"));
+            User bob = userRepository.save(User.builder()
+                .keycloakId("kc-rmb").email("rmb@it.dev").displayName("Bob").isActive(true).build());
+            workspaceMemberRepository.save(WorkspaceMember.builder().workspace(ws()).user(bob).role(WorkspaceRole.MEMBER).build());
+            var add = new com.taskforce.tf_api.core.dto.request.AddProjectMemberRequest();
+            add.setEmail("rmb@it.dev");
+            add.setRole(ProjectRole.MEMBER);
+            projectService.addMember(SLUG, project.getId(), owner.getId(), add);
+            Long pmId = projectMemberRepository.findByProjectIdAndUserId(project.getId(), bob.getId()).orElseThrow().getId();
+
+            projectService.removeMember(SLUG, project.getId(), owner.getId(), pmId);
+
+            assertThat(projectService.listMembers(SLUG, project.getId(), owner.getId())).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("unfavoriteProject est idempotent quand le projet n'est pas en favori")
+        void should_unfavorite_idempotent() {
+            ProjectResponse project = projectService.createProject(SLUG, owner.getId(), req("Unfav", "UNF"));
+
+            assertThat(projectService.unfavoriteProject(SLUG, project.getId(), owner.getId()).isFavorite()).isFalse();
+        }
+
+        @Test
+        @DisplayName("getProjectActivity renvoie des points d'activité (parcourt la fenêtre de jours)")
+        void should_get_project_activity() {
+            ProjectResponse project = projectService.createProject(SLUG, owner.getId(), req("Act", "ACT"));
+
+            assertThat(projectService.getProjectActivity(SLUG, project.getId(), owner.getId(), 14)).isNotEmpty();
         }
     }
 }

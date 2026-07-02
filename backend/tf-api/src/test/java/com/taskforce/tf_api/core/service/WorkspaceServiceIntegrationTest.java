@@ -240,5 +240,30 @@ class WorkspaceServiceIntegrationTest extends AbstractIntegrationTest {
 
             assertThat(res.getRole()).isEqualTo(WorkspaceRole.ADMIN);
         }
+
+        @Test
+        @DisplayName("getWorkspaceBySlug / listWorkspacesByUser retrouvent le workspace du membre")
+        void should_get_and_list() {
+            WorkspaceResponse ws = workspaceService.createNewWorkspace(owner.getId(), req("Getter"));
+
+            assertThat(workspaceService.getWorkspaceBySlug(ws.getSlug(), owner.getId()).getSlug()).isEqualTo(ws.getSlug());
+            assertThat(workspaceService.listWorkspacesByUser(owner.getId())).isNotEmpty();
+        }
+
+        @Test
+        @DisplayName("removeMember retire un membre non-owner")
+        void should_remove_member() {
+            Long wsId = createWs();
+            User dan = persistUser("dan");
+            var invite = new com.taskforce.tf_api.core.dto.request.InviteMemberRequest();
+            invite.setEmail("dan@it.dev");
+            invite.setRole(WorkspaceRole.MEMBER);
+            workspaceService.inviteMember(wsId, owner.getId(), invite);
+            Long memberId = workspaceMemberRepository.findByWorkspaceIdAndUserId(wsId, dan.getId()).orElseThrow().getId();
+
+            workspaceService.removeMember(wsId, owner.getId(), memberId);
+
+            assertThat(workspaceMemberRepository.findByWorkspaceIdAndUserId(wsId, dan.getId())).isEmpty();
+        }
     }
 }

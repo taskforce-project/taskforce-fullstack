@@ -140,4 +140,48 @@ class AnalyticsServiceIntegrationTest extends AbstractIntegrationTest {
     void workload_not_null() {
         assertThat(analyticsService.getWorkload(SLUG, owner.getId(), 7)).isNotNull();
     }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.taskforce.tf_api.core.repository.CycleRepository cycleRepository;
+
+    @Test
+    @DisplayName("getBurndown avec un cycle ACTIF renvoie des points (parcourt les jours)")
+    void burndown_with_active_cycle() {
+        cycleRepository.save(com.taskforce.tf_api.core.model.Cycle.builder()
+            .project(project)
+            .name("Sprint actif")
+            .status(com.taskforce.tf_api.core.enums.CycleStatus.ACTIVE)
+            .startDate(java.time.LocalDate.now().minusDays(3))
+            .endDate(java.time.LocalDate.now().plusDays(3))
+            .createdBy(owner)
+            .build());
+
+        assertThat(analyticsService.getBurndown(SLUG, owner.getId(), null)).isNotEmpty();
+    }
+
+    @Test
+    @DisplayName("getWorkload agrège une issue ouverte assignée avec échéance proche")
+    void workload_with_due_issue() {
+        var status = issueStatusRepository.save(com.taskforce.tf_api.core.model.IssueStatus.builder()
+            .project(project).name("Todo").category(IssueStatusCategory.UNSTARTED).build());
+        issueRepository.save(com.taskforce.tf_api.core.model.Issue.builder()
+            .project(project).status(status).reporter(owner).assignee(owner)
+            .sequenceNumber(1).title("Due bientôt")
+            .dueDate(java.time.LocalDate.now().plusDays(2))
+            .build());
+
+        assertThat(analyticsService.getWorkload(SLUG, owner.getId(), 7)).isNotNull();
+    }
+
+    @Test
+    @DisplayName("getCapacity agrège les issues ouvertes par membre")
+    void capacity_with_open_issue() {
+        var status = issueStatusRepository.save(com.taskforce.tf_api.core.model.IssueStatus.builder()
+            .project(project).name("Todo").category(IssueStatusCategory.UNSTARTED).build());
+        issueRepository.save(com.taskforce.tf_api.core.model.Issue.builder()
+            .project(project).status(status).reporter(owner).assignee(owner)
+            .sequenceNumber(1).title("Ouverte").build());
+
+        assertThat(analyticsService.getCapacity(SLUG, owner.getId(), null)).hasSize(1);
+    }
 }
