@@ -187,5 +187,162 @@ class CycleServiceIntegrationTest extends AbstractIntegrationTest {
             assertThatThrownBy(() -> cycleService.addIssueToCycle(SLUG, projectId(), cycle.getId(), add, owner.getId()))
                 .isInstanceOf(ResourceNotFoundException.class);
         }
+
+        @Test
+        @DisplayName("listCycleIssues renvoie les issues du cycle")
+        void should_list_cycle_issues() {
+            CycleResponse cycle = cycleService.createCycle(SLUG, projectId(), req("Sprint 1"), owner.getId());
+            Issue issue = persistIssue(project, "Task 1");
+            AddIssueToCycleRequest add = new AddIssueToCycleRequest();
+            add.setIssueId(issue.getId());
+            cycleService.addIssueToCycle(SLUG, projectId(), cycle.getId(), add, owner.getId());
+
+            assertThat(cycleService.listCycleIssues(SLUG, projectId(), cycle.getId(), owner.getId())).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("removeIssueFromCycle retire l'issue du cycle")
+        void should_remove_issue_from_cycle() {
+            CycleResponse cycle = cycleService.createCycle(SLUG, projectId(), req("Sprint 1"), owner.getId());
+            Issue issue = persistIssue(project, "Task 1");
+            AddIssueToCycleRequest add = new AddIssueToCycleRequest();
+            add.setIssueId(issue.getId());
+            cycleService.addIssueToCycle(SLUG, projectId(), cycle.getId(), add, owner.getId());
+            assertThat(cycleIssueRepository.countByCycleId(cycle.getId())).isEqualTo(1);
+
+            cycleService.removeIssueFromCycle(SLUG, projectId(), cycle.getId(), issue.getId(), owner.getId());
+
+            assertThat(cycleIssueRepository.countByCycleId(cycle.getId())).isZero();
+        }
+
+        @Test
+        @DisplayName("removeIssueFromCycle lève ResourceNotFoundException si l'issue n'est pas dans le cycle")
+        void should_throw_when_removing_absent_issue() {
+            CycleResponse cycle = cycleService.createCycle(SLUG, projectId(), req("Sprint 1"), owner.getId());
+            Issue issue = persistIssue(project, "Absent");
+
+            assertThatThrownBy(() ->
+                cycleService.removeIssueFromCycle(SLUG, projectId(), cycle.getId(), issue.getId(), owner.getId()))
+                .isInstanceOf(ResourceNotFoundException.class);
+        }
+
+        @Test
+        @DisplayName("addIssueToCycle lève ResourceNotFoundException pour une issue inexistante")
+        void should_throw_when_issue_unknown() {
+            CycleResponse cycle = cycleService.createCycle(SLUG, projectId(), req("Sprint 1"), owner.getId());
+            AddIssueToCycleRequest add = new AddIssueToCycleRequest();
+            add.setIssueId(999_999L);
+
+            assertThatThrownBy(() -> cycleService.addIssueToCycle(SLUG, projectId(), cycle.getId(), add, owner.getId()))
+                .isInstanceOf(ResourceNotFoundException.class);
+        }
+    }
+
+    // =========================================================================
+    @Nested
+    @DisplayName("CRUD cycle — branches additionnelles")
+    class CrudAdditional {
+
+        @Test
+        @DisplayName("listCycles renvoie les cycles du projet")
+        void should_list_cycles() {
+            cycleService.createCycle(SLUG, projectId(), req("Sprint 1"), owner.getId());
+            cycleService.createCycle(SLUG, projectId(), req("Sprint 2"), owner.getId());
+
+            assertThat(cycleService.listCycles(SLUG, projectId(), owner.getId())).hasSize(2);
+        }
+
+        @Test
+        @DisplayName("getCycle renvoie le cycle demandé")
+        void should_get_cycle() {
+            CycleResponse created = cycleService.createCycle(SLUG, projectId(), req("Sprint 1"), owner.getId());
+
+            CycleResponse res = cycleService.getCycle(SLUG, projectId(), created.getId(), owner.getId());
+
+            assertThat(res.getId()).isEqualTo(created.getId());
+            assertThat(res.getName()).isEqualTo("Sprint 1");
+            assertThat(res.getIssueCount()).isZero();
+        }
+
+        @Test
+        @DisplayName("updateCycle met à jour nom, description et dates")
+        void should_update_fields() {
+            CycleResponse created = cycleService.createCycle(SLUG, projectId(), req("Sprint 1"), owner.getId());
+
+            UpdateCycleRequest upd = new UpdateCycleRequest();
+            upd.setName("Sprint renommé");
+            upd.setDescription("nouvelle desc");
+            upd.setStartDate(java.time.LocalDate.of(2026, 1, 1));
+            upd.setEndDate(java.time.LocalDate.of(2026, 1, 15));
+
+            CycleResponse res = cycleService.updateCycle(SLUG, projectId(), created.getId(), upd, owner.getId());
+
+            assertThat(res.getName()).isEqualTo("Sprint renommé");
+            assertThat(res.getDescription()).isEqualTo("nouvelle desc");
+            assertThat(res.getStartDate()).isEqualTo(java.time.LocalDate.of(2026, 1, 1));
+            assertThat(res.getEndDate()).isEqualTo(java.time.LocalDate.of(2026, 1, 15));
+        }
+
+        @Test
+        @DisplayName("updateCycle refuse un nom déjà pris par un autre cycle")
+        void should_reject_duplicate_name_on_update() {
+            cycleService.createCycle(SLUG, projectId(), req("Sprint 1"), owner.getId());
+            CycleResponse second = cycleService.createCycle(SLUG, projectId(), req("Sprint 2"), owner.getId());
+
+            UpdateCycleRequest upd = new UpdateCycleRequest();
+            upd.setName("Sprint 1");
+
+            assertThatThrownBy(() -> cycleService.updateCycle(SLUG, projectId(), second.getId(), upd, owner.getId()))
+                .isInstanceOf(BusinessException.class);
+        }
+
+        @Test
+        @DisplayName("updateCycle tolère le même nom (pas de conflit avec soi-même)")
+        void should_allow_same_name_on_update() {
+            CycleResponse created = cycleService.createCycle(SLUG, projectId(), req("Sprint 1"), owner.getId());
+
+            UpdateCycleRequest upd = new UpdateCycleRequest();
+            upd.setName("Sprint 1");
+            upd.setDescription("maj");
+
+            CycleResponse res = cycleService.updateCycle(SLUG, projectId(), created.getId(), upd, owner.getId());
+
+            assertThat(res.getName()).isEqualTo("Sprint 1");
+            assertThat(res.getDescription()).isEqualTo("maj");
+        }
+
+        @Test
+        @DisplayName("deleteCycle supprime le cycle")
+        void should_delete_cycle() {
+            CycleResponse created = cycleService.createCycle(SLUG, projectId(), req("Sprint 1"), owner.getId());
+
+            cycleService.deleteCycle(SLUG, projectId(), created.getId(), owner.getId());
+
+            assertThat(cycleRepository.findById(created.getId())).isEmpty();
+        }
+
+        @Test
+        @DisplayName("deleteCycle lève ResourceNotFoundException pour un cycle inconnu")
+        void should_throw_when_deleting_unknown_cycle() {
+            assertThatThrownBy(() -> cycleService.deleteCycle(SLUG, projectId(), 999_999L, owner.getId()))
+                .isInstanceOf(ResourceNotFoundException.class);
+        }
+
+        @Test
+        @DisplayName("resolveProject lève ResourceNotFoundException pour un projet inconnu")
+        void should_throw_when_project_unknown() {
+            assertThatThrownBy(() -> cycleService.listCycles(SLUG, 999_999L, owner.getId()))
+                .isInstanceOf(ResourceNotFoundException.class);
+        }
+
+        @Test
+        @DisplayName("refuse l'accès à un non-membre du workspace (IDOR)")
+        void should_reject_non_member() {
+            User intruder = userRepository.save(User.builder()
+                .keycloakId("kc-intruder").email("intruder@it.dev").displayName("Intruder").isActive(true).build());
+
+            assertThatThrownBy(() -> cycleService.listCycles(SLUG, projectId(), intruder.getId()))
+                .isInstanceOf(BusinessException.class);
+        }
     }
 }
