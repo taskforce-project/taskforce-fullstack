@@ -96,4 +96,65 @@ class SlackIntegrationServiceIntegrationTest extends AbstractIntegrationTest {
         // Aucune intégration persistée → la branche ifPresent ne s'exécute pas
         service.sendNotification(ws.getId(), "hello");
     }
+
+    @Test
+    @DisplayName("handleCallback échange le code, extrait team.id/team.name et persiste l'intégration Slack")
+    void handle_callback_persists_integration() {
+        org.mockito.Mockito.doReturn(org.springframework.http.ResponseEntity.ok(java.util.Map.of(
+                "ok", true,
+                "access_token", "xoxb-123",
+                "team", java.util.Map.of("id", "T42", "name", "Acme Corp"))))
+            .when(restTemplate).exchange(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.eq(org.springframework.http.HttpMethod.POST),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(org.springframework.core.ParameterizedTypeReference.class));
+
+        String redirect = service.handleCallback("the-code", SLUG);
+
+        assertThat(redirect).contains("/" + SLUG + "/settings").contains("slack=connected");
+        var status = service.getStatus(SLUG);
+        assertThat(status.connected()).isTrue();
+        assertThat(status.meta()).containsEntry("teamName", "Acme Corp").containsEntry("teamId", "T42");
+    }
+
+    @Test
+    @DisplayName("handleCallback lève une erreur si la réponse Slack a ok=false")
+    void handle_callback_fails_when_not_ok() {
+        org.mockito.Mockito.doReturn(org.springframework.http.ResponseEntity.ok(java.util.Map.of(
+                "ok", false, "error", "invalid_code")))
+            .when(restTemplate).exchange(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.eq(org.springframework.http.HttpMethod.POST),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(org.springframework.core.ParameterizedTypeReference.class));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.handleCallback("bad", SLUG))
+            .isInstanceOf(RuntimeException.class);
+    }
+
+    @Test
+    @DisplayName("sendNotification poste sur le 1er canal actif via l'API Slack chat.postMessage")
+    void send_notification_posts_to_active_channel() {
+        connectSlack();
+        service.addChannel(SLUG,
+            new com.taskforce.tf_api.core.dto.request.SlackChannelRequest("C777", "alertes", java.util.List.of()));
+        var ws = workspaceRepository.findBySlug(SLUG).orElseThrow();
+
+        service.sendNotification(ws.getId(), "Nouvelle issue !");
+
+        org.mockito.Mockito.verify(restTemplate).postForObject(
+            org.mockito.ArgumentMatchers.eq("https://slack.com/api/chat.postMessage"),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.eq(java.util.Map.class));
+    }
+
+    @Test
+    @DisplayName("sendNotification avec intégration mais sans canal actif ne poste rien")
+    void send_notification_no_channel_no_post() {
+        connectSlack(); // intégration présente, aucun canal
+        var ws = workspaceRepository.findBySlug(SLUG).orElseThrow();
+
+        service.sendNotification(ws.getId(), "silence");
+
+        org.mockito.Mockito.verifyNoInteractions(restTemplate);
+    }
 }
