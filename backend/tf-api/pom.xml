@@ -278,23 +278,12 @@
 				<version>0.8.12</version>
 					<configuration>
 						<excludes>
-							<exclude>**/dto/**</exclude>
-							<exclude>**/model/**</exclude>
-							<exclude>**/config/**</exclude>
+							<!-- Hors périmètre : Brain OS (knowledge graph, coming-soon) + classe main. Tout le reste est testé. -->
 							<exclude>**/TfApiApplication.*</exclude>
-							<exclude>com/taskforce/tf_api/core/service/agent/**</exclude>
 							<exclude>com/taskforce/tf_api/core/service/brain/**</exclude>
 							<exclude>**/BrainTemplateService.*</exclude>
-							<exclude>com/taskforce/tf_api/modules/**</exclude>
-							<!-- Adaptateurs d'intégration externe (non testables sans API live : GitHub/Slack/Stripe/Groq/webhooks sortants) -->
-							<exclude>**/GitHubIntegrationService.*</exclude>
-							<exclude>**/SlackIntegrationService.*</exclude>
-							<exclude>**/StripeWebhookService.*</exclude>
-							<exclude>**/AssistantService.*</exclude>
 							<exclude>**/KnowledgeService.*</exclude>
-							<exclude>**/WebhookService.*</exclude>
-							<exclude>**/GroqService.*</exclude>
-							<exclude>**/StripeService.*</exclude>
+							<exclude>com/taskforce/tf_api/core/api/KnowledgeController.*</exclude>
 						</excludes>
 					</configuration>
 				<executions>
