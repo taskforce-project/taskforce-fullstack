@@ -72,6 +72,63 @@ class WorkspaceServiceIntegrationTest extends AbstractIntegrationTest {
     }
 
     // =========================================================================
+    // createWorkspace(User, firstName) — chemin d'inscription (B-T5 tr.3, branches profondes)
+    // =========================================================================
+    @Nested
+    @DisplayName("createWorkspace (inscription)")
+    class CreateAtRegistration {
+
+        @Test
+        @DisplayName("utilise le prénom Keycloak comme base du nom et amorce un brain BLANK")
+        void should_build_name_from_first_name_and_seed_blank() {
+            Workspace ws = workspaceService.createWorkspace(owner, "Alice");
+
+            assertThat(ws.getId()).isNotNull();
+            assertThat(ws.getName()).isEqualTo("Alice's Workspace");
+            assertThat(ws.getSlug()).isNotBlank();
+
+            WorkspaceMember member = workspaceMemberRepository
+                .findByWorkspaceIdAndUserId(ws.getId(), owner.getId()).orElseThrow();
+            assertThat(member.getRole()).isEqualTo(WorkspaceRole.OWNER);
+
+            verify(brainSeedingService).seedBrain(any(Workspace.class),
+                eq(com.taskforce.tf_api.core.enums.BrainTemplateType.BLANK), eq(owner.getEmail()));
+        }
+
+        @Test
+        @DisplayName("sans prénom, retombe sur la partie locale de l'email pour le nom")
+        void should_fallback_to_email_local_part_when_no_first_name() {
+            Workspace ws = workspaceService.createWorkspace(owner, null);
+
+            // owner.email = "ws-owner@it.dev" → partie locale "ws-owner"
+            assertThat(ws.getName()).isEqualTo("ws-owner's Workspace");
+        }
+
+        @Test
+        @DisplayName("un prénom blanc retombe aussi sur l'email")
+        void should_fallback_to_email_when_first_name_blank() {
+            Workspace ws = workspaceService.createWorkspace(owner, "   ");
+
+            assertThat(ws.getName()).isEqualTo("ws-owner's Workspace");
+        }
+
+        @Test
+        @DisplayName("collision de slug : deux workspaces de même base reçoivent des slugs distincts (suffixe)")
+        void should_generate_unique_slug_on_collision() {
+            Workspace first = workspaceService.createWorkspace(owner, "Dupe");
+
+            User other = userRepository.save(User.builder()
+                .keycloakId("kc-dupe").email("dupe2@it.dev").displayName("Dupe2")
+                .isActive(true).planType(PlanType.PRO).build());
+            Workspace second = workspaceService.createWorkspace(other, "Dupe");
+
+            assertThat(first.getSlug()).isEqualTo("dupe");
+            assertThat(second.getSlug()).isNotEqualTo(first.getSlug());
+            assertThat(second.getSlug()).startsWith("dupe-");
+        }
+    }
+
+    // =========================================================================
     @Nested
     @DisplayName("createNewWorkspace")
     class Create {
@@ -115,6 +172,30 @@ class WorkspaceServiceIntegrationTest extends AbstractIntegrationTest {
             WorkspaceResponse third = workspaceService.createNewWorkspace(pro.getId(), req("P3"));
 
             assertThat(third).isNotNull();
+        }
+
+        @Test
+        @DisplayName("gabarit de brain valide (saas, insensible à la casse) est transmis au seeding")
+        void should_parse_valid_brain_template() {
+            CreateWorkspaceRequest r = req("Templated");
+            r.setBrainTemplate("saas");
+
+            workspaceService.createNewWorkspace(owner.getId(), r);
+
+            verify(brainSeedingService).seedBrain(any(Workspace.class),
+                eq(com.taskforce.tf_api.core.enums.BrainTemplateType.SAAS), eq(owner.getEmail()));
+        }
+
+        @Test
+        @DisplayName("gabarit de brain inconnu retombe sur BLANK")
+        void should_fallback_brain_template_when_unknown() {
+            CreateWorkspaceRequest r = req("Bad Template");
+            r.setBrainTemplate("does-not-exist");
+
+            workspaceService.createNewWorkspace(owner.getId(), r);
+
+            verify(brainSeedingService).seedBrain(any(Workspace.class),
+                eq(com.taskforce.tf_api.core.enums.BrainTemplateType.BLANK), eq(owner.getEmail()));
         }
     }
 
