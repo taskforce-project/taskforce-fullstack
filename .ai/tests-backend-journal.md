@@ -118,3 +118,13 @@ Le dossier `src/test/java/.../` **mirror** `src/main/java/.../` : chaque `*Test.
   - `WorkspaceServiceIntegrationTest` +6 : update/remove par MEMBER refusés, remove OWNER refusé, get non-membre, role member étranger, auditLogs OWNER-only.
   - `ProjectServiceIntegrationTest` +8 : listProjects, labels CRUD (list/update/delete/doublon), get non-membre, doublon membre projet, attach team étrangère, detach non-liée.
 - Reste (hors scope volontaire) : adaptateurs SDK durs encore bas mais tolérés par le gate global (StripeService, StripeWebhookService, RateLimitFilter, OtpService partiel). Le scope global est **au-dessus de 70 %** — DoD couverture remplie.
+
+## Lot sécurité/config (02/07) : 74,7 % — gate relevé à 0,73
+
+- **74,7 % ligne sur le scope hors-brain (4651/6226), 455 tests, 0 échec.** Gate `jacoco:check` BUNDLE LINE **≥ 0,73** vert. +37 tests vs 418.
+- **Priorité sécurité/RGPD (demande user)** — package `shared.security` **40 % → 91 %** :
+  - `RateLimitFilterTest` (7) : passage sous quota, 429 au dépassement (AUTH_STRICT 10/min), cloisonnement buckets par IP, profils AI/refresh (20/min), résolution IP `X-Forwarded-For`/`X-Real-IP`/`remoteAddr`, chaîne jamais appelée si bloqué.
+  - `EncryptedStringConverterTest` (9) : round-trip AES-256-GCM (préfixe `enc:`), IV non-déterministe, null/legacy-clair/clé-absente passe-plat, déchiffrement tolérant (chiffré corrompu → entrée), `EncryptionKeyHolder` (ctor configure la clé statique ; secret vide = désactivé). `@AfterEach` remet la clé à null (état statique partagé).
+  - `StompAuthInterceptorTest` étendu (+10, total 14) : CONNECT token invalide avalé / email inconnu / header non-Bearer ignoré ; SUBSCRIBE & SEND membre-autorisé vs non-membre→`AccessDeniedException`, destination hors-canal ignorée, canal sans auth→refus.
+- **Configs Spring** `shared.config` **10 % → 78 %** : `SharedConfigBeanTest` (11) — smoke des bean-factories (Cors/OpenApi/RateLimit/Groq/Mail/Minio/OAuth2/Jpa/Otp beans + `StripeConfig.init()` @PostConstruct + `JwtDecoderConfig.jwtDecoder()` HS512). Assumé comme tests de **fumée** (pas de logique branchée) ; `KeycloakConfig`/`WebSocketConfig` volontairement exclus (client lourd / collaborateur requis).
+- Reste (durs) : SlackIntegrationService 58, IssueService 57 (branches profondes), StripeService 51 (SDK statique), SmartAssignService 42, WorkspaceService 40, GitHubIntegrationService 39, UserService 38, controllers Auth/Workspace/Integration ~35 chacun.
