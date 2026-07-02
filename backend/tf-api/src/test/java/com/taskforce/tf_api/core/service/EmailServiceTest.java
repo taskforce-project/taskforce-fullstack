@@ -209,4 +209,137 @@ class EmailServiceTest {
                     .hasMessageContaining("Erreur lors de l'envoi de l'email");
         }
     }
+
+    @Nested
+    @DisplayName("Send Welcome Email — best-effort")
+    class SendWelcomeEmailBestEffortTests {
+
+        @Test
+        @DisplayName("devrait avaler l'exception d'envoi sans la propager")
+        void sendWelcomeEmail_withMailError_shouldNotThrow() {
+            // Given
+            when(templateEngine.process(anyString(), any(Context.class)))
+                    .thenReturn("<html>Welcome</html>");
+            doThrow(new RuntimeException("SMTP down"))
+                    .when(mailSender).send(any(MimeMessage.class));
+
+            // When/Then : best-effort → aucune exception propagée
+            emailService.sendWelcomeEmail("test@example.com", "Frank");
+
+            verify(mailSender).send(any(MimeMessage.class));
+        }
+    }
+
+    @Nested
+    @DisplayName("Send Data Request Email (RGPD)")
+    class SendDataRequestEmailTests {
+
+        @Test
+        @DisplayName("devrait envoyer email de suppression de compte (DELETION)")
+        void sendDataRequestEmail_deletion_shouldSendEmail() {
+            // Given
+            doNothing().when(mailSender).send(any(MimeMessage.class));
+
+            // When
+            emailService.sendDataRequestEmail("test@example.com", "Grace", "DELETION");
+
+            // Then
+            verify(mailSender).send(any(MimeMessage.class));
+            verifyNoInteractions(templateEngine);
+        }
+
+        @Test
+        @DisplayName("devrait envoyer email d'accès aux données (ACCESS)")
+        void sendDataRequestEmail_access_shouldSendEmail() {
+            // Given
+            doNothing().when(mailSender).send(any(MimeMessage.class));
+
+            // When
+            emailService.sendDataRequestEmail("test@example.com", "Heidi", "ACCESS");
+
+            // Then
+            verify(mailSender).send(any(MimeMessage.class));
+        }
+
+        @Test
+        @DisplayName("devrait avaler l'exception d'envoi sans la propager (best-effort)")
+        void sendDataRequestEmail_withMailError_shouldNotThrow() {
+            // Given
+            doThrow(new RuntimeException("SMTP down"))
+                    .when(mailSender).send(any(MimeMessage.class));
+
+            // When/Then : best-effort → aucune exception propagée
+            emailService.sendDataRequestEmail("test@example.com", "Ivan", "DELETION");
+
+            verify(mailSender).send(any(MimeMessage.class));
+        }
+    }
+
+    @Nested
+    @DisplayName("Send Workspace Invitation Email")
+    class SendWorkspaceInvitationEmailTests {
+
+        @Test
+        @DisplayName("devrait envoyer email d'invitation workspace avec succès")
+        void sendWorkspaceInvitationEmail_withValidData_shouldSendEmail() {
+            // Given
+            doNothing().when(mailSender).send(any(MimeMessage.class));
+
+            // When
+            emailService.sendWorkspaceInvitationEmail(
+                    "test@example.com", "Judy", "Acme", "http://localhost:3000/invite/abc");
+
+            // Then
+            verify(mailSender).send(any(MimeMessage.class));
+            verifyNoInteractions(templateEngine);
+        }
+
+        @Test
+        @DisplayName("devrait avaler l'exception d'envoi sans la propager (best-effort)")
+        void sendWorkspaceInvitationEmail_withMailError_shouldNotThrow() {
+            // Given
+            doThrow(new RuntimeException("SMTP down"))
+                    .when(mailSender).send(any(MimeMessage.class));
+
+            // When/Then : best-effort → aucune exception propagée
+            emailService.sendWorkspaceInvitationEmail(
+                    "test@example.com", "Ken", "Acme", "http://localhost:3000/invite/abc");
+
+            verify(mailSender).send(any(MimeMessage.class));
+        }
+    }
+
+    @Nested
+    @DisplayName("Send Internal Notification")
+    class SendInternalNotificationTests {
+
+        @Test
+        @DisplayName("devrait envoyer une notification interne avec succès")
+        void sendInternalNotification_withValidData_shouldSendEmail() {
+            // Given
+            doNothing().when(mailSender).send(any(MimeMessage.class));
+
+            // When
+            emailService.sendInternalNotification(
+                    "sales@taskforce.com", "Nouveau lead", "<html><body>Lead</body></html>");
+
+            // Then
+            verify(mailSender).send(any(MimeMessage.class));
+            verifyNoInteractions(templateEngine);
+        }
+
+        @Test
+        @DisplayName("devrait avaler l'exception d'envoi sans la propager (best-effort)")
+        void sendInternalNotification_withMailError_shouldNotThrow() {
+            // Given
+            doThrow(new RuntimeException("SMTP down"))
+                    .when(mailSender).send(any(MimeMessage.class));
+
+            // When/Then : best-effort → aucune exception propagée
+            emailService.sendInternalNotification(
+                    "sales@taskforce.com", "Nouveau lead", "<html><body>Lead</body></html>");
+
+            verify(mailSender).send(any(MimeMessage.class));
+        }
+    }
 }
