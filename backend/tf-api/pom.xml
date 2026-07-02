@@ -294,6 +294,7 @@
 							<exclude>**/KnowledgeService.*</exclude>
 							<exclude>**/WebhookService.*</exclude>
 							<exclude>**/GroqService.*</exclude>
+							<exclude>**/StripeService.*</exclude>
 						</excludes>
 					</configuration>
 				<executions>
@@ -323,7 +324,7 @@
 										<limit>
 											<counter>LINE</counter>
 											<value>COVEREDRATIO</value>
-											<minimum>0.50</minimum>
+											<minimum>0.68</minimum>
 										</limit>
 									</limits>
 								</rule>
@@ -335,4 +336,33 @@
 		</plugins>
 	</build>
 
+	<profiles>
+		<!-- Rapport de couverture COMPLET (sans exclusions) → target/site/jacoco-full/index.html.
+		     N'affecte pas le gate : usage `mvn test -Pcov-full`. -->
+		<profile>
+			<id>cov-full</id>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.jacoco</groupId>
+						<artifactId>jacoco-maven-plugin</artifactId>
+						<configuration>
+							<excludes combine.self="override"/>
+						</configuration>
+						<executions>
+							<execution>
+								<id>report</id>
+								<phase>test</phase>
+								<goals><goal>report</goal></goals>
+								<configuration>
+									<outputDirectory>${project.build.directory}/site/jacoco-full</outputDirectory>
+									<excludes combine.self="override"/>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
 </project>

@@ -12,7 +12,9 @@
 #   .\scripts\it.ps1 -Offline             # -o (après un premier run en ligne)
 param(
   [string]$Test = "IntegrationSocleTest",
-  [switch]$Offline
+  [switch]$Offline,
+  [switch]$Verify,
+  [switch]$Full   # rapport de couverture COMPLET (sans exclusions) → target/site/jacoco-full/
 )
 # Pas de $ErrorActionPreference="Stop" : en PS 5.1 le stderr des commandes natives (docker)
 # déclenche une terminaison. On pilote via $LASTEXITCODE à la place.
@@ -38,8 +40,11 @@ foreach ($i in 1..30) {
 if (-not $ready) { docker logs --tail 30 $pg; docker rm -f $pg | Out-Null; throw "Postgres non prêt" }
 
 try {
-  # -Test ALL → toute la suite (unit + web + intégration) en un run → un seul jacoco.exec (coverage agrégé).
-  if ($Test -eq "ALL") { $mvnArgs = @("test") } else { $mvnArgs = @("test", "-Dtest=$Test") }
+  # -Full → suite complète + rapport sans exclusions. -Verify → mvn verify (gate). -Test ALL → toute la suite.
+  if ($Full)        { $mvnArgs = @("test", "-Pcov-full") }
+  elseif ($Verify)  { $mvnArgs = @("verify") }
+  elseif ($Test -eq "ALL") { $mvnArgs = @("test") }
+  else              { $mvnArgs = @("test", "-Dtest=$Test") }
   if ($Offline) { $mvnArgs = @("-o") + $mvnArgs }
   Write-Host "==> mvn $($mvnArgs -join ' ')"
   docker run --rm --network $net `
