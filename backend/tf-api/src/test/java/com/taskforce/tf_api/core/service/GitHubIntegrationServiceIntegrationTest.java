@@ -130,4 +130,43 @@ class GitHubIntegrationServiceIntegrationTest extends AbstractIntegrationTest {
 
         assertThat(service.listRepoIssues(SLUG, "org/repo")).hasSize(1);
     }
+
+    @Test
+    @DisplayName("handleCallback échange le code, récupère l'utilisateur GitHub et persiste l'intégration")
+    void handle_callback_persists_integration() {
+        // 1. échange code→token (POST)
+        org.mockito.Mockito.doReturn(org.springframework.http.ResponseEntity.ok(
+                java.util.Map.of("access_token", "gho_abc")))
+            .when(restTemplate).exchange(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.eq(org.springframework.http.HttpMethod.POST),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(org.springframework.core.ParameterizedTypeReference.class));
+        // 2. profil utilisateur GitHub (GET)
+        org.mockito.Mockito.doReturn(org.springframework.http.ResponseEntity.ok(
+                java.util.Map.of("login", "octocat", "avatar_url", "https://gh/avatar.png")))
+            .when(restTemplate).exchange(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.eq(org.springframework.http.HttpMethod.GET),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(org.springframework.core.ParameterizedTypeReference.class));
+
+        String redirect = service.handleCallback("the-code", SLUG);
+
+        assertThat(redirect).contains("/" + SLUG + "/settings").contains("github=connected");
+        var status = service.getStatus(SLUG);
+        assertThat(status.connected()).isTrue();
+        assertThat(status.meta()).containsEntry("login", "octocat");
+    }
+
+    @Test
+    @DisplayName("handleCallback lève une erreur si la réponse token ne contient pas d'access_token")
+    void handle_callback_fails_without_token() {
+        org.mockito.Mockito.doReturn(org.springframework.http.ResponseEntity.ok(java.util.Map.of("error", "bad_code")))
+            .when(restTemplate).exchange(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.eq(org.springframework.http.HttpMethod.POST),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(org.springframework.core.ParameterizedTypeReference.class));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.handleCallback("bad", SLUG))
+            .isInstanceOf(RuntimeException.class);
+    }
 }
