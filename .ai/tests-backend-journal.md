@@ -150,3 +150,15 @@ Le dossier `src/test/java/.../` **mirror** `src/main/java/.../` : chaque `*Test.
   - `modules.ged.api` **100 %** : `AttachmentControllerWebMvcTest` (upload multipart/list/delete + 401), `BrainAttachmentControllerWebMvcTest` (upload brain, `access.resolveAndAuthorize` mocké), `FileControllerWebMvcTest` (avatar 200 + fallback 302 dicebear + 401 ; brain file public 200 + 404). ⚠️ finding : `/api/files/avatars/**` **non public** (seul `/api/files/brain/**` l'est dans `PUBLIC_MATCHERS`) — la Javadoc du controller dit l'inverse.
   - `modules.sales.api` **100 %** : `SalesControllerWebMvcTest` (POST /api/sales/inquiry public : 201 + 400 email invalide + 400 champs manquants).
   - `core.service.agent.tools` **100 %** : `CreateNoteToolTest` (mapping args→CreateKnowledgeNodeRequest, tags/content optionnels, délégation KnowledgeService), `SearchBrainToolTest` (formatage résultats + troncature >200, repli "aucune note", topK défaut 5).
+
+## Lot A+B — sortants restants + contract tests wire (02/07) : 86,1 % — gate 0,84
+
+- **86,1 % ligne hors-brain (5361/6226), 668 tests, 0 échec.** Gate `jacoco:check` BUNDLE LINE **≥ 0,84** vert.
+- **A (0% comblés)** :
+  - `EmbeddingClient` **0 %→100 %** : contract test `MockRestServiceServer` (wire ai-service `/v1/embeddings` : POST JSON {texts}, parse {vectors}, 500→null, réponse sans vectors→null, toVectorLiteral).
+  - `GlobalExceptionHandler` **48 %→100 %** : mapping exception→HTTP (404 ResourceNotFound, 400 Business, 400 Validation, 403 Forbidden/AccessDenied, 409 IllegalState, 400 IllegalArgument, 500 Exception) — garantit le **contrat d'erreur** de l'API.
+- **B (contract tests wire, `MockRestServiceServer` — 0 nouvelle dépendance)** : valident le **vrai format HTTP** (URL, méthode, headers, body) des sortants, pas juste la logique Java :
+  - `GroqServiceContractTest` : POST `https://api.groq.com/openai/v1/chat/completions` + `Authorization: Bearer`, parse `choices[].message.content`, 500→GroqException.
+  - `GitHubIntegrationContractTest` : POST `.../login/oauth/access_token` (form) → GET `api.github.com/user` (Bearer) → redirect `github=connected` ; `listRepositories`/`listRepoIssues` GET (Bearer) + mapping DTO. URLs exactes asserties.
+  - `SlackIntegrationContractTest` : POST `slack.com/api/oauth.v2.access` (form, ok=true/false) ; `sendNotification` POST `chat.postMessage` (Bearer + JSON {channel,text}).
+- **Limite assumée** : Keycloak (SDK admin), MinIO (SDK), Stripe (SDK statique) **ne passent pas par RestTemplate** → pas de contract test wire possible ; leur validation réelle = **E2E** (domaine utilisateur). Nos tests mockent leur SDK (logique couverte : KeycloakService 78 %, MinioService 72 %, StripeWebhookService 81 %).
