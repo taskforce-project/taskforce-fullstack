@@ -56,6 +56,11 @@
 - B-T7 : `NotificationServiceTest` **9/9** (unit — pas de self-notification / assigné nul, persist+push temps réel, markAsRead + IDOR + introuvable, countUnread + workspace introuvable, mentions hors acteur) + `CycleServiceIntegrationTest` **7/7** (intég — création DRAFT, nom unique, update statut + statut invalide, introuvable, add issue + doublon + IDOR hors projet). `AnalyticsServiceIntegrationTest` **4/4** (KPIs via `countCompletedBetween` SQL réel, throughput = 8 buckets semaine, **gating PRO** enforced via `PlanFeatureService` mocké ; `Authorization`/`Groq`/`ObjectMapper` mockés). **B-T7 = 20/20.**
 - **Suite complète en un run : 192 tests verts** (1 skip) via `.\scripts\it.ps1 -Test ALL` (unit + web + intégration dans le même JVM → un seul `jacoco.exec`). Détail : 161 unit/web + 31 intégration.
 
+### Confirmation full run + durcissement sécu (04/07, branche `test/v1-hardening`)
+
+- **Run complet `it.ps1 -Full` : 670 tests, 0 échec** (1 skip), `BUILD SUCCESS` (20 min). Rapport **sans exclusions** `target/site/jacoco-full/` : **78.27 % lignes** (5364/6853) · branches 57.5 % · méthodes 69.8 %. Seul gros trou = `core.service.brain` (Brain OS stand-by, 226 l / 2 couvertes — exclu du gate) → **~81 % hors brain**.
+- **OWASP A05 (Security Misconfiguration) couvert** : `SecurityHeadersWebMvcTest` **2/2** — assert `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, CSP `default-src 'none'; frame-ancestors 'none'; form-action 'none'`, HSTS (`.secure(true)` → `max-age=31536000; includeSubDomains`), `Referrer-Policy`, `Permissions-Policy` ; présents **même sur 401**. Complète le socle sécu déjà en place (IDOR `AuthorizationService`+interceptor, crypto `EncryptedStringConverter`, brute-force `RateLimitFilter`, JWT `JwtService`/`JwtIdentityResolver`).
+
 ## Coverage JaCoCo — baseline (01/07)
 
 - **Ligne globale : 26,8 %** (1835 couvertes / 6853). Le plugin `jacoco:check` (**PACKAGE LINE ≥ 0,50**, lié à `verify`) **échoue en l'état** — ne PAS lancer `mvn verify` en gate tant que le seuil n'est pas atteint (ou tant que les exclusions ne sont pas décidées).
