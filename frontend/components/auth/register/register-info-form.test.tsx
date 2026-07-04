@@ -74,8 +74,8 @@ describe('SignupForm - Step 1: Information Form', () => {
     it('should render progress indicator showing step 1', () => {
       render(<SignupForm />);
 
+      // L'indicateur affiche « Étape 1 sur 3 » (le pourcentage textuel « 33% » a été retiré).
       expect(screen.getByText(/étape 1 sur 3/i)).toBeInTheDocument();
-      expect(screen.getByText(/33%/i)).toBeInTheDocument();
     });
 
     it('should render login link', () => {
