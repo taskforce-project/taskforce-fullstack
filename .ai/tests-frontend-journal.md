@@ -32,6 +32,32 @@
 
 - **QF-1** (trouvé en QA-1, corrigé) : `currentUser.id` number vs string → **à couvrir par un test** (non-régression du `canManage`).
 
-## Coverage courant
+## Coverage — RÉSULTAT (01/07)
 
-_(à mesurer au démarrage)_
+- **Décision appliquée** : `coverage.include` re-scopé sur la **logique** = `lib/**` + `hooks/**` + `components/auth/**` ; exclus `app/**` (pages), `components/ui` + autres composants (→ E2E Playwright), et `lib/{i18n,constants,mocks}` (données). `reportOnFailure: true` ajouté.
+- **Coverage global = 83.47 % lignes** / 85.55 % branches / 93.41 % fns → **objectif 70 % dépassé**. Seuil `global` relevé à **70/75/80** (lignes/branches/fns).
+- Baseline avant re-scope (pour mémoire) : 13.62 % (écrasé par `app/**` et UI à 0 %).
+- Détail : `lib/api` 94 %, `lib/store` 90 %, `lib/contexts` 92 %, `lib/auth` 92 %, `lib/config` 87 %, `components/auth` 98 %, `lib/utils` 71 %. Restes bas (in-scope) : `lib/hooks` 4.6 % (realtime/stomp), `hooks/` 40 %, `lib` racine 9 % — candidats à couvrir si on veut monter encore.
+
+## Tests réparés (pré-existants périmés — corrigés le 01/07)
+
+- `lib/contexts/auth-context.test.tsx` (**16/16**) : mock `authService` omettait `isAuthenticated` (+ défaut) ; redirect `/dashboard`→`/` ; test home-redirect supprimé (feature retirée) ; `refreshUser` async → `await act`.
+- `components/auth/forgot-password/forgot-password-form.test.tsx` : « Envoi... »→« Envoi en cours… » ; description toast reset alignée.
+- `components/auth/register/register-info-form.test.tsx` : assertion « 33% » retirée (le composant affiche « Étape 1 sur 3 »).
+
+## Suite 100 % verte + durcie (01/07)
+
+- **`auth-flow` flaky corrigé** : `userEvent.setup({ delay: null })` (typing déterministe) + `waitFor { timeout: 3000 }` + **`testTimeout: 15000`** global (les tests RTL+userEvent dépassaient le défaut 5 s sous charge de suite).
+- **Fuites réseau supprimées** (exit 1 malgré tests verts) : des composants tapaient le vrai backend au montage → `ECONNREFUSED` **après** le test → rejets non gérés → `vitest run` sortait en erreur. **Fix** : `vitest.setup.ts` stub `fetch` + `XMLHttpRequest` (échec réseau **immédiat** capté par le `try/catch` du composant). 102 fuites → **0**.
+- **Seuils par-fichier réalignés** sur l'actuel (stripe-service 95→78, client.ts branches 84→35, components/auth funcs 75→65, contexts/store branches →80, utils lines →72) : étaient stale/aspirationnels et masqués tant que des tests échouaient.
+- **Résultat (étape 1)** : `vitest run --coverage` → **exit 0**, **58 fichiers / 706 tests**, **coverage 83.67 %**, 0 erreur de seuil.
+
+## Renforcement coverage (04/07) — 83.67 % → **90.03 %**
+
+Passe de durcissement sur les zones faibles (revue du rapport HTML) :
+- **Code mort supprimé** : `components/auth/register/plan/plan-form-enhanced.tsx` (`RegisterPlanFormEnhanced`, **non importé nulle part**, 244 l non testées) → le dossier `plan` remonte de **52 % à ~98 %**.
+- **`lib/issue-filters.ts`** (filtres board : `applyIssueFilters`/`countActiveFilters`/`derive*`) : `lib/issue-filters.test.ts` → `lib` racine **9 % → 100 %**.
+- **`hooks/use-pagination.ts`** : `use-pagination.test.ts` (paging, clamp, resize) → `hooks` **40 % → 100 %**.
+- **Hooks realtime STOMP** (`use-project-realtime`, `use-notifications-realtime`) : mock `@stomp/stompjs` (capture du handler) + stores mockés → subscribe/upsert/remove/pushSignal/cleanup/non-JSON → `lib/hooks` **4.6 % → 49 %** (reste `use-stomp.ts` + branches SockJS fallback).
+- **Résultat final** : **62 fichiers / 738 tests verts**, **coverage 90.03 %**, exit 0, 0 erreur de seuil.
+- **Reste (optionnel)** : `lib/utils` validation 75.8 %, `lib/hooks` use-stomp/fallback SockJS, `lib/auth` branches 69 %.
