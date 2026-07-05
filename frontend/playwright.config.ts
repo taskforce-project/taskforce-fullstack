@@ -16,7 +16,9 @@ export default defineConfig({
   expect: { timeout: 10_000 },
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
+  // 1 retry en local : absorbe la course de compilation à la volée du dev-server Next (au 2ᵉ essai
+  // la route est déjà compilée → stable). En prod/CI les routes sont pré-buildées.
+  retries: process.env.CI ? 2 : 1,
   workers: process.env.CI ? 1 : undefined,
   reporter: [["html", { outputFolder: "playwright-report", open: "never" }], ["list"]],
   use: {
