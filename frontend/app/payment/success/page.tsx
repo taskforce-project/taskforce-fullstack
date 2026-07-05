@@ -76,7 +76,8 @@ function PaymentSuccessContent() {
   }, [sessionId, refreshUser]);
 
   const handleContinue = () => {
-    router.push("/dashboard");
+    // Auth émise par Keycloak (mot de passe requis) : après paiement, l'utilisateur se connecte.
+    router.push("/auth/login");
   };
 
   if (isVerifying) {
