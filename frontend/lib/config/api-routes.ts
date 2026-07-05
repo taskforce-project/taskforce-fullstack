@@ -73,6 +73,8 @@ export const WORKSPACE_ROUTES = {
   // Redistribution de charge (PROD-1.12)
   REDISTRIBUTE_PREVIEW: (slug: string) => `/api/workspaces/${slug}/redistribute/preview`,
   REDISTRIBUTE_APPLY: (slug: string) => `/api/workspaces/${slug}/redistribute/apply`,
+  // Journalisation des erreurs client (E25) — logs serveur classiques
+  CLIENT_LOG: "/api/logs/client",
   // Rétrocompatibilité
   CURRENT: "/api/workspaces/current",
 } as const;
