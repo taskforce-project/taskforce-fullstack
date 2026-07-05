@@ -40,7 +40,7 @@ class GdprServiceIntegrationTest extends AbstractIntegrationTest {
     @Autowired private WorkspaceRepository workspaceRepository;
     @Autowired private WorkspaceMemberRepository workspaceMemberRepository;
 
-    @MockitoBean private JwtService jwtService;
+    @MockitoBean private KeycloakService keycloakService;
     @MockitoBean private AuditService auditService;
 
     private User user;
@@ -88,7 +88,6 @@ class GdprServiceIntegrationTest extends AbstractIntegrationTest {
         assertThat(reloaded.getIsActive()).isFalse();
         assertThat(reloaded.getPlanStatus()).isEqualTo(PlanStatus.CANCELED);
 
-        verify(jwtService).revokeAllUserTokens(user.getId());
         verify(auditService).record(isNull(), eq(user.getId()), eq(AuditService.GDPR_DELETE),
             eq("User"), eq(String.valueOf(user.getId())), org.mockito.ArgumentMatchers.any());
     }
