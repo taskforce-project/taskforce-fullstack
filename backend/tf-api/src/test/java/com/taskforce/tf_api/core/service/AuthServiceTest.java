@@ -63,9 +63,6 @@ class AuthServiceTest {
     @Mock
     private UserRepository userRepository;
 
-    @Mock
-    private JwtService jwtService;
-
     // Dépendances ajoutées à AuthService (auto-join workspace + invitations) que le test
     // ne mockait pas → @InjectMocks les laissait null → NPE dans login/verifyOtp. Cf. BT-P5.
     @Mock
@@ -76,9 +73,6 @@ class AuthServiceTest {
 
     @Mock
     private AuditService auditService;
-
-    @Mock
-    private com.taskforce.tf_api.core.repository.RefreshTokenRepository refreshTokenRepository;
 
     @InjectMocks
     private AuthService authService;
@@ -372,8 +366,6 @@ class AuthServiceTest {
                 return user;
             });
             doNothing().when(emailService).sendWelcomeEmail(anyString(), anyString());
-            when(jwtService.generateTokens(any(User.class), any(UserRepresentation.class)))
-                .thenReturn(AuthResponse.builder().accessToken("access").refreshToken("refresh").build());
 
             // When
             VerifyOtpResponse response = authService.verifyOtpAndCompleteRegistration(verifyRequest);
@@ -382,7 +374,8 @@ class AuthServiceTest {
             assertThat(response).isNotNull();
             assertThat(response.getVerified()).isTrue();
             assertThat(response.getCheckoutSessionUrl()).isNull(); // FREE = pas de checkout
-            assertThat(response.getAuthData()).isNotNull();
+            // Migration OIDC : plus d'auto-login post-inscription → redirection vers /login.
+            assertThat(response.getAuthData()).isNull();
 
             verify(keycloakService).verifyEmail(TEST_KEYCLOAK_ID);
             verify(userRepository).save(userCaptor.capture());
@@ -419,8 +412,6 @@ class AuthServiceTest {
                 return user;
             });
             doNothing().when(emailService).sendWelcomeEmail(anyString(), anyString());
-            when(jwtService.generateTokens(any(User.class), any(UserRepresentation.class)))
-                .thenReturn(AuthResponse.builder().accessToken("access").refreshToken("refresh").build());
 
             // When
             VerifyOtpResponse response = authService.verifyOtpAndCompleteRegistration(verifyRequest);
@@ -464,8 +455,6 @@ class AuthServiceTest {
                 return user;
             });
             doNothing().when(emailService).sendWelcomeEmail(anyString(), anyString());
-            when(jwtService.generateTokens(any(User.class), any(UserRepresentation.class)))
-                .thenReturn(AuthResponse.builder().accessToken("access").refreshToken("refresh").build());
 
             // When
             VerifyOtpResponse response = authService.verifyOtpAndCompleteRegistration(verifyRequest);
@@ -558,19 +547,16 @@ class AuthServiceTest {
             when(keycloakAuthService.authenticate(TEST_EMAIL, "Password123!")).thenReturn(keycloakToken);
             when(keycloakService.getUserByEmail(TEST_EMAIL)).thenReturn(keycloakUser);
             when(userRepository.findByKeycloakId(TEST_KEYCLOAK_ID)).thenReturn(Optional.of(user));
-            when(jwtService.generateTokens(user, keycloakUser))
-                .thenReturn(AuthResponse.builder().accessToken("access").refreshToken("refresh").build());
 
             // When
             AuthResponse response = authService.login(loginRequest);
 
-            // Then
+            // Then : la réponse porte directement les tokens émis par Keycloak
             assertThat(response).isNotNull();
-            assertThat(response.getAccessToken()).isEqualTo("access");
-            assertThat(response.getRefreshToken()).isEqualTo("refresh");
+            assertThat(response.getAccessToken()).isEqualTo("keycloak_access_token");
+            assertThat(response.getRefreshToken()).isEqualTo("keycloak_refresh_token");
 
             verify(keycloakAuthService).authenticate(TEST_EMAIL, "Password123!");
-            verify(jwtService).generateTokens(user, keycloakUser);
         }
 
         @Test
@@ -604,8 +590,6 @@ class AuthServiceTest {
             assertThatThrownBy(() -> authService.login(loginRequest))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("désactivé");
-
-            verify(jwtService, never()).generateTokens(any(), any());
         }
 
         @Test
@@ -620,8 +604,6 @@ class AuthServiceTest {
                 savedUser.setId(1L);
                 return savedUser;
             });
-            when(jwtService.generateTokens(any(User.class), eq(keycloakUser)))
-                .thenReturn(AuthResponse.builder().accessToken("access").refreshToken("refresh").build());
 
             // When
             AuthResponse response = authService.login(loginRequest);
