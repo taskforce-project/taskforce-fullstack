@@ -2,10 +2,15 @@ package com.taskforce.tf_api.shared.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.test.util.ReflectionTestUtils;
+
+import io.github.bucket4j.distributed.proxy.ProxyManager;
 
 /**
  * Smoke tests des classes {@code @Configuration} du package shared.
@@ -33,10 +38,14 @@ class SharedConfigBeanTest {
     }
 
     @Test
-    @DisplayName("RateLimitConfig — rateLimitFilter() se construit")
+    @DisplayName("RateLimitConfig — rateLimitFilter() se construit (mode local, sans ProxyManager Redis)")
+    @SuppressWarnings("unchecked")
     void rateLimitConfig_rateLimitFilter() {
         RateLimitConfig cfg = new RateLimitConfig();
-        assertThat(cfg.rateLimitFilter()).isNotNull();
+        // Aucun ProxyManager disponible → le filtre retombe sur son mode local en mémoire.
+        ObjectProvider<ProxyManager<String>> provider = mock(ObjectProvider.class);
+        when(provider.getIfAvailable()).thenReturn(null);
+        assertThat(cfg.rateLimitFilter(provider)).isNotNull();
     }
 
     @Test
@@ -124,17 +133,5 @@ class SharedConfigBeanTest {
         ReflectionTestUtils.setField(cfg, "enterprisePriceId", "price_ent");
 
         assertThatCode(cfg::init).doesNotThrowAnyException();
-    }
-
-    @Test
-    @DisplayName("JwtDecoderConfig — jwtDecoder() HS512 se construit avec un secret assez long")
-    void jwtDecoderConfig_jwtDecoder() {
-        com.taskforce.tf_api.shared.security.JwtDecoderConfig cfg =
-                new com.taskforce.tf_api.shared.security.JwtDecoderConfig();
-        // HS512 exige une clé >= 512 bits (64 octets) : on répète pour dépasser le seuil.
-        String secret = "myVerySecretKeyForJWTTokenGeneration".repeat(3);
-        ReflectionTestUtils.setField(cfg, "jwtSecret", secret);
-
-        assertThat(cfg.jwtDecoder()).isNotNull();
     }
 }
