@@ -5,11 +5,13 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.taskforce.tf_api.core.enums.PlanStatus;
 import com.taskforce.tf_api.core.model.User;
+import com.taskforce.tf_api.core.repository.IssueWorklogRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
@@ -31,11 +33,15 @@ public class GdprService {
 
     private final UserRepository userRepository;
     private final WorkspaceMemberRepository workspaceMemberRepository;
+    private final IssueWorklogRepository issueWorklogRepository;
     private final JwtService jwtService;
     private final AuditService auditService;
+    private final JdbcTemplate jdbcTemplate;
 
+    // NB : read-write (PAS readOnly) — l'export journalise un audit GDPR_EXPORT (INSERT).
+    // Sous readOnly, l'INSERT échoue (SQLSTATE 25006) et marque la tx rollback-only → 500 (cf. FIX-006).
     /** Export des données personnelles de l'utilisateur (portabilité — JSON). */
-    @Transactional(readOnly = true)
+    @Transactional
     public Map<String, Object> exportMyData(Long userId) {
         User u = userRepository.findById(userId)
             .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
@@ -61,12 +67,51 @@ public class GdprService {
             })
             .toList();
 
+        // Profils de compétences (SQL brut : member_skill_profiles n'a pas d'entité JPA).
+        List<Map<String, Object>> skillProfiles = jdbcTemplate.query(
+            """
+            SELECT ws.slug AS workspace_slug, ws.name AS workspace_name,
+                   p.skills_json::text AS skills, p.seniority, p.capacity_hours_per_week,
+                   p.profile_text, p.growth_enabled, p.growth_target_skills::text AS growth_target_skills
+            FROM member_skill_profiles p
+            JOIN workspaces ws ON ws.id = p.workspace_id
+            WHERE p.user_id = ?
+            """,
+            (rs, n) -> {
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("workspace", rs.getString("workspace_name"));
+                row.put("slug", rs.getString("workspace_slug"));
+                row.put("skills", rs.getString("skills"));
+                row.put("seniority", rs.getString("seniority"));
+                row.put("capacityHoursPerWeek", rs.getObject("capacity_hours_per_week"));
+                row.put("profileText", rs.getString("profile_text"));
+                row.put("growthEnabled", rs.getObject("growth_enabled"));
+                row.put("growthTargetSkills", rs.getString("growth_target_skills"));
+                return row;
+            },
+            userId);
+
+        // Worklogs (temps saisi par l'utilisateur).
+        List<Map<String, Object>> worklogs = issueWorklogRepository
+            .findByUser_IdOrderByLoggedAtDescIdDesc(userId).stream()
+            .map(w -> {
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("issueId", w.getIssueId());
+                row.put("minutes", w.getMinutes());
+                row.put("description", w.getDescription());
+                row.put("loggedAt", w.getLoggedAt());
+                return row;
+            })
+            .toList();
+
         auditService.record(null, userId, AuditService.GDPR_EXPORT);
 
         Map<String, Object> export = new LinkedHashMap<>();
         export.put("exportedAt", LocalDateTime.now());
         export.put("profile", profile);
         export.put("workspaceMemberships", memberships);
+        export.put("skillProfiles", skillProfiles);
+        export.put("worklogs", worklogs);
         return export;
     }
 
