@@ -18,6 +18,18 @@
 - **Redistribution (PROD-1.12)** : dialog rend le plan backend (5 moves, from→to, score, Appliquer N). ✅
 - **Intelligence/Analytics** : KPIs, throughput hebdo (Opened/Resolved), burndown daté, AI insights (repli), team capacity. ✅
 
+## Findings backend (validation RGPD, 04/07)
+
+| # | Sévérité | Écran | Description | Statut |
+| - | :--: | --- | --- | :--: |
+| QF-5 | 🔴→✅ | RGPD export | **`GET /api/gdpr/export` renvoyait 500** : `GdprService.exportMyData` était `@Transactional(readOnly=true)` mais journalise un audit `GDPR_EXPORT` (INSERT) → SQLSTATE 25006 → tx rollback-only → 500 (**même pattern que FIX-006**). L'**export de portabilité RGPD était totalement cassé**. → Fix : `@Transactional` (read-write). Validé e2e : **200** + profil/memberships + audit écrit. ⚠️ `GdprServiceIntegrationTest` passait (AuditService non exercé sur le chemin readOnly réel) → bug non attrapé. | ✅ |
+
+## Findings supervision (E26, 05/07)
+
+| # | Sévérité | Zone | Description | Statut |
+| - | :--: | --- | --- | :--: |
+| QF-6 | 🟡→✅ | Actuator | **`/actuator/prometheus` renvoyait 500** (`NoResourceFoundException`) : l'endpoint était dans `management.endpoints.web.exposure.include` mais la dépendance **`micrometer-registry-prometheus` manquait** → aucun endpoint créé, donc **pas de métriques pour les alertes**. → Fix : dépendance ajoutée au pom + histogramme p95 (`percentiles-histogram`) + tag `application`. Vérifié : 200, 207 buckets. | ✅ |
+
 ## Notes techniques
 
 - **Type `AuthUser.id: string`** (frontend) ment sur le runtime (`number`). QF-1 corrigé localement ; **piste durable** : soit forcer le back à sérialiser en String, soit `Number()`/`String()` défensif partout. Vérifié : `settings/page.tsx:723` utilise déjà `Number(currentUser?.id)` (OK). Seule la page Membres était touchée.
