@@ -62,6 +62,10 @@ class GdprServiceIntegrationTest extends AbstractIntegrationTest {
         Map<String, Object> profile = (Map<String, Object>) export.get("profile");
         assertThat(profile.get("email")).isEqualTo("gdpr@it.dev");
         assertThat((java.util.List<?>) export.get("workspaceMemberships")).hasSize(1);
+        // Portabilité complète (C11.3) : le paquet inclut aussi compétences + temps saisi (listes présentes).
+        assertThat(export).containsKeys("skillProfiles", "worklogs");
+        assertThat(export.get("skillProfiles")).isInstanceOf(java.util.List.class);
+        assertThat(export.get("worklogs")).isInstanceOf(java.util.List.class);
 
         verify(auditService).record(isNull(), eq(user.getId()), eq(AuditService.GDPR_EXPORT));
     }
