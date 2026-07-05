@@ -8,6 +8,8 @@ import java.util.Map;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import com.taskforce.tf_api.core.enums.PlanStatus;
 import com.taskforce.tf_api.core.model.User;
@@ -34,7 +36,7 @@ public class GdprService {
     private final UserRepository userRepository;
     private final WorkspaceMemberRepository workspaceMemberRepository;
     private final IssueWorklogRepository issueWorklogRepository;
-    private final JwtService jwtService;
+    private final KeycloakService keycloakService;
     private final AuditService auditService;
     private final JdbcTemplate jdbcTemplate;
 
@@ -116,14 +118,21 @@ public class GdprService {
     }
 
     /**
-     * Droit à l'effacement : anonymise le compte + révoque l'accès.
-     * Conserve {@code keycloakId} (pour bloquer toute re-création via JIT) mais neutralise les PII
-     * et désactive le compte (login refusé).
+     * Droit à l'effacement : anonymise le compte local + supprime l'identité côté IdP (Keycloak).
+     *
+     * <p>La ligne {@code User} locale est conservée mais <b>anonymisée</b> (PII neutralisées,
+     * {@code isActive=false}) pour préserver l'intégrité référentielle (issues, commentaires).
+     * L'identité Keycloak, elle, est <b>supprimée</b> : c'est la véritable effacement des PII côté
+     * IdP (TF-RGPD-007). L'appel Keycloak est un appel HTTP externe, déclenché <b>après commit</b>
+     * de la transaction locale — un échec de l'IdP ne doit donc pas annuler l'anonymisation déjà
+     * validée (il est journalisé pour rejeu manuel).</p>
      */
     @Transactional
     public void deleteMyAccount(Long userId) {
         User u = userRepository.findById(userId)
             .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+
+        final String keycloakId = u.getKeycloakId();
 
         // Anonymisation des données personnelles
         u.setEmail("deleted-" + u.getId() + "@anonymized.invalid");
@@ -135,13 +144,46 @@ public class GdprService {
         u.setIsActive(false);
         userRepository.save(u);
 
-        // Révocation de tous les refresh tokens (accès coupé)
-        jwtService.revokeAllUserTokens(userId);
+        // Accès coupé côté IdP : la suppression du compte Keycloak (ci-dessous, après commit)
+        // invalide toutes les sessions/refresh tokens. Plus de table de refresh tokens custom.
 
         auditService.record(null, userId, AuditService.GDPR_DELETE,
             "User", String.valueOf(userId), Map.of("anonymized", true));
         log.info("Compte {} anonymisé (droit à l'effacement RGPD)", userId);
-        // NB : suppression du compte Keycloak associé = étape externe à effectuer séparément
-        // (révocation côté IdP) ; ici l'accès est déjà coupé via isActive=false + tokens révoqués.
+
+        // Suppression de l'identité Keycloak APRÈS commit : l'appel IdP externe ne doit pas
+        // pouvoir annuler l'anonymisation locale déjà validée (préoccupation ACID). TF-RGPD-007.
+        if (keycloakId != null && !keycloakId.isBlank()) {
+            deleteKeycloakIdentityAfterCommit(keycloakId, userId);
+        }
+    }
+
+    /**
+     * Planifie (ou exécute) la suppression du compte Keycloak. Si une transaction est active,
+     * l'appel est différé à {@code afterCommit} ; sinon il est exécuté immédiatement. Dans tous
+     * les cas, un échec est journalisé sans être propagé (rejeu manuel côté IdP).
+     */
+    private void deleteKeycloakIdentityAfterCommit(String keycloakId, Long userId) {
+        Runnable deletion = () -> {
+            try {
+                keycloakService.deleteUser(keycloakId);
+                log.info("Identité Keycloak {} supprimée (effacement RGPD du compte {})", keycloakId, userId);
+            } catch (Exception e) {
+                // Ne jamais propager : l'accès est déjà coupé (isActive=false + tokens révoqués).
+                log.error("Échec suppression Keycloak {} pour le compte {} — à rejouer manuellement : {}",
+                    keycloakId, userId, e.getMessage());
+            }
+        };
+
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    deletion.run();
+                }
+            });
+        } else {
+            deletion.run();
+        }
     }
 }
