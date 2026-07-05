@@ -13,7 +13,11 @@ export const DEMO = {
  */
 export async function login(page: Page, email = DEMO.email, password = DEMO.password) {
   await page.goto("/auth/login");
-  await page.waitForLoadState("networkidle"); // laisse le dev-server finir de compiler la route
+  await page.waitForLoadState("networkidle");
+  // En dev, Next compile la route à la volée puis remonte (Fast Refresh) et vide le formulaire.
+  // Un reload une fois la route compilée garantit une page stable (sans effet en prod/CI).
+  await page.reload();
+  await page.waitForLoadState("networkidle");
 
   // Bannière cookies (non bloquante) — on l'accepte si présente pour une page propre.
   const acceptCookies = page.getByRole("button", { name: /^accept/i });

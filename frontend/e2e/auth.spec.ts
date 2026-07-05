@@ -19,8 +19,10 @@ test.describe("Authentification (E2E)", () => {
   });
 
   test("accès à une route protégée sans session → redirigé vers login", async ({ page }) => {
-    await page.context().clearCookies();
+    // L'app stocke le JWT en localStorage (pas en cookie) → on vide le storage pour simuler l'absence de session.
+    await page.goto("/auth/login");
+    await page.evaluate(() => localStorage.clear());
     await page.goto(`/${DEMO.workspaceSlug}/dashboard`);
-    await expect(page).toHaveURL(/\/auth\/login/, { timeout: 15_000 });
+    await expect(page).toHaveURL(/\/auth\/login/, { timeout: 20_000 });
   });
 });
