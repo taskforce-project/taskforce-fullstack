@@ -43,12 +43,29 @@ vi.mock('@/lib/auth/register-storage', () => ({
   clearRegisterData: () => mockClearRegisterData(),
 }));
 
+// Dialogs mockés : exposent des boutons câblés sur les callbacks (quand open) pour exercer
+// handleEnterpriseSuccess / handleAcceptFreeAccount / handleDeclineFreeAccount.
 vi.mock('@/components/sales/enterprise-contact-dialog', () => ({
-  EnterpriseContactDialog: () => null,
+  EnterpriseContactDialog: ({ open, onSuccess }: { open: boolean; onSuccess: () => void }) =>
+    open ? <button data-testid="ent-success" onClick={onSuccess}>success</button> : null,
 }));
 
 vi.mock('@/components/sales/enterprise-confirmation-dialog', () => ({
-  EnterpriseConfirmationDialog: () => null,
+  EnterpriseConfirmationDialog: ({
+    open,
+    onAccept,
+    onDecline,
+  }: {
+    open: boolean;
+    onAccept: () => void;
+    onDecline: () => void;
+  }) =>
+    open ? (
+      <div>
+        <button data-testid="conf-accept" onClick={onAccept}>accept</button>
+        <button data-testid="conf-decline" onClick={onDecline}>decline</button>
+      </div>
+    ) : null,
 }));
 
 describe('RegisterPlanForm - Step 2: Plan Selection', () => {
@@ -396,6 +413,33 @@ describe('RegisterPlanForm - Step 2: Plan Selection', () => {
           description: 'Storage error',
         })
       );
+    });
+  });
+
+  describe('Confirmation compte FREE (flux Enterprise)', () => {
+    it('accepter → sélectionne FREE, stocke et va à la vérification', async () => {
+      const user = userEvent.setup();
+      render(<RegisterPlanForm />);
+
+      await user.click(screen.getByTestId('plan-card-enterprise')); // ouvre le dialog Enterprise
+      await user.click(screen.getByTestId('ent-success'));          // onSuccess → confirmation
+      await user.click(screen.getByTestId('conf-accept'));          // handleAcceptFreeAccount
+
+      expect(mockSetRegisterData).toHaveBeenCalledWith({ planType: 'FREE' });
+      expect(mockPush).toHaveBeenCalledWith('/auth/register/verification');
+      expect(toast.success).toHaveBeenCalled();
+    });
+
+    it('refuser → enregistre la demande et retourne à l’accueil', async () => {
+      const user = userEvent.setup();
+      render(<RegisterPlanForm />);
+
+      await user.click(screen.getByTestId('plan-card-enterprise'));
+      await user.click(screen.getByTestId('ent-success'));
+      await user.click(screen.getByTestId('conf-decline'));         // handleDeclineFreeAccount
+
+      expect(mockPush).toHaveBeenCalledWith('/');
+      expect(toast.success).toHaveBeenCalled();
     });
   });
 });
