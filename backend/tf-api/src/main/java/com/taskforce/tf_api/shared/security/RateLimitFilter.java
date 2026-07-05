@@ -2,6 +2,8 @@ package com.taskforce.tf_api.shared.security;
 
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
+import io.github.bucket4j.BucketConfiguration;
+import io.github.bucket4j.distributed.proxy.ProxyManager;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -31,8 +33,21 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 public class RateLimitFilter extends OncePerRequestFilter {
 
-    // Buckets par IP — clé = "${ip}:${profil}"
-    private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
+    // Mode local (mono-instance) — buckets en mémoire, clé = "${ip}:${profil}".
+    private final Map<String, Bucket> localBuckets = new ConcurrentHashMap<>();
+
+    // Mode distribué (multi-instances) — buckets partagés via Redis. null → mode local. TF-SEC-011.
+    private final ProxyManager<String> proxyManager;
+
+    /** Mode local (dev/test, mono-instance). */
+    public RateLimitFilter() {
+        this(null);
+    }
+
+    /** Mode distribué si {@code proxyManager} non null (buckets Redis partagés), sinon local. */
+    public RateLimitFilter(ProxyManager<String> proxyManager) {
+        this.proxyManager = proxyManager;
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -43,7 +58,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
         RateProfile profile = profileFor(path);
         String bucketKey = ip + ":" + profile.name();
-        Bucket bucket = buckets.computeIfAbsent(bucketKey, k -> buildBucket(profile));
+        Bucket bucket = resolveBucket(bucketKey, profile);
 
         if (bucket.tryConsume(1)) {
             chain.doFilter(request, response);
@@ -81,14 +96,26 @@ public class RateLimitFilter extends OncePerRequestFilter {
         return RateProfile.DEFAULT;
     }
 
-    private Bucket buildBucket(RateProfile profile) {
-        Bandwidth limit = switch (profile) {
+    /** Résout le bucket : proxy Redis partagé si distribué, sinon bucket local en mémoire. */
+    private Bucket resolveBucket(String bucketKey, RateProfile profile) {
+        if (proxyManager != null) {
+            return proxyManager.builder().build(bucketKey, () -> configFor(profile));
+        }
+        return localBuckets.computeIfAbsent(bucketKey,
+            k -> Bucket.builder().addLimit(bandwidthFor(profile)).build());
+    }
+
+    private BucketConfiguration configFor(RateProfile profile) {
+        return BucketConfiguration.builder().addLimit(bandwidthFor(profile)).build();
+    }
+
+    private Bandwidth bandwidthFor(RateProfile profile) {
+        return switch (profile) {
             case AUTH_STRICT  -> Bandwidth.builder().capacity(10) .refillIntervally(10, Duration.ofMinutes(1)).build();
             case AUTH_REFRESH -> Bandwidth.builder().capacity(20) .refillIntervally(20, Duration.ofMinutes(1)).build();
             case AI           -> Bandwidth.builder().capacity(20) .refillIntervally(20, Duration.ofMinutes(1)).build();
             case DEFAULT      -> Bandwidth.builder().capacity(200).refillIntervally(200, Duration.ofMinutes(1)).build();
         };
-        return Bucket.builder().addLimit(limit).build();
     }
 
     private String resolveClientIp(HttpServletRequest request) {
