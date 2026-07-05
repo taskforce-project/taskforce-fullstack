@@ -143,14 +143,10 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
       
       // Nettoyer les données temporaires
       clearRegisterData();
-      
+
       // Rafraîchir l'état d'authentification dans le contexte
       refreshUser();
-      
-      toast.success("Compte vérifié avec succès !", {
-        description: "Bienvenue sur TaskForce !",
-      });
-      
+
       // Si checkout URL présente (plan payant), rediriger vers Stripe
       if (result.checkoutSessionUrl) {
         toast.info("Redirection vers la page de paiement...", {
@@ -159,9 +155,13 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
         globalThis.window.location.href = result.checkoutSessionUrl;
         return;
       }
-      
-      // Sinon redirection vers dashboard
-      router.push('/dashboard');
+
+      // Plan gratuit : compte vérifié, mais plus d'auto-login (tokens émis par Keycloak,
+      // qui exige le mot de passe). On redirige vers la connexion.
+      toast.success("Compte vérifié avec succès !", {
+        description: "Connectez-vous pour accéder à votre espace.",
+      });
+      router.push('/auth/login');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       toast.error(t.common.error, {

@@ -384,7 +384,8 @@ describe('OTPForm - Step 3: Verification', () => {
       // Vérifier que le toast a été appelé avec au moins un message
       expect(toast.success).toHaveBeenCalled();
 
-      expect(mockPush).toHaveBeenCalledWith('/dashboard');
+      // Migration OIDC : plus d'auto-login post-inscription → redirection vers /auth/login.
+      expect(mockPush).toHaveBeenCalledWith('/auth/login');
     });
 
     it('should show error for invalid OTP', async () => {
