@@ -16,33 +16,39 @@ export function CookieBanner() {
     }
   }, [])
 
-  const accept = () => {
-    localStorage.setItem(STORAGE_KEY, "accepted")
+  const acknowledge = () => {
+    localStorage.setItem(STORAGE_KEY, "acknowledged")
     setVisible(false)
   }
 
   if (!visible) return null
 
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+    <div
+      className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50"
+      role="region"
+      aria-label="Cookie information"
+    >
       <Card className="w-[350px] shadow-lg rounded-2xl border bg-background text-foreground">
         <CardContent className="p-5">
           <div className="flex flex-col space-y-3">
             <div className="flex items-center space-x-2">
-              <span className="text-lg">🍪</span>
+              <span className="text-lg" aria-hidden="true">🍪</span>
               <h2 className="font-semibold">Cookie Notice</h2>
             </div>
             <p className="text-sm text-muted-foreground">
-              We use strictly necessary cookies to keep you authenticated. No tracking or advertising data is collected.
+              We only use strictly necessary cookies to keep you signed in. These
+              are exempt from consent under the CNIL/GDPR. We set no analytics,
+              tracking or advertising cookies, so there is nothing to opt out of.
             </p>
             <div className="flex justify-between items-center pt-2">
               <Link
                 href="/privacy-policy"
                 className="text-sm underline hover:text-primary transition-colors"
               >
-                Manage your preferences
+                Learn more
               </Link>
-              <Button size="sm" onClick={accept}>Accept</Button>
+              <Button size="sm" onClick={acknowledge}>Got it</Button>
             </div>
           </div>
         </CardContent>
