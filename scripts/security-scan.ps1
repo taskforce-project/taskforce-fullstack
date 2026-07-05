@@ -1,4 +1,4 @@
-# ============================================================
+﻿# ============================================================
 # TaskForce - Security Scan Script
 # ============================================================
 # Usage:
@@ -17,14 +17,16 @@ param(
     [switch]$Images,
     [switch]$Source,
     [switch]$Static,
+    [switch]$Dast,
     [ValidateSet("LOW", "MEDIUM", "HIGH", "CRITICAL")]
     [string]$Severity = "MEDIUM"
 )
 
 $ErrorActionPreference = "Continue"
 
-# Si aucun flag, tout lancer
-if (-not ($Images -or $Source -or $Static)) {
+# Si aucun flag: SAST/SCA (Images+Source+Static). Le DAST (ZAP) reste OPT-IN via -Dast
+# car lourd (image ~1.5 Go + scan de plusieurs minutes) et exige l'app en marche.
+if (-not ($Images -or $Source -or $Static -or $Dast)) {
     $Images = $true
     $Source = $true
     $Static = $true
@@ -335,6 +337,48 @@ if ($Static) {
 }
 
 # ════════════════════════════════════════════════════════════
+# DAST - OWASP ZAP baseline (app en marche)
+# ════════════════════════════════════════════════════════════
+if ($Dast) {
+    Write-Section "DAST - OWASP ZAP baseline"
+    # Cibles atteignables depuis le conteneur ZAP via host.docker.internal (ports mappes sur l'hote).
+    $zapTargets = [ordered]@{
+        "frontend" = "http://host.docker.internal:3000"
+        "backend"  = "http://host.docker.internal:8080"
+    }
+    foreach ($t in $zapTargets.GetEnumerator()) {
+        $name = $t.Key
+        $url  = $t.Value
+        Write-Step "ZAP baseline -> $name ($url)"
+        $htmlRep = "zap-$name.html"
+        $jsonRep = "zap-$name.json"
+        # -I : n'echoue pas sur les warnings ; -m 2 : 2 min de spider max (baseline = passif).
+        docker run --rm -v "${ReportDir}:/zap/wrk:rw" `
+            ghcr.io/zaproxy/zaproxy:stable `
+            zap-baseline.py -t $url -r $htmlRep -J $jsonRep -m 2 -I 2>&1 | Out-Null
+
+        $jsonPath = Join-Path $ReportDir $jsonRep
+        if (Test-Path $jsonPath) {
+            try {
+                $zap = Get-Content $jsonPath -Raw | ConvertFrom-Json
+                $alerts = @()
+                foreach ($site in @($zap.site)) { $alerts += @($site.alerts) }
+                $high = @($alerts | Where-Object { $_.riskcode -eq '3' }).Count
+                $med  = @($alerts | Where-Object { $_.riskcode -eq '2' }).Count
+                $ScanSummary.ZapHigh   = ($ScanSummary.ZapHigh   + $high)
+                $ScanSummary.ZapMedium = ($ScanSummary.ZapMedium + $med)
+                Write-OK "ZAP ${name}: $($alerts.Count) alertes (HIGH=$high, MEDIUM=$med) -> $htmlRep"
+            } catch {
+                Write-Warn "ZAP ${name}: rapport JSON illisible"
+            }
+        } else {
+            Write-Warn "ZAP ${name}: pas de rapport (cible injoignable ? app levee ?)"
+            $ScanSummary.Errors += ("ZAP " + $name + ": cible injoignable")
+        }
+    }
+}
+
+# ════════════════════════════════════════════════════════════
 # RÉSUMÉ FINAL
 # ════════════════════════════════════════════════════════════
 Write-Header "RÉSUMÉ DU SCAN"
@@ -356,6 +400,11 @@ if ($Source) {
 if ($Static) {
     $sgColor = if ($ScanSummary.SemgrepFindings -gt 0) { "Yellow" } else { "Green" }
     Write-Host "  Findings Semgrep      : $($ScanSummary.SemgrepFindings)" -ForegroundColor $sgColor
+}
+if ($Dast) {
+    $zapH = [int]$ScanSummary.ZapHigh; $zapM = [int]$ScanSummary.ZapMedium
+    $zapColor = if ($zapH -gt 0) { "Red" } elseif ($zapM -gt 0) { "Yellow" } else { "Green" }
+    Write-Host "  ZAP DAST HIGH / MEDIUM: $zapH / $zapM" -ForegroundColor $zapColor
 }
 
 if ($ScanSummary.Errors.Count -gt 0) {
