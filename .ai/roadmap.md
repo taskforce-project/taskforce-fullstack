@@ -10,6 +10,13 @@
 >
 > Sources : `.ai/qa.md` (QA produit détaillée), `.ai/known-issues.md` (bugs vérifiés), `.ai/module-map.md` (domaines↔code), `.ai/architecture-map.md` (archi réelle), `.ai/P0-fix-plan.md` (correctifs P0 paste-ready).
 
+> **▶ MAJ 05/07/2026 — round « V1-hardening » (branche `test/v1-hardening`).** Correctifs livrés + vérifiés (658 tests back + 54 front verts) :
+> - **Sécurité** — migration de l'émission des tokens vers **Keycloak OIDC RS256** (`JwtService` HS512 custom supprimé ; refresh/logout natifs IdP) → ferme **PC-019 / TF-SEC-009**. Détail : Brain OS `taskforce-docs` [ADR-011].
+> - **Sécurité** — **rate limiting distribué** (Bucket4j/Lettuce Redis, fallback local) → **TF-SEC-011** ; Redis ajouté au compose prod + `render.yaml`.
+> - **RGPD** — effacement de l'identité **Keycloak** à la suppression de compte (**TF-RGPD-007**) ; sous-traitants corrigés dans `constants_*.ts` (**TF-RGPD-005**) ; bannière cookies requalifiée en notice (**TF-RGPD-001**).
+> - **Build** — contournement du bug javac `SharedNameTable` (JDK 21.0.11) baké dans le `pom` (**TF-BUILD-001**) ; **`docker-compose.prod.yml` cassé** (\`n littéraux) à corriger (**TF-INFRA-011**).
+> - **Constat** : PC-001/002/003/005 étaient **déjà résolus** dans le code (le snapshot `.ai` du 05–20/06 est périmé sur ces points ; la source de vérité reste `taskforce-docs`).
+
 ---
 
 ## 0. Légende & conventions
