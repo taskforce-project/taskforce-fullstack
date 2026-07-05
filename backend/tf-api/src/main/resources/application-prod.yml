@@ -31,6 +31,12 @@ spring:
     clean-disabled: true
     validate-on-migrate: true
 
+  # Redis (rate limiting distribué multi-instances — TF-SEC-011)
+  data:
+    redis:
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
+
   # Security Configuration
   security:
     oauth2:
@@ -52,6 +58,11 @@ spring:
     error:
       include-stacktrace: never
       include-message: always
+
+# Rate limiting distribué (buckets partagés via Redis entre instances) — TF-SEC-011
+ratelimit:
+  distributed:
+    enabled: ${RATELIMIT_DISTRIBUTED_ENABLED:true}
 
 # CORS Configuration
 cors:

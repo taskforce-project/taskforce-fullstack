@@ -212,6 +212,17 @@
 			<artifactId>bucket4j_jdk17-core</artifactId>
 			<version>8.14.0</version>
 		</dependency>
+		<!-- Rate Limiting distribué (multi-instances) : buckets partagés via Redis/Lettuce.
+		     Activé seulement si ratelimit.distributed.enabled=true (prod) ; sinon fallback local. TF-SEC-011 -->
+		<dependency>
+			<groupId>com.bucket4j</groupId>
+			<artifactId>bucket4j_jdk17-lettuce</artifactId>
+			<version>8.14.0</version>
+		</dependency>
+		<dependency>
+			<groupId>io.lettuce</groupId>
+			<artifactId>lettuce-core</artifactId>
+		</dependency>
 
 		<!-- Test Dependencies -->
 		<dependency>
@@ -272,6 +283,17 @@
 							<version>${lombok.version}</version>
 						</path>
 					</annotationProcessorPaths>
+					<!--
+					  Contournement d'un bug interne de javac (SharedNameTable :
+					  "Cannot load from object array because this.hashes is null") déclenché par
+					  Lombok sur certains patchs JDK 21 (observé sur Temurin 21.0.11). Force la
+					  table de noms non-partagée dans un javac forké. À retirer quand le JDK ciblé
+					  n'est plus affecté (ou si l'image Maven est épinglée sur un build sain).
+					-->
+					<fork>true</fork>
+					<compilerArgs>
+						<arg>-XDuseUnsharedTable=true</arg>
+					</compilerArgs>
 				</configuration>
 			</plugin>
 			<plugin>
