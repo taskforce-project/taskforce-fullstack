@@ -11,7 +11,7 @@ import { findChannel } from "@/components/messages/data"
 import { applyReact }    from "@/components/messages/helpers"
 import { useMessageStore }   from "@/lib/store/message-store"
 import { useStomp }          from "@/lib/hooks/use-stomp"
-import type { Message }      from "@/components/messages/types"
+import type { Channel, Message } from "@/components/messages/types"
 import type { ApiChatMessage } from "@/lib/api/message-service"
 import { apiClient } from "@/lib/api/client"
 import { MESSAGE_ROUTES } from "@/lib/config/api-routes"
@@ -41,6 +41,7 @@ export default function MessagesPage() {
     fetchChannels,
     fetchMessages,
     setActiveChannel,
+    addMessage,
     removeMessage,
   } = useMessageStore()
 
@@ -62,8 +63,32 @@ export default function MessagesPage() {
 
   const useApiMode = channels.length > 0
 
+  // Auto-sélection du 1er canal réel dès que les canaux API sont chargés
+  // (évite de rester bloqué sur le canal mock "general" à l'ouverture).
+  useEffect(() => {
+    if (channels.length > 0 && activeChannelId === null) {
+      setActiveChannel(channels[0].id)
+    }
+  }, [channels, activeChannelId, setActiveChannel])
+
   const activeStringId = activeChannelId === null ? localActiveId : activeChannelId.toString()
-  const channel        = findChannel(activeStringId) ?? findChannel(localActiveId)
+
+  // En mode API, l'en-tête/nom vient du canal réel ; sinon fallback sur les mocks.
+  const channel: Channel | undefined = useMemo(() => {
+    if (useApiMode && activeChannelId !== null) {
+      const active = channels.find((c) => c.id === activeChannelId)
+      if (active) {
+        const kindMap = { CHANNEL: "channel", DM: "dm", GROUP_DM: "group-dm", PROJECT_CHANNEL: "project-channel" } as const
+        return {
+          id:          active.id.toString(),
+          kind:        kindMap[active.kind] ?? "channel",
+          name:        active.name ?? `channel-${active.id}`,
+          description: active.description ?? undefined,
+        }
+      }
+    }
+    return findChannel(activeStringId) ?? findChannel(localActiveId)
+  }, [useApiMode, activeChannelId, channels, activeStringId, localActiveId])
 
   const apiMessages: Message[] = useMemo(() => {
     if (activeChannelId === null) return []
@@ -103,10 +128,14 @@ export default function MessagesPage() {
   const handleSend = useCallback(async (text: string) => {
     if (useApiMode && activeChannelId !== null) {
       try {
-        await apiClient.post<{ data: ApiChatMessage }>(
+        const res = await apiClient.post<{ data: ApiChatMessage }>(
           MESSAGE_ROUTES.MESSAGES(slug, activeChannelId),
           { content: text }
         )
+        // Affichage immédiat via la réponse REST. L'écho STOMP qui suivra sera
+        // dédupliqué par id dans le store (addMessage) → pas de doublon, et le
+        // message s'affiche même si le temps réel est momentanément indisponible.
+        addMessage(activeChannelId, res.data.data)
       } catch {
         toast.error("Impossible d envoyer le message")
       }
@@ -122,7 +151,7 @@ export default function MessagesPage() {
         [localActiveId]: [...(prev[localActiveId] ?? []), newMsg],
       }))
     }
-  }, [useApiMode, activeChannelId, slug, localActiveId])
+  }, [useApiMode, activeChannelId, slug, localActiveId, addMessage])
 
   const handleReact = useCallback((msgId: string, emoji: string) => {
     if (!useApiMode) {
