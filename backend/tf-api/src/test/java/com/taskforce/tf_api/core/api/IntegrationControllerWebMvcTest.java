@@ -87,15 +87,17 @@ class IntegrationControllerWebMvcTest {
     // ------------------------------------------------------------------
 
     @Test
-    @DisplayName("GET github/connect → 302 + Location")
-    void github_connect_302() throws Exception {
-        when(gitHubService.buildAuthorizeUrl(anyString()))
-            .thenReturn(java.net.URI.create("https://github.com/login/oauth/authorize?state=acme"));
+    @DisplayName("GET github/connect → 200 + authorizeUrl (JSON, XHR authentifié)")
+    void github_connect_url() throws Exception {
+        when(userRepository.findByEmail(anyString()))
+            .thenReturn(Optional.of(User.builder().id(3L).email("dev@it.dev").build()));
+        when(gitHubService.buildAuthorizeUrl(anyString(), any()))
+            .thenReturn(java.net.URI.create("https://github.com/login/oauth/authorize?state=xyz"));
 
         mockMvc.perform(get("/api/workspaces/acme/integrations/github/connect").with(auth()))
-            .andExpect(status().isFound())
-            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
-                .header().string("Location", "https://github.com/login/oauth/authorize?state=acme"));
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.authorizeUrl").value("https://github.com/login/oauth/authorize?state=xyz"));
     }
 
     @Test
@@ -154,13 +156,16 @@ class IntegrationControllerWebMvcTest {
     // ------------------------------------------------------------------
 
     @Test
-    @DisplayName("GET slack/connect → 302 + Location")
-    void slack_connect_302() throws Exception {
-        when(slackService.buildAuthorizeUrl(anyString()))
-            .thenReturn(java.net.URI.create("https://slack.com/oauth/v2/authorize?state=acme"));
+    @DisplayName("GET slack/connect → 200 + authorizeUrl (JSON, XHR authentifié)")
+    void slack_connect_url() throws Exception {
+        when(userRepository.findByEmail(anyString()))
+            .thenReturn(Optional.of(User.builder().id(3L).email("dev@it.dev").build()));
+        when(slackService.buildAuthorizeUrl(anyString(), any()))
+            .thenReturn(java.net.URI.create("https://slack.com/oauth/v2/authorize?state=xyz"));
 
         mockMvc.perform(get("/api/workspaces/acme/integrations/slack/connect").with(auth()))
-            .andExpect(status().isFound());
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.authorizeUrl").value("https://slack.com/oauth/v2/authorize?state=xyz"));
     }
 
     @Test
