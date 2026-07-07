@@ -87,6 +87,8 @@ app:
   name: ${APP_NAME:TaskForce}
   url: ${APP_URL}
   frontend-url: ${FRONTEND_URL}
+  # Base publique du BACKEND (callbacks OAuth). Souvent = APP_URL (même domaine derrière nginx).
+  api-url: ${APP_API_URL:${APP_URL}}
 
 # Intégrations tierces (OAuth) — vides si non configurées
 integrations:
