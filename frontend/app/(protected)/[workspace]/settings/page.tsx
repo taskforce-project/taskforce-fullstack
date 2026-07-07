@@ -1003,10 +1003,35 @@ function IntegrationsPanel() {
   const {
     githubStatus, slackStatus, slackChannels, webhooks,
     fetchGitHubStatus, connectGitHub, disconnectGitHub,
-    fetchSlackStatus, disconnectSlack,
+    fetchSlackStatus, connectSlack, disconnectSlack,
     fetchSlackChannels, addSlackChannel, removeSlackChannel,
     fetchWebhooks, addWebhook, removeWebhook,
   } = useIntegrationStore()
+
+  // Démarrage OAuth (XHR → URL → navigation vers GitHub/Slack). Sur succès la page quitte,
+  // donc on ne réinitialise l'état de chargement qu'en cas d'échec.
+  const [connectingGitHub, setConnectingGitHub] = useState(false)
+  const [connectingSlack,  setConnectingSlack]  = useState(false)
+
+  async function handleConnectGitHub() {
+    setConnectingGitHub(true)
+    try {
+      await connectGitHub(slug)
+    } catch {
+      toast.error("Impossible de démarrer la connexion GitHub")
+      setConnectingGitHub(false)
+    }
+  }
+
+  async function handleConnectSlack() {
+    setConnectingSlack(true)
+    try {
+      await connectSlack(slug)
+    } catch {
+      toast.error("Impossible de démarrer la connexion Slack")
+      setConnectingSlack(false)
+    }
+  }
 
   // Slack channel form
   const [channelId,   setChannelId]   = useState("")
@@ -1111,8 +1136,8 @@ function IntegrationsPanel() {
               </Button>
             </div>
           ) : (
-            <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => connectGitHub(slug)}>
-              <Link2 className="h-3 w-3 mr-1.5" />Connect
+            <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleConnectGitHub} disabled={connectingGitHub}>
+              <Link2 className="h-3 w-3 mr-1.5" />{connectingGitHub ? "Connexion…" : "Connect"}
             </Button>
           )}
         </div>
@@ -1120,7 +1145,7 @@ function IntegrationsPanel() {
       </SectionCard>
 
       {/* ---- Slack ---- */}
-      <SectionCard title="Slack" description="Notifications Slack — bientôt disponible.">
+      <SectionCard title="Slack" description="Connectez votre espace Slack pour recevoir les notifications d'activité.">
         <div className="flex flex-col gap-4">
           <div className="flex items-center gap-4">
             <div className="h-10 w-10 rounded-lg border border-border bg-muted flex items-center justify-center text-xs font-bold text-foreground shrink-0">
@@ -1143,7 +1168,9 @@ function IntegrationsPanel() {
                 </Button>
               </div>
             ) : (
-              <Badge variant="secondary" className="text-xs text-muted-foreground">Bientôt disponible</Badge>
+              <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleConnectSlack} disabled={connectingSlack}>
+                <Link2 className="h-3 w-3 mr-1.5" />{connectingSlack ? "Connexion…" : "Connect"}
+              </Button>
             )}
           </div>
 
