@@ -29,6 +29,7 @@ import org.springframework.web.client.RestTemplate;
 import com.taskforce.tf_api.core.dto.request.SlackChannelRequest;
 import com.taskforce.tf_api.core.dto.response.IntegrationStatusResponse;
 import com.taskforce.tf_api.core.dto.response.SlackChannelResponse;
+import com.taskforce.tf_api.core.dto.response.SlackHistoryMessage;
 import com.taskforce.tf_api.core.enums.IntegrationProvider;
 import com.taskforce.tf_api.core.model.Integration;
 import com.taskforce.tf_api.core.model.OAuthState;
@@ -73,6 +74,9 @@ public class SlackIntegrationService {
 
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final int STATE_TTL_MINUTES = 10;
+
+    /** Cache des noms d'utilisateurs Slack résolus (clé : {@code workspaceId:slackUserId}). */
+    private final Map<String, String> slackUserNameCache = new java.util.concurrent.ConcurrentHashMap<>();
 
     // ----------------------------------------------------------------
     // OAuth flow
@@ -245,6 +249,79 @@ public class SlackIntegrationService {
                     .filter(SlackChannel::getActive)
                     .findFirst()
                     .ifPresent(channel -> postMessage(integration.getAccessToken(), channel.getChannelId(), text)));
+    }
+
+    // ----------------------------------------------------------------
+    // Miroir (pull) : lecture de l'historique + résolution des noms
+    // ----------------------------------------------------------------
+
+    /**
+     * Récupère l'historique d'un canal Slack (conversations.history) depuis {@code oldestTs} (exclu),
+     * en ordre chronologique. Ne garde que les messages texte d'utilisateurs (ignore les sous-types
+     * système join/leave/bot). Retourne une liste vide si Slack répond {@code ok:false}.
+     */
+    @SuppressWarnings("unchecked")
+    public List<SlackHistoryMessage> fetchHistory(Long workspaceId, String slackChannelId, String oldestTs) {
+        String token = requireToken(workspaceId);
+        String url = "https://slack.com/api/conversations.history?channel=" + slackChannelId + "&limit=100"
+            + (oldestTs != null && !oldestTs.isBlank() ? "&oldest=" + oldestTs : "");
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(token);
+        ResponseEntity<Map<String, Object>> resp = restTemplate.exchange(
+            url, HttpMethod.GET, new HttpEntity<>(headers),
+            new ParameterizedTypeReference<Map<String, Object>>() {});
+        Map<String, Object> body = resp.getBody();
+        if (body == null || Boolean.FALSE.equals(body.get("ok")) || !(body.get("messages") instanceof List<?> list)) {
+            return List.of();
+        }
+        List<SlackHistoryMessage> out = new java.util.ArrayList<>();
+        for (Object o : list) {
+            if (!(o instanceof Map<?, ?> m) || m.get("subtype") != null) continue;
+            String ts = str(m.get("ts"));
+            String text = str(m.get("text"));
+            if (ts == null || text == null || text.isBlank()) continue;
+            out.add(new SlackHistoryMessage(ts, str(m.get("user")), text));
+        }
+        java.util.Collections.reverse(out); // Slack renvoie du plus récent au plus ancien
+        return out;
+    }
+
+    /** Résout le nom affiché d'un utilisateur Slack (users.info), avec cache et fallback sur l'id. */
+    @SuppressWarnings("unchecked")
+    public String resolveUserName(Long workspaceId, String slackUserId) {
+        if (slackUserId == null || slackUserId.isBlank()) return "Slack";
+        String cacheKey = workspaceId + ":" + slackUserId;
+        String cached = slackUserNameCache.get(cacheKey);
+        if (cached != null) return cached;
+        String name = slackUserId;
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setBearerAuth(requireToken(workspaceId));
+            ResponseEntity<Map<String, Object>> resp = restTemplate.exchange(
+                "https://slack.com/api/users.info?user=" + slackUserId, HttpMethod.GET,
+                new HttpEntity<>(headers), new ParameterizedTypeReference<Map<String, Object>>() {});
+            Map<String, Object> body = resp.getBody();
+            if (body != null && Boolean.TRUE.equals(body.get("ok")) && body.get("user") instanceof Map<?, ?> u) {
+                String display = u.get("profile") instanceof Map<?, ?> p ? str(p.get("display_name")) : null;
+                String real = str(u.get("real_name"));
+                if (display != null && !display.isBlank()) name = display;
+                else if (real != null && !real.isBlank()) name = real;
+            }
+        } catch (Exception e) {
+            log.warn("Résolution du nom Slack {} échouée: {}", slackUserId, e.getMessage());
+        }
+        slackUserNameCache.put(cacheKey, name);
+        return name;
+    }
+
+    private String requireToken(Long workspaceId) {
+        return integrationRepository.findByWorkspaceIdAndProvider(workspaceId, IntegrationProvider.SLACK)
+            .map(Integration::getAccessToken)
+            .orElseThrow(() -> new BusinessException("Slack n'est pas connecté pour ce workspace"));
+    }
+
+    private String str(Object o) {
+        return o != null ? String.valueOf(o) : null;
     }
 
     /** Un canal reçoit l'événement si sa liste de types le contient, ou si elle est vide (wildcard). */
