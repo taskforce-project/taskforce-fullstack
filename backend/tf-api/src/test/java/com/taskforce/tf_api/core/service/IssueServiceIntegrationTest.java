@@ -69,6 +69,7 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
 
     @MockitoBean private SimpMessagingTemplate messagingTemplate;
     @MockitoBean private NotificationService notificationService;
+    @MockitoBean private SlackIntegrationService slackService;  // push Slack sur issue.created (no-op en test)
 
     @jakarta.persistence.PersistenceContext private jakarta.persistence.EntityManager em;
 
@@ -137,6 +138,11 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
             // effets de bord (mocks)
             verify(notificationService).notifyAssigned(any(Issue.class), any(User.class));
             verify(messagingTemplate).convertAndSend(contains("/topic/projects."), any(Object.class));
+            // push Slack déclenché sur issue.created
+            verify(slackService).notifyEvent(
+                org.mockito.ArgumentMatchers.eq(workspace.getId()),
+                org.mockito.ArgumentMatchers.eq("issue.created"),
+                org.mockito.ArgumentMatchers.anyString());
         }
 
         @Test
