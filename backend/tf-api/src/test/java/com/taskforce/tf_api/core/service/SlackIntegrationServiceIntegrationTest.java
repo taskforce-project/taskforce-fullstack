@@ -29,21 +29,39 @@ class SlackIntegrationServiceIntegrationTest extends AbstractIntegrationTest {
     @Autowired private WorkspaceRepository workspaceRepository;
 
     @Autowired private com.taskforce.tf_api.core.repository.IntegrationRepository integrationRepository;
+    @Autowired private com.taskforce.tf_api.core.repository.OAuthStateRepository oauthStateRepository;
     @MockitoBean private RestTemplate restTemplate;
 
     private static final String SLUG = "ws-slack-it";
+    private User owner;
 
     @BeforeEach
     void seed() {
-        User owner = userRepository.save(User.builder()
+        owner = userRepository.save(User.builder()
             .keycloakId("kc-slack").email("slack@it.dev").displayName("Owner").isActive(true).build());
         workspaceRepository.save(Workspace.builder().name("Slack WS").slug(SLUG).owner(owner).build());
     }
 
     @Test
-    @DisplayName("buildAuthorizeUrl construit une URL OAuth avec le state = slug")
+    @DisplayName("buildAuthorizeUrl construit une URL OAuth avec un state aléatoire persisté")
     void should_build_authorize_url() {
-        assertThat(service.buildAuthorizeUrl(SLUG).toString()).contains("state=" + SLUG);
+        assertThat(service.buildAuthorizeUrl(SLUG, owner).toString())
+            .contains("slack.com/oauth/v2/authorize")
+            .contains("client_id=")
+            .contains("state=");
+        assertThat(oauthStateRepository.count()).isEqualTo(1);
+    }
+
+    /** Persiste un state OAuth valide (le callback résout le workspace via ce state). */
+    private String pendingState() {
+        var ws = workspaceRepository.findBySlug(SLUG).orElseThrow();
+        return oauthStateRepository.save(com.taskforce.tf_api.core.model.OAuthState.builder()
+            .state("st-" + java.util.UUID.randomUUID())
+            .provider(com.taskforce.tf_api.core.enums.IntegrationProvider.SLACK)
+            .workspace(ws)
+            .user(owner)
+            .expiresAt(java.time.LocalDateTime.now().plusMinutes(5))
+            .build()).getState();
     }
 
     @Test
@@ -109,7 +127,7 @@ class SlackIntegrationServiceIntegrationTest extends AbstractIntegrationTest {
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(org.springframework.core.ParameterizedTypeReference.class));
 
-        String redirect = service.handleCallback("the-code", SLUG);
+        String redirect = service.handleCallback("the-code", pendingState());
 
         assertThat(redirect).contains("/" + SLUG + "/settings").contains("slack=connected");
         var status = service.getStatus(SLUG);
@@ -127,7 +145,7 @@ class SlackIntegrationServiceIntegrationTest extends AbstractIntegrationTest {
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(org.springframework.core.ParameterizedTypeReference.class));
 
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.handleCallback("bad", SLUG))
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.handleCallback("bad", pendingState()))
             .isInstanceOf(RuntimeException.class);
     }
 
@@ -156,5 +174,25 @@ class SlackIntegrationServiceIntegrationTest extends AbstractIntegrationTest {
         service.sendNotification(ws.getId(), "silence");
 
         org.mockito.Mockito.verifyNoInteractions(restTemplate);
+    }
+
+    @Test
+    @DisplayName("notifyEvent poste uniquement sur les canaux abonnés à l'événement")
+    void notify_event_filters_by_type() {
+        connectSlack();
+        service.addChannel(SLUG, new com.taskforce.tf_api.core.dto.request.SlackChannelRequest(
+            "C-created", "created-chan", java.util.List.of("issue.created")));
+        service.addChannel(SLUG, new com.taskforce.tf_api.core.dto.request.SlackChannelRequest(
+            "C-other", "other-chan", java.util.List.of("cycle.completed")));
+        var ws = workspaceRepository.findBySlug(SLUG).orElseThrow();
+
+        // dispatchEvent = logique sync sous-jacente de notifyEvent (@Async testé sans le proxy async)
+        service.dispatchEvent(ws.getId(), "issue.created", "Nouvelle issue !");
+
+        // Un seul POST : seul le canal abonné à issue.created reçoit
+        org.mockito.Mockito.verify(restTemplate, org.mockito.Mockito.times(1)).postForObject(
+            org.mockito.ArgumentMatchers.eq("https://slack.com/api/chat.postMessage"),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.eq(java.util.Map.class));
     }
 }
