@@ -35,4 +35,6 @@ export interface Message {
   reactions?: Reaction[]
   edited?: boolean
   pinned?: boolean
+  /** Source externe : "SLACK" pour un message importé via le miroir, sinon undefined. */
+  externalSource?: string
 }
