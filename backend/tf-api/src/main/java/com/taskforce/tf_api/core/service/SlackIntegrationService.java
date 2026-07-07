@@ -63,8 +63,9 @@ public class SlackIntegrationService {
     @Value("${app.frontend-url:http://localhost:3000}")
     private String frontendUrl;
 
-    @Value("${app.url:http://localhost:8080}")
-    private String appUrl;
+    // Base du BACKEND pour le callback OAuth (distincte de app.url = front, cf. EmailService).
+    @Value("${app.api-url:http://localhost:8080}")
+    private String apiUrl;
 
     private final IntegrationRepository  integrationRepository;
     private final SlackChannelRepository slackChannelRepository;
@@ -101,7 +102,7 @@ public class SlackIntegrationService {
             .expiresAt(LocalDateTime.now().plusMinutes(STATE_TTL_MINUTES))
             .build());
 
-        String callbackUrl = appUrl + "/api/integrations/slack/callback";
+        String callbackUrl = apiUrl + "/api/integrations/slack/callback";
         String url = SLACK_OAUTH_AUTHORIZE
             + "?client_id=" + encode(clientId)
             + "&redirect_uri=" + encode(callbackUrl)
