@@ -3,7 +3,10 @@ package com.taskforce.tf_api.core.service;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
+import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,11 +36,13 @@ import com.taskforce.tf_api.core.enums.IntegrationProvider;
 import com.taskforce.tf_api.core.model.Integration;
 import com.taskforce.tf_api.core.model.Issue;
 import com.taskforce.tf_api.core.model.IssueGitHubLink;
+import com.taskforce.tf_api.core.model.OAuthState;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.IntegrationRepository;
 import com.taskforce.tf_api.core.repository.IssueGitHubLinkRepository;
 import com.taskforce.tf_api.core.repository.IssueRepository;
+import com.taskforce.tf_api.core.repository.OAuthStateRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
@@ -70,24 +75,57 @@ public class GitHubIntegrationService {
     private final IssueGitHubLinkRepository issueGitHubLinkRepository;
     private final WorkspaceRepository      workspaceRepository;
     private final IssueRepository          issueRepository;
+    private final OAuthStateRepository     oauthStateRepository;
     private final RestTemplate             restTemplate;
+
+    private static final SecureRandom RANDOM = new SecureRandom();
+    private static final int STATE_TTL_MINUTES = 10;
 
     // ----------------------------------------------------------------
     // OAuth flow
     // ----------------------------------------------------------------
 
-    public URI buildAuthorizeUrl(String workspaceSlug) {
+    /**
+     * Émet un {@code state} aléatoire (anti-CSRF) lié au workspace + à l'utilisateur, le persiste,
+     * et construit l'URL d'autorisation GitHub. Appelé via XHR authentifié (le front navigue ensuite
+     * vers l'URL renvoyée).
+     */
+    @Transactional
+    public URI buildAuthorizeUrl(String workspaceSlug, User user) {
+        Workspace workspace = workspaceRepository.findBySlug(workspaceSlug)
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found: " + workspaceSlug));
+
+        oauthStateRepository.deleteByExpiresAtBefore(LocalDateTime.now());
+        String state = newState();
+        oauthStateRepository.save(OAuthState.builder()
+            .state(state)
+            .provider(IntegrationProvider.GITHUB)
+            .workspace(workspace)
+            .user(user)
+            .expiresAt(LocalDateTime.now().plusMinutes(STATE_TTL_MINUTES))
+            .build());
+
         String callbackUrl = appUrl + "/api/integrations/github/callback";
         String url = GITHUB_OAUTH_AUTHORIZE
             + "?client_id=" + encode(clientId)
             + "&redirect_uri=" + encode(callbackUrl)
             + "&scope=repo,read:org"
-            + "&state=" + encode(workspaceSlug);
+            + "&state=" + encode(state);
         return URI.create(url);
     }
 
     @Transactional
-    public String handleCallback(String code, String workspaceSlug) {
+    public String handleCallback(String code, String state) {
+        // 0. Résoudre + valider le state (workspace fiable, pas un slug devinable)
+        OAuthState oauthState = oauthStateRepository.findById(state)
+            .filter(s -> s.getProvider() == IntegrationProvider.GITHUB)
+            .orElseThrow(() -> new BusinessException("État OAuth invalide"));
+        if (oauthState.getExpiresAt().isBefore(LocalDateTime.now())) {
+            oauthStateRepository.delete(oauthState);
+            throw new BusinessException("État OAuth expiré, relancez la connexion");
+        }
+        Workspace workspace = oauthState.getWorkspace();
+
         // 1. Exchange code for token
         String accessToken = exchangeCodeForToken(code);
 
@@ -97,9 +135,6 @@ public class GitHubIntegrationService {
         String avatarUrl = String.valueOf(ghUser.getOrDefault("avatar_url", ""));
 
         // 3. Persist integration (upsert)
-        Workspace workspace = workspaceRepository.findBySlug(workspaceSlug)
-            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found: " + workspaceSlug));
-
         Optional<Integration> existing = integrationRepository
             .findByWorkspaceIdAndProvider(workspace.getId(), IntegrationProvider.GITHUB);
 
@@ -115,10 +150,20 @@ public class GitHubIntegrationService {
         );
         integration.setAccessToken(accessToken);
         integration.setMeta(meta);
+        integration.setInstalledBy(oauthState.getUser());
         integrationRepository.save(integration);
 
-        // 4. Redirect to frontend
-        return frontendUrl + "/" + workspaceSlug + "/settings?section=integrations&github=connected";
+        // 4. State consommé
+        oauthStateRepository.delete(oauthState);
+
+        // 5. Redirect to frontend
+        return frontendUrl + "/" + workspace.getSlug() + "/settings?section=integrations&github=connected";
+    }
+
+    private String newState() {
+        byte[] bytes = new byte[32];
+        RANDOM.nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
     @Transactional
