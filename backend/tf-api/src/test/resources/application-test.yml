@@ -64,6 +64,12 @@ stripe:
     enterprise:
       price-id: price_enterprise_test
 
+# Intégrations — poller du miroir Slack désactivé en test (pas de @Scheduled parasite)
+integrations:
+  slack:
+    mirror:
+      poll-enabled: false
+
 # OTP Configuration
 otp:
   length: 6
