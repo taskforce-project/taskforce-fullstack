@@ -52,6 +52,16 @@ public class ChatMessage {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
+    // --- Message importé d'une source externe (Slack). author_id reste null. ---
+    @Column(name = "external_source", length = 16)
+    private String externalSource;   // null = natif ; "SLACK" = importé
+
+    @Column(name = "external_id", length = 64)
+    private String externalId;       // ts Slack (déduplication)
+
+    @Column(name = "external_author", length = 200)
+    private String externalAuthor;   // nom affiché de l'expéditeur Slack
+
     @Column(nullable = false)
     @Builder.Default
     private Boolean isEdited = false;
