@@ -69,6 +69,13 @@ management:
       enabled: true
     readinessstate:
       enabled: true
+  # Métriques (supervision / alertes E26) : histogramme pour le p95 de latence + tag applicatif.
+  metrics:
+    tags:
+      application: taskforce-backend
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
 
 # OpenAPI / Swagger Configuration
 springdoc:

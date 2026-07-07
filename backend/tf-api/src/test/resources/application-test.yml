@@ -50,21 +50,15 @@ keycloak:
     username: admin-test
     password: admin
 
-# Stripe Configuration (mock)
+# Stripe Configuration (mock) — bloc unique (les 2 blocs `stripe:` dupliqués cassaient
+# le parse YAML strict de Boot 4 → tout @SpringBootTest/@WebMvcTest en profil `test` échouait).
 stripe:
-  api-key: sk_test_fake_key_for_testing
+  api-key: sk_test_mock_key
   success-url: http://localhost:3000/auth/verify-email?session_id={CHECKOUT_SESSION_ID}
   cancel-url: http://localhost:3000/auth/register
   plans:
     pro:
       price-id: price_test_pro
-    enterprise:
-      price-id: price_test_enterprise-test
-
-# Stripe Configuration (mock)
-stripe:
-  api-key: sk_test_mock_key
-  plans:
     premium:
       price-id: price_premium_test
     enterprise:

@@ -124,6 +124,7 @@ export interface AuditLogEntry {
 
 /** Journal d'audit du workspace (réservé OWNER/ADMIN côté back). */
 export async function getAuditLogs(slug: string): Promise<AuditLogEntry[]> {
+  // 403 attendu pour les non-OWNER/ADMIN → 4xx contextuel, non toasté globalement (cf. client.ts).
   const response = await apiClient.get<{ data: AuditLogEntry[] }>(WORKSPACE_ROUTES.AUDIT(slug));
   return response.data.data;
 }

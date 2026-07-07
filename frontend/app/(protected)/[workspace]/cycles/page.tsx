@@ -162,7 +162,7 @@ function CycleCard({ cycle, slug }: Readonly<{ cycle: Cycle; slug: string }>) {
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
+            <Button variant="ghost" size="icon" aria-label="Actions" className="h-7 w-7 shrink-0">
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>

@@ -1370,7 +1370,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
           />
 
           <SheetClose asChild>
-            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground">
+            <Button variant="ghost" size="icon" aria-label="Fermer" className="h-7 w-7 text-muted-foreground hover:text-foreground">
               <X className="size-4" />
             </Button>
           </SheetClose>

@@ -57,7 +57,8 @@ describe('Integration Tests - Authentication Flow', () => {
         mockPush('/dashboard');
       });
       
-      const user = userEvent.setup();
+      // delay: null → pas de temporisation inter-frappe (déterministe, non flaky sous charge de suite).
+      const user = userEvent.setup({ delay: null });
       
       // Dynamically import to avoid module resolution issues
       const { LoginForm } = await import('@/components/auth/login/login-form');
@@ -81,17 +82,18 @@ describe('Integration Tests - Authentication Flow', () => {
           email: 'test@example.com',
           password: 'Test@2024!',
         });
-      });
+      }, { timeout: 3000 });
 
       // Wait for redirect
       await waitFor(() => {
         expect(mockPush).toHaveBeenCalledWith('/dashboard');
-      });
+      }, { timeout: 3000 });
     });
 
     it('should show error on invalid credentials', async () => {
       mockLogin.mockRejectedValue(new Error('Invalid credentials'));
-      const user = userEvent.setup();
+      // delay: null → pas de temporisation inter-frappe (déterministe, non flaky sous charge de suite).
+      const user = userEvent.setup({ delay: null });
       
       const { LoginForm } = await import('@/components/auth/login/login-form');
       render(<LoginForm />);
@@ -106,7 +108,7 @@ describe('Integration Tests - Authentication Flow', () => {
 
       await waitFor(() => {
         expect(mockToastError).toHaveBeenCalled();
-      });
+      }, { timeout: 3000 });
 
       // Should not redirect
       expect(mockPush).not.toHaveBeenCalled();

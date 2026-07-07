@@ -64,6 +64,20 @@ services:
       - key: ALLOWED_ORIGINS
         value: https://taskforce.onrender.com
 
+      # Redis (rate limiting distribué multi-instances — TF-SEC-011)
+      - key: RATELIMIT_DISTRIBUTED_ENABLED
+        value: "true"
+      - key: REDIS_HOST
+        fromService:
+          name: taskforce-redis
+          type: redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          name: taskforce-redis
+          type: redis
+          property: port
+
       # Logging
       - key: LOGGING_LEVEL_ROOT
         value: INFO
@@ -173,8 +187,18 @@ services:
       - key: KC_HTTP_ENABLED
         value: true
 
+  # ================================
+  # 5. Redis (rate limiting distribué)
+  # ================================
+  - type: redis
+    name: taskforce-redis
+    plan: starter
+    region: frankfurt
+    ipAllowList: [] # Vide = accessible uniquement par services Render
+    maxmemoryPolicy: allkeys-lru
+
 # ================================
-# 5. PostgreSQL Database
+# 6. PostgreSQL Database
 # ================================
 databases:
   - name: taskforce-postgres

@@ -14,6 +14,7 @@ vi.mock('../api/auth-service', () => ({
     login: vi.fn(),
     logout: vi.fn(),
     getCurrentUser: vi.fn(),
+    isAuthenticated: vi.fn(),
   },
 }));
 
@@ -36,6 +37,9 @@ describe('AuthContext', () => {
     vi.clearAllMocks();
     vi.mocked(useRouter).mockReturnValue(mockRouter as unknown as ReturnType<typeof useRouter>);
     vi.stubGlobal('location', { pathname: '/dashboard' });
+    // Le contexte gate désormais l'init sur isAuthenticated() (présence d'un token) PUIS getCurrentUser().
+    // On laisse getCurrentUser() piloter l'état (intention historique des tests) → token présent par défaut.
+    vi.mocked(authService.authService.isAuthenticated).mockReturnValue(true);
   });
 
   describe('AuthProvider', () => {
@@ -69,7 +73,7 @@ describe('AuthContext', () => {
       expect(result.current.isAuthenticated).toBe(false);
     });
 
-    it('should redirect to dashboard when authenticated on login page', async () => {
+    it('should redirect to home when authenticated on login page', async () => {
       vi.mocked(authService.authService.getCurrentUser).mockReturnValue(mockUser);
       vi.stubGlobal('location', { pathname: '/auth/login' });
 
@@ -77,12 +81,13 @@ describe('AuthContext', () => {
         wrapper: AuthProvider,
       });
 
+      // Le contexte redirige la page login authentifiée vers la racine ("/"), qui route ensuite.
       await waitFor(() => {
-        expect(mockRouter.replace).toHaveBeenCalledWith('/dashboard');
+        expect(mockRouter.replace).toHaveBeenCalledWith('/');
       });
     });
 
-    it('should redirect to dashboard when authenticated on home page', async () => {
+    it('should not auto-redirect when authenticated on home page', async () => {
       vi.mocked(authService.authService.getCurrentUser).mockReturnValue(mockUser);
       vi.stubGlobal('location', { pathname: '/' });
 
@@ -91,7 +96,7 @@ describe('AuthContext', () => {
       });
 
       await waitFor(() => {
-        expect(mockRouter.replace).toHaveBeenCalledWith('/dashboard');
+        expect(mockRouter.replace).not.toHaveBeenCalled();
       });
     });
 
@@ -231,8 +236,9 @@ describe('AuthContext', () => {
 
       expect(result.current.user).toBeNull();
 
-      act(() => {
-        result.current.refreshUser();
+      // refreshUser est async (tente fetchMe() puis retombe sur getCurrentUser()) → il faut l'attendre.
+      await act(async () => {
+        await result.current.refreshUser();
       });
 
       expect(result.current.user).toEqual(mockUser);

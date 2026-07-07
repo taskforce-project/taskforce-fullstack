@@ -11,6 +11,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InjectMocks;
@@ -399,6 +402,295 @@ class OtpServiceTest {
 
             // Then
             assertThat(result).isEqualTo(0);
+        }
+    }
+
+    // =========================================================================
+    // Tests additionnels — branches non couvertes
+    // =========================================================================
+
+    @Nested
+    @DisplayName("Generate And Send OTP — branches additionnelles")
+    class GenerateAndSendOtpAdditionalTests {
+
+        @Test
+        @DisplayName("devrait envoyer l'email de réinitialisation pour un OTP PASSWORD_RESET")
+        void generateAndSendOtp_withPasswordReset_shouldSendResetEmail() {
+            // Given
+            String email = "reset@example.com";
+            String firstName = "Reset";
+            when(otpRepository.countRecentOtpAttempts(eq(email), any(LocalDateTime.class))).thenReturn(0L);
+            when(otpRepository.save(any(OtpVerification.class))).thenAnswer(i -> i.getArgument(0));
+
+            // When
+            OtpVerification result = otpService.generateAndSendOtp(
+                    email, firstName, OtpType.PASSWORD_RESET, 42L, "kc-reset", null);
+
+            // Then
+            assertThat(result.getOtpType()).isEqualTo(OtpType.PASSWORD_RESET);
+            assertThat(result.getUserId()).isEqualTo(42L);
+            assertThat(result.getPlanType()).isNull();
+            verify(emailService).sendResetPasswordEmail(eq(email), anyString(), eq(firstName));
+            verify(emailService, never()).sendOtpEmail(any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("devrait générer un code OTP à 6 chiffres numériques")
+        void generateAndSendOtp_shouldGenerateSixDigitNumericCode() {
+            // Given
+            String email = "digits@example.com";
+            when(otpRepository.countRecentOtpAttempts(eq(email), any(LocalDateTime.class))).thenReturn(0L);
+            when(otpRepository.save(any(OtpVerification.class))).thenAnswer(i -> i.getArgument(0));
+
+            // When
+            OtpVerification result = otpService.generateAndSendOtp(
+                    email, "Test", OtpType.EMAIL_VERIFICATION, null, "kc", PlanType.FREE);
+
+            // Then
+            assertThat(result.getOtpCode()).matches("\\d{6}");
+        }
+    }
+
+    @Nested
+    @DisplayName("Verify OTP With Type Tests")
+    class VerifyOtpWithTypeTests {
+
+        @Test
+        @DisplayName("devrait vérifier OTP avec type correspondant")
+        void verifyOtpWithType_withMatchingType_shouldReturnTrue() {
+            // Given
+            String email = "type@example.com";
+            String code = "123456";
+            OtpVerification otp = TestDataBuilder.buildOtp(email, code, OtpType.PASSWORD_RESET);
+
+            when(otpRepository.findValidOtpByEmailAndCode(eq(email), eq(code), any(LocalDateTime.class)))
+                    .thenReturn(Optional.of(otp));
+            when(otpRepository.save(any(OtpVerification.class))).thenReturn(otp);
+
+            // When
+            boolean result = otpService.verifyOtpWithType(email, code, OtpType.PASSWORD_RESET);
+
+            // Then
+            assertThat(result).isTrue();
+            verify(otpRepository).save(otpCaptor.capture());
+            assertThat(otpCaptor.getValue().getOtpStatus()).isEqualTo(OtpStatus.VERIFIED);
+        }
+
+        @Test
+        @DisplayName("devrait retourner false si le type ne correspond pas")
+        void verifyOtpWithType_withWrongType_shouldReturnFalse() {
+            // Given
+            String email = "type@example.com";
+            String code = "123456";
+            OtpVerification otp = TestDataBuilder.buildOtp(email, code, OtpType.EMAIL_VERIFICATION);
+
+            when(otpRepository.findValidOtpByEmailAndCode(eq(email), eq(code), any(LocalDateTime.class)))
+                    .thenReturn(Optional.of(otp));
+
+            // When
+            boolean result = otpService.verifyOtpWithType(email, code, OtpType.PASSWORD_RESET);
+
+            // Then
+            assertThat(result).isFalse();
+            verify(otpRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("devrait retourner false si aucun OTP valide trouvé")
+        void verifyOtpWithType_withNoOtp_shouldReturnFalse() {
+            // Given
+            String email = "type@example.com";
+            String code = "999999";
+            when(otpRepository.findValidOtpByEmailAndCode(eq(email), eq(code), any(LocalDateTime.class)))
+                    .thenReturn(Optional.empty());
+
+            // When
+            boolean result = otpService.verifyOtpWithType(email, code, OtpType.EMAIL_VERIFICATION);
+
+            // Then
+            assertThat(result).isFalse();
+        }
+
+        @Test
+        @DisplayName("devrait retourner false si le code ne peut pas être validé (max tentatives)")
+        void verifyOtpWithType_whenCannotBeValidated_shouldReturnFalse() {
+            // Given
+            String email = "locked@example.com";
+            String code = "123456";
+            OtpVerification otp = TestDataBuilder.buildOtp(email, code, OtpType.EMAIL_VERIFICATION);
+            otp.setAttempts(5); // atteint maxAttempts (5) → canBeValidated() == false
+
+            when(otpRepository.findValidOtpByEmailAndCode(eq(email), eq(code), any(LocalDateTime.class)))
+                    .thenReturn(Optional.of(otp));
+            when(otpRepository.save(any(OtpVerification.class))).thenReturn(otp);
+
+            // When
+            boolean result = otpService.verifyOtpWithType(email, code, OtpType.EMAIL_VERIFICATION);
+
+            // Then
+            assertThat(result).isFalse();
+            verify(otpRepository).save(any(OtpVerification.class));
+        }
+    }
+
+    @Nested
+    @DisplayName("Verify OTP — branche impossible à valider")
+    class VerifyOtpCannotBeValidatedTests {
+
+        @Test
+        @DisplayName("devrait retourner false si le code a atteint le max de tentatives")
+        void verifyOtp_whenMaxAttemptsReached_shouldReturnFalse() {
+            // Given
+            String email = "locked@example.com";
+            String code = "123456";
+            OtpVerification otp = TestDataBuilder.buildOtp(email, code, OtpType.EMAIL_VERIFICATION);
+            otp.setAttempts(5);
+
+            when(otpRepository.findValidOtpByEmailAndCode(eq(email), eq(code), any(LocalDateTime.class)))
+                    .thenReturn(Optional.of(otp));
+            when(otpRepository.save(any(OtpVerification.class))).thenReturn(otp);
+
+            // When
+            boolean result = otpService.verifyOtp(email, code);
+
+            // Then
+            assertThat(result).isFalse();
+            verify(otpRepository).save(any(OtpVerification.class));
+        }
+    }
+
+    @Nested
+    @DisplayName("Verify OTP And Get Details — branches additionnelles")
+    class VerifyOtpAndGetDetailsAdditionalTests {
+
+        @Test
+        @DisplayName("devrait retourner null si l'OTP est expiré")
+        void verifyOtpAndGetDetails_withExpiredOtp_shouldReturnNull() {
+            // Given
+            String email = "exp@example.com";
+            String code = "123456";
+            OtpVerification otp = TestDataBuilder.buildExpiredOtp();
+            otp.setEmail(email);
+            otp.setOtpCode(code);
+
+            when(otpRepository.findPendingOtpByEmail(email)).thenReturn(Optional.of(otp));
+
+            // When
+            OtpVerification result = otpService.verifyOtpAndGetDetails(email, code);
+
+            // Then
+            assertThat(result).isNull();
+            verify(otpRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("devrait retourner null si le max de tentatives est atteint")
+        void verifyOtpAndGetDetails_withMaxAttempts_shouldReturnNull() {
+            // Given
+            String email = "max@example.com";
+            String code = "123456";
+            OtpVerification otp = TestDataBuilder.buildOtp(email, code, OtpType.EMAIL_VERIFICATION);
+            otp.setAttempts(5);
+
+            when(otpRepository.findPendingOtpByEmail(email)).thenReturn(Optional.of(otp));
+
+            // When
+            OtpVerification result = otpService.verifyOtpAndGetDetails(email, code);
+
+            // Then
+            assertThat(result).isNull();
+            verify(otpRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("devrait incrémenter les tentatives et retourner null si le code est incorrect")
+        void verifyOtpAndGetDetails_withWrongCode_shouldIncrementAndReturnNull() {
+            // Given
+            String email = "wrong@example.com";
+            OtpVerification otp = TestDataBuilder.buildOtp(email, "123456", OtpType.EMAIL_VERIFICATION);
+
+            when(otpRepository.findPendingOtpByEmail(email)).thenReturn(Optional.of(otp));
+            when(otpRepository.save(any(OtpVerification.class))).thenReturn(otp);
+
+            // When
+            OtpVerification result = otpService.verifyOtpAndGetDetails(email, "000000");
+
+            // Then
+            assertThat(result).isNull();
+            verify(otpRepository).save(otpCaptor.capture());
+            assertThat(otpCaptor.getValue().getAttempts()).isEqualTo(1);
+            assertThat(otpCaptor.getValue().getOtpStatus()).isEqualTo(OtpStatus.PENDING);
+        }
+
+        @ParameterizedTest(name = "code invalide « {0} » → null + tentative incrémentée")
+        @ValueSource(strings = {"111111", "abcdef", "12345", "123-45", "0000000"})
+        @DisplayName("devrait rejeter les codes mal formés ou incorrects")
+        void verifyOtpAndGetDetails_withBadCodeShapes_shouldReturnNull(String badCode) {
+            // Given — l'OTP réel attend "654321"
+            String email = "shape@example.com";
+            OtpVerification otp = TestDataBuilder.buildOtp(email, "654321", OtpType.EMAIL_VERIFICATION);
+
+            when(otpRepository.findPendingOtpByEmail(email)).thenReturn(Optional.of(otp));
+            lenient().when(otpRepository.save(any(OtpVerification.class))).thenReturn(otp);
+
+            // When
+            OtpVerification result = otpService.verifyOtpAndGetDetails(email, badCode);
+
+            // Then
+            assertThat(result).isNull();
+        }
+    }
+
+    @Nested
+    @DisplayName("Invalidate All Pending OTPs Tests")
+    class InvalidateAllPendingOtpsTests {
+
+        @Test
+        @DisplayName("devrait déléguer l'invalidation au repository")
+        void invalidateAllPendingOtps_shouldCallRepository() {
+            // Given
+            String email = "inval@example.com";
+            when(otpRepository.expireAllPendingOtpsByEmail(email)).thenReturn(2);
+
+            // When
+            otpService.invalidateAllPendingOtps(email);
+
+            // Then
+            verify(otpRepository).expireAllPendingOtpsByEmail(email);
+        }
+    }
+
+    @Nested
+    @DisplayName("Get Latest OTP Tests")
+    class GetLatestOtpTests {
+
+        @Test
+        @DisplayName("devrait retourner le dernier OTP peu importe le statut")
+        void getLatestOtp_withExistingOtp_shouldReturnOtp() {
+            // Given
+            String email = "latest@example.com";
+            OtpVerification otp = TestDataBuilder.buildOtp();
+            when(otpRepository.findLatestOtpByEmail(email)).thenReturn(Optional.of(otp));
+
+            // When
+            OtpVerification result = otpService.getLatestOtp(email);
+
+            // Then
+            assertThat(result).isEqualTo(otp);
+        }
+
+        @Test
+        @DisplayName("devrait retourner null si aucun OTP")
+        void getLatestOtp_withNoOtp_shouldReturnNull() {
+            // Given
+            String email = "latest@example.com";
+            when(otpRepository.findLatestOtpByEmail(email)).thenReturn(Optional.empty());
+
+            // When
+            OtpVerification result = otpService.getLatestOtp(email);
+
+            // Then
+            assertThat(result).isNull();
         }
     }
 }

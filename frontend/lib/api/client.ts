@@ -72,16 +72,30 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
-    
-    // Si erreur 401 et pas déjà retryé
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-      
-      try {
-        // Tentative de refresh du token
-        const refreshToken = globalThis.window !== undefined ? localStorage.getItem("refreshToken") : null;
 
-        if (refreshToken) {
+    const requestUrl = error.config?.url ?? ""
+    const isAuthEndpoint = publicEndpoints.some((ep) => requestUrl.includes(ep))
+
+    // Déconnexion silencieuse (session expirée / refresh impossible) : pas de toast.
+    const clearSessionAndRedirect = () => {
+      if (globalThis.window !== undefined) {
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("refreshToken");
+        localStorage.removeItem("user");
+        window.location.href = "/auth/login";
+      }
+    };
+
+    // Erreur 401 sur un endpoint protégé, pas déjà retryé.
+    // (les 401 des endpoints auth — ex. mauvais mot de passe — sont laissés au formulaire)
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
+      originalRequest._retry = true;
+
+      const refreshToken = globalThis.window !== undefined ? localStorage.getItem("refreshToken") : null;
+
+      if (refreshToken) {
+        try {
+          // Tentative de refresh du token
           const response = await axios.post(`${API_URL}/api/auth/refresh-token`, {
             refreshToken,
           });
@@ -104,42 +118,39 @@ apiClient.interceptors.response.use(
           }
 
           return apiClient(originalRequest);
+        } catch (refreshError) {
+          // Refresh échoué → déconnexion silencieuse (pas de toast "Requête invalide")
+          clearSessionAndRedirect();
+          return Promise.reject(refreshError);
         }
-      } catch (refreshError) {
-        // Si le refresh échoue, déconnecter l'utilisateur
-        if (globalThis.window !== undefined) {
-          localStorage.removeItem("accessToken");
-          localStorage.removeItem("refreshToken");
-          localStorage.removeItem("user");
-          window.location.href = "/auth/login";
-        }
-        
-        return Promise.reject(refreshError);
       }
+
+      // Pas de refresh token → session simplement expirée : redirection silencieuse.
+      clearSessionAndRedirect();
+      return Promise.reject(error);
     }
 
-    // Show toast for non-401 errors (and 401 that could not be refreshed)
-    // Skip toast for auth/public endpoints: the calling forms handle their own error display
-    const requestUrl = error.config?.url ?? ""
-    const isAuthEndpoint = publicEndpoints.some((ep) => requestUrl.includes(ep))
-
+    // Toast global réservé aux erreurs SYSTÉMIQUES (inattendues, non contextuelles) :
+    //   - panne réseau (aucune réponse) et 5xx serveur → l'utilisateur doit être prévenu.
+    //   - 4xx = contextuel (validation, autorisation, ressource absente, intégration non
+    //     connectée) → géré par l'appelant (formulaire / composant) qui affiche un message
+    //     adapté. On NE toast PAS globalement pour éviter faux positifs et doublons ;
+    //     on trace quand même en console pour le debug.
+    // (Les 401 sont déjà traités plus haut : refresh ou redirection silencieuse.)
     if (globalThis.window !== undefined && !isAuthEndpoint) {
       const status = error.response?.status
       const data = error.response?.data as { message?: string } | undefined
       const message = data?.message || error.message || "Une erreur est survenue"
 
-      if (status === 403) {
-        toast.error("Accès refusé", { description: message })
-      } else if (status === 404) {
-        // 404 are usually silent (handled per-feature)
-      } else if (status && status >= 500) {
-        toast.error("Erreur serveur", { description: `${status} — ${message}` })
-      } else if (status && status >= 400) {
-        toast.error("Requête invalide", { description: message })
-      } else if (!error.response) {
+      if (!error.response) {
         toast.error("Impossible de contacter le serveur", {
           description: "Vérifiez votre connexion réseau.",
         })
+      } else if (status && status >= 500) {
+        toast.error("Erreur serveur", { description: `${status} — ${message}` })
+      } else if (status && status >= 400) {
+        // 4xx contextuel : pas de toast global — l'appelant décide. Trace console pour le dev.
+        console.warn(`[api] ${status} ${error.config?.url ?? ""} — ${message}`)
       }
     }
 

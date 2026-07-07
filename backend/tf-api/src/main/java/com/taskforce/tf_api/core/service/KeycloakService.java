@@ -199,4 +199,14 @@ public class KeycloakService {
         realmResource.users().get(keycloakId).remove();
         log.info("Utilisateur supprimé avec succès");
     }
+
+    /**
+     * Déconnecte l'utilisateur de <b>toutes</b> ses sessions Keycloak (invalide access + refresh
+     * tokens côté IdP). Équivalent OIDC natif de l'ancienne « révocation de tous les tokens ».
+     */
+    public void logoutUser(String keycloakId) {
+        log.info("Déconnexion de toutes les sessions Keycloak pour : {}", keycloakId);
+        realmResource.users().get(keycloakId).logout();
+        log.info("Sessions Keycloak invalidées pour : {}", keycloakId);
+    }
 }

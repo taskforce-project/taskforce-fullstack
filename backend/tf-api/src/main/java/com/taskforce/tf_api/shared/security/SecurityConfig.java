@@ -9,34 +9,42 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
-
-import javax.crypto.spec.SecretKeySpec;
-import java.nio.charset.StandardCharsets;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
-    @Value("${jwt.secret:myVerySecretKeyForJWTTokenGenerationThatIsLongEnoughToBeSecure256Bits}")
-    private String jwtSecret;
+    @Value("${keycloak.url:http://localhost:8080}")
+    private String keycloakUrl;
+
+    @Value("${keycloak.realm:taskforce}")
+    private String keycloakRealm;
 
     /**
-     * JwtDecoder utilisant HS512 pour valider les tokens custom générés par JwtService.
-     * Remplace le décodeur auto-configuré par Spring (qui cible les tokens RS256 de Keycloak).
+     * JwtDecoder RS256 adossé au JWK Set de Keycloak : valide les access tokens <b>émis par
+     * Keycloak</b> (clé asymétrique, rotation gérée par l'IdP) au lieu des anciens tokens HS512
+     * auto-émis (clé symétrique — dette PC-019 / TF-SEC-009, supprimée).
+     *
+     * <p>La signature est vérifiée via les clés publiques exposées sur {@code /protocol/openid-connect/certs},
+     * et l'{@code issuer} est validé (défense contre un token signé par un autre realm/IdP).</p>
      */
     @Bean
     @ConditionalOnProperty(name = "keycloak.enabled", havingValue = "true", matchIfMissing = true)
     public JwtDecoder jwtDecoder() {
-        byte[] keyBytes = jwtSecret.getBytes(StandardCharsets.UTF_8);
-        SecretKeySpec keySpec = new SecretKeySpec(keyBytes, "HmacSHA512");
-        return NimbusJwtDecoder.withSecretKey(keySpec)
-                .macAlgorithm(MacAlgorithm.HS512)
-                .build();
+        String issuer = keycloakUrl + "/realms/" + keycloakRealm;
+        String jwkSetUri = issuer + "/protocol/openid-connect/certs";
+
+        NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
+        OAuth2TokenValidator<Jwt> withIssuer = JwtValidators.createDefaultWithIssuer(issuer);
+        decoder.setJwtValidator(withIssuer);
+        return decoder;
     }
 
     // Endpoints publics partagés entre les deux configurations

@@ -17,6 +17,9 @@ public interface IssueWorklogRepository extends JpaRepository<IssueWorklog, Long
 
     Optional<IssueWorklog> findByIdAndIssueId(Long id, Long issueId);
 
+    /** Tous les worklogs saisis par un utilisateur (export RGPD — portabilité). */
+    List<IssueWorklog> findByUser_IdOrderByLoggedAtDescIdDesc(Long userId);
+
     @Query("SELECT COALESCE(SUM(w.minutes), 0) FROM IssueWorklog w WHERE w.issueId = :issueId")
     long sumMinutesByIssueId(@Param("issueId") Long issueId);
 }

@@ -121,7 +121,7 @@ describe('ForgotPasswordForm', () => {
       fireEvent.click(submitButton);
 
       expect(submitButton).toBeDisabled();
-      expect(submitButton).toHaveTextContent('Envoi...');
+      expect(submitButton).toHaveTextContent('Envoi en cours…');
     });
   });
 
@@ -237,7 +237,7 @@ describe('ForgotPasswordForm', () => {
           'NewPass@2024!'
         );
         expect(toast.success).toHaveBeenCalledWith('Mot de passe réinitialisé', {
-          description: 'Vous pouvez maintenant vous connecter avec votre nouveau mot de passe',
+          description: 'Vous pouvez maintenant vous connecter',
         });
         expect(mockRouter.push).toHaveBeenCalledWith('/auth/login');
       });

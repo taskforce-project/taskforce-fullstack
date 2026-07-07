@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { StripedPattern } from "@/components/magicui/striped-pattern";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, RefreshCw } from "lucide-react";
+import { reportClientError } from "@/lib/client-logger";
 
 interface ErrorPageProps {
   error: Error & { digest?: string };
@@ -15,6 +16,8 @@ interface ErrorPageProps {
 
 export default function ErrorPage({ error, reset }: Readonly<ErrorPageProps>) {
   useEffect(() => {
+    // Journalisation serveur (E25) — best-effort.
+    reportClientError("error", error.message || "Erreur de route", `error.tsx${error.digest ? " digest=" + error.digest : ""}`, error.stack);
     toast.error("Une erreur inattendue s'est produite", {
       description: error.message || "Essayez de recharger la page.",
       duration: 6000,

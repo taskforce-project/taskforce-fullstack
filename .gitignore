@@ -212,3 +212,6 @@ out/
 Network Trash Folder
 Temporary Items
 .apdisk
+# Sauvegardes DB (données — ne pas committer)
+/backups/
+/frontend/e2e/axe.min.js

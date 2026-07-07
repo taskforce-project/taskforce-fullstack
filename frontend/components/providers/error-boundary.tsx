@@ -4,6 +4,7 @@ import React from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { AlertTriangle } from "lucide-react"
+import { initClientLogger, reportClientError } from "@/lib/client-logger"
 
 interface ErrorBoundaryState {
   hasError: boolean
@@ -25,8 +26,14 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     return { hasError: true, error }
   }
 
+  componentDidMount() {
+    // Installe les handlers globaux (window.onerror / unhandledrejection) une seule fois.
+    initClientLogger()
+  }
+
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error("[ErrorBoundary]", error, info)
+    reportClientError("error", error.message, info.componentStack ?? "ErrorBoundary", error.stack)
     toast.error("Une erreur inattendue s'est produite", {
       description: error.message,
       duration: 6000,

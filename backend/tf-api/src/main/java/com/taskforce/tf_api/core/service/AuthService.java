@@ -16,18 +16,19 @@ import com.taskforce.tf_api.core.dto.request.ResetPasswordRequest;
 import com.taskforce.tf_api.core.dto.response.AuthResponse;
 import com.taskforce.tf_api.core.dto.response.RegisterResponse;
 import com.taskforce.tf_api.core.dto.response.SelectPlanResponse;
+import com.taskforce.tf_api.core.dto.response.UserResponse;
 import com.taskforce.tf_api.core.dto.response.VerifyOtpResponse;
 import com.taskforce.tf_api.core.enums.OtpType;
 import com.taskforce.tf_api.core.enums.PlanStatus;
 import com.taskforce.tf_api.core.enums.PlanType;
 import com.taskforce.tf_api.core.model.OtpVerification;
-import com.taskforce.tf_api.core.model.RefreshToken;
 import com.taskforce.tf_api.core.model.User;
-import com.taskforce.tf_api.core.repository.RefreshTokenRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.service.WorkspaceService;
 
-import io.jsonwebtoken.Claims;
+import com.nimbusds.jwt.JWTParser;
+
+import java.text.ParseException;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -48,8 +49,6 @@ public class AuthService {
     private final StripeService stripeService;
     private final EmailService emailService;
     private final UserRepository userRepository;
-    private final RefreshTokenRepository refreshTokenRepository;
-    private final JwtService jwtService;
     private final WorkspaceService workspaceService;
     private final AuditService auditService;
     private final WorkspaceInvitationService workspaceInvitationService;
@@ -278,13 +277,12 @@ public class AuthService {
         // Envoyer l'email de bienvenue
         emailService.sendWelcomeEmail(request.getEmail(), keycloakUser.getFirstName());
 
-        // Générer les tokens JWT
-        AuthResponse authData = jwtService.generateTokens(user, keycloakUser);
-
+        // Depuis la migration OIDC : plus d'auto-login (Keycloak ne peut émettre un token sans
+        // mot de passe, absent à ce stade). Le compte est prêt ; le front redirige vers /login.
         return VerifyOtpResponse.builder()
             .verified(true)
-            .message("Email vérifié avec succès")
-            .authData(authData)
+            .message("Email vérifié avec succès. Vous pouvez maintenant vous connecter.")
+            .authData(null)
             .checkoutSessionUrl(checkoutUrl)
             .build();
     }
@@ -298,9 +296,11 @@ public class AuthService {
     public AuthResponse login(LoginRequest request) {
         log.info("Tentative de connexion pour : {}", request.getEmail());
 
-        // Authentifier l'utilisateur via Keycloak (vérifie email + password)
+        // Authentifier l'utilisateur via Keycloak (vérifie email + password) et récupérer les
+        // tokens OIDC RS256 émis par Keycloak (plus de token custom HS512).
+        KeycloakTokenResponse kcToken;
         try {
-            keycloakAuthService.authenticate(
+            kcToken = keycloakAuthService.authenticate(
                 request.getEmail(),
                 request.getPassword()
             );
@@ -345,8 +345,9 @@ public class AuthService {
         // Appliquer d'éventuelles invitations workspace en attente (PROD-3.5, best-effort)
         workspaceInvitationService.acceptPendingInvitations(user);
 
-        // Générer les tokens JWT
-        AuthResponse authResponse = jwtService.generateTokens(user, keycloakUser);
+        // Réponse = tokens Keycloak + profil DB
+        AuthResponse authResponse = buildAuthResponse(
+            user, kcToken, keycloakUser.getFirstName(), keycloakUser.getLastName());
 
         auditService.record(null, user.getId(), AuditService.USER_LOGIN);
 
@@ -565,50 +566,83 @@ public class AuthService {
     }
 
     /**
-     * Rafraîchit l'access token via le refresh token stocké en DB.
-     * Applique la rotation : l'ancien token est révoqué, un nouveau est émis.
+     * Rafraîchit l'access token via le <b>refresh token Keycloak</b> (rotation gérée par l'IdP).
+     * L'utilisateur est identifié à partir du claim {@code email} du nouvel access token.
      */
-    @Transactional
     public AuthResponse refreshToken(String refreshTokenValue) {
-        log.info("Tentative de rafraîchissement du token");
+        log.info("Tentative de rafraîchissement du token via Keycloak");
 
-        RefreshToken refreshToken = refreshTokenRepository.findByToken(refreshTokenValue)
-            .orElseThrow(() -> new RuntimeException("Refresh token invalide"));
+        KeycloakTokenResponse kcToken = keycloakAuthService.refreshToken(refreshTokenValue);
 
-        if (!refreshToken.isValid()) {
-            throw new RuntimeException("Refresh token expiré ou révoqué");
-        }
-
-        User user = userRepository.findById(refreshToken.getUserId())
+        String email = extractClaim(kcToken.getAccessToken(), "email");
+        User user = userRepository.findByEmail(email)
             .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
         if (!user.getIsActive()) {
             throw new RuntimeException("Ce compte est désactivé");
         }
 
-        UserRepresentation keycloakUser = keycloakService.getUserByEmail(user.getEmail());
-
-        // Rotation : on révoque l'ancien avant d'en créer un nouveau
-        refreshToken.revoke();
-        refreshTokenRepository.save(refreshToken);
-
-        log.info("Token rafraîchi avec rotation pour : {}", user.getEmail());
-        return jwtService.generateTokens(user, keycloakUser);
+        log.info("Token rafraîchi pour : {}", user.getEmail());
+        return buildAuthResponse(user, kcToken,
+            extractClaim(kcToken.getAccessToken(), "given_name"),
+            extractClaim(kcToken.getAccessToken(), "family_name"));
     }
 
     /**
-     * Déconnexion : révoque tous les refresh tokens DB de l'utilisateur.
-     * Accepte un access token potentiellement expiré (l'utilisateur peut se déconnecter après expiry).
+     * Déconnexion : invalide toutes les sessions Keycloak de l'utilisateur (révocation côté IdP
+     * des access + refresh tokens). L'utilisateur est identifié via le claim {@code email} de
+     * l'access token (best-effort : un échec ne bloque pas la déconnexion côté client).
      */
-    @Transactional
     public void logout(String accessToken) {
         log.info("Déconnexion en cours");
+        try {
+            String email = extractClaim(accessToken, "email");
+            User user = userRepository.findByEmail(email).orElse(null);
+            if (user != null && user.getKeycloakId() != null) {
+                keycloakService.logoutUser(user.getKeycloakId());
+                log.info("Sessions Keycloak révoquées pour userId : {}", user.getId());
+            }
+        } catch (Exception e) {
+            log.warn("Déconnexion : révocation Keycloak impossible ({})", e.getMessage());
+        }
+    }
 
-        Claims claims = jwtService.parseClaimsAllowExpired(accessToken);
-        Long userId = ((Number) claims.get("userId")).longValue();
+    /** Construit la réponse d'authentification à partir des tokens Keycloak + du profil DB. */
+    private AuthResponse buildAuthResponse(User user, KeycloakTokenResponse kcToken,
+                                           String firstName, String lastName) {
+        UserResponse userResponse = UserResponse.builder()
+            .id(user.getId())
+            .keycloakId(user.getKeycloakId())
+            .email(user.getEmail())
+            .firstName(firstName)
+            .lastName(lastName)
+            .displayName(user.getDisplayName())
+            .avatarUrl(user.getAvatarUrl())
+            .planType(user.getPlanType())
+            .planStatus(user.getPlanStatus())
+            .subscriptionStartDate(user.getSubscriptionStartDate())
+            .subscriptionEndDate(user.getSubscriptionEndDate())
+            .trialEndDate(user.getTrialEndDate())
+            .isActive(user.getIsActive())
+            .createdAt(user.getCreatedAt())
+            .build();
 
-        jwtService.revokeAllUserTokens(userId);
-        log.info("Tous les refresh tokens révoqués pour userId : {}", userId);
+        return AuthResponse.builder()
+            .accessToken(kcToken.getAccessToken())
+            .refreshToken(kcToken.getRefreshToken())
+            .tokenType(kcToken.getTokenType() != null ? kcToken.getTokenType() : "Bearer")
+            .expiresIn((long) kcToken.getExpiresIn())
+            .user(userResponse)
+            .build();
+    }
+
+    /** Lit un claim (string) d'un JWT <b>sans vérifier la signature</b> (le token vient de Keycloak). */
+    private String extractClaim(String jwt, String claim) {
+        try {
+            return JWTParser.parse(jwt).getJWTClaimsSet().getStringClaim(claim);
+        } catch (ParseException e) {
+            throw new RuntimeException("Token invalide");
+        }
     }
 
     private String buildDisplayName(String firstName, String lastName) {

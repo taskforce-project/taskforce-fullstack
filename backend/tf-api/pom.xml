@@ -55,6 +55,12 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-actuator</artifactId>
 		</dependency>
+		<!-- Registry Prometheus : expose /actuator/prometheus (supervision/alertes E26). -->
+		<dependency>
+			<groupId>io.micrometer</groupId>
+			<artifactId>micrometer-registry-prometheus</artifactId>
+			<scope>runtime</scope>
+		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-jpa</artifactId>
@@ -206,6 +212,17 @@
 			<artifactId>bucket4j_jdk17-core</artifactId>
 			<version>8.14.0</version>
 		</dependency>
+		<!-- Rate Limiting distribué (multi-instances) : buckets partagés via Redis/Lettuce.
+		     Activé seulement si ratelimit.distributed.enabled=true (prod) ; sinon fallback local. TF-SEC-011 -->
+		<dependency>
+			<groupId>com.bucket4j</groupId>
+			<artifactId>bucket4j_jdk17-lettuce</artifactId>
+			<version>8.14.0</version>
+		</dependency>
+		<dependency>
+			<groupId>io.lettuce</groupId>
+			<artifactId>lettuce-core</artifactId>
+		</dependency>
 
 		<!-- Test Dependencies -->
 		<dependency>
@@ -228,10 +245,32 @@
 			<artifactId>h2</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<!-- Intégration DB réelle (Postgres pgvector + Flyway) — B-T4. -->
+		<!-- Boot 4 : slice @DataJpaTest dans un artefact dédié (modularisation des slices de test). -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-data-jpa-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<!-- Boot 4 : slice @WebMvcTest / MockMvc dans un artefact dédié (B-T6 controllers). -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-webmvc-test</artifactId>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 
 	<build>
 		<plugins>
+			<!-- Laisse la JVM forkée sortir proprement (le hook d'écriture de jacoco.exec s'exécute au
+			     shutdown) ; sinon surefire la force-kill après 30s → exec corrompu → jacoco:report « Unknown block type ». -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<configuration>
+					<forkedProcessExitTimeoutInSeconds>300</forkedProcessExitTimeoutInSeconds>
+				</configuration>
+			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
@@ -244,6 +283,17 @@
 							<version>${lombok.version}</version>
 						</path>
 					</annotationProcessorPaths>
+					<!--
+					  Contournement d'un bug interne de javac (SharedNameTable :
+					  "Cannot load from object array because this.hashes is null") déclenché par
+					  Lombok sur certains patchs JDK 21 (observé sur Temurin 21.0.11). Force la
+					  table de noms non-partagée dans un javac forké. À retirer quand le JDK ciblé
+					  n'est plus affecté (ou si l'image Maven est épinglée sur un build sain).
+					-->
+					<fork>true</fork>
+					<compilerArgs>
+						<arg>-XDuseUnsharedTable=true</arg>
+					</compilerArgs>
 				</configuration>
 			</plugin>
 			<plugin>
@@ -263,12 +313,23 @@
 				<groupId>org.jacoco</groupId>
 				<artifactId>jacoco-maven-plugin</artifactId>
 				<version>0.8.12</version>
+					<configuration>
+						<excludes>
+							<!-- Hors périmètre : Brain OS (knowledge graph, coming-soon) + classe main. Tout le reste est testé. -->
+							<exclude>**/TfApiApplication.*</exclude>
+							<exclude>com/taskforce/tf_api/core/service/brain/**</exclude>
+							<exclude>**/BrainTemplateService.*</exclude>
+							<exclude>**/KnowledgeService.*</exclude>
+							<exclude>com/taskforce/tf_api/core/api/KnowledgeController.*</exclude>
+						</excludes>
+					</configuration>
 				<executions>
 					<execution>
 						<id>prepare-agent</id>
 						<goals>
 							<goal>prepare-agent</goal>
 						</goals>
+					    <configuration><append>false</append></configuration>
 					</execution>
 					<execution>
 						<id>report</id>
@@ -285,12 +346,12 @@
 						<configuration>
 							<rules>
 								<rule>
-									<element>PACKAGE</element>
+									<element>BUNDLE</element>
 									<limits>
 										<limit>
 											<counter>LINE</counter>
 											<value>COVEREDRATIO</value>
-											<minimum>0.50</minimum>
+											<minimum>0.84</minimum>
 										</limit>
 									</limits>
 								</rule>
@@ -302,4 +363,33 @@
 		</plugins>
 	</build>
 
+	<profiles>
+		<!-- Rapport de couverture COMPLET (sans exclusions) → target/site/jacoco-full/index.html.
+		     N'affecte pas le gate : usage `mvn test -Pcov-full`. -->
+		<profile>
+			<id>cov-full</id>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.jacoco</groupId>
+						<artifactId>jacoco-maven-plugin</artifactId>
+						<configuration>
+							<excludes combine.self="override"/>
+						</configuration>
+						<executions>
+							<execution>
+								<id>report</id>
+								<phase>test</phase>
+								<goals><goal>report</goal></goals>
+								<configuration>
+									<outputDirectory>${project.build.directory}/site/jacoco-full</outputDirectory>
+									<excludes combine.self="override"/>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
 </project>

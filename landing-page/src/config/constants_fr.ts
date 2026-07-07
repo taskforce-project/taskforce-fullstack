@@ -987,8 +987,8 @@ export const constants_fr = {
           {
             category: "Fournisseurs de Services",
             description:
-              "Hébergement cloud, traitement des paiements, analytique, livraison d'e-mails",
-            examples: "AWS, Stripe, Google Analytics",
+              "Hébergement cloud, traitement des paiements et fonctionnalités IA",
+            examples: "Stripe (paiements), Groq (fonctionnalités IA)",
           },
           {
             category: "Transferts d'Entreprise",

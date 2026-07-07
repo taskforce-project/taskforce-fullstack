@@ -446,6 +446,7 @@ function MemberRow({ member, isYou, canManage, isOwner, profile, projects = [] }
             <Button
               variant="ghost"
               size="icon"
+              aria-label={`Actions pour ${member.displayName ?? member.email}`}
               className="size-8 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
             >
               <MoreHorizontal className="size-4" />
