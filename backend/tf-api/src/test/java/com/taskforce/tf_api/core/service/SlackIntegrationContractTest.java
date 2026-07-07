@@ -16,9 +16,11 @@ import org.springframework.web.client.RestTemplate;
 
 import com.taskforce.tf_api.core.enums.IntegrationProvider;
 import com.taskforce.tf_api.core.model.Integration;
+import com.taskforce.tf_api.core.model.OAuthState;
 import com.taskforce.tf_api.core.model.SlackChannel;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.IntegrationRepository;
+import com.taskforce.tf_api.core.repository.OAuthStateRepository;
 import com.taskforce.tf_api.core.repository.SlackChannelRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 
@@ -50,6 +52,7 @@ class SlackIntegrationContractTest {
     private IntegrationRepository integrationRepository;
     private SlackChannelRepository slackChannelRepository;
     private WorkspaceRepository workspaceRepository;
+    private OAuthStateRepository oauthStateRepository;
 
     private Workspace workspace;
 
@@ -58,14 +61,16 @@ class SlackIntegrationContractTest {
         integrationRepository  = Mockito.mock(IntegrationRepository.class);
         slackChannelRepository = Mockito.mock(SlackChannelRepository.class);
         workspaceRepository    = Mockito.mock(WorkspaceRepository.class);
+        oauthStateRepository   = Mockito.mock(OAuthStateRepository.class);
         RestTemplate rt = new RestTemplate();
 
         // Ordre du constructeur @RequiredArgsConstructor = ordre de déclaration des champs final :
-        // integrationRepository, slackChannelRepository, workspaceRepository, restTemplate
+        // integrationRepository, slackChannelRepository, workspaceRepository, oauthStateRepository, restTemplate
         service = new SlackIntegrationService(
             integrationRepository,
             slackChannelRepository,
             workspaceRepository,
+            oauthStateRepository,
             rt
         );
 
@@ -82,7 +87,7 @@ class SlackIntegrationContractTest {
     @Test
     @DisplayName("handleCallback : POST oauth.v2.access (form-urlencoded), ok=true → redirect slack=connected")
     void handleCallback_echange_le_code_ok() {
-        Mockito.when(workspaceRepository.findBySlug(SLUG)).thenReturn(Optional.of(workspace));
+        stubState("the-state");
         Mockito.when(integrationRepository.findByWorkspaceIdAndProvider(WORKSPACE_ID, IntegrationProvider.SLACK))
             .thenReturn(Optional.empty());
 
@@ -93,7 +98,7 @@ class SlackIntegrationContractTest {
                 "{\"ok\":true,\"access_token\":\"xoxb\",\"team\":{\"id\":\"T1\",\"name\":\"Acme\"}}",
                 MediaType.APPLICATION_JSON));
 
-        String redirect = service.handleCallback("the-code", SLUG);
+        String redirect = service.handleCallback("the-code", "the-state");
 
         assertThat(redirect).contains("slack=connected");
         server.verify();
@@ -102,13 +107,22 @@ class SlackIntegrationContractTest {
     @Test
     @DisplayName("handleCallback : ok=false → RuntimeException")
     void handleCallback_ok_false_leve_exception() {
+        stubState("the-state");
         server.expect(requestTo("https://slack.com/api/oauth.v2.access"))
             .andExpect(method(HttpMethod.POST))
             .andRespond(withSuccess("{\"ok\":false,\"error\":\"bad\"}", MediaType.APPLICATION_JSON));
 
-        assertThatThrownBy(() -> service.handleCallback("the-code", SLUG))
+        assertThatThrownBy(() -> service.handleCallback("the-code", "the-state"))
             .isInstanceOf(RuntimeException.class);
         server.verify();
+    }
+
+    /** Stub d'un state OAuth valide (workspace résolu via le state, pas via le slug). */
+    private void stubState(String state) {
+        OAuthState s = OAuthState.builder()
+            .state(state).provider(IntegrationProvider.SLACK)
+            .workspace(workspace).expiresAt(java.time.LocalDateTime.now().plusMinutes(5)).build();
+        Mockito.when(oauthStateRepository.findById(state)).thenReturn(Optional.of(s));
     }
 
     @Test
