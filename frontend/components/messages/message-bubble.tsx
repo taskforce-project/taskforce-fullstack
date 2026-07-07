@@ -61,6 +61,11 @@ export function MessageBubble({ message, showHeader, onReact, onEdit, onDelete }
               {displayName}
             </span>
             <span className="text-[11px] text-muted-foreground">{formatTime(message.ts)}</span>
+            {message.externalSource === "SLACK" && (
+              <span className="text-[10px] font-medium rounded px-1 py-0.5 bg-[#4A154B]/10 text-[#4A154B] dark:bg-[#4A154B]/30 dark:text-violet-300">
+                via Slack
+              </span>
+            )}
             {message.pinned && (
               <span className="text-[10px] text-amber-500 flex items-center gap-0.5">
                 <Pin className="h-2.5 w-2.5" /> pinned
