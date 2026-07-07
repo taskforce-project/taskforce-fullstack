@@ -26,6 +26,7 @@ function toUiMessage(m: ApiChatMessage): Message {
     content:        m.content,
     ts:             new Date(m.createdAt),
     edited:         m.isEdited,
+    externalSource: m.externalSource ?? undefined,
   }
 }
 
