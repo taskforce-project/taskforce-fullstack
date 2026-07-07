@@ -31,6 +31,8 @@ export interface ApiChatMessage {
   isEdited:       boolean
   createdAt:      string
   updatedAt:      string
+  /** "SLACK" si le message provient du miroir Slack, sinon null. */
+  externalSource: string | null
 }
 
 export interface CreateChannelPayload {

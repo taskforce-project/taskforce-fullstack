@@ -182,6 +182,22 @@ export async function deleteSlackChannel(slug: string, channelId: number): Promi
   await apiClient.delete(INTEGRATION_ROUTES.SLACK_CHANNEL(slug, channelId));
 }
 
+/** Active le miroir d'un canal Slack (crée le canal de chat miroir + 1re sync). */
+export async function mirrorSlackChannel(slug: string, channelId: number): Promise<number> {
+  const res = await apiClient.post<{ data: { mirrorChannelId: number } }>(
+    INTEGRATION_ROUTES.SLACK_CHANNEL_MIRROR(slug, channelId)
+  );
+  return res.data.data.mirrorChannelId;
+}
+
+/** Synchronise un canal Slack miroir (importe les nouveaux messages). Renvoie le nb importé. */
+export async function syncSlackChannel(slug: string, channelId: number): Promise<number> {
+  const res = await apiClient.post<{ data: { imported: number } }>(
+    INTEGRATION_ROUTES.SLACK_CHANNEL_SYNC(slug, channelId)
+  );
+  return res.data.data.imported;
+}
+
 // ---------------------------------------------------------------------------
 // Webhooks
 // ---------------------------------------------------------------------------
