@@ -98,6 +98,7 @@ public class IssueService {
     private final SimpMessagingTemplate         messagingTemplate;
     private final IssueChecklistItemRepository  checklistRepository;
     private final IssueWorklogRepository        worklogRepository;
+    private final SlackIntegrationService       slackService;
 
     public IssueService(
         IssueRepository issueRepository,
@@ -115,7 +116,8 @@ public class IssueService {
         ProjectLabelRepository projectLabelRepository,
         SimpMessagingTemplate messagingTemplate,
         IssueChecklistItemRepository checklistRepository,
-        IssueWorklogRepository worklogRepository
+        IssueWorklogRepository worklogRepository,
+        SlackIntegrationService slackService
     ) {
         this.issueRepository = issueRepository;
         this.issueStatusRepository = issueStatusRepository;
@@ -133,6 +135,7 @@ public class IssueService {
         this.messagingTemplate = messagingTemplate;
         this.checklistRepository = checklistRepository;
         this.worklogRepository = worklogRepository;
+        this.slackService = slackService;
     }
 
     // =========================================================================
@@ -335,6 +338,14 @@ public class IssueService {
 
         IssueResponse created = toResponse(issue);
         publishIssueEvent("created", issue.getProject().getId(), issue.getId(), created);
+
+        // Push Slack (best-effort, async) vers les canaux abonnés à "issue.created"
+        slackService.notifyEvent(
+            project.getWorkspace().getId(),
+            "issue.created",
+            "🆕 Nouvelle issue *" + project.getIdentifier() + "-" + issue.getSequenceNumber() + "* : " + issue.getTitle()
+        );
+
         return created;
     }
 
@@ -446,6 +457,8 @@ public class IssueService {
         issue = issueRepository.save(issue);
         IssueResponse updated = toResponse(issue);
         publishIssueEvent("updated", issue.getProject().getId(), issue.getId(), updated);
+        slackService.notifyEvent(issue.getProject().getWorkspace().getId(), "issue.updated",
+            "✏️ Issue *" + issue.getProject().getIdentifier() + "-" + issue.getSequenceNumber() + "* mise à jour : " + issue.getTitle());
         return updated;
     }
 
@@ -568,8 +581,13 @@ public class IssueService {
         Project project = resolveProject(workspaceSlug, projectId);
         assertWorkspaceMember(project.getWorkspace().getId(), userId);
         Issue issue = resolveIssue(issueId, project.getId());
+        // Capture avant suppression pour la notif Slack
+        String issueRef   = project.getIdentifier() + "-" + issue.getSequenceNumber();
+        String issueTitle = issue.getTitle();
+        Long   workspaceId = project.getWorkspace().getId();
         issueRepository.delete(issue);
         publishIssueEvent("deleted", project.getId(), issueId, null);
+        slackService.notifyEvent(workspaceId, "issue.deleted", "🗑️ Issue *" + issueRef + "* supprimée : " + issueTitle);
         log.info("Issue {} supprimée du projet {}", issueId, projectId);
     }
 
@@ -754,6 +772,8 @@ public class IssueService {
         comment = commentRepository.save(comment);
         logActivity(issue, author, IssueActivityType.COMMENT_ADDED, null, null);
         notificationService.notifyCommented(issue, author, comment);
+        slackService.notifyEvent(project.getWorkspace().getId(), "comment.created",
+            "💬 Nouveau commentaire de " + author.getDisplayName() + " sur *" + project.getIdentifier() + "-" + issue.getSequenceNumber() + "*");
 
         // Mentions : @email ou @partie-locale-email, résolues contre les membres du workspace
         List<User> mentioned = resolveMentions(request.getContent(), project.getWorkspace().getId());
