@@ -81,9 +81,14 @@ export async function getGitHubStatus(slug: string): Promise<IntegrationStatus> 
   return res.data.data;
 }
 
-/** Redirige le navigateur vers GitHub pour le flux OAuth */
-export function connectGitHub(slug: string): void {
-  window.location.href = INTEGRATION_ROUTES.GITHUB_CONNECT(slug);
+/**
+ * Démarre le flux OAuth GitHub : appel XHR authentifié qui renvoie l'URL d'autorisation,
+ * puis navigation du navigateur vers celle-ci. (Une navigation directe vers l'endpoint
+ * protégé n'enverrait pas le Bearer du localStorage → 401.)
+ */
+export async function connectGitHub(slug: string): Promise<void> {
+  const res = await apiClient.get<{ data: { authorizeUrl: string } }>(INTEGRATION_ROUTES.GITHUB_CONNECT(slug));
+  window.location.href = res.data.data.authorizeUrl;
 }
 
 export async function disconnectGitHub(slug: string): Promise<void> {
@@ -150,9 +155,10 @@ export async function getSlackStatus(slug: string): Promise<IntegrationStatus> {
   return res.data.data;
 }
 
-/** Redirige le navigateur vers Slack pour le flux OAuth */
-export function connectSlack(slug: string): void {
-  window.location.href = INTEGRATION_ROUTES.SLACK_CONNECT(slug);
+/** Démarre le flux OAuth Slack (cf. {@link connectGitHub}). */
+export async function connectSlack(slug: string): Promise<void> {
+  const res = await apiClient.get<{ data: { authorizeUrl: string } }>(INTEGRATION_ROUTES.SLACK_CONNECT(slug));
+  window.location.href = res.data.data.authorizeUrl;
 }
 
 export async function disconnectSlack(slug: string): Promise<void> {
