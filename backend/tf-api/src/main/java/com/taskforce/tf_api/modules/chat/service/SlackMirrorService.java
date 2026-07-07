@@ -89,6 +89,15 @@ public class SlackMirrorService {
         return syncChannel(resolveScoped(slackChannelDbId, ws.getId()));
     }
 
+    /**
+     * Sync d'un canal miroir par son id, dans une transaction dédiée (appelé par le poller —
+     * l'échec d'un canal n'affecte pas les autres). No-op si le canal a disparu.
+     */
+    @Transactional
+    public int syncMirrored(Long slackChannelDbId) {
+        return slackChannelRepository.findById(slackChannelDbId).map(this::syncChannel).orElse(0);
+    }
+
     /** Importe les nouveaux messages Slack dans le canal miroir + broadcast temps réel. */
     int syncChannel(SlackChannel sc) {
         if (sc.getMirrorChannelId() == null) return 0;
