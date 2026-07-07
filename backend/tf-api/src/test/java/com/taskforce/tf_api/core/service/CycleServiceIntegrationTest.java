@@ -59,6 +59,9 @@ class CycleServiceIntegrationTest extends AbstractIntegrationTest {
     @org.springframework.test.context.bean.override.mockito.MockitoBean
     private IssueService issueService;
 
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    private SlackIntegrationService slackService;
+
     private static final String SLUG = "ws-cycle-it";
 
     private User owner;
@@ -137,6 +140,21 @@ class CycleServiceIntegrationTest extends AbstractIntegrationTest {
             assertThat(res.getStatus()).isEqualTo(CycleStatus.ACTIVE);
             assertThat(cycleRepository.findById(created.getId()).orElseThrow().getStatus())
                 .isEqualTo(CycleStatus.ACTIVE);
+        }
+
+        @Test
+        @DisplayName("transition vers COMPLETED déclenche le push Slack cycle.completed")
+        void completing_cycle_triggers_slack_push() {
+            CycleResponse created = cycleService.createCycle(SLUG, projectId(), req("Sprint 1"), owner.getId());
+            UpdateCycleRequest upd = new UpdateCycleRequest();
+            upd.setStatus("COMPLETED");
+
+            cycleService.updateCycle(SLUG, projectId(), created.getId(), upd, owner.getId());
+
+            org.mockito.Mockito.verify(slackService).notifyEvent(
+                org.mockito.ArgumentMatchers.eq(project.getWorkspace().getId()),
+                org.mockito.ArgumentMatchers.eq("cycle.completed"),
+                org.mockito.ArgumentMatchers.anyString());
         }
 
         @Test
