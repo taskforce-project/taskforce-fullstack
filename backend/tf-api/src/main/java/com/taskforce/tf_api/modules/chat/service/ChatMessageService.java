@@ -129,6 +129,11 @@ public class ChatMessageService {
             name = dn != null ? dn : "";
             String[] parts = name.split(" ", 2);
             initials = initials(parts[0], parts.length > 1 ? parts[1] : "");
+        } else if (m.getExternalAuthor() != null && !m.getExternalAuthor().isBlank()) {
+            // Message importé (Slack) : pas d'auteur User → on affiche le nom externe
+            name = m.getExternalAuthor();
+            String[] parts = name.split(" ", 2);
+            initials = initials(parts[0], parts.length > 1 ? parts[1] : "");
         }
         return ChatMessageResponse.builder()
                 .id(m.getId())
@@ -140,6 +145,7 @@ public class ChatMessageService {
                 .isEdited(m.getIsEdited())
                 .createdAt(m.getCreatedAt())
                 .updatedAt(m.getUpdatedAt())
+                .externalSource(m.getExternalSource())
                 .build();
     }
 
