@@ -158,4 +158,46 @@ class SlackIntegrationContractTest {
 
         server.verify();
     }
+
+    @Test
+    @DisplayName("fetchHistory : GET conversations.history (Bearer) → messages en ordre chrono, sous-types ignorés")
+    void fetchHistory_maps_and_orders() {
+        Integration integration = Integration.builder()
+            .workspace(workspace).provider(IntegrationProvider.SLACK).accessToken("xoxb-token").meta(Map.of()).build();
+        Mockito.when(integrationRepository.findByWorkspaceIdAndProvider(WORKSPACE_ID, IntegrationProvider.SLACK))
+            .thenReturn(Optional.of(integration));
+
+        server.expect(requestTo(org.hamcrest.Matchers.containsString("conversations.history?channel=C1")))
+            .andExpect(method(HttpMethod.GET))
+            .andExpect(header("Authorization", "Bearer xoxb-token"))
+            .andRespond(withSuccess("{\"ok\":true,\"messages\":["
+                + "{\"ts\":\"200\",\"user\":\"U2\",\"text\":\"second\"},"
+                + "{\"subtype\":\"channel_join\",\"ts\":\"150\",\"text\":\"joined\"},"
+                + "{\"ts\":\"100\",\"user\":\"U1\",\"text\":\"first\"}]}", MediaType.APPLICATION_JSON));
+
+        var msgs = service.fetchHistory(WORKSPACE_ID, "C1", null);
+
+        assertThat(msgs).hasSize(2);                       // le channel_join (subtype) est ignoré
+        assertThat(msgs.get(0).text()).isEqualTo("first");  // remis en ordre chronologique (ts 100 avant 200)
+        assertThat(msgs.get(1).text()).isEqualTo("second");
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("resolveUserName : GET users.info → display_name")
+    void resolveUserName_maps() {
+        Integration integration = Integration.builder()
+            .workspace(workspace).provider(IntegrationProvider.SLACK).accessToken("xoxb-token").meta(Map.of()).build();
+        Mockito.when(integrationRepository.findByWorkspaceIdAndProvider(WORKSPACE_ID, IntegrationProvider.SLACK))
+            .thenReturn(Optional.of(integration));
+
+        server.expect(requestTo(org.hamcrest.Matchers.containsString("users.info?user=U1")))
+            .andExpect(method(HttpMethod.GET))
+            .andRespond(withSuccess(
+                "{\"ok\":true,\"user\":{\"real_name\":\"Alice R\",\"profile\":{\"display_name\":\"alice\"}}}",
+                MediaType.APPLICATION_JSON));
+
+        assertThat(service.resolveUserName(WORKSPACE_ID, "U1")).isEqualTo("alice");
+        server.verify();
+    }
 }
