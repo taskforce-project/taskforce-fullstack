@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.taskforce.tf_api.core.dto.request.GitHubLinkRequest;
 import com.taskforce.tf_api.core.dto.request.SlackChannelRequest;
+import com.taskforce.tf_api.core.dto.response.ConnectUrlResponse;
 import com.taskforce.tf_api.core.dto.response.GitHubIssueResponse;
 import com.taskforce.tf_api.core.dto.response.GitHubLinkResponse;
 import com.taskforce.tf_api.core.dto.response.GitHubRepoResponse;
@@ -65,19 +66,26 @@ public class IntegrationController {
         return ResponseEntity.ok(ApiResponse.success(gitHubService.listRepoIssues(slug, repo)));
     }
 
+    /**
+     * Démarre le flux OAuth : renvoie l'URL d'autorisation GitHub (JSON).
+     * Appelé en XHR authentifié — le front navigue ensuite vers {@code authorizeUrl}.
+     * (Un 302 ne marcherait pas : {@code window.location.href} n'envoie pas le Bearer du localStorage.)
+     */
     @GetMapping("/api/workspaces/{slug}/integrations/github/connect")
-    public ResponseEntity<Void> githubConnect(@PathVariable String slug) {
-        URI redirectUri = gitHubService.buildAuthorizeUrl(slug);
-        return ResponseEntity.status(HttpStatus.FOUND)
-            .location(redirectUri)
-            .build();
+    public ResponseEntity<ApiResponse<ConnectUrlResponse>> githubConnect(
+        @PathVariable String slug,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        User user = resolveUser(jwt);
+        URI authorizeUrl = gitHubService.buildAuthorizeUrl(slug, user);
+        return ResponseEntity.ok(ApiResponse.success(new ConnectUrlResponse(authorizeUrl.toString())));
     }
 
-    /** Callback appelé par GitHub — endpoint PUBLIC (pas de JWT requis) */
+    /** Callback appelé par GitHub — endpoint PUBLIC (pas de JWT requis). {@code state} = token aléatoire. */
     @GetMapping("/api/integrations/github/callback")
     public ResponseEntity<Void> githubCallback(
         @RequestParam String code,
-        @RequestParam String state   // workspaceSlug
+        @RequestParam String state
     ) {
         String redirectUrl = gitHubService.handleCallback(code, state);
         return ResponseEntity.status(HttpStatus.FOUND)
@@ -137,18 +145,20 @@ public class IntegrationController {
     }
 
     @GetMapping("/api/workspaces/{slug}/integrations/slack/connect")
-    public ResponseEntity<Void> slackConnect(@PathVariable String slug) {
-        URI redirectUri = slackService.buildAuthorizeUrl(slug);
-        return ResponseEntity.status(HttpStatus.FOUND)
-            .location(redirectUri)
-            .build();
+    public ResponseEntity<ApiResponse<ConnectUrlResponse>> slackConnect(
+        @PathVariable String slug,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        User user = resolveUser(jwt);
+        URI authorizeUrl = slackService.buildAuthorizeUrl(slug, user);
+        return ResponseEntity.ok(ApiResponse.success(new ConnectUrlResponse(authorizeUrl.toString())));
     }
 
-    /** Callback appelé par Slack — endpoint PUBLIC */
+    /** Callback appelé par Slack — endpoint PUBLIC. {@code state} = token aléatoire. */
     @GetMapping("/api/integrations/slack/callback")
     public ResponseEntity<Void> slackCallback(
         @RequestParam String code,
-        @RequestParam String state   // workspaceSlug
+        @RequestParam String state
     ) {
         String redirectUrl = slackService.handleCallback(code, state);
         return ResponseEntity.status(HttpStatus.FOUND)
