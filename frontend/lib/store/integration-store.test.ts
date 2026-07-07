@@ -84,8 +84,8 @@ describe('integration-store', () => {
     expect(useIntegrationStore.getState().githubStatus).toEqual(status);
   });
 
-  it('connectGitHub delegates to the service', () => {
-    act(() => useIntegrationStore.getState().connectGitHub('acme'));
+  it('connectGitHub delegates to the service', async () => {
+    await act(async () => { await useIntegrationStore.getState().connectGitHub('acme'); });
     expect(svc.connectGitHub).toHaveBeenCalledWith('acme');
   });
 
@@ -177,8 +177,8 @@ describe('integration-store', () => {
     expect(useIntegrationStore.getState().slackStatus).toEqual(status);
   });
 
-  it('connectSlack delegates to the service', () => {
-    act(() => useIntegrationStore.getState().connectSlack('acme'));
+  it('connectSlack delegates to the service', async () => {
+    await act(async () => { await useIntegrationStore.getState().connectSlack('acme'); });
     expect(svc.connectSlack).toHaveBeenCalledWith('acme');
   });
 
