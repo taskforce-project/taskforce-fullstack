@@ -60,12 +60,15 @@ describe('integration-service', () => {
   });
 
   describe('connectGitHub', () => {
-    it('redirige window.location.href vers la route de connexion', () => {
+    it('GET la route de connexion puis navigue vers authorizeUrl', async () => {
+      const url = 'https://github.com/login/oauth/authorize?client_id=x&state=abc';
+      vi.mocked(apiClient.get).mockResolvedValue({ data: { data: { authorizeUrl: url } } });
       window.location.href = '';
 
-      connectGitHub(SLUG);
+      await connectGitHub(SLUG);
 
-      expect(window.location.href).toBe(INTEGRATION_ROUTES.GITHUB_CONNECT(SLUG));
+      expect(apiClient.get).toHaveBeenCalledWith(INTEGRATION_ROUTES.GITHUB_CONNECT(SLUG));
+      expect(window.location.href).toBe(url);
     });
   });
 
@@ -152,12 +155,15 @@ describe('integration-service', () => {
   });
 
   describe('connectSlack', () => {
-    it('redirige window.location.href vers la route de connexion', () => {
+    it('GET la route de connexion puis navigue vers authorizeUrl', async () => {
+      const url = 'https://slack.com/oauth/v2/authorize?client_id=x&state=abc';
+      vi.mocked(apiClient.get).mockResolvedValue({ data: { data: { authorizeUrl: url } } });
       window.location.href = '';
 
-      connectSlack(SLUG);
+      await connectSlack(SLUG);
 
-      expect(window.location.href).toBe(INTEGRATION_ROUTES.SLACK_CONNECT(SLUG));
+      expect(apiClient.get).toHaveBeenCalledWith(INTEGRATION_ROUTES.SLACK_CONNECT(SLUG));
+      expect(window.location.href).toBe(url);
     });
   });
 
