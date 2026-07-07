@@ -40,6 +40,7 @@ class GitHubIntegrationServiceIntegrationTest extends AbstractIntegrationTest {
     @Autowired private IssueRepository issueRepository;
 
     @Autowired private com.taskforce.tf_api.core.repository.IntegrationRepository integrationRepository;
+    @Autowired private com.taskforce.tf_api.core.repository.OAuthStateRepository oauthStateRepository;
     @MockitoBean private RestTemplate restTemplate;
 
     private static final String SLUG = "ws-gh-it";
@@ -59,10 +60,15 @@ class GitHubIntegrationServiceIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("buildAuthorizeUrl construit une URL OAuth avec le state = slug")
+    @DisplayName("buildAuthorizeUrl construit une URL OAuth avec un state aléatoire persisté")
     void should_build_authorize_url() {
-        var uri = service.buildAuthorizeUrl(SLUG);
-        assertThat(uri.toString()).contains("state=" + SLUG);
+        var uri = service.buildAuthorizeUrl(SLUG, owner);
+        assertThat(uri.toString())
+            .contains("github.com/login/oauth/authorize")
+            .contains("client_id=")
+            .contains("state=");
+        // Le state est persisté et lié au workspace (résolu au callback)
+        assertThat(oauthStateRepository.count()).isEqualTo(1);
     }
 
     @Test
@@ -92,6 +98,18 @@ class GitHubIntegrationServiceIntegrationTest extends AbstractIntegrationTest {
             .accessToken("gho_token")
             .meta(java.util.Map.of())
             .build());
+    }
+
+    /** Persiste un state OAuth valide (le callback résout le workspace via ce state). */
+    private String pendingState() {
+        var ws = workspaceRepository.findBySlug(SLUG).orElseThrow();
+        return oauthStateRepository.save(com.taskforce.tf_api.core.model.OAuthState.builder()
+            .state("st-" + java.util.UUID.randomUUID())
+            .provider(com.taskforce.tf_api.core.enums.IntegrationProvider.GITHUB)
+            .workspace(ws)
+            .user(owner)
+            .expiresAt(java.time.LocalDateTime.now().plusMinutes(5))
+            .build()).getState();
     }
 
     @Test
@@ -149,7 +167,7 @@ class GitHubIntegrationServiceIntegrationTest extends AbstractIntegrationTest {
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(org.springframework.core.ParameterizedTypeReference.class));
 
-        String redirect = service.handleCallback("the-code", SLUG);
+        String redirect = service.handleCallback("the-code", pendingState());
 
         assertThat(redirect).contains("/" + SLUG + "/settings").contains("github=connected");
         var status = service.getStatus(SLUG);
@@ -166,7 +184,7 @@ class GitHubIntegrationServiceIntegrationTest extends AbstractIntegrationTest {
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(org.springframework.core.ParameterizedTypeReference.class));
 
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.handleCallback("bad", SLUG))
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.handleCallback("bad", pendingState()))
             .isInstanceOf(RuntimeException.class);
     }
 }
