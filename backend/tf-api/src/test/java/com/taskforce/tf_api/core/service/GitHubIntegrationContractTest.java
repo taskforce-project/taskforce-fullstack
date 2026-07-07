@@ -18,10 +18,12 @@ import com.taskforce.tf_api.core.dto.response.GitHubIssueResponse;
 import com.taskforce.tf_api.core.dto.response.GitHubRepoResponse;
 import com.taskforce.tf_api.core.enums.IntegrationProvider;
 import com.taskforce.tf_api.core.model.Integration;
+import com.taskforce.tf_api.core.model.OAuthState;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.IntegrationRepository;
 import com.taskforce.tf_api.core.repository.IssueGitHubLinkRepository;
 import com.taskforce.tf_api.core.repository.IssueRepository;
+import com.taskforce.tf_api.core.repository.OAuthStateRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -54,6 +56,7 @@ class GitHubIntegrationContractTest {
     private IssueGitHubLinkRepository issueGitHubLinkRepository;
     private WorkspaceRepository workspaceRepository;
     private IssueRepository issueRepository;
+    private OAuthStateRepository oauthStateRepository;
 
     private Workspace workspace;
 
@@ -63,15 +66,17 @@ class GitHubIntegrationContractTest {
         issueGitHubLinkRepository = Mockito.mock(IssueGitHubLinkRepository.class);
         workspaceRepository       = Mockito.mock(WorkspaceRepository.class);
         issueRepository           = Mockito.mock(IssueRepository.class);
+        oauthStateRepository      = Mockito.mock(OAuthStateRepository.class);
         RestTemplate rt = new RestTemplate();
 
         // Ordre du constructeur généré par @RequiredArgsConstructor = ordre de déclaration des champs final :
-        // integrationRepository, issueGitHubLinkRepository, workspaceRepository, issueRepository, restTemplate
+        // integrationRepository, issueGitHubLinkRepository, workspaceRepository, issueRepository, oauthStateRepository, restTemplate
         service = new GitHubIntegrationService(
             integrationRepository,
             issueGitHubLinkRepository,
             workspaceRepository,
             issueRepository,
+            oauthStateRepository,
             rt
         );
 
@@ -88,7 +93,11 @@ class GitHubIntegrationContractTest {
     @Test
     @DisplayName("handleCallback : POST token (form-urlencoded) puis GET /user (Bearer) → redirect github=connected")
     void handleCallback_echange_le_code_et_recupere_user() {
-        Mockito.when(workspaceRepository.findBySlug(SLUG)).thenReturn(Optional.of(workspace));
+        // Le workspace est résolu via le state OAuth (pas via le slug de l'URL)
+        OAuthState state = OAuthState.builder()
+            .state("the-state").provider(IntegrationProvider.GITHUB)
+            .workspace(workspace).expiresAt(java.time.LocalDateTime.now().plusMinutes(5)).build();
+        Mockito.when(oauthStateRepository.findById("the-state")).thenReturn(Optional.of(state));
         Mockito.when(integrationRepository.findByWorkspaceIdAndProvider(1L, IntegrationProvider.GITHUB))
             .thenReturn(Optional.empty());
 
@@ -104,7 +113,7 @@ class GitHubIntegrationContractTest {
                 "{\"login\":\"octocat\",\"avatar_url\":\"https://gh/av.png\"}",
                 MediaType.APPLICATION_JSON));
 
-        String redirect = service.handleCallback("the-code", SLUG);
+        String redirect = service.handleCallback("the-code", "the-state");
 
         assertThat(redirect).contains("github=connected");
         server.verify();
