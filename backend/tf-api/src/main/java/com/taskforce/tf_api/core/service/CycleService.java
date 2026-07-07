@@ -42,6 +42,7 @@ public class CycleService {
     private final WorkspaceMemberRepository  workspaceMemberRepository;
     private final UserRepository             userRepository;
     private final IssueService               issueService;
+    private final SlackIntegrationService    slackService;
 
     // =========================================================================
     // CRUD cycles
@@ -94,6 +95,7 @@ public class CycleService {
         Project project = resolveProject(workspaceSlug, projectId);
         assertWorkspaceMember(project.getWorkspace().getId(), userId);
         Cycle cycle = resolveCycle(cycleId, project.getId());
+        CycleStatus previousStatus = cycle.getStatus();
 
         if (request.getName() != null) {
             if (!request.getName().equals(cycle.getName())
@@ -114,6 +116,13 @@ public class CycleService {
         }
 
         cycle = cycleRepository.save(cycle);
+
+        // Push Slack à la transition vers COMPLETED (une seule fois)
+        if (cycle.getStatus() == CycleStatus.COMPLETED && previousStatus != CycleStatus.COMPLETED) {
+            slackService.notifyEvent(project.getWorkspace().getId(), "cycle.completed",
+                "🏁 Cycle *" + cycle.getName() + "* terminé");
+        }
+
         return toResponse(cycle, cycleIssueRepository.countByCycleId(cycle.getId()));
     }
 
