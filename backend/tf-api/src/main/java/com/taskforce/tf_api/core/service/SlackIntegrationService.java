@@ -3,7 +3,10 @@ package com.taskforce.tf_api.core.service;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
+import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -11,6 +14,7 @@ import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -27,11 +31,15 @@ import com.taskforce.tf_api.core.dto.response.IntegrationStatusResponse;
 import com.taskforce.tf_api.core.dto.response.SlackChannelResponse;
 import com.taskforce.tf_api.core.enums.IntegrationProvider;
 import com.taskforce.tf_api.core.model.Integration;
+import com.taskforce.tf_api.core.model.OAuthState;
 import com.taskforce.tf_api.core.model.SlackChannel;
+import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.IntegrationRepository;
+import com.taskforce.tf_api.core.repository.OAuthStateRepository;
 import com.taskforce.tf_api.core.repository.SlackChannelRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import lombok.RequiredArgsConstructor;
@@ -60,24 +68,56 @@ public class SlackIntegrationService {
     private final IntegrationRepository  integrationRepository;
     private final SlackChannelRepository slackChannelRepository;
     private final WorkspaceRepository    workspaceRepository;
+    private final OAuthStateRepository   oauthStateRepository;
     private final RestTemplate           restTemplate;
+
+    private static final SecureRandom RANDOM = new SecureRandom();
+    private static final int STATE_TTL_MINUTES = 10;
 
     // ----------------------------------------------------------------
     // OAuth flow
     // ----------------------------------------------------------------
 
-    public URI buildAuthorizeUrl(String workspaceSlug) {
+    /**
+     * Émet un {@code state} aléatoire (anti-CSRF) lié au workspace + à l'utilisateur, le persiste,
+     * et construit l'URL d'autorisation Slack. Appelé via XHR authentifié.
+     */
+    @Transactional
+    public URI buildAuthorizeUrl(String workspaceSlug, User user) {
+        Workspace workspace = workspaceRepository.findBySlug(workspaceSlug)
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found: " + workspaceSlug));
+
+        oauthStateRepository.deleteByExpiresAtBefore(LocalDateTime.now());
+        String state = newState();
+        oauthStateRepository.save(OAuthState.builder()
+            .state(state)
+            .provider(IntegrationProvider.SLACK)
+            .workspace(workspace)
+            .user(user)
+            .expiresAt(LocalDateTime.now().plusMinutes(STATE_TTL_MINUTES))
+            .build());
+
         String callbackUrl = appUrl + "/api/integrations/slack/callback";
         String url = SLACK_OAUTH_AUTHORIZE
             + "?client_id=" + encode(clientId)
             + "&redirect_uri=" + encode(callbackUrl)
             + "&scope=chat:write,channels:read,incoming-webhook"
-            + "&state=" + encode(workspaceSlug);
+            + "&state=" + encode(state);
         return URI.create(url);
     }
 
     @Transactional
-    public String handleCallback(String code, String workspaceSlug) {
+    public String handleCallback(String code, String state) {
+        // 0. Résoudre + valider le state
+        OAuthState oauthState = oauthStateRepository.findById(state)
+            .filter(s -> s.getProvider() == IntegrationProvider.SLACK)
+            .orElseThrow(() -> new BusinessException("État OAuth invalide"));
+        if (oauthState.getExpiresAt().isBefore(LocalDateTime.now())) {
+            oauthStateRepository.delete(oauthState);
+            throw new BusinessException("État OAuth expiré, relancez la connexion");
+        }
+        Workspace workspace = oauthState.getWorkspace();
+
         // 1. Exchange code for token
         Map<String, Object> tokenResponse = exchangeCodeForToken(code);
 
@@ -86,9 +126,6 @@ public class SlackIntegrationService {
         String teamName  = extractPath(tokenResponse, "team.name");
 
         // 2. Persist integration (upsert)
-        Workspace workspace = workspaceRepository.findBySlug(workspaceSlug)
-            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found: " + workspaceSlug));
-
         Optional<Integration> existing = integrationRepository
             .findByWorkspaceIdAndProvider(workspace.getId(), IntegrationProvider.SLACK);
 
@@ -104,9 +141,18 @@ public class SlackIntegrationService {
         );
         integration.setAccessToken(botToken);
         integration.setMeta(meta);
+        integration.setInstalledBy(oauthState.getUser());
         integrationRepository.save(integration);
 
-        return frontendUrl + "/" + workspaceSlug + "/settings?section=integrations&slack=connected";
+        oauthStateRepository.delete(oauthState);
+
+        return frontendUrl + "/" + workspace.getSlug() + "/settings?section=integrations&slack=connected";
+    }
+
+    private String newState() {
+        byte[] bytes = new byte[32];
+        RANDOM.nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
     @Transactional
@@ -166,37 +212,59 @@ public class SlackIntegrationService {
     // Send notification (fire-and-forget)
     // ----------------------------------------------------------------
 
+    /**
+     * Push d'un événement vers Slack (best-effort, asynchrone, fire-and-forget).
+     * Poste sur chaque canal <b>actif</b> dont les {@code eventTypes} contiennent {@code eventType}
+     * (ou wildcard si aucun type configuré). Ne lève jamais : les échecs sont loggués.
+     */
+    @Async
+    public void notifyEvent(Long workspaceId, String eventType, String text) {
+        dispatchEvent(workspaceId, eventType, text);
+    }
+
+    /**
+     * Logique de dispatch synchrone (testable directement, sans le proxy {@code @Async}).
+     * Poste sur chaque canal actif abonné à {@code eventType}.
+     */
+    void dispatchEvent(Long workspaceId, String eventType, String text) {
+        integrationRepository
+            .findByWorkspaceIdAndProvider(workspaceId, IntegrationProvider.SLACK)
+            .ifPresent(integration ->
+                slackChannelRepository.findByWorkspaceIdOrderByCreatedAtDesc(workspaceId).stream()
+                    .filter(SlackChannel::getActive)
+                    .filter(c -> matchesEvent(c.getEventTypes(), eventType))
+                    .forEach(c -> postMessage(integration.getAccessToken(), c.getChannelId(), text)));
+    }
+
+    /** Envoi direct sur le 1er canal actif (utilitaire ; ne filtre pas par type d'événement). */
     public void sendNotification(Long workspaceId, String text) {
         integrationRepository
             .findByWorkspaceIdAndProvider(workspaceId, IntegrationProvider.SLACK)
-            .ifPresent(integration -> {
-                try {
-                    HttpHeaders headers = new HttpHeaders();
-                    headers.setBearerAuth(integration.getAccessToken());
-                    headers.setContentType(MediaType.APPLICATION_JSON);
+            .ifPresent(integration ->
+                slackChannelRepository.findByWorkspaceIdOrderByCreatedAtDesc(workspaceId).stream()
+                    .filter(SlackChannel::getActive)
+                    .findFirst()
+                    .ifPresent(channel -> postMessage(integration.getAccessToken(), channel.getChannelId(), text)));
+    }
 
-                    // Get first active channel for this workspace
-                    slackChannelRepository
-                        .findByWorkspaceIdOrderByCreatedAtDesc(workspaceId)
-                        .stream()
-                        .filter(SlackChannel::getActive)
-                        .findFirst()
-                        .ifPresent(channel -> {
-                            Map<String, String> body = Map.of(
-                                "channel", channel.getChannelId(),
-                                "text",    text
-                            );
-                            HttpEntity<Map<String, String>> request = new HttpEntity<>(body, headers);
-                            restTemplate.postForObject(
-                                "https://slack.com/api/chat.postMessage",
-                                request,
-                                Map.class
-                            );
-                        });
-                } catch (Exception e) {
-                    log.warn("Failed to send Slack notification to workspace {}: {}", workspaceId, e.getMessage());
-                }
-            });
+    /** Un canal reçoit l'événement si sa liste de types le contient, ou si elle est vide (wildcard). */
+    private boolean matchesEvent(String[] eventTypes, String eventType) {
+        if (eventTypes == null || eventTypes.length == 0) return true;
+        return Arrays.asList(eventTypes).contains(eventType);
+    }
+
+    /** POST chat.postMessage (best-effort — n'interrompt jamais l'appelant). */
+    private void postMessage(String botToken, String channelId, String text) {
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setBearerAuth(botToken);
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<Map<String, String>> request =
+                new HttpEntity<>(Map.of("channel", channelId, "text", text), headers);
+            restTemplate.postForObject("https://slack.com/api/chat.postMessage", request, Map.class);
+        } catch (Exception e) {
+            log.warn("Échec de notification Slack (canal {}): {}", channelId, e.getMessage());
+        }
     }
 
     // ----------------------------------------------------------------
