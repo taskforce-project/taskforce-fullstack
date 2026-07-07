@@ -26,7 +26,7 @@ import { stripeService, type SubscriptionInfo } from "@/lib/api/stripe-service"
 import { useUpgradeStore } from "@/lib/store/upgrade-store"
 import { getAuditLogs, type AuditLogEntry } from "@/lib/api/workspace-service"
 import { useIntegrationStore } from "@/lib/store/integration-store"
-import { getGitHubRepos, getGitHubRepoIssues, type GitHubRepo, type GitHubRepoIssue } from "@/lib/api/integration-service"
+import { getGitHubRepos, getGitHubRepoIssues, mirrorSlackChannel, syncSlackChannel, type GitHubRepo, type GitHubRepoIssue } from "@/lib/api/integration-service"
 import { exportMyData, deleteMyAccount } from "@/lib/api/gdpr-service"
 import { apiClient } from "@/lib/api/client"
 import { USER_ROUTES } from "@/lib/config/api-routes"
@@ -1189,17 +1189,48 @@ function IntegrationsPanel() {
                       <p className="text-sm font-medium text-foreground">#{ch.channelName}</p>
                       <p className="text-xs text-muted-foreground">{ch.eventTypes.join(", ")}</p>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-destructive hover:bg-destructive/10"
-                      onClick={async () => {
-                        try { await removeSlackChannel(slug, ch.id); toast.success("Canal supprimé") }
-                        catch { toast.error("Impossible de supprimer le canal") }
-                      }}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {/* Miroir : rapatrie les messages Slack dans un canal de chat TaskForce */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        title="Rapatrier les messages de ce canal Slack dans le chat TaskForce"
+                        onClick={async () => {
+                          try {
+                            const n = await mirrorSlackChannel(slug, ch.id)
+                            toast.success(`Miroir activé — ${n} message${n > 1 ? "s" : ""} importé${n > 1 ? "s" : ""}`)
+                          } catch { toast.error("Impossible d'activer le miroir") }
+                        }}
+                      >
+                        Miroir
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs"
+                        title="Importer les nouveaux messages Slack"
+                        onClick={async () => {
+                          try {
+                            const n = await syncSlackChannel(slug, ch.id)
+                            toast.success(`${n} nouveau${n > 1 ? "x" : ""} message${n > 1 ? "s" : ""} synchronisé${n > 1 ? "s" : ""}`)
+                          } catch { toast.error("Synchronisation impossible") }
+                        }}
+                      >
+                        Sync
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-destructive hover:bg-destructive/10"
+                        onClick={async () => {
+                          try { await removeSlackChannel(slug, ch.id); toast.success("Canal supprimé") }
+                          catch { toast.error("Impossible de supprimer le canal") }
+                        }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
                 {/* Add channel form */}
