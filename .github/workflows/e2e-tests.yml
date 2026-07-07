@@ -4,6 +4,12 @@ name: E2E Tests (Playwright)
 # La stack dev est levée via docker-compose ; Playwright tourne sur le runner (localhost:3000/8080
 # mappés). NEXT_PUBLIC_API_URL=http://localhost:8080 fonctionne car, sur le runner, localhost pointe
 # vers les ports publiés des conteneurs.
+#
+# ⚠️ GATE — Ce job a besoin de `backend/tf-api/.env.dev` (secrets/config non versionnés, volontairement).
+# Il est donc SKIPPÉ par défaut (statut neutre, pas d'échec rouge) et ne s'exécute que si la variable
+# de dépôt `E2E_ENABLED` vaut "true" (Settings → Secrets and variables → Actions → Variables).
+# Pour l'activer : définir `E2E_ENABLED=true` ET fournir l'env (ex. secret `E2E_ENV_FILE`, cf. étape
+# « Générer .env.dev »). Localement, les tests restent lançables via `npm run e2e`.
 
 on:
   push:
@@ -20,6 +26,8 @@ on:
 jobs:
   e2e:
     name: Playwright E2E
+    # Gate : skip tant que le dépôt n'a pas opté-in (env non versionné requis pour lever la stack).
+    if: ${{ vars.E2E_ENABLED == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -33,6 +41,17 @@ jobs:
           node-version: 22.x
           cache: npm
           cache-dependency-path: frontend/package-lock.json
+
+      - name: 🔐 Générer backend/tf-api/.env.dev depuis le secret
+        # L'env n'est pas versionné : on le reconstruit depuis le secret `E2E_ENV_FILE` (opt-in).
+        env:
+          E2E_ENV_FILE: ${{ secrets.E2E_ENV_FILE }}
+        run: |
+          if [ -z "$E2E_ENV_FILE" ]; then
+            echo "::error::E2E_ENABLED=true mais le secret E2E_ENV_FILE est absent — impossible de lever la stack."
+            exit 1
+          fi
+          printf '%s' "$E2E_ENV_FILE" > backend/tf-api/.env.dev
 
       - name: 🐳 Lever la stack (dev)
         run: docker compose -f docker-compose.dev.yml --env-file backend/tf-api/.env.dev up -d --build postgres keycloak backend frontend minio rabbitmq
