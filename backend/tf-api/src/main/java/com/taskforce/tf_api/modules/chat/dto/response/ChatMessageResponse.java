@@ -18,4 +18,6 @@ public class ChatMessageResponse {
     private Boolean       isEdited;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    /** Source externe du message : null = natif TaskForce ; "SLACK" = importé via le miroir. */
+    private String        externalSource;
 }
