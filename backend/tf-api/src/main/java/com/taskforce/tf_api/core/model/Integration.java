@@ -7,8 +7,10 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import com.taskforce.tf_api.core.enums.IntegrationProvider;
+import com.taskforce.tf_api.shared.security.EncryptedStringConverter;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -56,6 +58,8 @@ public class Integration {
     @Column(nullable = false, length = 32)
     private IntegrationProvider provider;
 
+    // Chiffré au repos (AES-256-GCM) : token OAuth non utilisé comme clé de recherche.
+    @Convert(converter = EncryptedStringConverter.class)
     @Column(name = "access_token", nullable = false, columnDefinition = "TEXT")
     private String accessToken;
 
