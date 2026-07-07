@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -38,6 +39,7 @@ public class ChannelController {
     private final ChannelService     channelService;
     private final ChatMessageService messageService;
     private final UserRepository     userRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
     // =========================================================================
     // Channels
@@ -93,6 +95,9 @@ public class ChannelController {
     ) {
         Long userId = resolveUserId(jwt);
         ChatMessageResponse saved = messageService.sendMessage(channelId, userId, req);
+        // Rediffusion temps réel : le front envoie en REST mais s'abonne via STOMP.
+        // On broadcast APRÈS le commit du service (comme le fait ChatWebSocketController).
+        messagingTemplate.convertAndSend("/topic/channel." + channelId, saved);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Message envoyé", saved));
     }
