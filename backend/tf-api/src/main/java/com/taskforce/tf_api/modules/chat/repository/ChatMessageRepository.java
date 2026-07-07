@@ -25,4 +25,7 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
         """)
     List<ChatMessage> findRecentByChannel(@Param("channelId") Long channelId,
                                           Pageable pageable);
+
+    /** Déduplication du miroir : un message externe (Slack) n'est importé qu'une fois par canal. */
+    boolean existsByChannel_IdAndExternalId(Long channelId, String externalId);
 }
