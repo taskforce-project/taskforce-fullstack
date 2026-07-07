@@ -35,7 +35,7 @@ interface IntegrationState {
 
   // GitHub
   fetchGitHubStatus:  (slug: string) => Promise<void>;
-  connectGitHub:      (slug: string) => void;
+  connectGitHub:      (slug: string) => Promise<void>;
   disconnectGitHub:   (slug: string) => Promise<void>;
   fetchGitHubLinks:   (slug: string, issueId: number) => Promise<void>;
   addGitHubLink:      (slug: string, issueId: number, payload: GitHubLinkPayload) => Promise<GitHubLink>;
@@ -43,7 +43,7 @@ interface IntegrationState {
 
   // Slack
   fetchSlackStatus:    (slug: string) => Promise<void>;
-  connectSlack:        (slug: string) => void;
+  connectSlack:        (slug: string) => Promise<void>;
   disconnectSlack:     (slug: string) => Promise<void>;
   fetchSlackChannels:  (slug: string) => Promise<void>;
   addSlackChannel:     (slug: string, payload: SlackChannelPayload) => Promise<SlackChannel>;
@@ -72,8 +72,8 @@ export const useIntegrationStore = create<IntegrationState>((set, get) => ({
     set({ githubStatus: status });
   },
 
-  connectGitHub: (slug) => {
-    connectGitHub(slug);
+  connectGitHub: async (slug) => {
+    await connectGitHub(slug);
   },
 
   disconnectGitHub: async (slug) => {
@@ -116,8 +116,8 @@ export const useIntegrationStore = create<IntegrationState>((set, get) => ({
     set({ slackStatus: status });
   },
 
-  connectSlack: (slug) => {
-    connectSlack(slug);
+  connectSlack: async (slug) => {
+    await connectSlack(slug);
   },
 
   disconnectSlack: async (slug) => {
