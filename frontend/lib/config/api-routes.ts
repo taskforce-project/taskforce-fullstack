@@ -298,6 +298,8 @@ export const INTEGRATION_ROUTES = {
   SLACK_DISCONNECT:  (slug: string) => `/api/workspaces/${slug}/integrations/slack`,
   SLACK_CHANNELS:    (slug: string) => `/api/workspaces/${slug}/integrations/slack/channels`,
   SLACK_CHANNEL:     (slug: string, channelId: number) => `/api/workspaces/${slug}/integrations/slack/channels/${channelId}`,
+  SLACK_CHANNEL_MIRROR: (slug: string, channelId: number) => `/api/workspaces/${slug}/integrations/slack/channels/${channelId}/mirror`,
+  SLACK_CHANNEL_SYNC:   (slug: string, channelId: number) => `/api/workspaces/${slug}/integrations/slack/channels/${channelId}/sync`,
   WEBHOOKS:          (slug: string) => `/api/workspaces/${slug}/webhooks`,
   WEBHOOK:           (slug: string, id: number) => `/api/workspaces/${slug}/webhooks/${id}`,
 } as const;
