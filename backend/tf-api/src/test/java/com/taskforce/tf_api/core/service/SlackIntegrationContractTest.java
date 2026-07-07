@@ -77,7 +77,7 @@ class SlackIntegrationContractTest {
         ReflectionTestUtils.setField(service, "clientId", "cid");
         ReflectionTestUtils.setField(service, "clientSecret", "secret");
         ReflectionTestUtils.setField(service, "frontendUrl", "http://localhost:3000");
-        ReflectionTestUtils.setField(service, "appUrl", "http://localhost:8080");
+        ReflectionTestUtils.setField(service, "apiUrl", "http://localhost:8080");
 
         workspace = Workspace.builder().id(WORKSPACE_ID).name("Acme").slug(SLUG).build();
 
