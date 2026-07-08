@@ -93,7 +93,7 @@ export function SiteHeader() {
           href="/"
           className="flex items-center gap-2.5 text-[17px] font-semibold tracking-tight text-foreground"
         >
-          <img src="/logo_taskforce_tp.png" alt="" aria-hidden className="size-8 object-contain" />
+          <img src="/logo-taskforce.svg" alt="" aria-hidden className="h-9 w-auto" />
           TaskForce
         </a>
 
