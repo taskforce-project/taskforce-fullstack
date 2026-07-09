@@ -15,15 +15,15 @@ import lombok.extern.slf4j.Slf4j;
  *
  * <p>Best-effort : en cas d'indisponibilité (réseau, service down), renvoie {@code null}
  * et l'appelant ignore simplement l'embedding (le node reste utilisable, juste non indexé).
- * Le service Python bascule lui-même sur un vecteur déterministe 384d si le vrai modèle
- * n'est pas installé — on récupère donc toujours des vecteurs de dimension cohérente.
+ * Le service Python bascule lui-même sur un vecteur lexical déterministe 1024d si Ollama
+ * (BGE-M3) est indisponible — on récupère donc toujours des vecteurs de dimension cohérente.
  */
 @Component
 @Slf4j
 public class EmbeddingClient {
 
-    /** Dimension attendue (all-MiniLM-L6-v2). Doit matcher la colonne pgvector vector(384). */
-    public static final int DIMENSIONS = 384;
+    /** Dimension attendue (BGE-M3 via Ollama). Doit matcher la colonne pgvector vector(1024) (V59). */
+    public static final int DIMENSIONS = 1024;
 
     private final RestTemplate http;
     private final String embeddingsUrl;
