@@ -16,18 +16,25 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.taskforce.tf_api.core.dto.request.ConnectPlaneRequest;
 import com.taskforce.tf_api.core.dto.request.GitHubLinkRequest;
 import com.taskforce.tf_api.core.dto.request.SlackChannelRequest;
 import com.taskforce.tf_api.core.dto.response.ConnectUrlResponse;
 import com.taskforce.tf_api.core.dto.response.GitHubIssueResponse;
 import com.taskforce.tf_api.core.dto.response.GitHubLinkResponse;
 import com.taskforce.tf_api.core.dto.response.GitHubRepoResponse;
+import com.taskforce.tf_api.core.dto.response.IntegrationCatalogResponse;
 import com.taskforce.tf_api.core.dto.response.IntegrationStatusResponse;
+import com.taskforce.tf_api.core.dto.response.PlaneStatusResponse;
+import com.taskforce.tf_api.core.dto.response.PlaneSyncResponse;
 import com.taskforce.tf_api.core.dto.response.SlackChannelResponse;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.service.GitHubIntegrationService;
+import com.taskforce.tf_api.core.service.PlaneClient.PlaneProject;
+import com.taskforce.tf_api.core.service.PlaneIntegrationService;
 import com.taskforce.tf_api.core.service.SlackIntegrationService;
+import com.taskforce.tf_api.core.service.integration.IntegrationCatalogService;
 import com.taskforce.tf_api.shared.dto.ApiResponse;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
@@ -40,7 +47,20 @@ public class IntegrationController {
 
     private final GitHubIntegrationService gitHubService;
     private final SlackIntegrationService  slackService;
+    private final PlaneIntegrationService  planeService;
+    private final IntegrationCatalogService catalogService;
     private final UserRepository           userRepository;
+
+    // ====================================================================
+    // Catalogue d'intégrations (le « pool » d'outils, générique)
+    // ====================================================================
+
+    @GetMapping("/api/workspaces/{slug}/integrations/catalog")
+    public ResponseEntity<ApiResponse<IntegrationCatalogResponse>> catalog(
+        @PathVariable String slug, @AuthenticationPrincipal Jwt jwt
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(catalogService.getCatalog(slug, resolveUser(jwt).getId())));
+    }
 
     // ====================================================================
     // GitHub — status & OAuth
@@ -200,6 +220,52 @@ public class IntegrationController {
     ) {
         slackService.deleteChannel(slug, channelId);
         return ResponseEntity.ok(ApiResponse.success("Canal Slack supprimé", null));
+    }
+
+    // ====================================================================
+    // Plane — connexion (clé API) + ingestion Brain OS
+    // ====================================================================
+
+    @GetMapping("/api/workspaces/{slug}/integrations/plane/status")
+    public ResponseEntity<ApiResponse<PlaneStatusResponse>> planeStatus(
+        @PathVariable String slug, @AuthenticationPrincipal Jwt jwt
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(planeService.getStatus(slug, resolveUser(jwt).getId())));
+    }
+
+    @PostMapping("/api/workspaces/{slug}/integrations/plane/connect")
+    public ResponseEntity<ApiResponse<PlaneStatusResponse>> planeConnect(
+        @PathVariable String slug,
+        @Valid @RequestBody ConnectPlaneRequest request,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        PlaneStatusResponse status = planeService.connect(slug, resolveUser(jwt).getId(), request);
+        return ResponseEntity.ok(ApiResponse.success("Plane connecté", status));
+    }
+
+    @GetMapping("/api/workspaces/{slug}/integrations/plane/projects")
+    public ResponseEntity<ApiResponse<List<PlaneProject>>> planeProjects(
+        @PathVariable String slug, @AuthenticationPrincipal Jwt jwt
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(planeService.listProjects(slug, resolveUser(jwt).getId())));
+    }
+
+    @PostMapping("/api/workspaces/{slug}/integrations/plane/sync")
+    public ResponseEntity<ApiResponse<PlaneSyncResponse>> planeSync(
+        @PathVariable String slug,
+        @RequestParam("project") String projectId,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        PlaneSyncResponse result = planeService.sync(slug, resolveUser(jwt).getId(), projectId);
+        return ResponseEntity.ok(ApiResponse.success("Synchronisation Plane terminée", result));
+    }
+
+    @DeleteMapping("/api/workspaces/{slug}/integrations/plane")
+    public ResponseEntity<ApiResponse<Void>> planeDisconnect(
+        @PathVariable String slug, @AuthenticationPrincipal Jwt jwt
+    ) {
+        planeService.disconnect(slug, resolveUser(jwt).getId());
+        return ResponseEntity.ok(ApiResponse.success("Plane déconnecté", null));
     }
 
     // ====================================================================
