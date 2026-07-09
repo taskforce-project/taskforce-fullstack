@@ -55,7 +55,7 @@ public class DecisionService {
     private static final int RAG_TOPK = 6;
 
     @Transactional
-    public DecisionBrief decide(String slug, Long projectId, Long userId) {
+    public DecisionBrief decide(String slug, Long projectId, Long userId, boolean deep) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
         Project project = projectRepository.findByIdAndWorkspaceId(projectId, ws.getId())
             .orElseThrow(() -> new ResourceNotFoundException("Project", "id", projectId));
@@ -68,7 +68,8 @@ public class DecisionService {
             return fallbackBrief(project, snap);
         }
         try {
-            JsonNode json = callLlm(project, snap, hits);
+            // Défaut = tier "fast" (8B) ; "deep" (14B + thinking) = bouton « Approfondir ».
+            JsonNode json = callLlm(project, snap, hits, deep ? "deep" : "fast");
             String situation = json.path("situation").asText("").trim();
             List<String> risks = readStrings(json.path("risks"));
             List<Priority> priorities = readPriorities(json.path("priorities"));
@@ -104,8 +105,8 @@ public class DecisionService {
     // Reflect — LLM
     // =========================================================================
 
-    private JsonNode callLlm(Project project, Snapshot s, List<KnowledgeNode> hits) throws Exception {
-        String content = llm.chatCompletion(model, systemPrompt(hits), userPrompt(project, s), true);
+    private JsonNode callLlm(Project project, Snapshot s, List<KnowledgeNode> hits, String tier) throws Exception {
+        String content = llm.chatCompletion(model, systemPrompt(hits), userPrompt(project, s), true, tier);
         return objectMapper.readTree(content);
     }
 
