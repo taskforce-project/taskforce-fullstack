@@ -136,16 +136,18 @@ public class IssueController {
     // IA — spec + prompt d'exécution (human-in-the-loop)
     // =========================================================================
 
-    /** Génère (sans persister) un brouillon spec + prompt d'exécution + découpage + « déjà vu ? ». */
+    /** Génère (sans persister) un brouillon spec + prompt d'exécution + découpage + « déjà vu ? ».
+     *  {@code deep=true} → analyse approfondie (14B + thinking, plus lent) ; défaut = rapide (8B). */
     @PostMapping("/{issueId}/ai/spec")
     public ResponseEntity<ApiResponse<IssueSpecDraft>> generateSpec(
         @PathVariable String slug,
         @PathVariable Long projectId,
         @PathVariable Long issueId,
+        @RequestParam(name = "deep", defaultValue = "false") boolean deep,
         @AuthenticationPrincipal Jwt jwt
     ) {
         Long userId = resolveUserId(jwt);
-        IssueSpecDraft draft = issueAiService.generateSpec(slug, projectId, issueId, userId);
+        IssueSpecDraft draft = issueAiService.generateSpec(slug, projectId, issueId, userId, deep);
         return ResponseEntity.ok(ApiResponse.success("Brouillon généré", draft));
     }
 
