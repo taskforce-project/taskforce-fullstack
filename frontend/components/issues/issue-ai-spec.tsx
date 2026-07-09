@@ -48,10 +48,10 @@ export function IssueAiSpecPanel({ workspaceSlug, projectId, issueId }: Readonly
     setSaved(false)
   }
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (deep = false) => {
     setGenerating(true)
     try {
-      const d = await generateIssueSpec(workspaceSlug, projectId, issueId)
+      const d = await generateIssueSpec(workspaceSlug, projectId, issueId, deep)
       applyDraft(d)
     } catch {
       toast.error("Échec de la génération de la spec")
@@ -108,10 +108,16 @@ export function IssueAiSpecPanel({ workspaceSlug, projectId, issueId }: Readonly
             fondés sur le contexte réel de ton Brain OS.
           </p>
         </div>
-        <Button size="sm" onClick={handleGenerate} className="gap-1.5">
-          <Sparkles className="size-3.5" />
-          Générer la spec IA
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" onClick={() => handleGenerate(false)} className="gap-1.5">
+            <Sparkles className="size-3.5" />
+            Générer la spec IA
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => handleGenerate(true)} className="gap-1.5" title="14B + raisonnement — plus lent (~1-3 min)">
+            <BrainCircuit className="size-3.5" />
+            Approfondir
+          </Button>
+        </div>
       </div>
     )
   }
@@ -138,10 +144,16 @@ export function IssueAiSpecPanel({ workspaceSlug, projectId, issueId }: Readonly
           <Sparkles className="size-3" />
           {draft?.mode === "generated" ? "Généré par l'IA" : "Brouillon (LLM indisponible)"}
         </Badge>
-        <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs" onClick={handleGenerate} disabled={generating}>
-          <RefreshCw className="size-3.5" />
-          Régénérer
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs" onClick={() => handleGenerate(false)} disabled={generating}>
+            <RefreshCw className="size-3.5" />
+            Régénérer
+          </Button>
+          <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs" onClick={() => handleGenerate(true)} disabled={generating} title="14B + raisonnement — plus lent (~1-3 min)">
+            <BrainCircuit className="size-3.5" />
+            Approfondir
+          </Button>
+        </div>
       </div>
 
       {/* « Déjà vu ? » — notes proches du Brain OS */}
