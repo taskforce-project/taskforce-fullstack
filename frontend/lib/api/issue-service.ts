@@ -598,15 +598,16 @@ export interface SpecNode {
   title: string;
 }
 
-/** Génère un brouillon spec + prompt d'exécution + découpage + « déjà vu ? » (rien persisté). */
+/** Génère un brouillon spec + prompt d'exécution + découpage + « déjà vu ? » (rien persisté).
+ *  `deep=true` → analyse approfondie (14B + thinking, plus lent) ; défaut = rapide (8B). */
 export async function generateIssueSpec(
   slug: string,
   projectId: number,
-  issueId: number
+  issueId: number,
+  deep = false
 ): Promise<IssueSpecDraft> {
-  const res = await apiClient.post<{ data: IssueSpecDraft }>(
-    ISSUE_ROUTES.AI_SPEC(slug, projectId, issueId)
-  );
+  const url = ISSUE_ROUTES.AI_SPEC(slug, projectId, issueId) + (deep ? "?deep=true" : "");
+  const res = await apiClient.post<{ data: IssueSpecDraft }>(url);
   return res.data.data;
 }
 
