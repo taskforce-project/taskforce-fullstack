@@ -558,3 +558,68 @@ export async function deleteRelation(
 ): Promise<void> {
   await apiClient.delete(ISSUE_ROUTES.RELATION(slug, projectId, issueId, relationId));
 }
+
+// ---------------------------------------------------------------------------
+// IA — spec + prompt d'exécution (human-in-the-loop)
+// ---------------------------------------------------------------------------
+
+/** Une note Brain OS proche de l'issue (« déjà vu ? »). */
+export interface SimilarNode {
+  nodeId: number;
+  title: string;
+  domain: string | null;
+  score: number | null;
+}
+
+/** Brouillon généré par l'IA — non persisté tant que l'humain n'a pas approuvé. */
+export interface IssueSpecDraft {
+  spec: string;
+  executionPrompt: string;
+  breakdown: string[];
+  similar: SimilarNode[];
+  /** "generated" (LLM local) ou "fallback" (LLM indisponible → gabarit structurel). */
+  mode: "generated" | "fallback";
+}
+
+/** Contenu approuvé (éventuellement édité par l'humain) à persister. */
+export interface ApproveSpecPayload {
+  spec: string;
+  executionPrompt?: string;
+  breakdown?: string[];
+  /** Injecter le découpage comme checklist de l'issue (suivi d'avancement). */
+  addChecklist?: boolean;
+}
+
+/** Node Brain OS créé à l'approbation (spec persistée, liée à l'issue). */
+export interface SpecNode {
+  id: number;
+  type: string;
+  domain: string;
+  title: string;
+}
+
+/** Génère un brouillon spec + prompt d'exécution + découpage + « déjà vu ? » (rien persisté). */
+export async function generateIssueSpec(
+  slug: string,
+  projectId: number,
+  issueId: number
+): Promise<IssueSpecDraft> {
+  const res = await apiClient.post<{ data: IssueSpecDraft }>(
+    ISSUE_ROUTES.AI_SPEC(slug, projectId, issueId)
+  );
+  return res.data.data;
+}
+
+/** Approuve le brouillon → persiste un node SPEC lié à l'issue dans le Brain OS. */
+export async function approveIssueSpec(
+  slug: string,
+  projectId: number,
+  issueId: number,
+  payload: ApproveSpecPayload
+): Promise<SpecNode> {
+  const res = await apiClient.post<{ data: SpecNode }>(
+    ISSUE_ROUTES.AI_SPEC_APPROVE(slug, projectId, issueId),
+    payload
+  );
+  return res.data.data;
+}
