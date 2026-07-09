@@ -167,6 +167,10 @@ export const ISSUE_ROUTES = {
   RELATION:         (slug: string, projectId: number, issueId: number, relationId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/relations/${relationId}`,
   WORKLOGS:         (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/worklogs`,
   WORKLOG:          (slug: string, projectId: number, issueId: number, worklogId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/worklogs/${worklogId}`,
+  /** IA — génère un brouillon spec + prompt d'exécution (human-in-the-loop, rien persisté) */
+  AI_SPEC:          (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/ai/spec`,
+  /** IA — approuve le brouillon → persiste un node SPEC lié à l'issue */
+  AI_SPEC_APPROVE:  (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/ai/spec/approve`,
 } as const;
 
 /**
