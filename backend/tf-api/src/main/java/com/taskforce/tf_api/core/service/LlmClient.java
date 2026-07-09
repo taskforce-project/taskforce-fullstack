@@ -20,4 +20,16 @@ public interface LlmClient {
 
     /** Complétion brute (messages libres + outils) → message assistant (peut contenir {@code tool_calls}). */
     JsonNode rawChat(String model, List<Map<String, Object>> messages, List<Map<String, Object>> tools);
+
+    /**
+     * Variante avec <b>routing par tier</b> ({@code fast|standard|deep}) — pour l'AI Gateway local.
+     * Les providers sans tiers (Groq) ignorent le tier (implémentation par défaut).
+     */
+    default String chatCompletion(String model, String systemPrompt, String userPrompt, boolean jsonMode, String tier) {
+        return chatCompletion(model, systemPrompt, userPrompt, jsonMode);
+    }
+
+    default JsonNode rawChat(String model, List<Map<String, Object>> messages, List<Map<String, Object>> tools, String tier) {
+        return rawChat(model, messages, tools);
+    }
 }
