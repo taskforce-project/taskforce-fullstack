@@ -36,6 +36,7 @@ import {
 } from "@/lib/api/analytics-service"
 import { listProjects, type Project } from "@/lib/api/project-service"
 import { WorkloadHeatmap } from "@/components/analytics/workload-heatmap"
+import { DecisionBoard } from "@/components/analytics/decision-board"
 
 const ALL_PROJECTS = "all"
 
@@ -201,6 +202,19 @@ export default function AnalyticsPage() {
           </SelectContent>
         </Select>
       </div>
+
+      {/* Decision board (OODA) — aide à la décision par projet */}
+      {projectFilter === ALL_PROJECTS ? (
+        <p className="rounded-lg border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
+          💡 Sélectionne un projet ci-dessus pour l&apos;<span className="font-medium text-foreground">aide à la décision IA</span> (situation, risques et 3 priorités du jour).
+        </p>
+      ) : (
+        <DecisionBoard
+          slug={slug}
+          projectId={Number(projectFilter)}
+          projectName={projects.find((p) => String(p.id) === projectFilter)?.name ?? "Projet"}
+        />
+      )}
 
       {/* KPI strip */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
