@@ -98,6 +98,7 @@ services:
 
       # IA interne
       AI_SERVICE_URL: ${AI_SERVICE_URL:-http://ai-service:8000}
+      INTEGRATIONS_PLANE_API_BASE: ${INTEGRATIONS_PLANE_API_BASE:-https://api.plane.so}
       # GROQ_API_KEY : fourni par env_file (.env.dev). Ne PAS le redéclarer ici avec
       # ${GROQ_API_KEY:-} : l'override 'environment' écrase env_file et, sans variable
       # d'interpolation côté compose, le vide → clé perdue dans le conteneur (assistant en repli).
