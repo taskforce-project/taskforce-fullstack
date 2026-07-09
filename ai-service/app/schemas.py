@@ -24,6 +24,8 @@ class EmbedResponse(BaseModel):
 class ChatRequest(BaseModel):
     messages: List[dict]                  # [{role, content}] ou messages d'outils (format OpenAI)
     model: Optional[str] = None           # défaut = settings.ollama_model
+    tier: Optional[str] = None            # "fast" | "standard" | "deep" — routing modèle (prioritaire sur model)
+    think: bool = False                   # forcer le raisonnement Qwen3 ; sinon /no_think (plus rapide)
     tools: Optional[List[dict]] = None    # tool-calling (format OpenAI)
     json_mode: bool = False               # force une sortie JSON valide
     temperature: float = 0.4
