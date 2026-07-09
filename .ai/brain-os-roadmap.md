@@ -175,8 +175,9 @@ TOTAL                                ≈ 218 GB
 - [x] **Spec + prompt d'exécution IA** : `POST /api/workspaces/{slug}/projects/{projectId}/issues/{id}/ai/spec` → `IssueAiService.generateSpec` (RAG bge-m3 + LLM local Qwen, repli déterministe) renvoie `IssueSpecDraft{spec, executionPrompt, breakdown, similar, mode}` **sans rien persister**
 - [x] **« Déjà vu ? »** : `retrieveRelevant` sur titre+description → notes proches du Brain OS
 - [x] **HITL** : l'humain édite le brouillon (onglet « Spec IA », `components/issues/issue-ai-spec.tsx`) → `…/ai/spec/approve` (`ApproveSpecRequest`) **écrit un node `SPEC`** (`domain=ENGINEERING`, `refType=ISSUE`, embeddé) via `KnowledgeService.createNode` — le cerveau grandit. **Vérifié e2e** (node #3078 lié à l'issue WEB-1)
-- [ ] *(lot 2)* injecter `breakdown` en **checklist d'issue** ; edge `SPEC —IMPLEMENTS→ issue` ; decision-log par issue
-- [ ] *(lot 2, option)* **code agent** : issue → Claude implémente (conventions `04-engineering`) → PR draft → review humaine
+- [x] **lot 2a (09/07)** : `breakdown` → **checklist réelle de l'issue** à l'approbation (`ApproveSpecRequest.addChecklist` → `IssueService.addChecklistItem`) ; **« déjà vu » scoré** (`BrainSearchService.retrieveRelevantScored`, % cosinus) — vérifié e2e (spec #3079 + 4 items, déjà-vu WEB-1 41%)
+- [ ] *(lot 2b)* **bridge GitHub** : approuver une spec → PR draft (branche + spec en body) ou issue GitHub via l'intégration existante — « management côté GitHub »
+- [ ] *(far, option)* **code agent autonome** : issue → implémente → PR (nécessite API payante ou modèle local costaud ; le flux $0 = humain copie le prompt dans Claude Code)
 
 ### Phase 5 — Marketplace (moat)
 - Brain Packs (SaaS/Ecom… nodes pré-remplis), templates ADR sectoriels
