@@ -195,7 +195,8 @@ services:
       GROQ_MODEL: ${GROQ_MODEL:-llama-3.1-8b-instant}
       # AI Gateway → LLM local Ollama (sur l'hôte). host.docker.internal = la machine hôte.
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:14b-instruct}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:14b}
+      OLLAMA_MODEL_FAST: ${OLLAMA_MODEL_FAST:-qwen3:8b}
       OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL:-bge-m3}
       LOG_LEVEL: ${AI_SERVICE_LOG_LEVEL:-INFO}
     extra_hosts:
