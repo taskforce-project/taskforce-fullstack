@@ -10,8 +10,8 @@ from app.services.embedding_service import EmbeddingService
 from app.services.ollama_gateway import OllamaGateway
 from app.services.smart_assign_service import SmartAssignService
 
-_embedding_service = EmbeddingService(settings)
 _ollama_gateway = OllamaGateway(settings)
+_embedding_service = EmbeddingService(settings, _ollama_gateway)
 _smart_assign_service = SmartAssignService()
 
 
