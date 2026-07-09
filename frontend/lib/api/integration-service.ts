@@ -220,3 +220,95 @@ export async function updateWebhook(slug: string, id: number, payload: WebhookPa
 export async function deleteWebhook(slug: string, id: number): Promise<void> {
   await apiClient.delete(INTEGRATION_ROUTES.WEBHOOK(slug, id));
 }
+
+// ---------------------------------------------------------------------------
+// Catalogue générique (le « pool » d'outils)
+// ---------------------------------------------------------------------------
+
+export interface ConnectorField {
+  key: string;
+  label: string;
+  secret: boolean;
+  required: boolean;
+}
+
+export interface ConnectorView {
+  key: string;
+  name: string;
+  category: string;
+  authType: "OAUTH2" | "API_KEY" | "TOKEN" | "CONFIG" | "NONE";
+  status: "AVAILABLE" | "PLANNED";
+  connected: boolean;
+  fields: ConnectorField[];
+  capabilities: string[];
+  description: string | null;
+  docsUrl: string | null;
+  /** Aide (tooltip) : où récupérer la clé quand ce n'est pas du 1-clic OAuth. */
+  setupHint: string | null;
+}
+
+export interface CategoryGroup {
+  category: string;
+  label: string;
+  tools: ConnectorView[];
+}
+
+export interface IntegrationCatalog {
+  total: number;
+  available: number;
+  connected: number;
+  categories: CategoryGroup[];
+}
+
+export async function getIntegrationCatalog(slug: string): Promise<IntegrationCatalog> {
+  const res = await apiClient.get<{ data: IntegrationCatalog }>(INTEGRATION_ROUTES.CATALOG(slug));
+  return res.data.data;
+}
+
+// ---------------------------------------------------------------------------
+// Plane (connecteur clé API → ingestion Brain OS)
+// ---------------------------------------------------------------------------
+
+export interface PlaneStatus {
+  connected: boolean;
+  planeWorkspace: string | null;
+  ingestedNodes: number;
+}
+
+export interface PlaneProject {
+  id: string;
+  name: string;
+}
+
+export interface PlaneSyncResult {
+  created: number;
+  updated: number;
+  total: number;
+}
+
+export async function getPlaneStatus(slug: string): Promise<PlaneStatus> {
+  const res = await apiClient.get<{ data: PlaneStatus }>(INTEGRATION_ROUTES.PLANE_STATUS(slug));
+  return res.data.data;
+}
+
+export async function connectPlane(
+  slug: string,
+  payload: { apiKey: string; planeWorkspace: string }
+): Promise<PlaneStatus> {
+  const res = await apiClient.post<{ data: PlaneStatus }>(INTEGRATION_ROUTES.PLANE_CONNECT(slug), payload);
+  return res.data.data;
+}
+
+export async function listPlaneProjects(slug: string): Promise<PlaneProject[]> {
+  const res = await apiClient.get<{ data: PlaneProject[] }>(INTEGRATION_ROUTES.PLANE_PROJECTS(slug));
+  return res.data.data;
+}
+
+export async function syncPlane(slug: string, projectId: string): Promise<PlaneSyncResult> {
+  const res = await apiClient.post<{ data: PlaneSyncResult }>(INTEGRATION_ROUTES.PLANE_SYNC(slug, projectId));
+  return res.data.data;
+}
+
+export async function disconnectPlane(slug: string): Promise<void> {
+  await apiClient.delete(INTEGRATION_ROUTES.PLANE_DISCONNECT(slug));
+}
