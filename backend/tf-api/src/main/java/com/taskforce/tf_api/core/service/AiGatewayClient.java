@@ -51,22 +51,35 @@ public class AiGatewayClient implements LlmClient {
 
     @Override
     public String chatCompletion(String model, String systemPrompt, String userPrompt, boolean jsonMode) {
+        return chatCompletion(model, systemPrompt, userPrompt, jsonMode, null);
+    }
+
+    @Override
+    public String chatCompletion(String model, String systemPrompt, String userPrompt, boolean jsonMode, String tier) {
         JsonNode message = callChat(
             List.of(Map.of("role", "system", "content", systemPrompt),
                     Map.of("role", "user",   "content", userPrompt)),
-            null, jsonMode);
+            null, jsonMode, tier);
         return message.path("content").asText("");
     }
 
     @Override
     public JsonNode rawChat(String model, List<Map<String, Object>> messages, List<Map<String, Object>> tools) {
-        return callChat(messages, tools, false);
+        return callChat(messages, tools, false, null);
     }
 
-    private JsonNode callChat(List<?> messages, List<Map<String, Object>> tools, boolean jsonMode) {
+    @Override
+    public JsonNode rawChat(String model, List<Map<String, Object>> messages, List<Map<String, Object>> tools, String tier) {
+        return callChat(messages, tools, false, tier);
+    }
+
+    private JsonNode callChat(List<?> messages, List<Map<String, Object>> tools, boolean jsonMode, String tier) {
         Map<String, Object> body = new java.util.HashMap<>();
         body.put("messages", messages);
         body.put("json_mode", jsonMode);
+        if (tier != null) {
+            body.put("tier", tier);
+        }
         if (tools != null && !tools.isEmpty()) {
             body.put("tools", tools);
         }
