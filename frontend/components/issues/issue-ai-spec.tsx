@@ -212,6 +212,15 @@ export function IssueAiSpecPanel({ workspaceSlug, projectId, issueId }: Readonly
         />
       </label>
 
+      {/* Option suivi : découpage → checklist de l'issue */}
+      <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+        <Checkbox
+          checked={addChecklist}
+          onCheckedChange={(v) => setAddChecklist(v === true)}
+        />
+        Ajouter le découpage en checklist de l'issue (suivi d'avancement)
+      </label>
+
       {/* Approbation → write-back Brain OS */}
       <div className="flex items-center justify-end gap-2 border-t border-border pt-3">
         {saved && (
