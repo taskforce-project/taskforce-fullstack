@@ -26,11 +26,40 @@ class OllamaGateway:
     def __init__(self, settings: Settings) -> None:
         self._base_url = settings.ollama_base_url.rstrip("/")
         self._default_model = settings.ollama_model
+        self._embed_model = settings.ollama_embed_model
         self._timeout_s = settings.ollama_timeout_s
 
     @property
     def default_model(self) -> str:
         return self._default_model
+
+    @property
+    def embed_model(self) -> str:
+        return self._embed_model
+
+    def embed(self, texts: List[str], model: Optional[str] = None) -> List[List[float]]:
+        """Calcule les embeddings via Ollama (``/api/embed``). Retourne une liste de vecteurs.
+
+        Lève :class:`OllamaGatewayError` si Ollama est indisponible ou la réponse invalide.
+        """
+        body = {"model": model or self._embed_model, "input": texts}
+        request = urllib.request.Request(
+            f"{self._base_url}/api/embed",
+            data=json.dumps(body).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=self._timeout_s) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+        except (urllib.error.URLError, TimeoutError) as exc:
+            logger.error("Ollama embeddings injoignable (%s): %s", self._base_url, exc)
+            raise OllamaGatewayError(f"Embeddings locaux indisponibles: {exc}") from exc
+
+        vectors = payload.get("embeddings")
+        if not isinstance(vectors, list) or not vectors:
+            raise OllamaGatewayError("Réponse d'embeddings invalide (pas de 'embeddings')")
+        return [[float(x) for x in vector] for vector in vectors]
 
     def chat(
         self,
