@@ -306,6 +306,14 @@ export const INTEGRATION_ROUTES = {
   SLACK_CHANNEL_SYNC:   (slug: string, channelId: number) => `/api/workspaces/${slug}/integrations/slack/channels/${channelId}/sync`,
   WEBHOOKS:          (slug: string) => `/api/workspaces/${slug}/webhooks`,
   WEBHOOK:           (slug: string, id: number) => `/api/workspaces/${slug}/webhooks/${id}`,
+  /** Catalogue générique : le pool d'outils + statut de connexion */
+  CATALOG:           (slug: string) => `/api/workspaces/${slug}/integrations/catalog`,
+  /** Plane (connecteur clé API → ingestion Brain OS) */
+  PLANE_STATUS:      (slug: string) => `/api/workspaces/${slug}/integrations/plane/status`,
+  PLANE_CONNECT:     (slug: string) => `/api/workspaces/${slug}/integrations/plane/connect`,
+  PLANE_PROJECTS:    (slug: string) => `/api/workspaces/${slug}/integrations/plane/projects`,
+  PLANE_SYNC:        (slug: string, project: string) => `/api/workspaces/${slug}/integrations/plane/sync?project=${encodeURIComponent(project)}`,
+  PLANE_DISCONNECT:  (slug: string) => `/api/workspaces/${slug}/integrations/plane`,
 } as const;
 
 /** Routes RGPD — droits des personnes (CERT-C11). */
