@@ -8,6 +8,7 @@ import {
   ChevronDown, Send, ExternalLink, Pencil, Check as CheckIcon,
   Paperclip, Upload, Trash2, FileText, Link2, Plus,
   MoreHorizontal, Pin, PinOff, Archive, ArchiveRestore, Link as LinkIcon, Hash,
+  Sparkles,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -29,6 +30,7 @@ import {
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 import { SmartAssignPanel } from "@/components/smart-assign/smart-assign-panel"
+import { IssueAiSpecPanel } from "@/components/issues/issue-ai-spec"
 import { DeleteConfirmDialog } from "@/components/dialogs/delete-confirm-dialog"
 import {
   listAttachments,
@@ -1014,7 +1016,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
 
   const initDescription = issue?.description ?? ""
   const [comment, setComment] = useState("")
-  const [tab, setTab] = useState<"comments" | "activity" | "attachments" | "github" | "subtasks" | "relations" | "checklist" | "time">("comments")
+  const [tab, setTab] = useState<"comments" | "activity" | "attachments" | "github" | "subtasks" | "relations" | "checklist" | "time" | "spec">("comments")
 
   // Archive / pin (façon GitHub)
   const [pinned, setPinned] = useState<boolean>(issue?.pinned ?? false)
@@ -1448,6 +1450,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
             <div>
               <ScrollableTabs className="mb-4" scrollClassName="gap-4 border-b border-border">
                 {([
+                  { key: "spec",        icon: Sparkles,      label: "Spec IA",     show: Boolean(workspaceSlug && projectId) },
                   { key: "comments",    icon: MessageSquare, label: `Comments (${storeComments.length})`, show: true },
                   { key: "activity",    icon: Activity,      label: "Activity",                            show: true },
                   { key: "attachments", icon: Paperclip,     label: "Attachments", show: Boolean(workspaceSlug && projectId) },
@@ -1478,6 +1481,14 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                   </button>
                 ))}
               </ScrollableTabs>
+
+              {tab === "spec" && workspaceSlug && projectId && issue?.id && (
+                <IssueAiSpecPanel
+                  workspaceSlug={workspaceSlug}
+                  projectId={projectId}
+                  issueId={Number(issue.id)}
+                />
+              )}
 
               {tab === "comments" && (
                 <CommentsTab
