@@ -199,6 +199,8 @@ export const ANALYTICS_ROUTES = {
   INSIGHTS:   (slug: string) => `/api/workspaces/${slug}/analytics/insights`,
   /** Heatmap charge équipe (US-022) : membre × jour, sur N jours */
   WORKLOAD:   (slug: string) => `/api/workspaces/${slug}/analytics/workload`,
+  /** Décision IA par projet (boucle OODA) : POST → situation + risques + 3 priorités */
+  DECISION:   (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/decision`,
 } as const;
 
 /**
