@@ -16,7 +16,7 @@ import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantStep;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantToolCall;
 import com.taskforce.tf_api.core.model.KnowledgeNode;
 import com.taskforce.tf_api.core.model.Workspace;
-import com.taskforce.tf_api.core.service.GroqService;
+import com.taskforce.tf_api.core.service.LlmClient;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.core.service.brain.BrainSearchService;
 
@@ -39,9 +39,11 @@ public class AgentService {
     private final BrainAccessGuard   access;
     private final BrainSearchService search;
     private final AgentToolRegistry  tools;
-    private final GroqService        groq;
+    private final LlmClient          llm;
     private final ObjectMapper       objectMapper;
 
+    // Nom de modèle passé au client LLM. Ignoré par l'AI Gateway (qui impose son modèle Ollama) ;
+    // utilisé seulement si provider=groq.
     @Value("${ai.groq.assistant-model:llama-3.3-70b-versatile}")
     private String model;
 
@@ -65,8 +67,8 @@ public class AgentService {
         steps.add(new AssistantStep("Recherche dans le Brain OS (" + hits.size() + " note(s))", "done"));
 
         // ── Sans LLM : repli gracieux (sources réelles) ──────────────────────
-        if (!groq.isConfigured()) {
-            steps.add(new AssistantStep("Génération (clé LLM requise)", "pending"));
+        if (!llm.isConfigured()) {
+            steps.add(new AssistantStep("Génération (LLM requis)", "pending"));
             return new AssistantAnswer(fallbackAnswer(message, hits), null, "fallback",
                 sources, steps, List.of());
         }
@@ -98,7 +100,7 @@ public class AgentService {
         List<Map<String, Object>> toolDefs = tools.toolDefinitions();
 
         for (int i = 0; i < MAX_TOOL_ITERS; i++) {
-            JsonNode msg = groq.rawChat(model, messages, toolDefs);
+            JsonNode msg = llm.rawChat(model, messages, toolDefs);
             JsonNode calls = msg.path("tool_calls");
             if (calls.isArray() && !calls.isEmpty()) {
                 messages.add(objectMapper.convertValue(msg, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {}));
@@ -130,7 +132,7 @@ public class AgentService {
     }
 
     private String runDirect(String message, List<KnowledgeNode> hits) {
-        return groq.chatCompletion(model, systemPrompt(hits, false), message, false);
+        return llm.chatCompletion(model, systemPrompt(hits, false), message, false);
     }
 
     // -------------------------------------------------------------------------
@@ -176,8 +178,8 @@ public class AgentService {
             }
         }
         sb.append("\n\n> [!note] Génération désactivée\n")
-          .append("> Configurez `GROQ_API_KEY` pour activer les réponses génératives, le raisonnement et ")
-          .append("les actions (recherche + écriture dans le cerveau).");
+          .append("> Activez un LLM (Ollama local via l'AI Gateway) pour les réponses génératives, le ")
+          .append("raisonnement et les actions (recherche + écriture dans le cerveau).");
         return sb.toString();
     }
 }
