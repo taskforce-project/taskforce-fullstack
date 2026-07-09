@@ -6,6 +6,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.taskforce.tf_api.core.dto.response.DecisionBrief;
@@ -35,9 +36,10 @@ public class DecisionController {
     public ResponseEntity<ApiResponse<DecisionBrief>> decide(
         @PathVariable String slug,
         @PathVariable Long projectId,
+        @RequestParam(name = "deep", defaultValue = "false") boolean deep,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        DecisionBrief brief = decisionService.decide(slug, projectId, resolveUserId(jwt));
+        DecisionBrief brief = decisionService.decide(slug, projectId, resolveUserId(jwt), deep);
         return ResponseEntity.ok(ApiResponse.success("Décision générée", brief));
     }
 
