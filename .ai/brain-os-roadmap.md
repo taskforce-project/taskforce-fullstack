@@ -171,11 +171,12 @@ TOTAL                                ≈ 218 GB
 - [x] recherche sémantique live · empty-state + insights · suppression confirmée · relations read-only · footer scroll-reveal
 - [ ] *(futur)* tiptap WYSIWYG inline (réseau propre) ; viewer PDF in-app ; wizard onboarding IA
 
-### Phase 4 — Issues enrichies + human-in-the-loop
-- Decision log par issue (obstacles/solutions/liens ADR), node lié auto (`ref_type=ISSUE`)
-- « Déjà vu ? » : similarity search à la création d'issue
-- HITL : l'IA propose → `pending_approval` → approve/reject/modify
-- Code agent optionnel : issue → Claude implémente (conventions lues dans `04-engineering`) → PR draft → review humaine
+### Phase 4 — Issues enrichies + human-in-the-loop · 🟢 **lot 1 fait (09/07)**
+- [x] **Spec + prompt d'exécution IA** : `POST /api/workspaces/{slug}/projects/{projectId}/issues/{id}/ai/spec` → `IssueAiService.generateSpec` (RAG bge-m3 + LLM local Qwen, repli déterministe) renvoie `IssueSpecDraft{spec, executionPrompt, breakdown, similar, mode}` **sans rien persister**
+- [x] **« Déjà vu ? »** : `retrieveRelevant` sur titre+description → notes proches du Brain OS
+- [x] **HITL** : l'humain édite le brouillon (onglet « Spec IA », `components/issues/issue-ai-spec.tsx`) → `…/ai/spec/approve` (`ApproveSpecRequest`) **écrit un node `SPEC`** (`domain=ENGINEERING`, `refType=ISSUE`, embeddé) via `KnowledgeService.createNode` — le cerveau grandit. **Vérifié e2e** (node #3078 lié à l'issue WEB-1)
+- [ ] *(lot 2)* injecter `breakdown` en **checklist d'issue** ; edge `SPEC —IMPLEMENTS→ issue` ; decision-log par issue
+- [ ] *(lot 2, option)* **code agent** : issue → Claude implémente (conventions `04-engineering`) → PR draft → review humaine
 
 ### Phase 5 — Marketplace (moat)
 - Brain Packs (SaaS/Ecom… nodes pré-remplis), templates ADR sectoriels
