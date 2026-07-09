@@ -100,7 +100,8 @@ public class AgentService {
         List<Map<String, Object>> toolDefs = tools.toolDefinitions();
 
         for (int i = 0; i < MAX_TOOL_ITERS; i++) {
-            JsonNode msg = llm.rawChat(model, messages, toolDefs);
+            // Tier "fast" (8B) par défaut sur ce hardware (14B trop lent/erratique) ; réactif.
+            JsonNode msg = llm.rawChat(model, messages, toolDefs, "fast");
             JsonNode calls = msg.path("tool_calls");
             if (calls.isArray() && !calls.isEmpty()) {
                 messages.add(objectMapper.convertValue(msg, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {}));
@@ -132,7 +133,8 @@ public class AgentService {
     }
 
     private String runDirect(String message, List<KnowledgeNode> hits) {
-        return llm.chatCompletion(model, systemPrompt(hits, false), message, false);
+        // Tier "fast" : petit modèle 8B pour les réponses simples/interactives (rapide).
+        return llm.chatCompletion(model, systemPrompt(hits, false), message, false, "fast");
     }
 
     // -------------------------------------------------------------------------
