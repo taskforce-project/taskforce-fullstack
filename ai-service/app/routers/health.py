@@ -13,7 +13,8 @@ def health() -> dict:
     return {
         "status": "ok",
         "service": "taskforce-ai-service",
-        "embedding_model": settings.embedding_model,
+        "embedding_model": settings.ollama_embed_model,
+        "embedding_dim": settings.embedding_dim,
         "llm_model": settings.ollama_model,
         "ollama_base_url": settings.ollama_base_url,
     }
