@@ -14,11 +14,11 @@ from pydantic import BaseModel
 class Settings(BaseModel):
     """Paramètres du service (immuables après démarrage)."""
 
-    # --- Embeddings ---
+    # --- Embeddings (BGE-M3 via Ollama, 1024d) ---
     # Dimension de l'espace vectoriel. DOIT rester alignée avec la colonne pgvector
-    # `knowledge_nodes.embedding vector(N)` côté backend (migration Flyway).
-    embedding_dim: int = 384
-    embedding_model: str = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+    # `knowledge_nodes.embedding vector(N)` côté backend (migration V59 = 1024).
+    embedding_dim: int = 1024
+    ollama_embed_model: str = os.getenv("OLLAMA_EMBED_MODEL", "bge-m3")
 
     # --- AI Gateway → LLM local (Ollama, API OpenAI-compatible) ---
     ollama_base_url: str = os.getenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434")
