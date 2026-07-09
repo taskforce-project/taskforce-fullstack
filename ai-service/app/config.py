@@ -22,7 +22,8 @@ class Settings(BaseModel):
 
     # --- AI Gateway → LLM local (Ollama, API OpenAI-compatible) ---
     ollama_base_url: str = os.getenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434")
-    ollama_model: str = os.getenv("OLLAMA_MODEL", "qwen2.5:14b-instruct")
+    ollama_model: str = os.getenv("OLLAMA_MODEL", "qwen3:14b")            # tier standard/deep
+    ollama_model_fast: str = os.getenv("OLLAMA_MODEL_FAST", "qwen3:8b")   # tier "fast" (petites actions)
     ollama_timeout_s: float = float(os.getenv("OLLAMA_TIMEOUT", "180"))  # génération locale = lente
 
     model_config = {"frozen": True}
