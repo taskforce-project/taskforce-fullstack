@@ -212,8 +212,14 @@ server:
 
 # AI Configuration (Phase 4)
 ai:
+  # Fournisseur LLM actif : ollama (local/gratuit) | groq (bloqué sur ce réseau) | (vide = repli sans LLM)
+  provider: ${AI_PROVIDER:ollama}
   groq:
     api-key: ${GROQ_API_KEY:}
     smart-assign-model: ${GROQ_SMART_ASSIGN_MODEL:llama-3.1-8b-instant}
     assistant-model: ${GROQ_ASSISTANT_MODEL:llama-3.3-70b-versatile}
+  # AI Gateway (service Python ai-service) → LLM local Ollama (Qwen 14B sur la RTX 5070, gratuit).
+  # Le routing modèle + l'URL Ollama vivent dans l'ai-service (OLLAMA_BASE_URL/OLLAMA_MODEL).
+  gateway:
+    base-url: ${AI_GATEWAY_BASE_URL:http://ai-service:8000}
 
