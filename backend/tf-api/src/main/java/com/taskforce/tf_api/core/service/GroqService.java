@@ -27,7 +27,7 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Service
 @Slf4j
-public class GroqService {
+public class GroqService implements LlmClient {
 
     private static final String GROQ_BASE_URL = "https://api.groq.com/openai/v1";
 
