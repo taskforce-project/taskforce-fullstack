@@ -108,6 +108,43 @@ public class BrainSearchService {
         return ids.stream().map(byId::get).filter(n -> n != null).toList();
     }
 
+    /** Un node retrouvé avec son score de similarité cosinus (0..1). */
+    public record ScoredNode(KnowledgeNode node, double score) {}
+
+    /**
+     * Comme {@link #retrieveRelevant} mais expose le score cosinus (pour l'affichage « déjà vu ? »).
+     * Sans contrôle d'accès : l'appelant a déjà autorisé le workspace.
+     */
+    @Transactional
+    public List<ScoredNode> retrieveRelevantScored(Long workspaceId, String query, int topK) {
+        backfillMissingEmbeddings(workspaceId);
+        float[] qvec = embeddingClient.embed(query);
+        if (qvec == null) return List.of();
+        String qLit = EmbeddingClient.toVectorLiteral(qvec);
+        int limit = Math.max(1, Math.min(topK, 20));
+
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+            "SELECT id, 1 - (embedding <=> CAST(? AS vector)) AS score FROM knowledge_nodes "
+            + "WHERE workspace_id = ? AND status = 'ACTIVE' AND embedding IS NOT NULL "
+            + "ORDER BY embedding <=> CAST(? AS vector) ASC LIMIT ?",
+            qLit, workspaceId, qLit, limit);
+        if (rows.isEmpty()) return List.of();
+
+        Map<Long, Double> scoreById = new LinkedHashMap<>();
+        for (Map<String, Object> row : rows) {
+            scoreById.put(((Number) row.get("id")).longValue(), ((Number) row.get("score")).doubleValue());
+        }
+        Map<Long, KnowledgeNode> byId = new HashMap<>();
+        nodeRepository.findAllById(scoreById.keySet()).forEach(n -> byId.put(n.getId(), n));
+
+        List<ScoredNode> out = new ArrayList<>();
+        scoreById.forEach((id, score) -> {
+            KnowledgeNode n = byId.get(id);
+            if (n != null) out.add(new ScoredNode(n, score));
+        });
+        return out;
+    }
+
     // =========================================================================
     // Indexation (appelée par KnowledgeService à l'écriture)
     // =========================================================================
