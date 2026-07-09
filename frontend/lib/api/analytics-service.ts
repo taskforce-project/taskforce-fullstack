@@ -114,3 +114,43 @@ export async function getAiInsights(slug: string): Promise<AiInsight[]> {
   const res = await apiClient.get<{ data: AiInsight[] }>(ANALYTICS_ROUTES.INSIGHTS(slug));
   return res.data.data;
 }
+
+// ---------------------------------------------------------------------------
+// Décision IA par projet (boucle OODA)
+// ---------------------------------------------------------------------------
+
+export interface DecisionSnapshot {
+  total: number;
+  open: number;
+  inProgress: number;
+  completed: number;
+  overdue: number;
+  dueSoon: number;
+}
+
+export interface DecisionPriority {
+  title: string;
+  rationale: string;
+  level: "HIGH" | "MEDIUM" | "LOW";
+}
+
+export interface DecisionBrief {
+  situation: string;
+  risks: string[];
+  priorities: DecisionPriority[];
+  snapshot: DecisionSnapshot;
+  /** "generated" (LLM local) ou "fallback" (métriques seules). */
+  mode: "generated" | "fallback";
+}
+
+/** Génère la décision du jour (situation + risques + 3 priorités) pour un projet.
+ *  `deep=true` → analyse approfondie (14B + thinking, plus lent) ; défaut = rapide (8B). */
+export async function getProjectDecision(
+  slug: string,
+  projectId: number,
+  deep = false
+): Promise<DecisionBrief> {
+  const url = ANALYTICS_ROUTES.DECISION(slug, projectId) + (deep ? "?deep=true" : "");
+  const res = await apiClient.post<{ data: DecisionBrief }>(url);
+  return res.data.data;
+}
