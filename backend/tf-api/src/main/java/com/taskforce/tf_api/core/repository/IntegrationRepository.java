@@ -1,5 +1,6 @@
 package com.taskforce.tf_api.core.repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -12,6 +13,8 @@ import com.taskforce.tf_api.core.model.Integration;
 public interface IntegrationRepository extends JpaRepository<Integration, Long> {
 
     Optional<Integration> findByWorkspaceIdAndProvider(Long workspaceId, IntegrationProvider provider);
+
+    List<Integration> findByWorkspaceId(Long workspaceId);
 
     boolean existsByWorkspaceIdAndProvider(Long workspaceId, IntegrationProvider provider);
 
