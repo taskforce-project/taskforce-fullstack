@@ -27,6 +27,7 @@ import { useUpgradeStore } from "@/lib/store/upgrade-store"
 import { getAuditLogs, type AuditLogEntry } from "@/lib/api/workspace-service"
 import { useIntegrationStore } from "@/lib/store/integration-store"
 import { getGitHubRepos, getGitHubRepoIssues, mirrorSlackChannel, syncSlackChannel, type GitHubRepo, type GitHubRepoIssue } from "@/lib/api/integration-service"
+import { IntegrationsCatalog } from "@/components/integrations/integrations-catalog"
 import { exportMyData, deleteMyAccount } from "@/lib/api/gdpr-service"
 import { apiClient } from "@/lib/api/client"
 import { USER_ROUTES } from "@/lib/config/api-routes"
@@ -1113,6 +1114,11 @@ function IntegrationsPanel() {
 
   return (
     <div className="flex flex-col gap-4">
+      {/* ---- Catalogue (le pool générique) ---- */}
+      <SectionCard title="Catalogue d'intégrations" description="Branchez vos outils sur le Brain OS. Un clic pour l'OAuth, sinon une clé API (aide ⓘ au survol).">
+        {slug && <IntegrationsCatalog slug={slug} />}
+      </SectionCard>
+
       {/* ---- GitHub ---- */}
       <SectionCard title="GitHub" description="Link issues to pull requests and commits.">
         <div className="flex items-center gap-4">
