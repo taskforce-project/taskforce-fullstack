@@ -16,6 +16,22 @@ from app.config import Settings
 logger = logging.getLogger("ai-service.gateway")
 
 
+def _with_thinking(messages: List[dict], think: bool) -> List[dict]:
+    """Injecte ``/no_think`` (Qwen3) sur le dernier message quand le raisonnement n'est pas voulu.
+
+    Copie superficielle : on ne mute pas la liste de l'appelant. En mode ``think`` on ne touche à rien.
+    """
+    if think or not messages:
+        return messages
+    out = list(messages)
+    last = dict(out[-1])
+    content = str(last.get("content", "")).rstrip()
+    if "/no_think" not in content:
+        last["content"] = (content + " /no_think").strip()
+    out[-1] = last
+    return out
+
+
 class OllamaGatewayError(RuntimeError):
     """Erreur d'appel au LLM local (indisponible, réponse invalide…)."""
 
@@ -26,12 +42,26 @@ class OllamaGateway:
     def __init__(self, settings: Settings) -> None:
         self._base_url = settings.ollama_base_url.rstrip("/")
         self._default_model = settings.ollama_model
+        self._fast_model = settings.ollama_model_fast
         self._embed_model = settings.ollama_embed_model
         self._timeout_s = settings.ollama_timeout_s
 
     @property
     def default_model(self) -> str:
         return self._default_model
+
+    def resolve_tier(self, tier: Optional[str]) -> tuple[str, bool]:
+        """Route un *tier* logique vers ``(modèle, think)``. Le gateway possède le routing modèle.
+
+        - ``fast``     → 8B, sans raisonnement (petites actions, chat interactif).
+        - ``deep``     → 14B, **avec** raisonnement Qwen3 (analyse profonde, plus lent).
+        - ``standard`` → 14B, sans raisonnement (génération courante). Défaut.
+        """
+        if tier == "fast":
+            return self._fast_model, False
+        if tier == "deep":
+            return self._default_model, True
+        return self._default_model, False
 
     @property
     def embed_model(self) -> str:
@@ -68,16 +98,23 @@ class OllamaGateway:
         tools: Optional[List[dict]] = None,
         json_mode: bool = False,
         temperature: float = 0.4,
+        tier: Optional[str] = None,
+        think: bool = False,
     ) -> tuple[str, dict]:
         """Appelle le LLM. Retourne ``(model_utilisé, message_assistant)``.
 
+        Routing : ``tier`` (fast/standard/deep) est prioritaire ; sinon ``model`` explicite (ou défaut)
+        + ``think``. Sans raisonnement, on injecte ``/no_think`` (Qwen3) — nettement plus rapide.
         Le ``message`` peut contenir ``tool_calls`` (boucle agentique côté backend).
         Lève :class:`OllamaGatewayError` en cas d'indisponibilité ou de réponse invalide.
         """
-        resolved_model = model or self._default_model
+        if tier is not None:
+            resolved_model, resolved_think = self.resolve_tier(tier)
+        else:
+            resolved_model, resolved_think = (model or self._default_model), think
         body: dict = {
             "model": resolved_model,
-            "messages": messages,
+            "messages": _with_thinking(messages, resolved_think),
             "temperature": temperature,
             "stream": False,
         }
