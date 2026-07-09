@@ -65,7 +65,7 @@ public class IssueAiService {
     // =========================================================================
 
     @Transactional
-    public IssueSpecDraft generateSpec(String slug, Long projectId, Long issueId, Long userId) {
+    public IssueSpecDraft generateSpec(String slug, Long projectId, Long issueId, Long userId, boolean deep) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
         Issue issue = resolveIssue(ws, projectId, issueId);
 
@@ -81,7 +81,8 @@ public class IssueAiService {
             return fallbackDraft(issue, similar);
         }
         try {
-            JsonNode json = callLlm(issue, hits);
+            // Défaut = tier "fast" (8B, rapide) ; "deep" (14B + thinking) = bouton « Approfondir ».
+            JsonNode json = callLlm(issue, hits, deep ? "deep" : "fast");
             String spec = json.path("spec").asText("").trim();
             String prompt = json.path("executionPrompt").asText("").trim();
             List<String> breakdown = readStringArray(json.path("breakdown"));
@@ -141,8 +142,8 @@ public class IssueAiService {
     // Helpers — LLM
     // =========================================================================
 
-    private JsonNode callLlm(Issue issue, List<KnowledgeNode> hits) throws Exception {
-        String content = llm.chatCompletion(model, systemPrompt(hits), userPrompt(issue), true);
+    private JsonNode callLlm(Issue issue, List<KnowledgeNode> hits, String tier) throws Exception {
+        String content = llm.chatCompletion(model, systemPrompt(hits), userPrompt(issue), true, tier);
         return objectMapper.readTree(content);
     }
 
