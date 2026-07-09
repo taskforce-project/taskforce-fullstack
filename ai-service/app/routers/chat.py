@@ -22,6 +22,8 @@ def chat(
             tools=payload.tools,
             json_mode=payload.json_mode,
             temperature=payload.temperature,
+            tier=payload.tier,
+            think=payload.think,
         )
     except OllamaGatewayError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
