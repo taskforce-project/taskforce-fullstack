@@ -20,6 +20,7 @@ import { Kbd } from "@/components/ui/kbd"
 import { ThemeToggle } from "@/components/common/theme-toggle"
 import { CommandPalette } from "@/components/command-palette"
 import { NotificationBell } from "@/components/layout/topbar/notification-bell"
+import { WorkflowsButton } from "@/components/workflows/workflows-button"
 import { useProjectStore } from "@/lib/store/project-store"
 import { usePanelStore } from "@/lib/store/panel-store"
 import { useUserStore } from "@/lib/store/user-store"
@@ -197,6 +198,9 @@ export function AppTopbar() {
           <Sparkles className="size-4 text-primary" />
           <span className="hidden lg:inline">Ask AI</span>
         </Button>
+
+        {/* Workflows IA — dock des analyses en arrière-plan (badge = jobs actifs) */}
+        <WorkflowsButton />
 
         {/* Notifications — badge non-lus + popover preview (QA2-11) */}
         <NotificationBell />
