@@ -13,5 +13,12 @@ public record ApproveSpecRequest(
     String executionPrompt,
     List<String> breakdown,
     /** Si vrai, injecte le découpage comme checklist de l'issue (suivi d'avancement). */
-    boolean addChecklist
+    boolean addChecklist,
+    /** Si vrai, écrit la spec + labels + effort + priorité sur l'issue elle-même (persistant). */
+    boolean applyToIssue,
+    List<String> labels,   // noms de labels (résolus vers les labels existants du projet)
+    Integer storyPoints,   // effort
+    String priority,       // NONE | LOW | MEDIUM | HIGH | URGENT
+    String type,           // nom de type (résolu vers un type existant du projet)
+    boolean autoAssign     // si vrai, choisit l'assigné via le smart-assign (Qwen)
 ) {}
