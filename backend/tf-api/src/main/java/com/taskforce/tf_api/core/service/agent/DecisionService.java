@@ -17,34 +17,32 @@ import com.taskforce.tf_api.core.enums.IssueStatusCategory;
 import com.taskforce.tf_api.core.model.Issue;
 import com.taskforce.tf_api.core.model.KnowledgeNode;
 import com.taskforce.tf_api.core.model.Project;
-import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.IssueRepository;
-import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.service.LlmClient;
-import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.core.service.brain.BrainSearchService;
-import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Aide à la décision par projet — la première surface de la boucle <b>OODA</b> (Phase C).
+ * Le raisonnement de la boucle <b>OODA</b> par projet, en briques réutilisables.
  *
- * <p><b>Observe</b> : métriques réelles du projet ({@link Snapshot}) + contexte Brain OS (vision,
- * specs, données ingérées via les connecteurs). <b>Reflect/Predict</b> : le LLM local en tire une
- * situation, des risques et les <b>3 priorités de demain</b>. <b>Act</b> : l'humain transforme une
- * priorité en issue (côté front, via l'endpoint issues existant). Repli déterministe si LLM absent.
+ * <p><b>Observe</b> : {@link #snapshot} — métriques réelles du projet. <b>Contexte</b> :
+ * {@link #retrieveContext} — Brain OS (vision, specs, données ingérées). <b>Reflect/Predict</b> :
+ * {@link #analyze} — le LLM local en tire une situation, des risques et les <b>3 priorités de
+ * demain</b>, ou pose une question de clarification. Repli déterministe si le LLM est absent.
+ *
+ * <p>Ce service ne fait ni autorisation ni persistance : il est orchestré par
+ * {@link AnalysisJobRunner}, qui joue ces briques comme les étapes d'un workflow observable.
+ * <b>Act</b> : l'humain accepte une priorité, qui devient une issue.
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class DecisionService {
 
-    private final BrainAccessGuard   access;
     private final BrainSearchService search;
-    private final IssueRepository     issueRepository;
-    private final ProjectRepository   projectRepository;
+    private final IssueRepository    issueRepository;
     private final LlmClient          llm;
     private final ObjectMapper       objectMapper;
 
@@ -54,30 +52,55 @@ public class DecisionService {
     private static final int DUE_SOON_DAYS = 7;
     private static final int RAG_TOPK = 6;
 
-    @Transactional
-    public DecisionBrief decide(String slug, Long projectId, Long userId, boolean deep) {
-        Workspace ws = access.resolveAndAuthorize(slug, userId);
-        Project project = projectRepository.findByIdAndWorkspaceId(projectId, ws.getId())
-            .orElseThrow(() -> new ResourceNotFoundException("Project", "id", projectId));
+    /**
+     * Résultat d'un tour d'analyse : soit un brief, soit une <b>question de clarification</b>
+     * quand le modèle estime qu'il lui manque un élément décisif (mode approfondi uniquement).
+     * Exactement l'un des deux est renseigné.
+     */
+    public record Analysis(DecisionBrief brief, String question) {
+        public boolean needsInput() {
+            return question != null && !question.isBlank();
+        }
+    }
 
-        Snapshot snap = snapshot(projectId);
-        List<KnowledgeNode> hits = search.retrieveRelevant(ws.getId(),
-            project.getName() + " vision objectifs roadmap risques priorités", RAG_TOPK);
+    /** Contexte Brain OS pertinent pour le projet (RAG). */
+    @Transactional(readOnly = true)
+    public List<KnowledgeNode> retrieveContext(Long workspaceId, String projectName) {
+        return search.retrieveRelevant(workspaceId,
+            projectName + " vision objectifs roadmap risques priorités", RAG_TOPK);
+    }
 
+    /**
+     * Un tour d'analyse. Si {@code allowQuestion} et que le modèle demande une clarification,
+     * retourne une {@link Analysis} porteuse de la question au lieu d'un brief.
+     *
+     * <p>Volontairement <b>hors transaction</b> : l'appel au LLM dure de quelques secondes à
+     * plusieurs minutes, et garder une connexion à la base ouverte pendant ce temps épuiserait
+     * le pool dès que deux analyses tournent ensemble.
+     *
+     * @param clarification réponse humaine à réinjecter dans le prompt (null au premier tour)
+     */
+    public Analysis analyze(Project project, Snapshot snap, List<KnowledgeNode> hits,
+                            boolean deep, String clarification, boolean allowQuestion) {
         if (!llm.isConfigured()) {
-            return fallbackBrief(project, snap);
+            return new Analysis(fallbackBrief(project, snap), null);
         }
         try {
             // Défaut = tier "fast" (8B) ; "deep" (14B + thinking) = bouton « Approfondir ».
-            JsonNode json = callLlm(project, snap, hits, deep ? "deep" : "fast");
+            JsonNode json = callLlm(project, snap, hits, deep ? "deep" : "fast", clarification, allowQuestion);
+
+            if (allowQuestion) {
+                String question = json.path("question").asText("").trim();
+                if (!question.isEmpty()) return new Analysis(null, question);
+            }
             String situation = json.path("situation").asText("").trim();
             List<String> risks = readStrings(json.path("risks"));
             List<Priority> priorities = readPriorities(json.path("priorities"));
             if (situation.isEmpty() && priorities.isEmpty()) throw new IllegalStateException("réponse LLM vide");
-            return new DecisionBrief(situation, risks, priorities, snap, "generated");
+            return new Analysis(new DecisionBrief(situation, risks, priorities, snap, "generated"), null);
         } catch (Exception ex) {
-            log.warn("Décision IA indisponible (projet={}): {}", projectId, ex.getMessage());
-            return fallbackBrief(project, snap);
+            log.warn("Décision IA indisponible (projet={}): {}", project.getId(), ex.getMessage());
+            return new Analysis(fallbackBrief(project, snap), null);
         }
     }
 
@@ -85,7 +108,9 @@ public class DecisionService {
     // Observe — métriques réelles du projet
     // =========================================================================
 
-    private Snapshot snapshot(Long projectId) {
+    /** Transactionnel : la boucle ci-dessous traverse {@code issue.project} (association paresseuse). */
+    @Transactional(readOnly = true)
+    public Snapshot snapshot(Long projectId) {
         long total = issueRepository.countByProjectId(projectId);
         long open = issueRepository.countOpenIssues(projectId);
         long inProgress = issueRepository.findByProjectIdAndStatusCategory(projectId, IssueStatusCategory.STARTED).size();
@@ -105,12 +130,14 @@ public class DecisionService {
     // Reflect — LLM
     // =========================================================================
 
-    private JsonNode callLlm(Project project, Snapshot s, List<KnowledgeNode> hits, String tier) throws Exception {
-        String content = llm.chatCompletion(model, systemPrompt(hits), userPrompt(project, s), true, tier);
+    private JsonNode callLlm(Project project, Snapshot s, List<KnowledgeNode> hits, String tier,
+                             String clarification, boolean allowQuestion) throws Exception {
+        String content = llm.chatCompletion(
+            model, systemPrompt(hits, allowQuestion), userPrompt(project, s, clarification), true, tier);
         return objectMapper.readTree(content);
     }
 
-    private String systemPrompt(List<KnowledgeNode> hits) {
+    private String systemPrompt(List<KnowledgeNode> hits, boolean allowQuestion) {
         StringBuilder sb = new StringBuilder();
         sb.append("Tu es Taskforce AI, le COO du produit. À partir des métriques réelles d'un projet et du ")
           .append("contexte (Brain OS : vision, specs, données ingérées), tu produis une décision actionnable.\n\n")
@@ -119,8 +146,17 @@ public class DecisionService {
           .append("- \"risks\" (array de strings) : risques concrets (retards, charge, dérive de scope…).\n")
           .append("- \"priorities\" (array de 3 objets) : les 3 actions les plus importantes pour demain, ")
           .append("chaque objet = {\"title\": string (action concrète, à l'impératif), \"rationale\": string ")
-          .append("(pourquoi maintenant), \"level\": \"HIGH\"|\"MEDIUM\"|\"LOW\"}.\n\n")
-          .append("Sois concret et priorise l'impact. N'invente pas de données absentes du contexte. Langue : français.");
+          .append("(pourquoi maintenant), \"level\": \"HIGH\"|\"MEDIUM\"|\"LOW\"}.\n\n");
+        if (allowQuestion) {
+            // Une seule question, et seulement si elle change la décision : sinon le workflow
+            // s'arrête pour rien et l'humain paie une interruption sans valeur.
+            sb.append("EXCEPTION — si, et seulement si, un élément de contexte manquant t'empêche de ")
+              .append("trancher entre plusieurs priorités radicalement différentes, réponds à la place ")
+              .append("avec la SEULE clé \"question\" (string) : une question courte, fermée, adressée à ")
+              .append("l'humain qui pilote le projet. Ne pose pas de question dont la réponse est déjà ")
+              .append("dans les métriques ou le contexte. Dans le doute, décide sans poser de question.\n\n");
+        }
+        sb.append("Sois concret et priorise l'impact. N'invente pas de données absentes du contexte. Langue : français.");
         if (!hits.isEmpty()) {
             sb.append("\n\nContexte projet (Brain OS) :\n");
             for (KnowledgeNode n : hits) {
@@ -133,22 +169,29 @@ public class DecisionService {
         return sb.toString();
     }
 
-    private String userPrompt(Project project, Snapshot s) {
-        return "Projet : " + project.getName() + "\n"
-            + "Métriques (aujourd'hui) :\n"
-            + "- issues totales : " + s.total() + "\n"
-            + "- ouvertes : " + s.open() + " (dont en cours : " + s.inProgress() + ")\n"
-            + "- terminées : " + s.completed() + "\n"
-            + "- en retard (assignées) : " + s.overdue() + "\n"
-            + "- à échéance sous " + DUE_SOON_DAYS + " j : " + s.dueSoon() + "\n"
-            + "Donne la situation, les risques, et les 3 priorités de demain.";
+    private String userPrompt(Project project, Snapshot s, String clarification) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Projet : ").append(project.getName()).append("\n")
+          .append("Métriques (aujourd'hui) :\n")
+          .append("- issues totales : ").append(s.total()).append("\n")
+          .append("- ouvertes : ").append(s.open()).append(" (dont en cours : ").append(s.inProgress()).append(")\n")
+          .append("- terminées : ").append(s.completed()).append("\n")
+          .append("- en retard (assignées) : ").append(s.overdue()).append("\n")
+          .append("- à échéance sous ").append(DUE_SOON_DAYS).append(" j : ").append(s.dueSoon()).append("\n");
+        if (clarification != null && !clarification.isBlank()) {
+            sb.append("\nPrécision apportée par l'humain qui pilote le projet : ")
+              .append(clarification.trim())
+              .append("\nTiens-en compte et décide maintenant (ne pose plus de question).\n");
+        }
+        sb.append("Donne la situation, les risques, et les 3 priorités de demain.");
+        return sb.toString();
     }
 
     // =========================================================================
     // Repli déterministe (fondé sur les métriques, jamais inventé)
     // =========================================================================
 
-    private DecisionBrief fallbackBrief(Project project, Snapshot s) {
+    public DecisionBrief fallbackBrief(Project project, Snapshot s) {
         double progress = s.total() > 0 ? (100.0 * s.completed() / s.total()) : 0;
         String situation = String.format(
             "**%s** : %d issues (%d ouvertes, %d en cours, %d terminées — %.0f%% d'avancement).%s",
