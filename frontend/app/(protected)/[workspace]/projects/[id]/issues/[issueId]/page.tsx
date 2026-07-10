@@ -8,7 +8,6 @@ import {
   CircleDot,
   Clock,
   CheckCircle2,
-  Calendar,
   User,
   RefreshCw,
   Paperclip,
@@ -18,7 +17,6 @@ import {
   AlertCircle,
   X,
   Pencil,
-  Check as CheckIcon,
   Pin,
   PinOff,
   Archive,
@@ -44,6 +42,8 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { DeleteConfirmDialog } from "@/components/dialogs/delete-confirm-dialog"
 import { AttachmentsTab, SubtasksTab } from "@/components/sheets/issue-sheet"
+import { IssueDescription } from "@/components/issues/issue-description"
+import { DatePicker } from "@/components/ui/date-picker"
 import { listProjectMembers, type ProjectMember } from "@/lib/api/project-service"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
@@ -198,9 +198,6 @@ export default function IssueDetailPage() {
   const [projectMembers, setProjectMembers] = useState<ProjectMember[]>([])
   const [editingTitle, setEditingTitle]     = useState(false)
   const [titleDraft, setTitleDraft]         = useState("")
-  const [editingDesc, setEditingDesc]       = useState(false)
-  const [descDraft, setDescDraft]           = useState("")
-  const [editingDue, setEditingDue]         = useState(false)
   const [deleteOpen, setDeleteOpen]         = useState(false)
   const titleRef = useRef<HTMLInputElement>(null)
 
@@ -409,39 +406,13 @@ export default function IssueDetailPage() {
             </div>
           </div>
 
-          {/* Description — éditable inline */}
+          {/* Description — rendu markdown interactif (cases à cocher) + petit éditeur */}
           <div>
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Description</p>
-            {editingDesc ? (
-              <div className="flex flex-col gap-2">
-                <textarea
-                  value={descDraft}
-                  onChange={(e) => setDescDraft(e.target.value)}
-                  rows={6}
-                  autoFocus
-                  className="w-full rounded-md border border-primary/50 bg-background px-3 py-2 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary/20 resize-none"
-                  placeholder="Ajouter une description…"
-                />
-                <div className="flex gap-2">
-                  <Button size="sm" className="h-7 text-xs gap-1.5" onClick={async () => { setEditingDesc(false); await patch({ description: descDraft }); toast.success("Description mise à jour") }}>
-                    <CheckIcon className="size-3" /> Enregistrer
-                  </Button>
-                  <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditingDesc(false)}>Annuler</Button>
-                </div>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => { setDescDraft(issue.description ?? ""); setEditingDesc(true) }}
-                className="group relative w-full rounded-xl border border-border bg-card p-4 text-left [box-shadow:var(--shadow-sm)] hover:border-primary/30 transition-colors"
-                title="Cliquer pour éditer"
-              >
-                {issue.description
-                  ? <span className="prose prose-sm prose-invert max-w-none text-sm text-foreground leading-relaxed whitespace-pre-wrap">{issue.description}</span>
-                  : <span className="text-sm italic text-muted-foreground">Aucune description. Cliquer pour en ajouter une.</span>}
-                <Pencil className="size-3.5 absolute top-3 right-3 opacity-0 group-hover:opacity-40 transition-opacity" />
-              </button>
-            )}
+            <IssueDescription
+              value={issue.description ?? ""}
+              onSave={async (next) => { await patch({ description: next }); toast.success("Description mise à jour") }}
+            />
           </div>
 
           {/* Sous-tâches */}
@@ -667,28 +638,11 @@ export default function IssueDetailPage() {
           </SidebarSection>
 
           <SidebarSection label="Due date">
-            {editingDue ? (
-              <input
-                type="date"
-                defaultValue={issue.dueDate ? issue.dueDate.slice(0, 10) : ""}
-                autoFocus
-                onBlur={async (e) => { setEditingDue(false); await patch({ dueDate: e.target.value || null }); toast.success("Échéance mise à jour") }}
-                className="w-full text-sm bg-background border border-border rounded px-2 h-8 outline-none focus:border-primary/50 scheme-dark"
-              />
-            ) : (
-              <button
-                type="button"
-                onClick={() => setEditingDue(true)}
-                className="group flex w-full items-center gap-2 text-left text-sm rounded px-1 -mx-1 py-0.5 hover:bg-muted/50 transition-colors"
-                title="Cliquer pour éditer"
-              >
-                <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span className={cn("flex-1", issue.dueDate ? "text-foreground" : "text-muted-foreground")}>
-                  {issue.dueDate ? formatDate(issue.dueDate) : "No due date"}
-                </span>
-                <Pencil className="size-3 opacity-0 group-hover:opacity-40 shrink-0" />
-              </button>
-            )}
+            <DatePicker
+              value={issue.dueDate ? issue.dueDate.slice(0, 10) : ""}
+              onChange={async (val) => { await patch({ dueDate: val || null }); toast.success(val ? "Échéance mise à jour" : "Échéance retirée") }}
+              placeholder="Aucune échéance"
+            />
           </SidebarSection>
 
           <SidebarSection label="Labels">
