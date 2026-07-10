@@ -17,7 +17,12 @@ public record IssueSpecDraft(
     String executionPrompt,      // prompt prêt à coller dans Claude Code
     List<String> breakdown,      // découpage en sous-tâches
     List<SimilarNode> similar,   // « déjà vu ? » — notes proches du Brain OS (RAG)
-    String mode
+    String mode,
+    // ── Enrichissement de l'issue (appliqué à l'issue si l'humain approuve) ──
+    List<String> labels,         // labels suggérés (parmi ceux du projet)
+    Integer storyPoints,         // estimation d'effort (Fibonacci : 1,2,3,5,8,13)
+    String priority,             // NONE | LOW | MEDIUM | HIGH | URGENT
+    String type                  // type suggéré (parmi ceux du projet : Task/Bug/Feature…)
 ) {
     /** Une note Brain OS proche (contexte réutilisable / anti-duplication). */
     public record SimilarNode(Long nodeId, String title, String domain, Double score) {}
