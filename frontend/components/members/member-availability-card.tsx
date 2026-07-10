@@ -7,6 +7,7 @@ import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { DatePicker } from "@/components/ui/date-picker"
 import {
   Select,
   SelectContent,
@@ -140,11 +141,11 @@ export function MemberAvailabilityCard({ slug, userId, canEdit }: MemberAvailabi
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label htmlFor="leave-start" className="text-xs font-medium text-muted-foreground">Du</label>
-                  <Input id="leave-start" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-9" />
+                  <DatePicker id="leave-start" value={startDate} onChange={setStartDate} placeholder="Début" />
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label htmlFor="leave-end" className="text-xs font-medium text-muted-foreground">Au</label>
-                  <Input id="leave-end" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-9" />
+                  <DatePicker id="leave-end" value={endDate} onChange={setEndDate} placeholder="Fin" />
                 </div>
               </div>
               <Input
