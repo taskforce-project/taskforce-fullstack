@@ -51,7 +51,7 @@ public class SmartAssignService {
     private final ProjectRepository projectRepository;
     private final ProjectMemberRepository projectMemberRepository;
     private final IssueRepository issueRepository;
-    private final GroqService groqService;
+    private final LlmClient llm; // via l'AI Gateway → Qwen local (Groq était bloqué → fallback permanent)
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
 
@@ -503,7 +503,8 @@ public class SmartAssignService {
             ));
         }
 
-        String raw = groqService.chatCompletion(modelName, systemPrompt, userMsg.toString(), true);
+        // Tier "fast" (8B) : le smart-assign doit rester réactif (notamment en preview à la création).
+        String raw = llm.chatCompletion(modelName, systemPrompt, userMsg.toString(), true, "fast");
 
         try {
             JsonNode root   = objectMapper.readTree(raw);
