@@ -199,8 +199,27 @@ export const ANALYTICS_ROUTES = {
   INSIGHTS:   (slug: string) => `/api/workspaces/${slug}/analytics/insights`,
   /** Heatmap charge équipe (US-022) : membre × jour, sur N jours */
   WORKLOAD:   (slug: string) => `/api/workspaces/${slug}/analytics/workload`,
-  /** Décision IA par projet (boucle OODA) : POST → situation + risques + 3 priorités */
-  DECISION:   (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/decision`,
+  /** Génération de graphe par l'IA (langage naturel → spec rendue depuis les vraies séries) */
+  CHART:      (slug: string) => `/api/workspaces/${slug}/analytics/chart`,
+} as const;
+
+/**
+ * Workflows d'analyse IA — async, persistés, temps réel (dock « Workflows IA »).
+ * Backend: /api/workspaces/{slug}/analysis & /api/workspaces/{slug}/priorities/{id}
+ */
+export const ANALYSIS_ROUTES = {
+  /** Lancer (POST {projectId, depth}) & lister les workflows du workspace. */
+  JOBS:   (slug: string) => `/api/workspaces/${slug}/analysis`,
+  JOB:    (slug: string, jobId: number) => `/api/workspaces/${slug}/analysis/${jobId}`,
+  /** Répondre à une question du modèle (HITL) → reprend le workflow. */
+  ANSWER: (slug: string, jobId: number) => `/api/workspaces/${slug}/analysis/${jobId}/answer`,
+  /** Dernier brief persisté d'un projet (situation + risques + priorités actionnables). */
+  BRIEF:  (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/brief`,
+  /** Actions sur une priorité. */
+  PRIORITY:         (slug: string, priorityId: number) => `/api/workspaces/${slug}/priorities/${priorityId}`,
+  PRIORITY_ACCEPT:  (slug: string, priorityId: number) => `/api/workspaces/${slug}/priorities/${priorityId}/accept`,
+  PRIORITY_PIN:     (slug: string, priorityId: number) => `/api/workspaces/${slug}/priorities/${priorityId}/pin`,
+  PRIORITY_DISMISS: (slug: string, priorityId: number) => `/api/workspaces/${slug}/priorities/${priorityId}/dismiss`,
 } as const;
 
 /**
