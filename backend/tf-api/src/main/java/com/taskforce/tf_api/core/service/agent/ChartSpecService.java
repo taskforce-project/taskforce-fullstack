@@ -157,7 +157,7 @@ public class ChartSpecService {
         if (containsAny(p, "burndown", "reste", "sprint", "restant", "idéal", "ideal")) {
             return spec("Burndown du sprint", "burndown", "line", null, List.of("remaining", "ideal"));
         }
-        if (containsAny(p, "membre", "charge", "capacit", "assign", "équipe", "equipe", "surcharge")) {
+        if (containsAny(p, "membre", "charg", "capacit", "assign", "équipe", "equipe")) {
             if (containsAny(p, "jour", "heatmap", "quotidien", "semaine", "période", "periode")) {
                 return spec("Charge de l'équipe", "workload", "heatmap", null, List.of());
             }
