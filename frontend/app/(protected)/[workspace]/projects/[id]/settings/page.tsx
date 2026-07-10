@@ -8,8 +8,7 @@ import {
   AlertTriangle,
   Users,
   GitBranch,
-  MessageSquare,
-  Webhook,
+  Plug,
   Save,
   Archive,
   Loader2,
@@ -41,6 +40,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { BrandLogo } from "@/components/ui/brand-logo"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { useProjectStore } from "@/lib/store/project-store"
@@ -49,14 +49,15 @@ import { useLabelStore } from "@/lib/store/label-store"
 import type { ProjectStatus } from "@/lib/api/project-service"
 
 // ---------------------------------------------------------------------------
-// Static integrations (not yet wired to real API)
+// Sous-navigation de la page réglages (sidebar secondaire)
 // ---------------------------------------------------------------------------
 
-const INTEGRATIONS = [
-  { id: "github",  name: "GitHub",   description: "Sync issues with GitHub pull requests and commits.", icon: GitBranch,    connected: false, detail: null },
-  { id: "slack",   name: "Slack",    description: "Get notifications in Slack when issues are updated.", icon: MessageSquare, connected: false, detail: null },
-  { id: "webhook", name: "Webhooks", description: "Send custom HTTP requests on project events.",       icon: Webhook,       connected: false, detail: null },
-]
+const SECTIONS = [
+  { key: "general",      label: "Général",      icon: Settings },
+  { key: "members",      label: "Membres",      icon: Users },
+  { key: "labels",       label: "Labels",       icon: Tag },
+  { key: "integrations", label: "Intégrations", icon: GitBranch },
+] as const
 
 // ---------------------------------------------------------------------------
 // Section components
@@ -107,6 +108,7 @@ export default function ProjectSettingsPage() {
   const [isSaving,      setIsSaving]      = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState("")
   const [deleteOpen,    setDeleteOpen]    = useState(false)
+  const [section,       setSection]       = useState<string>("general")
 
   // Sync state when activeProject loads
   useEffect(() => {
@@ -194,9 +196,58 @@ export default function ProjectSettingsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-10 max-w-2xl mx-auto w-full">
+    <div className="mx-auto flex w-full max-w-5xl gap-8">
+      {/* ── Sidebar secondaire (desktop) ── */}
+      <aside className="hidden w-52 shrink-0 md:block">
+        <nav className="sticky top-4 flex flex-col gap-0.5">
+          {SECTIONS.map((s) => (
+            <button
+              key={s.key}
+              type="button"
+              onClick={() => setSection(s.key)}
+              className={cn(
+                "flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition-colors",
+                section === s.key ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+              )}
+            >
+              <s.icon className="size-4 shrink-0" /> {s.label}
+            </button>
+          ))}
+          <div className="my-1.5 h-px bg-border" />
+          <button
+            type="button"
+            onClick={() => setSection("danger")}
+            className={cn(
+              "flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition-colors",
+              section === "danger" ? "bg-red-500/10 font-medium text-red-400" : "text-muted-foreground hover:bg-red-500/5 hover:text-red-400",
+            )}
+          >
+            <AlertTriangle className="size-4 shrink-0" /> Zone de danger
+          </button>
+        </nav>
+      </aside>
+
+      {/* ── Contenu ── */}
+      <div className="min-w-0 flex-1 md:max-w-2xl">
+        {/* Sous-nav mobile (pills) */}
+        <div className="mb-5 flex gap-1.5 overflow-x-auto pb-1 md:hidden">
+          {[...SECTIONS, { key: "danger", label: "Danger", icon: AlertTriangle }].map((s) => (
+            <button
+              key={s.key}
+              type="button"
+              onClick={() => setSection(s.key)}
+              className={cn(
+                "flex shrink-0 items-center whitespace-nowrap rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                section === s.key ? "border-foreground/20 bg-foreground/10 text-foreground" : "border-border text-muted-foreground",
+              )}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
 
       {/* ── General ── */}
+      {section === "general" && (
       <section>
         <SectionTitle icon={Settings} title="Général" description="Informations générales du projet" />
         <form onSubmit={handleSaveGeneral} className="flex flex-col gap-4">
@@ -275,10 +326,10 @@ export default function ProjectSettingsPage() {
           </div>
         </form>
       </section>
-
-      <Separator />
+      )}
 
       {/* ── Members ── */}
+      {section === "members" && (
       <section>
         <div className="flex items-start justify-between gap-4">
           <SectionTitle icon={Users} title="Membres" description="Gérer les accès au projet" />
@@ -317,10 +368,10 @@ export default function ProjectSettingsPage() {
           })}
         </div>
       </section>
-
-      <Separator />
+      )}
 
       {/* ── Labels ── */}
+      {section === "labels" && (
       <section>
         <SectionTitle icon={Tag} title="Labels" description="Labels personnalisés pour catégoriser les issues" />
         <div className="flex flex-col gap-2">
@@ -412,47 +463,33 @@ export default function ProjectSettingsPage() {
           </form>
         </div>
       </section>
+      )}
 
-      <Separator />
-
-      {/* ── Integrations ── */}
+      {/* ── Integrations → gérées au niveau workspace ── */}
+      {section === "integrations" && (
       <section>
-        <SectionTitle icon={GitBranch} title="Intégrations" description="Connectez des services externes" />
-        <div className="flex flex-col gap-3">
-          {INTEGRATIONS.map((integration) => (
-            <div key={integration.id} className="flex items-center gap-4 py-3 px-4 rounded-lg border border-border bg-card">
-              <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                <integration.icon className="h-4 w-4 text-muted-foreground" />
+        <SectionTitle icon={GitBranch} title="Intégrations" description="Gérées une fois pour tout le workspace" />
+        <div className="flex flex-col items-start gap-4 rounded-xl border border-border bg-card p-5">
+          <div className="flex items-center gap-2">
+            {["github", "slack", "linear", "notion", "figma"].map((k) => (
+              <div key={k} className="flex size-8 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted p-1.5">
+                <BrandLogo slug={k} name={k} className="size-full" />
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium">{integration.name}</p>
-                  {integration.connected && (
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-emerald-500/30 text-emerald-400 bg-emerald-500/10">
-                      Connecté
-                    </Badge>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                  {integration.connected ? integration.detail : integration.description}
-                </p>
-              </div>
-              <Button
-                variant="secondary"
-                size="sm"
-                className="shrink-0 h-7 text-xs"
-                onClick={() => toast.info("Intégrations disponibles prochainement")}
-              >
-                Connecter
-              </Button>
-            </div>
-          ))}
+            ))}
+            <span className="ml-1 text-xs text-muted-foreground">+40 autres</span>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            GitHub, Slack et tous les connecteurs se branchent au niveau du <span className="font-medium text-foreground">workspace</span>, puis s&apos;appliquent à ce projet — un seul endroit à gérer.
+          </p>
+          <Button className="gap-2" onClick={() => router.push(`/${workspace}/settings`)}>
+            <Plug className="size-4" /> Gérer les intégrations
+          </Button>
         </div>
       </section>
-
-      <Separator />
+      )}
 
       {/* ── Danger Zone ── */}
+      {section === "danger" && (
       <section>
         <div className="rounded-xl border border-red-500/30 bg-red-500/5 overflow-hidden">
           <div className="px-4 py-3 border-b border-red-500/20">
@@ -527,6 +564,8 @@ export default function ProjectSettingsPage() {
           </div>
         </div>
       </section>
+      )}
+      </div>
     </div>
   )
 }

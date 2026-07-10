@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState, useRef } from "react"
-import { useParams } from "next/navigation"
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
   Circle,
   RefreshCw,
@@ -509,8 +509,14 @@ function AddColumnPopover({
 export default function ProjectBoardPage() {
   const { t } = useTranslation()
   const params = useParams()
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const workspace = extractParam(params.workspace)
   const projectId = Number(extractParam(params.id))
+
+  /** Deep-link `?issue=<id>` : on arrive sur le board et l'issue s'ouvre en sheet. */
+  const deepLinkedIssueId = searchParams.get("issue")
 
   const { issues, statuses, error, fetchIssues, fetchStatuses, createStatus, clearIssues, updateIssue, deleteStatus, updateStatus } = useIssueStore()
 
@@ -527,6 +533,22 @@ export default function ProjectBoardPage() {
     // Distance d'activation : un simple clic ouvre l'issue, un glissé > 6px déclenche le drag
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
   )
+
+  // `?issue=<id>` → ouvre la sheet dès que les issues sont chargées. Un lien vers une issue
+  // (décision IA, notification, lien copié) ramène donc sur le board, pas sur une page isolée.
+  //
+  // Le lien est consommé **une seule fois**, et le paramètre retiré aussitôt : sans cela, le
+  // temps réel (`useProjectRealtime`) rafraîchit `issues`, l'effet se rejoue, et rouvre l'issue
+  // du lien par-dessus celle que l'utilisateur venait d'ouvrir.
+  const deepLinkConsumed = useRef(false)
+  useEffect(() => {
+    if (!deepLinkedIssueId || deepLinkConsumed.current) return
+    const target = issues.find((i) => String(i.id) === deepLinkedIssueId)
+    if (!target) return
+    deepLinkConsumed.current = true
+    setSelectedIssue(toSheetIssue(target))
+    router.replace(pathname, { scroll: false })
+  }, [deepLinkedIssueId, issues, router, pathname])
 
   useEffect(() => {
     if (!workspace || !projectId) return
