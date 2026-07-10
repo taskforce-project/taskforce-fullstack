@@ -14,14 +14,22 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskforce.tf_api.core.dto.request.ApproveSpecRequest;
 import com.taskforce.tf_api.core.dto.request.CreateChecklistItemRequest;
 import com.taskforce.tf_api.core.dto.request.CreateKnowledgeNodeRequest;
+import com.taskforce.tf_api.core.dto.request.UpdateIssueRequest;
 import com.taskforce.tf_api.core.dto.response.IssueSpecDraft;
 import com.taskforce.tf_api.core.dto.response.IssueSpecDraft.SimilarNode;
 import com.taskforce.tf_api.core.dto.response.KnowledgeNodeResponse;
+import com.taskforce.tf_api.core.dto.response.SmartAssignResponse;
+import com.taskforce.tf_api.core.enums.IssuePriority;
 import com.taskforce.tf_api.core.model.Issue;
+import com.taskforce.tf_api.core.model.IssueType;
 import com.taskforce.tf_api.core.model.KnowledgeNode;
+import com.taskforce.tf_api.core.model.ProjectLabel;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.IssueRepository;
+import com.taskforce.tf_api.core.repository.IssueTypeRepository;
+import com.taskforce.tf_api.core.repository.ProjectLabelRepository;
 import com.taskforce.tf_api.core.service.IssueService;
+import com.taskforce.tf_api.core.service.SmartAssignService;
 import com.taskforce.tf_api.core.service.KnowledgeService;
 import com.taskforce.tf_api.core.service.LlmClient;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
@@ -51,7 +59,10 @@ public class IssueAiService {
     private final BrainSearchService search;
     private final KnowledgeService   knowledgeService;
     private final IssueService        issueService;
+    private final SmartAssignService  smartAssignService;
     private final IssueRepository     issueRepository;
+    private final ProjectLabelRepository projectLabelRepository;
+    private final IssueTypeRepository issueTypeRepository;
     private final LlmClient          llm;
     private final ObjectMapper       objectMapper;
 
@@ -77,17 +88,29 @@ public class IssueAiService {
                 s.node().getDomain() != null ? s.node().getDomain().name() : null, s.score()))
             .toList();
 
+        List<String> projectLabels = projectLabelRepository.findByProjectIdOrderByNameAsc(projectId)
+            .stream().map(ProjectLabel::getName).toList();
+        List<String> projectTypes = issueTypeRepository.findByProjectIdOrderByName(projectId)
+            .stream().map(IssueType::getName).toList();
+
         if (!llm.isConfigured()) {
             return fallbackDraft(issue, similar);
         }
         try {
             // Défaut = tier "fast" (8B, rapide) ; "deep" (14B + thinking) = bouton « Approfondir ».
-            JsonNode json = callLlm(issue, hits, deep ? "deep" : "fast");
+            JsonNode json = callLlm(issue, hits, projectLabels, projectTypes, deep ? "deep" : "fast");
             String spec = json.path("spec").asText("").trim();
             String prompt = json.path("executionPrompt").asText("").trim();
             List<String> breakdown = readStringArray(json.path("breakdown"));
             if (spec.isEmpty() && prompt.isEmpty()) throw new IllegalStateException("réponse LLM vide");
-            return new IssueSpecDraft(spec, prompt, breakdown, similar, "generated");
+            // Enrichissement de l'issue (labels + type restreints à ceux du projet).
+            List<String> labels = readStringArray(json.path("labels")).stream()
+                .filter(l -> projectLabels.stream().anyMatch(pl -> pl.equalsIgnoreCase(l)))
+                .toList();
+            Integer storyPoints = json.path("storyPoints").isNumber() ? json.path("storyPoints").asInt() : null;
+            String priority = normalizePriority(json.path("priority").asText(null));
+            String type = matchName(json.path("type").asText(null), projectTypes);
+            return new IssueSpecDraft(spec, prompt, breakdown, similar, "generated", labels, storyPoints, priority, type);
         } catch (Exception ex) {
             log.warn("Génération spec IA indisponible (issue={}): {}", issueId, ex.getMessage());
             return fallbackDraft(issue, similar);
@@ -126,6 +149,16 @@ public class IssueAiService {
 
         KnowledgeNodeResponse saved = knowledgeService.createNode(slug, userId, node);
 
+        // ── Persistance SUR l'issue (l'IA a écrit le ticket, l'humain valide) ──
+        if (req.applyToIssue()) {
+            applyToIssue(slug, projectId, issueId, userId, req);
+        }
+
+        // Assignation intelligente (smart-assign → Qwen) sur l'issue enrichie.
+        if (req.autoAssign()) {
+            autoAssign(slug, projectId, issueId, userId);
+        }
+
         // Suivi d'avancement : le découpage IA devient la checklist de l'issue.
         if (req.addChecklist() && req.breakdown() != null) {
             for (String step : req.breakdown()) {
@@ -138,16 +171,71 @@ public class IssueAiService {
         return saved;
     }
 
+    /** Écrit la spec (description), le type, les labels, l'effort et la priorité directement sur l'issue. */
+    private void applyToIssue(String slug, Long projectId, Long issueId, Long userId, ApproveSpecRequest req) {
+        UpdateIssueRequest upd = new UpdateIssueRequest();
+        if (req.spec() != null && !req.spec().isBlank()) upd.setDescription(req.spec().trim());
+        if (req.storyPoints() != null) upd.setStoryPoints(req.storyPoints());
+        if (req.priority() != null && !req.priority().isBlank()) {
+            try { upd.setPriority(IssuePriority.valueOf(req.priority().trim().toUpperCase(java.util.Locale.ROOT))); }
+            catch (IllegalArgumentException ignored) { /* priorité invalide → on ignore */ }
+        }
+        Long typeId = resolveTypeId(projectId, req.type());
+        if (typeId != null) upd.setTypeId(typeId);
+        List<Long> labelIds = resolveLabelIds(projectId, req.labels());
+        if (!labelIds.isEmpty()) upd.setLabelIds(labelIds);
+        issueService.updateIssue(slug, projectId, issueId, upd, userId);
+    }
+
+    /** Assigne l'issue via le smart-assign (Qwen) — best-effort, ne bloque pas l'approbation. */
+    private void autoAssign(String slug, Long projectId, Long issueId, Long userId) {
+        try {
+            SmartAssignResponse rec = smartAssignService.recommend(slug, projectId, issueId, userId);
+            if (rec != null && rec.getRecommended() != null && rec.getRecommended().getUserId() != null) {
+                UpdateIssueRequest upd = new UpdateIssueRequest();
+                upd.setAssigneeId(rec.getRecommended().getUserId());
+                issueService.updateIssue(slug, projectId, issueId, upd, userId);
+            }
+        } catch (Exception ex) {
+            log.warn("Auto-assign IA échoué (issue={}): {}", issueId, ex.getMessage());
+        }
+    }
+
+    /** Résout un nom de type vers l'ID d'un type EXISTANT du projet (insensible à la casse) ; null sinon. */
+    private Long resolveTypeId(Long projectId, String name) {
+        if (name == null || name.isBlank()) return null;
+        return issueTypeRepository.findByProjectIdOrderByName(projectId).stream()
+            .filter(t -> t.getName().equalsIgnoreCase(name.trim()))
+            .map(IssueType::getId)
+            .findFirst().orElse(null);
+    }
+
+    /** Résout des noms de labels vers les IDs des labels EXISTANTS du projet (insensible à la casse). */
+    private List<Long> resolveLabelIds(Long projectId, List<String> names) {
+        if (names == null || names.isEmpty()) return List.of();
+        List<ProjectLabel> projectLabels = projectLabelRepository.findByProjectIdOrderByNameAsc(projectId);
+        List<Long> ids = new ArrayList<>();
+        for (String name : names) {
+            if (name == null) continue;
+            projectLabels.stream()
+                .filter(pl -> pl.getName().equalsIgnoreCase(name.trim()))
+                .findFirst()
+                .ifPresent(pl -> { if (!ids.contains(pl.getId())) ids.add(pl.getId()); });
+        }
+        return ids;
+    }
+
     // =========================================================================
     // Helpers — LLM
     // =========================================================================
 
-    private JsonNode callLlm(Issue issue, List<KnowledgeNode> hits, String tier) throws Exception {
-        String content = llm.chatCompletion(model, systemPrompt(hits), userPrompt(issue), true, tier);
+    private JsonNode callLlm(Issue issue, List<KnowledgeNode> hits, List<String> projectLabels,
+                             List<String> projectTypes, String tier) throws Exception {
+        String content = llm.chatCompletion(model, systemPrompt(hits, projectLabels, projectTypes), userPrompt(issue), true, tier);
         return objectMapper.readTree(content);
     }
 
-    private String systemPrompt(List<KnowledgeNode> hits) {
+    private String systemPrompt(List<KnowledgeNode> hits, List<String> projectLabels, List<String> projectTypes) {
         StringBuilder sb = new StringBuilder();
         sb.append("Tu es Taskforce AI, un architecte logiciel senior. À partir d'une issue, tu produis ")
           .append("une spécification actionnable et un prompt d'exécution prêt à coller dans Claude Code.\n\n")
@@ -157,9 +245,15 @@ public class IssueAiService {
           .append("- \"executionPrompt\" (string) : un prompt autonome et précis pour un agent de code ")
           .append("(Claude Code) : quoi implémenter, fichiers/couches concernés, contraintes du repo, ")
           .append("definition of done, tests attendus. Rédige-le à l'impératif, sans blabla.\n")
-          .append("- \"breakdown\" (array de strings) : le découpage en sous-tâches ordonnées.\n\n")
+          .append("- \"breakdown\" (array de strings) : le découpage en sous-tâches ordonnées.\n")
+          .append("- \"storyPoints\" (number) : estimation d'effort en Fibonacci (1,2,3,5,8,13).\n")
+          .append("- \"priority\" (string) : une de NONE, LOW, MEDIUM, HIGH, URGENT.\n")
+          .append("- \"type\" (string) : le type EXACTEMENT parmi cette liste (sinon null) : ")
+          .append(projectTypes.isEmpty() ? "(aucun type défini)" : String.join(", ", projectTypes)).append(".\n")
+          .append("- \"labels\" (array de strings) : 0 à 3 labels EXACTEMENT parmi cette liste (sinon []) : ")
+          .append(projectLabels.isEmpty() ? "(aucun label défini)" : String.join(", ", projectLabels)).append(".\n\n")
           .append("Fonde-toi sur le contexte réel du projet (Brain OS) ci-dessous ; n'invente pas de ")
-          .append("conventions. Réponds dans la langue de l'issue.");
+          .append("conventions, labels ou types hors liste. Réponds dans la langue de l'issue.");
         if (!hits.isEmpty()) {
             sb.append("\n\nContexte projet (Brain OS) :\n");
             for (KnowledgeNode n : hits) {
@@ -209,7 +303,7 @@ public class IssueAiService {
             "Ajouter les tests",
             "Vérifier build + lint");
 
-        return new IssueSpecDraft(spec, prompt, breakdown, similar, "fallback");
+        return new IssueSpecDraft(spec, prompt, breakdown, similar, "fallback", List.of(), null, null, null);
     }
 
     // =========================================================================
@@ -263,5 +357,21 @@ public class IssueAiService {
 
     private String truncate(String s, int max) {
         return s != null && s.length() > max ? s.substring(0, max) : s;
+    }
+
+    /** Retourne le nom canonique de {@code raw} s'il figure (insensible à la casse) dans {@code allowed} ; null sinon. */
+    private String matchName(String raw, List<String> allowed) {
+        if (raw == null || raw.isBlank()) return null;
+        return allowed.stream().filter(a -> a.equalsIgnoreCase(raw.trim())).findFirst().orElse(null);
+    }
+
+    /** Valide une priorité renvoyée par le LLM ; null si absente/invalide. */
+    private String normalizePriority(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        try {
+            return IssuePriority.valueOf(raw.trim().toUpperCase(java.util.Locale.ROOT)).name();
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
     }
 }
