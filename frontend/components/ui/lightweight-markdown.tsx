@@ -17,6 +17,39 @@ export interface MarkdownProps {
   className?: string
   onWikiLink?: (title: string) => void
   onTag?: (tag: string) => void
+  /**
+   * Rend les cases à cocher `- [ ]` / `- [x]` **interactives**. Reçoit l'index de la
+   * tâche (ordre d'apparition dans le document, 0-based) et son nouvel état.
+   * Utiliser {@link toggleTaskInMarkdown} pour reconstruire le markdown côté appelant.
+   */
+  onToggleTask?: (taskIndex: number, checked: boolean) => void
+}
+
+// Détection d'un item de checklist markdown : `- [ ] …`, `* [x] …`, `+ [X] …`.
+const TASK_RE = /^(\s*[-*+]\s+)\[([ xX])\]\s+(.*)$/
+
+/**
+ * Bascule la Nième case à cocher (0-based, ordre du document) d'une chaîne markdown,
+ * en ignorant les blocs de code délimités par ```. Renvoie le markdown mis à jour.
+ * Miroir exact de l'ordre de comptage du parseur → l'index reste cohérent avec le rendu.
+ */
+export function toggleTaskInMarkdown(md: string, taskIndex: number): string {
+  const lines = md.replace(/\r\n/g, "\n").split("\n")
+  let counter = 0
+  let inFence = false
+  for (let i = 0; i < lines.length; i++) {
+    if (/^```/.test(lines[i].trim())) { inFence = !inFence; continue }
+    if (inFence) continue
+    const m = TASK_RE.exec(lines[i])
+    if (!m) continue
+    if (counter === taskIndex) {
+      const checked = m[2] !== " "
+      lines[i] = `${m[1]}[${checked ? " " : "x"}] ${m[3]}`
+      break
+    }
+    counter++
+  }
+  return lines.join("\n")
 }
 
 // code | image | [[wiki]] | ==hl== | **b** | *i* | _i_ | [txt](url) | #tag
@@ -135,11 +168,14 @@ function CodeBlock({ code, lang }: { code: string; lang?: string }) {
 
 // ─── Parsing en blocs ─────────────────────────────────────────────────────────
 
+type TaskItem = { checked: boolean; text: string; index: number }
+
 type Block =
   | { type: "code"; lang?: string; code: string }
   | { type: "callout"; kind: string; title: string; lines: string[] }
   | { type: "quote"; lines: string[] }
   | { type: "h"; level: number; text: string }
+  | { type: "tasks"; items: TaskItem[] }
   | { type: "ul"; items: string[] }
   | { type: "ol"; items: string[] }
   | { type: "p"; lines: string[] }
@@ -148,6 +184,7 @@ function parseBlocks(content: string): Block[] {
   const lines = content.replace(/\r\n/g, "\n").split("\n")
   const blocks: Block[] = []
   let para: string[] = []
+  let taskCounter = 0 // index global des cases à cocher (ordre du document)
   const flushPara = () => { if (para.length) { blocks.push({ type: "p", lines: para }); para = [] } }
 
   for (let idx = 0; idx < lines.length; idx++) {
@@ -178,9 +215,16 @@ function parseBlocks(content: string): Block[] {
     }
     const line = raw.trimEnd()
     const heading = /^(#{1,4})\s+(.*)$/.exec(line)
+    const task = TASK_RE.exec(line)
     const bullet = /^\s*[-*+]\s+(.*)$/.exec(line)
     const ordered = /^\s*\d+[.)]\s+(.*)$/.exec(line)
     if (heading) { flushPara(); blocks.push({ type: "h", level: heading[1].length, text: heading[2] }) }
+    else if (task) {
+      flushPara()
+      const item: TaskItem = { checked: task[2] !== " ", text: task[3], index: taskCounter++ }
+      const prev = blocks[blocks.length - 1]
+      if (prev && prev.type === "tasks") prev.items.push(item); else blocks.push({ type: "tasks", items: [item] })
+    }
     else if (bullet) {
       flushPara()
       const prev = blocks[blocks.length - 1]
@@ -229,6 +273,31 @@ export function Markdown(props: MarkdownProps) {
           )
         }
         if (b.type === "h") return <p key={i} className={H_CLS[Math.min(b.level, 4) - 1]}>{inl(b.text, `h${i}`)}</p>
+        if (b.type === "tasks") {
+          const boxCls = (checked: boolean) =>
+            `mt-0.5 flex size-4 shrink-0 items-center justify-center rounded border transition-colors ${checked ? "border-emerald-500 bg-emerald-500 text-white" : "border-muted-foreground/40"}`
+          return (
+            <ul key={i} className="space-y-1">
+              {b.items.map((it) => (
+                <li key={it.index} className="flex items-start gap-2">
+                  {props.onToggleTask ? (
+                    <button
+                      type="button"
+                      onClick={() => props.onToggleTask!(it.index, !it.checked)}
+                      aria-label={it.checked ? "Décocher" : "Cocher"}
+                      className={`${boxCls(it.checked)} cursor-pointer hover:brightness-110`}
+                    >
+                      {it.checked && <Check className="size-3" />}
+                    </button>
+                  ) : (
+                    <span className={boxCls(it.checked)}>{it.checked && <Check className="size-3" />}</span>
+                  )}
+                  <span className={it.checked ? "text-muted-foreground line-through" : ""}>{inl(it.text, `tk${i}-${it.index}`)}</span>
+                </li>
+              ))}
+            </ul>
+          )
+        }
         if (b.type === "ul") return <ul key={i} className="list-disc space-y-0.5 pl-5">{b.items.map((it, j) => <li key={j}>{inl(it, `ul${i}-${j}`)}</li>)}</ul>
         if (b.type === "ol") return <ol key={i} className="list-decimal space-y-0.5 pl-5">{b.items.map((it, j) => <li key={j}>{inl(it, `ol${i}-${j}`)}</li>)}</ol>
         return (
