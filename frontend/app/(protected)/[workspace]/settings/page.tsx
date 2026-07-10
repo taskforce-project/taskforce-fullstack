@@ -28,6 +28,7 @@ import { getAuditLogs, type AuditLogEntry } from "@/lib/api/workspace-service"
 import { useIntegrationStore } from "@/lib/store/integration-store"
 import { getGitHubRepos, getGitHubRepoIssues, mirrorSlackChannel, syncSlackChannel, type GitHubRepo, type GitHubRepoIssue } from "@/lib/api/integration-service"
 import { IntegrationsCatalog } from "@/components/integrations/integrations-catalog"
+import { BrandLogo } from "@/components/ui/brand-logo"
 import { exportMyData, deleteMyAccount } from "@/lib/api/gdpr-service"
 import { apiClient } from "@/lib/api/client"
 import { USER_ROUTES } from "@/lib/config/api-routes"
@@ -1122,8 +1123,8 @@ function IntegrationsPanel() {
       {/* ---- GitHub ---- */}
       <SectionCard title="GitHub" description="Link issues to pull requests and commits.">
         <div className="flex items-center gap-4">
-          <div className="h-10 w-10 rounded-lg border border-border bg-muted flex items-center justify-center text-xs font-bold text-foreground shrink-0">
-            GH
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted p-2">
+            <BrandLogo slug="github" name="GitHub" className="size-full" />
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-foreground">GitHub</p>
@@ -1154,8 +1155,8 @@ function IntegrationsPanel() {
       <SectionCard title="Slack" description="Connectez votre espace Slack pour recevoir les notifications d'activité.">
         <div className="flex flex-col gap-4">
           <div className="flex items-center gap-4">
-            <div className="h-10 w-10 rounded-lg border border-border bg-muted flex items-center justify-center text-xs font-bold text-foreground shrink-0">
-              SL
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted p-2">
+              <BrandLogo slug="slack" name="Slack" className="size-full" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-foreground">Slack</p>
