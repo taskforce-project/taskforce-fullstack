@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from "react"
 import {
-  Bold, Italic, Heading1, Heading2, List, ListOrdered, Code, Link2, Braces, Eye, Pencil, X,
+  Bold, Italic, Heading1, Heading2, List, ListOrdered, ListChecks, Code, Link2, Braces, Eye, Pencil, X,
   Highlighter, Image as ImageIcon, Quote, Paperclip, Loader2,
 } from "lucide-react"
 import { Markdown } from "@/components/ui/lightweight-markdown"
@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input"
 export interface UploadedFile { url: string; filename: string; image: boolean }
 
 type ToolAction =
-  | "bold" | "italic" | "h1" | "h2" | "highlight" | "ul" | "ol"
+  | "bold" | "italic" | "h1" | "h2" | "highlight" | "ul" | "ol" | "task"
   | "callout" | "code" | "codeblock" | "link" | "image" | "wiki"
 
 // Config statique (hors composant) : aucune closure sur un ref pendant le rendu.
@@ -23,6 +23,7 @@ const TOOLBAR: { icon: typeof Bold; label: string; action: ToolAction }[] = [
   { icon: Highlighter, label: "Surligner", action: "highlight" },
   { icon: List, label: "Liste", action: "ul" },
   { icon: ListOrdered, label: "Liste numérotée", action: "ol" },
+  { icon: ListChecks, label: "Case à cocher", action: "task" },
   { icon: Quote, label: "Callout (tip/warning/danger…)", action: "callout" },
   { icon: Code, label: "Code", action: "code" },
   { icon: Braces, label: "Bloc de code", action: "codeblock" },
@@ -39,13 +40,17 @@ const TOOLBAR: { icon: typeof Bold; label: string; action: ToolAction }[] = [
 export interface MarkdownEditorProps {
   value: string
   onChange: (value: string) => void
-  tags: string[]
-  onTagsChange: (tags: string[]) => void
+  /** Tags Brain OS — optionnels : la barre de tags n'est rendue que si `onTagsChange` est fourni. */
+  tags?: string[]
+  onTagsChange?: (tags: string[]) => void
   /** Upload d'une pièce jointe (image/doc) → MinIO. Active les boutons image/joindre. */
   onUploadFile?: (file: File) => Promise<UploadedFile | null>
+  /** Hauteur de la zone d'édition (nb de lignes). Défaut 20 (notes Brain OS). */
+  rows?: number
+  placeholder?: string
 }
 
-export function MarkdownEditor({ value, onChange, tags, onTagsChange, onUploadFile }: MarkdownEditorProps) {
+export function MarkdownEditor({ value, onChange, tags = [], onTagsChange, onUploadFile, rows = 20, placeholder }: MarkdownEditorProps) {
   const taRef = useRef<HTMLTextAreaElement>(null)
   const imgInputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -113,6 +118,7 @@ export function MarkdownEditor({ value, onChange, tags, onTagsChange, onUploadFi
       case "highlight": return surround("==")
       case "ul": return prefixLines("- ")
       case "ol": return prefixLines("1. ")
+      case "task": return prefixLines("- [ ] ")
       case "callout": return insertBlock("> [!tip] Titre\n> Votre message ici.\n")
       case "code": return surround("`")
       case "codeblock": return surround("```\n", "\n```")
@@ -124,7 +130,7 @@ export function MarkdownEditor({ value, onChange, tags, onTagsChange, onUploadFi
 
   const addTag = (raw: string) => {
     const t = raw.trim().replace(/^#/, "").toLowerCase().replace(/\s+/g, "-")
-    if (t && !tags.includes(t)) onTagsChange([...tags, t])
+    if (t && !tags.includes(t)) onTagsChange?.([...tags, t])
     setTagInput("")
   }
 
@@ -167,9 +173,9 @@ export function MarkdownEditor({ value, onChange, tags, onTagsChange, onUploadFi
           ref={taRef}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          rows={20}
+          rows={rows}
           spellCheck={false}
-          placeholder="# Titre&#10;&#10;Contenu markdown… Utilise [[Autre note]] pour lier et #tag pour classer."
+          placeholder={placeholder ?? "# Titre&#10;&#10;Contenu markdown… Utilise [[Autre note]] pour lier et #tag pour classer."}
           className="w-full resize-y rounded-md border bg-background p-3 font-mono text-sm leading-relaxed outline-none focus:border-foreground/20"
         />
       ) : (
@@ -178,13 +184,14 @@ export function MarkdownEditor({ value, onChange, tags, onTagsChange, onUploadFi
         </div>
       )}
 
-      {/* Tags */}
+      {/* Tags — masqués si l'appelant ne gère pas les tags (ex. description d'issue) */}
+      {onTagsChange && (
       <div className="flex flex-wrap items-center gap-1.5 rounded-md border bg-muted/20 px-2 py-1.5">
         <span className="text-xs text-muted-foreground">Tags</span>
         {tags.map((t) => (
           <span key={t} className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
             #{t}
-            <button type="button" onClick={() => onTagsChange(tags.filter((x) => x !== t))} className="hover:text-destructive">
+            <button type="button" onClick={() => onTagsChange?.(tags.filter((x) => x !== t))} className="hover:text-destructive">
               <X className="size-3" />
             </button>
           </span>
@@ -200,6 +207,7 @@ export function MarkdownEditor({ value, onChange, tags, onTagsChange, onUploadFi
           className="h-6 w-24 flex-1 border-0 bg-transparent px-1 text-xs shadow-none focus-visible:ring-0"
         />
       </div>
+      )}
     </div>
   )
 }
