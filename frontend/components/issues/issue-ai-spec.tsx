@@ -19,6 +19,8 @@ interface IssueAiSpecPanelProps {
   workspaceSlug: string
   projectId: number
   issueId: number
+  /** Appelé après une approbation qui a modifié l'issue (pour rafraîchir la vue). */
+  onApplied?: () => void
 }
 
 /**
@@ -27,7 +29,7 @@ interface IssueAiSpecPanelProps {
  * avec les notes proches du Brain OS (« déjà vu ? »). L'humain édite, copie le prompt, puis
  * approuve → la spec est écrite dans le Brain OS (write-back), liée à l'issue.
  */
-export function IssueAiSpecPanel({ workspaceSlug, projectId, issueId }: Readonly<IssueAiSpecPanelProps>) {
+export function IssueAiSpecPanel({ workspaceSlug, projectId, issueId, onApplied }: Readonly<IssueAiSpecPanelProps>) {
   const [draft, setDraft] = useState<IssueSpecDraft | null>(null)
   const [generating, setGenerating] = useState(false)
   const [approving, setApproving] = useState(false)
@@ -39,6 +41,8 @@ export function IssueAiSpecPanel({ workspaceSlug, projectId, issueId }: Readonly
   const [prompt, setPrompt] = useState("")
   const [breakdown, setBreakdown] = useState("")
   const [addChecklist, setAddChecklist] = useState(true)
+  const [applyToIssue, setApplyToIssue] = useState(true)
+  const [autoAssign, setAutoAssign] = useState(false)
 
   const applyDraft = (d: IssueSpecDraft) => {
     setDraft(d)
@@ -75,20 +79,27 @@ export function IssueAiSpecPanel({ workspaceSlug, projectId, issueId }: Readonly
     setApproving(true)
     try {
       const steps = breakdown.split("\n").map((s) => s.trim()).filter(Boolean)
-      const node = await approveIssueSpec(workspaceSlug, projectId, issueId, {
+      await approveIssueSpec(workspaceSlug, projectId, issueId, {
         spec,
         executionPrompt: prompt,
         breakdown: steps,
         addChecklist: addChecklist && steps.length > 0,
+        applyToIssue,
+        labels: draft?.labels ?? [],
+        storyPoints: draft?.storyPoints ?? null,
+        priority: draft?.priority ?? null,
+        type: draft?.type ?? null,
+        autoAssign,
       })
       setSaved(true)
       toast.success(
-        addChecklist && steps.length > 0
-          ? `Spec enregistrée + ${steps.length} tâche(s) en checklist`
-          : `Spec enregistrée dans le Brain OS — ${node.title}`
+        applyToIssue
+          ? "Issue remplie (description, type, labels, effort" + (autoAssign ? ", assigné" : "") + ")"
+          : "Spec enregistrée dans le Brain OS"
       )
+      if (applyToIssue || autoAssign) onApplied?.() // rafraîchir la vue de l'issue
     } catch {
-      toast.error("Échec de l'enregistrement dans le Brain OS")
+      toast.error("Échec de l'enregistrement")
     } finally {
       setApproving(false)
     }
@@ -224,6 +235,37 @@ export function IssueAiSpecPanel({ workspaceSlug, projectId, issueId }: Readonly
         />
       </label>
 
+      {/* Ce que l'IA va écrire sur l'issue */}
+      {draft && (draft.labels.length > 0 || draft.storyPoints != null || draft.priority || draft.type) && (
+        <div className="rounded-md border border-border bg-muted/30 p-3">
+          <div className="mb-2 text-xs font-medium text-muted-foreground">Sera appliqué à l&apos;issue</div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {draft.type && <Badge variant="outline" className="text-[10px]">Type : {draft.type}</Badge>}
+            {draft.priority && <Badge variant="outline" className="text-[10px]">Priorité : {draft.priority}</Badge>}
+            {draft.storyPoints != null && <Badge variant="outline" className="text-[10px]">Effort : {draft.storyPoints} pts</Badge>}
+            {draft.labels.map((l) => <Badge key={l} variant="secondary" className="text-[10px]">{l}</Badge>)}
+          </div>
+        </div>
+      )}
+
+      {/* Option : remplir l'issue elle-même */}
+      <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+        <Checkbox
+          checked={applyToIssue}
+          onCheckedChange={(v) => setApplyToIssue(v === true)}
+        />
+        Remplir l&apos;issue (description = la spec, + type / labels / effort / priorité)
+      </label>
+
+      {/* Option : assignation intelligente via le smart-assign (Qwen) */}
+      <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+        <Checkbox
+          checked={autoAssign}
+          onCheckedChange={(v) => setAutoAssign(v === true)}
+        />
+        Assigner automatiquement (smart-assign IA)
+      </label>
+
       {/* Option suivi : découpage → checklist de l'issue */}
       <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
         <Checkbox
@@ -233,12 +275,12 @@ export function IssueAiSpecPanel({ workspaceSlug, projectId, issueId }: Readonly
         Ajouter le découpage en checklist de l'issue (suivi d'avancement)
       </label>
 
-      {/* Approbation → write-back Brain OS */}
+      {/* Approbation → issue remplie + write-back Brain OS */}
       <div className="flex items-center justify-end gap-2 border-t border-border pt-3">
         {saved && (
           <span className="mr-auto flex items-center gap-1.5 text-xs text-green-600 dark:text-green-500">
             <Check className="size-3.5" />
-            Enregistrée dans le Brain OS
+            {applyToIssue ? "Issue mise à jour" : "Enregistrée dans le Brain OS"}
           </span>
         )}
         <Button
@@ -248,7 +290,7 @@ export function IssueAiSpecPanel({ workspaceSlug, projectId, issueId }: Readonly
           disabled={approving || !spec.trim()}
         >
           {approving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
-          {saved ? "Ré-enregistrer" : "Enregistrer dans le Brain OS"}
+          {applyToIssue ? "Accepter & remplir l'issue" : "Enregistrer dans le Brain OS"}
         </Button>
       </div>
     </div>
