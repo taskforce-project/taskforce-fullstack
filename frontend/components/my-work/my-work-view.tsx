@@ -207,7 +207,8 @@ function mapMyIssue(i: ApiIssue, baseUrl: string): Issue {
     project:    i.projectName,
     projectId:  String(i.projectId),
     dueDate:    i.dueDate ? new Date(i.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null,
-    url:        `${baseUrl}/projects/${i.projectId}/issues/${i.id}`,
+    // Board + sheet ouverte (`?issue=`), plutôt que la page détail isolée.
+    url:        `${baseUrl}/projects/${i.projectId}?issue=${i.id}`,
   }
 }
 
