@@ -11,6 +11,8 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import org.springframework.test.util.ReflectionTestUtils;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskforce.tf_api.core.dto.response.ChartSpecResponse;
 import com.taskforce.tf_api.core.service.LlmClient;
@@ -44,6 +46,9 @@ class ChartSpecServiceTest {
     void setUp() {
         // resolveAndAuthorize est appelé pour l'autorisation ; sa valeur de retour est ignorée ici.
         lenient().when(access.resolveAndAuthorize(anyString(), any())).thenReturn(null);
+        // Le champ @Value n'est pas injecté hors Spring ; sans modèle non-null, le vrai chemin LLM
+        // ne serait jamais exercé (anyString() ne matche pas null) et tout tomberait sur l'heuristique.
+        ReflectionTestUtils.setField(service, "model", "test-model");
     }
 
     // ── Repli déterministe (LLM absent) ──────────────────────────────────────
