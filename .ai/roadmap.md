@@ -24,6 +24,13 @@
 > - **CI Playwright gatée** (`E2E_ENABLED`), tests conservés.
 > - **À venir sur cette branche** : voir **PROD-5.2** (Slack **miroir/bidirectionnel** — vision user : rapatrier les messages Slack dans TaskForce) et **PROD-7.x « Login GitHub »** ci-dessous.
 
+> **▶ MAJ 10/07/2026 — workflows d'analyse IA (async + HITL + décisions actionnables).** Vérifié bout-en-bout en Docker (token Keycloak réel → API) :
+> - **Backend** — Flyway **V60** (`analysis_job`, `decision_brief`, `decision_priority`). `AnalysisJobRunner` (`@Async`) joue le plan **observe → contexte (RAG Brain OS) → analyse (LLM) → clarification → persistance**, et publie chaque transition sur `/topic/analysis.{workspaceId}`. `DecisionService` recentré sur le raisonnement (`analyze()` volontairement **hors transaction** : l'appel LLM dure des minutes, garder une connexion ouverte épuiserait le pool). Nouveau `AnalysisController` ; **`DecisionController` supprimé** (l'ancien `POST /projects/{id}/decision` était synchrone et non persisté).
+> - **Frontend** — dock « Workflows IA » (2ᵉ consommateur du socle `PanelDock`, après « Ask AI ») : badge des analyses actives, étapes en direct (`AgentPlan`), réponse HITL. `DecisionBoard` : un bouton **Analyser** + bascule Rapide/Approfondi ; les 3 priorités sont persistées et **actionnables** (accepter → issue liée, épingler, éditer, écarter/restaurer).
+> - **Preuves** (workspace `taskforce-demo`) : V60 appliquée (v59→v60), `ddl-auto=validate` OK, démarrage sans ligne ERROR. Job QUICK → `DONE`, brief `mode=generated` (LLM local, **pas** le repli), 3 priorités persistées. Job DEEP → `DONE` en ~2 min, 5/5 étapes `completed`. `accept` → issue **WEB-45** créée, et **idempotent** ; `pin`/`dismiss` = bascules ; éditer une priorité acceptée → **400**. Tests : `AnalysisPlanTest` **14/14** ; front `tsc` + `eslint` verts.
+> - **Bug attrapé uniquement par le test end-to-end** : Spring Boot 4 sérialise en **Jackson 3** (`tools.jackson`) alors que les services manipulent un `ObjectMapper` **Jackson 2** → le `JsonNode` exposé dans le DTO ressortait en `{"array":true,"bigDecimal":false,…}` au lieu du tableau d'étapes. Les DTO n'exposent plus que des types du JDK. *(compile et tests unitaires étaient verts : seul un vrai appel HTTP l'a révélé.)*
+> - **Reste** : abonner le dock à **STOMP** (le back publie déjà ; `use-stomp.ts` est couplé au chat → extraire la connexion/fallback avant d'ajouter un abonnement). Cf. `FE-ANL-003` / `IA-DEC-004`. En attendant, polling 5 s tant qu'un workflow est actif.
+
 ---
 
 ## 0. Légende & conventions
