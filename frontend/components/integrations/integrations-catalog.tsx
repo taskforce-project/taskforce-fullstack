@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import { Info, Loader2, ExternalLink, Check, Plug } from "lucide-react"
+import { useState, useEffect, useCallback, useMemo } from "react"
+import { Info, Loader2, ExternalLink, Check, Plug, Search } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog"
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { BrandLogo } from "@/components/ui/brand-logo"
 import { cn } from "@/lib/utils"
 import { useIntegrationStore } from "@/lib/store/integration-store"
 import {
@@ -20,12 +21,33 @@ import {
 } from "@/lib/api/integration-service"
 
 const CAP_LABEL: Record<string, string> = { observe: "Observe", act: "Agit", metrics: "Métriques" }
+const AUTH_LABEL: Record<string, string> = { OAUTH2: "OAuth", API_KEY: "Clé API", TOKEN: "Token", CONFIG: "Config", NONE: "Sans auth" }
+
+/** Puce de filtre par catégorie (façon marketplace). */
+function CatPill({ active, onClick, children }: Readonly<{ active: boolean; onClick: () => void; children: React.ReactNode }>) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+        active
+          ? "border-foreground/20 bg-foreground/10 text-foreground"
+          : "border-border text-muted-foreground hover:border-foreground/20 hover:text-foreground",
+      )}
+    >
+      {children}
+    </button>
+  )
+}
 
 /** Le catalogue générique : rend le « pool » d'outils (GET /integrations/catalog) groupé par catégorie. */
 export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
   const [catalog, setCatalog] = useState<IntegrationCatalog | null>(null)
   const [loading, setLoading] = useState(true)
   const [dialogTool, setDialogTool] = useState<ConnectorView | null>(null)
+  const [query, setQuery] = useState("")
+  const [activeCat, setActiveCat] = useState<string>("all")
   const { connectGitHub, connectSlack } = useIntegrationStore()
 
   const refresh = useCallback(() => {
@@ -52,6 +74,21 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
     setDialogTool(tool)
   }
 
+  // Filtrage recherche + catégorie (marketplace) — catégories vides masquées.
+  const groups = useMemo(() => {
+    if (!catalog) return []
+    const q = query.trim().toLowerCase()
+    return catalog.categories
+      .filter((g) => activeCat === "all" || g.category === activeCat)
+      .map((g) => ({
+        ...g,
+        tools: q
+          ? g.tools.filter((t) => t.name.toLowerCase().includes(q) || (t.description ?? "").toLowerCase().includes(q))
+          : g.tools,
+      }))
+      .filter((g) => g.tools.length > 0)
+  }, [catalog, query, activeCat])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12 text-muted-foreground">
@@ -63,25 +100,54 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
 
   return (
     <TooltipProvider delayDuration={200}>
-      <div className="flex flex-col gap-6">
-        {/* Résumé du pool */}
-        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          <Badge variant="secondary" className="gap-1"><Plug className="size-3" />{catalog.total} outils</Badge>
-          <Badge variant="secondary" className="text-emerald-600 dark:text-emerald-400">{catalog.connected} connecté(s)</Badge>
-          <Badge variant="secondary">{catalog.available} disponible(s)</Badge>
-          <span>· le reste arrive bientôt</span>
+      <div className="flex flex-col gap-5">
+        {/* Recherche */}
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Rechercher un connecteur…"
+            className="h-10 pl-9"
+          />
         </div>
 
-        {catalog.categories.map((group) => (
-          <section key={group.category} className="flex flex-col gap-2.5">
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{group.label}</h4>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {group.tools.map((tool) => (
-                <ConnectorCard key={tool.key} tool={tool} onAction={() => handleAction(tool)} />
-              ))}
-            </div>
-          </section>
-        ))}
+        {/* Filtres par catégorie */}
+        <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 scrollbar-hide">
+          <CatPill active={activeCat === "all"} onClick={() => setActiveCat("all")}>
+            Tous <span className="tabular-nums opacity-60">{catalog.total}</span>
+          </CatPill>
+          {catalog.categories.map((g) => (
+            <CatPill key={g.category} active={activeCat === g.category} onClick={() => setActiveCat(g.category)}>
+              {g.label} <span className="tabular-nums opacity-60">{g.tools.length}</span>
+            </CatPill>
+          ))}
+        </div>
+
+        {/* Résumé */}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1"><span className="size-1.5 rounded-full bg-emerald-500" /><span className="font-medium text-foreground">{catalog.connected}</span> connecté(s)</span>
+          <span className="text-muted-foreground/40">·</span>
+          <span><span className="font-medium text-foreground">{catalog.available}</span> disponible(s)</span>
+          <span className="text-muted-foreground/40">·</span>
+          <span>{catalog.total} au total</span>
+        </div>
+
+        {/* Grille */}
+        {groups.length === 0 ? (
+          <p className="py-12 text-center text-sm text-muted-foreground">Aucun connecteur ne correspond à ta recherche.</p>
+        ) : (
+          groups.map((group) => (
+            <section key={group.category} className="flex flex-col gap-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{group.label}</h4>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {group.tools.map((tool) => (
+                  <ConnectorCard key={tool.key} tool={tool} onAction={() => handleAction(tool)} />
+                ))}
+              </div>
+            </section>
+          ))
+        )}
 
         {dialogTool && (
           <ConnectorDialog
@@ -96,52 +162,70 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
   )
 }
 
-/** Carte d'un outil du catalogue. */
+/** Tuile d'un connecteur — façon marketplace (logo, description, capacités, action). */
 function ConnectorCard({ tool, onAction }: Readonly<{ tool: ConnectorView; onAction: () => void }>) {
   const planned = tool.status === "PLANNED"
-  const initials = tool.name.replaceAll(/[^A-Za-z0-9]/g, "").slice(0, 2).toUpperCase()
 
   return (
-    <div className={cn(
-      "flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5",
-      planned && "opacity-60"
-    )}>
-      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-muted text-[11px] font-bold text-foreground">
-        {initials}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5">
-          <span className="truncate text-sm font-medium text-foreground">{tool.name}</span>
-          {tool.connected && <Check className="size-3.5 shrink-0 text-emerald-500" />}
+    <div
+      className={cn(
+        "flex flex-col gap-3 rounded-xl border border-border bg-card p-4 transition-all",
+        planned ? "opacity-70" : "hover:border-foreground/20 hover:shadow-sm",
+      )}
+    >
+      {/* Ligne haute : logo + état */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted p-2 text-[11px]">
+          <BrandLogo slug={tool.key} name={tool.name} className="size-full" />
         </div>
-        {tool.description && <p className="truncate text-xs text-muted-foreground">{tool.description}</p>}
+        {tool.connected ? (
+          <Badge variant="outline" className="gap-1 border-emerald-500/25 bg-emerald-500/10 text-[10px] text-emerald-500">
+            <Check className="size-3" /> Connecté
+          </Badge>
+        ) : planned ? (
+          <Badge variant="outline" className="text-[10px] text-muted-foreground">Bientôt</Badge>
+        ) : (
+          <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70">{AUTH_LABEL[tool.authType] ?? tool.authType}</span>
+        )}
       </div>
 
-      {/* Aide (tooltip) : quoi faire pour configurer, quand ce n'est pas du 1-clic */}
-      {tool.setupHint && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button type="button" className="shrink-0 text-muted-foreground/60 hover:text-foreground" aria-label="Aide à la connexion">
-              <Info className="size-3.5" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed">
-            {tool.setupHint}
-          </TooltipContent>
-        </Tooltip>
-      )}
+      {/* Nom + description */}
+      <div className="flex-1">
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm font-semibold text-foreground">{tool.name}</span>
+          {tool.setupHint && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button type="button" className="text-muted-foreground/50 hover:text-foreground" aria-label="Aide à la connexion">
+                  <Info className="size-3" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed">{tool.setupHint}</TooltipContent>
+            </Tooltip>
+          )}
+        </div>
+        {tool.description && <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">{tool.description}</p>}
+      </div>
 
-      {planned ? (
-        <Badge variant="outline" className="shrink-0 text-[10px] text-muted-foreground">Bientôt</Badge>
-      ) : tool.connected ? (
-        <Button variant="outline" size="sm" className="h-7 shrink-0 text-xs" onClick={onAction}>
-          {tool.authType === "OAUTH2" ? "Gérer" : "Synchroniser"}
-        </Button>
-      ) : (
-        <Button size="sm" className="h-7 shrink-0 gap-1 text-xs" onClick={onAction}>
-          <Plug className="size-3" />Connecter
-        </Button>
-      )}
+      {/* Ligne basse : capacités + action */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-wrap gap-1">
+          {tool.capabilities.slice(0, 3).map((c) => (
+            <span key={c} className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{CAP_LABEL[c] ?? c}</span>
+          ))}
+        </div>
+        {!planned && (
+          tool.connected ? (
+            <Button variant="outline" size="sm" className="h-7 shrink-0 text-xs" onClick={onAction}>
+              {tool.authType === "OAUTH2" ? "Gérer" : "Configurer"}
+            </Button>
+          ) : (
+            <Button size="sm" className="h-7 shrink-0 gap-1 text-xs" onClick={onAction}>
+              <Plug className="size-3" /> Connecter
+            </Button>
+          )
+        )}
+      </div>
     </div>
   )
 }
