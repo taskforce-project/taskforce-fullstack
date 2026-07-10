@@ -4,7 +4,7 @@
  * (réponse markdown + sources Brain OS + étapes + tool calls). Le backend délègue à l'agent
  * (Groq tool-calling si une clé est configurée, sinon repli RAG : sources réelles).
  */
-import { apiClient } from "./client"
+import { apiClient, AI_TIMEOUT_MS } from "./client"
 import { ASSISTANT_ROUTES } from "../config/api-routes"
 
 export interface AssistantSource {
@@ -36,6 +36,7 @@ export async function sendAgentMessage(slug: string, message: string): Promise<A
   const res = await apiClient.post<{ data: AssistantAnswer }>(
     ASSISTANT_ROUTES.CHAT(slug),
     { message },
+    { timeout: AI_TIMEOUT_MS },
   )
   return res.data.data
 }

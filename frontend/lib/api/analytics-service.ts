@@ -1,4 +1,4 @@
-import { apiClient } from "./client";
+import { apiClient, AI_TIMEOUT_MS } from "./client";
 import { ANALYTICS_ROUTES } from "../config/api-routes";
 
 // ---------------------------------------------------------------------------
@@ -116,9 +116,51 @@ export async function getAiInsights(slug: string): Promise<AiInsight[]> {
 }
 
 // ---------------------------------------------------------------------------
+// Génération de graphe par l'IA (langage naturel → spec rendue depuis les vraies séries)
+// ---------------------------------------------------------------------------
+
+/** Jeux de données réels qu'un graphe peut cibler (miroir du catalogue backend). */
+export type ChartDataset = "throughput" | "burndown" | "capacity" | "workload";
+export type ChartType = "area" | "bar" | "line";
+
+/**
+ * Spec de graphe produite par l'IA. Ne contient **aucune donnée** : décrit seulement comment
+ * visualiser un jeu de données réel que le front charge via les endpoints ci-dessus.
+ * `unsupported` renseigné = la demande ne peut pas être satisfaite (le front l'affiche tel quel).
+ */
+export interface ChartSpec {
+  title: string;
+  description: string;
+  dataset: ChartDataset | null;
+  chartType: ChartType | null;
+  bucket: ThroughputBucket | null;
+  series: string[];
+  unsupported: string | null;
+}
+
+export async function generateChart(
+  slug: string,
+  prompt: string,
+  projectId?: number | null,
+): Promise<ChartSpec> {
+  const res = await apiClient.post<{ data: ChartSpec }>(
+    ANALYTICS_ROUTES.CHART(slug),
+    { prompt, projectId: projectId ?? null },
+    { timeout: AI_TIMEOUT_MS },
+  );
+  return res.data.data;
+}
+
+// ---------------------------------------------------------------------------
 // Décision IA par projet (boucle OODA)
 // ---------------------------------------------------------------------------
 
+/**
+ * Métriques observées d'un projet — la jambe « observe » de la boucle.
+ *
+ * La décision elle-même est produite par un **workflow asynchrone** : voir
+ * `lib/api/analysis-service.ts` (`StoredBrief`, `StoredPriority`).
+ */
 export interface DecisionSnapshot {
   total: number;
   open: number;
@@ -126,31 +168,4 @@ export interface DecisionSnapshot {
   completed: number;
   overdue: number;
   dueSoon: number;
-}
-
-export interface DecisionPriority {
-  title: string;
-  rationale: string;
-  level: "HIGH" | "MEDIUM" | "LOW";
-}
-
-export interface DecisionBrief {
-  situation: string;
-  risks: string[];
-  priorities: DecisionPriority[];
-  snapshot: DecisionSnapshot;
-  /** "generated" (LLM local) ou "fallback" (métriques seules). */
-  mode: "generated" | "fallback";
-}
-
-/** Génère la décision du jour (situation + risques + 3 priorités) pour un projet.
- *  `deep=true` → analyse approfondie (14B + thinking, plus lent) ; défaut = rapide (8B). */
-export async function getProjectDecision(
-  slug: string,
-  projectId: number,
-  deep = false
-): Promise<DecisionBrief> {
-  const url = ANALYTICS_ROUTES.DECISION(slug, projectId) + (deep ? "?deep=true" : "");
-  const res = await apiClient.post<{ data: DecisionBrief }>(url);
-  return res.data.data;
 }

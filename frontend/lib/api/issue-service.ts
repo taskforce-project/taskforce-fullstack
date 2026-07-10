@@ -3,7 +3,7 @@
  * Toutes les routes sont scopées par workspace slug + project id.
  */
 
-import { apiClient } from "./client";
+import { apiClient, AI_TIMEOUT_MS } from "./client";
 import { ISSUE_ROUTES, ROADMAP_ROUTES } from "../config/api-routes";
 
 // ---------------------------------------------------------------------------
@@ -579,6 +579,11 @@ export interface IssueSpecDraft {
   similar: SimilarNode[];
   /** "generated" (LLM local) ou "fallback" (LLM indisponible → gabarit structurel). */
   mode: "generated" | "fallback";
+  /** Enrichissement suggéré, appliqué à l'issue si l'humain approuve. */
+  labels: string[];
+  storyPoints: number | null;
+  priority: IssuePriority | null;
+  type: string | null;
 }
 
 /** Contenu approuvé (éventuellement édité par l'humain) à persister. */
@@ -588,6 +593,14 @@ export interface ApproveSpecPayload {
   breakdown?: string[];
   /** Injecter le découpage comme checklist de l'issue (suivi d'avancement). */
   addChecklist?: boolean;
+  /** Écrire la spec (description) + labels + effort + priorité + type sur l'issue (persistant). */
+  applyToIssue?: boolean;
+  labels?: string[];
+  storyPoints?: number | null;
+  priority?: IssuePriority | null;
+  type?: string | null;
+  /** Choisir l'assigné via le smart-assign (Qwen). */
+  autoAssign?: boolean;
 }
 
 /** Node Brain OS créé à l'approbation (spec persistée, liée à l'issue). */
@@ -607,7 +620,7 @@ export async function generateIssueSpec(
   deep = false
 ): Promise<IssueSpecDraft> {
   const url = ISSUE_ROUTES.AI_SPEC(slug, projectId, issueId) + (deep ? "?deep=true" : "");
-  const res = await apiClient.post<{ data: IssueSpecDraft }>(url);
+  const res = await apiClient.post<{ data: IssueSpecDraft }>(url, undefined, { timeout: AI_TIMEOUT_MS });
   return res.data.data;
 }
 

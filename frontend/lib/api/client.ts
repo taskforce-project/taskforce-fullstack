@@ -28,6 +28,14 @@ export const apiClient: AxiosInstance = axios.create({
 });
 
 /**
+ * Timeout dédié aux appels **génératifs** (LLM local Ollama) — spec, décision, agent.
+ * La génération locale (surtout 14B / démarrage à froid / « Approfondir ») dépasse largement les 30s
+ * par défaut. Aligné au-dessus du readTimeout du gateway backend (180s). À passer par requête :
+ * `apiClient.post(url, body, { timeout: AI_TIMEOUT_MS })`.
+ */
+export const AI_TIMEOUT_MS = 200_000;
+
+/**
  * Endpoints publics qui ne nécessitent pas de token JWT
  */
 const publicEndpoints = ["/api/auth/", "/api/sales/"];
