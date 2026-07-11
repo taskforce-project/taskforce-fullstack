@@ -5,6 +5,8 @@ import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -13,18 +15,22 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.taskforce.tf_api.core.dto.request.BreakdownQueryRequest;
 import com.taskforce.tf_api.core.dto.request.GenerateChartRequest;
+import com.taskforce.tf_api.core.dto.request.SaveChartRequest;
 import com.taskforce.tf_api.core.dto.response.AiInsightResponse;
 import com.taskforce.tf_api.core.dto.response.AnalyticsKpisResponse;
 import com.taskforce.tf_api.core.dto.response.BurndownPointResponse;
 import com.taskforce.tf_api.core.dto.response.ChartSpecResponse;
 import com.taskforce.tf_api.core.dto.response.MemberCapacityResponse;
+import com.taskforce.tf_api.core.dto.response.SavedChartResponse;
 import com.taskforce.tf_api.core.dto.response.ThroughputPointResponse;
 import com.taskforce.tf_api.core.dto.response.WorkloadResponse;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.service.AnalyticsService;
 import com.taskforce.tf_api.core.service.agent.ChartSpecService;
+import com.taskforce.tf_api.core.service.agent.SavedChartService;
 import com.taskforce.tf_api.shared.dto.ApiResponse;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
@@ -38,6 +44,7 @@ public class AnalyticsController {
 
     private final AnalyticsService analyticsService;
     private final ChartSpecService chartSpecService;
+    private final SavedChartService savedChartService;
     private final UserRepository   userRepository;
 
     @GetMapping("/kpis")
@@ -130,6 +137,46 @@ public class AnalyticsController {
             "Graphe généré",
             chartSpecService.generate(slug, userId, request.getPrompt(), request.getProjectId())
         ));
+    }
+
+    /** Ré-exécute une répartition « X par Y » (rafraîchit un graphe épinglé avec des données à jour). */
+    @PostMapping("/breakdown")
+    public ResponseEntity<ApiResponse<ChartSpecResponse>> breakdown(
+        @PathVariable String slug,
+        @RequestBody BreakdownQueryRequest request,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        return ResponseEntity.ok(ApiResponse.success("Répartition calculée",
+            chartSpecService.runBreakdown(slug, resolveUserId(jwt),
+                request.getDimension(), request.getMeasure(), request.getScope())));
+    }
+
+    // ── Graphes épinglés (« Custom ») ─────────────────────────────────────────
+
+    @GetMapping("/charts")
+    public ResponseEntity<ApiResponse<List<SavedChartResponse>>> listSavedCharts(
+        @PathVariable String slug, @AuthenticationPrincipal Jwt jwt
+    ) {
+        return ResponseEntity.ok(ApiResponse.success("Graphes épinglés récupérés",
+            savedChartService.list(slug, resolveUserId(jwt))));
+    }
+
+    @PostMapping("/charts")
+    public ResponseEntity<ApiResponse<SavedChartResponse>> saveChart(
+        @PathVariable String slug,
+        @Valid @RequestBody SaveChartRequest request,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Graphe épinglé",
+            savedChartService.save(slug, resolveUserId(jwt), request)));
+    }
+
+    @DeleteMapping("/charts/{chartId}")
+    public ResponseEntity<ApiResponse<Void>> deleteSavedChart(
+        @PathVariable String slug, @PathVariable Long chartId, @AuthenticationPrincipal Jwt jwt
+    ) {
+        savedChartService.delete(slug, resolveUserId(jwt), chartId);
+        return ResponseEntity.ok(ApiResponse.success("Graphe retiré", null));
     }
 
     private Long resolveUserId(Jwt jwt) {
