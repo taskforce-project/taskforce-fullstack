@@ -14,6 +14,7 @@ import com.stripe.model.Subscription;
 import com.stripe.model.checkout.Session;
 import com.stripe.param.CustomerCreateParams;
 import com.stripe.param.checkout.SessionCreateParams;
+import com.taskforce.tf_api.core.enums.PlanType;
 
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
@@ -143,6 +144,19 @@ public class StripeService {
             case "ENTERPRISE" -> enterprisePriceId;
             default -> throw new IllegalArgumentException("Type de plan invalide : " + planType);
         };
+    }
+
+    /**
+     * Reverse de {@link #getPriceIdForPlan} : déduit le {@link PlanType} depuis un price-id Stripe.
+     * Renvoie {@code null} si le prix ne correspond à aucun forfait configuré (source de vérité pour
+     * synchroniser {@code User.planType} depuis les webhooks {@code customer.subscription.*}).
+     */
+    public PlanType getPlanForPriceId(String priceId) {
+        if (priceId == null || priceId.isBlank()) return null;
+        if (priceId.equals(basicPriceId)) return PlanType.BASIC;
+        if (priceId.equals(businessPriceId)) return PlanType.BUSINESS;
+        if (priceId.equals(enterprisePriceId)) return PlanType.ENTERPRISE;
+        return null;
     }
 
     /**
