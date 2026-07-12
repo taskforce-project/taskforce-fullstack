@@ -10,38 +10,51 @@ import org.springframework.transaction.annotation.Transactional;
 import com.taskforce.tf_api.core.dto.response.AiUsageResponse;
 import com.taskforce.tf_api.core.enums.PlanType;
 import com.taskforce.tf_api.core.model.AiTokenUsage;
+import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.AiTokenUsageRepository;
+import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 
 import lombok.RequiredArgsConstructor;
 
 /**
- * Suivi de la **consommation IA réelle** par workspace et par mois (agrégat incrémental) + exposition
- * de la conso vs le **plafond du plan** (popover chat + page Settings « Usage IA », façon Claude).
+ * Suivi de la **consommation IA réelle** par **compte** (le propriétaire des workspaces) et par mois
+ * (agrégat incrémental) + exposition de la conso vs le **plafond du plan** (popover chat + page Settings
+ * « Usage IA », façon Claude). Compté par compte et non par workspace pour que le quota ne soit pas
+ * contournable en multipliant les workspaces.
  */
 @Service
 @RequiredArgsConstructor
 public class AiUsageService {
 
     private final AiTokenUsageRepository repository;
+    private final WorkspaceRepository workspaceRepository;
     private final BrainAccessGuard access;
 
     private static String currentPeriod() {
         return YearMonth.now().toString(); // 'YYYY-MM'
     }
 
-    /** Incrémente l'agrégat du mois courant. No-op si usage nul (repli/sans LLM). */
+    /**
+     * Incrémente l'agrégat du mois courant sur le **compte** (propriétaire du workspace). No-op si usage
+     * nul (repli/sans LLM) ou si le propriétaire est introuvable. Prend le {@code workspaceId} car c'est
+     * ce que connaît l'agent ; la résolution workspace → compte vit ici (source unique de la logique de conso).
+     */
     @Transactional
     public void record(Long workspaceId, LlmUsage usage) {
         if (workspaceId == null || usage == null || usage.totalTokens() <= 0) {
             return;
         }
+        Long accountId = workspaceRepository.findOwnerIdByWorkspaceId(workspaceId).orElse(null);
+        if (accountId == null) {
+            return; // workspace/propriétaire introuvable → on ne compte rien (best-effort)
+        }
         String period = currentPeriod();
-        AiTokenUsage row = repository.findByWorkspaceIdAndPeriod(workspaceId, period)
+        AiTokenUsage row = repository.findByAccountIdAndPeriod(accountId, period)
             .orElseGet(() -> {
                 AiTokenUsage created = new AiTokenUsage();
-                created.setWorkspaceId(workspaceId);
+                created.setAccountId(accountId);
                 created.setPeriod(period);
                 return created;
             });
@@ -52,14 +65,20 @@ public class AiUsageService {
         repository.save(row);
     }
 
-    /** Conso du mois courant + plafond du plan (du propriétaire du workspace). */
+    /**
+     * Conso du mois courant du **compte** (propriétaire du workspace, agrégée sur tous ses workspaces)
+     * + plafond de son plan. Un membre non-propriétaire voit donc la conso/quota du compte qui l'héberge.
+     */
     @Transactional(readOnly = true)
     public AiUsageResponse getUsage(String slug, Long userId) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
-        PlanType plan = (ws.getOwner() != null && ws.getOwner().getPlanType() != null)
-            ? ws.getOwner().getPlanType() : PlanType.FREE;
+        User owner = ws.getOwner();
+        PlanType plan = (owner != null && owner.getPlanType() != null)
+            ? owner.getPlanType() : PlanType.FREE;
         String period = currentPeriod();
-        Optional<AiTokenUsage> row = repository.findByWorkspaceIdAndPeriod(ws.getId(), period);
+        Optional<AiTokenUsage> row = (owner != null)
+            ? repository.findByAccountIdAndPeriod(owner.getId(), period)
+            : Optional.empty();
         String resetAt = LocalDate.now().plusMonths(1).withDayOfMonth(1).toString();
         return new AiUsageResponse(
             plan.name(),
