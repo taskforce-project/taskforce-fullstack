@@ -49,7 +49,7 @@ public class TestDataBuilder {
         return VerifyOtpRequest.builder().email(email).otpCode(code).build();
     }
     public static SelectPlanRequest buildSelectPlanRequest() {
-        return SelectPlanRequest.builder().email("test@example.com").planType("PREMIUM").build();
+        return SelectPlanRequest.builder().email("test@example.com").planType("BUSINESS").build();
     }
     public static SelectPlanRequest buildSelectPlanRequest(String email, String planType) {
         return SelectPlanRequest.builder().email(email).planType(planType).build();
