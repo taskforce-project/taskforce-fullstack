@@ -46,14 +46,20 @@ export const stripeService = {
   ): Promise<CheckoutSessionResponse> {
     try {
       const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
-      
-      const response = await apiClient.post<CheckoutSessionResponse>(STRIPE_ROUTES.CREATE_CHECKOUT, {
-        planType,
-        successUrl: successUrl || `${baseUrl}/payment/success`,
-        cancelUrl: cancelUrl || `${baseUrl}/payment/cancel`,
-      });
-      
-      return response.data;
+
+      // Chemin protégé /api/billing (l'upgrade in-app nécessite l'utilisateur authentifié).
+      // Le back facture par siège (quantité = nb de membres) et renvoie l'enveloppe ApiResponse.
+      const response = await apiClient.post<{ data: { sessionId?: string; sessionUrl: string } }>(
+        BILLING_ROUTES.CHECKOUT,
+        {
+          planType,
+          successUrl: successUrl || `${baseUrl}/payment/success`,
+          cancelUrl: cancelUrl || `${baseUrl}/payment/cancel`,
+        },
+      );
+
+      const data = response.data.data;
+      return { sessionId: data.sessionId, checkoutUrl: data.sessionUrl };
     } catch (error) {
       throw new Error(getErrorMessage(error));
     }
