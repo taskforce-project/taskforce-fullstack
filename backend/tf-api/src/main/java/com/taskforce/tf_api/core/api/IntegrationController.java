@@ -30,7 +30,11 @@ import com.taskforce.tf_api.core.dto.response.PlaneStatusResponse;
 import com.taskforce.tf_api.core.dto.response.PlaneSyncResponse;
 import com.taskforce.tf_api.core.dto.response.SlackChannelResponse;
 import com.taskforce.tf_api.core.model.User;
+import com.taskforce.tf_api.core.enums.PlanFeature;
+import com.taskforce.tf_api.core.enums.PlanType;
 import com.taskforce.tf_api.core.repository.UserRepository;
+import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.service.PlanFeatureService;
 import com.taskforce.tf_api.core.service.GitHubIntegrationService;
 import com.taskforce.tf_api.core.service.PlaneClient.PlaneProject;
 import com.taskforce.tf_api.core.service.PlaneIntegrationService;
@@ -53,6 +57,14 @@ public class IntegrationController {
     private final IntegrationCatalogService catalogService;
     private final ConnectorConnectionService connectorConnectionService;
     private final UserRepository           userRepository;
+    private final WorkspaceRepository      workspaceRepository;
+    private final PlanFeatureService       planFeatureService;
+
+    /** Les intégrations sont une feature Business+ : exige que le COMPTE (propriétaire) la couvre (→ 409). */
+    private void requireIntegrations(String slug) {
+        PlanType plan = workspaceRepository.findOwnerPlanBySlug(slug).orElse(PlanType.FREE);
+        planFeatureService.requireFeature(plan, PlanFeature.INTEGRATIONS);
+    }
 
     // ====================================================================
     // Catalogue d'intégrations (le « pool » d'outils, générique)
@@ -77,6 +89,7 @@ public class IntegrationController {
         @RequestBody(required = false) ConnectConnectorRequest request,
         @AuthenticationPrincipal Jwt jwt
     ) {
+        requireIntegrations(slug);
         connectorConnectionService.connect(
             slug, resolveUser(jwt).getId(), key,
             request != null ? request.getConfig() : null);
@@ -127,6 +140,7 @@ public class IntegrationController {
         @PathVariable String slug,
         @AuthenticationPrincipal Jwt jwt
     ) {
+        requireIntegrations(slug);
         User user = resolveUser(jwt);
         URI authorizeUrl = gitHubService.buildAuthorizeUrl(slug, user);
         return ResponseEntity.ok(ApiResponse.success(new ConnectUrlResponse(authorizeUrl.toString())));
@@ -200,6 +214,7 @@ public class IntegrationController {
         @PathVariable String slug,
         @AuthenticationPrincipal Jwt jwt
     ) {
+        requireIntegrations(slug);
         User user = resolveUser(jwt);
         URI authorizeUrl = slackService.buildAuthorizeUrl(slug, user);
         return ResponseEntity.ok(ApiResponse.success(new ConnectUrlResponse(authorizeUrl.toString())));
