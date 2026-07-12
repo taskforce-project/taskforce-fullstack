@@ -48,7 +48,7 @@ export function NavUser({
   const openUpgrade = useUpgradeStore((s) => s.openUpgrade)
   const openSettings = useSettingsStore((s) => s.openSettings)
 
-  const isPro = authUser?.planType === "PRO" || authUser?.planType === "ENTERPRISE"
+  const isPro = authUser?.planType === "BUSINESS" || authUser?.planType === "ENTERPRISE"
 
   const handleLogout = async () => {
     await logout()
