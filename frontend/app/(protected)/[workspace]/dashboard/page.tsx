@@ -4,8 +4,8 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import {
-  ArrowUpRight, Clock,
-  Zap, Loader2, Layers, Activity,
+  ArrowUpRight,
+  Zap, Loader2, Layers, Activity, CheckCircle2,
 } from "lucide-react"
 import {
   ResponsiveContainer, AreaChart, Area, Tooltip,
@@ -25,13 +25,14 @@ import { cn } from "@/lib/utils"
 
 // ─── Primitives ───────────────────────────────────────────────────────────────
 
-/** Corps de panneau « bientôt disponible » — pour les sections non encore câblées (pas de mock). */
-function ComingSoonBody({ label }: { readonly label?: string }) {
+/** Corps « renvoi » — la fonctionnalité vit ailleurs (ex. Intelligence) ; CTA honnête, pas de mock. */
+function CtaBody({ href, label, cta }: { readonly href: string; readonly label: string; readonly cta: string }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-1.5 px-4 py-10 text-center">
-      <Clock className="size-5 text-muted-foreground/50" />
-      <p className="text-sm font-medium text-muted-foreground">Bientôt disponible</p>
-      {label && <p className="text-xs text-muted-foreground/70">{label}</p>}
+    <div className="flex flex-col items-center justify-center gap-2.5 px-4 py-8 text-center">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <Button variant="outline" size="sm" className="gap-1.5" asChild>
+        <Link href={href}>{cta} <ArrowUpRight className="size-3" /></Link>
+      </Button>
     </div>
   )
 }
@@ -202,9 +203,34 @@ export default function DashboardPage() {
       <div className="grid gap-5 lg:grid-cols-3">
         {/* Left 2/3 */}
         <div className="space-y-5 lg:col-span-2">
-          {/* Needs attention — bientôt disponible (alertes/exceptions à câbler) */}
-          <SectionCard title="Needs attention" bodyClassName="p-0">
-            <ComingSoonBody label="Alertes & exceptions" />
+          {/* Needs attention — projets à risque/critiques (données réelles, pas de mock). */}
+          <SectionCard title="Needs attention" href="./projects" bodyClassName="p-0">
+            {(() => {
+              const flagged = projects.filter((p) => {
+                const h = healthOf(p)
+                return h === "atRisk" || h === "critical"
+              })
+              if (flagged.length === 0) {
+                return (
+                  <div className="flex flex-col items-center justify-center gap-1.5 px-4 py-10 text-center">
+                    <CheckCircle2 className="size-5 text-emerald-500" />
+                    <p className="text-sm font-medium text-muted-foreground">Rien à signaler</p>
+                    <p className="text-xs text-muted-foreground/70">Toutes les opérations sont saines.</p>
+                  </div>
+                )
+              }
+              return flagged.map((p) => (
+                <Link
+                  key={p.id}
+                  href={`./projects/${p.id}`}
+                  className="flex items-center gap-3 border-b border-border px-4 py-3 transition-colors last:border-0 hover:bg-muted/50"
+                >
+                  <span className={cn("size-2 shrink-0 rounded-full", healthOf(p) === "critical" ? "bg-rose-500" : "bg-amber-500")} />
+                  <span className="flex-1 truncate text-sm font-medium text-foreground">{p.name}</span>
+                  <Badge variant="secondary" className="shrink-0 font-normal text-muted-foreground">{p.openIssues} ouvertes</Badge>
+                </Link>
+              ))
+            })()}
           </SectionCard>
 
           {/* Active operations */}
@@ -234,7 +260,7 @@ export default function DashboardPage() {
           </SectionCard>
 
           {/* AI recommendations */}
-          <SectionCard title="AI recommendations" href="./agents" bodyClassName="p-4 space-y-2">
+          <SectionCard title="Recommandations de Cortex" href="./analytics" bodyClassName="p-4 space-y-2">
               {insightsLoading && (
                 <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
                   <Loader2 className="size-4 animate-spin" /> Generating AI insights…
@@ -266,7 +292,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <Button variant="outline" size="sm" className="shrink-0 gap-1.5" asChild>
-                      <Link href="./agents">{ins.action} <ArrowUpRight className="size-3" /></Link>
+                      <Link href="./analytics">{ins.action} <ArrowUpRight className="size-3" /></Link>
                     </Button>
                   </div>
                 </div>
@@ -276,14 +302,14 @@ export default function DashboardPage() {
 
         {/* Right 1/3 */}
         <div className="space-y-5">
-          {/* Agent activity — bientôt disponible (feature Agents IA coming-soon) */}
-          <SectionCard title="Agent activity" bodyClassName="p-0">
-            <ComingSoonBody label="Activité des agents IA" />
+          {/* Cortex — l'assistant + les analyses IA vivent dans Intelligence. */}
+          <SectionCard title="Cortex" bodyClassName="p-0">
+            <CtaBody href="./analytics" label="Signaux et analyses IA de votre workspace." cta="Ouvrir Intelligence" />
           </SectionCard>
 
-          {/* Pending decisions — bientôt disponible */}
+          {/* Pending decisions — l'aide à la décision par projet vit dans Intelligence. */}
           <SectionCard title="Pending decisions" bodyClassName="p-0">
-            <ComingSoonBody label="Décisions à valider" />
+            <CtaBody href="./analytics" label="Décisions IA à valider par projet." cta="Voir l'aide à la décision" />
           </SectionCard>
         </div>
       </div>
