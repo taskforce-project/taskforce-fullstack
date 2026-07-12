@@ -37,9 +37,9 @@ describe('Integration Tests - Subscription Flow', () => {
       });
 
       const { stripeService } = await import('@/lib/api/stripe-service');
-      await stripeService.createCheckoutSession('PRO');
+      await stripeService.createCheckoutSession('BUSINESS');
 
-      expect(mockCreateCheckoutSession).toHaveBeenCalledWith('PRO');
+      expect(mockCreateCheckoutSession).toHaveBeenCalledWith('BUSINESS');
     });
 
     it('should handle upgrade API failure gracefully', async () => {
@@ -50,7 +50,7 @@ describe('Integration Tests - Subscription Flow', () => {
       const { stripeService } = await import('@/lib/api/stripe-service');
       
       await expect(
-        stripeService.createCheckoutSession('PRO')
+        stripeService.createCheckoutSession('BUSINESS')
       ).rejects.toThrow('Payment processing error');
     });
   });
