@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog"
 import { ProjectIconPicker } from "@/components/ui/project-icon-picker"
 import { ColorPalettePicker, PROJECT_COLORS } from "@/components/ui/color-palette-picker"
+import { ProjectVisibilityPicker } from "@/components/ui/project-visibility-picker"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { useProjectStore } from "@/lib/store/project-store"
 import type { Project } from "@/lib/api/project-service"
@@ -50,6 +51,7 @@ export function CreateProjectDialog({ children, onCreated, defaultOpen = false }
   const [description, setDescription] = useState("")
   const [iconUrl, setIconUrl] = useState<string | null>(null)
   const [color, setColor] = useState<string>(PROJECT_COLORS[0])
+  const [isPublic, setIsPublic] = useState(false)
 
   function handleNameChange(value: string) {
     setName(value)
@@ -70,6 +72,7 @@ export function CreateProjectDialog({ children, onCreated, defaultOpen = false }
         description: description.trim() || undefined,
         iconUrl: iconUrl ?? undefined,
         color,
+        isPublic,
       })
       if (project) {
         onCreated?.(project)
@@ -87,6 +90,7 @@ export function CreateProjectDialog({ children, onCreated, defaultOpen = false }
     setDescription("")
     setIconUrl(null)
     setColor(PROJECT_COLORS[0])
+    setIsPublic(false)
   }
 
   return (
@@ -160,6 +164,12 @@ export function CreateProjectDialog({ children, onCreated, defaultOpen = false }
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-foreground">Color</label>
             <ColorPalettePicker value={color} onChange={setColor} />
+          </div>
+
+          {/* Visibility */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-foreground">Visibility</label>
+            <ProjectVisibilityPicker value={isPublic} onChange={setIsPublic} />
           </div>
         </div>
 

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { UserPlus, Search, X, Loader2, Info } from "lucide-react"
 import { toast } from "sonner"
 
@@ -51,6 +52,7 @@ const PROJECT_ROLES: { value: ProjectRole; label: string }[] = [
  * Option : ajouter l'invité à une équipe existante ou en créer une.
  */
 export function ProjectInviteDialog({ workspace, projectId, onInvited }: ProjectInviteDialogProps) {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<UserSearchResult[]>([])
@@ -119,8 +121,17 @@ export function ProjectInviteDialog({ workspace, projectId, onInvited }: Project
       onInvited()
       reset()
       setOpen(false)
-    } catch {
-      toast.error("Erreur lors de l'invitation")
+    } catch (err) {
+      // 409 = plafond du forfait Free sur un projet privé (façon GitHub) → upsell.
+      const e = err as { response?: { status?: number; data?: { message?: string } } }
+      if (e?.response?.status === 409) {
+        toast.error(e.response?.data?.message ?? "Limite du forfait Free atteinte sur ce projet privé.", {
+          description: "Rendez le projet public, ou passez à un forfait payant pour inviter sans limite.",
+          action: { label: "Voir les forfaits", onClick: () => router.push(`/${workspace}/billing`) },
+        })
+      } else {
+        toast.error("Erreur lors de l'invitation")
+      }
     } finally {
       setSubmitting(false)
     }

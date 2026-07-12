@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog"
 import { ProjectIconPicker } from "@/components/ui/project-icon-picker"
 import { ColorPalettePicker, PROJECT_COLORS } from "@/components/ui/color-palette-picker"
+import { ProjectVisibilityPicker } from "@/components/ui/project-visibility-picker"
 import { useProjectStore } from "@/lib/store/project-store"
 import type { Project } from "@/lib/api/project-service"
 
@@ -36,6 +37,7 @@ export function EditProjectDialog({ project, slug, open, onOpenChange }: EditPro
   const [description, setDescription] = useState(project.description ?? "")
   const [iconUrl, setIconUrl] = useState<string | null>(project.iconUrl)
   const [color, setColor] = useState(project.color || PROJECT_COLORS[0])
+  const [isPublic, setIsPublic] = useState(project.isPublic)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -44,6 +46,7 @@ export function EditProjectDialog({ project, slug, open, onOpenChange }: EditPro
       setDescription(project.description ?? "")
       setIconUrl(project.iconUrl)
       setColor(project.color || PROJECT_COLORS[0])
+      setIsPublic(project.isPublic)
     }
   }, [open, project])
 
@@ -56,6 +59,7 @@ export function EditProjectDialog({ project, slug, open, onOpenChange }: EditPro
         description: description.trim() || undefined,
         iconUrl: iconUrl ?? undefined,
         color,
+        isPublic,
       })
       toast.success("Opération mise à jour")
       onOpenChange(false)
@@ -103,6 +107,19 @@ export function EditProjectDialog({ project, slug, open, onOpenChange }: EditPro
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-medium text-muted-foreground">Couleur</label>
             <ColorPalettePicker value={color} onChange={setColor} />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-muted-foreground">Visibilité</label>
+            <ProjectVisibilityPicker
+              value={isPublic}
+              onChange={setIsPublic}
+              labels={{
+                privateTitle: "Privé",
+                privateHint: "Visible par les membres invités uniquement.",
+                publicTitle: "Public",
+                publicHint: "Visible par tout le workspace.",
+              }}
+            />
           </div>
         </div>
 
