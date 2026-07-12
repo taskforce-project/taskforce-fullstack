@@ -53,7 +53,10 @@ function SelectTrigger({
 function SelectContent({
   className,
   children,
-  position = "item-aligned",
+  // `popper` (défaut shadcn moderne) et non `item-aligned` : ce dernier se positionne mal /
+  // ne s'affiche pas quand le Select est dans un Radix Dialog modal (scroll-lock + body
+  // pointer-events:none) — cas de l'issue-sheet où les dropdowns « ne s'ouvraient plus ».
+  position = "popper",
   align = "center",
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Content>) {
