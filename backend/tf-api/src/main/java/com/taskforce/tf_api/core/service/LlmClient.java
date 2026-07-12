@@ -32,4 +32,18 @@ public interface LlmClient {
     default JsonNode rawChat(String model, List<Map<String, Object>> messages, List<Map<String, Object>> tools, String tier) {
         return rawChat(model, messages, tools);
     }
+
+    // ── Capture d'usage (tokens) ─────────────────────────────────────────────
+    // Arme un accumulateur pour le thread courant : tous les appels LLM suivants y
+    // additionnent leur usage jusqu'à {@link #endUsageCapture()}. No-op par défaut
+    // (providers qui ne remontent pas d'usage, ex. Groq bloqué).
+
+    /** Démarre l'accumulation d'usage pour le thread courant. */
+    default void beginUsageCapture() { /* no-op */ }
+
+    /** Usage cumulé depuis {@link #beginUsageCapture()} (sans réinitialiser). */
+    default LlmUsage currentUsage() { return LlmUsage.ZERO; }
+
+    /** Termine l'accumulation et libère l'accumulateur du thread. */
+    default void endUsageCapture() { /* no-op */ }
 }
