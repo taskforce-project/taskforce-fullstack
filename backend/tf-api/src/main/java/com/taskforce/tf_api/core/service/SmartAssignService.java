@@ -80,7 +80,7 @@ public class SmartAssignService {
         String issueText = buildIssueText(issue, issueLabels);
 
         SmartAssignResponse response = computeRecommendation(
-            workspace, project, issueText, issueLabels, issue.getPriority(), issue.getStoryPoints());
+            workspace, project, issueText, issueLabels, issue.getPriority(), issue.getStoryPoints(), true);
 
         SmartAssignCandidateResponse recommended = response.getRecommended();
         if (recommended != null) {
@@ -117,7 +117,7 @@ public class SmartAssignService {
         IssuePriority priority = request.getPriority() != null ? request.getPriority() : IssuePriority.NONE;
         String issueText = buildText(request.getTitle(), request.getDescription(), issueLabels);
 
-        return computeRecommendation(workspace, project, issueText, issueLabels, priority, null);
+        return computeRecommendation(workspace, project, issueText, issueLabels, priority, null, true);
     }
 
     /**
@@ -151,7 +151,7 @@ public class SmartAssignService {
                 .map(l -> l.getName().toLowerCase())
                 .toList();
             SmartAssignResponse rec = computeRecommendation(
-                workspace, project, buildIssueText(issue, labels), labels, issue.getPriority(), issue.getStoryPoints());
+                workspace, project, buildIssueText(issue, labels), labels, issue.getPriority(), issue.getStoryPoints(), true);
             results.add(BulkSmartAssignItemResponse.builder()
                 .issueId(issueId)
                 .recommended(rec.getRecommended())
@@ -173,8 +173,9 @@ public class SmartAssignService {
         List<String> labels = issue.getLabels().stream()
             .map(l -> l.getName().toLowerCase())
             .toList();
+        // Redistribution : ranking HEURISTIQUE (sans LLM) → rapide, pas d'appel IA par issue.
         return computeRecommendation(
-            workspace, project, buildIssueText(issue, labels), labels, issue.getPriority(), issue.getStoryPoints());
+            workspace, project, buildIssueText(issue, labels), labels, issue.getPriority(), issue.getStoryPoints(), false);
     }
 
     /**
@@ -183,7 +184,8 @@ public class SmartAssignService {
      */
     private SmartAssignResponse computeRecommendation(Workspace workspace, Project project,
                                                       String issueText, List<String> issueLabels,
-                                                      IssuePriority priority, Integer issueStoryPoints) {
+                                                      IssuePriority priority, Integer issueStoryPoints,
+                                                      boolean useAi) {
         List<User> candidates = resolveCandidates(workspace, project);
         if (candidates.isEmpty()) {
             return SmartAssignResponse.builder()
@@ -199,11 +201,15 @@ public class SmartAssignService {
 
         GroqResult groq = GroqResult.empty();
         boolean fallbackUsed = false;
-        try {
-            groq = fetchGroqScores(issueText, priority, candidates, metricsByUser);
-        } catch (Exception ex) {
-            fallbackUsed = true;
-            log.warn("Smart assign Groq fallback triggered: {}", ex.getMessage());
+        // `useAi=false` (redistribution) : on saute le LLM et on classe au heuristique Java pur —
+        // sinon, un appel LLM par issue rendait la redistribution très lente (LLM local) → timeout.
+        if (useAi) {
+            try {
+                groq = fetchGroqScores(issueText, priority, candidates, metricsByUser);
+            } catch (Exception ex) {
+                fallbackUsed = true;
+                log.warn("Smart assign Groq fallback triggered: {}", ex.getMessage());
+            }
         }
 
         List<SmartAssignCandidateResponse> ranked =
@@ -218,7 +224,8 @@ public class SmartAssignService {
         return SmartAssignResponse.builder()
             .recommended(recommended)
             .alternatives(alternatives)
-            .strategy(fallbackUsed ? "java-fallback" : "java-rules + ai-semantic + ai-history")
+            .strategy(!useAi ? "java-rules (heuristique, sans IA)"
+                : fallbackUsed ? "java-fallback" : "java-rules + ai-semantic + ai-history")
             .fallbackUsed(fallbackUsed)
             .build();
     }
