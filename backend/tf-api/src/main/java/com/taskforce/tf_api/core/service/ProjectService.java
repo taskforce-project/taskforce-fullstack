@@ -69,6 +69,12 @@ public class ProjectService {
     private final IssueRepository          issueRepository;
     private final IssueService             issueService;
 
+    /**
+     * Plafond « façon GitHub » : nombre max de collaborateurs sur un projet PRIVÉ en forfait Free
+     * (créateur inclus). Les projets publics et les forfaits payants sont illimités.
+     */
+    private static final long FREE_PRIVATE_PROJECT_MEMBER_LIMIT = 5;
+
     // -------------------------------------------------------------------------
     // Lecture
     // -------------------------------------------------------------------------
@@ -81,8 +87,13 @@ public class ProjectService {
     public List<ProjectResponse> listProjects(String workspaceSlug, Long requestingUserId) {
         Workspace workspace = resolveWorkspaceAndAssertMember(workspaceSlug, requestingUserId);
         Set<Long> favoriteIds = new HashSet<>(projectFavoriteRepository.findProjectIdsByUserId(requestingUserId));
+        // Visibilité projet privé : un OWNER/ADMIN voit tout ; sinon on ne montre que public + projets où il est membre.
+        boolean wsAdmin = isWorkspaceAdmin(workspace.getId(), requestingUserId);
+        Set<Long> memberProjectIds = wsAdmin ? Set.of()
+            : new HashSet<>(projectMemberRepository.findProjectIdsByUserId(requestingUserId));
         return projectRepository.findByWorkspaceIdOrderByCreatedAtDesc(workspace.getId())
             .stream()
+            .filter(p -> p.isPublic() || wsAdmin || memberProjectIds.contains(p.getId()))
             .map(project -> toResponse(project, favoriteIds.contains(project.getId())))
             .collect(Collectors.toList());
     }
@@ -94,7 +105,7 @@ public class ProjectService {
     @Transactional(readOnly = true)
     public ProjectResponse getProject(String workspaceSlug, Long projectId, Long requestingUserId) {
         Workspace workspace = resolveWorkspaceAndAssertMember(workspaceSlug, requestingUserId);
-        Project project = resolveProject(projectId, workspace.getId());
+        Project project = resolveViewableProject(projectId, workspace, requestingUserId);
         return toResponse(project, projectFavoriteRepository.existsByUserIdAndProjectId(requestingUserId, project.getId()));
     }
 
@@ -106,7 +117,7 @@ public class ProjectService {
     public List<ProjectActivityPointResponse> getProjectActivity(String workspaceSlug, Long projectId,
                                                                  Long requestingUserId, int days) {
         Workspace workspace = resolveWorkspaceAndAssertMember(workspaceSlug, requestingUserId);
-        Project project = resolveProject(projectId, workspace.getId());
+        Project project = resolveViewableProject(projectId, workspace, requestingUserId);
 
         int window = Math.min(Math.max(days, 1), 90);
         java.time.LocalDate today = java.time.LocalDate.now();
@@ -312,7 +323,7 @@ public class ProjectService {
     public List<ProjectMemberResponse> listMembers(String workspaceSlug, Long projectId,
                                                     Long requestingUserId) {
         Workspace workspace = resolveWorkspaceAndAssertMember(workspaceSlug, requestingUserId);
-        resolveProject(projectId, workspace.getId());
+        resolveViewableProject(projectId, workspace, requestingUserId);
 
         return projectMemberRepository.findByProjectId(projectId)
             .stream()
@@ -345,6 +356,9 @@ public class ProjectService {
             throw new BusinessException("Cet utilisateur est déjà membre du projet");
         }
 
+        // Plafond « façon GitHub » : projet privé + forfait Free = collaborateurs limités.
+        enforcePrivateProjectSeatLimit(project);
+
         User requester = resolveUser(requestingUserId);
         ProjectMember member = ProjectMember.builder()
             .project(project)
@@ -364,7 +378,7 @@ public class ProjectService {
     @Transactional(readOnly = true)
     public List<ProjectTeamResponse> listProjectTeams(String workspaceSlug, Long projectId, Long requestingUserId) {
         Workspace workspace = resolveWorkspaceAndAssertMember(workspaceSlug, requestingUserId);
-        resolveProject(projectId, workspace.getId());
+        resolveViewableProject(projectId, workspace, requestingUserId);
 
         return projectTeamRepository.findByProjectId(projectId).stream()
             .map(pt -> ProjectTeamResponse.from(pt.getTeam(), teamMemberRepository.countByTeamId(pt.getTeam().getId())))
@@ -441,7 +455,7 @@ public class ProjectService {
     public List<ProjectLabelResponse> listLabels(String workspaceSlug, Long projectId,
                                                   Long requestingUserId) {
         Workspace workspace = resolveWorkspaceAndAssertMember(workspaceSlug, requestingUserId);
-        resolveProject(projectId, workspace.getId());
+        resolveViewableProject(projectId, workspace, requestingUserId);
 
         return projectLabelRepository.findByProjectIdOrderByNameAsc(projectId)
             .stream()
@@ -544,6 +558,34 @@ public class ProjectService {
             .orElseThrow(() -> new ResourceNotFoundException("Projet introuvable"));
     }
 
+    /** Résout un projet ET vérifie que l'utilisateur a le droit de le VOIR (visibilité projet privé). */
+    private Project resolveViewableProject(Long projectId, Workspace workspace, Long userId) {
+        Project project = resolveProject(projectId, workspace.getId());
+        assertCanViewProject(project, userId);
+        return project;
+    }
+
+    /**
+     * Visibilité « façon GitHub » : un projet est visible s'il est <b>public</b>, OU si l'utilisateur
+     * en est <b>membre</b> ({@link ProjectMember}), OU s'il est <b>OWNER/ADMIN</b> du workspace.
+     * Sinon → 404 (on ne révèle pas l'existence d'un projet privé).
+     * <p>NB : ne gate que les lectures de {@code ProjectService} ; les vues agrégées d'issues
+     * (My Queue, recherche, analytics) restent à durcir (roadmap {@code TF-PROJECT-VISIBILITY}).</p>
+     */
+    private void assertCanViewProject(Project project, Long userId) {
+        if (project.isPublic()) return;
+        if (projectMemberRepository.existsByProjectIdAndUserId(project.getId(), userId)) return;
+        if (isWorkspaceAdmin(project.getWorkspace().getId(), userId)) return;
+        throw new ResourceNotFoundException("Projet introuvable");
+    }
+
+    /** Vrai si l'utilisateur est OWNER ou ADMIN du workspace (voit tous les projets, même privés). */
+    private boolean isWorkspaceAdmin(Long workspaceId, Long userId) {
+        return workspaceMemberRepository.findByWorkspaceIdAndUserId(workspaceId, userId)
+            .map(wm -> wm.getRole().name().equals("OWNER") || wm.getRole().name().equals("ADMIN"))
+            .orElse(false);
+    }
+
     private User resolveUser(Long userId) {
         return userRepository.findById(userId)
             .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
@@ -566,6 +608,30 @@ public class ProjectService {
             .filter(wm -> wm.getRole().name().equals("OWNER") || wm.getRole().name().equals("ADMIN"))
             .orElseThrow(() -> new BusinessException(
                 "Droits insuffisants pour gérer ce projet"));
+    }
+
+    /**
+     * Plafond « façon GitHub » : sur le forfait Free, un projet PRIVÉ est limité à
+     * {@value #FREE_PRIVATE_PROJECT_MEMBER_LIMIT} collaborateurs (créateur inclus).
+     * Les projets publics et les forfaits payants (BASIC/BUSINESS/ENTERPRISE) sont illimités.
+     * Lève une {@link IllegalStateException} (→ 409) pour déclencher l'upsell côté front,
+     * en miroir du plafond de workspaces de {@code WorkspaceService}.
+     */
+    private void enforcePrivateProjectSeatLimit(Project project) {
+        if (project.isPublic()) {
+            return; // projet public = visible par tout le workspace, collaborateurs illimités
+        }
+        User owner = project.getWorkspace().getOwner();
+        if (owner != null && owner.isPaid()) {
+            return; // forfait payant = collaborateurs illimités sur les projets privés
+        }
+        long current = projectMemberRepository.countByProjectId(project.getId());
+        if (current >= FREE_PRIVATE_PROJECT_MEMBER_LIMIT) {
+            throw new IllegalStateException(
+                "Les projets privés sont limités à " + FREE_PRIVATE_PROJECT_MEMBER_LIMIT
+                + " collaborateurs sur le forfait Free. Rendez ce projet public, "
+                + "ou passez à un forfait payant pour inviter sans limite.");
+        }
     }
 
     // -------------------------------------------------------------------------
