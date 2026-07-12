@@ -69,25 +69,132 @@ const BRANDS = [
   { key: "n8n", search: "n8n" },
   { key: "zapier", search: "Zapier" },
   { key: "groq", search: "Groq" },
+  // ── Ajouts « catalogue au complet » ──────────────────────────────────────
+  // Gestion de projet
+  { key: "jira", search: "Jira" },
+  { key: "trello", search: "Trello" },
+  { key: "monday", search: "monday" },
+  { key: "airtable", search: "Airtable" },
+  { key: "shortcut", search: "Shortcut" },
+  // Dev & CI/CD
+  { key: "gitlab", search: "GitLab" },
+  { key: "bitbucket", search: "Bitbucket" },
+  { key: "postman", search: "Postman" },
+  { key: "insomnia", search: "Insomnia" },
+  { key: "vscode", search: "Visual Studio Code", match: "Visual Studio Code" },
+  { key: "cursor", search: "Cursor" },
+  { key: "sentry", search: "Sentry" },
+  { key: "datadog", search: "Datadog" },
+  { key: "grafana", search: "Grafana" },
+  { key: "sonarqube", search: "SonarQube" },
+  { key: "circleci", search: "CircleCI" },
+  { key: "terraform", search: "Terraform" },
+  // Hébergement & Infra
+  { key: "azure", search: "Azure", match: "Azure" },
+  { key: "gcp", search: "Google Cloud", match: "Google Cloud" },
+  { key: "netlify", search: "Netlify" },
+  { key: "railway", search: "Railway" },
+  { key: "fly", search: "Fly.io" },
+  { key: "digitalocean", search: "DigitalOcean" },
+  { key: "heroku", search: "Heroku" },
+  { key: "firebase", search: "Firebase" },
+  // Bases de données
+  { key: "postgresql", search: "PostgreSQL" },
+  { key: "planetscale", search: "PlanetScale" },
+  { key: "prisma", search: "Prisma" },
+  { key: "elasticsearch", search: "Elasticsearch" },
+  { key: "snowflake", search: "Snowflake" },
+  // Analytics
+  { key: "mixpanel", search: "Mixpanel" },
+  { key: "amplitude", search: "Amplitude" },
+  { key: "segment", search: "Segment" },
+  { key: "plausible", search: "Plausible" },
+  { key: "hotjar", search: "Hotjar" },
+  // Paiements
+  { key: "paypal", search: "PayPal" },
+  { key: "paddle", search: "Paddle" },
+  { key: "lemonsqueezy", search: "Lemon Squeezy", match: "Lemon Squeezy" },
+  { key: "wise", search: "Wise" },
+  // CRM & Ventes
+  { key: "pipedrive", search: "Pipedrive" },
+  { key: "zendesk", search: "Zendesk" },
+  { key: "freshworks", search: "Freshworks" },
+  { key: "attio", search: "Attio" },
+  // Communication
+  { key: "discord", search: "Discord" },
+  { key: "microsoft-teams", search: "Teams", match: "Microsoft Teams" },
+  { key: "zoom", search: "Zoom" },
+  { key: "telegram", search: "Telegram" },
+  { key: "whatsapp", search: "WhatsApp" },
+  { key: "sendgrid", search: "SendGrid" },
+  { key: "mailchimp", search: "Mailchimp" },
+  // Identité & Auth
+  { key: "auth0", search: "Auth0" },
+  { key: "okta", search: "Okta" },
+  // Sécurité
+  { key: "1password", search: "1Password" },
+  { key: "doppler", search: "Doppler" },
+  { key: "snyk", search: "Snyk" },
+  // Productivité & Google/Microsoft détaillés
+  { key: "gmail", search: "Gmail" },
+  { key: "google-drive", search: "Google Drive", match: "Google Drive" },
+  { key: "google-calendar", search: "Google Calendar", match: "Google Calendar" },
+  { key: "google-sheets", search: "Google Sheets", match: "Google Sheets" },
+  { key: "google-meet", search: "Google Meet", match: "Google Meet" },
+  { key: "outlook", search: "Outlook" },
+  { key: "onedrive", search: "OneDrive" },
+  { key: "confluence", search: "Confluence" },
+  { key: "dropbox", search: "Dropbox" },
+  { key: "miro", search: "Miro" },
+  { key: "loom", search: "Loom" },
+  { key: "todoist", search: "Todoist" },
+  { key: "obsidian", search: "Obsidian" },
+  // Design & Média
+  { key: "framer", search: "Framer" },
+  { key: "sketch", search: "Sketch" },
+  { key: "adobe", search: "Adobe", match: "Adobe" },
+  // Automatisation
+  { key: "make", search: "Make", match: "Make" },
+  { key: "pipedream", search: "Pipedream" },
+  // Modèles IA
+  { key: "openai", search: "OpenAI" },
+  { key: "anthropic", search: "Anthropic" },
+  { key: "gemini", search: "Gemini", match: "Google Gemini" },
+  { key: "mistral", search: "Mistral" },
+  { key: "huggingface", search: "Hugging Face", match: "Hugging Face" },
+  { key: "ollama", search: "Ollama" },
+  { key: "perplexity", search: "Perplexity" },
+  { key: "cohere", search: "Cohere" },
+  { key: "replicate", search: "Replicate" },
   // Absents de SVGL / pas de marque unique → fallback initiales : plane, vps, mail-smtp, granola,
   // jenkins, zapier, hubspot, intercom, elevenlabs, google-ads, microsoft-clarity, zoho.
 ]
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
-async function fetchJson(url) {
-  const res = await fetch(url, { headers: { "User-Agent": "taskforce-logos-script" } })
-  if (!res.ok) throw new Error(`HTTP ${res.status} — ${url}`)
-  return res.json()
+async function fetchJson(url, tries = 3) {
+  // L'API SVGL renvoie par moments un 404 sous charge (rate-limit) alors que le logo existe.
+  // On retente avec backoff : un vrai « not found » finit par échouer, un transitoire se rétablit.
+  for (let i = 0; i < tries; i++) {
+    const res = await fetch(url, { headers: { "User-Agent": "taskforce-logos-script" } })
+    if (res.ok) return res.json()
+    if (i < tries - 1) { await sleep(1000 * (i + 1)); continue }
+    throw new Error(`HTTP ${res.status} — ${url}`)
+  }
 }
 
-async function downloadSvg(url, dest) {
-  const res = await fetch(url)
-  if (!res.ok) throw new Error(`HTTP ${res.status} — ${url}`)
-  const svg = await res.text()
-  if (!svg.trim().startsWith("<svg")) throw new Error(`Réponse non-SVG — ${url}`)
-  await writeFile(dest, svg, "utf8")
-  return svg
+async function downloadSvg(url, dest, tries = 3) {
+  for (let i = 0; i < tries; i++) {
+    const res = await fetch(url)
+    if (res.ok) {
+      const svg = await res.text()
+      if (!svg.trim().startsWith("<svg")) throw new Error(`Réponse non-SVG — ${url}`)
+      await writeFile(dest, svg, "utf8")
+      return svg
+    }
+    if (i < tries - 1) { await sleep(800 * (i + 1)); continue }
+    throw new Error(`HTTP ${res.status} — ${url}`)
+  }
 }
 
 /**
@@ -130,12 +237,20 @@ async function main() {
   const manifest = {}
   const missing = []
 
+  // Un SEUL appel API : tout le catalogue SVGL, puis matching en LOCAL. La recherche répétée
+  // (`?search=` × N) déclenche le rate-limit de SVGL (404 sur des logos pourtant présents) ;
+  // récupérer la liste complète une fois l'évite totalement.
+  const catalog = await fetchJson(API)
+  if (!Array.isArray(catalog) || catalog.length === 0) throw new Error("Catalogue SVGL vide/inattendu")
+  console.log(`Catalogue SVGL : ${catalog.length} logos\n`)
+
   for (const b of BRANDS) {
     try {
-      const list = await fetchJson(`${API}?search=${encodeURIComponent(b.search)}`)
-      if (!Array.isArray(list) || list.length === 0) { missing.push(b.key); console.log(`✗ ${b.key} — aucun résultat`); await sleep(120); continue }
+      const needle = b.search.toLowerCase()
+      const list = catalog.filter((s) => (s.title ?? "").toLowerCase().includes(needle))
+      if (list.length === 0) { missing.push(b.key); console.log(`✗ ${b.key} — absent du catalogue SVGL`); continue }
       const svg = pickBest(list, b.match ?? b.search)
-      if (!svg) { missing.push(b.key); console.log(`✗ ${b.key} — pas de correspondance fiable`); await sleep(120); continue }
+      if (!svg) { missing.push(b.key); console.log(`✗ ${b.key} — pas de correspondance fiable`); continue }
       const route = svg.route
 
       if (route && typeof route === "object" && route.light && route.dark) {
@@ -155,7 +270,7 @@ async function main() {
       missing.push(b.key)
       console.log(`✗ ${b.key} — ${e.message}`)
     }
-    await sleep(120) // politesse rate-limit
+    await sleep(300) // politesse rate-limit (SVGL 404 sous cadence trop rapide)
   }
 
   // Manifeste trié (clés alpha) → diff stable
