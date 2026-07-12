@@ -76,7 +76,7 @@ export function PlanGate({ minPlan, plans, children, fallback }: PlanGateProps) 
         </p>
       </div>
       <Button size="sm" asChild>
-        <Link href={`/${slug}/settings?section=billing`}>{t("common.learnMore")}</Link>
+        <Link href={`/${slug}/billing`}>{t("common.learnMore")}</Link>
       </Button>
     </div>
   )
