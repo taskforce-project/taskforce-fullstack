@@ -13,6 +13,7 @@ import com.taskforce.tf_api.core.model.AiTokenUsage;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.AiTokenUsageRepository;
+import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 
@@ -30,6 +31,7 @@ public class AiUsageService {
 
     private final AiTokenUsageRepository repository;
     private final WorkspaceRepository workspaceRepository;
+    private final UserRepository userRepository;
     private final BrainAccessGuard access;
 
     private static String currentPeriod() {
@@ -90,6 +92,34 @@ public class AiUsageService {
             period,
             resetAt
         );
+    }
+
+    /**
+     * Bloque (→ 409) si le <b>compte</b> a atteint son plafond mensuel de tokens IA. No-op si le plan est
+     * illimité (Enterprise) ou si le compte/plafond est introuvable. Appelé <b>avant</b> chaque génération
+     * LLM (cf. {@code AgentService.run}) : c'est le gate de l'IA (façon Claude, l'IA est métrée par tokens).
+     */
+    @Transactional(readOnly = true)
+    public void assertWithinQuota(Long workspaceId) {
+        if (workspaceId == null) {
+            return;
+        }
+        Long accountId = workspaceRepository.findOwnerIdByWorkspaceId(workspaceId).orElse(null);
+        if (accountId == null) {
+            return;
+        }
+        PlanType plan = userRepository.findById(accountId).map(User::getPlanType).orElse(PlanType.FREE);
+        long limit = limitFor(plan);
+        if (limit < 0) {
+            return; // illimité
+        }
+        long used = repository.findByAccountIdAndPeriod(accountId, currentPeriod())
+            .map(AiTokenUsage::getTotalTokens).orElse(0L);
+        if (used >= limit) {
+            throw new IllegalStateException(
+                "Quota IA mensuel atteint (" + limit + " tokens) sur votre forfait. "
+                + "Passez à un forfait supérieur pour continuer à utiliser Cortex.");
+        }
     }
 
     /**
