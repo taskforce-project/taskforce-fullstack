@@ -14,6 +14,8 @@ import {
   Filter,
   Layers,
   Loader2,
+  Sparkles,
+  CalendarDays,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -719,12 +721,12 @@ export default function MembersPage() {
         {/* Table header */}
         <div className="flex items-center gap-4 px-5 py-2.5 border-b border-border bg-muted/20 text-xs font-medium uppercase tracking-wide text-muted-foreground">
           <div className="size-9 shrink-0" />
-          <div className="w-48 shrink-0">Member</div>
-          <div className="w-28 shrink-0">Role</div>
-          <div className="hidden md:block flex-1">Email</div>
-          <div className="hidden xl:block w-52 shrink-0">Skills</div>
-          <div className="hidden xl:block w-44 shrink-0">Projects</div>
-          <div className="hidden lg:block w-28 shrink-0 text-right">Joined</div>
+          <div className="w-48 shrink-0 flex items-center gap-1.5"><User className="size-3.5" /> Member</div>
+          <div className="w-28 shrink-0 flex items-center gap-1.5"><Shield className="size-3.5" /> Role</div>
+          <div className="hidden md:flex flex-1 items-center gap-1.5"><Mail className="size-3.5" /> Email</div>
+          <div className="hidden xl:flex w-52 shrink-0 items-center gap-1.5"><Sparkles className="size-3.5" /> Skills</div>
+          <div className="hidden xl:flex w-44 shrink-0 items-center gap-1.5"><Layers className="size-3.5" /> Projects</div>
+          <div className="hidden lg:flex w-28 shrink-0 items-center justify-end gap-1.5"><CalendarDays className="size-3.5" /> Joined</div>
           <div className="size-8 shrink-0" />
         </div>
 
