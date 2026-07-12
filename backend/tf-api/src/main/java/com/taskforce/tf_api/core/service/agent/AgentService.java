@@ -55,13 +55,24 @@ public class AgentService {
 
     @Transactional
     public AssistantAnswer run(String slug, Long userId, String message) {
+        return run(slug, userId, message, List.of());
+    }
+
+    /**
+     * Variante avec <b>mémoire multi-tours</b> : {@code history} = messages précédents de la
+     * conversation (format LLM {@code {role, content}}, ordre chronologique), injectés dans le
+     * prompt avant le message courant. Vide = premier tour (comportement identique à l'ancien).
+     */
+    @Transactional
+    public AssistantAnswer run(String slug, Long userId, String message, List<Map<String, Object>> history) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
         AgentContext ctx = new AgentContext(slug, ws.getId(), userId);
+        List<Map<String, Object>> hist = history == null ? List.of() : history;
 
         // ── Intention : small-talk / salutation → réponse directe SANS recherche Brain OS ni sources.
         //    (Les étapes reflètent le chemin RÉEL : pas d'étape « Recherche Brain OS » pour un simple bonjour.)
         if (isConversational(message)) {
-            return runConversational(ws.getId(), message);
+            return runConversational(ws.getId(), message, hist);
         }
 
         boolean deep = isDeepIntent(message);
@@ -97,8 +108,8 @@ public class AgentService {
             steps.add(new AssistantStep(genLabel, "active",
                 deep ? "Sélection et appel des outils du Brain OS" : "Génération via Cortex (rapide)"));
             List<AssistantToolCall> toolCalls = new ArrayList<>();
-            String answer = deep ? runToolLoop(message, hits, ctx, toolCalls)
-                                 : runDirect(message, hits);
+            String answer = deep ? runToolLoop(message, hits, ctx, toolCalls, hist)
+                                 : runDirect(message, hits, hist);
             steps.set(steps.size() - 1, new AssistantStep(genLabel, "done", genDoneDescription(deep, toolCalls)));
             LlmUsage usage = llm.currentUsage();
             recordUsage(ws.getId(), usage);
@@ -170,7 +181,7 @@ public class AgentService {
     }
 
     /** Réponse à un message conversationnel : 2 étapes réelles (comprendre → rédiger), sans RAG ni sources. */
-    private AssistantAnswer runConversational(Long workspaceId, String message) {
+    private AssistantAnswer runConversational(Long workspaceId, String message, List<Map<String, Object>> history) {
         List<AssistantStep> steps = new ArrayList<>();
         steps.add(new AssistantStep("Compréhension de la demande", "done",
             "Conversation générale — réponse directe (pas de recherche nécessaire)"));
@@ -183,7 +194,7 @@ public class AgentService {
         llm.beginUsageCapture();
         try {
             steps.add(new AssistantStep("Rédaction de la réponse", "active", "Génération via Cortex (rapide)"));
-            String answer = llm.chatCompletion(model, CONVERSATIONAL_PROMPT, message, false, "fast");
+            String answer = llm.chat(model, withHistory(CONVERSATIONAL_PROMPT, history, message), "fast");
             steps.set(steps.size() - 1, new AssistantStep("Rédaction de la réponse", "done", "Réponse générée par Cortex"));
             LlmUsage usage = llm.currentUsage();
             recordUsage(workspaceId, usage);
@@ -209,10 +220,9 @@ public class AgentService {
     // -------------------------------------------------------------------------
 
     private String runToolLoop(String message, List<KnowledgeNode> hits,
-                               AgentContext ctx, List<AssistantToolCall> toolCalls) {
-        List<Map<String, Object>> messages = new ArrayList<>();
-        messages.add(Map.of("role", "system", "content", systemPrompt(hits, true)));
-        messages.add(Map.of("role", "user", "content", message));
+                               AgentContext ctx, List<AssistantToolCall> toolCalls,
+                               List<Map<String, Object>> history) {
+        List<Map<String, Object>> messages = withHistory(systemPrompt(hits, true), history, message);
         List<Map<String, Object>> toolDefs = tools.toolDefinitions();
 
         for (int i = 0; i < MAX_TOOL_ITERS; i++) {
@@ -248,9 +258,20 @@ public class AgentService {
         return "Réponse interrompue (trop d'étapes d'outils).";
     }
 
-    private String runDirect(String message, List<KnowledgeNode> hits) {
+    private String runDirect(String message, List<KnowledgeNode> hits, List<Map<String, Object>> history) {
         // Tier "fast" : petit modèle 8B pour les réponses simples/interactives (rapide).
-        return llm.chatCompletion(model, systemPrompt(hits, false), message, false, "fast");
+        // Historique injecté (mémoire multi-tours) entre le system prompt et le message courant.
+        return llm.chat(model, withHistory(systemPrompt(hits, false), history, message), "fast");
+    }
+
+    /** Liste de messages LLM : system + historique (mémoire multi-tours) + message courant. */
+    private static List<Map<String, Object>> withHistory(String systemPrompt,
+                                                         List<Map<String, Object>> history, String message) {
+        List<Map<String, Object>> messages = new ArrayList<>();
+        messages.add(Map.of("role", "system", "content", systemPrompt));
+        if (history != null) messages.addAll(history);
+        messages.add(Map.of("role", "user", "content", message));
+        return messages;
     }
 
     // -------------------------------------------------------------------------
