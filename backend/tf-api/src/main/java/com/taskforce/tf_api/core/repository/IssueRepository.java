@@ -18,6 +18,10 @@ import com.taskforce.tf_api.core.model.Issue;
 @Repository
 public interface IssueRepository extends JpaRepository<Issue, Long> {
 
+    /** Nombre total d'issues d'un workspace (tous projets) — pour le plafond du forfait Free. */
+    @Query("SELECT COUNT(i) FROM Issue i WHERE i.project.workspace.id = :workspaceId")
+    long countByWorkspaceId(@Param("workspaceId") Long workspaceId);
+
     /** Issues actives d'un projet (hors archivées), épinglées d'abord puis sequence_number desc */
     @Query("""
         SELECT i FROM Issue i
