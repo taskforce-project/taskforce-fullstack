@@ -68,9 +68,9 @@ public class AnalyticsService {
         return ws;
     }
 
-    /** Gating PRO d'une fonctionnalité selon le plan de l'appelant (PROD-4.4) → 409 si non couvert. */
-    private void requireFeature(Long userId, PlanFeature feature) {
-        PlanType plan = userRepository.findById(userId).map(User::getPlanType).orElse(PlanType.FREE);
+    /** Gating d'une fonctionnalité selon le plan du COMPTE (propriétaire du workspace) → 409 si non couvert. */
+    private void requireFeature(String slug, PlanFeature feature) {
+        PlanType plan = workspaceRepository.findOwnerPlanBySlug(slug).orElse(PlanType.FREE);
         planFeatureService.requireFeature(plan, feature);
     }
 
@@ -140,7 +140,7 @@ public class AnalyticsService {
 
     public List<ThroughputPointResponse> getThroughput(String slug, Long userId, Long projectId, String bucket) {
         Workspace ws = requireWorkspaceMember(slug, userId);
-        requireFeature(userId, PlanFeature.ADVANCED_ANALYTICS);
+        requireFeature(slug, PlanFeature.ADVANCED_ANALYTICS);
         List<Long> projectIds = resolveProjectIds(ws.getId(), projectId);
 
         boolean daily = "DAY".equalsIgnoreCase(bucket);
@@ -174,7 +174,7 @@ public class AnalyticsService {
 
     public List<BurndownPointResponse> getBurndown(String slug, Long userId, Long projectId) {
         requireWorkspaceMember(slug, userId);
-        requireFeature(userId, PlanFeature.ADVANCED_ANALYTICS);
+        requireFeature(slug, PlanFeature.ADVANCED_ANALYTICS);
         List<Cycle> activeCycles = cycleRepository.findActiveByWorkspaceSlug(slug);
         if (projectId != null) {
             activeCycles = activeCycles.stream()
@@ -227,7 +227,7 @@ public class AnalyticsService {
     @Transactional(readOnly = true)
     public List<MemberCapacityResponse> getCapacity(String slug, Long userId, Long projectId) {
         Workspace ws = requireWorkspaceMember(slug, userId);
-        requireFeature(userId, PlanFeature.ADVANCED_ANALYTICS);
+        requireFeature(slug, PlanFeature.ADVANCED_ANALYTICS);
         List<Long> projectIds = resolveProjectIds(ws.getId(), projectId);
 
         // Build map: userId → open issue count
@@ -263,7 +263,7 @@ public class AnalyticsService {
     @Transactional(readOnly = true)
     public WorkloadResponse getWorkload(String slug, Long userId, Integer days) {
         Workspace ws = requireWorkspaceMember(slug, userId);
-        requireFeature(userId, PlanFeature.ADVANCED_ANALYTICS);
+        requireFeature(slug, PlanFeature.ADVANCED_ANALYTICS);
 
         // Fenêtre [from, to) bornée 1..30 jours (défaut 14).
         int window = days == null ? WORKLOAD_DEFAULT_DAYS
