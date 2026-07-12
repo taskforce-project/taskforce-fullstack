@@ -22,8 +22,10 @@ import com.taskforce.tf_api.core.enums.PlanType;
 public class PlanFeatureService {
 
     private static final Map<PlanType, Set<PlanFeature>> MATRIX = Map.of(
+        // Cœur (smart-assign) gratuit ; analytics avancées / insights / assistant = BUSINESS+.
         PlanType.FREE, EnumSet.of(PlanFeature.AI_SMART_ASSIGN),
-        PlanType.PRO, EnumSet.allOf(PlanFeature.class),
+        PlanType.BASIC, EnumSet.of(PlanFeature.AI_SMART_ASSIGN),
+        PlanType.BUSINESS, EnumSet.allOf(PlanFeature.class),
         PlanType.ENTERPRISE, EnumSet.allOf(PlanFeature.class)
     );
 
