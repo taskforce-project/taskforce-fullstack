@@ -42,6 +42,7 @@ class StripeWebhookServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private SubscriptionRepository subscriptionRepository;
     @Mock private SubscriptionHistoryRepository subscriptionHistoryRepository;
+    @Mock private StripeService stripeService;
 
     @InjectMocks private StripeWebhookService service;
 
