@@ -1,52 +1,57 @@
 "use client"
 
-import { useEffect, useId, useState } from "react"
+import { useCallback, useEffect, useId, useState } from "react"
 import {
   ResponsiveContainer, AreaChart, Area, BarChart, Bar, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from "recharts"
 import {
   Activity, TrendingDown, Users, CalendarRange, Sparkles, Loader2,
-  Maximize2, AlertCircle, Send, Lock,
+  Maximize2, AlertCircle, Send, Lock, X, FolderKanban, Pin, Trash2, BarChart3, Box,
 } from "lucide-react"
+
+import { toast } from "sonner"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
+import { Drawer, DrawerContent, DrawerClose, DrawerTitle, DrawerDescription } from "@/components/ui/drawer"
 import { WorkloadHeatmap } from "@/components/analytics/workload-heatmap"
+import { Bars3D } from "@/components/analytics/bars-3d"
 import {
   getAnalyticsThroughput, getAnalyticsBurndown, getAnalyticsCapacity, getAnalyticsWorkload,
-  generateChart,
-  type ChartSpec, type Workload,
+  generateChart, runBreakdown, listSavedCharts, saveChart, deleteSavedChart,
+  type ChartSpec, type Workload, type NamedValue, type SavedChart,
 } from "@/lib/api/analytics-service"
+import { listProjects } from "@/lib/api/project-service"
 
 // ─── Métadonnées de séries ──────────────────────────────────────────────────
 // Le libellé et la couleur d'une série vivent ici (le backend n'envoie que la clé).
 
+// Palette sémantique explicite (le thème garde ses --chart-* en niveaux de gris ; ici on veut
+// des séries distinctes et colorées, lisibles en clair comme en sombre).
 const SERIES_META: Record<string, { label: string; color: string }> = {
-  resolved:   { label: "Résolues",        color: "var(--chart-1)" },
-  opened:     { label: "Ouvertes",        color: "var(--chart-2)" },
-  remaining:  { label: "Restant",         color: "var(--chart-1)" },
-  ideal:      { label: "Idéal",           color: "var(--chart-2)" },
-  openIssues: { label: "Issues ouvertes", color: "var(--chart-1)" },
+  resolved:   { label: "Résolues",        color: "#10b981" },  // emerald — terminé
+  opened:     { label: "Ouvertes",        color: "#3b82f6" },  // blue — entrant
+  remaining:  { label: "Restant",         color: "#f43f5e" },  // rose — reste à faire
+  ideal:      { label: "Idéal",           color: "#94a3b8" },  // slate — repère (pointillé)
+  openIssues: { label: "Issues ouvertes", color: "#6366f1" },  // indigo — charge
+  completion: { label: "Avancement (%)",  color: "#6366f1" },  // indigo — % de complétion projet
+  done:       { label: "Terminées",       color: "#10b981" },  // emerald
+  open:       { label: "Ouvertes",        color: "#f59e0b" },  // amber
 }
+
+/** Palette de repli pour une série hors catalogue (rotation stable). */
+const FALLBACK_COLORS = ["#3b82f6", "#10b981", "#f43f5e", "#6366f1", "#f59e0b", "#14b8a6"]
 
 const DATASET_XKEY: Record<string, string> = {
   throughput: "week",   // ThroughputPoint.week sert de libellé, quel que soit le bucket
   burndown:   "day",
   capacity:   "name",   // dérivé (displayName)
-}
-
-const TOOLTIP_STYLE: React.CSSProperties = {
-  background: "var(--popover)",
-  border: "1px solid var(--border)",
-  borderRadius: "var(--radius)",
-  fontSize: 12,
-  color: "var(--popover-foreground)",
+  projects:   "name",   // nom du projet
 }
 
 const seriesLabel = (key: string) => SERIES_META[key]?.label ?? key
-const seriesColor = (key: string) => SERIES_META[key]?.color ?? "var(--chart-1)"
+const seriesColor = (key: string, index = 0) => SERIES_META[key]?.color ?? FALLBACK_COLORS[index % FALLBACK_COLORS.length]
 
 // ─── Catalogue (sidebar du modal) ────────────────────────────────────────────
 // Presets sur données réelles — aucun n'appelle l'IA, ils cadrent des séries connues.
@@ -62,8 +67,9 @@ function preset(id: string, label: string, icon: React.ElementType, spec: Partia
   return {
     id, label, icon,
     spec: {
-      title: label, description: "", dataset: null, chartType: null, bucket: null,
-      series: [], unsupported: null, ...spec,
+      title: label, description: "", mode: "timeseries", dataset: null, chartType: null, bucket: null,
+      series: [], data: null, dimension: null, measure: null, scope: null,
+      xLabel: null, yLabel: null, unsupported: null, suggestions: [], ...spec,
     },
   }
 }
@@ -79,6 +85,8 @@ const PRESETS: Preset[] = [
     { dataset: "capacity", chartType: "bar", series: ["openIssues"] }),
   preset("workload", "Charge de l'équipe (14 j)", CalendarRange,
     { dataset: "workload", chartType: null, series: [] }),
+  preset("projects", "Avancement des projets", FolderKanban,
+    { dataset: "projects", chartType: "bar", series: ["completion"] }),
 ]
 
 // ─── Chargement des données réelles d'une spec ────────────────────────────────
@@ -116,6 +124,15 @@ function useChartData(slug: string, projectId: number | null, spec: ChartSpec) {
         } else if (dataset === "workload") {
           const d = await getAnalyticsWorkload(slug, 14)
           if (alive) setWorkload(d)
+        } else if (dataset === "projects") {
+          // Comparaison workspace : avancement (%) + volumes par projet. Ignore le filtre projet.
+          const d = await listProjects(slug)
+          if (alive) setRows(d.map((p) => ({
+            name: p.name,
+            completion: p.totalIssues > 0 ? Math.round(((p.totalIssues - p.openIssues) / p.totalIssues) * 100) : 0,
+            done: p.totalIssues - p.openIssues,
+            open: p.openIssues,
+          })))
         }
       } catch {
         if (alive) setError(true)
@@ -131,28 +148,94 @@ function useChartData(slug: string, projectId: number | null, spec: ChartSpec) {
   return { rows, workload, loading, error }
 }
 
+// ─── Tooltip riche (partagé) ──────────────────────────────────────────────────
+
+interface TooltipEntry {
+  dataKey?: string | number
+  name?: string
+  value?: number | string
+  color?: string
+  fill?: string
+  stroke?: string
+}
+
+/** Carte de tooltip détaillée : la catégorie en tête, puis chaque série avec sa pastille couleur. */
+function ChartTooltip({
+  active, payload, label,
+}: Readonly<{ active?: boolean; payload?: TooltipEntry[]; label?: string | number }>) {
+  if (!active || !payload || payload.length === 0) return null
+  return (
+    <div className="rounded-lg border border-border bg-popover px-3 py-2 text-xs shadow-lg">
+      {label != null && <p className="mb-1.5 font-medium text-popover-foreground">{label}</p>}
+      <div className="flex flex-col gap-1">
+        {payload.map((entry) => (
+          <div key={String(entry.dataKey)} className="flex items-center gap-2">
+            <span className="size-2 shrink-0 rounded-full" style={{ background: entry.color ?? entry.fill ?? entry.stroke ?? "var(--chart-1)" }} />
+            <span className="text-muted-foreground">{entry.name}</span>
+            <span className="ml-3 font-semibold tabular-nums text-popover-foreground">
+              {typeof entry.value === "number" ? entry.value.toLocaleString("fr-FR") : entry.value}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ─── Rendu d'une spec ─────────────────────────────────────────────────────────
 
 /**
  * Rend une {@link ChartSpec} depuis les vraies séries. `variant="preview"` = silhouette sans
- * axes (style dashboard, dégradé) ; `variant="full"` = axes + légende + tooltip (dans le modal).
+ * axes (style dashboard, dégradé) ; `variant="full"` = axes + légende cliquable + tooltip riche +
+ * surlignage au survol (dans le sheet).
  */
 function SpecChart({
-  slug, projectId, spec, variant,
-}: Readonly<{ slug: string; projectId: number | null; spec: ChartSpec; variant: "preview" | "full" }>) {
+  slug, projectId, spec, variant, threeD = false, onSuggestion,
+}: Readonly<{ slug: string; projectId: number | null; spec: ChartSpec; variant: "preview" | "full"; threeD?: boolean; onSuggestion?: (prompt: string) => void }>) {
   const gradientId = useId().replace(/:/g, "")
   const { rows, workload, loading, error } = useChartData(slug, projectId, spec)
   const preview = variant === "preview"
-  const height = preview ? "100%" : 340
+  const height = "100%"   // rempli par le conteneur (aperçu compact, ou pane du sheet plein écran)
+
+  // Légende interactive : cliquer une série la masque / la réaffiche.
+  const [hidden, setHidden] = useState<Set<string>>(new Set())
+  const toggleSeries = (key: string) => setHidden((prev) => {
+    const next = new Set(prev)
+    if (next.has(key)) next.delete(key); else next.add(key)
+    return next
+  })
 
   if (spec.unsupported) {
     return (
       <Centered>
         <AlertCircle className="size-5 text-amber-500" />
-        <p className="max-w-sm text-sm text-muted-foreground">{spec.unsupported}</p>
+        <p className="max-w-md text-sm text-muted-foreground">{spec.unsupported}</p>
+        {onSuggestion && spec.suggestions.length > 0 && (
+          <div className="mt-2 flex flex-col items-center gap-2">
+            <p className="text-xs font-medium text-muted-foreground">Essaie plutôt :</p>
+            <div className="flex flex-wrap justify-center gap-1.5">
+              {spec.suggestions.map((s) => (
+                <button
+                  key={s.prompt}
+                  type="button"
+                  onClick={() => onSuggestion(s.prompt)}
+                  className="flex items-center gap-1 rounded-full border border-primary/30 bg-primary/[0.06] px-3 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
+                >
+                  <Sparkles className="size-3" /> {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </Centered>
     )
   }
+
+  // Répartition « X par Y » : données déjà calculées en base (mode breakdown).
+  if (spec.mode === "breakdown") {
+    return <BreakdownChart slug={slug} spec={spec} preview={preview} threeD={threeD} />
+  }
+
   if (loading) return <Centered><Loader2 className="size-5 animate-spin text-muted-foreground" /></Centered>
   if (error) return <Centered><p className="text-xs text-muted-foreground">Données indisponibles</p></Centered>
 
@@ -164,27 +247,36 @@ function SpecChart({
 
   const xKey = DATASET_XKEY[spec.dataset ?? ""] ?? "name"
   const series = spec.series.length > 0 ? spec.series : Object.keys(SERIES_META)
-  const margin = preview ? { top: 4, right: 0, left: 0, bottom: 0 } : { top: 8, right: 8, left: -12, bottom: 0 }
+  // Marges pleines : de la place pour les axes (gauche/bas) et la légende — sinon ils sont rognés.
+  const margin = preview ? { top: 4, right: 0, left: 0, bottom: 0 } : { top: 12, right: 20, left: 4, bottom: 4 }
 
   if (rows.length === 0) return <Centered><p className="text-xs text-muted-foreground">Pas encore assez de données</p></Centered>
 
-  const axes = !preview && (
-    <>
-      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-      <XAxis dataKey={xKey} tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
-      <YAxis tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
-      <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: "var(--muted)" }} />
-      <Legend wrapperStyle={{ fontSize: 12 }} />
-    </>
-  )
+  // Grille (les deux sens, subtile), axes, tooltip riche, légende cliquable.
+  const legendClick = (data: { dataKey?: unknown }) => {
+    const key = data.dataKey
+    if (typeof key === "string" || typeof key === "number") toggleSeries(String(key))
+  }
+  // ⚠️ Recharts n'inspecte QUE ses enfants directs (et les tableaux, qu'il aplatit) pour repérer
+  // grille/axes/légende/tooltip — il n'entre PAS dans un <Fragment>. On renvoie donc un *tableau*
+  // d'éléments (surtout pas un <>…</>) : sinon Grid/XAxis/YAxis/Tooltip/Legend sont ignorés et le
+  // graphe sort « nu » (courbes seules, ni grille ni survol). C'était la cause du « pas de tooltip ».
+  const axes = preview ? null : [
+    <CartesianGrid key="grid" strokeDasharray="3 3" stroke="var(--border)" strokeOpacity={0.7} />,
+    <XAxis key="x" dataKey={xKey} tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />,
+    <YAxis key="y" tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} allowDecimals={false} />,
+    <Tooltip key="tip" content={<ChartTooltip />} cursor={{ fill: "var(--muted)", fillOpacity: 0.4 }} />,
+    <Legend key="legend" wrapperStyle={{ fontSize: 12, cursor: "pointer" }} onClick={legendClick} />,
+  ]
 
   if (spec.chartType === "bar") {
     return (
       <ResponsiveContainer width="100%" height={height}>
         <BarChart data={rows} margin={margin} barGap={3}>
           {axes}
-          {series.map((key) => (
-            <Bar key={key} dataKey={key} name={seriesLabel(key)} fill={seriesColor(key)} radius={[3, 3, 0, 0]} isAnimationActive={!preview} />
+          {series.map((key, i) => (
+            <Bar key={key} dataKey={key} name={seriesLabel(key)} fill={seriesColor(key, i)} radius={[3, 3, 0, 0]}
+              hide={hidden.has(key)} activeBar={{ stroke: "var(--foreground)", strokeWidth: 1 }} isAnimationActive={!preview} />
           ))}
         </BarChart>
       </ResponsiveContainer>
@@ -196,10 +288,10 @@ function SpecChart({
       <ResponsiveContainer width="100%" height={height}>
         <LineChart data={rows} margin={margin}>
           {axes}
-          {series.map((key) => (
+          {series.map((key, i) => (
             <Line key={key} type="monotone" dataKey={key} name={seriesLabel(key)}
-              stroke={seriesColor(key)} strokeWidth={2} strokeDasharray={key === "ideal" ? "4 4" : undefined}
-              dot={false} isAnimationActive={!preview} />
+              stroke={seriesColor(key, i)} strokeWidth={2} strokeDasharray={key === "ideal" ? "4 4" : undefined}
+              hide={hidden.has(key)} dot={false} activeDot={{ r: 5, strokeWidth: 2 }} isAnimationActive={!preview} />
           ))}
         </LineChart>
       </ResponsiveContainer>
@@ -213,16 +305,16 @@ function SpecChart({
         <defs>
           {series.map((key, i) => (
             <linearGradient key={key} id={`${gradientId}-${i}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={seriesColor(key)} stopOpacity={0.28} />
-              <stop offset="100%" stopColor={seriesColor(key)} stopOpacity={0} />
+              <stop offset="0%" stopColor={seriesColor(key, i)} stopOpacity={0.3} />
+              <stop offset="100%" stopColor={seriesColor(key, i)} stopOpacity={0} />
             </linearGradient>
           ))}
         </defs>
         {axes}
         {series.map((key, i) => (
           <Area key={key} type="monotone" dataKey={key} name={seriesLabel(key)}
-            stroke={seriesColor(key)} strokeWidth={2} fill={`url(#${gradientId}-${i})`} fillOpacity={1}
-            dot={false} activeDot={{ r: 3 }} isAnimationActive={!preview} />
+            stroke={seriesColor(key, i)} strokeWidth={2} fill={`url(#${gradientId}-${i})`} fillOpacity={1}
+            hide={hidden.has(key)} dot={false} activeDot={{ r: 5, strokeWidth: 2 }} isAnimationActive={!preview} />
         ))}
       </AreaChart>
     </ResponsiveContainer>
@@ -233,6 +325,81 @@ function Centered({ children }: { readonly children: React.ReactNode }) {
   return <div className="flex h-full flex-col items-center justify-center gap-2 text-center">{children}</div>
 }
 
+/**
+ * Rend une répartition « X par Y » (mode breakdown) — une série `value` par catégorie `label`.
+ * Les points arrivent avec le spec (génération IA) ; pour un graphe **épinglé** (spec sans data,
+ * mais avec dimension/measure/scope), on ré-exécute la requête pour des données à jour.
+ */
+function BreakdownChart({
+  slug, spec, preview, threeD = false,
+}: Readonly<{ slug: string; spec: ChartSpec; preview: boolean; threeD?: boolean }>) {
+  const [fetched, setFetched] = useState<NamedValue[] | null>(null)
+  const [loading, setLoading] = useState(false)
+  const needsFetch = (!spec.data || spec.data.length === 0) && spec.dimension != null
+
+  useEffect(() => {
+    if (!needsFetch || !slug || !spec.dimension) return
+    let alive = true
+    const load = async () => {
+      setLoading(true)
+      try {
+        const fresh = await runBreakdown(slug, spec.dimension!, spec.measure, spec.scope)
+        if (alive) setFetched(fresh.data ?? [])
+      } catch {
+        if (alive) setFetched([])
+      } finally {
+        if (alive) setLoading(false)
+      }
+    }
+    void load()
+    return () => { alive = false }
+  }, [needsFetch, slug, spec.dimension, spec.measure, spec.scope])
+
+  if (loading) return <Centered><Loader2 className="size-5 animate-spin text-muted-foreground" /></Centered>
+  const data = fetched ?? spec.data ?? []
+  if (data.length === 0) {
+    return <Centered><p className="text-xs text-muted-foreground">Aucune donnée pour cette répartition</p></Centered>
+  }
+  const color = "#6366f1"
+  const yName = spec.yLabel ?? "Valeur"
+
+  // Vue 3D (barres) — Three.js, interactive (rotation + survol).
+  if (threeD && !preview && spec.chartType !== "line") {
+    return <Bars3D data={data} color={color} yLabel={yName} />
+  }
+  const margin = preview ? { top: 4, right: 0, left: 0, bottom: 0 } : { top: 12, right: 20, left: 4, bottom: 4 }
+  // Tableau (pas de <Fragment>) : recharts n'unwrappe pas les fragments — cf. SpecChart.
+  const axes = preview ? null : [
+    <CartesianGrid key="grid" strokeDasharray="3 3" stroke="var(--border)" strokeOpacity={0.7} vertical={false} />,
+    <XAxis key="x" dataKey="label" tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false}
+      interval={0} angle={data.length > 6 ? -20 : 0} textAnchor={data.length > 6 ? "end" : "middle"} height={data.length > 6 ? 48 : 24} />,
+    <YAxis key="y" tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} allowDecimals={false} />,
+    <Tooltip key="tip" content={<ChartTooltip />} cursor={{ fill: "var(--muted)", fillOpacity: 0.4 }} />,
+    <Legend key="legend" wrapperStyle={{ fontSize: 12 }} />,
+  ]
+
+  if (spec.chartType === "line") {
+    return (
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={data} margin={margin}>
+          {axes}
+          <Line type="monotone" dataKey="value" name={yName} stroke={color} strokeWidth={2}
+            dot={!preview} activeDot={{ r: 5, strokeWidth: 2 }} isAnimationActive={!preview} />
+        </LineChart>
+      </ResponsiveContainer>
+    )
+  }
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={data} margin={margin}>
+        {axes}
+        <Bar dataKey="value" name={yName} fill={color} radius={[3, 3, 0, 0]}
+          activeBar={{ stroke: "var(--foreground)", strokeWidth: 1 }} isAnimationActive={!preview} />
+      </BarChart>
+    </ResponsiveContainer>
+  )
+}
+
 /** Aperçu compact de la heatmap : quelques barres d'intensité, sans axes. */
 function MiniHeatmap({ workload }: { readonly workload: Workload | null }) {
   const totals = (workload?.members ?? []).map((m) => m.openIssues)
@@ -241,7 +408,7 @@ function MiniHeatmap({ workload }: { readonly workload: Workload | null }) {
   return (
     <div className="flex h-full items-end gap-1">
       {totals.slice(0, 12).map((v, i) => (
-        <div key={i} className="flex-1 rounded-t bg-[var(--chart-1)]" style={{ height: `${Math.max((v / max) * 100, 6)}%`, opacity: 0.35 + (v / max) * 0.65 }} />
+        <div key={i} className="flex-1 rounded-t" style={{ backgroundColor: "#6366f1", height: `${Math.max((v / max) * 100, 6)}%`, opacity: 0.35 + (v / max) * 0.65 }} />
       ))}
     </div>
   )
@@ -333,38 +500,61 @@ function ChartExplorerModal({
   onOpenChange: (open: boolean) => void
   initialPresetId: string
 }>) {
-  // Le graphe affiché : soit un preset du catalogue, soit une spec produite par l'IA.
+  // Le graphe affiché : soit un preset du catalogue, soit un graphe épinglé, soit une spec IA.
   const [activeSpec, setActiveSpec] = useState<ChartSpec | null>(null)
   const [activePresetId, setActivePresetId] = useState<string | null>(null)
+  const [activeSavedId, setActiveSavedId] = useState<number | null>(null)
   const [prompt, setPrompt] = useState("")
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState(false)
+  const [saved, setSaved] = useState<SavedChart[]>([])
+  const [pinning, setPinning] = useState(false)
+  const [view3d, setView3d] = useState(false)
 
-  // À l'ouverture, positionner sur le preset demandé.
+  const refreshSaved = useCallback(() => {
+    listSavedCharts(slug).then(setSaved).catch(() => { /* non bloquant */ })
+  }, [slug])
+
+  // À l'ouverture, positionner sur le preset demandé + charger les graphes épinglés.
   useEffect(() => {
     if (!open) return
     const p = PRESETS.find((x) => x.id === initialPresetId) ?? PRESETS[0]
     setActivePresetId(p.id)
+    setActiveSavedId(null)
     setActiveSpec(p.spec)
     setPrompt("")
     setGenError(false)
-  }, [open, initialPresetId])
+    setView3d(false)
+    refreshSaved()
+  }, [open, initialPresetId, refreshSaved])
 
   function pickPreset(p: Preset) {
     setActivePresetId(p.id)
+    setActiveSavedId(null)
     setActiveSpec(p.spec)
     setGenError(false)
+    setView3d(false)
   }
 
-  async function runGenerate() {
-    const q = prompt.trim()
+  function pickSaved(chart: SavedChart) {
+    setActivePresetId(null)
+    setActiveSavedId(chart.id)
+    setActiveSpec(chart.spec)
+    setGenError(false)
+    setView3d(false)
+  }
+
+  async function runGenerate(override?: string) {
+    const q = (override ?? prompt).trim()
     if (!q || generating) return
     setGenerating(true)
     setGenError(false)
     try {
       const spec = await generateChart(slug, q, projectId)
       setActivePresetId(null)   // on quitte les presets : c'est une spec IA
+      setActiveSavedId(null)
       setActiveSpec(spec)
+      setView3d(false)
     } catch {
       setGenError(true)
     } finally {
@@ -372,17 +562,64 @@ function ChartExplorerModal({
     }
   }
 
-  const aiGenerated = activePresetId === null && activeSpec !== null
+  async function pinActive() {
+    if (!activeSpec || pinning) return
+    setPinning(true)
+    try {
+      const chart = await saveChart(slug, activeSpec.title || "Graphe", activeSpec)
+      toast.success("Graphe épinglé dans « Custom »")
+      setSaved((s) => [chart, ...s])
+      setActivePresetId(null)
+      setActiveSavedId(chart.id)
+    } catch {
+      toast.error("Impossible d'épingler le graphe")
+    } finally {
+      setPinning(false)
+    }
+  }
+
+  async function removeSaved(id: number) {
+    try {
+      await deleteSavedChart(slug, id)
+      setSaved((s) => s.filter((c) => c.id !== id))
+      if (activeSavedId === id) pickPreset(PRESETS[0])
+    } catch {
+      toast.error("Suppression impossible")
+    }
+  }
+
+  const aiGenerated = activePresetId === null && activeSavedId === null && activeSpec !== null
+  // Épinglable : UNIQUEMENT les graphes générés par l'IA (les permanents sont déjà là, un
+  // graphe déjà épinglé n'a pas à l'être deux fois).
+  const canPin = aiGenerated && activeSpec !== null && activeSpec.mode !== "unsupported"
+  // Vue 3D proposée pour les répartitions en barres (une valeur par catégorie).
+  const can3d = activeSpec !== null && activeSpec.mode === "breakdown" && activeSpec.chartType !== "line"
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl gap-0 overflow-hidden p-0">
-        <DialogTitle className="sr-only">Explorateur de graphes</DialogTitle>
-        <div className="flex h-[560px] flex-col sm:flex-row">
+    <Drawer open={open} onOpenChange={onOpenChange} direction="bottom">
+      <DrawerContent className="h-[80vh]">
+        {/* Barre de titre du sheet (la poignée est rendue par DrawerContent). */}
+        <div className="flex items-center justify-between gap-2 border-b border-border px-4 pb-3 pt-1">
+          <div className="flex items-center gap-2">
+            <Activity className="size-4 text-primary" />
+            <DrawerTitle className="text-sm">Explorateur de graphes</DrawerTitle>
+            <DrawerDescription className="sr-only">
+              Catalogue de graphes et génération par l&apos;IA, rendus depuis les données réelles.
+            </DrawerDescription>
+          </div>
+          <DrawerClose asChild>
+            <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-foreground">
+              <X className="size-4" />
+            </Button>
+          </DrawerClose>
+        </div>
+
+        <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
           {/* Sidebar : catalogue + input IA */}
           <aside className="flex w-full shrink-0 flex-col border-b border-border bg-muted/30 sm:w-64 sm:border-b-0 sm:border-r">
-            <div className="px-3 py-3">
-              <p className="px-1 pb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Catalogue</p>
+            <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+              {/* 1) Graphes permanents (base) — toujours là, non épinglables. */}
+              <p className="px-1 pb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Permanents</p>
               <div className="flex flex-col gap-0.5">
                 {PRESETS.map((p) => (
                   <button
@@ -398,10 +635,44 @@ function ChartExplorerModal({
                   </button>
                 ))}
               </div>
+
+              {/* 2) Graphes épinglés — les graphes IA que tu as sauvegardés. Toujours visible. */}
+              <p className="mt-4 flex items-center gap-1.5 px-1 pb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <Pin className="size-3" /> Épinglés {saved.length > 0 && <span className="tabular-nums opacity-60">{saved.length}</span>}
+              </p>
+              {saved.length === 0 ? (
+                <p className="px-2.5 py-2 text-xs leading-relaxed text-muted-foreground/70">
+                  Génère un graphe avec l&apos;IA, puis clique <span className="font-medium text-foreground">Épingler</span> pour le garder ici.
+                </p>
+              ) : (
+                <div className="flex flex-col gap-0.5">
+                  {saved.map((chart) => (
+                    <div
+                      key={chart.id}
+                      className={cn(
+                        "group/item flex items-center gap-2 rounded-md px-2.5 py-2 text-sm transition-colors",
+                        activeSavedId === chart.id ? "bg-primary/10 text-primary" : "text-foreground hover:bg-accent/60",
+                      )}
+                    >
+                      <button type="button" onClick={() => pickSaved(chart)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
+                        <BarChart3 className="size-4 shrink-0" /> <span className="truncate">{chart.title}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeSaved(chart.id)}
+                        className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-rose-500 group-hover/item:opacity-100"
+                        title="Retirer"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* Input IA — pousse en bas de la sidebar */}
-            <div className="mt-auto border-t border-border p-3">
+            {/* Input IA — ancré en bas de la sidebar */}
+            <div className="shrink-0 border-t border-border p-3">
               <p className="mb-1.5 flex items-center gap-1.5 px-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 <Sparkles className="size-3 text-primary" /> Générer avec l&apos;IA
               </p>
@@ -413,7 +684,7 @@ function ChartExplorerModal({
                   placeholder="ex. charge par membre"
                   className="h-9 min-w-0 flex-1 rounded-md border border-border bg-background px-2.5 text-sm outline-none focus:border-primary/50"
                 />
-                <Button size="sm" className="h-9 shrink-0 px-2.5" onClick={runGenerate} disabled={!prompt.trim() || generating}>
+                <Button size="sm" className="h-9 shrink-0 px-2.5" onClick={() => runGenerate()} disabled={!prompt.trim() || generating}>
                   {generating ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
                 </Button>
               </div>
@@ -423,7 +694,7 @@ function ChartExplorerModal({
           </aside>
 
           {/* Zone principale : le graphe */}
-          <div className="flex min-w-0 flex-1 flex-col p-5">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col p-5">
             {activeSpec && (
               <>
                 <div className="mb-1 flex items-center gap-2">
@@ -433,18 +704,56 @@ function ChartExplorerModal({
                       <Sparkles className="size-2.5" /> IA
                     </span>
                   )}
+                  <div className="ml-auto flex shrink-0 items-center gap-1.5">
+                    {can3d && (
+                      <div className="flex rounded-lg border border-border bg-background p-0.5">
+                        {([["2D", false], ["3D", true]] as const).map(([lbl, val]) => (
+                          <button
+                            key={lbl}
+                            type="button"
+                            onClick={() => setView3d(val)}
+                            className={cn(
+                              "flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors",
+                              view3d === val ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground",
+                            )}
+                          >
+                            {val && <Box className="size-3.5" />}{lbl}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {canPin && (
+                      <Button
+                        variant="outline" size="sm"
+                        className="h-7 gap-1.5 text-xs"
+                        onClick={pinActive}
+                        disabled={pinning}
+                        title="Épingler dans « Custom » pour le garder"
+                      >
+                        {pinning ? <Loader2 className="size-3.5 animate-spin" /> : <Pin className="size-3.5" />}
+                        Épingler
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 {activeSpec.description && (
                   <p className="mb-3 text-sm text-muted-foreground">{activeSpec.description}</p>
                 )}
-                <div className="min-h-0 flex-1">
-                  <SpecChart slug={slug} projectId={projectId} spec={activeSpec} variant="full" />
+                {/* overflow-hidden (pas auto) : recharts mesure mal sa taille et perd le hover dans
+                    un conteneur scrollable. Le heatmap gère son propre scroll en interne. */}
+                <div className="min-h-0 flex-1 overflow-hidden">
+                  <SpecChart
+                    slug={slug} projectId={projectId} spec={activeSpec} variant="full" threeD={view3d}
+                    onSuggestion={(p) => { setPrompt(p); void runGenerate(p) }}
+                  />
                 </div>
               </>
             )}
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </DrawerContent>
+    </Drawer>
   )
 }
+
+
