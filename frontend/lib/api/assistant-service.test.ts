@@ -27,6 +27,9 @@ const buildAnswer = () => ({
   usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
 });
 
+// L'endpoint renvoie désormais un tour : { conversationId, title, answer }.
+const buildTurn = () => ({ conversationId: 1, title: 'Hello there', answer: buildAnswer() });
+
 describe('assistant-service', () => {
   const slug = 'acme';
 
@@ -35,22 +38,22 @@ describe('assistant-service', () => {
   });
 
   it('sendAgentMessage: POST chat route with { message } and returns full answer', async () => {
-    const answer = buildAnswer();
-    vi.mocked(apiClient.post).mockResolvedValue(envelope(answer));
+    const turn = buildTurn();
+    vi.mocked(apiClient.post).mockResolvedValue(envelope(turn));
 
     const result = await sendAgentMessage(slug, 'hi');
 
-    expect(apiClient.post).toHaveBeenCalledWith(ASSISTANT_ROUTES.CHAT(slug), { message: 'hi' }, expect.anything());
-    expect(result).toEqual(answer);
+    expect(apiClient.post).toHaveBeenCalledWith(ASSISTANT_ROUTES.CHAT(slug), { message: 'hi', conversationId: null }, expect.anything());
+    expect(result).toEqual(turn);
   });
 
   it('sendAssistantMessage: returns only the answer markdown string', async () => {
-    const answer = buildAnswer();
-    vi.mocked(apiClient.post).mockResolvedValue(envelope(answer));
+    const turn = buildTurn();
+    vi.mocked(apiClient.post).mockResolvedValue(envelope(turn));
 
     const result = await sendAssistantMessage(slug, 'hi');
 
-    expect(apiClient.post).toHaveBeenCalledWith(ASSISTANT_ROUTES.CHAT(slug), { message: 'hi' }, expect.anything());
+    expect(apiClient.post).toHaveBeenCalledWith(ASSISTANT_ROUTES.CHAT(slug), { message: 'hi', conversationId: null }, expect.anything());
     expect(result).toBe('Hello there');
   });
 

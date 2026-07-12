@@ -40,11 +40,25 @@ export interface AssistantAnswer {
   usage: AssistantUsage
 }
 
-/** Envoie un message à l'agent et renvoie la réponse structurée complète. */
-export async function sendAgentMessage(slug: string, message: string): Promise<AssistantAnswer> {
-  const res = await apiClient.post<{ data: AssistantAnswer }>(
+/** Réponse d'un tour : la réponse de l'agent + la conversation où il est rattaché (créée si absente). */
+export interface ChatTurnResponse {
+  conversationId: number
+  title: string
+  answer: AssistantAnswer
+}
+
+/**
+ * Envoie un message à l'agent (dans une conversation existante ou nouvelle) et renvoie la réponse
+ * structurée + l'id/titre de la conversation.
+ */
+export async function sendAgentMessage(
+  slug: string,
+  message: string,
+  conversationId?: number | null,
+): Promise<ChatTurnResponse> {
+  const res = await apiClient.post<{ data: ChatTurnResponse }>(
     ASSISTANT_ROUTES.CHAT(slug),
-    { message },
+    { message, conversationId: conversationId ?? null },
     { timeout: AI_TIMEOUT_MS },
   )
   return res.data.data
@@ -52,5 +66,5 @@ export async function sendAgentMessage(slug: string, message: string): Promise<A
 
 /** Variante texte (compat) : renvoie seulement la réponse markdown. */
 export async function sendAssistantMessage(slug: string, message: string): Promise<string> {
-  return (await sendAgentMessage(slug, message)).answer
+  return (await sendAgentMessage(slug, message)).answer.answer
 }
