@@ -11,6 +11,7 @@ export { PromptSuggestion } from "./prompt-suggestion"
 export { FeedbackBar } from "./feedback-bar"
 export { ScrollButton } from "./scroll-button"
 export { ThinkingBar } from "./thinking-bar"
+export { TokenMeter } from "./token-meter"
 export { Message, type MessageRole, type MessageProps } from "./message"
 
 // Réexports des primitives déjà en place (cohérence du kit).
