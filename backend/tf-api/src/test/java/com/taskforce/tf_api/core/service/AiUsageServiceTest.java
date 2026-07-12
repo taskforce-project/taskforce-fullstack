@@ -86,7 +86,7 @@ class AiUsageServiceTest {
     @Test
     @DisplayName("getUsage : renvoie la conso agrégée du compte + le plafond du plan du propriétaire")
     void getUsage_returns_account_aggregate_and_owner_plan() {
-        User owner = User.builder().id(99L).planType(PlanType.PRO).build();
+        User owner = User.builder().id(99L).planType(PlanType.BUSINESS).build();
         Workspace ws = Workspace.builder().id(10L).slug("acme").owner(owner).build();
         when(access.resolveAndAuthorize("acme", 7L)).thenReturn(ws);
 
@@ -100,9 +100,9 @@ class AiUsageServiceTest {
 
         AiUsageResponse res = service.getUsage("acme", 7L);
 
-        assertThat(res.plan()).isEqualTo("PRO");
+        assertThat(res.plan()).isEqualTo("BUSINESS");
         assertThat(res.usedTokens()).isEqualTo(500);
-        assertThat(res.limitTokens()).isEqualTo(1_000_000L); // plafond PRO
+        assertThat(res.limitTokens()).isEqualTo(2_000_000L); // plafond BUSINESS
         assertThat(res.requestCount()).isEqualTo(3);
     }
 }
