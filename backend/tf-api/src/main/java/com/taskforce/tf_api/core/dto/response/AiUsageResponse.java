@@ -1,7 +1,7 @@
 package com.taskforce.tf_api.core.dto.response;
 
 /**
- * Consommation IA du mois courant + plafond du plan, pour un workspace.
+ * Consommation IA du mois courant + plafond du plan, pour un **compte** (propriétaire, agrégée sur ses workspaces).
  * {@code limitTokens = -1} → illimité (plan ENTERPRISE).
  */
 public record AiUsageResponse(
