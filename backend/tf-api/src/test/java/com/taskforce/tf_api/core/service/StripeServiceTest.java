@@ -74,10 +74,10 @@ class StripeServiceTest {
         @DisplayName("devrait accepter plan en minuscules")
         void getPriceIdForPlan_withLowercase_shouldWork() {
             // When
-            String result = stripeService.getPriceIdForPlan("pro");
+            String result = stripeService.getPriceIdForPlan("business");
 
             // Then
-            assertThat(result).isEqualTo("price_pro_mock");
+            assertThat(result).isEqualTo("price_business_mock");
         }
 
         @Test
