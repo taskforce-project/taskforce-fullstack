@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,11 +31,25 @@ import lombok.RequiredArgsConstructor;
 public class AiConversationService {
 
     private static final String DEFAULT_TITLE = "Nouvelle conversation";
-    /** Nb de messages d'historique injectés dans le prompt (mémoire multi-tours). */
+    /** Nb de messages d'historique injectés dans le prompt (mémoire multi-tours, avant compression). */
     private static final int HISTORY_LIMIT = 10;
+    /** Seuil (en nb de messages) au-delà duquel on compresse les anciens échanges dans un résumé. */
+    private static final int COMPRESS_THRESHOLD = 12;
+    /** Nb de messages récents gardés verbatim (le reste est condensé dans le résumé glissant). */
+    private static final int KEEP_RECENT = 6;
+
+    private static final String SUMMARY_SYSTEM =
+        "Tu condenses l'historique d'une conversation entre un utilisateur et l'assistant Cortex. "
+        + "Produis un résumé FACTUEL et compact (150 mots max) qui préserve le contexte, les faits/chiffres "
+        + "donnés, les décisions prises, les préférences et les tâches en cours. Pas de salutations ni de méta.";
 
     private final AiConversationRepository conversationRepository;
     private final AiMessageRepository messageRepository;
+    private final LlmClient llm;
+
+    // Nom de modèle passé au client LLM (ignoré par l'AI Gateway, qui impose son modèle Ollama).
+    @Value("${ai.groq.assistant-model:llama-3.3-70b-versatile}")
+    private String model;
 
     // ── Lecture ───────────────────────────────────────────────────────────────
 
@@ -60,17 +75,90 @@ public class AiConversationService {
             messageRepository.sumTokens(id), messages);
     }
 
-    /** Historique récent (chronologique) au format LLM [{role, content}] — mémoire multi-tours. */
+    /**
+     * Historique au format LLM [{role, content}] pour la mémoire multi-tours. Si la conversation a été
+     * compressée, renvoie le <b>résumé glissant</b> (message system) suivi des messages récents (au-delà
+     * du filigrane) ; sinon les {@link #HISTORY_LIMIT} derniers messages, en ordre chronologique.
+     */
     @Transactional(readOnly = true)
     public List<Map<String, Object>> recentHistory(Long conversationId) {
+        AiConversation conv = conversationRepository.findById(conversationId).orElse(null);
+        String summary = conv != null ? conv.getSummary() : null;
+        List<Map<String, Object>> out = new ArrayList<>();
+
+        if (summary != null && !summary.isBlank()) {
+            out.add(Map.of("role", "system",
+                "content", "Résumé des échanges précédents de cette conversation : " + summary));
+            long upto = conv.getSummaryUptoId() != null ? conv.getSummaryUptoId() : 0L;
+            for (AiMessage m : messageRepository.findByConversationIdAndIdGreaterThanOrderByIdAsc(conversationId, upto)) {
+                out.add(Map.of("role", m.getRole(), "content", m.getContent()));
+            }
+            return out;
+        }
+
         List<AiMessage> recent = messageRepository.findByConversationIdOrderByCreatedAtDesc(
             conversationId, PageRequest.of(0, HISTORY_LIMIT));
-        List<Map<String, Object>> out = new ArrayList<>();
         for (int i = recent.size() - 1; i >= 0; i--) { // rétablir l'ordre chronologique
             AiMessage m = recent.get(i);
             out.add(Map.of("role", m.getRole(), "content", m.getContent()));
         }
         return out;
+    }
+
+    /**
+     * Compression de contexte : si le fil dépasse {@link #COMPRESS_THRESHOLD} messages, condense les plus
+     * anciens (au-delà des {@link #KEEP_RECENT} récents gardés verbatim) dans un résumé glissant — un seul
+     * appel LLM, uniquement au franchissement. Best-effort : un échec de résumé ne casse jamais le chat.
+     * À appeler avant {@link #recentHistory} pour un tour donné.
+     */
+    @Transactional
+    public void compressIfNeeded(Long conversationId) {
+        if (!llm.isConfigured()) {
+            return;
+        }
+        if (messageRepository.countByConversationId(conversationId) <= COMPRESS_THRESHOLD) {
+            return;
+        }
+        AiConversation conv = conversationRepository.findById(conversationId).orElse(null);
+        if (conv == null) {
+            return;
+        }
+        long upto = conv.getSummaryUptoId() != null ? conv.getSummaryUptoId() : 0L;
+        List<AiMessage> unsummarized =
+            messageRepository.findByConversationIdAndIdGreaterThanOrderByIdAsc(conversationId, upto);
+        if (unsummarized.size() <= KEEP_RECENT) {
+            return; // rien de nouveau à condenser (on garde les récents verbatim)
+        }
+        List<AiMessage> toSummarize = unsummarized.subList(0, unsummarized.size() - KEEP_RECENT);
+        try {
+            String summary = llm.chatCompletion(model, SUMMARY_SYSTEM, buildSummaryPrompt(conv.getSummary(), toSummarize), false, "fast");
+            if (summary != null && !summary.isBlank()) {
+                conv.setSummary(summary.strip());
+                conv.setSummaryUptoId(toSummarize.get(toSummarize.size() - 1).getId());
+                conversationRepository.save(conv);
+            }
+        } catch (Exception e) {
+            // Compression best-effort : on n'échoue pas le tour pour un résumé raté.
+        }
+    }
+
+    /** Construit le prompt de résumé : résumé courant (à étendre) + nouveaux échanges à intégrer. */
+    private static String buildSummaryPrompt(String existingSummary, List<AiMessage> messages) {
+        StringBuilder sb = new StringBuilder();
+        if (existingSummary != null && !existingSummary.isBlank()) {
+            sb.append("Résumé actuel à mettre à jour :\n").append(existingSummary).append("\n\n");
+        }
+        sb.append("Nouveaux échanges à intégrer :\n");
+        for (AiMessage m : messages) {
+            String who = "assistant".equals(m.getRole()) ? "Cortex" : "Utilisateur";
+            String c = m.getContent() != null ? m.getContent() : "";
+            if (c.length() > 600) {
+                c = c.substring(0, 600) + "…";
+            }
+            sb.append("- ").append(who).append(" : ").append(c.replace("\n", " ")).append('\n');
+        }
+        sb.append("\nRésumé mis à jour (150 mots max) :");
+        return sb.toString();
     }
 
     // ── Écriture ────────────────────────────────────────────────────────────────
