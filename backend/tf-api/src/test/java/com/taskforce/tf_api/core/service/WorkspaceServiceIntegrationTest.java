@@ -119,7 +119,7 @@ class WorkspaceServiceIntegrationTest extends AbstractIntegrationTest {
 
             User other = userRepository.save(User.builder()
                 .keycloakId("kc-dupe").email("dupe2@it.dev").displayName("Dupe2")
-                .isActive(true).planType(PlanType.PRO).build());
+                .isActive(true).planType(PlanType.BUSINESS).build());
             Workspace second = workspaceService.createWorkspace(other, "Dupe");
 
             assertThat(first.getSlug()).isEqualTo("dupe");
@@ -165,7 +165,7 @@ class WorkspaceServiceIntegrationTest extends AbstractIntegrationTest {
         void should_allow_pro_beyond_free_limit() {
             User pro = userRepository.save(User.builder()
                 .keycloakId("kc-pro").email("pro@it.dev").displayName("Pro")
-                .isActive(true).planType(PlanType.PRO).build());
+                .isActive(true).planType(PlanType.BUSINESS).build());
 
             workspaceService.createNewWorkspace(pro.getId(), req("P1"));
             workspaceService.createNewWorkspace(pro.getId(), req("P2"));
@@ -205,7 +205,7 @@ class WorkspaceServiceIntegrationTest extends AbstractIntegrationTest {
     class Usage {
 
         @Test
-        @DisplayName("renvoie le plan, l'usage et les limites du plan (FREE : 5 membres / 2 workspaces)")
+        @DisplayName("renvoie le plan, l'usage et les limites du plan (FREE : membres illimités / 2 workspaces)")
         void should_report_usage_and_limits() {
             WorkspaceResponse ws = workspaceService.createNewWorkspace(owner.getId(), req("Usage WS"));
 
@@ -213,7 +213,7 @@ class WorkspaceServiceIntegrationTest extends AbstractIntegrationTest {
 
             assertThat(usage.getPlan()).isEqualTo(PlanType.FREE.name());
             assertThat(usage.getMembersUsed()).isEqualTo(1);
-            assertThat(usage.getMembersLimit()).isEqualTo(5);
+            assertThat(usage.getMembersLimit()).isEqualTo(-1); // membres illimités (tarification par membre)
             assertThat(usage.getWorkspacesUsed()).isEqualTo(1);
             assertThat(usage.getWorkspacesLimit()).isEqualTo(2);
         }
