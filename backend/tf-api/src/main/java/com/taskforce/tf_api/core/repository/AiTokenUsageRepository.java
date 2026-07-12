@@ -8,5 +8,5 @@ import com.taskforce.tf_api.core.model.AiTokenUsage;
 
 public interface AiTokenUsageRepository extends JpaRepository<AiTokenUsage, Long> {
 
-    Optional<AiTokenUsage> findByWorkspaceIdAndPeriod(Long workspaceId, String period);
+    Optional<AiTokenUsage> findByAccountIdAndPeriod(Long accountId, String period);
 }
