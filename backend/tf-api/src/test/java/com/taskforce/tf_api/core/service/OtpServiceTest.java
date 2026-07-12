@@ -120,10 +120,10 @@ class OtpServiceTest {
 
             // When
             OtpVerification result = otpService.generateAndSendOtp(
-                    email, "Pro User", OtpType.EMAIL_VERIFICATION, null, "keycloak-pro", PlanType.PRO);
+                    email, "Pro User", OtpType.EMAIL_VERIFICATION, null, "keycloak-pro", PlanType.BUSINESS);
 
             // Then
-            assertThat(result.getPlanType()).isEqualTo(PlanType.PRO.toString());
+            assertThat(result.getPlanType()).isEqualTo(PlanType.BUSINESS.toString());
         }
 
         @Test
@@ -266,7 +266,7 @@ class OtpServiceTest {
             // Given
             String email = "test@example.com";
             String keycloakId = "keycloak-123";
-            String planType = PlanType.PRO.toString();
+            String planType = PlanType.BUSINESS.toString();
             OtpVerification otp = TestDataBuilder.buildOtp(email, "123456", OtpType.EMAIL_VERIFICATION);
 
             when(otpRepository.findPendingOtpByEmail(email)).thenReturn(Optional.of(otp));
@@ -289,7 +289,7 @@ class OtpServiceTest {
             when(otpRepository.findPendingOtpByEmail(email)).thenReturn(Optional.empty());
 
             // When
-            boolean result = otpService.updatePlanType(email, "keycloak-123", PlanType.PRO.toString());
+            boolean result = otpService.updatePlanType(email, "keycloak-123", PlanType.BUSINESS.toString());
 
             // Then
             assertThat(result).isFalse();
