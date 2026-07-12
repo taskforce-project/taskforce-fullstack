@@ -25,6 +25,7 @@ import { getAvatarUrl } from "@/lib/utils/avatar"
 import { useAuth } from "@/lib/contexts/auth-context"
 import { useTranslation } from "@/lib/i18n"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
+import { useSettingsStore } from "@/lib/store/settings-store"
 import {
   Sidebar,
   SidebarContent,
@@ -147,6 +148,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { t } = useTranslation()
   const pathname = usePathname()
   const activeWorkspace = useWorkspaceStore((s) => s.activeWorkspace)
+  const openSettings = useSettingsStore((s) => s.openSettings)
   const slug = activeWorkspace?.slug ?? ""
 
   const withSlug = (url: string) => (slug ? `/${slug}${url}` : url)
@@ -220,6 +222,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             </CollapsibleContent>
           </SidebarMenuItem>
         </Collapsible>
+      )
+    }
+
+    // Settings ouvre le grand modal (façon Claude) plutôt qu'une page.
+    if (item.key === "nav.settings") {
+      return (
+        <SidebarMenuItem key={item.key}>
+          <SidebarMenuButton tooltip={t(item.key)} onClick={() => openSettings()}>
+            <item.icon />
+            <span>{t(item.key)}</span>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
       )
     }
 
