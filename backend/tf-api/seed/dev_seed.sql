@@ -672,55 +672,6 @@ BEGIN
            'WEB-' || (1 + (n % 8)), 'Web Application'
     FROM generate_series(1, 20) AS n;
 
-    -- =====================================================================
-    -- 24. Chat natif — canaux, membres, messages (temps réel STOMP)
-    -- =====================================================================
-    DECLARE
-        v_ch_general BIGINT;
-        v_ch_random  BIGINT;
-        v_ch_dev     BIGINT;
-        v_ch_design  BIGINT;
-    BEGIN
-        INSERT INTO channels (workspace_id, kind, name, description, is_private, created_by)
-        VALUES (v_ws, 'CHANNEL', 'general', 'Discussions générales de l''équipe.', false, v_admin)
-        RETURNING id INTO v_ch_general;
-
-        INSERT INTO channels (workspace_id, kind, name, description, is_private, created_by)
-        VALUES (v_ws, 'CHANNEL', 'random', 'Hors-sujet, pauses café, GIFs.', false, v_admin)
-        RETURNING id INTO v_ch_random;
-
-        INSERT INTO channels (workspace_id, kind, name, description, is_private, created_by)
-        VALUES (v_ws, 'CHANNEL', 'dev', 'Discussions techniques backend / frontend.', false, v_marcus)
-        RETURNING id INTO v_ch_dev;
-
-        INSERT INTO channels (workspace_id, kind, name, description, is_private, created_by)
-        VALUES (v_ws, 'CHANNEL', 'design', 'Design system, maquettes, UI/UX.', false, v_lina)
-        RETURNING id INTO v_ch_design;
-
-        -- Membres : toute l'équipe sur general/random ; sous-groupes sur dev/design
-        INSERT INTO channel_members (channel_id, user_id)
-        SELECT c.ch, u.usr
-        FROM (VALUES (v_ch_general), (v_ch_random)) AS c(ch)
-        CROSS JOIN (VALUES (v_admin),(v_sarah),(v_marcus),(v_aicha),(v_tom),(v_lina),(v_omar),(v_nina),(v_diego)) AS u(usr);
-
-        INSERT INTO channel_members (channel_id, user_id) VALUES
-            (v_ch_dev, v_admin), (v_ch_dev, v_marcus), (v_ch_dev, v_aicha), (v_ch_dev, v_tom), (v_ch_dev, v_nina), (v_ch_dev, v_diego),
-            (v_ch_design, v_admin), (v_ch_design, v_sarah), (v_ch_design, v_lina), (v_ch_design, v_aicha);
-
-        -- Historique de messages (createdAt étalés pour un rendu réaliste)
-        INSERT INTO chat_messages (channel_id, author_id, content, created_at) VALUES
-            (v_ch_general, v_admin,  'Bienvenue sur le workspace TaskForce HQ 👋', now() - INTERVAL '3 days'),
-            (v_ch_general, v_sarah,  'Hello tout le monde ! Contente de démarrer 🎉', now() - INTERVAL '3 days' + INTERVAL '5 min'),
-            (v_ch_general, v_marcus, 'On fait le point sprint à 14h ?', now() - INTERVAL '2 days'),
-            (v_ch_general, v_tom,    'OK pour moi 👍', now() - INTERVAL '2 days' + INTERVAL '3 min'),
-            (v_ch_dev,     v_marcus, 'La branche chore/integration est prête pour le chat temps réel.', now() - INTERVAL '1 day'),
-            (v_ch_dev,     v_aicha,  'Nickel, le STOMP se connecte bien côté front.', now() - INTERVAL '1 day' + INTERVAL '12 min'),
-            (v_ch_dev,     v_nina,   'Pensez à seed des canaux pour la démo 😉', now() - INTERVAL '20 hours'),
-            (v_ch_design,  v_lina,   'Nouvelle version du design system dispo sur Figma.', now() - INTERVAL '6 hours'),
-            (v_ch_design,  v_sarah,  'Super, je l''intègre cet après-midi.', now() - INTERVAL '5 hours'),
-            (v_ch_random,  v_diego,  'Quelqu''un pour un café ? ☕', now() - INTERVAL '2 hours');
-    END;
-
     -- ==================================================================
     -- Échéances réalistes — remplit la heatmap de charge (US-022) + les
     -- compteurs « en retard » / « échéance proche » du Decision Board.
@@ -748,17 +699,6 @@ BEGIN
       AND (i.start_date IS NULL OR i.start_date > i.due_date)
       AND i.project_id IN (SELECT id FROM projects WHERE workspace_id = v_ws);
 
-    -- ==================================================================
-    -- Discussions (forum interne) — la table était vide ; on la remplit de fils
-    -- réalistes : catégories et états variés, une épinglée, une verrouillée.
-    -- ==================================================================
-    INSERT INTO discussions (workspace_id, author_id, title, body, category, state, is_pinned, is_locked, reply_count, reaction_count, tags, created_at, updated_at) VALUES
-      (v_ws, v_admin,  'Roadmap Q3 : priorités produit',              'On aligne les priorités du trimestre. Vos retours sur le focus « AI Delivery OS » ?',      'ANNOUNCEMENT', 'OPEN',     TRUE,  FALSE, 7, 12, 'roadmap,produit',    now() - INTERVAL '5 days',  now() - INTERVAL '2 hours'),
-      (v_ws, v_sarah,  'Idée : mode focus sur le board',              'Un raccourci pour masquer les colonnes terminées pendant un sprint, ça vous parle ?',      'IDEA',         'OPEN',     FALSE, FALSE, 4,  8, 'ux,board',           now() - INTERVAL '4 days',  now() - INTERVAL '1 day'),
-      (v_ws, v_marcus, 'Question : convention de nommage des branches','On part sur feature/*, fix/* — on ajoute chore/* pour la maintenance ?',                   'QUESTION',     'ANSWERED', FALSE, FALSE, 6,  3, 'git,convention',     now() - INTERVAL '6 days',  now() - INTERVAL '3 days'),
-      (v_ws, v_nina,   'Show & Tell : explorateur de graphes IA',     'Démo du nouvel explorateur de graphes généré par l''IA sur la page Intelligence 🎉',       'SHOW',         'OPEN',     FALSE, FALSE, 9, 21, 'ia,analytics',       now() - INTERVAL '2 days',  now() - INTERVAL '4 hours'),
-      (v_ws, v_tom,    'Post-mortem : incident déploiement',          'Retour sur l''incident de la semaine dernière et les actions correctives prises.',         'GENERAL',      'CLOSED',   FALSE, TRUE,  5,  6, 'infra,post-mortem',  now() - INTERVAL '8 days',  now() - INTERVAL '7 days'),
-      (v_ws, v_lina,   'Design system : tokens de couleur',           'Proposition de palette pour les graphiques (emerald/blue/rose/indigo) — vos avis ?',        'IDEA',         'OPEN',     FALSE, FALSE, 3,  5, 'design,ui',          now() - INTERVAL '1 day',   now() - INTERVAL '6 hours');
 
     RAISE NOTICE 'Seed QA ULTRA-complet : workspace "taskforce-demo" (id=%) — 9 membres + 24 solos (hors équipe), 4 projets, ~267 issues (throughput JOURNALIER 30 j + hebdo, KPIs/capacité/burndown remplis), sous-tâches/URGENT/cancelled, commentaires, checklist, relations, worklogs (~70), 3 cycles + sprint actif peuplé, ~130 commentaires (fils), ~35 notifications (mix lu/non-lu), favoris, 5 pages, invitations, abonnement PRO + historique, demandes enterprise, ÉCHÉANCES réparties sur la quinzaine (heatmap de charge remplie).', v_ws;
 END
