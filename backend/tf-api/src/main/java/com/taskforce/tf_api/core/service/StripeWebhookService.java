@@ -40,6 +40,7 @@ public class StripeWebhookService {
     private final UserRepository userRepository;
     private final SubscriptionRepository subscriptionRepository;
     private final SubscriptionHistoryRepository subscriptionHistoryRepository;
+    private final StripeService stripeService;
 
     // =========================================================================
     // Handlers publics
@@ -71,15 +72,21 @@ public class StripeWebhookService {
         Subscription sub = subscriptionRepository.findByUserId(user.getId())
             .orElseGet(() -> Subscription.builder().userId(user.getId()).build());
 
+        // Applique le forfait acheté (metadata posée par BillingController au checkout in-app ;
+        // le priceId définitif est re-synchronisé ensuite par customer.subscription.updated).
+        PlanType purchased = resolvePlanFromMetadata(session.getMetadata());
+
         sub.setStatus(PlanStatus.ACTIVE);
         sub.setStripeCustomerId(customerId);
         sub.setStripeSubscriptionId(subscriptionId);
+        if (purchased != null) sub.setPlanType(purchased);
         if (sub.getStartedAt() == null) sub.setStartedAt(LocalDateTime.now());
         subscriptionRepository.save(sub);
 
         // User
         user.setPlanStatus(PlanStatus.ACTIVE);
         user.setStripeSubscriptionId(subscriptionId);
+        if (purchased != null) user.setPlanType(purchased);
         userRepository.save(user);
 
         recordHistory(user.getId(), event.getId(), event.getType(),
@@ -118,16 +125,22 @@ public class StripeWebhookService {
         sub.setCanceledAt(fromUnix(stripeSub.getCanceledAt()));
         sub.setTrialEnd(fromUnix(stripeSub.getTrialEnd()));
 
-        // Extraire priceId depuis les items de l'abonnement
+        // Extraire priceId + en déduire le forfait (source de vérité pour synchroniser plan_type).
+        PlanType planFromPrice = null;
         if (stripeSub.getItems() != null && stripeSub.getItems().getData() != null
                 && !stripeSub.getItems().getData().isEmpty()) {
             var price = stripeSub.getItems().getData().get(0).getPrice();
-            if (price != null) sub.setStripePriceId(price.getId());
+            if (price != null) {
+                sub.setStripePriceId(price.getId());
+                planFromPrice = stripeService.getPlanForPriceId(price.getId());
+            }
         }
+        if (planFromPrice != null) sub.setPlanType(planFromPrice);
 
         subscriptionRepository.save(sub);
 
         user.setPlanStatus(newStatus);
+        if (planFromPrice != null) user.setPlanType(planFromPrice); // up/down-grade via portail Stripe
         userRepository.save(user);
 
         recordHistory(user.getId(), event.getId(), event.getType(),
@@ -155,18 +168,33 @@ public class StripeWebhookService {
 
         subscriptionRepository.findByUserId(user.getId()).ifPresent(sub -> {
             sub.setStatus(PlanStatus.CANCELED);
+            sub.setPlanType(PlanType.FREE);
             sub.setCanceledAt(LocalDateTime.now());
             sub.setEndedAt(LocalDateTime.now());
             subscriptionRepository.save(sub);
         });
 
+        // Retour au forfait gratuit à l'annulation de l'abonnement (rétrogradation).
         user.setPlanStatus(PlanStatus.CANCELED);
+        user.setPlanType(PlanType.FREE);
         userRepository.save(user);
 
         recordHistory(user.getId(), event.getId(), event.getType(),
             user.getPlanType(), PlanStatus.CANCELED, stripeSub.getId(), null, null, null, null, null);
 
         log.info("customer.subscription.deleted traité : userId={}", user.getId());
+    }
+
+    /** Déduit le {@link PlanType} depuis la metadata Stripe {@code planType} (posée au checkout in-app). */
+    private PlanType resolvePlanFromMetadata(Map<String, String> metadata) {
+        if (metadata == null) return null;
+        String raw = metadata.get("planType");
+        if (raw == null || raw.isBlank()) return null;
+        try {
+            return PlanType.valueOf(raw.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
     }
 
     @Transactional
