@@ -5,7 +5,7 @@
 export * from "./register-storage";
 
 // Types
-export type PlanType = "FREE" | "PRO" | "ENTERPRISE";
+export type PlanType = "FREE" | "BASIC" | "BUSINESS" | "ENTERPRISE";
 export type PlanStatus =
   | "ACTIVE"
   | "CANCELED"
