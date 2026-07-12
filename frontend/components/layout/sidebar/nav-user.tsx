@@ -122,7 +122,7 @@ export function NavUser({
                   <Badge className="ml-auto h-5 bg-primary px-1.5 text-[10px] text-primary-foreground">Pro</Badge>
                 )}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => openSettings("billing")}>
+              <DropdownMenuItem onClick={() => router.push(`/${slug}/billing`)}>
                 <CreditCard />
                 Billing
               </DropdownMenuItem>
