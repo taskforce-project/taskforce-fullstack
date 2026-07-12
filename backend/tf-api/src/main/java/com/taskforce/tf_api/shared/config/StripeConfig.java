@@ -25,10 +25,13 @@ public class StripeConfig {
     @Value("${stripe.plans.free.price-id:#{null}}")
     private String freePriceId;
 
-    @Value("${stripe.plans.pro.price-id}")
-    private String proPriceId;
+    @Value("${stripe.plans.basic.price-id:}")
+    private String basicPriceId;
 
-    @Value("${stripe.plans.enterprise.price-id}")
+    @Value("${stripe.plans.business.price-id:}")
+    private String businessPriceId;
+
+    @Value("${stripe.plans.enterprise.price-id:}")
     private String enterprisePriceId;
 
     /**
@@ -39,7 +42,9 @@ public class StripeConfig {
         Stripe.apiKey = apiKey;
         log.info("Stripe API initialized - Webhook secret configured: {}",
                 webhookSecret != null && !webhookSecret.isEmpty());
-        log.info("Stripe Plans configured - PRO: {}, Enterprise: {}",
-                proPriceId != null, enterprisePriceId != null);
+        log.info("Stripe Plans configured - BASIC: {}, BUSINESS: {}, Enterprise: {}",
+                basicPriceId != null && !basicPriceId.isEmpty(),
+                businessPriceId != null && !businessPriceId.isEmpty(),
+                enterprisePriceId != null && !enterprisePriceId.isEmpty());
     }
 }
