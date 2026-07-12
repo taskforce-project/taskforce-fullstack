@@ -13,18 +13,17 @@ import { useAuth } from "@/lib/contexts/auth-context"
 import { stripeService, type SubscriptionInfo } from "@/lib/api/stripe-service"
 import { getAiUsage, type AiUsage } from "@/lib/api/ai-usage-service"
 
-type PlanKey = "FREE" | "PRO" | "ENTERPRISE"
-type Tab = "individual" | "team"
+type PlanKey = "FREE" | "BASIC" | "BUSINESS" | "ENTERPRISE"
+type SelfServe = "BASIC" | "BUSINESS"
 
 /** Ordre des forfaits (pour décider upgrade vs rétrogradation). */
-const RANK: Record<PlanKey, number> = { FREE: 0, PRO: 1, ENTERPRISE: 2 }
+const RANK: Record<PlanKey, number> = { FREE: 0, BASIC: 1, BUSINESS: 2, ENTERPRISE: 3 }
 
 interface PlanDef {
   key: PlanKey
   name: string
-  tab: Tab
   tagline: string
-  /** Prix mensuel en € (0 = gratuit, null = sur devis). Le prix annuel = −17 %. */
+  /** Prix mensuel PAR MEMBRE en € (0 = gratuit, null = sur devis). Prix annuel = −17 %. */
   monthly: number | null
   /** Forfait dont celui-ci hérite (« Tout ce qui est dans X, plus : »). */
   inherits?: string
@@ -32,63 +31,84 @@ interface PlanDef {
   highlight?: boolean
 }
 
-/** Forfaits TaskForce — crédits IA alignés sur le quota par compte (cf. AiUsageService.limitFor). */
+/** Forfaits TaskForce (par membre/mois) — crédits IA alignés sur le quota par compte (AiUsageService.limitFor). */
 const PLANS: PlanDef[] = [
   {
     key: "FREE",
     name: "Free",
-    tab: "individual",
-    tagline: "Pour découvrir TaskForce, en solo ou à quelques-uns.",
+    tagline: "Pour découvrir TaskForce.",
     monthly: 0,
     features: [
+      "Membres illimités",
       "2 workspaces",
-      "Jusqu'à 5 membres",
+      "250 issues",
       "Board, List & Cycles",
-      "Smart Assign de base",
+      "Smart Assign",
       "100 000 tokens IA Cortex / mois",
     ],
   },
   {
-    key: "PRO",
-    name: "Pro",
-    tab: "individual",
-    highlight: true,
-    tagline: "Pour les équipes qui livrent au quotidien.",
-    monthly: 12,
+    key: "BASIC",
+    name: "Basic",
+    tagline: "Pour les petites équipes qui démarrent.",
+    monthly: 10,
     inherits: "Free",
     features: [
-      "10 workspaces",
-      "Jusqu'à 50 membres",
-      "1 000 000 tokens IA Cortex / mois",
-      "Mémoire Cortex : le fil se souvient d'un tour à l'autre",
+      "5 workspaces",
+      "Issues illimitées",
+      "Uploads de fichiers illimités",
+      "Rôles administrateur",
+      "500 000 tokens IA Cortex / mois",
+    ],
+  },
+  {
+    key: "BUSINESS",
+    name: "Business",
+    tagline: "Pour les équipes qui livrent vite.",
+    monthly: 16,
+    inherits: "Basic",
+    highlight: true,
+    features: [
+      "Workspaces illimités",
+      "Invités & projets privés",
       "Analytics avancées + burndown",
-      "Décisions & insights IA",
+      "Décisions & workflows IA",
       "Intégration GitHub",
-      "Support prioritaire",
+      "2 000 000 tokens IA Cortex / mois",
     ],
   },
   {
     key: "ENTERPRISE",
     name: "Enterprise",
-    tab: "team",
-    tagline: "Pour les organisations : sécurité, conformité et déploiement dédié.",
+    tagline: "Sécurité, conformité et déploiement dédié.",
     monthly: null,
-    inherits: "Pro",
+    inherits: "Business",
     features: [
-      "Membres illimités",
-      "Tokens IA Cortex illimités",
-      "SSO / Keycloak dédié",
+      "SSO / SAML / SCIM",
+      "Contrôles admin granulaires",
       "Audit & conformité RGPD",
       "Déploiement on-premise",
-      "Accompagnement dédié",
+      "Support prioritaire & accompagnement",
+      "Tokens IA Cortex illimités",
     ],
   },
 ]
 
+/** Petit interrupteur « façon Linear » (pilule bleue + point blanc). */
+function YearlyToggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
+  return (
+    <button type="button" onClick={onToggle} className="flex items-center gap-2 text-xs text-muted-foreground transition-colors hover:text-foreground">
+      <span className={cn("relative h-4 w-7 rounded-full transition-colors", on ? "bg-blue-500" : "bg-muted-foreground/30")}>
+        <span className={cn("absolute top-0.5 size-3 rounded-full bg-white transition-all", on ? "left-3.5" : "left-0.5")} />
+      </span>
+      Facturé annuellement
+    </button>
+  )
+}
+
 /**
- * Page **Facturation** dédiée — structure et workflow calqués sur une page d'abonnement moderne
- * (onglets Individuel / Team, bascule mensuel / annuel, comparatif de forfaits, CTA qui s'adaptent au
- * forfait courant, checkout Stripe direct). Barre compacte plan courant + consommation IA (par compte).
+ * Page **Facturation** — grille d'offres à 4 forfaits (par membre/mois), présentée en colonnes façon
+ * page d'abonnement moderne. Barre compacte plan courant + consommation IA (agrégée par compte).
  */
 export default function BillingPage() {
   const { user } = useAuth()
@@ -96,7 +116,6 @@ export default function BillingPage() {
   const slug = typeof params?.workspace === "string" ? params.workspace : ""
   const current = (user?.planType ?? "FREE") as PlanKey
 
-  const [tab, setTab] = useState<Tab>("individual")
   const [annual, setAnnual] = useState(false)
   const [sub, setSub] = useState<SubscriptionInfo | null>(null)
   const [usage, setUsage] = useState<AiUsage | null>(null)
@@ -129,17 +148,17 @@ export default function BillingPage() {
   async function openPortal() {
     setBusy(true)
     try {
-      await stripeService.openBillingPortal() // redirige vers le portail Stripe
+      await stripeService.openBillingPortal()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Portail de facturation indisponible pour le moment")
       setBusy(false)
     }
   }
 
-  async function checkoutPro() {
+  async function checkout(plan: SelfServe) {
     setBusy(true)
     try {
-      const { checkoutUrl } = await stripeService.createCheckoutSession("PRO")
+      const { checkoutUrl } = await stripeService.createCheckoutSession(plan)
       window.location.href = checkoutUrl
     } catch {
       toast.error("Impossible de démarrer le paiement pour le moment. Réessayez plus tard.")
@@ -147,11 +166,11 @@ export default function BillingPage() {
     }
   }
 
-  function priceFor(p: PlanDef): { big: string; per: string; note: string } {
-    if (p.monthly === null) return { big: "Sur devis", per: "", note: "Facturation annuelle" }
-    if (p.monthly === 0) return { big: "0 €", per: "/ mois", note: "Gratuit pour toujours" }
+  function priceFor(p: PlanDef): { big: string; per: string } {
+    if (p.monthly === null) return { big: "Sur devis", per: "" }
+    if (p.monthly === 0) return { big: "0 €", per: "" }
     const perMonth = annual ? Math.round(p.monthly * 0.83) : p.monthly
-    return { big: `${perMonth} €`, per: "/ mois", note: annual ? "Facturé annuellement · −17 %" : "Facturé mensuellement" }
+    return { big: `${perMonth} €`, per: "par membre / mois" }
   }
 
   function renderCta(p: PlanDef) {
@@ -159,7 +178,7 @@ export default function BillingPage() {
     if (p.key === current) {
       return current === "FREE"
         ? <Button variant="secondary" className={base} disabled>Forfait actuel</Button>
-        : <Button variant="outline" className={base} onClick={openPortal} disabled={busy}>{busy ? "Ouverture…" : "Gérer la facturation"}</Button>
+        : <Button variant="outline" className={base} onClick={openPortal} disabled={busy}>{busy ? "Ouverture…" : "Gérer"}</Button>
     }
     if (p.key === "ENTERPRISE") {
       return (
@@ -171,21 +190,19 @@ export default function BillingPage() {
       )
     }
     if (RANK[p.key] < RANK[current]) {
-      return <Button variant="ghost" className={cn(base, "text-muted-foreground hover:text-foreground")} onClick={openPortal} disabled={busy}>Rétrograder vers {p.name}</Button>
+      return <Button variant="ghost" className={cn(base, "text-muted-foreground hover:text-foreground")} onClick={openPortal} disabled={busy}>Rétrograder</Button>
     }
     return (
       <Button
         variant={p.highlight ? "default" : "outline"}
         className={cn(base, "gap-1.5")}
-        onClick={p.key === "PRO" ? checkoutPro : undefined}
+        onClick={() => checkout(p.key as SelfServe)}
         disabled={busy}
       >
         {busy ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />} Passer à {p.name}
       </Button>
     )
   }
-
-  const shown = PLANS.filter((p) => p.tab === tab)
 
   return (
     <PageContainer>
@@ -215,90 +232,52 @@ export default function BillingPage() {
         )}
       </div>
 
-      {/* Section forfaits — page dédiée */}
-      <div className="mt-8 flex flex-col items-center text-center">
-        <h2 className="text-xl font-semibold tracking-tight text-foreground">Trouvez le forfait adapté à votre équipe</h2>
-        <p className="mt-1.5 text-sm text-muted-foreground">Changez de forfait à tout moment. Sans engagement, annulable quand vous voulez.</p>
-
-        {/* Onglet Individuel / Team */}
-        <div className="mt-6 inline-flex rounded-lg border border-border bg-muted/40 p-0.5 text-sm">
-          {([["individual", "Individuel"], ["team", "Team et Enterprise"]] as const).map(([k, label]) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => setTab(k)}
-              className={cn(
-                "rounded-md px-4 py-1.5 font-medium transition-colors",
-                tab === k ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {/* Bascule Mensuel / Annuel (forfaits individuels) */}
-        {tab === "individual" && (
-          <div className="mt-3 inline-flex items-center rounded-full border border-border bg-muted/40 p-0.5 text-xs">
-            <button
-              type="button"
-              onClick={() => setAnnual(false)}
-              className={cn("rounded-full px-3 py-1 font-medium transition-colors", !annual ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}
-            >
-              Mensuel
-            </button>
-            <button
-              type="button"
-              onClick={() => setAnnual(true)}
-              className={cn("rounded-full px-3 py-1 font-medium transition-colors", annual ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}
-            >
-              Annuel <span className="text-blue-500">· −17 %</span>
-            </button>
-          </div>
-        )}
+      {/* Titre section */}
+      <div className="mt-8 text-center">
+        <h2 className="text-xl font-semibold tracking-tight text-foreground">Des forfaits qui grandissent avec votre équipe</h2>
+        <p className="mt-1.5 text-sm text-muted-foreground">Tarification par membre. Changez à tout moment, sans engagement.</p>
       </div>
 
-      {/* Forfaits — colonnes séparées par un filet (style épuré) */}
-      <div
-        className={cn(
-          "mx-auto mt-8 overflow-hidden rounded-2xl border border-border bg-card/40",
-          tab === "individual"
-            ? "grid max-w-4xl divide-y divide-border md:grid-cols-2 md:divide-x md:divide-y-0"
-            : "max-w-md",
-        )}
-      >
-        {shown.map((p) => {
+      {/* 4 colonnes séparées par un filet (style épuré) */}
+      <div className="mx-auto mt-6 grid w-full max-w-6xl divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card/40 md:grid-cols-4 md:divide-x md:divide-y-0">
+        {PLANS.map((p) => {
           const price = priceFor(p)
           const feats: { label: string; head: boolean }[] = [
             ...(p.inherits ? [{ label: `Tout ce qui est dans ${p.inherits}`, head: true }] : []),
             ...p.features.map((f) => ({ label: f, head: false })),
           ]
+          const paid = p.monthly !== null && p.monthly > 0
           return (
-            <div
-              key={p.key}
-              className={cn("flex flex-col p-8", p.highlight && "bg-gradient-to-b from-primary/[0.06] to-transparent")}
-            >
-              <div className="flex items-center gap-2.5">
-                <h3 className="text-2xl font-semibold tracking-tight text-foreground">{p.name}</h3>
+            <div key={p.key} className={cn("flex flex-col p-6", p.highlight && "bg-gradient-to-b from-primary/[0.06] to-transparent")}>
+              <div className="flex items-center gap-2">
+                <h3 className="text-xl font-semibold tracking-tight text-foreground">{p.name}</h3>
                 {p.highlight && (
-                  <span className="rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">Recommandé</span>
+                  <span className="rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">Populaire</span>
                 )}
               </div>
 
-              <div className="mt-4 flex items-baseline gap-1.5">
+              <div className="mt-3 flex items-baseline gap-1.5">
                 <span className="text-3xl font-semibold tracking-tight tabular-nums text-foreground">{price.big}</span>
-                {price.per && <span className="text-sm text-muted-foreground">{price.per}</span>}
+                {price.per && <span className="text-xs text-muted-foreground">{price.per}</span>}
               </div>
-              <p className="mt-1 h-4 text-xs text-muted-foreground">{price.note}</p>
 
-              <p className="mt-4 min-h-[2.5rem] text-sm leading-relaxed text-muted-foreground">{p.tagline}</p>
+              {/* Toggle annuel (forfaits payants) — sinon ligne d'équilibre */}
+              <div className="mt-3 flex h-5 items-center">
+                {paid ? <YearlyToggle on={annual} onToggle={() => setAnnual((v) => !v)} /> : (
+                  <span className="text-xs text-muted-foreground">
+                    {p.monthly === 0 ? "Gratuit pour toujours" : "Facturation annuelle"}
+                  </span>
+                )}
+              </div>
 
-              <div className="mt-5">{renderCta(p)}</div>
+              <p className="mt-3 min-h-[2.5rem] text-sm leading-relaxed text-muted-foreground">{p.tagline}</p>
 
-              <div className="mt-8 flex flex-col gap-3.5">
+              <div className="mt-4">{renderCta(p)}</div>
+
+              <div className="mt-7 flex flex-col gap-3">
                 {feats.map((f) => (
-                  <div key={f.label} className="flex items-center gap-2.5 text-sm">
-                    <CircleCheck className={cn("size-[18px] shrink-0", p.highlight ? "text-primary" : "text-muted-foreground/60")} />
+                  <div key={f.label} className="flex items-start gap-2.5 text-sm">
+                    <CircleCheck className={cn("mt-px size-[18px] shrink-0", p.highlight ? "text-primary" : "text-muted-foreground/60")} />
                     <span className={f.head ? "font-medium text-foreground" : "text-muted-foreground"}>{f.label}</span>
                   </div>
                 ))}
@@ -308,7 +287,7 @@ export default function BillingPage() {
         })}
       </div>
 
-      <p className="mx-auto mt-6 max-w-3xl text-center text-xs text-muted-foreground">
+      <p className="mx-auto mt-6 max-w-6xl text-center text-xs text-muted-foreground">
         Les prix et forfaits sont indicatifs (placeholders) et seront ajustés avec la grille tarifaire finale de TaskForce.
         Des limites d&apos;utilisation s&apos;appliquent.
       </p>
