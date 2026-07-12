@@ -158,7 +158,7 @@ describe('SubscriptionManager', () => {
       fireEvent.click(proButton);
 
       await waitFor(() => {
-        expect(stripeService.stripeService.createCheckoutSession).toHaveBeenCalledWith('PRO');
+        expect(stripeService.stripeService.createCheckoutSession).toHaveBeenCalledWith('BUSINESS');
         expect(window.location.href).toBe('https://checkout.stripe.com/pro');
       });
     });
@@ -208,7 +208,7 @@ describe('SubscriptionManager', () => {
   describe('PRO Plan', () => {
     beforeEach(async () => {
       vi.mocked(stripeService.stripeService.getSubscriptionInfo).mockResolvedValue({
-        planType: 'PRO',
+        planType: 'BUSINESS',
         status: 'active',
         amount: 49,
         currency: 'EUR',
@@ -277,7 +277,7 @@ describe('SubscriptionManager', () => {
 
       vi.mocked(stripeService.stripeService.getSubscriptionInfo)
         .mockResolvedValueOnce({
-          planType: 'PRO',
+          planType: 'BUSINESS',
           status: 'active',
           amount: 49,
           currency: 'EUR',
@@ -285,7 +285,7 @@ describe('SubscriptionManager', () => {
           cancelAtPeriodEnd: false,
         })
         .mockResolvedValueOnce({
-          planType: 'PRO',
+          planType: 'BUSINESS',
           status: 'active',
           amount: 49,
           currency: 'EUR',
@@ -320,7 +320,7 @@ describe('SubscriptionManager', () => {
 
     it('should show warning banner when subscription is set to cancel', async () => {
       vi.mocked(stripeService.stripeService.getSubscriptionInfo).mockResolvedValue({
-        planType: 'PRO',
+        planType: 'BUSINESS',
         status: 'active',
         amount: 49,
         currency: 'EUR',

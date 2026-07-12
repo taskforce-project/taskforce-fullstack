@@ -17,13 +17,15 @@ import { useAuth } from "@/lib/contexts/auth-context";
 
 const PLAN_ICONS = {
   FREE: Sparkles,
-  PRO: Crown,
+  BASIC: Sparkles,
+  BUSINESS: Crown,
   ENTERPRISE: Building2,
 };
 
 const PLAN_COLORS = {
   FREE: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100",
-  PRO: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-100",
+  BASIC: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-100",
+  BUSINESS: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-100",
   ENTERPRISE: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100",
 };
 
@@ -52,7 +54,7 @@ export function SubscriptionManager() {
     }
   };
 
-  const handleUpgrade = async (plan: "PRO" | "ENTERPRISE") => {
+  const handleUpgrade = async (plan: "BASIC" | "BUSINESS") => {
     try {
       const { checkoutUrl } = await stripeService.createCheckoutSession(plan);
       window.location.href = checkoutUrl;
@@ -176,20 +178,22 @@ export function SubscriptionManager() {
       <CardFooter className="flex gap-2">
         {subscription.planType === "FREE" && (
           <>
-            <Button onClick={() => handleUpgrade("PRO")} className="flex-1">
-              Passer à Pro
+            <Button onClick={() => handleUpgrade("BASIC")} variant="outline" className="flex-1">
+              Passer à Basic
             </Button>
-            <Button onClick={() => handleUpgrade("ENTERPRISE")} variant="outline" className="flex-1">
-              Passer à Enterprise
+            <Button onClick={() => handleUpgrade("BUSINESS")} className="flex-1">
+              Passer à Business
             </Button>
           </>
         )}
 
-        {subscription.planType === "PRO" && (
+        {(subscription.planType === "BASIC" || subscription.planType === "BUSINESS") && (
           <>
-            <Button onClick={() => handleUpgrade("ENTERPRISE")} className="flex-1">
-              Passer à Enterprise
-            </Button>
+            {subscription.planType === "BASIC" && (
+              <Button onClick={() => handleUpgrade("BUSINESS")} className="flex-1">
+                Passer à Business
+              </Button>
+            )}
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="destructive" disabled={isCancelling} className="flex-1">
