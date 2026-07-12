@@ -201,6 +201,11 @@ export const ANALYTICS_ROUTES = {
   WORKLOAD:   (slug: string) => `/api/workspaces/${slug}/analytics/workload`,
   /** Génération de graphe par l'IA (langage naturel → spec rendue depuis les vraies séries) */
   CHART:      (slug: string) => `/api/workspaces/${slug}/analytics/chart`,
+  /** Ré-exécution d'une répartition « X par Y » (rafraîchit un graphe épinglé) */
+  BREAKDOWN:  (slug: string) => `/api/workspaces/${slug}/analytics/breakdown`,
+  /** Graphes épinglés « Custom » (GET liste / POST épingler) */
+  SAVED_CHARTS: (slug: string) => `/api/workspaces/${slug}/analytics/charts`,
+  SAVED_CHART:  (slug: string, id: number) => `/api/workspaces/${slug}/analytics/charts/${id}`,
 } as const;
 
 /**
@@ -228,6 +233,14 @@ export const ANALYSIS_ROUTES = {
  */
 export const ASSISTANT_ROUTES = {
   CHAT: (slug: string) => `/api/workspaces/${slug}/assistant`,
+} as const;
+
+/**
+ * Consommation IA (tokens) du workspace — mois courant + plafond du plan.
+ * Backend: @RequestMapping("/api/workspaces/{slug}/ai")
+ */
+export const AI_ROUTES = {
+  USAGE: (slug: string) => `/api/workspaces/${slug}/ai/usage`,
 } as const;
 
 /**
@@ -278,33 +291,8 @@ export const TEAM_ROUTES = {
   REMOVE_MEMBER:  (slug: string, teamId: number, userId: number) => `/api/workspaces/${slug}/teams/${teamId}/members/${userId}`,
 } as const;
 
-/**
- * Routes discussions
- * Backend: /api/workspaces/{slug}/discussions
- */
-export const DISCUSSION_ROUTES = {
-  LIST:    (slug: string) => `/api/workspaces/${slug}/discussions`,
-  CREATE:  (slug: string) => `/api/workspaces/${slug}/discussions`,
-  BY_ID:   (slug: string, id: number) => `/api/workspaces/${slug}/discussions/${id}`,
-  UPDATE:  (slug: string, id: number) => `/api/workspaces/${slug}/discussions/${id}`,
-  DELETE:  (slug: string, id: number) => `/api/workspaces/${slug}/discussions/${id}`,
-  PIN:     (slug: string, id: number) => `/api/workspaces/${slug}/discussions/${id}/pin`,
-  LOCK:    (slug: string, id: number) => `/api/workspaces/${slug}/discussions/${id}/lock`,
-} as const;
-
 // Base backend pour les redirections navigateur (OAuth) — PAS pour les appels Axios.
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
-
-/**
- * Routes messagerie / chat
- * Backend: /api/workspaces/{slug}/channels (ChannelController)
- */
-export const MESSAGE_ROUTES = {
-  CHANNELS:   (slug: string) => `/api/workspaces/${slug}/channels`,
-  MESSAGES:   (slug: string, channelId: number) => `/api/workspaces/${slug}/channels/${channelId}/messages`,
-  EDIT_MSG:   (slug: string, channelId: number, messageId: number) => `/api/workspaces/${slug}/channels/${channelId}/messages/${messageId}`,
-  DELETE_MSG: (slug: string, channelId: number, messageId: number) => `/api/workspaces/${slug}/channels/${channelId}/messages/${messageId}`,
-} as const;
 
 /**
  * Routes intégrations (GitHub / Slack / Webhooks)
@@ -323,12 +311,12 @@ export const INTEGRATION_ROUTES = {
   SLACK_DISCONNECT:  (slug: string) => `/api/workspaces/${slug}/integrations/slack`,
   SLACK_CHANNELS:    (slug: string) => `/api/workspaces/${slug}/integrations/slack/channels`,
   SLACK_CHANNEL:     (slug: string, channelId: number) => `/api/workspaces/${slug}/integrations/slack/channels/${channelId}`,
-  SLACK_CHANNEL_MIRROR: (slug: string, channelId: number) => `/api/workspaces/${slug}/integrations/slack/channels/${channelId}/mirror`,
-  SLACK_CHANNEL_SYNC:   (slug: string, channelId: number) => `/api/workspaces/${slug}/integrations/slack/channels/${channelId}/sync`,
   WEBHOOKS:          (slug: string) => `/api/workspaces/${slug}/webhooks`,
   WEBHOOK:           (slug: string, id: number) => `/api/workspaces/${slug}/webhooks/${id}`,
   /** Catalogue générique : le pool d'outils + statut de connexion */
   CATALOG:           (slug: string) => `/api/workspaces/${slug}/integrations/catalog`,
+  /** Connexion générique d'un connecteur du catalogue (POST config / DELETE) */
+  CONNECTOR:         (slug: string, key: string) => `/api/workspaces/${slug}/integrations/connectors/${key}`,
   /** Plane (connecteur clé API → ingestion Brain OS) */
   PLANE_STATUS:      (slug: string) => `/api/workspaces/${slug}/integrations/plane/status`,
   PLANE_CONNECT:     (slug: string) => `/api/workspaces/${slug}/integrations/plane/connect`,
