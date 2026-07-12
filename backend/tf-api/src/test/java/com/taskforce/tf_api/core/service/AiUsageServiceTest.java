@@ -16,10 +16,13 @@ import com.taskforce.tf_api.core.model.AiTokenUsage;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.AiTokenUsageRepository;
+import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -38,6 +41,7 @@ class AiUsageServiceTest {
 
     @Mock private AiTokenUsageRepository repository;
     @Mock private WorkspaceRepository workspaceRepository;
+    @Mock private UserRepository userRepository;
     @Mock private BrainAccessGuard access;
 
     @InjectMocks private AiUsageService service;
@@ -104,5 +108,33 @@ class AiUsageServiceTest {
         assertThat(res.usedTokens()).isEqualTo(500);
         assertThat(res.limitTokens()).isEqualTo(2_000_000L); // plafond BUSINESS
         assertThat(res.requestCount()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("assertWithinQuota : compte FREE au plafond (100k) → 409 (IllegalStateException)")
+    void assertWithinQuota_throws_when_free_over_limit() {
+        when(workspaceRepository.findOwnerIdByWorkspaceId(10L)).thenReturn(Optional.of(99L));
+        when(userRepository.findById(99L))
+            .thenReturn(Optional.of(User.builder().id(99L).planType(PlanType.FREE).build()));
+        AiTokenUsage row = new AiTokenUsage();
+        row.setTotalTokens(100_000L); // pile au plafond FREE
+        when(repository.findByAccountIdAndPeriod(eq(99L), anyString())).thenReturn(Optional.of(row));
+
+        assertThatThrownBy(() -> service.assertWithinQuota(10L))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("Quota IA");
+    }
+
+    @Test
+    @DisplayName("assertWithinQuota : compte BUSINESS sous le plafond → OK (pas d'exception)")
+    void assertWithinQuota_ok_when_under_limit() {
+        when(workspaceRepository.findOwnerIdByWorkspaceId(10L)).thenReturn(Optional.of(99L));
+        when(userRepository.findById(99L))
+            .thenReturn(Optional.of(User.builder().id(99L).planType(PlanType.BUSINESS).build()));
+        AiTokenUsage row = new AiTokenUsage();
+        row.setTotalTokens(500_000L); // bien sous 2M
+        when(repository.findByAccountIdAndPeriod(eq(99L), anyString())).thenReturn(Optional.of(row));
+
+        assertThatCode(() -> service.assertWithinQuota(10L)).doesNotThrowAnyException();
     }
 }
