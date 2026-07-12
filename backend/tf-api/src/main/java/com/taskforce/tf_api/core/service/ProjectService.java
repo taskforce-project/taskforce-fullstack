@@ -68,6 +68,7 @@ public class ProjectService {
     private final ProjectTeamRepository    projectTeamRepository;
     private final IssueRepository          issueRepository;
     private final IssueService             issueService;
+    private final ProjectVisibilityGuard   visibilityGuard;
 
     /**
      * Plafond « façon GitHub » : nombre max de collaborateurs sur un projet PRIVÉ en forfait Free
@@ -573,17 +574,12 @@ public class ProjectService {
      * (My Queue, recherche, analytics) restent à durcir (roadmap {@code TF-PROJECT-VISIBILITY}).</p>
      */
     private void assertCanViewProject(Project project, Long userId) {
-        if (project.isPublic()) return;
-        if (projectMemberRepository.existsByProjectIdAndUserId(project.getId(), userId)) return;
-        if (isWorkspaceAdmin(project.getWorkspace().getId(), userId)) return;
-        throw new ResourceNotFoundException("Projet introuvable");
+        visibilityGuard.assertCanView(project, userId);
     }
 
     /** Vrai si l'utilisateur est OWNER ou ADMIN du workspace (voit tous les projets, même privés). */
     private boolean isWorkspaceAdmin(Long workspaceId, Long userId) {
-        return workspaceMemberRepository.findByWorkspaceIdAndUserId(workspaceId, userId)
-            .map(wm -> wm.getRole().name().equals("OWNER") || wm.getRole().name().equals("ADMIN"))
-            .orElse(false);
+        return visibilityGuard.isWorkspaceAdmin(workspaceId, userId);
     }
 
     private User resolveUser(Long userId) {
