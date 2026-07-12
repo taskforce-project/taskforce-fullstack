@@ -63,7 +63,8 @@ class AgentServiceTest {
         org.springframework.test.util.ReflectionTestUtils.setField(service, "model", "m");
         when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
         when(groq.isConfigured()).thenReturn(true);
-        when(groq.chatCompletion(anyString(), anyString(), anyString(), org.mockito.ArgumentMatchers.anyBoolean(), anyString()))
+        // Chemin fast = complétion multi-tours (llm.chat) désormais.
+        when(groq.chat(anyString(), org.mockito.ArgumentMatchers.any(), anyString()))
             .thenReturn("Réponse directe");
         when(groq.currentUsage()).thenReturn(new com.taskforce.tf_api.core.service.LlmUsage(12, 34, 46));
 
@@ -138,7 +139,7 @@ class AgentServiceTest {
         org.springframework.test.util.ReflectionTestUtils.setField(service, "model", "m");
         when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
         when(groq.isConfigured()).thenReturn(true);
-        when(groq.chatCompletion(anyString(), anyString(), anyString(), org.mockito.ArgumentMatchers.anyBoolean(), anyString()))
+        when(groq.chat(anyString(), org.mockito.ArgumentMatchers.any(), anyString()))
             .thenThrow(new RuntimeException("LLM down"));
 
         AssistantAnswer answer = service.run("acme", 7L, "Quel est le statut du projet ?");
@@ -152,7 +153,7 @@ class AgentServiceTest {
         stubWorkspace();
         org.springframework.test.util.ReflectionTestUtils.setField(service, "model", "m");
         when(groq.isConfigured()).thenReturn(true);
-        when(groq.chatCompletion(anyString(), anyString(), anyString(), org.mockito.ArgumentMatchers.anyBoolean(), anyString()))
+        when(groq.chat(anyString(), org.mockito.ArgumentMatchers.any(), anyString()))
             .thenReturn("Bonjour ! Tout va bien, merci 😊");
 
         AssistantAnswer answer = service.run("acme", 7L, "Hey comment va tu ?");
@@ -165,5 +166,36 @@ class AgentServiceTest {
         // Et aucune recherche n'a été déclenchée
         org.mockito.Mockito.verify(search, org.mockito.Mockito.never())
             .retrieveRelevant(anyLong(), anyString(), anyInt());
+    }
+
+    @Test
+    @DisplayName("run (mémoire) : l'historique de la conversation est injecté dans les messages du LLM")
+    void run_injects_conversation_history() {
+        stubWorkspace();
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "model", "m");
+        when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
+        when(groq.isConfigured()).thenReturn(true);
+        when(groq.chat(anyString(), org.mockito.ArgumentMatchers.any(), anyString()))
+            .thenReturn("Ton projet s'appelle Zephyr.");
+
+        List<java.util.Map<String, Object>> history = List.of(
+            java.util.Map.of("role", "user", "content", "Mon projet s'appelle Zephyr"),
+            java.util.Map.of("role", "assistant", "content", "Bien noté, Zephyr."));
+
+        AssistantAnswer answer = service.run("acme", 7L, "Rappelle-moi son nom", history);
+
+        assertThat(answer.answer()).isEqualTo("Ton projet s'appelle Zephyr.");
+
+        // Les messages envoyés au LLM = system + historique (2) + message courant.
+        @SuppressWarnings("unchecked")
+        org.mockito.ArgumentCaptor<List<java.util.Map<String, Object>>> captor =
+            org.mockito.ArgumentCaptor.forClass(List.class);
+        org.mockito.Mockito.verify(groq).chat(anyString(), captor.capture(), anyString());
+        List<java.util.Map<String, Object>> sent = captor.getValue();
+        assertThat(sent).hasSize(4);
+        assertThat(sent.get(0)).containsEntry("role", "system");
+        assertThat(sent.get(1)).containsEntry("content", "Mon projet s'appelle Zephyr");
+        assertThat(sent.get(2)).containsEntry("role", "assistant");
+        assertThat(sent.get(3)).containsEntry("content", "Rappelle-moi son nom");
     }
 }
