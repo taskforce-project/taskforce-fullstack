@@ -198,6 +198,8 @@ services:
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:14b}
       OLLAMA_MODEL_FAST: ${OLLAMA_MODEL_FAST:-qwen3:8b}
       OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL:-bge-m3}
+      # Analyse approfondie sur 14B local = longue → 300s (doit rester ≤ ai.gateway.read-timeout-ms côté backend).
+      OLLAMA_TIMEOUT: ${OLLAMA_TIMEOUT:-300}
       LOG_LEVEL: ${AI_SERVICE_LOG_LEVEL:-INFO}
     extra_hosts:
       - "host.docker.internal:host-gateway"
