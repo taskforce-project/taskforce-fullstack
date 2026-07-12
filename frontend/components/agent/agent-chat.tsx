@@ -4,11 +4,12 @@ import { useEffect, useRef, useState } from "react"
 import { useParams } from "next/navigation"
 import { Send, Sparkles } from "lucide-react"
 import {
-  Message, Steps, Reasoning, Tool, Sources, ThinkingBar, FeedbackBar, PromptSuggestion,
+  Message, Steps, Reasoning, Tool, Sources, ThinkingBar, FeedbackBar, PromptSuggestion, TokenMeter,
   type ToolStatus,
 } from "@/components/chat"
 import { Markdown } from "@/components/ui/lightweight-markdown"
 import { sendAgentMessage, type AssistantAnswer } from "@/lib/api/assistant-service"
+import { CortexUsage } from "./cortex-usage"
 
 interface Turn {
   id: string
@@ -34,11 +35,23 @@ export function AgentChat() {
   const [turns, setTurns] = useState<Turn[]>([])
   const [input, setInput] = useState("")
   const [loading, setLoading] = useState(false)
+  // Consommation cumulée de la session (tokens réels) + chrono live → footer sous l'input (façon Claude).
+  const [sessionTokens, setSessionTokens] = useState(0)
+  const [elapsed, setElapsed] = useState(0)
+  const [lastMs, setLastMs] = useState<number | null>(null)
+  const startRef = useRef<number>(0)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [turns, loading])
+
+  // Chrono en direct pendant la génération (back non-streaming → on montre au moins le temps écoulé).
+  useEffect(() => {
+    if (!loading) return
+    const id = setInterval(() => setElapsed((Date.now() - startRef.current) / 1000), 100)
+    return () => clearInterval(id)
+  }, [loading])
 
   const send = async (text: string) => {
     const msg = text.trim()
@@ -46,22 +59,26 @@ export function AgentChat() {
     setInput("")
     setTurns((t) => [...t, { id: `u${Date.now()}`, role: "user", text: msg }])
     setLoading(true)
+    startRef.current = Date.now()
+    setElapsed(0)
     try {
       const answer = await sendAgentMessage(slug, msg)
+      setSessionTokens((n) => n + (answer.usage?.totalTokens ?? 0))
       setTurns((t) => [...t, { id: `a${Date.now()}`, role: "assistant", answer }])
     } catch {
       setTurns((t) => [...t, {
         id: `a${Date.now()}`, role: "assistant",
-        answer: { answer: "Désolé, je n'ai pas pu répondre. Réessayez.", reasoning: null, mode: "fallback", sources: [], steps: [], toolCalls: [] },
+        answer: { answer: "Désolé, je n'ai pas pu répondre. Réessayez.", reasoning: null, mode: "fallback", sources: [], steps: [], toolCalls: [], usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 } },
       }])
     } finally {
+      setLastMs(Date.now() - startRef.current)
       setLoading(false)
     }
   }
 
   return (
     <div className="flex h-full flex-col">
-      {/* Conversation */}
+      {/* Conversation — le titre « Cortex » est porté par l'en-tête du panneau (pas de doublon ici). */}
       <div className="flex-1 overflow-y-auto px-3 py-4">
         {turns.length === 0 && !loading ? (
           <div className="flex flex-col items-center gap-3 px-2 py-8 text-center">
@@ -69,9 +86,9 @@ export function AgentChat() {
               <Sparkles className="size-5" />
             </div>
             <div>
-              <p className="text-sm font-medium">Taskforce AI — agent</p>
+              <p className="text-sm font-medium">Cortex</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Fondé sur le Brain OS de votre workspace. Il cite ses sources.
+                L&apos;agent IA de Taskforce, fondé sur le Brain OS de votre workspace. Il cite ses sources.
               </p>
             </div>
             <div className="mt-2 flex w-full flex-col gap-1.5">
@@ -120,9 +137,22 @@ export function AgentChat() {
             <Send className="size-3.5" />
           </button>
         </div>
-        <p className="mt-1 text-center text-[10px] text-muted-foreground/40">
-          Enter pour envoyer · Shift+Enter pour un saut de ligne
-        </p>
+        {/* Footer façon Claude : chrono/conso en direct (gauche) + modal contexte/consommation (droite) */}
+        <div className="mt-1 flex items-center justify-between gap-2 px-1 text-[10px] text-muted-foreground/50">
+          <span className="flex min-w-0 items-center gap-1.5">
+            {loading ? (
+              <span className="tabular-nums text-primary/70">Cortex réfléchit · {elapsed.toFixed(1)} s</span>
+            ) : sessionTokens > 0 ? (
+              <>
+                <TokenMeter value={sessionTokens} className="text-muted-foreground/60" />
+                {lastMs != null && <span className="tabular-nums">· {(lastMs / 1000).toFixed(1)} s</span>}
+              </>
+            ) : (
+              <span>Entrée ↵ · Maj+Entrée</span>
+            )}
+          </span>
+          <CortexUsage sessionTokens={sessionTokens} />
+        </div>
       </div>
     </div>
   )
@@ -133,7 +163,7 @@ function AgentAnswerView({ answer }: { answer: AssistantAnswer }) {
   return (
     <div className="space-y-1">
       {answer.steps.length > 0 && (
-        <Steps steps={answer.steps.map((s) => ({ title: s.label, status: s.status }))} />
+        <Steps steps={answer.steps.map((s) => ({ title: s.label, status: s.status, description: s.description ?? undefined }))} />
       )}
       {answer.reasoning && <Reasoning content={answer.reasoning} />}
       {answer.toolCalls.map((tc, i) => (
@@ -143,7 +173,16 @@ function AgentAnswerView({ answer }: { answer: AssistantAnswer }) {
       {answer.sources.length > 0 && (
         <Sources items={answer.sources.map((s) => ({ title: s.title, snippet: s.domain, score: s.score ?? undefined }))} />
       )}
-      <FeedbackBar className="mt-1" onCopy={() => navigator.clipboard?.writeText(answer.answer)} />
+      <div className="mt-1 flex items-center justify-between gap-2">
+        <FeedbackBar onCopy={() => navigator.clipboard?.writeText(answer.answer)} />
+        {answer.usage && answer.usage.totalTokens > 0 && (
+          <span className="flex shrink-0 items-center gap-1.5 text-[10px] tabular-nums text-muted-foreground/60">
+            <span className="rounded bg-muted px-1 py-px font-medium uppercase tracking-wide">{answer.mode}</span>
+            {answer.usage.totalTokens.toLocaleString("fr-FR")} tokens
+            <span className="opacity-70">({answer.usage.promptTokens}↑ {answer.usage.completionTokens}↓)</span>
+          </span>
+        )}
+      </div>
     </div>
   )
 }
