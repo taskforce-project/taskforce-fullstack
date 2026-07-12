@@ -5,8 +5,6 @@
 #   docker-compose -f docker-compose.prod.yml --env-file backend/tf-api/.env.prod up -d
 # ===============================
 
-version: '3.8'
-
 services:
   # ================================
   # PostgreSQL Database
@@ -62,7 +60,10 @@ services:
       postgres:
         condition: service_healthy
     networks:
-      - taskforce-network`n    volumes:`n      # Import du realm production`n      - ./keycloak/realms:/opt/keycloak/data/import
+      - taskforce-network
+    volumes:
+      # Import du realm production
+      - ./keycloak/realms:/opt/keycloak/data/import
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready || exit 1"]
       interval: 30s
@@ -118,7 +119,7 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - taskforce-network`n    volumes:`n      # Import du realm production`n      - ./keycloak/realms:/opt/keycloak/data/import
+      - taskforce-network
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/api/actuator/health || exit 1"]
       interval: 30s
