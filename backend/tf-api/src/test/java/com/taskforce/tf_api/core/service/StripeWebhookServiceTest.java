@@ -57,7 +57,7 @@ class StripeWebhookServiceTest {
     }
 
     private User user() {
-        return User.builder().id(7L).email("pay@it.dev").planType(com.taskforce.tf_api.core.enums.PlanType.PRO).build();
+        return User.builder().id(7L).email("pay@it.dev").planType(com.taskforce.tf_api.core.enums.PlanType.BUSINESS).build();
     }
 
     // =========================================================================
