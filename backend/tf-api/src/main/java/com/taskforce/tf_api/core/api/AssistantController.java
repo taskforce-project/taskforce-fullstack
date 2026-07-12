@@ -12,9 +12,14 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer;
+import com.taskforce.tf_api.core.dto.response.ChatTurnResponse;
+import com.taskforce.tf_api.core.model.AiConversation;
 import com.taskforce.tf_api.core.model.User;
+import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.UserRepository;
+import com.taskforce.tf_api.core.service.AiConversationService;
 import com.taskforce.tf_api.core.service.agent.AgentService;
+import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.shared.dto.ApiResponse;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
@@ -38,8 +43,10 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class AssistantController {
 
-    private final AgentService   agentService;
-    private final UserRepository userRepository;
+    private final AgentService          agentService;
+    private final UserRepository        userRepository;
+    private final BrainAccessGuard      access;
+    private final AiConversationService conversationService;
 
     private Long resolveUserId(Jwt jwt) {
         String email = jwt.getClaimAsString("email");
@@ -116,14 +123,24 @@ public class AssistantController {
     // -------------------------------------------------------------------------
 
     @PostMapping(produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<ApiResponse<AssistantAnswer>> chat(
+    public ResponseEntity<ApiResponse<ChatTurnResponse>> chat(
         @PathVariable String slug,
         @Valid @RequestBody AssistantRequest body,
         @AuthenticationPrincipal Jwt jwt
     ) {
         Long userId = resolveUserId(jwt);
+        Workspace ws = access.resolveAndAuthorize(slug, userId);
+        AiConversation conv = conversationService.getOrCreate(ws.getId(), userId, body.conversationId());
+
         AssistantAnswer answer = agentService.run(slug, userId, body.message());
-        return ResponseEntity.ok(ApiResponse.success(answer));
+
+        // Persiste le tour dans la conversation (multi-conversation + historique).
+        conversationService.appendMessage(conv.getId(), "user", body.message(), null, 0);
+        conversationService.appendMessage(conv.getId(), "assistant", answer.answer(), answer.mode(),
+            answer.usage() != null ? answer.usage().totalTokens() : 0);
+        String title = conversationService.autoTitle(conv.getId(), body.message());
+
+        return ResponseEntity.ok(ApiResponse.success(new ChatTurnResponse(conv.getId(), title, answer)));
     }
 
     // -------------------------------------------------------------------------
@@ -131,6 +148,7 @@ public class AssistantController {
     // -------------------------------------------------------------------------
 
     public record AssistantRequest(
-        @NotBlank @Size(max = 4000) String message
+        @NotBlank @Size(max = 4000) String message,
+        Long conversationId
     ) {}
 }
