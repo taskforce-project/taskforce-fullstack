@@ -1491,7 +1491,7 @@ function UsagePanel() {
               </div>
               <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                 <div
-                  className={cn("h-full rounded-full transition-[width] duration-500", pct >= 90 ? "bg-rose-500" : pct >= 70 ? "bg-amber-500" : "bg-primary")}
+                  className={cn("h-full rounded-full transition-[width] duration-500", pct >= 90 ? "bg-rose-500" : pct >= 70 ? "bg-amber-500" : "bg-gradient-to-r from-blue-600 to-blue-400 dark:from-blue-500 dark:to-blue-300")}
                   style={{ width: `${unlimited ? 4 : pct}%` }}
                 />
               </div>
