@@ -16,14 +16,12 @@ import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
-import com.taskforce.tf_api.core.service.DiscussionService;
 import com.taskforce.tf_api.core.service.IssueService;
 import com.taskforce.tf_api.core.service.NotificationService;
 import com.taskforce.tf_api.core.service.ProfileService;
 import com.taskforce.tf_api.core.service.TeamService;
 import com.taskforce.tf_api.shared.security.SecurityConfig;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
@@ -33,10 +31,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Tests de tranche web — GET principaux de plusieurs controllers workspace
- * (Notification, Team, MyWork, Roadmap, Discussion, Profile). Services mockés.
+ * (Notification, Team, MyWork, Roadmap, Profile). Services mockés.
  */
 @WebMvcTest({NotificationController.class, TeamController.class, MyWorkController.class,
-             RoadmapController.class, DiscussionController.class, ProfileController.class})
+             RoadmapController.class, ProfileController.class})
 @Import(SecurityConfig.class)
 @ActiveProfiles("test")
 @DisplayName("Misc controllers (@WebMvcTest)")
@@ -47,7 +45,6 @@ class MiscControllersWebMvcTest {
     @MockitoBean private NotificationService notificationService;
     @MockitoBean private TeamService teamService;
     @MockitoBean private IssueService issueService;
-    @MockitoBean private DiscussionService discussionService;
     @MockitoBean private ProfileService profileService;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private WorkspaceRepository workspaceRepository;
@@ -61,20 +58,18 @@ class MiscControllersWebMvcTest {
     }
 
     @Test
-    @DisplayName("GET notifications / teams / my-issues / roadmap / discussions / profile → 200")
+    @DisplayName("GET notifications / teams / my-issues / roadmap / profile → 200")
     void all_gets_200() throws Exception {
         when(notificationService.listNotifications(anyString(), anyLong())).thenReturn(List.of());
         when(teamService.listTeams(anyString())).thenReturn(List.of());
         when(issueService.listMyIssues(anyString(), anyLong())).thenReturn(List.of());
         when(issueService.getScheduledIssues(anyString(), anyLong())).thenReturn(List.of());
-        when(discussionService.listDiscussions(anyString(), any())).thenReturn(List.of());
         when(profileService.getProfile(anyString(), anyLong())).thenReturn(null);
 
         mockMvc.perform(get("/api/workspaces/acme/notifications").with(auth())).andExpect(status().isOk());
         mockMvc.perform(get("/api/workspaces/acme/teams").with(auth())).andExpect(status().isOk());
         mockMvc.perform(get("/api/workspaces/acme/my-issues").with(auth())).andExpect(status().isOk());
         mockMvc.perform(get("/api/workspaces/acme/roadmap").with(auth())).andExpect(status().isOk());
-        mockMvc.perform(get("/api/workspaces/acme/discussions").with(auth())).andExpect(status().isOk());
         mockMvc.perform(get("/api/workspaces/acme/profile").with(auth())).andExpect(status().isOk());
     }
 
