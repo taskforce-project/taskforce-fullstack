@@ -15,6 +15,10 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
 
     Optional<Workspace> findByOwnerId(Long ownerId);
 
+    /** Id du propriétaire (compte de facturation) d'un workspace, sans charger l'entité. */
+    @Query("SELECT w.owner.id FROM Workspace w WHERE w.id = :workspaceId")
+    Optional<Long> findOwnerIdByWorkspaceId(@Param("workspaceId") Long workspaceId);
+
     Optional<Workspace> findBySlug(String slug);
 
     boolean existsBySlug(String slug);
