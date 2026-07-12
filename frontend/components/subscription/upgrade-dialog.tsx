@@ -37,7 +37,7 @@ const PLANS: readonly PlanDef[] = [
     price: "0 €",
     period: "/mois",
     tagline: "Pour démarrer et tester.",
-    features: ["2 workspaces", "Jusqu'à 5 membres", "Board, List, Cycles", "Smart Assign de base"],
+    features: ["2 workspaces", "Jusqu'à 5 membres", "Board, List, Cycles", "Smart Assign de base", "100k tokens IA Cortex / mois"],
   },
   {
     key: "PRO",
@@ -49,6 +49,7 @@ const PLANS: readonly PlanDef[] = [
     features: [
       "10 workspaces",
       "Jusqu'à 50 membres",
+      "1M tokens IA Cortex / mois",
       "Analytics avancées + burndown",
       "Assistant IA & insights",
       "Intégrations (GitHub)",
@@ -60,7 +61,7 @@ const PLANS: readonly PlanDef[] = [
     name: "Enterprise",
     price: "Sur devis",
     tagline: "Sécurité, SSO & on-premise.",
-    features: ["Membres illimités", "SSO / Keycloak dédié", "Audit & RGPD avancés", "Déploiement on-premise", "Accompagnement dédié"],
+    features: ["Membres illimités", "Tokens IA Cortex illimités", "SSO / Keycloak dédié", "Audit & RGPD avancés", "Déploiement on-premise", "Accompagnement dédié"],
   },
 ]
 
