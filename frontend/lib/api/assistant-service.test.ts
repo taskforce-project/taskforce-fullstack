@@ -11,7 +11,8 @@ vi.mock('./client', () => ({
     patch: vi.fn(),
     delete: vi.fn(),
   },
-  getErrorMessage: vi.fn((e: any) => e?.message || 'error'),
+  getErrorMessage: vi.fn((e: { message?: string }) => e?.message || 'error'),
+  AI_TIMEOUT_MS: 180000, // requis : assistant-service importe ce timeout pour les appels agent
 }));
 
 const envelope = <T,>(data: T) => ({ data: { success: true, message: 'ok', data } });
@@ -23,6 +24,7 @@ const buildAnswer = () => ({
   sources: [],
   steps: [],
   toolCalls: [],
+  usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
 });
 
 describe('assistant-service', () => {
@@ -38,7 +40,7 @@ describe('assistant-service', () => {
 
     const result = await sendAgentMessage(slug, 'hi');
 
-    expect(apiClient.post).toHaveBeenCalledWith(ASSISTANT_ROUTES.CHAT(slug), { message: 'hi' });
+    expect(apiClient.post).toHaveBeenCalledWith(ASSISTANT_ROUTES.CHAT(slug), { message: 'hi' }, expect.anything());
     expect(result).toEqual(answer);
   });
 
@@ -48,7 +50,7 @@ describe('assistant-service', () => {
 
     const result = await sendAssistantMessage(slug, 'hi');
 
-    expect(apiClient.post).toHaveBeenCalledWith(ASSISTANT_ROUTES.CHAT(slug), { message: 'hi' });
+    expect(apiClient.post).toHaveBeenCalledWith(ASSISTANT_ROUTES.CHAT(slug), { message: 'hi' }, expect.anything());
     expect(result).toBe('Hello there');
   });
 

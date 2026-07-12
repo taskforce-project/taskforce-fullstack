@@ -15,12 +15,20 @@ export interface AssistantSource {
 export interface AssistantStep {
   label: string
   status: "pending" | "active" | "done" | "error"
+  /** Détail optionnel de l'étape (routing, domaines trouvés, outils appelés…). */
+  description: string | null
 }
 export interface AssistantToolCall {
   name: string
   status: string
   input: string | null
   output: string | null
+}
+/** Tokens réellement consommés par le tour (usage LLM cumulé). */
+export interface AssistantUsage {
+  promptTokens: number
+  completionTokens: number
+  totalTokens: number
 }
 export interface AssistantAnswer {
   answer: string
@@ -29,6 +37,7 @@ export interface AssistantAnswer {
   sources: AssistantSource[]
   steps: AssistantStep[]
   toolCalls: AssistantToolCall[]
+  usage: AssistantUsage
 }
 
 /** Envoie un message à l'agent et renvoie la réponse structurée complète. */
