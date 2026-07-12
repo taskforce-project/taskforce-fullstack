@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ProjectIconPicker } from "@/components/ui/project-icon-picker"
 import { ColorPalettePicker, PROJECT_COLORS } from "@/components/ui/color-palette-picker"
+import { ProjectVisibilityPicker } from "@/components/ui/project-visibility-picker"
 import { useProjectStore } from "@/lib/store/project-store"
 
 export default function NewProjectPage() {
@@ -24,6 +25,7 @@ export default function NewProjectPage() {
   const [description, setDescription] = useState("")
   const [iconUrl, setIconUrl] = useState<string | null>(null)
   const [color, setColor] = useState<string>(PROJECT_COLORS[0])
+  const [isPublic, setIsPublic] = useState(false)
 
   function handleNameChange(value: string) {
     setName(value)
@@ -44,6 +46,7 @@ export default function NewProjectPage() {
         description: description.trim() || undefined,
         iconUrl: iconUrl ?? undefined,
         color,
+        isPublic,
       })
       if (project) {
         toast.success(`Projet "${project.name}" créé`)
@@ -135,6 +138,12 @@ export default function NewProjectPage() {
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium text-foreground">Color</label>
           <ColorPalettePicker value={color} onChange={setColor} />
+        </div>
+
+        {/* Visibility */}
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-foreground">Visibility</label>
+          <ProjectVisibilityPicker value={isPublic} onChange={setIsPublic} />
         </div>
       </div>
 
