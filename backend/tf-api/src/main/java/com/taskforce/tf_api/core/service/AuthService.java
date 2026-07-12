@@ -223,19 +223,20 @@ public class AuthService {
         // Marquer l'email comme vérifié dans Keycloak
         keycloakService.verifyEmail(keycloakId);
 
-        // Créer l'utilisateur dans notre DB
-        PlanType planTypeEnum = PlanType.valueOf(planType.toUpperCase());
+        // Créer l'utilisateur dans notre DB — TOUJOURS en FREE : un forfait payant n'est accordé qu'après
+        // paiement confirmé (webhook checkout.session.completed / subscription.updated). Empêche qu'un
+        // utilisateur s'attribue un plan payant sans payer.
+        PlanType.valueOf(planType.toUpperCase()); // valide le plan choisi (lève si invalide)
         String firstName = keycloakUser.getFirstName();
         String lastName = keycloakUser.getLastName();
         String displayName = buildDisplayName(firstName, lastName);
         User user = User.builder()
             .keycloakId(keycloakId)
             .email(request.getEmail())
-            .planType(planTypeEnum)
+            .planType(PlanType.FREE)
             .isActive(true)
             .displayName(displayName)
-            // Plan status: NULL pour FREE, TRIALING pour plans payants en attente de configuration Stripe
-            .planStatus(planTypeEnum == PlanType.FREE ? null : com.taskforce.tf_api.core.enums.PlanStatus.TRIALING)
+            .planStatus(null)
             .build();
 
         // Si plan payant, créer le client Stripe
@@ -255,7 +256,7 @@ public class AuthService {
                     priceId,
                     stripeSuccessUrl,
                     stripeCancelUrl,
-                    null
+                    java.util.Map.of("planType", planType.toUpperCase()) // le webhook applique le forfait au paiement
                 );
                 checkoutUrl = session.getUrl();
 
@@ -505,9 +506,10 @@ public class AuthService {
             
             log.info("Utilisateur {} déjà créé en base. Mise à jour avec les infos de paiement.", customerEmail);
             
-            // Mettre à jour avec les informations de paiement
+            // Mettre à jour avec les informations de paiement (paiement déjà validé ci-dessus).
             existingUser.setStripeCustomerId(customerId);
             existingUser.setStripeSubscriptionId(subscriptionId);
+            existingUser.setPlanType(PlanType.valueOf(planType.toUpperCase())); // applique le forfait payé
             existingUser.setPlanStatus(PlanStatus.ACTIVE);
             userRepository.save(existingUser);
             
