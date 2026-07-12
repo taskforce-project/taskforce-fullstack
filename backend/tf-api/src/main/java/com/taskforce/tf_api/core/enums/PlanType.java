@@ -1,23 +1,19 @@
 package com.taskforce.tf_api.core.enums;
 
 /**
- * Type de plan d'abonnement
+ * Type de plan d'abonnement (tarification par membre/mois).
+ * Ordre = niveau croissant : FREE &lt; BASIC &lt; BUSINESS &lt; ENTERPRISE.
  */
 public enum PlanType {
-    /**
-     * Plan gratuit avec fonctionnalités limitées
-     */
+    /** Gratuit — pour découvrir, périmètre limité. */
     FREE,
 
-    /**
-     * Plan PRO avec fonctionnalités avancées
-     * Prix : 29€/mois (configurable dans Stripe)
-     */
-    PRO,
+    /** Basic — premier palier payant (par membre/mois). */
+    BASIC,
 
-    /**
-     * Plan entreprise avec support premium et fonctionnalités complètes
-     * Prix : 99€/mois (configurable dans Stripe)
-     */
+    /** Business — équipes, fonctionnalités avancées + IA (par membre/mois). */
+    BUSINESS,
+
+    /** Enterprise — sécurité, conformité, déploiement dédié (sur devis). */
     ENTERPRISE
 }
