@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation"
 import {
   User, Bell, CreditCard, Users, Check, Zap, Globe, Key, Palette, Webhook,
   X as XIcon, Plus, Upload, Camera, Link2, Trash2, Shield, Search, Loader2,
-  Activity, CheckCircle2, AlertTriangle,
+  Activity, CheckCircle2, AlertTriangle, Gauge,
 } from "lucide-react"
 import { toast } from "sonner"
 import { useTheme } from "next-themes"
@@ -26,10 +26,11 @@ import { stripeService, type SubscriptionInfo } from "@/lib/api/stripe-service"
 import { useUpgradeStore } from "@/lib/store/upgrade-store"
 import { getAuditLogs, type AuditLogEntry } from "@/lib/api/workspace-service"
 import { useIntegrationStore } from "@/lib/store/integration-store"
-import { getGitHubRepos, getGitHubRepoIssues, mirrorSlackChannel, syncSlackChannel, type GitHubRepo, type GitHubRepoIssue } from "@/lib/api/integration-service"
+import { getGitHubRepos, getGitHubRepoIssues, type GitHubRepo, type GitHubRepoIssue } from "@/lib/api/integration-service"
 import { IntegrationsCatalog } from "@/components/integrations/integrations-catalog"
 import { BrandLogo } from "@/components/ui/brand-logo"
 import { exportMyData, deleteMyAccount } from "@/lib/api/gdpr-service"
+import { getAiUsage, type AiUsage } from "@/lib/api/ai-usage-service"
 import { apiClient } from "@/lib/api/client"
 import { USER_ROUTES } from "@/lib/config/api-routes"
 import { searchUsers, type UserSearchResult } from "@/lib/api/user-service"
@@ -43,6 +44,7 @@ type SettingsSection =
   | "security"
   | "workspace"
   | "billing"
+  | "usage"
   | "status"
   | "integrations"
   | "privacy"
@@ -62,6 +64,7 @@ const SECTIONS: SectionConfig[] = [
   { key: "security",      label: "Security",       icon: <Key className="h-4 w-4" />,        group: "Personal" },
   { key: "workspace",     label: "General",        icon: <Globe className="h-4 w-4" />,      group: "Workspace" },
   { key: "billing",       label: "Billing & Plan", icon: <CreditCard className="h-4 w-4" />, group: "Workspace" },
+  { key: "usage",         label: "Usage IA",       icon: <Gauge className="h-4 w-4" />,       group: "Workspace" },
   { key: "integrations",  label: "Integrations",   icon: <Webhook className="h-4 w-4" />,    group: "Workspace" },
   { key: "status",        label: "Status",         icon: <Activity className="h-4 w-4" />,    group: "Workspace" },
   { key: "privacy",       label: "Privacy & Data", icon: <Shield className="h-4 w-4" />,     group: "Personal" },
@@ -75,7 +78,7 @@ const PLAN_FEATURES: Record<string, string[]> = {
 
 const SECTION_GROUPS = [
   { label: "Personal",  keys: ["profile", "account", "appearance", "notifications", "security", "privacy"] as const },
-  { label: "Workspace", keys: ["workspace", "billing", "integrations", "status"] as const },
+  { label: "Workspace", keys: ["workspace", "billing", "usage", "integrations", "status"] as const },
 ]
 
 const SKILL_OPTIONS = [
@@ -1197,35 +1200,6 @@ function IntegrationsPanel() {
                       <p className="text-xs text-muted-foreground">{ch.eventTypes.join(", ")}</p>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
-                      {/* Miroir : rapatrie les messages Slack dans un canal de chat TaskForce */}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 text-xs"
-                        title="Rapatrier les messages de ce canal Slack dans le chat TaskForce"
-                        onClick={async () => {
-                          try {
-                            const n = await mirrorSlackChannel(slug, ch.id)
-                            toast.success(`Miroir activé — ${n} message${n > 1 ? "s" : ""} importé${n > 1 ? "s" : ""}`)
-                          } catch { toast.error("Impossible d'activer le miroir") }
-                        }}
-                      >
-                        Miroir
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 text-xs"
-                        title="Importer les nouveaux messages Slack"
-                        onClick={async () => {
-                          try {
-                            const n = await syncSlackChannel(slug, ch.id)
-                            toast.success(`${n} nouveau${n > 1 ? "x" : ""} message${n > 1 ? "s" : ""} synchronisé${n > 1 ? "s" : ""}`)
-                          } catch { toast.error("Synchronisation impossible") }
-                        }}
-                      >
-                        Sync
-                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -1452,6 +1426,95 @@ function PrivacyPanel() {
 }
 
 // ---------------------------------------------------------------------------
+// Usage IA Panel (conso tokens réelle du mois vs plafond du plan)
+// ---------------------------------------------------------------------------
+
+function MiniStat({ label, value }: Readonly<{ label: string; value: number }>) {
+  return (
+    <div className="rounded-lg border border-border bg-background px-3 py-2.5">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="mt-0.5 text-lg font-semibold tabular-nums text-foreground">{value.toLocaleString("fr-FR")}</p>
+    </div>
+  )
+}
+
+function UsagePanel() {
+  const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug)
+  const openUpgrade = useUpgradeStore((s) => s.openUpgrade)
+  const [usage, setUsage] = useState<AiUsage | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!slug) return
+    let alive = true
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoading(true)
+    getAiUsage(slug)
+      .then((u) => { if (alive) setUsage(u) })
+      .catch(() => { /* non bloquant */ })
+      .finally(() => { if (alive) setLoading(false) })
+    return () => { alive = false }
+  }, [slug])
+
+  const unlimited = usage ? usage.limitTokens < 0 : false
+  const pct = usage && !unlimited && usage.limitTokens > 0
+    ? Math.min(100, Math.round((usage.usedTokens / usage.limitTokens) * 100))
+    : 0
+
+  return (
+    <div className="flex flex-col gap-4">
+      <SectionCard title="Consommation IA" description="Tokens consommés par l'agent Cortex ce mois-ci, et plafond de votre plan.">
+        {loading ? (
+          <p className="text-sm text-muted-foreground">Chargement…</p>
+        ) : !usage ? (
+          <p className="text-sm text-muted-foreground">Consommation indisponible pour le moment.</p>
+        ) : (
+          <div className="flex flex-col gap-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium text-foreground">Plan <span className="uppercase">{usage.plan}</span></p>
+                <p className="text-xs text-muted-foreground mt-0.5">Période {usage.period} · réinitialisation le {usage.resetAt}</p>
+              </div>
+              {usage.plan === "FREE" && (
+                <Button size="sm" className="h-8 text-xs gap-1.5 shrink-0" onClick={() => openUpgrade()}>
+                  <Zap className="h-3.5 w-3.5" /> Améliorer le plan
+                </Button>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Tokens ce mois</span>
+                <span className="tabular-nums font-medium text-foreground">
+                  {usage.usedTokens.toLocaleString("fr-FR")} {unlimited ? "/ illimité" : `/ ${usage.limitTokens.toLocaleString("fr-FR")} (${pct}%)`}
+                </span>
+              </div>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                <div
+                  className={cn("h-full rounded-full transition-[width] duration-500", pct >= 90 ? "bg-rose-500" : pct >= 70 ? "bg-amber-500" : "bg-primary")}
+                  style={{ width: `${unlimited ? 4 : pct}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <MiniStat label="Prompt" value={usage.promptTokens} />
+              <MiniStat label="Completion" value={usage.completionTokens} />
+              <MiniStat label="Requêtes" value={usage.requestCount} />
+            </div>
+
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Le coût IA est volontairement bas (modèle local ≈ coût serveur). Les plafonds sont indicatifs
+              et seront ajustés avec la grille tarifaire finale ; seul le compute IA sera rechargeable à la demande.
+            </p>
+          </div>
+        )}
+      </SectionCard>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
@@ -1513,6 +1576,7 @@ export default function SettingsPage() {
         {active === "security"      && <SecurityPanel />}
         {active === "workspace"     && <WorkspacePanel />}
         {active === "billing"       && <BillingPanel />}
+        {active === "usage"         && <UsagePanel />}
         {active === "integrations"  && <IntegrationsPanel />}
         {active === "status"        && <StatusPanel />}
         {active === "privacy"       && <PrivacyPanel />}
