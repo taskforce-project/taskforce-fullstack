@@ -1,12 +1,12 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import Link from "next/link"
 import { useParams } from "next/navigation"
 import { Sparkles, ExternalLink, Zap, ChevronDown, ChevronRight, RefreshCw } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { useUpgradeStore } from "@/lib/store/upgrade-store"
+import { useSettingsStore } from "@/lib/store/settings-store"
 import { getAiUsage, type AiUsage } from "@/lib/api/ai-usage-service"
 
 /** Fenêtre de contexte du modèle local (approx.) — sert la jauge « fenêtre de contexte ». */
@@ -57,6 +57,7 @@ export function CortexUsage({ sessionTokens, className }: { sessionTokens: numbe
   const params = useParams()
   const slug = typeof params?.workspace === "string" ? params.workspace : ""
   const openUpgrade = useUpgradeStore((s) => s.openUpgrade)
+  const openSettings = useSettingsStore((s) => s.openSettings)
 
   const [open, setOpen] = useState(false)
   const [usage, setUsage] = useState<AiUsage | null>(null)
@@ -92,7 +93,7 @@ export function CortexUsage({ sessionTokens, className }: { sessionTokens: numbe
   const unlimited = usage ? usage.limitTokens < 0 : false
   const usePct = usage && !unlimited ? pctOf(usage.usedTokens, usage.limitTokens) : 0
   const useTone = usePct >= 90 ? "rose" : usePct >= 70 ? "amber" : "blue"
-  const detailsHref = slug ? `/${slug}/settings?section=usage` : "#"
+  const openDetails = () => { setOpen(false); openSettings("usage") }
 
   return (
     <div ref={ref} className={cn("relative", className)}>
@@ -111,17 +112,17 @@ export function CortexUsage({ sessionTokens, className }: { sessionTokens: numbe
         <div className="absolute bottom-full right-0 z-50 mb-2 w-80 overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-lg">
           {/* Fenêtre de contexte */}
           <div className="p-3">
-            <Link
-              href={detailsHref}
-              onClick={() => setOpen(false)}
-              className="flex items-center justify-between text-xs transition-colors hover:text-foreground"
+            <button
+              type="button"
+              onClick={openDetails}
+              className="flex w-full items-center justify-between text-left text-xs transition-colors hover:text-foreground"
             >
               <span className="text-muted-foreground">Fenêtre de contexte</span>
               <span className="flex items-center gap-1 tabular-nums font-medium">
                 {fmt(sessionTokens)} / {fmt(CONTEXT_WINDOW)} <span className="text-muted-foreground">({ctxPct}%)</span>
                 <ChevronRight className="size-3 text-muted-foreground" />
               </span>
-            </Link>
+            </button>
             <div className="mt-1.5"><Bar pct={ctxPct} tone={ctxPct >= 90 ? "rose" : ctxPct >= 70 ? "amber" : "blue"} /></div>
           </div>
 
@@ -129,14 +130,14 @@ export function CortexUsage({ sessionTokens, className }: { sessionTokens: numbe
 
           {/* Utilisation du forfait */}
           <div className="p-3">
-            <Link
-              href={detailsHref}
-              onClick={() => setOpen(false)}
-              className="flex items-center justify-between text-xs font-semibold transition-colors hover:text-foreground"
+            <button
+              type="button"
+              onClick={openDetails}
+              className="flex w-full items-center justify-between text-left text-xs font-semibold transition-colors hover:text-foreground"
             >
               <span>Utilisation du forfait · <span className="uppercase text-muted-foreground">{usage?.plan ?? "…"}</span></span>
               <ChevronRight className="size-3 text-muted-foreground" />
-            </Link>
+            </button>
 
             <div className="mt-2 space-y-1">
               <div className="flex items-center justify-between text-[11px]">
@@ -177,13 +178,13 @@ export function CortexUsage({ sessionTokens, className }: { sessionTokens: numbe
               >
                 <RefreshCw className={cn("size-3.5", refreshing && "animate-spin")} />
               </button>
-              <Link
-                href={detailsHref}
-                onClick={() => setOpen(false)}
+              <button
+                type="button"
+                onClick={openDetails}
                 className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] font-medium transition-colors hover:bg-muted"
               >
                 <ExternalLink className="size-3" /> Détails
-              </Link>
+              </button>
               <button
                 type="button"
                 onClick={() => { setOpen(false); openUpgrade() }}
