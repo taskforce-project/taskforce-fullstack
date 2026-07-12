@@ -209,7 +209,7 @@ describe('authService - API Service', () => {
           message: 'Redirecting to payment',
           data: {
             email: 'test@example.com',
-            planType: 'PRO',
+            planType: 'BUSINESS',
             stripeCheckoutUrl: 'https://checkout.stripe.com/mock',
             message: 'Redirecting to payment',
           },
@@ -218,7 +218,7 @@ describe('authService - API Service', () => {
 
       vi.mocked(client.apiClient.post).mockResolvedValue(mockResponse);
 
-      const response = await authService.selectPlan('test@example.com', 'PRO');
+      const response = await authService.selectPlan('test@example.com', 'BUSINESS');
 
       expect(response).toBeDefined();
       expect(response.stripeCheckoutUrl).toBe('https://checkout.stripe.com/mock');
