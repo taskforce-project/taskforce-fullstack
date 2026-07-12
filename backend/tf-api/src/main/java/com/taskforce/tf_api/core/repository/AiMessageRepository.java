@@ -16,6 +16,9 @@ public interface AiMessageRepository extends JpaRepository<AiMessage, Long> {
     /** Derniers messages (ordre décroissant) — pour l'historique injecté dans le prompt. */
     List<AiMessage> findByConversationIdOrderByCreatedAtDesc(Long conversationId, Pageable pageable);
 
+    /** Messages postérieurs au filigrane de résumé (id croissant = ordre chronologique). */
+    List<AiMessage> findByConversationIdAndIdGreaterThanOrderByIdAsc(Long conversationId, Long id);
+
     int countByConversationId(Long conversationId);
 
     @Query("select coalesce(sum(m.totalTokens), 0) from AiMessage m where m.conversationId = :conversationId")
