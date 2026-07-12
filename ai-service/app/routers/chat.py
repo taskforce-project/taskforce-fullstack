@@ -16,7 +16,7 @@ def chat(
     gateway: OllamaGateway = Depends(get_ollama_gateway),
 ) -> ChatResponse:
     try:
-        model, message = gateway.chat(
+        model, message, usage = gateway.chat(
             payload.messages,
             model=payload.model,
             tools=payload.tools,
@@ -27,4 +27,4 @@ def chat(
         )
     except OllamaGatewayError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
-    return ChatResponse(model=model, message=message)
+    return ChatResponse(model=model, message=message, usage=usage)
