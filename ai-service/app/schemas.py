@@ -34,6 +34,7 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     model: str
     message: dict                         # message assistant (peut contenir `tool_calls`)
+    usage: dict = Field(default_factory=dict)  # {prompt_tokens, completion_tokens, total_tokens} — tokens réels
 
 
 # --- Smart Assign -----------------------------------------------------------
