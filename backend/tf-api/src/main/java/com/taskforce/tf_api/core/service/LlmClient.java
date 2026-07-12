@@ -33,6 +33,17 @@ public interface LlmClient {
         return rawChat(model, messages, tools);
     }
 
+    /**
+     * Complétion <b>multi-tours</b> (mémoire de conversation) : une liste de messages
+     * {@code {role, content}} → le contenu texte de la réponse assistant. Réutilise {@link #rawChat}
+     * sans outils (l'usage tokens est capturé de la même façon). Utilisée par l'agent pour injecter
+     * l'historique de la conversation dans le prompt.
+     */
+    default String chat(String model, List<Map<String, Object>> messages, String tier) {
+        JsonNode msg = rawChat(model, messages, List.of(), tier);
+        return msg == null ? "" : msg.path("content").asText("");
+    }
+
     // ── Capture d'usage (tokens) ─────────────────────────────────────────────
     // Arme un accumulateur pour le thread courant : tous les appels LLM suivants y
     // additionnent leur usage jusqu'à {@link #endUsageCapture()}. No-op par défaut
