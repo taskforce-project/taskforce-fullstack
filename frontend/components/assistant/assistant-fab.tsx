@@ -157,10 +157,10 @@ function FABEmptyState() {
     <div className="flex-1 flex flex-col items-center justify-center gap-3 py-8 px-4 text-center">
       {/* Animation dot-matrix ElevenLabs UI (QA3-10) */}
       <div className="flex items-center justify-center text-primary">
-        <Matrix rows={7} cols={7} frames={wave} fps={10} size={6} gap={2} ariaLabel="Taskforce AI" />
+        <Matrix rows={7} cols={7} frames={wave} fps={10} size={6} gap={2} ariaLabel="Cortex" />
       </div>
       <div>
-        <p className="text-sm font-medium text-foreground">Taskforce AI</p>
+        <p className="text-sm font-medium text-foreground">Cortex</p>
         <p className="text-xs text-muted-foreground mt-1">
           Votre assistant exécutif. Posez vos questions sur vos projets, équipes ou stratégies.
         </p>
@@ -252,7 +252,7 @@ export function AssistantFAB() {
               <Sparkles className="size-3.5 text-primary" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-foreground leading-none">Taskforce AI</p>
+              <p className="text-sm font-semibold text-foreground leading-none">Cortex</p>
               <p className="text-[10px] text-muted-foreground mt-0.5">Assistant exécutif</p>
             </div>
             <AssistantModalPrimitive.Trigger asChild>
