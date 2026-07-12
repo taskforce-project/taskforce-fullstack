@@ -425,8 +425,9 @@ class AuthServiceTest {
             verify(userRepository).save(userCaptor.capture());
 
             User savedUser = userCaptor.getValue();
-            assertThat(savedUser.getPlanType()).isEqualTo(PlanType.BUSINESS);
-            assertThat(savedUser.getPlanStatus()).isEqualTo(PlanStatus.TRIALING);
+            // L'utilisateur est créé en FREE ; le forfait payant n'est accordé qu'après paiement (webhook).
+            assertThat(savedUser.getPlanType()).isEqualTo(PlanType.FREE);
+            assertThat(savedUser.getPlanStatus()).isNull();
             assertThat(savedUser.getStripeCustomerId()).isEqualTo("cus_123");
         }
 
@@ -464,7 +465,8 @@ class AuthServiceTest {
             assertThat(response.getCheckoutSessionUrl()).isNotNull();
 
             verify(userRepository).save(userCaptor.capture());
-            assertThat(userCaptor.getValue().getPlanType()).isEqualTo(PlanType.ENTERPRISE);
+            // Créé en FREE jusqu'au paiement (le checkout est tout de même retourné).
+            assertThat(userCaptor.getValue().getPlanType()).isEqualTo(PlanType.FREE);
         }
 
         @Test
