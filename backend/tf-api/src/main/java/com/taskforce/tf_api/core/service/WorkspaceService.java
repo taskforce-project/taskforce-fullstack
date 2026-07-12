@@ -48,11 +48,9 @@ public class WorkspaceService {
     private final AuditService auditService;
     private final BrainSeedingService brainSeedingService;
 
-    // Limites de workspaces par plan
+    // Limites de workspaces par plan (les membres sont illimités : tarification par membre/mois)
     private static final long MAX_WORKSPACES_FREE = 2;
-    private static final long MAX_WORKSPACES_PRO = 10;
-    private static final long MAX_MEMBERS_FREE = 5;
-    private static final long MAX_MEMBERS_PRO = 50;
+    private static final long MAX_WORKSPACES_BASIC = 5;
 
     // -------------------------------------------------------------------------
     // Création automatique à l'inscription
@@ -180,21 +178,17 @@ public class WorkspaceService {
         }
     }
 
-    /** Limite de membres pour un plan (Long.MAX_VALUE = illimité). */
+    /** Membres illimités sur tous les plans (tarification par membre/mois, pas de plafond). */
     private long memberLimitFor(PlanType plan) {
-        return switch (plan) {
-            case FREE -> MAX_MEMBERS_FREE;
-            case PRO -> MAX_MEMBERS_PRO;
-            default -> Long.MAX_VALUE;
-        };
+        return Long.MAX_VALUE;
     }
 
-    /** Limite de workspaces pour un plan (Long.MAX_VALUE = illimité). */
+    /** Limite de workspaces par plan (Long.MAX_VALUE = illimité). Switch exhaustif = MAJ forcée si un tier est ajouté. */
     private long workspaceLimitFor(PlanType plan) {
         return switch (plan) {
             case FREE -> MAX_WORKSPACES_FREE;
-            case PRO -> MAX_WORKSPACES_PRO;
-            default -> Long.MAX_VALUE;
+            case BASIC -> MAX_WORKSPACES_BASIC;
+            case BUSINESS, ENTERPRISE -> Long.MAX_VALUE;
         };
     }
 
