@@ -241,6 +241,8 @@ export const ASSISTANT_ROUTES = {
  */
 export const AI_ROUTES = {
   USAGE: (slug: string) => `/api/workspaces/${slug}/ai/usage`,
+  CONVERSATIONS: (slug: string) => `/api/workspaces/${slug}/ai/conversations`,
+  CONVERSATION: (slug: string, id: number) => `/api/workspaces/${slug}/ai/conversations/${id}`,
 } as const;
 
 /**
