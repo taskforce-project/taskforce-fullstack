@@ -69,10 +69,12 @@ export const usePanelStore = create<PanelState>((set, get) => ({
   openPanel: (input) => {
     const panel = normalize(input);
     set((s) => {
-      const others = s.panels.filter((p) => p.id !== panel.id);
-      // Conserver la largeur courante si le panneau était déjà ouvert
+      // Un seul panneau par côté à la fois : ouvrir sur un côté ferme celui déjà ouvert de ce
+      // côté (sinon deux panneaux se retrouvaient côte à côte et écrasaient tout — retour user).
+      // Les panneaux d'un AUTRE côté restent (le socle gauche/droite garde son sens).
       const existing = s.panels.find((p) => p.id === panel.id);
-      return { panels: [...others, existing ? { ...panel, width: existing.width } : panel] };
+      const kept = s.panels.filter((p) => p.id !== panel.id && p.side !== panel.side);
+      return { panels: [...kept, existing ? { ...panel, width: existing.width } : panel] };
     });
   },
 
