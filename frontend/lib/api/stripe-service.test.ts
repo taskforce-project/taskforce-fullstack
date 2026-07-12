@@ -41,12 +41,12 @@ describe('stripeService', () => {
       vi.mocked(apiClient.post).mockResolvedValue(mockResponse);
 
       // When
-      const result = await stripeService.createCheckoutSession('PRO');
+      const result = await stripeService.createCheckoutSession('BUSINESS');
 
       // Then
       expect(result).toEqual(mockResponse.data);
       expect(apiClient.post).toHaveBeenCalledWith('/api/stripe/create-checkout', {
-        planType: 'PRO',
+        planType: 'BUSINESS',
         successUrl: 'http://localhost:3000/payment/success',
         cancelUrl: 'http://localhost:3000/payment/cancel',
       });
@@ -89,7 +89,7 @@ describe('stripeService', () => {
 
       // When
       const result = await stripeService.createCheckoutSession(
-        'PRO',
+        'BUSINESS',
         customSuccessUrl,
         customCancelUrl
       );
@@ -97,7 +97,7 @@ describe('stripeService', () => {
       // Then
       expect(result).toEqual(mockResponse.data);
       expect(apiClient.post).toHaveBeenCalledWith('/api/stripe/create-checkout', {
-        planType: 'PRO',
+        planType: 'BUSINESS',
         successUrl: customSuccessUrl,
         cancelUrl: customCancelUrl,
       });
@@ -110,7 +110,7 @@ describe('stripeService', () => {
 
       // When/Then
       await expect(
-        stripeService.createCheckoutSession('PRO')
+        stripeService.createCheckoutSession('BUSINESS')
       ).rejects.toThrow(errorMessage);
     });
   });
@@ -142,7 +142,7 @@ describe('stripeService', () => {
         data: {
           id: 2,
           userId: 20,
-          planType: 'PRO' as const,
+          planType: 'BUSINESS' as const,
           status: 'ACTIVE',
           amount: 999,
           currency: 'EUR',

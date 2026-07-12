@@ -20,7 +20,7 @@ export interface CheckoutSessionResponse {
 export interface SubscriptionInfo {
   id?: number;
   userId?: number;
-  planType: "FREE" | "PRO" | "ENTERPRISE";
+  planType: "FREE" | "BASIC" | "BUSINESS" | "ENTERPRISE";
   status: string;
   amount?: number;
   currency?: string;
@@ -34,13 +34,13 @@ export interface SubscriptionInfo {
 export const stripeService = {
   /**
    * Créer une session de paiement Stripe
-   * @param planType - Type de plan (PRO, ENTERPRISE)
+   * @param planType - Type de plan payant en self-service (BASIC, BUSINESS)
    * @param successUrl - URL de redirection après paiement réussi
    * @param cancelUrl - URL de redirection si annulation
    * @returns URL de checkout Stripe
    */
   async createCheckoutSession(
-    planType: "PRO" | "ENTERPRISE",
+    planType: "BASIC" | "BUSINESS",
     successUrl?: string,
     cancelUrl?: string
   ): Promise<CheckoutSessionResponse> {
