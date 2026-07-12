@@ -177,11 +177,9 @@ public class User {
     @Column(name = "avatar_url", length = 500)
     private String avatarUrl;
 
-    /**
-     * Vérifie si l'utilisateur a un plan PRO ou supérieur
-     */
-    public boolean isProOrHigher() {
-        return planType == PlanType.PRO || planType == PlanType.ENTERPRISE;
+    /** Vrai si l'utilisateur est sur un plan payant (BASIC, BUSINESS ou ENTERPRISE). */
+    public boolean isPaid() {
+        return planType != null && planType != PlanType.FREE;
     }
 
     /**
