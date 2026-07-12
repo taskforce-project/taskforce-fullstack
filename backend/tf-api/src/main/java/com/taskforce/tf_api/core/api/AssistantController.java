@@ -135,6 +135,9 @@ public class AssistantController {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
         AiConversation conv = conversationService.getOrCreate(ws.getId(), userId, body.conversationId());
 
+        // Compression de contexte : condense les anciens échanges si le fil est trop long (avant de lire l'historique).
+        conversationService.compressIfNeeded(conv.getId());
+
         // Mémoire multi-tours : historique de la conversation AVANT d'ajouter le tour courant.
         List<Map<String, Object>> history = conversationService.recentHistory(conv.getId());
         AssistantAnswer answer = agentService.run(slug, userId, body.message(), history);
