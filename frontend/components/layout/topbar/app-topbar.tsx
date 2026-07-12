@@ -3,8 +3,9 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Search, Sparkles } from "lucide-react"
+import { Search, Sparkles, FlaskConical } from "lucide-react"
 
+import { cn } from "@/lib/utils"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import {
@@ -43,8 +44,6 @@ function segmentLabel(segment: string): string {
     skills: "Skills",
     analytics: "Intelligence",
     agents: "Agents",
-    messages: "Messages",
-    discussions: "Discussions",
     settings: "Settings",
     admin: "Admin",
     new: "New",
@@ -101,6 +100,11 @@ function useBreadcrumbs() {
 
 export function AppTopbar() {
   const breadcrumbs = useBreadcrumbs()
+  const pathname = usePathname()
+  // Fonctionnalités « Lab » (en cours de finition) : Intelligence (/analytics) + Brain OS (/brain).
+  // Le header se teinte en bleu discret (info) + un indicateur + un lien feedback — pendant des
+  // fioles bleues de la sidebar. Remplace le bandeau `LabBanner` sur ces pages pleines.
+  const isLab = /\/(analytics|brain)(\/|$)/.test(pathname)
   const [cmdOpen, setCmdOpen] = React.useState(false)
   const togglePanel = usePanelStore((s) => s.togglePanel)
   const planType = useUserStore((s) => s.user?.planType)
@@ -114,7 +118,7 @@ export function AppTopbar() {
     togglePanel({
       id: "assistant",
       side: "right",
-      title: "Taskforce AI — Agent",
+      title: "Cortex",
       icon: <Sparkles className="size-4 text-primary" />,
       content: <AgentChat />,
     })
@@ -133,7 +137,14 @@ export function AppTopbar() {
   }, [])
 
   return (
-    <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background px-4">
+    <header
+      className={cn(
+        "sticky top-0 z-40 flex h-14 shrink-0 items-center gap-2 border-b px-4 transition-colors",
+        isLab
+          ? "border-blue-300 bg-blue-100 dark:border-blue-900/60 dark:bg-blue-950/50"
+          : "border-border bg-background",
+      )}
+    >
       {/* Left: sidebar trigger + breadcrumb */}
       <div className="flex flex-1 items-center gap-2">
         <SidebarTrigger className="-ml-1" />
@@ -160,6 +171,22 @@ export function AppTopbar() {
           </Breadcrumb>
         )}
       </div>
+
+      {/* Indicateur « Lab » centré dans le header (feature en expérimentation). */}
+      {isLab && (
+        <div className="pointer-events-none absolute left-1/2 flex -translate-x-1/2 items-center gap-2">
+          <span className="flex items-center gap-1.5 rounded-full bg-blue-200/70 px-2.5 py-0.5 text-[11px] font-medium text-blue-800 dark:bg-blue-900/60 dark:text-blue-200">
+            <FlaskConical className="size-3.5" />
+            Expérimentation
+          </span>
+          <a
+            href="mailto:feedback@taskforce.dev?subject=Feedback"
+            className="pointer-events-auto hidden text-[11px] font-medium text-blue-700 underline-offset-2 hover:underline md:inline dark:text-blue-300"
+          >
+            Donner mon feedback
+          </a>
+        </div>
+      )}
 
       {/* Right: search, notifications, theme, user */}
       <div className="flex items-center gap-1">
