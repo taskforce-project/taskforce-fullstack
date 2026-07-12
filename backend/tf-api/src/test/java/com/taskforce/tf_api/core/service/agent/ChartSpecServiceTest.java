@@ -1,5 +1,7 @@
 package com.taskforce.tf_api.core.service.agent;
 
+import java.util.List;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -10,11 +12,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
-
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskforce.tf_api.core.dto.response.ChartSpecResponse;
+import com.taskforce.tf_api.core.dto.response.NamedValue;
+import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.service.LlmClient;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 
@@ -23,86 +26,149 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * Tests unitaires — {@link ChartSpecService}.
+ * Tests unitaires — {@link ChartSpecService}, moteur à deux modes (série temporelle + répartition).
  *
- * <p>Deux garanties à tenir : (1) sans LLM, le repli par mots-clés produit un graphe utile ;
- * (2) avec LLM, la sortie est <b>validée contre le catalogue</b> — jamais de dataset ou de série
- * inventés ne doit franchir la validation.
+ * <p>Garanties : (1) sans LLM, la demande est routée par mots-clés vers le bon mode ; (2) avec LLM,
+ * la sortie est validée — une répartition passe par {@link AnalyticsQueryService} (données réelles),
+ * une série temporelle référence un dataset connu, le hors-périmètre devient {@code unsupported}.
  */
 @ExtendWith(MockitoExtension.class)
 class ChartSpecServiceTest {
 
-    @Mock  private BrainAccessGuard access;
-    @Mock  private LlmClient        llm;
+    @Mock  private BrainAccessGuard      access;
+    @Mock  private LlmClient             llm;
+    @Mock  private AnalyticsQueryService queryService;
     @InjectMocks private ChartSpecService service;
 
-    // Le service a besoin d'un vrai ObjectMapper (parsing JSON) — @Spy le rend injectable par @InjectMocks.
     @Spy private ObjectMapper objectMapper = new ObjectMapper();
 
     @BeforeEach
     void setUp() {
-        // resolveAndAuthorize est appelé pour l'autorisation ; sa valeur de retour est ignorée ici.
-        lenient().when(access.resolveAndAuthorize(anyString(), any())).thenReturn(null);
-        // Le champ @Value n'est pas injecté hors Spring ; sans modèle non-null, le vrai chemin LLM
-        // ne serait jamais exercé (anyString() ne matche pas null) et tout tomberait sur l'heuristique.
+        Workspace ws = mock(Workspace.class);
+        lenient().when(ws.getId()).thenReturn(1L);
+        lenient().when(access.resolveAndAuthorize(anyString(), any())).thenReturn(ws);
         ReflectionTestUtils.setField(service, "model", "test-model");
+
+        // Whitelist du moteur de requête (données réelles) — stubs génériques.
+        lenient().when(queryService.isValidDimension(anyString())).thenReturn(true);
+        lenient().when(queryService.dimensionLabel(anyString())).thenReturn("Projet");
+        lenient().when(queryService.measureLabel(anyString())).thenReturn("Nombre d'issues");
+        lenient().when(queryService.run(any(), anyString(), anyString(), anyString()))
+            .thenReturn(List.of(new NamedValue("Web App", 12), new NamedValue("API", 7)));
+
+        // Prédiction (score de succès sur données réelles) — stubs génériques.
+        lenient().when(queryService.isValidPrediction(anyString())).thenReturn(true);
+        lenient().when(queryService.predictionTitle(anyString())).thenReturn("Prédiction de succès par projet");
+        lenient().when(queryService.predictionYLabel(anyString())).thenReturn("Score de succès (%)");
+        lenient().when(queryService.predict(any(), anyString()))
+            .thenReturn(List.of(new NamedValue("Infrastructure", 73), new NamedValue("Web App", 60)));
     }
 
-    // ── Repli déterministe (LLM absent) ──────────────────────────────────────
+    // ── Répartition (retrieval DB) ────────────────────────────────────────────
 
-    @ParameterizedTest(name = "« {0} » → dataset {1}")
+    @ParameterizedTest(name = "« {0} » → répartition (mode breakdown)")
     @CsvSource({
-        "burndown du sprint,           burndown",
-        "reste à faire cette semaine,  burndown",
-        "charge par membre,            capacity",
-        "qui est surchargé,            capacity",
-        "débit quotidien sur 30 jours, throughput",
-        "tâches résolues par semaine,  throughput",
+        "le nombre d'issues par projet",
+        "répartition des issues par statut",
+        "issues ouvertes par assigné",
+        "combien d'issues par priorité",
     })
-    @DisplayName("sans LLM, la demande est mappée au bon dataset par mots-clés")
-    void heuristicMapsPromptToDataset(String prompt, String expectedDataset) {
+    @DisplayName("sans LLM, « par X » déclenche une répartition calculée en base")
+    void heuristicRoutesBreakdown(String prompt) {
         when(llm.isConfigured()).thenReturn(false);
 
         ChartSpecResponse spec = service.generate("demo", 1L, prompt, null);
 
+        assertThat(spec.mode()).isEqualTo("breakdown");
+        assertThat(spec.data()).isNotEmpty();          // vraies données du moteur de requête
+        assertThat(spec.dataset()).isNull();
         assertThat(spec.unsupported()).isNull();
-        assertThat(spec.dataset()).isEqualTo(expectedDataset);
-        assertThat(spec.series()).allMatch(s -> !s.isBlank());
     }
 
     @Test
-    @DisplayName("sans LLM, une charge « par jour » bascule sur la heatmap workload")
-    void heuristicPicksWorkloadForDailyLoad() {
-        when(llm.isConfigured()).thenReturn(false);
-
-        ChartSpecResponse spec = service.generate("demo", 1L, "charge de l'équipe jour par jour", null);
-
-        assertThat(spec.dataset()).isEqualTo("workload");
-        assertThat(spec.chartType()).isEqualTo("heatmap");
-    }
-
-    // ── Validation de la sortie LLM contre le catalogue ──────────────────────
-
-    private void llmReturns(String json) {
-        when(llm.isConfigured()).thenReturn(true);
-        when(llm.chatCompletion(anyString(), anyString(), anyString(), anyBoolean(), anyString())).thenReturn(json);
-    }
-
-    @Test
-    @DisplayName("une spec LLM valide est conservée")
-    void validLlmSpecIsKept() {
+    @DisplayName("une répartition LLM valide est exécutée et porte les données réelles")
+    void llmBreakdownIsExecuted() {
         llmReturns("""
-            {"title":"Résolues vs ouvertes","description":"par semaine","dataset":"throughput",
-             "chartType":"area","bucket":"week","series":["resolved","opened"]}
+            {"title":"Issues par projet","dimension":"PROJECT","measure":"COUNT","scope":"ALL","chartType":"bar"}
             """);
 
-        ChartSpecResponse spec = service.generate("demo", 1L, "résolues vs ouvertes", null);
+        ChartSpecResponse spec = service.generate("demo", 1L, "issues par projet", null);
 
+        assertThat(spec.mode()).isEqualTo("breakdown");
+        assertThat(spec.chartType()).isEqualTo("bar");
+        assertThat(spec.data()).extracting(NamedValue::label).contains("Web App", "API");
+        assertThat(spec.yLabel()).isEqualTo("Nombre d'issues");
+    }
+
+    // ── Prédiction (projections sur données réelles, jamais inventées) ─────────
+
+    @ParameterizedTest(name = "« {0} » → prédiction (mode breakdown, score de succès)")
+    @CsvSource({
+        "prédiction de succès des projets",
+        "quels projets ont le plus de chances de réussir",
+        "montre le risque par projet",
+        "santé des projets",
+    })
+    @DisplayName("sans LLM, une demande de prédiction est routée vers le score de succès")
+    void heuristicRoutesPrediction(String prompt) {
+        when(llm.isConfigured()).thenReturn(false);
+
+        ChartSpecResponse spec = service.generate("demo", 1L, prompt, null);
+
+        assertThat(spec.mode()).isEqualTo("breakdown");
+        assertThat(spec.yLabel()).isEqualTo("Score de succès (%)");
+        assertThat(spec.data()).extracting(NamedValue::label).contains("Infrastructure");
+        assertThat(spec.dimension()).isNull();   // instantané : la donnée voyage dans le spec
+    }
+
+    @Test
+    @DisplayName("une prédiction demandée par le LLM (predict=SUCCESS) est calculée en base")
+    void llmPredictionIsExecuted() {
+        llmReturns("""
+            {"title":"Chances de succès par projet","predict":"SUCCESS"}
+            """);
+
+        ChartSpecResponse spec = service.generate("demo", 1L, "predictions de succes des projets", null);
+
+        assertThat(spec.mode()).isEqualTo("breakdown");
+        assertThat(spec.yLabel()).isEqualTo("Score de succès (%)");
+        assertThat(spec.data()).extracting(NamedValue::value).contains(73L);
+    }
+
+    // ── Séries temporelles ────────────────────────────────────────────────────
+
+    @ParameterizedTest(name = "« {0} » → série temporelle {1}")
+    @CsvSource({
+        "burndown du sprint,           burndown",
+        "débit quotidien sur 30 jours, throughput",
+        "avancement des projets,       projects",
+    })
+    @DisplayName("sans LLM, les demandes temporelles restent en mode timeseries")
+    void heuristicRoutesTimeseries(String prompt, String expectedDataset) {
+        when(llm.isConfigured()).thenReturn(false);
+
+        ChartSpecResponse spec = service.generate("demo", 1L, prompt, null);
+
+        assertThat(spec.mode()).isEqualTo("timeseries");
+        assertThat(spec.dataset()).isEqualTo(expectedDataset);
+        assertThat(spec.data()).isNull();
+    }
+
+    @Test
+    @DisplayName("une série temporelle LLM valide est conservée")
+    void llmTimeseriesIsKept() {
+        llmReturns("""
+            {"title":"Débit","dataset":"throughput","chartType":"area","bucket":"week","series":["resolved","opened"]}
+            """);
+
+        ChartSpecResponse spec = service.generate("demo", 1L, "débit", null);
+
+        assertThat(spec.mode()).isEqualTo("timeseries");
         assertThat(spec.dataset()).isEqualTo("throughput");
-        assertThat(spec.chartType()).isEqualTo("area");
         assertThat(spec.bucket()).isEqualTo("week");
         assertThat(spec.series()).containsExactly("resolved", "opened");
     }
@@ -117,34 +183,10 @@ class ChartSpecServiceTest {
         ChartSpecResponse spec = service.generate("demo", 1L, "charge", null);
 
         assertThat(spec.dataset()).isEqualTo("capacity");
-        assertThat(spec.series()).containsExactly("openIssues");  // revenue/xyz écartés
+        assertThat(spec.series()).containsExactly("openIssues");
     }
 
-    @Test
-    @DisplayName("un dataset hors catalogue déclenche le repli heuristique (pas de faux graphe)")
-    void unknownDatasetFallsBackToHeuristic() {
-        llmReturns("""
-            {"title":"Revenus","dataset":"revenue","chartType":"bar","series":["amount"]}
-            """);
-
-        // Le prompt parle de burndown → l'heuristique doit rattraper avec un dataset réel.
-        ChartSpecResponse spec = service.generate("demo", 1L, "montre le burndown", null);
-
-        assertThat(spec.dataset()).isEqualTo("burndown");
-        assertThat(spec.series()).containsExactly("remaining", "ideal");
-    }
-
-    @Test
-    @DisplayName("un type de graphe invalide retombe sur le défaut du dataset")
-    void invalidChartTypeUsesDatasetDefault() {
-        llmReturns("""
-            {"title":"X","dataset":"burndown","chartType":"pie","series":["remaining"]}
-            """);
-
-        ChartSpecResponse spec = service.generate("demo", 1L, "burndown", null);
-
-        assertThat(spec.chartType()).isEqualTo("line");  // défaut de burndown
-    }
+    // ── Robustesse ────────────────────────────────────────────────────────────
 
     @Test
     @DisplayName("une demande hors périmètre est marquée unsupported, sans données inventées")
@@ -153,9 +195,10 @@ class ChartSpecServiceTest {
 
         ChartSpecResponse spec = service.generate("demo", 1L, "revenus mensuels", null);
 
+        assertThat(spec.mode()).isEqualTo("unsupported");
         assertThat(spec.unsupported()).contains("revenus");
+        assertThat(spec.data()).isNull();
         assertThat(spec.dataset()).isNull();
-        assertThat(spec.series()).isEmpty();
     }
 
     @Test
@@ -163,8 +206,30 @@ class ChartSpecServiceTest {
     void malformedLlmOutputFallsBack() {
         llmReturns("ceci n'est pas du JSON");
 
-        ChartSpecResponse spec = service.generate("demo", 1L, "charge par membre", null);
+        ChartSpecResponse spec = service.generate("demo", 1L, "issues par projet", null);
 
-        assertThat(spec.dataset()).isEqualTo("capacity");
+        assertThat(spec.mode()).isEqualTo("breakdown");  // l'heuristique rattrape
+    }
+
+    @Test
+    @DisplayName("un dataset ET une dimension inconnus → repli heuristique (jamais de faux graphe)")
+    void unusableLlmOutputFallsBack() {
+        when(queryService.isValidDimension("REVENUE")).thenReturn(false);
+        llmReturns("""
+            {"title":"X","dimension":"REVENUE","measure":"COUNT"}
+            """);
+
+        // Le prompt parle de burndown → l'heuristique doit rattraper avec un dataset réel.
+        ChartSpecResponse spec = service.generate("demo", 1L, "montre le burndown", null);
+
+        assertThat(spec.mode()).isEqualTo("timeseries");
+        assertThat(spec.dataset()).isEqualTo("burndown");
+    }
+
+    // ── Helper ────────────────────────────────────────────────────────────────
+
+    private void llmReturns(String json) {
+        when(llm.isConfigured()).thenReturn(true);
+        when(llm.chatCompletion(anyString(), anyString(), anyString(), anyBoolean(), anyString())).thenReturn(json);
     }
 }
