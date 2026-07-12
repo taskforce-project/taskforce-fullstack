@@ -80,9 +80,9 @@ public class AiUsageService {
      */
     private long limitFor(PlanType plan) {
         return switch (plan) {
-            case FREE -> 1_000_000L;
-            case PRO -> 20_000_000L;
-            default -> -1L; // ENTERPRISE (et plans supérieurs) : illimité
+            case FREE -> 100_000L;      // 100k tokens/mois (généreux pour du modèle local)
+            case PRO -> 1_000_000L;     // 1M tokens/mois
+            default -> -1L;             // ENTERPRISE (et plans supérieurs) : illimité
         };
     }
 }
