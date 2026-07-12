@@ -36,7 +36,7 @@ import { USER_ROUTES } from "@/lib/config/api-routes"
 import { searchUsers, type UserSearchResult } from "@/lib/api/user-service"
 import { cn } from "@/lib/utils"
 
-type SettingsSection =
+export type SettingsSection =
   | "profile"
   | "account"
   | "appearance"
@@ -56,7 +56,7 @@ interface SectionConfig {
   group: string
 }
 
-const SECTIONS: SectionConfig[] = [
+export const SECTIONS: SectionConfig[] = [
   { key: "profile",       label: "Profile",        icon: <User className="h-4 w-4" />,       group: "Personal" },
   { key: "account",       label: "Account",        icon: <Globe className="h-4 w-4" />,      group: "Personal" },
   { key: "appearance",    label: "Appearance",     icon: <Palette className="h-4 w-4" />,    group: "Personal" },
@@ -76,7 +76,7 @@ const PLAN_FEATURES: Record<string, string[]> = {
   enterprise: ["Tout de Pro", "Membres illimités", "SSO / Keycloak", "Audit & RGPD avancés", "Déploiement on-premise", "SLA dédié"],
 }
 
-const SECTION_GROUPS = [
+export const SECTION_GROUPS = [
   { label: "Personal",  keys: ["profile", "account", "appearance", "notifications", "security", "privacy"] as const },
   { label: "Workspace", keys: ["workspace", "billing", "usage", "integrations", "status"] as const },
 ]
@@ -1518,6 +1518,57 @@ function UsagePanel() {
 // Page
 // ---------------------------------------------------------------------------
 
+/** Navigation latérale des sections — réutilisée par la page ET le modal Settings. */
+export function SettingsNav({
+  active,
+  onSelect,
+  className,
+}: Readonly<{ active: SettingsSection; onSelect: (s: SettingsSection) => void; className?: string }>) {
+  return (
+    <nav className={cn("flex flex-col gap-6", className)}>
+      {SECTION_GROUPS.map((group) => (
+        <div key={group.label} className="flex flex-col gap-0.5">
+          <p className="px-3 mb-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">{group.label}</p>
+          {SECTIONS.filter((s) => (group.keys as readonly string[]).includes(s.key)).map((s) => (
+            <button
+              key={s.key}
+              onClick={() => onSelect(s.key)}
+              className={cn(
+                "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm text-left transition-colors w-full",
+                active === s.key
+                  ? "bg-muted text-foreground font-medium"
+                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+              )}
+            >
+              {s.icon}
+              {s.label}
+            </button>
+          ))}
+        </div>
+      ))}
+    </nav>
+  )
+}
+
+/** Rendu du panneau de la section active — réutilisé par la page ET le modal Settings. */
+export function SettingsPanels({ active }: Readonly<{ active: SettingsSection }>) {
+  return (
+    <>
+      {active === "profile"       && <ProfilePanel />}
+      {active === "account"       && <AccountPanel />}
+      {active === "appearance"    && <AppearancePanel />}
+      {active === "notifications" && <NotificationsPanel />}
+      {active === "security"      && <SecurityPanel />}
+      {active === "workspace"     && <WorkspacePanel />}
+      {active === "billing"       && <BillingPanel />}
+      {active === "usage"         && <UsagePanel />}
+      {active === "integrations"  && <IntegrationsPanel />}
+      {active === "status"        && <StatusPanel />}
+      {active === "privacy"       && <PrivacyPanel />}
+    </>
+  )
+}
+
 export default function SettingsPage() {
   const searchParams = useSearchParams()
   const [active, setActive] = useState<SettingsSection>(() => {
@@ -1542,45 +1593,14 @@ export default function SettingsPage() {
         description="Profil, workspace, facturation, sécurité et confidentialité."
       />
       <div className="flex gap-8 w-full min-h-0">
-      <nav className="sticky top-0 self-start flex flex-col gap-6 w-48 shrink-0">
-        {SECTION_GROUPS.map((group) => (
-          <div key={group.label} className="flex flex-col gap-0.5">
-            <p className="px-3 mb-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">{group.label}</p>
-            {SECTIONS.filter((s) => (group.keys as readonly string[]).includes(s.key)).map((s) => (
-              <button
-                key={s.key}
-                onClick={() => setActive(s.key)}
-                className={cn(
-                  "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm text-left transition-colors w-full",
-                  active === s.key
-                    ? "bg-muted text-foreground font-medium"
-                    : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                )}
-              >
-                {s.icon}
-                {s.label}
-              </button>
-            ))}
-          </div>
-        ))}
-      </nav>
+        <SettingsNav active={active} onSelect={setActive} className="sticky top-0 self-start w-48 shrink-0" />
 
-      <Separator orientation="vertical" className="self-stretch" />
+        <Separator orientation="vertical" className="self-stretch" />
 
-      <div className="flex-1 min-w-0">
-        <h2 className="text-base font-semibold text-foreground mb-5">{activeSection?.label}</h2>
-        {active === "profile"       && <ProfilePanel />}
-        {active === "account"       && <AccountPanel />}
-        {active === "appearance"    && <AppearancePanel />}
-        {active === "notifications" && <NotificationsPanel />}
-        {active === "security"      && <SecurityPanel />}
-        {active === "workspace"     && <WorkspacePanel />}
-        {active === "billing"       && <BillingPanel />}
-        {active === "usage"         && <UsagePanel />}
-        {active === "integrations"  && <IntegrationsPanel />}
-        {active === "status"        && <StatusPanel />}
-        {active === "privacy"       && <PrivacyPanel />}
-      </div>
+        <div className="flex-1 min-w-0">
+          <h2 className="text-base font-semibold text-foreground mb-5">{activeSection?.label}</h2>
+          <SettingsPanels active={active} />
+        </div>
       </div>
     </PageContainer>
   )
