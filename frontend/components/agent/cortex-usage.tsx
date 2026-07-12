@@ -18,8 +18,13 @@ const fmt = (n: number) =>
 const pctOf = (used: number, total: number) =>
   total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0
 
-function Bar({ pct, tone = "primary" }: { pct: number; tone?: "primary" | "amber" | "rose" }) {
-  const color = tone === "rose" ? "bg-rose-500" : tone === "amber" ? "bg-amber-500" : "bg-primary"
+function Bar({ pct, tone = "blue" }: { pct: number; tone?: "blue" | "amber" | "rose" }) {
+  const color =
+    tone === "rose"
+      ? "bg-rose-500"
+      : tone === "amber"
+        ? "bg-amber-500"
+        : "bg-gradient-to-r from-blue-600 to-blue-400 dark:from-blue-500 dark:to-blue-300"
   return (
     <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
       <div className={cn("h-full rounded-full transition-[width] duration-500", color)} style={{ width: `${pct}%` }} />
@@ -36,7 +41,7 @@ function Ring({ pct }: { pct: number }) {
       <circle cx="8" cy="8" r={r} fill="none" strokeWidth="2" className="stroke-muted" />
       <circle
         cx="8" cy="8" r={r} fill="none" strokeWidth="2" strokeLinecap="round"
-        className={cn(pct >= 90 ? "stroke-rose-500" : pct >= 70 ? "stroke-amber-500" : "stroke-primary")}
+        className={cn(pct >= 90 ? "stroke-rose-500" : pct >= 70 ? "stroke-amber-500" : "stroke-blue-500 dark:stroke-blue-400")}
         strokeDasharray={c} strokeDashoffset={c - (c * pct) / 100}
       />
     </svg>
@@ -86,7 +91,7 @@ export function CortexUsage({ sessionTokens, className }: { sessionTokens: numbe
   const ctxPct = pctOf(sessionTokens, CONTEXT_WINDOW)
   const unlimited = usage ? usage.limitTokens < 0 : false
   const usePct = usage && !unlimited ? pctOf(usage.usedTokens, usage.limitTokens) : 0
-  const useTone = usePct >= 90 ? "rose" : usePct >= 70 ? "amber" : "primary"
+  const useTone = usePct >= 90 ? "rose" : usePct >= 70 ? "amber" : "blue"
   const detailsHref = slug ? `/${slug}/settings?section=usage` : "#"
 
   return (
@@ -117,7 +122,7 @@ export function CortexUsage({ sessionTokens, className }: { sessionTokens: numbe
                 <ChevronRight className="size-3 text-muted-foreground" />
               </span>
             </Link>
-            <div className="mt-1.5"><Bar pct={ctxPct} tone={ctxPct >= 90 ? "rose" : ctxPct >= 70 ? "amber" : "primary"} /></div>
+            <div className="mt-1.5"><Bar pct={ctxPct} tone={ctxPct >= 90 ? "rose" : ctxPct >= 70 ? "amber" : "blue"} /></div>
           </div>
 
           <div className="h-px bg-border" />
@@ -144,7 +149,7 @@ export function CortexUsage({ sessionTokens, className }: { sessionTokens: numbe
                     : "…"}
                 </span>
               </div>
-              <Bar pct={unlimited ? 4 : usePct} tone={unlimited ? "primary" : useTone} />
+              <Bar pct={unlimited ? 4 : usePct} tone={unlimited ? "blue" : useTone} />
               {usage && (
                 <div className="flex items-center justify-between text-[10px] text-muted-foreground/70">
                   <span className="tabular-nums">
