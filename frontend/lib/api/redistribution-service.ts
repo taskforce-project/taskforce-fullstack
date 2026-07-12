@@ -1,4 +1,4 @@
-import { apiClient } from "@/lib/api/client";
+import { apiClient, AI_TIMEOUT_MS } from "@/lib/api/client";
 import { WORKSPACE_ROUTES } from "@/lib/config/api-routes";
 
 /**
@@ -49,7 +49,9 @@ export async function previewRedistribution(
   const url = targetUserId
     ? `${WORKSPACE_ROUTES.REDISTRIBUTE_PREVIEW(slug)}?userId=${targetUserId}`
     : WORKSPACE_ROUTES.REDISTRIBUTE_PREVIEW(slug);
-  const res = await apiClient.post<{ data: RedistributionPlan }>(url, {});
+  // Flux IA-heavy : le back range les candidats via le LLM (une passe par issue déplaçable) →
+  // peut dépasser les 30s par défaut avec plusieurs membres surchargés. Timeout IA long.
+  const res = await apiClient.post<{ data: RedistributionPlan }>(url, {}, { timeout: AI_TIMEOUT_MS });
   return res.data.data;
 }
 
