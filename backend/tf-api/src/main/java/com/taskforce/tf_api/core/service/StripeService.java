@@ -29,10 +29,13 @@ public class StripeService {
     @Value("${stripe.api-key}")
     private String stripeSecretKey;
 
-    @Value("${stripe.plans.pro.price-id}")
-    private String proPriceId;
+    @Value("${stripe.plans.basic.price-id:}")
+    private String basicPriceId;
 
-    @Value("${stripe.plans.enterprise.price-id}")
+    @Value("${stripe.plans.business.price-id:}")
+    private String businessPriceId;
+
+    @Value("${stripe.plans.enterprise.price-id:}")
     private String enterprisePriceId;
 
     @PostConstruct
@@ -123,7 +126,8 @@ public class StripeService {
      */
     public String getPriceIdForPlan(String planType) {
         return switch (planType.toUpperCase()) {
-            case "PRO" -> proPriceId;
+            case "BASIC" -> basicPriceId;
+            case "BUSINESS" -> businessPriceId;
             case "ENTERPRISE" -> enterprisePriceId;
             default -> throw new IllegalArgumentException("Type de plan invalide : " + planType);
         };
