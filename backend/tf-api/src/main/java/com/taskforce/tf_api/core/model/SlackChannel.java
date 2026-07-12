@@ -57,16 +57,6 @@ public class SlackChannel {
     @Builder.Default
     private Boolean active = true;
 
-    // --- Miroir Slack → chat TaskForce ---
-    // Id du canal de chat (module chat) qui reçoit les messages importés.
-    // Stocké en Long brut (pas de relation JPA) : SlackChannel est en `core`, Channel en `modules.chat`
-    // → interdit de dépendre de `modules` depuis `core` (règle shared ← core ← modules).
-    @Column(name = "mirror_channel_id")
-    private Long mirrorChannelId;
-
-    @Column(name = "last_sync_ts", length = 32)
-    private String lastSyncTs;   // curseur conversations.history (dernier ts importé)
-
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
