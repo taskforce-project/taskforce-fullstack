@@ -129,7 +129,8 @@ class SharedConfigBeanTest {
         ReflectionTestUtils.setField(cfg, "apiKey", "sk_test_dummy");
         ReflectionTestUtils.setField(cfg, "webhookSecret", "whsec_dummy");
         ReflectionTestUtils.setField(cfg, "freePriceId", null);
-        ReflectionTestUtils.setField(cfg, "proPriceId", "price_pro");
+        ReflectionTestUtils.setField(cfg, "basicPriceId", "price_basic");
+        ReflectionTestUtils.setField(cfg, "businessPriceId", "price_business");
         ReflectionTestUtils.setField(cfg, "enterprisePriceId", "price_ent");
 
         assertThatCode(cfg::init).doesNotThrowAnyException();
