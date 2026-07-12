@@ -20,12 +20,13 @@ const ALL: PlanFeature[] = [
 
 const MATRIX: Record<PlanTier, PlanFeature[]> = {
   FREE: ["AI_SMART_ASSIGN"],
-  PRO: ALL,
+  BASIC: ["AI_SMART_ASSIGN"],
+  BUSINESS: ALL,
   ENTERPRISE: ALL,
 };
 
 function toTier(plan: string | null | undefined): PlanTier {
-  if (plan === "PRO" || plan === "ENTERPRISE") return plan;
+  if (plan === "BASIC" || plan === "BUSINESS" || plan === "ENTERPRISE") return plan;
   return "FREE";
 }
 

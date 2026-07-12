@@ -3,16 +3,18 @@
  * (constantes MAX_WORKSPACES / MAX_MEMBERS). Sert aux CTA d'usage / upgrade (PROD-4.2/4.3).
  */
 
-export type PlanTier = "FREE" | "PRO" | "ENTERPRISE";
+export type PlanTier = "FREE" | "BASIC" | "BUSINESS" | "ENTERPRISE";
 
+// Membres illimités sur tous les plans (tarification par membre/mois) ; seuls les workspaces sont plafonnés.
 export const PLAN_LIMITS: Record<PlanTier, { workspaces: number; members: number }> = {
-  FREE: { workspaces: 2, members: 5 },
-  PRO: { workspaces: 10, members: 50 },
+  FREE: { workspaces: 2, members: Number.POSITIVE_INFINITY },
+  BASIC: { workspaces: 5, members: Number.POSITIVE_INFINITY },
+  BUSINESS: { workspaces: Number.POSITIVE_INFINITY, members: Number.POSITIVE_INFINITY },
   ENTERPRISE: { workspaces: Number.POSITIVE_INFINITY, members: Number.POSITIVE_INFINITY },
 };
 
 function toTier(plan: string | null | undefined): PlanTier {
-  if (plan === "PRO" || plan === "ENTERPRISE") return plan;
+  if (plan === "BASIC" || plan === "BUSINESS" || plan === "ENTERPRISE") return plan;
   return "FREE";
 }
 
