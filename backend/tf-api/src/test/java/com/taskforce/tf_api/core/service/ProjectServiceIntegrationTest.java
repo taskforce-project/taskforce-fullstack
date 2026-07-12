@@ -452,4 +452,127 @@ class ProjectServiceIntegrationTest extends AbstractIntegrationTest {
                 .isInstanceOf(ResourceNotFoundException.class);
         }
     }
+
+    // =========================================================================
+    @Nested
+    @DisplayName("plafond collaborateurs projet privé (façon GitHub)")
+    class PrivateProjectSeatLimit {
+
+        private Workspace ws() { return workspaceRepository.findBySlug(SLUG).orElseThrow(); }
+
+        /** Crée un utilisateur, l'ajoute au workspace, renvoie son email. */
+        private String wsMember(String tag) {
+            User u = userRepository.save(User.builder()
+                .keycloakId("kc-" + tag).email(tag + "@it.dev").displayName(tag).isActive(true).build());
+            workspaceMemberRepository.save(WorkspaceMember.builder()
+                .workspace(ws()).user(u).role(WorkspaceRole.MEMBER).build());
+            return u.getEmail();
+        }
+
+        private void addMember(Long projectId, String email) {
+            var add = new com.taskforce.tf_api.core.dto.request.AddProjectMemberRequest();
+            add.setEmail(email);
+            add.setRole(ProjectRole.MEMBER);
+            projectService.addMember(SLUG, projectId, owner.getId(), add);
+        }
+
+        @Test
+        @DisplayName("Free + projet privé : plafonné à 5 collaborateurs (créateur inclus), le 6e est refusé (409)")
+        void free_private_caps_at_five() {
+            // owner = FREE par défaut ; projet privé par défaut (isPublic=false)
+            ProjectResponse p = projectService.createProject(SLUG, owner.getId(), req("Priv", "PRV"));
+            // créateur = 1 membre (LEAD) → on ajoute 4 collaborateurs pour atteindre 5
+            addMember(p.getId(), wsMember("p1"));
+            addMember(p.getId(), wsMember("p2"));
+            addMember(p.getId(), wsMember("p3"));
+            addMember(p.getId(), wsMember("p4"));
+            assertThat(projectService.listMembers(SLUG, p.getId(), owner.getId())).hasSize(5);
+
+            String sixth = wsMember("p5");
+            assertThatThrownBy(() -> addMember(p.getId(), sixth))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("projets privés");
+        }
+
+        @Test
+        @DisplayName("Projet PUBLIC : aucun plafond, même en Free")
+        void public_project_is_unlimited() {
+            ProjectResponse p = projectService.createProject(SLUG, owner.getId(), req("Pub", "PUB"));
+            var upd = new com.taskforce.tf_api.core.dto.request.UpdateProjectRequest();
+            upd.setIsPublic(true);
+            projectService.updateProject(SLUG, p.getId(), owner.getId(), upd);
+
+            for (int i = 1; i <= 5; i++) addMember(p.getId(), wsMember("pub" + i)); // 6 au total > 5
+            assertThat(projectService.listMembers(SLUG, p.getId(), owner.getId())).hasSize(6);
+        }
+
+        @Test
+        @DisplayName("Forfait payant : projet privé illimité")
+        void paid_private_is_unlimited() {
+            owner.setPlanType(com.taskforce.tf_api.core.enums.PlanType.BUSINESS);
+            userRepository.save(owner);
+
+            ProjectResponse p = projectService.createProject(SLUG, owner.getId(), req("Biz", "BIZ"));
+            for (int i = 1; i <= 5; i++) addMember(p.getId(), wsMember("biz" + i)); // 6 au total > 5
+            assertThat(projectService.listMembers(SLUG, p.getId(), owner.getId())).hasSize(6);
+        }
+    }
+
+    // =========================================================================
+    @Nested
+    @DisplayName("visibilité projet privé (façon GitHub)")
+    class PrivateProjectVisibility {
+
+        private Workspace ws() { return workspaceRepository.findBySlug(SLUG).orElseThrow(); }
+
+        private User wsUser(String tag, WorkspaceRole role) {
+            User u = userRepository.save(User.builder()
+                .keycloakId("kc-" + tag).email(tag + "@it.dev").displayName(tag).isActive(true).build());
+            workspaceMemberRepository.save(WorkspaceMember.builder().workspace(ws()).user(u).role(role).build());
+            return u;
+        }
+
+        @Test
+        @DisplayName("projet privé : invisible pour un membre du workspace non invité (getProject → 404, listProjects l'exclut)")
+        void private_hidden_from_non_member() {
+            ProjectResponse priv = projectService.createProject(SLUG, owner.getId(), req("Secret", "SEC"));
+            User bob = wsUser("visB", WorkspaceRole.MEMBER); // membre workspace, PAS du projet
+
+            assertThatThrownBy(() -> projectService.getProject(SLUG, priv.getId(), bob.getId()))
+                .isInstanceOf(ResourceNotFoundException.class);
+            assertThat(projectService.listProjects(SLUG, bob.getId()))
+                .extracting(ProjectResponse::getId).doesNotContain(priv.getId());
+        }
+
+        @Test
+        @DisplayName("projet privé : visible pour un collaborateur invité ET pour un ADMIN workspace non invité")
+        void private_visible_to_member_and_admin() {
+            ProjectResponse priv = projectService.createProject(SLUG, owner.getId(), req("Secret2", "SE2"));
+
+            User kai = wsUser("visK", WorkspaceRole.MEMBER);
+            var add = new com.taskforce.tf_api.core.dto.request.AddProjectMemberRequest();
+            add.setEmail("visK@it.dev"); add.setRole(ProjectRole.MEMBER);
+            projectService.addMember(SLUG, priv.getId(), owner.getId(), add);
+            assertThat(projectService.getProject(SLUG, priv.getId(), kai.getId()).getId()).isEqualTo(priv.getId());
+
+            User adm = wsUser("visA", WorkspaceRole.ADMIN); // ADMIN non invité → voit quand même
+            assertThat(projectService.getProject(SLUG, priv.getId(), adm.getId()).getId()).isEqualTo(priv.getId());
+            assertThat(projectService.listProjects(SLUG, adm.getId()))
+                .extracting(ProjectResponse::getId).contains(priv.getId());
+        }
+
+        @Test
+        @DisplayName("projet public : visible par tout membre du workspace")
+        void public_visible_to_all() {
+            ProjectResponse pub = projectService.createProject(SLUG, owner.getId(), req("Open", "OPN"));
+            var upd = new com.taskforce.tf_api.core.dto.request.UpdateProjectRequest();
+            upd.setIsPublic(true);
+            projectService.updateProject(SLUG, pub.getId(), owner.getId(), upd);
+
+            User bob = wsUser("visP", WorkspaceRole.MEMBER);
+            assertThat(projectService.getProject(SLUG, pub.getId(), bob.getId()).getId()).isEqualTo(pub.getId());
+            assertThat(projectService.listProjects(SLUG, bob.getId()))
+                .extracting(ProjectResponse::getId).contains(pub.getId());
+        }
+    }
 }
