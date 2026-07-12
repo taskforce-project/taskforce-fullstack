@@ -1,6 +1,7 @@
 package com.taskforce.tf_api.core.service.integration;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,10 +33,11 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class IntegrationCatalogService {
 
-    private final ConnectorCatalog          catalog;
-    private final WorkspaceRepository        workspaceRepository;
-    private final WorkspaceMemberRepository  workspaceMemberRepository;
-    private final IntegrationRepository      integrationRepository;
+    private final ConnectorCatalog             catalog;
+    private final WorkspaceRepository           workspaceRepository;
+    private final WorkspaceMemberRepository     workspaceMemberRepository;
+    private final IntegrationRepository         integrationRepository;
+    private final ConnectorConnectionService    connectorConnectionService;
 
     @Transactional(readOnly = true)
     public IntegrationCatalogResponse getCatalog(String slug, Long userId) {
@@ -45,9 +47,12 @@ public class IntegrationCatalogService {
             throw new ForbiddenException("Accès refusé au workspace");
         }
 
-        Set<String> connectedKeys = integrationRepository.findByWorkspaceId(ws.getId()).stream()
+        // État de connexion réel = flux dédiés (GitHub/Slack/Plane via `integrations`)
+        // + connexions génériques (`connector_connection`).
+        Set<String> connectedKeys = new HashSet<>(integrationRepository.findByWorkspaceId(ws.getId()).stream()
             .map(i -> i.getProvider().name().toLowerCase())
-            .collect(Collectors.toSet());
+            .collect(Collectors.toSet()));
+        connectedKeys.addAll(connectorConnectionService.connectedKeys(ws.getId()));
 
         // Groupement par catégorie, dans l'ordre de déclaration du catalogue.
         Map<String, CategoryGroup> groups = new LinkedHashMap<>();
