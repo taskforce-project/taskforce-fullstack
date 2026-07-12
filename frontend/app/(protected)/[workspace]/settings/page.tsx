@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import {
-  User, Bell, CreditCard, Users, Check, Zap, Globe, Key, Palette, Webhook,
+  User, Bell, Users, Zap, Globe, Key, Palette, Webhook,
   X as XIcon, Plus, Upload, Camera, Link2, Trash2, Shield, Search, Loader2,
   Activity, CheckCircle2, AlertTriangle, Gauge,
 } from "lucide-react"
@@ -22,7 +22,6 @@ import { useAuth } from "@/lib/contexts/auth-context"
 import { useUserStore } from "@/lib/store/user-store"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { DeleteConfirmDialog } from "@/components/dialogs/delete-confirm-dialog"
-import { stripeService, type SubscriptionInfo } from "@/lib/api/stripe-service"
 import { useUpgradeStore } from "@/lib/store/upgrade-store"
 import { getAuditLogs, type AuditLogEntry } from "@/lib/api/workspace-service"
 import { useIntegrationStore } from "@/lib/store/integration-store"
@@ -43,7 +42,6 @@ export type SettingsSection =
   | "notifications"
   | "security"
   | "workspace"
-  | "billing"
   | "usage"
   | "status"
   | "integrations"
@@ -63,22 +61,15 @@ export const SECTIONS: SectionConfig[] = [
   { key: "notifications", label: "Notifications",  icon: <Bell className="h-4 w-4" />,       group: "Personal" },
   { key: "security",      label: "Security",       icon: <Key className="h-4 w-4" />,        group: "Personal" },
   { key: "workspace",     label: "General",        icon: <Globe className="h-4 w-4" />,      group: "Workspace" },
-  { key: "billing",       label: "Billing & Plan", icon: <CreditCard className="h-4 w-4" />, group: "Workspace" },
   { key: "usage",         label: "Usage IA",       icon: <Gauge className="h-4 w-4" />,       group: "Workspace" },
   { key: "integrations",  label: "Integrations",   icon: <Webhook className="h-4 w-4" />,    group: "Workspace" },
   { key: "status",        label: "Status",         icon: <Activity className="h-4 w-4" />,    group: "Workspace" },
   { key: "privacy",       label: "Privacy & Data", icon: <Shield className="h-4 w-4" />,     group: "Personal" },
 ]
 
-const PLAN_FEATURES: Record<string, string[]> = {
-  free:       ["2 workspaces", "Jusqu'à 5 membres", "Board, List & Cycles", "Smart Assign de base", "Support communauté"],
-  pro:        ["10 workspaces", "Jusqu'à 50 membres", "Analytics avancées + burndown", "Assistant IA & insights", "Intégrations (GitHub)", "Support prioritaire"],
-  enterprise: ["Tout de Pro", "Membres illimités", "SSO / Keycloak", "Audit & RGPD avancés", "Déploiement on-premise", "SLA dédié"],
-}
-
 export const SECTION_GROUPS = [
   { label: "Personal",  keys: ["profile", "account", "appearance", "notifications", "security", "privacy"] as const },
-  { label: "Workspace", keys: ["workspace", "billing", "usage", "integrations", "status"] as const },
+  { label: "Workspace", keys: ["workspace", "usage", "integrations", "status"] as const },
 ]
 
 const SKILL_OPTIONS = [
@@ -599,124 +590,6 @@ function SecurityPanel() {
   )
 }
 
-function BillingPanel() {
-  const { user } = useAuth()
-  const plan = (user?.planType ?? "FREE") as string
-  const [portalLoading, setPortalLoading] = useState(false)
-  const [sub, setSub] = useState<SubscriptionInfo | null>(null)
-  const openUpgrade = useUpgradeStore((s) => s.openUpgrade)
-
-  // Vraie info d'abonnement (date de renouvellement réelle, pas codée en dur). QA Q-19
-  useEffect(() => {
-    if (plan === "FREE") return
-    let active = true
-    stripeService.getSubscriptionInfo()
-      .then((s) => { if (active) setSub(s) })
-      .catch(() => { /* non bloquant — fallback message générique */ })
-    return () => { active = false }
-  }, [plan])
-
-  const renewLabel = (() => {
-    if (plan === "FREE") return "No active subscription"
-    if (!sub?.currentPeriodEnd) return "Abonnement actif"
-    const date = new Date(sub.currentPeriodEnd).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })
-    return sub.cancelAtPeriodEnd ? `Se termine le ${date}` : `Renouvellement le ${date}`
-  })()
-
-  async function handleManageBilling() {
-    setPortalLoading(true)
-    try {
-      await stripeService.openBillingPortal() // redirige vers Stripe
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Impossible d'ouvrir le portail de facturation")
-      setPortalLoading(false)
-    }
-  }
-
-  const PLANS = [
-    { key: "FREE",       label: "Free",       price: "$0",     features: PLAN_FEATURES.free,       highlight: false },
-    { key: "PRO",        label: "Pro",        price: "$12/mo", features: PLAN_FEATURES.pro,        highlight: true  },
-    { key: "ENTERPRISE", label: "Enterprise", price: "Custom", features: PLAN_FEATURES.enterprise, highlight: false },
-  ]
-
-  return (
-    <div className="flex flex-col gap-4">
-      <SectionCard title="Current plan" description="You can upgrade or downgrade at any time.">
-        <div className="flex items-center gap-3">
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <span className="text-lg font-bold capitalize text-foreground">{plan}</span>
-              {plan !== "FREE" && (
-                <Badge variant="outline" className="bg-amber-500/15 text-amber-400 border-amber-500/20 text-xs">
-                  <Zap className="h-3 w-3 mr-1" />Active
-                </Badge>
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5">{renewLabel}</p>
-          </div>
-          {plan !== "FREE" && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 text-xs"
-              onClick={handleManageBilling}
-              disabled={portalLoading}
-            >
-              {portalLoading ? "Ouverture…" : "Gérer la facturation"}
-            </Button>
-          )}
-        </div>
-      </SectionCard>
-      <SectionCard title="Plans" description="Choose the plan that fits your team.">
-        <div className="grid grid-cols-3 gap-3">
-          {PLANS.map((p) => (
-            <div
-              key={p.key}
-              className={cn(
-                "rounded-lg border p-4 flex flex-col gap-3 transition-all",
-                p.highlight ? "border-primary/40 bg-primary/5" : "border-border bg-background",
-                plan === p.key && "ring-1 ring-primary"
-              )}
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-foreground">{p.label}</p>
-                  <p className="text-xs font-medium text-primary mt-0.5">{p.price}</p>
-                </div>
-                {plan === p.key && <Check className="h-4 w-4 text-emerald-400 shrink-0" />}
-              </div>
-              <ul className="flex flex-col gap-1">
-                {p.features.map((f) => (
-                  <li key={f} className="flex items-start gap-1.5 text-xs text-muted-foreground">
-                    <Check className="h-3 w-3 text-emerald-400 shrink-0 mt-0.5" />
-                    {f}
-                  </li>
-                ))}
-              </ul>
-              {plan !== p.key && (
-                p.key === "ENTERPRISE" ? (
-                  <Button asChild size="sm" variant="outline" className="h-7 text-xs mt-auto">
-                    <a href="mailto:sales@taskforce.dev?subject=Demande%20Enterprise%20TaskForce">Contact sales</a>
-                  </Button>
-                ) : (
-                  <Button
-                    size="sm"
-                    variant={p.highlight ? "default" : "outline"}
-                    className="h-7 text-xs mt-auto"
-                    onClick={() => openUpgrade()}
-                  >
-                    Upgrade
-                  </Button>
-                )
-              )}
-            </div>
-          ))}
-        </div>
-      </SectionCard>
-    </div>
-  )
-}
-
 function WorkspacePanel() {
   const router = useRouter()
   const { activeWorkspace, updateWorkspaceInfo, deleteCurrentWorkspace } = useWorkspaceStore()
@@ -832,7 +705,7 @@ function StatusPanel() {
     async function probe() {
       for (let attempt = 1; attempt <= 3 && alive; attempt++) {
         try {
-          await apiClient.get("/api/workspaces/current")
+          await apiClient.get("/api/workspaces") // sonde légère (la liste existe toujours ; /current 500 si owner multi-workspace)
           if (alive) setApi("ok")
           return
         } catch {
@@ -1560,7 +1433,6 @@ export function SettingsPanels({ active }: Readonly<{ active: SettingsSection }>
       {active === "notifications" && <NotificationsPanel />}
       {active === "security"      && <SecurityPanel />}
       {active === "workspace"     && <WorkspacePanel />}
-      {active === "billing"       && <BillingPanel />}
       {active === "usage"         && <UsagePanel />}
       {active === "integrations"  && <IntegrationsPanel />}
       {active === "status"        && <StatusPanel />}
