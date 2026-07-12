@@ -721,6 +721,45 @@ BEGIN
             (v_ch_random,  v_diego,  'Quelqu''un pour un café ? ☕', now() - INTERVAL '2 hours');
     END;
 
-    RAISE NOTICE 'Seed QA ULTRA-complet : workspace "taskforce-demo" (id=%) — 9 membres + 24 solos (hors équipe), 4 projets, ~267 issues (throughput JOURNALIER 30 j + hebdo, KPIs/capacité/burndown remplis), sous-tâches/URGENT/cancelled, commentaires, checklist, relations, worklogs (~70), 3 cycles + sprint actif peuplé, ~130 commentaires (fils), ~35 notifications (mix lu/non-lu), favoris, 5 pages, invitations, abonnement PRO + historique, demandes enterprise.', v_ws;
+    -- ==================================================================
+    -- Échéances réalistes — remplit la heatmap de charge (US-022) + les
+    -- compteurs « en retard » / « échéance proche » du Decision Board.
+    --
+    -- RELATIVES à CURRENT_DATE : toujours pertinentes quel que soit le jour où
+    -- le seed est rejoué (sinon des dates fixes tombent vite hors fenêtre).
+    -- Ciblent EXACTEMENT ce que compte la heatmap : issues OUVERTES (statut hors
+    -- COMPLETED/CANCELLED) et ASSIGNÉES. Étalées sur [-3 j, +13 j] → un mix
+    -- réaliste de retards, d'échéances du jour et de la quinzaine à venir.
+    -- ==================================================================
+    UPDATE issues i
+    SET due_date = CURRENT_DATE + ((((i.id * 7 + i.sequence_number * 3) % 17) - 3))::int
+    FROM issue_statuses s
+    WHERE i.status_id = s.id
+      AND s.category::text NOT IN ('COMPLETED', 'CANCELLED')
+      AND i.assignee_id IS NOT NULL
+      AND i.project_id IN (SELECT id FROM projects WHERE workspace_id = v_ws);
+
+    -- Start date cohérente là où elle manque (start ≤ due), pour un Gantt/roadmap lisible.
+    UPDATE issues i
+    SET start_date = LEAST(i.start_date, i.due_date - 2)
+    FROM issue_statuses s
+    WHERE i.status_id = s.id
+      AND i.due_date IS NOT NULL
+      AND (i.start_date IS NULL OR i.start_date > i.due_date)
+      AND i.project_id IN (SELECT id FROM projects WHERE workspace_id = v_ws);
+
+    -- ==================================================================
+    -- Discussions (forum interne) — la table était vide ; on la remplit de fils
+    -- réalistes : catégories et états variés, une épinglée, une verrouillée.
+    -- ==================================================================
+    INSERT INTO discussions (workspace_id, author_id, title, body, category, state, is_pinned, is_locked, reply_count, reaction_count, tags, created_at, updated_at) VALUES
+      (v_ws, v_admin,  'Roadmap Q3 : priorités produit',              'On aligne les priorités du trimestre. Vos retours sur le focus « AI Delivery OS » ?',      'ANNOUNCEMENT', 'OPEN',     TRUE,  FALSE, 7, 12, 'roadmap,produit',    now() - INTERVAL '5 days',  now() - INTERVAL '2 hours'),
+      (v_ws, v_sarah,  'Idée : mode focus sur le board',              'Un raccourci pour masquer les colonnes terminées pendant un sprint, ça vous parle ?',      'IDEA',         'OPEN',     FALSE, FALSE, 4,  8, 'ux,board',           now() - INTERVAL '4 days',  now() - INTERVAL '1 day'),
+      (v_ws, v_marcus, 'Question : convention de nommage des branches','On part sur feature/*, fix/* — on ajoute chore/* pour la maintenance ?',                   'QUESTION',     'ANSWERED', FALSE, FALSE, 6,  3, 'git,convention',     now() - INTERVAL '6 days',  now() - INTERVAL '3 days'),
+      (v_ws, v_nina,   'Show & Tell : explorateur de graphes IA',     'Démo du nouvel explorateur de graphes généré par l''IA sur la page Intelligence 🎉',       'SHOW',         'OPEN',     FALSE, FALSE, 9, 21, 'ia,analytics',       now() - INTERVAL '2 days',  now() - INTERVAL '4 hours'),
+      (v_ws, v_tom,    'Post-mortem : incident déploiement',          'Retour sur l''incident de la semaine dernière et les actions correctives prises.',         'GENERAL',      'CLOSED',   FALSE, TRUE,  5,  6, 'infra,post-mortem',  now() - INTERVAL '8 days',  now() - INTERVAL '7 days'),
+      (v_ws, v_lina,   'Design system : tokens de couleur',           'Proposition de palette pour les graphiques (emerald/blue/rose/indigo) — vos avis ?',        'IDEA',         'OPEN',     FALSE, FALSE, 3,  5, 'design,ui',          now() - INTERVAL '1 day',   now() - INTERVAL '6 hours');
+
+    RAISE NOTICE 'Seed QA ULTRA-complet : workspace "taskforce-demo" (id=%) — 9 membres + 24 solos (hors équipe), 4 projets, ~267 issues (throughput JOURNALIER 30 j + hebdo, KPIs/capacité/burndown remplis), sous-tâches/URGENT/cancelled, commentaires, checklist, relations, worklogs (~70), 3 cycles + sprint actif peuplé, ~130 commentaires (fils), ~35 notifications (mix lu/non-lu), favoris, 5 pages, invitations, abonnement PRO + historique, demandes enterprise, ÉCHÉANCES réparties sur la quinzaine (heatmap de charge remplie).', v_ws;
 END
 $seed$;
