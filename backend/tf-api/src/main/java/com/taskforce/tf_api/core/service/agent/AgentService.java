@@ -101,6 +101,9 @@ public class AgentService {
         }
 
         // ── Avec LLM : raisonnement + outils (deep) ou réponse directe (fast) ─
+        // Quota IA mensuel du compte : bloque (409 upsell) si le plafond de tokens du plan est atteint.
+        aiUsageService.assertWithinQuota(ws.getId());
+
         // On arme la capture d'usage : chaque appel LLM (jusqu'à 5 en boucle deep) additionne ses tokens.
         String genLabel = deep ? "Raisonnement + outils" : "Rédaction de la réponse";
         llm.beginUsageCapture();
