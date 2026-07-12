@@ -100,8 +100,11 @@ class OllamaGateway:
         temperature: float = 0.4,
         tier: Optional[str] = None,
         think: bool = False,
-    ) -> tuple[str, dict]:
-        """Appelle le LLM. Retourne ``(model_utilisé, message_assistant)``.
+    ) -> tuple[str, dict, dict]:
+        """Appelle le LLM. Retourne ``(model_utilisé, message_assistant, usage)``.
+
+        ``usage`` = compteurs de tokens renvoyés par l'endpoint OpenAI-compatible d'Ollama
+        (``{prompt_tokens, completion_tokens, total_tokens}``) — ``{}`` si absent.
 
         Routing : ``tier`` (fast/standard/deep) est prioritaire ; sinon ``model`` explicite (ou défaut)
         + ``think``. Sans raisonnement, on injecte ``/no_think`` (Qwen3) — nettement plus rapide.
@@ -140,4 +143,5 @@ class OllamaGateway:
         choices = payload.get("choices") or []
         if not choices:
             raise OllamaGatewayError("Réponse LLM sans 'choices'")
-        return resolved_model, choices[0].get("message", {})
+        usage = payload.get("usage") or {}
+        return resolved_model, choices[0].get("message", {}), usage
