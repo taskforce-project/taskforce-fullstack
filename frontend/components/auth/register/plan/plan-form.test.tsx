@@ -257,7 +257,7 @@ describe('RegisterPlanForm - Step 2: Plan Selection', () => {
 
       await waitFor(() => {
         expect(mockSetRegisterData).toHaveBeenCalledWith({
-          planType: 'PRO',
+          planType: 'BUSINESS',
         });
       });
     });
