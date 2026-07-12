@@ -785,7 +785,8 @@ export default function MembersPage() {
         const unlimited = rawLimit === -1 || !Number.isFinite(rawLimit)
         const planLabel =
           currentUser?.planType === "ENTERPRISE" ? "Enterprise"
-          : currentUser?.planType === "PRO" ? "Pro"
+          : currentUser?.planType === "BUSINESS" ? "Business"
+          : currentUser?.planType === "BASIC" ? "Basic"
           : "Free"
         const atLimit = !unlimited && memberCount >= rawLimit
         return (
