@@ -99,6 +99,10 @@ public class IssueService {
     private final IssueChecklistItemRepository  checklistRepository;
     private final IssueWorklogRepository        worklogRepository;
     private final SlackIntegrationService       slackService;
+    private final ProjectVisibilityGuard        visibilityGuard;
+
+    /** Plafond d'issues du forfait Free (par workspace). Payant = illimité. */
+    private static final long FREE_ISSUE_LIMIT = 250;
 
     public IssueService(
         IssueRepository issueRepository,
@@ -117,7 +121,8 @@ public class IssueService {
         SimpMessagingTemplate messagingTemplate,
         IssueChecklistItemRepository checklistRepository,
         IssueWorklogRepository worklogRepository,
-        SlackIntegrationService slackService
+        SlackIntegrationService slackService,
+        ProjectVisibilityGuard visibilityGuard
     ) {
         this.issueRepository = issueRepository;
         this.issueStatusRepository = issueStatusRepository;
@@ -136,6 +141,7 @@ public class IssueService {
         this.checklistRepository = checklistRepository;
         this.worklogRepository = worklogRepository;
         this.slackService = slackService;
+        this.visibilityGuard = visibilityGuard;
     }
 
     // =========================================================================
@@ -206,6 +212,7 @@ public class IssueService {
     public List<IssueResponse> listIssues(String workspaceSlug, Long projectId, Long requestingUserId) {
         Project project = resolveProject(workspaceSlug, projectId);
         assertWorkspaceMember(project.getWorkspace().getId(), requestingUserId);
+        visibilityGuard.assertCanView(project, requestingUserId); // projet privé : membres invités + OWNER/ADMIN
         return issueRepository.findForKanban(project.getId()).stream()
             .map(this::toResponse)
             .toList();
@@ -221,6 +228,7 @@ public class IssueService {
                                                        org.springframework.data.domain.Pageable pageable) {
         Project project = resolveProject(workspaceSlug, projectId);
         assertWorkspaceMember(project.getWorkspace().getId(), requestingUserId);
+        visibilityGuard.assertCanView(project, requestingUserId); // projet privé : membres invités + OWNER/ADMIN
         return PageResponse.of(
             issueRepository.findByProjectIdOrderBySequenceNumberDesc(project.getId(), pageable)
                 .map(this::toResponse)
@@ -235,7 +243,11 @@ public class IssueService {
         var ws = workspaceRepository.findBySlug(slug)
             .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
         assertWorkspaceMember(ws.getId(), userId);
+        // Visibilité projet privé : on ne renvoie que les issues des projets visibles par l'utilisateur.
+        boolean admin = visibilityGuard.isWorkspaceAdmin(ws.getId(), userId);
+        Set<Long> memberProjectIds = admin ? Set.of() : visibilityGuard.memberProjectIds(userId);
         return issueRepository.findScheduledByWorkspaceSlug(slug).stream()
+            .filter(i -> admin || i.getProject().isPublic() || memberProjectIds.contains(i.getProject().getId()))
             .map(this::toResponse)
             .toList();
     }
@@ -248,6 +260,8 @@ public class IssueService {
         var ws = workspaceRepository.findBySlug(slug)
             .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
         assertWorkspaceMember(ws.getId(), userId);
+        // Pas de filtre de visibilité : une issue ASSIGNÉE à l'utilisateur implique qu'il y a accès
+        // (on ne lui cache pas son propre travail, même sur un projet privé).
         return issueRepository.findByWorkspaceSlugAndAssigneeId(slug, userId).stream()
             .map(this::toResponse)
             .toList();
@@ -260,6 +274,7 @@ public class IssueService {
     public IssueResponse getIssue(String workspaceSlug, Long projectId, Long issueId, Long requestingUserId) {
         Project project = resolveProject(workspaceSlug, projectId);
         assertWorkspaceMember(project.getWorkspace().getId(), requestingUserId);
+        visibilityGuard.assertCanView(project, requestingUserId); // projet privé : membres invités + OWNER/ADMIN
         Issue issue = resolveIssue(issueId, project.getId());
         return toResponse(issue);
     }
@@ -272,6 +287,7 @@ public class IssueService {
                                      CreateIssueRequest request, Long reporterId) {
         Project project = resolveProject(workspaceSlug, projectId);
         assertWorkspaceMember(project.getWorkspace().getId(), reporterId);
+        enforceIssueLimit(project); // plafond 250 issues sur le forfait Free
 
         User reporter = resolveUser(reporterId);
 
@@ -935,6 +951,23 @@ public class IssueService {
     private void assertWorkspaceMember(Long workspaceId, Long userId) {
         if (!workspaceMemberRepository.existsByWorkspaceIdAndUserId(workspaceId, userId)) {
             throw new BusinessException("Accès refusé");
+        }
+    }
+
+    /**
+     * Plafond d'issues du forfait Free ({@value #FREE_ISSUE_LIMIT} par workspace) — payant = illimité.
+     * Lève une {@link IllegalStateException} (→ 409) pour déclencher l'upsell.
+     */
+    private void enforceIssueLimit(Project project) {
+        User owner = project.getWorkspace().getOwner();
+        if (owner == null || owner.isPaid()) {
+            return; // forfait payant = issues illimitées
+        }
+        long count = issueRepository.countByWorkspaceId(project.getWorkspace().getId());
+        if (count >= FREE_ISSUE_LIMIT) {
+            throw new IllegalStateException(
+                "Limite de " + FREE_ISSUE_LIMIT + " issues atteinte sur le forfait Free. "
+                + "Passez à un forfait payant pour des issues illimitées.");
         }
     }
 
