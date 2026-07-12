@@ -13,10 +13,12 @@ import {
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { BrandLogo } from "@/components/ui/brand-logo"
+import { LabBanner } from "@/components/layout/lab-banner"
 import { cn } from "@/lib/utils"
 import { useIntegrationStore } from "@/lib/store/integration-store"
 import {
   getIntegrationCatalog, getPlaneStatus, connectPlane, listPlaneProjects, syncPlane, disconnectPlane,
+  connectConnector, disconnectConnector,
   type IntegrationCatalog, type ConnectorView, type PlaneProject, type PlaneStatus,
 } from "@/lib/api/integration-service"
 
@@ -60,12 +62,11 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
   useEffect(() => { refresh() }, [refresh])
 
   async function handleAction(tool: ConnectorView) {
-    if (tool.status !== "AVAILABLE") return
-    // OAuth = 1 clic (redirection). Clé/config = dialog avec formulaire + aide.
-    if (tool.authType === "OAUTH2" && !tool.connected) {
+    // GitHub / Slack : OAuth 1-clic dédié (redirection). Le reste → dialog générique (formulaire).
+    if (!tool.connected && (tool.key === "github" || tool.key === "slack")) {
       try {
         if (tool.key === "github") await connectGitHub(slug)
-        else if (tool.key === "slack") await connectSlack(slug)
+        else await connectSlack(slug)
       } catch {
         toast.error(`Impossible de démarrer la connexion ${tool.name}`)
       }
@@ -101,6 +102,10 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
   return (
     <TooltipProvider delayDuration={200}>
       <div className="flex flex-col gap-5">
+        <LabBanner
+          feature="integrations"
+          message="Intégrations : les 129 connecteurs sont branchables (identifiants stockés), mais la synchronisation des données par outil n'est pas encore active."
+        />
         {/* Recherche */}
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -262,12 +267,18 @@ function ConnectorDialog({
   async function handleConnect() {
     setConnecting(true)
     try {
-      await connectPlane(slug, { apiKey: form.apiKey ?? "", planeWorkspace: form.planeWorkspace ?? "" })
+      if (isPlane) {
+        await connectPlane(slug, { apiKey: form.apiKey ?? "", planeWorkspace: form.planeWorkspace ?? "" })
+        await loadConnected()
+      } else {
+        // Connecteur générique : identifiants stockés chiffrés côté back.
+        await connectConnector(slug, tool.key, form)
+      }
       toast.success(`${tool.name} connecté`)
-      await loadConnected()
       onChanged()
+      if (!isPlane) onClose()
     } catch {
-      toast.error("Connexion échouée — vérifie la clé API et le slug du workspace")
+      toast.error("Connexion échouée — vérifie les informations saisies")
     } finally {
       setConnecting(false)
     }
@@ -290,7 +301,8 @@ function ConnectorDialog({
 
   async function handleDisconnect() {
     try {
-      await disconnectPlane(slug)
+      if (isPlane) await disconnectPlane(slug)
+      else await disconnectConnector(slug, tool.key)
       toast.success(`${tool.name} déconnecté`)
       onChanged()
       onClose()
@@ -347,7 +359,7 @@ function ConnectorDialog({
               </Button>
             </DialogFooter>
           </div>
-        ) : (
+        ) : isPlane ? (
           <div className="flex flex-col gap-3">
             <p className="text-xs text-muted-foreground">
               {status?.planeWorkspace && <>Workspace <span className="font-medium text-foreground">{status.planeWorkspace}</span> · </>}
@@ -371,6 +383,21 @@ function ConnectorDialog({
               <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={handleSync} disabled={syncing || !projectId}>
                 {syncing ? <Loader2 className="size-3.5 animate-spin" /> : <Plug className="size-3.5" />}
                 {syncing ? "Synchronisation…" : "Synchroniser → Brain OS"}
+              </Button>
+            </DialogFooter>
+          </div>
+        ) : (
+          // Connecteur générique connecté : identifiants stockés (chiffrés). La sync par service viendra ensuite.
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-2 rounded-md border border-emerald-500/25 bg-emerald-500/10 p-3 text-xs text-emerald-600 dark:text-emerald-400">
+              <Check className="size-4 shrink-0" />
+              <span><span className="font-medium">{tool.name}</span> est connecté — identifiants enregistrés (chiffrés).</span>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" size="sm"
+                      className="h-8 text-xs text-destructive border-destructive/30 hover:bg-destructive/10"
+                      onClick={handleDisconnect}>
+                Déconnecter
               </Button>
             </DialogFooter>
           </div>
