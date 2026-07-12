@@ -60,9 +60,7 @@ public class StripeService {
         return customer;
     }
 
-    /**
-     * Crée une session de paiement Checkout Stripe
-     */
+    /** Session Checkout à 1 siège (compat — inscription). */
     public Session createCheckoutSession(
         String customerId,
         String priceId,
@@ -70,7 +68,21 @@ public class StripeService {
         String cancelUrl,
         Map<String, String> metadata
     ) throws StripeException {
-        log.info("Création d'une session Checkout Stripe pour le client : {}", customerId);
+        return createCheckoutSession(customerId, priceId, 1L, successUrl, cancelUrl, metadata);
+    }
+
+    /**
+     * Crée une session de paiement Checkout Stripe pour {@code quantity} sièges (tarification par membre).
+     */
+    public Session createCheckoutSession(
+        String customerId,
+        String priceId,
+        long quantity,
+        String successUrl,
+        String cancelUrl,
+        Map<String, String> metadata
+    ) throws StripeException {
+        log.info("Création d'une session Checkout Stripe pour le client {} ({} siège(s))", customerId, quantity);
 
         SessionCreateParams.Builder paramsBuilder = SessionCreateParams.builder()
             .setMode(SessionCreateParams.Mode.SUBSCRIPTION)
@@ -80,7 +92,7 @@ public class StripeService {
             .addLineItem(
                 SessionCreateParams.LineItem.builder()
                     .setPrice(priceId)
-                    .setQuantity(1L)
+                    .setQuantity(Math.max(1L, quantity))
                     .build()
             );
 
