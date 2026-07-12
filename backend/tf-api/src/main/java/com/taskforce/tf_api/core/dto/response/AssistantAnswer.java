@@ -15,14 +15,26 @@ public record AssistantAnswer(
     String mode,
     List<AssistantSource> sources,
     List<AssistantStep> steps,
-    List<AssistantToolCall> toolCalls
+    List<AssistantToolCall> toolCalls,
+    AssistantUsage usage
 ) {
     /** Une note Brain OS utilisée pour fonder la réponse (RAG). */
     public record AssistantSource(String title, String domain, Double score) {}
 
-    /** Une étape du déroulé de l'agent. status : pending | active | done | error. */
-    public record AssistantStep(String label, String status) {}
+    /**
+     * Une étape du déroulé de l'agent. status : pending | active | done | error.
+     * {@code description} = détail optionnel (routing, domaines trouvés, outils appelés…).
+     */
+    public record AssistantStep(String label, String status, String description) {
+        /** Compat : étape sans détail. */
+        public AssistantStep(String label, String status) { this(label, status, null); }
+    }
 
     /** Un appel d'outil effectué par l'agent. status : success | error | running. */
     public record AssistantToolCall(String name, String status, String input, String output) {}
+
+    /** Tokens réellement consommés par ce tour (cumulés sur les appels LLM). */
+    public record AssistantUsage(long promptTokens, long completionTokens, long totalTokens) {
+        public static final AssistantUsage NONE = new AssistantUsage(0, 0, 0);
+    }
 }
