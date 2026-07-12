@@ -27,7 +27,6 @@ export const AUTH_ROUTES = {
 export const STRIPE_ROUTES = {
   CREATE_CHECKOUT: "/api/stripe/create-checkout",
   VERIFY_SESSION: "/api/stripe/verify-session",
-  SUBSCRIPTION_INFO: "/api/stripe/subscription",
   CANCEL_SUBSCRIPTION: "/api/stripe/cancel",
   WEBHOOK: "/api/stripe/webhook",
 } as const;
@@ -38,6 +37,7 @@ export const STRIPE_ROUTES = {
  */
 export const BILLING_ROUTES = {
   PORTAL: "/api/billing/portal",
+  SUBSCRIPTION: "/api/billing/subscription",
 } as const;
 
 /**
