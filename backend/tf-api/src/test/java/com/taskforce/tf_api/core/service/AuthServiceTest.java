@@ -262,7 +262,7 @@ class AuthServiceTest {
 
         @BeforeEach
         void setUp() {
-            selectPlanRequest = TestDataBuilder.buildSelectPlanRequest(TEST_EMAIL, "PRO");
+            selectPlanRequest = TestDataBuilder.buildSelectPlanRequest(TEST_EMAIL, "BUSINESS");
         }
 
         @Test
@@ -273,7 +273,7 @@ class AuthServiceTest {
             keycloakUser.setId(TEST_KEYCLOAK_ID);
 
             when(keycloakService.getUserByEmail(TEST_EMAIL)).thenReturn(keycloakUser);
-            when(otpService.updatePlanType(TEST_EMAIL, TEST_KEYCLOAK_ID, "PRO")).thenReturn(true);
+            when(otpService.updatePlanType(TEST_EMAIL, TEST_KEYCLOAK_ID, "BUSINESS")).thenReturn(true);
 
             // When
             SelectPlanResponse response = authService.selectPlan(selectPlanRequest);
@@ -281,11 +281,11 @@ class AuthServiceTest {
             // Then
             assertThat(response).isNotNull();
             assertThat(response.getEmail()).isEqualTo(TEST_EMAIL);
-            assertThat(response.getPlanType()).isEqualTo("PRO");
+            assertThat(response.getPlanType()).isEqualTo("BUSINESS");
             assertThat(response.isOtpSent()).isTrue();
             assertThat(response.getMessage()).contains("Plan sélectionné");
 
-            verify(otpService).updatePlanType(TEST_EMAIL, TEST_KEYCLOAK_ID, "PRO");
+            verify(otpService).updatePlanType(TEST_EMAIL, TEST_KEYCLOAK_ID, "BUSINESS");
         }
 
         @Test
@@ -326,7 +326,7 @@ class AuthServiceTest {
             keycloakUser.setId(TEST_KEYCLOAK_ID);
 
             when(keycloakService.getUserByEmail(TEST_EMAIL)).thenReturn(keycloakUser);
-            when(otpService.updatePlanType(TEST_EMAIL, TEST_KEYCLOAK_ID, "PRO")).thenReturn(false);
+            when(otpService.updatePlanType(TEST_EMAIL, TEST_KEYCLOAK_ID, "BUSINESS")).thenReturn(false);
 
             // When/Then
             assertThatThrownBy(() -> authService.selectPlan(selectPlanRequest))
@@ -391,7 +391,7 @@ class AuthServiceTest {
         @DisplayName("devrait retourner URL checkout pour plan PRO")
         void verifyOtp_shouldReturnCheckoutUrl_whenProPlan() throws StripeException {
             // Given
-            otpVerification.setPlanType(PlanType.PRO.toString());
+            otpVerification.setPlanType(PlanType.BUSINESS.toString());
 
             Customer stripeCustomer = new Customer();
             stripeCustomer.setId("cus_123");
@@ -403,7 +403,7 @@ class AuthServiceTest {
             when(keycloakService.getUserByEmail(TEST_EMAIL)).thenReturn(keycloakUser);
             doNothing().when(keycloakService).verifyEmail(TEST_KEYCLOAK_ID);
             when(stripeService.createCustomer(anyString(), anyString())).thenReturn(stripeCustomer);
-            when(stripeService.getPriceIdForPlan("PRO")).thenReturn("price_pro");
+            when(stripeService.getPriceIdForPlan("BUSINESS")).thenReturn("price_pro");
             when(stripeService.createCheckoutSession(any(), any(), any(), any(), any()))
                 .thenReturn(checkoutSession);
             when(userRepository.save(any(User.class))).thenAnswer(i -> {
@@ -425,7 +425,7 @@ class AuthServiceTest {
             verify(userRepository).save(userCaptor.capture());
 
             User savedUser = userCaptor.getValue();
-            assertThat(savedUser.getPlanType()).isEqualTo(PlanType.PRO);
+            assertThat(savedUser.getPlanType()).isEqualTo(PlanType.BUSINESS);
             assertThat(savedUser.getPlanStatus()).isEqualTo(PlanStatus.TRIALING);
             assertThat(savedUser.getStripeCustomerId()).isEqualTo("cus_123");
         }
@@ -500,7 +500,7 @@ class AuthServiceTest {
         @DisplayName("devrait lancer exception si erreur Stripe")
         void verifyOtp_shouldThrowException_whenStripeError() throws StripeException {
             // Given
-            otpVerification.setPlanType(PlanType.PRO.toString());
+            otpVerification.setPlanType(PlanType.BUSINESS.toString());
 
             when(otpService.verifyOtpAndGetDetails(TEST_EMAIL, TEST_OTP_CODE)).thenReturn(otpVerification);
             when(keycloakService.getUserByEmail(TEST_EMAIL)).thenReturn(keycloakUser);
@@ -648,7 +648,7 @@ class AuthServiceTest {
             keycloakUser = TestDataBuilder.buildKeycloakUser(TEST_EMAIL, "Test", "User", false);
             keycloakUser.setId(TEST_KEYCLOAK_ID);
             existingOtp = TestDataBuilder.buildOtp(TEST_EMAIL, "999999", OtpType.EMAIL_VERIFICATION);
-            existingOtp.setPlanType(PlanType.PRO.toString());
+            existingOtp.setPlanType(PlanType.BUSINESS.toString());
         }
 
         @Test
@@ -674,7 +674,7 @@ class AuthServiceTest {
                 eq(OtpType.EMAIL_VERIFICATION),
                 isNull(),
                 eq(TEST_KEYCLOAK_ID),
-                eq(PlanType.PRO)
+                eq(PlanType.BUSINESS)
             );
         }
 
@@ -836,7 +836,7 @@ class AuthServiceTest {
 
             otpVerification = TestDataBuilder.buildOtp(TEST_EMAIL, TEST_OTP_CODE, OtpType.EMAIL_VERIFICATION);
             otpVerification.setKeycloakId(TEST_KEYCLOAK_ID);
-            otpVerification.setPlanType(PlanType.PRO.toString());
+            otpVerification.setPlanType(PlanType.BUSINESS.toString());
 
             keycloakUser = TestDataBuilder.buildKeycloakUser(TEST_EMAIL, "Test", "User", false);
             keycloakUser.setId(TEST_KEYCLOAK_ID);
@@ -865,7 +865,7 @@ class AuthServiceTest {
             // Then
             assertThat(response).isNotNull();
             assertThat(response.getEmail()).isEqualTo(TEST_EMAIL);
-            assertThat(response.getPlanType()).isEqualTo("PRO");
+            assertThat(response.getPlanType()).isEqualTo("BUSINESS");
             assertThat(response.isUserCreated()).isTrue();
             assertThat(response.getSubscriptionId()).isEqualTo("sub_123");
 
@@ -874,7 +874,7 @@ class AuthServiceTest {
             verify(emailService).sendWelcomeEmail(TEST_EMAIL, "Test");
 
             User savedUser = userCaptor.getValue();
-            assertThat(savedUser.getPlanType()).isEqualTo(PlanType.PRO);
+            assertThat(savedUser.getPlanType()).isEqualTo(PlanType.BUSINESS);
             assertThat(savedUser.getPlanStatus()).isEqualTo(PlanStatus.ACTIVE);
             assertThat(savedUser.getStripeCustomerId()).isEqualTo("cus_123");
             assertThat(savedUser.getStripeSubscriptionId()).isEqualTo("sub_123");
@@ -884,7 +884,7 @@ class AuthServiceTest {
         @DisplayName("devrait mettre à jour utilisateur existant avec infos paiement")
         void completeAfterPayment_shouldUpdateUser_whenAlreadyExists() throws StripeException {
             // Given
-            User existingUser = TestDataBuilder.buildUser(TEST_EMAIL, PlanType.PRO);
+            User existingUser = TestDataBuilder.buildUser(TEST_EMAIL, PlanType.BUSINESS);
             existingUser.setPlanStatus(PlanStatus.TRIALING);
 
             when(stripeService.getCheckoutSession("session_123")).thenReturn(stripeSession);
