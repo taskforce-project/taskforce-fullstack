@@ -9,7 +9,7 @@ import { useParams } from "next/navigation"
 
 import { PageContainer, PageHeader } from "@/components/layout/page-shell"
 import { Badge } from "@/components/ui/badge"
-import { SectionCard } from "@/components/ui/section-card"
+import { SectionCard, MetricSplit } from "@/components/ui/section-card"
 import { useUpgradeStore } from "@/lib/store/upgrade-store"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useAuth } from "@/lib/contexts/auth-context"
@@ -47,20 +47,21 @@ interface KpiMetric {
   deltaInverse?: boolean
 }
 
-function KpiCard({ metric }: { readonly metric: KpiMetric }) {
+/** Une cellule KPI dans le MetricSplit — même chrome que les cartes du dashboard. */
+function KpiCell({ metric }: { readonly metric: KpiMetric }) {
   const positive = metric.delta > 0
   const isGood = metric.deltaInverse ? !positive : positive
   const deltaClass = metric.delta === 0 ? "text-muted-foreground" : isGood ? "text-emerald-500" : "text-rose-500"
   const DeltaIcon = metric.delta === 0 ? Minus : positive ? TrendingUp : TrendingDown
 
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-border bg-card p-4">
+    <div className="flex flex-1 flex-col gap-2 px-5 py-4">
       <div className="flex items-center justify-between gap-2">
-        <span className="truncate text-xs font-medium text-muted-foreground">{metric.label}</span>
+        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{metric.label}</span>
         <metric.icon className="size-4 shrink-0 text-muted-foreground" />
       </div>
       <div className="flex items-baseline gap-1.5">
-        <span className="text-3xl font-semibold tabular-nums text-foreground">{metric.value}</span>
+        <span className="text-2xl font-semibold tabular-nums tracking-tight text-foreground">{metric.value}</span>
         <span className="text-xs text-muted-foreground">{metric.unit}</span>
       </div>
       <div className={cn("flex items-center gap-1 text-xs font-medium tabular-nums", deltaClass)}>
@@ -188,10 +189,12 @@ export default function AnalyticsPage() {
           : insights.map((ins, i) => <InsightRow key={`${ins.agent}-${i}`} insight={ins} />)}
       </SectionCard>
 
-      {/* 3 — Les chiffres. */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {kpiMetrics.map((m) => <KpiCard key={m.label} metric={m} />)}
-      </div>
+      {/* 3 — Les chiffres (même chrome que les cartes du dashboard : en-tête + MetricSplit). */}
+      <SectionCard title="Indicateurs clés" icon={<Activity className="size-4" />} bodyClassName="p-0">
+        <MetricSplit className="max-sm:flex-col max-sm:divide-x-0 max-sm:divide-y">
+          {kpiMetrics.map((m) => <KpiCell key={m.label} metric={m} />)}
+        </MetricSplit>
+      </SectionCard>
 
       {/* 4 — L'exploration : 3 aperçus → modal (catalogue + génération IA). */}
       <ChartExplorer slug={slug} projectId={projectId} gated={!isPro} onUpgrade={openUpgrade} />
