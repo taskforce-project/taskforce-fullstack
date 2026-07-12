@@ -38,6 +38,7 @@ export const STRIPE_ROUTES = {
 export const BILLING_ROUTES = {
   PORTAL: "/api/billing/portal",
   SUBSCRIPTION: "/api/billing/subscription",
+  CHECKOUT: "/api/billing/checkout",
 } as const;
 
 /**
