@@ -38,6 +38,8 @@ class AssistantControllerWebMvcTest {
     @Autowired private MockMvc mockMvc;
 
     @MockitoBean private com.taskforce.tf_api.core.service.agent.AgentService agentService;
+    @MockitoBean private com.taskforce.tf_api.core.service.AiConversationService conversationService;
+    @MockitoBean private com.taskforce.tf_api.core.service.brain.BrainAccessGuard access;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private WorkspaceRepository workspaceRepository;
     @MockitoBean private WorkspaceMemberRepository workspaceMemberRepository;
@@ -53,7 +55,18 @@ class AssistantControllerWebMvcTest {
     @Test
     @DisplayName("POST assistant (Accept JSON) → 200")
     void chat_json_200() throws Exception {
-        when(agentService.run(anyString(), anyLong(), anyString())).thenReturn(null);
+        // Chaîne complète : autorisation → conversation (get/create) → agent (avec historique) → persistance.
+        var ws = com.taskforce.tf_api.core.model.Workspace.builder().id(1L).slug("acme").name("Acme").build();
+        when(access.resolveAndAuthorize(anyString(), anyLong())).thenReturn(ws);
+        var conv = org.mockito.Mockito.mock(com.taskforce.tf_api.core.model.AiConversation.class);
+        when(conv.getId()).thenReturn(1L);
+        when(conversationService.getOrCreate(anyLong(), anyLong(), any())).thenReturn(conv);
+        when(conversationService.recentHistory(anyLong())).thenReturn(java.util.List.of());
+        when(conversationService.autoTitle(anyLong(), anyString())).thenReturn("Bonjour");
+        when(agentService.run(anyString(), anyLong(), anyString(), any())).thenReturn(
+            new com.taskforce.tf_api.core.dto.response.AssistantAnswer(
+                "Réponse", null, "fast", java.util.List.of(), java.util.List.of(), java.util.List.of(),
+                com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantUsage.NONE));
 
         mockMvc.perform(post(URL).with(auth())
                 .accept(MediaType.APPLICATION_JSON)
