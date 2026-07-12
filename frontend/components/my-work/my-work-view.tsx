@@ -1,20 +1,18 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useParams } from "next/navigation"
-import Link from "next/link"
+import { useParams, useRouter } from "next/navigation"
 import {
-  CircleDot, CheckCircle2, Clock, AlertTriangle,
-  RefreshCw, FileText, ArrowUpRight, Layers,
+  CircleDot, CheckCircle2, Clock, RefreshCw, FileText, Layers, Hash, CalendarDays,
 } from "lucide-react"
 
 import { useTranslation } from "@/lib/i18n"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { SectionCard, CardSubSection } from "@/components/ui/section-card"
 import { PageContainer, PageHeader } from "@/components/layout/page-shell"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { DataTable, type DataTableColumn } from "@/components/ui/data-table"
 import { cn } from "@/lib/utils"
 import { useProjectStore } from "@/lib/store/project-store"
 import { useCycleStore } from "@/lib/store/cycle-store"
@@ -42,6 +40,8 @@ interface Issue {
   project: string
   projectId: string
   dueDate: string | null
+  /** Timestamp brut pour le tri chronologique (l'affichage reste `dueDate`). */
+  dueTs: number | null
   url: string
 }
 
@@ -99,6 +99,11 @@ const PRIORITY_DOT: Record<IssuePriority, string> = {
   none:   "bg-muted-foreground/20",
 }
 
+/** Ordre logique pour le tri par priorité (urgent en tête). */
+const PRIORITY_ORDER: Record<IssuePriority, number> = {
+  urgent: 0, high: 1, medium: 2, low: 3, none: 4,
+}
+
 const STATUS_ICON: Record<IssueStatus, React.ReactNode> = {
   todo:        <CircleDot className="size-3.5 text-muted-foreground" />,
   in_progress: <RefreshCw className="size-3.5 text-blue-500" />,
@@ -107,91 +112,137 @@ const STATUS_ICON: Record<IssueStatus, React.ReactNode> = {
   cancelled:   <CheckCircle2 className="size-3.5 text-muted-foreground" />,
 }
 
+const STATUS_LABEL: Record<IssueStatus, string> = {
+  todo: "To do", in_progress: "In progress", in_review: "In review", done: "Done", cancelled: "Cancelled",
+}
+
 const CYCLE_STATUS: Record<CycleStatus, { label: string; dot: string }> = {
   active:    { label: "Active",    dot: "bg-emerald-500" },
   upcoming:  { label: "Upcoming",  dot: "bg-blue-500" },
   completed: { label: "Completed", dot: "bg-muted-foreground" },
 }
 
-const ROW = "group flex items-center gap-3 px-4 py-2.5 border-b border-border last:border-0 hover:bg-muted/50 transition-colors"
+// ─── Colonnes DataTable (partagées, triables) ────────────────────────────────
 
-// ─── Rows ──────────────────────────────────────────────────────────────────
-
-function IssueRow({ issue }: Readonly<{ issue: Issue }>) {
-  const isOverdue = issue.dueDate === "Overdue"
-  return (
-    <Link href={issue.url} className={ROW}>
-      <span className={cn("size-2 shrink-0 rounded-full", PRIORITY_DOT[issue.priority])} />
-      <span className="shrink-0">{STATUS_ICON[issue.status]}</span>
-      <span className="w-14 shrink-0 truncate font-mono text-xs tabular-nums text-muted-foreground">{issue.identifier}</span>
-      <span className="min-w-0 flex-1 truncate text-sm text-foreground">{issue.title}</span>
-      <span className="hidden w-40 shrink-0 items-center gap-1 text-xs text-muted-foreground sm:flex">
-        <Layers className="size-3 shrink-0" /> <span className="truncate">{issue.project}</span>
+const ISSUE_COLUMNS: DataTableColumn<Issue>[] = [
+  {
+    key: "priority", header: "", align: "center", className: "w-10",
+    render: (i) => <span className={cn("inline-block size-2 rounded-full", PRIORITY_DOT[i.priority])} title={i.priority} />,
+    sortValue: (i) => PRIORITY_ORDER[i.priority],
+  },
+  {
+    key: "status", header: "Status", icon: <CircleDot className="size-3" />, className: "w-28",
+    render: (i) => (
+      <span className="flex items-center gap-1.5">
+        {STATUS_ICON[i.status]}
+        <span className="hidden text-xs text-muted-foreground lg:inline">{STATUS_LABEL[i.status]}</span>
       </span>
-      <span className={cn("hidden w-24 shrink-0 items-center justify-end gap-1 text-xs md:flex", isOverdue ? "text-rose-500" : "text-muted-foreground")}>
-        {isOverdue && <AlertTriangle className="size-3" />} {issue.dueDate ?? "—"}
-      </span>
-      <ArrowUpRight className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-60" />
-    </Link>
-  )
-}
+    ),
+    sortValue: (i) => i.status,
+  },
+  {
+    key: "identifier", header: "ID", icon: <Hash className="size-3" />, className: "w-20",
+    render: (i) => <span className="font-mono text-xs tabular-nums text-muted-foreground">{i.identifier}</span>,
+    sortValue: (i) => i.identifier,
+  },
+  {
+    key: "title", header: "Title",
+    render: (i) => <span className="text-sm text-foreground">{i.title}</span>,
+    sortValue: (i) => i.title.toLowerCase(),
+  },
+  {
+    key: "project", header: "Project", icon: <Layers className="size-3" />, className: "hidden w-40 sm:table-cell",
+    render: (i) => <span className="block truncate text-xs text-muted-foreground">{i.project}</span>,
+    sortValue: (i) => i.project.toLowerCase(),
+  },
+  {
+    key: "due", header: "Due", icon: <CalendarDays className="size-3" />, align: "right", className: "hidden w-24 md:table-cell",
+    render: (i) => <span className="text-xs text-muted-foreground">{i.dueDate ?? "—"}</span>,
+    sortValue: (i) => i.dueTs ?? Number.POSITIVE_INFINITY,
+  },
+]
 
-function CycleRow({ cycle }: Readonly<{ cycle: Cycle }>) {
-  const sc = CYCLE_STATUS[cycle.status]
-  return (
-    <Link href={cycle.url} className={cn(ROW, "py-3")}>
-      <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted">
-        <RefreshCw className="size-3.5 text-muted-foreground" />
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-foreground">{cycle.title}</p>
-        <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-          <span>{cycle.project}</span>
-          <span>·</span>
-          <span>{cycle.startDate} → {cycle.endDate}</span>
-          {cycle.daysLeft !== null && (
-            <>
-              <span>·</span>
-              <span className="font-medium text-amber-500">{cycle.daysLeft}d left</span>
-            </>
-          )}
-        </div>
-      </div>
-      <div className="hidden w-24 shrink-0 justify-start sm:flex">
+const CYCLE_COLUMNS: DataTableColumn<Cycle>[] = [
+  {
+    key: "title", header: "Sprint", icon: <RefreshCw className="size-3" />,
+    render: (c) => <span className="text-sm font-medium text-foreground">{c.title}</span>,
+    sortValue: (c) => c.title.toLowerCase(),
+  },
+  {
+    key: "project", header: "Project", icon: <Layers className="size-3" />, className: "hidden w-40 sm:table-cell",
+    render: (c) => <span className="block truncate text-xs text-muted-foreground">{c.project}</span>,
+    sortValue: (c) => c.project.toLowerCase(),
+  },
+  {
+    key: "period", header: "Period", className: "hidden w-40 md:table-cell",
+    render: (c) => <span className="text-xs text-muted-foreground">{c.startDate} → {c.endDate}</span>,
+  },
+  {
+    key: "status", header: "Status", className: "w-28",
+    render: (c) => {
+      const sc = CYCLE_STATUS[c.status]
+      return (
         <Badge variant="secondary" className="gap-1.5 font-normal text-muted-foreground">
           <span className={cn("size-1.5 rounded-full", sc.dot)} /> {sc.label}
         </Badge>
-      </div>
-      <div className="hidden w-28 shrink-0 items-center gap-2 md:flex">
-        {cycle.status !== "upcoming" ? (
-          <>
-            <Progress value={cycle.progress} className="h-1.5 flex-1" />
-            <span className="w-8 text-right text-xs tabular-nums text-muted-foreground">{cycle.progress}%</span>
-          </>
-        ) : null}
-      </div>
-      <span className="hidden w-12 shrink-0 text-right text-xs text-muted-foreground lg:block">{cycle.completedIssues}/{cycle.totalIssues}</span>
-      <ArrowUpRight className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-60" />
-    </Link>
-  )
-}
+      )
+    },
+    sortValue: (c) => c.status,
+  },
+  {
+    key: "progress", header: "Progress", className: "hidden w-32 lg:table-cell",
+    render: (c) => c.status === "upcoming"
+      ? <span className="text-xs text-muted-foreground">—</span>
+      : (
+        <span className="flex items-center gap-2">
+          <Progress value={c.progress} className="h-1.5 flex-1" />
+          <span className="w-8 text-right text-xs tabular-nums text-muted-foreground">{c.progress}%</span>
+        </span>
+      ),
+    sortValue: (c) => c.progress,
+  },
+  {
+    key: "count", header: "Issues", align: "right", className: "hidden w-16 lg:table-cell",
+    render: (c) => <span className="text-xs tabular-nums text-muted-foreground">{c.completedIssues}/{c.totalIssues}</span>,
+    sortValue: (c) => c.totalIssues,
+  },
+]
 
-function PageRow({ page }: Readonly<{ page: Page }>) {
-  return (
-    <Link href={page.url} className={ROW}>
-      <FileText className="size-4 shrink-0 text-muted-foreground" />
-      <span className="min-w-0 flex-1 truncate text-sm text-foreground">{page.title}</span>
-      <span className="hidden w-40 shrink-0 items-center gap-1 text-xs text-muted-foreground sm:flex">
-        <Layers className="size-3 shrink-0" /> <span className="truncate">{page.project}</span>
-      </span>
-      <div className="hidden w-28 shrink-0 items-center justify-end gap-1.5 md:flex">
+const PAGE_COLUMNS: DataTableColumn<Page>[] = [
+  {
+    key: "title", header: "Page", icon: <FileText className="size-3" />,
+    render: (p) => <span className="text-sm text-foreground">{p.title}</span>,
+    sortValue: (p) => p.title.toLowerCase(),
+  },
+  {
+    key: "project", header: "Project", icon: <Layers className="size-3" />, className: "hidden w-40 sm:table-cell",
+    render: (p) => <span className="block truncate text-xs text-muted-foreground">{p.project}</span>,
+    sortValue: (p) => p.project.toLowerCase(),
+  },
+  {
+    key: "edited", header: "Last edited", align: "right", className: "w-40",
+    render: (p) => (
+      <span className="flex items-center justify-end gap-1.5">
         <Avatar className="size-5">
-          <AvatarFallback className="text-[8px] font-semibold">{page.lastEditedByInitials}</AvatarFallback>
+          <AvatarFallback className="text-[8px] font-semibold">{p.lastEditedByInitials}</AvatarFallback>
         </Avatar>
-        <span className="text-xs text-muted-foreground">{page.lastEditedAt}</span>
+        <span className="text-xs text-muted-foreground">{p.lastEditedAt}</span>
+      </span>
+    ),
+  },
+]
+
+// ─── Section (titre + compteur au-dessus d'une table) ────────────────────────
+
+function QueueSection({ label, count, children }: Readonly<{ label: string; count: number; children: React.ReactNode }>) {
+  return (
+    <section className="space-y-2">
+      <div className="flex items-center gap-2 px-1">
+        <h2 className="text-sm font-semibold text-foreground">{label}</h2>
+        <span className="rounded-full bg-muted px-2 py-0.5 text-xs tabular-nums text-muted-foreground">{count}</span>
       </div>
-      <ArrowUpRight className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-60" />
-    </Link>
+      {children}
+    </section>
   )
 }
 
@@ -207,6 +258,7 @@ function mapMyIssue(i: ApiIssue, baseUrl: string): Issue {
     project:    i.projectName,
     projectId:  String(i.projectId),
     dueDate:    i.dueDate ? new Date(i.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null,
+    dueTs:      i.dueDate ? new Date(i.dueDate).getTime() : null,
     // Board + sheet ouverte (`?issue=`), plutôt que la page détail isolée.
     url:        `${baseUrl}/projects/${i.projectId}?issue=${i.id}`,
   }
@@ -261,6 +313,7 @@ type QueueTab = "all" | "issues" | "sprints" | "pages"
 
 export function MyWorkView({ defaultTab }: MyWorkViewProps) {
   useTranslation()
+  const router = useRouter()
 
   const initialTab: QueueTab =
     defaultTab === "cycles" ? "sprints" : defaultTab === "issues" ? "issues" : defaultTab === "pages" ? "pages" : "all"
@@ -322,29 +375,42 @@ export function MyWorkView({ defaultTab }: MyWorkViewProps) {
         </TabsList>
       </Tabs>
 
-      <SectionCard title="My Queue" bodyClassName="p-0">
+      {/* Tables homogènes (DataTable : tri + pagination paramétrable) */}
+      <div className="space-y-6">
         {(tab === "all" || tab === "issues") && (
-          <CardSubSection label="Issues" count={myIssues.length}>
-            {myIssues.length === 0
-              ? <p className="px-4 py-3 text-sm text-muted-foreground">Aucune tâche ouverte qui vous est assignée.</p>
-              : myIssues.map((i) => <IssueRow key={i.id} issue={i} />)}
-          </CardSubSection>
+          <QueueSection label="Issues" count={myIssues.length}>
+            <DataTable
+              columns={ISSUE_COLUMNS}
+              data={myIssues}
+              rowKey={(i) => i.id}
+              onRowClick={(i) => router.push(i.url)}
+              emptyMessage="Aucune tâche ouverte qui vous est assignée."
+            />
+          </QueueSection>
         )}
         {(tab === "all" || tab === "sprints") && (
-          <CardSubSection label="Sprints" count={activeSprints}>
-            {myCycles.length === 0
-              ? <p className="px-4 py-3 text-sm text-muted-foreground">Aucun sprint actif.</p>
-              : myCycles.map((c) => <CycleRow key={c.id} cycle={c} />)}
-          </CardSubSection>
+          <QueueSection label="Sprints" count={myCycles.length}>
+            <DataTable
+              columns={CYCLE_COLUMNS}
+              data={myCycles}
+              rowKey={(c) => c.id}
+              onRowClick={(c) => router.push(c.url)}
+              emptyMessage="Aucun sprint actif."
+            />
+          </QueueSection>
         )}
         {(tab === "all" || tab === "pages") && (
-          <CardSubSection label="Pages" count={myPages.length}>
-            {myPages.length === 0
-              ? <p className="px-4 py-3 text-sm text-muted-foreground">Aucune page récente.</p>
-              : myPages.map((p) => <PageRow key={p.id} page={p} />)}
-          </CardSubSection>
+          <QueueSection label="Pages" count={myPages.length}>
+            <DataTable
+              columns={PAGE_COLUMNS}
+              data={myPages}
+              rowKey={(p) => p.id}
+              onRowClick={(p) => router.push(p.url)}
+              emptyMessage="Aucune page récente."
+            />
+          </QueueSection>
         )}
-      </SectionCard>
+      </div>
     </PageContainer>
   )
 }
