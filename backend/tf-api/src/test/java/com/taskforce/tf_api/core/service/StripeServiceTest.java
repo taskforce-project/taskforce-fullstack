@@ -32,7 +32,8 @@ class StripeServiceTest {
     @BeforeEach
     void setup() {
         ReflectionTestUtils.setField(stripeService, "stripeSecretKey", "sk_test_mock_key");
-        ReflectionTestUtils.setField(stripeService, "proPriceId", "price_pro_mock");
+        ReflectionTestUtils.setField(stripeService, "basicPriceId", "price_basic_mock");
+        ReflectionTestUtils.setField(stripeService, "businessPriceId", "price_business_mock");
         ReflectionTestUtils.setField(stripeService, "enterprisePriceId", "price_enterprise_mock");
     }
 
@@ -41,13 +42,13 @@ class StripeServiceTest {
     class GetPriceIdForPlanTests {
 
         @Test
-        @DisplayName("devrait retourner price ID pour plan PRO")
-        void getPriceIdForPlan_withPro_shouldReturnProPriceId() {
+        @DisplayName("devrait retourner price ID pour plan BUSINESS")
+        void getPriceIdForPlan_withBusiness_shouldReturnBusinessPriceId() {
             // When
-            String result = stripeService.getPriceIdForPlan("PRO");
+            String result = stripeService.getPriceIdForPlan("BUSINESS");
 
             // Then
-            assertThat(result).isEqualTo("price_pro_mock");
+            assertThat(result).isEqualTo("price_business_mock");
         }
 
         @Test
@@ -98,11 +99,11 @@ class StripeServiceTest {
         @DisplayName("devrait avoir les price IDs configurés")
         void shouldHaveConfiguredPriceIds() {
             // When
-            String proPriceId = (String) ReflectionTestUtils.getField(stripeService, "proPriceId");
+            String businessPriceId = (String) ReflectionTestUtils.getField(stripeService, "businessPriceId");
             String enterprisePriceId = (String) ReflectionTestUtils.getField(stripeService, "enterprisePriceId");
 
             // Then
-            assertThat(proPriceId).isNotNull().isEqualTo("price_pro_mock");
+            assertThat(businessPriceId).isNotNull().isEqualTo("price_business_mock");
             assertThat(enterprisePriceId).isNotNull().isEqualTo("price_enterprise_mock");
         }
 
