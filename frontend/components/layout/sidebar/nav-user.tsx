@@ -30,6 +30,7 @@ import {
 import { useAuth } from "@/lib/contexts/auth-context"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { useUpgradeStore } from "@/lib/store/upgrade-store"
+import { useSettingsStore } from "@/lib/store/settings-store"
 
 export function NavUser({
   user,
@@ -45,6 +46,7 @@ export function NavUser({
   const router = useRouter()
   const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug)
   const openUpgrade = useUpgradeStore((s) => s.openUpgrade)
+  const openSettings = useSettingsStore((s) => s.openSettings)
 
   const isPro = authUser?.planType === "PRO" || authUser?.planType === "ENTERPRISE"
 
@@ -120,11 +122,11 @@ export function NavUser({
                   <Badge className="ml-auto h-5 bg-primary px-1.5 text-[10px] text-primary-foreground">Pro</Badge>
                 )}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => router.push(`/${slug}/settings?section=billing`)}>
+              <DropdownMenuItem onClick={() => openSettings("billing")}>
                 <CreditCard />
                 Billing
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => router.push(`/${slug}/settings?section=notifications`)}>
+              <DropdownMenuItem onClick={() => openSettings("notifications")}>
                 <Bell />
                 Notifications
               </DropdownMenuItem>
