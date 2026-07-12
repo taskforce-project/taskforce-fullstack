@@ -25,8 +25,8 @@ Source de vérité code : `PlanType`, `WorkspaceService` (workspaces), `ProjectS
 | Membres (workspace) | ∞ | ∞ | ∞ | ∞ | per‑seat, aucun plafond ✅ (comme Linear) |
 | Collaborateurs / projet **privé** | **5** | ∞ | ∞ | ∞ | `ProjectService.enforcePrivateProjectSeatLimit` ✅ *enforced (409)* |
 | Collaborateurs / projet **public** | ∞ | ∞ | ∞ | ∞ | visible par tout le workspace ✅ |
-| Issues | 250 *(indicatif)* | ∞ | ∞ | ∞ | affiché, **pas encore enforced** ⚠️ |
-| Tokens IA Cortex / mois | **100 000** | **500 000** | **2 000 000** | ∞ | `AiUsageService.limitFor` ✅ *enforced (quota compte)* |
+| Issues | **250** | ∞ | ∞ | ∞ | `IssueService.enforceIssueLimit` ✅ *enforced (409, par workspace)* |
+| Tokens IA Cortex / mois | **100 000** | **500 000** | **2 000 000** | ∞ | `AiUsageService.assertWithinQuota` ✅ *enforced (409 au dépassement) — l'IA est métrée par tokens, dispo à tous* |
 
 ## 3. Fonctionnalités & accès (`PlanFeatureService` / `plan-gate`)
 
