@@ -106,7 +106,7 @@ export default function AnalyticsPage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [projectFilter, setProjectFilter] = useState<string>(ALL_PROJECTS)
 
-  const isPro = user?.planType === "PRO" || user?.planType === "ENTERPRISE"
+  const isPro = user?.planType === "BUSINESS" || user?.planType === "ENTERPRISE"
   const projectId = projectFilter === ALL_PROJECTS ? null : Number(projectFilter)
 
   // Liste des projets pour le filtre + insights IA (workspace-wide)
