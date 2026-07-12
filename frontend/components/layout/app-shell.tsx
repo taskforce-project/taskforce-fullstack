@@ -10,6 +10,7 @@ import { AppTopbar } from "@/components/layout/topbar/app-topbar"
 import { PanelDock } from "@/components/layout/panel-dock"
 import { AppFooter } from "@/components/layout/app-footer"
 import { UpgradeDialog } from "@/components/subscription/upgrade-dialog"
+import { SettingsModal } from "@/components/settings/settings-modal"
 
 interface AppShellProps {
   readonly children: React.ReactNode
@@ -43,8 +44,9 @@ export function AppShell({ children }: AppShellProps) {
         </div>
       </SidebarInset>
 
-      {/* Modal d'upgrade global — ouvrable depuis n'importe quel CTA (QA2-19) */}
+      {/* Modals globaux — ouvrables depuis n'importe quel CTA */}
       <UpgradeDialog />
+      <SettingsModal />
     </SidebarProvider>
   )
 }
