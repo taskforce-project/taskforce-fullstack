@@ -32,6 +32,7 @@ class AgentServiceTest {
     @Mock private AgentToolRegistry tools;
     @Mock private GroqService groq;
     @Mock private ObjectMapper objectMapper;
+    @Mock private com.taskforce.tf_api.core.service.AiUsageService aiUsageService;
 
     @InjectMocks private AgentService service;
 
@@ -62,13 +63,18 @@ class AgentServiceTest {
         org.springframework.test.util.ReflectionTestUtils.setField(service, "model", "m");
         when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
         when(groq.isConfigured()).thenReturn(true);
-        when(groq.chatCompletion(anyString(), anyString(), anyString(), org.mockito.ArgumentMatchers.anyBoolean()))
+        when(groq.chatCompletion(anyString(), anyString(), anyString(), org.mockito.ArgumentMatchers.anyBoolean(), anyString()))
             .thenReturn("Réponse directe");
+        when(groq.currentUsage()).thenReturn(new com.taskforce.tf_api.core.service.LlmUsage(12, 34, 46));
 
-        AssistantAnswer answer = service.run("acme", 7L, "Bonjour, ça va ?");
+        // Message « métier » (non small-talk) → chemin knowledge fast (avec recherche Brain OS).
+        AssistantAnswer answer = service.run("acme", 7L, "Donne-moi le statut du projet");
 
         assertThat(answer.mode()).isEqualTo("fast");
         assertThat(answer.answer()).isEqualTo("Réponse directe");
+        // usage réel remonté jusqu'au DTO
+        assertThat(answer.usage().totalTokens()).isEqualTo(46);
+        assertThat(answer.usage().promptTokens()).isEqualTo(12);
     }
 
     @Test
@@ -88,7 +94,7 @@ class AgentServiceTest {
         var real = new ObjectMapper();
         var withCall = real.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"search_brain\",\"arguments\":\"{}\"}}]}");
         var finalMsg = real.readTree("{\"content\":\"Réponse finale\"}");
-        when(groq.rawChat(anyString(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+        when(groq.rawChat(anyString(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), anyString()))
             .thenReturn(withCall, finalMsg);
 
         AgentTool tool = org.mockito.Mockito.mock(AgentTool.class);
@@ -115,7 +121,7 @@ class AgentServiceTest {
         var real = new ObjectMapper();
         var withCall = real.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"ghost\",\"arguments\":\"{}\"}}]}");
         var finalMsg = real.readTree("{\"content\":\"Fini\"}");
-        when(groq.rawChat(anyString(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+        when(groq.rawChat(anyString(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), anyString()))
             .thenReturn(withCall, finalMsg);
         when(tools.get("ghost")).thenReturn(null);
 
@@ -132,11 +138,32 @@ class AgentServiceTest {
         org.springframework.test.util.ReflectionTestUtils.setField(service, "model", "m");
         when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
         when(groq.isConfigured()).thenReturn(true);
-        when(groq.chatCompletion(anyString(), anyString(), anyString(), org.mockito.ArgumentMatchers.anyBoolean()))
+        when(groq.chatCompletion(anyString(), anyString(), anyString(), org.mockito.ArgumentMatchers.anyBoolean(), anyString()))
             .thenThrow(new RuntimeException("LLM down"));
 
-        AssistantAnswer answer = service.run("acme", 7L, "Bonjour");
+        AssistantAnswer answer = service.run("acme", 7L, "Quel est le statut du projet ?");
 
         assertThat(answer.mode()).isEqualTo("fallback");
+    }
+
+    @Test
+    @DisplayName("run (conversationnel) : salutation → réponse directe, SANS recherche Brain OS ni sources")
+    void run_conversational_greeting() {
+        stubWorkspace();
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "model", "m");
+        when(groq.isConfigured()).thenReturn(true);
+        when(groq.chatCompletion(anyString(), anyString(), anyString(), org.mockito.ArgumentMatchers.anyBoolean(), anyString()))
+            .thenReturn("Bonjour ! Tout va bien, merci 😊");
+
+        AssistantAnswer answer = service.run("acme", 7L, "Hey comment va tu ?");
+
+        assertThat(answer.mode()).isEqualTo("fast");
+        assertThat(answer.answer()).isEqualTo("Bonjour ! Tout va bien, merci 😊");
+        assertThat(answer.sources()).isEmpty();
+        // Étapes réelles : pas de « Recherche dans le Brain OS » pour un simple bonjour
+        assertThat(answer.steps()).noneMatch(s -> s.label().contains("Brain OS"));
+        // Et aucune recherche n'a été déclenchée
+        org.mockito.Mockito.verify(search, org.mockito.Mockito.never())
+            .retrieveRelevant(anyLong(), anyString(), anyInt());
     }
 }
