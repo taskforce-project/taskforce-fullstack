@@ -13,8 +13,9 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * Agrégat mensuel de consommation de tokens IA d'un workspace (une ligne par mois 'YYYY-MM').
- * Incrémenté à chaque appel LLM réel (cf. {@code AiUsageService.record}).
+ * Agrégat mensuel de consommation de tokens IA d'un <b>compte</b> (le propriétaire des workspaces —
+ * une ligne par mois 'YYYY-MM'). Compté par compte et non par workspace pour que le quota ne soit pas
+ * contournable en multipliant les workspaces. Incrémenté à chaque appel LLM réel (cf. {@code AiUsageService.record}).
  */
 @Entity
 @Table(name = "ai_token_usage")
@@ -27,8 +28,9 @@ public class AiTokenUsage extends AuditableEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "workspace_id", nullable = false)
-    private Long workspaceId;
+    /** Compte de facturation = id du user propriétaire du workspace. */
+    @Column(name = "account_id", nullable = false)
+    private Long accountId;
 
     /** Mois de rattachement au format 'YYYY-MM'. */
     @Column(nullable = false, length = 7)
