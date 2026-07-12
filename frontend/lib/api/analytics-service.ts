@@ -120,22 +120,46 @@ export async function getAiInsights(slug: string): Promise<AiInsight[]> {
 // ---------------------------------------------------------------------------
 
 /** Jeux de données réels qu'un graphe peut cibler (miroir du catalogue backend). */
-export type ChartDataset = "throughput" | "burndown" | "capacity" | "workload";
+export type ChartDataset = "throughput" | "burndown" | "capacity" | "workload" | "projects";
 export type ChartType = "area" | "bar" | "line";
 
+/** Un point de répartition calculé en base (mode breakdown). */
+export interface NamedValue {
+  label: string;
+  value: number;
+}
+
+/** Reformulation proposée quand une demande n'est pas satisfiable (label = bouton, prompt = à relancer). */
+export interface ChartSuggestion {
+  label: string;
+  prompt: string;
+}
+
 /**
- * Spec de graphe produite par l'IA. Ne contient **aucune donnée** : décrit seulement comment
- * visualiser un jeu de données réel que le front charge via les endpoints ci-dessus.
- * `unsupported` renseigné = la demande ne peut pas être satisfaite (le front l'affiche tel quel).
+ * Spec de graphe produite par l'IA — deux modes, jamais de données inventées :
+ * - `timeseries` : référence un `dataset` réel que le front charge via les endpoints ci-dessus.
+ * - `breakdown` : répartition « X par Y » **calculée en base** (retrieval SQL sûr) — les points
+ *   réels sont dans `data`, avec `xLabel`/`yLabel`.
+ * - `unsupported` : la demande ne peut pas être satisfaite (le front affiche `unsupported`).
  */
 export interface ChartSpec {
   title: string;
   description: string;
+  mode: "timeseries" | "breakdown" | "unsupported";
   dataset: ChartDataset | null;
   chartType: ChartType | null;
   bucket: ThroughputBucket | null;
   series: string[];
+  data: NamedValue[] | null;
+  /** Répartition (mode breakdown) : paramètres pour ré-exécuter une donnée à jour. */
+  dimension: string | null;
+  measure: string | null;
+  scope: string | null;
+  xLabel: string | null;
+  yLabel: string | null;
   unsupported: string | null;
+  /** Reformulations proposées quand `unsupported` — cliquables pour relancer. */
+  suggestions: ChartSuggestion[];
 }
 
 export async function generateChart(
@@ -149,6 +173,45 @@ export async function generateChart(
     { timeout: AI_TIMEOUT_MS },
   );
   return res.data.data;
+}
+
+/** Ré-exécute une répartition (rafraîchit un graphe épinglé breakdown avec des données à jour). */
+export async function runBreakdown(
+  slug: string,
+  dimension: string,
+  measure: string | null,
+  scope: string | null,
+): Promise<ChartSpec> {
+  const res = await apiClient.post<{ data: ChartSpec }>(
+    ANALYTICS_ROUTES.BREAKDOWN(slug),
+    { dimension, measure, scope },
+  );
+  return res.data.data;
+}
+
+// ---------------------------------------------------------------------------
+// Graphes épinglés (« Custom »)
+// ---------------------------------------------------------------------------
+
+export interface SavedChart {
+  id: number;
+  title: string;
+  spec: ChartSpec;
+  createdAt: string;
+}
+
+export async function listSavedCharts(slug: string): Promise<SavedChart[]> {
+  const res = await apiClient.get<{ data: SavedChart[] }>(ANALYTICS_ROUTES.SAVED_CHARTS(slug));
+  return res.data.data;
+}
+
+export async function saveChart(slug: string, title: string, spec: ChartSpec): Promise<SavedChart> {
+  const res = await apiClient.post<{ data: SavedChart }>(ANALYTICS_ROUTES.SAVED_CHARTS(slug), { title, spec });
+  return res.data.data;
+}
+
+export async function deleteSavedChart(slug: string, id: number): Promise<void> {
+  await apiClient.delete(ANALYTICS_ROUTES.SAVED_CHART(slug, id));
 }
 
 // ---------------------------------------------------------------------------
