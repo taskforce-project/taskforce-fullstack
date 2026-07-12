@@ -65,8 +65,9 @@ export const stripeService = {
    */
   async getSubscriptionInfo(): Promise<SubscriptionInfo> {
     try {
-      const response = await apiClient.get<SubscriptionInfo>(STRIPE_ROUTES.SUBSCRIPTION_INFO);
-      return response.data;
+      const response = await apiClient.get<{ data: SubscriptionInfo }>(BILLING_ROUTES.SUBSCRIPTION);
+      return response.data.data; // enveloppe ApiResponse<T> (chemin protégé /api/billing)
+
     } catch (error) {
       throw new Error(getErrorMessage(error));
     }
