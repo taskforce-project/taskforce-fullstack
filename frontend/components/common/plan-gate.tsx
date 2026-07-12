@@ -9,12 +9,13 @@ import { useTranslation } from "@/lib/i18n"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { Button } from "@/components/ui/button"
 
-type Plan = "FREE" | "PRO" | "ENTERPRISE"
+type Plan = "FREE" | "BASIC" | "BUSINESS" | "ENTERPRISE"
 
 const PLAN_RANK: Record<Plan, number> = {
   FREE: 0,
-  PRO: 1,
-  ENTERPRISE: 2,
+  BASIC: 1,
+  BUSINESS: 2,
+  ENTERPRISE: 3,
 }
 
 interface PlanGateProps {
@@ -61,7 +62,7 @@ export function PlanGate({ minPlan, plans, children, fallback }: PlanGateProps) 
 
   if (fallback) return <>{fallback}</>
 
-  const requiredPlan = plans ? plans[0] : minPlan ?? "pro"
+  const requiredPlan = plans ? plans[0] : minPlan ?? "BUSINESS"
 
   return (
     <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-border bg-muted/40 p-8 text-center">
