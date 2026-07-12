@@ -41,7 +41,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * projet introuvable, update, delete (cascade), CRUD label.
  */
 @DisplayName("ProjectService (intégration Postgres)")
-@Import(ProjectService.class)
+@Import({ProjectService.class, ProjectVisibilityGuard.class})
 class ProjectServiceIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired private ProjectService projectService;
