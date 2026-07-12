@@ -55,7 +55,7 @@ import static org.mockito.Mockito.verify;
  * (IDOR statut hors projet, non-membre → 403).</p>
  */
 @DisplayName("IssueService (intégration Postgres)")
-@Import(IssueService.class)
+@Import({IssueService.class, ProjectVisibilityGuard.class})
 class IssueServiceIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired private IssueService issueService;
@@ -1121,6 +1121,55 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
             assertThatThrownBy(() -> issueService.updateStatus(
                     SLUG, project.getId(), foreign.getId(), upd, owner.getId()))
                 .isInstanceOf(ResourceNotFoundException.class);
+        }
+    }
+
+    // =========================================================================
+    @Nested
+    @DisplayName("visibilité projet privé (lectures d'issues)")
+    class PrivateProjectIssueVisibility {
+
+        private User wsMember(String kc) {
+            User u = userRepository.save(User.builder()
+                .keycloakId(kc).email(kc + "@it.dev").displayName(kc).isActive(true).build());
+            workspaceMemberRepository.save(WorkspaceMember.builder()
+                .workspace(workspace).user(u).role(WorkspaceRole.MEMBER).build());
+            return u;
+        }
+
+        @Test
+        @DisplayName("projet privé : un membre du workspace non invité ne peut pas lister/voir les issues (404)")
+        void private_issues_hidden_from_non_member() {
+            Long id = newIssueId("Secret issue"); // project est privé par défaut (isPublic=false)
+            User bob = wsMember("kc-vis-bob");
+
+            assertThatThrownBy(() -> issueService.listIssues(SLUG, project.getId(), bob.getId()))
+                .isInstanceOf(ResourceNotFoundException.class);
+            assertThatThrownBy(() -> issueService.getIssue(SLUG, project.getId(), id, bob.getId()))
+                .isInstanceOf(ResourceNotFoundException.class);
+        }
+
+        @Test
+        @DisplayName("projet public : tout membre du workspace peut lister les issues")
+        void public_issues_visible_to_member() {
+            newIssueId("Open issue");
+            project.setPublic(true);
+            projectRepository.save(project);
+            User bob = wsMember("kc-vis-pub");
+
+            assertThat(issueService.listIssues(SLUG, project.getId(), bob.getId())).isNotEmpty();
+        }
+
+        @Test
+        @DisplayName("getScheduledIssues masque les issues planifiées d'un projet privé pour un non-membre (l'ADMIN les voit)")
+        void scheduled_excludes_private_for_non_member() {
+            CreateIssueRequest cr = createRequest("Planned secret", null);
+            cr.setDueDate("2026-10-01");
+            issueService.createIssue(SLUG, project.getId(), cr, owner.getId()); // projet privé
+
+            User bob = wsMember("kc-vis-sched");
+            assertThat(issueService.getScheduledIssues(SLUG, bob.getId())).isEmpty();
+            assertThat(issueService.getScheduledIssues(SLUG, owner.getId())).isNotEmpty();
         }
     }
 }
