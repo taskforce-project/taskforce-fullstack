@@ -1,5 +1,8 @@
 package com.taskforce.tf_api.core.api;
 
+import java.util.List;
+import java.util.Map;
+
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -132,7 +135,9 @@ public class AssistantController {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
         AiConversation conv = conversationService.getOrCreate(ws.getId(), userId, body.conversationId());
 
-        AssistantAnswer answer = agentService.run(slug, userId, body.message());
+        // Mémoire multi-tours : historique de la conversation AVANT d'ajouter le tour courant.
+        List<Map<String, Object>> history = conversationService.recentHistory(conv.getId());
+        AssistantAnswer answer = agentService.run(slug, userId, body.message(), history);
 
         // Persiste le tour dans la conversation (multi-conversation + historique).
         conversationService.appendMessage(conv.getId(), "user", body.message(), null, 0);
