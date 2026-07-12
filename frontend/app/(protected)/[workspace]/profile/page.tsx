@@ -141,7 +141,7 @@ export default function ProfilePage() {
   const displayName  = user?.displayName ?? (user ? `${user.firstName} ${user.lastName}` : "Your Name")
   const email        = user?.email ?? "you@taskforce.io"
   const plan         = user?.planType ?? "FREE"
-  const isPro        = plan === "PRO" || plan === "ENTERPRISE"
+  const isPro        = plan === "BUSINESS" || plan === "ENTERPRISE"
 
   return (
     <div className="flex flex-col gap-6 max-w-4xl mx-auto w-full">
