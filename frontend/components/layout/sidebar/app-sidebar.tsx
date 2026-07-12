@@ -10,15 +10,13 @@ import {
   Layers,
   Activity,
   Brain,
-  Cpu,
   User,
-  MessagesSquare,
-  MessageSquare,
   Settings2,
   HelpCircle,
   Plus,
   ChevronRight,
   Lock,
+  FlaskConical,
 } from "lucide-react"
 
 import { NavUser } from "@/components/layout/sidebar/nav-user"
@@ -57,6 +55,8 @@ type NavItem = {
   readonly icon: React.ElementType
   readonly badge?: string
   readonly comingSoon?: boolean
+  /** Feature en cours de finition → petite fiole bleue (info) dans la sidebar + bandeau « Lab » sur la page. */
+  readonly lab?: boolean
   readonly requiresRole?: readonly string[]
   readonly requiresPlan?: readonly string[]
   readonly items?: readonly {
@@ -107,18 +107,15 @@ const NAV_WORK: readonly NavItem[] = [
     key: "nav.analytics",
     url: "/analytics",
     icon: Activity,
+    lab: true, // Intelligence : données réelles mais en cours de finition (prédictions, dock, 3D).
   },
   {
     key: "nav.brain",
     url: "/brain",
     icon: Brain,
+    lab: true, // Brain OS : Phase 0, en construction.
   },
-  {
-    key: "nav.agents",
-    url: "/agents",
-    icon: Cpu,
-    comingSoon: true,
-  },
+  // Agents retiré (11/07/2026) : non construit, aucune utilité pour l'instant.
 ]
 
 const NAV_PEOPLE: readonly NavItem[] = [
@@ -128,21 +125,6 @@ const NAV_PEOPLE: readonly NavItem[] = [
     icon: User,
   },
   // Teams retiré du menu (QA2-21) — désormais géré par opération (onglet Members du projet).
-]
-
-const NAV_COMMS: readonly NavItem[] = [
-  {
-    key: "nav.messages",
-    url: "/messages",
-    icon: MessagesSquare,
-    comingSoon: true, // chat 100% mock (components/messages/data.ts) — verrouillé tant que non câblé au backend réel
-  },
-  {
-    key: "nav.discussions",
-    url: "/discussions",
-    icon: MessageSquare,
-    comingSoon: true,
-  },
 ]
 
 const NAV_BOTTOM: readonly NavItem[] = [
@@ -247,6 +229,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <Link href={withSlug(item.url)}>
             <item.icon />
             <span>{t(item.key)}</span>
+            {item.lab && (
+              <FlaskConical
+                className="ml-auto size-3.5 shrink-0 text-blue-500 group-data-[collapsible=icon]:hidden"
+                aria-label="Fonctionnalité en cours de finition"
+              />
+            )}
           </Link>
         </SidebarMenuButton>
       </SidebarMenuItem>
@@ -285,14 +273,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarGroupLabel>People</SidebarGroupLabel>
           <SidebarMenu>
             {NAV_PEOPLE.filter(canAccess).map(renderItem)}
-          </SidebarMenu>
-        </SidebarGroup>
-
-        {/* Comms */}
-        <SidebarGroup>
-          <SidebarGroupLabel>Comms</SidebarGroupLabel>
-          <SidebarMenu>
-            {NAV_COMMS.filter(canAccess).map(renderItem)}
           </SidebarMenu>
         </SidebarGroup>
 
