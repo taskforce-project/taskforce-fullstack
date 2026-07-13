@@ -19,8 +19,9 @@ const ALL: PlanFeature[] = [
 ];
 
 const MATRIX: Record<PlanTier, PlanFeature[]> = {
-  FREE: ["AI_SMART_ASSIGN"],
-  BASIC: ["AI_SMART_ASSIGN"],
+  // IA incluse partout (métrée par tokens) ; murs payants = analytics avancées / intégrations / historique illimité.
+  FREE: ["AI_SMART_ASSIGN", "AI_ASSISTANT", "AI_INSIGHTS"],
+  BASIC: ["AI_SMART_ASSIGN", "AI_ASSISTANT", "AI_INSIGHTS"],
   BUSINESS: ALL,
   ENTERPRISE: ALL,
 };
