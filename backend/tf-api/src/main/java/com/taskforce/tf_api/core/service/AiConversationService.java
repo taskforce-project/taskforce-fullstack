@@ -46,6 +46,7 @@ public class AiConversationService {
     private final AiConversationRepository conversationRepository;
     private final AiMessageRepository messageRepository;
     private final LlmClient llm;
+    private final AiMeter aiMeter; // gate quota + comptage de la conso tokens de la compression d'historique
 
     // Nom de modèle passé au client LLM (ignoré par l'AI Gateway, qui impose son modèle Ollama).
     @Value("${ai.groq.assistant-model:llama-3.3-70b-versatile}")
@@ -131,7 +132,9 @@ public class AiConversationService {
         }
         List<AiMessage> toSummarize = unsummarized.subList(0, unsummarized.size() - KEEP_RECENT);
         try {
-            String summary = llm.chatCompletion(model, SUMMARY_SYSTEM, buildSummaryPrompt(conv.getSummary(), toSummarize), false, "fast");
+            // Métré : gate quota (au-dessus du plafond → compression sautée, best-effort) + comptage réel.
+            String summary = aiMeter.metered(conv.getWorkspaceId(),
+                () -> llm.chatCompletion(model, SUMMARY_SYSTEM, buildSummaryPrompt(conv.getSummary(), toSummarize), false, "fast"));
             if (summary != null && !summary.isBlank()) {
                 conv.setSummary(summary.strip());
                 conv.setSummaryUptoId(toSummarize.get(toSummarize.size() - 1).getId());
