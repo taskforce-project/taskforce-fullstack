@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import com.taskforce.tf_api.core.dto.response.DecisionBrief.Snapshot;
 import com.taskforce.tf_api.core.enums.AnalysisDepth;
 import com.taskforce.tf_api.core.model.KnowledgeNode;
+import com.taskforce.tf_api.core.service.AiMeter;
 import com.taskforce.tf_api.core.service.agent.AnalysisJobService.JobContext;
 import com.taskforce.tf_api.core.service.agent.DecisionService.Analysis;
 
@@ -37,6 +38,7 @@ public class AnalysisJobRunner {
 
     private final AnalysisJobService jobService;
     private final DecisionService    decisionService;
+    private final AiMeter            aiMeter; // gate quota + comptage de la conso tokens de l'analyse
 
     /** Joue le workflow de bout en bout. Toute erreur bascule le job en FAILED (jamais d'exception qui fuit). */
     @Async
@@ -58,8 +60,9 @@ public class AnalysisJobRunner {
             // Analyse — le modèle décide, ou demande une clarification (DEEP, premier tour seulement).
             jobService.step(jobId, AnalysisPlan.ANALYZE, AnalysisPlan.IN_PROGRESS);
             boolean allowQuestion = deep && clarification == null;
-            Analysis analysis = decisionService.analyze(
-                ctx.project(), snapshot, hits, deep, clarification, allowQuestion);
+            // Métré : gate quota (au-dessus du plafond → job en échec avec message d'upsell) + comptage réel.
+            Analysis analysis = aiMeter.metered(ctx.workspaceId(),
+                () -> decisionService.analyze(ctx.project(), snapshot, hits, deep, clarification, allowQuestion));
 
             if (analysis.needsInput()) {
                 jobService.suspend(jobId, analysis.question());
