@@ -19,6 +19,7 @@ import com.taskforce.tf_api.core.repository.AiConversationRepository;
 import com.taskforce.tf_api.core.repository.AiMessageRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -39,6 +40,7 @@ class AiConversationServiceTest {
     @Mock private AiConversationRepository conversationRepository;
     @Mock private AiMessageRepository messageRepository;
     @Mock private com.taskforce.tf_api.core.service.LlmClient llm;
+    @Mock private AiMeter aiMeter;
 
     @InjectMocks private AiConversationService service;
 
@@ -52,8 +54,10 @@ class AiConversationServiceTest {
 
     @Test
     @DisplayName("compressIfNeeded : au-delà du seuil, condense les anciens et pose le filigrane")
-    void compressIfNeeded_summarizes_over_threshold() {
+    void compressIfNeeded_summarizes_over_threshold() throws Exception {
         ReflectionTestUtils.setField(service, "model", "m");
+        // AiMeter en pass-through : exécute le résumé LLM sans gate ni comptage réel.
+        when(aiMeter.metered(any(), any())).thenAnswer(inv -> ((AiMeter.AiCall<?>) inv.getArgument(1)).call());
         when(llm.isConfigured()).thenReturn(true);
         when(messageRepository.countByConversationId(1L)).thenReturn(13); // > seuil (12)
 
