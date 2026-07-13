@@ -449,15 +449,15 @@ BEGIN
     UPDATE users SET stripe_customer_id = 'cus_seed_admin' WHERE id = v_admin;
     INSERT INTO subscriptions (user_id, plan_type, status, stripe_customer_id, stripe_subscription_id, stripe_price_id,
                                amount, currency, billing_interval, current_period_start, current_period_end, started_at)
-    VALUES (v_admin, 'PRO', 'ACTIVE'::plan_status, 'cus_seed_admin', 'sub_seed_admin', 'price_seed_pro',
+    VALUES (v_admin, 'BUSINESS', 'ACTIVE'::plan_status, 'cus_seed_admin', 'sub_seed_admin', 'price_seed_pro',
             12.00, 'EUR', 'month', NOW() - INTERVAL '10 days', NOW() + INTERVAL '20 days', NOW() - INTERVAL '40 days')
     ON CONFLICT (user_id) DO UPDATE SET plan_type = EXCLUDED.plan_type, status = EXCLUDED.status,
         stripe_customer_id = EXCLUDED.stripe_customer_id, stripe_subscription_id = EXCLUDED.stripe_subscription_id,
         current_period_start = EXCLUDED.current_period_start, current_period_end = EXCLUDED.current_period_end;
 
     INSERT INTO subscription_history (user_id, plan_type, plan_status, stripe_subscription_id, stripe_event_id, stripe_invoice_id, amount_paid, currency, event_type, event_data, period_start, period_end) VALUES
-        (v_admin, 'PRO', 'ACTIVE'::plan_status, 'sub_seed_admin', 'seed_evt_checkout', NULL,        NULL,  'EUR', 'checkout.session.completed', '{"seed":true}'::jsonb, NOW() - INTERVAL '40 days', NOW() - INTERVAL '10 days'),
-        (v_admin, 'PRO', 'ACTIVE'::plan_status, 'sub_seed_admin', 'seed_evt_invoice1', 'in_seed_1', 12.00, 'EUR', 'invoice.payment_succeeded', '{"seed":true}'::jsonb, NOW() - INTERVAL '10 days', NOW() + INTERVAL '20 days');
+        (v_admin, 'BUSINESS', 'ACTIVE'::plan_status, 'sub_seed_admin', 'seed_evt_checkout', NULL,        NULL,  'EUR', 'checkout.session.completed', '{"seed":true}'::jsonb, NOW() - INTERVAL '40 days', NOW() - INTERVAL '10 days'),
+        (v_admin, 'BUSINESS', 'ACTIVE'::plan_status, 'sub_seed_admin', 'seed_evt_invoice1', 'in_seed_1', 12.00, 'EUR', 'invoice.payment_succeeded', '{"seed":true}'::jsonb, NOW() - INTERVAL '10 days', NOW() + INTERVAL '20 days');
 
     -- 18. Demandes Enterprise (sales/admin)
     INSERT INTO enterprise_inquiries (full_name, email, team_size, message, status) VALUES
@@ -700,6 +700,6 @@ BEGIN
       AND i.project_id IN (SELECT id FROM projects WHERE workspace_id = v_ws);
 
 
-    RAISE NOTICE 'Seed QA ULTRA-complet : workspace "taskforce-demo" (id=%) — 9 membres + 24 solos (hors équipe), 4 projets, ~267 issues (throughput JOURNALIER 30 j + hebdo, KPIs/capacité/burndown remplis), sous-tâches/URGENT/cancelled, commentaires, checklist, relations, worklogs (~70), 3 cycles + sprint actif peuplé, ~130 commentaires (fils), ~35 notifications (mix lu/non-lu), favoris, 5 pages, invitations, abonnement PRO + historique, demandes enterprise, ÉCHÉANCES réparties sur la quinzaine (heatmap de charge remplie).', v_ws;
+    RAISE NOTICE 'Seed QA ULTRA-complet : workspace "taskforce-demo" (id=%) — 9 membres + 24 solos (hors équipe), 4 projets, ~267 issues (throughput JOURNALIER 30 j + hebdo, KPIs/capacité/burndown remplis), sous-tâches/URGENT/cancelled, commentaires, checklist, relations, worklogs (~70), 3 cycles + sprint actif peuplé, ~130 commentaires (fils), ~35 notifications (mix lu/non-lu), favoris, 5 pages, invitations, abonnement BUSINESS + historique, demandes enterprise, ÉCHÉANCES réparties sur la quinzaine (heatmap de charge remplie).', v_ws;
 END
 $seed$;
