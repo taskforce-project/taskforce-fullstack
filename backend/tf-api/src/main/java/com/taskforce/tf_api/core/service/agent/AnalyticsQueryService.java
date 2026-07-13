@@ -11,7 +11,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.taskforce.tf_api.core.dto.response.NamedValue;
-import com.taskforce.tf_api.core.repository.ProjectRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -31,8 +30,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class AnalyticsQueryService {
 
-    private final JdbcTemplate      jdbcTemplate;
-    private final ProjectRepository projectRepository;
+    private final JdbcTemplate jdbcTemplate;
 
     private static final int MAX_ROWS = 50;
 
@@ -98,14 +96,13 @@ public class AnalyticsQueryService {
      * Les trois choix sont validés contre la whitelist (défaut sûr si inconnu).
      */
     @Transactional(readOnly = true)
-    public List<NamedValue> run(Long workspaceId, String dimensionKey, String measureKey, String scopeKey) {
+    public List<NamedValue> run(List<Long> projectIds, String dimensionKey, String measureKey, String scopeKey) {
         Dimension dimension = DIMENSIONS.getOrDefault(up(dimensionKey), Dimension.PROJECT);
         Measure   measure   = MEASURES.getOrDefault(up(measureKey), Measure.COUNT);
         Scope     scope     = SCOPES.getOrDefault(up(scopeKey), Scope.ALL);
 
-        List<Long> projectIds = projectRepository.findByWorkspaceIdOrderByCreatedAtDesc(workspaceId)
-            .stream().map(p -> p.getId()).toList();
-        if (projectIds.isEmpty()) return List.of();
+        // projectIds = projets déjà scopés par l'appelant (TF-RBAC-INTEL) ; on ne recalcule rien ici.
+        if (projectIds == null || projectIds.isEmpty()) return List.of();
 
         String placeholders = projectIds.stream().map(id -> "?").collect(Collectors.joining(","));
         // Tous les fragments viennent d'enums (figés) ; seuls les projectIds sont des paramètres liés.
@@ -147,13 +144,12 @@ public class AnalyticsQueryService {
      * déterministe et explicable, pas une boule de cristal — le libellé le dit.
      */
     @Transactional(readOnly = true)
-    public List<NamedValue> predict(Long workspaceId, String kindKey) {
+    public List<NamedValue> predict(List<Long> projectIds, String kindKey) {
         // Une seule prédiction pour l'instant (SUCCESS) ; le défaut sûr couvre toute clé inconnue.
         PREDICTIONS.getOrDefault(up(kindKey), Prediction.SUCCESS);
 
-        List<Long> projectIds = projectRepository.findByWorkspaceIdOrderByCreatedAtDesc(workspaceId)
-            .stream().map(p -> p.getId()).toList();
-        if (projectIds.isEmpty()) return List.of();
+        // projectIds = projets déjà scopés par l'appelant (TF-RBAC-INTEL).
+        if (projectIds == null || projectIds.isEmpty()) return List.of();
 
         String placeholders = projectIds.stream().map(id -> "?").collect(Collectors.joining(","));
         // Seuls les projectIds sont des paramètres liés ; le reste est figé → aucune injection.
