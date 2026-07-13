@@ -1,11 +1,24 @@
 import axios, { type AxiosInstance } from "axios";
 
+/** Options de construction — permettent d'injecter un token/workspace par session (transport HTTP). */
+export interface TaskforceClientOptions {
+  /** Bearer TaskForce à utiliser tel quel (pass-through). Prioritaire sur `TASKFORCE_TOKEN` (env). */
+  token?: string;
+  /** Workspace par défaut pour cette instance (sinon `TASKFORCE_WORKSPACE`). */
+  workspace?: string;
+}
+
 /**
  * Client HTTP vers l'API TaskForce (`/api/...`, enveloppe `ApiResponse<T>` → on renvoie `.data`).
  *
- * Auth : soit un `TASKFORCE_TOKEN` statique, soit un **password grant Keycloak** (dev). En dev,
- * l'issuer du token est `keycloak:8080` alors que Keycloak est exposé sur `localhost:8180` — on force
- * donc l'en-tête `Host` sur l'appel token pour que l'`iss` du JWT matche ce que le backend valide.
+ * Auth : soit un token statique (arg `token` ou `TASKFORCE_TOKEN`), soit un **password grant
+ * Keycloak** (dev). En dev, l'issuer du token est `keycloak:8080` alors que Keycloak est exposé sur
+ * `localhost:8180` — on force donc l'en-tête `Host` sur l'appel token pour que l'`iss` du JWT matche
+ * ce que le backend valide.
+ *
+ * En transport **HTTP** (remote/SaaS), on construit une instance **par session** avec le bearer
+ * présenté par le client (`new TaskforceClient({ token })`) : chaque appel agit avec l'identité du
+ * caller (compte de service en prod, ou token utilisateur).
  */
 export class TaskforceClient {
   private readonly http: AxiosInstance;
@@ -18,10 +31,10 @@ export class TaskforceClient {
   };
   private tokenCache: { token: string; expiresAt: number } | null = null;
 
-  constructor() {
+  constructor(opts: TaskforceClientOptions = {}) {
     this.apiUrl = process.env.TASKFORCE_API_URL ?? "http://localhost:8080/api";
-    this.defaultWorkspace = process.env.TASKFORCE_WORKSPACE ?? "taskforce-demo";
-    this.staticToken = process.env.TASKFORCE_TOKEN || undefined;
+    this.defaultWorkspace = opts.workspace?.trim() || process.env.TASKFORCE_WORKSPACE || "taskforce-demo";
+    this.staticToken = opts.token || process.env.TASKFORCE_TOKEN || undefined;
     this.kc = {
       url: process.env.KEYCLOAK_URL ?? "http://localhost:8180",
       hostHeader: process.env.KEYCLOAK_HOST_HEADER ?? "keycloak:8080",
