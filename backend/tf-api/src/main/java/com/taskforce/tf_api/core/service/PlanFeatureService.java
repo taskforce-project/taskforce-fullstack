@@ -13,19 +13,21 @@ import com.taskforce.tf_api.core.enums.PlanType;
  * Gating des fonctionnalités par plan (PROD-4.4). Source unique de la **politique** —
  * à ajuster ici (et à mirrorer côté front dans `plan-features.ts`).
  *
- * <p>Défaut (à confirmer produit) : le cœur CDC (smart-assign) reste GRATUIT ;
- * insights/assistant/analytics avancées/intégrations/historique illimité sont PRO+.
- * Le mécanisme est en place mais l'enforcement aux endpoints reste à câbler une fois
- * la politique validée (éviter de masquer l'IA au plan FREE en dev).</p>
+ * <p>Politique produit (validée 13/07) : <b>l'IA est incluse partout</b>, métrée par TOKENS
+ * (smart-assign + assistant Cortex + insights, dispo dès FREE — cf. {@code AiUsageService.assertWithinQuota}
+ * + {@code AiMeter}). Les <b>murs payants</b> (BUSINESS+) sont les capacités de <b>scale</b> :
+ * analytics avancées, intégrations, historique illimité ({@code UNLIMITED_HISTORY}, cf.
+ * {@code IssueService.listActivity}).</p>
  */
 @Service
 public class PlanFeatureService {
 
     private static final Map<PlanType, Set<PlanFeature>> MATRIX = Map.of(
-        // Cœur (smart-assign) gratuit ; analytics avancées / insights / assistant = BUSINESS+.
-        PlanType.FREE, EnumSet.of(PlanFeature.AI_SMART_ASSIGN),
-        PlanType.BASIC, EnumSet.of(PlanFeature.AI_SMART_ASSIGN),
-        PlanType.BUSINESS, EnumSet.allOf(PlanFeature.class),
+        // IA incluse PARTOUT, métrée par tokens (smart-assign + assistant Cortex + insights) — « IA native incluse ».
+        // Murs payants (BUSINESS+) = capacités de scale : analytics avancées / intégrations / historique illimité.
+        PlanType.FREE,       EnumSet.of(PlanFeature.AI_SMART_ASSIGN, PlanFeature.AI_ASSISTANT, PlanFeature.AI_INSIGHTS),
+        PlanType.BASIC,      EnumSet.of(PlanFeature.AI_SMART_ASSIGN, PlanFeature.AI_ASSISTANT, PlanFeature.AI_INSIGHTS),
+        PlanType.BUSINESS,   EnumSet.allOf(PlanFeature.class),
         PlanType.ENTERPRISE, EnumSet.allOf(PlanFeature.class)
     );
 
