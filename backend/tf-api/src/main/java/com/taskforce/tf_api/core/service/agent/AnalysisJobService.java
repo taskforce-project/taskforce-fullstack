@@ -37,6 +37,7 @@ import com.taskforce.tf_api.core.repository.IssueRepository;
 import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.service.IssueService;
+import com.taskforce.tf_api.core.service.ProjectVisibilityGuard;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
@@ -71,6 +72,7 @@ public class AnalysisJobService {
     private final IssueService               issueService;
     private final SimpMessagingTemplate      messagingTemplate;
     private final ObjectMapper               objectMapper;
+    private final ProjectVisibilityGuard     visibilityGuard;
 
     /** Contexte figé passé au runner : entités détachées, aucun accès paresseux hors transaction. */
     public record JobContext(Long workspaceId, Project project, AnalysisDepth depth, String answer) {}
@@ -105,7 +107,11 @@ public class AnalysisJobService {
     @Transactional(readOnly = true)
     public List<AnalysisJobResponse> list(String slug, Long userId) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
-        return jobRepository.findVisibleByWorkspaceId(ws.getId()).stream().map(this::toResponse).toList();
+        // Scope TF-RBAC-INTEL : ne rendre que les workflows des projets visibles par l'utilisateur.
+        java.util.Set<Long> viewable = new java.util.HashSet<>(visibilityGuard.viewableProjectIds(ws.getId(), userId));
+        return jobRepository.findVisibleByWorkspaceId(ws.getId()).stream()
+            .filter(j -> j.getProject() != null && viewable.contains(j.getProject().getId()))
+            .map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)
@@ -209,8 +215,9 @@ public class AnalysisJobService {
     @Transactional(readOnly = true)
     public StoredBriefResponse latestBrief(String slug, Long projectId, Long userId) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
-        projectRepository.findByIdAndWorkspaceId(projectId, ws.getId())
+        Project project = projectRepository.findByIdAndWorkspaceId(projectId, ws.getId())
             .orElseThrow(() -> new ResourceNotFoundException("Project", "id", projectId));
+        visibilityGuard.assertCanView(project, userId);  // TF-RBAC-INTEL : brief scopé aux projets visibles
         return briefRepository.findFirstByProjectIdOrderByCreatedAtDesc(projectId)
             .map(this::toResponse)
             .orElse(null);
@@ -316,14 +323,18 @@ public class AnalysisJobService {
 
     private AnalysisJob requireJob(String slug, Long jobId, Long userId) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
-        return jobRepository.findByIdAndWorkspaceId(jobId, ws.getId())
+        AnalysisJob job = jobRepository.findByIdAndWorkspaceId(jobId, ws.getId())
             .orElseThrow(() -> new ResourceNotFoundException("Workflow introuvable: " + jobId));
+        visibilityGuard.assertCanView(job.getProject(), userId);  // TF-RBAC-INTEL
+        return job;
     }
 
     private DecisionPriority requirePriority(String slug, Long priorityId, Long userId) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
-        return priorityRepository.findByIdAndWorkspaceId(priorityId, ws.getId())
+        DecisionPriority priority = priorityRepository.findByIdAndWorkspaceId(priorityId, ws.getId())
             .orElseThrow(() -> new ResourceNotFoundException("Priorité introuvable: " + priorityId));
+        visibilityGuard.assertCanView(priority.getBrief().getProject(), userId);  // TF-RBAC-INTEL
+        return priority;
     }
 
     /** Mute le plan stocké puis le réécrit. */
