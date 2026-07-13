@@ -55,17 +55,20 @@ public class WebhookController {
     public ResponseEntity<ApiResponse<WebhookResponse>> update(
         @PathVariable String slug,
         @PathVariable Long webhookId,
-        @Valid @RequestBody WebhookRequest req
+        @Valid @RequestBody WebhookRequest req,
+        @AuthenticationPrincipal Jwt jwt
     ) {
-        return ResponseEntity.ok(ApiResponse.success("Webhook mis à jour", webhookService.update(slug, webhookId, req)));
+        Long userId = resolveUser(jwt).getId();
+        return ResponseEntity.ok(ApiResponse.success("Webhook mis à jour", webhookService.update(slug, webhookId, req, userId)));
     }
 
     @DeleteMapping("/{webhookId}")
     public ResponseEntity<ApiResponse<Void>> delete(
         @PathVariable String slug,
-        @PathVariable Long webhookId
+        @PathVariable Long webhookId,
+        @AuthenticationPrincipal Jwt jwt
     ) {
-        webhookService.delete(slug, webhookId);
+        webhookService.delete(slug, webhookId, resolveUser(jwt).getId());
         return ResponseEntity.ok(ApiResponse.success("Webhook supprimé", null));
     }
 
