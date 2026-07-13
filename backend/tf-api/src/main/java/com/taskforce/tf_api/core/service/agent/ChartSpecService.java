@@ -15,6 +15,7 @@ import com.taskforce.tf_api.core.dto.response.ChartSpecResponse;
 import com.taskforce.tf_api.core.dto.response.ChartSuggestion;
 import com.taskforce.tf_api.core.dto.response.NamedValue;
 import com.taskforce.tf_api.core.model.Workspace;
+import com.taskforce.tf_api.core.service.AiMeter;
 import com.taskforce.tf_api.core.service.LlmClient;
 import com.taskforce.tf_api.core.service.ProjectVisibilityGuard;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
@@ -47,6 +48,7 @@ public class ChartSpecService {
     private final AnalyticsQueryService  queryService;
     private final ObjectMapper           objectMapper;
     private final ProjectVisibilityGuard visibilityGuard;
+    private final AiMeter                aiMeter; // gate quota + comptage de la conso tokens de la génération de graphe
 
     @Value("${ai.groq.assistant-model:llama-3.3-70b-versatile}")
     private String model;
@@ -81,7 +83,8 @@ public class ChartSpecService {
 
         if (llm.isConfigured()) {
             try {
-                ChartSpecResponse fromLlm = callLlm(projectIds, prompt);
+                // Métré : gate quota (au-dessus du plafond → repli heuristique, aucun token brûlé) + comptage réel.
+                ChartSpecResponse fromLlm = aiMeter.metered(ws.getId(), () -> callLlm(projectIds, prompt));
                 if (fromLlm != null) return fromLlm;
             } catch (Exception ex) {
                 log.warn("Génération de graphe IA indisponible : {}", ex.getMessage());
