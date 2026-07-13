@@ -30,10 +30,12 @@ import com.taskforce.tf_api.core.dto.response.PlaneStatusResponse;
 import com.taskforce.tf_api.core.dto.response.PlaneSyncResponse;
 import com.taskforce.tf_api.core.dto.response.SlackChannelResponse;
 import com.taskforce.tf_api.core.model.User;
+import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.enums.PlanFeature;
 import com.taskforce.tf_api.core.enums.PlanType;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.PlanFeatureService;
 import com.taskforce.tf_api.core.service.GitHubIntegrationService;
 import com.taskforce.tf_api.core.service.PlaneClient.PlaneProject;
@@ -59,11 +61,20 @@ public class IntegrationController {
     private final UserRepository           userRepository;
     private final WorkspaceRepository      workspaceRepository;
     private final PlanFeatureService       planFeatureService;
+    private final AuthorizationService     authorizationService;
 
     /** Les intégrations sont une feature Business+ : exige que le COMPTE (propriétaire) la couvre (→ 409). */
     private void requireIntegrations(String slug) {
         PlanType plan = workspaceRepository.findOwnerPlanBySlug(slug).orElse(PlanType.FREE);
         planFeatureService.requireFeature(plan, PlanFeature.INTEGRATIONS);
+    }
+
+    /** Config d'intégration = action de gestion : exige OWNER/ADMIN du workspace (sinon 403). */
+    private void requireManager(String slug, Jwt jwt) {
+        Long wsId = workspaceRepository.findBySlug(slug)
+            .map(Workspace::getId)
+            .orElseThrow(() -> new ResourceNotFoundException("Espace de travail introuvable"));
+        authorizationService.requireManager(wsId, resolveUser(jwt).getId());
     }
 
     // ====================================================================
@@ -90,6 +101,7 @@ public class IntegrationController {
         @AuthenticationPrincipal Jwt jwt
     ) {
         requireIntegrations(slug);
+        requireManager(slug, jwt);
         connectorConnectionService.connect(
             slug, resolveUser(jwt).getId(), key,
             request != null ? request.getConfig() : null);
@@ -102,6 +114,7 @@ public class IntegrationController {
         @PathVariable String key,
         @AuthenticationPrincipal Jwt jwt
     ) {
+        requireManager(slug, jwt);
         connectorConnectionService.disconnect(slug, resolveUser(jwt).getId(), key);
         return ResponseEntity.ok(ApiResponse.success("Connecteur déconnecté", null));
     }
@@ -141,6 +154,7 @@ public class IntegrationController {
         @AuthenticationPrincipal Jwt jwt
     ) {
         requireIntegrations(slug);
+        requireManager(slug, jwt);
         User user = resolveUser(jwt);
         URI authorizeUrl = gitHubService.buildAuthorizeUrl(slug, user);
         return ResponseEntity.ok(ApiResponse.success(new ConnectUrlResponse(authorizeUrl.toString())));
@@ -159,7 +173,10 @@ public class IntegrationController {
     }
 
     @DeleteMapping("/api/workspaces/{slug}/integrations/github")
-    public ResponseEntity<ApiResponse<Void>> githubDisconnect(@PathVariable String slug) {
+    public ResponseEntity<ApiResponse<Void>> githubDisconnect(
+        @PathVariable String slug, @AuthenticationPrincipal Jwt jwt
+    ) {
+        requireManager(slug, jwt);
         gitHubService.disconnect(slug);
         return ResponseEntity.ok(ApiResponse.success("GitHub déconnecté", null));
     }
@@ -215,6 +232,7 @@ public class IntegrationController {
         @AuthenticationPrincipal Jwt jwt
     ) {
         requireIntegrations(slug);
+        requireManager(slug, jwt);
         User user = resolveUser(jwt);
         URI authorizeUrl = slackService.buildAuthorizeUrl(slug, user);
         return ResponseEntity.ok(ApiResponse.success(new ConnectUrlResponse(authorizeUrl.toString())));
@@ -233,7 +251,10 @@ public class IntegrationController {
     }
 
     @DeleteMapping("/api/workspaces/{slug}/integrations/slack")
-    public ResponseEntity<ApiResponse<Void>> slackDisconnect(@PathVariable String slug) {
+    public ResponseEntity<ApiResponse<Void>> slackDisconnect(
+        @PathVariable String slug, @AuthenticationPrincipal Jwt jwt
+    ) {
+        requireManager(slug, jwt);
         slackService.disconnect(slug);
         return ResponseEntity.ok(ApiResponse.success("Slack déconnecté", null));
     }
@@ -245,8 +266,10 @@ public class IntegrationController {
     @PostMapping("/api/workspaces/{slug}/integrations/slack/channels")
     public ResponseEntity<ApiResponse<SlackChannelResponse>> addSlackChannel(
         @PathVariable String slug,
-        @Valid @RequestBody SlackChannelRequest req
+        @Valid @RequestBody SlackChannelRequest req,
+        @AuthenticationPrincipal Jwt jwt
     ) {
+        requireManager(slug, jwt);
         SlackChannelResponse channel = slackService.addChannel(slug, req);
         return ResponseEntity.status(HttpStatus.CREATED)
             .body(ApiResponse.success("Canal Slack ajouté", channel));
@@ -262,8 +285,10 @@ public class IntegrationController {
     @DeleteMapping("/api/workspaces/{slug}/integrations/slack/channels/{channelId}")
     public ResponseEntity<ApiResponse<Void>> deleteSlackChannel(
         @PathVariable String slug,
-        @PathVariable Long channelId
+        @PathVariable Long channelId,
+        @AuthenticationPrincipal Jwt jwt
     ) {
+        requireManager(slug, jwt);
         slackService.deleteChannel(slug, channelId);
         return ResponseEntity.ok(ApiResponse.success("Canal Slack supprimé", null));
     }
@@ -285,6 +310,7 @@ public class IntegrationController {
         @Valid @RequestBody ConnectPlaneRequest request,
         @AuthenticationPrincipal Jwt jwt
     ) {
+        requireManager(slug, jwt);
         PlaneStatusResponse status = planeService.connect(slug, resolveUser(jwt).getId(), request);
         return ResponseEntity.ok(ApiResponse.success("Plane connecté", status));
     }
@@ -302,6 +328,7 @@ public class IntegrationController {
         @RequestParam("project") String projectId,
         @AuthenticationPrincipal Jwt jwt
     ) {
+        requireManager(slug, jwt);
         PlaneSyncResponse result = planeService.sync(slug, resolveUser(jwt).getId(), projectId);
         return ResponseEntity.ok(ApiResponse.success("Synchronisation Plane terminée", result));
     }
@@ -310,6 +337,7 @@ public class IntegrationController {
     public ResponseEntity<ApiResponse<Void>> planeDisconnect(
         @PathVariable String slug, @AuthenticationPrincipal Jwt jwt
     ) {
+        requireManager(slug, jwt);
         planeService.disconnect(slug, resolveUser(jwt).getId());
         return ResponseEntity.ok(ApiResponse.success("Plane déconnecté", null));
     }
