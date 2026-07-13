@@ -42,6 +42,7 @@ class ChartSpecServiceTest {
     @Mock  private BrainAccessGuard      access;
     @Mock  private LlmClient             llm;
     @Mock  private AnalyticsQueryService queryService;
+    @Mock  private com.taskforce.tf_api.core.service.ProjectVisibilityGuard visibilityGuard;
     @InjectMocks private ChartSpecService service;
 
     @Spy private ObjectMapper objectMapper = new ObjectMapper();
@@ -51,6 +52,8 @@ class ChartSpecServiceTest {
         Workspace ws = mock(Workspace.class);
         lenient().when(ws.getId()).thenReturn(1L);
         lenient().when(access.resolveAndAuthorize(anyString(), any())).thenReturn(ws);
+        // Scope TF-RBAC-INTEL : l'utilisateur voit des projets (les données mockées de queryService priment).
+        lenient().when(visibilityGuard.viewableProjectIds(any(), any())).thenReturn(List.of(1L, 2L));
         ReflectionTestUtils.setField(service, "model", "test-model");
 
         // Whitelist du moteur de requête (données réelles) — stubs génériques.
