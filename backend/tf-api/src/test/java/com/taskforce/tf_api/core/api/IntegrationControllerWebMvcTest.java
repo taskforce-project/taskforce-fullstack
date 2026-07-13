@@ -2,6 +2,7 @@ package com.taskforce.tf_api.core.api;
 
 import java.util.List;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import java.util.Optional;
@@ -18,16 +19,25 @@ import com.taskforce.tf_api.core.dto.response.GitHubIssueResponse;
 import com.taskforce.tf_api.core.dto.response.GitHubLinkResponse;
 import com.taskforce.tf_api.core.dto.response.SlackChannelResponse;
 import com.taskforce.tf_api.core.model.User;
+import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.GitHubIntegrationService;
+import com.taskforce.tf_api.core.service.PlanFeatureService;
+import com.taskforce.tf_api.core.service.PlaneIntegrationService;
 import com.taskforce.tf_api.core.service.SlackIntegrationService;
+import com.taskforce.tf_api.core.service.integration.ConnectorConnectionService;
+import com.taskforce.tf_api.core.service.integration.IntegrationCatalogService;
+import com.taskforce.tf_api.shared.exception.ForbiddenException;
 import com.taskforce.tf_api.shared.security.SecurityConfig;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -53,6 +63,23 @@ class IntegrationControllerWebMvcTest {
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private WorkspaceRepository workspaceRepository;
     @MockitoBean private WorkspaceMemberRepository workspaceMemberRepository;
+    @MockitoBean private PlaneIntegrationService planeService;
+    @MockitoBean private IntegrationCatalogService catalogService;
+    @MockitoBean private ConnectorConnectionService connectorConnectionService;
+    @MockitoBean private PlanFeatureService planFeatureService;
+    @MockitoBean private AuthorizationService authorizationService;
+
+    @BeforeEach
+    void stubResolution() {
+        // requireManager résout ws + user ; la vérif de rôle (AuthorizationService) est mockée (no-op par défaut).
+        lenient().when(workspaceRepository.findBySlug(anyString()))
+            .thenReturn(Optional.of(Workspace.builder().id(1L).slug("acme").build()));
+        lenient().when(userRepository.findByEmail(anyString()))
+            .thenReturn(Optional.of(User.builder().id(3L).email("dev@it.dev").build()));
+        // WorkspaceAccessInterceptor : membre du workspace (sinon 403 avant d'atteindre le contrôleur).
+        lenient().when(workspaceMemberRepository.existsByWorkspaceIdAndUserId(anyLong(), anyLong()))
+            .thenReturn(true);
+    }
 
     private org.springframework.test.web.servlet.request.RequestPostProcessor auth() {
         return jwt().jwt(b -> b.claim("email", "dev@it.dev"));
@@ -74,6 +101,16 @@ class IntegrationControllerWebMvcTest {
     @DisplayName("DELETE github (disconnect) → 200")
     void disconnect_200() throws Exception {
         mockMvc.perform(delete("/api/workspaces/acme/integrations/github").with(auth())).andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("DELETE github (disconnect) par un non-gestionnaire (MEMBER) → 403")
+    void disconnect_forbidden_for_non_manager() throws Exception {
+        doThrow(new ForbiddenException("Permission insuffisante pour cette action"))
+            .when(authorizationService).requireManager(anyLong(), anyLong());
+
+        mockMvc.perform(delete("/api/workspaces/acme/integrations/github").with(auth()))
+            .andExpect(status().isForbidden());
     }
 
     @Test
