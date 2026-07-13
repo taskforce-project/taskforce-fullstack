@@ -10,6 +10,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -45,6 +46,8 @@ import com.taskforce.tf_api.core.enums.IssueActivityType;
 import com.taskforce.tf_api.core.enums.IssuePriority;
 import com.taskforce.tf_api.core.enums.IssueRelationType;
 import com.taskforce.tf_api.core.enums.IssueStatusCategory;
+import com.taskforce.tf_api.core.enums.PlanFeature;
+import com.taskforce.tf_api.core.enums.PlanType;
 import com.taskforce.tf_api.core.model.Issue;
 import com.taskforce.tf_api.core.model.IssueActivity;
 import com.taskforce.tf_api.core.model.IssueComment;
@@ -100,9 +103,14 @@ public class IssueService {
     private final IssueWorklogRepository        worklogRepository;
     private final SlackIntegrationService       slackService;
     private final ProjectVisibilityGuard        visibilityGuard;
+    private final PlanFeatureService            planFeatureService;
 
     /** Plafond d'issues du forfait Free (par workspace). Payant = illimité. */
     private static final long FREE_ISSUE_LIMIT = 250;
+
+    /** Rétention d'historique d'activité sans {@code UNLIMITED_HISTORY} : N dernières entrées (payant = illimité). */
+    @Value("${issue.history.retention-limit:100}")
+    private int historyRetentionLimit;
 
     public IssueService(
         IssueRepository issueRepository,
@@ -122,7 +130,8 @@ public class IssueService {
         IssueChecklistItemRepository checklistRepository,
         IssueWorklogRepository worklogRepository,
         SlackIntegrationService slackService,
-        ProjectVisibilityGuard visibilityGuard
+        ProjectVisibilityGuard visibilityGuard,
+        PlanFeatureService planFeatureService
     ) {
         this.issueRepository = issueRepository;
         this.issueStatusRepository = issueStatusRepository;
@@ -142,6 +151,7 @@ public class IssueService {
         this.worklogRepository = worklogRepository;
         this.slackService = slackService;
         this.visibilityGuard = visibilityGuard;
+        this.planFeatureService = planFeatureService;
     }
 
     // =========================================================================
@@ -285,8 +295,7 @@ public class IssueService {
     @Transactional
     public IssueResponse createIssue(String workspaceSlug, Long projectId,
                                      CreateIssueRequest request, Long reporterId) {
-        Project project = resolveProject(workspaceSlug, projectId);
-        assertWorkspaceMember(project.getWorkspace().getId(), reporterId);
+        Project project = resolveWritableProject(workspaceSlug, projectId, reporterId);
         enforceIssueLimit(project); // plafond 250 issues sur le forfait Free
 
         User reporter = resolveUser(reporterId);
@@ -371,8 +380,7 @@ public class IssueService {
     @Transactional
     public IssueResponse updateIssue(String workspaceSlug, Long projectId, Long issueId,
                                      UpdateIssueRequest request, Long userId) {
-        Project project = resolveProject(workspaceSlug, projectId);
-        assertWorkspaceMember(project.getWorkspace().getId(), userId);
+        Project project = resolveWritableProject(workspaceSlug, projectId, userId);
 
         Issue issue = resolveIssue(issueId, project.getId());
         User actor = resolveUser(userId);
@@ -504,7 +512,7 @@ public class IssueService {
     @Transactional
     public ChecklistItemResponse addChecklistItem(String slug, Long projectId, Long issueId, Long userId,
                                                   CreateChecklistItemRequest request) {
-        resolveChecklistScope(slug, projectId, issueId, userId);
+        assertWritableChecklistScope(slug, projectId, issueId, userId);
         IssueChecklistItem item = IssueChecklistItem.builder()
             .issueId(issueId)
             .content(request.getContent().trim())
@@ -517,7 +525,7 @@ public class IssueService {
     @Transactional
     public ChecklistItemResponse updateChecklistItem(String slug, Long projectId, Long issueId, Long itemId,
                                                      Long userId, UpdateChecklistItemRequest request) {
-        resolveChecklistScope(slug, projectId, issueId, userId);
+        assertWritableChecklistScope(slug, projectId, issueId, userId);
         IssueChecklistItem item = checklistRepository.findByIdAndIssueId(itemId, issueId)
             .orElseThrow(() -> new ResourceNotFoundException("Item de checklist introuvable"));
         if (request.getContent() != null && !request.getContent().isBlank()) {
@@ -534,7 +542,7 @@ public class IssueService {
 
     @Transactional
     public void deleteChecklistItem(String slug, Long projectId, Long issueId, Long itemId, Long userId) {
-        resolveChecklistScope(slug, projectId, issueId, userId);
+        assertWritableChecklistScope(slug, projectId, issueId, userId);
         IssueChecklistItem item = checklistRepository.findByIdAndIssueId(itemId, issueId)
             .orElseThrow(() -> new ResourceNotFoundException("Item de checklist introuvable"));
         checklistRepository.delete(item);
@@ -561,7 +569,7 @@ public class IssueService {
 
     @Transactional
     public WorklogResponse addWorklog(String slug, Long projectId, Long issueId, Long userId, LogWorkRequest request) {
-        resolveChecklistScope(slug, projectId, issueId, userId);
+        assertWritableChecklistScope(slug, projectId, issueId, userId);
         User author = resolveUser(userId);
         LocalDate loggedAt = (request.getLoggedAt() != null && !request.getLoggedAt().isBlank())
             ? LocalDate.parse(request.getLoggedAt())
@@ -579,7 +587,7 @@ public class IssueService {
 
     @Transactional
     public void deleteWorklog(String slug, Long projectId, Long issueId, Long worklogId, Long userId) {
-        resolveChecklistScope(slug, projectId, issueId, userId);
+        assertWritableChecklistScope(slug, projectId, issueId, userId);
         IssueWorklog worklog = worklogRepository.findByIdAndIssueId(worklogId, issueId)
             .orElseThrow(() -> new ResourceNotFoundException("Entrée de temps introuvable"));
         // Seul l'auteur de l'entrée peut la supprimer (cohérent avec les commentaires).
@@ -594,8 +602,7 @@ public class IssueService {
      */
     @Transactional
     public void deleteIssue(String workspaceSlug, Long projectId, Long issueId, Long userId) {
-        Project project = resolveProject(workspaceSlug, projectId);
-        assertWorkspaceMember(project.getWorkspace().getId(), userId);
+        Project project = resolveWritableProject(workspaceSlug, projectId, userId);
         Issue issue = resolveIssue(issueId, project.getId());
         // Capture avant suppression pour la notif Slack
         String issueRef   = project.getIdentifier() + "-" + issue.getSequenceNumber();
@@ -610,8 +617,7 @@ public class IssueService {
     /** Archive ou désarchive une issue (masquée des vues par défaut quand archivée). */
     @Transactional
     public IssueResponse setArchived(String workspaceSlug, Long projectId, Long issueId, boolean archived, Long userId) {
-        Project project = resolveProject(workspaceSlug, projectId);
-        assertWorkspaceMember(project.getWorkspace().getId(), userId);
+        Project project = resolveWritableProject(workspaceSlug, projectId, userId);
         Issue issue = resolveIssue(issueId, project.getId());
         issue.setArchivedAt(archived ? java.time.LocalDateTime.now() : null);
         // Une issue archivée ne reste pas épinglée.
@@ -625,8 +631,7 @@ public class IssueService {
     /** Épingle / dépingle une issue (remontée en tête de board/liste). */
     @Transactional
     public IssueResponse setPinned(String workspaceSlug, Long projectId, Long issueId, boolean pinned, Long userId) {
-        Project project = resolveProject(workspaceSlug, projectId);
-        assertWorkspaceMember(project.getWorkspace().getId(), userId);
+        Project project = resolveWritableProject(workspaceSlug, projectId, userId);
         Issue issue = resolveIssue(issueId, project.getId());
         issue.setPinned(pinned);
         issue = issueRepository.save(issue);
@@ -672,8 +677,7 @@ public class IssueService {
     @Transactional
     public IssueStatusResponse createStatus(String workspaceSlug, Long projectId,
                                             CreateIssueStatusRequest request, Long userId) {
-        Project project = resolveProject(workspaceSlug, projectId);
-        assertWorkspaceMember(project.getWorkspace().getId(), userId);
+        Project project = resolveWritableProject(workspaceSlug, projectId, userId);
 
         if (issueStatusRepository.existsByProjectIdAndName(project.getId(), request.getName())) {
             throw new BusinessException("Un statut '" + request.getName() + "' existe déjà dans ce projet");
@@ -690,8 +694,7 @@ public class IssueService {
     @Transactional
     public IssueStatusResponse updateStatus(String workspaceSlug, Long projectId, Long statusId,
                                             UpdateIssueStatusRequest request, Long userId) {
-        Project project = resolveProject(workspaceSlug, projectId);
-        assertWorkspaceMember(project.getWorkspace().getId(), userId);
+        Project project = resolveWritableProject(workspaceSlug, projectId, userId);
 
         IssueStatus status = issueStatusRepository.findById(statusId)
             .filter(s -> s.getProject().getId().equals(project.getId()))
@@ -711,8 +714,7 @@ public class IssueService {
 
     @Transactional
     public void deleteStatus(String workspaceSlug, Long projectId, Long statusId, Long userId) {
-        Project project = resolveProject(workspaceSlug, projectId);
-        assertWorkspaceMember(project.getWorkspace().getId(), userId);
+        Project project = resolveWritableProject(workspaceSlug, projectId, userId);
         IssueStatus status = issueStatusRepository.findById(statusId)
             .filter(s -> s.getProject().getId().equals(project.getId()))
             .orElseThrow(() -> new ResourceNotFoundException("Statut introuvable"));
@@ -729,8 +731,7 @@ public class IssueService {
     @Transactional
     public List<IssueStatusResponse> reorderStatuses(String workspaceSlug, Long projectId,
                                                       ReorderStatusesRequest request, Long userId) {
-        Project project = resolveProject(workspaceSlug, projectId);
-        assertWorkspaceMember(project.getWorkspace().getId(), userId);
+        Project project = resolveWritableProject(workspaceSlug, projectId, userId);
 
         for (ReorderStatusesRequest.StatusPosition sp : request.getStatuses()) {
             IssueStatus status = issueStatusRepository.findById(sp.getId())
@@ -775,8 +776,7 @@ public class IssueService {
     @Transactional
     public IssueCommentResponse addComment(String workspaceSlug, Long projectId, Long issueId,
                                            CreateIssueCommentRequest request, Long userId) {
-        Project project = resolveProject(workspaceSlug, projectId);
-        assertWorkspaceMember(project.getWorkspace().getId(), userId);
+        Project project = resolveWritableProject(workspaceSlug, projectId, userId);
         Issue issue = resolveIssue(issueId, project.getId());
         User author = resolveUser(userId);
 
@@ -827,8 +827,7 @@ public class IssueService {
     @Transactional
     public IssueCommentResponse updateComment(String workspaceSlug, Long projectId, Long issueId,
                                               Long commentId, CreateIssueCommentRequest request, Long userId) {
-        Project project = resolveProject(workspaceSlug, projectId);
-        assertWorkspaceMember(project.getWorkspace().getId(), userId);
+        Project project = resolveWritableProject(workspaceSlug, projectId, userId);
         resolveIssue(issueId, project.getId());
 
         IssueComment comment = commentRepository.findById(commentId)
@@ -845,8 +844,7 @@ public class IssueService {
 
     @Transactional
     public void deleteComment(String workspaceSlug, Long projectId, Long issueId, Long commentId, Long userId) {
-        Project project = resolveProject(workspaceSlug, projectId);
-        assertWorkspaceMember(project.getWorkspace().getId(), userId);
+        Project project = resolveWritableProject(workspaceSlug, projectId, userId);
         Issue issue = resolveIssue(issueId, project.getId());
 
         IssueComment comment = commentRepository.findById(commentId)
@@ -868,9 +866,14 @@ public class IssueService {
         Project project = resolveProject(workspaceSlug, projectId);
         assertWorkspaceMember(project.getWorkspace().getId(), userId);
         resolveIssue(issueId, project.getId());
-        return activityRepository.findByIssueIdOrderByCreatedAtAsc(issueId).stream()
-            .map(this::toActivityResponse)
-            .toList();
+        List<IssueActivity> activities = activityRepository.findByIssueIdOrderByCreatedAtAsc(issueId);
+        // Rétention d'historique par plan : UNLIMITED_HISTORY (BUSINESS+) = tout ; sinon on ne renvoie que
+        // les N entrées les plus récentes (le compte payant conserve l'historique complet).
+        PlanType plan = workspaceRepository.findOwnerPlanBySlug(workspaceSlug).orElse(PlanType.FREE);
+        if (!planFeatureService.has(plan, PlanFeature.UNLIMITED_HISTORY) && activities.size() > historyRetentionLimit) {
+            activities = activities.subList(activities.size() - historyRetentionLimit, activities.size());
+        }
+        return activities.stream().map(this::toActivityResponse).toList();
     }
 
     // =========================================================================
@@ -890,8 +893,7 @@ public class IssueService {
     @Transactional
     public IssueRelationResponse addRelation(String workspaceSlug, Long projectId, Long issueId,
                                               CreateIssueRelationRequest request, Long userId) {
-        Project project = resolveProject(workspaceSlug, projectId);
-        assertWorkspaceMember(project.getWorkspace().getId(), userId);
+        Project project = resolveWritableProject(workspaceSlug, projectId, userId);
         Issue source = resolveIssue(issueId, project.getId());
         Issue target = resolveIssue(request.getTargetIssueId(), project.getId());
 
@@ -919,8 +921,7 @@ public class IssueService {
 
     @Transactional
     public void deleteRelation(String workspaceSlug, Long projectId, Long issueId, Long relationId, Long userId) {
-        Project project = resolveProject(workspaceSlug, projectId);
-        assertWorkspaceMember(project.getWorkspace().getId(), userId);
+        Project project = resolveWritableProject(workspaceSlug, projectId, userId);
         IssueRelation relation = relationRepository.findById(relationId)
             .filter(r -> r.getSource().getId().equals(issueId) || r.getTarget().getId().equals(issueId))
             .orElseThrow(() -> new ResourceNotFoundException("Relation introuvable"));
@@ -952,6 +953,26 @@ public class IssueService {
         if (!workspaceMemberRepository.existsByWorkspaceIdAndUserId(workspaceId, userId)) {
             throw new BusinessException("Accès refusé");
         }
+    }
+
+    /**
+     * Prologue commun à toutes les opérations d'<b>écriture</b> d'issue : résout le projet, vérifie
+     * l'appartenance workspace, puis le <b>droit d'écriture</b> ({@code VIEWER} = lecture seule ; projet
+     * privé invisible → 404). Source unique de la garde d'écriture (TF-RBAC-WRITE).
+     */
+    private Project resolveWritableProject(String workspaceSlug, Long projectId, Long userId) {
+        Project project = resolveProject(workspaceSlug, projectId);
+        assertWorkspaceMember(project.getWorkspace().getId(), userId);
+        visibilityGuard.assertCanWrite(project, userId);
+        return project;
+    }
+
+    /** Idem {@link #resolveChecklistScope} + <b>droit d'écriture</b> (VIEWER exclu ; privé invisible → 404). */
+    private void assertWritableChecklistScope(String slug, Long projectId, Long issueId, Long userId) {
+        Project project = resolveProject(slug, projectId);
+        assertWorkspaceMember(project.getWorkspace().getId(), userId);
+        visibilityGuard.assertCanWrite(project, userId);
+        resolveIssue(issueId, project.getId());
     }
 
     /**
