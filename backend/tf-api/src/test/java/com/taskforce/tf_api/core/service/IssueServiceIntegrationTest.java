@@ -11,23 +11,27 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import com.taskforce.tf_api.core.dto.request.CreateIssueRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateIssueRequest;
 import com.taskforce.tf_api.core.dto.response.IssueResponse;
 import com.taskforce.tf_api.core.enums.IssuePriority;
 import com.taskforce.tf_api.core.enums.IssueStatusCategory;
+import com.taskforce.tf_api.core.enums.ProjectRole;
 import com.taskforce.tf_api.core.enums.WorkspaceRole;
 import com.taskforce.tf_api.core.model.Issue;
 import com.taskforce.tf_api.core.model.IssueStatus;
 import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.model.ProjectLabel;
+import com.taskforce.tf_api.core.model.ProjectMember;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.model.WorkspaceMember;
 import com.taskforce.tf_api.core.repository.IssueRepository;
 import com.taskforce.tf_api.core.repository.IssueStatusRepository;
 import com.taskforce.tf_api.core.repository.ProjectLabelRepository;
+import com.taskforce.tf_api.core.repository.ProjectMemberRepository;
 import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
@@ -55,7 +59,7 @@ import static org.mockito.Mockito.verify;
  * (IDOR statut hors projet, non-membre → 403).</p>
  */
 @DisplayName("IssueService (intégration Postgres)")
-@Import({IssueService.class, ProjectVisibilityGuard.class})
+@Import({IssueService.class, ProjectVisibilityGuard.class, PlanFeatureService.class})
 class IssueServiceIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired private IssueService issueService;
@@ -66,6 +70,7 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
     @Autowired private IssueStatusRepository issueStatusRepository;
     @Autowired private IssueRepository issueRepository;
     @Autowired private ProjectLabelRepository projectLabelRepository;
+    @Autowired private ProjectMemberRepository projectMemberRepository;
 
     @MockitoBean private SimpMessagingTemplate messagingTemplate;
     @MockitoBean private NotificationService notificationService;
@@ -102,6 +107,10 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
             .filter(s -> s.getProject().getId().equals(project.getId())
                 && s.getCategory() == IssueStatusCategory.COMPLETED)
             .findFirst().orElseThrow();
+
+        // Bean issueService partagé entre tests : rétention d'historique désactivée par défaut
+        // (le test dédié HistoryRetention la règle explicitement), sinon la valeur fuiterait d'un test à l'autre.
+        ReflectionTestUtils.setField(issueService, "historyRetentionLimit", Integer.MAX_VALUE);
     }
 
     private CreateIssueRequest createRequest(String title, Long assigneeId) {
@@ -607,6 +616,9 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
                 .keycloakId("kc-other-cmt").email("other@it.dev").displayName("Other").isActive(true).build());
             workspaceMemberRepository.save(WorkspaceMember.builder()
                 .workspace(workspace).user(other).role(WorkspaceRole.MEMBER).build());
+            // Membre du projet → peut écrire ; le refus vient donc du contrôle d'AUTEUR, pas de la visibilité.
+            projectMemberRepository.save(ProjectMember.builder()
+                .project(project).user(other).role(ProjectRole.MEMBER).build());
 
             var upd = new com.taskforce.tf_api.core.dto.request.CreateIssueCommentRequest();
             upd.setContent("tentative");
@@ -628,6 +640,9 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
                 .keycloakId("kc-other-wl").email("otherwl@it.dev").displayName("OtherWl").isActive(true).build());
             workspaceMemberRepository.save(WorkspaceMember.builder()
                 .workspace(workspace).user(other).role(WorkspaceRole.MEMBER).build());
+            // Membre du projet → peut écrire ; le refus vient donc du contrôle d'AUTEUR, pas de la visibilité.
+            projectMemberRepository.save(ProjectMember.builder()
+                .project(project).user(other).role(ProjectRole.MEMBER).build());
 
             assertThatThrownBy(() -> issueService.deleteWorklog(
                     SLUG, project.getId(), id, w.getId(), other.getId()))
@@ -1170,6 +1185,108 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
             User bob = wsMember("kc-vis-sched");
             assertThat(issueService.getScheduledIssues(SLUG, bob.getId())).isEmpty();
             assertThat(issueService.getScheduledIssues(SLUG, owner.getId())).isNotEmpty();
+        }
+    }
+
+    // =========================================================================
+    @Nested
+    @DisplayName("RBAC écriture projet (TF-RBAC-WRITE)")
+    class WriteRbac {
+
+        private User wsMember(String kc, WorkspaceRole role) {
+            User u = userRepository.save(User.builder()
+                .keycloakId(kc).email(kc + "@it.dev").displayName(kc).isActive(true).build());
+            workspaceMemberRepository.save(WorkspaceMember.builder()
+                .workspace(workspace).user(u).role(role).build());
+            return u;
+        }
+
+        @Test
+        @DisplayName("VIEWER de projet : lecture OK mais écriture refusée (BusinessException « lecture seule »)")
+        void viewer_can_read_but_not_write() {
+            User viewer = wsMember("kc-viewer", WorkspaceRole.MEMBER);
+            projectMemberRepository.save(ProjectMember.builder()
+                .project(project).user(viewer).role(ProjectRole.VIEWER).build());
+            newIssueId("visible au viewer"); // créée par l'owner
+
+            // Lecture : le VIEWER (membre projet) voit les issues …
+            assertThat(issueService.listIssues(SLUG, project.getId(), viewer.getId())).isNotEmpty();
+            // … mais ne peut pas en créer (lecture seule).
+            assertThatThrownBy(() -> issueService.createIssue(
+                    SLUG, project.getId(), createRequest("nope", null), viewer.getId()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("lecture seule");
+        }
+
+        @Test
+        @DisplayName("MEMBER de projet : écriture autorisée")
+        void project_member_can_write() {
+            User member = wsMember("kc-pmember", WorkspaceRole.MEMBER);
+            projectMemberRepository.save(ProjectMember.builder()
+                .project(project).user(member).role(ProjectRole.MEMBER).build());
+
+            IssueResponse res = issueService.createIssue(
+                SLUG, project.getId(), createRequest("par un membre projet", null), member.getId());
+            assertThat(res.getId()).isNotNull();
+        }
+
+        @Test
+        @DisplayName("projet privé : un membre du workspace non invité ne peut pas écrire (404, projet invisible)")
+        void non_member_cannot_write_private() {
+            User outsider = wsMember("kc-outsider", WorkspaceRole.MEMBER);
+
+            assertThatThrownBy(() -> issueService.createIssue(
+                    SLUG, project.getId(), createRequest("intrus", null), outsider.getId()))
+                .isInstanceOf(ResourceNotFoundException.class);
+        }
+
+        @Test
+        @DisplayName("projet public : tout membre du workspace peut écrire (contribution ouverte)")
+        void any_member_can_write_public() {
+            project.setPublic(true);
+            projectRepository.save(project);
+            User contributor = wsMember("kc-contrib", WorkspaceRole.MEMBER);
+
+            IssueResponse res = issueService.createIssue(
+                SLUG, project.getId(), createRequest("contribution ouverte", null), contributor.getId());
+            assertThat(res.getId()).isNotNull();
+        }
+
+        @Test
+        @DisplayName("OWNER du workspace : écrit dans un projet privé sans en être membre (admin)")
+        void workspace_owner_writes_private_without_membership() {
+            // owner n'a pas de ProjectMember (cf. seed) mais est OWNER du workspace → admin.
+            IssueResponse res = issueService.createIssue(
+                SLUG, project.getId(), createRequest("par l'admin", null), owner.getId());
+            assertThat(res.getId()).isNotNull();
+        }
+    }
+
+    // =========================================================================
+    @Nested
+    @DisplayName("rétention d'historique par plan (UNLIMITED_HISTORY)")
+    class HistoryRetention {
+
+        @Test
+        @DisplayName("sans UNLIMITED_HISTORY (FREE) : activité bornée aux N dernières ; BUSINESS voit tout")
+        void activity_retention_gated_by_plan() {
+            ReflectionTestUtils.setField(issueService, "historyRetentionLimit", 1);
+            owner.setPlanType(com.taskforce.tf_api.core.enums.PlanType.FREE);
+            userRepository.save(owner);
+
+            Long id = newIssueId("Historique"); // 1 activité : CREATED
+            UpdateIssueRequest u1 = new UpdateIssueRequest(); u1.setTitle("v2");
+            issueService.updateIssue(SLUG, project.getId(), id, u1, owner.getId());
+            UpdateIssueRequest u2 = new UpdateIssueRequest(); u2.setPriority(IssuePriority.URGENT);
+            issueService.updateIssue(SLUG, project.getId(), id, u2, owner.getId());
+
+            // FREE (pas d'UNLIMITED_HISTORY) → borné à la dernière entrée.
+            assertThat(issueService.listActivity(SLUG, project.getId(), id, owner.getId())).hasSize(1);
+
+            // BUSINESS → historique complet (> 1).
+            owner.setPlanType(com.taskforce.tf_api.core.enums.PlanType.BUSINESS);
+            userRepository.save(owner);
+            assertThat(issueService.listActivity(SLUG, project.getId(), id, owner.getId())).hasSizeGreaterThan(1);
         }
     }
 }
