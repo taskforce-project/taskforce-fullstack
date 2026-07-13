@@ -173,7 +173,7 @@
 > - ⏸️ `TF-AI-SURFACES` **[②] recadré** : le chat humain partant, l'app Slack/Teams passe **P2** ; `@Cortex` dans les **commentaires** reste pertinent (P2). **[P2]**
 >
 > **🐞 Bugs / correctifs**
-> - `TF-BILL-500` **Page Billing → 500** au chargement des plans (bug back). **[P0]**
+> - ✅ `TF-BILL-500` **Page Billing → 500 au chargement — RÉSOLU (vérifié live 13/07)** : plus aucun 500 au chargement (corrigé lors de la refonte Billing #38–#41). Vérifié dans **Brave (session réelle)** : les **41 appels `/api/` de la page = 200**, dont `/api/billing/subscription` et `/api/workspaces/{slug}/ai/usage` ; la grille 4 forfaits rend (CTA Gérer/Rétrograder/Nous contacter). Seul chemin 500 restant (`checkout`/`portal` déclarent `throws StripeException` → catch-all `Exception` → 500 si Stripe mal configuré) **durci** : `@ExceptionHandler(StripeException.class)` dans `BillingController` → **502** propre + message actionnable. Compile OK ; *à rebuild backend pour être live*. **[P0→FAIT]**
 > - `TF-MBR-REDIST` **Members : redistribution des tâches ne marche pas**. **[P1]**
 > - `TF-QA-CMDK` Vérifier le **search ⌘K**. **[P1]**
 > - `TF-QA-PAGIN` Vérifier la **pagination dynamique** de tous les tableaux. **[P1]**
