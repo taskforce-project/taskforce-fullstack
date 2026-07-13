@@ -45,7 +45,7 @@ import static org.mockito.Mockito.doThrow;
  * du gating PRO</b> sur les analytics avancées.</p>
  */
 @DisplayName("AnalyticsService (intégration Postgres)")
-@Import(AnalyticsService.class)
+@Import({AnalyticsService.class, ProjectVisibilityGuard.class})
 class AnalyticsServiceIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired private AnalyticsService analyticsService;
@@ -204,6 +204,28 @@ class AnalyticsServiceIntegrationTest extends AbstractIntegrationTest {
         assertThat(kpis.velocity()).isGreaterThanOrEqualTo(3);
         // getThroughput DAY exerce les buckets avec données
         assertThat(analyticsService.getThroughput(SLUG, owner.getId(), null, "DAY")).hasSize(30);
+    }
+
+    @Test
+    @DisplayName("getKpis scope les projets (TF-RBAC-INTEL) : un membre non-admin ne voit pas un projet privé dont il n'est pas membre")
+    void kpis_scoped_hides_private_project_from_non_member() {
+        Workspace ws = workspaceRepository.findBySlug(SLUG).orElseThrow();
+        // Projet PRIVÉ + une issue résolue dedans.
+        Project priv = projectRepository.save(Project.builder()
+            .workspace(ws).name("Privé").identifier("PRV").isPublic(false).createdBy(owner).build());
+        IssueStatus st = issueStatusRepository.save(IssueStatus.builder()
+            .project(priv).name("Done").category(IssueStatusCategory.COMPLETED).build());
+        issueRepository.save(Issue.builder().project(priv).status(st).reporter(owner)
+            .sequenceNumber(1).title("secret").completedAt(LocalDateTime.now().minusMinutes(1)).build());
+
+        // Membre simple : non OWNER/ADMIN, non membre du projet privé.
+        User member = userRepository.save(User.builder()
+            .keycloakId("kc-m").email("m@it.dev").displayName("M").isActive(true).build());
+        workspaceMemberRepository.save(WorkspaceMember.builder().workspace(ws).user(member).role(WorkspaceRole.MEMBER).build());
+
+        // Owner (admin) voit l'issue du projet privé ; le membre non → 0.
+        assertThat(analyticsService.getKpis(SLUG, owner.getId(), null).tasksResolved()).isGreaterThanOrEqualTo(1);
+        assertThat(analyticsService.getKpis(SLUG, member.getId(), null).tasksResolved()).isZero();
     }
 
     @Test
