@@ -20,6 +20,7 @@ import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.IssueService;
 import com.taskforce.tf_api.core.service.SmartAssignService;
+import com.taskforce.tf_api.core.service.agent.IssueAiService;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 import com.taskforce.tf_api.shared.security.JwtIdentityResolver;
 import com.taskforce.tf_api.shared.security.SecurityConfig;
@@ -52,6 +53,7 @@ class IssueControllerWebMvcTest {
 
     @MockitoBean private IssueService issueService;
     @MockitoBean private SmartAssignService smartAssignService;
+    @MockitoBean private IssueAiService issueAiService; // dépendance d'IssueController (sinon contexte KO)
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private WorkspaceRepository workspaceRepository;             // WorkspaceAccessInterceptor
     @MockitoBean private WorkspaceMemberRepository workspaceMemberRepository; // WorkspaceAccessInterceptor
