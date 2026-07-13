@@ -18,6 +18,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskforce.tf_api.core.dto.response.ChartSpecResponse;
 import com.taskforce.tf_api.core.dto.response.NamedValue;
 import com.taskforce.tf_api.core.model.Workspace;
+import com.taskforce.tf_api.core.service.AiMeter;
 import com.taskforce.tf_api.core.service.LlmClient;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 
@@ -43,12 +44,16 @@ class ChartSpecServiceTest {
     @Mock  private LlmClient             llm;
     @Mock  private AnalyticsQueryService queryService;
     @Mock  private com.taskforce.tf_api.core.service.ProjectVisibilityGuard visibilityGuard;
+    @Mock  private AiMeter aiMeter;
     @InjectMocks private ChartSpecService service;
 
     @Spy private ObjectMapper objectMapper = new ObjectMapper();
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
+        // AiMeter en pass-through : exécute le travail LLM sans gate ni comptage réel (métrage testé ailleurs).
+        lenient().when(aiMeter.metered(any(), any()))
+            .thenAnswer(inv -> ((AiMeter.AiCall<?>) inv.getArgument(1)).call());
         Workspace ws = mock(Workspace.class);
         lenient().when(ws.getId()).thenReturn(1L);
         lenient().when(access.resolveAndAuthorize(anyString(), any())).thenReturn(ws);
