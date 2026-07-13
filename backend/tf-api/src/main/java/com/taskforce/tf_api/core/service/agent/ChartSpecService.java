@@ -16,6 +16,7 @@ import com.taskforce.tf_api.core.dto.response.ChartSuggestion;
 import com.taskforce.tf_api.core.dto.response.NamedValue;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.service.LlmClient;
+import com.taskforce.tf_api.core.service.ProjectVisibilityGuard;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 
 import lombok.RequiredArgsConstructor;
@@ -45,6 +46,7 @@ public class ChartSpecService {
     private final LlmClient              llm;
     private final AnalyticsQueryService  queryService;
     private final ObjectMapper           objectMapper;
+    private final ProjectVisibilityGuard visibilityGuard;
 
     @Value("${ai.groq.assistant-model:llama-3.3-70b-versatile}")
     private String model;
@@ -74,17 +76,18 @@ public class ChartSpecService {
 
     public ChartSpecResponse generate(String slug, Long userId, String prompt, Long projectId) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
-        Long wsId = ws.getId();
+        // Scope TF-RBAC-INTEL : répartitions/prédictions bornées aux projets visibles par l'utilisateur.
+        List<Long> projectIds = visibilityGuard.viewableProjectIds(ws.getId(), userId);
 
         if (llm.isConfigured()) {
             try {
-                ChartSpecResponse fromLlm = callLlm(wsId, prompt);
+                ChartSpecResponse fromLlm = callLlm(projectIds, prompt);
                 if (fromLlm != null) return fromLlm;
             } catch (Exception ex) {
                 log.warn("Génération de graphe IA indisponible : {}", ex.getMessage());
             }
         }
-        return heuristic(wsId, prompt);
+        return heuristic(projectIds, prompt);
     }
 
     /** Ré-exécute une répartition (rafraîchit un graphe épinglé avec des données à jour). */
@@ -93,7 +96,8 @@ public class ChartSpecService {
         if (!queryService.isValidDimension(dimension)) {
             return unsupported(null, "Dimension de répartition inconnue : " + dimension, List.of());
         }
-        return breakdown(ws.getId(), null, "", "bar", dimension, measure, scope);
+        List<Long> projectIds = visibilityGuard.viewableProjectIds(ws.getId(), userId);
+        return breakdown(projectIds, null, "", "bar", dimension, measure, scope);
     }
 
     // =========================================================================
@@ -101,7 +105,7 @@ public class ChartSpecService {
     // =========================================================================
 
     /** Interroge le LLM et construit la réponse. Retourne null si sa sortie n'est pas exploitable. */
-    private ChartSpecResponse callLlm(Long wsId, String prompt) throws Exception {
+    private ChartSpecResponse callLlm(List<Long> projectIds, String prompt) throws Exception {
         String content = llm.chatCompletion(model, systemPrompt(), prompt, true, "fast");
         JsonNode json = objectMapper.readTree(content);
 
@@ -115,13 +119,13 @@ public class ChartSpecService {
         // Prédiction (dérivée de données réelles) si le modèle l'a demandée — prioritaire.
         String predict = text(json, "predict");
         if (!predict.isEmpty() && queryService.isValidPrediction(predict)) {
-            return prediction(wsId, title, description, predict);
+            return prediction(projectIds, title, description, predict);
         }
 
         // Répartition (retrieval DB) prioritaire si le modèle a choisi une dimension.
         String dimension = text(json, "dimension");
         if (!dimension.isEmpty() && queryService.isValidDimension(dimension)) {
-            return breakdown(wsId, title, description, chartType, dimension, text(json, "measure"), text(json, "scope"));
+            return breakdown(projectIds, title, description, chartType, dimension, text(json, "measure"), text(json, "scope"));
         }
 
         // Sinon série temporelle si le dataset est connu.
@@ -178,9 +182,9 @@ public class ChartSpecService {
     // Construction des réponses
     // =========================================================================
 
-    private ChartSpecResponse breakdown(Long wsId, String title, String description, String chartType,
+    private ChartSpecResponse breakdown(List<Long> projectIds, String title, String description, String chartType,
                                         String dimension, String measure, String scope) {
-        List<NamedValue> data = queryService.run(wsId, dimension, measure, scope);
+        List<NamedValue> data = queryService.run(projectIds, dimension, measure, scope);
         String ct = List.of("bar", "line").contains(chartType) ? chartType : "bar";
         String dim = dimension.toUpperCase(Locale.ROOT);
         String mes = measure == null || measure.isBlank() ? "COUNT" : measure.toUpperCase(Locale.ROOT);
@@ -197,8 +201,8 @@ public class ChartSpecService {
      * en base à partir de signaux réels (cf. {@link AnalyticsQueryService#predict}). {@code dimension}
      * reste nul : c'est un instantané (pas de ré-exécution auto), la donnée voyage dans le spec.
      */
-    private ChartSpecResponse prediction(Long wsId, String title, String description, String kind) {
-        List<NamedValue> data = queryService.predict(wsId, kind);
+    private ChartSpecResponse prediction(List<Long> projectIds, String title, String description, String kind) {
+        List<NamedValue> data = queryService.predict(projectIds, kind);
         String finalTitle = title == null || title.isBlank() ? queryService.predictionTitle(kind) : title.trim();
         return new ChartSpecResponse(finalTitle, safe(description), "breakdown",
             null, "bar", null, null, data, null, null, null, "Projet", queryService.predictionYLabel(kind), null, List.of());
@@ -237,13 +241,13 @@ public class ChartSpecService {
     // Repli déterministe (LLM absent ou en échec)
     // =========================================================================
 
-    private ChartSpecResponse heuristic(Long wsId, String prompt) {
+    private ChartSpecResponse heuristic(List<Long> projectIds, String prompt) {
         String p = prompt == null ? "" : prompt.toLowerCase(Locale.ROOT);
 
         // 0) Prédiction — avant la répartition (« succès des projets » contient « projet »).
         if (containsAny(p, "prédiction", "prediction", "prédire", "predire", "succès", "succes",
                 "réussite", "reussite", "chance", "risque", "santé", "sante")) {
-            return prediction(wsId, null, "", "SUCCESS");
+            return prediction(projectIds, null, "", "SUCCESS");
         }
 
         // 1) Répartition « par X » — le vrai retrieval, prioritaire.
@@ -252,7 +256,7 @@ public class ChartSpecService {
             String measure = containsAny(p, "point", "story") ? "POINTS" : "COUNT";
             String scope = containsAny(p, "ouvert", "en cours", "restant") ? "OPEN"
                 : containsAny(p, "terminé", "termine", "résolu", "resolu", "fini", "fermé", "ferme", "clos") ? "DONE" : "ALL";
-            return breakdown(wsId, null, "", "bar", dimension, measure, scope);
+            return breakdown(projectIds, null, "", "bar", dimension, measure, scope);
         }
 
         // 2) Séries temporelles.
