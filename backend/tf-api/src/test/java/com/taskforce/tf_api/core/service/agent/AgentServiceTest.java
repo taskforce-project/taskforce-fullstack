@@ -33,6 +33,7 @@ class AgentServiceTest {
     @Mock private GroqService groq;
     @Mock private ObjectMapper objectMapper;
     @Mock private com.taskforce.tf_api.core.service.AiUsageService aiUsageService;
+    @Mock private com.taskforce.tf_api.core.service.mcp.WorkspaceMcpService workspaceMcp;
 
     @InjectMocks private AgentService service;
 
@@ -90,7 +91,8 @@ class AgentServiceTest {
             .title("Note").content("contenu").build();
         when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of(node));
         when(groq.isConfigured()).thenReturn(true);
-        when(tools.toolDefinitions()).thenReturn(List.of());
+        when(workspaceMcp.toolsFor(org.mockito.ArgumentMatchers.any())).thenReturn(List.of());
+        when(tools.toolDefinitions(org.mockito.ArgumentMatchers.anyList())).thenReturn(List.of());
 
         var real = new ObjectMapper();
         var withCall = real.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"search_brain\",\"arguments\":\"{}\"}}]}");
@@ -99,7 +101,7 @@ class AgentServiceTest {
             .thenReturn(withCall, finalMsg);
 
         AgentTool tool = org.mockito.Mockito.mock(AgentTool.class);
-        when(tools.get("search_brain")).thenReturn(tool);
+        when(tools.get(org.mockito.ArgumentMatchers.eq("search_brain"), org.mockito.ArgumentMatchers.anyList())).thenReturn(tool);
         when(tool.execute(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any())).thenReturn("résultat outil");
 
         AssistantAnswer answer = service.run("acme", 7L, "analyse le projet et propose un plan");
@@ -117,14 +119,15 @@ class AgentServiceTest {
         org.springframework.test.util.ReflectionTestUtils.setField(service, "model", "m");
         when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
         when(groq.isConfigured()).thenReturn(true);
-        when(tools.toolDefinitions()).thenReturn(List.of());
+        when(workspaceMcp.toolsFor(org.mockito.ArgumentMatchers.any())).thenReturn(List.of());
+        when(tools.toolDefinitions(org.mockito.ArgumentMatchers.anyList())).thenReturn(List.of());
 
         var real = new ObjectMapper();
         var withCall = real.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"ghost\",\"arguments\":\"{}\"}}]}");
         var finalMsg = real.readTree("{\"content\":\"Fini\"}");
         when(groq.rawChat(anyString(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), anyString()))
             .thenReturn(withCall, finalMsg);
-        when(tools.get("ghost")).thenReturn(null);
+        // tools.get("ghost", external) renvoie null par défaut (mock) → chemin « outil inconnu ».
 
         AssistantAnswer answer = service.run("acme", 7L, "décide et archive la note");
 
@@ -197,5 +200,45 @@ class AgentServiceTest {
         assertThat(sent.get(1)).containsEntry("content", "Mon projet s'appelle Zephyr");
         assertThat(sent.get(2)).containsEntry("role", "assistant");
         assertThat(sent.get(3)).containsEntry("content", "Rappelle-moi son nom");
+    }
+
+    @Test
+    @DisplayName("run (deep) : écriture externe MCP → PROPOSÉE (pending), pas exécutée (validation humaine)")
+    void run_deep_external_write_is_proposed_not_executed() throws Exception {
+        stubWorkspace();
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "model", "m");
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "confirmExternalWrites", true);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "mcpToolTier", "fast");
+        when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
+        when(groq.isConfigured()).thenReturn(true);
+
+        // Un outil externe d'ÉCRITURE (readOnly=false) découvert pour le workspace.
+        var extClient = org.mockito.Mockito.mock(com.taskforce.tf_api.core.service.mcp.McpClient.class);
+        var real = new ObjectMapper();
+        var writeDef = new com.taskforce.tf_api.core.service.mcp.McpClient.ToolDef(
+            "do_write", "écrit qqch", real.readTree("{\"type\":\"object\"}"), false);
+        var extTool = new com.taskforce.tf_api.core.service.mcp.ExternalMcpTool(
+            extClient,
+            new com.taskforce.tf_api.core.service.mcp.McpClient.ServerRef("srv", "http://x/mcp", null),
+            writeDef, real);
+        when(workspaceMcp.toolsFor(org.mockito.ArgumentMatchers.any())).thenReturn(List.of(extTool));
+        when(tools.toolDefinitions(org.mockito.ArgumentMatchers.anyList())).thenReturn(List.of());
+        when(tools.get(org.mockito.ArgumentMatchers.eq("srv__do_write"), org.mockito.ArgumentMatchers.anyList()))
+            .thenReturn(extTool);
+
+        var real2 = new ObjectMapper();
+        var withCall = real2.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"srv__do_write\",\"arguments\":\"{}\"}}]}");
+        var finalMsg = real2.readTree("{\"content\":\"Je propose de créer l'issue.\"}");
+        when(groq.rawChat(anyString(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), anyString()))
+            .thenReturn(withCall, finalMsg);
+
+        AssistantAnswer answer = service.run("acme", 7L, "crée une issue dans l'outil externe");
+
+        assertThat(answer.mode()).isEqualTo("deep");
+        assertThat(answer.toolCalls()).hasSize(1);
+        assertThat(answer.toolCalls().get(0).status()).isEqualTo("pending");
+        // L'écriture externe n'a PAS été exécutée (aucun appel au serveur MCP).
+        org.mockito.Mockito.verify(extClient, org.mockito.Mockito.never())
+            .initialize(org.mockito.ArgumentMatchers.any());
     }
 }
