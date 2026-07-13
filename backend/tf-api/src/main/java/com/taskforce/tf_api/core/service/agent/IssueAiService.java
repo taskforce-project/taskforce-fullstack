@@ -28,6 +28,7 @@ import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.IssueRepository;
 import com.taskforce.tf_api.core.repository.IssueTypeRepository;
 import com.taskforce.tf_api.core.repository.ProjectLabelRepository;
+import com.taskforce.tf_api.core.service.AiMeter;
 import com.taskforce.tf_api.core.service.IssueService;
 import com.taskforce.tf_api.core.service.SmartAssignService;
 import com.taskforce.tf_api.core.service.KnowledgeService;
@@ -65,6 +66,7 @@ public class IssueAiService {
     private final IssueTypeRepository issueTypeRepository;
     private final LlmClient          llm;
     private final ObjectMapper       objectMapper;
+    private final AiMeter            aiMeter; // gate quota + comptage de la conso tokens de la génération de spec
 
     @Value("${ai.groq.assistant-model:llama-3.3-70b-versatile}")
     private String model; // ignoré par l'AI Gateway (Ollama impose son modèle) ; utile si provider=groq
@@ -98,7 +100,9 @@ public class IssueAiService {
         }
         try {
             // Défaut = tier "fast" (8B, rapide) ; "deep" (14B + thinking) = bouton « Approfondir ».
-            JsonNode json = callLlm(issue, hits, projectLabels, projectTypes, deep ? "deep" : "fast");
+            // Métré : gate quota (au-dessus du plafond → repli déterministe, aucun token brûlé) + comptage réel.
+            String tier = deep ? "deep" : "fast";
+            JsonNode json = aiMeter.metered(ws.getId(), () -> callLlm(issue, hits, projectLabels, projectTypes, tier));
             String spec = json.path("spec").asText("").trim();
             String prompt = json.path("executionPrompt").asText("").trim();
             List<String> breakdown = readStringArray(json.path("breakdown"));
