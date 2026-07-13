@@ -54,6 +54,7 @@ public class SmartAssignService {
     private final LlmClient llm; // via l'AI Gateway → Qwen local (Groq était bloqué → fallback permanent)
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
+    private final AiMeter aiMeter; // gate quota + capture/enregistrement de la conso tokens du scoring LLM
 
     @Value("${ai.groq.smart-assign-model:llama-3.1-8b-instant}")
     private String modelName;
@@ -205,7 +206,9 @@ public class SmartAssignService {
         // sinon, un appel LLM par issue rendait la redistribution très lente (LLM local) → timeout.
         if (useAi) {
             try {
-                groq = fetchGroqScores(issueText, priority, candidates, metricsByUser);
+                // Métré : gate quota (au-dessus du plafond → repli heuristique, aucun token brûlé) + comptage réel.
+                groq = aiMeter.metered(workspace.getId(),
+                    () -> fetchGroqScores(issueText, priority, candidates, metricsByUser));
             } catch (Exception ex) {
                 fallbackUsed = true;
                 log.warn("Smart assign Groq fallback triggered: {}", ex.getMessage());
