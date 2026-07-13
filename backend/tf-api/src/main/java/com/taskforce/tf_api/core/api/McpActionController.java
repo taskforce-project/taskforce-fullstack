@@ -20,6 +20,7 @@ import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.PlanFeatureService;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.core.service.mcp.WorkspaceMcpService;
@@ -49,6 +50,7 @@ public class McpActionController {
     private final BrainAccessGuard     access;
     private final WorkspaceRepository  workspaceRepository;
     private final PlanFeatureService   planFeatureService;
+    private final AuthorizationService authorizationService;
 
     /** Exécute une action externe validée (bouton d'approbation). */
     @PostMapping("/actions/execute")
@@ -79,7 +81,7 @@ public class McpActionController {
         @Valid @RequestBody McpServerRequest body,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        Workspace ws = authorizeIntegrations(slug, jwt);
+        Workspace ws = authorizeManager(slug, jwt);
         workspaceMcp.connectServer(ws, body.connectorKey(), body.mcpUrl(), body.mcpToken(), body.mcpAllow());
         return ResponseEntity.ok(ApiResponse.success(workspaceMcp.serverStatuses(ws.getId())));
     }
@@ -91,7 +93,7 @@ public class McpActionController {
         @PathVariable String connectorKey,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        Workspace ws = authorizeIntegrations(slug, jwt);
+        Workspace ws = authorizeManager(slug, jwt);
         workspaceMcp.disconnectServer(ws.getId(), connectorKey);
         return ResponseEntity.ok(ApiResponse.success(workspaceMcp.serverStatuses(ws.getId())));
     }
@@ -101,6 +103,13 @@ public class McpActionController {
         Workspace ws = access.resolveAndAuthorize(slug, resolveUserId(jwt));
         PlanType plan = workspaceRepository.findOwnerPlanBySlug(slug).orElse(PlanType.FREE);
         planFeatureService.requireFeature(plan, PlanFeature.INTEGRATIONS);
+        return ws;
+    }
+
+    /** Config serveur MCP = action de gestion : membre + INTEGRATIONS + rôle OWNER/ADMIN (sinon 403). */
+    private Workspace authorizeManager(String slug, Jwt jwt) {
+        Workspace ws = authorizeIntegrations(slug, jwt);
+        authorizationService.requireManager(ws.getId(), resolveUserId(jwt));
         return ws;
     }
 
