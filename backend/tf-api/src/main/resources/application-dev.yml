@@ -182,6 +182,13 @@ integrations:
     mirror:
       poll-enabled: ${SLACK_MIRROR_POLL_ENABLED:true}
       poll-interval-ms: ${SLACK_MIRROR_POLL_INTERVAL_MS:60000}
+  # MCP — TaskForce = hôte MCP : Cortex pilote des serveurs MCP externes (cf. McpClient / WorkspaceMcpService)
+  mcp:
+    connect-timeout-ms: ${MCP_CONNECT_TIMEOUT_MS:10000}
+    read-timeout-ms: ${MCP_READ_TIMEOUT_MS:60000}
+    tools-cache-ttl-ms: ${MCP_TOOLS_CACHE_TTL_MS:60000}   # cache tools/list par workspace
+    confirm-writes: ${MCP_CONFIRM_WRITES:true}            # écritures externes proposées (validation humaine)
+    tool-tier: ${MCP_TOOL_TIER:fast}                      # tier LLM des tours avec outils externes (fast|standard|deep)
 # JWT Configuration
 jwt:
   secret: ${JWT_SECRET:myVerySecretKeyForJWTTokenGenerationThatIsLongEnoughToBeSecure256Bits}
