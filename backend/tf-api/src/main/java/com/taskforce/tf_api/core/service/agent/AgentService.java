@@ -22,6 +22,8 @@ import com.taskforce.tf_api.core.service.LlmClient;
 import com.taskforce.tf_api.core.service.LlmUsage;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.core.service.brain.BrainSearchService;
+import com.taskforce.tf_api.core.service.mcp.ExternalMcpTool;
+import com.taskforce.tf_api.core.service.mcp.WorkspaceMcpService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,17 +41,27 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class AgentService {
 
-    private final BrainAccessGuard   access;
-    private final BrainSearchService search;
-    private final AgentToolRegistry  tools;
-    private final LlmClient          llm;
-    private final ObjectMapper       objectMapper;
-    private final AiUsageService     aiUsageService;
+    private final BrainAccessGuard    access;
+    private final BrainSearchService  search;
+    private final AgentToolRegistry   tools;
+    private final LlmClient           llm;
+    private final ObjectMapper        objectMapper;
+    private final AiUsageService      aiUsageService;
+    private final WorkspaceMcpService workspaceMcp;
 
     // Nom de modèle passé au client LLM. Ignoré par l'AI Gateway (qui impose son modèle Ollama) ;
     // utilisé seulement si provider=groq.
     @Value("${ai.groq.assistant-model:llama-3.3-70b-versatile}")
     private String model;
+
+    // Sûreté MCP : les écritures externes sont PROPOSÉES (validation humaine), pas exécutées par l'agent.
+    @Value("${integrations.mcp.confirm-writes:true}")
+    private boolean confirmExternalWrites;
+
+    // Tier LLM des tours avec outils externes MCP. Défaut "fast" (8B) ; bumpable ("standard"/"deep")
+    // pour plus de fiabilité multi-outils si le hardware suit.
+    @Value("${integrations.mcp.tool-tier:fast}")
+    private String mcpToolTier;
 
     private static final int MAX_TOOL_ITERS = 5;
 
@@ -225,12 +237,21 @@ public class AgentService {
     private String runToolLoop(String message, List<KnowledgeNode> hits,
                                AgentContext ctx, List<AssistantToolCall> toolCalls,
                                List<Map<String, Object>> history) {
-        List<Map<String, Object>> messages = withHistory(systemPrompt(hits, true), history, message);
-        List<Map<String, Object>> toolDefs = tools.toolDefinitions();
+        // Outils externes (serveurs MCP connectés sur le workspace) — découverts par requête, cachés.
+        List<AgentTool> external = workspaceMcp.toolsFor(ctx);
+        if (!external.isEmpty()) {
+            log.info("Cortex deep (ws={}) : {} outil(s) interne(s) + {} externe(s) MCP {}",
+                ctx.workspaceId(), tools.all().size(), external.size(),
+                external.stream().map(AgentTool::name).toList());
+        }
+
+        List<Map<String, Object>> messages = withHistory(systemPrompt(hits, true, external), history, message);
+        List<Map<String, Object>> toolDefs = tools.toolDefinitions(external);
+        // Tier "fast" (8B) par défaut ; les tours avec outils externes MCP peuvent viser un tier plus fort.
+        String tier = external.isEmpty() ? "fast" : mcpToolTier;
 
         for (int i = 0; i < MAX_TOOL_ITERS; i++) {
-            // Tier "fast" (8B) par défaut sur ce hardware (14B trop lent/erratique) ; réactif.
-            JsonNode msg = llm.rawChat(model, messages, toolDefs, "fast");
+            JsonNode msg = llm.rawChat(model, messages, toolDefs, tier);
             JsonNode calls = msg.path("tool_calls");
             if (calls.isArray() && !calls.isEmpty()) {
                 messages.add(objectMapper.convertValue(msg, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {}));
@@ -241,9 +262,15 @@ public class AgentService {
                     String result;
                     String status = "success";
                     try {
-                        AgentTool tool = tools.get(name);
-                        if (tool == null) { result = "Outil inconnu: " + name; status = "error"; }
-                        else {
+                        AgentTool tool = tools.get(name, external);
+                        if (tool == null) {
+                            result = "Outil inconnu: " + name; status = "error";
+                        } else if (confirmExternalWrites && tool instanceof ExternalMcpTool ext && !ext.isReadOnly()) {
+                            // Écriture externe : NE PAS exécuter — proposer l'action à l'utilisateur (validation humaine).
+                            result = "Action externe proposée à l'utilisateur — en attente de sa validation. "
+                                + "Ne pas ré-appeler cet outil ; résume simplement l'action que tu proposes.";
+                            status = "pending";
+                        } else {
                             Map<String, Object> args = objectMapper.readValue(argsJson, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
                             result = tool.execute(args, ctx);
                         }
@@ -264,7 +291,7 @@ public class AgentService {
     private String runDirect(String message, List<KnowledgeNode> hits, List<Map<String, Object>> history) {
         // Tier "fast" : petit modèle 8B pour les réponses simples/interactives (rapide).
         // Historique injecté (mémoire multi-tours) entre le system prompt et le message courant.
-        return llm.chat(model, withHistory(systemPrompt(hits, false), history, message), "fast");
+        return llm.chat(model, withHistory(systemPrompt(hits, false, List.of()), history, message), "fast");
     }
 
     /** Liste de messages LLM : system + historique (mémoire multi-tours) + message courant. */
@@ -288,13 +315,19 @@ public class AgentService {
             + "recherche|enqu[êe]te|propose|r[ée]dige|note|archive|met[s]? à jour|strat[ée]gie).*");
     }
 
-    private String systemPrompt(List<KnowledgeNode> hits, boolean withTools) {
+    private String systemPrompt(List<KnowledgeNode> hits, boolean withTools, List<AgentTool> external) {
         StringBuilder sb = new StringBuilder();
         sb.append("Tu es Cortex, le copilote IA du workspace TaskForce. Réponds dans la langue de l'utilisateur, ")
           .append("de façon concise et fondée sur le contexte réel. ");
         if (withTools) {
-            sb.append("Tu peux utiliser des outils : recherche dans la mémoire (search_brain) et création ")
-              .append("de notes (create_note). Suis les règles AGENTS : bon domaine + type, [[liens]] et #tags. ");
+            sb.append("Tu peux utiliser l'outil de recherche mémoire (search_brain). ");
+            if (external != null && !external.isEmpty()) {
+                String names = external.stream().map(AgentTool::name)
+                    .collect(java.util.stream.Collectors.joining(", "));
+                sb.append("Des outils externes sont connectés (serveurs MCP) : ").append(names)
+                  .append(". N'appelle un outil d'écriture externe qu'avec des paramètres explicites et vérifiés, ")
+                  .append("et jamais sans que l'utilisateur l'ait demandé. ");
+            }
         }
         if (!hits.isEmpty()) {
             sb.append("\n\nContexte (Brain OS) :\n");
