@@ -57,6 +57,7 @@ public class AnalyticsService {
     private final PlanFeatureService         planFeatureService;
     private final UserRepository             userRepository;
     private final JdbcTemplate               jdbcTemplate;
+    private final ProjectVisibilityGuard     visibilityGuard;
 
     @Value("${ai.groq.assistant-model:llama-3.3-70b-versatile}")
     private String assistantModel;
@@ -93,7 +94,7 @@ public class AnalyticsService {
 
     public AnalyticsKpisResponse getKpis(String slug, Long userId, Long projectId) {
         Workspace ws = requireWorkspaceMember(slug, userId);
-        List<Long> projectIds = resolveProjectIds(ws.getId(), projectId);
+        List<Long> projectIds = resolveProjectIds(ws.getId(), userId, projectId);
 
         if (projectIds.isEmpty()) {
             return new AnalyticsKpisResponse(0, 0, 0.0, 0.0, 0, 0, 0);
@@ -120,8 +121,8 @@ public class AnalyticsService {
         long velocityLast  = issueRepository.countCompletedBetween(projectIds, w1, w0);
         int  velocityDelta = delta(velocityThis, velocityLast);
 
-        // Active cycles across workspace
-        long activeCycles = cycleRepository.findActiveByWorkspaceSlug(slug).size();
+        // Cycles actifs restreints aux projets visibles (TF-RBAC-INTEL)
+        long activeCycles = activeViewableCycles(slug, ws.getId(), userId).size();
 
         return new AnalyticsKpisResponse(
             resolvedThis, resolvedDelta,
@@ -141,7 +142,7 @@ public class AnalyticsService {
     public List<ThroughputPointResponse> getThroughput(String slug, Long userId, Long projectId, String bucket) {
         Workspace ws = requireWorkspaceMember(slug, userId);
         requireFeature(slug, PlanFeature.ADVANCED_ANALYTICS);
-        List<Long> projectIds = resolveProjectIds(ws.getId(), projectId);
+        List<Long> projectIds = resolveProjectIds(ws.getId(), userId, projectId);
 
         boolean daily = "DAY".equalsIgnoreCase(bucket);
         return daily ? buildThroughput(projectIds, 30, true) : buildThroughput(projectIds, 8, false);
@@ -173,9 +174,10 @@ public class AnalyticsService {
     // -------------------------------------------------------------------------
 
     public List<BurndownPointResponse> getBurndown(String slug, Long userId, Long projectId) {
-        requireWorkspaceMember(slug, userId);
+        Workspace ws = requireWorkspaceMember(slug, userId);
         requireFeature(slug, PlanFeature.ADVANCED_ANALYTICS);
-        List<Cycle> activeCycles = cycleRepository.findActiveByWorkspaceSlug(slug);
+        // Cycles actifs restreints aux projets visibles par l'utilisateur (TF-RBAC-INTEL)
+        List<Cycle> activeCycles = activeViewableCycles(slug, ws.getId(), userId);
         if (projectId != null) {
             activeCycles = activeCycles.stream()
                 .filter(c -> c.getProject() != null && c.getProject().getId().equals(projectId))
@@ -228,7 +230,7 @@ public class AnalyticsService {
     public List<MemberCapacityResponse> getCapacity(String slug, Long userId, Long projectId) {
         Workspace ws = requireWorkspaceMember(slug, userId);
         requireFeature(slug, PlanFeature.ADVANCED_ANALYTICS);
-        List<Long> projectIds = resolveProjectIds(ws.getId(), projectId);
+        List<Long> projectIds = resolveProjectIds(ws.getId(), userId, projectId);
 
         // Build map: userId → open issue count
         // Cast via Number to handle both Long and Integer returns from JPQL aggregates
@@ -271,7 +273,7 @@ public class AnalyticsService {
         LocalDate from = LocalDate.now();
         LocalDate to   = from.plusDays(window);
 
-        List<Long> projectIds = getProjectIds(ws.getId());
+        List<Long> projectIds = getProjectIds(ws.getId(), userId);
 
         // counts[userId][date] = nb d'échéances ouvertes ce jour-là
         Map<Long, Map<String, Long>> counts = new HashMap<>();
@@ -355,7 +357,7 @@ public class AnalyticsService {
       }
 
       try {
-        List<Long> projectIds = getProjectIds(ws.getId());
+        List<Long> projectIds = getProjectIds(ws.getId(), userId);
 
         // Build context for the LLM
         long memberCount = workspaceMemberRepository.findByWorkspaceId(ws.getId()).size();
@@ -372,7 +374,7 @@ public class AnalyticsService {
         long resolvedMonth = projectIds.isEmpty() ? 0 : issueRepository.countCompletedBetween(projectIds, m0, now);
         long velocityThis  = projectIds.isEmpty() ? 0 : issueRepository.countCompletedBetween(projectIds, w0, now);
         long velocityLast  = projectIds.isEmpty() ? 0 : issueRepository.countCompletedBetween(projectIds, w1, w0);
-        long activeCycles  = cycleRepository.findActiveByWorkspaceSlug(slug).size();
+        long activeCycles  = activeViewableCycles(slug, ws.getId(), userId).size();
 
         String context = String.format(
             "Workspace: %s | Members: %d | Projects: %d | Open issues: %d | Resolved this month: %d | " +
@@ -444,18 +446,35 @@ public class AnalyticsService {
             .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable: " + slug));
     }
 
-    private List<Long> getProjectIds(Long workspaceId) {
-        return projectRepository.findByWorkspaceIdOrderByCreatedAtDesc(workspaceId)
-            .stream().map(p -> p.getId()).toList();
+    /**
+     * Projets <b>visibles</b> par l'utilisateur pour les analytics (TF-RBAC-INTEL, façon GitHub/Linear) :
+     * OWNER/ADMIN du workspace → tous ; sinon publics + projets dont il est membre.
+     */
+    private List<Long> getProjectIds(Long workspaceId, Long userId) {
+        return visibilityGuard.viewableProjectIds(workspaceId, userId);
     }
 
-    /** Filtre analytics par projet (PROD-1.7) : si projectId valide du workspace → ce seul projet, sinon tous. */
-    private List<Long> resolveProjectIds(Long workspaceId, Long projectId) {
-        List<Long> all = getProjectIds(workspaceId);
-        if (projectId != null && all.contains(projectId)) {
+    /**
+     * Scope analytics par projet, borné aux projets visibles par l'utilisateur : un {@code projectId}
+     * hors de son périmètre → 404 (on ne révèle pas l'existence) ; sinon tous ses projets visibles.
+     */
+    private List<Long> resolveProjectIds(Long workspaceId, Long userId, Long projectId) {
+        List<Long> viewable = getProjectIds(workspaceId, userId);
+        if (projectId != null) {
+            if (!viewable.contains(projectId)) {
+                throw new ResourceNotFoundException("Projet introuvable");
+            }
             return List.of(projectId);
         }
-        return all;
+        return viewable;
+    }
+
+    /** Cycles actifs du workspace restreints aux projets <b>visibles</b> par l'utilisateur (scope burndown). */
+    private List<Cycle> activeViewableCycles(String slug, Long workspaceId, Long userId) {
+        java.util.Set<Long> viewable = new java.util.HashSet<>(getProjectIds(workspaceId, userId));
+        return cycleRepository.findActiveByWorkspaceSlug(slug).stream()
+            .filter(c -> c.getProject() != null && viewable.contains(c.getProject().getId()))
+            .toList();
     }
 
     private double avgResolutionDays(List<Issue> issues) {
