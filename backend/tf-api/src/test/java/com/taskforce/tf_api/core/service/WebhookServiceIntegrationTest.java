@@ -16,14 +16,19 @@ import org.springframework.web.client.RestTemplate;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskforce.tf_api.core.dto.request.WebhookRequest;
 import com.taskforce.tf_api.core.dto.response.WebhookResponse;
+import com.taskforce.tf_api.core.enums.WorkspaceRole;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
+import com.taskforce.tf_api.core.model.WorkspaceMember;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WebhookRepository;
+import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.shared.exception.ForbiddenException;
 import com.taskforce.tf_api.util.AbstractIntegrationTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -35,7 +40,7 @@ import static org.mockito.Mockito.when;
  * CRUD + déclenchement (fire → POST HTTP).
  */
 @DisplayName("WebhookService (intégration Postgres)")
-@Import({WebhookService.class, WebhookServiceIntegrationTest.Cfg.class})
+@Import({WebhookService.class, AuthorizationService.class, WebhookServiceIntegrationTest.Cfg.class})
 class WebhookServiceIntegrationTest extends AbstractIntegrationTest {
 
     @TestConfiguration
@@ -47,6 +52,7 @@ class WebhookServiceIntegrationTest extends AbstractIntegrationTest {
     @Autowired private UserRepository userRepository;
     @Autowired private WorkspaceRepository workspaceRepository;
     @Autowired private WebhookRepository webhookRepository;
+    @Autowired private WorkspaceMemberRepository workspaceMemberRepository;
 
     @MockitoBean private RestTemplate restTemplate;
 
@@ -59,6 +65,8 @@ class WebhookServiceIntegrationTest extends AbstractIntegrationTest {
         owner = userRepository.save(User.builder()
             .keycloakId("kc-hook").email("hook@it.dev").displayName("Owner").isActive(true).build());
         workspace = workspaceRepository.save(Workspace.builder().name("Hook WS").slug(SLUG).owner(owner).build());
+        workspaceMemberRepository.save(WorkspaceMember.builder()
+            .workspace(workspace).user(owner).role(WorkspaceRole.OWNER).build());
     }
 
     private WebhookResponse create(String url) {
@@ -71,11 +79,24 @@ class WebhookServiceIntegrationTest extends AbstractIntegrationTest {
         WebhookResponse w = create("https://ex.com/hook");
         assertThat(webhookService.list(SLUG)).hasSize(1);
 
-        webhookService.update(SLUG, w.id(), new WebhookRequest("https://ex.com/v2", null, null));
+        webhookService.update(SLUG, w.id(), new WebhookRequest("https://ex.com/v2", null, null), owner.getId());
         assertThat(webhookRepository.findById(w.id()).orElseThrow().getUrl()).isEqualTo("https://ex.com/v2");
 
-        webhookService.delete(SLUG, w.id());
+        webhookService.delete(SLUG, w.id(), owner.getId());
         assertThat(webhookService.list(SLUG)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("un simple membre (non OWNER/ADMIN) ne peut pas gérer les webhooks (ForbiddenException)")
+    void member_cannot_manage() {
+        User member = userRepository.save(User.builder()
+            .keycloakId("kc-hook-member").email("member@it.dev").displayName("Member").isActive(true).build());
+        workspaceMemberRepository.save(WorkspaceMember.builder()
+            .workspace(workspace).user(member).role(WorkspaceRole.MEMBER).build());
+
+        assertThatThrownBy(() -> webhookService.create(
+                SLUG, new WebhookRequest("https://evil.example/exfil", null, List.of()), member))
+            .isInstanceOf(ForbiddenException.class);
     }
 
     // NB : fire() est @Async → non testable ici (le thread async ne voit pas la donnée non-committée
