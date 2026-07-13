@@ -35,6 +35,7 @@ public class WebhookService {
     private final WorkspaceRepository workspaceRepository;
     private final RestTemplate        restTemplate;
     private final ObjectMapper        objectMapper;
+    private final AuthorizationService authorizationService; // gate OWNER/ADMIN du CRUD (webhook sortant = exfil)
 
     // ----------------------------------------------------------------
     // CRUD
@@ -44,6 +45,8 @@ public class WebhookService {
     public WebhookResponse create(String workspaceSlug, WebhookRequest req, User createdBy) {
         Workspace workspace = workspaceRepository.findBySlug(workspaceSlug)
             .orElseThrow(() -> new ResourceNotFoundException("Workspace not found: " + workspaceSlug));
+        // Webhook sortant = risque d'exfiltration → réservé aux gestionnaires (OWNER/ADMIN).
+        authorizationService.requireManager(workspace.getId(), createdBy.getId());
 
         Webhook webhook = Webhook.builder()
             .workspace(workspace)
@@ -68,9 +71,10 @@ public class WebhookService {
     }
 
     @Transactional
-    public WebhookResponse update(String workspaceSlug, Long webhookId, WebhookRequest req) {
+    public WebhookResponse update(String workspaceSlug, Long webhookId, WebhookRequest req, Long userId) {
         Workspace workspace = workspaceRepository.findBySlug(workspaceSlug)
             .orElseThrow(() -> new ResourceNotFoundException("Workspace not found: " + workspaceSlug));
+        authorizationService.requireManager(workspace.getId(), userId);
 
         Webhook webhook = webhookRepository.findById(webhookId)
             .filter(w -> w.getWorkspace().getId().equals(workspace.getId()))
@@ -85,9 +89,10 @@ public class WebhookService {
     }
 
     @Transactional
-    public void delete(String workspaceSlug, Long webhookId) {
+    public void delete(String workspaceSlug, Long webhookId, Long userId) {
         Workspace workspace = workspaceRepository.findBySlug(workspaceSlug)
             .orElseThrow(() -> new ResourceNotFoundException("Workspace not found: " + workspaceSlug));
+        authorizationService.requireManager(workspace.getId(), userId);
         webhookRepository.deleteByIdAndWorkspaceId(webhookId, workspace.getId());
     }
 
