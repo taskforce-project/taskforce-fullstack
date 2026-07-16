@@ -311,6 +311,9 @@ public class BrainIngestionService {
         Map<String, Object> metadata = new LinkedHashMap<>();
         metadata.put("cycleId", facts.cycleId());
         metadata.put("projectIdentifier", facts.projectIdentifier());
+        // Appartenance projet (liste = une note peut être transverse à plusieurs projets ; ici le
+        // cycle n'en a qu'un). Le graphe s'en sert pour dessiner les régions — cf. BrainGraph.
+        metadata.put("projects", List.of(cycle.getProject().getId()));
         metadata.put("generatedBy", "ingestion-auto");
         metadata.put("mode", synthesis != null ? "generated" : "facts-only");
         metadata.put("closed", closed);
