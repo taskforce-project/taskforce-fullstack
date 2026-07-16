@@ -37,5 +37,13 @@ public class CreateKnowledgeNodeRequest {
     /** Tags explicites (les #tags du contenu sont aussi détectés automatiquement). */
     private List<String> tags;
 
+    /**
+     * Projets auxquels la note appartient — <b>plusieurs</b> possibles : une connaissance est
+     * souvent transverse (une décision d'archi vaut pour le web et l'API). C'est ce qui interdit un
+     * simple champ {@code projectId}, et ce que le graphe rend par des régions qui se chevauchent.
+     * Stocké dans {@code metadata.projects}.
+     */
+    private List<Long> projects;
+
     private Map<String, Object> metadata;
 }

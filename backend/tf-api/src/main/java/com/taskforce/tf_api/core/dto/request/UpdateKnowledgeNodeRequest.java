@@ -25,5 +25,9 @@ public class UpdateKnowledgeNodeRequest {
     private String status;        // NodeStatus
     private String versionLabel;
     private List<String> tags;
+
+    /** Projets de rattachement (plusieurs = note transverse) → {@code metadata.projects}. Voir {@link CreateKnowledgeNodeRequest}. */
+    private List<Long> projects;
+
     private Map<String, Object> metadata;
 }
