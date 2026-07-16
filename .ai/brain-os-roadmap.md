@@ -1,11 +1,15 @@
 # Roadmap — Brain OS (couche de connaissance native TaskForce)
 
-> **⏸ STAND-BY (décision 2026-06-30)** : socle **fonctionnellement complet**, on l'arrête là pour la V1.
+> **⏸ STAND-BY (décision 2026-06-30, rouvert ponctuellement le 16/07)** : socle **fonctionnellement
+> complet**, on l'arrête là pour la V1. Seule exception rouverte depuis : la **Phase 4bis** (ingestion
+> automatique), parce que le graphe ne se remplissait de **rien** de ce qui se passe dans les projets.
+> **Brain OS refermé après ce lot.**
 > Reste avant gel : **tests + revue sécu** du périmètre Brain OS (mutualisés avec le chantier Tests global de l'app).
 > Tout le reste (Phases 4/5, tiptap, async, marketplace, env-gated LLM) est parti en **backlog** : `.ai/backlog-post-v1.md` §1.
 > Priorité désormais = clôture V1 de l'app (voir `.ai/roadmap.md`).
 >
-> **Statut** : Phases 0→3 **faites** · deep-path agentique **code-complet** (génération env-gated LLM) · **Branche** : `feat/dashboard` · **Maj** : 2026-06-29
+> **Statut** : Phases 0→3 **faites** · Phase 4 lots 1/2a/2b **faits** · **Phase 4bis (ingestion auto) faite**
+> · deep-path agentique **code-complet** · **Branche** : `feat/dashboard` · **Maj** : 2026-07-16
 >
 > **Synthèse** : le Brain OS est un produit complet et utilisable — graphe neural (tags + wikilinks),
 > éditeur riche (callouts/titres/couleurs/images MinIO/code, toolbar sticky), explorateur Obsidian
@@ -21,6 +25,12 @@
 obstacle et artefact d'un workspace est stocké dans un **graphe de connaissance** interrogeable
 par l'humain *et* par l'IA. L'IA répond, décide et **réécrit dans le graphe** (write-back) — le
 cerveau grandit tout seul.
+
+> **Où en est réellement le « tout seul » ?** Jusqu'au 16/07/2026 c'était la vision, pas le code :
+> **aucun** chemin d'écriture ne partait de l'activité projet (mesuré : 267 issues, 0 node lié).
+> Depuis la **Phase 4bis**, la clôture d'un cycle et les issues terminées alimentent le graphe sans
+> intervention humaine. Les autres chemins (spec approuvée, `create_note`, édition) restent
+> **déclenchés par un humain**, et les issues hors cycle / commentaires / PR ne sont pas ingérés.
 
 ## 1. Décisions d'architecture (tranchées)
 
@@ -180,6 +190,54 @@ TOTAL                                ≈ 218 GB
 - [x] **smart-assign → Qwen (09/07)** : `SmartAssignService` appelait `GroqService` en dur (bloqué → fallback Java permanent) → swap **`LlmClient`** (AI Gateway → Qwen), tier `fast`. `fallbackUsed=false`, raison LLM réelle. Signaux gardés (skills/workload/historique/growth)
 - [ ] *(lot 2b)* **bridge GitHub** : approuver une spec → PR draft (branche + spec en body) ou issue GitHub via l'intégration existante — « management côté GitHub »
 - [ ] *(far, option)* **code agent autonome** : issue → implémente → PR (nécessite API payante ou modèle local costaud ; le flux $0 = humain copie le prompt dans Claude Code)
+
+### Phase 4bis — Ingestion automatique de l'activité projet · 🟢 **fait (16/07)**
+
+> **Le constat qui a déclenché ce lot** : le graphe ne se nourrissait **que** du seed, de la main de
+> l'humain et de deux actions explicites (spec approuvée, outil `create_note`). Mesuré en base :
+> 267 issues, 137 commentaires… et **0 node avec `ref_type` non nul**. Aucun `@EventListener` ne
+> touchait le brain. La phrase §0 « le cerveau grandit tout seul » décrivait la vision, pas le code.
+
+- [x] **Contrat d'écriture = celui d'un agent** (`AGENTS.md` §2) porté dans le produit : faits issus
+      **du SQL**, LLM cantonné à la **rédaction** (il ne reçoit que les faits) ; **upsert** par
+      `refType/refId` (une fiche par cycle, jamais un node par événement) ; **grain = le lot** (le
+      cycle) ; **format Obsidian** (`#tags` + `[[wikilinks]]` → `BrainLinkService` tisse les arêtes).
+- [x] **Zéro nouvel enum, zéro nouvelle table** : `NodeType.ACTION_OODA`, `NodeDomain.HISTORIQUE` et
+      `NodeRefType.CYCLE` existaient déjà **sans aucun écrivain**. On remplit un trou laissé exprès.
+- [x] **Points d'accroche déjà écrits** : `CycleService:121` (transition → `COMPLETED`, garde « une
+      seule fois » qui servait déjà au push Slack) et `IssueService:411` (`completedAt == null`).
+      → `CycleCompletedEvent` / `IssueCompletedEvent` (identifiants seuls).
+- [x] **`BrainIngestionListener`** : `@TransactionalEventListener(AFTER_COMMIT)` + `@Async` + try/catch.
+      AFTER_COMMIT = un échec d'ingestion ne peut pas annuler la clôture d'un cycle ; `@Async` = la
+      requête HTTP ne paie pas les ~200 s du LLM.
+- [x] **`BrainIngestionService`** : `collectCycleFacts` (tx courte) → `synthesize` (**hors tx**) →
+      `writeCycleNode` (tx courte). Un `@Transactional` englobant l'appel LLM immobiliserait une
+      connexion du pool pendant toute la génération.
+- [x] **Qwen tier `fast` via `LlmClient` → `AiMeter`** = **7ᵉ chemin IA** métré (sinon on rouvrait le
+      trou de quota fermé par TF-AI-CONSUMPTION-WF). Repli déterministe sur LLM absent / quota 409 /
+      timeout / réponse vide → **le node est écrit dans tous les cas**, en faits seuls.
+- [x] **V69 + verrou pessimiste** — *bug trouvé par le scénario, invisible en test unitaire* :
+      l'upsert est un check-then-act ; 4 issues terminées coup sur coup → 4 listeners `@Async` lisent
+      « aucun node » avant tout commit → **4 doublons en 240 ms**. Correctif : `findByIdForUpdate`
+      (verrou sur la ligne du cycle, faits relus sous verrou) + index partiel `uq_knodes_cycle_ref`
+      (l'invariant vit dans le schéma, pas seulement dans l'appelant).
+- [x] **Scénario `scripts/scenario/play.mjs`** : joue un projet via la **vraie API REST** (un SQL ne
+      traverse pas Spring → aucun événement → c'est *pourquoi* le seed laisse le brain vide). Vérifie
+      l'idempotence et la présence des rétros. **Vérifié e2e** : `Rétro — Sprint 1 · Fondations (PORT)`
+      = 4/5 livrées, 80 %, 13/21 pts, synthèse Qwen sans fait inventé, arête auto vers
+      `[[16 · Historique des actions]]`, embeddé. 30 tests unitaires (`BrainIngestionServiceTest`).
+- [ ] **Hors périmètre assumé** : issues **hors cycle** (259 des 267 du seed), **commentaires**, **PR**
+      → aucune ingestion. Le grain reste le lot ; l'événement isolé n'écrit rien.
+- [ ] *(futur)* rétro **de projet** (agrégat multi-cycles) ; `ACTION_OODA` sur clôture de projet.
+
+> **Comportement connu — nodes orphelins.** Supprimer un projet (donc ses cycles) **ne supprime pas**
+> les rétros correspondantes : `refId` n'est pas une FK. Constaté en rejouant le scénario (`--reset`) :
+> 2 nodes pointent vers des cycles disparus. C'est **cohérent avec la décision §1** (« graphe
+> **parallèle** qui *peut* pointer vers issues/projets ») — une rétro reste une connaissance valide
+> même si le sprint est effacé, et la supprimer serait perdre de la mémoire. Seule la suppression du
+> **workspace** cascade (vérifié en Phase 0). À trancher si ça gêne : purge à la suppression de projet,
+> ou marquage `status=ARCHIVED` du node. Pas de piège pour la démo : `db.ps1 seed` DROP le workspace
+> entier, donc un `seed` → `play.mjs` repart toujours propre.
 
 ### Phase 5 — Marketplace (moat)
 - Brain Packs (SaaS/Ecom… nodes pré-remplis), templates ADR sectoriels
