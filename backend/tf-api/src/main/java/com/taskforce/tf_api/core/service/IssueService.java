@@ -11,6 +11,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -48,6 +49,7 @@ import com.taskforce.tf_api.core.enums.IssueRelationType;
 import com.taskforce.tf_api.core.enums.IssueStatusCategory;
 import com.taskforce.tf_api.core.enums.PlanFeature;
 import com.taskforce.tf_api.core.enums.PlanType;
+import com.taskforce.tf_api.core.event.IssueCompletedEvent;
 import com.taskforce.tf_api.core.model.Issue;
 import com.taskforce.tf_api.core.model.IssueActivity;
 import com.taskforce.tf_api.core.model.IssueComment;
@@ -104,6 +106,7 @@ public class IssueService {
     private final SlackIntegrationService       slackService;
     private final ProjectVisibilityGuard        visibilityGuard;
     private final PlanFeatureService            planFeatureService;
+    private final ApplicationEventPublisher     events;
 
     /** Plafond d'issues du forfait Free (par workspace). Payant = illimité. */
     private static final long FREE_ISSUE_LIMIT = 250;
@@ -131,7 +134,8 @@ public class IssueService {
         IssueWorklogRepository worklogRepository,
         SlackIntegrationService slackService,
         ProjectVisibilityGuard visibilityGuard,
-        PlanFeatureService planFeatureService
+        PlanFeatureService planFeatureService,
+        ApplicationEventPublisher events
     ) {
         this.issueRepository = issueRepository;
         this.issueStatusRepository = issueStatusRepository;
@@ -152,6 +156,7 @@ public class IssueService {
         this.slackService = slackService;
         this.visibilityGuard = visibilityGuard;
         this.planFeatureService = planFeatureService;
+        this.events = events;
     }
 
     // =========================================================================
@@ -411,6 +416,10 @@ public class IssueService {
                 if (newStatus.getCategory() == IssueStatusCategory.COMPLETED && issue.getCompletedAt() == null) {
                     issue.setCompletedAt(LocalDateTime.now());
                     logActivity(issue, actor, IssueActivityType.COMPLETED, null, newStatus.getName());
+                    // … et le Brain OS rafraîchit le relevé du cycle porteur. Publié sous la même garde
+                    // « une seule fois », consommé après commit — cf. BrainIngestionListener.
+                    events.publishEvent(new IssueCompletedEvent(
+                        workspaceSlug, project.getWorkspace().getId(), project.getId(), issue.getId(), userId));
                 } else if (newStatus.getCategory() != IssueStatusCategory.COMPLETED && issue.getCompletedAt() != null) {
                     issue.setCompletedAt(null);
                     logActivity(issue, actor, IssueActivityType.REOPENED, old, newStatus.getName());

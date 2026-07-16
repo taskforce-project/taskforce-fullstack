@@ -2,6 +2,7 @@ package com.taskforce.tf_api.core.service;
 
 import java.util.List;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -11,6 +12,7 @@ import com.taskforce.tf_api.core.dto.request.UpdateCycleRequest;
 import com.taskforce.tf_api.core.dto.response.CycleResponse;
 import com.taskforce.tf_api.core.dto.response.IssueResponse;
 import com.taskforce.tf_api.core.enums.CycleStatus;
+import com.taskforce.tf_api.core.event.CycleCompletedEvent;
 import com.taskforce.tf_api.core.model.Cycle;
 import com.taskforce.tf_api.core.model.CycleIssue;
 import com.taskforce.tf_api.core.model.Issue;
@@ -43,6 +45,7 @@ public class CycleService {
     private final UserRepository             userRepository;
     private final IssueService               issueService;
     private final SlackIntegrationService    slackService;
+    private final ApplicationEventPublisher  events;
 
     // =========================================================================
     // CRUD cycles
@@ -121,6 +124,10 @@ public class CycleService {
         if (cycle.getStatus() == CycleStatus.COMPLETED && previousStatus != CycleStatus.COMPLETED) {
             slackService.notifyEvent(project.getWorkspace().getId(), "cycle.completed",
                 "🏁 Cycle *" + cycle.getName() + "* terminé");
+            // … et le Brain OS écrit la rétro du cycle. Publié ici (même garde « une seule fois »),
+            // consommé après commit et hors requête — cf. BrainIngestionListener.
+            events.publishEvent(new CycleCompletedEvent(
+                workspaceSlug, project.getWorkspace().getId(), project.getId(), cycle.getId(), userId));
         }
 
         return toResponse(cycle, cycleIssueRepository.countByCycleId(cycle.getId()));
