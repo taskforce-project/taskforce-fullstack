@@ -148,6 +148,8 @@ public class IssueAiService {
             .refType("ISSUE")
             .refId(issueId)
             .tags(List.of("spec", "ai-generated"))
+            // Rattache la spec au projet de son issue → elle rejoint sa région dans le graphe.
+            .projects(List.of(projectId))
             .metadata(metadata)
             .build();
 
