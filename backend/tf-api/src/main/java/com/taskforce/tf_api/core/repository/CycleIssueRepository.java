@@ -15,6 +15,10 @@ public interface CycleIssueRepository extends JpaRepository<CycleIssue, Long> {
     @Query("SELECT ci FROM CycleIssue ci JOIN FETCH ci.issue WHERE ci.cycle.id = :cycleId ORDER BY ci.addedAt ASC")
     List<CycleIssue> findByCycleId(@Param("cycleId") Long cycleId);
 
+    /** Cycles auxquels une issue est rattachée (ingestion Brain OS : retrouver le cycle porteur). */
+    @Query("SELECT ci FROM CycleIssue ci JOIN FETCH ci.cycle WHERE ci.issue.id = :issueId")
+    List<CycleIssue> findByIssueId(@Param("issueId") Long issueId);
+
     Optional<CycleIssue> findByCycleIdAndIssueId(Long cycleId, Long issueId);
 
     boolean existsByCycleIdAndIssueId(Long cycleId, Long issueId);
