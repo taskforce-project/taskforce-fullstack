@@ -1,0 +1,14 @@
+{
+  "name": "taskforce-scenario",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Joue la vie d'un projet TaskForce via la vraie API REST — alimente le Brain OS par le vrai chemin de code.",
+  "scripts": {
+    "play": "node play.mjs",
+    "replay": "node play.mjs --reset"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
