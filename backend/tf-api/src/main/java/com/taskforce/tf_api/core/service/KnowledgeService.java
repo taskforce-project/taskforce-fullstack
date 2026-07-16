@@ -56,6 +56,24 @@ public class KnowledgeService {
     /** Plafond de nodes/arêtes renvoyés dans la vue d'ensemble (protège le payload + le rendu). */
     private static final int OVERVIEW_CAP = 1000;
 
+    /**
+     * Fusionne l'appartenance projet dans les metadata (clé {@code projects}).
+     *
+     * <p>C'est une <b>liste</b>, pas un {@code projectId} : une connaissance est souvent transverse
+     * (une décision d'archi vaut pour le web ET l'API). C'est ce qui permet au graphe de dessiner
+     * des régions qui se chevauchent plutôt que des parts de tarte exclusives. Une liste vide
+     * détache la note de tout projet (elle redevient globale).
+     */
+    private static Map<String, Object> withProjects(Map<String, Object> metadata, List<Long> projects) {
+        Map<String, Object> meta = metadata != null ? new HashMap<>(metadata) : new HashMap<>();
+        if (projects != null) {
+            List<Long> clean = projects.stream().filter(java.util.Objects::nonNull).distinct().toList();
+            if (clean.isEmpty()) meta.remove("projects");
+            else meta.put("projects", clean);
+        }
+        return meta;
+    }
+
     // =========================================================================
     // Lecture
     // =========================================================================
@@ -145,7 +163,7 @@ public class KnowledgeService {
             .versionLabel("v1")
             .refType(req.getRefType() != null ? BrainEnums.refType(req.getRefType()) : null)
             .refId(req.getRefId())
-            .metadata(req.getMetadata() != null ? req.getMetadata() : new HashMap<>())
+            .metadata(withProjects(req.getMetadata(), req.getProjects()))
             .build();
         // Attribution explicite (pas d'AuditorAware ; convention projet = id user en string).
         node.setCreatedBy(String.valueOf(userId));
@@ -168,7 +186,12 @@ public class KnowledgeService {
         if (req.getDomain() != null)       node.setDomain(BrainEnums.domain(req.getDomain()));
         if (req.getStatus() != null)       node.setStatus(BrainEnums.status(req.getStatus()));
         if (req.getVersionLabel() != null) node.setVersionLabel(req.getVersionLabel());
-        if (req.getMetadata() != null)     node.setMetadata(req.getMetadata());
+        // Les projets peuvent être révisés seuls (sans toucher au reste des metadata) — on repart
+        // alors de l'existant plutôt que de l'écraser.
+        if (req.getMetadata() != null || req.getProjects() != null) {
+            Map<String, Object> base = req.getMetadata() != null ? req.getMetadata() : node.getMetadata();
+            node.setMetadata(withProjects(base, req.getProjects()));
+        }
         node.setUpdatedBy(String.valueOf(userId));
 
         KnowledgeNode saved = nodeRepository.save(node);
