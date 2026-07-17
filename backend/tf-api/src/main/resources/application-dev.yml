@@ -221,13 +221,16 @@ server:
 
 # AI Configuration (Phase 4)
 ai:
-  # Fournisseur LLM actif : ollama (local/gratuit) | groq (bloqué sur ce réseau) | (vide = repli sans LLM)
-  provider: ${AI_PROVIDER:ollama}
-  groq:
-    api-key: ${GROQ_API_KEY:}
-    smart-assign-model: ${GROQ_SMART_ASSIGN_MODEL:llama-3.1-8b-instant}
-    assistant-model: ${GROQ_ASSISTANT_MODEL:llama-3.3-70b-versatile}
-  # AI Gateway (service Python ai-service) → LLM local Ollama (Qwen 14B sur la RTX 5070, gratuit).
+  # Un seul chemin LLM : l'AI Gateway (service Python ai-service) → notre modèle local Ollama, gratuit.
+  # Le bloc `groq` et la clé `provider` ont été SUPPRIMÉS le 16/07 (TF-AI-GROQ-CLEANUP) : Groq était
+  # bloqué sur ce réseau (403), écarté par la décision du 07/07, et son client n'implémentait pas la
+  # capture d'usage → le sélectionner désarmait silencieusement tout le quota IA.
+  model:
+    # Décoratif : l'AI Gateway IGNORE volontairement le modèle qu'on lui passe (AiGatewayClient.callChat)
+    # et applique le sien (OLLAMA_MODEL, routé par tier fast/standard/deep dans l'ai-service).
+    # Conservé parce que LlmClient.chatCompletion(model, …) le prend encore en paramètre.
+    assistant: ${AI_ASSISTANT_MODEL:gateway-default}
+    smart-assign: ${AI_SMART_ASSIGN_MODEL:gateway-default}
   # Le routing modèle + l'URL Ollama vivent dans l'ai-service (OLLAMA_BASE_URL/OLLAMA_MODEL).
   gateway:
     base-url: ${AI_GATEWAY_BASE_URL:http://ai-service:8000}
