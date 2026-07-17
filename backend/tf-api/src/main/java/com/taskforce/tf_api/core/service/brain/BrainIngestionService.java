@@ -68,7 +68,7 @@ public class BrainIngestionService {
     private final LlmClient                llm;
     private final AiMeter                  aiMeter;
 
-    @Value("${ai.groq.assistant-model:llama-3.3-70b-versatile}")
+    @Value("${ai.model.assistant:gateway-default}")
     private String model; // ignoré par l'AI Gateway (Ollama impose son modèle) ; utile si provider=groq
 
     /** Hub de domaine ciblé par un wikilink pour raccrocher la rétro au graphe (best-effort). */
