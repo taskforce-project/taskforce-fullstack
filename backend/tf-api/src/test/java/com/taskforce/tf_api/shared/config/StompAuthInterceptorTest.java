@@ -12,6 +12,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageDeliveryException;
+import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.MessageBuilder;
@@ -59,14 +60,23 @@ class StompAuthInterceptorTest {
 
     @InjectMocks private StompAuthInterceptor interceptor;
 
+    /**
+     * {@code setLeaveMutable(true)} reproduit le pipeline réel : sur le {@code clientInboundChannel},
+     * Spring livre la frame CONNECT avec un accessor <b>mutable</b>, justement pour qu'un intercepteur
+     * puisse y poser le Principal ({@code accessor.setUser(...)}). Sans ce flag, {@code getMessageHeaders()}
+     * fige les en-têtes et l'{@code setUser} de production échoue en « Already immutable » — un artefact de
+     * test, pas un bug du code.
+     */
     private Message<byte[]> connect(String authHeader) {
         StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.CONNECT);
+        accessor.setLeaveMutable(true);
         if (authHeader != null) accessor.setNativeHeader("Authorization", authHeader);
         return MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
     }
 
     private Message<byte[]> subscribe(String destination, String principalUserId) {
         StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
+        accessor.setLeaveMutable(true);
         accessor.setDestination(destination);
         if (principalUserId != null) {
             accessor.setUser(new UsernamePasswordAuthenticationToken(principalUserId, null, java.util.List.of()));
@@ -95,11 +105,12 @@ class StompAuthInterceptorTest {
             when(userRepository.findByEmail("dev@it.dev"))
                 .thenReturn(Optional.of(User.builder().id(7L).email("dev@it.dev").build()));
 
-            // Ne lève pas = la connexion est acceptée. On ne relit pas le Principal depuis le message :
-            // ses en-têtes sont déjà immuables ici (« Already immutable »), et c'est le rôle des tests
-            // SUBSCRIBE ci-dessous de prouver que le Principal posé est bien exploité.
-            interceptor.preSend(connect("Bearer tok"), channel);
+            Message<?> out = interceptor.preSend(connect("Bearer tok"), channel);
 
+            // Le Principal posé par l'intercepteur = l'id utilisateur, relu directement sur les en-têtes.
+            java.security.Principal user = SimpMessageHeaderAccessor.getUser(out.getHeaders());
+            assertThat(user).isNotNull();
+            assertThat(user.getName()).isEqualTo("7");
             verify(jwtDecoder).decode("tok");
             verify(userRepository).findByEmail("dev@it.dev");
         }
