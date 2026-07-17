@@ -118,7 +118,6 @@ function toSheetIssue(issue: Issue): SheetIssue {
     archived:       issue.archived,
     dueDate:        issue.dueDate,
     storyPoints:    issue.storyPoints,
-    cycle:          null,
     createdAt:      issue.createdAt,
   }
 }
