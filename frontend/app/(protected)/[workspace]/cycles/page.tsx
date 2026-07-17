@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useParams } from "next/navigation"
 import {
   Plus,
@@ -96,7 +96,7 @@ function formatDate(date: string): string {
 // CycleCard
 // ─────────────────────────────────────────────────────────────────────────────
 
-function CycleCard({ cycle, slug }: Readonly<{ cycle: Cycle; slug: string }>) {
+function CycleCard({ cycle, slug, reload }: Readonly<{ cycle: Cycle; slug: string; reload: () => void | Promise<void> }>) {
   const pct  = progress(cycle.issues)
   const left = daysLeft(cycle.endDate)
   const router = useRouter()
@@ -108,6 +108,7 @@ function CycleCard({ cycle, slug }: Readonly<{ cycle: Cycle; slug: string }>) {
 
   async function handleDelete() {
     await deleteCycle(slug, projectId, cycleId)
+    await reload() // la page tient un état local → sans ça, la carte supprimée restait à l'écran
   }
 
   /**
@@ -120,7 +121,8 @@ function CycleCard({ cycle, slug }: Readonly<{ cycle: Cycle; slug: string }>) {
   async function handleTransition(next: ApiCycleStatus) {
     setBusy(true)
     try {
-      await updateCycle(slug, projectId, cycleId, { status: next })
+      const updated = await updateCycle(slug, projectId, cycleId, { status: next })
+      if (updated) await reload() // reclasse la carte dans la bonne section (Active/Upcoming/Completed)
     } finally {
       setBusy(false)
     }
@@ -274,11 +276,12 @@ function CycleCard({ cycle, slug }: Readonly<{ cycle: Cycle; slug: string }>) {
 // Section
 // ─────────────────────────────────────────────────────────────────────────────
 
-function CycleSection({ title, cycles, defaultOpen = true, slug }: Readonly<{
+function CycleSection({ title, cycles, defaultOpen = true, slug, reload }: Readonly<{
   title: string
   cycles: Cycle[]
   defaultOpen?: boolean
   slug: string
+  reload: () => void | Promise<void>
 }>) {
   const [open, setOpen] = useState(defaultOpen)
 
@@ -297,7 +300,7 @@ function CycleSection({ title, cycles, defaultOpen = true, slug }: Readonly<{
 
       {open && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {cycles.map((cycle) => <CycleCard key={cycle.id} cycle={cycle} slug={slug} />)}
+          {cycles.map((cycle) => <CycleCard key={cycle.id} cycle={cycle} slug={slug} reload={reload} />)}
         </div>
       )}
     </div>
@@ -347,15 +350,18 @@ export default function CyclesPage() {
 
   const [cycles, setCycles] = useState<Cycle[]>([])
 
-  useEffect(() => {
+  // Extrait en callback pour être rejoué après une transition/suppression : la page tient son PROPRE
+  // état local (mappé depuis l'API), distinct du store — muter le store ne la rafraîchit donc pas.
+  const reload = useCallback(async () => {
     if (!slug) return
-    fetchProjects(slug).then((projs) => {
-      Promise.all(projs.map((p) => fetchCycles(slug, p.id))).then((results) => {
-        setCycles(mapApiCyclesToLocal(results, projs))
-      })
-    })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug])
+    const projs = await fetchProjects(slug)
+    const results = await Promise.all(projs.map((p) => fetchCycles(slug, p.id)))
+    setCycles(mapApiCyclesToLocal(results, projs))
+  }, [slug, fetchProjects, fetchCycles])
+
+  useEffect(() => {
+    void reload()
+  }, [reload])
 
   const active    = cycles.filter((c) => c.status === "active")
   const upcoming  = cycles.filter((c) => c.status === "upcoming")
@@ -381,18 +387,18 @@ export default function CyclesPage() {
 
       {/* Active cycles */}
       {active.length > 0 && (
-        <CycleSection title="Active" cycles={active} defaultOpen slug={slug} />
+        <CycleSection title="Active" cycles={active} defaultOpen slug={slug} reload={reload} />
       )}
 
       {/* Upcoming cycles */}
       {upcoming.length > 0 && (
-        <CycleSection title="Upcoming" cycles={upcoming} defaultOpen slug={slug} />
+        <CycleSection title="Upcoming" cycles={upcoming} defaultOpen slug={slug} reload={reload} />
       )}
 
       {/* Completed cycles */}
       {completed.length > 0 && (
-        <CycleSection title="Completed" cycles={completed} defaultOpen={false} slug={slug} />
-      )}  
+        <CycleSection title="Completed" cycles={completed} defaultOpen={false} slug={slug} reload={reload} />
+      )}
 
       {/* Empty state */}
       {!isLoading && cycles.length === 0 && (
