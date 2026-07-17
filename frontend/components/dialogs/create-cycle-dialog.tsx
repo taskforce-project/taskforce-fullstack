@@ -35,22 +35,21 @@ import {
 } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 import { useProjectStore } from "@/lib/store/project-store"
+import { useCycleStore } from "@/lib/store/cycle-store"
+import type { Cycle } from "@/lib/api/cycle-service"
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-interface CreateCyclePayload {
-  name: string
-  description: string
-  projectId: string
-  startDate: Date
-  endDate: Date
-}
+// Le payload local a disparu : il décrivait un objet que le dialog passait à un callback jamais fourni.
+// Le contrat qui compte est celui du service (`CreateCyclePayload` de cycle-service), et l'appelant
+// reçoit désormais le `Cycle` réellement persisté.
 
 interface CreateCycleDialogProps {
   readonly children?: React.ReactNode
-  readonly onCreated?: (payload: CreateCyclePayload) => void
+  /** Notifié APRÈS persistance réussie, avec le cycle créé. Optionnel : la création n'en dépend pas. */
+  readonly onCreated?: (cycle: Cycle) => void
 }
 
 // ---------------------------------------------------------------------------
@@ -61,6 +60,7 @@ export function CreateCycleDialog({ children, onCreated }: CreateCycleDialogProp
   const params = useParams()
   const slug = typeof params?.workspace === "string" ? params.workspace : ""
   const { projects, fetchProjects } = useProjectStore()
+  const { createCycle } = useCycleStore()
 
   const [open, setOpen] = useState(false)
   const [name, setName] = useState("")
@@ -70,6 +70,7 @@ export function CreateCycleDialog({ children, onCreated }: CreateCycleDialogProp
   const [endDate, setEndDate] = useState<Date | undefined>(undefined)
   const [startOpen, setStartOpen] = useState(false)
   const [endOpen, setEndOpen] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
 
   // Load projects when dialog opens
   useEffect(() => {
@@ -85,17 +86,36 @@ export function CreateCycleDialog({ children, onCreated }: CreateCycleDialogProp
   const selectedProject = projects.find((p) => String(p.id) === projectId) ?? projects[0]
   const canCreate = name.trim().length > 0 && startDate !== undefined && endDate !== undefined
 
-  function handleCreate() {
-    if (!name.trim() || !startDate || !endDate) return
-    onCreated?.({
-      name: name.trim(),
-      description,
-      projectId,
-      startDate,
-      endDate,
-    })
-    resetForm()
-    setOpen(false)
+  /**
+   * ⚠️ Ce dialog ne persistait RIEN. Il se contentait de `onCreated?.(payload)` — et ses deux usages
+   * (`cycles/page.tsx`) l'instancient **sans aucune prop**, donc `onCreated` était `undefined` et
+   * l'appel un no-op. Formulaire rempli, dialog fermé, aucune erreur, **aucun cycle créé**.
+   * Il appelle désormais le store lui-même, comme `create-project-dialog`. `onCreated` reste optionnel
+   * pour les appelants qui veulent réagir, mais la création ne dépend plus de lui.
+   */
+  async function handleCreate() {
+    if (!name.trim() || !startDate || !endDate || !slug) return
+    const pid = Number(projectId)
+    if (!Number.isFinite(pid) || pid <= 0) return
+
+    setIsLoading(true)
+    try {
+      // Le backend attend des LocalDate → "yyyy-MM-dd" (pas un ISO complet avec heure).
+      const cycle = await createCycle(slug, pid, {
+        name: name.trim(),
+        description: description.trim() || undefined,
+        startDate: format(startDate, "yyyy-MM-dd"),
+        endDate: format(endDate, "yyyy-MM-dd"),
+      })
+      // On ne ferme QUE si la création a abouti : sinon le formulaire reste, avec sa saisie.
+      if (cycle) {
+        onCreated?.(cycle)
+        resetForm()
+        setOpen(false)
+      }
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   function resetForm() {
@@ -248,7 +268,7 @@ export function CreateCycleDialog({ children, onCreated }: CreateCycleDialogProp
           <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>
             Cancel
           </Button>
-          <Button size="sm" onClick={handleCreate} disabled={!canCreate} className="gap-2">
+          <Button size="sm" onClick={handleCreate} disabled={!canCreate || isLoading} className="gap-2">
             <RefreshCw className="h-3.5 w-3.5" />
             Create cycle
           </Button>
