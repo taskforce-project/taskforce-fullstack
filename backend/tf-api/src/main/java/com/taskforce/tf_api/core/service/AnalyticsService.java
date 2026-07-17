@@ -67,7 +67,7 @@ public class AnalyticsService {
     private final JdbcTemplate               jdbcTemplate;
     private final ProjectVisibilityGuard     visibilityGuard;
 
-    @Value("${ai.groq.assistant-model:llama-3.3-70b-versatile}")
+    @Value("${ai.model.assistant:gateway-default}")
     private String assistantModel;
 
     /** Résout le workspace par slug ET vérifie que l'appelant en est membre (RBAC, PROD-3.2). */
