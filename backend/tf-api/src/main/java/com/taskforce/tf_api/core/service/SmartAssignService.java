@@ -56,7 +56,7 @@ public class SmartAssignService {
     private final ObjectMapper objectMapper;
     private final AiMeter aiMeter; // gate quota + capture/enregistrement de la conso tokens du scoring LLM
 
-    @Value("${ai.groq.smart-assign-model:llama-3.1-8b-instant}")
+    @Value("${ai.model.smart-assign:gateway-default}")
     private String modelName;
 
     // NB: read-write (PAS readOnly) — la méthode écrit ai_runs + assignment_events.
