@@ -177,9 +177,34 @@ public class User {
     @Column(name = "avatar_url", length = 500)
     private String avatarUrl;
 
-    /** Vrai si l'utilisateur est sur un plan payant (BASIC, BUSINESS ou ENTERPRISE). */
+    /**
+     * Vrai si l'utilisateur bénéficie effectivement d'un plan payant : un palier ≠ FREE <b>et</b> un
+     * abonnement qui n'est pas en défaut de paiement.
+     *
+     * <p>Le second test est le correctif de {@code TF-BILL-UNPAID} : cette méthode ne regardait que
+     * {@code planType}, si bien qu'un {@code invoice.payment_failed} → {@link PlanStatus#PAST_DUE}
+     * (écrit par {@code StripeWebhookService}) laissait l'utilisateur conserver <b>100 %</b> de ses
+     * features et de ses quotas, indéfiniment. Le statut était persisté et jamais relu.</p>
+     *
+     * <p><b>Pourquoi une liste de refus et non une liste d'autorisation</b> ({@code == ACTIVE || TRIALING},
+     * cf. {@link #hasActiveSubscription()}) : {@code planStatus} est <b>nullable</b>, et des comptes ont un
+     * palier payant sans statut — les plans posés hors Stripe, par exemple {@code V40__dev_admin_pro.sql}
+     * qui fait un {@code UPDATE plan_type} sans toucher {@code plan_status}. Une liste d'autorisation les
+     * rétrograderait silencieusement. On ne refuse donc que sur un défaut de paiement <b>explicite</b>.</p>
+     *
+     * <p>{@link PlanStatus#CANCELED} n'y figure pas volontairement : une résiliation programmée doit courir
+     * jusqu'à la fin de période, et c'est {@code customer.subscription.deleted} qui repasse le palier à FREE.
+     * {@link PlanStatus#INCOMPLETE} non plus : le paiement est en cours de traitement, pas en échec.</p>
+     */
     public boolean isPaid() {
-        return planType != null && planType != PlanType.FREE;
+        return planType != null && planType != PlanType.FREE && !isDelinquent();
+    }
+
+    /** Défaut de paiement avéré — l'accès payant doit cesser. */
+    private boolean isDelinquent() {
+        return planStatus == PlanStatus.PAST_DUE
+            || planStatus == PlanStatus.UNPAID
+            || planStatus == PlanStatus.INCOMPLETE_EXPIRED;
     }
 
     /**
