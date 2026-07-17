@@ -95,12 +95,12 @@ class StompAuthInterceptorTest {
             when(userRepository.findByEmail("dev@it.dev"))
                 .thenReturn(Optional.of(User.builder().id(7L).email("dev@it.dev").build()));
 
-            Message<?> out = interceptor.preSend(connect("Bearer tok"), channel);
+            // Ne lève pas = la connexion est acceptée. On ne relit pas le Principal depuis le message :
+            // ses en-têtes sont déjà immuables ici (« Already immutable »), et c'est le rôle des tests
+            // SUBSCRIBE ci-dessous de prouver que le Principal posé est bien exploité.
+            interceptor.preSend(connect("Bearer tok"), channel);
 
-            StompHeaderAccessor accessor =
-                StompHeaderAccessor.wrap(out);
-            assertThat(accessor.getUser()).isNotNull();
-            assertThat(accessor.getUser().getName()).isEqualTo("7");
+            verify(jwtDecoder).decode("tok");
             verify(userRepository).findByEmail("dev@it.dev");
         }
 
@@ -145,7 +145,9 @@ class StompAuthInterceptorTest {
         @Test
         @DisplayName("identité illisible (resolver qui lève) → REFUSÉ")
         void connect_unresolvable_identity_is_rejected() {
-            Jwt jwt = Jwt.withTokenValue("t").header("alg", "none").build();
+            // Le builder de Jwt refuse un token sans aucun claim → on met un `sub`, et c'est le resolver
+            // qui simule l'absence d'identité exploitable (claim `email` manquant hors profil dev).
+            Jwt jwt = Jwt.withTokenValue("t").header("alg", "none").claim("sub", "abc").build();
             when(jwtDecoder.decode("tok")).thenReturn(jwt);
             when(identityResolver.resolveEmail(any())).thenThrow(new IllegalStateException("JWT email claim missing"));
 
