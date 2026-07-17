@@ -48,19 +48,9 @@ class SharedConfigBeanTest {
         assertThat(cfg.rateLimitFilter(provider)).isNotNull();
     }
 
-    @Test
-    @DisplayName("GroqConfig — tous les beans (RestTemplate + modèles) se construisent")
-    void groqConfig_beans() {
-        GroqConfig cfg = new GroqConfig();
-        ReflectionTestUtils.setField(cfg, "apiKey", "test-groq-key");
-        ReflectionTestUtils.setField(cfg, "smartAssignModel", "llama-3.1-8b-instant");
-        ReflectionTestUtils.setField(cfg, "assistantModel", "llama-3.3-70b-versatile");
-
-        assertThat(cfg.groqRestTemplate()).isNotNull();
-        assertThat(cfg.groqApiKey()).isEqualTo("test-groq-key");
-        assertThat(cfg.groqSmartAssignModel()).isEqualTo("llama-3.1-8b-instant");
-        assertThat(cfg.groqAssistantModel()).isEqualTo("llama-3.3-70b-versatile");
-    }
+    // GroqConfig supprimé le 16/07 (TF-AI-GROQ-CLEANUP) — son test ne vérifiait que la construction
+    // de ses beans (RestTemplate + noms de modèles), soit de la cérémonie sur un client cloud bloqué
+    // sur ce réseau, jamais appelé, et dont l'absence de capture d'usage désarmait le quota IA.
 
     @Test
     @DisplayName("MailConfig — javaMailSender() se construit (aucune connexion SMTP)")
