@@ -100,10 +100,30 @@ function CycleCard({ cycle, slug }: Readonly<{ cycle: Cycle; slug: string }>) {
   const pct  = progress(cycle.issues)
   const left = daysLeft(cycle.endDate)
   const router = useRouter()
-  const { deleteCycle } = useCycleStore()
+  const { deleteCycle, updateCycle } = useCycleStore()
+  const [busy, setBusy] = useState(false)
+
+  const projectId = Number.parseInt(cycle.project.id, 10)
+  const cycleId   = Number.parseInt(cycle.id, 10)
 
   async function handleDelete() {
-    await deleteCycle(slug, Number.parseInt(cycle.project.id, 10), Number.parseInt(cycle.id, 10))
+    await deleteCycle(slug, projectId, cycleId)
+  }
+
+  /**
+   * Transition de statut — le chaînon UI qui manquait (C2). `updateCycle` existait dans le store et
+   * n'avait AUCUN appelant : un cycle naissait `DRAFT` et y restait, donc `ACTIVE`/`COMPLETED` étaient
+   * inatteignables depuis le produit (burndown vide, KPI à 0, sections Active/Completed désertes). Le
+   * backend, lui, gère déjà tout : validation, push Slack ET l'event Brain OS à la clôture (garde « une
+   * seule fois »). Passer un cycle à COMPLETED depuis l'UI déclenche donc enfin la rétro (TF-BRAIN-INGEST).
+   */
+  async function handleTransition(next: ApiCycleStatus) {
+    setBusy(true)
+    try {
+      await updateCycle(slug, projectId, cycleId, { status: next })
+    } finally {
+      setBusy(false)
+    }
   }
 
   function handleViewIssues() {
@@ -167,10 +187,25 @@ function CycleCard({ cycle, slug }: Readonly<{ cycle: Cycle; slug: string }>) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem className="gap-2" onClick={handleViewIssues}><BarChart3 className="h-4 w-4" />View issues</DropdownMenuItem>
-            <DropdownMenuItem>Edit cycle</DropdownMenuItem>
+            <DropdownMenuItem className="gap-2" onClick={handleViewIssues}><BarChart3 className="h-4 w-4" />Voir les issues</DropdownMenuItem>
+            {/* Transitions contextuelles — remplacent le « Edit cycle » qui n'avait aucun onClick. */}
+            {cycle.status === "upcoming" && (
+              <DropdownMenuItem className="gap-2" disabled={busy} onClick={() => handleTransition("ACTIVE")}>
+                <Play className="h-4 w-4 text-emerald-400" />Démarrer le cycle
+              </DropdownMenuItem>
+            )}
+            {cycle.status === "active" && (
+              <DropdownMenuItem className="gap-2" disabled={busy} onClick={() => handleTransition("COMPLETED")}>
+                <CheckCircle2 className="h-4 w-4 text-emerald-400" />Terminer le cycle
+              </DropdownMenuItem>
+            )}
+            {cycle.status === "completed" && (
+              <DropdownMenuItem className="gap-2" disabled={busy} onClick={() => handleTransition("ACTIVE")}>
+                <Play className="h-4 w-4 text-blue-400" />Rouvrir le cycle
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={handleDelete}>Delete</DropdownMenuItem>
+            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={handleDelete}>Supprimer</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
