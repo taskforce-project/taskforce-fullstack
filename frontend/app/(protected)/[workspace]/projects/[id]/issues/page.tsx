@@ -115,7 +115,6 @@ function toSheetIssue(issue: Issue): SheetIssue {
     archived:       issue.archived,
     dueDate:        formatDate(issue.dueDate),
     storyPoints:    null,
-    cycle:          null,
     createdAt:      formatDate(issue.createdAt) ?? issue.createdAt,
   }
 }
