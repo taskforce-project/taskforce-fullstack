@@ -46,7 +46,7 @@ public class DecisionService {
     private final LlmClient          llm;
     private final ObjectMapper       objectMapper;
 
-    @Value("${ai.groq.assistant-model:llama-3.3-70b-versatile}")
+    @Value("${ai.model.assistant:gateway-default}")
     private String model;
 
     private static final int DUE_SOON_DAYS = 7;
