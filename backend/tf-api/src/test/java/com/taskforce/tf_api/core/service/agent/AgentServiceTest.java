@@ -12,7 +12,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer;
 import com.taskforce.tf_api.core.model.Workspace;
-import com.taskforce.tf_api.core.service.GroqService;
+import com.taskforce.tf_api.core.service.LlmClient;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -30,7 +30,7 @@ class AgentServiceTest {
     @Mock private com.taskforce.tf_api.core.service.brain.BrainAccessGuard access;
     @Mock private com.taskforce.tf_api.core.service.brain.BrainSearchService search;
     @Mock private AgentToolRegistry tools;
-    @Mock private GroqService groq;
+    @Mock private LlmClient groq;   // on mocke l'INTERFACE, jamais une impl concrete (TF-AI-GROQ-CLEANUP)
     @Mock private ObjectMapper objectMapper;
     @Mock private com.taskforce.tf_api.core.service.AiUsageService aiUsageService;
     @Mock private com.taskforce.tf_api.core.service.mcp.WorkspaceMcpService workspaceMcp;
