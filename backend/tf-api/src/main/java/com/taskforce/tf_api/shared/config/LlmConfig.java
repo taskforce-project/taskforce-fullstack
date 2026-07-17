@@ -32,10 +32,14 @@ import com.taskforce.tf_api.core.service.LlmClient;
  * {@link AiGatewayClient} — jamais par {@code GroqService}. Les deux clients sont distincts :
  * {@code GroqService} tape {@code https://api.groq.com} en direct, l'AI Gateway tape le service Python.</p>
  *
- * <p>Nettoyage restant, tracé en {@code TF-AI-GROQ-CLEANUP} : supprimer {@code GroqService},
- * {@code AssistantService} (mort — aucun contrôleur ne l'injecte) et leurs tests ; renommer
- * {@code ai.groq.assistant-model}, lu par 8 services alors que l'AI Gateway <b>ignore</b> le modèle
- * qu'on lui passe — on lit « llama-3.3-70b » dans le code pendant que Qwen répond.</p>
+ * <p><b>Nettoyage effectué le 16/07</b> ({@code TF-AI-GROQ-CLEANUP}, feu vert user « on utilise notre
+ * propre modèle ») : {@code GroqService}, {@code GroqConfig} et {@code AssistantService} (mort) supprimés
+ * avec leurs 3 tests ; config {@code ai.groq.*} et {@code ai.provider} retirées ; les propriétés de modèle
+ * renommées en {@code ai.model.assistant} / {@code ai.model.smart-assign} — elles annonçaient
+ * {@code llama-3.3-70b-versatile} dans 9 fichiers alors que l'AI Gateway <b>ignore</b> volontairement le
+ * modèle qu'on lui passe et applique le sien : on lisait « llama-3.3-70b » partout pendant que Qwen
+ * répondait. Les valeurs restent décoratives ({@code gateway-default}) tant que
+ * {@code LlmClient.chatCompletion(model, …)} prend ce paramètre.</p>
  */
 @Configuration
 public class LlmConfig {
