@@ -32,6 +32,9 @@ public class BrainSearchService {
     private final EmbeddingClient         embeddingClient;
     private final JdbcTemplate            jdbcTemplate;
     private final BrainAccessGuard        access;
+    /** Écrit chaque vecteur dans SA transaction — cf. {@link BrainEmbeddingWriter} : sans ça, un
+     *  vecteur refusé avortait la transaction de l'appelant et tuait la recherche qui suit. */
+    private final BrainEmbeddingWriter    embeddingWriter;
 
     private static final int BACKFILL_BATCH = 200;
 
@@ -149,14 +152,15 @@ public class BrainSearchService {
     // Indexation (appelée par KnowledgeService à l'écriture)
     // =========================================================================
 
-    /** Embedde et stocke le vecteur d'un node (best-effort). */
+    /**
+     * Embedde et stocke le vecteur d'un node (best-effort — et pour de vrai : l'écriture a sa propre
+     * transaction, donc un échec ici ne fait pas tomber l'écriture du node qui nous appelle).
+     */
     public void embedNode(KnowledgeNode node) {
         float[] vec = embeddingClient.embed(embeddingText(node.getTitle(), node.getContent()));
         if (vec == null) return;
         try {
-            jdbcTemplate.update(
-                "UPDATE knowledge_nodes SET embedding = CAST(? AS vector) WHERE id = ?",
-                EmbeddingClient.toVectorLiteral(vec), node.getId());
+            embeddingWriter.write(node.getId(), EmbeddingClient.toVectorLiteral(vec));
         } catch (Exception ex) {
             log.warn("Impossible d'écrire l'embedding du node {}: {}", node.getId(), ex.getMessage());
         }
@@ -179,17 +183,20 @@ public class BrainSearchService {
         List<float[]> vectors = embeddingClient.embedBatch(texts);
         if (vectors == null || vectors.size() != missing.size()) return;
 
+        int written = 0;
         for (int i = 0; i < missing.size(); i++) {
             Long id = ((Number) missing.get(i).get("id")).longValue();
             try {
-                jdbcTemplate.update(
-                    "UPDATE knowledge_nodes SET embedding = CAST(? AS vector) WHERE id = ?",
-                    EmbeddingClient.toVectorLiteral(vectors.get(i)), id);
+                // Transaction dédiée par node : un vecteur refusé ne doit pas avorter celle de
+                // l'appelant (la recherche vectorielle qui suit mourrait en 25P02).
+                embeddingWriter.write(id, EmbeddingClient.toVectorLiteral(vectors.get(i)));
+                written++;
             } catch (Exception ex) {
                 log.warn("Backfill embedding échoué pour node {}: {}", id, ex.getMessage());
             }
         }
-        log.info("Backfill embeddings : {} nodes indexés (workspace {})", missing.size(), workspaceId);
+        log.info("Backfill embeddings : {}/{} nodes indexés (workspace {})",
+            written, missing.size(), workspaceId);
     }
 
     /** Texte indexé = titre + contenu (tronqué pour rester raisonnable). */
