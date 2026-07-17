@@ -6,9 +6,16 @@ import java.util.Map;
 import com.fasterxml.jackson.databind.JsonNode;
 
 /**
- * Abstraction du LLM utilisée par l'agent — implémentée par {@link GroqService} (cloud, bloqué ici)
- * et {@link AiGatewayClient} (LLM local via l'AI Gateway → Ollama). Le bean actif est choisi par
- * {@code ai.provider} (cf. {@code LlmConfig}). L'agent ne connaît plus le fournisseur.
+ * Abstraction du LLM utilisée par l'agent — <b>seule implémentation</b> : {@link AiGatewayClient}
+ * (l'AI Gateway Python {@code ai-service} → notre modèle Ollama local). L'agent ne connaît pas le
+ * fournisseur ; le bean est fourni par {@code LlmConfig}.
+ *
+ * <p>Cette interface a longtemps eu deux implémentations, dont un client Groq cloud. Il est
+ * <b>supprimé</b> ({@code TF-AI-GROQ-CLEANUP}) : Groq était bloqué sur le réseau (403), écarté par la
+ * décision du 07/07 au profit du modèle local, et son implémentation <b>n'override jamais</b> la
+ * capture d'usage ci-dessous — la sélectionner désarmait silencieusement toute la facturation IA.
+ * Garder une abstraction reste utile (elle isole l'agent du transport et rend les tests mockables),
+ * mais <b>on mocke cette interface, jamais une classe concrète</b>.</p>
  */
 public interface LlmClient {
 
@@ -22,8 +29,8 @@ public interface LlmClient {
     JsonNode rawChat(String model, List<Map<String, Object>> messages, List<Map<String, Object>> tools);
 
     /**
-     * Variante avec <b>routing par tier</b> ({@code fast|standard|deep}) — pour l'AI Gateway local.
-     * Les providers sans tiers (Groq) ignorent le tier (implémentation par défaut).
+     * Variante avec <b>routing par tier</b> ({@code fast|standard|deep}) — géré par l'AI Gateway local.
+     * Le défaut ignore le tier : il ne sert que si une implémentation sans tiers réapparaît un jour.
      */
     default String chatCompletion(String model, String systemPrompt, String userPrompt, boolean jsonMode, String tier) {
         return chatCompletion(model, systemPrompt, userPrompt, jsonMode);
