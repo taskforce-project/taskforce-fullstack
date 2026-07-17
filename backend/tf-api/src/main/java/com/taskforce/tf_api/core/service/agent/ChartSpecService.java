@@ -50,7 +50,7 @@ public class ChartSpecService {
     private final ProjectVisibilityGuard visibilityGuard;
     private final AiMeter                aiMeter; // gate quota + comptage de la conso tokens de la génération de graphe
 
-    @Value("${ai.groq.assistant-model:llama-3.3-70b-versatile}")
+    @Value("${ai.model.assistant:gateway-default}")
     private String model;
 
     // ── Séries temporelles ───────────────────────────────────────────────────
