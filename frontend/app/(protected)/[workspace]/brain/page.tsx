@@ -8,6 +8,7 @@ import {
 } from "lucide-react"
 
 import { useBrainStore } from "@/lib/store/brain-store"
+import { useProjectStore } from "@/lib/store/project-store"
 import dynamic from "next/dynamic"
 
 const BrainGraph = dynamic(
@@ -67,6 +68,8 @@ export default function BrainPage() {
     overview, loading, error, selectedNodeId, fetchOverview, selectNode, removeNode,
     searchResults, searching, search, clearSearch,
   } = useBrainStore()
+  const projects = useProjectStore((s) => s.projects)
+  const fetchProjects = useProjectStore((s) => s.fetchProjects)
 
   const [createOpen, setCreateOpen] = useState(false)
   const [queryText, setQueryText] = useState("")
@@ -86,6 +89,11 @@ export default function BrainPage() {
   useEffect(() => {
     if (slug) fetchOverview(slug)
   }, [slug, fetchOverview])
+
+  // Les projets nomment et colorent les régions du graphe (metadata.projects → région).
+  useEffect(() => {
+    if (slug) void fetchProjects(slug)
+  }, [slug, fetchProjects])
 
   // Nodes visibles : le noyau (system : règles/AGENTS) est masqué sauf si l'utilisateur l'affiche.
   const visibleNodes = useMemo(() => {
@@ -316,6 +324,7 @@ export default function BrainPage() {
             <BrainGraph
               nodes={visibleNodes}
               edges={overview?.edges ?? []}
+              projects={projects}
               selectedNodeId={selectedNodeId}
               onSelect={(id) => { selectNode(id); setView("editor") }}
               activeTag={activeTag}
