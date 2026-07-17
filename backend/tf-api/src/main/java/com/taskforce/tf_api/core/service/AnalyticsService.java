@@ -40,9 +40,11 @@ import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AnalyticsService {
 
     private final WorkspaceRepository       workspaceRepository;
@@ -51,7 +53,13 @@ public class AnalyticsService {
     private final IssueRepository            issueRepository;
     private final CycleRepository            cycleRepository;
     private final CycleIssueRepository       cycleIssueRepository;
-    private final GroqService                groqService;
+    /** Le bean {@code @Primary} (→ AI Gateway → Ollama), <b>pas</b> {@code GroqService} en direct :
+     *  l'injection de la classe concrète court-circuitait le routing et rendait les insights morts
+     *  (clé Groq vide + réseau bloqué). Cf. {@code TF-INTEL-INSIGHTS}. */
+    private final LlmClient                  llm;
+    /** Gate de quota + comptage tokens. Sans lui, {@code /insights} était le <b>8ᵉ chemin IA</b> — le
+     *  seul non métré — et un compte FREE pouvait y boucler sans plafond. Cf. {@code TF-AI-LEAK-INSIGHTS}. */
+    private final AiMeter                    aiMeter;
     private final ObjectMapper               objectMapper;
     private final AuthorizationService       authorizationService;
     private final PlanFeatureService         planFeatureService;
@@ -83,8 +91,11 @@ public class AnalyticsService {
             .category("Upgrade")
             .urgency("low")
             .confidence(100)
-            .action("Passer à Pro")
-            .insight("Les AI insights sont disponibles à partir du plan Pro. Passez à Pro pour activer les recommandations IA.")
+            .action("Voir les forfaits")
+            // « Pro » ne nomme aucun plan réel (FREE/BASIC/BUSINESS/ENTERPRISE) — cf. TF-PLAN-PRO-GHOST.
+            // Chemin mort en pratique : AI_INSIGHTS est accordé dès FREE (PlanFeatureService.MATRIX).
+            .insight("Les insights IA ne sont pas inclus dans votre forfait actuel.")
+            .mode("upgrade")
             .build());
     }
 
@@ -398,10 +409,15 @@ public class AnalyticsService {
             "Urgency must be one of: low, medium, high. Confidence is 50-95. Keep insight under 150 chars.";
 
         try {
-            String raw = groqService.chatCompletion(assistantModel, systemPrompt, context, true);
+            // Métré : gate quota AVANT l'appel (au-dessus du plafond → repli, aucun token brûlé) + comptage réel.
+            String raw = aiMeter.metered(ws.getId(),
+                () -> llm.chatCompletion(assistantModel, systemPrompt, context, true, "fast"));
             JsonNode root = objectMapper.readTree(raw);
             JsonNode arr  = root.path("insights");
-            if (!arr.isArray() || arr.isEmpty()) return fallbackInsights();
+            if (!arr.isArray() || arr.isEmpty()) {
+                log.warn("Insights IA : réponse LLM sans tableau 'insights' (ws={}) → repli", ws.getId());
+                return fallbackInsights();
+            }
 
             List<AiInsightResponse> result = new ArrayList<>();
             for (JsonNode n : arr) {
@@ -413,26 +429,42 @@ public class AnalyticsService {
                     .confidence(Math.max(50, Math.min(95, n.path("confidence").asInt(70))))
                     .action(n.path("action").asText("Review"))
                     .insight(n.path("insight").asText(""))
+                    .mode("generated")
                     .build());
             }
             return result;
         } catch (Exception e) {
+            // Un log, enfin : ce catch était muet, et c'est ce qui a rendu la panne invisible des mois durant.
+            log.warn("Insights IA indisponibles (ws={}) → repli déterministe : {}", ws.getId(), e.getMessage());
             return fallbackInsights();
         }
       } catch (ResourceNotFoundException e) {
         throw e; // 404 légitime (workspace introuvable)
       } catch (Exception e) {
-        // Toute autre erreur (DB, lazy, Groq…) → fallback gracieux, jamais de 500
+        // Toute autre erreur (DB, lazy…) → repli gracieux, jamais de 500 — mais tracée.
+        log.warn("Insights IA : échec de la collecte des métriques (slug={}) → repli : {}", slug, e.getMessage());
         return fallbackInsights();
       }
     }
 
+    /**
+     * Repli déterministe quand le LLM n'a pas répondu.
+     *
+     * <p>⚠️ Il reste volontairement générique, mais il est désormais <b>étiqueté</b>
+     * ({@code mode = "fallback"}) : le front peut enfin distinguer un insight réel d'un repli. Avant
+     * {@code TF-INTEL-INSIGHTS}, cette unique phrase en dur était <b>tout</b> ce que la carte
+     * « Recommandations de Cortex » affichait — {@code AnalyticsService} appelait {@code GroqService}
+     * en direct (court-circuitant {@code LlmClient}, le bean {@code @Primary} et l'AI Gateway), or la
+     * clé Groq est vide par défaut et le réseau la bloque : l'appel levait à chaque fois, le catch
+     * était muet, et le DTO n'avait aucun champ de provenance. Panne invisible dans l'UI et dans les logs.</p>
+     */
     private List<AiInsightResponse> fallbackInsights() {
         return List.of(
             AiInsightResponse.builder()
                 .agent("COO").agentColor("#0a84ff").category("Operations")
                 .urgency("medium").confidence(70)
                 .action("Review open issues").insight("Check open issues and team workload to optimize sprint delivery.")
+                .mode("fallback")
                 .build()
         );
     }
