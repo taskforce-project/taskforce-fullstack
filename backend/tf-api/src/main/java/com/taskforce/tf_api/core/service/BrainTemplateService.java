@@ -907,9 +907,11 @@ public class BrainTemplateService {
             """
             # Projet — AI Service #ai
 
-            `ai-service/` (FastAPI). À l'origine un **stub** (vecteurs hash) ; en prod l'IA tourne en
-            **Java direct** via `GroqService` (Groq `llama-3.1-8b` smart-assign, `llama-3.3-70b` assistant).
-            Réactivé pour les **embeddings** du Brain OS — voir [[DEC — embedding lexical maison]].
+            `ai-service/` (FastAPI) — **l'unique chemin LLM** : le Java l'appelle via `AiGatewayClient`,
+            il route vers **notre modèle local** (Ollama) et fournit les **embeddings** du Brain OS.
+            Historique : d'abord un **stub** (vecteurs hash), puis un temps un appel **Groq en direct**
+            depuis Java — supprimé le 16/07 (bloqué réseau, et son client ne comptait pas les tokens).
+            Voir [[DEC — embedding lexical maison]].
             """));
 
         n.add(new SeedNode(NodeDomain.ARCHITECTURE, NodeType.DOC,
