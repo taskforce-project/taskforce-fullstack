@@ -3,8 +3,8 @@
 import { useState, useEffect, useRef } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import {
-  User, Bell, Users, Zap, Globe, Key, Palette, Webhook,
-  X as XIcon, Plus, Upload, Camera, Link2, Trash2, Shield, Search, Loader2,
+  User, Bell, Mail, Users, Zap, Globe, Key, Palette, Webhook,
+  Upload, Camera, Link2, Trash2, Shield, Loader2,
   Activity, CheckCircle2, AlertTriangle, Gauge,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -16,7 +16,6 @@ import { Badge } from "@/components/ui/badge"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { Separator } from "@/components/ui/separator"
 import { PageContainer, PageHeader } from "@/components/layout/page-shell"
-import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useAuth } from "@/lib/contexts/auth-context"
 import { useUserStore } from "@/lib/store/user-store"
@@ -72,11 +71,8 @@ export const SECTION_GROUPS = [
   { label: "Workspace", keys: ["workspace", "usage", "integrations", "status"] as const },
 ]
 
-const SKILL_OPTIONS = [
-  "React", "TypeScript", "Vue", "Angular", "Node.js", "Java", "Spring",
-  "Python", "PostgreSQL", "Docker", "UI/UX", "Design", "QA", "DevOps",
-  "Product", "CSS", "Tailwind", "GraphQL", "REST API", "Security",
-]
+// SKILL_OPTIONS + SkillsTagInput retirés avec le faux champ « Skills » du Profil (TF-SETTINGS-FAKE) :
+// le vrai éditeur de compétences vit sur la fiche membre (/members/{id}).
 
 // ---------------------------------------------------------------------------
 // Primitives
@@ -112,80 +108,6 @@ function SectionCard({ title, description, children, danger = false }: Readonly<
   )
 }
 
-function SkillsTagInput({ value, onChange }: Readonly<{ value: string[]; onChange: (v: string[]) => void }>) {
-  const [input, setInput] = useState("")
-  const available = SKILL_OPTIONS.filter(
-    (s) => !value.includes(s) && s.toLowerCase().includes(input.toLowerCase())
-  )
-
-  function add(skill: string) {
-    if (!value.includes(skill)) onChange([...value, skill])
-    setInput("")
-  }
-
-  function remove(skill: string) {
-    onChange(value.filter((s) => s !== skill))
-  }
-
-  function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter" && input.trim()) {
-      add(input.trim())
-      e.preventDefault()
-    } else if (e.key === "Backspace" && !input && value.length > 0) {
-      remove(value.at(-1) as string)
-    }
-  }
-
-  return (
-    <div className="flex flex-col gap-2">
-      {value.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {value.map((s) => (
-            <span
-              key={s}
-              className="inline-flex items-center gap-1 rounded-full bg-primary/15 border border-primary/30 px-2.5 py-0.5 text-xs text-primary font-medium"
-            >
-              {s}
-              <button
-                type="button"
-                onClick={() => remove(s)}
-                className="text-primary/60 hover:text-primary transition-colors ml-0.5"
-              >
-                <XIcon className="size-2.5" />
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
-      <div className="flex items-center h-9 rounded-md border border-border bg-background px-3 gap-2 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/20 transition-all">
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={onKeyDown}
-          placeholder="Type a skill or pick one below…"
-          className="flex-1 text-sm text-foreground placeholder:text-muted-foreground outline-none bg-transparent"
-        />
-      </div>
-      {available.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {available.slice(0, 12).map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => add(s)}
-              className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground hover:border-primary/40 hover:text-primary hover:bg-primary/10 transition-colors"
-            >
-              <Plus className="size-2.5" />
-              {s}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
 function StyledInput(props: Readonly<React.InputHTMLAttributes<HTMLInputElement>>) {
   return (
     <input
@@ -212,8 +134,6 @@ function ProfilePanel() {
   const [lastName, setLastName]   = useState(user?.lastName ?? "")
   const [displayName, setDisplayName] = useState(user?.displayName ?? "")
   const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl ?? "")
-  const [role, setRole] = useState("")
-  const [skills, setSkills] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
 
@@ -365,15 +285,10 @@ function ProfilePanel() {
           <FormField label="Email" hint="Managed via your identity provider.">
             <StyledInput type="email" value={user?.email ?? ""} readOnly />
           </FormField>
-
-          <Separator />
-
-          <FormField label="Role / Title" hint="Shown to team members.">
-            <StyledInput value={role} onChange={(e) => setRole(e.target.value)} placeholder="e.g. Lead Engineer" />
-          </FormField>
-          <FormField label="Skills" hint="Used for smart issue assignment.">
-            <SkillsTagInput value={skills} onChange={setSkills} />
-          </FormField>
+          {/* Les champs « Role / Title » et « Skills » ont été RETIRÉS : ils n'étaient jamais chargés ni
+              enregistrés (le payload de sauvegarde = firstName/lastName/displayName/avatarUrl), et le hint
+              « Used for smart issue assignment » MENTAIT — le vrai éditeur de compétences (le seul lu par
+              le smart-assign) vit sur la fiche d'un membre (/members/{id}). Cf. TF-SETTINGS-FAKE. */}
         </div>
       </SectionCard>
       <div className="flex justify-end">
@@ -502,61 +417,44 @@ function AppearancePanel() {
   )
 }
 
-const NOTIF_DEFAULTS = {
-  mentions:      true,
-  assignments:   true,
-  comments:      true,
-  statusChanges: false,
-  dueSoon:       true,
-  weeklyDigest:  false,
-}
-
+/**
+ * Panneau Notifications — réécrit HONNÊTE (TF-SETTINGS-FAKE).
+ *
+ * <p>L'ancienne version affichait 6 toggles « Email notifications » persistés dans `localStorage`, sans
+ * aucun effet : le back ne lisait AUCUNE préférence, et surtout <b>ces emails n'existent pas</b>
+ * (`EmailService` ne fait qu'OTP/welcome/reset/invitation ; « Weekly digest » = zéro ligne de code).
+ * Six interrupteurs qui ne pilotaient rien, plus un toast « enregistrées » qui confirmait le mensonge.</p>
+ *
+ * <p>Ce qui est <b>vrai</b> : les notifications <b>in-app</b> (cloche + temps réel) existent et sont
+ * toujours actives — `NotificationService` les persiste et les pousse. On le dit, sans promettre des
+ * réglages qui n'existent pas.</p>
+ */
 function NotificationsPanel() {
-  // Pas d'endpoint dédié → préférences persistées côté client (init paresseuse, restent après reload).
-  const [prefs, setPrefs] = useState<typeof NOTIF_DEFAULTS>(() => {
-    if (globalThis.window === undefined) return NOTIF_DEFAULTS
-    try {
-      const saved = localStorage.getItem("tf-notif-prefs")
-      return saved ? { ...NOTIF_DEFAULTS, ...JSON.parse(saved) } : NOTIF_DEFAULTS
-    } catch { return NOTIF_DEFAULTS }
-  })
-
-  const rows: { key: keyof typeof prefs; label: string; desc: string }[] = [
-    { key: "mentions",      label: "Mentions",       desc: "When someone @mentions you" },
-    { key: "assignments",   label: "Assignments",    desc: "When an issue is assigned to you" },
-    { key: "comments",      label: "Comments",       desc: "When someone comments on your issues" },
-    { key: "statusChanges", label: "Status changes", desc: "When an issue you own changes status" },
-    { key: "dueSoon",       label: "Due soon",       desc: "1 day before an issue is due" },
-    { key: "weeklyDigest",  label: "Weekly digest",  desc: "Summary email every Monday" },
-  ]
-
-  function toggle(key: keyof typeof prefs) {
-    setPrefs((prev) => ({ ...prev, [key]: !prev[key] }))
-  }
-
-  function handleSave() {
-    localStorage.setItem("tf-notif-prefs", JSON.stringify(prefs))
-    toast.success("Préférences de notification enregistrées")
-  }
-
   return (
     <div className="flex flex-col gap-4">
-      <SectionCard title="Email notifications" description="Choose which events trigger an email.">
-        <div className="flex flex-col divide-y divide-border/50">
-          {rows.map((row) => (
-            <div key={row.key} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
-              <div>
-                <p className="text-sm font-medium text-foreground">{row.label}</p>
-                <p className="text-xs text-muted-foreground">{row.desc}</p>
-              </div>
-              <Switch checked={prefs[row.key]} onCheckedChange={() => toggle(row.key)} />
+      <SectionCard title="Notifications" description="Comment Taskforce vous tient informé.">
+        <div className="flex flex-col gap-3">
+          <div className="flex items-start gap-3">
+            <Bell className="size-4 text-muted-foreground mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-foreground">Notifications dans l'application</p>
+              <p className="text-xs text-muted-foreground">
+                Mentions, assignations, commentaires et changements de statut apparaissent en temps réel
+                dans la cloche de notifications. Toujours actives.
+              </p>
             </div>
-          ))}
+          </div>
+          <div className="flex items-start gap-3">
+            <Mail className="size-4 text-muted-foreground mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-foreground">Notifications par e-mail</p>
+              <p className="text-xs text-muted-foreground">
+                Le réglage fin des e-mails par type d'événement n'est pas encore disponible. À venir.
+              </p>
+            </div>
+          </div>
         </div>
       </SectionCard>
-      <div className="flex justify-end">
-        <Button size="sm" className="h-8 text-xs" onClick={handleSave}>Save preferences</Button>
-      </div>
     </div>
   )
 }

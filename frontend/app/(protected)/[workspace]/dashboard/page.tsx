@@ -25,6 +25,14 @@ import { cn } from "@/lib/utils"
 
 // ─── Primitives ───────────────────────────────────────────────────────────────
 
+/** Libellé + pastille par état de santé — la source unique pour le badge d'opération (TF-DASH-HARDCODE). */
+const HEALTH_META: Record<"healthy" | "atRisk" | "critical" | "paused", { label: string; dot: string }> = {
+  healthy:  { label: "Sur les rails", dot: "bg-emerald-500" },
+  atRisk:   { label: "À risque",      dot: "bg-amber-500" },
+  critical: { label: "Critique",      dot: "bg-red-500" },
+  paused:   { label: "En pause",      dot: "bg-muted-foreground/50" },
+}
+
 /** Corps « renvoi » — la fonctionnalité vit ailleurs (ex. Intelligence) ; CTA honnête, pas de mock. */
 function CtaBody({ href, label, cta }: { readonly href: string; readonly label: string; readonly cta: string }) {
   return (
@@ -49,6 +57,9 @@ export default function DashboardPage() {
   const [aiInsights, setAiInsights] = useState<AiInsight[]>([])
   const [insightsLoading, setInsightsLoading] = useState(false)
   const [throughput, setThroughput] = useState<ThroughputPoint[]>([])
+  // Distingue « refus de plan » (409) de « vraiment pas de données » — sinon un utilisateur FREE
+  // croyait manquer de données alors qu'il se heurtait à un mur payant (TF-DASH-HARDCODE).
+  const [throughputGated, setThroughputGated] = useState(false)
 
   useEffect(() => {
     if (slug) void fetchProjects(slug)
@@ -62,10 +73,15 @@ export default function DashboardPage() {
       .then(setAiInsights)
       .catch(() => setAiInsights([]))
       .finally(() => setInsightsLoading(false))
-    // Throughput journalier sur 30 jours (réel) — gated Pro : en cas de 409/erreur, on masque le graphe.
+    // Throughput journalier sur 30 jours (réel) — gated par plan (409). On distingue le refus de plan
+    // d'un simple manque de données pour ne pas afficher un message trompeur.
+    setThroughputGated(false)
     getAnalyticsThroughput(slug, null, "day")
       .then(setThroughput)
-      .catch(() => setThroughput([]))
+      .catch((e) => {
+        setThroughput([])
+        if (e?.response?.status === 409) setThroughputGated(true)
+      })
   }, [slug])
 
   const activeOps = projects.filter((p) => p.status === "ACTIVE").length
@@ -95,6 +111,7 @@ export default function DashboardPage() {
     progress: p.totalIssues > 0 ? Math.round(((p.totalIssues - p.openIssues) / p.totalIssues) * 100) : 0,
     done: p.totalIssues - p.openIssues,
     total: p.totalIssues,
+    health: healthOf(p), // la santé RÉELLE de l'opération — plus de « On track » en dur (TF-DASH-HARDCODE)
   }))
 
   const firstName = user?.firstName ?? "—"
@@ -192,6 +209,10 @@ export default function DashboardPage() {
                   />
                 </AreaChart>
               </ResponsiveContainer>
+            ) : throughputGated ? (
+              <Link href="./analytics" className="block py-4 text-center text-xs text-primary hover:underline">
+                Débit détaillé disponible avec un forfait supérieur
+              </Link>
             ) : (
               <p className="py-4 text-center text-xs text-muted-foreground/60">Pas encore assez de données</p>
             )}
@@ -246,8 +267,12 @@ export default function DashboardPage() {
                   <div className="min-w-0 flex-1 space-y-2">
                     <div className="flex items-center justify-between gap-3">
                       <p className="truncate text-sm font-medium text-foreground">{op.name}</p>
+                      {/* Piloté par la santé réelle (healthOf) — cohérent avec le compteur d'en-tête.
+                          Avant : « On track » en dur, qui pouvait afficher « sur les rails » sur un projet
+                          critique pendant que l'en-tête annonçait « N à risque ». */}
                       <Badge variant="secondary" className="gap-1.5 font-normal text-muted-foreground">
-                        <span className="size-1.5 rounded-full bg-emerald-500" /> On track
+                        <span className={cn("size-1.5 rounded-full", HEALTH_META[op.health].dot)} />
+                        {HEALTH_META[op.health].label}
                       </Badge>
                     </div>
                     <div className="flex items-center gap-3">

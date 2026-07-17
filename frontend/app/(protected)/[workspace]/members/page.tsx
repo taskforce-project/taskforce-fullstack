@@ -360,8 +360,11 @@ function MemberRow({ member, isYou, canManage, isOwner, profile, projects = [] }
 
   return (
     <div className="group flex items-center gap-4 px-5 py-3 border-b border-border/50 last:border-0 hover:bg-muted/20 transition-colors">
-      {/* Avatar */}
-      <div className="relative shrink-0">
+      {/* Avatar — le point vert « en ligne » était CODÉ EN DUR sur chaque membre : aucune prop, aucune
+          condition. Il n'existe aucun système de présence (ni table, ni topic STOMP, ni heartbeat) →
+          retiré plutôt que de simuler une fonctionnalité inexistante. Voir TF-PRESENCE-FAKE : la vraie
+          présence est un chantier à part. */}
+      <div className="shrink-0">
         <UserAvatar
           email={member.email}
           name={displayLabel}
@@ -369,7 +372,6 @@ function MemberRow({ member, isYou, canManage, isOwner, profile, projects = [] }
           className="size-9"
           fallbackClassName="text-xs font-semibold"
         />
-        <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full bg-emerald-400 ring-2 ring-card" />
       </div>
 
       {/* Member (nom) */}
