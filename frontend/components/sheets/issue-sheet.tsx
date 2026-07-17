@@ -74,7 +74,6 @@ export interface SheetIssue {
   labels: IssueLabel[]
   dueDate: string | null
   storyPoints: number | null
-  cycle: string | null
   createdAt: string
   description?: string
   pinned?: boolean
@@ -1101,14 +1100,9 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
   const [assignee, setAssignee] = useState(issue?.assignee ?? null)
   const [labels, setLabels] = useState<IssueLabel[]>(issue?.labels ?? [])
   const [points, setPoints] = useState<number | null>(issue?.storyPoints ?? null)
-  const [cycle, setCycle] = useState<string | null>(issue?.cycle ?? null)
-  const [editingCycle, setEditingCycle] = useState(false)
-  const [cycleDraft, setCycleDraft] = useState(issue?.cycle ?? "")
   const [dueDate, setDueDate] = useState<string | null>(issue?.dueDate ?? null)
-  const cycleRef  = useRef<HTMLInputElement>(null)
 
   useEffect(() => { if (editingTitle) titleRef.current?.focus() }, [editingTitle])
-  useEffect(() => { if (editingCycle) cycleRef.current?.focus() }, [editingCycle])
 
   // Reset state when issue changes
   useEffect(() => {
@@ -1120,7 +1114,6 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
     setLabels(issue.labels)
     setDueDate(issue.dueDate)
     setPoints(issue.storyPoints)
-    setCycle(issue.cycle)
     setStatusId(issue.statusId)
     setStatusName(issue.statusName)
     setStatusCategory(issue.statusCategory)
@@ -1176,11 +1169,6 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
     }
   }
 
-  function saveCycle() {
-    setCycle(cycleDraft.trim() || null)
-    setEditingCycle(false)
-    toast.success("Cycle updated")
-  }
 
   async function handleDelete() {
     if (!workspaceSlug || !projectId) return
@@ -1235,8 +1223,6 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
     toast.success(next ? "Échéance mise à jour" : "Échéance retirée")
   }
 
-  const onCycleKey = makeKeyHandler(saveCycle, () => setEditingCycle(false))
-
   function toggleLabel(l: IssueLabel) {
     setLabels((prev) => {
       const exists = prev.some((x) => x.id === l.id)
@@ -1246,7 +1232,6 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
     })
   }
 
-  function onCycleClick()  { setCycleDraft(cycle ?? ""); setEditingCycle(true) }
 
   // L'IA a rempli l'issue (spec → description, labels, effort, priorité) → resynchroniser la vue.
   async function handleAiApplied() {
@@ -1699,24 +1684,12 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
               </Select>
             </MetaRow>
 
-            {/* Cycle — inline editable */}
-            <MetaRow icon={<GitBranch className="size-3.5" />} label="Cycle">
-              {editingCycle ? (
-                <input ref={cycleRef} type="text" value={cycleDraft}
-                  onChange={(e) => setCycleDraft(e.target.value)}
-                  onBlur={saveCycle}
-                  onKeyDown={onCycleKey}
-                  placeholder="e.g. Sprint 4"
-                  className="w-full h-5 text-xs bg-transparent border-b border-primary outline-none placeholder:text-muted-foreground/50"
-                />
-              ) : (
-                <button type="button" onClick={onCycleClick}
-                  className="flex items-center gap-1 text-xs hover:bg-muted/50 rounded px-1 -mx-1 py-0.5 w-full text-left transition-colors group">
-                  <span className="flex-1 truncate text-foreground">{cycle ?? "—"}</span>
-                  <Pencil className="size-3 opacity-0 group-hover:opacity-40 shrink-0" />
-                </button>
-              )}
-            </MetaRow>
+            {/* Cycle — l'ancien champ « éditable » était un MENSONGE : il faisait un setState local + un
+                toast « Cycle updated » SANS aucun appel API, et acceptait n'importe quel texte libre. Pire,
+                le back n'expose pas le cycle d'une issue (pas de reverse-lookup sur IssueResponse), donc
+                cette ligne ne peut de toute façon rien afficher de fiable. Le rattachement d'une issue à un
+                cycle vit désormais sur la page du cycle (C3, `AddIssuesDialog`). Ligne retirée plutôt que
+                maintenue trompeuse. */}
 
             {/* Due date — sélecteur de date shadcn (Calendar + Popover) */}
             <MetaRow icon={<Calendar className="size-3.5" />} label="Due date">
