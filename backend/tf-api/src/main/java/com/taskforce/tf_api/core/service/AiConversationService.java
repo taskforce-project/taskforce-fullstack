@@ -49,7 +49,7 @@ public class AiConversationService {
     private final AiMeter aiMeter; // gate quota + comptage de la conso tokens de la compression d'historique
 
     // Nom de modèle passé au client LLM (ignoré par l'AI Gateway, qui impose son modèle Ollama).
-    @Value("${ai.groq.assistant-model:llama-3.3-70b-versatile}")
+    @Value("${ai.model.assistant:gateway-default}")
     private String model;
 
     // ── Lecture ───────────────────────────────────────────────────────────────
