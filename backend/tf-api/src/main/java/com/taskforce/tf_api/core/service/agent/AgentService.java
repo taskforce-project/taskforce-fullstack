@@ -51,7 +51,7 @@ public class AgentService {
 
     // Nom de modèle passé au client LLM. Ignoré par l'AI Gateway (qui impose son modèle Ollama) ;
     // utilisé seulement si provider=groq.
-    @Value("${ai.groq.assistant-model:llama-3.3-70b-versatile}")
+    @Value("${ai.model.assistant:gateway-default}")
     private String model;
 
     // Sûreté MCP : les écritures externes sont PROPOSÉES (validation humaine), pas exécutées par l'agent.
