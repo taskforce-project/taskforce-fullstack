@@ -4,8 +4,6 @@ import { useEffect } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import {
-  MapPin,
-  Link2,
   Calendar,
   GitCommitHorizontal,
   Users,
@@ -25,6 +23,9 @@ import { useAuth } from "@/lib/contexts/auth-context"
 import { cn } from "@/lib/utils"
 import { useProjectStore } from "@/lib/store/project-store"
 import { useProfileStore, type HeatWeek, type HeatCell } from "@/lib/store/profile-store"
+// `planLabel` existait déjà et n'était importé NULLE PART — écrit exactement pour ce besoin, puis oublié
+// au profit d'un littéral « Pro » en dur. Cf. TF-PLAN-PRO-GHOST.
+import { planLabel } from "@/lib/config/plan-limits"
 import type { Project } from "@/lib/api/project-service"
 
 // ---------------------------------------------------------------------------
@@ -36,11 +37,49 @@ const PROJECT_COLORS = [
   "bg-orange-500", "bg-blue-500", "bg-pink-500",
 ]
 
-const ACTIVITY_TYPE_ICON: Record<string, React.ReactNode> = {
-  issue_closed:  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />,
-  issue_created: <CircleDot    className="h-3.5 w-3.5 text-primary shrink-0" />,
-  comment:       <GitCommitHorizontal className="h-3.5 w-3.5 text-yellow-400 shrink-0" />,
-  cycle_started: <Clock        className="h-3.5 w-3.5 text-violet-400 shrink-0" />,
+/**
+ * Clés = valeurs EXACTES de l'enum backend `IssueActivityType`, que `ProfileService` sérialise via
+ * `getAction().name()` — donc en MAJUSCULES.
+ *
+ * ⚠️ Cette table indexait auparavant sur `issue_created` / `issue_closed` / `comment` / `cycle_started`,
+ * qui ne correspondent à AUCUNE valeur de l'enum : le lookup échouait à 100 % et le repli
+ * `?? ACTIVITY_TYPE_ICON["issue_created"]` masquait complètement le bug. Toutes les lignes portaient la
+ * même icône, sans verbe ni date — deux événements distincts sur une même issue (ex. MOB-6 : CREATED,
+ * STATUS_CHANGED, COMPLETED à 1,5 s d'écart) s'affichaient en lignes identiques, et l'utilisateur y
+ * voyait un doublon.
+ */
+const ACTIVITY_META: Record<string, { icon: React.ReactNode; label: string }> = {
+  CREATED:             { icon: <CircleDot className="h-3.5 w-3.5 text-primary shrink-0" />,            label: "a créé" },
+  COMPLETED:           { icon: <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />,     label: "a terminé" },
+  REOPENED:            { icon: <CircleDot className="h-3.5 w-3.5 text-orange-400 shrink-0" />,         label: "a rouvert" },
+  STATUS_CHANGED:      { icon: <Clock className="h-3.5 w-3.5 text-violet-400 shrink-0" />,             label: "a changé le statut de" },
+  PRIORITY_CHANGED:    { icon: <Clock className="h-3.5 w-3.5 text-violet-400 shrink-0" />,             label: "a changé la priorité de" },
+  ASSIGNEE_CHANGED:    { icon: <Users className="h-3.5 w-3.5 text-blue-400 shrink-0" />,               label: "a réassigné" },
+  TYPE_CHANGED:        { icon: <Clock className="h-3.5 w-3.5 text-violet-400 shrink-0" />,             label: "a changé le type de" },
+  TITLE_CHANGED:       { icon: <Clock className="h-3.5 w-3.5 text-violet-400 shrink-0" />,             label: "a renommé" },
+  DESCRIPTION_CHANGED: { icon: <Clock className="h-3.5 w-3.5 text-violet-400 shrink-0" />,             label: "a décrit" },
+  LABEL_ADDED:         { icon: <Clock className="h-3.5 w-3.5 text-violet-400 shrink-0" />,             label: "a étiqueté" },
+  LABEL_REMOVED:       { icon: <Clock className="h-3.5 w-3.5 text-violet-400 shrink-0" />,             label: "a retiré une étiquette de" },
+  DUE_DATE_CHANGED:    { icon: <Calendar className="h-3.5 w-3.5 text-amber-400 shrink-0" />,           label: "a daté" },
+  START_DATE_CHANGED:  { icon: <Calendar className="h-3.5 w-3.5 text-amber-400 shrink-0" />,           label: "a planifié" },
+  PARENT_CHANGED:      { icon: <Clock className="h-3.5 w-3.5 text-violet-400 shrink-0" />,             label: "a rattaché" },
+  COMMENT_ADDED:       { icon: <GitCommitHorizontal className="h-3.5 w-3.5 text-yellow-400 shrink-0" />, label: "a commenté" },
+  COMMENT_DELETED:     { icon: <GitCommitHorizontal className="h-3.5 w-3.5 text-muted-foreground shrink-0" />, label: "a supprimé un commentaire de" },
+}
+
+/** Repli explicite : un type inconnu se voit, au lieu de se déguiser en « créé ». */
+const ACTIVITY_FALLBACK = { icon: <CircleDot className="h-3.5 w-3.5 text-muted-foreground shrink-0" />, label: "a modifié" }
+
+/** Date relative courte, sans dépendance : « à l'instant », « 3 h », « 2 j », sinon la date. */
+function relativeDate(iso: string): string {
+  const then = new Date(iso).getTime()
+  if (Number.isNaN(then)) return ""
+  const mins = Math.floor((Date.now() - then) / 60_000)
+  if (mins < 1)    return "à l'instant"
+  if (mins < 60)   return `${mins} min`
+  if (mins < 1440) return `${Math.floor(mins / 60)} h`
+  if (mins < 10080) return `${Math.floor(mins / 1440)} j`
+  return new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })
 }
 
 const HEAT_COLORS = [
@@ -141,7 +180,11 @@ export default function ProfilePage() {
   const displayName  = user?.displayName ?? (user ? `${user.firstName} ${user.lastName}` : "Your Name")
   const email        = user?.email ?? "you@taskforce.io"
   const plan         = user?.planType ?? "FREE"
-  const isPro        = plan === "BUSINESS" || plan === "ENTERPRISE"
+  /** Palier payant. Le libellé vient de `planLabel()` — plus de littéral « Pro » : ce plan N'EXISTE PAS
+   *  (les 4 tiers réels sont FREE / BASIC / BUSINESS / ENTERPRISE). C'était un vestige du modèle 3 tiers,
+   *  affiché à 20 px de l'enum brut → le badge disait « Pro » pendant que la carte disait « BUSINESS ».
+   *  Cf. TF-PLAN-PRO-GHOST. */
+  const isPaid       = plan === "BASIC" || plan === "BUSINESS" || plan === "ENTERPRISE"
 
   return (
     <div className="flex flex-col gap-6 max-w-4xl mx-auto w-full">
@@ -167,26 +210,28 @@ export default function ProfilePage() {
                 <p className="text-sm text-muted-foreground">{email}</p>
               </div>
               <div className="flex items-center gap-2">
-                {isPro && (
+                {isPaid && (
                   <Badge variant="outline" className="bg-amber-500/15 text-amber-400 border-amber-500/20 gap-1 text-xs">
-                    <Star className="h-3 w-3" />Pro
+                    <Star className="h-3 w-3" />{planLabel(plan)}
                   </Badge>
                 )}
                 <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" asChild>
-                  <Link href="/settings">
+                  {/* Le lien pointait `/settings` — chemin ABSOLU, sans le workspace. `app/settings`
+                      n'existe pas (seul `app/(protected)/[workspace]/settings`) → 404. C'est le bug
+                      signalé « l'edit profil fonctionne pas ». */}
+                  <Link href={`/${slug}/settings`}>
                     <Settings className="h-3.5 w-3.5" />
-                    Edit profile
+                    Modifier le profil
                   </Link>
                 </Button>
               </div>
             </div>
 
-            {/* Meta row */}
-            <div className="flex flex-wrap items-center gap-4 mt-3 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" /> Paris, France</span>
-              <span className="flex items-center gap-1.5"><Link2 className="h-3.5 w-3.5" /> taskforce.io</span>
-              <span className="flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" /> Joined January 2025</span>
-            </div>
+            {/* Meta row — RETIRÉE : « Paris, France · taskforce.io · Joined January 2025 » était codé en
+                dur et servi à TOUS les utilisateurs (règle d'or n°7 : pas de mock). Aucun champ
+                localisation / site / date d'inscription n'existe sur `User` — on ne remplace pas un
+                mensonge par un autre. Ces champs reviendront avec l'onboarding, qui les collectera pour
+                de vrai (cf. TF-ONBOARDING + la migration `company`/`location`/`website`). */}
 
             {/* Follow-style counters */}
             <div className="flex items-center gap-4 mt-4">
@@ -238,18 +283,24 @@ export default function ProfilePage() {
               <h3 className="text-sm font-semibold text-foreground">Recent activity</h3>
             </div>
             <div className="divide-y divide-border/40">
-              {activity.map((item) => (
-                <div key={item.id} className="flex items-start gap-3 px-5 py-3">
-                  {ACTIVITY_TYPE_ICON[item.type] ?? ACTIVITY_TYPE_ICON["issue_created"]}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-foreground truncate">
-                      <span className="text-muted-foreground font-mono text-xs mr-1">{item.issueIdentifier}</span>
-                      {item.issueTitle}
-                    </p>
+              {activity.map((item) => {
+                const meta = ACTIVITY_META[item.type] ?? ACTIVITY_FALLBACK
+                return (
+                  <div key={item.id} className="flex items-start gap-3 px-5 py-3">
+                    {meta.icon}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-foreground truncate">
+                        <span className="text-muted-foreground mr-1">{meta.label}</span>
+                        <span className="text-muted-foreground font-mono text-xs mr-1">{item.issueIdentifier}</span>
+                        {item.issueTitle}
+                      </p>
+                      <p className="text-xs text-muted-foreground/70 mt-0.5">
+                        {relativeDate(item.createdAt)} · {item.projectName}
+                      </p>
+                    </div>
                   </div>
-                  <span className="text-xs text-muted-foreground shrink-0">{item.projectName}</span>
-                </div>
-              ))}
+                )
+              })}
               {activity.length === 0 && (
                 <p className="px-5 py-6 text-sm text-muted-foreground text-center">Aucune activité récente.</p>
               )}
@@ -262,8 +313,10 @@ export default function ProfilePage() {
           {/* Projects */}
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-foreground">Projects</h3>
-              <Link href="/projects" className="text-xs text-primary hover:underline">View all</Link>
+              <h3 className="text-sm font-semibold text-foreground">Projets</h3>
+              {/* Idem : `/projects` sans le workspace → 404. Le composant `ProjectCard` ci-dessus
+                  construisait pourtant déjà `/${slug}/projects/${p.id}` correctement. */}
+              <Link href={`/${slug}/projects`} className="text-xs text-primary hover:underline">Voir tout</Link>
             </div>
             {projects.slice(0, 3).map((p, idx) => (
               <ProjectCard
@@ -280,34 +333,39 @@ export default function ProfilePage() {
           {/* Plan card */}
           <div className="rounded-xl border border-border bg-card [box-shadow:var(--shadow-sm)] p-4 flex flex-col gap-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-foreground">Your plan</h3>
+              <h3 className="text-sm font-semibold text-foreground">Votre forfait</h3>
+              {/* `planLabel` rend « Business » ; le `capitalize` CSS d'avant était un no-op sur « BUSINESS »
+                  (il ne minusculise pas la suite) → d'où l'enum brut affiché en majuscules. */}
               <Badge
                 variant="outline"
                 className={cn(
-                  "capitalize text-xs",
-                  isPro
+                  "text-xs",
+                  isPaid
                     ? "bg-amber-500/15 text-amber-400 border-amber-500/20"
                     : "bg-muted text-muted-foreground"
                 )}
               >
-                {plan}
+                {planLabel(plan)}
               </Badge>
             </div>
-            {!isPro && (
+            {!isPaid && (
               <>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Upgrade to Pro to unlock analytics, unlimited cycles, and advanced features.
+                  Passez à un forfait supérieur pour débloquer les analytics avancées, les intégrations et
+                  l&apos;historique illimité.
                 </p>
                 <Button size="sm" className="h-8 text-xs w-full gap-1.5" asChild>
-                  <Link href="/settings">
+                  <Link href={`/${slug}/settings`}>
                     <Star className="h-3.5 w-3.5" />
-                    Upgrade to Pro
+                    Voir les forfaits
                   </Link>
                 </Button>
               </>
             )}
-            {isPro && (
-              <p className="text-xs text-muted-foreground">All features unlocked. Thanks for being a Pro member!</p>
+            {isPaid && (
+              <p className="text-xs text-muted-foreground">
+                Forfait {planLabel(plan)} actif — toutes les fonctionnalités incluses sont débloquées.
+              </p>
             )}
           </div>
         </div>
