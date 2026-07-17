@@ -1,8 +1,9 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
+import { toast } from "sonner"
 import {
   ArrowLeft,
   RefreshCw,
@@ -13,13 +14,24 @@ import {
   Calendar,
   Loader2,
   AlertCircle,
+  Plus,
+  X,
 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { UserAvatar } from "@/components/ui/user-avatar"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 import { useCycleStore } from "@/lib/store/cycle-store"
+import { useIssueStore } from "@/lib/store/issue-store"
 import type { CycleStatus } from "@/lib/api/cycle-service"
 import type { Issue, IssuePriority, IssueStatusCategory } from "@/lib/api/issue-service"
 // ---------------------------------------------------------------------------
@@ -77,9 +89,31 @@ function daysLeft(endDate: string | null | undefined): number | null {
 // IssueRow
 // ---------------------------------------------------------------------------
 
-function IssueRow({ issue }: { readonly issue: Issue }) {
+function IssueRow({
+  issue, slug, projectId, cycleId, onRemoved,
+}: Readonly<{
+  issue: Issue
+  slug: string
+  projectId: number
+  cycleId: number
+  onRemoved: () => void | Promise<void>
+}>) {
+  const { removeIssueFromCycle } = useCycleStore()
+  const [removing, setRemoving] = useState(false)
+
+  async function handleRemove() {
+    setRemoving(true)
+    try {
+      await removeIssueFromCycle(slug, projectId, cycleId, issue.id)
+      toast.success(`${issue.identifier} retirée du cycle`)
+      await onRemoved()
+    } finally {
+      setRemoving(false)
+    }
+  }
+
   return (
-    <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors border-b border-border/50 last:border-0">
+    <div className="group flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors border-b border-border/50 last:border-0">
       <div className={cn("size-2 rounded-full shrink-0", PRIORITY_DOT[issue.priority])} />
       {getCategoryIcon(issue.status.category)}
       <span className="text-xs text-muted-foreground font-mono shrink-0 w-16">{issue.identifier}</span>
@@ -95,7 +129,107 @@ function IssueRow({ issue }: { readonly issue: Issue }) {
       ) : (
         <div className="size-6 rounded-full border border-dashed border-border shrink-0" />
       )}
+      <button
+        onClick={handleRemove}
+        disabled={removing}
+        aria-label={`Retirer ${issue.identifier} du cycle`}
+        className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive disabled:opacity-50 shrink-0"
+      >
+        {removing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
+      </button>
     </div>
+  )
+}
+
+/**
+ * Dialog d'ajout d'issues au cycle (C3). `addIssueToCycle` existait dans le store et n'avait AUCUN
+ * appelant → un cycle restait vide à vie, et la rétro Brain OS (déclenchée à la clôture) n'avait aucun
+ * fait d'issue à synthétiser.
+ *
+ * <p>Le backend n'expose PAS le cycle d'une issue (pas de reverse-lookup sur `IssueResponse`), donc on
+ * exclut les candidats en comparant à la liste des issues DÉJÀ dans le cycle (`alreadyIn`) — l'info
+ * qu'on possède réellement, plutôt qu'un champ fantôme.</p>
+ */
+function AddIssuesDialog({
+  slug, projectId, cycleId, alreadyIn, onAdded,
+}: Readonly<{
+  slug: string
+  projectId: number
+  cycleId: number
+  alreadyIn: Set<number>
+  onAdded: () => void | Promise<void>
+}>) {
+  const { fetchIssues } = useIssueStore()
+  const { addIssueToCycle } = useCycleStore()
+  const [open, setOpen] = useState(false)
+  const [projectIssues, setProjectIssues] = useState<Issue[]>([])
+  const [loading, setLoading] = useState(false)
+  const [addingId, setAddingId] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (!open) return
+    setLoading(true)
+    fetchIssues(slug, projectId)
+      .then(setProjectIssues)
+      .finally(() => setLoading(false))
+  }, [open, slug, projectId, fetchIssues])
+
+  // Candidats = issues du projet pas encore dans ce cycle.
+  const candidates = projectIssues.filter((i) => !alreadyIn.has(i.id))
+
+  async function handleAdd(issue: Issue) {
+    setAddingId(issue.id)
+    try {
+      await addIssueToCycle(slug, projectId, cycleId, issue.id)
+      toast.success(`${issue.identifier} ajoutée au cycle`)
+      await onAdded()
+    } finally {
+      setAddingId(null)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline" className="gap-2">
+          <Plus className="h-3.5 w-3.5" /> Ajouter des issues
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Ajouter des issues au cycle</DialogTitle>
+        </DialogHeader>
+        {loading ? (
+          <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" /><span className="text-sm">Chargement…</span>
+          </div>
+        ) : candidates.length === 0 ? (
+          <p className="py-12 text-center text-sm text-muted-foreground">
+            Toutes les issues du projet sont déjà dans ce cycle.
+          </p>
+        ) : (
+          <ScrollArea className="max-h-80">
+            <div className="flex flex-col">
+              {candidates.map((issue) => (
+                <button
+                  key={issue.id}
+                  onClick={() => handleAdd(issue)}
+                  disabled={addingId !== null}
+                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-muted/40 transition-colors rounded-md text-left disabled:opacity-50"
+                >
+                  <div className={cn("size-2 rounded-full shrink-0", PRIORITY_DOT[issue.priority])} />
+                  <span className="text-xs text-muted-foreground font-mono shrink-0 w-16">{issue.identifier}</span>
+                  <span className="text-sm text-foreground flex-1 min-w-0 truncate">{issue.title}</span>
+                  {addingId === issue.id
+                    ? <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground shrink-0" />
+                    : <Plus className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
+                </button>
+              ))}
+            </div>
+          </ScrollArea>
+        )}
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -166,6 +300,10 @@ export default function CycleDetailPage() {
 
   const completedCount = issues.filter((i) => i.status.category === "COMPLETED").length
   const totalCount     = issues.length
+
+  // Ids déjà dans le cycle → exclus des candidats à l'ajout (le back n'expose pas le cycle d'une issue).
+  const alreadyIn = new Set(issues.map((i) => i.id))
+  const reloadIssues = async () => { await fetchCycleIssues(workspace, projectId, cycleId) }
   const progress       = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
 
   return (
@@ -232,9 +370,19 @@ export default function CycleDetailPage() {
       </div>
 
       {/* Issues */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-foreground">Issues du cycle</h2>
+        <AddIssuesDialog
+          slug={workspace}
+          projectId={projectId}
+          cycleId={cycleId}
+          alreadyIn={alreadyIn}
+          onAdded={reloadIssues}
+        />
+      </div>
       {issues.length === 0 ? (
         <div className="rounded-xl border border-border border-dashed bg-card p-12 text-center text-muted-foreground text-sm">
-          No issues in this cycle yet.
+          Aucune issue dans ce cycle. Cliquez sur « Ajouter des issues » pour en rattacher.
         </div>
       ) : (
         <div className="flex flex-col gap-4">
@@ -252,7 +400,14 @@ export default function CycleDetailPage() {
                 </div>
                 <div className="rounded-xl border border-border bg-card overflow-hidden [box-shadow:var(--shadow-sm)]">
                   {group.map((issue) => (
-                    <IssueRow key={issue.id} issue={issue} />
+                    <IssueRow
+                      key={issue.id}
+                      issue={issue}
+                      slug={workspace}
+                      projectId={projectId}
+                      cycleId={cycleId}
+                      onRemoved={reloadIssues}
+                    />
                   ))}
                 </div>
               </div>
