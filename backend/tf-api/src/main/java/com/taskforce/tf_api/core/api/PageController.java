@@ -23,17 +23,26 @@ import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.service.PageService;
 import com.taskforce.tf_api.shared.dto.ApiResponse;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
+import com.taskforce.tf_api.shared.security.JwtIdentityResolver;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
+/**
+ * Pages de projet.
+ *
+ * <p>Le {@code slug} et l'appelant sont transmis à {@link PageService} sur <b>chaque</b> opération :
+ * ils portent le contrôle d'accès (cf. {@code PC-021}). Auparavant seul le {@code projectId} était
+ * passé, et le {@code slug} — pourtant reçu — n'était jamais utilisé.
+ */
 @RestController
 @RequestMapping("/api/workspaces/{slug}/projects/{projectId}/pages")
 @RequiredArgsConstructor
 public class PageController {
 
-    private final PageService    pageService;
-    private final UserRepository userRepository;
+    private final PageService         pageService;
+    private final UserRepository      userRepository;
+    private final JwtIdentityResolver identityResolver;
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<PageResponse>>> listPages(
@@ -41,7 +50,7 @@ public class PageController {
         @PathVariable Long projectId,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        List<PageResponse> pages = pageService.listPages(projectId);
+        List<PageResponse> pages = pageService.listPages(slug, projectId, resolveUserId(jwt));
         return ResponseEntity.ok(ApiResponse.success("Pages récupérées", pages));
     }
 
@@ -52,8 +61,7 @@ public class PageController {
         @Valid @RequestBody CreatePageRequest request,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        Long userId = resolveUserId(jwt);
-        PageResponse page = pageService.createPage(projectId, userId, request);
+        PageResponse page = pageService.createPage(slug, projectId, resolveUserId(jwt), request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Page créée", page));
     }
 
@@ -64,7 +72,7 @@ public class PageController {
         @PathVariable Long pageId,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        PageResponse page = pageService.getPage(projectId, pageId);
+        PageResponse page = pageService.getPage(slug, projectId, pageId, resolveUserId(jwt));
         return ResponseEntity.ok(ApiResponse.success("Page récupérée", page));
     }
 
@@ -76,7 +84,7 @@ public class PageController {
         @Valid @RequestBody UpdatePageRequest request,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        PageResponse page = pageService.updatePage(projectId, pageId, request);
+        PageResponse page = pageService.updatePage(slug, projectId, pageId, resolveUserId(jwt), request);
         return ResponseEntity.ok(ApiResponse.success("Page mise à jour", page));
     }
 
@@ -87,7 +95,7 @@ public class PageController {
         @PathVariable Long pageId,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        pageService.deletePage(projectId, pageId);
+        pageService.deletePage(slug, projectId, pageId, resolveUserId(jwt));
         return ResponseEntity.ok(ApiResponse.success("Page supprimée", null));
     }
 
@@ -95,8 +103,10 @@ public class PageController {
     // Helpers
     // =========================================================================
 
+    /** Passe par {@link JwtIdentityResolver} : en profil dev, un token sans claim {@code email} tombait
+     *  sinon en « Utilisateur introuvable » (incohérence {@code TF-JWT-IDENTITY}). */
     private Long resolveUserId(Jwt jwt) {
-        String email = jwt.getClaimAsString("email");
+        String email = identityResolver.resolveEmail(jwt);
         User user = userRepository.findByEmail(email)
             .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
         return user.getId();
