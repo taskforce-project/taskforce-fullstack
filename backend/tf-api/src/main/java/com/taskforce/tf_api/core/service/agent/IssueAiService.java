@@ -68,7 +68,7 @@ public class IssueAiService {
     private final ObjectMapper       objectMapper;
     private final AiMeter            aiMeter; // gate quota + comptage de la conso tokens de la génération de spec
 
-    @Value("${ai.groq.assistant-model:llama-3.3-70b-versatile}")
+    @Value("${ai.model.assistant:gateway-default}")
     private String model; // ignoré par l'AI Gateway (Ollama impose son modèle) ; utile si provider=groq
 
     private static final int RAG_TOPK = 5;
