@@ -9,7 +9,17 @@
 > Priorité désormais = clôture V1 de l'app (voir `.ai/roadmap.md`).
 >
 > **Statut** : Phases 0→3 **faites** · Phase 4 lots 1/2a/2b **faits** · **Phase 4bis (ingestion auto) faite**
-> · deep-path agentique **code-complet** · **Branche** : `feat/dashboard` · **Maj** : 2026-07-16
+> · **Phase 4ter (régions par projet) faite** · **RAG réparé (16/07 — il n'avait jamais marché, cf. §RAG)**
+> · deep-path agentique **code-complet** · **Branche** : `chore/v1-closure` · **Maj** : 2026-07-16
+>
+> **⚠️ Le RAG était décoratif jusqu'au 16/07.** Toute la Phase 1 (« embedding & retrieval ») était marquée
+> « faite & vérifiée e2e », et elle l'était — *isolément*. Mais en usage réel, la recherche vectorielle
+> mourait à chaque fois qu'elle était appelée depuis un chemin en `@Transactional(readOnly = true)` :
+> le backfill d'embeddings tente un `UPDATE` dans la tx en lecture seule, Postgres avorte **toute** la
+> transaction, et le `SELECT … <=> …` suivant échoue en `25P02`. Les **19 nodes du seed n'ont jamais pu
+> s'indexer**. Correctif : `BrainEmbeddingWriter` (`REQUIRES_NEW`, une tx par vecteur) → 78/78 indexés.
+> **Leçon transférable** : une vérif « e2e » qui appelle le service *directement* ne reproduit pas le
+> contexte transactionnel de l'appelant réel. C'est ce trou-là qui a laissé passer le bug.
 >
 > **Synthèse** : le Brain OS est un produit complet et utilisable — graphe neural (tags + wikilinks),
 > éditeur riche (callouts/titres/couleurs/images MinIO/code, toolbar sticky), explorateur Obsidian
@@ -229,6 +239,81 @@ TOTAL                                ≈ 218 GB
 - [ ] **Hors périmètre assumé** : issues **hors cycle** (259 des 267 du seed), **commentaires**, **PR**
       → aucune ingestion. Le grain reste le lot ; l'événement isolé n'écrit rien.
 - [ ] *(futur)* rétro **de projet** (agrégat multi-cycles) ; `ACTION_OODA` sur clôture de projet.
+
+### Phase 4ter — Régions par projet dans le graphe · 🟢 **fait (16/07)**
+
+> **Constat de départ** : le « camembert par projet » était **déjà entièrement codé**
+> (`brain-graph.tsx` — quartiers teintés + anneau de pourtour) mais **à sec** : il ne se déclenche que
+> si `node.refType === "PROJECT" && depth === 1`, or **aucun node** n'a jamais porté `refType=PROJECT`
+> et **aucun** n'a de `parentNodeId` (mesuré : 0/21). D'où la roue plate observée.
+
+- [x] **Décision : régions (blobs) plutôt que parts de tarte.** La part de tarte découle du
+      `parentNodeId` → un node a **un** parent, donc **une** part : une note transverse y est
+      *impossible par construction*, pas seulement moche. La région est un **ensemble** : une note
+      peut être dans deux, les enveloppes se chevauchent, et **l'intersection est l'information**.
+- [x] **Donnée** : `metadata.projects = [ids]` — une **liste**, pas un `projectId`. Zéro migration
+      (le JSONB sert déjà aux tags). Écrit par l'ingestion (cycle → projet), `approveSpec`
+      (issue → projet), et exposé aux `Create/UpdateKnowledgeNodeRequest`.
+- [x] **Layout déterministe** (aucune simulation, fidèle au parti pris du composant), en deux idées :
+      **(1)** `Brain OS` + la connaissance hors projet forment la **cellule « Base commune », au centre** —
+      c'est la ressource native sur laquelle tout se construit, donc les projets viennent s'y **coller** ;
+      **(2)** les cellules projet se posent en couronne **collée** au noyau, packées par leur **largeur
+      angulaire** (`asin(r / anneau)`), pas réparties sur 360°. Amas par **ensemble exact de projets** ;
+      une note transverse se pose **au milieu du segment** entre les cellules concernées → recouvrement
+      en lentille.
+      ⚠️ **Deux versions ratées avant celle-ci, à ne pas refaire** : répartir les projets sur 360° les
+      met dos à dos dès qu'il n'y en a que deux, et leur note commune finit à 90° des deux (ou pile sur
+      le noyau si on prend le barycentre) → enveloppes en **bâtons illisibles**. Retour user, sans appel :
+      « ultra moche, on arrive pas à voir quel projet ».
+- [x] **Camembert par domaine À L'INTÉRIEUR d'une cellule** (demande user) : chaque domaine (Projet,
+      Produit, Architecture, Sécurité, Runbooks…) prend un secteur proportionnel à son nombre de notes,
+      et ses notes s'y rangent. Traits de séparation **découpés dans la forme organique** (`clip`) →
+      ils épousent le contour. Libellés de domaine **au zoom seulement** : à l'échelle « vue globale »,
+      17 libellés empilés dans la base ne diraient plus rien. Aucune donnée nouvelle : `node.domain`
+      existait déjà. Sans ce 2ᵉ niveau, une cellule dit « ces notes sont au projet WEB » mais pas
+      « voici la partie archi de WEB » — or c'est ça qu'on veut lire.
+- [x] **Rendu « eau » = metaballs** (`metaballContour`, état actuel du code). Chaque cellule évalue un
+      **champ scalaire** : `influence(ses nœuds) − PRESSURE × influence(les nœuds des AUTRES cellules)`
+      (`PRESSURE = 0.62`, `BLOB_R = 46`). Le contour est trouvé par **marche radiale** depuis le centre
+      (`CONTOUR_RAYS = 144`, `MARCH_STEP = 5`) là où le champ franchit son seuil, puis lissé.
+      **C'est le terme de pression qui fait l'eau** : une cellule voisine *repousse* le contour, donc
+      deux amas proches s'aplatissent l'un contre l'autre et se pincent réellement. Alpha faible → les
+      teintes s'additionnent aux recouvrements, l'intersection ressort d'elle-même. Contour calculé
+      **une fois par layout**, pas par frame (sinon 144 rayons × N cellules × 60 fps).
+      ⚠️ **Garde-fous non négociables**, appris en live : `if (center <= 1) return circle(radius*0.55)`
+      — sans lui, une cellule dominée par la pression voisine a un champ négatif partout et son contour
+      **explose en éventail** (vu sur `MOB`, écrasée par `PORT`) ; `t` borné à [0,1] ; `hit ?? bound`.
+- [x] **Code couleur par projet** (retour user : « MOB, PORT c'est naze… un code couleur pour savoir
+      qui est quel projet »). Palette `PROJECT_HUE` → une teinte stable par projet (`hueOf`), reprise
+      par le remplissage, le contour **et une légende à pastilles**. Le graphe se lit sans avoir à
+      déchiffrer des identifiants de 3 lettres.
+      ⚠️ **Deux rendus abandonnés avant** — ne pas y revenir en croyant simplifier : **(1)** enveloppe
+      convexe adoucie (2 nœuds → capsule) : une région de 2 notes éloignées avalait la moitié du
+      graphe ; **(2)** **union des disques** (« étoile de 96 rayons ») : trop ronde et surtout **inerte**
+      — les cellules ne réagissaient pas les unes aux autres, donc ça ne faisait pas « de l'eau ».
+- [x] **🐞 `zoomToFit` avec une durée d'animation ne fait RIEN**, silencieusement, sans erreur. Le
+      `getGraphBbox()` était pourtant déjà juste, et le même appel rejoué en console avec une durée
+      **0** cadrait parfaitement : l'animation se fait écraser avant d'aboutir. Correctif : durée 0 +
+      quelques tentatives (les projets arrivent du store après le 1er rendu, et les positions étant
+      fixes le moteur ne redémarre pas → `onEngineStop` ne se rejoue jamais).
+- [x] **Vérifié en live** : régions `WEB` et `PORT`, note `ADR — Jeton d'accès partagé` en
+      `projects: [65, 70]` → les deux enveloppes s'étirent vers elle et se rejoignent.
+- [ ] **⚠️ Limite connue — une petite cellule à côté d'une grosse retombe en disque.** Avec le seed
+      3 mois, `MOB` (5 notes) est voisine de `PORT` (36 notes) : la pression de `PORT` rend le champ de
+      `MOB` négatif jusqu'en son centre, le garde-fou `center <= 1` se déclenche et `MOB` s'affiche en
+      **cercle terne** au lieu d'une forme organique. Ce n'est pas un plantage (le garde-fou fait son
+      travail) mais le rendu ment sur la nature de la cellule. Piste : normaliser la pression par la
+      **taille relative** des cellules, ou plafonner la contribution d'une voisine. **Non corrigé.**
+- [x] **Scénario à 2 projets** (`scripts/scenario/play.mjs`) : **PORT** *gros* (28 issues, 4 cycles —
+      3 clôturés + 1 actif, 6 notes sur 6 domaines) et **MOB** *petit* (6 issues, 1 cycle, 2 notes),
+      + 2 notes **transverses**. Vérifié en live : 4 rétros `generated` par Qwen (86 / 75 / 86 / 83 %
+      de complétion) + 1 relevé vivant ; **PORT = 12 notes sur 8 domaines**, **MOB = 5 sur 4** → les
+      camemberts internes ont de quoi se remplir. Reprise sur **429** ajoutée dans le client du script :
+      il enchaîne ~200 requêtes et déclenchait le `RateLimitFilter` — le serveur demande de ralentir,
+      on patiente au lieu d'échouer.
+- [ ] **Reste** : *sélecteur de projet dans l'éditeur* — aujourd'hui seuls l'ingestion, `approveSpec`
+      et l'API posent `metadata.projects` ; un humain ne peut pas rattacher une note à la main depuis
+      l'UI.
 
 > **Comportement connu — nodes orphelins.** Supprimer un projet (donc ses cycles) **ne supprime pas**
 > les rétros correspondantes : `refId` n'est pas une FK. Constaté en rejouant le scénario (`--reset`) :
