@@ -43,7 +43,6 @@ function segmentLabel(segment: string): string {
     members: "Members",
     skills: "Skills",
     analytics: "Intelligence",
-    agents: "Agents",
     settings: "Settings",
     admin: "Admin",
     new: "New",

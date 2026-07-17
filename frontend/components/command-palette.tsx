@@ -27,7 +27,8 @@ import {
   ArrowLeft,
 } from "lucide-react"
 import { useTheme } from "next-themes"
-import { toast } from "sonner"
+
+import { sendAssistantMessage } from "@/lib/api/assistant-service"
 
 import {
   CommandDialog,
@@ -40,37 +41,30 @@ import {
   CommandShortcut,
 } from "@/components/ui/command"
 
-// ─── Hook streaming IA (mock — brancher sur fetch SSE réel) ──────────────────
-function useAIStream(query: string | null) {
+// ─── Hook IA — appelle le VRAI assistant (Cortex), plus de mock ──────────────
+//
+// ⚠️ Ce hook renvoyait auparavant une phrase FIGÉE (« Cette réponse sera bientôt connectée à l'API »)
+// avec un faux streaming mot-à-mot. C'était un mensonge servi à l'utilisateur sur le différenciateur du
+// produit (règle d'or n°7). Il tape désormais l'endpoint réel via `sendAssistantMessage`, le même que
+// le panneau Cortex. Pas de vrai token-streaming (le back répond en une fois) → on montre un loader
+// puis la réponse. Cf. PC-029.
+function useAssistant(slug: string, query: string | null) {
   const [text, setText] = useState("")
   const [isRunning, setIsRunning] = useState(false)
-  const abortRef = useRef<AbortController | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!query) { setText(""); setIsRunning(false); return }
-    abortRef.current?.abort()
-    const ac = new AbortController()
-    abortRef.current = ac
-    const reply = [
-      `Je traite votre demande : « ${query.slice(0, 80)} ».`,
-      "Cette réponse sera bientôt connectée à l'API Taskforce.",
-      "Je peux également vous rediriger vers la section pertinente ou vous aider à préciser votre question.",
-    ].join(" ")
-    const words = reply.split(" ")
-    let i = 0; setText(""); setIsRunning(true)
-    const tick = setInterval(() => {
-      if (ac.signal.aborted || i >= words.length) {
-        clearInterval(tick)
-        if (!ac.signal.aborted) setIsRunning(false)
-        return
-      }
-      setText((prev) => (prev ? `${prev} ${words[i]}` : words[i]))
-      i++
-    }, 40)
-    return () => { ac.abort(); clearInterval(tick) }
-  }, [query])
+    if (!query || !slug) { setText(""); setIsRunning(false); setError(null); return }
+    let cancelled = false
+    setText(""); setError(null); setIsRunning(true)
+    sendAssistantMessage(slug, query)
+      .then((answer) => { if (!cancelled) setText(answer) })
+      .catch(() => { if (!cancelled) setError("L'assistant est momentanément indisponible. Réessayez.") })
+      .finally(() => { if (!cancelled) setIsRunning(false) })
+    return () => { cancelled = true }
+  }, [slug, query])
 
-  return { text, isRunning }
+  return { text, isRunning, error }
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -99,7 +93,7 @@ export function CommandPalette({ open, onOpenChange }: Readonly<CommandPalettePr
   const [aiInput, setAiInput] = useState("")
   const [aiQuery, setAiQuery] = useState<string | null>(null)
   const aiInputRef = useRef<HTMLTextAreaElement>(null)
-  const { text: aiText, isRunning } = useAIStream(aiQuery)
+  const { text: aiText, isRunning, error: aiError } = useAssistant(slug, aiQuery)
 
   // Reset à chaque ouverture/fermeture
   useEffect(() => {
@@ -147,10 +141,13 @@ export function CommandPalette({ open, onOpenChange }: Readonly<CommandPalettePr
     { id: "profile",       label: "View my profile",     group: "Navigation", icon: <User className="h-4 w-4" />,           shortcut: "G F", action: () => go("/profile") },
     // Actions
     { id: "ask-ai",        label: "Ask AI",              group: "Actions",    icon: <Sparkles className="h-4 w-4" />,        shortcut: "A",   action: enterAiMode },
-    { id: "new-issue",     label: "Create new issue",    group: "Actions",    icon: <Plus className="h-4 w-4" />,            shortcut: "C",   action: () => { onOpenChange(false); toast.info("New issue dialog coming soon") } },
-    { id: "new-project",   label: "Create new project",  group: "Actions",    icon: <Plus className="h-4 w-4" />,                             action: () => go("/projects") },
-    { id: "notifications", label: "Open notifications",  group: "Actions",    icon: <Bell className="h-4 w-4" />,                             action: () => go("/inbox") },
-    { id: "upgrade",       label: "Upgrade to Pro",      group: "Actions",    icon: <Zap className="h-4 w-4" />,                              action: () => { go("/settings"); toast.info("Redirecting to Billing…") } },
+    // « Create new issue » affichait « coming soon » (action morte) → mène à la page issues, où le
+    // bouton de création existe réellement. Honnête et utile plutôt qu'un toast qui ne fait rien.
+    { id: "new-issue",     label: "Créer une issue",     group: "Actions",    icon: <Plus className="h-4 w-4" />,            shortcut: "C",   action: () => go("/issues") },
+    { id: "new-project",   label: "Créer un projet",     group: "Actions",    icon: <Plus className="h-4 w-4" />,                             action: () => go("/projects") },
+    { id: "notifications", label: "Ouvrir les notifications", group: "Actions", icon: <Bell className="h-4 w-4" />,                          action: () => go("/inbox") },
+    // « Upgrade to Pro » : le plan Pro n'existe pas (cf. TF-PLAN-PRO-GHOST).
+    { id: "upgrade",       label: "Voir les forfaits",   group: "Actions",    icon: <Zap className="h-4 w-4" />,                              action: () => go("/settings") },
     // Appearance
     { id: "theme-light",   label: "Switch to light mode", group: "Appearance", icon: <Sun className="h-4 w-4" />,    action: () => { setTheme("light"); onOpenChange(false) } },
     { id: "theme-dark",    label: "Switch to dark mode",  group: "Appearance", icon: <Moon className="h-4 w-4" />,   action: () => { setTheme("dark"); onOpenChange(false) } },
@@ -188,11 +185,10 @@ export function CommandPalette({ open, onOpenChange }: Readonly<CommandPalettePr
                     : <Sparkles className="size-3 text-primary" />
                   }
                 </div>
-                <p className="text-sm text-foreground leading-relaxed flex-1">
-                  {aiText}
-                  {isRunning && (
-                    <span className="inline-block w-1 h-3.5 bg-primary/70 rounded-sm ml-0.5 animate-pulse align-middle" />
-                  )}
+                <p className="text-sm leading-relaxed flex-1">
+                  {aiError
+                    ? <span className="text-destructive">{aiError}</span>
+                    : <span className="text-foreground">{aiText || (isRunning ? "Réflexion en cours…" : "")}</span>}
                 </p>
               </div>
               {!isRunning && (
