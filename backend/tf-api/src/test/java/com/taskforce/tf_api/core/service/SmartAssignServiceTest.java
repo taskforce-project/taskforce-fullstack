@@ -89,7 +89,7 @@ class SmartAssignServiceTest {
     @Mock private ProjectRepository projectRepository;
     @Mock private ProjectMemberRepository projectMemberRepository;
     @Mock private IssueRepository issueRepository;
-    @Mock private GroqService groqService;
+    @Mock private LlmClient llm;   // on mocke l'INTERFACE, jamais une impl concrete (TF-AI-GROQ-CLEANUP)
     @Mock private JdbcTemplate jdbcTemplate;
     @Mock private AiUsageService aiUsageService; // dép. du vrai AiMeter (pass-through en test)
 
@@ -102,10 +102,10 @@ class SmartAssignServiceTest {
     void setUp() {
         // ObjectMapper réel — le service parse la réponse Groq et sérialise les payloads JSON.
         // Vrai AiMeter (métrage) avec conso mockée → pass-through transparent (gate/enregistrement no-op).
-        AiMeter aiMeter = new AiMeter(aiUsageService, groqService);
+        AiMeter aiMeter = new AiMeter(aiUsageService, llm);
         service = new SmartAssignService(
             workspaceRepository, workspaceMemberRepository, projectRepository,
-            projectMemberRepository, issueRepository, groqService, jdbcTemplate, new ObjectMapper(), aiMeter);
+            projectMemberRepository, issueRepository, llm, jdbcTemplate, new ObjectMapper(), aiMeter);
         ReflectionTestUtils.setField(service, "modelName", "test-model");
 
         workspace = Workspace.builder().id(WS_ID).slug(SLUG).name("Demo").build();
@@ -127,7 +127,7 @@ class SmartAssignServiceTest {
             .thenReturn(List.of());
 
         // Groq renvoie par défaut un JSON vide et valide → ranking déterministe piloté par les règles Java.
-        lenient().when(groqService.chatCompletion(any(), any(), any(), anyBoolean(), any()))
+        lenient().when(llm.chatCompletion(any(), any(), any(), anyBoolean(), any()))
             .thenReturn("{\"scores\":[]}");
     }
 
@@ -286,7 +286,7 @@ class SmartAssignServiceTest {
             User u = user(10L, "Alice");
             stubResolvedContext();
             stubWorkspaceMembers(u);
-            when(groqService.chatCompletion(any(), any(), any(), anyBoolean(), any()))
+            when(llm.chatCompletion(any(), any(), any(), anyBoolean(), any()))
                 .thenThrow(new RuntimeException("groq down"));
 
             SmartAssignResponse res = service.preview(SLUG, PROJECT_ID, REQUESTER, previewRequest(IssuePriority.MEDIUM));
@@ -307,7 +307,7 @@ class SmartAssignServiceTest {
             stubResolvedContext();
             stubWorkspaceMembers(alice, bob);
             stubSkills(10L, "java");
-            when(groqService.chatCompletion(any(), any(), any(), anyBoolean(), any()))
+            when(llm.chatCompletion(any(), any(), any(), anyBoolean(), any()))
                 .thenReturn("{\"scores\":[{\"candidate_id\":11,\"score\":0.99,\"reason\":\"great semantic fit\"}]}");
 
             SmartAssignResponse res = service.preview(SLUG, PROJECT_ID, REQUESTER, previewRequest(IssuePriority.MEDIUM, "java"));

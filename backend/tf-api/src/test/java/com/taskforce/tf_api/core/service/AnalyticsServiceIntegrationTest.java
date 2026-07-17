@@ -40,9 +40,15 @@ import static org.mockito.Mockito.doThrow;
  *
  * <p>Service chargé via {@code @Import} ; repos + {@code JdbcTemplate} réels ; les collaborateurs
  * non-DB sont mockés ({@code AuthorizationService} → membre OK, {@code PlanFeatureService} → gating,
- * {@code GroqService}/{@code ObjectMapper} inutilisés ici). Valide le calcul KPIs (SQL réel de
- * {@code countCompletedBetween}), la structure du throughput (8 buckets semaine) et l'<b>enforcement
- * du gating PRO</b> sur les analytics avancées.</p>
+ * {@code LlmClient}/{@code AiMeter}/{@code ObjectMapper} inutilisés hors du test d'insights). Valide le
+ * calcul KPIs (SQL réel de {@code countCompletedBetween}), la structure du throughput (8 buckets
+ * semaine) et l'<b>enforcement du gating</b> sur les analytics avancées.</p>
+ *
+ * <p><b>{@code TF-AI-GROQ-CLEANUP}</b> — ce test mockait {@code GroqService}, la <b>classe concrète</b>.
+ * C'est ce couplage qui a laissé passer {@code TF-INTEL-INSIGHTS} : le test prouvait que le parsing
+ * marchait <i>en supposant que Groq répond</i>, alors qu'en vrai l'appel levait à chaque fois (clé vide,
+ * réseau bloqué) et que la carte servait une phrase en dur. Un test vert sur une fonctionnalité morte.
+ * On mocke désormais l'<b>interface</b> {@link LlmClient}.</p>
  */
 @DisplayName("AnalyticsService (intégration Postgres)")
 @Import({AnalyticsService.class, ProjectVisibilityGuard.class})
@@ -58,7 +64,8 @@ class AnalyticsServiceIntegrationTest extends AbstractIntegrationTest {
 
     @MockitoBean private AuthorizationService authorizationService;   // requireMember → no-op (membre OK)
     @MockitoBean private PlanFeatureService planFeatureService;        // gating PRO
-    @MockitoBean private GroqService groqService;                      // inutilisé (pas d'insights ici)
+    @MockitoBean private LlmClient llm;                                // l'INTERFACE, pas une impl concrète
+    @MockitoBean private AiMeter aiMeter;                              // rendu transparent dans le test d'insights
     @MockitoBean private ObjectMapper objectMapper;                   // inutilisé (pas de parsing ici)
 
     private static final String SLUG = "ws-an-it";
@@ -237,15 +244,19 @@ class AnalyticsServiceIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("generateInsights (PRO) parse le JSON Groq en 3 insights")
-    void insights_parsed_from_groq_json() throws Exception {
+    @DisplayName("generateInsights parse le JSON du LLM en 3 insights, étiquetés generated")
+    void insights_parsed_from_llm_json() throws Exception {
         org.mockito.Mockito.when(planFeatureService.has(any(), any())).thenReturn(true);
+        // AiMeter rendu transparent : il exécute le travail sans gate ni comptage (testés ailleurs).
+        org.mockito.Mockito.when(aiMeter.metered(any(), any()))
+            .thenAnswer(i -> ((AiMeter.AiCall<?>) i.getArgument(1)).call());
         String json = "{\"insights\":["
             + "{\"agent\":\"COO\",\"agentColor\":\"#0a84ff\",\"category\":\"Operations\",\"urgency\":\"high\",\"confidence\":88,\"action\":\"Ajuster le scope\",\"insight\":\"Trop d'issues ouvertes\"},"
             + "{\"agent\":\"CPO\",\"category\":\"Product\",\"urgency\":\"medium\",\"confidence\":40,\"action\":\"Prioriser\",\"insight\":\"Backlog large\"},"
             + "{\"agent\":\"CTO\",\"category\":\"Engineering\",\"urgency\":\"low\",\"confidence\":99,\"action\":\"Revue\",\"insight\":\"Vélocité stable\"}"
             + "]}";
-        org.mockito.Mockito.when(groqService.chatCompletion(any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean()))
+        // 5 arguments : generateInsights route désormais par LlmClient avec un tier (« fast »).
+        org.mockito.Mockito.when(llm.chatCompletion(any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean(), any()))
             .thenReturn(json);
         // le mock ObjectMapper délègue à un vrai parseur pour readTree
         org.mockito.Mockito.when(objectMapper.readTree(org.mockito.ArgumentMatchers.anyString()))
@@ -260,16 +271,34 @@ class AnalyticsServiceIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("generateInsights (PRO) retombe sur le fallback si le JSON n'a pas d'insights")
+    @DisplayName("generateInsights retombe sur le repli si le JSON n'a pas d'insights, et l'ÉTIQUETTE")
     void insights_fallback_on_empty_json() throws Exception {
         org.mockito.Mockito.when(planFeatureService.has(any(), any())).thenReturn(true);
-        org.mockito.Mockito.when(groqService.chatCompletion(any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean()))
+        org.mockito.Mockito.when(aiMeter.metered(any(), any()))
+            .thenAnswer(i -> ((AiMeter.AiCall<?>) i.getArgument(1)).call());
+        org.mockito.Mockito.when(llm.chatCompletion(any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean(), any()))
             .thenReturn("{}");
         org.mockito.Mockito.when(objectMapper.readTree(org.mockito.ArgumentMatchers.anyString()))
             .thenAnswer(i -> new ObjectMapper().readTree((String) i.getArgument(0)));
 
         var insights = analyticsService.generateInsights(SLUG, owner.getId());
 
-        assertThat(insights).hasSize(1); // fallbackInsights
+        assertThat(insights).hasSize(1);
+        // Le cœur de TF-INTEL-INSIGHTS : le repli doit se DÉCLARER. Sans cette étiquette, il est
+        // indiscernable d'un vrai insight — c'est ce qui a caché la panne pendant des mois.
+        assertThat(insights.get(0).getMode()).isEqualTo("fallback");
+    }
+
+    @Test
+    @DisplayName("generateInsights : le LLM en échec ne remonte pas d'erreur, il rend un repli étiqueté")
+    void insights_fallback_when_llm_throws() throws Exception {
+        org.mockito.Mockito.when(planFeatureService.has(any(), any())).thenReturn(true);
+        org.mockito.Mockito.when(aiMeter.metered(any(), any()))
+            .thenThrow(new IllegalStateException("quota atteint"));
+
+        var insights = analyticsService.generateInsights(SLUG, owner.getId());
+
+        assertThat(insights).hasSize(1);
+        assertThat(insights.get(0).getMode()).isEqualTo("fallback");
     }
 }
