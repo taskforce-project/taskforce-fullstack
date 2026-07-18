@@ -479,12 +479,16 @@ public class IssueService {
                     logActivity(issue, actor, IssueActivityType.LABEL_REMOVED, removed.getName(), null);
                 }
             }
-            // Muter la collection gérée par Hibernate (clear/addAll) au lieu de la
-            // remplacer par une nouvelle liste : remplacer le PersistentBag déclenche
-            // un DELETE+INSERT dont l'ordre de flush peut violer la PK composite de
-            // issue_label_assignments (cause du 500 au changement de label).
-            issue.getLabels().clear();
-            issue.getLabels().addAll(newLabels);
+            // Appliquer le delta sur la collection gérée : retirer UNIQUEMENT les labels
+            // absents de la nouvelle sélection, ajouter UNIQUEMENT les nouveaux. Combiné au
+            // mapping Set (cf. Issue#labels), Hibernate émet des INSERT/DELETE ligne à ligne
+            // et ne touche pas aux labels inchangés — plus de violation de PK composite.
+            issue.getLabels().removeIf(l -> !newIds.contains(l.getId()));
+            for (ProjectLabel added : newLabels) {
+                if (!oldIds.contains(added.getId())) {
+                    issue.getLabels().add(added);
+                }
+            }
         }
 
         issue = issueRepository.save(issue);
