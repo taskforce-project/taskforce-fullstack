@@ -203,6 +203,9 @@ otp:
   length: ${OTP_LENGTH:6}
   max-attempts: ${OTP_MAX_ATTEMPTS:5}
   max-requests-per-hour: ${OTP_MAX_REQUESTS_PER_HOUR:5}
+  # Dev sans SMTP : si l'envoi de l'e-mail OTP échoue, on logge le code et on laisse
+  # l'inscription réussir (code récupérable dans les logs). En prod (défaut false) l'échec bloque.
+  dev-fallback-log: ${OTP_DEV_FALLBACK_LOG:true}
 
 # Logging Configuration
 logging:
