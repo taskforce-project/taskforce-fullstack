@@ -340,17 +340,28 @@ export function MyWorkView({ defaultTab }: MyWorkViewProps) {
     const baseUrl = `/${slug}`
 
     async function load() {
-      // Issues : un seul appel cross-projets (mes issues assignées) — plus de N+1
-      const [myIssuesRaw, projs] = await Promise.all([listMyIssues(slug), fetchProjects(slug)])
-      setMyIssues(myIssuesRaw.map((i) => mapMyIssue(i, baseUrl)))
+      try {
+        // Issues : un seul appel cross-projets (mes issues assignées) — plus de N+1
+        const [myIssuesRaw, projs] = await Promise.all([listMyIssues(slug), fetchProjects(slug)])
+        setMyIssues(myIssuesRaw.map((i) => mapMyIssue(i, baseUrl)))
 
-      // Cycles & pages restent agrégés par projet
-      const [cycleResults, pageResults] = await Promise.all([
-        Promise.all(projs.map(async (p) => ({ proj: p, cycles: await fetchCycles(slug, p.id) }))),
-        Promise.all(projs.map(async (p) => ({ proj: p, pages: await pageService.list(slug, String(p.id)) }))),
-      ])
-      setMyCycles(flattenCycles(cycleResults, baseUrl))
-      setMyPages(flattenPages(pageResults, baseUrl))
+        // Cycles & pages agrégés par projet, en mode tolérant : un projet dont les cycles ou
+        // les pages échouent (droits, session expirée, indispo ponctuelle) ne doit pas faire
+        // tomber toute la vue. Promise.allSettled + on ne garde que les succès.
+        const cycleResults = (
+          await Promise.allSettled(projs.map(async (p) => ({ proj: p, cycles: await fetchCycles(slug, p.id) })))
+        ).flatMap((r) => (r.status === "fulfilled" ? [r.value] : []))
+        const pageResults = (
+          await Promise.allSettled(projs.map(async (p) => ({ proj: p, pages: await pageService.list(slug, String(p.id)) })))
+        ).flatMap((r) => (r.status === "fulfilled" ? [r.value] : []))
+
+        setMyCycles(flattenCycles(cycleResults, baseUrl))
+        setMyPages(flattenPages(pageResults, baseUrl))
+      } catch (e) {
+        // Échec des appels de base (ex. session expirée) : l'interceptor gère le 401/refresh.
+        // On évite ici l'« unhandled rejection » qui affichait un overlay d'erreur brut (My Queue KO).
+        console.warn("My Queue : chargement partiel", e)
+      }
     }
     void load()
   // eslint-disable-next-line react-hooks/exhaustive-deps
