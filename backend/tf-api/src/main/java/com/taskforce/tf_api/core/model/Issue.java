@@ -3,7 +3,9 @@ package com.taskforce.tf_api.core.model;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -147,8 +149,12 @@ public class Issue {
         joinColumns        = @JoinColumn(name = "issue_id"),
         inverseJoinColumns = @JoinColumn(name = "label_id")
     )
+    // Set (et non List/bag) : le mapping correct pour un many-to-many à PK composite.
+    // Un bag force Hibernate à DELETE-all puis réinsérer toute la collection à chaque
+    // changement, ce qui violait la PK de issue_label_assignments (500 au changement de
+    // label). Un Set émet des INSERT/DELETE ligne à ligne. LinkedHashSet = ordre stable.
     @Builder.Default
-    private List<ProjectLabel> labels = new ArrayList<>();
+    private Set<ProjectLabel> labels = new LinkedHashSet<>();
 
     @OneToMany(mappedBy = "issue", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
