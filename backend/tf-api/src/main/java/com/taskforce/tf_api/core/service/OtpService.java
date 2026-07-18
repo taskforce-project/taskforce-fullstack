@@ -4,6 +4,7 @@ import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +27,12 @@ public class OtpService {
 
     private final OtpVerificationRepository otpRepository;
     private final EmailService emailService;
+
+    /** En dev (SMTP non configuré : creds Mailtrap vides), un échec d'envoi d'OTP est loggué
+     *  au lieu de faire échouer l'inscription — le code reste récupérable dans les logs.
+     *  Défaut false : en prod l'échec d'envoi reste bloquant (AUTH-05). */
+    @Value("${otp.dev-fallback-log:false}")
+    private boolean devFallbackLog;
 
     private static final int OTP_LENGTH = 6;
     private static final int OTP_EXPIRY_MINUTES = 15;
@@ -78,11 +85,23 @@ public class OtpService {
         otp = otpRepository.save(otp);
         log.info("OTP créé avec succès pour : {} avec plan {}", email, planType);
 
-        // Envoyer l'email selon le type d'OTP
-        if (otpType == OtpType.PASSWORD_RESET) {
-            emailService.sendResetPasswordEmail(email, otpCode, firstName);
-        } else {
-            emailService.sendOtpEmail(email, otpCode, firstName);
+        // Envoyer l'email selon le type d'OTP.
+        // En dev (devFallbackLog), si le SMTP n'est pas configuré, l'envoi lève une exception :
+        // on logge alors le code et on laisse l'inscription aboutir (transaction non rollbackée),
+        // pour que le flux reste testable sans SMTP. En prod l'échec reste bloquant (AUTH-05).
+        try {
+            if (otpType == OtpType.PASSWORD_RESET) {
+                emailService.sendResetPasswordEmail(email, otpCode, firstName);
+            } else {
+                emailService.sendOtpEmail(email, otpCode, firstName);
+            }
+        } catch (RuntimeException e) {
+            if (!devFallbackLog) {
+                throw e;
+            }
+            log.warn("[OTP dev-fallback] Envoi e-mail impossible (SMTP non configuré ?). "
+                + "Code OTP pour {} = {} (valable {} min). Cause : {}",
+                email, otpCode, OTP_EXPIRY_MINUTES, e.getMessage());
         }
 
         return otp;
