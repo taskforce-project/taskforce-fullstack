@@ -36,9 +36,10 @@ interface SmartAssignProps {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function getBarColor(value: number): string {
-  if (value >= 70) return "bg-emerald-500"
-  if (value >= 40) return "bg-amber-400"
-  return "bg-red-400"
+  // Bleu de référence pour un bon score ; seuils d'alerte amber/rose alignés sur la jauge d'usage IA (échelle inversée)
+  if (value >= 70) return "bg-gradient-to-r from-blue-600 to-blue-400 dark:from-blue-500 dark:to-blue-300"
+  if (value >= 40) return "bg-amber-500"
+  return "bg-rose-500"
 }
 
 function WorkloadBar({ value }: Readonly<{ value: number }>) {
