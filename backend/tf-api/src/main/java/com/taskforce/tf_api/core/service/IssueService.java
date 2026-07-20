@@ -359,6 +359,14 @@ public class IssueService {
             .build();
 
         issue = issueRepository.save(issue);
+
+        // Labels à la création (après le save : l'id de l'issue est requis pour la table
+        // de jointure issue_label_assignments). Miroir de updateIssue — cf. ISS-01.
+        if (request.getLabelIds() != null && !request.getLabelIds().isEmpty()) {
+            issue.getLabels().addAll(projectLabelRepository.findAllById(request.getLabelIds()));
+            issue = issueRepository.save(issue);
+        }
+
         logActivity(issue, reporter, IssueActivityType.CREATED, null, issue.getTitle());
 
         // Notification d'assignation à la création
@@ -493,9 +501,21 @@ public class IssueService {
 
         issue = issueRepository.save(issue);
         IssueResponse updated = toResponse(issue);
-        publishIssueEvent("updated", issue.getProject().getId(), issue.getId(), updated);
-        slackService.notifyEvent(issue.getProject().getWorkspace().getId(), "issue.updated",
-            "✏️ Issue *" + issue.getProject().getIdentifier() + "-" + issue.getSequenceNumber() + "* mise à jour : " + issue.getTitle());
+        // Effets de bord best-effort : une panne de messagerie temps réel (relais STOMP) ou de Slack ne
+        // doit JAMAIS faire échouer — ni rollback — l'édition de l'issue. Sans ces gardes, un connecteur
+        // Slack mal en point ou un broker indisponible remontait en 500 sur un simple ajout de label,
+        // affiché à tort comme un refus de droits (ISS-06).
+        try {
+            publishIssueEvent("updated", issue.getProject().getId(), issue.getId(), updated);
+        } catch (Exception e) {
+            log.warn("Publication temps réel 'issue.updated' échouée (non bloquant) : {}", e.getMessage());
+        }
+        try {
+            slackService.notifyEvent(issue.getProject().getWorkspace().getId(), "issue.updated",
+                "✏️ Issue *" + issue.getProject().getIdentifier() + "-" + issue.getSequenceNumber() + "* mise à jour : " + issue.getTitle());
+        } catch (Exception e) {
+            log.warn("Notification Slack 'issue.updated' échouée (non bloquant) : {}", e.getMessage());
+        }
         return updated;
     }
 
