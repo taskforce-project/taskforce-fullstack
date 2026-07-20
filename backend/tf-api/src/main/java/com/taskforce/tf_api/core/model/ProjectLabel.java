@@ -62,4 +62,22 @@ public class ProjectLabel {
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    // equals/hashCode par id — REQUIS pour un usage correct dans un Set<ProjectLabel>
+    // (cf. Issue#labels @ManyToMany). Sans ça (égalité par identité), Hibernate ne
+    // reconnaissait pas un label déjà présent et ré-insérait sa ligne quand on en ajoutait
+    // un autre → duplicate key sur issue_label_assignments_pkey (ISS-06).
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof ProjectLabel that)) return false;
+        return id != null && id.equals(that.id);
+    }
+
+    @Override
+    public int hashCode() {
+        // Constante : hashCode stable même quand l'id est null (label transient),
+        // condition d'un usage sûr dans un Set avant/après persistance.
+        return getClass().hashCode();
+    }
 }
