@@ -54,6 +54,71 @@
 5. **Migrer le reste des pages** (Dashboard, Signals, My Queue, Intelligence, Agents, détail projet) vers shadcn pur et **supprimer le bloc `@layer components`** custom de `globals.css`.
 6. **Membres de projet** : `addMember` exige déjà membre du workspace (ok), mais UI sans recherche + rôle hardcodé MEMBER + changement de rôle = stub.
 
+## ✅ Fait 2026-07-20 (branche `chore/v1-closure`) — aperçu des PJ, Signal Center, rate limiting
+
+Trois symptômes sans rapport apparent, trois causes racines distinctes. Chacune a été **mesurée avant
+correctif** — dans les trois cas l'hypothèse de départ était fausse.
+
+### 1. Aperçu des pièces jointes cassé — cause : la **CSP**, pas MinIO
+
+- **Symptôme** : vignette d'image cassée dans le sheet d'issue ; le `fetch` de l'URL présignée échoue en
+  `TypeError: Failed to fetch`.
+- **Pistes écartées par la mesure** : le backend renvoyait **200** sur `/attachments`, MinIO était joignable,
+  la signature présignée était **valide** (URL générée avec `mc` → HTTP 200, 1449 octets) et le CORS MinIO
+  renvoyait bien `Access-Control-Allow-Origin: http://localhost:3000`. Ni le réseau, ni la signature, ni le
+  CORS n'étaient en cause.
+- **Cause réelle** : `frontend/next.config.ts` construisait la CSP **sans l'origine du stockage objet**.
+  `img-src 'self' data: blob: https: ${API_ORIGIN}` — le mot-clé `https:` **ne couvre pas** un MinIO local
+  en `http://localhost:9000`, et `connect-src` ne le listait pas non plus. Le navigateur bloquait donc la
+  requête **avant** tout échange réseau, d'où un échec qui ressemble à une panne de stockage.
+- **Correctif** : nouvelle constante `STORAGE_ORIGIN` alimentée par `NEXT_PUBLIC_STORAGE_URL` (défaut
+  `http://localhost:9000`), ajoutée à **`img-src` ET `connect-src`** ; variable passée au service `frontend`
+  dans `docker-compose.dev.yml`.
+- ⚠️ **Invariant à tenir** : `NEXT_PUBLIC_STORAGE_URL` (front) doit rester **aligné sur
+  `MINIO_PUBLIC_ENDPOINT`** (back) — c'est l'hôte qui signe l'URL.
+- **Vérifié en live** : la vignette du logo s'affiche sur l'issue 4826.
+
+### 2. Lignes mortes dans le Signal Center — cause : liens de notification **NULL**
+
+- **Cause structurelle** : la table `notifications` ne porte **aucune clé étrangère** vers `issues`/`projects` ;
+  `issue_url`/`project_url` sont **dénormalisées à l'écriture** par `NotificationService.buildNotification`.
+  Une ligne insérée **hors du code Java** (en pratique : le seed) arrive donc avec des liens `NULL`, et rien
+  ne permet de les reconstruire à la lecture.
+- **Constat mesuré** : **35 lignes sur 266** sans lien — exactement les lignes du seed. Elles affichaient bien
+  un identifiant (« WEB-3 ») mais le clic ne faisait rien.
+- **Correctifs** :
+  1. Migration Flyway **`V71__backfill_notification_urls.sql`** : reconstruit les liens en décomposant
+     `issue_identifier` (« WEB-3 » → identifiant projet + numéro de séquence) puis en rejoignant
+     `projects`/`issues`, avec un filet qui ramène **au moins vers le projet**. Idempotente (ne touche que
+     les colonnes `NULL`).
+  2. `backend/tf-api/seed/dev_seed.sql` : bloc de **résolution des liens en fin de seed** (même règle) ;
+     identifiants du bloc de volume tirés d'issues **réelles** au lieu d'être fabriqués (`'WEB-' || n`) ;
+     signal de surcharge aligné sur la convention Java `overload-<userId>`.
+  3. Garde front : `DataTable` accepte `isRowClickable` — une ligne **sans destination** n'est ni cliquable
+     ni pourvue du bouton « ouvrir ».
+- **Résultat mesuré après migration** : **265/266** lignes résolues. Reste **1 ligne** (`overload` du seed
+  historique, `issue_identifier` `NULL`) — irrécupérable par jointure, corrigée au prochain reseed.
+
+### 3. Blocages de rate limiting
+
+- **Cause n°1 — les préflights comptaient** : `RateLimitFilter` (bucket4j, par IP, `OncePerRequestFilter`
+  monté sur `/api/*` **avant** Spring Security) comptait **aussi** les préflights CORS `OPTIONS`. Le front
+  étant sur une origine différente (`localhost:3000` → `localhost:8080`), chaque requête non simple en
+  générait un : **le quota réel était divisé par deux**.
+- **Cause n°2 — la vue « Ma file » était bavarde** : `3 + 2N` requêtes par affichage (un appel cycles **et**
+  un appel pages **par projet**, N = nombre de projets).
+- **Cause n°3 — l'attente était invisible** : le profil `DEFAULT` est de **200 requêtes / 60 s** et
+  `refillIntervally` rend **tous les jetons d'un coup** en fin de fenêtre → l'attente réelle va de **0 à 60 s**
+  (et non ~10 s). Aucun en-tête `Retry-After` n'était émis et le front n'avait **aucun traitement du 429** :
+  les stores avalaient l'erreur, l'application paraissait figée.
+- **Correctifs** : `shouldNotFilter` exclut `OPTIONS` ; le filtre émet `Retry-After` et
+  `X-RateLimit-Remaining`, **exposés via `CorsConfig.setExposedHeaders`** (sans quoi ils restent masqués au JS
+  en cross-origin) ; nouveaux endpoints agrégés `GET /api/workspaces/{slug}/my-cycles` et
+  `GET /api/workspaces/{slug}/my-pages` ; `client.ts` affiche un toast dédié au **429** avec le délai réel.
+- **Mesures live** : 20 préflights `OPTIONS` consomment **0 jeton** (199 → 198, seul le GET réel compte) ;
+  un 429 renvoie `Retry-After: 57` ; « Ma file » passe de `3+2N` à **3 appels agrégés**, **0 appel par projet**
+  mesuré.
+
 ## Priority queue (do in this order)
 
 | ID     | Priority | Title                                                                        | Impact                                       | Effort | Conf. |
