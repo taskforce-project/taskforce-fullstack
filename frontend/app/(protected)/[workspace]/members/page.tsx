@@ -812,7 +812,7 @@ export default function MembersPage() {
                 <div className="flex items-center gap-2">
                   <div className="w-32 h-1.5 rounded-full bg-muted overflow-hidden">
                     <div
-                      className={cn("h-full rounded-full transition-all", atLimit ? "bg-amber-500" : "bg-primary")}
+                      className={cn("h-full rounded-full transition-all", atLimit ? "bg-amber-500" : "bg-gradient-to-r from-blue-600 to-blue-400 dark:from-blue-500 dark:to-blue-300")}
                       style={{ width: `${Math.min((memberCount / rawLimit) * 100, 100)}%` }}
                     />
                   </div>
