@@ -43,7 +43,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * introuvable) et la relation cycle↔issue (ajout, doublon, IDOR issue hors projet).
  */
 @DisplayName("CycleService (intégration Postgres)")
-@Import(CycleService.class)
+// ProjectVisibilityGuard : dépendance de CycleService depuis l'ajout de listWorkspaceCycles
+// (périmètre = projets visibles). C'est un @Component sur repos JPA, donc chargeable dans la tranche.
+@Import({CycleService.class, ProjectVisibilityGuard.class})
 class CycleServiceIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired private CycleService cycleService;
