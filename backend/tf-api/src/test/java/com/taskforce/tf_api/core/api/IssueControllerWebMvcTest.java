@@ -18,6 +18,7 @@ import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.service.CycleService;
 import com.taskforce.tf_api.core.service.IssueService;
 import com.taskforce.tf_api.core.service.SmartAssignService;
 import com.taskforce.tf_api.core.service.agent.IssueAiService;
@@ -52,6 +53,7 @@ class IssueControllerWebMvcTest {
     @Autowired private MockMvc mockMvc;
 
     @MockitoBean private IssueService issueService;
+    @MockitoBean private CycleService cycleService;       // dépendance d'IssueController (sinon contexte KO)
     @MockitoBean private SmartAssignService smartAssignService;
     @MockitoBean private IssueAiService issueAiService; // dépendance d'IssueController (sinon contexte KO)
     @MockitoBean private UserRepository userRepository;
