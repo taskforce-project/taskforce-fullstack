@@ -16,7 +16,9 @@ import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.service.CycleService;
 import com.taskforce.tf_api.core.service.IssueService;
+import com.taskforce.tf_api.core.service.PageService;
 import com.taskforce.tf_api.core.service.NotificationService;
 import com.taskforce.tf_api.core.service.ProfileService;
 import com.taskforce.tf_api.core.service.TeamService;
@@ -45,6 +47,9 @@ class MiscControllersWebMvcTest {
     @MockitoBean private NotificationService notificationService;
     @MockitoBean private TeamService teamService;
     @MockitoBean private IssueService issueService;
+    // MyWorkController agrège désormais issues + cycles + pages (routes /my-cycles et /my-pages).
+    @MockitoBean private CycleService cycleService;
+    @MockitoBean private PageService  pageService;
     @MockitoBean private ProfileService profileService;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private WorkspaceRepository workspaceRepository;
