@@ -30,6 +30,7 @@ import com.taskforce.tf_api.core.dto.request.ReorderStatusesRequest;
 import com.taskforce.tf_api.core.dto.request.SmartAssignPreviewRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateIssueRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateIssueStatusRequest;
+import com.taskforce.tf_api.core.dto.response.CycleResponse;
 import com.taskforce.tf_api.core.dto.response.IssueActivityResponse;
 import com.taskforce.tf_api.core.dto.response.IssueCommentResponse;
 import com.taskforce.tf_api.core.dto.response.IssueRelationResponse;
@@ -43,6 +44,7 @@ import com.taskforce.tf_api.core.dto.response.KnowledgeNodeResponse;
 import com.taskforce.tf_api.core.dto.response.SmartAssignResponse;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
+import com.taskforce.tf_api.core.service.CycleService;
 import com.taskforce.tf_api.core.service.IssueService;
 import com.taskforce.tf_api.core.service.SmartAssignService;
 import com.taskforce.tf_api.core.service.agent.IssueAiService;
@@ -67,6 +69,7 @@ import lombok.extern.slf4j.Slf4j;
 public class IssueController {
 
     private final IssueService   issueService;
+    private final CycleService   cycleService;
     private final SmartAssignService smartAssignService;
     private final IssueAiService issueAiService;
     private final UserRepository userRepository;
@@ -85,6 +88,19 @@ public class IssueController {
         Long userId = resolveUserId(jwt);
         List<IssueResponse> issues = issueService.listIssues(slug, projectId, userId);
         return ResponseEntity.ok(ApiResponse.success("Issues récupérées", issues));
+    }
+
+    /** GET .../issues/{issueId}/cycles — cycles auxquels l'issue est rattachée (sélecteur du sheet, CYC-03b). */
+    @GetMapping("/{issueId}/cycles")
+    public ResponseEntity<ApiResponse<List<CycleResponse>>> listIssueCycles(
+        @PathVariable String slug,
+        @PathVariable Long projectId,
+        @PathVariable Long issueId,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long userId = resolveUserId(jwt);
+        return ResponseEntity.ok(ApiResponse.success("Cycles de l'issue récupérés",
+            cycleService.listCyclesForIssue(slug, projectId, issueId, userId)));
     }
 
     /**
