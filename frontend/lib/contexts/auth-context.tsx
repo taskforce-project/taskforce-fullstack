@@ -115,13 +115,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
       await authService.logout();
       setUser(null);
       clearUser();
-      // Redirection vers login
-      router.push("/auth/login");
+      // Reload DUR (window.location) et non router.push : détruit tous les stores Zustand
+      // en mémoire (singletons module-level) pour ne pas mélanger les comptes sur un même
+      // navigateur (cache stale au switch de compte → 403, erreurs d'intégrations…). QA2.
+      window.location.href = "/auth/login";
     } catch (error) {
       // Même en cas d'erreur, déconnecter côté client
       setUser(null);
       clearUser();
-      router.push("/auth/login");
+      window.location.href = "/auth/login";
       throw error;
     }
   };
