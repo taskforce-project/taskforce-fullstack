@@ -17,6 +17,7 @@ import {
 } from "@/lib/api/project-service"
 import { teamService, type Team } from "@/lib/api/team-service"
 import { searchUsers, type UserSearchResult } from "@/lib/api/user-service"
+import { ProjectInviteDialog } from "@/components/dialogs/project-invite-dialog"
 
 interface ProjectTeamsSectionProps {
   readonly workspace: string
@@ -104,8 +105,16 @@ export function ProjectTeamsSection({ workspace, projectId }: ProjectTeamsSectio
         await attachProjectTeam(workspace, projectId, team.id)
         setLinkedIds((prev) => new Set(prev).add(team.id))
       }
-    } catch {
-      toast.error("Action impossible")
+    } catch (err) {
+      // 409 = plafond Free du projet privé (collaborateurs via équipe compris) → message clair + upsell.
+      const e = err as { response?: { status?: number; data?: { message?: string } } }
+      if (e?.response?.status === 409) {
+        toast.error(e.response?.data?.message ?? "Limite de collaborateurs atteinte sur ce projet privé (forfait Free).", {
+          description: "Rendez le projet public, ou passez à un forfait payant pour associer sans limite.",
+        })
+      } else {
+        toast.error("Action impossible")
+      }
     }
   }
 
@@ -149,6 +158,16 @@ export function ProjectTeamsSection({ workspace, projectId }: ProjectTeamsSectio
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Inviter de nouvelles personnes directement depuis les équipes (modale, sans changer de page) :
+          email + rôle projet (Viewer inclus) + équipe optionnelle + ajout au workspace automatique. */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold text-foreground">Membres &amp; équipes</h3>
+          <p className="text-xs text-muted-foreground">Invitez de nouvelles personnes ou regroupez-les en équipes, sans quitter l&apos;opération.</p>
+        </div>
+        <ProjectInviteDialog workspace={workspace} projectId={projectId} onInvited={() => { void reloadTeams() }} />
+      </div>
+
       {/* Créer une équipe */}
       <div className="flex items-center gap-2 rounded-xl border border-border bg-card p-3 [box-shadow:var(--shadow-sm)]">
         <Users className="size-4 shrink-0 text-muted-foreground" />
