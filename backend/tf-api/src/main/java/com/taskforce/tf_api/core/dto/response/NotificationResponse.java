@@ -57,5 +57,7 @@ public class NotificationResponse {
         private String name;
         private String initials;
         private String avatarUrl;
+        /** Seed de l'avatar côté front (DiceBear déterministe) quand avatarUrl est absent. */
+        private String email;
     }
 }
