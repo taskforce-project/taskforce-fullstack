@@ -316,11 +316,18 @@ function AccountPanel() {
   }
 
   async function handleDelete() {
-    if (globalThis.window !== undefined && !window.confirm("Supprimer définitivement votre compte ? Cette action est irréversible.")) return
     setDeleting(true)
     try {
       await deleteMyAccount()
       toast.success("Compte supprimé. Déconnexion…")
+      // Purge cliente + reload dur : le compte est anonymisé et la session Keycloak supprimée
+      // côté serveur — rester « connecté » dessus provoquait des 403 en cascade (flow brisé). RGPD-02.
+      if (globalThis.window !== undefined) {
+        localStorage.removeItem("accessToken")
+        localStorage.removeItem("refreshToken")
+        localStorage.removeItem("user")
+        window.location.href = "/auth/login"
+      }
     } catch {
       toast.error("Échec de la suppression. Réessayez ou contactez privacy@taskforce.dev.")
       setDeleting(false)
@@ -366,9 +373,18 @@ function AccountPanel() {
             <p className="text-sm font-medium text-foreground">Delete your account</p>
             <p className="text-xs text-muted-foreground mt-0.5">Permanently delete your account and all associated data.</p>
           </div>
-          <Button variant="destructive" size="sm" className="h-8 text-xs shrink-0" onClick={handleDelete} disabled={deleting}>
-            {deleting ? "Suppression…" : "Delete account"}
-          </Button>
+          <DeleteConfirmDialog
+            title="Supprimer votre compte ?"
+            description="Votre compte et toutes les données associées seront supprimés définitivement (RGPD — droit à l'effacement, art. 17). Cette action est irréversible."
+            confirmLabel="Supprimer mon compte"
+            variant="danger"
+            confirmText={user?.email ?? undefined}
+            onConfirm={handleDelete}
+          >
+            <Button variant="destructive" size="sm" className="h-8 text-xs shrink-0" disabled={deleting}>
+              {deleting ? "Suppression…" : "Delete account"}
+            </Button>
+          </DeleteConfirmDialog>
         </div>
       </SectionCard>
       <div className="flex justify-end">
@@ -1106,7 +1122,14 @@ function PrivacyPanel() {
     try {
       await deleteMyAccount()
       toast.success("Compte anonymisé. Déconnexion…")
-      setTimeout(() => { window.location.href = "/login" }, 1200)
+      // Purge cliente + BONNE route (/auth/login ; /login n'existe pas → 404) : sinon l'utilisateur
+      // restait « connecté » sur un compte anonymisé → 403 en cascade. RGPD-02.
+      if (globalThis.window !== undefined) {
+        localStorage.removeItem("accessToken")
+        localStorage.removeItem("refreshToken")
+        localStorage.removeItem("user")
+        setTimeout(() => { window.location.href = "/auth/login" }, 1000)
+      }
     } catch {
       toast.error("Échec de la suppression. Réessayez ou contactez privacy@taskforce.dev.")
       setLoading(null)
@@ -1362,10 +1385,10 @@ export default function SettingsPage() {
         title="Settings"
         description="Profil, workspace, facturation, sécurité et confidentialité."
       />
-      <div className="flex gap-8 w-full min-h-0">
-        <SettingsNav active={active} onSelect={setActive} className="sticky top-0 self-start w-48 shrink-0" />
+      <div className="flex flex-col md:flex-row gap-8 w-full min-h-0">
+        <SettingsNav active={active} onSelect={setActive} className="sticky top-0 self-start w-full md:w-48 shrink-0" />
 
-        <Separator orientation="vertical" className="self-stretch" />
+        <Separator orientation="vertical" className="hidden md:block self-stretch" />
 
         <div className="flex-1 min-w-0">
           <h2 className="text-base font-semibold text-foreground mb-5">{activeSection?.label}</h2>
