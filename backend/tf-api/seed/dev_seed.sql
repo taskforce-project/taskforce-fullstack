@@ -425,14 +425,18 @@ BEGIN
     WHERE i.project_id = v_web AND i.sequence_number IN (3, 4, 5, 12, 13);
 
     -- 15. Notifications (inbox) — pour l'admin, types variés, mix lu/non-lu
+    -- Les colonnes issue_url / project_url sont volontairement absentes : elles sont
+    -- résolues en fin de seed (bloc « Liens des notifications »), à partir de
+    -- issue_identifier, exactement comme le fait NotificationService à l'écriture.
+    -- Le signal de surcharge suit la convention Java : clé « overload-<userId> ».
     INSERT INTO notifications (recipient_id, workspace_id, actor_id, type, urgency, read, title, body, issue_identifier, project_name) VALUES
-        (v_admin, v_ws, v_sarah,  'assigned',      'info',     false, 'Nouvelle assignation', 'Sarah vous a assigné WEB-9',                'WEB-9', 'Web Application'),
-        (v_admin, v_ws, v_admin,  'mention',       'info',     false, 'Vous avez été mentionné', 'Mention sur WEB-3',                       'WEB-3', 'Web Application'),
-        (v_admin, v_ws, v_marcus, 'commented',     'info',     true,  'Nouveau commentaire', 'Marcus a commenté API-3',                    'API-3', 'API Platform'),
-        (v_admin, v_ws, NULL,     'dueSoon',       'warning',  false, 'Échéance proche', 'WEB-4 arrive à échéance demain',                 'WEB-4', 'Web Application'),
-        (v_admin, v_ws, NULL,     'overdue',       'critical', false, 'Issue en retard', 'WEB-3 est en retard',                            'WEB-3', 'Web Application'),
-        (v_admin, v_ws, v_tom,    'statusChanged', 'info',     true,  'Changement de statut', 'OPS-1 marquée Done',                        'OPS-1', 'Infrastructure'),
-        (v_admin, v_ws, NULL,     'overload',      'warning',  false, 'Surcharge détectée', 'Sarah a beaucoup de tâches ouvertes',         NULL,    NULL);
+        (v_admin, v_ws, v_sarah,  'assigned',      'info',     false, 'New assignment',    'Sarah assigned WEB-9 to you',        'WEB-9', 'Web Application'),
+        (v_admin, v_ws, v_admin,  'mention',       'info',     false, 'You were mentioned','Mentioned on WEB-3',                 'WEB-3', 'Web Application'),
+        (v_admin, v_ws, v_marcus, 'commented',     'info',     true,  'New comment',       'Marcus commented on API-3',          'API-3', 'API Platform'),
+        (v_admin, v_ws, NULL,     'dueSoon',       'warning',  false, 'Due soon',          'WEB-4 is due tomorrow',              'WEB-4', 'Web Application'),
+        (v_admin, v_ws, NULL,     'overdue',       'critical', false, 'Overdue issue',     'WEB-3 is overdue',                   'WEB-3', 'Web Application'),
+        (v_admin, v_ws, v_tom,    'statusChanged', 'info',     true,  'Status changed',    'OPS-1 moved to Done',                'OPS-1', 'Infrastructure'),
+        (v_admin, v_ws, NULL,     'overload',      'warning',  false, 'Workload alert',    'Sarah has too many open issues',     'overload-' || v_sarah, 'Web Application');
 
     -- 16. Favoris projet + pages (doc projet) + invitations en attente
     INSERT INTO project_favorites (user_id, project_id) VALUES (v_admin, v_web), (v_admin, v_api);
@@ -515,14 +519,14 @@ BEGIN
 
     -- 20. Notifications supplémentaires (inbox en volume, mix lu/non-lu)
     INSERT INTO notifications (recipient_id, workspace_id, actor_id, type, urgency, read, title, body, issue_identifier, project_name) VALUES
-        (v_admin, v_ws, v_marcus, 'assigned',      'info',     false, 'Nouvelle assignation', 'Marcus vous a assigné API-3',        'API-3', 'API Platform'),
-        (v_admin, v_ws, v_aicha,  'commented',     'info',     false, 'Nouveau commentaire',  'Aïcha a commenté WEB-3',             'WEB-3', 'Web Application'),
-        (v_admin, v_ws, v_nina,   'mention',       'info',     false, 'Mention',              'Nina vous a mentionné sur API-7',    'API-7', 'API Platform'),
-        (v_admin, v_ws, NULL,     'dueSoon',       'warning',  false, 'Échéance proche',      'Une tâche arrive à échéance',        'OPS-4', 'Infrastructure'),
-        (v_admin, v_ws, NULL,     'overdue',       'critical', false, 'Issue en retard',      'WEB-9 est en retard',                'WEB-9', 'Web Application'),
-        (v_admin, v_ws, v_tom,    'completed',     'info',     true,  'Tâche terminée',       'Tom a terminé OPS-2',                'OPS-2', 'Infrastructure'),
-        (v_admin, v_ws, v_sarah,  'statusChanged', 'info',     true,  'Changement de statut', 'WEB-1 marquée Done',                 'WEB-1', 'Web Application'),
-        (v_admin, v_ws, v_diego,  'assigned',      'low',      false, 'Nouvelle assignation', 'Diego a pris WEB-12',                'WEB-12','Web Application');
+        (v_admin, v_ws, v_marcus, 'assigned',      'info',     false, 'New assignment', 'Marcus assigned API-3 to you',     'API-3', 'API Platform'),
+        (v_admin, v_ws, v_aicha,  'commented',     'info',     false, 'New comment',    'Aicha commented on WEB-3',         'WEB-3', 'Web Application'),
+        (v_admin, v_ws, v_nina,   'mention',       'info',     false, 'Mention',        'Nina mentioned you on API-7',      'API-7', 'API Platform'),
+        (v_admin, v_ws, NULL,     'dueSoon',       'warning',  false, 'Due soon',       'An issue is approaching its due date', 'OPS-4', 'Infrastructure'),
+        (v_admin, v_ws, NULL,     'overdue',       'critical', false, 'Overdue issue',  'WEB-9 is overdue',                 'WEB-9', 'Web Application'),
+        (v_admin, v_ws, v_tom,    'completed',     'info',     true,  'Issue completed','Tom completed OPS-2',              'OPS-2', 'Infrastructure'),
+        (v_admin, v_ws, v_sarah,  'statusChanged', 'info',     true,  'Status changed', 'WEB-1 moved to Done',              'WEB-1', 'Web Application'),
+        (v_admin, v_ws, v_diego,  'assigned',      'low',      false, 'New assignment', 'Diego picked up WEB-12',           'WEB-12','Web Application');
 
     -- 21. Pages & worklogs supplémentaires (volume doc / temps passé)
     INSERT INTO pages (project_id, created_by, title, emoji, content) VALUES
@@ -661,16 +665,28 @@ BEGIN
     WHERE p.workspace_id = v_ws AND i.assignee_id IS NOT NULL AND (i.id % 4) = 0;
 
     -- 23d. Notifications — volume additionnel pour l'admin (inbox réaliste, mix lu/non-lu)
+    -- Les identifiants sont TIRÉS d'issues réelles (et non fabriqués « WEB-<n> ») : c'est la
+    -- seule façon que le lien vers l'issue soit résoluble en fin de seed. Un identifiant
+    -- inventé produirait une ligne d'inbox au clic sans effet.
     INSERT INTO notifications (recipient_id, workspace_id, actor_id, type, urgency, read, title, body, issue_identifier, project_name)
     SELECT v_admin, v_ws,
-           (ARRAY[v_sarah, v_marcus, v_aicha, v_tom, v_nina])[1 + (n % 5)],
-           (ARRAY['assigned','commented','mention','statusChanged','completed'])[1 + (n % 5)],
-           (ARRAY['info','info','info','low','info'])[1 + (n % 5)],
-           (n % 4) = 0,
-           (ARRAY['Nouvelle assignation','Nouveau commentaire','Mention','Changement de statut','Tâche terminée'])[1 + (n % 5)],
-           'Activité sur votre workspace (#' || n || ')',
-           'WEB-' || (1 + (n % 8)), 'Web Application'
-    FROM generate_series(1, 20) AS n;
+           (ARRAY[v_sarah, v_marcus, v_aicha, v_tom, v_nina])[1 + (src.n % 5)::int],
+           (ARRAY['assigned','commented','mention','statusChanged','completed'])[1 + (src.n % 5)::int],
+           (ARRAY['info','info','info','low','info'])[1 + (src.n % 5)::int],
+           (src.n % 4) = 0,
+           (ARRAY['New assignment','New comment','Mention','Status changed','Issue completed'])[1 + (src.n % 5)::int],
+           'Activity in your workspace (#' || src.n || ')',
+           src.identifier, src.project_name
+    FROM (
+        SELECT ROW_NUMBER() OVER (ORDER BY (i.id % 13), i.id) AS n,
+               p.identifier || '-' || i.sequence_number       AS identifier,
+               p.name                                         AS project_name
+        FROM issues i
+        JOIN projects p ON p.id = i.project_id
+        WHERE p.workspace_id = v_ws
+        ORDER BY (i.id % 13), i.id
+        LIMIT 20
+    ) AS src;
 
     -- ==================================================================
     -- Échéances réalistes — remplit la heatmap de charge (US-022) + les
@@ -699,6 +715,49 @@ BEGIN
       AND (i.start_date IS NULL OR i.start_date > i.due_date)
       AND i.project_id IN (SELECT id FROM projects WHERE workspace_id = v_ws);
 
+
+    -- ==================================================================
+    -- Liens des notifications (issue_url / project_url)
+    --
+    -- La table `notifications` ne porte pas de clé étrangère vers issues/projects :
+    -- NotificationService dénormalise les URL à l'écriture. Les INSERT ci-dessus ne
+    -- peuvent donc pas les fournir ligne à ligne (les ids ne sont pas connus dans les
+    -- VALUES). On les résout ici EN UNE FOIS, avec la même règle que le code Java —
+    -- sinon chaque ligne d'inbox issue du seed est cliquable mais sans effet.
+    --
+    -- Même logique que la migration V71 (qui, elle, répare les bases déjà semées).
+    -- ==================================================================
+
+    -- Signaux liés à une issue : « <IDENTIFIANT_PROJET>-<NUMÉRO> ».
+    UPDATE notifications n
+    SET issue_url   = '/' || w.slug || '/projects/' || p.id || '/issues/' || i.id,
+        project_url = '/' || w.slug || '/projects/' || p.id
+    FROM workspaces w
+    JOIN projects p ON p.workspace_id = w.id
+    JOIN issues   i ON i.project_id   = p.id
+    WHERE n.workspace_id = w.id
+      AND n.issue_url IS NULL
+      AND n.issue_identifier ~ '^[A-Za-z0-9]+-[0-9]+$'
+      AND p.identifier      = split_part(n.issue_identifier, '-', 1)
+      AND i.sequence_number = split_part(n.issue_identifier, '-', 2)::int;
+
+    -- Signaux de surcharge : centrés membre, comme notifyOverload (clé « overload-<userId> »).
+    UPDATE notifications n
+    SET issue_url   = '/' || w.slug || '/members/' || split_part(n.issue_identifier, '-', 2),
+        project_url = '/' || w.slug || '/members'
+    FROM workspaces w
+    WHERE n.workspace_id = w.id
+      AND n.issue_url IS NULL
+      AND n.issue_identifier ~ '^overload-[0-9]+$';
+
+    -- Filet : à défaut d'issue résoluble, au moins ramener vers le projet.
+    UPDATE notifications n
+    SET project_url = '/' || w.slug || '/projects/' || p.id
+    FROM workspaces w
+    JOIN projects p ON p.workspace_id = w.id
+    WHERE n.workspace_id = w.id
+      AND n.project_url IS NULL
+      AND p.name = n.project_name;
 
     RAISE NOTICE 'Seed QA ULTRA-complet : workspace "taskforce-demo" (id=%) — 9 membres + 24 solos (hors équipe), 4 projets, ~267 issues (throughput JOURNALIER 30 j + hebdo, KPIs/capacité/burndown remplis), sous-tâches/URGENT/cancelled, commentaires, checklist, relations, worklogs (~70), 3 cycles + sprint actif peuplé, ~130 commentaires (fils), ~35 notifications (mix lu/non-lu), favoris, 5 pages, invitations, abonnement BUSINESS + historique, demandes enterprise, ÉCHÉANCES réparties sur la quinzaine (heatmap de charge remplie).', v_ws;
 END
