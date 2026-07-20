@@ -186,6 +186,8 @@ export const CYCLE_ROUTES = {
   DELETE:       (slug: string, projectId: number, cycleId: number) => `/api/workspaces/${slug}/projects/${projectId}/cycles/${cycleId}`,
   ISSUES:       (slug: string, projectId: number, cycleId: number) => `/api/workspaces/${slug}/projects/${projectId}/cycles/${cycleId}/issues`,
   ISSUE:        (slug: string, projectId: number, cycleId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/cycles/${cycleId}/issues/${issueId}`,
+  // Reverse-lookup : cycles auxquels une issue est rattachée (sélecteur du sheet — CYC-03b).
+  FOR_ISSUE:    (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/cycles`,
 } as const;
 
 /**
