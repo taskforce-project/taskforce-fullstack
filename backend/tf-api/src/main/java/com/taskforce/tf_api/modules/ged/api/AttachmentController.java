@@ -59,7 +59,10 @@ public class AttachmentController {
             @PathVariable Long issueId,
             @AuthenticationPrincipal Jwt jwt
     ) {
-        List<AttachmentResponse> attachments = attachmentService.listByIssue(slug, projectId, issueId);
+        // Le JWT était injecté mais jamais lu : la lecture n'était donc soumise à aucune
+        // autorisation au-delà de « être authentifié ».
+        Long userId = resolveUserId(jwt);
+        List<AttachmentResponse> attachments = attachmentService.listByIssue(slug, projectId, issueId, userId);
         return ResponseEntity.ok(ApiResponse.success("Pièces jointes récupérées", attachments));
     }
 
