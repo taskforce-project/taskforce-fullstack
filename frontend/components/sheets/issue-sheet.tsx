@@ -49,6 +49,7 @@ import { useUserStore } from "@/lib/store/user-store"
 import { useLabelStore } from "@/lib/store/label-store"
 import { useIntegrationStore } from "@/lib/store/integration-store"
 import { listProjectMembers, type ProjectMember } from "@/lib/api/project-service"
+import { listCycles, addIssueToCycle, removeIssueFromCycle, listIssueCycles, type Cycle } from "@/lib/api/cycle-service"
 import type { IssueComment, IssueActivity, IssueLabel, IssueStatus as ApiIssueStatus, Issue, IssueRelation, IssueRelationType, ChecklistItem, Worklog } from "@/lib/api/issue-service"
 import { listChildIssues, listRelations, addRelation, deleteRelation,
          listChecklist, addChecklistItem, updateChecklistItem, deleteChecklistItem,
@@ -115,7 +116,10 @@ function memberInitials(m: ProjectMember): string {
 }
 function formatCommentTime(iso: string): string {
   try {
-    const d = new Date(iso)
+    // Le backend renvoie un LocalDateTime UTC sans offset ("...T12:00:00") : sans "Z",
+    // new Date() le parse en heure locale et un commentaire récent reste bloqué sur
+    // "just now" (diff ≤ 0). On force UTC si aucun fuseau n'est présent. Cf. ISS-09.
+    const d = new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(iso) ? iso : iso + "Z")
     const now = new Date()
     const diff = Math.floor((now.getTime() - d.getTime()) / 1000)
     if (diff < 60) return "just now"
@@ -584,7 +588,22 @@ export function AttachmentsTab({ issueId, projectId, workspaceSlug }: Readonly<A
               key={a.id}
               className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 px-3 py-2"
             >
-              <FileText className="size-4 shrink-0 text-muted-foreground" />
+              {a.contentType?.startsWith("image/") && a.downloadUrl ? (
+                // Aperçu inline pour les images (vignette cliquable → plein écran).
+                // <img> natif volontaire : l'URL présignée MinIO (localhost:9000, signature liée à
+                // l'URL exacte) doit être chargée par le navigateur, pas proxyfiée par next/image.
+                // eslint-disable-next-line @next/next/no-img-element
+                <a href={a.downloadUrl} target="_blank" rel="noreferrer" className="shrink-0" title={a.originalName}>
+                  <img
+                    src={a.downloadUrl}
+                    alt={a.originalName}
+                    loading="lazy"
+                    className="size-9 rounded object-cover border border-border bg-muted"
+                  />
+                </a>
+              ) : (
+                <FileText className="size-4 shrink-0 text-muted-foreground" />
+              )}
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium truncate text-foreground">{a.originalName}</p>
                 <p className="text-[10px] text-muted-foreground">
@@ -1101,6 +1120,9 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
   const [labels, setLabels] = useState<IssueLabel[]>(issue?.labels ?? [])
   const [points, setPoints] = useState<number | null>(issue?.storyPoints ?? null)
   const [dueDate, setDueDate] = useState<string | null>(issue?.dueDate ?? null)
+  // Cycle courant de l'issue + cycles du projet (options du sélecteur) — CYC-03b.
+  const [cycleId, setCycleId] = useState<number | null>(null)
+  const [projectCycles, setProjectCycles] = useState<Cycle[]>([])
 
   useEffect(() => { if (editingTitle) titleRef.current?.focus() }, [editingTitle])
 
@@ -1118,6 +1140,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
     setStatusName(issue.statusName)
     setStatusCategory(issue.statusCategory)
     setPinned(issue.pinned ?? false)
+    setCycleId(null)
   }, [issue])
 
   // Load project members + statuses + labels when sheet opens
@@ -1131,6 +1154,15 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
     fetchLabels(workspaceSlug, projectId)
       .catch(() => { /* silent */ })
   }, [open, workspaceSlug, projectId, fetchStatuses, fetchLabels])
+
+  // Cycles du projet (options du sélecteur) + cycle courant de l'issue — CYC-03b.
+  useEffect(() => {
+    if (!open || !workspaceSlug || !projectId || !issue) return
+    listCycles(workspaceSlug, projectId).then(setProjectCycles).catch(() => { /* silent */ })
+    listIssueCycles(workspaceSlug, projectId, Number(issue.id))
+      .then((cs) => setCycleId(cs[0]?.id ?? null))
+      .catch(() => { /* silent */ })
+  }, [open, workspaceSlug, projectId, issue])
 
   // Fil d'activité unifié → charger commentaires + évènements dès l'ouverture du sheet.
   useEffect(() => {
@@ -1160,13 +1192,13 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
   // Couleur réelle de la colonne courante (reflète la couleur personnalisée du board)
   const currentStatusColor = displayStatuses.find((s) => s.id === statusId)?.color ?? "#94a3b8"
 
-  async function callUpdate(payload: Parameters<typeof updateIssue>[3]) {
-    if (!workspaceSlug || !projectId) return
-    try {
-      await updateIssue(workspaceSlug, projectId, issueId, payload)
-    } catch {
-      toast.error("Failed to save")
-    }
+  async function callUpdate(payload: Parameters<typeof updateIssue>[3]): Promise<boolean> {
+    if (!workspaceSlug || !projectId) return false
+    // updateIssue avale les erreurs et renvoie null (cf. WS-10) → on remonte le refus par un toast
+    // au bon moment (à l'action) plutôt que via la bannière du board révélée à la fermeture du sheet.
+    const ok = await updateIssue(workspaceSlug, projectId, issueId, payload)
+    if (!ok) toast.error("Modification non enregistrée — réessaie dans un instant.")
+    return Boolean(ok)
   }
 
 
@@ -1224,12 +1256,13 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
   }
 
   function toggleLabel(l: IssueLabel) {
-    setLabels((prev) => {
-      const exists = prev.some((x) => x.id === l.id)
-      const next = exists ? prev.filter((x) => x.id !== l.id) : [...prev, l]
-      void callUpdate({ labelIds: next.map((x) => x.id) })
-      return next
-    })
+    const exists = labels.some((x) => x.id === l.id)
+    const next = exists ? labels.filter((x) => x.id !== l.id) : [...labels, l]
+    const previous = labels
+    setLabels(next)
+    // Si l'enregistrement échoue, on RÉTABLIT l'état précédent — pas de label « fantôme » affiché
+    // comme ajouté alors qu'il n'a pas été persisté (ISS-06).
+    void callUpdate({ labelIds: next.map((x) => x.id) }).then((ok) => { if (!ok) setLabels(previous) })
   }
 
 
@@ -1684,12 +1717,41 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
               </Select>
             </MetaRow>
 
-            {/* Cycle — l'ancien champ « éditable » était un MENSONGE : il faisait un setState local + un
-                toast « Cycle updated » SANS aucun appel API, et acceptait n'importe quel texte libre. Pire,
-                le back n'expose pas le cycle d'une issue (pas de reverse-lookup sur IssueResponse), donc
-                cette ligne ne peut de toute façon rien afficher de fiable. Le rattachement d'une issue à un
-                cycle vit désormais sur la page du cycle (C3, `AddIssuesDialog`). Ligne retirée plutôt que
-                maintenue trompeuse. */}
+            {/* Cycle — sélecteur réel (CYC-03b). Le back expose désormais le cycle courant de l'issue
+                (GET .../issues/{id}/cycles). « Changer » = retirer du cycle précédent puis ajouter au
+                nouveau (pas d'endpoint « move »). On appelle les fns service en direct (le store avale
+                les erreurs) pour un vrai feedback. */}
+            {workspaceSlug && projectId && issue && (
+              <MetaRow icon={<RefreshCw className="size-3.5" />} label="Cycle">
+                <Select
+                  value={cycleId === null ? "none" : String(cycleId)}
+                  onValueChange={async (val) => {
+                    const next = val === "none" ? null : Number(val)
+                    const prev = cycleId
+                    if (next === prev) return
+                    setCycleId(next)
+                    try {
+                      if (prev !== null) await removeIssueFromCycle(workspaceSlug, projectId, prev, issueId)
+                      if (next !== null) await addIssueToCycle(workspaceSlug, projectId, next, issueId)
+                      toast.success(next !== null ? "Cycle mis à jour" : "Retirée du cycle")
+                    } catch {
+                      setCycleId(prev)
+                      toast.error("Impossible de mettre à jour le cycle")
+                    }
+                  }}
+                >
+                  <SelectTrigger size="sm" className="w-full">
+                    <span>{cycleId === null ? "Aucun cycle" : (projectCycles.find((c) => c.id === cycleId)?.name ?? "—")}</span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Aucun cycle</SelectItem>
+                    {projectCycles.map((c) => (
+                      <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </MetaRow>
+            )}
 
             {/* Due date — sélecteur de date shadcn (Calendar + Popover) */}
             <MetaRow icon={<Calendar className="size-3.5" />} label="Due date">
