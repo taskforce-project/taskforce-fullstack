@@ -452,7 +452,7 @@ export default function CycleDetailPage() {
           <div className="mt-4">
             <div className="h-2 rounded-full bg-muted overflow-hidden">
               <div
-                className={cn("h-full rounded-full transition-all", progress === 100 ? "bg-emerald-500" : "bg-primary")}
+                className="h-full rounded-full transition-all bg-gradient-to-r from-blue-600 to-blue-400 dark:from-blue-500 dark:to-blue-300"
                 style={{ width: `${progress}%` }}
               />
             </div>
