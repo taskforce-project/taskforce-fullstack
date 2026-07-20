@@ -25,6 +25,8 @@ import lombok.extern.slf4j.Slf4j;
 public class MinioService {
 
     private final MinioClient minioClient;
+    /** Client signant les URLs présignées avec l'endpoint PUBLIC (joignable par le navigateur). */
+    private final MinioClient minioPublicClient;
 
     @Value("${minio.bucket}")
     private String bucket;
@@ -59,7 +61,7 @@ public class MinioService {
 
     public String presignedGetUrl(String objectKey) {
         try {
-            return minioClient.getPresignedObjectUrl(
+            return minioPublicClient.getPresignedObjectUrl(
                 GetPresignedObjectUrlArgs.builder()
                     .bucket(bucket)
                     .object(objectKey)
