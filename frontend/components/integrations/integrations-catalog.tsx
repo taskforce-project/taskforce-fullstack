@@ -47,15 +47,18 @@ function CatPill({ active, onClick, children }: Readonly<{ active: boolean; onCl
 export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
   const [catalog, setCatalog] = useState<IntegrationCatalog | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
   const [dialogTool, setDialogTool] = useState<ConnectorView | null>(null)
   const [query, setQuery] = useState("")
   const [activeCat, setActiveCat] = useState<string>("all")
   const { connectGitHub, connectSlack } = useIntegrationStore()
 
   const refresh = useCallback(() => {
+    setLoading(true)
+    setError(false)
     getIntegrationCatalog(slug)
-      .then(setCatalog)
-      .catch(() => toast.error("Impossible de charger le catalogue d'intégrations"))
+      .then((c) => { setCatalog(c); setError(false) })
+      .catch(() => setError(true))
       .finally(() => setLoading(false))
   }, [slug])
 
@@ -97,7 +100,16 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
       </div>
     )
   }
-  if (!catalog) return null
+  if (error || !catalog) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-12 text-center">
+        <p className="text-sm text-muted-foreground">Le catalogue d'intégrations n'a pas pu être chargé.</p>
+        <Button variant="outline" size="sm" onClick={refresh} className="gap-1.5">
+          <Loader2 className="size-3.5" /> Réessayer
+        </Button>
+      </div>
+    )
+  }
 
   return (
     <TooltipProvider delayDuration={200}>
