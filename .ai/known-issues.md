@@ -119,6 +119,50 @@ correctif** — dans les trois cas l'hypothèse de départ était fausse.
   un 429 renvoie `Retry-After: 57` ; « Ma file » passe de `3+2N` à **3 appels agrégés**, **0 appel par projet**
   mesuré.
 
+## ✅ Fait 2026-07-20 (branche `chore/v1-closure`) — contrôle d'accès des pièces jointes (IDOR)
+
+Vérifier le **scope** d'une ressource n'est pas l'**autoriser** : la première question dit où vit l'objet,
+la seconde dit **qui** a le droit de le demander. Les pièces jointes ne posaient que la première.
+
+### Contrôle d'accès manquant sur les pièces jointes d'issue
+
+- **Le défaut** : `AttachmentService` ne faisait qu'une vérification de **scope** (`findScopedIssue` —
+  « l'issue appartient-elle bien au projet et au workspace de l'URL ? »). Cela ne dit **rien de qui**
+  demande. `AttachmentController.list` injectait `@AuthenticationPrincipal Jwt jwt` mais **ne le lisait
+  jamais**, et `listByIssue` ne recevait **aucun `userId`**. Un grep de
+  `WorkspaceMember|ProjectMember|hasAccess|assertMember` sur tout l'arbre `modules/ged` ne renvoyait
+  **aucun résultat**. Contrevient à la règle du projet : « Autorisation au niveau service : vérifier
+  `WorkspaceMember`/`ProjectMember` + rôles ».
+- **Portée réelle — plus étroite que soupçonné au départ** : un compte **totalement étranger au
+  workspace** était **déjà** bloqué en amont par `WorkspaceAccessInterceptor` (mesuré : **403** « Accès
+  refusé : vous n'êtes pas membre de cet espace de travail », en lecture **comme** en upload, avec le
+  compte `test@taskforce.dev`). La faille exploitable était donc : **un membre du workspace pouvait lire
+  et téléverser les pièces jointes d'un projet PRIVÉ dont il n'est pas membre**. Aggravant : l'**URL
+  présignée MinIO** renvoyée n'exige ensuite **plus aucune authentification pendant une heure** — la
+  fuite **survit à la requête**.
+- **Correctif** : deux helpers explicites au-dessus de `findScopedIssue`, sur le modèle déjà en place
+  dans `PageService` —
+  1. lecture (`listByIssue`) → `ProjectVisibilityGuard.assertCanView` : projet invisible = **404, jamais
+     403** (on ne révèle pas son existence) ;
+  2. écriture (`upload`) → `assertCanWrite` : 404 si invisible, refus si rôle `VIEWER` (lecture seule) ;
+  3. `delete` → la garde est placée **AVANT** le contrôle de propriété existant. Motif : un non-membre
+     recevait auparavant un 403 « vous n'êtes pas le propriétaire », ce qui **confirmait l'existence** de
+     la pièce jointe.
+  4. `listByIssue` prend désormais un `userId`, transmis par le contrôleur (signature passée de **3 à 4
+     arguments**).
+- **Vérification** : suite backend complète verte — **759 tests, 0 échec, 0 erreur** (contre **755** avant,
+  soit **+4 cas**). Nouveau bloc `@Nested` « Contrôle d'accès (IDOR) » dans
+  `AttachmentServiceIntegrationTest` : non-membre en lecture → 404, non-membre en upload → 404, membre du
+  projet → lecture OK, `VIEWER` → lecture OK mais upload refusé (`BusinessException`).
+- **Preuve end-to-end en dev**, compte `admin@taskforce.dev` (MEMBER du workspace `pierre`, **non-membre**
+  du projet privé 84) :
+  - `GET /api/workspaces/pierre/projects/84/issues/4828/attachments` → **404 « Projet introuvable »** ;
+  - `GET /api/workspaces/taskforce-demo/projects/78/issues/4826/attachments` → **200**, 1 pièce jointe —
+    le chemin légitime est **intact**.
+- ⚠️ **Dette relevée au passage** : le seed du test d'intégration existant créait un workspace **sans ligne
+  `WorkspaceMember` pour son propriétaire**, ce qui rendait même l'owner **non-admin** aux yeux de
+  `ProjectVisibilityGuard`. Corrigé en reprenant le helper documenté de `PageServiceIntegrationTest`.
+
 ## Priority queue (do in this order)
 
 | ID     | Priority | Title                                                                        | Impact                                       | Effort | Conf. |
