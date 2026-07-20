@@ -3,12 +3,14 @@ package com.taskforce.tf_api.shared.security;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.BucketConfiguration;
+import io.github.bucket4j.ConsumptionProbe;
 import io.github.bucket4j.distributed.proxy.ProxyManager;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -16,6 +18,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Filtre de rate limiting par adresse IP.
@@ -60,14 +63,35 @@ public class RateLimitFilter extends OncePerRequestFilter {
         String bucketKey = ip + ":" + profile.name();
         Bucket bucket = resolveBucket(bucketKey, profile);
 
-        if (bucket.tryConsume(1)) {
+        ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
+        if (probe.isConsumed()) {
+            // Le client peut ainsi lever le pied AVANT le mur, plutôt que de le découvrir en 429.
+            response.setHeader("X-RateLimit-Remaining", String.valueOf(probe.getRemainingTokens()));
             chain.doFilter(request, response);
         } else {
-            log.warn("Rate limit dépassé — ip={} path={} profile={}", ip, path, profile);
+            // `refillIntervally` rend tous les jetons d'un coup en fin de fenêtre : l'attente réelle
+            // va de 0 à 60 s. Sans Retry-After, le client ne peut que deviner — et réessayer trop tôt.
+            long waitSeconds = Math.max(1, TimeUnit.NANOSECONDS.toSeconds(probe.getNanosToWaitForRefill()));
+            log.warn("Rate limit dépassé — ip={} path={} profile={} retryAfter={}s", ip, path, profile, waitSeconds);
             response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
+            response.setHeader("Retry-After", String.valueOf(waitSeconds));
+            response.setHeader("X-RateLimit-Remaining", "0");
             response.setContentType("application/json");
-            response.getWriter().write("{\"error\":\"Too Many Requests\",\"message\":\"Limite de requêtes atteinte. Réessayez dans quelques secondes.\"}");
+            response.getWriter().write(
+                "{\"error\":\"Too Many Requests\",\"message\":\"Rate limit reached. Retry in "
+                    + waitSeconds + "s.\",\"retryAfterSeconds\":" + waitSeconds + "}");
         }
+    }
+
+    /**
+     * Les préflights CORS ne sont pas des actions utilisateur : le navigateur en émet un par requête
+     * non simple, sur une origine différente (localhost:3000 → localhost:8080). Les compter revenait
+     * à diviser par deux le quota réel — l'utilisateur atteignait la limite deux fois plus vite, sans
+     * qu'aucun appel métier supplémentaire n'ait été fait.
+     */
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        return HttpMethod.OPTIONS.matches(request.getMethod());
     }
 
     // =========================================================================
