@@ -24,4 +24,12 @@ public interface CycleIssueRepository extends JpaRepository<CycleIssue, Long> {
     boolean existsByCycleIdAndIssueId(Long cycleId, Long issueId);
 
     long countByCycleId(Long cycleId);
+
+    /**
+     * Nombre d'issues par cycle, pour un lot de cycles — une requête au lieu d'un
+     * {@link #countByCycleId(Long)} par cycle (N+1 dans les vues agrégées).
+     * Chaque ligne est un {@code [cycleId, count]} ; un cycle sans issue n'apparaît pas.
+     */
+    @Query("SELECT ci.cycle.id, COUNT(ci) FROM CycleIssue ci WHERE ci.cycle.id IN :cycleIds GROUP BY ci.cycle.id")
+    List<Object[]> countByCycleIds(@Param("cycleIds") List<Long> cycleIds);
 }

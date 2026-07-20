@@ -33,6 +33,21 @@ public interface CycleRepository extends JpaRepository<Cycle, Long> {
 
     boolean existsByNameAndProjectId(String name, Long projectId);
 
+    /**
+     * Tous les cycles d'un ensemble de projets, projet chargé en une passe.
+     *
+     * <p>Alimente la vue agrégée « Ma file » : le {@code JOIN FETCH} évite un SELECT par cycle pour
+     * lire le nom du projet, et la liste d'ids est déjà filtrée sur les projets visibles par
+     * l'appelant (cf. {@code ProjectVisibilityGuard.viewableProjectIds}).</p>
+     */
+    @Query("""
+        SELECT c FROM Cycle c
+        JOIN FETCH c.project p
+        WHERE p.id IN :projectIds
+        ORDER BY c.startDate DESC, c.id DESC
+        """)
+    List<Cycle> findByProjectIdsWithProject(@Param("projectIds") List<Long> projectIds);
+
     /** Cycles actifs pour tous les projets d'un workspace */
     @Query("""
         SELECT c FROM Cycle c
