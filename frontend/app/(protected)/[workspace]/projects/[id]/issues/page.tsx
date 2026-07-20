@@ -234,7 +234,7 @@ function IssueStats({ issues }: { readonly issues: Issue[] }) {
       <div className="hidden sm:flex items-center gap-2 ml-2">
         <div className="w-20 h-1.5 rounded-full bg-muted overflow-hidden">
           <div
-            className="h-full rounded-full bg-emerald-500 transition-all"
+            className="h-full rounded-full transition-all bg-gradient-to-r from-blue-600 to-blue-400 dark:from-blue-500 dark:to-blue-300"
             style={{ width: `${donePercent}%` }}
           />
         </div>

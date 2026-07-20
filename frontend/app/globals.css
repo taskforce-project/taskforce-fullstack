@@ -51,7 +51,8 @@
   --font-serif: Georgia, serif;
   --font-mono: var(--font-jetbrains-mono), "SF Mono", ui-monospace, monospace;
 
-  --radius:          0.375rem;   /* QA2-R2 : roundedness ÷~2 (plus proche Cloudflare, ~6px) */
+  --radius:          0.625rem;   /* 10px — radius de référence unique : cartes du dashboard + popover Cortex.
+                                    Tout le reste (panneaux, dialogs, inputs, boutons) s'aligne dessus via l'échelle. */
   --spacing:         0.25rem;
   --tracking-normal: -0.011em;
 
@@ -200,10 +201,12 @@
   --font-mono:  var(--font-mono);
   --font-serif: var(--font-serif);
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-sm: calc(var(--radius) - 4px);  /*  6px — badges, petits contrôles */
+  --radius-md: calc(var(--radius) - 2px);  /*  8px — boutons, inputs */
+  --radius-lg: var(--radius);              /* 10px — panneaux, dialogs, popovers */
+  /* Aligné sur --radius (et non +4px) : les cartes/popovers en `rounded-xl` gardent le radius
+     de référence au lieu de sur-arrondir, ce qui unifie tout l'app sur une seule valeur. */
+  --radius-xl: var(--radius);              /* 10px — cartes (Card shadcn, cartes dashboard) */
 
   --shadow-2xs: var(--shadow-2xs);
   --shadow-xs:  var(--shadow-xs);
