@@ -142,7 +142,13 @@ export const useIssueStore = create<IssueState>((set, get) => ({
   createIssue: async (slug, projectId, payload) => {
     try {
       const issue = await createIssueApi(slug, projectId, payload);
-      set((state) => ({ issues: [issue, ...state.issues] }));
+      // Idempotent : l'événement temps réel STOMP a pu déjà insérer l'issue (upsertIssueLocal)
+      // avant la résolution du POST → sans dédup elle s'affichait en double (ISS-01).
+      set((state) => ({
+        issues: state.issues.some((i) => i.id === issue.id)
+          ? state.issues.map((i) => (i.id === issue.id ? issue : i))
+          : [issue, ...state.issues],
+      }));
       return issue;
     } catch (err) {
       const message = extractError(err, "Erreur lors de la création de l'issue");
@@ -159,9 +165,11 @@ export const useIssueStore = create<IssueState>((set, get) => ({
         activeIssue: state.activeIssue?.id === updated.id ? updated : state.activeIssue,
       }));
       return updated;
-    } catch (err) {
-      const message = extractError(err, "Erreur lors de la mise à jour de l'issue");
-      set({ error: message });
+    } catch {
+      // On ne pose PLUS store.error ici : un échec d'édition depuis le sheet (ex. refus VIEWER
+      // « lecture seule ») polluait la bannière passive du board, invisible sous l'overlay du sheet
+      // puis révélée à sa fermeture (WS-10). Le refus est remonté via le retour null ; l'appelant
+      // (issue-sheet.callUpdate) affiche un toast au bon moment.
       return null;
     }
   },
