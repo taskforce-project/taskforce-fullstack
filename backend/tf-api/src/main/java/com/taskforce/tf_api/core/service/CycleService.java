@@ -1,6 +1,8 @@
 package com.taskforce.tf_api.core.service;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -11,6 +13,7 @@ import com.taskforce.tf_api.core.dto.request.CreateCycleRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateCycleRequest;
 import com.taskforce.tf_api.core.dto.response.CycleResponse;
 import com.taskforce.tf_api.core.dto.response.IssueResponse;
+import com.taskforce.tf_api.core.dto.response.MyWorkCycleResponse;
 import com.taskforce.tf_api.core.enums.CycleStatus;
 import com.taskforce.tf_api.core.event.CycleCompletedEvent;
 import com.taskforce.tf_api.core.model.Cycle;
@@ -18,6 +21,7 @@ import com.taskforce.tf_api.core.model.CycleIssue;
 import com.taskforce.tf_api.core.model.Issue;
 import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.model.User;
+import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.CycleIssueRepository;
 import com.taskforce.tf_api.core.repository.CycleRepository;
 import com.taskforce.tf_api.core.repository.IssueRepository;
@@ -46,6 +50,7 @@ public class CycleService {
     private final IssueService               issueService;
     private final SlackIntegrationService    slackService;
     private final ApplicationEventPublisher  events;
+    private final ProjectVisibilityGuard     visibilityGuard;
 
     // =========================================================================
     // CRUD cycles
@@ -57,6 +62,39 @@ public class CycleService {
         assertWorkspaceMember(project.getWorkspace().getId(), userId);
         return cycleRepository.findByProjectId(project.getId()).stream()
             .map(c -> toResponse(c, cycleIssueRepository.countByCycleId(c.getId())))
+            .toList();
+    }
+
+    /**
+     * Tous les cycles du workspace visibles par l'utilisateur, en <b>un seul appel</b> (« Ma file »).
+     *
+     * <p>Remplace un appel par projet côté client : la vue en émettait autant qu'il y a de projets,
+     * ce qui vidait le quota de rate limiting à chaque affichage. Le décompte d'issues est groupé
+     * en une requête plutôt qu'un {@code COUNT} par cycle.</p>
+     */
+    @Transactional(readOnly = true)
+    public List<MyWorkCycleResponse> listWorkspaceCycles(String workspaceSlug, Long userId) {
+        Workspace workspace = workspaceRepository.findBySlug(workspaceSlug)
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
+        assertWorkspaceMember(workspace.getId(), userId);
+
+        List<Long> viewableProjectIds = visibilityGuard.viewableProjectIds(workspace.getId(), userId);
+        if (viewableProjectIds.isEmpty()) return List.of();
+
+        List<Cycle> cycles = cycleRepository.findByProjectIdsWithProject(viewableProjectIds);
+        if (cycles.isEmpty()) return List.of();
+
+        Map<Long, Long> issueCounts = cycleIssueRepository
+            .countByCycleIds(cycles.stream().map(Cycle::getId).toList())
+            .stream()
+            .collect(Collectors.toMap(row -> (Long) row[0], row -> (Long) row[1]));
+
+        return cycles.stream()
+            .map(c -> MyWorkCycleResponse.builder()
+                .projectId(c.getProject().getId())
+                .projectName(c.getProject().getName())
+                .cycle(toResponse(c, issueCounts.getOrDefault(c.getId(), 0L)))
+                .build())
             .toList();
     }
 
