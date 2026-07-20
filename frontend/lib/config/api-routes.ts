@@ -141,6 +141,10 @@ export const PROJECT_ROUTES = {
 export const ISSUE_ROUTES = {
   /** Vue My Work — issues assignées à l'utilisateur, tous projets du workspace */
   MY_ISSUES: (slug: string) => `/api/workspaces/${slug}/my-issues`,
+  /** Vue My Work — cycles de tous les projets visibles, en un appel (évite un appel par projet) */
+  MY_CYCLES: (slug: string) => `/api/workspaces/${slug}/my-cycles`,
+  /** Vue My Work — pages récentes de tous les projets visibles, en un appel */
+  MY_PAGES:  (slug: string) => `/api/workspaces/${slug}/my-pages`,
   LIST:    (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues`,
   /** Liste paginée pour l'infinite-scroll du backlog (QA2-33) */
   PAGED:   (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/paged`,
@@ -209,6 +213,20 @@ export const ANALYTICS_ROUTES = {
   /** Graphes épinglés « Custom » (GET liste / POST épingler) */
   SAVED_CHARTS: (slug: string) => `/api/workspaces/${slug}/analytics/charts`,
   SAVED_CHART:  (slug: string, id: number) => `/api/workspaces/${slug}/analytics/charts/${id}`,
+} as const;
+
+/**
+ * Cartes de dashboard épinglées — par utilisateur et par workspace.
+ * Backend: @RequestMapping("/api/workspaces/{slug}/dashboard-cards")
+ */
+export const DASHBOARD_CARD_ROUTES = {
+  /** Liste triée par position (le premier GET bootstrape les 4 cartes par défaut) / POST création */
+  LIST:    (slug: string) => `/api/workspaces/${slug}/dashboard-cards`,
+  CREATE:  (slug: string) => `/api/workspaces/${slug}/dashboard-cards`,
+  UPDATE:  (slug: string, id: number) => `/api/workspaces/${slug}/dashboard-cards/${id}`,
+  /** PUT { orderedIds } — réécrit les positions 0..n dans cet ordre */
+  REORDER: (slug: string) => `/api/workspaces/${slug}/dashboard-cards/reorder`,
+  DELETE:  (slug: string, id: number) => `/api/workspaces/${slug}/dashboard-cards/${id}`,
 } as const;
 
 /**
