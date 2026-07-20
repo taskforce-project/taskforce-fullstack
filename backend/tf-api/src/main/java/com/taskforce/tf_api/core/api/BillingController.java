@@ -115,9 +115,11 @@ public class BillingController {
         long seats = Math.max(1L, workspaceMemberRepository.countDistinctMembersByOwnerId(user.getId()));
 
         // Réutilise le client Stripe existant, sinon en crée un.
+        // Les identifiants de seed (`cus_seed_*`) sont factices → n'existent pas dans le vrai compte
+        // Stripe ; on les traite comme absents pour créer un client réel (sinon "No such customer").
         String customerId = subscriptionRepository.findByUserId(user.getId())
             .map(Subscription::getStripeCustomerId)
-            .filter(id -> id != null && !id.isBlank())
+            .filter(id -> id != null && !id.isBlank() && !id.startsWith("cus_seed"))
             .orElseGet(() -> {
                 try {
                     return stripeService.createCustomer(user.getEmail(), user.getDisplayName()).getId();
