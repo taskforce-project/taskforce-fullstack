@@ -28,6 +28,7 @@
 | AssistantController          | `/api/workspaces/{slug}/assistant`                                         |       ✅       |
 | ProfileController            | `/api/workspaces/{slug}/profile`                                           |       ✅       |
 | NotificationController       | `/api/workspaces/{slug}/notifications`                                     |       ✅       |
+| MyWorkController             | `/api/workspaces/{slug}` (→ `/my-issues`, `/my-cycles`, `/my-pages`)       |       ✅       |
 | RoadmapController            | `/api/workspaces/{slug}/roadmap`                                           |       ✅       |
 | WebhookController            | `/api/workspaces/{slug}/webhooks`                                          |       ✅       |
 | IntegrationController        | `/api/workspaces/{slug}/integrations/...` + `/api/integrations/*/callback` |       ✅       |
@@ -95,6 +96,27 @@ intended target `RoadmapController GET /api/workspaces/{slug}/roadmap` exists.
 
 `listNotifications`, `countUnread` `/unread-count`, `markAsRead` `/{id}/read`,
 `markAllAsRead` `/read-all`, `acknowledgeAll` `/acknowledge-all`. **All ✅.**
+
+### My Work / « Ma file » — ✅ (`MyWorkController`, 2026-07-20)
+
+Vue **cross-projets**. Trois endpoints agrégés sous la même base ; le périmètre est toujours celui des
+projets visibles par l'appelant (`ProjectVisibilityGuard.viewableProjectIds`).
+
+| M   | Path                                     | FE                                     | Réponse                               |
+| --- | ---------------------------------------- | -------------------------------------- | ------------------------------------- |
+| GET | `/api/workspaces/{slug}/my-issues`        | `ISSUE_ROUTES.MY_ISSUES`               | `ApiResponse<List<IssueResponse>>`    |
+| GET | `/api/workspaces/{slug}/my-cycles`        | `cycle-service` (`ISSUE_ROUTES.MY_CYCLES`) | `ApiResponse<List<MyWorkCycleResponse>>` |
+| GET | `/api/workspaces/{slug}/my-pages`         | `page-service` (`ISSUE_ROUTES.MY_PAGES`)   | `ApiResponse<List<MyWorkPageResponse>>`  |
+
+- `MyWorkCycleResponse = { projectId, projectName, cycle: CycleResponse }` — décompte d'issues groupé en
+  **une** requête (`CycleIssueRepository.countByCycleIds`).
+- `MyWorkPageResponse = { projectId, projectName, page: PageResponse }` — borné à **50 documents récents**.
+- L'enveloppe `{projectId, projectName}` existe parce que `CycleResponse`/`PageResponse` sont normalement
+  servis depuis une route **déjà scopée par projet** : sans elle, le client devrait rappeler l'API projet par
+  projet, c'est-à-dire exactement le N+1 que ces endpoints suppriment (« Ma file » passait de `3+2N` à 3 appels).
+- ⚠️ `MyWorkController` est passé de `@RequestMapping("/api/workspaces/{slug}/my-issues")` à
+  `@RequestMapping("/api/workspaces/{slug}")` + `@GetMapping("/my-issues")` : **l'URL externe de `/my-issues`
+  est inchangée**.
 
 ### Stripe — ✅ paths, partial backend (`stripe-service.ts`)
 
