@@ -18,9 +18,11 @@ import com.taskforce.tf_api.shared.exception.ForbiddenException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AttachmentService {
 
     private static final long MAX_FILE_SIZE = 25 * 1024 * 1024L; // 25 MB
@@ -134,6 +136,7 @@ public class AttachmentService {
         try {
             downloadUrl = minioService.presignedGetUrl(a.getStoredKey());
         } catch (Exception e) {
+            log.warn("Présignature MinIO échouée pour {} : {}", a.getStoredKey(), e.getMessage());
             downloadUrl = null;
         }
 
