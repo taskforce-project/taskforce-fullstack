@@ -52,10 +52,14 @@ public class CorsConfig {
                 "OPTIONS"
         ));
 
-        // Headers exposés au client
+        // Headers exposés au client.
+        // Retry-After / X-RateLimit-Remaining : sans exposition explicite, le navigateur les masque
+        // au JS en cross-origin — le front recevrait un 429 sans savoir combien de temps patienter.
         config.setExposedHeaders(Arrays.asList(
                 "Authorization",
-                "Content-Disposition"
+                "Content-Disposition",
+                "Retry-After",
+                "X-RateLimit-Remaining"
         ));
 
         // Durée de cache de la config CORS (1 heure)
