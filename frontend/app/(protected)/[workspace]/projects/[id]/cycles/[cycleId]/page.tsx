@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
   ArrowLeft,
@@ -16,6 +16,10 @@ import {
   AlertCircle,
   Plus,
   X,
+  MoreHorizontal,
+  Play,
+  RotateCcw,
+  Trash2,
 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -29,6 +33,14 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { DeleteConfirmDialog } from "@/components/dialogs/delete-confirm-dialog"
 import { cn } from "@/lib/utils"
 import { useCycleStore } from "@/lib/store/cycle-store"
 import { useIssueStore } from "@/lib/store/issue-store"
@@ -116,8 +128,15 @@ function IssueRow({
     <div className="group flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors border-b border-border/50 last:border-0">
       <div className={cn("size-2 rounded-full shrink-0", PRIORITY_DOT[issue.priority])} />
       {getCategoryIcon(issue.status.category)}
-      <span className="text-xs text-muted-foreground font-mono shrink-0 w-16">{issue.identifier}</span>
-      <span className="text-sm text-foreground flex-1 min-w-0 truncate">{issue.title}</span>
+      {/* Ligne cliquable → ouvre l'issue via le deep-link board (?issue=), les issues n'ayant
+          pas de route dédiée (elles s'ouvrent en sheet). CYC-03a. */}
+      <Link
+        href={`/${slug}/projects/${projectId}?issue=${issue.id}`}
+        className="flex items-center gap-3 flex-1 min-w-0 group/link"
+      >
+        <span className="text-xs text-muted-foreground font-mono shrink-0 w-16">{issue.identifier}</span>
+        <span className="text-sm text-foreground flex-1 min-w-0 truncate group-hover/link:text-primary transition-colors">{issue.title}</span>
+      </Link>
       {issue.assignee ? (
         <UserAvatar
           email={issue.assignee.email}
@@ -255,7 +274,10 @@ export default function CycleDetailPage() {
   if (typeof cycleIdRaw === "string") cycleId = Number(cycleIdRaw)
   else if (Array.isArray(cycleIdRaw)) cycleId = Number(cycleIdRaw[0] ?? "0")
 
-  const { activeCycle: cycle, cycleIssues: issues, isLoading, error, fetchCycle, fetchCycleIssues } = useCycleStore()
+  const { activeCycle: cycle, cycleIssues: issues, isLoading, error, fetchCycle, fetchCycleIssues, updateCycle, deleteCycle } = useCycleStore()
+  const router = useRouter()
+  const [acting, setActing] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   useEffect(() => {
     if (workspace && projectId && cycleId) {
@@ -263,6 +285,30 @@ export default function CycleDetailPage() {
       fetchCycleIssues(workspace, projectId, cycleId)
     }
   }, [workspace, projectId, cycleId, fetchCycle, fetchCycleIssues])
+
+  // Transitions (Démarrer/Terminer/Rouvrir) et suppression, surfacées ici : la page détail est la
+  // destination commune de My Work et de la liste projet, alors que le menu riche n'existait que sur
+  // la page /cycles (hors sidebar). CYC-02/04/08.
+  async function handleTransition(next: CycleStatus, label: string) {
+    setActing(true)
+    try {
+      const updated = await updateCycle(workspace, projectId, cycleId, { status: next })
+      if (updated) toast.success(label)
+    } finally {
+      setActing(false)
+    }
+  }
+
+  async function handleDelete() {
+    setActing(true)
+    try {
+      await deleteCycle(workspace, projectId, cycleId)
+      toast.success("Cycle supprimé")
+      router.push(`/${workspace}/projects/${projectId}/cycles`)
+    } finally {
+      setActing(false)
+    }
+  }
 
   if (isLoading) {
     return (
@@ -340,21 +386,66 @@ export default function CycleDetailPage() {
             </div>
           </div>
 
-          {totalCount > 0 && (
-            <div className="flex items-center gap-4 rounded-lg bg-muted/30 px-4 py-3">
-              <div className="text-center">
-                <p className="text-2xl font-bold text-foreground tabular-nums">{progress}%</p>
-                <p className="text-xs text-muted-foreground">Complete</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-emerald-400" />
+          <div className="flex items-start gap-3">
+            {totalCount > 0 && (
+              <div className="flex items-center gap-4 rounded-lg bg-muted/30 px-4 py-3">
                 <div className="text-center">
-                  <p className="text-lg font-semibold text-foreground tabular-nums">{completedCount}/{totalCount}</p>
-                  <p className="text-xs text-muted-foreground">Issues done</p>
+                  <p className="text-2xl font-bold text-foreground tabular-nums">{progress}%</p>
+                  <p className="text-xs text-muted-foreground">Complete</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-emerald-400" />
+                  <div className="text-center">
+                    <p className="text-lg font-semibold text-foreground tabular-nums">{completedCount}/{totalCount}</p>
+                    <p className="text-xs text-muted-foreground">Issues done</p>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+
+            {/* Actions du cycle — Démarrer / Terminer / Rouvrir / Supprimer (CYC-02/04/08). */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" disabled={acting} aria-label="Actions du cycle">
+                  {acting ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                {cycle.status === "DRAFT" && (
+                  <DropdownMenuItem onClick={() => handleTransition("ACTIVE", "Cycle démarré")}>
+                    <Play className="h-3.5 w-3.5" /> Démarrer le cycle
+                  </DropdownMenuItem>
+                )}
+                {cycle.status === "ACTIVE" && (
+                  <DropdownMenuItem onClick={() => handleTransition("COMPLETED", "Cycle terminé")}>
+                    <CheckCircle2 className="h-3.5 w-3.5" /> Terminer le cycle
+                  </DropdownMenuItem>
+                )}
+                {cycle.status === "COMPLETED" && (
+                  <DropdownMenuItem onClick={() => handleTransition("ACTIVE", "Cycle rouvert")}>
+                    <RotateCcw className="h-3.5 w-3.5" /> Rouvrir le cycle
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onSelect={() => setConfirmDelete(true)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" /> Supprimer le cycle
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DeleteConfirmDialog
+              open={confirmDelete}
+              onOpenChange={setConfirmDelete}
+              title="Supprimer le cycle ?"
+              description={`« ${cycle.name} » sera supprimé. Les issues rattachées ne sont pas supprimées. Action irréversible.`}
+              confirmLabel="Supprimer le cycle"
+              variant="danger"
+              onConfirm={handleDelete}
+            />
+          </div>
         </div>
 
         {totalCount > 0 && (
