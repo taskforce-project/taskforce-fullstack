@@ -97,7 +97,8 @@ class AttachmentControllerWebMvcTest {
     @DisplayName("GET attachments (auth) → 200 + liste")
     void list_200() throws Exception {
         stubUser();
-        when(attachmentService.listByIssue(anyString(), anyLong(), anyLong()))
+        // 4e argument : l'id de l'appelant, désormais transmis pour l'autorisation.
+        when(attachmentService.listByIssue(anyString(), anyLong(), anyLong(), anyLong()))
             .thenReturn(List.of(sampleResponse()));
 
         mockMvc.perform(get(BASE).with(auth()))
