@@ -4,12 +4,18 @@ import type { NextConfig } from "next";
 // - unsafe-inline requis pour Tailwind (styles inline) et Next.js hydration
 // - unsafe-eval requis en dev (hot-reload) — à retirer si nonce mis en place en production
 const API_ORIGIN = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+// Origine du stockage objet (MinIO/S3) telle que le NAVIGATEUR la joint. Les pièces jointes sont
+// servies par URL présignée : l'hôte fait partie de la signature, le navigateur charge donc
+// directement depuis cette origine — sans elle dans img-src/connect-src, la CSP bloque la requête
+// (vignette cassée, `TypeError: Failed to fetch`) alors que le backend et MinIO sont sains.
+// `https:` dans img-src ne couvre pas un MinIO local en http:// → il faut l'origine explicite.
+const STORAGE_ORIGIN = process.env.NEXT_PUBLIC_STORAGE_URL ?? "http://localhost:9000";
 const cspHeader = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline'",
-  `connect-src 'self' ${API_ORIGIN} ws://localhost:8080 wss://localhost:8080`,
-  `img-src 'self' data: blob: https: ${API_ORIGIN}`,
+  `connect-src 'self' ${API_ORIGIN} ${STORAGE_ORIGIN} ws://localhost:8080 wss://localhost:8080`,
+  `img-src 'self' data: blob: https: ${API_ORIGIN} ${STORAGE_ORIGIN}`,
   "font-src 'self' data:",
   "media-src 'self'",
   "object-src 'none'",
