@@ -2,6 +2,7 @@ package com.taskforce.tf_api.core.service;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -336,7 +337,7 @@ class SmartAssignServiceTest {
                 Issue.builder().id(99L).title("Stretch task").description("Learn").project(project)
                     .status(IssueStatus.builder().category(IssueStatusCategory.BACKLOG).build())
                     .priority(priority).storyPoints(storyPoints)
-                    .labels(List.of(label("react"))).build());
+                    .labels(Set.of(label("react"))).build());
         }
 
         @Test
@@ -378,7 +379,7 @@ class SmartAssignServiceTest {
         private Issue existingIssue() {
             return Issue.builder().id(ISSUE_ID).title("Existing").description("desc").project(project)
                 .status(IssueStatus.builder().category(IssueStatusCategory.BACKLOG).build())
-                .priority(IssuePriority.MEDIUM).storyPoints(3).labels(List.of(label("java"))).build();
+                .priority(IssuePriority.MEDIUM).storyPoints(3).labels(Set.of(label("java"))).build();
         }
 
         @Test
@@ -467,11 +468,11 @@ class SmartAssignServiceTest {
             stubWorkspaceMembers(alice);
             Issue mine = Issue.builder().id(1L).title("Mine").project(project)
                 .status(IssueStatus.builder().category(IssueStatusCategory.BACKLOG).build())
-                .priority(IssuePriority.MEDIUM).storyPoints(3).labels(List.of(label("java"))).build();
+                .priority(IssuePriority.MEDIUM).storyPoints(3).labels(Set.of(label("java"))).build();
             Project otherProject = Project.builder().id(77L).workspace(workspace).build();
             Issue foreign = Issue.builder().id(2L).title("Foreign").project(otherProject)
                 .status(IssueStatus.builder().category(IssueStatusCategory.BACKLOG).build())
-                .priority(IssuePriority.MEDIUM).labels(List.of()).build();
+                .priority(IssuePriority.MEDIUM).labels(Set.of()).build();
             when(issueRepository.findById(1L)).thenReturn(Optional.of(mine));
             when(issueRepository.findById(2L)).thenReturn(Optional.of(foreign));
 
@@ -503,7 +504,7 @@ class SmartAssignServiceTest {
             stubSkills(10L, "java");
             Issue issue = Issue.builder().id(9L).title("Redistrib").project(project)
                 .status(IssueStatus.builder().category(IssueStatusCategory.BACKLOG).build())
-                .priority(IssuePriority.MEDIUM).storyPoints(3).labels(List.of(label("java"))).build();
+                .priority(IssuePriority.MEDIUM).storyPoints(3).labels(Set.of(label("java"))).build();
 
             SmartAssignResponse res = service.rankForRedistribution(workspace, project, issue);
 
@@ -729,7 +730,7 @@ class SmartAssignServiceTest {
                 Issue.builder().id(99L).title("Stretch task").description("Learn").project(project)
                     .status(IssueStatus.builder().category(IssueStatusCategory.BACKLOG).build())
                     .priority(priority).storyPoints(storyPoints)
-                    .labels(List.of(label("react"))).build());
+                    .labels(Set.of(label("react"))).build());
         }
 
         @Test
