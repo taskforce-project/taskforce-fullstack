@@ -14,6 +14,8 @@ export interface ActorSummary {
   name: string;
   initials: string;
   avatarUrl: string | null;
+  /** Seed déterministe de l'avatar (DiceBear) quand aucun `avatarUrl` n'est persisté. */
+  email: string | null;
 }
 
 export interface NotificationResponse {

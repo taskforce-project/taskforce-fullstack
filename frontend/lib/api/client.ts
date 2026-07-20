@@ -179,6 +179,20 @@ apiClient.interceptors.response.use(
         } else {
           toast.error("Erreur serveur", { id: "api-server-error", description: `${status} — ${message}` })
         }
+      } else if (status === 429) {
+        // Exception au principe « 4xx = contextuel » : le 429 n'est pas lié à l'action en cours,
+        // il frappe TOUS les appels de l'onglet pendant la fenêtre. Sans message dédié, l'appli
+        // paraissait simplement figée (les stores avalent l'erreur en silence). `id` stable →
+        // un seul toast même quand une rafale d'appels est rejetée d'un coup.
+        const retryAfter = Number(error.response?.headers?.["retry-after"])
+        const wait = Number.isFinite(retryAfter) && retryAfter > 0 ? `${retryAfter} s` : "quelques secondes"
+        console.warn(`[api] 429 ${error.config?.url ?? ""} — retry after ${wait}`)
+        if (!silent) {
+          toast.warning("Trop de requêtes", {
+            id: "api-rate-limit",
+            description: `Vous avez atteint la limite. Réessayez dans ${wait}.`,
+          })
+        }
       } else if (status && status >= 400) {
         // 4xx contextuel : pas de toast global — l'appelant décide. Trace console pour le dev.
         console.warn(`[api] ${status} ${error.config?.url ?? ""} — ${message}`)

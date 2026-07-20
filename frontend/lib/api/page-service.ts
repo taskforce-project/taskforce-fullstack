@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/api/client"
-import { PAGE_ROUTES } from "@/lib/config/api-routes"
+import { ISSUE_ROUTES, PAGE_ROUTES } from "@/lib/config/api-routes"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -36,9 +36,25 @@ export interface UpdatePagePayload {
 // Service
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Page rendue dans une vue cross-projets : le projet porteur voyage avec la page. */
+export interface WorkspacePage {
+  projectId: number
+  projectName: string
+  page: PageSummary
+}
+
 export const pageService = {
   async list(slug: string, projectId: string): Promise<PageSummary[]> {
     const res = await apiClient.get<{ data: PageSummary[] }>(PAGE_ROUTES.LIST(slug, projectId))
+    return res.data.data
+  },
+
+  /**
+   * Pages récentes de tous les projets visibles du workspace, en UN appel.
+   * Remplace la boucle « un appel par projet » de « Ma file », qui épuisait le rate limit.
+   */
+  async listWorkspaceRecent(slug: string): Promise<WorkspacePage[]> {
+    const res = await apiClient.get<{ data: WorkspacePage[] }>(ISSUE_ROUTES.MY_PAGES(slug))
     return res.data.data
   },
 

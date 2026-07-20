@@ -4,7 +4,7 @@
  */
 
 import { apiClient } from "./client";
-import { CYCLE_ROUTES } from "../config/api-routes";
+import { CYCLE_ROUTES, ISSUE_ROUTES } from "../config/api-routes";
 import type { Issue } from "./issue-service";
 
 // ---------------------------------------------------------------------------
@@ -54,6 +54,22 @@ export interface UpdateCyclePayload {
 
 export async function listCycles(slug: string, projectId: number): Promise<Cycle[]> {
   const res = await apiClient.get<{ data: Cycle[] }>(CYCLE_ROUTES.LIST(slug, projectId));
+  return res.data.data;
+}
+
+/** Cycle rendu dans une vue cross-projets : le projet porteur voyage avec le cycle. */
+export interface WorkspaceCycle {
+  projectId: number;
+  projectName: string;
+  cycle: Cycle;
+}
+
+/**
+ * Tous les cycles des projets visibles du workspace, en UN appel.
+ * Remplace la boucle « un appel par projet » de « Ma file », qui épuisait le rate limit.
+ */
+export async function listWorkspaceCycles(slug: string): Promise<WorkspaceCycle[]> {
+  const res = await apiClient.get<{ data: WorkspaceCycle[] }>(ISSUE_ROUTES.MY_CYCLES(slug));
   return res.data.data;
 }
 
