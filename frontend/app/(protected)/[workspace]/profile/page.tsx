@@ -19,6 +19,8 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { Separator } from "@/components/ui/separator"
+import { MemberSkillsCard } from "@/components/members/member-skills-card"
+import { MemberAvailabilityCard } from "@/components/members/member-availability-card"
 import { useAuth } from "@/lib/contexts/auth-context"
 import { cn } from "@/lib/utils"
 import { useProjectStore } from "@/lib/store/project-store"
@@ -269,6 +271,16 @@ export default function ProfilePage() {
           </div>
         ))}
       </div>
+
+      {/* Compétences & disponibilité — mêmes cartes que la fiche membre, montées ici sur SON propre
+          profil. MBR-03 : l'éditeur de congés était absent de « Mon profil » car cette page
+          (≠ /members/[id]) ne montait pas ces cartes. canEdit : c'est mon propre profil. */}
+      {user && Number.isFinite(Number(user.id)) && (
+        <div className="flex flex-col gap-6">
+          <MemberSkillsCard slug={slug} userId={Number(user.id)} canEdit />
+          <MemberAvailabilityCard slug={slug} userId={Number(user.id)} canEdit />
+        </div>
+      )}
 
       {/* Main 2-col layout */}
       <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-6">
