@@ -1,8 +1,5 @@
 package com.taskforce.tf_api.shared.security;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
-
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -139,12 +136,39 @@ class RateLimitFilterTest {
             filter.doFilter(req("/api/auth/verify-otp", null, null, "4.4.4.4"), new MockHttpServletResponse(), mock(FilterChain.class));
         }
         FilterChain chain = mock(FilterChain.class);
-        var sw = new StringWriter();
-        // sanity : le corps JSON est écrit dans le writer de la réponse bloquée
         var response = new MockHttpServletResponse();
         filter.doFilter(req("/api/auth/verify-otp", null, null, "4.4.4.4"), response, chain);
+
         verify(chain, never()).doFilter(any(), any());
-        assertThat(response.getContentAsString()).contains("Limite de requêtes atteinte");
-        new PrintWriter(sw).close();
+        assertThat(response.getStatus()).isEqualTo(429);
+        assertThat(response.getContentAsString()).contains("Rate limit reached");
+        // Le client doit savoir COMBIEN de temps patienter : sans Retry-After il ne peut que
+        // deviner, et réessaie trop tôt. `refillIntervally` rend les jetons en fin de fenêtre,
+        // donc l'attente annoncée va jusqu'à 60 s.
+        assertThat(response.getHeader("Retry-After")).isNotNull();
+        assertThat(Integer.parseInt(response.getHeader("Retry-After"))).isBetween(1, 60);
+        assertThat(response.getHeader("X-RateLimit-Remaining")).isEqualTo("0");
+    }
+
+    @Test
+    @DisplayName("les préflights CORS (OPTIONS) ne consomment aucun jeton")
+    void cors_preflights_are_not_counted() throws Exception {
+        // Le front est sur une autre origine : le navigateur émet un préflight par requête non
+        // simple. Les compter revenait à diviser le quota réel par deux, sans qu'aucun appel
+        // métier supplémentaire n'ait été fait.
+        var primed = new MockHttpServletResponse();
+        filter.doFilter(req("/api/projects", null, null, "9.9.9.9"), primed, mock(FilterChain.class));
+        int remainingBefore = Integer.parseInt(primed.getHeader("X-RateLimit-Remaining"));
+
+        for (int i = 0; i < 20; i++) {
+            MockHttpServletRequest preflight = req("/api/projects", null, null, "9.9.9.9");
+            preflight.setMethod("OPTIONS");
+            filter.doFilter(preflight, new MockHttpServletResponse(), mock(FilterChain.class));
+        }
+
+        var after = new MockHttpServletResponse();
+        filter.doFilter(req("/api/projects", null, null, "9.9.9.9"), after, mock(FilterChain.class));
+        // Seule la requête réelle ci-dessus a consommé un jeton — les 20 préflights, aucun.
+        assertThat(Integer.parseInt(after.getHeader("X-RateLimit-Remaining"))).isEqualTo(remainingBefore - 1);
     }
 }
