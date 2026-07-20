@@ -41,12 +41,21 @@ import {
   SidebarMenuSubItem,
   SidebarRail,
   SidebarSeparator,
+  useSidebar,
 } from "@/components/ui/sidebar"
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -149,7 +158,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname()
   const activeWorkspace = useWorkspaceStore((s) => s.activeWorkspace)
   const openSettings = useSettingsStore((s) => s.openSettings)
+  const { state, isMobile } = useSidebar()
   const slug = activeWorkspace?.slug ?? ""
+
+  // Sidebar réduite au rail d'icônes (48px). En mobile elle s'ouvre en Sheet pleine largeur,
+  // donc le mode « icône » ne s'applique pas.
+  const collapsed = state === "collapsed" && !isMobile
 
   const withSlug = (url: string) => (slug ? `/${slug}${url}` : url)
 
@@ -194,6 +208,38 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     }
 
     if (item.items) {
+      // Sidebar repliée : shadcn masque le sous-menu (`group-data-[collapsible=icon]:hidden` sur
+      // SidebarMenuSub) et ce bouton n'est pas un lien → l'entrée serait totalement morte.
+      // On bascule sur un DropdownMenu porté (même pattern que le sélecteur de workspace) :
+      // il sort du rail de 48px, donc ni la largeur ni la règle de masquage ne s'appliquent.
+      if (collapsed) {
+        return (
+          <SidebarMenuItem key={item.key}>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <SidebarMenuButton
+                  tooltip={t(item.key)}
+                  isActive={isActive(item.url)}
+                  className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                >
+                  <item.icon />
+                  <span>{t(item.key)}</span>
+                </SidebarMenuButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="right" align="start" sideOffset={4} className="min-w-48">
+                <DropdownMenuLabel>{t(item.key)}</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {item.items.map((sub) => (
+                  <DropdownMenuItem key={sub.key} asChild>
+                    <Link href={withSlug(sub.url)}>{t(sub.key)}</Link>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </SidebarMenuItem>
+        )
+      }
+
       return (
         <Collapsible
           key={item.key}
