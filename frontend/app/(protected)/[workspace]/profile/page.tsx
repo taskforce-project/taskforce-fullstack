@@ -149,7 +149,8 @@ function ProjectCard({ project: p, slug, colorClass }: Readonly<{ project: Proje
 
       <div className="flex flex-col gap-1.5">
         <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-          <div className={cn("h-full rounded-full", colorClass)} style={{ width: `${pct}%` }} />
+          {/* Remplissage bleu de référence — la couleur projet reste portée par la pastille du titre */}
+          <div className="h-full rounded-full bg-gradient-to-r from-blue-600 to-blue-400 dark:from-blue-500 dark:to-blue-300" style={{ width: `${pct}%` }} />
         </div>
         <div className="flex justify-between text-xs text-muted-foreground">
           <span>{done} / {p.totalIssues} issues</span>
