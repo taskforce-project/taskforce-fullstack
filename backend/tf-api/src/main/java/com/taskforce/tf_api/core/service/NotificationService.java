@@ -208,7 +208,9 @@ public class NotificationService {
         }
 
         String urgency = overdue ? "critical" : "warning";
-        String title   = issue.getTitle() + (overdue ? " — échéance dépassée" : " — échéance proche");
+        // Libellés en anglais : ils sont rendus TELS QUELS par le Signal Center (pas de clé i18n
+        // côté notification), donc c'est ici que se joue la langue de l'inbox.
+        String title   = issue.getTitle() + (overdue ? " — deadline breached" : " — due soon");
         // Alerte système : pas d'acteur (actor null)
         Notification notif = buildNotification(issue, null, assignee, type, urgency, title, null);
         persistAndPush(notif);
@@ -228,8 +230,8 @@ public class NotificationService {
         String dedupKey   = "overload-" + member.getId();
         String memberUrl  = "/" + slug + "/members/" + member.getId();
         String membersUrl = "/" + slug + "/members";
-        String title      = memberName + " est en surcharge (" + openCount + " tâches ouvertes)";
-        String body       = "Charge au-dessus du seuil (" + threshold + "). Pensez à rééquilibrer les assignations.";
+        String title      = memberName + " is overloaded (" + openCount + " open issues)";
+        String body       = "Workload above the threshold (" + threshold + "). Consider rebalancing assignments.";
 
         for (User recipient : recipients) {
             if (recipient == null) continue;
@@ -339,6 +341,7 @@ public class NotificationService {
                 .name(name)
                 .initials(initials)
                 .avatarUrl(a.getAvatarUrl())
+                .email(a.getEmail())
                 .build();
         }
 
