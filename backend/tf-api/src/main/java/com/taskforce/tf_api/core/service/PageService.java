@@ -2,15 +2,18 @@ package com.taskforce.tf_api.core.service;
 
 import java.util.List;
 
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.taskforce.tf_api.core.dto.request.CreatePageRequest;
 import com.taskforce.tf_api.core.dto.request.UpdatePageRequest;
+import com.taskforce.tf_api.core.dto.response.MyWorkPageResponse;
 import com.taskforce.tf_api.core.dto.response.PageResponse;
 import com.taskforce.tf_api.core.model.Page;
 import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.model.User;
+import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.PageRepository;
 import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
@@ -64,6 +67,34 @@ public class PageService {
         Project project = resolveProject(workspaceSlug, projectId);
         visibilityGuard.assertCanView(project, userId);
         return PageResponse.from(resolvePage(pageId, project.getId()));
+    }
+
+    /** Nombre de documents récents remontés par la vue agrégée « Ma file ». */
+    private static final int RECENT_PAGES_LIMIT = 50;
+
+    /**
+     * Pages récentes du workspace visibles par l'utilisateur, en <b>un seul appel</b> (« Ma file »).
+     *
+     * <p>Remplace un appel par projet côté client. Le périmètre est calculé avec la même règle de
+     * visibilité que {@link #listPages} — {@code viewableProjectIds} applique projet public OU
+     * membre du projet OU admin du workspace —, donc aucune page de projet privé ne fuit ici.</p>
+     */
+    public List<MyWorkPageResponse> listWorkspacePages(String workspaceSlug, Long userId) {
+        Workspace workspace = workspaceRepository.findBySlug(workspaceSlug)
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
+
+        List<Long> viewableProjectIds = visibilityGuard.viewableProjectIds(workspace.getId(), userId);
+        if (viewableProjectIds.isEmpty()) return List.of();
+
+        return pageRepository
+            .findRecentByProjectIds(viewableProjectIds, PageRequest.of(0, RECENT_PAGES_LIMIT))
+            .stream()
+            .map(p -> MyWorkPageResponse.builder()
+                .projectId(p.getProject().getId())
+                .projectName(p.getProject().getName())
+                .page(PageResponse.from(p))
+                .build())
+            .toList();
     }
 
     // =========================================================================
