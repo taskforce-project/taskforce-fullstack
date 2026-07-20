@@ -106,6 +106,10 @@ mail:
 # Minio — stockage objet S3-compatible
 minio:
   endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+  # Endpoint PUBLIC (joignable depuis le navigateur) utilisé pour SIGNER les URLs présignées.
+  # En Docker, `endpoint` vise le réseau interne (minio:9000) ; une URL présignée signée avec cet
+  # hôte est injoignable côté client. On signe donc avec l'hôte public (localhost:9000).
+  public-endpoint: ${MINIO_PUBLIC_ENDPOINT:http://localhost:9000}
   access-key: ${MINIO_ROOT_USER:minioadmin}
   secret-key: ${MINIO_ROOT_PASSWORD:minioadmin}
   bucket: ${MINIO_BUCKET:taskforce-attachments}
