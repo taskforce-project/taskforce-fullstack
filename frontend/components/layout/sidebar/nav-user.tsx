@@ -51,8 +51,9 @@ export function NavUser({
   const isPro = authUser?.planType === "BUSINESS" || authUser?.planType === "ENTERPRISE"
 
   const handleLogout = async () => {
+    // logout() fait déjà un reload dur vers /auth/login (vide les stores Zustand en mémoire
+    // → plus de mélange de comptes sur un même navigateur). Pas de router.push ici. QA2.
     await logout()
-    router.push("/auth/login")
   }
 
   return (

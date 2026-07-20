@@ -41,9 +41,9 @@ export function LabBanner({ feature, message, className }: LabBannerProps) {
   const subject = encodeURIComponent(`Feedback — ${feature}`)
 
   return (
-    <div className={cn("flex items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm text-blue-900 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-200", className)}>
-      <FlaskConical className="size-4 shrink-0 text-blue-500" />
-      <span className="flex-1">
+    <div className={cn("flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm text-blue-900 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-200", className)}>
+      <FlaskConical className="size-4 shrink-0 text-blue-500 mt-0.5" />
+      <span className="min-w-0 flex-1">
         {message ?? "Fonctionnalité en cours de finition — les données sont réelles, l'expérience évolue encore."}
       </span>
       <a
