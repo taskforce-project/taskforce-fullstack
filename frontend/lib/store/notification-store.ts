@@ -27,7 +27,9 @@ export interface Signal {
   urgency: Urgency;
   read: boolean;
   acknowledged: boolean;
-  actor?: { name: string; initials: string; color: string };
+  /** Acteur du signal. `avatarUrl`/`email` alimentent le composant partagé UserAvatar
+   *  (email = seed DiceBear déterministe quand aucun avatar n'est persisté en base). */
+  actor?: { name: string; initials: string; avatarUrl: string | null; email: string | null };
   operation: string;
   operationUrl: string;
   title: string;
@@ -40,16 +42,6 @@ export interface Signal {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/** Palette de couleurs déterministe pour les avatars acteurs */
-const ACTOR_COLORS = [
-  "#3b82f6", "#8b5cf6", "#10b981", "#f97316",
-  "#ec4899", "#06b6d4", "#84cc16", "#f59e0b",
-];
-
-function actorColor(actorId: number): string {
-  return ACTOR_COLORS[actorId % ACTOR_COLORS.length];
-}
 
 /** Conversion d'une date ISO en label relatif simple */
 function toRelativeTime(isoDate: string): string {
@@ -72,9 +64,10 @@ function toSignal(n: NotificationResponse): Signal {
     acknowledged: n.acknowledged,
     actor: n.actor
       ? {
-          name:     n.actor.name,
-          initials: n.actor.initials,
-          color:    actorColor(n.actor.id),
+          name:      n.actor.name,
+          initials:  n.actor.initials,
+          avatarUrl: n.actor.avatarUrl,
+          email:     n.actor.email,
         }
       : undefined,
     operation:    n.projectName,
@@ -101,6 +94,8 @@ interface NotificationState {
   signals: Signal[];
   unreadCount: number;
   isLoading: boolean;
+  /** Horodatage de la dernière synchro réelle (fetch ou push STOMP) — alimente l'indicateur « Live ». */
+  lastSyncAt: number | null;
 
   /** Charge les notifications depuis le backend */
   fetchNotifications: (slug: string) => Promise<void>;
@@ -122,6 +117,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   signals:     [],
   unreadCount: 0,
   isLoading:   false,
+  lastSyncAt:  null,
 
   fetchNotifications: async (slug) => {
     set({ isLoading: true });
@@ -129,7 +125,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       const data = await listNotifications(slug);
       const signals = sortByUrgency(data.map(toSignal));
       const unreadCount = signals.filter((s) => !s.read).length;
-      set({ signals, unreadCount, isLoading: false });
+      set({ signals, unreadCount, isLoading: false, lastSyncAt: Date.now() });
     } catch {
       set({ isLoading: false });
     }
@@ -143,6 +139,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       return {
         signals:     sortByUrgency([signal, ...state.signals]),
         unreadCount: signal.read ? state.unreadCount : state.unreadCount + 1,
+        lastSyncAt:  Date.now(),
       };
     });
   },
