@@ -801,7 +801,7 @@ function ChecklistTab({
       {items.length > 0 && (
         <div className="flex items-center gap-2">
           <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-            <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${pct}%` }} />
+            <div className="h-full rounded-full transition-all bg-gradient-to-r from-blue-600 to-blue-400 dark:from-blue-500 dark:to-blue-300" style={{ width: `${pct}%` }} />
           </div>
           <span className="text-[10px] text-muted-foreground">{doneCount}/{items.length}</span>
         </div>
