@@ -50,9 +50,16 @@ public class SecurityConfig {
     // Endpoints publics partagés entre les deux configurations
     private static final String[] PUBLIC_MATCHERS = {
         "/api/auth/**",
+        // Preview publique d'une invitation : l'invité clique le lien du mail sans être connecté
+        // (il n'a parfois pas encore de compte). Un seul segment `*` → seul GET /api/invitations/{token}
+        // est public ; POST /api/invitations/{token}/accept (2 segments) reste authentifié (JWT requis). WS-03/04.
+        "/api/invitations/*",
         "/api/files/brain/**",
         "/api/sales/**",
         "/api/stripe/**",
+        // Webhook Stripe : requête serveur-à-serveur signée (pas de JWT). La signature est
+        // vérifiée dans StripeWebhookController via constructEvent. Sans ça : 401 → BILL-03 KO.
+        "/api/webhooks/stripe",
         "/actuator/**",
         "/swagger-ui/**",
         "/v3/api-docs/**",
