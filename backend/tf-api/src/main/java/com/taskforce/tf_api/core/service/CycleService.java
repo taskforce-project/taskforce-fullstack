@@ -155,6 +155,19 @@ public class CycleService {
             .toList();
     }
 
+    /** Cycles auxquels une issue est rattachée (reverse-lookup pour le sélecteur du sheet — CYC-03b). */
+    @Transactional(readOnly = true)
+    public List<CycleResponse> listCyclesForIssue(String workspaceSlug, Long projectId, Long issueId, Long userId) {
+        Project project = resolveProject(workspaceSlug, projectId);
+        assertWorkspaceMember(project.getWorkspace().getId(), userId);
+        Issue issue = issueRepository.findById(issueId)
+            .filter(i -> i.getProject().getId().equals(project.getId()))
+            .orElseThrow(() -> new ResourceNotFoundException("Issue introuvable dans ce projet"));
+        return cycleIssueRepository.findByIssueId(issue.getId()).stream()
+            .map(ci -> toResponse(ci.getCycle(), cycleIssueRepository.countByCycleId(ci.getCycle().getId())))
+            .toList();
+    }
+
     @Transactional
     public void addIssueToCycle(String workspaceSlug, Long projectId, Long cycleId,
                                  AddIssueToCycleRequest request, Long userId) {
