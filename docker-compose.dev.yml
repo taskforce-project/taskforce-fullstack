@@ -235,6 +235,9 @@ services:
       NEXT_PUBLIC_API_URL: http://localhost:8080
       # API URL pour les appels côté serveur (SSR dans Docker)
       NEXT_PUBLIC_API_URL_SSR: http://backend:8080
+      # Origine MinIO telle que le navigateur la joint (URLs présignées des pièces jointes).
+      # Doit rester alignée sur MINIO_PUBLIC_ENDPOINT côté backend : c'est l'hôte signé.
+      NEXT_PUBLIC_STORAGE_URL: http://localhost:9000
       # Enable polling for hot reload on Docker Desktop (Windows/macOS)
       WATCHPACK_POLLING: "true"
       CHOKIDAR_USEPOLLING: "true"
