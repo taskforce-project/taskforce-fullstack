@@ -39,6 +39,12 @@ interface DataTableProps<T> {
   readonly data: readonly T[]
   readonly rowKey: (row: T) => string | number
   readonly onRowClick?: (row: T) => void
+  /**
+   * Lignes réellement cliquables, quand `onRowClick` ne s'applique pas à toutes.
+   * Une ligne exclue perd le curseur ET le handler : jamais de ligne qui a l'air
+   * cliquable et ne fait rien. Par défaut, toutes les lignes le sont.
+   */
+  readonly isRowClickable?: (row: T) => boolean
   /** Taille de page (défaut 25). `0` = pas de pagination (toutes les lignes). */
   readonly pageSize?: number
   readonly pageSizes?: readonly number[]
@@ -58,9 +64,10 @@ export function DataTable<T>({
   data,
   rowKey,
   onRowClick,
+  isRowClickable,
   pageSize = 25,
   pageSizes = [25, 50, 100],
-  emptyMessage = "Aucune donnée.",
+  emptyMessage = "No data.",
   className,
 }: DataTableProps<T>) {
   const [sort, setSort] = React.useState<{ key: string; dir: "asc" | "desc" } | null>(null)
@@ -134,11 +141,13 @@ export function DataTable<T>({
                 </TableCell>
               </TableRow>
             ) : (
-              rows.map((row) => (
+              rows.map((row) => {
+                const clickable = Boolean(onRowClick) && (isRowClickable?.(row) ?? true)
+                return (
                 <TableRow
                   key={rowKey(row)}
-                  onClick={onRowClick ? () => onRowClick(row) : undefined}
-                  className={cn(onRowClick && "cursor-pointer")}
+                  onClick={clickable ? () => onRowClick?.(row) : undefined}
+                  className={cn(clickable && "cursor-pointer")}
                 >
                   {columns.map((col) => (
                     <TableCell key={col.key} className={cn(alignClass(col.align), col.className)}>
@@ -146,7 +155,8 @@ export function DataTable<T>({
                     </TableCell>
                   ))}
                 </TableRow>
-              ))
+                )
+              })
             )}
           </TableBody>
         </Table>
