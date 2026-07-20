@@ -1,5 +1,7 @@
 package com.taskforce.tf_api.core.dto.request;
 
+import java.util.List;
+
 import com.taskforce.tf_api.core.enums.IssuePriority;
 
 import jakarta.validation.constraints.NotBlank;
@@ -32,4 +34,7 @@ public class CreateIssueRequest {
     private String startDate;
 
     private String dueDate;
+
+    /** Optionnel — labels à rattacher dès la création (cf. ISS-01). */
+    private List<Long> labelIds;
 }
