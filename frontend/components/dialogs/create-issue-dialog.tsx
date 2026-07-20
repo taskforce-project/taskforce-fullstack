@@ -197,6 +197,7 @@ export function CreateIssueDialog({
         priority,
         assigneeId,
         dueDate: dueDate ? format(dueDate, "yyyy-MM-dd") : undefined,
+        labelIds: selectedLabelIds.length ? selectedLabelIds : undefined,
       })
       if (issue) {
         onCreated?.(issue)

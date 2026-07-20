@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { format } from "date-fns"
 import { useParams } from "next/navigation"
+import { toast } from "sonner"
 import {
   RefreshCw,
   CalendarIcon,
@@ -109,6 +110,7 @@ export function CreateCycleDialog({ children, onCreated }: CreateCycleDialogProp
       })
       // On ne ferme QUE si la création a abouti : sinon le formulaire reste, avec sa saisie.
       if (cycle) {
+        toast.success(`Cycle « ${cycle.name} » créé`)
         onCreated?.(cycle)
         resetForm()
         setOpen(false)
