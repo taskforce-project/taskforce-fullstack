@@ -67,7 +67,7 @@ function projectQuery(projectId?: number | null): string {
 }
 
 export async function getAnalyticsKpis(slug: string, projectId?: number | null): Promise<AnalyticsKpis> {
-  const res = await apiClient.get<{ data: AnalyticsKpis }>(ANALYTICS_ROUTES.KPIS(slug) + projectQuery(projectId));
+  const res = await apiClient.get<{ data: AnalyticsKpis }>(ANALYTICS_ROUTES.KPIS(slug) + projectQuery(projectId), { silentError: true });
   return res.data.data;
 }
 
@@ -81,22 +81,22 @@ export async function getAnalyticsThroughput(
 ): Promise<ThroughputPoint[]> {
   let query = projectQuery(projectId);
   if (bucket) query += `${query ? "&" : "?"}bucket=${bucket.toUpperCase()}`;
-  const res = await apiClient.get<{ data: ThroughputPoint[] }>(ANALYTICS_ROUTES.THROUGHPUT(slug) + query);
+  const res = await apiClient.get<{ data: ThroughputPoint[] }>(ANALYTICS_ROUTES.THROUGHPUT(slug) + query, { silentError: true });
   return res.data.data;
 }
 
 export async function getAnalyticsBurndown(slug: string, projectId?: number | null): Promise<BurndownPoint[]> {
-  const res = await apiClient.get<{ data: BurndownPoint[] }>(ANALYTICS_ROUTES.BURNDOWN(slug) + projectQuery(projectId));
+  const res = await apiClient.get<{ data: BurndownPoint[] }>(ANALYTICS_ROUTES.BURNDOWN(slug) + projectQuery(projectId), { silentError: true });
   return res.data.data;
 }
 
 export async function getAnalyticsCapacity(slug: string, projectId?: number | null): Promise<MemberCapacity[]> {
-  const res = await apiClient.get<{ data: MemberCapacity[] }>(ANALYTICS_ROUTES.CAPACITY(slug) + projectQuery(projectId));
+  const res = await apiClient.get<{ data: MemberCapacity[] }>(ANALYTICS_ROUTES.CAPACITY(slug) + projectQuery(projectId), { silentError: true });
   return res.data.data;
 }
 
 export async function getAnalyticsWorkload(slug: string, days = 14): Promise<Workload> {
-  const res = await apiClient.get<{ data: Workload }>(`${ANALYTICS_ROUTES.WORKLOAD(slug)}?days=${days}`);
+  const res = await apiClient.get<{ data: Workload }>(`${ANALYTICS_ROUTES.WORKLOAD(slug)}?days=${days}`, { silentError: true });
   return res.data.data;
 }
 
@@ -111,7 +111,7 @@ export interface AiInsight {
 }
 
 export async function getAiInsights(slug: string): Promise<AiInsight[]> {
-  const res = await apiClient.get<{ data: AiInsight[] }>(ANALYTICS_ROUTES.INSIGHTS(slug));
+  const res = await apiClient.get<{ data: AiInsight[] }>(ANALYTICS_ROUTES.INSIGHTS(slug), { silentError: true, timeout: AI_TIMEOUT_MS });
   return res.data.data;
 }
 

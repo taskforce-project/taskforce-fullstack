@@ -42,7 +42,8 @@ export interface UpsertSkillsPayload {
 // ---------------------------------------------------------------------------
 
 export async function listSkillProfiles(slug: string): Promise<MemberSkillProfile[]> {
-  const res = await apiClient.get<{ data: MemberSkillProfile[] }>(SKILL_ROUTES.LIST(slug));
+  // Enrichissement (page Membres) : échec silencieux — la liste des membres reste affichée sans les compétences.
+  const res = await apiClient.get<{ data: MemberSkillProfile[] }>(SKILL_ROUTES.LIST(slug), { silentError: true });
   return res.data.data;
 }
 

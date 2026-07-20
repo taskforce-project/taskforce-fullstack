@@ -7,6 +7,17 @@ import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from "ax
 import { toast } from "sonner";
 
 /**
+ * Extension de la config Axios : `silentError` supprime le toast global (réseau/5xx).
+ * À poser sur les appels de FOND (polling, préchargement, badges) qui ne doivent jamais
+ * alarmer l'utilisateur s'ils échouent — seule une action explicite mérite un toast.
+ */
+declare module "axios" {
+  interface AxiosRequestConfig {
+    silentError?: boolean;
+  }
+}
+
+/**
  * API URL configuration
  * - SSR (serveur Next.js): utilise NEXT_PUBLIC_API_URL_SSR ou backend:8080 (réseau Docker)
  * - CSR (navigateur): utilise NEXT_PUBLIC_API_URL ou localhost:8080 (hôte)
@@ -149,13 +160,25 @@ apiClient.interceptors.response.use(
       const status = error.response?.status
       const data = error.response?.data as { message?: string } | undefined
       const message = data?.message || error.message || "Une erreur est survenue"
+      // Appels de fond (polling, préchargement) : on ne toast jamais, on trace seulement.
+      const silent = Boolean(error.config?.silentError)
 
       if (!error.response) {
-        toast.error("Impossible de contacter le serveur", {
-          description: "Vérifiez votre connexion réseau.",
-        })
+        // Réseau / timeout : `id` stable → un seul toast à la fois (pas d'empilement de doublons).
+        if (silent) {
+          console.warn(`[api] réseau/timeout (silencieux) ${error.config?.url ?? ""} — ${message}`)
+        } else {
+          toast.error("Impossible de contacter le serveur", {
+            id: "api-network-error",
+            description: "Vérifiez votre connexion réseau.",
+          })
+        }
       } else if (status && status >= 500) {
-        toast.error("Erreur serveur", { description: `${status} — ${message}` })
+        if (silent) {
+          console.warn(`[api] ${status} (silencieux) ${error.config?.url ?? ""} — ${message}`)
+        } else {
+          toast.error("Erreur serveur", { id: "api-server-error", description: `${status} — ${message}` })
+        }
       } else if (status && status >= 400) {
         // 4xx contextuel : pas de toast global — l'appelant décide. Trace console pour le dev.
         console.warn(`[api] ${status} ${error.config?.url ?? ""} — ${message}`)

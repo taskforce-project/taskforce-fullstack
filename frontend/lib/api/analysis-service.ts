@@ -76,7 +76,8 @@ export async function launchAnalysis(slug: string, projectId: number, depth: Ana
 
 /** Liste les workflows récents du workspace (pour le dock). */
 export async function listAnalysisJobs(slug: string): Promise<AnalysisJob[]> {
-  const res = await apiClient.get<{ data: AnalysisJob[] }>(ANALYSIS_ROUTES.JOBS(slug))
+  // Appel de fond (dock « Workflows IA » du topbar, poll 5s tant qu'un job tourne) : échec silencieux.
+  const res = await apiClient.get<{ data: AnalysisJob[] }>(ANALYSIS_ROUTES.JOBS(slug), { silentError: true })
   return res.data.data
 }
 

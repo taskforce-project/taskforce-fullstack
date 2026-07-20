@@ -204,25 +204,18 @@ export const authService = {
    * Déconnexion
    */
   async logout(): Promise<void> {
+    // Révoquer la session Keycloak côté serveur AVANT de purger le localStorage
+    // (l'intercepteur attache encore le Bearer). Best-effort : on nettoie le client
+    // même si l'appel échoue (session déjà expirée, réseau…). Cf. AUTH-02.
     try {
-      // Appel API optionnel pour invalider le token côté serveur
-      // await apiClient.post("/auth/logout");
-      
-      // Nettoyer le localStorage
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("refreshToken");
-        localStorage.removeItem("user");
-      }
-    } catch (error) {
-      // Même en cas d'erreur, nettoyer le localStorage
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("refreshToken");
-        localStorage.removeItem("user");
-      }
-      
-      throw new Error(getErrorMessage(error));
+      await apiClient.post(AUTH_ROUTES.LOGOUT);
+    } catch {
+      // ignore : la déconnexion côté client doit aboutir dans tous les cas
+    }
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("refreshToken");
+      localStorage.removeItem("user");
     }
   },
 

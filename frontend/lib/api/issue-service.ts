@@ -140,6 +140,7 @@ export interface CreateIssuePayload {
   parentId?: number;
   startDate?: string;
   dueDate?: string;
+  labelIds?: number[];
 }
 
 export interface UpdateIssuePayload {

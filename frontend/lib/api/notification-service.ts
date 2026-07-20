@@ -38,13 +38,14 @@ export interface NotificationResponse {
 
 /** Liste les notifications non acquittées du workspace */
 export async function listNotifications(slug: string): Promise<NotificationResponse[]> {
-  const response = await apiClient.get<{ data: NotificationResponse[] }>(NOTIFICATION_ROUTES.LIST(slug));
+  // Appel de fond (cloche du topbar, poll 60s) : échec silencieux — jamais de toast.
+  const response = await apiClient.get<{ data: NotificationResponse[] }>(NOTIFICATION_ROUTES.LIST(slug), { silentError: true });
   return response.data.data;
 }
 
 /** Nombre de notifications non lues */
 export async function countUnread(slug: string): Promise<number> {
-  const response = await apiClient.get<{ data: number }>(NOTIFICATION_ROUTES.UNREAD_COUNT(slug));
+  const response = await apiClient.get<{ data: number }>(NOTIFICATION_ROUTES.UNREAD_COUNT(slug), { silentError: true });
   return response.data.data;
 }
 

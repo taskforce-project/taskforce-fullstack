@@ -107,7 +107,8 @@ export interface WorkspaceUsage {
 }
 
 export async function getWorkspaceUsage(slug: string): Promise<WorkspaceUsage> {
-  const response = await apiClient.get<{ data: WorkspaceUsage }>(WORKSPACE_ROUTES.USAGE(slug));
+  // Enrichissement (badges d'usage) : échec silencieux — pas de toast si la métrique n'est pas dispo.
+  const response = await apiClient.get<{ data: WorkspaceUsage }>(WORKSPACE_ROUTES.USAGE(slug), { silentError: true });
   return response.data.data;
 }
 

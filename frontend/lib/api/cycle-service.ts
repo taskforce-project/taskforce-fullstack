@@ -122,3 +122,13 @@ export async function removeIssueFromCycle(
 ): Promise<void> {
   await apiClient.delete(CYCLE_ROUTES.ISSUE(slug, projectId, cycleId, issueId));
 }
+
+/** Cycles auxquels une issue est rattachée (reverse-lookup pour le sélecteur du sheet — CYC-03b). */
+export async function listIssueCycles(
+  slug: string,
+  projectId: number,
+  issueId: number
+): Promise<Cycle[]> {
+  const res = await apiClient.get<{ data: Cycle[] }>(CYCLE_ROUTES.FOR_ISSUE(slug, projectId, issueId));
+  return res.data.data;
+}
