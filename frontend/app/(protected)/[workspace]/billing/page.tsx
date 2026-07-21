@@ -159,7 +159,7 @@ export default function BillingPage() {
     setBusy(true)
     try {
       const { checkoutUrl } = await stripeService.createCheckoutSession(plan)
-      window.location.href = checkoutUrl
+      window.location.assign(checkoutUrl)
     } catch {
       toast.error("Impossible de démarrer le paiement pour le moment. Réessayez plus tard.")
       setBusy(false)
