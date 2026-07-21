@@ -776,10 +776,87 @@ Planning prévisionnel (Gantt, jalons DFS, chemin critique), budget prévisionne
 
 > Les efforts sont indicatifs (mono-exécutant). Beaucoup de recoupements PRODUIT↔CERTIF (RBAC=C24, Stripe=C23, MinIO/audit=C21) : faire une fois, cocher des deux côtés.
 
-## 4. Séquencement recommandé — **PLAN DE CLÔTURE V1 (arrêté 2026-06-30)**
+## 4. Séquencement — **PHASE DE CLÔTURE CERTIFICATION (arrêtée 2026-07-21)**
 
+> **▶ RECADRAGE DU 21/07/2026 — le scope est verrouillé sur la note pédagogique officielle.**
+> Source : `Note pédagogique - DFS V1 2025.docx.pdf` (fournie par l'école) + grille vierge
+> `Grille_évaluation_vierge_DFS_25-26.xlsx` + `CDC - TaskForce - DFS.pdf`.
+>
+> **Trois livrables, et rien d'autre :**
+>
+> | Livrable | Échéance | Format imposé |
+> |---|---|---|
+> | **Dossier de validation** | **14/09/2026** | PDF via Classroom **+ 2 exemplaires papier** le jour de la soutenance |
+> | **Support de présentation** | **25/09/2026** | PDF sur Classroom |
+> | **Soutenance** | **28–29/09/2026** | 35 min : 20 min présentation + démo, 15 min questions |
+>
+> *(La mise en situation Bloc 4 du 05/10/2026 se déroule sur une **application fournie par l'école** —
+> elle ne porte pas sur ce projet.)*
+>
+> **Périmètre noté = C1 à C26.** Citation de la note : « Le dossier de validation porte sur les
+> **3 premiers blocs** de compétences de votre référentiel. » Aucun travail hors C1–C26 ne rapporte
+> de point. Le critère de réussite le plus explicite du document est le **synthétisme** :
+> « Ne cherchez pas à tout dire. Présentez une synthèse en ne mentionnant que les points clés. »
+>
+> **Contraintes de forme du dossier** (aucune n'est satisfaite aujourd'hui — la doc actuelle est un
+> référentiel technique de ~97 fichiers, le livrable attendu est un mémoire) :
+> page de garde **imposée par le certificateur** · sommaire · **30 à 50 pages / 10 000 à 15 000 mots** ·
+> avant-propos, remerciements, résumé, abréviations, glossaire, liste des figures et tableaux, introduction ·
+> conclusion **≤ 1 page** (400–450 mots) · annexes · table des matières calquée sur les blocs **ou**
+> tableau d'équivalences exhaustif.
+>
+> **Écarts au CDC à traiter dans le dossier** (relevés le 21/07) :
+> 1. Le CDC impose « Back-end : **PHP (Symfony) ou Node.js** » → réalisé en **Java/Spring Boot**.
+>    C22 note « un choix de technologies adapté » : l'écart est défendable mais doit être **argumenté
+>    explicitement**, pas passé sous silence. Bien tourné, il alimente C2 (distance critique).
+> 2. Le CDC exige un « **Manuel utilisateur** pour les collaborateurs et managers » — absent des livrables.
+>
 > Décision : **on arrête le dev de features**. Focus **webapp** (la landing = roadmap à part, tout à la fin).
 > Brain OS = **stand-by** (cf. `brain-os-roadmap.md`). Les « plus » = `.ai/backlog-post-v1.md`.
+
+### 4.A — Ce qui reste à faire pour clôturer (ordre d'exécution)
+
+> Rien ici n'ajoute de fonctionnalité. Tout sert soit à **prouver** un critère C1–C26, soit à
+> **produire** un des trois livrables.
+
+| # | Lot | Pourquoi (critère / livrable) | Statut |
+|---|---|---|:--:|
+| **C1** | **Passe UI/UX finale** : chaque écran est soit fonctionnel, soit marqué « plus tard » de façon visible et assumée | C13, C15 — « interface fonctionnelle pour tous les utilisateurs ». Un bouton mort vu par le jury coûte plus qu'une fonctionnalité absente et annoncée | 🟧 |
+| **C2** | **Audit de fonctionnalité** : parcourir l'app écran par écran, lister ce qui marche / ce qui est décoratif | Alimente C1 ci-dessus **et** la démo de soutenance (blocs 2 et 3) | 🔲 |
+| **C3** | **Couverture de tests re-mesurée** front + back, chiffres réels remontés | **C18 et C25 — seuls seuils chiffrés de toute la grille (≥ 50 %)**. Dernières mesures : 92 % front / 78 % back, à reconfirmer après les correctifs | 🔲 |
+| **C4** | **Lint + typecheck propres** sur tout le repo (pas seulement les fichiers touchés) | C16 « le code satisfait aux tests d'un outil de revue de code par analyse statique » | 🔲 |
+| **C5** | **Sécurité : rejouer ZAP + Semgrep + Trivy**, 0 HIGH | C16 (front), C21/C24 (back) — « composants tiers à jour et sans vulnérabilité connue » | 🔲 |
+| **C6** | **Vérifier le chiffrement au repos** des données personnelles | C24 « toutes les données sensibles sont chiffrées » + CDC §7 « chiffrement des données personnelles des employés » | 🔲 |
+| **C7** | **Conformité RGPD de bout en bout** : cookies, politique de confidentialité, accès aux données, **double opt-in** | **C11 — 4 critères**, dont le double opt-in aujourd'hui non traité | 🔲 |
+| **C8** | **E9 — audit RGPD d'un cas professionnel externe** | C11. Le RGPD de TaskForce **ne le remplace pas**. ⚠️ Sujet imposé par l'école → à réclamer s'il n'a pas été fourni | 🔲 |
+| **C9** | **Mesurer le SEO de la landing** et atteindre ≥ 70 % | **C20 — seul seuil chiffré non démontré**. Un juré peut le vérifier en direct avec Lighthouse | 🔲 |
+| **C10** | **Trancher l'accessibilité** : la matrice dit « WCAG AA ✅ », la roadmap dit « audit RGAA à faire ». Contradiction à lever | C13, C15 — « y compris pour les personnes en situation de handicap » | 🔲 |
+| **C11** | **E6 — trame de compte-rendu d'activité** + 1 exemple rempli | C4, critère `[R17]` : « la trame […] **est opérationnelle** ». Classée « optionnelle » à tort | 🔲 |
+| **C12** | **Manuel utilisateur** (collaborateurs + managers) | Livrable explicite du CDC §8 | 🔲 |
+| **C13** | **Webhooks Stripe** : finaliser ou assumer la limite en distance critique | C23 « l'intégration du système de paiement est **fonctionnelle** » | 🔲 |
+| **C14** | **Actualiser la grille remplie** (`Grille_evaluation_TaskForce_REMPLIE`) | Premier document lu par le jury. Elle déclare encore **< 50 %** de couverture alors que le réel est 92 % / 78 % | 🔲 |
+| **C15** | **Récupérer la page de garde imposée** par le certificateur | Obligatoire, non trouvée dans le repo | 🔲 |
+| **C16** | **Rédiger le dossier 40 pages** (condensation, pas assemblage) | **Livrable n°1 — 14/09** | 🔲 |
+| **C17** | **Support de soutenance + texte oral + répétition chronométrée** | **Livrables n°2 et 3 — 25/09 puis 28–29/09**. Voir `.ai/soutenance-brief.md` | 🔲 |
+
+### 4.B — Repoussé APRÈS la soutenance (ne pas empiéter)
+
+> Aucun de ces chantiers n'est rattaché à une compétence C1–C26. Ils restent documentés,
+> ils ne sont simplement plus dans le chemin critique.
+
+| Chantier | Ex-priorité | Raison du report |
+|---|---|---|
+| **Bloc 4 — déploiement, hébergement cloud, DNS/TLS, supervision (E21–E29)** | 4 | **Évalué le 05/10 sur une application fournie par l'école.** Absent de la grille du fil rouge. C'est la plus grosse économie du recadrage |
+| **CI — seuils bloquants, SonarQube, scan CVE** | 5 | C19/C26 notent « outils QA cohérents / gestion des dépendances / chaîne de build » — déjà satisfaits par les 7 workflows existants |
+| **Passage complet de l'UI en anglais** (~1000 chaînes, 110 fichiers, 2 systèmes i18n à réconcilier) | — | Décision produit du 20/07, **postérieure** au gel. Aucun critère ne l'exige. Chantier actif le plus coûteux et le moins rentable |
+| **Brain OS phases 4–5** | — | Hors CDC (`backlog-post-v1.md` §1) |
+| **v2 « AI Delivery OS »** | — | Aucun rattachement à un critère |
+| **Refonte design landing** (hors seuil SEO C20) | 7 | Seul le seuil ≥ 70 % compte |
+| **taskforce-motion, MCP, intégrations tierces** | — | Aucune mention dans les documents de cadrage |
+| **Niveau Plane/Linear** (Modules, Views, Gantt, Intake, import/export) | — | `backlog-post-v1.md` §2 : « aucun n'est requis par le CDC » |
+| **RBAC granulaire, SSO entreprise, on-premise** | — | `backlog-post-v1.md` §3 |
+
+### 4.C — Historique du plan précédent (conservé)
 
 1. ✅ **Correctifs + seed + PROD-1.12 redistribution** (CDC #4 fermé) + QA-1 seed densifié.
 2. ✅ **Tests BACKEND** (C25) — 670 tests, **78 % lignes** (JaCoCo), unit + `@WebMvcTest` + intégration Postgres réel.
@@ -791,14 +868,17 @@ Planning prévisionnel (Gantt, jalons DFS, chemin critique), budget prévisionne
 8. 🔲 **Documentation — EN DERNIER** (décision user 05/07) : conception (UML classes, MCD/MLD Flyway, cas d'usage, wireframes), **veille (C12)**, **RGPD cas pro (C11/E9)**, gestion projet (E1–E6), manuel utilisateur, changelog (E29).
 9. 🔲 **Landing page + SEO (C20)** : roadmap dédiée, **tout à la fin**.
 
-> **▶ RESTE À FAIRE (topo 05/07) — par ordre de priorité :**
-> 1. **E26 supervision** : configurer les **règles d'alerte SigNoz** (rapide).
-> 2. **Accessibilité (C13/C15)** : audit RGAA/WCAG + corrections (contrastes, focus, ARIA, clavier).
-> 3. **Planifier le backup** (Tâche Windows / cron) + **durcir CSP nonce** (prod).
-> 4. **Déploiement** (Bloc 4) : dépend des **VM école** (à préparer côté user).
-> 5. **CI** (reportée).
-> 6. **Documentation** (conception, veille, RGPD cas pro, gestion projet) — **en dernier**.
-> 7. **Landing + SEO** — **tout à la fin**.
+> **▶ RESTE À FAIRE (topo 05/07) — PÉRIMÉ, remplacé par le §4.A du 21/07.**
+> Conservé pour l'historique. Les items 4 (déploiement), 5 (CI) et une partie du 7 (refonte landing)
+> sont désormais **après soutenance** (§4.B) ; l'accessibilité (2) et le SEO (7) restent dans le
+> chemin critique sous `C10` et `C9`.
+> 1. **E26 supervision** : configurer les **règles d'alerte SigNoz** (rapide). → §4.B (Bloc 4)
+> 2. **Accessibilité (C13/C15)** : audit RGAA/WCAG + corrections (contrastes, focus, ARIA, clavier). → **§4.A `C10`**
+> 3. **Planifier le backup** (Tâche Windows / cron) + **durcir CSP nonce** (prod). → §4.B
+> 4. **Déploiement** (Bloc 4) : dépend des **VM école**. → **§4.B — hors périmètre noté**
+> 5. **CI** (reportée). → §4.B
+> 6. **Documentation** (conception, veille, RGPD cas pro, gestion projet). → **§4.A `C8`, `C11`, `C16`**
+> 7. **Landing + SEO**. → SEO en **§4.A `C9`** ; refonte design en §4.B
 
 > **Journaux de test** : `.ai/tests-backend-journal.md` · `.ai/tests-frontend-journal.md`.
 
