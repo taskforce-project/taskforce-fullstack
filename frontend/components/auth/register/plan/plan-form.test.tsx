@@ -342,23 +342,25 @@ describe('RegisterPlanForm - Step 2: Plan Selection', () => {
     it('should display plan prices correctly', () => {
       render(<RegisterPlanForm />);
 
+      // Tarification par siège : le prix affiché est un prix par membre.
       expect(screen.getByText('0€')).toBeInTheDocument();
-      expect(screen.getByText('29€')).toBeInTheDocument();
+      expect(screen.getByText('10€ / membre')).toBeInTheDocument();
+      expect(screen.getByText('16€ / membre')).toBeInTheDocument();
       expect(screen.getByText('Sur devis')).toBeInTheDocument();
     });
 
-    it('should show monthly billing label for paid plans', () => {
+    it('should show monthly billing label for every plan except Enterprise', () => {
       render(<RegisterPlanForm />);
 
-      const monthlyLabels = screen.getAllByText('/mois');
-      expect(monthlyLabels).toHaveLength(2); // Pro and Enterprise have /mois (Free is 0€ with /mois in the template)
+      // Free, Basic et Business affichent « /mois » ; Enterprise est sur devis.
+      expect(screen.getAllByText('/mois')).toHaveLength(3);
     });
 
     it('should have hover effect on plan cards', () => {
       render(<RegisterPlanForm />);
 
-      const proCard = screen.getByText('Pro').closest('[data-slot="card"]');
-      expect(proCard).toHaveClass('cursor-pointer');
+      const businessCard = screen.getByText('Business').closest('[data-slot="card"]');
+      expect(businessCard).toHaveClass('cursor-pointer');
     });
 
     it('should show informative message about plan changes', () => {
@@ -393,8 +395,9 @@ describe('RegisterPlanForm - Step 2: Plan Selection', () => {
     it('should have accessible plan descriptions', () => {
       render(<RegisterPlanForm />);
 
-      expect(screen.getByText('Parfait pour démarrer')).toBeInTheDocument();
-      expect(screen.getByText('Pour les équipes en croissance')).toBeInTheDocument();
+      expect(screen.getByText('Pour découvrir TaskForce')).toBeInTheDocument();
+      expect(screen.getByText('Pour les petites équipes')).toBeInTheDocument();
+      expect(screen.getByText('Pour les équipes qui livrent')).toBeInTheDocument();
       expect(screen.getByText('Pour les grandes organisations')).toBeInTheDocument();
     });
   });
