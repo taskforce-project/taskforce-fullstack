@@ -10,6 +10,11 @@ interface PixelBlastProps {
   patternScale?: number
   patternDensity?: number
   liquid?: boolean
+  /**
+   * Réglages fins de la distorsion « liquide ». Acceptés par l'API mais **pas encore honorés par le
+   * shader** : seul le drapeau `liquid` a un effet aujourd'hui. Conservés pour ne pas casser la
+   * signature quand l'effet sera terminé.
+   */
   liquidStrength?: number
   liquidRadius?: number
   pixelSizeJitter?: number
@@ -47,9 +52,6 @@ export default function PixelBlast({
   noiseAmount = 0,
   pixelSizeJitter = 0,
   liquid = false,
-  liquidStrength = 0.1,
-  liquidRadius = 1,
-  liquidWobbleSpeed = 4.5,
   className,
   style,
 }: Readonly<PixelBlastProps>) {
@@ -314,7 +316,12 @@ export default function PixelBlast({
       if (canvas.parentElement === container) canvas.remove()
       gl.deleteProgram(program)
     }
-    // biome-ignore lint/correctness/useExhaustiveDependencies: intentional re-init on key variant changes only
+    // Réinitialisation volontairement limitée aux paramètres qui changent la structure du shader.
+    // Les autres props sont lues à chaque frame via des uniforms : les ajouter ici reconstruirait le
+    // contexte WebGL à chaque changement de couleur ou de vitesse, ce qui est exactement l'inverse
+    // du but recherché.
+    // (La directive précédente visait Biome ; le linter du projet est ESLint, elle était sans effet.)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [variant, liquid, noiseAmount])
 
   return (
