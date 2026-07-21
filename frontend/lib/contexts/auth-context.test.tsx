@@ -190,7 +190,12 @@ describe('AuthContext', () => {
 
       expect(result.current.user).toBeNull();
       expect(result.current.isAuthenticated).toBe(false);
-      expect(mockRouter.push).toHaveBeenCalledWith('/auth/login');
+      // QA2 : rechargement dur (`window.location`) et non `router.push`. Une navigation cliente
+      // laisserait vivants les stores Zustand, qui sont des singletons au niveau module — deux
+      // comptes successifs sur le même navigateur mélangeraient leurs caches (403, intégrations
+      // fantômes). Seul un rechargement complet les détruit.
+      expect(window.location.href).toBe('/auth/login');
+      expect(mockRouter.push).not.toHaveBeenCalled();
     });
 
     it('should handle logout errors gracefully', async () => {
@@ -215,8 +220,9 @@ describe('AuthContext', () => {
         // Expected to throw
       }
 
-      // Should  still redirect even on error
-      expect(mockRouter.push).toHaveBeenCalledWith('/auth/login');
+      // La déconnexion doit aboutir même si l'appel serveur échoue : l'état client est purgé et le
+      // rechargement dur a lieu dans les deux branches.
+      expect(window.location.href).toBe('/auth/login');
     });
   });
 
