@@ -24,6 +24,8 @@ import com.taskforce.tf_api.core.dto.request.UpdateLabelRequest;
 import com.taskforce.tf_api.core.dto.request.CreateProjectRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateProjectRequest;
 import com.taskforce.tf_api.core.dto.response.ProjectActivityPointResponse;
+import com.taskforce.tf_api.core.dto.response.ProjectActivitySeriesResponse;
+import com.taskforce.tf_api.core.dto.response.ProjectHealthPointResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectLabelResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectMemberResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectResponse;
@@ -99,6 +101,41 @@ public class ProjectController {
         Long userId = resolveUserId(jwt);
         ProjectResponse project = projectService.getProject(slug, id, userId);
         return ResponseEntity.ok(ApiResponse.success("Projet récupéré", project));
+    }
+
+    /**
+     * GET /api/workspaces/{slug}/projects/health-history?days=30
+     * Nombre de projets à risque / critiques par jour — alimente la courbe du KPI « At risk ».
+     *
+     * <p>Chemin littéral déclaré AVANT {@code /{id}} : sans cela, « health-history » serait tenté
+     * comme identifiant de projet.</p>
+     */
+    @GetMapping("/health-history")
+    public ResponseEntity<ApiResponse<List<ProjectHealthPointResponse>>> getHealthHistory(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String slug,
+        @RequestParam(name = "days", defaultValue = "30") int days
+    ) {
+        Long userId = resolveUserId(jwt);
+        List<ProjectHealthPointResponse> history = projectService.getHealthHistory(slug, userId, days);
+        return ResponseEntity.ok(ApiResponse.success("Historique de santé récupéré", history));
+    }
+
+    /**
+     * GET /api/workspaces/{slug}/projects/activity?days=14
+     * Activité de TOUS les projets visibles, en un appel — sparklines de la page Operations.
+     *
+     * <p>Chemin littéral déclaré avant {@code /{id}}, comme {@code /health-history}.</p>
+     */
+    @GetMapping("/activity")
+    public ResponseEntity<ApiResponse<List<ProjectActivitySeriesResponse>>> getWorkspaceActivity(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String slug,
+        @RequestParam(name = "days", defaultValue = "14") int days
+    ) {
+        Long userId = resolveUserId(jwt);
+        List<ProjectActivitySeriesResponse> series = projectService.getWorkspaceActivity(slug, userId, days);
+        return ResponseEntity.ok(ApiResponse.success("Activité des opérations récupérée", series));
     }
 
     /**
