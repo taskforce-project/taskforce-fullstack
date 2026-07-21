@@ -18,6 +18,8 @@ import {
   LayoutGrid,
   List as ListIcon,
   ArrowUpDown,
+  Lock,
+  Globe,
 } from "lucide-react"
 
 import { CreateProjectDialog } from "@/components/dialogs/create-project-dialog"
@@ -42,19 +44,21 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { UserAvatar } from "@/components/ui/user-avatar"
+import { Sparkline } from "@/components/ui/sparkline"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { ResponsiveContainer, AreaChart, Area } from "recharts"
 import { cn } from "@/lib/utils"
-import { getAvatarUrl } from "@/lib/utils/avatar"
 import { useProjectStore } from "@/lib/store/project-store"
-import { getProjectActivity } from "@/lib/api/project-service"
+import { getProjectsHealthHistory, getWorkspaceProjectsActivity } from "@/lib/api/project-service"
 import type { Project } from "@/lib/api/project-service"
+
+/** Activité par projet : `projectId` → nombre d'issues créées par jour (série continue). */
+type ActivityMap = ReadonlyMap<number, readonly number[]>
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -154,12 +158,16 @@ function MemberStack({ project }: { readonly project: Project }) {
   return (
     <div className="flex items-center -space-x-1.5">
       {visible.map((m) => (
-        <Avatar key={m.id} className="size-5 ring-1 ring-background">
-          <AvatarImage src={getAvatarUrl({ email: m.email, avatarUrl: m.avatarUrl })} />
-          <AvatarFallback className="text-[8px]">
-            {(m.displayName ?? m.email).slice(0, 2).toUpperCase()}
-          </AvatarFallback>
-        </Avatar>
+        // `UserAvatar` (et non Avatar brut) : composant partagé de l'app — même PDP pour un même
+        // utilisateur partout, et fond opaque hérité (les identicons par défaut sont transparents).
+        <UserAvatar
+          key={m.id}
+          email={m.email}
+          avatarUrl={m.avatarUrl}
+          name={m.displayName}
+          className="size-5 ring-1 ring-background"
+          fallbackClassName="text-[8px]"
+        />
       ))}
       {extra > 0 && (
         <div className="flex size-5 items-center justify-center rounded-full bg-muted text-[8px] font-medium text-muted-foreground ring-1 ring-background">
@@ -170,22 +178,66 @@ function MemberStack({ project }: { readonly project: Project }) {
   )
 }
 
+/**
+ * Visibilité du projet — information de gouvernance : « privé » veut dire que seuls ses
+ * collaborateurs y accèdent. Affichée en clair plutôt que devinée depuis les réglages.
+ */
+function VisibilityBadge({ isPublic }: { readonly isPublic: boolean }) {
+  return (
+    <Badge variant="secondary" className="gap-1 font-normal text-muted-foreground" title={isPublic ? "Visible par tout le workspace" : "Réservé aux collaborateurs du projet"}>
+      {isPublic ? <Globe className="size-2.5" /> : <Lock className="size-2.5" />}
+      {isPublic ? "Public" : "Private"}
+    </Badge>
+  )
+}
+
 // ─── Stats strip ──────────────────────────────────────────────────────────────
 
-function StatsStrip({ projects }: { readonly projects: Project[] }) {
+/** Fenêtre de l'historique de santé — 30 jours : assez pour voir une tendance, assez court pour rester lisible dans une cellule de KPI. */
+const HEALTH_WINDOW_DAYS = 30
+
+function StatsStrip({
+  projects,
+  history,
+}: {
+  readonly projects: Project[]
+  readonly history: readonly { atRisk: number; critical: number }[]
+}) {
   const total = projects.length
   const active = projects.filter((p) => p.status === "ACTIVE").length
   const critical = projects.filter((p) => deriveHealth(p) === "critical").length
   const atRisk = projects.filter((p) => deriveHealth(p) === "at-risk").length
   const avgProgress = total > 0 ? Math.round(projects.reduce((acc, p) => acc + progressPct(p), 0) / total) : 0
 
+  // `renderZero` : ici zéro est l'OBJECTIF. Une ligne plate au plancher signifie « aucune opération
+  // en difficulté sur 30 jours » — c'est le résultat qu'on veut voir, pas une absence de données.
+  const riskTrend = (tone: "red", key: "atRisk" | "critical") => (
+    <Sparkline
+      values={history.map((p) => p[key])}
+      tone={tone}
+      height={28}
+      renderZero
+      emptyLabel=""
+    />
+  )
+
   return (
     <SectionCard title="Overview" bodyClassName="p-0">
       <MetricSplit>
         <Metric label="Total operations" value={total} />
         <Metric label="Active" value={active} valueClassName="text-emerald-600 dark:text-emerald-400" />
-        <Metric label="At risk" value={atRisk} valueClassName={atRisk > 0 ? "text-amber-600 dark:text-amber-400" : undefined} />
-        <Metric label="Critical" value={critical} valueClassName={critical > 0 ? "text-rose-600 dark:text-rose-400" : undefined} />
+        <Metric
+          label="At risk"
+          value={atRisk}
+          valueClassName={atRisk > 0 ? "text-amber-600 dark:text-amber-400" : undefined}
+          chart={history.length > 0 ? riskTrend("red", "atRisk") : undefined}
+        />
+        <Metric
+          label="Critical"
+          value={critical}
+          valueClassName={critical > 0 ? "text-rose-600 dark:text-rose-400" : undefined}
+          chart={history.length > 0 ? riskTrend("red", "critical") : undefined}
+        />
         <Metric label="Avg progress" value={`${avgProgress}%`} />
       </MetricSplit>
     </SectionCard>
@@ -194,7 +246,15 @@ function StatsStrip({ projects }: { readonly projects: Project[] }) {
 
 // ─── Row ──────────────────────────────────────────────────────────────────────
 
-function OperationRow({ project, slug }: { readonly project: Project; readonly slug: string }) {
+function OperationRow({
+  project,
+  slug,
+  activity,
+}: {
+  readonly project: Project
+  readonly slug: string
+  readonly activity: readonly number[]
+}) {
   const router = useRouter()
   const archiveProject = useProjectStore((s) => s.archiveProject)
   const updateProject = useProjectStore((s) => s.updateProject)
@@ -217,9 +277,14 @@ function OperationRow({ project, slug }: { readonly project: Project; readonly s
           <span className={cn("size-2 shrink-0 rounded-full", HEALTH_META[health].dot)} />
           <ProjectIcon iconUrl={project.iconUrl} name={project.name} color={project.color} size={20} className="shrink-0 rounded" />
           <span className="font-medium text-foreground">{project.name}</span>
+          <VisibilityBadge isPublic={project.isPublic} />
         </div>
       </TableCell>
       <TableCell><HealthBadge level={health} /></TableCell>
+      <TableCell className="hidden lg:table-cell">
+        {/* Même lecture qu'en vue cartes : la forme de l'activité, sans quitter la liste. */}
+        <Sparkline values={activity} tone="blue" height={28} className="w-24" emptyLabel="—" />
+      </TableCell>
       <TableCell className="hidden md:table-cell">
         {riskSignal ? (
           <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -308,23 +373,20 @@ function OperationRow({ project, slug }: { readonly project: Project; readonly s
 
 // ─── Card (cards view) ──────────────────────────────────────────────────────────
 
-function ProjectCard({ project, slug }: { readonly project: Project; readonly slug: string }) {
+function ProjectCard({
+  project,
+  slug,
+  activity,
+}: {
+  readonly project: Project
+  readonly slug: string
+  /** Fournie par la page (un seul appel groupé) — plus de requête par carte. */
+  readonly activity: readonly number[]
+}) {
   const router = useRouter()
   const toggleFavorite = useProjectStore((s) => s.toggleFavorite)
   const health = deriveHealth(project)
   const pct = progressPct(project)
-
-  // Activité du projet (réel) — issues créées/jour sur 14 j, façon GitHub (QA2-32).
-  const [activity, setActivity] = useState<{ date: string; activity: number }[]>([])
-  useEffect(() => {
-    let alive = true
-    getProjectActivity(slug, project.id, 14)
-      .then((pts) => { if (alive) setActivity(pts.map((p) => ({ date: p.date, activity: p.count }))) })
-      .catch(() => { /* indispo → pas de sparkline */ })
-    return () => { alive = false }
-  }, [slug, project.id])
-
-  const hasActivity = activity.some((p) => p.activity > 0)
 
   return (
     <div
@@ -340,7 +402,10 @@ function ProjectCard({ project, slug }: { readonly project: Project; readonly sl
           <ProjectIcon iconUrl={project.iconUrl} name={project.name} color={project.color} size={28} className="shrink-0 rounded" />
           <div className="min-w-0">
             <p className="truncate text-sm font-medium text-foreground">{project.name}</p>
-            <HealthBadge level={health} />
+            <div className="flex flex-wrap items-center gap-1">
+              <HealthBadge level={health} />
+              <VisibilityBadge isPublic={project.isPublic} />
+            </div>
           </div>
         </div>
         <button
@@ -360,24 +425,12 @@ function ProjectCard({ project, slug }: { readonly project: Project; readonly sl
         <p className="line-clamp-2 text-xs text-muted-foreground">{project.description}</p>
       )}
 
-      {/* Activité (sparkline bleu, façon GitHub) — remplace la barre de progression */}
-      <div className="mt-auto">
-        <p className="mb-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70">Activité</p>
-        {hasActivity ? (
-          <ResponsiveContainer width="100%" height={36}>
-            <AreaChart data={activity} margin={{ top: 2, right: 0, left: 0, bottom: 2 }}>
-              <defs>
-                <linearGradient id={`act-${project.id}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.25} />
-                  <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <Area type="monotone" dataKey="activity" stroke="#3b82f6" strokeWidth={1.5} fill={`url(#act-${project.id})`} dot={false} />
-            </AreaChart>
-          </ResponsiveContainer>
-        ) : (
-          <div className="flex h-9 items-center text-[10px] text-muted-foreground/50">Pas d&apos;activité récente</div>
-        )}
+      {/* Activité (sparkline bleu, façon GitHub) — remplace la barre de progression.
+          `-mb-3` annule le `gap-3` de la carte : le dégradé rejoint le filet séparateur du bas
+          au lieu de flotter au-dessus. */}
+      <div className="mt-auto -mb-3">
+        <p className="mb-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70">Activity</p>
+        <Sparkline values={activity} tone="blue" height={36} emptyLabel="No recent activity" />
       </div>
 
       <div className="flex items-center justify-between border-t border-border/60 pt-2.5">
@@ -461,6 +514,15 @@ export default function ProjectsPage() {
   const slug = params.workspace
   // « New project » depuis la sidebar → ?new=1 ouvre le modal d'emblée (PROD-8.7)
   const autoNew = useSearchParams().get("new") === "1"
+  const router = useRouter()
+
+  // Le paramètre est nettoyé à la FERMETURE du modal, jamais à son ouverture : `router.replace`
+  // déclenche une navigation qui remonte le modal, et l'aurait donc refermé aussitôt ouvert.
+  // Sans ce nettoyage, `?new=1` resterait dans l'URL et le clic suivant sur « New project » ne
+  // produirait aucune transition de prop — donc aucune réouverture.
+  const clearNewParam = () => {
+    if (autoNew && slug) router.replace(`/${slug}/projects`, { scroll: false })
+  }
 
   const { projects, isLoading, fetchProjects } = useProjectStore()
   const [filter, setFilter] = useState<FilterTab>("active")
@@ -468,9 +530,29 @@ export default function ProjectsPage() {
   const [view, setView] = useState<"list" | "cards">("cards")
   const [sortBy, setSortBy] = useState<SortKey>("health")
 
+  // Historique de santé (courbe rouge) + activité de TOUS les projets (sparklines) : deux appels
+  // groupés au niveau de la page, quel que soit le nombre de projets affichés.
+  const [history, setHistory] = useState<{ atRisk: number; critical: number }[]>([])
+  const [activityMap, setActivityMap] = useState<ActivityMap>(new Map())
+
   useEffect(() => {
     if (slug) fetchProjects(slug)
   }, [slug, fetchProjects])
+
+  useEffect(() => {
+    if (!slug) return
+    let alive = true
+    getProjectsHealthHistory(slug, HEALTH_WINDOW_DAYS)
+      .then((pts) => { if (alive) setHistory(pts.map((p) => ({ atRisk: p.atRisk, critical: p.critical }))) })
+      .catch(() => { /* indispo → le KPI reste affiché, sans courbe */ })
+    getWorkspaceProjectsActivity(slug, 14)
+      .then((series) => {
+        if (!alive) return
+        setActivityMap(new Map(series.map((s) => [s.projectId, s.points.map((p) => p.count)])))
+      })
+      .catch(() => { /* indispo → pas de sparkline, la liste reste utilisable */ })
+    return () => { alive = false }
+  }, [slug])
 
   const filtered = useMemo(() => {
     let list = projects
@@ -512,14 +594,14 @@ export default function ProjectsPage() {
         title="Active Operations"
         description="Real-time health and velocity across all workstreams"
         actions={
-          <CreateProjectDialog defaultOpen={autoNew}>
+          <CreateProjectDialog defaultOpen={autoNew} onOpenChange={(o) => { if (!o) clearNewParam() }}>
             <Button size="sm" className="gap-1.5"><Plus className="size-4" /> New Operation</Button>
           </CreateProjectDialog>
         }
       />
 
       {/* Stats */}
-      {!isLoading && activeProjects.length > 0 && <StatsStrip projects={activeProjects} />}
+      {!isLoading && activeProjects.length > 0 && <StatsStrip projects={activeProjects} history={history} />}
 
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-3">
@@ -561,22 +643,23 @@ export default function ProjectsPage() {
             </DropdownMenuContent>
           </DropdownMenu>
           {/* Vue liste / cartes */}
+          {/* Cartes en PREMIER : c'est la vue par défaut, elle doit occuper la position de tête. */}
           <div className="flex items-center rounded-md border border-border p-0.5">
             <button
               type="button"
-              onClick={() => setView("list")}
-              aria-label="Vue liste"
-              className={cn("flex size-7 items-center justify-center rounded transition-colors", view === "list" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground")}
-            >
-              <ListIcon className="size-4" />
-            </button>
-            <button
-              type="button"
               onClick={() => setView("cards")}
-              aria-label="Vue cartes"
+              aria-label="Card view"
               className={cn("flex size-7 items-center justify-center rounded transition-colors", view === "cards" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground")}
             >
               <LayoutGrid className="size-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setView("list")}
+              aria-label="List view"
+              className={cn("flex size-7 items-center justify-center rounded transition-colors", view === "list" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground")}
+            >
+              <ListIcon className="size-4" />
             </button>
           </div>
         </div>
@@ -593,7 +676,7 @@ export default function ProjectsPage() {
         <>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {pageItems.map((project) => (
-              <ProjectCard key={project.id} project={project} slug={slug} />
+              <ProjectCard key={project.id} project={project} slug={slug} activity={activityMap.get(project.id) ?? []} />
             ))}
           </div>
           {total > pageSize && (
@@ -617,6 +700,7 @@ export default function ProjectsPage() {
               <TableRow className="hover:bg-transparent">
                 <TableHead>Operation</TableHead>
                 <TableHead>Health</TableHead>
+                <TableHead className="hidden lg:table-cell">Activity</TableHead>
                 <TableHead className="hidden md:table-cell">Signal</TableHead>
                 <TableHead className="hidden lg:table-cell">Progress</TableHead>
                 <TableHead className="hidden lg:table-cell">Velocity</TableHead>
@@ -627,7 +711,7 @@ export default function ProjectsPage() {
             </TableHeader>
             <TableBody>
               {pageItems.map((project) => (
-                <OperationRow key={project.id} project={project} slug={slug} />
+                <OperationRow key={project.id} project={project} slug={slug} activity={activityMap.get(project.id) ?? []} />
               ))}
             </TableBody>
           </Table>

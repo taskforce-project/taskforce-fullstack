@@ -19,7 +19,11 @@
   --popover-foreground: #1d1d1f;
   --sidebar-foreground: #3a3a3c;
 
-  --primary:            #1d1d1f;   /* noir — pas de bleu */
+  /* Bleu de marque — même famille que les barres de progression (blue-600 → blue-400) et que les
+     courbes d'activité. Porte TOUTES les actions primaires : bouton principal, case cochée,
+     interrupteur actif, curseur. Auparavant noir : rien ne distinguait alors une action engageante
+     d'un simple élément de texte. */
+  --primary:            #2563eb;   /* blue-600 */
   --primary-foreground: #ffffff;
   --secondary:          #f2f2f4;
   --secondary-foreground: #1d1d1f;
@@ -32,7 +36,7 @@
 
   --border:             #e6e6e9;   /* gris clair solide, façon Cloudflare */
   --input:              #dededf;
-  --ring:               rgba(29, 29, 31, 0.28);
+  --ring:               rgba(37, 99, 235, 0.35);   /* anneau de focus aligné sur le primaire */
 
   --sidebar-primary:            #1d1d1f;
   --sidebar-primary-foreground: #ffffff;
@@ -103,8 +107,10 @@
   --popover-foreground: #f5f5f7;
   --sidebar-foreground: #c7c7cc;
 
-  --primary:            #ffffff;
-  --primary-foreground: #0b0b0c;
+  /* Bleu remonté d'un cran (blue-500) : sur fond sombre, le blue-600 du thème clair manque de
+     luminance et l'action primaire passe inaperçue. Texte blanc conservé — contraste suffisant. */
+  --primary:            #3b82f6;   /* blue-500 */
+  --primary-foreground: #ffffff;
   --secondary:          #202022;
   --secondary-foreground: #f5f5f7;
   --muted:              #202022;
@@ -116,7 +122,7 @@
 
   --border:             #2a2a2c;
   --input:              #2a2a2c;
-  --ring:               rgba(255, 255, 255, 0.30);
+  --ring:               rgba(59, 130, 246, 0.45);   /* anneau de focus aligné sur le primaire */
 
   --sidebar-primary:            #ffffff;
   --sidebar-primary-foreground: #0b0b0c;
