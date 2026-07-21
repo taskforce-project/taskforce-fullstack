@@ -103,7 +103,7 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
   if (error || !catalog) {
     return (
       <div className="flex flex-col items-center gap-3 py-12 text-center">
-        <p className="text-sm text-muted-foreground">Le catalogue d'intégrations n'a pas pu être chargé.</p>
+        <p className="text-sm text-muted-foreground">Le catalogue d&apos;intégrations n&apos;a pas pu être chargé.</p>
         <Button variant="outline" size="sm" onClick={refresh} className="gap-1.5">
           <Loader2 className="size-3.5" /> Réessayer
         </Button>
