@@ -291,7 +291,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <span>{t(item.key)}</span>
             {item.lab && (
               <FlaskConical
-                className="ml-auto size-3.5 shrink-0 text-blue-500 group-data-[collapsible=icon]:hidden"
+                /* Violet : le bleu est réservé aux actions primaires (cf. `--primary`). */
+                className="ml-auto size-3.5 shrink-0 text-violet-500 group-data-[collapsible=icon]:hidden"
                 aria-label="Fonctionnalité en cours de finition"
               />
             )}
