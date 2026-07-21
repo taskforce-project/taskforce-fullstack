@@ -41,14 +41,18 @@ export function LabBanner({ feature, message, className }: LabBannerProps) {
   const subject = encodeURIComponent(`Feedback — ${feature}`)
 
   return (
-    <div className={cn("flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm text-blue-900 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-200", className)}>
-      <FlaskConical className="size-4 shrink-0 text-blue-500 mt-0.5" />
+    /* Violet et non bleu : le bleu porte désormais les actions primaires (boutons, cases,
+       interrupteurs). Un bandeau « lab » en bleu se lirait comme quelque chose d'actionnable,
+       alors que c'est un avertissement de maturité. Une teinte distincte le rend lisible d'un
+       coup d'œil sans le confondre avec le reste. */
+    <div className={cn("flex items-start gap-3 rounded-lg border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm text-violet-900 dark:border-violet-900/50 dark:bg-violet-950/40 dark:text-violet-200", className)}>
+      <FlaskConical className="size-4 shrink-0 text-violet-500 mt-0.5" />
       <span className="min-w-0 flex-1">
         {message ?? "Fonctionnalité en cours de finition — les données sont réelles, l'expérience évolue encore."}
       </span>
       <a
         href={`mailto:${FEEDBACK_EMAIL}?subject=${subject}`}
-        className="shrink-0 rounded-md border border-blue-300 bg-white/70 px-2.5 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-white dark:border-blue-800 dark:bg-blue-900/40 dark:text-blue-100 dark:hover:bg-blue-900/70"
+        className="shrink-0 rounded-md border border-violet-300 bg-white/70 px-2.5 py-1 text-xs font-medium text-violet-700 transition-colors hover:bg-white dark:border-violet-800 dark:bg-violet-900/40 dark:text-violet-100 dark:hover:bg-violet-900/70"
       >
         Donner mon feedback
       </a>
@@ -56,7 +60,7 @@ export function LabBanner({ feature, message, className }: LabBannerProps) {
         type="button"
         onClick={dismiss}
         aria-label="Fermer le bandeau"
-        className="shrink-0 rounded p-1 text-blue-500 transition-colors hover:bg-blue-100 dark:hover:bg-blue-900/60"
+        className="shrink-0 rounded p-1 text-violet-500 transition-colors hover:bg-violet-100 dark:hover:bg-violet-900/60"
       >
         <X className="size-4" />
       </button>

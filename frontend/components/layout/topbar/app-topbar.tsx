@@ -174,13 +174,14 @@ export function AppTopbar() {
       {/* Indicateur « Lab » centré dans le header (feature en expérimentation). */}
       {isLab && (
         <div className="pointer-events-none absolute left-1/2 flex -translate-x-1/2 items-center gap-2">
-          <span className="flex items-center gap-1.5 rounded-full bg-blue-200/70 px-2.5 py-0.5 text-[11px] font-medium text-blue-800 dark:bg-blue-900/60 dark:text-blue-200">
+          {/* Violet : le bleu porte les actions primaires, un marqueur d'état doit s'en distinguer. */}
+          <span className="flex items-center gap-1.5 rounded-full bg-violet-200/70 px-2.5 py-0.5 text-[11px] font-medium text-violet-800 dark:bg-violet-900/60 dark:text-violet-200">
             <FlaskConical className="size-3.5" />
             Expérimentation
           </span>
           <a
             href="mailto:feedback@taskforce.dev?subject=Feedback"
-            className="pointer-events-auto hidden text-[11px] font-medium text-blue-700 underline-offset-2 hover:underline md:inline dark:text-blue-300"
+            className="pointer-events-auto hidden text-[11px] font-medium text-violet-700 underline-offset-2 hover:underline md:inline dark:text-violet-300"
           >
             Donner mon feedback
           </a>
