@@ -3,7 +3,6 @@ import { renderHook, act } from '@testing-library/react';
 import { useIsMobile } from './use-mobile';
 
 describe('useIsMobile', () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let matchMediaSpy: any;
   let addEventListenerSpy: ReturnType<typeof vi.fn>;
   let removeEventListenerSpy: ReturnType<typeof vi.fn>;

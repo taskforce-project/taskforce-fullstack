@@ -52,6 +52,17 @@ describe("usePagination", () => {
     expect(result.current.page).toBe(2)
   })
 
+  it("restaure la page demandée quand la liste retrouve sa taille", () => {
+    const { result, rerender } = renderHook(({ items }) => usePagination(items, 10), {
+      initialProps: { items: range(50) }, // 5 pages
+    })
+    act(() => result.current.setPage(5))
+    rerender({ items: range(12) }) // filtre appliqué → 2 pages
+    expect(result.current.page).toBe(2)
+    rerender({ items: range(50) }) // filtre retiré → la position de lecture revient
+    expect(result.current.page).toBe(5)
+  })
+
   it("expose au moins 1 page pour une liste vide", () => {
     const { result } = renderHook(() => usePagination<number>([], 25))
     expect(result.current.pageCount).toBe(1)
