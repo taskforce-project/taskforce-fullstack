@@ -99,11 +99,14 @@ export function Metric({
   value,
   delta,
   valueClassName,
+  chart,
 }: {
   readonly label: React.ReactNode
   readonly value: React.ReactNode
   readonly delta?: React.ReactNode
   readonly valueClassName?: string
+  /** Courbe de tendance sous le chiffre (façon Cloudflare) : le chiffre dit « où on en est », la courbe « d'où on vient ». */
+  readonly chart?: React.ReactNode
 }) {
   return (
     <div className="flex flex-1 flex-col gap-2 px-5 py-4">
@@ -112,6 +115,9 @@ export function Metric({
         <span className={cn("text-2xl font-semibold tabular-nums tracking-tight text-foreground", valueClassName)}>{value}</span>
         {delta}
       </div>
+      {/* `-mb-4` annule le padding bas de la cellule : le dégradé descend jusqu'au bord de la
+          carte, au lieu de s'arrêter en l'air à 16 px au-dessus. */}
+      {chart && <div className="mt-auto -mb-4 pt-1">{chart}</div>}
     </div>
   )
 }

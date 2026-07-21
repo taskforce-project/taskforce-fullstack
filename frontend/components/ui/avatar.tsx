@@ -13,7 +13,11 @@ function Avatar({
     <AvatarPrimitive.Root
       data-slot="avatar"
       className={cn(
-        "relative flex size-8 shrink-0 overflow-hidden rounded-full",
+        // `bg-background` : les identicons DiceBear (avatars par défaut) sont des SVG à fond
+        // TRANSPARENT. Sans fond opaque on voyait à travers — le contenu de la page, et surtout
+        // l'avatar du dessous dans une pile chevauchée. Le fond suit le thème (near-blanc en
+        // clair, near-noir en sombre) ; une photo uploadée le recouvre entièrement.
+        "relative flex size-8 shrink-0 overflow-hidden rounded-full bg-background",
         className
       )}
       {...props}
