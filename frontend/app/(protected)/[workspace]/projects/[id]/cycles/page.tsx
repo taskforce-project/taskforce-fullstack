@@ -232,7 +232,7 @@ export default function ProjectCyclesPage() {
     <div className="flex flex-col gap-4">
       <p className="text-xs text-muted-foreground">
         Les <span className="font-medium text-foreground">cycles</span> (sprints) sont des itérations limitées dans le temps :
-        regroupez-y des issues pour suivre la vélocité, la charge et les échéances de l'équipe.
+        regroupez-y des issues pour suivre la vélocité, la charge et les échéances de l&apos;équipe.
       </p>
       <div className="flex items-center justify-between">
         {error ? (
