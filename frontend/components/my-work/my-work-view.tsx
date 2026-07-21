@@ -12,6 +12,7 @@ import { Progress } from "@/components/ui/progress"
 import { PageContainer, PageHeader } from "@/components/layout/page-shell"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table"
+import { RefreshControl } from "@/components/ui/refresh-control"
 import { IssueSheetLoader, type IssueSheetTarget } from "@/components/sheets/issue-sheet-loader"
 import { cn } from "@/lib/utils"
 import { useUserStore } from "@/lib/store/user-store"
@@ -317,6 +318,8 @@ export function MyWorkView({ defaultTab }: MyWorkViewProps) {
   const [myCycles, setMyCycles] = useState<Cycle[]>([])
   const [myPages, setMyPages] = useState<Page[]>([])
   const [sheetTarget, setSheetTarget] = useState<IssueSheetTarget | null>(null)
+  const [lastSyncAt, setLastSyncAt] = useState<number | null>(null)
+  const [refreshToken, setRefreshToken] = useState(0)
 
   useEffect(() => {
     fetchMe()
@@ -344,14 +347,18 @@ export function MyWorkView({ defaultTab }: MyWorkViewProps) {
       if (cyclesRes.status === "fulfilled") setMyCycles(cyclesRes.value.map((c) => mapWorkspaceCycle(c, baseUrl)))
       if (pagesRes.status  === "fulfilled") setMyPages(pagesRes.value.map((p) => mapWorkspacePage(p, baseUrl)))
 
+      // Horodaté APRÈS les appels : c'est l'heure de l'état affiché, pas celle de la demande.
+      setLastSyncAt(Date.now())
+
       const failed = [issuesRes, cyclesRes, pagesRes].filter((r) => r.status === "rejected")
       if (failed.length > 0) console.warn("My Queue: partial load", failed)
     }
     void load()
   // Dépendance sur l'id (primitif) et non sur l'objet `user` : `fetchMe` en renvoie une nouvelle
   // référence à chaque appel, ce qui relançait le chargement complet à chaque fois.
+  // `refreshToken` : incrémenté par le bouton Refresh pour rejouer le même effet.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug, user?.id])
+  }, [slug, user?.id, refreshToken])
 
 
   return (
@@ -359,6 +366,12 @@ export function MyWorkView({ defaultTab }: MyWorkViewProps) {
       <PageHeader
         title="My Queue"
         description="Issues, sprints, and pages assigned to or recently edited by you"
+        actions={
+          <RefreshControl
+            lastSyncAt={lastSyncAt}
+            onRefresh={async () => { setRefreshToken((n) => n + 1) }}
+          />
+        }
       />
 
       {/* Onglets de tri (All / Issues / Sprints / Pages) — QA2-23 */}
