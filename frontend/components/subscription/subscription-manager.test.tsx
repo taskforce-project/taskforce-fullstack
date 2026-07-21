@@ -134,52 +134,53 @@ describe('SubscriptionManager', () => {
       });
     });
 
-    it('should show upgrade buttons for PRO and ENTERPRISE', async () => {
+    // Enterprise se souscrit sur devis, pas en ligne : depuis Free, seuls Basic et Business sont
+    // proposés au paiement immédiat.
+    it('should show upgrade buttons for BASIC and BUSINESS', async () => {
       render(<SubscriptionManager />);
 
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /Passer à Pro/i })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: /Passer à Enterprise/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Passer à Basic/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Passer à Business/i })).toBeInTheDocument();
       });
+      expect(screen.queryByRole('button', { name: /Passer à Enterprise/i })).not.toBeInTheDocument();
     });
 
-    it('should redirect to Stripe checkout when upgrading to PRO', async () => {
+    it('should redirect to Stripe checkout when upgrading to BUSINESS', async () => {
       vi.mocked(stripeService.stripeService.createCheckoutSession).mockResolvedValue({
-        checkoutUrl: 'https://checkout.stripe.com/pro',
+        checkoutUrl: 'https://checkout.stripe.com/business',
       });
 
       render(<SubscriptionManager />);
 
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /Passer à Pro/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Passer à Business/i })).toBeInTheDocument();
       });
 
-      const proButton = screen.getByRole('button', { name: /Passer à Pro/i });
-      fireEvent.click(proButton);
+      fireEvent.click(screen.getByRole('button', { name: /Passer à Business/i }));
 
       await waitFor(() => {
         expect(stripeService.stripeService.createCheckoutSession).toHaveBeenCalledWith('BUSINESS');
-        expect(window.location.href).toBe('https://checkout.stripe.com/pro');
+        expect(window.location.href).toBe('https://checkout.stripe.com/business');
       });
     });
 
-    it('should redirect to Stripe checkout when upgrading to ENTERPRISE', async () => {
+    it('should redirect to Stripe checkout when upgrading to BASIC', async () => {
       vi.mocked(stripeService.stripeService.createCheckoutSession).mockResolvedValue({
-        checkoutUrl: 'https://checkout.stripe.com/enterprise',
+        checkoutUrl: 'https://checkout.stripe.com/basic',
       });
 
       render(<SubscriptionManager />);
 
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /Passer à Enterprise/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Passer à Basic/i })).toBeInTheDocument();
       });
 
-      const enterpriseButton = screen.getByRole('button', { name: /Passer à Enterprise/i });
-      fireEvent.click(enterpriseButton);
+      fireEvent.click(screen.getByRole('button', { name: /Passer à Basic/i }));
 
       await waitFor(() => {
-        expect(stripeService.stripeService.createCheckoutSession).toHaveBeenCalledWith('ENTERPRISE');
-        expect(window.location.href).toBe('https://checkout.stripe.com/enterprise');
+        expect(stripeService.stripeService.createCheckoutSession).toHaveBeenCalledWith('BASIC');
+        expect(window.location.href).toBe('https://checkout.stripe.com/basic');
       });
     });
 
@@ -191,11 +192,10 @@ describe('SubscriptionManager', () => {
       render(<SubscriptionManager />);
 
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /Passer à Pro/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Passer à Business/i })).toBeInTheDocument();
       });
 
-      const proButton = screen.getByRole('button', { name: /Passer à Pro/i });
-      fireEvent.click(proButton);
+      fireEvent.click(screen.getByRole('button', { name: /Passer à Business/i }));
 
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith('Erreur', {
@@ -205,7 +205,7 @@ describe('SubscriptionManager', () => {
     });
   });
 
-  describe('PRO Plan', () => {
+  describe('BUSINESS Plan', () => {
     beforeEach(async () => {
       vi.mocked(stripeService.stripeService.getSubscriptionInfo).mockResolvedValue({
         planType: 'BUSINESS',
@@ -217,11 +217,11 @@ describe('SubscriptionManager', () => {
       });
     });
 
-    it('should display PRO plan with pricing information', async () => {
+    it('should display BUSINESS plan with pricing information', async () => {
       render(<SubscriptionManager />);
 
       await waitFor(() => {
-        expect(screen.getByText(/Plan PRO/i)).toBeInTheDocument();
+        expect(screen.getByText(/Plan BUSINESS/i)).toBeInTheDocument();
         expect(screen.getByText(/49/i)).toBeInTheDocument();
         expect(screen.getByText(/EUR/i)).toBeInTheDocument();
         expect(screen.getByText(/mois/i)).toBeInTheDocument();
@@ -238,12 +238,15 @@ describe('SubscriptionManager', () => {
       });
     });
 
-    it('should show upgrade to ENTERPRISE button', async () => {
+    // Business est le plan le plus élevé souscriptible en ligne : au-delà, c'est Enterprise, sur
+    // devis. Aucun bouton de montée en gamme ne doit donc être proposé ici.
+    it('should not offer any further upgrade from BUSINESS', async () => {
       render(<SubscriptionManager />);
 
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /Passer à Enterprise/i })).toBeInTheDocument();
+        expect(screen.getByText(/Plan BUSINESS/i)).toBeInTheDocument();
       });
+      expect(screen.queryByRole('button', { name: /Passer à/i })).not.toBeInTheDocument();
     });
 
     it('should show cancel subscription button', async () => {
