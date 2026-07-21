@@ -79,6 +79,14 @@ export function ProjectIcon({ iconUrl, className, size = 40, color }: ProjectIco
     if (Icon) {
       return (
         <div className={baseClass} style={containerStyle}>
+          {/*
+            `static-components` interdit de définir un composant pendant le rendu, car sa nouvelle
+            identité à chaque passe remonterait tout le sous-arbre. Ici il n'y a pas de définition :
+            `getLucideIcon` lit une référence dans l'espace de noms du module `lucide-react`, qui est
+            constant. Pour un `iconName` donné, l'identité ne change jamais. La règle ne sait
+            simplement pas traverser l'accès par propriété dynamique.
+          */}
+          {/* eslint-disable-next-line react-hooks/static-components */}
           <Icon style={{ width: size * 0.5, height: size * 0.5 }} className={glyphClass} />
         </div>
       )

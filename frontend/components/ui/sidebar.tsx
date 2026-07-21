@@ -602,14 +602,17 @@ function SidebarMenuBadge({
 function SidebarMenuSkeleton({
   className,
   showIcon = false,
+  width = "70%",
   ...props
 }: React.ComponentProps<"div"> & {
   showIcon?: boolean
+  /** Largeur de la barre. Varier cette valeur d'une ligne à l'autre donne un squelette plus vivant. */
+  width?: string
 }) {
-  // Random width between 50 to 90%.
-  const width = React.useMemo(() => {
-    return `${Math.floor(Math.random() * 40) + 50}%`
-  }, [])
+  // La version shadcn d'origine tirait la largeur au sort (`Math.random()` au rendu). Rendu une fois
+  // côté serveur puis une fois côté client, cela produit deux largeurs différentes et déclenche une
+  // erreur d'hydratation. La largeur est donc passée par le parent, qui seul connaît le rang de la
+  // ligne et peut la faire varier de façon déterministe.
 
   return (
     <div

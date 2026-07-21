@@ -356,7 +356,6 @@ interface ModeConfig {
 }
 
 /** Shadow palette colors from the landing-page CSS variables */
-const C_PINK = "#ec4899"
 const C_ORANGE = "#ff7a00"
 const C_PURPLE = "#a855f7"
 const C_RED = "#ff0055"
