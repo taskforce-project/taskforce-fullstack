@@ -21,6 +21,7 @@ import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 import { getRegisterData, clearRegisterData } from "@/lib/auth/register-storage";
 import { validateOTP, globalRateLimiter } from "@/lib/utils/validation";
 import { authService } from "@/lib/api";
@@ -278,8 +279,8 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
       </Card>
       <FieldDescription className="text-center">
         En continuant, vous acceptez nos{" "}
-        <a href="/legal-notices">Conditions d&apos;utilisation</a> et{" "}
-        <a href="/privacy-policy">Politique de confidentialité</a>.
+        <Link href="/legal-notices">Conditions d&apos;utilisation</Link> et{" "}
+        <Link href="/privacy-policy">Politique de confidentialité</Link>.
       </FieldDescription>
     </div>
   );
