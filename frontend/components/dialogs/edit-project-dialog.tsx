@@ -74,9 +74,9 @@ export function EditProjectDialog({ project, slug, open, onOpenChange }: EditPro
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Modifier l'opération</DialogTitle>
+          <DialogTitle>Modifier l&apos;opération</DialogTitle>
           <DialogDescription>
-            Infos globales du projet. Les réglages techniques sont dans l'onglet Settings.
+            Infos globales du projet. Les réglages techniques sont dans l&apos;onglet Settings.
           </DialogDescription>
         </DialogHeader>
 

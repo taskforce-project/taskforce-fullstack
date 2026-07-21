@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import {
   Trash2,
   AlertTriangle,
@@ -67,9 +67,14 @@ export function DeleteConfirmDialog({
   }
 
   // Réinitialise le champ à chaque (ré)ouverture pour ne pas garder une saisie précédente.
-  useEffect(() => {
+  // Ajustement **pendant le rendu** (motif documenté par React pour un état dérivé d'une prop)
+  // plutôt qu'en effet : le champ est déjà vide au premier rendu du dialogue, sans passe
+  // supplémentaire pendant laquelle l'ancienne saisie resterait visible.
+  const [wasOpen, setWasOpen] = useState(open)
+  if (open !== wasOpen) {
+    setWasOpen(open)
     if (open) setTyped("")
-  }, [open])
+  }
 
   // Sans `confirmText`, le bouton est toujours actif (comportement historique). Avec, il faut une
   // correspondance exacte (insensible à la casse et aux espaces de bord).
