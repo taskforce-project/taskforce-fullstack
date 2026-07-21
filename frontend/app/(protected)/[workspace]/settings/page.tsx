@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import {
-  User, Bell, Mail, Users, Zap, Globe, Key, Palette, Webhook,
+  User, Bell, Mail, Zap, Globe, Key, Palette, Webhook,
   Upload, Camera, Link2, Trash2, Shield, Loader2,
   Activity, CheckCircle2, AlertTriangle, Gauge,
 } from "lucide-react"
@@ -31,7 +31,6 @@ import { exportMyData, deleteMyAccount } from "@/lib/api/gdpr-service"
 import { getAiUsage, type AiUsage } from "@/lib/api/ai-usage-service"
 import { apiClient } from "@/lib/api/client"
 import { USER_ROUTES } from "@/lib/config/api-routes"
-import { searchUsers, type UserSearchResult } from "@/lib/api/user-service"
 import { cn } from "@/lib/utils"
 
 export type SettingsSection =
@@ -453,7 +452,7 @@ function NotificationsPanel() {
           <div className="flex items-start gap-3">
             <Bell className="size-4 text-muted-foreground mt-0.5 shrink-0" />
             <div>
-              <p className="text-sm font-medium text-foreground">Notifications dans l'application</p>
+              <p className="text-sm font-medium text-foreground">Notifications dans l&apos;application</p>
               <p className="text-xs text-muted-foreground">
                 Mentions, assignations, commentaires et changements de statut apparaissent en temps réel
                 dans la cloche de notifications. Toujours actives.
@@ -465,7 +464,7 @@ function NotificationsPanel() {
             <div>
               <p className="text-sm font-medium text-foreground">Notifications par e-mail</p>
               <p className="text-xs text-muted-foreground">
-                Le réglage fin des e-mails par type d'événement n'est pas encore disponible. À venir.
+                Le réglage fin des e-mails par type d&apos;événement n&apos;est pas encore disponible. À venir.
               </p>
             </div>
           </div>
