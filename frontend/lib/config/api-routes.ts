@@ -118,6 +118,10 @@ export const AVAILABILITY_ROUTES = {
 export const PROJECT_ROUTES = {
   LIST:    (slug: string) => `/api/workspaces/${slug}/projects`,
   CREATE:  (slug: string) => `/api/workspaces/${slug}/projects`,
+  /** Santé des opérations jour par jour (courbe du KPI « At risk ») */
+  HEALTH_HISTORY: (slug: string) => `/api/workspaces/${slug}/projects/health-history`,
+  /** Activité de tous les projets visibles en un appel (sparklines de la page Operations) */
+  ALL_ACTIVITY:   (slug: string) => `/api/workspaces/${slug}/projects/activity`,
   BY_ID:   (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}`,
   UPDATE:  (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}`,
   ARCHIVE: (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/archive`,
