@@ -135,11 +135,23 @@ export function SmartAssignPanel({
     setRan(false)
   }
 
+  /**
+   * Ouvre le panneau ET lance l'analyse dans la foulée.
+   *
+   * Le panneau demandait auparavant un SECOND clic (« Find best match ») : l'utilisateur qui
+   * cliquait « Smart assign » obtenait un formulaire, pas un résultat. L'intention du clic est
+   * sans ambiguïté — on la sert directement, le loader tenant lieu de retour immédiat.
+   */
+  function handleOpenAndAnalyze() {
+    setOpen(true)
+    void handleAnalyze()
+  }
+
   if (!open) {
     return (
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={handleOpenAndAnalyze}
         className="mt-1 flex w-full items-center justify-center gap-1.5 rounded-md border border-primary/30 bg-primary/10 px-2 py-1.5 text-xs font-medium text-primary hover:bg-primary/15 transition-colors"
       >
         <Sparkles className="size-3.5" />
@@ -181,25 +193,19 @@ export function SmartAssignPanel({
           }
         </div>
 
-        {/* Analyze button */}
-        {!ran && (
-          <Button
-            size="sm"
-            className="h-7 text-xs gap-1.5 w-full"
-            onClick={handleAnalyze}
-            disabled={loading}
-          >
-            {loading ? (
-              <>
-                <Loader2 className="size-3 animate-spin" />
-                Analyzing team…
-              </>
-            ) : (
-              <>
-                <Sparkles className="size-3" />
-                Find best match
-              </>
-            )}
+        {/* Analyse en cours — retour immédiat au clic, pas de bouton à re-cliquer. */}
+        {loading && (
+          <div className="flex items-center justify-center gap-1.5 rounded-md bg-muted/40 px-2 py-2 text-xs text-muted-foreground">
+            <Loader2 className="size-3 animate-spin" />
+            Analyzing team…
+          </div>
+        )}
+
+        {/* Relance : seulement si l'analyse n'a rien donné (échec réseau, quota IA). */}
+        {!loading && !ran && (
+          <Button size="sm" className="h-7 w-full gap-1.5 text-xs" onClick={handleAnalyze}>
+            <Sparkles className="size-3" />
+            Find best match
           </Button>
         )}
 
@@ -320,9 +326,11 @@ export function SmartAssignPanel({
               </div>
             )}
 
+            {/* Relance directement l'analyse — même principe que le bouton d'entrée : une
+                intention explicite ne doit pas retomber sur un second bouton. */}
             <button
               type="button"
-              onClick={() => { setRan(false); setShowAll(false) }}
+              onClick={() => { setShowAll(false); void handleAnalyze() }}
               className="text-[10px] text-muted-foreground hover:text-foreground transition-colors self-start"
             >
               Re-analyze
