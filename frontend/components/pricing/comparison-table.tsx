@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 import {
   Table,
@@ -107,7 +108,7 @@ export function ComparisonTable({ className }: Readonly<ComparisonTableProps>) {
             <a href="mailto:contact@taskforce.com">Nous contacter</a>
           </Button>
           <Button size="lg" asChild>
-            <a href="/auth/register">Commencer gratuitement</a>
+            <Link href="/auth/register">Commencer gratuitement</Link>
           </Button>
         </div>
       </div>

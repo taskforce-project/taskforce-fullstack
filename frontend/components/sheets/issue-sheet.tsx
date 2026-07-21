@@ -592,8 +592,8 @@ export function AttachmentsTab({ issueId, projectId, workspaceSlug }: Readonly<A
                 // Aperçu inline pour les images (vignette cliquable → plein écran).
                 // <img> natif volontaire : l'URL présignée MinIO (localhost:9000, signature liée à
                 // l'URL exacte) doit être chargée par le navigateur, pas proxyfiée par next/image.
-                // eslint-disable-next-line @next/next/no-img-element
                 <a href={a.downloadUrl} target="_blank" rel="noreferrer" className="shrink-0" title={a.originalName}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={a.downloadUrl}
                     alt={a.originalName}
@@ -642,16 +642,6 @@ export function AttachmentsTab({ issueId, projectId, workspaceSlug }: Readonly<A
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
-
-function makeKeyHandler(
-  onEnter?: () => void,
-  onEscape?: () => void
-): (e: React.KeyboardEvent) => void {
-  return (e) => {
-    if (e.key === "Enter") onEnter?.()
-    if (e.key === "Escape") onEscape?.()
-  }
-}
 
 /** Presets d'estimation (story points, façon Fibonacci) ; null = aucune estimation */
 const STORY_POINT_PRESETS: (number | null)[] = [null, 1, 2, 3, 5, 8, 13]
