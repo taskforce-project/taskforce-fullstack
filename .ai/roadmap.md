@@ -823,7 +823,7 @@ Planning prévisionnel (Gantt, jalons DFS, chemin critique), budget prévisionne
 |---|---|---|:--:|
 | **C1** | **Passe UI/UX finale** : chaque écran est soit fonctionnel, soit marqué « plus tard » de façon visible et assumée | C13, C15 — « interface fonctionnelle pour tous les utilisateurs ». Un bouton mort vu par le jury coûte plus qu'une fonctionnalité absente et annoncée | 🟧 |
 | **C2** | **Audit de fonctionnalité** : parcourir l'app écran par écran, lister ce qui marche / ce qui est décoratif | Alimente C1 ci-dessus **et** la démo de soutenance (blocs 2 et 3) | 🔲 |
-| **C3** | **Couverture de tests re-mesurée** front + back, chiffres réels remontés | **C18 et C25 — seuls seuils chiffrés de toute la grille (≥ 50 %)**. Dernières mesures : 92 % front / 78 % back, à reconfirmer après les correctifs. ⚠️ **Bloqué : 41 tests front au rouge** (voir MAJ 21/07 ci-dessous) — une suite rouge ne produit pas un chiffre défendable | 🟧 |
+| **C3** | **Couverture de tests re-mesurée** front + back, chiffres réels remontés | **C18 et C25 — seuls seuils chiffrés de toute la grille (≥ 50 %)**. **Front fait le 21/07 : 88,83 % lignes, suite 785/785 verte.** Reste le back à re-mesurer | 🟧 |
 | **C4** | **Lint + typecheck propres** sur tout le repo (pas seulement les fichiers touchés) | C16 « le code satisfait aux tests d'un outil de revue de code par analyse statique » | ✅ |
 | **C5** | **Sécurité : rejouer ZAP + Semgrep + Trivy**, 0 HIGH | C16 (front), C21/C24 (back) — « composants tiers à jour et sans vulnérabilité connue » | 🔲 |
 | **C6** | **Vérifier le chiffrement au repos** des données personnelles | C24 « toutes les données sensibles sont chiffrées » + CDC §7 « chiffrement des données personnelles des employés » | 🔲 |
@@ -871,12 +871,46 @@ Planning prévisionnel (Gantt, jalons DFS, chemin critique), budget prévisionne
 > **Détail relevé** : `PixelBlast.tsx` portait une directive `biome-ignore` alors que le linter du
 > projet est ESLint — la justification n'avait donc aucun effet. Remplacée.
 >
-> ⚠️ **Point bloquant pour `C3`** : la suite front est à **41 tests en échec sur 716** (10 fichiers).
-> Vérifié : **aucun n'est causé par ce lot** — aucun fichier source exercé par ces tests n'apparaît au
-> diff. Causes réelles : mock de `./client` sans l'export `AI_TIMEOUT_MS` ; tests cherchant des
-> libellés français (« Gratuit », « Passer à Pro ») supprimés lors du passage à l'anglais ; signatures
-> de routes et forme d'enveloppe changées depuis l'écriture des tests. **À traiter avant de mesurer la
-> couverture**, sinon le chiffre annoncé au jury ne vaut rien.
+> ⚠️ **Point relevé pendant ce lot, traité juste après** : la suite front était à **41 tests en échec
+> sur 716**. Vérifié : aucun n'était causé par le lot C4. Voir la MAJ `C3` ci-dessous.
+
+> **▶ MAJ 21/07/2026 (2) — lot `C3` front livré : suite verte et couverture re-mesurée.**
+>
+> **Résultat** : `vitest run` → **785 tests / 62 fichiers, 0 échec** · `vitest run --coverage` →
+> **88,83 % lignes · 87,24 % branches · 87,04 % fonctions**, sortie **0** (tous les seuils par chemin
+> passent). Le seuil de la grille est 50 %.
+>
+> **1. Les 41 tests au rouge décrivaient tous un contrat périmé — jamais un bug.** Dans chaque cas
+> la source portait une décision volontaire et documentée, et c'est le test qui n'avait pas suivi :
+>
+> | Fichier | Cas | Ce que la source fait vraiment |
+> |---|---|---|
+> | `analytics`, `notification`, `skill`, `workspace` | 14 | Ces lectures passent `{ silentError: true }` : elles alimentent des cartes qui affichent leur propre erreur, un toast global ferait doublon |
+> | `redistribution` | 3 | Le mock de `./client` n'exposait pas `AI_TIMEOUT_MS` → l'import échouait |
+> | `stripe-service` | 5 | Routes passées à `/api/billing/*`, enveloppe `ApiResponse<T>`, et `sessionUrl` renommé `checkoutUrl` |
+> | `plan-form` | 10 | Catalogue passé de 3 à **4 plans** (Free / Basic / Business / Enterprise), tarification **par siège** |
+> | `subscription-manager` | 6 | Enterprise n'est plus souscriptible en ligne (sur devis) ; Business est le plan le plus haut en self-service |
+> | `auth-context` | 2 | QA2 : le logout fait un rechargement dur (`window.location`) et non `router.push`, pour détruire les stores Zustand (singletons module) et ne pas mélanger deux comptes |
+> | `issue-store` | 1 | WS-10 : `updateIssue` ne pose plus `store.error`, il renvoie `null` ; c'est l'appelant qui toaste |
+>
+> **2. Deux défauts réels corrigés dans `plan-form.tsx`** : l'union `"free" \| "pro" \| "enterprise"`
+> ne correspondait plus aux identifiants du catalogue et un `as` masquait l'écart ; la grille était
+> restée en `md:grid-cols-3` avec **quatre** cartes, laissant la dernière seule sur une ligne.
+>
+> **3. Quatre stores n'avaient aucun test** — `workflow`, `dashboard-cards`, `brain`, `settings` —
+> soit 240 des 268 lignes manquantes de `lib/store` (81,35 %, sous le seuil interne de 90 %).
+> **50 tests ajoutés** : chargement, cas d'erreur, mises à jour optimistes **et leur revert**,
+> upsert temps réel, recherche sémantique. `lib/store` repasse au vert.
+>
+> **4. `client.test.ts` réécrit.** Il mockait axios intégralement, donc les intercepteurs réellement
+> enregistrés n'étaient **jamais exécutés** — les tests se limitaient à vérifier que l'objet
+> `interceptors` existe. Les gestionnaires sont maintenant récupérés depuis `use.mock.calls` et
+> exercés : Bearer posé/retiré selon l'endpoint, refresh 401 avec rotation et rejeu, purge de session,
+> toasts réseau/5xx/429 et leur silence sous `silentError`. **27 tests** (couverture fonctions
+> 33 % → au-dessus du seuil).
+>
+> Piège rencontré : `vitest.setup.ts` installe un `localStorage` fait de `vi.fn()` **sans stockage**
+> (`setItem` n'écrit rien). Tout test portant sur les jetons doit lui donner une mémoire.
 
 ### 4.B — Repoussé APRÈS la soutenance (ne pas empiéter)
 
