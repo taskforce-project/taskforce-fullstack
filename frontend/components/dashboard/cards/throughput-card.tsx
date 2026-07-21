@@ -2,8 +2,9 @@
 
 import { useEffect, useId, useState } from "react"
 import Link from "next/link"
-import { Area, AreaChart, ResponsiveContainer, Tooltip } from "recharts"
+import { Area, AreaChart, ResponsiveContainer, Tooltip, YAxis } from "recharts"
 
+import { AreaGradient, chartBaseline } from "@/components/ui/sparkline"
 import { getAnalyticsThroughput, type ThroughputPoint } from "@/lib/api/analytics-service"
 import { GLOBAL_RANGE_DAYS, type DashboardCardBodyProps } from "../card-registry"
 import { CardEmpty, CardError, CardSkeleton } from "../card-states"
@@ -69,21 +70,27 @@ export function ThroughputCard({ slug, card, globalRange, refreshToken }: Dashbo
   const totalResolved = data.reduce((s, p) => s + p.resolved, 0)
   const caption = weekly ? "Résolues · 8 semaines" : `Résolues · ${windowDays} j`
 
+  // Même traitement que les sparklines des opérations : le tracé s'arrête au-dessus du bas de
+  // carte, l'aplat descend jusqu'à lui. Géométrie et dégradé viennent du module partagé pour que
+  // toutes les courbes de l'app aient exactement le même rendu.
+  const CHART_HEIGHT = 112 // h-28
+  const CHART_MARGIN_TOP = 4
+  const domainMax = Math.max(1, ...data.map((p) => p.resolved))
+  const baseline = chartBaseline({ height: CHART_HEIGHT, domainMax, marginTop: CHART_MARGIN_TOP })
+
   return (
-    <div className="flex h-full flex-col p-4 pb-2">
+    <div className="flex h-full flex-col p-4 pb-0">
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-2xl font-semibold tabular-nums tracking-tight">{totalResolved.toLocaleString("fr-FR")}</span>
         <span className="text-[11px] text-muted-foreground">{caption}</span>
       </div>
       <div className="mt-2 h-28 w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+          <AreaChart data={data} margin={{ top: CHART_MARGIN_TOP, right: 0, left: 0, bottom: 0 }}>
             <defs>
-              <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.28} />
-                <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
-              </linearGradient>
+              <AreaGradient id={gradientId} color="#3b82f6" />
             </defs>
+            <YAxis hide domain={[baseline, domainMax]} />
             <Tooltip
               contentStyle={{
                 background: "var(--popover)",
@@ -106,6 +113,7 @@ export function ThroughputCard({ slug, card, globalRange, refreshToken }: Dashbo
               dot={false}
               activeDot={{ r: 3, fill: "#3b82f6" }}
               isAnimationActive={false}
+              baseValue={baseline}
             />
           </AreaChart>
         </ResponsiveContainer>

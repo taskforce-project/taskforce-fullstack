@@ -1,8 +1,9 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Line, LineChart, ResponsiveContainer, Tooltip } from "recharts"
+import { Line, LineChart, ResponsiveContainer, Tooltip, YAxis } from "recharts"
 
+import { chartBaseline } from "@/components/ui/sparkline"
 import { getAnalyticsBurndown, type BurndownPoint } from "@/lib/api/analytics-service"
 import type { DashboardCardBodyProps } from "../card-registry"
 import { CardEmpty, CardError, CardSkeleton } from "../card-states"
@@ -43,15 +44,25 @@ export function BurndownCard({ slug, refreshToken }: DashboardCardBodyProps) {
 
   const remaining = points.at(-1)?.remaining ?? 0
 
+  // Même bande basse que les autres courbes de l'app : les tracés s'arrêtent au-dessus du bas de
+  // carte au lieu de s'y coller. Pertinent ici en particulier — un burndown réussi finit à zéro,
+  // et c'est précisément là que la ligne se confondrait avec le bord.
+  // Pas de dégradé (deux lignes, aucun remplissage) : seule la géométrie est partagée.
+  const CHART_HEIGHT = 112 // h-28
+  const CHART_MARGIN_TOP = 4
+  const domainMax = Math.max(1, ...points.map((p) => Math.max(p.remaining, p.ideal)))
+  const baseline = chartBaseline({ height: CHART_HEIGHT, domainMax, marginTop: CHART_MARGIN_TOP })
+
   return (
-    <div className="flex h-full flex-col p-4 pb-2">
+    <div className="flex h-full flex-col p-4 pb-0">
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-2xl font-semibold tabular-nums tracking-tight">{remaining.toLocaleString("fr-FR")}</span>
         <span className="text-[11px] text-muted-foreground">Restant vs idéal</span>
       </div>
       <div className="mt-2 h-28 w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={points} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+          <LineChart data={points} margin={{ top: CHART_MARGIN_TOP, right: 0, left: 0, bottom: 0 }}>
+            <YAxis hide domain={[baseline, domainMax]} />
             <Tooltip
               contentStyle={{
                 background: "var(--popover)",
