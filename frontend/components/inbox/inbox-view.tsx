@@ -5,7 +5,7 @@ import { useRouter, useParams } from "next/navigation"
 import {
   Radio, AtSign, ShieldAlert, ClipboardList,
   CheckCheck, Flame, AlertTriangle, Clock, CheckCircle2,
-  MessageSquare, ArrowRight, ArrowUpRight, RefreshCw, X,
+  MessageSquare, ArrowRight, ArrowUpRight, X,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PageContainer } from "@/components/layout/page-shell"
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table"
+import { RefreshControl } from "@/components/ui/refresh-control"
 import { IssueSheetLoader, parseIssueTarget, type IssueSheetTarget } from "@/components/sheets/issue-sheet-loader"
 import { cn } from "@/lib/utils"
 import { useNotificationStore } from "@/lib/store/notification-store"
@@ -63,77 +64,6 @@ const TABS: { key: NotifTab; icon: React.ElementType; label: string; filter: (s:
   { key: "mentions",    icon: AtSign,        label: "Mentions",    filter: (s) => s.type === "mention" },
   { key: "assignments", icon: ClipboardList, label: "Assignments", filter: (s) => s.type === "assigned" },
 ]
-
-// ─── Summary strip ────────────────────────────────────────────────────────────
-
-/**
- * Libellé relatif de la dernière synchro, re-rendu toutes les 30 s.
- * Les données arrivent en temps réel (STOMP + filet de polling 60 s côté cloche) ; ce libellé
- * accompagne le bouton Refresh pour dire QUAND remonte l'état affiché.
- */
-/** Écart relatif entre deux instants — pure, donc sûre à appeler pendant le rendu. */
-function formatSince(from: number, now: number): string {
-  const seconds = Math.floor((now - from) / 1000)
-  if (seconds < 15)   return "just now"
-  if (seconds < 60)   return `${seconds}s ago`
-  if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`
-  return `${Math.floor(seconds / 3600)}h ago`
-}
-
-function useSyncedLabel(lastSyncAt: number | null): string | null {
-  // Seul `now` est en état, et il n'est mis à jour que par le minuteur (callback asynchrone).
-  // Le libellé, lui, est DÉRIVÉ : le rendu reste pur (pas de `Date.now()` pendant le rendu) et
-  // aucun état n'est réinitialisé dans un effet.
-  const [now, setNow] = useState(() => Date.now())
-
-  useEffect(() => {
-    if (lastSyncAt === null) return
-    const id = setInterval(() => setNow(Date.now()), 30_000)
-    return () => clearInterval(id)
-  }, [lastSyncAt])
-
-  // Après un refresh, `lastSyncAt` peut devancer `now` (le minuteur n'a pas encore tiré) :
-  // l'écart est alors négatif et retombe naturellement sur « just now ».
-  return lastSyncAt === null ? null : formatSince(lastSyncAt, now)
-}
-
-/**
- * État de synchro + rafraîchissement manuel.
- *
- * Remplace l'ancien bandeau de compteurs (« N critical / N warnings / N unread ») : ces trois
- * chiffres étaient déjà portés par les badges des onglets, et l'indicateur « Live » n'était qu'un
- * libellé — sans aucun moyen de forcer une actualisation. Ici, le libellé qualifie une action.
- */
-function SyncControl({
-  lastSyncAt,
-  onRefresh,
-}: { readonly lastSyncAt: number | null; readonly onRefresh: () => Promise<void> }) {
-  const [refreshing, setRefreshing] = useState(false)
-  const synced = useSyncedLabel(lastSyncAt)
-
-  async function handleRefresh() {
-    setRefreshing(true)
-    try {
-      await onRefresh()
-    } finally {
-      setRefreshing(false)
-    }
-  }
-
-  return (
-    <div className="flex items-center gap-2">
-      {synced && <span className="hidden text-xs text-muted-foreground sm:inline">Updated {synced}</span>}
-      <Button
-        variant="outline" size="sm" className="gap-1.5"
-        onClick={() => void handleRefresh()}
-        disabled={refreshing}
-      >
-        <RefreshCw className={cn("size-3.5", refreshing && "animate-spin")} />
-        Refresh
-      </Button>
-    </div>
-  )
-}
 
 // ─── Empty state ──────────────────────────────────────────────────────────────
 
@@ -311,7 +241,7 @@ export function InboxView({ defaultTab = "all" }: InboxViewProps) {
               <CheckCheck className="size-3.5" /> Mark all read
             </Button>
           )}
-          <SyncControl
+          <RefreshControl
             lastSyncAt={lastSyncAt}
             onRefresh={async () => { if (slug) await fetchNotifications(slug) }}
           />
