@@ -15,6 +15,8 @@ import com.taskforce.tf_api.core.dto.request.CreateProjectRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateProjectRequest;
 import com.taskforce.tf_api.core.dto.response.ProjectLabelResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectActivityPointResponse;
+import com.taskforce.tf_api.core.dto.response.ProjectActivitySeriesResponse;
+import com.taskforce.tf_api.core.dto.response.ProjectHealthPointResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectMemberResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectResponse;
 import com.taskforce.tf_api.core.enums.ProjectRole;
@@ -134,6 +136,92 @@ public class ProjectService {
             java.time.LocalDate day = from.plusDays(i);
             String key = day.toString(); // ISO 'YYYY-MM-DD'
             series.add(new ProjectActivityPointResponse(key, counts.getOrDefault(key, 0L)));
+        }
+        return series;
+    }
+
+    /**
+     * Activité quotidienne de TOUS les projets visibles du workspace, en un seul appel.
+     *
+     * <p>La page Operations affiche une sparkline par projet. Interrogée projet par projet, elle
+     * émettait autant de requêtes que de projets affichés — le même N+1 que celui corrigé sur
+     * « Ma file ». Ici : une requête, quel que soit le nombre de projets.</p>
+     */
+    @Transactional(readOnly = true)
+    public List<ProjectActivitySeriesResponse> getWorkspaceActivity(String workspaceSlug, Long requestingUserId, int days) {
+        Workspace workspace = resolveWorkspaceAndAssertMember(workspaceSlug, requestingUserId);
+
+        int window = Math.min(Math.max(days, 1), 90);
+        java.time.LocalDate today = java.time.LocalDate.now();
+        java.time.LocalDate from = today.minusDays(window - 1L);
+
+        List<Long> scopedIds = visibilityGuard.viewableProjectIds(workspace.getId(), requestingUserId);
+        if (scopedIds.isEmpty()) return List.of();
+
+        // [projectId][jour ISO] -> nombre d'issues créées
+        java.util.Map<Long, java.util.Map<String, Long>> counts = new java.util.HashMap<>();
+        for (Object[] row : projectRepository.findActivityByProjectIds(scopedIds, from)) {
+            Long projectId = ((Number) row[0]).longValue();
+            counts.computeIfAbsent(projectId, k -> new java.util.HashMap<>())
+                  .put(row[1].toString(), ((Number) row[2]).longValue());
+        }
+
+        List<ProjectActivitySeriesResponse> series = new java.util.ArrayList<>(scopedIds.size());
+        for (Long projectId : scopedIds) {
+            java.util.Map<String, Long> byDay = counts.getOrDefault(projectId, java.util.Map.of());
+            List<ProjectActivityPointResponse> points = new java.util.ArrayList<>(window);
+            for (int i = 0; i < window; i++) {
+                String key = from.plusDays(i).toString();
+                points.add(new ProjectActivityPointResponse(key, byDay.getOrDefault(key, 0L)));
+            }
+            series.add(ProjectActivitySeriesResponse.builder().projectId(projectId).points(points).build());
+        }
+        return series;
+    }
+
+    /**
+     * Historique de santé des opérations du workspace sur les {@code days} derniers jours.
+     *
+     * <p>Alimente la courbe placée sous le KPI « At risk ». Le périmètre est celui des projets
+     * <b>ACTIFS et visibles par l'appelant</b> — mêmes règles que la page qui affiche le KPI, sinon
+     * la courbe et le chiffre au-dessus raconteraient deux histoires différentes. Un projet en pause
+     * ou archivé n'a pas de santé « à risque » (l'affichage le range dans « Paused »), il est donc
+     * exclu ici aussi.</p>
+     *
+     * <p>Série continue : chaque jour de la fenêtre est présent, à zéro s'il n'y a rien à signaler —
+     * l'objectif produit étant zéro, une ligne plate au plancher est l'état sain, pas un trou.</p>
+     */
+    @Transactional(readOnly = true)
+    public List<ProjectHealthPointResponse> getHealthHistory(String workspaceSlug, Long requestingUserId, int days) {
+        Workspace workspace = resolveWorkspaceAndAssertMember(workspaceSlug, requestingUserId);
+
+        int window = Math.min(Math.max(days, 1), 90);
+        java.time.LocalDate today = java.time.LocalDate.now();
+        java.time.LocalDate from = today.minusDays(window - 1L);
+
+        // Visibles par l'appelant, puis restreints aux ACTIFS (cf. javadoc).
+        java.util.Set<Long> activeIds = projectRepository
+            .findByWorkspaceIdAndStatusOrderByCreatedAtDesc(workspace.getId(), ProjectStatus.ACTIVE)
+            .stream().map(Project::getId).collect(java.util.stream.Collectors.toSet());
+        List<Long> scopedIds = visibilityGuard.viewableProjectIds(workspace.getId(), requestingUserId)
+            .stream().filter(activeIds::contains).toList();
+
+        java.util.Map<String, Object[]> byDay = new java.util.HashMap<>();
+        if (!scopedIds.isEmpty()) {
+            for (Object[] row : projectRepository.findHealthHistory(scopedIds, from)) {
+                byDay.put(row[0].toString(), row);
+            }
+        }
+
+        List<ProjectHealthPointResponse> series = new java.util.ArrayList<>(window);
+        for (int i = 0; i < window; i++) {
+            String key = from.plusDays(i).toString(); // ISO 'YYYY-MM-DD'
+            Object[] row = byDay.get(key);
+            series.add(ProjectHealthPointResponse.builder()
+                .date(key)
+                .atRisk(row != null ? ((Number) row[1]).longValue() : 0L)
+                .critical(row != null ? ((Number) row[2]).longValue() : 0L)
+                .build());
         }
         return series;
     }
