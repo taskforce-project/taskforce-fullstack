@@ -12,9 +12,15 @@ vi.mock('./client', () => ({
     delete: vi.fn(),
   },
   getErrorMessage: vi.fn((e: any) => e?.message || 'error'),
+  // Requis : redistribution-service importe ce timeout (le back range les candidats via le LLM,
+  // une passe par issue déplaçable, ce qui dépasse les 30 s par défaut).
+  AI_TIMEOUT_MS: 200_000,
 }));
 
 const envelope = <T,>(data: T) => ({ data: { success: true, message: 'ok', data } });
+
+/** Doit rester aligné sur la valeur exposée par le mock ci-dessus. */
+const AI_TIMEOUT = { timeout: 200_000 };
 
 describe('redistribution-service', () => {
   const slug = 'acme';
@@ -29,7 +35,11 @@ describe('redistribution-service', () => {
 
     const result = await previewRedistribution(slug);
 
-    expect(apiClient.post).toHaveBeenCalledWith(WORKSPACE_ROUTES.REDISTRIBUTE_PREVIEW(slug), {});
+    expect(apiClient.post).toHaveBeenCalledWith(
+      WORKSPACE_ROUTES.REDISTRIBUTE_PREVIEW(slug),
+      {},
+      AI_TIMEOUT,
+    );
     expect(result).toEqual(plan);
   });
 
@@ -41,7 +51,8 @@ describe('redistribution-service', () => {
 
     expect(apiClient.post).toHaveBeenCalledWith(
       `${WORKSPACE_ROUTES.REDISTRIBUTE_PREVIEW(slug)}?userId=12`,
-      {}
+      {},
+      AI_TIMEOUT,
     );
     expect(result).toEqual(plan);
   });

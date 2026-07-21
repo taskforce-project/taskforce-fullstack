@@ -5,6 +5,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { stripeService } from './stripe-service';
 import { apiClient } from './client';
+import { BILLING_ROUTES, STRIPE_ROUTES } from '../config/api-routes';
+
+/**
+ * Enveloppe `ApiResponse<T>` : les routes protégées `/api/billing` la renvoient, le service lit donc
+ * `response.data.data`. `/api/stripe/cancel` fait exception (cf. le bloc `cancelSubscription`).
+ */
+const envelope = <T,>(data: T) => ({ data: { success: true, message: 'ok', data } });
 
 // Mock du client API
 vi.mock('./client', () => ({
@@ -30,45 +37,43 @@ describe('stripeService', () => {
   });
 
   describe('createCheckoutSession', () => {
-    it('devrait créer une session de checkout pour plan PRO', async () => {
+    it('devrait créer une session de checkout pour le plan BUSINESS', async () => {
       // Given
-      const mockResponse = {
-        data: {
-          sessionId: 'session_123',
-          checkoutUrl: 'https://checkout.stripe.com/session_123',
-        },
-      };
-      vi.mocked(apiClient.post).mockResolvedValue(mockResponse);
+      vi.mocked(apiClient.post).mockResolvedValue(
+        envelope({ sessionId: 'session_123', sessionUrl: 'https://checkout.stripe.com/session_123' })
+      );
 
       // When
       const result = await stripeService.createCheckoutSession('BUSINESS');
 
-      // Then
-      expect(result).toEqual(mockResponse.data);
-      expect(apiClient.post).toHaveBeenCalledWith('/api/stripe/create-checkout', {
+      // Then — le service renomme `sessionUrl` en `checkoutUrl` pour l'appelant.
+      expect(result).toEqual({
+        sessionId: 'session_123',
+        checkoutUrl: 'https://checkout.stripe.com/session_123',
+      });
+      expect(apiClient.post).toHaveBeenCalledWith(BILLING_ROUTES.CHECKOUT, {
         planType: 'BUSINESS',
         successUrl: 'http://localhost:3000/payment/success',
         cancelUrl: 'http://localhost:3000/payment/cancel',
       });
     });
 
-    it('devrait créer une session de checkout pour plan ENTERPRISE', async () => {
+    it('devrait créer une session de checkout pour le plan BASIC', async () => {
       // Given
-      const mockResponse = {
-        data: {
-          sessionId: 'session_456',
-          checkoutUrl: 'https://checkout.stripe.com/session_456',
-        },
-      };
-      vi.mocked(apiClient.post).mockResolvedValue(mockResponse);
+      vi.mocked(apiClient.post).mockResolvedValue(
+        envelope({ sessionId: 'session_456', sessionUrl: 'https://checkout.stripe.com/session_456' })
+      );
 
-      // When
-      const result = await stripeService.createCheckoutSession('ENTERPRISE');
+      // When — seuls BASIC et BUSINESS sont souscrivables en self-service ; ENTERPRISE passe par un devis.
+      const result = await stripeService.createCheckoutSession('BASIC');
 
       // Then
-      expect(result).toEqual(mockResponse.data);
-      expect(apiClient.post).toHaveBeenCalledWith('/api/stripe/create-checkout', {
-        planType: 'ENTERPRISE',
+      expect(result).toEqual({
+        sessionId: 'session_456',
+        checkoutUrl: 'https://checkout.stripe.com/session_456',
+      });
+      expect(apiClient.post).toHaveBeenCalledWith(BILLING_ROUTES.CHECKOUT, {
+        planType: 'BASIC',
         successUrl: 'http://localhost:3000/payment/success',
         cancelUrl: 'http://localhost:3000/payment/cancel',
       });
@@ -76,13 +81,9 @@ describe('stripeService', () => {
 
     it('devrait utiliser les URLs personnalisées si fournies', async () => {
       // Given
-      const mockResponse = {
-        data: {
-          sessionId: 'session_789',
-          checkoutUrl: 'https://checkout.stripe.com/session_789',
-        },
-      };
-      vi.mocked(apiClient.post).mockResolvedValue(mockResponse);
+      vi.mocked(apiClient.post).mockResolvedValue(
+        envelope({ sessionId: 'session_789', sessionUrl: 'https://checkout.stripe.com/session_789' })
+      );
 
       const customSuccessUrl = 'http://localhost:3000/custom/success';
       const customCancelUrl = 'http://localhost:3000/custom/cancel';
@@ -95,8 +96,11 @@ describe('stripeService', () => {
       );
 
       // Then
-      expect(result).toEqual(mockResponse.data);
-      expect(apiClient.post).toHaveBeenCalledWith('/api/stripe/create-checkout', {
+      expect(result).toEqual({
+        sessionId: 'session_789',
+        checkoutUrl: 'https://checkout.stripe.com/session_789',
+      });
+      expect(apiClient.post).toHaveBeenCalledWith(BILLING_ROUTES.CHECKOUT, {
         planType: 'BUSINESS',
         successUrl: customSuccessUrl,
         cancelUrl: customCancelUrl,
@@ -118,45 +122,41 @@ describe('stripeService', () => {
   describe('getSubscriptionInfo', () => {
     it('devrait récupérer les informations d\'abonnement FREE', async () => {
       // Given
-      const mockSubscription = {
-        data: {
-          id: 1,
-          userId: 10,
-          planType: 'FREE' as const,
-          status: 'ACTIVE',
-        },
+      const subscription = {
+        id: 1,
+        userId: 10,
+        planType: 'FREE' as const,
+        status: 'ACTIVE',
       };
-      vi.mocked(apiClient.get).mockResolvedValue(mockSubscription);
+      vi.mocked(apiClient.get).mockResolvedValue(envelope(subscription));
 
       // When
       const result = await stripeService.getSubscriptionInfo();
 
       // Then
-      expect(result).toEqual(mockSubscription.data);
-      expect(apiClient.get).toHaveBeenCalledWith('/api/stripe/subscription');
+      expect(result).toEqual(subscription);
+      expect(apiClient.get).toHaveBeenCalledWith(BILLING_ROUTES.SUBSCRIPTION);
     });
 
-    it('devrait récupérer les informations d\'abonnement PRO avec détails', async () => {
+    it('devrait récupérer les informations d\'abonnement BUSINESS avec détails', async () => {
       // Given
-      const mockSubscription = {
-        data: {
-          id: 2,
-          userId: 20,
-          planType: 'BUSINESS' as const,
-          status: 'ACTIVE',
-          amount: 999,
-          currency: 'EUR',
-          currentPeriodEnd: '2026-04-19T00:00:00Z',
-          cancelAtPeriodEnd: false,
-        },
+      const subscription = {
+        id: 2,
+        userId: 20,
+        planType: 'BUSINESS' as const,
+        status: 'ACTIVE',
+        amount: 999,
+        currency: 'EUR',
+        currentPeriodEnd: '2026-04-19T00:00:00Z',
+        cancelAtPeriodEnd: false,
       };
-      vi.mocked(apiClient.get).mockResolvedValue(mockSubscription);
+      vi.mocked(apiClient.get).mockResolvedValue(envelope(subscription));
 
       // When
       const result = await stripeService.getSubscriptionInfo();
 
       // Then
-      expect(result).toEqual(mockSubscription.data);
+      expect(result).toEqual(subscription);
       expect(result.amount).toBe(999);
       expect(result.currency).toBe('EUR');
       expect(result.cancelAtPeriodEnd).toBe(false);
@@ -172,6 +172,8 @@ describe('stripeService', () => {
     });
   });
 
+  // `cancelSubscription` vise `/api/stripe/cancel` (contrôleur public), qui ne renvoie pas
+  // l'enveloppe `ApiResponse<T>` : le service lit donc `response.data` directement, à un seul niveau.
   describe('cancelSubscription', () => {
     it('devrait annuler l\'abonnement à la fin de la période (par défaut)', async () => {
       // Given
@@ -187,7 +189,7 @@ describe('stripeService', () => {
 
       // Then
       expect(result).toEqual(mockResponse.data);
-      expect(apiClient.post).toHaveBeenCalledWith('/api/stripe/cancel', {
+      expect(apiClient.post).toHaveBeenCalledWith(STRIPE_ROUTES.CANCEL_SUBSCRIPTION, {
         immediately: false,
       });
     });
@@ -206,7 +208,7 @@ describe('stripeService', () => {
 
       // Then
       expect(result).toEqual(mockResponse.data);
-      expect(apiClient.post).toHaveBeenCalledWith('/api/stripe/cancel', {
+      expect(apiClient.post).toHaveBeenCalledWith(STRIPE_ROUTES.CANCEL_SUBSCRIPTION, {
         immediately: true,
       });
     });

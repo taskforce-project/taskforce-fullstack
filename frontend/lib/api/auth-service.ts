@@ -28,6 +28,25 @@ export interface OtpResponse {
 }
 
 /**
+ * Réponse d'inscription (étape 1)
+ */
+export interface RegisterResponse {
+  userId: string;
+  email: string;
+}
+
+/**
+ * Réponse de sélection de plan (étape 2)
+ */
+export interface SelectPlanResponse {
+  email: string;
+  planType: string;
+  /** Présent uniquement pour un plan payant : redirection vers Stripe Checkout. */
+  stripeCheckoutUrl?: string;
+  message: string;
+}
+
+/**
  * Réponse de vérification OTP
  */
 export interface VerifyOtpResponse {
@@ -71,9 +90,9 @@ export const authService = {
    * @param data - Données d'inscription avec plan
    * @returns ID utilisateur et email
    */
-  async register(data: RegisterCredentials): Promise<{ userId: string; email: string }> {
+  async register(data: RegisterCredentials): Promise<RegisterResponse> {
     try {
-      const response = await apiClient.post<{ success: boolean; message: string; data: any }>(AUTH_ROUTES.REGISTER, data);
+      const response = await apiClient.post<{ success: boolean; message: string; data: RegisterResponse }>(AUTH_ROUTES.REGISTER, data);
       return response.data.data;
     } catch (error) {
       throw new Error(getErrorMessage(error));
@@ -86,14 +105,9 @@ export const authService = {
    * @param planType - Type de plan (FREE, PRO, ENTERPRISE)
    * @returns URL Stripe si plan payant
    */
-  async selectPlan(email: string, planType: string): Promise<{
-    email: string;
-    planType: string;
-    stripeCheckoutUrl?: string;
-    message: string;
-  }> {
+  async selectPlan(email: string, planType: string): Promise<SelectPlanResponse> {
     try {
-      const response = await apiClient.post<{ success: boolean; message: string; data: any }>(AUTH_ROUTES.SELECT_PLAN, { email, planType });
+      const response = await apiClient.post<{ success: boolean; message: string; data: SelectPlanResponse }>(AUTH_ROUTES.SELECT_PLAN, { email, planType });
       return response.data.data;
     } catch (error) {
       throw new Error(getErrorMessage(error));
@@ -151,7 +165,9 @@ export const authService = {
    */
   async forgotPassword(email: string): Promise<{ message: string }> {
     try {
-      const response = await apiClient.post<{ success: boolean; message: string; data: any }>(AUTH_ROUTES.FORGOT_PASSWORD, { email });
+      // Seul `message` est consommé ici : la charge utile `data` reste volontairement non typée
+      // (`unknown`) pour signaler qu'elle n'est pas exploitée côté client.
+      const response = await apiClient.post<{ success: boolean; message: string; data: unknown }>(AUTH_ROUTES.FORGOT_PASSWORD, { email });
       return { message: response.data.message || "Email envoyé" };
     } catch (error) {
       throw new Error(getErrorMessage(error));
@@ -167,7 +183,8 @@ export const authService = {
    */
   async resetPassword(email: string, otpCode: string, newPassword: string): Promise<{ message: string }> {
     try {
-      const response = await apiClient.post<{ success: boolean; message: string; data: any }>(AUTH_ROUTES.RESET_PASSWORD, { 
+      // Idem `forgotPassword` : seule la confirmation textuelle est utilisée.
+      const response = await apiClient.post<{ success: boolean; message: string; data: unknown }>(AUTH_ROUTES.RESET_PASSWORD, {
         email, 
         otpCode, 
         newPassword 

@@ -122,7 +122,8 @@ describe('workspace-service', () => {
 
       const result = await getWorkspaceUsage(SLUG);
 
-      expect(apiClient.get).toHaveBeenCalledWith(WORKSPACE_ROUTES.USAGE(SLUG));
+      // `silentError` : la jauge d'usage est un complément, son indisponibilité ne doit rien afficher.
+      expect(apiClient.get).toHaveBeenCalledWith(WORKSPACE_ROUTES.USAGE(SLUG), { silentError: true });
       expect(result).toEqual(usage);
     });
   });

@@ -37,7 +37,8 @@ describe('notification-service', () => {
 
     const result = await listNotifications(slug);
 
-    expect(apiClient.get).toHaveBeenCalledWith(NOTIFICATION_ROUTES.LIST(slug));
+    // `silentError` : la cloche est un affichage de fond, une panne réseau ne doit pas produire de toast.
+    expect(apiClient.get).toHaveBeenCalledWith(NOTIFICATION_ROUTES.LIST(slug), { silentError: true });
     expect(result).toEqual(notifs);
   });
 
@@ -46,7 +47,7 @@ describe('notification-service', () => {
 
     const result = await countUnread(slug);
 
-    expect(apiClient.get).toHaveBeenCalledWith(NOTIFICATION_ROUTES.UNREAD_COUNT(slug));
+    expect(apiClient.get).toHaveBeenCalledWith(NOTIFICATION_ROUTES.UNREAD_COUNT(slug), { silentError: true });
     expect(result).toBe(7);
   });
 

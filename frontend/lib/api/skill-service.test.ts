@@ -30,7 +30,8 @@ describe('skill-service', () => {
 
     const result = await listSkillProfiles(slug);
 
-    expect(apiClient.get).toHaveBeenCalledWith(SKILL_ROUTES.LIST(slug));
+    // `silentError` : lecture de fond pour le smart-assign, l'appelant gère son propre repli.
+    expect(apiClient.get).toHaveBeenCalledWith(SKILL_ROUTES.LIST(slug), { silentError: true });
     expect(result).toEqual(profiles);
   });
 
