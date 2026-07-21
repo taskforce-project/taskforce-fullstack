@@ -14,8 +14,11 @@ import { getRegisterData, setRegisterData } from "@/lib/auth/register-storage";
 import { EnterpriseContactDialog } from "@/components/sales/enterprise-contact-dialog";
 import { EnterpriseConfirmationDialog } from "@/components/sales/enterprise-confirmation-dialog";
 
+/** Identifiants du catalogue. `basic` et `business` sont les deux plans payants en self-service. */
+type PlanId = "free" | "basic" | "business" | "enterprise";
+
 type Plan = {
-  id: string;
+  id: PlanId;
   name: string;
   price: string;
   description: string;
@@ -85,9 +88,7 @@ export function RegisterPlanForm({
   const router = useRouter();
   const { t } = usePreferencesStore();
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<
-    "free" | "pro" | "enterprise"
-  >("free");
+  const [selectedPlan, setSelectedPlan] = useState<PlanId>("free");
   const [userEmail, setUserEmail] = useState<string>("");
   const [userFirstName, setUserFirstName] = useState<string>("");
   const [userLastName, setUserLastName] = useState<string>("");
@@ -201,7 +202,8 @@ export function RegisterPlanForm({
       </div>
 
       <form onSubmit={handleSubmit} className="w-full">
-        <div className="grid gap-6 md:grid-cols-3 mb-6">
+        {/* Quatre plans : trois colonnes laissaient le dernier seul sur une deuxième ligne. */}
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-6">
           {plans.map((plan) => (
             <Card
               key={plan.id}
@@ -216,7 +218,7 @@ export function RegisterPlanForm({
                   // Ouvrir le dialog au lieu de sélectionner directement
                   setShowEnterpriseDialog(true);
                 } else {
-                  setSelectedPlan(plan.id as "free" | "pro" | "enterprise");
+                  setSelectedPlan(plan.id);
                 }
               }}
             >
