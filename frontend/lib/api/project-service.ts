@@ -197,6 +197,50 @@ export interface ProjectActivityPoint {
   count: number;
 }
 
+/** Un point de l'historique de santé : combien d'opérations étaient à risque / critiques ce jour-là. */
+export interface ProjectHealthPoint {
+  date: string; // ISO 'YYYY-MM-DD'
+  atRisk: number;
+  critical: number;
+}
+
+/**
+ * Historique de santé des opérations du workspace (série continue, un point par jour).
+ * `silentError` : la courbe est un complément d'information — son indisponibilité ne doit
+ * pas faire surgir un toast d'erreur au chargement de la page.
+ */
+export async function getProjectsHealthHistory(
+  slug: string,
+  days = 30,
+): Promise<ProjectHealthPoint[]> {
+  const response = await apiClient.get<{ data: ProjectHealthPoint[] }>(
+    PROJECT_ROUTES.HEALTH_HISTORY(slug),
+    { params: { days }, silentError: true },
+  );
+  return response.data.data;
+}
+
+/** Série d'activité d'un projet, telle que renvoyée par l'appel groupé. */
+export interface ProjectActivitySeries {
+  projectId: number;
+  points: ProjectActivityPoint[];
+}
+
+/**
+ * Activité de TOUS les projets visibles du workspace, en un seul appel.
+ * Évite une requête par projet affiché (sparklines de la page Operations).
+ */
+export async function getWorkspaceProjectsActivity(
+  slug: string,
+  days = 14,
+): Promise<ProjectActivitySeries[]> {
+  const response = await apiClient.get<{ data: ProjectActivitySeries[] }>(
+    PROJECT_ROUTES.ALL_ACTIVITY(slug),
+    { params: { days }, silentError: true },
+  );
+  return response.data.data;
+}
+
 /** Activité quotidienne du projet sur les `days` derniers jours (série continue). */
 export async function getProjectActivity(
   slug: string,
