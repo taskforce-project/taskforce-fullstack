@@ -113,9 +113,9 @@ export function IssueAiSpecPanel({ workspaceSlug, projectId, issueId, onApplied 
           <Sparkles className="size-6 text-primary" />
         </div>
         <div className="max-w-xs">
-          <p className="text-sm font-medium">Spécification assistée par l'IA</p>
+          <p className="text-sm font-medium">Spécification assistée par l&apos;IA</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Génère une spec, un prompt d'exécution prêt à coller dans Claude Code, et un découpage —
+            Génère une spec, un prompt d&apos;exécution prêt à coller dans Claude Code, et un découpage —
             fondés sur le contexte réel de ton Brain OS.
           </p>
         </div>
@@ -138,7 +138,7 @@ export function IssueAiSpecPanel({ workspaceSlug, projectId, issueId, onApplied 
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
         <Loader2 className="size-6 animate-spin text-primary" />
-        <p className="text-sm font-medium">L'IA rédige la spec…</p>
+        <p className="text-sm font-medium">L&apos;IA rédige la spec…</p>
         <p className="text-xs text-muted-foreground">
           Retrieval Brain OS + génération locale — cela peut prendre quelques secondes.
         </p>
@@ -204,7 +204,7 @@ export function IssueAiSpecPanel({ workspaceSlug, projectId, issueId, onApplied 
       {/* Prompt d'exécution (le wow) */}
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-medium text-muted-foreground">Prompt d'exécution (Claude Code)</span>
+          <span className="text-xs font-medium text-muted-foreground">Prompt d&apos;exécution (Claude Code)</span>
           <Button
             variant="outline"
             size="sm"
@@ -272,7 +272,7 @@ export function IssueAiSpecPanel({ workspaceSlug, projectId, issueId, onApplied 
           checked={addChecklist}
           onCheckedChange={(v) => setAddChecklist(v === true)}
         />
-        Ajouter le découpage en checklist de l'issue (suivi d'avancement)
+        Ajouter le découpage en checklist de l&apos;issue (suivi d&apos;avancement)
       </label>
 
       {/* Approbation → issue remplie + write-back Brain OS */}
