@@ -173,21 +173,21 @@ describe('RegisterPlanForm - Step 2: Plan Selection', () => {
       expect(freeCard).toHaveClass('ring-2', 'ring-primary');
     });
 
-    it('should change selection when clicking on PRO plan', async () => {
+    it('should change selection when clicking on BUSINESS plan', async () => {
       const user = userEvent.setup();
       render(<RegisterPlanForm />);
 
-      const proCard = screen.getByTestId('plan-card-pro');
+      const businessCard = screen.getByTestId('plan-card-business');
 
       // Initially should not be selected
-      expect(proCard).not.toHaveClass('ring-2');
+      expect(businessCard).not.toHaveClass('ring-2');
 
       // Click to select
-      await user.click(proCard);
+      await user.click(businessCard);
 
       // Now should be selected
       await waitFor(() => {
-        expect(proCard).toHaveClass('ring-2', 'ring-primary');
+        expect(businessCard).toHaveClass('ring-2', 'ring-primary');
       });
     });
 
@@ -210,15 +210,15 @@ describe('RegisterPlanForm - Step 2: Plan Selection', () => {
       render(<RegisterPlanForm />);
 
       const freeCard = screen.getByTestId('plan-card-free');
-      const proCard = screen.getByTestId('plan-card-pro');
+      const businessCard = screen.getByTestId('plan-card-business');
 
       // Start with FREE selected
       expect(freeCard).toHaveClass('ring-2', 'ring-primary');
 
-      // Select Pro
-      await user.click(proCard);
+      // Select Business
+      await user.click(businessCard);
       await waitFor(() => {
-        expect(proCard).toHaveClass('ring-2', 'ring-primary');
+        expect(businessCard).toHaveClass('ring-2', 'ring-primary');
         expect(freeCard).not.toHaveClass('ring-2');
       });
     });
@@ -249,13 +249,13 @@ describe('RegisterPlanForm - Step 2: Plan Selection', () => {
       expect(mockPush).toHaveBeenCalledWith('/auth/register/verification');
     });
 
-    it('should store PRO plan when selected', async () => {
+    it('should store BUSINESS plan when selected', async () => {
       const user = userEvent.setup();
-      
+
       render(<RegisterPlanForm />);
 
-      const proCard = screen.getByTestId('plan-card-pro');
-      await user.click(proCard);
+      const businessCard = screen.getByTestId('plan-card-business');
+      await user.click(businessCard);
 
       const submitButton = screen.getByRole('button', { name: /continuer/i });
       await user.click(submitButton);
