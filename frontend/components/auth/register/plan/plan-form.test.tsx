@@ -86,11 +86,12 @@ describe('RegisterPlanForm - Step 2: Plan Selection', () => {
   });
 
   describe('Rendering', () => {
-    it('should render all three plan options', () => {
+    it('should render the four plan options', () => {
       render(<RegisterPlanForm />);
 
-      expect(screen.getByText('Gratuit')).toBeInTheDocument();
-      expect(screen.getByText('Pro')).toBeInTheDocument();
+      expect(screen.getByText('Free')).toBeInTheDocument();
+      expect(screen.getByText('Basic')).toBeInTheDocument();
+      expect(screen.getByText('Business')).toBeInTheDocument();
       expect(screen.getByText('Enterprise')).toBeInTheDocument();
     });
 
@@ -101,31 +102,35 @@ describe('RegisterPlanForm - Step 2: Plan Selection', () => {
       expect(screen.getByText(/66%/i)).toBeInTheDocument();
     });
 
-    it('should display FREE plan as recommended', () => {
+    it('should display BUSINESS plan as recommended', () => {
       render(<RegisterPlanForm />);
 
       const recommendedBadge = screen.getByText('Recommandé');
       expect(recommendedBadge).toBeInTheDocument();
-      
-      // Should be near the FREE plan
-      const freeCard = screen.getByTestId('plan-card-free');
-      expect(freeCard).toContainElement(recommendedBadge);
+
+      // Le badge est porté par Business : c'est le plan mis en avant, pas Free.
+      const businessCard = screen.getByTestId('plan-card-business');
+      expect(businessCard).toContainElement(recommendedBadge);
     });
 
     it('should render plan features correctly', () => {
       render(<RegisterPlanForm />);
 
-      // Free plan features
-      expect(screen.getByText('5 projets maximum')).toBeInTheDocument();
-      expect(screen.getByText('10 membres par projet')).toBeInTheDocument();
-
-      // Pro plan features
-      expect(screen.getByText('Projets illimités')).toBeInTheDocument();
-      expect(screen.getByText('50 membres par projet')).toBeInTheDocument();
-
-      // Enterprise features
+      // Free — le modèle est par siège, les membres ne sont donc jamais plafonnés.
       expect(screen.getByText('Membres illimités')).toBeInTheDocument();
-      expect(screen.getByText('Support dédié 24/7')).toBeInTheDocument();
+      expect(screen.getByText('2 workspaces')).toBeInTheDocument();
+
+      // Basic
+      expect(screen.getByText('5 workspaces')).toBeInTheDocument();
+      expect(screen.getByText('Issues illimitées')).toBeInTheDocument();
+
+      // Business
+      expect(screen.getByText('Workspaces illimités')).toBeInTheDocument();
+      expect(screen.getByText('Intégration GitHub')).toBeInTheDocument();
+
+      // Enterprise
+      expect(screen.getByText('SSO / SAML / SCIM')).toBeInTheDocument();
+      expect(screen.getByText('Support dédié & accompagnement')).toBeInTheDocument();
     });
 
     it('should render navigation buttons', () => {
