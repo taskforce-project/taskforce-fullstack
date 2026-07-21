@@ -17,8 +17,12 @@ export function sanitizeInput(input: string): string {
     return input;
   }
 
-  // Côté client uniquement, utilise DOMPurify
+  // Côté client uniquement, utilise DOMPurify.
+  // `require` est délibéré : un import statique fait évaluer le module au chargement, y compris
+  // pendant le rendu serveur, où il échoue (cf. la note d'en-tête). La fonction étant synchrone,
+  // `await import()` n'est pas utilisable ici.
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const DOMPurify = require("isomorphic-dompurify");
     return DOMPurify.sanitize(input, { ALLOWED_TAGS: [] });
   } catch (error) {
