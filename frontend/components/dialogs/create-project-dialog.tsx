@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import {
   Plus,
   FolderKanban,
@@ -34,18 +34,28 @@ interface CreateProjectDialogProps {
   readonly onCreated?: (project: Project) => void
   /** Ouvre le modal d'emblée (ex : arrivée via « New project » de la sidebar — PROD-8.7). */
   readonly defaultOpen?: boolean
+  /** Notifie chaque changement d'état — permet à l'appelant de nettoyer l'URL à la fermeture. */
+  readonly onOpenChange?: (open: boolean) => void
 }
 
 // ---------------------------------------------------------------------------
 // CreateProjectDialog
 // ---------------------------------------------------------------------------
 
-export function CreateProjectDialog({ children, onCreated, defaultOpen = false }: CreateProjectDialogProps) {
+export function CreateProjectDialog({ children, onCreated, defaultOpen = false, onOpenChange }: CreateProjectDialogProps) {
   const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug)
   const createProject = useProjectStore((s) => s.createProject)
 
   const [open, setOpen] = useState(defaultOpen)
   const [isLoading, setIsLoading] = useState(false)
+
+  // `defaultOpen` vient d'un paramètre d'URL (`?new=1`). Or `useState` ne lit sa valeur initiale
+  // qu'au PREMIER rendu : si l'utilisateur est déjà sur la page Opérations et clique « New Project »,
+  // la navigation ne remonte pas le composant, la prop passait de `false` à `true` sans effet, et
+  // le modal ne s'ouvrait jamais — le clic semblait ne rien faire. On suit donc les passages à vrai.
+  useEffect(() => {
+    if (defaultOpen) setOpen(true)
+  }, [defaultOpen])
   const [name, setName] = useState("")
   const [identifier, setIdentifier] = useState("")
   const [description, setDescription] = useState("")
@@ -76,12 +86,24 @@ export function CreateProjectDialog({ children, onCreated, defaultOpen = false }
       })
       if (project) {
         onCreated?.(project)
-        resetForm()
-        setOpen(false)
+        changeOpen(false) // passe par le point unique : réinitialise ET prévient l'appelant
       }
     } finally {
       setIsLoading(false)
     }
+  }
+
+  /**
+   * Point de passage UNIQUE pour ouvrir/fermer.
+   *
+   * Le bouton « Cancel » et la création appelaient `setOpen(false)` en direct, ce qui
+   * court-circuitait `onOpenChange` : l'appelant n'était jamais prévenu de la fermeture, et le
+   * paramètre `?new=1` restait collé dans l'URL — bloquant toute réouverture ultérieure.
+   */
+  function changeOpen(next: boolean) {
+    setOpen(next)
+    onOpenChange?.(next)
+    if (!next) resetForm()
   }
 
   function resetForm() {
@@ -94,7 +116,7 @@ export function CreateProjectDialog({ children, onCreated, defaultOpen = false }
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) resetForm() }}>
+    <Dialog open={open} onOpenChange={changeOpen}>
       <DialogTrigger asChild>
         {children ?? (
           <Button size="sm" className="gap-2">
@@ -174,7 +196,7 @@ export function CreateProjectDialog({ children, onCreated, defaultOpen = false }
         </div>
 
         <DialogFooter className="gap-2">
-          <Button variant="outline" size="sm" onClick={() => setOpen(false)} disabled={isLoading}>
+          <Button variant="outline" size="sm" onClick={() => changeOpen(false)} disabled={isLoading}>
             Cancel
           </Button>
           <Button size="sm" onClick={handleCreate} disabled={!name.trim() || !identifier.trim() || isLoading} className="gap-2">
