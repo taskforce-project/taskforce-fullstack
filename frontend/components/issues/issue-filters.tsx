@@ -74,8 +74,11 @@ function FilterDropdown({
           className={cn("h-8 gap-1.5 text-xs", count > 0 && "border-primary/50 text-foreground")}
         >
           {label}
+          {/* Compteur en gris : c'est une information d'état, pas une action. Le bleu primaire
+              reste réservé à ce sur quoi on agit (bouton, case, interrupteur) — l'étendre à un
+              simple décompte diluerait le signal. */}
           {count > 0 && (
-            <span className="flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
+            <span className="flex size-4 items-center justify-center rounded-full bg-muted text-[10px] font-medium tabular-nums text-muted-foreground">
               {count}
             </span>
           )}
