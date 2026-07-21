@@ -31,7 +31,7 @@ function buildHeatmapGrid(entries: HeatmapEntry[]): HeatWeek[] {
   const start     = new Date(today);
   start.setDate(today.getDate() - totalDays + 1);
 
-  let current = new Date(start);
+  const current = new Date(start);
 
   for (let w = 0; w < HEATMAP_WEEKS; w++) {
     const days: HeatCell[] = [];

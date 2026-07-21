@@ -19,7 +19,7 @@ interface LabelState {
   removeLabel: (slug: string, projectId: number, labelId: number) => Promise<void>;
 }
 
-export const useLabelStore = create<LabelState>((set, get) => ({
+export const useLabelStore = create<LabelState>((set) => ({
   labelsByProject: {},
 
   fetchLabels: async (slug, projectId) => {

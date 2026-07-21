@@ -29,7 +29,7 @@ interface PageStore {
 // Store
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const usePageStore = create<PageStore>((set, get) => ({
+export const usePageStore = create<PageStore>((set) => ({
   pages: [],
   currentPage: null,
   loading: false,

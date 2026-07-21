@@ -29,7 +29,7 @@ interface TeamStore {
 // Store
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const useTeamStore = create<TeamStore>((set, get) => ({
+export const useTeamStore = create<TeamStore>((set) => ({
   teams: [],
   loading: false,
   error: null,

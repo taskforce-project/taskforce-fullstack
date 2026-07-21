@@ -228,14 +228,20 @@ describe('issue-store', () => {
     expect(useIssueStore.getState().activeIssue).toEqual(updated);
   });
 
-  it('updateIssue sets error on failure', async () => {
+  // WS-10 : un échec d'édition ne doit PAS poser `store.error`. Un refus (ex. VIEWER en lecture
+  // seule) polluait la bannière passive du board, invisible sous l'overlay du sheet puis révélée à
+  // sa fermeture. L'échec se signale par le retour `null` ; c'est l'appelant qui affiche un toast.
+  it('updateIssue renvoie null sans poser store.error en cas d’échec', async () => {
+    act(() => useIssueStore.setState({ error: null }));
     vi.mocked(svc.updateIssue).mockRejectedValue(new Error('upfail'));
 
+    let result: unknown;
     await act(async () => {
-      await useIssueStore.getState().updateIssue('ws', 10, 5, { title: 'new' });
+      result = await useIssueStore.getState().updateIssue('ws', 10, 5, { title: 'new' });
     });
 
-    expect(useIssueStore.getState().error).toBe('upfail');
+    expect(result).toBeNull();
+    expect(useIssueStore.getState().error).toBeNull();
   });
 
   it('deleteIssue filters out the issue and clears activeIssue', async () => {

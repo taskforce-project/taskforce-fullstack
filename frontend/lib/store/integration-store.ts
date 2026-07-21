@@ -56,7 +56,7 @@ interface IntegrationState {
   removeWebhook:   (slug: string, id: number) => Promise<void>;
 }
 
-export const useIntegrationStore = create<IntegrationState>((set, get) => ({
+export const useIntegrationStore = create<IntegrationState>((set) => ({
   githubStatus:  null,
   slackStatus:   null,
   webhooks:      [],

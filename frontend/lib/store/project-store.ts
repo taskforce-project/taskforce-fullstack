@@ -55,7 +55,7 @@ interface ProjectState {
 // Store
 // ---------------------------------------------------------------------------
 
-export const useProjectStore = create<ProjectState>((set, get) => ({
+export const useProjectStore = create<ProjectState>((set) => ({
   projects: [],
   activeProject: null,
   isLoading: false,
