@@ -68,9 +68,12 @@ function OperationsColumn() {
           ))}
           {/* Tuile fantôme : `?new=1` ouvre le modal de création côté page Opérations (PROD-8.7). */}
           <div className="mt-auto p-2">
+            {/* `text-muted-foreground` sans le modificateur `/70` : l'opacité faisait tomber le
+                contraste sous le seuil WCAG AA (audit axe-core du 22/07). La couleur reste
+                discrète sans être illisible. */}
             <Link
               href="./projects?new=1"
-              className="flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-border py-2 text-xs text-muted-foreground/70 transition-colors hover:border-primary/40 hover:bg-muted/30 hover:text-primary"
+              className="flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-border py-2 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-muted/30 hover:text-primary"
             >
               <Plus className="size-3.5" /> Créer une opération
             </Link>
