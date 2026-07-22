@@ -827,7 +827,7 @@ Planning prévisionnel (Gantt, jalons DFS, chemin critique), budget prévisionne
 | **C4** | **Lint + typecheck propres** sur tout le repo (pas seulement les fichiers touchés) | C16 « le code satisfait aux tests d'un outil de revue de code par analyse statique » | ✅ |
 | **C5** | **Sécurité : rejouer ZAP + Semgrep + Trivy**, 0 HIGH | C16 (front), C21/C24 (back) — « composants tiers à jour et sans vulnérabilité connue ». ✅ **22/07 : 0 CRITICAL sur les deux images** (13→0 et 1→0), npm production 0 haute, ZAP backend 0 alerte de risque. Reste 12 hautes dont **11 issues des images de base Alpine** (correctif amont) + 1 Keycloak assumé. ⚠️ **Deux mesures manquantes** : scan de code source (ne termine pas sous Docker/Windows → à rejouer en CI) et re-passage ZAP après les correctifs de CSP/en-têtes | 🟧 |
 | **C6** | **Vérifier le chiffrement au repos** des données personnelles | C24 « toutes les données sensibles sont chiffrées » + CDC §7. 🟧 **Constat du 22/07** : AES-256-GCM (`EncryptedStringConverter`) appliqué aux identifiants de connecteurs, à la config d'intégration et aux demandes Enterprise. **Mais email, `keycloakId` et jetons ne sont PAS chiffrés** — choix documenté et défendable (GCM non déterministe casserait les recherches), à condition de ne **pas** annoncer « toutes les données personnelles sont chiffrées ». Formulation juste : les *secrets* sont chiffrés en base, les identifiants servant de clés de recherche sont protégés par le contrôle d'accès et le chiffrement disque de l'hôte. Reste à formaliser dans le dossier | 🟧 |
-| **C7** | **Conformité RGPD de bout en bout** | **C11**. ✅ **22/07 — vérifié dans le code, et l'inventaire des « manques » était périmé.** Le **double opt-in EST implémenté** (l'OTP marque l'e-mail vérifié, `AuthService:224`, et la connexion est **bloquée** tant qu'il ne l'est pas, `AuthService:318`). La **purge Keycloak** est faite (`TF-RGPD-007`). Le **registre Art. 30** existe (7 traitements + sous-traitants) — corrigé le 22/07 : Groq y figurait comme destinataire hors UE alors qu'il est retiré du code depuis le 16/07, et le traitement IA réel (modèle auto-hébergé, **aucun transfert**) manquait. Reste : **rétention non automatisée** (méthodes de purge présentes, aucune tâche planifiée) | 🟧 |
+| **C7** | **Conformité RGPD de bout en bout** | **C11**. ✅ **22/07 — vérifié dans le code, et l'inventaire des « manques » était périmé.** Le **double opt-in EST implémenté** (l'OTP marque l'e-mail vérifié, `AuthService:224`, et la connexion est **bloquée** tant qu'il ne l'est pas, `AuthService:318`). La **purge Keycloak** est faite (`TF-RGPD-007`). Le **registre Art. 30** existe (7 traitements + sous-traitants) — corrigé le 22/07 : Groq y figurait comme destinataire hors UE alors qu'il est retiré du code depuis le 16/07, et le traitement IA réel (modèle auto-hébergé, **aucun transfert**) manquait. ✅ **Rétention automatisée le 22/07** : `RetentionScheduler` (quotidien 03:30) purge OTP expirés, states OAuth et invitations sans suite — voir MAJ (7). Seul point ouvert, **et il n'est pas technique** : la durée de conservation du journal d'audit est une décision du responsable de traitement | ✅ |
 | **C8** | **E9 — audit RGPD d'un cas professionnel externe** | C11. Le RGPD de TaskForce **ne le remplace pas**. ⚠️ Sujet imposé par l'école → à réclamer s'il n'a pas été fourni | 🔲 |
 | **C9** | **Mesurer le SEO de la landing** et atteindre ≥ 70 % | **C20**. ✅ **22/07 — mesuré : SEO 92 % sur l'accueil, 100 % sur les 4 autres pages** (seuil grille : 70 %). Le site n'a jamais eu de problème de SEO : le job Lighthouse ne mesurait simplement **rien**. Corrigé, il audite désormais les 5 pages | ✅ |
 | **C10** | **Trancher l'accessibilité** | C13, C15. ✅ **22/07 — tranché par la mesure, et les deux camps avaient tort.** Le test s'intitulait « WCAG 2.1 AA » mais **n'échouait que sur `critical`** ; or les manquements AA remontent en `serious`. La page de connexion en comptait **4** et le dashboard **6**, invisibles. Tout est corrigé : **0 violation sur les 3 pages**, tous impacts confondus, et le seuil du test inclut désormais `serious` | ✅ |
@@ -1131,6 +1131,39 @@ Planning prévisionnel (Gantt, jalons DFS, chemin critique), budget prévisionne
 > Le `whsec_…` affiché par `stripe listen` va dans `STRIPE_WEBHOOK_SECRET` de `.env.dev`, puis
 > `docker compose up -d --force-recreate backend` (l'env n'est relu qu'à la recréation du conteneur).
 > Une fois ce test passé, C23 est démontrable en direct devant le jury.
+
+> **▶ MAJ 22/07/2026 (7) — lot `C7` : la rétention est désormais appliquée, plus seulement déclarée.**
+>
+> Dernier manque fonctionnel du RGPD. Les durées de conservation figuraient au registre sans qu'aucune
+> tâche ne les applique — `OtpService.cleanupExpiredOtps()` portait même la mention « à appeler
+> périodiquement via un scheduler », et **ce scheduler n'avait jamais été écrit**.
+>
+> **Livré** : `RetentionScheduler` (quotidien, 03:30, `taskforce.retention.cron`) purge trois
+> traitements qui **portent déjà leur propre échéance** — les supprimer une fois expirés n'invente
+> aucune politique, cela applique la date que la donnée déclare :
+>
+> | Donnée | Échéance | Pourquoi elle compte |
+> |---|---|---|
+> | Codes OTP | expirés > 7 j | associés à un e-mail, sans finalité une fois périmés |
+> | States OAuth | dès l'expiration | le nettoyage opportuniste existant ne s'exécutait qu'à l'émission d'un nouveau state : un workspace qui ne reconnecte plus d'intégration les gardait indéfiniment |
+> | Invitations sans suite | expirées > 30 j | **le cas le plus sensible** : l'e-mail d'une personne qui n'est jamais devenue utilisatrice |
+>
+> Les invitations `ACCEPTED` sont exclues (l'invité est devenu membre, la ligne appartient à
+> l'historique). `@Transactional` est porté par les méthodes de dépôt, pas par le job : chaque purge
+> est isolée, un incident sur une table ne gèle pas la rétention entière — c'est le comportement que
+> `RetentionSchedulerTest` vérifie en priorité (`@ParameterizedTest` sur les 3 purges défaillantes).
+>
+> **Volontairement hors périmètre — le journal d'audit.** Sa durée est notée « à définir en prod » et
+> sa table est déclarée immuable au registre. Fixer cette durée relève du **responsable de traitement**,
+> pas du développeur : la trancher dans le code inventerait une politique et contredirait une mesure
+> de sécurité annoncée. **Décision à prendre par le CEO avant exploitation réelle.**
+>
+> ⚠️ **Découvert au passage, non traité** : l'entité `RefreshToken`, son dépôt et la table
+> `refresh_tokens` (`V3__complete_auth_subscription_schema.sql`) sont **du code mort**. Les seules
+> références hors de leur propre définition sont `TestDataBuilder` ; l'authentification passe
+> entièrement par Keycloak depuis `TF-RGPD-007` (commentaire explicite dans `GdprService`). Le
+> registre citait encore `RefreshTokenRepository` parmi les purges disponibles — corrigé. Suppression
+> à faire dans un lot dédié (retrait Java + migration de suppression de table).
 
 ### 4.B — Repoussé APRÈS la soutenance (ne pas empiéter)
 
