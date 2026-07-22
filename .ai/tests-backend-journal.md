@@ -201,3 +201,8 @@ Le dossier `src/test/java/.../` **mirror** `src/main/java/.../` : chaque `*Test.
   `IssueAiService` (179, 0,6 %), `DecisionService` (104, **0 %**). Orchestration de jobs asynchrones
   et appels LLM : coûteux à tester, chaque itération Maven ~20 min, et sans effet sur un critère de
   la grille (50 % largement tenu). **Reporté après soutenance**, assumé à l'oral.
+- **Gate vérifié, pas seulement déclaré (22/07)** : `it.ps1 -Verify` → `jacoco:0.8.12:check (jacoco-check)`
+  → **« All coverage checks have been met »**, `BUILD SUCCESS`, 786 tests (20 min). C'est le premier
+  passage réel du gate sur ce projet : il existait depuis le début mais restait lié à `verify`, que
+  rien n'appelait. Corollaire pour la CI : tant que le workflow s'arrête à `test`, le seuil reste
+  décoratif — le rendre bloquant suppose de passer la CI sur `verify` (chantier `CI.2`, §4.B).
