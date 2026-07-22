@@ -223,3 +223,7 @@ Temporary Items
 # Sauvegardes DB (données — ne pas committer)
 /backups/
 /frontend/e2e/axe.min.js
+
+# Rapports Lighthouse CI (générés localement par `lhci autorun`)
+.lighthouseci/
+.lh-out/
