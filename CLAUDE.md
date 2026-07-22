@@ -29,6 +29,14 @@ Lire `.ai/P0-fix-plan.md` ou `taskforce-docs/produit/README.md`. Calculer la pro
 4. **Tester** (couverture ≥ 50 %) + linter avant commit.
 5. **Mettre à jour le Brain OS frère** (`../taskforce-docs`) selon la DoD `AGENTS.md` §2 : fiche produit `v1/02-produit/*` (`[statut::]`), Architecture/API si le contrat change, bloc « ▶ Prochaine action », changelog. **+ MAJ `.ai/roadmap.md`** (statut de l'item).
 
+> **L'étape 5 est vérifiée mécaniquement** depuis le 22/07/2026. Le hook `Stop`
+> (`.claude/settings.json` → `.claude/hooks/check-docs-sync.sh`) refuse de clore un tour qui laisse
+> du code modifié **plus récent** que la dernière trace écrite dans `.ai/`. Motif : cette règle
+> existait déjà en texte ici et dans la mémoire de l'agent, et les deux dérivaient — une consigne
+> qui se déclenche en fin de tâche arrive au moment où l'attention est la plus faible. Ce n'est
+> donc plus une consigne à retenir mais une condition de sortie. La règle est auto-nettoyante :
+> tracer une fois couvre tout ce qui a été modifié avant.
+
 ## Règles d'or
 
 | # | Règle |
