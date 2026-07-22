@@ -830,7 +830,7 @@ Planning prévisionnel (Gantt, jalons DFS, chemin critique), budget prévisionne
 | **C7** | **Conformité RGPD de bout en bout** : cookies, politique de confidentialité, accès aux données, **double opt-in** | **C11 — 4 critères**, dont le double opt-in aujourd'hui non traité | 🔲 |
 | **C8** | **E9 — audit RGPD d'un cas professionnel externe** | C11. Le RGPD de TaskForce **ne le remplace pas**. ⚠️ Sujet imposé par l'école → à réclamer s'il n'a pas été fourni | 🔲 |
 | **C9** | **Mesurer le SEO de la landing** et atteindre ≥ 70 % | **C20 — seul seuil chiffré non démontré**. Un juré peut le vérifier en direct avec Lighthouse | 🔲 |
-| **C10** | **Trancher l'accessibilité** : la matrice dit « WCAG AA ✅ », la roadmap dit « audit RGAA à faire ». Contradiction à lever | C13, C15 — « y compris pour les personnes en situation de handicap » | 🔲 |
+| **C10** | **Trancher l'accessibilité** | C13, C15. ✅ **22/07 — tranché par la mesure, et les deux camps avaient tort.** Le test s'intitulait « WCAG 2.1 AA » mais **n'échouait que sur `critical`** ; or les manquements AA remontent en `serious`. La page de connexion en comptait **4** et le dashboard **6**, invisibles. Tout est corrigé : **0 violation sur les 3 pages**, tous impacts confondus, et le seuil du test inclut désormais `serious` | ✅ |
 | **C11** | **E6 — trame de compte-rendu d'activité** + 1 exemple rempli | C4, critère `[R17]` : « la trame […] **est opérationnelle** ». Classée « optionnelle » à tort | 🔲 |
 | **C12** | **Manuel utilisateur** (collaborateurs + managers) | Livrable explicite du CDC §8 | 🔲 |
 | **C13** | **Webhooks Stripe** : finaliser ou assumer la limite en distance critique | C23 « l'intégration du système de paiement est **fonctionnelle** » | 🔲 |
@@ -1008,6 +1008,40 @@ Planning prévisionnel (Gantt, jalons DFS, chemin critique), budget prévisionne
 > secrets, sans exclusion — `node_modules`, `target`, `.git`, et **ses propres rapports précédents**.
 > Le scan ne terminait plus (observé bloqué > 4 h). Ajout de `--skip-dirs` ; aucune perte de
 > couverture, Trivy détectant les dépendances via les fichiers de verrouillage.
+
+> **▶ MAJ 22/07/2026 (3) — lot `C10` : l'accessibilité tranchée par la mesure.**
+>
+> La contradiction opposait la matrice (« WCAG 2.1 AA vérifié ✅ ») à la roadmap (« audit RGAA à
+> faire »). **Les deux avaient tort**, et la cause était dans le test lui-même : `e2e/a11y.spec.ts`
+> s'intitulait « WCAG 2.1 AA » mais n'assertionnait que sur les violations `critical`. Or les
+> manquements au niveau AA remontent en `serious`. Le test affichait donc « 0 violation » pendant que
+> la page de connexion en comptait **4** et le dashboard **6**. Il attestait un niveau qu'il ne
+> vérifiait pas.
+>
+> **Résultat après correction : 0 violation sur les 3 pages**, tous impacts confondus.
+>
+> | Défaut trouvé | Nature | Correctif |
+> |---|---|---|
+> | `--label-tertiary` / `--label-quaternary` | Contraste ~3,1:1 et ~2,0:1 pour un seuil AA de 4,5:1 (critère 1.4.3). Portaient du vrai contenu : sous-titre de connexion, « Pas encore de compte ? », liens légaux | Assombris, hiérarchie conservée |
+> | `text-muted-foreground/70` | Le modificateur d'opacité faisait tomber le contraste sous le seuil | `/70` retiré |
+> | `nested-interactive` ×5 | dnd-kit posait `role="button"` sur toute la barre d'en-tête des cartes, laquelle **contient** le bouton de menu — un lecteur d'écran ne sait plus quoi annoncer | Rôles séparés : les `listeners` (pointeur) restent sur la barre, les `attributes` (clavier, ARIA) passent sur une poignée dédiée. **Usage souris inchangé** |
+> | `button-name` ×2 **(critique)** | Sélecteurs Radix sans nom accessible : « Rows per page » (libellé non associé, et masqué sous `sm`) et le filtre projet | `aria-label` explicites. Principe : le nom d'un sélecteur ne doit **pas** dépendre de sa valeur courante |
+>
+> **Trois défauts du harnais de test corrigés au passage** — ils masquaient les précédents :
+> - Le test `membres` **expirait avant de scanner** : il attendait la *visibilité* d'un e-mail masqué
+>   par les classes responsives à la largeur de test. Passé en `state: "attached"` — c'est ce
+>   correctif qui a révélé les 2 violations **critiques**.
+> - Le helper de connexion cherchait un bouton `/^accept/i` pour fermer la bannière cookies, alors
+>   qu'elle affiche « Got it ». Ce garde-fou n'a **jamais rien fermé** ; la bannière, en `fixed z-50`,
+>   interceptait le clic par intermittence.
+> - Résultat oscillant entre 0 et 3 violations sans changement de code : la bannière s'affiche depuis
+>   un `useEffect`, donc **après** `networkidle`. Le scan la voyait tantôt, tantôt pas. Attente
+>   explicite ajoutée — elle entre désormais dans le périmètre audité.
+>
+> **Comportement applicatif relevé, à qualifier** : deux connexions **simultanées** du même compte se
+> neutralisent, l'une reste bloquée sur `/auth/login`. Le symptôme alternait entre `dashboard` et
+> `membres` et passait pour de l'instabilité. Contourné par une exécution sérielle. Reste à
+> déterminer s'il s'agit d'un choix (session unique par utilisateur) ou d'une limite subie.
 
 ### 4.B — Repoussé APRÈS la soutenance (ne pas empiéter)
 
