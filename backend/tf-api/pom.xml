@@ -31,6 +31,19 @@
 	</scm>
 	<properties>
 		<java.version>21</java.version>
+		<!--
+		  Surcharges de sécurité (audit Trivy du 22/07/2026), via les propriétés que le BOM Spring
+		  Boot expose : elles gouvernent TOUS les artefacts de la famille d'un coup, ce qui vaut
+		  mieux que d'énumérer chaque module dans <dependencyManagement>.
+
+		  `tomcat` : le parent 4.0.6 embarque encore une version portant 3 CVE CRITICAL — c'est le
+		  dernier bloc critique de l'image backend.
+		  `netty` : 4.2.12 → 4.2.15, correctif de niveau patch (mêmes majeure et mineure).
+
+		  À RETIRER dès que le BOM rattrape ces versions, sinon on fige une version en arrière.
+		-->
+		<tomcat.version>11.0.22</tomcat.version>
+		<netty.version>4.2.15.Final</netty.version>
 		<keycloak.version>25.0.6</keycloak.version>
 		<springdoc.version>3.0.3</springdoc.version>
 		<dotenv.version>3.2.0</dotenv.version>
@@ -277,6 +290,31 @@
 	-->
 	<dependencyManagement>
 		<dependencies>
+			<!--
+			  Jackson — BOM importés plutôt qu'artefacts épinglés un par un : un BOM garde `core`,
+			  `databind` et `annotations` cohérents entre eux. Épingler `databind` seul laisserait
+			  `annotations` en arrière, ce qui produit des erreurs de liaison difficiles à lire.
+
+			  Les deux lignes coexistent : Spring Boot 4 sérialise avec Jackson 3 (`tools.jackson`),
+			  tandis que des dépendances tierces tirent encore Jackson 2 (`com.fasterxml`). Le projet
+			  s'est déjà fait mordre par cette cohabitation (cf. MAJ 10/07 : un `JsonNode` sortait en
+			  `{"array":true,…}`), d'où la prudence — mais il s'agit ici de rester DANS chaque ligne,
+			  pas d'en franchir une : 3.1.2 → 3.1.4 est un saut de patch.
+			-->
+			<dependency>
+				<groupId>tools.jackson</groupId>
+				<artifactId>jackson-bom</artifactId>
+				<version>3.1.4</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+			<dependency>
+				<groupId>com.fasterxml.jackson</groupId>
+				<artifactId>jackson-bom</artifactId>
+				<version>2.21.4</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
 			<!-- 3 CVE CRITICAL chacun. Thymeleaf n'est pas supprimable : il rend les gabarits
 			     d'e-mails (OTP, réinitialisation, bienvenue) dans src/main/resources/templates/email. -->
 			<dependency>
