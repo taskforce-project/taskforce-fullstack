@@ -32,6 +32,20 @@ COPY . .
 # Variables d'environnement de build
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# ── Origines publiques, figées au BUILD ──────────────────────────────────────
+# Next.js remplace les `process.env.NEXT_PUBLIC_*` par leur valeur littérale pendant `next build` :
+# elles finissent dans le bundle envoyé au navigateur. Les poser à l'exécution (`environment:` du
+# compose) n'a donc AUCUN effet sur le code client — l'application déployée retomberait sur les
+# valeurs par défaut `localhost` de `next.config.ts`, injoignables depuis le poste d'un utilisateur.
+# Elles doivent être passées en `build.args`. Consommées par : next.config.ts (CSP `connect-src` /
+# `img-src`), lib/config/api-routes.ts et lib/api/client.ts.
+ARG NEXT_PUBLIC_API_URL=http://localhost:8080
+ARG NEXT_PUBLIC_API_URL_SSR=http://backend:8080
+ARG NEXT_PUBLIC_STORAGE_URL=http://localhost:9000
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL_SSR=$NEXT_PUBLIC_API_URL_SSR
+ENV NEXT_PUBLIC_STORAGE_URL=$NEXT_PUBLIC_STORAGE_URL
+
 # Build de l'application Next.js
 RUN npm run build
 
