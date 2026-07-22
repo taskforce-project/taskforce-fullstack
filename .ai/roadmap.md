@@ -827,14 +827,14 @@ Planning prévisionnel (Gantt, jalons DFS, chemin critique), budget prévisionne
 | **C4** | **Lint + typecheck propres** sur tout le repo (pas seulement les fichiers touchés) | C16 « le code satisfait aux tests d'un outil de revue de code par analyse statique » | ✅ |
 | **C5** | **Sécurité : rejouer ZAP + Semgrep + Trivy**, 0 HIGH | C16 (front), C21/C24 (back) — « composants tiers à jour et sans vulnérabilité connue ». ✅ **22/07 : 0 CRITICAL sur les deux images** (13→0 et 1→0), npm production 0 haute, ZAP backend 0 alerte de risque. Reste 12 hautes dont **11 issues des images de base Alpine** (correctif amont) + 1 Keycloak assumé. ⚠️ **Deux mesures manquantes** : scan de code source (ne termine pas sous Docker/Windows → à rejouer en CI) et re-passage ZAP après les correctifs de CSP/en-têtes | 🟧 |
 | **C6** | **Vérifier le chiffrement au repos** des données personnelles | C24 « toutes les données sensibles sont chiffrées » + CDC §7. 🟧 **Constat du 22/07** : AES-256-GCM (`EncryptedStringConverter`) appliqué aux identifiants de connecteurs, à la config d'intégration et aux demandes Enterprise. **Mais email, `keycloakId` et jetons ne sont PAS chiffrés** — choix documenté et défendable (GCM non déterministe casserait les recherches), à condition de ne **pas** annoncer « toutes les données personnelles sont chiffrées ». Formulation juste : les *secrets* sont chiffrés en base, les identifiants servant de clés de recherche sont protégés par le contrôle d'accès et le chiffrement disque de l'hôte. Reste à formaliser dans le dossier | 🟧 |
-| **C7** | **Conformité RGPD de bout en bout** : cookies, politique de confidentialité, accès aux données, **double opt-in** | **C11 — 4 critères**, dont le double opt-in aujourd'hui non traité | 🔲 |
+| **C7** | **Conformité RGPD de bout en bout** | **C11**. ✅ **22/07 — vérifié dans le code, et l'inventaire des « manques » était périmé.** Le **double opt-in EST implémenté** (l'OTP marque l'e-mail vérifié, `AuthService:224`, et la connexion est **bloquée** tant qu'il ne l'est pas, `AuthService:318`). La **purge Keycloak** est faite (`TF-RGPD-007`). Le **registre Art. 30** existe (7 traitements + sous-traitants) — corrigé le 22/07 : Groq y figurait comme destinataire hors UE alors qu'il est retiré du code depuis le 16/07, et le traitement IA réel (modèle auto-hébergé, **aucun transfert**) manquait. Reste : **rétention non automatisée** (méthodes de purge présentes, aucune tâche planifiée) | 🟧 |
 | **C8** | **E9 — audit RGPD d'un cas professionnel externe** | C11. Le RGPD de TaskForce **ne le remplace pas**. ⚠️ Sujet imposé par l'école → à réclamer s'il n'a pas été fourni | 🔲 |
-| **C9** | **Mesurer le SEO de la landing** et atteindre ≥ 70 % | **C20 — seul seuil chiffré non démontré**. Un juré peut le vérifier en direct avec Lighthouse | 🔲 |
+| **C9** | **Mesurer le SEO de la landing** et atteindre ≥ 70 % | **C20**. ✅ **22/07 — mesuré : SEO 92 % sur l'accueil, 100 % sur les 4 autres pages** (seuil grille : 70 %). Le site n'a jamais eu de problème de SEO : le job Lighthouse ne mesurait simplement **rien**. Corrigé, il audite désormais les 5 pages | ✅ |
 | **C10** | **Trancher l'accessibilité** | C13, C15. ✅ **22/07 — tranché par la mesure, et les deux camps avaient tort.** Le test s'intitulait « WCAG 2.1 AA » mais **n'échouait que sur `critical`** ; or les manquements AA remontent en `serious`. La page de connexion en comptait **4** et le dashboard **6**, invisibles. Tout est corrigé : **0 violation sur les 3 pages**, tous impacts confondus, et le seuil du test inclut désormais `serious` | ✅ |
 | **C11** | **E6 — trame de compte-rendu d'activité** + 1 exemple rempli | C4, critère `[R17]` : « la trame […] **est opérationnelle** ». Classée « optionnelle » à tort | 🔲 |
 | **C12** | **Manuel utilisateur** (collaborateurs + managers) | Livrable explicite du CDC §8 | 🔲 |
-| **C13** | **Webhooks Stripe** : finaliser ou assumer la limite en distance critique | C23 « l'intégration du système de paiement est **fonctionnelle** » | 🔲 |
-| **C14** | **Actualiser la grille remplie** (`Grille_evaluation_TaskForce_REMPLIE`) | Premier document lu par le jury. Elle déclare encore **< 50 %** de couverture alors que le réel est 92 % / 78 % | 🔲 |
+| **C13** | **Webhooks Stripe** | C23 « l'intégration du système de paiement est **fonctionnelle** ». ✅ **22/07 — vérifié : implémenté, pas « à finaliser ».** `POST /api/webhooks/stripe` (dans `PUBLIC_MATCHERS`, la signature faisant office d'authentification) · signature vérifiée via `Webhook.constructEvent`, 400 si invalide · **5 événements** traités · **idempotence** par `stripe_event_id UNIQUE` · **500 délibéré** sur erreur de traitement pour que Stripe rejoue en backoff (`FIX-005`) · mapping complet des statuts · historique de facturation. **Seule limite** : jamais exercé avec de vrais événements Stripe (nécessite les clés de test du user — cf. ci-dessous) | 🟧 |
+| **C14** | **Actualiser la grille remplie** (`Grille_evaluation_TaskForce_REMPLIE`) | Premier document lu par le jury. Elle déclare encore **< 50 %** de couverture alors que le réel mesuré est **88,83 % (front) / 73,71 % (back)** — cf. `C3`. ⚠️ Cette ligne portait elle-même « 92 % / 78 % », chiffres périmés issus d'une mesure antérieure : corrigé le 22/07 | 🔲 |
 | **C15** | **Récupérer la page de garde imposée** par le certificateur | Obligatoire, non trouvée dans le repo | 🔲 |
 | **C16** | **Rédiger le dossier 40 pages** (condensation, pas assemblage) | **Livrable n°1 — 14/09** | 🔲 |
 | **C17** | **Support de soutenance + texte oral + répétition chronométrée** | **Livrables n°2 et 3 — 25/09 puis 28–29/09**. Voir `.ai/soutenance-brief.md` | 🔲 |
@@ -1042,6 +1042,95 @@ Planning prévisionnel (Gantt, jalons DFS, chemin critique), budget prévisionne
 > neutralisent, l'une reste bloquée sur `/auth/login`. Le symptôme alternait entre `dashboard` et
 > `membres` et passait pour de l'instabilité. Contourné par une exécution sérielle. Reste à
 > déterminer s'il s'agit d'un choix (session unique par utilisateur) ou d'une limite subie.
+
+> **▶ MAJ 22/07/2026 (4) — lot `C9` : le SEO était bon, c'est la mesure qui n'existait pas.**
+>
+> | Page | SEO | Accessibilité | Performance |
+> |---|---|---|---|
+> | `/` | **92 %** | 95 % | 92 % |
+> | `/about` · `/blog` · `/changelog` | **100 %** | 93 % | 95-96 % |
+> | `/accessibility` | **100 %** | 97 % | 94 % |
+>
+> **C20 est tenu très largement** (seuil : 70 %). Le site n'a jamais eu de problème ; le job
+> Lighthouse ne mesurait rien, et `continue-on-error: true` faisait remonter « success ».
+>
+> **Trois défauts cumulés dans le job**, tous corrigés :
+> 1. `urls: http://localhost:4321` visait un serveur que rien ne démarrait. La config déclarait
+>    pourtant `startServerCommand` — mais **`defaults.run.working-directory` ne s'applique pas aux
+>    étapes `uses:`** : l'action tournait depuis la racine du dépôt, où le script `preview` n'existe pas.
+> 2. L'entrée `urls` de l'action supplantait de toute façon l'URL de la configuration.
+> 3. `continue-on-error: true` avalait l'échec.
+>
+> Remplacé par `staticDistDir` : LHCI sert lui-même le dossier construit, sans processus serveur ni
+> dépendance au répertoire courant. **Effet de bord bénéfique — l'audit couvre désormais les 5 pages
+> au lieu de la seule page d'accueil.**
+>
+> **Accessibilité de la landing améliorée au passage** (mêmes causes que dans l'application) :
+> `text-foreground/35` (contraste **2,4:1**) et `text-muted-foreground/60` (**2,84:1**) — encore des
+> modificateurs d'opacité — et un `<h4>` succédant à un `<h2>` sans `<h3>`. L'accueil passe de 92 à 95 %.
+>
+> **Reste** : `/about`, `/blog` et `/changelog` plafonnent à 93 % avec **exactement les mêmes 4
+> audits** (`color-contrast`, `heading-order`, `image-redundant-alt`, `label-content-name-mismatch`),
+> donc un composant de mise en page partagé. Non traité : la landing est en cours de refonte, corriger
+> un composant qui va être réécrit serait du travail perdu. Sans effet sur C20.
+
+> **▶ MAJ 22/07/2026 (5) — lot `C7` : le RGPD était fait, l'inventaire des manques était faux.**
+>
+> Ce lot était décrit comme « 4 critères dont le double opt-in non traité ». Vérification faite dans
+> le code, **trois des quatre « manques » n'existaient plus** :
+>
+> | Point réputé manquant | Réalité vérifiée |
+> |---|---|
+> | **Double opt-in** | **Implémenté.** `verifyOtp` marque l'e-mail vérifié (`AuthService:224`) et `login` **refuse** l'accès tant qu'il ne l'est pas (`AuthService:318`) : le compte est inutilisable avant que l'utilisateur ne prouve qu'il contrôle l'adresse. C'est la définition même du double opt-in appliquée à la création de compte |
+> | **Purge Keycloak** | **Faite** (`TF-RGPD-007`), et proprement : anonymisation locale commitée d'abord, suppression IdP différée à `afterCommit` pour qu'un échec externe ne puisse pas annuler l'effacement déjà validé |
+> | **Registre Art. 30** | **Existe** — `taskforce-docs/v1/07-securite/Registre_Traitements_RGPD.md`, 7 traitements + tableau des sous-traitants |
+> | Consentement cookies granulaire | **Sans objet** : seuls des cookies strictement nécessaires sont posés, exemptés de consentement (CNIL) — la bannière l'explique |
+>
+> **Deux erreurs corrigées dans le registre**, toutes deux relevées grâce au travail du jour :
+> - Il déclarait **Groq Inc. (USA)** comme destinataire du « contexte de tâche ». Inexact depuis le
+>   **16/07** (`TF-AI-GROQ-CLEANUP`) : vérifié, il ne subsiste que des commentaires. *Un registre qui
+>   déclare un transfert hors UE inexistant est aussi fautif qu'un registre qui en omet un.*
+> - Il **omettait le traitement IA réel**. Ajouté en n°8, avec ce qui en est le meilleur argument :
+>   le modèle est **auto-hébergé**, donc **aucun contenu de travail ne quitte l'infrastructure** pour
+>   alimenter un service tiers.
+>
+> **Seul manque réel : la rétention n'est pas automatisée.** Les méthodes de purge existent
+> (`OtpVerificationRepository`, `RefreshTokenRepository`) mais aucune tâche planifiée ne les appelle —
+> les seuls `@Scheduled` du projet portent sur les alertes métier. Consigné dans le registre.
+>
+> **Point relevé hors RGPD** : les deux formulaires de newsletter de la landing (`BlogPage`,
+> `ChangelogPage`) sont **purement décoratifs** — ni `onSubmit`, ni état, ni appel API, ni `name` sur
+> le champ. Aucun enjeu de données puisqu'ils ne collectent rien, mais ce sont des boutons morts que
+> le jury cliquera. À traiter en `C1`.
+
+> **▶ MAJ 22/07/2026 (6) — lot `C13` : les webhooks Stripe étaient faits.**
+>
+> Quatrième lot d'affilée où l'inventaire des manques était plus pessimiste que le code. L'intégration
+> n'est pas un stub :
+>
+> | Élément | État vérifié |
+> |---|---|
+> | Endpoint | `POST /api/webhooks/stripe`, déclaré dans `PUBLIC_MATCHERS` — correct : c'est la **signature** qui authentifie, un JWT n'aurait aucun sens pour un appel serveur-à-serveur |
+> | Signature | `Webhook.constructEvent(payload, sigHeader, secret)`, **400** si invalide |
+> | Événements | **5** : `checkout.session.completed`, `customer.subscription.{updated,deleted}`, `invoice.payment_{succeeded,failed}` |
+> | Idempotence | `stripe_event_id UNIQUE` → un rejeu ne double jamais l'effet |
+> | Reprise sur erreur | **500 délibéré** en cas d'échec de traitement, pour que Stripe rejoue en backoff (~3 j). Renvoyer 200 perdrait l'événement sur une panne transitoire (`FIX-005`) |
+> | Boucle complète | front → `/api/billing/checkout` → Stripe → paiement → webhook → plan mis à jour |
+>
+> **Seule limite réelle, à assumer telle quelle** : le flux n'a **jamais été exercé avec de vrais
+> événements Stripe**. Le code est complet et couvert par des tests unitaires (~80 %), mais aucun
+> événement authentique n'y est passé. Cette vérification exige les clés de test Stripe du user — et
+> **l'assistant ne doit pas les manipuler**. Commande à lancer par le user lui-même :
+>
+> ```
+> stripe login
+> stripe listen --forward-to localhost:8080/api/webhooks/stripe
+> stripe trigger checkout.session.completed
+> ```
+>
+> Le `whsec_…` affiché par `stripe listen` va dans `STRIPE_WEBHOOK_SECRET` de `.env.dev`, puis
+> `docker compose up -d --force-recreate backend` (l'env n'est relu qu'à la recréation du conteneur).
+> Une fois ce test passé, C23 est démontrable en direct devant le jury.
 
 ### 4.B — Repoussé APRÈS la soutenance (ne pas empiéter)
 
