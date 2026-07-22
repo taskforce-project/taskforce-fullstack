@@ -5,7 +5,10 @@
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>4.0.0</version>
+		<!-- 4.0.0 → 4.0.6 (22/07/2026, audit Trivy) : le BOM du parent gouverne tomcat-embed-core,
+		     spring-security, netty et jackson. Ce seul bond corrige 13 des 55 CVE HIGH/CRITICAL de
+		     l'image backend, dont 4 CRITICAL (tomcat ×3, spring-boot ×1). -->
+		<version>4.0.6</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com.taskforce</groupId>
@@ -205,6 +208,8 @@
 			<artifactId>postgresql</artifactId>
 			<scope>runtime</scope>
 		</dependency>
+		<!-- Version imposée dans <dependencyManagement> ci-dessous (CVE). -->
+
 
 		<!-- Rate Limiting -->
 		<dependency>
@@ -259,6 +264,51 @@
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
+
+	<!--
+	  Versions FORCÉES pour raison de sécurité (audit Trivy du 22/07/2026).
+
+	  Ces artefacts sont tirés transitivement et leur version gouvernée par le BOM Spring Boot, qui
+	  reste en retard sur certains avis. On passe par <dependencyManagement> plutôt que par des
+	  propriétés : cela fonctionne que le parent expose ou non une propriété pour l'artefact.
+
+	  À REVOIR à chaque montée du parent : si le BOM rattrape ces versions, ces entrées deviennent
+	  inutiles et doivent être retirées pour ne pas figer une version en arrière.
+	-->
+	<dependencyManagement>
+		<dependencies>
+			<!-- 3 CVE CRITICAL chacun. Thymeleaf n'est pas supprimable : il rend les gabarits
+			     d'e-mails (OTP, réinitialisation, bienvenue) dans src/main/resources/templates/email. -->
+			<dependency>
+				<groupId>org.thymeleaf</groupId>
+				<artifactId>thymeleaf</artifactId>
+				<version>3.1.5.RELEASE</version>
+			</dependency>
+			<dependency>
+				<groupId>org.thymeleaf</groupId>
+				<artifactId>thymeleaf-spring6</artifactId>
+				<version>3.1.5.RELEASE</version>
+			</dependency>
+			<!-- 1 CVE CRITICAL. -->
+			<dependency>
+				<groupId>org.bouncycastle</groupId>
+				<artifactId>bcprov-jdk18on</artifactId>
+				<version>1.84</version>
+			</dependency>
+			<!-- 1 CVE HIGH. -->
+			<dependency>
+				<groupId>commons-io</groupId>
+				<artifactId>commons-io</artifactId>
+				<version>2.14.0</version>
+			</dependency>
+			<!-- 2 CVE HIGH sur le pilote JDBC. -->
+			<dependency>
+				<groupId>org.postgresql</groupId>
+				<artifactId>postgresql</artifactId>
+				<version>42.7.12</version>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
 
 	<build>
 		<plugins>
