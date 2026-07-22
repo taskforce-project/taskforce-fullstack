@@ -72,8 +72,13 @@
 
   --label-primary:    #1d1d1f;
   --label-secondary:  #4b4b4f;
-  --label-tertiary:   #8e8e93;
-  --label-quaternary: #b5b5ba;
+  /* Assombris le 22/07 (audit axe-core). Les valeurs précédentes — #8e8e93 et #b5b5ba, reprises de
+     la palette iOS — donnaient respectivement ~3,1:1 et ~2,0:1 sur le fond clair, là où WCAG 2.1 AA
+     (critère 1.4.3) exige 4,5:1 pour du texte normal. Elles portaient du vrai contenu, pas de la
+     décoration : sous-titre de connexion, « Pas encore de compte ? », liens légaux.
+     La hiérarchie entre les quatre niveaux est conservée, simplement resserrée. */
+  --label-tertiary:   #67676c;
+  --label-quaternary: #6e6e73;
   --fill-primary:     rgba(0, 0, 0, 0.08);
   --fill-secondary:   rgba(0, 0, 0, 0.05);
   --fill-tertiary:    rgba(0, 0, 0, 0.03);
@@ -139,8 +144,9 @@
 
   --label-primary:    #f5f5f7;
   --label-secondary:  #aeaeb2;
+  /* En sombre, `tertiary` passait déjà (~6:1) ; seul `quaternary` échouait (~3:1). Éclairci. */
   --label-tertiary:   #8e8e93;
-  --label-quaternary: #5a5a5e;
+  --label-quaternary: #7a7a7f;
   --fill-primary:     rgba(255, 255, 255, 0.10);
   --fill-secondary:   rgba(255, 255, 255, 0.06);
   --fill-tertiary:    rgba(255, 255, 255, 0.035);
