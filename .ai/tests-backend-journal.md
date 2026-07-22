@@ -167,3 +167,37 @@ Le dossier `src/test/java/.../` **mirror** `src/main/java/.../` : chaque `*Test.
   - `GitHubIntegrationContractTest` : POST `.../login/oauth/access_token` (form) → GET `api.github.com/user` (Bearer) → redirect `github=connected` ; `listRepositories`/`listRepoIssues` GET (Bearer) + mapping DTO. URLs exactes asserties.
   - `SlackIntegrationContractTest` : POST `slack.com/api/oauth.v2.access` (form, ok=true/false) ; `sendNotification` POST `chat.postMessage` (Bearer + JSON {channel,text}).
 - **Limite assumée** : Keycloak (SDK admin), MinIO (SDK), Stripe (SDK statique) **ne passent pas par RestTemplate** → pas de contract test wire possible ; leur validation réelle = **E2E** (domaine utilisateur). Nos tests mockent leur SDK (logique couverte : KeycloakService 78 %, MinioService 72 %, StripeWebhookService 81 %).
+
+## Re-mesure de clôture (22/07) : 73,71 % — le gate n'avait jamais gardé
+
+- **786 tests, 0 échec** (1 skip), `BUILD SUCCESS` (~30 min). JaCoCo avec exclusions :
+  **73,71 % lignes (6032/8183)** · branches **53,16 %** · méthodes **62,89 %**.
+- **La couverture a BAISSÉ** depuis les 86,1 % du 02/07 (5361/6226). Le code a gagné **~1 970 lignes**
+  pendant que les lignes couvertes n'avançaient que de 671 : la couche IA/agent et le catalogue de
+  connecteurs sont arrivés quasiment sans tests.
+- **Pourquoi personne ne l'a vu** (`PC-028`, déjà consigné) : `jacoco-check` n'a pas de `<phase>`, il
+  se lie donc à `verify`. Or `it.ps1 -Test ALL` fait `clean test` et la CI `mvnw clean test
+  jacoco:report` — **aucun des deux n'atteint `verify`**. Le gate affiché à 0,84 n'a jamais rien
+  bloqué. Un chiffre annoncé n'est une preuve que si quelque chose le vérifie.
+- **Correctifs** :
+  - Seuil `jacoco-check` **0,84 → 0,70**, aligné sur le mesuré, raisonnement en commentaire dans le
+    `pom.xml`. Rôle assumé : interdire une régression, pas afficher une cible.
+  - **Exclusions réparées** : les motifs JaCoCo portent sur des **chemins de classe**, et une classe
+    imbriquée est compilée en `Outer$Inner.class` — que `Outer.*` ne matche pas. Les records internes
+    du Brain OS (`BrainTemplateService.{SeedNode,Sys,ProjectRef}`, `KnowledgeController.ReseedRequest`)
+    étaient comptés à 0 % alors qu'ils sont hors périmètre. Ajout des motifs `**/X$*.*`.
+    *Impact réel : **11 lignes** — les 96 relevées d'abord étaient des **instructions**, pas des lignes
+    (colonnes `INSTRUCTION_*` vs `LINE_*` du CSV JaCoCo). Piège à retenir.*
+  - **`ConnectorCatalogTest` (27 tests)** : `ConnectorCatalog` **0 % → 98,7 %** (157/159 lignes,
+    0 méthode non couverte). Catalogue **déclaratif** de 129 connecteurs qui pilote toute l'UI
+    d'intégrations : une erreur de déclaration ne casse rien à la compilation et ne se voit qu'à
+    l'écran — ou en base. D'où des tests d'**intégrité** plutôt que de comportement : unicité et
+    forme des clés (slug), ordre de déclaration préservé (l'UI groupe par catégorie), copie
+    défensive de `all()`, champs déduits du mode d'auth (`@ParameterizedTest` sur les 4 modes
+    utilisés), et surtout **tout champ dont la clé évoque un secret est marqué `secret`** — ce
+    drapeau pilote à la fois le masquage UI et le chiffrement au repos (recoupe C24). Les 2 lignes
+    restantes sont la branche `NONE` des deux `switch`, qu'aucun connecteur n'utilise.
+- **Reste, concentré sur trois classes IA** : `AnalysisJobService` (204 lignes, **0 %**),
+  `IssueAiService` (179, 0,6 %), `DecisionService` (104, **0 %**). Orchestration de jobs asynchrones
+  et appels LLM : coûteux à tester, chaque itération Maven ~20 min, et sans effet sur un critère de
+  la grille (50 % largement tenu). **Reporté après soutenance**, assumé à l'oral.
