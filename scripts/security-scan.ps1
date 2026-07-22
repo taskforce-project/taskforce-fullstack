@@ -45,6 +45,20 @@ $FrontendImage  = "${ProjectName}-frontend"
 $WorkspaceRoot  = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $TrivyCache     = "trivy_cache"
 
+# Répertoires exclus du scan filesystem (correctif du 22/07/2026).
+# Sans eux, `trivy fs --scanners vuln,secret,misconfig` parcourt tout le dépôt — dont
+# `node_modules`, `target`, `.git` et ses PROPRES rapports précédents. Le scanner de secrets lit
+# le contenu de chaque fichier : le scan ne terminait plus (observé bloqué > 4 h).
+# Aucune perte de couverture : Trivy détecte les dépendances via les fichiers de VERROUILLAGE
+# (`package-lock.json`, `pom.xml`), pas en marchant dans les paquets installés — et ceux-ci sont
+# de toute façon couverts par le scan d'IMAGES (étape 1/3).
+$FsSkipDirs = @(
+    "**/node_modules", "**/target", "**/.git", "**/.next", "**/dist", "**/build",
+    "**/coverage", "**/__pycache__", "**/.venv", "security-reports", "**/playwright-report"
+)
+$FsSkipArgs = @()
+foreach ($d in $FsSkipDirs) { $FsSkipArgs += @("--skip-dirs", $d) }
+
 # ── Helpers ───────────────────────────────────────────────
 function Write-Header($text) {
     Write-Host ""
@@ -242,6 +256,7 @@ if ($Source) {
         --severity "$Severity,HIGH,CRITICAL" `
         --format table `
         --no-progress `
+        @FsSkipArgs `
         /workspace
 
     # ── JSON ─────────────────────────────────────────────
@@ -256,6 +271,7 @@ if ($Source) {
         --severity "$Severity,HIGH,CRITICAL" `
         --format json `
         --no-progress `
+        @FsSkipArgs `
         /workspace | Out-File -FilePath $fsJsonFile -Encoding UTF8
 
     # ── HTML ─────────────────────────────────────────────
@@ -271,6 +287,7 @@ if ($Source) {
         --format template `
         --template "@contrib/html.tpl" `
         --no-progress `
+        @FsSkipArgs `
         /workspace | Out-File -FilePath $fsHtmlFile -Encoding UTF8
 
     Write-OK "Rapports : trivy-fs.json / trivy-fs.html"
