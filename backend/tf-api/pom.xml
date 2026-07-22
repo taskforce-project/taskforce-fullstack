@@ -320,7 +320,7 @@
 							     compilée en `Outer$Inner.class`, que `Outer.*` ne matche pas. Sans le
 							     `$*`, les records internes (BrainTemplateService.SeedNode, .Sys,
 							     .ProjectRef, KnowledgeController.ReseedRequest) restaient comptés à 0 %
-							     — 96 lignes indûment pénalisantes. -->
+							     — 11 lignes indûment pénalisantes. -->
 							<exclude>**/TfApiApplication.*</exclude>
 							<exclude>com/taskforce/tf_api/core/service/brain/**</exclude>
 							<exclude>**/BrainTemplateService.*</exclude>
