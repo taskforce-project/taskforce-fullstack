@@ -10,12 +10,28 @@ const API_ORIGIN = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 // (vignette cassée, `TypeError: Failed to fetch`) alors que le backend et MinIO sont sains.
 // `https:` dans img-src ne couvre pas un MinIO local en http:// → il faut l'origine explicite.
 const STORAGE_ORIGIN = process.env.NEXT_PUBLIC_STORAGE_URL ?? "http://localhost:9000";
+
+const IS_PROD = process.env.NODE_ENV === "production";
+
+// Origine WebSocket du temps réel (STOMP/SockJS), DÉRIVÉE de l'API au lieu d'être écrite en dur.
+// Auparavant la CSP listait `ws://localhost:8080 wss://localhost:8080` : en production, la
+// connexion vers le vrai hôte d'API était donc bloquée par la CSP et le temps réel tombait
+// silencieusement — un bug qui ne pouvait pas se voir en développement.
+const WS_ORIGIN = API_ORIGIN.replace(/^http/, "ws");
+
 const cspHeader = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
+  // `unsafe-eval` n'est requis QUE par le rechargement à chaud du serveur de développement.
+  // L'embarquer en production élargissait la surface XSS sans aucune contrepartie.
+  `script-src 'self' 'unsafe-inline'${IS_PROD ? "" : " 'unsafe-eval'"}`,
+  // `unsafe-inline` sur les styles reste nécessaire : Tailwind et l'hydratation de Next.js
+  // injectent des styles en ligne. Le lever suppose de passer aux nonces.
   "style-src 'self' 'unsafe-inline'",
-  `connect-src 'self' ${API_ORIGIN} ${STORAGE_ORIGIN} ws://localhost:8080 wss://localhost:8080`,
-  `img-src 'self' data: blob: https: ${API_ORIGIN} ${STORAGE_ORIGIN}`,
+  `connect-src 'self' ${API_ORIGIN} ${STORAGE_ORIGIN} ${WS_ORIGIN}`,
+  // `https:` était un joker autorisant les images de N'IMPORTE quelle origine HTTPS. Il n'a de
+  // raison d'être qu'en développement, où MinIO est en http:// ; en production les deux origines
+  // utiles sont explicites.
+  `img-src 'self' data: blob: ${API_ORIGIN} ${STORAGE_ORIGIN}${IS_PROD ? "" : " https:"}`,
   "font-src 'self' data:",
   "media-src 'self'",
   "object-src 'none'",
@@ -32,12 +48,21 @@ const securityHeaders = [
   { key: "X-Frame-Options",             value: "DENY" },
   { key: "X-XSS-Protection",            value: "0" }, // désactivé — la CSP prend le relais
   { key: "Referrer-Policy",             value: "strict-origin-when-cross-origin" },
+  // Isole le contexte de navigation : une fenêtre ouverte depuis un autre site ne peut plus
+  // manipuler celle-ci via `window.opener` (ZAP le signalait manquant).
+  // COEP n'est délibérément PAS posé : `require-corp` bloquerait les vignettes servies par MinIO,
+  // qui ne renvoie pas d'en-tête Cross-Origin-Resource-Policy.
+  { key: "Cross-Origin-Opener-Policy",  value: "same-origin" },
   { key: "Permissions-Policy",          value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()" },
   { key: "Content-Security-Policy",     value: cspHeader },
 ];
 
 const nextConfig: NextConfig = {
   output: 'standalone', // Pour Docker
+  // Supprime l'en-tête `X-Powered-By: Next.js`, qui annonce la technologie et sa présence sur
+  // chaque réponse (ZAP : 5 occurrences). Aucune valeur fonctionnelle, uniquement du renseignement
+  // offert à un attaquant.
+  poweredByHeader: false,
   // Next 16 : Turbopack est le bundler par défaut (build + dev).
   // Config vide lève le conflit « webpack config sans turbopack config »
   turbopack: {},
