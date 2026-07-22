@@ -1,7 +1,7 @@
 "use client"
 
 import type { ReactNode } from "react"
-import { Clock, MoreHorizontal, RefreshCw, Scaling, Trash2 } from "lucide-react"
+import { Clock, GripVertical, MoreHorizontal, RefreshCw, Scaling, Trash2 } from "lucide-react"
 import type { DraggableAttributes, DraggableSyntheticListeners } from "@dnd-kit/core"
 
 import { cn } from "@/lib/utils"
@@ -61,8 +61,22 @@ export function CardShell({
 }: CardShellProps) {
   return (
     <Card className={cn("flex h-full min-h-[230px] flex-col gap-0 overflow-hidden py-0 transition-opacity", isDragging && "opacity-40")}>
+      {/*
+        Les deux moitiés du glisser-déposer sont SÉPARÉES (correctif a11y du 22/07).
+
+        Avant, `dragAttributes` et `dragListeners` étaient posés ensemble sur cette barre. Or
+        `dragAttributes` de dnd-kit contient `role="button"` et `tabindex="0"` : la barre devenait un
+        contrôle interactif contenant lui-même le bouton de menu — c'est la violation
+        `nested-interactive` d'axe-core (5 occurrences, une par carte), un cas où un lecteur d'écran
+        ne sait plus quoi annoncer.
+
+        Désormais : les `listeners` (pointeur) restent sur la barre — on peut toujours saisir la
+        carte n'importe où sur son en-tête, l'usage à la souris est inchangé — tandis que les
+        `attributes` (rôle, tabulation, description ARIA) vont sur une poignée dédiée. Les
+        événements clavier de la poignée remontent jusqu'aux listeners par propagation, donc le
+        glisser-déposer au clavier continue de fonctionner.
+      */}
       <div
-        {...(dragAttributes ?? {})}
         {...(dragListeners ?? {})}
         className={cn(
           "flex items-center justify-between gap-2 border-b border-border bg-muted/40 px-4 py-2.5",
@@ -70,6 +84,16 @@ export function CardShell({
         )}
       >
         <div className="flex min-w-0 items-center gap-2 text-sm font-medium text-muted-foreground">
+          {dragListeners && (
+            <button
+              type="button"
+              {...(dragAttributes ?? {})}
+              aria-label={`Déplacer la carte ${title}`}
+              className="-ml-1 shrink-0 cursor-grab rounded text-muted-foreground/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing"
+            >
+              <GripVertical className="size-3.5" />
+            </button>
+          )}
           {icon}
           <span className="truncate">{title}</span>
         </div>
