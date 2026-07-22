@@ -64,6 +64,15 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
+# ── Retrait du CLI npm de l'image d'exécution (audit Trivy du 22/07/2026) ────
+# L'image `node:*-alpine` embarque npm et ses ~600 dépendances internes. Le build `standalone` de
+# Next.js démarre avec `node server.js` : npm n'est JAMAIS utilisé à l'exécution, mais ses paquets
+# sont scannés et remontent des CVE. Sur cette image : la SEULE CRITICAL (`tar`) et 13 des 27 HIGH
+# venaient de /usr/local/lib/node_modules/npm — aucune du code applicatif.
+# Les supprimer réduit la surface d'attaque réelle : plus de gestionnaire de paquets disponible pour
+# un attaquant ayant obtenu l'exécution de code dans le conteneur.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
+
 # Copier les fichiers nécessaires
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
