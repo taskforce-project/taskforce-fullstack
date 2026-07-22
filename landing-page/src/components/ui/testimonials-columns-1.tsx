@@ -32,7 +32,8 @@ function TestimonialCard({ item }: { item: TestimonialItem }) {
         </div>
         <div>
           <p className="text-foreground/80 text-xs font-semibold">{item.author}</p>
-          <p className="text-muted-foreground/60 text-[10px]">{item.role}</p>
+          {/* Idem : l'opacité passait sous le seuil de contraste WCAG AA. */}
+          <p className="text-muted-foreground text-[10px]">{item.role}</p>
         </div>
       </div>
     </div>

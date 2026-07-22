@@ -1,127 +1,39 @@
 ---
-import "@/styles/global.css";
-import "@/styles/accessibility.css";
-import App from "@/components/App";
-
-const title = "TaskForce — AI Delivery Operating System";
-const description =
-  "TaskForce turns intent into shipped software: plan the work, assign it, and orchestrate your AI agents through every step of delivery — with human approval at each checkpoint.";
-const canonicalURL = Astro.site
-  ? new URL(Astro.url.pathname, Astro.site).href
-  : Astro.url.pathname;
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { Hero } from "@/components/sections/Hero";
+import { LogosSection } from "@/components/sections/LogosSection";
+import {
+  StatementSection,
+  OrchestrationFeature,
+  SmartAssignFeature,
+  AgentsFeature,
+  BrainOSFeature,
+  AnalyticsFeature,
+} from "@/components/sections/HomeFeatures";
+import {
+  IntegrationsSection,
+  EnterpriseSection,
+  TestimonialsSection,
+} from "@/components/sections/HomeSections";
+import { HowItWorks } from "@/components/sections/HowItWorks";
+import { CtaSection } from "@/components/sections/CtaSection";
 ---
 
-<!doctype html>
-<html lang="en" class="scroll-smooth">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="generator" content={Astro.generator} />
-
-    <!-- SEO Meta Tags -->
-    <title>{title}</title>
-    <meta name="description" content={description} />
-    <link rel="canonical" href={canonicalURL} />
-
-    <!-- i18n / Alternate Languages -->
-    <link rel="alternate" hreflang="en" href={canonicalURL} />
-    <link rel="alternate" hreflang="fr" href={canonicalURL} />
-    <link rel="alternate" hreflang="x-default" href={canonicalURL} />
-
-    <!-- Open Graph / Facebook -->
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content={canonicalURL} />
-    <meta property="og:title" content={title} />
-    <meta property="og:description" content={description} />
-    <meta property="og:image" content="/og-image.jpg" />
-
-    <!-- Twitter -->
-    <meta property="twitter:card" content="summary_large_image" />
-    <meta property="twitter:url" content={canonicalURL} />
-    <meta property="twitter:title" content={title} />
-    <meta property="twitter:description" content={description} />
-    <meta property="twitter:image" content="/og-image.jpg" />
-
-    <!-- Favicon -->
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-
-    <!-- Fonts : Inter Variable (métrique Linear/Attio, cf. Spec_Master §6) -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,100..900&display=swap"
-      rel="stylesheet"
-    />
-
-    <!-- Additional Meta Tags for SEO -->
-    <meta name="robots" content="index, follow" />
-    <meta name="author" content="TaskForce" />
-    <meta
-      name="keywords"
-      content="AI delivery, AI project management, agent orchestration, AI agents, software delivery, Claude Code, developer productivity, project orchestration"
-    />
-
-    <!-- Theme Color (light-only) -->
-    <meta name="theme-color" content="#ffffff" />
-
-    <!-- Apple Touch Icon -->
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-
-    <!-- Manifest -->
-    <link rel="manifest" href="/manifest.json" />
-  </head>
-
-  <body class="min-h-screen bg-background font-sans antialiased">
-    <!-- Daltonism SVG Filters (accessibilité) -->
-    <svg style="display: none;">
-      <defs>
-        <filter id="protanopia-filter">
-          <feColorMatrix
-            type="matrix"
-            values="0.567, 0.433, 0, 0, 0
-                    0.558, 0.442, 0, 0, 0
-                    0, 0.242, 0.758, 0, 0
-                    0, 0, 0, 1, 0"
-          ></feColorMatrix>
-        </filter>
-        <filter id="deuteranopia-filter">
-          <feColorMatrix
-            type="matrix"
-            values="0.625, 0.375, 0, 0, 0
-                    0.7, 0.3, 0, 0, 0
-                    0, 0.3, 0.7, 0, 0
-                    0, 0, 0, 1, 0"
-          ></feColorMatrix>
-        </filter>
-        <filter id="tritanopia-filter">
-          <feColorMatrix
-            type="matrix"
-            values="0.95, 0.05, 0, 0, 0
-                    0, 0.433, 0.567, 0, 0
-                    0, 0.475, 0.525, 0, 0
-                    0, 0, 0, 1, 0"
-          ></feColorMatrix>
-        </filter>
-      </defs>
-    </svg>
-
-    <App client:only="react" />
-
-    <!-- Schema.org structured data -->
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@type": "SoftwareApplication",
-        "name": "TaskForce",
-        "applicationCategory": "DeveloperApplication",
-        "description": "TaskForce is an AI Delivery Operating System: it plans, assigns, and orchestrates AI agents through every step of software delivery, with human approval at each checkpoint.",
-        "operatingSystem": "Web",
-        "offers": {
-          "@type": "Offer",
-          "price": "0",
-          "priceCurrency": "USD"
-        }
-      }
-    </script>
-  </body>
-</html>
+<BaseLayout
+  title="TaskForce — AI Delivery Operating System"
+  description="TaskForce turns intent into shipped software: describe the outcome and it orchestrates your AI agents through every step of delivery — with human approval at each checkpoint."
+>
+  <Hero />
+  <LogosSection />
+  <StatementSection />
+  <HowItWorks />
+  <OrchestrationFeature />
+  <SmartAssignFeature />
+  <AgentsFeature />
+  <BrainOSFeature />
+  <AnalyticsFeature />
+  <IntegrationsSection />
+  <EnterpriseSection />
+  <TestimonialsSection />
+  <CtaSection />
+</BaseLayout>

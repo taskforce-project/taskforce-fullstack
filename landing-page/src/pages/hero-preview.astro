@@ -1,8 +1,8 @@
 ---
-// DEV HARNESS — aperçu isolé de l'above-fold (header + hero), à supprimer avant commit.
-// Le Hero est hydraté (client:load) pour la simulation live + onglets interactifs.
+// DEV HARNESS — aperçu isolé (header + hero + footer), à supprimer avant commit.
 import "@/styles/global.css";
 import { SiteHeader } from "@/components/layout/SiteHeader";
+import { SiteFooter } from "@/components/layout/SiteFooter";
 import { Hero } from "@/components/sections/Hero";
 ---
 
@@ -22,5 +22,6 @@ import { Hero } from "@/components/sections/Hero";
   <body class="min-h-screen bg-background font-sans antialiased">
     <SiteHeader client:load />
     <Hero client:load />
+    <SiteFooter />
   </body>
 </html>

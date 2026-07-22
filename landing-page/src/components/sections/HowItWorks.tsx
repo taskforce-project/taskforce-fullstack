@@ -40,7 +40,8 @@ export function HowItWorks() {
                 <span className="flex size-11 items-center justify-center rounded-xl border border-black/[0.08] bg-card text-foreground shadow-sm">
                   <s.icon className="size-5" strokeWidth={1.75} />
                 </span>
-                <span className="text-[13px] font-medium text-muted-foreground/60">
+                {/* Sans le `/60`, qui ramenait le contraste à 2,84:1 (Lighthouse, 22/07). */}
+                <span className="text-[13px] font-medium text-muted-foreground">
                   0{i + 1}
                 </span>
               </div>

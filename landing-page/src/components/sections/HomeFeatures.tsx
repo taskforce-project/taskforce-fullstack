@@ -91,7 +91,10 @@ function PipelineViz() {
     <Frame title="taskforce.app · Run #145 — Checkout redesign">
       <div className="p-5">
         <div className="flex items-center justify-between">
-          <h4 className="text-sm font-semibold text-foreground">Delivery pipeline</h4>
+          {/* `h3` et non `h4` : le titre de section au-dessus est un `h2`, sauter un niveau casse
+              la navigation par titres des lecteurs d'écran (Lighthouse `heading-order`, 22/07).
+              L'apparence est portée par les classes, pas par le niveau. */}
+          <h3 className="text-sm font-semibold text-foreground">Delivery pipeline</h3>
           <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700">
             <span className="size-1.5 rounded-full bg-indigo-500" />
             In progress
