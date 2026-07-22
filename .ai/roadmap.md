@@ -825,8 +825,8 @@ Planning prévisionnel (Gantt, jalons DFS, chemin critique), budget prévisionne
 | **C2** | **Audit de fonctionnalité** : parcourir l'app écran par écran, lister ce qui marche / ce qui est décoratif | Alimente C1 ci-dessus **et** la démo de soutenance (blocs 2 et 3) | 🔲 |
 | **C3** | **Couverture de tests re-mesurée** front + back, chiffres réels remontés | **C18 et C25 — seuls seuils chiffrés de toute la grille (≥ 50 %)**. ✅ **Front 21/07 : 88,83 % lignes, 785/785 verte.** ✅ **Back 22/07 : 73,71 % lignes, 786/786 verte.** | ✅ |
 | **C4** | **Lint + typecheck propres** sur tout le repo (pas seulement les fichiers touchés) | C16 « le code satisfait aux tests d'un outil de revue de code par analyse statique » | ✅ |
-| **C5** | **Sécurité : rejouer ZAP + Semgrep + Trivy**, 0 HIGH | C16 (front), C21/C24 (back) — « composants tiers à jour et sans vulnérabilité connue » | 🔲 |
-| **C6** | **Vérifier le chiffrement au repos** des données personnelles | C24 « toutes les données sensibles sont chiffrées » + CDC §7 « chiffrement des données personnelles des employés » | 🔲 |
+| **C5** | **Sécurité : rejouer ZAP + Semgrep + Trivy**, 0 HIGH | C16 (front), C21/C24 (back) — « composants tiers à jour et sans vulnérabilité connue ». ✅ **22/07 : 0 CRITICAL sur les deux images** (13→0 et 1→0), npm production 0 haute, ZAP backend 0 alerte de risque. Reste 12 hautes dont **11 issues des images de base Alpine** (correctif amont) + 1 Keycloak assumé. ⚠️ **Deux mesures manquantes** : scan de code source (ne termine pas sous Docker/Windows → à rejouer en CI) et re-passage ZAP après les correctifs de CSP/en-têtes | 🟧 |
+| **C6** | **Vérifier le chiffrement au repos** des données personnelles | C24 « toutes les données sensibles sont chiffrées » + CDC §7. 🟧 **Constat du 22/07** : AES-256-GCM (`EncryptedStringConverter`) appliqué aux identifiants de connecteurs, à la config d'intégration et aux demandes Enterprise. **Mais email, `keycloakId` et jetons ne sont PAS chiffrés** — choix documenté et défendable (GCM non déterministe casserait les recherches), à condition de ne **pas** annoncer « toutes les données personnelles sont chiffrées ». Formulation juste : les *secrets* sont chiffrés en base, les identifiants servant de clés de recherche sont protégés par le contrôle d'accès et le chiffrement disque de l'hôte. Reste à formaliser dans le dossier | 🟧 |
 | **C7** | **Conformité RGPD de bout en bout** : cookies, politique de confidentialité, accès aux données, **double opt-in** | **C11 — 4 critères**, dont le double opt-in aujourd'hui non traité | 🔲 |
 | **C8** | **E9 — audit RGPD d'un cas professionnel externe** | C11. Le RGPD de TaskForce **ne le remplace pas**. ⚠️ Sujet imposé par l'école → à réclamer s'il n'a pas été fourni | 🔲 |
 | **C9** | **Mesurer le SEO de la landing** et atteindre ≥ 70 % | **C20 — seul seuil chiffré non démontré**. Un juré peut le vérifier en direct avec Lighthouse | 🔲 |
@@ -957,6 +957,57 @@ Planning prévisionnel (Gantt, jalons DFS, chemin critique), budget prévisionne
 > **0 %**), `IssueAiService` (179, 0,6 %), `DecisionService` (104, **0 %**). Orchestration de jobs
 > asynchrones et appels LLM : coûteux à tester, sans effet sur un critère de la grille. **Reporté en
 > §4.B**, assumé à l'oral.
+
+> **▶ MAJ 22/07/2026 (2) — lot `C5` : CVE des images, et ce que le chiffre brut cachait.**
+>
+> | Image | Avant | Après | Reste |
+> |---|---|---|---|
+> | **Frontend** | 1 CRITICAL · 27 HIGH | **0 CRITICAL · 2 HIGH** | 2 paquets Alpine (amont) |
+> | **Backend** | 13 CRITICAL · 42 HIGH | **0 CRITICAL · 16 HIGH** | 9 Alpine (amont) · 6 Jackson · 1 Keycloak |
+>
+> **Aucune CRITICAL ne subsiste sur les deux images.** 786/786 tests backend et 785/785 tests
+> frontend passent après toutes les montées. Les 18 HIGH restantes sont caractérisées : 11
+> proviennent des images de base Alpine (correctif à publier en amont, pas de notre ressort), 7 sont
+> les reports assumés ci-dessous.
+>
+> **La lecture brute du rapport était trompeuse.** En traçant l'emplacement de chaque paquet
+> (`PkgPath`), la seule CRITICAL du frontend et **13 des 27 HIGH** se trouvaient dans
+> `/usr/local/lib/node_modules/npm/` — les dépendances internes du CLI npm livré avec
+> `node:20-alpine`, **jamais** dans le code applicatif. Or l'étage d'exécution démarre
+> `node server.js` : npm n'y sert à rien. Le supprimer élimine 14 vulnérabilités et réduit la
+> surface réelle (plus de gestionnaire de paquets pour un attaquant ayant obtenu l'exécution de code).
+>
+> **Corrections appliquées :**
+> - **Frontend** : npm retiré de l'image d'exécution ; `next` 16.1.1 → **16.2.6** (9 HIGH),
+>   `axios` → 1.18.1, `ws` → 8.21.1, `sharp` via `overrides`. Arbre **livré en production** :
+>   1 critique + 4 hautes → **plus rien au-dessus de « modéré »**. `tsc` propre, **785/785 tests**.
+> - **Backend** : parent Spring Boot **4.0.0 → 4.0.6** (gouverne tomcat, spring-security, netty,
+>   jackson) ; `<dependencyManagement>` forçant Thymeleaf 3.1.5 (6 CRITICAL — non supprimable, il
+>   rend les gabarits d'e-mails), BouncyCastle 1.84, commons-io, pilote PostgreSQL ; agent
+>   OpenTelemetry 2.12.0 → **2.26.1** (1 CRITICAL). **786/786 tests** après montée.
+> - **2ᵉ passe** : `tomcat.version` 11.0.22 et `netty.version` 4.2.15 forcés via les propriétés du
+>   BOM — le parent 4.0.6 embarquait encore un Tomcat portant les 3 dernières CRITICAL. **Résultat
+>   vérifié : 0 CRITICAL, netty et tomcat disparus du rapport.**
+>
+> **Écartés délibérément, à assumer :**
+> - **Keycloak 25.0.6 → 26.0.6** (1 HIGH) : bond de version MAJEURE du client admin, sur le composant
+>   qui garde toute l'authentification, alors que le serveur déployé est en 23.0 — l'écart se
+>   creuserait. Risque disproportionné en clôture.
+> - **Jackson** (6 HIGH) — *report à réexaminer* : la prudence initiale visait la coexistence
+>   Jackson 2 / Jackson 3, qui a déjà mordu le projet (Spring Boot 4 sérialise en `tools.jackson`,
+>   cf. MAJ 10/07). Mais après mesure, le correctif de `tools.jackson` est un saut de **patch**
+>   (3.1.2 → 3.1.4), pas un franchissement de majeure : le risque est faible et l'argument ne tient
+>   pas pour cette ligne-là. Seule la ligne `com.fasterxml` (2.18.8 → 2.21.4) est un saut mineur qui
+>   mérite d'être vérifié. À traiter au prochain cycle.
+> - **vitest 2.x → 4.1.10** (2 CRITICAL) : dépendance de **développement**, jamais livrée. Version
+>   majeure du lanceur de tests, casserait vraisemblablement une partie des 785 tests.
+> - **Paquets Alpine** (libexpat, curl, p11-kit, libssl3) : dépendent de la publication d'une image
+>   de base à jour, pas de nous. Rebuild avec `--pull` tenté.
+>
+> **Outillage corrigé** : `scripts/security-scan.ps1` parcourait tout le dépôt avec le scanner de
+> secrets, sans exclusion — `node_modules`, `target`, `.git`, et **ses propres rapports précédents**.
+> Le scan ne terminait plus (observé bloqué > 4 h). Ajout de `--skip-dirs` ; aucune perte de
+> couverture, Trivy détectant les dépendances via les fichiers de verrouillage.
 
 ### 4.B — Repoussé APRÈS la soutenance (ne pas empiéter)
 
