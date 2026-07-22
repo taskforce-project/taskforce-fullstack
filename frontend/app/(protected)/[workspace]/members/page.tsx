@@ -295,7 +295,9 @@ function InviteMemberDialog({ onInvited }: { readonly onInvited?: () => void }) 
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium">Role</label>
             <Select value={role} onValueChange={(v) => setRole(v as WorkspaceRole)}>
-              <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+              {/* Le <label> voisin n'est pas associé au contrôle (pas de `htmlFor`) : sans
+                  `aria-label`, ce sélecteur reste anonyme malgré son intitulé visible. */}
+              <SelectTrigger className="h-9" aria-label="Rôle du membre invité"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="MEMBER">Member</SelectItem>
                 <SelectItem value="ADMIN">Admin</SelectItem>
@@ -700,7 +702,10 @@ export default function MembersPage() {
         {/* Filtre par projet (QA2-20) */}
         {projects.length > 0 && (
           <Select value={projectFilter} onValueChange={setProjectFilter}>
-            <SelectTrigger className="h-9 w-44 text-sm shrink-0"><SelectValue placeholder="Projet" /></SelectTrigger>
+            {/* Le nom accessible ne doit pas dépendre de la valeur affichée : selon la sélection,
+                `SelectValue` peut ne rendre aucun texte et le bouton devient anonyme pour un
+                lecteur d'écran (axe : `button-name`, critique). */}
+            <SelectTrigger className="h-9 w-44 text-sm shrink-0" aria-label="Filtrer par projet"><SelectValue placeholder="Projet" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Tous les projets</SelectItem>
               {projects.map((p) => (
