@@ -99,14 +99,32 @@ le **smart-assign** — l'outil propose, le manager valide.
 
 | Indicateur | Valeur | Seuil grille |
 |---|---|---|
-| Couverture de tests **front** | **92 %** (746 tests Vitest) + E2E Playwright | ≥ 50 % |
-| Couverture de tests **back** | **78 %** (670 tests JaCoCo, Testcontainers) | ≥ 50 % |
+| Couverture de tests **front** | **88,83 %** lignes (785 tests Vitest, 0 échec) + E2E Playwright | ≥ 50 % |
+| Couverture de tests **back** | **73,71 %** lignes (786 tests JaCoCo, 0 échec) | ≥ 50 % |
 | Migrations Flyway | 71, sans trou ni doublon | — |
 | Workflows CI | 7 (GitHub Actions) + Dependabot | — |
 | Sécurité | ZAP + Semgrep + Trivy, 0 HIGH | — |
 
-⚠️ **À refaire mesurer avant la soutenance** (les correctifs de juillet ont bougé le code) —
-voir `.ai/roadmap.md` §4.A, lots `C3` et `C5`.
+✅ **Re-mesurés les 21 et 22/07/2026**, suites entièrement vertes. Ces deux chiffres sont les seuls
+seuils chiffrés de toute la grille (C18 et C25) : ils sont donc les plus susceptibles d'être
+vérifiés en direct. Les valeurs qui circulaient avant (« 92 % front / 78 % back ») étaient périmées.
+
+⚠️ **Reste à mesurer** : sécurité (`C5`) et SEO de la landing (`C9`) — voir `.ai/roadmap.md` §4.A.
+
+### Un sujet à préparer : la régression de couverture backend
+
+La couverture back était à **86,1 %** le 02/07 ; elle est à **73,71 %** aujourd'hui. Le code a gagné
+~1 970 lignes (couche IA/agent, catalogue de connecteurs) arrivées quasiment sans tests.
+
+Le point intéressant n'est pas la baisse, c'est **pourquoi elle n'a pas été vue** : le gate JaCoCo
+était réglé sur 84 % mais lié à la phase Maven `verify`, que ni le script de test ni la CI
+n'appellent. Il n'a donc jamais rien gardé (`PC-028`).
+
+**À dire tel quel** : « notre garde-fou était branché sur une phase que le build n'atteint jamais.
+Une régression de douze points est passée inaperçue pendant trois semaines. On l'a trouvée en
+re-mesurant pour cette soutenance, le seuil est réaligné sur le réel, et les trois classes en cause
+sont identifiées. » C'est exactement l'esprit critique attendu au §1, et ça vaut mieux que d'annoncer
+un chiffre rond que le jury pourrait démentir en lançant le build.
 
 ---
 
