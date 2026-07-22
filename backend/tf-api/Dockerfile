@@ -35,7 +35,8 @@ RUN apk add --no-cache curl
 
 # Télécharger le Java agent OpenTelemetry (instrumentation automatique pour SigNoz/OTLP)
 # Désactivé par défaut via OTEL_SDK_DISABLED=true - activer dans .env.dev quand le profil observability est utilisé
-ARG OTEL_AGENT_VERSION=2.12.0
+# 2.12.0 → 2.26.1 (22/07/2026, audit Trivy) : l'agent 2.12.0 porte une CVE CRITICAL.
+ARG OTEL_AGENT_VERSION=2.26.1
 RUN mkdir -p /otel && \
     curl -fsSL -o /otel/opentelemetry-javaagent.jar \
     "https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v${OTEL_AGENT_VERSION}/opentelemetry-javaagent.jar"
