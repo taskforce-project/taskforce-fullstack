@@ -806,10 +806,15 @@ Planning prévisionnel (Gantt, jalons DFS, chemin critique), budget prévisionne
 > tableau d'équivalences exhaustif.
 >
 > **Écarts au CDC à traiter dans le dossier** (relevés le 21/07) :
-> 1. Le CDC impose « Back-end : **PHP (Symfony) ou Node.js** » → réalisé en **Java/Spring Boot**.
->    C22 note « un choix de technologies adapté » : l'écart est défendable mais doit être **argumenté
->    explicitement**, pas passé sous silence. Bien tourné, il alimente C2 (distance critique).
-> 2. Le CDC exige un « **Manuel utilisateur** pour les collaborateurs et managers » — absent des livrables.
+> 1. ~~Le CDC impose « Back-end : PHP (Symfony) ou Node.js » → réalisé en Java/Spring Boot.~~
+>    ✅ **Question refermée le 23/07/2026 : le choix technique est LIBRE, à condition de pouvoir
+>    l'argumenter.** Ce n'est donc pas un écart à défendre mais une décision à justifier. Ne plus la
+>    poser. C22-1 demande d'ailleurs « un choix de technologies **adapté** », pas conforme au CDC.
+>    ⚠️ Reste vrai : l'argumentaire **manquait**. `ADR-001` comparait Java à Quarkus et Micronaut,
+>    **jamais à Symfony ni à Node.js**, c'est-à-dire aux deux options que le jury demandera
+>    d'écarter. Section « Alternatives écartées, face au cahier des charges » ajoutée le 23/07.
+> 2. ~~Le CDC exige un « Manuel utilisateur » — absent des livrables.~~ ✅ **Il existe** depuis le
+>    05/07 : `15-utilisateur/Manuel_Utilisateur.md`, 399 lignes, 12 sections (cf. lot C12).
 >
 > Décision : **on arrête le dev de features**. Focus **webapp** (la landing = roadmap à part, tout à la fin).
 > Brain OS = **stand-by** (cf. `brain-os-roadmap.md`). Les « plus » = `.ai/backlog-post-v1.md`.
@@ -1358,6 +1363,125 @@ Planning prévisionnel (Gantt, jalons DFS, chemin critique), budget prévisionne
 >
 > Un exemple inventé n'aurait rien prouvé. Celui-ci est vérifiable ligne à ligne dans l'historique
 > git, ce qui est précisément ce que « opérationnelle » veut dire.
+
+> **▶ MAJ 23/07/2026 (5) — mesure d'audience intégrée (C20), et audit du support de soutenance.**
+>
+> **Mesure d'audience.** Deux critères de la grille étaient au rouge faute d'outil. **Umami**
+> retenu, auto-hébergé, réutilisant le Postgres existant via une base dédiée.
+>
+> Le choix est un **choix de conformité, pas de confort**, et c'est ainsi qu'il doit être présenté :
+> Google Analytics aurait introduit un destinataire hors UE au registre et imposé un consentement,
+> contredisant le retrait de Groq du 16/07 et l'auto-hébergement du modèle. Umami ne dépose aucun
+> cookie et n'est joignable que depuis notre infrastructure.
+>
+> **Vérifié de bout en bout**, pas seulement déployé : service en réponse (heartbeat 200), script de
+> mesure servi (2 573 octets), et un événement émis vers l'API **retrouvé en base** avec sa
+> provenance (`google.com`), son navigateur, son système et son type d'appareil. Le champ `country`
+> est **vide**, confirmant l'absence de géolocalisation d'adresse IP.
+>
+> ⚠️ **Une affirmation que j'avais écrite au registre était fausse, corrigée après vérification du
+> script servi.** J'y avais écrit « aucune information n'est lue ni écrite dans le terminal ». Le
+> script effectue en réalité **une lecture**, celle de la clé `umami.disabled`, qui sert à respecter
+> une opposition posée par le visiteur lui-même. Aucune écriture, aucun identifiant persistant, mais
+> écrire « aucune lecture » aurait été contredit par un simple examen du script.
+>
+> Fichiers : `docker-compose.dev.yml` et `.prod.yml` (service `umami`) ·
+> `landing-page/src/components/AudienceTracking.astro` (source unique, injecté sur les **16 pages**) ·
+> `landing-page/Dockerfile` (`ARG` : Astro inline les `PUBLIC_*` au **build**, pas à l'exécution) ·
+> `db/init/03-init-umami-db.sql` et son équivalent prod · registre RGPD **traitement n°9**.
+>
+> Grille : **76 verts, 9 jaunes, 5 rouges**.
+>
+> **Audit du support de soutenance (`TaskForce_Soutenance_v3.pptx`).** Le support **existe déjà** :
+> 32 diapositives, notes intégrées. Mais il date du **14/07** et n'est **suivi par aucun des deux
+> dépôts** (15 Mo à la racine du workspace, non versionné). Deux problèmes trouvés :
+>
+> | Diapo | Affirmation | Réel mesuré le 23/07 |
+> |---|---|---|
+> | 8 | 165 composants, dont 74 primitives | **176**, dont **76** |
+> | 13 | 706 tests Vitest, 92 % de couverture | **805**, **89,55 %** |
+> | 16 | 49 entités, 68 migrations | 49 entités, **72** migrations |
+> | 17 | 35 contrôleurs, plus de 200 endpoints | **36** contrôleurs, **219** endpoints (le « plus de 200 » reste juste) |
+> | 21 | 692 tests, environ 72 % JaCoCo | **792**, **73,71 %** |
+>
+> Et surtout : **aucune diapositive ne couvre C20** (référencement et mesure d'audience), soit
+> **4 critères sans support**. `Plan_Minute` v2.0 l'avait identifié le 21/07 et prévoit une
+> diapositive dédiée ; le support, antérieur, ne l'implémente pas. Sauvegarde du fichier prise avant
+> toute modification.
+
+> **▶ MAJ 23/07/2026 (6) — CI de la landing remise au vert, et chiffres du support actualisés.**
+>
+> **La landing n'avait jamais été lintée proprement.** Le lot `C4` du 21/07 portait sur `frontend/`,
+> un espace de travail distinct avec sa propre configuration ESLint : `landing-page/` n'y était pas
+> inclus, et personne ne s'en était aperçu. Or `landing-tests.yml` lance `lint` et `typecheck` en
+> **bloquant** (`continue-on-error: false`). Le job échouait donc, sur des fichiers **inchangés
+> depuis mai**.
+>
+> Cinq défauts corrigés, tous préexistants :
+>
+> | Fichier | Défaut | Correctif |
+> |---|---|---|
+> | `hero115.tsx`, `feature72.tsx` | interface vide étendant un supertype | alias de type |
+> | `layout/Header.tsx` | import `RefreshCw` mort | retiré |
+> | `layout/Footer.tsx` | `external` absent de l'union inférée par `Object.entries` | type `FooterLink` explicite, `external?: boolean` |
+> | `ui/etheral-shadow.tsx` | `animation` possiblement indéfini dans le JSX | calcul hissé hors du JSX, là où la garde existe déjà (même idiome que les 2 lignes voisines) |
+>
+> **Vérifié** : `eslint` **exit 0** · `tsc --noEmit` **exit 0** · `astro build` **exit 0**, 16 pages.
+>
+> **Chiffres du support de soutenance actualisés.** 9 remplacements sur 10 fichiers XML, appliqués
+> au corps des diapositives **et aux notes du présentateur**, celles-ci étant lues à voix haute.
+> Archive vérifiée intacte (195 entrées avant et après), sauvegarde prise avant écriture.
+>
+> **Reste sur `B3`, et je ne l'ai délibérément pas fait :**
+> - **La diapositive C20 manquante** (référencement et mesure d'audience, 4 critères sans support).
+>   Insérer une diapositive par script dans un deck gabarité risque de le corrompre ; à faire dans
+>   PowerPoint, présent sur la machine, en dupliquant une diapositive existante.
+> - **L'export PDF**, annexe obligatoire. LibreOffice absent, PowerPoint présent : action utilisateur.
+> - ⚠️ **Le support n'est suivi par aucun dépôt** : 15 Mo à la racine du workspace, non versionné.
+>   Une perte de machine le perdrait. À verser dans `taskforce-docs`.
+
+> **▶ MAJ 23/07/2026 (7) — ⚠️ le support de soutenance ne s'ouvre pas dans PowerPoint.**
+>
+> **C'est le point le plus grave de la journée.** En cherchant à insérer la diapositive C20 par
+> l'API PowerPoint, `Presentations.Open` a échoué. Vérifications faites, dans l'ordre :
+>
+> | Test | Résultat |
+> |---|---|
+> | PowerPoint COM crée, enregistre et rouvre son propre fichier | **OK** — l'automatisation fonctionne |
+> | Ouverture du deck **dans sa version intacte du 14/07** | **Échec identique** — mes modifications ne sont pas en cause |
+> | Marquage de source (Mark-of-the-Web), Protected View | absents |
+> | Chemin court, dossier Documents, arguments par défaut | échec dans tous les cas |
+>
+> **Un défaut structurel réel trouvé et corrigé** : `[Content_Types].xml` déclarait **32
+> `slideMaster`** alors que l'archive n'en contient **qu'un**. Les 31 déclarations excédentaires
+> désignaient des parties inexistantes, ce qui rend le paquet OPC invalide. Séquelle de la
+> génération par pptxgenjs. Vérifié avant correction : aucune relation `.rels` ne pointait vers ces
+> parties fantômes, le défaut était donc entièrement contenu dans le fichier de types. Après
+> réparation : 0 override orphelin, 195 entrées préservées, archive intègre.
+>
+> **Le fichier reste refusé par COM après cette réparation.** L'archive est pourtant cohérente :
+> types de contenu alignés sur les parties réelles, toutes les relations résolvent, et
+> `presentation.xml` référence 1 master et 32 diapositives dont tous les `r:id` existent.
+>
+> **Test décisif, à faire par l'utilisateur et par lui seul** : ouvrir le fichier en
+> double-cliquant. `Presentations.Open` échoue net là où PowerPoint interactif proposerait une
+> **réparation**. Si le prompt apparaît, l'accepter puis **réenregistrer** : le fichier sera
+> normalisé par PowerPoint et redeviendra manipulable.
+>
+> ⚠️ **Conséquence à mesurer** : ce support est le livrable annexe obligatoire du dossier, et il
+> semble n'avoir **jamais été ouvert** depuis sa génération le 14/07. Le `README` de
+> `18-soutenance` le déclarait pourtant « v3 générée, ancrée sur le code réel ». Déclarer livré un
+> fichier qu'on n'a pas ouvert est exactement le travers corrigé toute la journée, appliqué cette
+> fois au support de soutenance.
+>
+> **Bloqués tant que le fichier ne s'ouvre pas** : insertion de la diapositive C20 (4 critères sans
+> support) et export PDF (annexe obligatoire). Contenu de la diapositive rédigé et prêt à coller.
+>
+> Sauvegardes conservées : version du 14/07 intacte et version d'avant réparation.
+>
+> ✅ Fait au passage : le support est désormais **versionné** dans
+> `taskforce-docs/v1/18-soutenance/` (il vivait à la racine du workspace, 15 Mo non suivis par git).
+> ✅ Backend reconstruit et vérifié : `Started TfApiApplication`, conteneur sain, agent OTEL 2.26.1.
 
 ### 4.B — Repoussé APRÈS la soutenance (ne pas empiéter)
 

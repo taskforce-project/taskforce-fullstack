@@ -29,6 +29,14 @@ COPY --from=deps /app/node_modules ./node_modules
 # Copier le code source
 COPY . .
 
+# Mesure d'audience (CERT-C20). Astro inline les variables `PUBLIC_*` au moment du build : elles
+# doivent donc être des ARG et non des variables d'exécution, le site étant généré statiquement.
+# Vides par défaut, auquel cas aucun script de mesure n'est injecté dans les pages.
+ARG PUBLIC_UMAMI_SRC=
+ARG PUBLIC_UMAMI_WEBSITE_ID=
+ENV PUBLIC_UMAMI_SRC=$PUBLIC_UMAMI_SRC
+ENV PUBLIC_UMAMI_WEBSITE_ID=$PUBLIC_UMAMI_WEBSITE_ID
+
 # Build Astro
 RUN npm run build
 
