@@ -379,6 +379,37 @@ services:
       - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
       - ./pgadmin/pgpass:/pgpass
 
+  # ================================
+  # Umami — mesure d'audience de la landing (CERT-C20)
+  # ================================
+  # Choisi contre Google Analytics et Plausible Cloud pour deux raisons de conformité, pas de
+  # confort : il ne dépose AUCUN cookie (donc pas de consentement à recueillir, pas de bannière
+  # supplémentaire) et il est auto-hébergé (donc aucun transfert hors UE). Le registre des
+  # traitements reste ainsi sans destinataire étranger, ce qui est cohérent avec le retrait de
+  # Groq et l'auto-hébergement du modèle de langage.
+  #
+  # Il réutilise le Postgres existant via une base dédiée `umami` (cf. db/init/03-init-umami-db.sql).
+  umami:
+    image: ghcr.io/umami-software/umami:postgresql-v2.11.2
+    container_name: taskforce-umami-dev
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-PostgreSQLP54!}@postgres:5432/umami
+      DATABASE_TYPE: postgresql
+      # Sert à signer les sessions de la console Umami. Valeur de développement uniquement :
+      # en production elle doit venir de l'environnement, comme tous les autres secrets.
+      APP_SECRET: ${UMAMI_APP_SECRET:-dev-only-not-a-production-secret}
+      # Désactive la télémétrie sortante de l'outil lui-même : mesurer notre audience ne doit pas
+      # créer un flux vers un tiers, ce serait contradictoire avec la raison de l'avoir choisi.
+      DISABLE_TELEMETRY: "1"
+    ports:
+      - "${UMAMI_PORT:-3001}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - taskforce-network
+    restart: unless-stopped
+
 # ================================
 # Volumes
 # ================================

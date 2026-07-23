@@ -260,6 +260,12 @@ services:
     build:
       context: ./landing-page
       dockerfile: Dockerfile
+      # Astro inline les variables `PUBLIC_*` AU BUILD : les passer en `environment:` n'aurait
+      # aucun effet, le site étant généré statiquement. Elles doivent donc être des arguments de
+      # construction, et tout changement impose de reconstruire l'image.
+      args:
+        PUBLIC_UMAMI_SRC: ${PUBLIC_UMAMI_SRC:-}
+        PUBLIC_UMAMI_WEBSITE_ID: ${PUBLIC_UMAMI_WEBSITE_ID:-}
     container_name: taskforce-landing-prod
     environment:
       NODE_ENV: production
@@ -267,6 +273,30 @@ services:
       - taskforce-network
     restart: always
     # Exposé via reverse proxy (Nginx/Traefik)
+
+  # ================================
+  # Umami — mesure d'audience de la landing (CERT-C20)
+  # ================================
+  # Auto-hébergé et sans cookie : aucun transfert hors UE et aucun consentement à recueillir.
+  # Le registre des traitements reste ainsi sans destinataire étranger, ce qui serait impossible
+  # avec une solution hébergée outre-Atlantique.
+  umami:
+    image: ghcr.io/umami-software/umami:postgresql-v2.11.2
+    container_name: taskforce-umami-prod
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/umami
+      DATABASE_TYPE: postgresql
+      APP_SECRET: ${UMAMI_APP_SECRET}
+      # Mesurer notre audience ne doit pas créer un flux sortant vers un tiers : ce serait
+      # contradictoire avec la raison même du choix de cet outil.
+      DISABLE_TELEMETRY: "1"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - taskforce-network
+    restart: always
+    # Exposé via reverse proxy, la console étant une interface d'administration
 
   # ================================
   # MinIO — stockage objet S3-compatible (pièces jointes, avatars)
