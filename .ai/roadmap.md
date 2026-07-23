@@ -831,13 +831,13 @@ Planning prévisionnel (Gantt, jalons DFS, chemin critique), budget prévisionne
 | **C8** | **E9 — audit RGPD d'un cas professionnel externe** | C11. Le RGPD de TaskForce **ne le remplace pas**. ⚠️ Sujet imposé par l'école → à réclamer s'il n'a pas été fourni | 🔲 |
 | **C9** | **Mesurer le SEO de la landing** et atteindre ≥ 70 % | **C20**. ✅ **22/07 — mesuré : SEO 92 % sur l'accueil, 100 % sur les 4 autres pages** (seuil grille : 70 %). Le site n'a jamais eu de problème de SEO : le job Lighthouse ne mesurait simplement **rien**. Corrigé, il audite désormais les 5 pages | ✅ |
 | **C10** | **Trancher l'accessibilité** | C13, C15. ✅ **22/07 — tranché par la mesure, et les deux camps avaient tort.** Le test s'intitulait « WCAG 2.1 AA » mais **n'échouait que sur `critical`** ; or les manquements AA remontent en `serious`. La page de connexion en comptait **4** et le dashboard **6**, invisibles. Tout est corrigé : **0 violation sur les 3 pages**, tous impacts confondus, et le seuil du test inclut désormais `serious` | ✅ |
-| **C11** | **E6 — trame de compte-rendu d'activité** + 1 exemple rempli | C4, critère `[R17]` : « la trame […] **est opérationnelle** ». Classée « optionnelle » à tort | 🔲 |
-| **C12** | **Manuel utilisateur** (collaborateurs + managers) | Livrable explicite du CDC §8 | 🔲 |
+| **C11** | **E6 — trame de compte-rendu d'activité** + 1 exemple rempli | C4, critère `[R17]` : « la trame […] **est opérationnelle** ». Classée « optionnelle » à tort — **confirmé manquant le 23/07** (aucun fichier dans le corpus) | 🔲 |
+| **C12** | **Manuel utilisateur** (collaborateurs + managers) | Livrable explicite du CDC §8. ✅ **23/07 — il existe déjà** : `15-utilisateur/Manuel_Utilisateur.md` (399 l., 12 sections, produit le 05/07), + `FAQ.md` (229 l.), `Release_Notes.md`, `Guid_Installation.md`. Reste optionnel : guide d'administration OWNER/ADMIN | ✅ |
 | **C13** | **Webhooks Stripe** | C23 « l'intégration du système de paiement est **fonctionnelle** ». ✅ **22/07 — vérifié : implémenté, pas « à finaliser ».** `POST /api/webhooks/stripe` (dans `PUBLIC_MATCHERS`, la signature faisant office d'authentification) · signature vérifiée via `Webhook.constructEvent`, 400 si invalide · **5 événements** traités · **idempotence** par `stripe_event_id UNIQUE` · **500 délibéré** sur erreur de traitement pour que Stripe rejoue en backoff (`FIX-005`) · mapping complet des statuts · historique de facturation. **Seule limite** : jamais exercé avec de vrais événements Stripe (nécessite les clés de test du user — cf. ci-dessous) | 🟧 |
 | **C14** | **Actualiser la grille remplie** (`Grille_evaluation_TaskForce_REMPLIE`) | Premier document lu par le jury. Elle déclare encore **< 50 %** de couverture alors que le réel mesuré est **88,83 % (front) / 73,71 % (back)** — cf. `C3`. ⚠️ Cette ligne portait elle-même « 92 % / 78 % », chiffres périmés issus d'une mesure antérieure : corrigé le 22/07 | 🔲 |
 | **C15** | **Récupérer la page de garde imposée** par le certificateur | Obligatoire, non trouvée dans le repo | 🔲 |
 | **C16** | **Rédiger le dossier 40 pages** (condensation, pas assemblage) | **Livrable n°1 — 14/09** | 🔲 |
-| **C17** | **Support de soutenance + texte oral + répétition chronométrée** | **Livrables n°2 et 3 — 25/09 puis 28–29/09**. Voir `.ai/soutenance-brief.md` | 🔲 |
+| **C17** | **Support de soutenance + texte oral + répétition chronométrée** | **Livrables n°2 et 3 — 25/09 puis 28–29/09**. 🟧 **23/07 — largement écrit** : `18-soutenance/` contient `Plan_Soutenance.md` (431 l.), `Script_Oral.md` (444 l.) et `Plan_Minute.md` (299 l.). Restent le PPT et la répétition chronométrée — et **les chiffres cités y sont périmés** (cf. Phase A) | 🟧 |
 
 > **▶ MAJ 21/07/2026 — lot `C4` livré : lint et typecheck propres sur tout le dépôt.**
 >
@@ -1214,6 +1214,82 @@ Planning prévisionnel (Gantt, jalons DFS, chemin critique), budget prévisionne
 > `Auth_Autorisation.md` « la table subsiste », `Journal_Decisions_ADR.md` ADR-011,
 > `Audit_RGPD_Conformite.md` étape 8, `taskforce-architecture.html` groupe « Identité »). À reprendre
 > dans la passe documentaire (`C16`) : le MCD livré au jury doit refléter le schéma après `V72`.
+
+> **▶ MAJ 23/07/2026 — état réel du corpus documentaire : il est écrit, pas à écrire.**
+>
+> Parcours fichier par fichier de `taskforce-docs` avant d'ouvrir un chantier de rédaction. Sur ~97
+> documents catalogués, la quasi-totalité a été produite le 05/07. **Une roadmap de documentation
+> existait déjà** (`16-memoire-rncp/Roadmap_Documentation.md`) : la roadmap de clôture y a été ajoutée
+> plutôt que dans un fichier concurrent.
+>
+> **Ce que le corpus contenait déjà**, alors que ce tableau les déclarait non commencés : manuel
+> utilisateur (399 l.), FAQ, release notes, veille technologique (6 entrées), note d'innovation et
+> distance critique, plan de soutenance + script oral + plan minute (1 174 l.). Lignes C12 et C17
+> corrigées ci-dessus.
+>
+> **Trois écarts trouvés, dont un dangereux :**
+>
+> | Écart | Gravité |
+> |---|---|
+> | Couverture citée à **16 endroits** dans 5 fichiers, avec **3 jeux de chiffres différents** (92/78, 92,33/71,3, réel 88,83/73,71) | haute — deux pages du dossier se contredisent |
+> | `Bloc4_Deploiement_Production.md:93` affirme des certificats **Let's Encrypt via Certbot**, C28 coché ✅, alors qu'**aucun déploiement n'existe** | **critique — sur-déclaration** |
+> | `Audit_RGPD_Conformite.md` étiqueté **E9** et coché fait, alors qu'il audite **TaskForce** ; E9 exige un **cas professionnel externe** | haute — un livrable manquant passe pour fait |
+>
+> Le premier et le troisième sous-estiment ou mal-étiquettent. **Le deuxième sur-déclare, et c'est le seul
+> qui puisse se retourner contre le projet** : un manque annoncé se défend, une preuve réclamée par le jury
+> et absente ne se défend pas.
+>
+> **Nature du travail restant** : réconciliation puis assemblage, pas rédaction. Plan détaillé en 3 phases
+> (A réconciliation bloquante · B manques réels · C assemblage) dans `Roadmap_Documentation.md`.
+>
+> ⚠️ **Vérifié au passage** : `STRIPE_WEBHOOK_SECRET` est renseigné dans les deux `.env.dev` (préfixe
+> `whsec_…`), aux côtés des clés de test et des deux `price_…`. La configuration Stripe est **complète** ;
+> il ne manque que de faire passer un événement réel. Les valeurs n'ont pas été lues ni manipulées.
+
+> **▶ MAJ 23/07/2026 (2) — Phase A livrée : réconciliation du corpus documentaire.**
+>
+> **A1 — un chiffre, une source.** Les valeurs canoniques sont désormais **front 88,63 % / 785 tests
+> (23/07)** et **back 73,71 % (22/07) / 792 tests (23/07)**, propagées aux 16 emplacements des 5
+> fichiers concernés. La couverture front a été **remesurée** plutôt que recopiée : `Plan_Minute.md`
+> annonçait 92,33 % sur le même périmètre exactement, l'écart venait de la mesure elle-même.
+>
+> **Deux découvertes de la remesure**, qu'aucune relecture n'aurait données :
+> - La suite front est **verte** (785/785) en exécution normale, mais **3 tests expirent sous
+>   `--coverage`** : l'instrumentation fait dépasser le délai de 15 s, un rendu non démonté laisse
+>   deux formulaires dans le DOM et deux autres tests tombent en cascade. Défaut d'outillage, pas
+>   d'application (14/14 en isolation), mais il tire le chiffre vers le bas.
+> - La **porte de couverture est rouge** : `lib/utils` est à 71,01 % pour 72 % attendus, parce que
+>   `lib/utils/export-issues-csv.ts` (47 lignes, échappement CSV) **n'a aucun test** depuis le 22/06.
+>
+> **A2 — sur-déclarations corrigées.** Quatre, toutes rédigées au présent de l'indicatif :
+>
+> | Affirmation | Réalité |
+> |---|---|
+> | Certificats Let's Encrypt via Certbot, crontab, zone DNS, SPF/DKIM, callbacks OAuth en production (C28 ✅) | **Rien n'est déployé.** `nginx/nginx.conf` et `nginx/ssl/` n'existent même pas : seul `nginx.conf.example` existe. C28 passé à ⬜ |
+> | « Diagramme de déploiement formalisé » coché (C29) | Il n'existe nulle part dans le corpus. Critère décoché |
+> | Tests d'intégration « avec Testcontainers » (×2 dans Bloc3, plus le script oral) | **Absent du `pom.xml`**, délibérément écarté et commenté dans `AbstractIntegrationTest` |
+> | `backend-tests.yml` fait « Checkstyle, SpotBugs, porte JaCoCo » | Il fait `mvnw clean test jacoco:report`. Rien d'autre |
+>
+> **A3 — E9 désétiqueté.** `Audit_RGPD_Conformite.md` porte le tag E9 et était coché fait, alors que
+> son propre en-tête dit qu'il audite **TaskForce**. E9 exige un **cas professionnel externe** :
+> rouvert comme non commencé.
+>
+> **A4 — statuts relevés** : C20 SEO ✅ (92 à 100 %), C23 Stripe ✅ (webhooks réels), C15 accessibilité
+> ✅ (0 violation), C11 double opt-in et rétention ✅.
+>
+> **A5 — grille XLSX mise à jour** (`memoire/Grille_evaluation_TaskForce_REMPLIE_DFS_25-26.xlsx`,
+> premier document lu par le jury, inchangée depuis le 18/06 donc antérieure à toute la production
+> du 05/07). 53 critères touchés : **78 verts, 9 jaunes, 3 rouges**. Volontairement **pas** tout au
+> vert. Restent rouges parce que rien n'existe : **trame de compte rendu** (E6) et **outils de mesure
+> d'audience** (2 critères). Restent jaunes : wireframes rétro-documentés plutôt que validés en amont,
+> TLS de production, éco-conception front, **chiffrement au repos** (formulation à ne pas surestimer,
+> cf. C6) et CI back sans analyse qualité ni scan automatisé.
+>
+> ⚠️ **Piège technique rencontré, à connaître pour toute reprise du fichier** : ExcelJS **partage les
+> objets de style** entre cellules de mise en forme identique. Écrire `cell.fill` a effacé la couleur
+> de cellules non ciblées (50 vertes tombées à 31). Corrigé en relevant les couleurs d'origine puis en
+> les réaffirmant une par une avec un objet neuf. Sauvegarde prise avant écriture, restauration
+> vérifiée bit à bit par git.
 
 ### 4.B — Repoussé APRÈS la soutenance (ne pas empiéter)
 
