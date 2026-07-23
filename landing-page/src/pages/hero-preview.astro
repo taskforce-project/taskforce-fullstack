@@ -1,4 +1,5 @@
 ---
+import AudienceTracking from "@/components/AudienceTracking.astro";
 // DEV HARNESS — aperçu isolé (header + hero + footer), à supprimer avant commit.
 import "@/styles/global.css";
 import { SiteHeader } from "@/components/layout/SiteHeader";
@@ -18,6 +19,7 @@ import { Hero } from "@/components/sections/Hero";
       href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,100..900&display=swap"
       rel="stylesheet"
     />
+    <AudienceTracking />
   </head>
   <body class="min-h-screen bg-background font-sans antialiased">
     <SiteHeader client:load />

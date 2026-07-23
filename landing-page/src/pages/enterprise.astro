@@ -1,4 +1,5 @@
 ---
+import AudienceTracking from "@/components/AudienceTracking.astro";
 import "@/styles/global.css";
 import "@/styles/accessibility.css";
 import EnterprisePage from "@/components/EnterprisePage";
@@ -19,6 +20,7 @@ const description = "Enterprise-grade project management. SOC 2, ISO 27001, SAML
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
+    <AudienceTracking />
   </head>
   <body class="min-h-screen bg-[#0a0a0a] font-sans antialiased">
     <Header client:load />

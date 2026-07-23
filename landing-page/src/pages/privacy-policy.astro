@@ -1,4 +1,5 @@
 ---
+import AudienceTracking from "@/components/AudienceTracking.astro";
 import "@/styles/global.css";
 import "@/styles/accessibility.css";
 import PrivacyPolicyPage from "@/components/PrivacyPolicyPage";
@@ -15,6 +16,7 @@ const description = "Taskforce Privacy Policy - How we collect, use, and protect
     <title>{title}</title>
     <meta name="description" content={description} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <AudienceTracking />
   </head>
   <body class="min-h-screen bg-background font-sans antialiased">
     <PrivacyPolicyPage client:only="react" />
