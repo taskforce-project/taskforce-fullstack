@@ -823,7 +823,7 @@ Planning prévisionnel (Gantt, jalons DFS, chemin critique), budget prévisionne
 |---|---|---|:--:|
 | **C1** | **Passe UI/UX finale** : chaque écran est soit fonctionnel, soit marqué « plus tard » de façon visible et assumée | C13, C15 — « interface fonctionnelle pour tous les utilisateurs ». Un bouton mort vu par le jury coûte plus qu'une fonctionnalité absente et annoncée | 🟧 |
 | **C2** | **Audit de fonctionnalité** : parcourir l'app écran par écran, lister ce qui marche / ce qui est décoratif | Alimente C1 ci-dessus **et** la démo de soutenance (blocs 2 et 3) | 🔲 |
-| **C3** | **Couverture de tests re-mesurée** front + back, chiffres réels remontés | **C18 et C25 — seuls seuils chiffrés de toute la grille (≥ 50 %)**. ✅ **Front 21/07 : 88,83 % lignes, 785/785 verte.** ✅ **Back 22/07 : 73,71 % lignes, 786/786 verte.** | ✅ |
+| **C3** | **Couverture de tests re-mesurée** front + back, chiffres réels remontés | **C18 et C25 — seuls seuils chiffrés de toute la grille (≥ 50 %)**. ✅ **Front 21/07 : 88,83 % lignes, 785/785 verte.** ✅ **Back 22/07 : 73,71 % lignes, suite verte — 792 tests après l'ajout de `RetentionSchedulerTest` (C7).** | ✅ |
 | **C4** | **Lint + typecheck propres** sur tout le repo (pas seulement les fichiers touchés) | C16 « le code satisfait aux tests d'un outil de revue de code par analyse statique » | ✅ |
 | **C5** | **Sécurité : rejouer ZAP + Semgrep + Trivy**, 0 HIGH | C16 (front), C21/C24 (back) — « composants tiers à jour et sans vulnérabilité connue ». ✅ **22/07 : 0 CRITICAL sur les deux images** (13→0 et 1→0), npm production 0 haute, ZAP backend 0 alerte de risque. Reste 12 hautes dont **11 issues des images de base Alpine** (correctif amont) + 1 Keycloak assumé. ⚠️ **Deux mesures manquantes** : scan de code source (ne termine pas sous Docker/Windows → à rejouer en CI) et re-passage ZAP après les correctifs de CSP/en-têtes | 🟧 |
 | **C6** | **Vérifier le chiffrement au repos** des données personnelles | C24 « toutes les données sensibles sont chiffrées » + CDC §7. 🟧 **Constat du 22/07** : AES-256-GCM (`EncryptedStringConverter`) appliqué aux identifiants de connecteurs, à la config d'intégration et aux demandes Enterprise. **Mais email, `keycloakId` et jetons ne sont PAS chiffrés** — choix documenté et défendable (GCM non déterministe casserait les recherches), à condition de ne **pas** annoncer « toutes les données personnelles sont chiffrées ». Formulation juste : les *secrets* sont chiffrés en base, les identifiants servant de clés de recherche sont protégés par le contrôle d'accès et le chiffrement disque de l'hôte. Reste à formaliser dans le dossier | 🟧 |
@@ -1153,6 +1153,13 @@ Planning prévisionnel (Gantt, jalons DFS, chemin critique), budget prévisionne
 > est isolée, un incident sur une table ne gèle pas la rétention entière — c'est le comportement que
 > `RetentionSchedulerTest` vérifie en priorité (`@ParameterizedTest` sur les 3 purges défaillantes).
 >
+> **Vérifié** — `.\scripts\it.ps1 -Test ALL` : **792 tests, 0 échec, 1 ignoré** (15 min 36, BUILD SUCCESS).
+> Le passage de `OAuthStateRepository.deleteByExpiresAtBefore` de `void` à `long` (pour que la purge
+> puisse justifier le nombre de lignes supprimées) touche `GitHubIntegrationService` et
+> `SlackIntegrationService` : leurs quatre classes de tests sont vertes, tests d'intégration Postgres
+> compris — ce sont eux qui exercent réellement la méthode. Couverture **non re-mesurée** ici
+> (`jacoco-check` est lié à `verify`, cf. `PC-028`) : dernier chiffre connu 73,71 %.
+>
 > **Volontairement hors périmètre — le journal d'audit.** Sa durée est notée « à définir en prod » et
 > sa table est déclarée immuable au registre. Fixer cette durée relève du **responsable de traitement**,
 > pas du développeur : la trancher dans le code inventerait une politique et contredirait une mesure
@@ -1164,6 +1171,49 @@ Planning prévisionnel (Gantt, jalons DFS, chemin critique), budget prévisionne
 > entièrement par Keycloak depuis `TF-RGPD-007` (commentaire explicite dans `GdprService`). Le
 > registre citait encore `RefreshTokenRepository` parmi les purges disponibles — corrigé. Suppression
 > à faire dans un lot dédié (retrait Java + migration de suppression de table).
+> → ✅ **Traité le 22/07 dans le lot dédié — voir MAJ (8) ci-dessous.**
+
+> **▶ MAJ 22/07/2026 (8) — code mort : l'authentification maison résiduelle est supprimée.**
+>
+> Suite au constat de la MAJ (7). Trois artefacts retirés, tous hérités de l'authentification
+> **avant** le passage à Keycloak (`TF-RGPD-007`) :
+>
+> | Artefact | Sort |
+> |---|---|
+> | `core/model/RefreshToken.java` | **Supprimé** |
+> | `core/repository/RefreshTokenRepository.java` | **Supprimé** — 7 méthodes (rotation, révocation, purge), **aucun appelant** |
+> | `TestDataBuilder.buildRefreshToken` | **Supprimé** — seule référence subsistante, et elle-même jamais appelée par un test |
+> | Table `refresh_tokens` | **`V72__drop_refresh_tokens.sql`** — nouvelle migration, `DROP TABLE IF EXISTS` |
+>
+> **La migration `V3` n'est pas touchée** : elle est appliquée en base, et `ddl-auto=validate` ne
+> pardonne pas la réécriture d'un script déjà joué. La suppression passe donc par un `V{n}` en avant,
+> comme `V64__drop_human_chat.sql` l'avait fait pour le chat.
+>
+> **Piège écarté — deux noms voisins, deux choses différentes.** `RefreshTokenRequest` (DTO) et
+> `AuthService.refreshToken(...)` **restent en place et sont utilisés** : ils portent le renouvellement
+> de session réel, délégué à Keycloak (`POST /api/auth/refresh` → `AuthController:218`). Seul le
+> stockage *maison* des jetons disparaît. Un grep naïf sur `RefreshToken` mélange les deux.
+>
+> **Pourquoi ça compte pour le dossier** : la table survivait uniquement parce qu'aucune migration
+> destructive n'avait été jugée nécessaire (ADR-011 le dit explicitement). Or une table de jetons
+> vide mais présente au schéma est un faux positif pour un jury qui lit le MCD — elle suggère une
+> gestion de session maison là où l'architecture délègue tout à l'IdP. Le schéma décrit désormais ce
+> que le code fait.
+>
+> **Vérifié** — `.\scripts\it.ps1 -Test ALL` : **792 tests, 0 échec, 1 ignoré** (20 min 15, BUILD SUCCESS).
+> Total **inchangé** par rapport à la MAJ (7), ce qui est le résultat attendu : `buildRefreshToken`
+> n'était appelé par aucun test, sa suppression ne retire donc aucun cas de la suite. La preuve utile
+> est ailleurs — Flyway journalise « Successfully applied 72 migrations […] now at version v72 » sur
+> le Postgres réel des tests d'intégration, et `ddl-auto=validate` passe **après** le `DROP`. Si une
+> entité avait encore pointé vers `refresh_tokens`, la validation aurait fait échouer le contexte
+> Spring et les 3 tests du « Socle d'intégration (Postgres réel + Flyway) » seraient rouges.
+>
+> ⚠️ **Reste à faire, hors périmètre de ce lot — la documentation décrit encore la table.**
+> Six fiches du Brain OS la présentent comme existante (`Dictionnaire_Donnees.md` §`refresh_tokens`,
+> `Modele_Donnees_MCD_MLD.md` — entité + relation `users ||--o{ refresh_tokens` + règle de gestion,
+> `Auth_Autorisation.md` « la table subsiste », `Journal_Decisions_ADR.md` ADR-011,
+> `Audit_RGPD_Conformite.md` étape 8, `taskforce-architecture.html` groupe « Identité »). À reprendre
+> dans la passe documentaire (`C16`) : le MCD livré au jury doit refléter le schéma après `V72`.
 
 ### 4.B — Repoussé APRÈS la soutenance (ne pas empiéter)
 
