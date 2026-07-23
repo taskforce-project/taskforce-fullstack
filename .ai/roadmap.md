@@ -1291,6 +1291,40 @@ Planning prévisionnel (Gantt, jalons DFS, chemin critique), budget prévisionne
 > les réaffirmant une par une avec un objet neuf. Sauvegarde prise avant écriture, restauration
 > vérifiée bit à bit par git.
 
+> **▶ MAJ 23/07/2026 (3) — porte de couverture front remise au vert.**
+>
+> Suite directe de la Phase A, qui avait révélé l'écart. `lib/utils/export-issues-csv.ts` (47 lignes,
+> créé le 22/06) n'avait **aucun test** : `lib/utils` plafonnait à 71,01 % de lignes pour 72 % attendus
+> et 81,25 % de fonctions pour 85 %, ce qui faisait sortir `vitest run --coverage` en code 1.
+>
+> **`lib/utils/export-issues-csv.test.ts`** : 20 tests, `it.each` data-driven conformément à la
+> préférence du projet. La fonction ne retournant rien (elle construit un Blob et déclenche un
+> téléchargement), les tests **interceptent `URL.createObjectURL`** pour capturer le Blob et en relire
+> le contenu, ce qui permet aussi de vérifier que l'URL objet est révoquée et qu'aucun lien ne reste
+> dans le DOM. Couvert : échappement RFC 4180 (virgule, guillemet doublé, retour à la ligne, et
+> **point-virgule**, qui n'est pas dans la RFC mais est le séparateur d'Excel en locale française),
+> valeurs absentes et leurs replis (`displayName` puis `email` puis vide), structure du fichier
+> (en-tête seul sur liste vide, séparateur CRLF, BOM UTF-8), et nom de fichier horodaté.
+>
+> | | Avant | Après |
+> |---|---|---|
+> | `lib/utils` lignes | 71,01 % (seuil 72 %) | **93,23 %** |
+> | `lib/utils` fonctions | 81,25 % (seuil 85 %) | **94,44 %** |
+> | Couverture globale front | 88,63 % | **89,55 %** |
+> | Suite front | 785 tests / 62 fichiers | **805 tests / 63 fichiers** |
+> | Sortie `vitest run --coverage` | **1** | **0** |
+>
+> Nouveaux chiffres propagés au corpus (mémoire, grille XLSX cellule E72, plan et script de soutenance).
+> Les valeurs posées quelques heures plus tôt étaient déjà périmées : c'est le prix de la mesure, et
+> c'est préférable à un chiffre stable et faux.
+>
+> ⚠️ **Non corrigé, faute de pouvoir le reproduire.** Les 3 expirations de tests d'authentification
+> sous `--coverage` observées le matin **ne se sont pas reproduites** sur les exécutions suivantes.
+> Le nettoyage RTL est pourtant bien appelé en `afterEach` et `testTimeout` est déjà à 15 s : la cause
+> de la cascade (deux `<input id="email">` dans le DOM) reste donc à établir. Aucun correctif
+> spéculatif n'a été appliqué, un correctif invérifiable n'étant pas un correctif. Risque réel en CI,
+> à traiter si l'échec revient.
+
 ### 4.B — Repoussé APRÈS la soutenance (ne pas empiéter)
 
 > Aucun de ces chantiers n'est rattaché à une compétence C1–C26. Ils restent documentés,
