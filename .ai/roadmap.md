@@ -828,10 +828,10 @@ Planning prévisionnel (Gantt, jalons DFS, chemin critique), budget prévisionne
 | **C5** | **Sécurité : rejouer ZAP + Semgrep + Trivy**, 0 HIGH | C16 (front), C21/C24 (back) — « composants tiers à jour et sans vulnérabilité connue ». ✅ **22/07 : 0 CRITICAL sur les deux images** (13→0 et 1→0), npm production 0 haute, ZAP backend 0 alerte de risque. Reste 12 hautes dont **11 issues des images de base Alpine** (correctif amont) + 1 Keycloak assumé. ⚠️ **Deux mesures manquantes** : scan de code source (ne termine pas sous Docker/Windows → à rejouer en CI) et re-passage ZAP après les correctifs de CSP/en-têtes | 🟧 |
 | **C6** | **Vérifier le chiffrement au repos** des données personnelles | C24 « toutes les données sensibles sont chiffrées » + CDC §7. 🟧 **Constat du 22/07** : AES-256-GCM (`EncryptedStringConverter`) appliqué aux identifiants de connecteurs, à la config d'intégration et aux demandes Enterprise. **Mais email, `keycloakId` et jetons ne sont PAS chiffrés** — choix documenté et défendable (GCM non déterministe casserait les recherches), à condition de ne **pas** annoncer « toutes les données personnelles sont chiffrées ». Formulation juste : les *secrets* sont chiffrés en base, les identifiants servant de clés de recherche sont protégés par le contrôle d'accès et le chiffrement disque de l'hôte. Reste à formaliser dans le dossier | 🟧 |
 | **C7** | **Conformité RGPD de bout en bout** | **C11**. ✅ **22/07 — vérifié dans le code, et l'inventaire des « manques » était périmé.** Le **double opt-in EST implémenté** (l'OTP marque l'e-mail vérifié, `AuthService:224`, et la connexion est **bloquée** tant qu'il ne l'est pas, `AuthService:318`). La **purge Keycloak** est faite (`TF-RGPD-007`). Le **registre Art. 30** existe (7 traitements + sous-traitants) — corrigé le 22/07 : Groq y figurait comme destinataire hors UE alors qu'il est retiré du code depuis le 16/07, et le traitement IA réel (modèle auto-hébergé, **aucun transfert**) manquait. ✅ **Rétention automatisée le 22/07** : `RetentionScheduler` (quotidien 03:30) purge OTP expirés, states OAuth et invitations sans suite — voir MAJ (7). Seul point ouvert, **et il n'est pas technique** : la durée de conservation du journal d'audit est une décision du responsable de traitement | ✅ |
-| **C8** | **E9 — audit RGPD d'un cas professionnel externe** | C11. Le RGPD de TaskForce **ne le remplace pas**. ⚠️ Sujet imposé par l'école → à réclamer s'il n'a pas été fourni | 🔲 |
+| **C8** | **E9 — audit RGPD d'un cas professionnel externe** | C11. ⚠️ **Vérifié à la source le 23/07** (référentiel p. 8) : « cas professionnel individuel écrit **hors projet fil rouge**, à partir d'**un site web marchand existant fourni** ». **Pèse 4 critères, pas 1** — consentement cookies, vue de confidentialité, formulaire d'accès, double opt-in s'évaluent sur le site fourni. Ils avaient été cochés au vert sur la foi de TaskForce : erreur corrigée. **Sujet à réclamer à l'école, c'est le seul livrable dont la matière ne nous appartient pas** | 🔲 |
 | **C9** | **Mesurer le SEO de la landing** et atteindre ≥ 70 % | **C20**. ✅ **22/07 — mesuré : SEO 92 % sur l'accueil, 100 % sur les 4 autres pages** (seuil grille : 70 %). Le site n'a jamais eu de problème de SEO : le job Lighthouse ne mesurait simplement **rien**. Corrigé, il audite désormais les 5 pages | ✅ |
 | **C10** | **Trancher l'accessibilité** | C13, C15. ✅ **22/07 — tranché par la mesure, et les deux camps avaient tort.** Le test s'intitulait « WCAG 2.1 AA » mais **n'échouait que sur `critical`** ; or les manquements AA remontent en `serious`. La page de connexion en comptait **4** et le dashboard **6**, invisibles. Tout est corrigé : **0 violation sur les 3 pages**, tous impacts confondus, et le seuil du test inclut désormais `serious` | ✅ |
-| **C11** | **E6 — trame de compte-rendu d'activité** + 1 exemple rempli | C4, critère `[R17]` : « la trame […] **est opérationnelle** ». Classée « optionnelle » à tort — **confirmé manquant le 23/07** (aucun fichier dans le corpus) | 🔲 |
+| **C11** | **E6 — trame de compte-rendu d'activité** + 1 exemple rempli | C4, critère `[R17]` : « la trame […] **est opérationnelle** ». ✅ **23/07** : `01-projet/Trame_Compte_Rendu_Activite.md` (dérivée point par point de la méthode E5) + `01-projet/CR_2026-S30_Cloture_V1.md`, exemple rempli sur la semaine réelle du 20 au 23/07, références de commit vérifiables, valeurs toutes mesurées | ✅ |
 | **C12** | **Manuel utilisateur** (collaborateurs + managers) | Livrable explicite du CDC §8. ✅ **23/07 — il existe déjà** : `15-utilisateur/Manuel_Utilisateur.md` (399 l., 12 sections, produit le 05/07), + `FAQ.md` (229 l.), `Release_Notes.md`, `Guid_Installation.md`. Reste optionnel : guide d'administration OWNER/ADMIN | ✅ |
 | **C13** | **Webhooks Stripe** | C23 « l'intégration du système de paiement est **fonctionnelle** ». ✅ **22/07 — vérifié : implémenté, pas « à finaliser ».** `POST /api/webhooks/stripe` (dans `PUBLIC_MATCHERS`, la signature faisant office d'authentification) · signature vérifiée via `Webhook.constructEvent`, 400 si invalide · **5 événements** traités · **idempotence** par `stripe_event_id UNIQUE` · **500 délibéré** sur erreur de traitement pour que Stripe rejoue en backoff (`FIX-005`) · mapping complet des statuts · historique de facturation. **Seule limite** : jamais exercé avec de vrais événements Stripe (nécessite les clés de test du user — cf. ci-dessous) | 🟧 |
 | **C14** | **Actualiser la grille remplie** (`Grille_evaluation_TaskForce_REMPLIE`) | Premier document lu par le jury. Elle déclare encore **< 50 %** de couverture alors que le réel mesuré est **88,83 % (front) / 73,71 % (back)** — cf. `C3`. ⚠️ Cette ligne portait elle-même « 92 % / 78 % », chiffres périmés issus d'une mesure antérieure : corrigé le 22/07 | 🔲 |
@@ -1324,6 +1324,40 @@ Planning prévisionnel (Gantt, jalons DFS, chemin critique), budget prévisionne
 > de la cascade (deux `<input id="email">` dans le DOM) reste donc à établir. Aucun correctif
 > spéculatif n'a été appliqué, un correctif invérifiable n'étant pas un correctif. Risque réel en CI,
 > à traiter si l'échec revient.
+
+> **▶ MAJ 23/07/2026 (4) — lot `B2` livré, et correction d'une erreur que j'avais introduite.**
+>
+> **Correction d'abord.** En Phase A, j'ai passé au vert les 4 critères RGPD de la grille (bannière
+> cookies, vue de confidentialité, formulaire d'accès, double opt-in) en m'appuyant sur leur
+> implémentation dans TaskForce. **C'est faux.** Le référentiel officiel (`memoire/DFS_RNCP_
+> Referentiel...pdf`, p. 8) rattache C11 à un « cas professionnel individuel écrit inclus dans le
+> Dossier de validation **(hors projet fil rouge)** », à partir d'« un site web marchand existant
+> **fourni**, non conforme et non optimisé ». Ces 4 critères s'évaluent donc sur **ce site**, pas sur
+> le nôtre. Que TaskForce ait une bannière cookies ne démontre pas C11.
+>
+> C'est exactement la sur-déclaration que je corrigeais chez les autres quelques heures plus tôt.
+> **Conséquence sous-estimée depuis le début : E9 ne pèse pas un critère mais quatre**, ce qui en
+> fait le livrable manquant le plus lourd du dossier, et le seul dont la matière ne nous appartient
+> pas. Les 4 lignes repassent au rouge (grille + `README` du mémoire + roadmap documentaire).
+>
+> ⚠️ **La correction de la grille XLSX n'a pas pu être appliquée** : le fichier est ouvert dans un
+> tableur (`EBUSY`). Script prêt (`fix-c11.js`), à rejouer dès fermeture. Décompte visé après
+> application : **74 verts, 9 jaunes, 7 rouges**.
+>
+> **`B2` livré ensuite.** Le référentiel exige que la trame « corresponde à la méthode projet retenue
+> lors de l'évaluation E5 ». Elle en est donc dérivée point par point : priorisation hebdomadaire
+> Eisenhower, Definition of Done en 6 points, validation de jalon au lieu de la revue de sprint,
+> bilan de phase au lieu de la rétrospective. Deux fichiers :
+>
+> - `01-projet/Trame_Compte_Rendu_Activite.md` — la trame, avec 3 règles de remplissage qui la
+>   rendent opérationnelle plutôt que décorative : référence vérifiable obligatoire par activité,
+>   date et périmètre obligatoires par indicateur, écarts déclarés et non rattrapés en silence.
+> - `01-projet/CR_2026-S30_Cloture_V1.md` — exemple rempli sur la **semaine réelle du 20 au 23/07**,
+>   avec empreintes de commit vérifiables et **aucune valeur estimée**. Il déclare ses propres écarts,
+>   dont la case « CI verte » non cochée et l'erreur C11 ci-dessus.
+>
+> Un exemple inventé n'aurait rien prouvé. Celui-ci est vérifiable ligne à ligne dans l'historique
+> git, ce qui est précisément ce que « opérationnelle » veut dire.
 
 ### 4.B — Repoussé APRÈS la soutenance (ne pas empiéter)
 
