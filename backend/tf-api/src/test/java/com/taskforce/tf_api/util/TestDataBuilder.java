@@ -21,9 +21,6 @@ public class TestDataBuilder {
     public static OtpVerification buildExpiredOtp() {
         return OtpVerification.builder().keycloakId(UUID.randomUUID().toString()).email("test@example.com").otpCode("123456").otpType(OtpType.EMAIL_VERIFICATION).otpStatus(OtpStatus.PENDING).attempts(0).maxAttempts(5).expiresAt(LocalDateTime.now().minusMinutes(1)).planType(PlanType.FREE.toString()).build();
     }
-    public static RefreshToken buildRefreshToken(User user) {
-        return RefreshToken.builder().userId(user.getId()).token(UUID.randomUUID().toString()).expiresAt(LocalDateTime.now().plusDays(30)).build();
-    }
     public static UserRepresentation buildKeycloakUser() {
         UserRepresentation user = new UserRepresentation(); user.setId(UUID.randomUUID().toString()); user.setEmail("test@example.com"); user.setFirstName("Test"); user.setLastName("User"); user.setEmailVerified(false); user.setEnabled(true); return user;
     }
