@@ -2,7 +2,15 @@ import { Globe, Mail, MapPin, Phone, Twitter } from "lucide-react";
 
 import { FooterBackgroundGradient, TextHoverEffect } from "@/components/ui/hover-footer";
 
-const footerLinks = {
+/**
+ * Un lien de pied de page. `external` n'est porté que par une minorité d'entrées : sans
+ * annotation explicite, TypeScript infère un type distinct par tableau, et `Object.entries`
+ * produit alors une union dont certains membres n'ont pas la propriété. L'annotation ci-dessous
+ * uniformise les éléments et rend `link.external` valide partout.
+ */
+type FooterLink = { label: string; href: string; external?: boolean };
+
+const footerLinks: Record<string, FooterLink[]> = {
   Product: [
     { label: "Tasks & Projects", href: "/#tasks" },
     { label: "Team Wiki",        href: "/#wiki" },
