@@ -59,6 +59,12 @@ export function Component({
 
   const displacementScale = animation ? mapRange(animation.scale, 1, 100, 20, 100) : 0;
   const animationDuration = animation ? mapRange(animation.speed, 1, 100, 1000, 50) : 1;
+  // Calculé ici, où `animation` est déjà gardé, plutôt que dans le JSX : TypeScript ne peut pas
+  // déduire de `animationEnabled`, qui est un booléen distinct, que `animation` est défini.
+  // Même idiome que les deux lignes ci-dessus.
+  const turbulenceBaseFrequency = animation
+    ? `${mapRange(animation.scale, 0, 100, 0.001, 0.0005)},${mapRange(animation.scale, 0, 100, 0.004, 0.002)}`
+    : '0,0';
 
   useEffect(() => {
     if (feColorMatrixRef.current && animationEnabled) {
@@ -117,7 +123,7 @@ export function Component({
                 <feTurbulence
                   result="undulation"
                   numOctaves="2"
-                  baseFrequency={`${mapRange(animation.scale, 0, 100, 0.001, 0.0005)},${mapRange(animation.scale, 0, 100, 0.004, 0.002)}`}
+                  baseFrequency={turbulenceBaseFrequency}
                   seed="0"
                   type="turbulence"
                 />
