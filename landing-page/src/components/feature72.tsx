@@ -43,7 +43,9 @@ interface FeatureCardListProps {
   className?: string;
 }
 
-interface Feature72Props extends FeatureCardListProps {}
+// Alias plutôt qu'interface vide, comme dans `hero115.tsx` : une interface sans membre propre est
+// équivalente à son supertype, et le linter la refuse (`no-empty-object-type`).
+type Feature72Props = FeatureCardListProps;
 type Props = Partial<Feature72Props>;
 
 const defaultProps: Feature72Props = {

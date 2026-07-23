@@ -28,7 +28,9 @@ interface HeroBasicProps {
   icon?: React.ReactNode;
 }
 
-interface Hero115Props extends HeroBasicProps {}
+// Alias plutôt qu'interface vide : une interface qui n'ajoute aucun membre est équivalente à son
+// supertype, et le linter la refuse à juste titre (`no-empty-object-type`).
+type Hero115Props = HeroBasicProps;
 type Props = Partial<Hero115Props>;
 
 const defaultProps: Hero115Props = {
