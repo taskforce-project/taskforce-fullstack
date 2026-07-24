@@ -245,6 +245,9 @@ services:
         NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL}
         NEXT_PUBLIC_API_URL_SSR: http://backend:8080
         NEXT_PUBLIC_STORAGE_URL: ${MINIO_PUBLIC_ENDPOINT}
+        # Site vitrine : autre origine que l'application (www.<domaine> face à app.<domaine>).
+        # Cible du logo et de « Retour au site » sur les pages d'authentification.
+        NEXT_PUBLIC_SITE_URL: ${SITE_PUBLIC_URL}
     container_name: taskforce-frontend-prod
     environment:
       NODE_ENV: production

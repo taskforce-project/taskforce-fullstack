@@ -236,6 +236,11 @@ services:
       # Origine MinIO telle que le navigateur la joint (URLs présignées des pièces jointes).
       # Doit rester alignée sur MINIO_PUBLIC_ENDPOINT côté backend : c'est l'hôte signé.
       NEXT_PUBLIC_STORAGE_URL: http://localhost:9000
+      # Site vitrine (projet Astro distinct, autre origine) — cible du logo et de « Retour au site »
+      # sur les pages d'authentification. En production ce sera www.<domaine> ; en développement, le
+      # port du serveur Astro que vous utilisez réellement : 4321 si lancé à la main,
+      # ${LANDING_PORT} (18081 par défaut) si c'est le conteneur `landing` de ce compose.
+      NEXT_PUBLIC_SITE_URL: ${SITE_PUBLIC_URL:-http://localhost:4321}
       # Enable polling for hot reload on Docker Desktop (Windows/macOS)
       WATCHPACK_POLLING: "true"
       CHOKIDAR_USEPOLLING: "true"
