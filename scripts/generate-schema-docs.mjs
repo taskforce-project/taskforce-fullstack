@@ -25,6 +25,7 @@ import { execFileSync } from "node:child_process";
 import { writeFileSync, readFileSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { DOMAINES, HORS_METIER } from "./lib/domaines.mjs";
 
 const ICI = dirname(fileURLToPath(import.meta.url));
 const DOCS = resolve(ICI, "../../taskforce-docs/v1/03-architecture");
@@ -33,57 +34,6 @@ const BASE = process.env.TF_PG_DB ?? "taskforce-db";
 const USER = process.env.TF_PG_USER ?? "postgres";
 const CHECK = process.argv.includes("--check");
 
-/** Domaines fonctionnels. L'ordre fixe celui des sections produites. */
-const DOMAINES = [
-  {
-    id: "4.1", titre: "IAM et Workspace",
-    intro: "Le socle multi-tenant. Toute donnée métier est rattachée à un workspace, et l'appartenance à un workspace conditionne l'accès.",
-    tables: ["users", "workspaces", "workspace_members", "workspace_invitations", "teams", "team_members", "companies"],
-  },
-  {
-    id: "4.2", titre: "Projets et Issues (coeur métier)",
-    intro: "Le domaine que le cahier des charges décrit : les tâches, leur affectation, la charge et les compétences qui la conditionnent.",
-    tables: [
-      "projects", "project_members", "project_teams", "project_labels", "project_favorites",
-      "issues", "issue_statuses", "issue_types", "issue_comments", "issue_activity",
-      "issue_checklist_items", "issue_relations", "issue_label_assignments", "issue_worklogs",
-      "issue_sequence_counters", "cycles", "cycle_issues", "attachments",
-      "member_leaves", "member_skill_profiles", "assignment_events",
-    ],
-  },
-  {
-    id: "4.3", titre: "IA, affectation intelligente et graphe de connaissances",
-    intro: "Le moteur d'affectation et sa mémoire. `knowledge_nodes` porte les vecteurs d'embedding utilisés par la recherche sémantique.",
-    tables: [
-      "ai_conversation", "ai_message", "ai_documents", "ai_runs", "ai_token_usage",
-      "ai_insight_snapshots", "brain_workspaces", "knowledge_nodes", "knowledge_edges",
-      "analysis_job", "decision_brief", "decision_priority", "saved_chart",
-    ],
-  },
-  {
-    id: "4.4", titre: "Authentification et sécurité",
-    intro: "L'identité est déléguée à Keycloak. Ne subsistent ici que les données propres à l'application : codes à usage unique, jetons anti-CSRF, journal d'audit.",
-    tables: ["otp_verification", "oauth_states", "audit_logs"],
-  },
-  {
-    id: "4.5", titre: "Facturation",
-    intro: "Abonnements et historique. Aucune donnée de carte n'est stockée : la facturation est déléguée au prestataire de paiement.",
-    tables: ["subscriptions", "subscription_history"],
-  },
-  {
-    id: "4.6", titre: "Intégrations et communications",
-    intro: "Connecteurs externes et notifications. Les identifiants de connecteurs sont chiffrés en base (AES-256-GCM).",
-    tables: ["integrations", "connector_connection", "webhooks", "slack_channels", "issue_github_links", "notifications"],
-  },
-  {
-    id: "4.7", titre: "Documentation, tableaux de bord et prospects",
-    intro: "Pages de documentation collaborative, composition du tableau de bord par utilisateur, et demandes commerciales.",
-    tables: ["pages", "dashboard_cards", "enterprise_inquiries"],
-  },
-];
-
-/** Tables techniques, hors périmètre métier mais présentes en base. */
-const HORS_METIER = ["flyway_schema_history"];
 
 // ---------------------------------------------------------------------------
 // Introspection
