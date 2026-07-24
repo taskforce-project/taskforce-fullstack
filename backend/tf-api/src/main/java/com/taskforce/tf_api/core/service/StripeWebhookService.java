@@ -11,6 +11,7 @@ import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.stripe.exception.EventDataObjectDeserializationException;
 import com.stripe.model.Event;
 import com.stripe.model.EventDataObjectDeserializer;
 import com.stripe.model.Invoice;
@@ -289,13 +290,44 @@ public class StripeWebhookService {
     }
 
     @SuppressWarnings("unchecked")
+    /**
+     * Extrait l'objet métier d'un événement Stripe, <b>avec repli sur la désérialisation permissive</b>.
+     *
+     * <p><b>Pourquoi ce repli est indispensable.</b> {@code getObject()} renvoie un {@code Optional}
+     * <b>vide</b> dès que la version d'API du compte Stripe diffère de celle que cible la version de
+     * {@code stripe-java} embarquée. Sans repli, chaque webhook était alors traité comme un succès
+     * vide : la méthode renvoyait {@code null}, le gestionnaire sortait sans rien faire, et le
+     * contrôleur répondait <b>200</b>. Stripe considérait donc l'événement comme délivré et ne le
+     * rejouait jamais. Aucun abonnement n'était activé, aucun changement de forfait appliqué, aucun
+     * échec de paiement enregistré, <b>sans la moindre erreur visible</b>.</p>
+     *
+     * <p>Constaté le 24/07/2026 en exerçant de vrais événements : compte en
+     * {@code 2026-06-24.dahlia}, SDK {@code stripe-java} 31.2.0. <b>Les cinq types d'événements
+     * traités échouaient tous.</b></p>
+     *
+     * <p>{@code deserializeUnsafe()} est le remède documenté par Stripe pour ce cas. Il lit la charge
+     * utile sans exiger la concordance de version. Le risque — un champ renommé ou absent dans une
+     * version plus récente — est ici acceptable : les gestionnaires ne lisent que des champs stables
+     * ({@code id}, {@code customer}, {@code status}, {@code amount_paid}, {@code currency}).</p>
+     *
+     * <p>Un désaccord de version ne se résout pas en rejouant : l'échec définitif est journalisé en
+     * {@code ERROR} et renvoie {@code null} plutôt que de provoquer trois jours de tentatives vaines.</p>
+     */
     private <T extends StripeObject> T deserialize(Event event, Class<T> type) {
         EventDataObjectDeserializer deserializer = event.getDataObjectDeserializer();
-        if (!deserializer.getObject().isPresent()) {
-            log.warn("Impossible de désérialiser l'objet Stripe pour l'événement {}", event.getId());
-            return null;
+        StripeObject obj = deserializer.getObject().orElse(null);
+
+        if (obj == null) {
+            try {
+                obj = deserializer.deserializeUnsafe();
+                log.warn("Désérialisation de secours pour l'événement {} : la version d'API du compte "
+                    + "Stripe diffère de celle ciblée par stripe-java. Traitement poursuivi.", event.getId());
+            } catch (EventDataObjectDeserializationException e) {
+                log.error("Impossible de désérialiser l'objet Stripe pour l'événement {} : {}",
+                    event.getId(), e.getMessage());
+                return null;
+            }
         }
-        StripeObject obj = deserializer.getObject().get();
         if (!type.isInstance(obj)) {
             log.warn("Type inattendu pour {}: attendu {}, reçu {}", event.getId(), type.getSimpleName(), obj.getClass().getSimpleName());
             return null;
