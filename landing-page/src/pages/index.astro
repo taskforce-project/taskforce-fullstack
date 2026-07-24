@@ -1,39 +1,54 @@
 ---
 import BaseLayout from "@/layouts/BaseLayout.astro";
-import { Hero } from "@/components/sections/Hero";
-import { LogosSection } from "@/components/sections/LogosSection";
+import { Hero } from "@/components/site/home/Hero";
 import {
-  StatementSection,
-  OrchestrationFeature,
-  SmartAssignFeature,
-  AgentsFeature,
-  BrainOSFeature,
-  AnalyticsFeature,
-} from "@/components/sections/HomeFeatures";
-import {
-  IntegrationsSection,
-  EnterpriseSection,
-  TestimonialsSection,
-} from "@/components/sections/HomeSections";
-import { HowItWorks } from "@/components/sections/HowItWorks";
-import { CtaSection } from "@/components/sections/CtaSection";
+  LogoWall,
+  Anatomy,
+  Pipeline,
+  Agents,
+  Approvals,
+} from "@/components/site/home/Narrative";
+import { BrainOS, SmartAssign, Models, Analytics } from "@/components/site/home/Features";
+import { Leaks, WhyOneSystem, Maturity } from "@/components/site/home/Platform";
+import { Trust, Integrations, WhereThisGoes, FinalCta } from "@/components/site/home/Proof";
 ---
 
 <BaseLayout
   title="TaskForce — AI Delivery Operating System"
-  description="TaskForce turns intent into shipped software: describe the outcome and it orchestrates your AI agents through every step of delivery — with human approval at each checkpoint."
+  description="Describe the outcome and TaskForce runs the delivery: agents plan and draft every step, a human approves each checkpoint, and the models can run on your own hardware."
 >
-  <Hero />
-  <LogosSection />
-  <StatementSection />
-  <HowItWorks />
-  <OrchestrationFeature />
-  <SmartAssignFeature />
-  <AgentsFeature />
-  <BrainOSFeature />
-  <AnalyticsFeature />
-  <IntegrationsSection />
-  <EnterpriseSection />
-  <TestimonialsSection />
-  <CtaSection />
+  {/* Ordre : problème → mécanisme → garantie → composants → conséquence → honnêteté → preuve.
+      Chaque section répond à la question que la précédente vient de poser.
+
+      ⚠️ `client:idle` et non `client:visible` : Astro rend `<astro-island>` en
+      `display: contents`, donc l'élément a une boîte de 0×0 et l'IntersectionObserver du
+      directive `visible` ne se déclenche jamais — les îlots restaient en `ssr` indéfiniment
+      (animations figées, recherche des intégrations inerte). `idle` ne dépend d'aucune
+      géométrie. La paresse n'est pas perdue pour autant : chaque illustration porte son
+      propre IntersectionObserver et ne joue que lorsqu'elle est réellement à l'écran. */}
+  <Hero client:load />
+  <LogoWall />
+
+  <!-- Le problème, puis ce qu'un run y répond -->
+  <Leaks client:idle />
+  <Anatomy />
+  <Pipeline client:idle />
+  <Approvals client:idle />
+
+  <!-- Ce qui fait tourner le run -->
+  <Agents client:idle />
+  <BrainOS client:idle />
+  <SmartAssign client:idle />
+  <Models client:idle />
+  <Analytics client:idle />
+
+  <!-- Pourquoi un seul système, et où en est vraiment le produit -->
+  <WhyOneSystem client:idle />
+  <Maturity />
+
+  <!-- Preuves et sortie -->
+  <Trust />
+  <Integrations client:idle />
+  <WhereThisGoes />
+  <FinalCta />
 </BaseLayout>
