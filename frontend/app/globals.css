@@ -406,47 +406,263 @@ textarea:not([disabled]) { cursor: text; }
 
 @layer components {
 
-  /* ── Auth shell ── */
+  /* ══════════════════════════════════════════════════════════════════════════
+     AUTH — coquille plein écran, sans défilement
+     ─────────────────────────────────────────────────────────────────────────
+     Parti pris : une seule colonne centrée sur fond calme. Pas de panneau
+     latéral, pas de décor animé. Les pages d'authentification sont un passage,
+     pas une destination — tout ce que l'œil n'a pas besoin de voir est retiré.
+     La hauteur est verrouillée à 100svh (`svh` et non `vh` : sur mobile, la
+     barre d'URL rétractable fausse `vh` et réintroduit un défilement).
+     ══════════════════════════════════════════════════════════════════════════ */
+
   .auth-shell {
-    min-height: 100svh;
-    background: transparent;
-    display: flex;
-    flex-direction: column;
+    height: 100svh;
+    background: var(--background);
+    display: grid;
+    grid-template-rows: auto 1fr auto;  /* barre · contenu · mention légale */
+    overflow: hidden;
   }
 
-  .auth-controls {
-    position: fixed;
-    top: 0;
-    right: 0;
-    z-index: 50;
-    padding: 1rem;
+  /* ── Barre supérieure : marque à gauche, rien au centre, actions à droite ── */
+  /* La hauteur suit le logo, pas l'inverse : 80 px de signe plus 6 px d'air de part et d'autre.
+     Passer de 56 à 92 px prend 36 px sur le budget vertical du contenu — assumé, c'est le prix
+     demandé pour un logo deux fois plus grand. */
+  .auth-topbar {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    justify-content: space-between;
+    gap: 1rem;
+    height: 5.75rem;
+    padding: 0 1rem;
+  }
+  @media (min-width: 640px) {
+    .auth-topbar { padding: 0 1.5rem; }
   }
 
-  .auth-control-btn {
+  /* Marque et retour au site forment un bloc à gauche, séparés par un filet vertical : deux
+     éléments distincts mais de même famille, plutôt que deux items perdus aux extrémités. */
+  .auth-topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+  }
+
+  /* Ne contient plus que le logo : la taille de police et l'écart n'ont plus d'objet depuis que le
+     mot « TaskForce » a été retiré. Une classe qui déclare des propriétés sans effet fait croire à
+     un style maîtrisé. */
+  .auth-brand {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  .auth-back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding-left: 0.75rem;
+    border-left: 1px solid var(--separator);
+    font-size: 0.8125rem;
+    color: var(--label-tertiary);
+    white-space: nowrap;
+    transition: color 140ms ease;
+  }
+  .auth-back-link:hover { color: var(--label-primary); }
+
+  @media (max-width: 480px) {
+    /* Sur mobile la barre doit rester lisible : le retour au site cède la place, la marque cliquable
+       et le bouton d'action suffisent. */
+    .auth-back-link { display: none; }
+  }
+
+  .auth-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+
+  /* Action opposée à la page courante (créer un compte / se connecter). */
+  .auth-cta-btn {
+    display: inline-flex;
+    align-items: center;
+    height: 2rem;
+    padding: 0 0.875rem;
+    margin-left: 0.25rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    background: var(--card);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--label-primary);
+    white-space: nowrap;
+    transition: background 140ms ease, border-color 140ms ease;
+  }
+  .auth-cta-btn:hover {
+    background: var(--fill-secondary);
+    border-color: var(--label-quaternary);
+  }
+
+  /* Bouton icône discret (thème, langue) */
+  .auth-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: var(--radius-md);
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--label-tertiary);
+    transition: background 140ms ease, color 140ms ease;
+    cursor: pointer;
+  }
+  .auth-icon-btn:hover {
+    background: var(--fill-secondary);
+    color: var(--label-primary);
+  }
+
+  /* Retour au site : discret mais lisible, seule action textuelle de la barre */
+  /* ── Zone centrale ── */
+  .auth-main {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 2.25rem;
-    height: 2.25rem;
-    border-radius: 9999px;
-    border: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
-    background: color-mix(in srgb, var(--background) 80%, transparent);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    transition: background 150ms;
-    cursor: pointer;
+    padding: 0 1.25rem;
+    min-height: 0;      /* indispensable : sans cela l'enfant peut déborder de la grille */
+    overflow-y: auto;   /* filet de sécurité sur très petit écran, jamais visible sinon */
   }
-  .auth-control-btn:hover { background: var(--accent); }
 
-  .auth-main {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
+  .auth-panel {
+    width: 100%;
+    max-width: 22.5rem;   /* 360px — largeur de lecture confortable pour un formulaire court */
   }
+  .auth-panel-wide {
+    max-width: 26.5rem;   /* 424px — inscription : deux colonnes prénom / nom */
+  }
+
+  /* ── Titres ── */
+  .auth-title {
+    font-size: 1.375rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    color: var(--label-primary);
+  }
+  .auth-subtitle {
+    margin-top: 0.375rem;
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    color: var(--label-tertiary);
+  }
+
+  /* ── Champs ── */
+  .auth-label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--label-secondary);
+    margin-bottom: 0.25rem;
+  }
+  /* Uniquement la taille. La couleur, la bordure et l'anneau de focus appartiennent au composant
+     `Input` du système : les redéclarer ici était sans effet (les utilitaires Tailwind du composant
+     l'emportent sur la couche `components`) et laissait croire à un style qui n'existait pas. */
+  .auth-input {
+    height: 2.25rem;
+    font-size: 0.875rem;
+  }
+
+  /* ── Connexion via un fournisseur externe ── */
+  .auth-social-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    height: 2.375rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    background: var(--card);
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--label-primary);
+    transition: background 140ms ease, border-color 140ms ease;
+  }
+  .auth-social-btn:hover {
+    background: var(--fill-secondary);
+    border-color: var(--label-quaternary);
+  }
+
+  /* Séparateur « ou » : filet continu barré par le libellé, plutôt que deux traits à ajuster. */
+  .auth-separator {
+    position: relative;
+    margin: 1.25rem 0 0;
+    text-align: center;
+  }
+  .auth-separator::before {
+    content: "";
+    position: absolute;
+    inset: 50% 0 auto;
+    height: 1px;
+    background: var(--separator);
+  }
+  .auth-separator > span {
+    position: relative;
+    padding: 0 0.625rem;
+    background: var(--background);
+    font-size: 0.75rem;
+    color: var(--label-tertiary);
+  }
+
+  /* ── Action principale ── */
+  .auth-submit {
+    width: 100%;
+    height: 2.375rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+
+  /* ── Liens ── */
+  .auth-link {
+    color: var(--label-secondary);
+    font-weight: 500;
+    transition: color 140ms ease;
+  }
+  .auth-link:hover { color: var(--label-primary); }
+
+  .auth-link-muted {
+    color: var(--label-tertiary);
+    transition: color 140ms ease;
+  }
+  .auth-link-muted:hover { color: var(--label-primary); }
+
+  /* ── Mention légale : une ligne, jamais plus ── */
+  .auth-legal {
+    padding: 0 1.5rem 1rem;
+    text-align: center;
+    font-size: 0.6875rem;
+    line-height: 1.4;
+    color: var(--label-quaternary);
+  }
+
+  /* ── Fil d'étapes (inscription) ──
+     Segments pleine largeur plutôt que pastilles numérotées : l'information utile
+     est « où j'en suis dans une barre de progression », pas « l'étape porte le
+     numéro 2 ». Le libellé de l'étape courante suffit à la nommer. */
+  .auth-steps {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+  .auth-step-seg {
+    flex: 1;
+    height: 0.1875rem;
+    border-radius: 9999px;
+    background: var(--fill-secondary);
+    transition: background 220ms ease;
+  }
+  .auth-step-seg[data-state="done"]    { background: color-mix(in srgb, var(--primary) 45%, transparent); }
+  .auth-step-seg[data-state="current"] { background: var(--primary); }
 
   /* ── Gradient text (titres décoratifs auth) ── */
   .gradient-text {
