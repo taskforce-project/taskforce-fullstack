@@ -86,6 +86,27 @@ export const authService = {
   },
 
   /**
+   * Défi de vérification humaine, à demander au chargement du formulaire d'inscription.
+   *
+   * En cas d'échec réseau on renvoie `{ token: "", required: false }` plutôt que de propager :
+   * un serveur de défi injoignable ne doit pas empêcher quiconque de s'inscrire. Si le mécanisme est
+   * réellement actif côté serveur, l'inscription sera refusée à la soumission avec un motif clair —
+   * ce qui est le bon endroit pour le dire.
+   */
+  async getChallenge(): Promise<{ token: string; required: boolean }> {
+    try {
+      const response = await apiClient.get<{
+        success: boolean;
+        message: string;
+        data: { token: string; required: boolean };
+      }>(AUTH_ROUTES.CHALLENGE);
+      return response.data.data;
+    } catch {
+      return { token: "", required: false };
+    }
+  },
+
+  /**
    * Inscription utilisateur (Étape 1)
    * @param data - Données d'inscription avec plan
    * @returns ID utilisateur et email
