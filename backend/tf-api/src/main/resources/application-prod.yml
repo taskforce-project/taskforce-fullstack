@@ -90,6 +90,15 @@ app:
   # Base publique du BACKEND (callbacks OAuth). Souvent = APP_URL (même domaine derrière nginx).
   api-url: ${APP_API_URL:${APP_URL}}
 
+# Chiffrement au repos des colonnes sensibles (AES-256-GCM, RGPD C11.2 / C24).
+#
+# VOLONTAIREMENT SANS VALEUR PAR DÉFAUT : si TF_ENCRYPTION_KEY n'est pas fournie, l'application
+# REFUSE de démarrer. Sans cette contrainte, l'absence de clé ne produit aucune erreur — le
+# convertisseur devient un passe-plat et les jetons OAuth partent en clair en base, sans log ni
+# alerte. Un échec au démarrage est infiniment préférable à un chiffrement silencieusement inactif.
+security:
+  encryption-key: ${TF_ENCRYPTION_KEY}
+
 # Intégrations tierces (OAuth) — vides si non configurées
 integrations:
   github:
