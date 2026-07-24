@@ -34,9 +34,19 @@ public class StripeWebhookController {
     @PostMapping("/stripe")
     public ResponseEntity<String> handleStripeWebhook(
         @RequestBody String payload,
-        @RequestHeader("Stripe-Signature") String sigHeader
+        // `required = false` volontaire. Avec un en-tête obligatoire, Spring lève
+        // MissingRequestHeaderException AVANT d'entrer ici, et le gestionnaire global la traduit en
+        // 500 : un point d'entrée public répondait donc « erreur serveur » à une requête simplement
+        // malformée, en journalisant une trace à chaque fois. Stripe envoie toujours l'en-tête, mais
+        // n'importe qui peut appeler cette route — c'est une erreur du client, elle vaut 400.
+        @RequestHeader(value = "Stripe-Signature", required = false) String sigHeader
     ) {
         log.info("Réception d'un webhook Stripe");
+
+        if (sigHeader == null || sigHeader.isBlank()) {
+            log.warn("Webhook Stripe sans en-tête Stripe-Signature — rejeté");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Missing signature header");
+        }
 
         Event event;
         try {
