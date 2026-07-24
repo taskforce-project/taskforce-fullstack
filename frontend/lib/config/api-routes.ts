@@ -11,6 +11,8 @@
 export const AUTH_ROUTES = {
   LOGIN: "/api/auth/login",
   REGISTER: "/api/auth/register",
+  /** Défi de vérification humaine, demandé au chargement du formulaire d'inscription. */
+  CHALLENGE: "/api/auth/challenge",
   SELECT_PLAN: "/api/auth/select-plan",
   VERIFY_OTP: "/api/auth/verify-otp",
   RESEND_OTP: "/api/auth/resend-otp",
