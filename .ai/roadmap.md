@@ -838,7 +838,7 @@ Planning prévisionnel (Gantt, jalons DFS, chemin critique), budget prévisionne
 | **C10** | **Trancher l'accessibilité** | C13, C15. ✅ **22/07 — tranché par la mesure, et les deux camps avaient tort.** Le test s'intitulait « WCAG 2.1 AA » mais **n'échouait que sur `critical`** ; or les manquements AA remontent en `serious`. La page de connexion en comptait **4** et le dashboard **6**, invisibles. Tout est corrigé : **0 violation sur les 3 pages**, tous impacts confondus, et le seuil du test inclut désormais `serious` | ✅ |
 | **C11** | **E6 — trame de compte-rendu d'activité** + 1 exemple rempli | C4, critère `[R17]` : « la trame […] **est opérationnelle** ». ✅ **23/07** : `01-projet/Trame_Compte_Rendu_Activite.md` (dérivée point par point de la méthode E5) + `01-projet/CR_2026-S30_Cloture_V1.md`, exemple rempli sur la semaine réelle du 20 au 23/07, références de commit vérifiables, valeurs toutes mesurées | ✅ |
 | **C12** | **Manuel utilisateur** (collaborateurs + managers) | Livrable explicite du CDC §8. ✅ **23/07 — il existe déjà** : `15-utilisateur/Manuel_Utilisateur.md` (399 l., 12 sections, produit le 05/07), + `FAQ.md` (229 l.), `Release_Notes.md`, `Guid_Installation.md`. Reste optionnel : guide d'administration OWNER/ADMIN | ✅ |
-| **C13** | **Webhooks Stripe** | C23 « l'intégration du système de paiement est **fonctionnelle** ». ✅ **22/07 — vérifié : implémenté, pas « à finaliser ».** `POST /api/webhooks/stripe` (dans `PUBLIC_MATCHERS`, la signature faisant office d'authentification) · signature vérifiée via `Webhook.constructEvent`, 400 si invalide · **5 événements** traités · **idempotence** par `stripe_event_id UNIQUE` · **500 délibéré** sur erreur de traitement pour que Stripe rejoue en backoff (`FIX-005`) · mapping complet des statuts · historique de facturation. **Seule limite** : jamais exercé avec de vrais événements Stripe (nécessite les clés de test du user — cf. ci-dessous) | 🟧 |
+| **C13** | **Webhooks Stripe** | C23 « l'intégration du système de paiement est **fonctionnelle** ». ✅ **22/07 — vérifié : implémenté, pas « à finaliser ».** `POST /api/webhooks/stripe` (dans `PUBLIC_MATCHERS`, la signature faisant office d'authentification) · signature vérifiée via `Webhook.constructEvent`, 400 si invalide · **5 événements** traités · **idempotence** par `stripe_event_id UNIQUE` · **500 délibéré** sur erreur de traitement pour que Stripe rejoue en backoff (`FIX-005`) · mapping complet des statuts · historique de facturation. ⚠️ **La « seule limite » — jamais exercé avec de vrais événements — n'était pas cosmétique : c'était LE défaut.** ✅ **24/07 — exercé pour de vrai, deux défauts bloquants trouvés et corrigés** (désérialisation impossible par écart de version d'API → tous les webhooks répondaient 200 sans rien faire ; puis colonnes enum PostgreSQL non mappées → aucune ligne `subscriptions` jamais créée par le code). **Chaîne complète vérifiée** : `FREE` → `BASIC/ACTIVE`, abonnement et historique écrits avec un vrai `evt_`, **idempotence prouvée** par renvoi du même événement. Voir MAJ (16) | ✅ |
 | **C14** | **Actualiser la grille remplie** (`Grille_evaluation_TaskForce_REMPLIE`) | Premier document lu par le jury. ✅ **23–24/07 — à jour : 77 verts, 13 jaunes, 0 rouge.** Elle déclarait **< 50 %** de couverture contre **88,83 % (front) / 73,71 % (back)** réellement mesurés (cf. `C3`) ; les 4 rouges de C11 sont passés au jaune après la décision E9 (MAJ 9). ⚠️ Deux pièges rencontrés, à ne pas réintroduire : cette ligne portait elle-même « 92 % / 78 % », chiffres périmés ; et la grille **ne couvre que les blocs 1 à 3** (s'arrête à C26) — C27+ vit dans `Bloc4_Deploiement_Production.md` | ✅ |
 | **C15** | **Récupérer la page de garde imposée** par le certificateur | Obligatoire. ✅ **24/07 — trouvée : elle est en page 11 de la note pédagogique**, pas dans un fichier séparé (d'où l'échec des recherches précédentes). Extraite telle quelle dans `16-memoire-rncp/assets/Page_de_Garde_Imposee.pdf` + `Page_de_Garde.md`. Reste à trancher au montage : le pied de page « Page 11 sur 11 » hérité de la note | ✅ |
 | **C16** | **Rédiger le dossier 40 pages** (condensation, pas assemblage) | **Livrable n°1 — 14/09** | 🔲 |
@@ -1932,12 +1932,14 @@ Planning prévisionnel (Gantt, jalons DFS, chemin critique), budget prévisionne
 > **Deux tests ajoutés** dans `StripeWebhookServiceTest` (`@Nested ApiVersionMismatch`) : le repli
 > traite l'événement malgré la divergence, et l'échec du repli abandonne sans exception.
 >
-> ⚠️ **Défaut mineur relevé au passage, non corrigé** : un POST sans en-tête `Stripe-Signature` renvoie
-> **500**, pas 400. `@RequestHeader` est obligatoire, donc Spring lève `MissingRequestHeaderException`
-> **avant** d'entrer dans la méthode, et le gestionnaire global la mappe en 500. La signature
-> *invalide* renvoie bien 400 — la documentation n'est donc pas fausse, elle est incomplète. Sans
-> conséquence pratique (Stripe envoie toujours l'en-tête) mais un endpoint public qui répond 500 sur
-> une entrée triviale, en journalisant une trace, mérite un `required = false` et un 400 explicite.
+> ✅ **Défaut mineur relevé au passage, corrigé** : un POST sans en-tête `Stripe-Signature` renvoyait
+> **500**, pas 400. `@RequestHeader` étant obligatoire, Spring levait `MissingRequestHeaderException`
+> **avant** d'entrer dans la méthode, et le gestionnaire global la mappait en 500. La signature
+> *invalide* renvoyait bien 400 — la documentation n'était donc pas fausse, elle était incomplète.
+> Sans conséquence pratique (Stripe envoie toujours l'en-tête), mais un point d'entrée **public** qui
+> répond « erreur serveur » à une requête malformée, en journalisant une trace à chaque appel, est une
+> surface de nuisance gratuite. Passé en `required = false` avec un 400 explicite. **Vérifié en direct
+> après reconstruction** : en-tête absent → **400**, signature invalide → **400**.
 >
 > **Méthode employée** — reproductible, et à réutiliser après tout changement de version d'API :
 > `stripe listen --forward-to localhost:8080/api/webhooks/stripe`, puis `stripe trigger` sur les 5
@@ -1951,6 +1953,284 @@ Planning prévisionnel (Gantt, jalons DFS, chemin critique), budget prévisionne
 > ne marche pas — il faut l'identifiant `pm_…` réellement retourné. Et `stripe trigger
 > checkout.session.completed --override checkout_session:customer_email=…` est **rejeté**
 > (`customer_and_confirmation_email_mismatch`) : le fixture crée son propre client.
+>
+> ---
+>
+> **▶ SECOND DÉFAUT, révélé par la correction du premier : aucune ligne `subscriptions` n'avait jamais
+> pu être écrite par le code.**
+>
+> Une fois la désérialisation réparée, le gestionnaire est allé au bout — et a échoué en base :
+>
+> ```
+> ERROR: column "status" is of type plan_status but expression is of type character varying
+> ```
+>
+> **Trois colonnes** utilisent le type enum PostgreSQL `plan_status` : `subscriptions.status`,
+> `subscription_history.plan_status`, `users.plan_status`. Sans `@JdbcTypeCode(SqlTypes.NAMED_ENUM)`,
+> Hibernate envoie une chaîne et PostgreSQL refuse. **`User.planStatus` portait déjà l'annotation** —
+> quelqu'un avait rencontré le problème et ne l'avait corrigé qu'à un seul endroit. Les deux autres
+> entités ne l'avaient pas.
+>
+> Conséquence : **aucun abonnement n'a jamais pu être créé par l'application.** La ligne présente en
+> base vient du `dev_seed.sql`, insérée en SQL direct — ce qui explique que personne ne l'ait vu. Le
+> défaut ne se manifestait qu'à l'`INSERT`, donc uniquement pour un **premier** abonné.
+>
+> Corrigé de la même façon que l'existant : annotation ajoutée sur `Subscription.status` et
+> `SubscriptionHistory.planStatus`. Aucune migration, aucun changement de schéma, `ddl-auto=validate`
+> accepte.
+>
+> **▶ VÉRIFICATION DE BOUT EN BOUT, après les deux correctifs.** Client Stripe réel, moyen de paiement
+> réel, abonnement au vrai prix BASIC (19,00 € / mois), événement `customer.subscription.updated`
+> authentique :
+>
+> | Contrôle | Avant | Après |
+> |---|---|---|
+> | Forfait de l'utilisateur | `FREE`, statut absent | **`BASIC`, statut `ACTIVE`** |
+> | Ligne `subscriptions` | inexistante | **créée** — `ACTIVE`, `BASIC`, `EUR`, `sub_…` réel |
+> | Ligne `subscription_history` | inexistante | **créée** avec le vrai `evt_…` |
+> | Journal | « Impossible de désérialiser » | « Désérialisation de secours […] Traitement poursuivi » |
+>
+> **Idempotence enfin exercée** (l'index unique existait depuis `V36`, jamais éprouvé) :
+> `stripe events resend` du même `evt_` → **toujours 1 ligne**, total inchangé. Le rejeu ne double rien.
+>
+> **C13 passe de 🟧 à ✅.** L'intégration de paiement est désormais fonctionnelle **et démontrée**, au
+> sens de C23.
+>
+> **Suite backend après tous les correctifs de la journée : 807 tests, 0 échec, BUILD SUCCESS**
+> (792 au 22/07, plus 9 `DueDateAlertSchedulerTest`, 4 sur la garde de chiffrement, 2 sur le désaccord
+> de version Stripe). Trois passages complets ce jour, tous verts.
+>
+> **Remise en état** : utilisateur 2 rétabli à l'identique (`FREE`, statut nul, `stripe_customer_id`
+> nul), ligne d'abonnement et d'historique créées pour le test supprimées — la base est revenue à
+> l'état du seed (2 lignes d'historique, 1 abonnement). Abonnement Stripe de test **annulé** pour qu'il
+> cesse d'émettre des webhooks mensuels ; le client de test subsiste, sans effet. Écoute `stripe listen`
+> arrêtée.
+
+> **▶ MAJ 24/07/2026 (17) — refonte des pages d'authentification (lot `C1`, premier jet).**
+>
+> Direction demandée : relevance.ai / Linear. **Une seule colonne centrée sur fond calme**, sans
+> panneau de marque ni décor animé. Le `FloatingPaths` et le panneau sombre occupaient 45 % de la
+> largeur pour ne rien dire, et poussaient la page au défilement dès qu'un écran était court.
+>
+> **Contrainte tenue : aucune page ne défile.** Coquille en grille `100svh` (et non `100vh` : sur
+> mobile, la barre d'URL rétractable fausse `vh`), trois bandes — barre supérieure vide au centre
+> avec « Retour au site » à droite, contenu centré, mention légale sur **une ligne**.
+>
+> **Mesuré sur un écran court (1280 × 600), cas le plus défavorable** :
+>
+> | Écran | Avant | Après |
+> |---|---|---|
+> | Connexion | panneau scindé, défilement | pas de défilement, 213 px de marge |
+> | Inscription étape 1 | défilement dès la saisie du mot de passe (marge −15 px) | pas de défilement, **28 px** de marge |
+> | Saut de mise en page à l'apparition de la jauge | **21 px** | **0** |
+>
+> **Ce qui a été retiré, et pourquoi** : le sous-titre de l'inscription (le fil d'étapes annonce déjà
+> « Étape 1 sur 3 · Votre compte »), la notification « Informations enregistrées » (la navigation vers
+> l'étape 2 *est* la confirmation), le panneau illustré de l'étape 3 (doublait la hauteur), et les
+> **trois** barres de progression dupliquées dans les trois étapes — remplacées par un `AuthStepper`
+> unique porté par les pages.
+>
+> **Ce qui a été ajouté** : jauge de robustesse du mot de passe. La règle des 50 points existait déjà
+> mais **uniquement à la soumission** : on découvrait son mot de passe trop faible après avoir cliqué,
+> sans savoir ce qui manquait. Une contrainte qu'on impose doit être visible pendant la saisie. La
+> place lui est réservée en permanence (`visibility` plutôt que démontage) pour supprimer le sursaut.
+>
+> **Deux régressions que j'avais introduites, rattrapées par les tests existants** — les deux méritent
+> d'être notées parce que ce sont exactement les détails qu'une refonte visuelle fait perdre :
+> 1. Le champ OTP avait perdu son filtre `replace(/\D/g,"")` : il acceptait `abc123def`. Le `maxLength`
+>    de 6 aurait alors tronqué le vrai code.
+> 2. Les boutons de chargement affichaient un **spinner nu**, sans texte. Invisible pour un lecteur
+>    d'écran. Libellés rétablis à côté du spinner sur les quatre formulaires.
+>
+> **Quatre tests décrivaient un contrat volontairement changé** (fil d'étapes déplacé, libellé
+> reformulé, notification retirée) : mis à jour, et la couverture du fil d'étapes **déplacée** vers un
+> `auth-stepper.test.tsx` dédié plutôt que perdue. **107 tests d'authentification verts** (contre 101),
+> `tsc` et `eslint` à 0.
+>
+> ⚠️ **Détail corrigé au passage** : `.auth-input` déclarait un fond et une bordure qui n'avaient
+> **aucun effet** — les utilitaires Tailwind du composant `Input` l'emportent sur la couche
+> `components`. Déclarations retirées ; la classe ne porte plus que la taille. Une règle CSS inerte est
+> pire qu'absente, elle fait croire à un style maîtrisé.
+>
+> ⚠️ **Piège d'outillage à retenir** : le panneau du navigateur intégré étant masqué, la page **ne
+> recompose pas**. `getComputedStyle` renvoie alors des valeurs périmées après un changement de thème,
+> et `requestAnimationFrame` ne se déclenche jamais (délai d'attente). J'ai d'abord conclu à un défaut
+> du thème sombre — **c'était faux**. Vérification correcte : lire les tokens **au niveau de chaque
+> élément** (tous justes) et mesurer un élément **créé à la volée** (couleurs sombres correctes).
+>
+> **Reste sur ce lot** : validation visuelle par l'utilisateur, puis le site (landing). L'étape 2
+> (choix du plan) n'a pas pu être inspectée en direct — elle redirige vers l'étape 1 sans données
+> d'inscription en session, ce qui est le garde-fou attendu.
+
+> **▶ MAJ 24/07/2026 (18) — retours utilisateur sur les pages d'authentification (lot `C1`, 2ᵉ passe).**
+>
+> **1. Logo trop petit — et la cause n'était pas celle qu'on croit.** Le fichier est plus **large que
+> haut** (rapport ~3:2) : un `width` de 36 ne donnait que **24 pixels de hauteur**. Régler la largeur
+> d'une image dont la hauteur est la contrainte ne pouvait pas marcher.
+>
+> Puis, sur second retour : **le mot « TaskForce » retiré, le logo seul et nettement plus grand** —
+> **60 × 40** dans une barre de 56 px, soit 8 px d'air de part et d'autre. La marque est dans le
+> dessin ; la répéter en texte n'apprenait rien et bridait la taille du signe. Le nom reste porté par
+> l'`aria-label` du lien, donc toujours annoncé par un lecteur d'écran. `.auth-brand` a perdu ses
+> déclarations de police et d'écart, devenues sans objet. **Le budget de hauteur est intact** : la
+> barre n'a pas grandi, l'inscription tient toujours à 507 px pour 511 disponibles.
+>
+> **2. Barre supérieure regroupée.** Elle paraissait vide parce que ses deux éléments étaient jetés aux
+> extrémités. Désormais : marque **+ « Retour au site »** en un bloc à gauche, séparés par un filet ;
+> à droite les réglages et **l'action opposée à la page courante** — « Créer un compte » sur la
+> connexion, « Se connecter » ailleurs. La barre cesse d'être décorative.
+>
+> **3. Footer = celui de l'application.** `AppFooter` gagne une prop `bleed` : les marges négatives
+> servent à percer le cadre du contenu applicatif, elles feraient déborder la grille des pages
+> d'authentification. Un seul footer à entretenir, comme demandé.
+>
+> **4. Vérification humaine à l'inscription — implémentée de bout en bout, sans service tiers.**
+>
+> `HumanChallengeService` : le formulaire demande un **jeton signé** au chargement
+> (`GET /api/auth/challenge`), le serveur vérifie à la soumission la **signature HMAC**, un **âge
+> maximal d'une heure** et un **délai minimal de trois secondes**. Comparaison à temps constant.
+> Sans état : la signature porte tout, il n'y a pas de Redis en dev.
+>
+> **Vérifié en direct** contre le backend reconstruit :
+>
+> | Cas | Résultat |
+> |---|---|
+> | `GET /api/auth/challenge` | **200**, jeton de 74 caractères en 3 segments, `required: true` |
+> | Soumission **instantanée** | **400** — « Formulaire soumis trop rapidement » |
+> | Jeton **forgé** (signature bidon) | **400** — « Vérification humaine invalide » |
+> | Jeton légitime **après 5 s** | **201** — le défi passe, l'inscription suit |
+>
+> **23 tests** (`HumanChallengeServiceTest`), horloge injectée plutôt que subie : vérifier « refuse
+> au-delà d'une heure » en dormant serait impossible, et « refuse sous trois secondes » rendrait la
+> suite lente. Deux horloges fixes suffisent, le jeton étant sans état.
+>
+> ⚠️ **Ce que ce mécanisme ne fait pas, et c'est écrit dans le code** : il n'arrête pas un adversaire
+> déterminé (demander un jeton, attendre trois secondes, poster). C'est un **filtre à automates
+> naïfs**. Il est dimensionné pour ce qu'il protège réellement : la création de compte est déjà
+> verrouillée par l'OTP courriel, donc le risque n'est pas le faux compte mais le **volume** d'envois
+> depuis notre serveur. Un service tiers ferait sortir des adresses IP de visiteurs vers un
+> sous-traitant, à inscrire au registre — écarté délibérément. **L'usage unique du jeton manque** : il
+> demanderait un magasin partagé, c'est l'incrément suivant, pas un oubli.
+>
+> **5. Connexion via GitHub — non livrée, et voici pourquoi.** `AuthSocialButtons` existe et la page
+> est dessinée pour l'accueillir, mais les boutons restent **absents** tant que
+> `NEXT_PUBLIC_AUTH_SOCIAL_PROVIDERS` n'est pas renseignée. Ce n'est pas de la prudence décorative :
+> **la connexion sociale n'existe pas côté serveur**, et un bouton qui mène à une erreur est pire que
+> pas de bouton.
+>
+> L'application authentifie en **ROPC** (`/api/auth/login`, mot de passe → Keycloak → jetons). La
+> connexion sociale exige le **flux d'autorisation**, soit quatre pièces manquantes : un fournisseur
+> d'identité dans le realm Keycloak (**aucun n'est déclaré**, vérifié dans les trois fichiers de
+> realm) ; une application OAuth GitHub dont l'URL de rappel pointe vers le courtier Keycloak — **une
+> action sur github.com, qui n'appartient qu'à toi** ; une route de rappel côté application qui
+> échange le code contre des jetons ; et la création du compte local au premier passage. C'est une
+> fonctionnalité à part entière, pas un bouton — la livrer à moitié au milieu d'un lot qui touche déjà
+> cinq autres choses, sur un chemin critique de sécurité, aurait été le mauvais arbitrage.
+>
+> **6. Budget de hauteur tenu, en mesurant plutôt qu'en estimant.** La vérification humaine faisait
+> défiler l'inscription. Premier essai de compensation : **3 pixels gagnés** sur les 42 nécessaires —
+> mon estimation était fausse. En instrumentant réellement chaque bloc du panneau, le coupable était
+> le bloc de consentement (**74 px**). Cinq ajustements chiffrés (fil d'étapes sur une ligne,
+> consentement sur une ligne, libellés 6→4 px, champs 38→36 px, marges) → **507 px pour 511
+> disponibles à 1280 × 600 : aucun défilement, saut de mise en page nul.**
+>
+> ⚠️ **Détail d'hygiène corrigé au passage** : `verification-form` journalisait en clair dans la
+> console du navigateur l'adresse, le prénom et le nom de la personne qui s'inscrit
+> (`console.log('[DEBUG] …')`). Retiré.
+>
+> **Contrôles** : `tsc` 0 · `eslint` 0 erreur (les 20 avertissements `set-state-in-effect` restent
+> ceux déjà assumés) · **107 tests d'authentification front** · **23 tests** sur le défi.
+>
+> ⚠️ **Une seule cause, trois fois de suite : ajouter une dépendance de constructeur.** Le fil de la
+> journée sur ce lot, et il mérite d'être retenu tel quel.
+>
+> | # | Symptôme | Cause |
+> |---|---|---|
+> | 1 | Le backend **refuse de démarrer** — « No default constructor found » | Deux constructeurs sur `HumanChallengeService`, aucun annoté : Spring cherchait un constructeur sans argument. `@Autowired` posé sur le bon |
+> | 2 | **24 tests** de `AuthControllerWebMvcTest` **en erreur** (pas en échec : contexte impossible à construire) | La tranche `@WebMvcTest` ne déclare que les beans qu'elle connaît. `@MockitoBean HumanChallengeService` ajouté |
+> | 3 | **7 tests** de `register` dans `AuthServiceTest`, dont **3 NullPointerException** | `@InjectMocks` n'injecte que ce qui est déclaré `@Mock`. Ajouté |
+>
+> Le plus instructif est le troisième : **ce fichier documentait déjà l'incident**, ligne 66, à propos
+> de `WorkspaceService` et `WorkspaceInvitationService` (« que le test ne mockait pas → `@InjectMocks`
+> les laissait null → NPE », réf. BT-P5). J'ai reproduit un mode de défaillance qui était **écrit en
+> commentaire dans le fichier même que je cassais**. Le commentaire a été étendu pour énoncer la règle
+> mécaniquement : toute dépendance ajoutée à `AuthService` doit arriver avec son `@Mock`, dans le même
+> changement.
+>
+> **Ce que j'aurais dû faire d'emblée**, et qui a fini par tout clore : recenser les points de
+> construction avant de toucher au constructeur. Deux fichiers seulement instancient ces beans en test
+> — `AuthControllerWebMvcTest` et `AuthServiceTest`. `PaymentAndDataControllersWebMvcTest` mocke bien
+> `AuthService` mais n'instancie pas `AuthController`, il n'était donc pas concerné. Trente secondes de
+> `grep` auraient économisé deux passages de suite complète, soit ~40 minutes.
+>
+> **Tests ajoutés au passage** : 2 sur `GET /api/auth/challenge` — dont un qui fige le fait qu'il doit
+> rester **public**, le défi étant demandé au chargement du formulaire donc sans session — et 1 sur le
+> refus d'inscription quand la vérification échoue, qui vérifie aussi que **rien n'a été tenté avant**
+> (ni lecture en base, ni création Keycloak, ni envoi d'OTP). **`AuthControllerWebMvcTest` 26 verts ·
+> `AuthServiceTest` 35 verts.**
+
+> **▶ MAJ 24/07/2026 (19) — « Retour au site » renvoyait au tableau de bord.**
+>
+> Le logo et le bouton pointaient `/`, soit la racine de **cette** application. Or « le site » est un
+> **projet Astro distinct, servi sur une autre origine** : `nginx.conf.example` le confirme —
+> `app.example.com` → frontend Next, `www.example.com` → landing Astro. En développement, deux ports
+> séparés. Le lien ramenait donc l'utilisateur là d'où il venait.
+>
+> **Corrigé** via `NEXT_PUBLIC_SITE_URL`, déclarée dans les deux compose et les deux fichiers
+> d'exemple. Valeur de repli `http://localhost:4321`, celle réellement utilisée ; `.env.dev` n'a pas
+> été touché, la valeur par défaut du compose suffit. Rendu vérifié : `4321` en dev,
+> `https://www.example.com` en prod, `docker compose config` sort en 0 sur les deux.
+>
+> **Détail qui n'est pas cosmétique** : ces deux liens passent de `<Link>` à `<a>`. `Link` sert la
+> navigation **interne** de Next ; l'employer vers une autre origine déclenche une navigation côté
+> client sur une route qui n'existe pas dans cette application. Le lien aurait « marché » en
+> apparence tout en court-circuitant le vrai chargement de page.
+>
+> ⚠️ **Contrainte de production à retenir** : `NEXT_PUBLIC_*` est **figée au build** (Next l'inline
+> dans le bundle envoyé au navigateur). Changer l'URL du site impose un `--build` du frontend, pas un
+> redémarrage — d'où son passage en `args:` et non en `environment:` dans le compose de production,
+> comme les trois autres URL publiques.
+>
+> **Faux diagnostic écarté au passage.** Symptôme rapporté : « la landing ne démarre plus ». Elle
+> tournait. `localhost:18081` répond 200, et `astro sync` charge config et contenu sans erreur dans le
+> conteneur. Ma première sonde était bien tombée en échec, mais elle a coïncidé avec deux
+> redémarrages du conteneur (17:11 et 17:13) accompagnés d'un `EIO` transitoire sur le volume monté —
+> Astro a trébuché puis repris (« Continuing with previous valid configuration »). Le fichier
+> incriminé, `jsconfig.json`, n'existe même pas.
+>
+> **La cause probable de la confusion** : **deux serveurs Astro tournaient en parallèle** sur le même
+> dossier — le conteneur sur `18081`, et un `astro dev` lancé à la main sur `4321` (démarré à 13:16).
+> Un second `npm run dev` échouerait sur « port déjà utilisé », ce qui ressemble beaucoup à « ça ne
+> démarre plus ». `git diff` sur `docker-compose.dev.yml` était vide côté bloc `landing` : mes seules
+> modifications y avaient retiré les variables `GROQ_*` de `ai-service` et du backend.
+>
+> **Suite backend complète après les trois correctifs de dépendance : 833 tests, 0 échec, BUILD
+> SUCCESS** (18 min 47).
+
+> **▶ MAJ 24/07/2026 (20) — logo doublé sur demande : 120 × 80.**
+>
+> Troisième passe sur le logo, à ×2 exactement (60 × 40 → **120 × 80**). La barre supérieure suit le
+> signe et non l'inverse : **56 → 92 px** (80 px de logo, 6 px d'air de part et d'autre).
+>
+> **Le coût est réel et chiffré** : 36 px pris sur le budget vertical du contenu. Seuils de hauteur de
+> fenêtre en deçà desquels le panneau défile *à l'intérieur* de sa zone (la page, elle, ne défile
+> jamais) :
+>
+> | Écran | Panneau | Seuil |
+> |---|---|---|
+> | Connexion | 297 px | **422 px** — hors d'atteinte en pratique |
+> | Inscription | 507 px | **633 px** |
+>
+> Mesuré : inscription verte à 1280 × 640 (8 px de marge), défile de 32 px à 1280 × 600. La connexion
+> tient partout. C'est l'arbitrage assumé du logo doublé, énoncé plutôt que découvert.
+>
+> **Levier disponible si le défilement à 600 px devient gênant** : retirer le « Vous avez déjà un
+> compte ? Se connecter » du bas de l'inscription, qui rend 32 px — exactement le déficit. Il est
+> devenu redondant depuis que la barre porte « Se connecter » en bouton à droite, et la barre est
+> désormais difficile à manquer. Non fait : cela change une formulation visible et deux assertions de
+> test, c'est une décision de produit, pas une optimisation.
+>
+> `tsc` 0 · `eslint` 0 · **107 tests d'authentification verts**.
 
 ### 4.B — Repoussé APRÈS la soutenance (ne pas empiéter)
 
