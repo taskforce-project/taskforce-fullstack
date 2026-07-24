@@ -98,6 +98,10 @@ app:
 # alerte. Un échec au démarrage est infiniment préférable à un chiffrement silencieusement inactif.
 security:
   encryption-key: ${TF_ENCRYPTION_KEY}
+  # Défi de vérification humaine à l'inscription. Une valeur par défaut vide est tolérée ici,
+  # contrairement à la clé de chiffrement : l'absence de filtre dégrade la protection contre les
+  # inscriptions automatisées, elle n'expose pas de donnée. L'état est journalisé au démarrage.
+  human-challenge-secret: ${TF_HUMAN_CHALLENGE_SECRET:}
 
 # Intégrations tierces (OAuth) — vides si non configurées
 integrations:
