@@ -4,7 +4,6 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { usePreferencesStore } from "@/lib/store/preferences-store";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -167,37 +166,15 @@ export function RegisterPlanForm({
   };
 
   return (
-    <div className={cn("flex flex-col gap-6 w-full", className)} {...props}>
-      {/* Bouton retour en haut à gauche */}
-      <div className="absolute top-4 left-4">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => router.push('/auth/register')}
-          disabled={isLoading}
-          className="gap-2"
-        >
-          ← Retour
-        </Button>
-      </div>
-
-      {/* Progress indicator */}
-      <div className="w-full space-y-2">
-        <div className="flex justify-between text-sm text-muted-foreground">
-          <span>Étape 2 sur 3</span>
-          <span>66%</span>
-        </div>
-        <Progress value={66} />
-      </div>
-
+    <div className={cn("flex flex-col gap-5 w-full", className)} {...props}>
+      {/* Le fil d'étapes vit désormais dans la page (AuthStepper) : la barre de progression et le
+          « Étape 2 sur 3 » qui figuraient ici faisaient doublon. Le bouton retour était en position
+          absolue en haut à gauche, où il recouvrait la marque de la barre supérieure — il est
+          repassé dans le flux. */}
       <div className="flex flex-col items-center text-center">
-        <h1 className="text-2xl font-bold">Choisissez votre plan</h1>
-        <p className="text-balance text-muted-foreground">
-          Étape 2 sur 3 : Sélectionnez le plan qui vous convient
-        </p>
-        <p className="text-sm text-muted-foreground mt-2">
-          Vous pourrez changer de plan à tout moment depuis votre dashboard
+        <h1 className="auth-title">Choisissez votre plan</h1>
+        <p className="auth-subtitle max-w-md text-balance">
+          Vous pourrez en changer à tout moment depuis votre espace de travail.
         </p>
       </div>
 

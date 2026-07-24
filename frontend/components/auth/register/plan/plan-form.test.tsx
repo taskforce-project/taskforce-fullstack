@@ -95,11 +95,14 @@ describe('RegisterPlanForm - Step 2: Plan Selection', () => {
       expect(screen.getByText('Enterprise')).toBeInTheDocument();
     });
 
-    it('should show progress indicator for step 2', () => {
+    // Le fil d'étapes appartient désormais à la page (`AuthStepper`), plus au formulaire : il était
+    // dupliqué à l'identique dans les trois étapes. Le formulaire ne doit plus l'afficher — la
+    // progression est testée sur `AuthStepper` lui-même (auth-stepper.test.tsx).
+    it('ne porte plus le fil d\'étapes, désormais rendu par la page', () => {
       render(<RegisterPlanForm />);
 
-      expect(screen.getAllByText(/étape 2 sur 3/i)).toHaveLength(2); // Appears in progress bar and description
-      expect(screen.getByText(/66%/i)).toBeInTheDocument();
+      expect(screen.queryByText(/étape 2 sur 3/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/66%/i)).not.toBeInTheDocument();
     });
 
     it('should display BUSINESS plan as recommended', () => {
@@ -366,7 +369,7 @@ describe('RegisterPlanForm - Step 2: Plan Selection', () => {
     it('should show informative message about plan changes', () => {
       render(<RegisterPlanForm />);
 
-      expect(screen.getByText(/vous pourrez changer de plan à tout moment/i)).toBeInTheDocument();
+      expect(screen.getByText(/vous pourrez en changer à tout moment/i)).toBeInTheDocument();
     });
   });
 
