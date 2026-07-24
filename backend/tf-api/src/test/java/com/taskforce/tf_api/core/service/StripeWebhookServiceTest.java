@@ -10,6 +10,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.stripe.exception.EventDataObjectDeserializationException;
 import com.stripe.model.Event;
 import com.stripe.model.EventDataObjectDeserializer;
 import com.stripe.model.Invoice;
@@ -190,6 +191,81 @@ class StripeWebhookServiceTest {
             service.handleInvoicePaymentFailed(eventReturning(invoice(), "evt_6", "invoice.payment_failed"));
 
             verify(subscriptionHistoryRepository).save(any());
+        }
+    }
+
+    /**
+     * Désaccord de version d'API entre le compte Stripe et {@code stripe-java}.
+     *
+     * <p><b>Ce cas n'était pas couvert, et c'est ce qui a rendu le défaut invisible.</b> Le
+     * constructeur {@code eventReturning} ci-dessus fait toujours renvoyer {@code Optional.of(obj)}
+     * à {@code getObject()} : il simule le seul cas où les versions concordent. En production elles
+     * ne concordaient pas — compte en {@code 2026-06-24.dahlia}, SDK 31.2.0 — et
+     * {@code getObject()} renvoyait systématiquement un {@code Optional} vide.</p>
+     *
+     * <p>Conséquence mesurée le 24/07/2026 en exerçant de vrais événements : <b>les cinq types
+     * traités échouaient tous</b>, le contrôleur répondait 200, Stripe n'a jamais rejoué, et aucun
+     * abonnement n'a été activé. Une suite verte sur un chemin que la réalité n'emprunte jamais.</p>
+     */
+    @Nested
+    @DisplayName("désaccord de version d'API Stripe")
+    class ApiVersionMismatch {
+
+        /** Événement dont {@code getObject()} est vide — l'objet n'est lisible qu'en mode permissif. */
+        private Event eventNeedingFallback(StripeObject obj, String id) throws Exception {
+            Event e = mock(Event.class);
+            when(e.getId()).thenReturn(id);
+            EventDataObjectDeserializer d = mock(EventDataObjectDeserializer.class);
+            when(e.getDataObjectDeserializer()).thenReturn(d);
+            when(d.getObject()).thenReturn(Optional.empty());   // versions divergentes
+            when(d.deserializeUnsafe()).thenReturn(obj);        // repli documenté par Stripe
+            lenient().when(subscriptionHistoryRepository.existsByStripeEventId(id)).thenReturn(false);
+            return e;
+        }
+
+        private Invoice invoice() {
+            Invoice inv = mock(Invoice.class);
+            when(inv.getCustomer()).thenReturn("cus_1");
+            lenient().when(inv.getId()).thenReturn("in_9");
+            lenient().when(inv.getParent()).thenReturn(null);
+            lenient().when(inv.getAmountPaid()).thenReturn(1900L);
+            lenient().when(inv.getCurrency()).thenReturn("eur");
+            return inv;
+        }
+
+        @Test
+        @DisplayName("le repli permissif permet de traiter l'événement malgré la divergence")
+        void unsafe_fallback_processes_event() throws Exception {
+            User u = user();
+            u.setPlanStatus(PlanStatus.CANCELED);
+            when(userRepository.findByStripeCustomerId("cus_1")).thenReturn(Optional.of(u));
+            when(subscriptionRepository.findByUserId(7L)).thenReturn(Optional.empty());
+
+            service.handleInvoicePaymentSucceeded(eventNeedingFallback(invoice(), "evt_mismatch"));
+
+            // Sans le repli, rien de tout cela ne se produisait : la méthode sortait sur un null.
+            assertThat(u.getPlanStatus()).isEqualTo(PlanStatus.ACTIVE);
+            verify(subscriptionHistoryRepository).save(any());
+        }
+
+        @Test
+        @DisplayName("si même le repli échoue, l'événement est abandonné sans exception")
+        void gives_up_cleanly_when_fallback_also_fails() throws Exception {
+            Event e = mock(Event.class);
+            when(e.getId()).thenReturn("evt_illisible");
+            EventDataObjectDeserializer d = mock(EventDataObjectDeserializer.class);
+            when(e.getDataObjectDeserializer()).thenReturn(d);
+            when(d.getObject()).thenReturn(Optional.empty());
+            when(d.deserializeUnsafe())
+                .thenThrow(new EventDataObjectDeserializationException("charge utile illisible", "{}"));
+            lenient().when(subscriptionHistoryRepository.existsByStripeEventId("evt_illisible")).thenReturn(false);
+
+            // Un désaccord de version ne se résout pas en rejouant : on abandonne, on journalise,
+            // et surtout on ne propage pas d'exception qui ferait rejouer Stripe trois jours durant.
+            service.handleInvoicePaymentSucceeded(e);
+
+            verify(userRepository, never()).findByStripeCustomerId(any());
+            verify(subscriptionHistoryRepository, never()).save(any());
         }
     }
 }
