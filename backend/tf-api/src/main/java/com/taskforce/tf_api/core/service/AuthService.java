@@ -25,6 +25,7 @@ import com.taskforce.tf_api.core.model.OtpVerification;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.service.WorkspaceService;
+import com.taskforce.tf_api.shared.security.HumanChallengeService;
 
 import com.nimbusds.jwt.JWTParser;
 
@@ -52,6 +53,7 @@ public class AuthService {
     private final WorkspaceService workspaceService;
     private final AuditService auditService;
     private final WorkspaceInvitationService workspaceInvitationService;
+    private final HumanChallengeService humanChallengeService;
 
     @Value("${stripe.success-url}")
     private String stripeSuccessUrl;
@@ -70,8 +72,16 @@ public class AuthService {
      * renvoie simplement un OTP au lieu de lever une erreur.
      */
     public RegisterResponse register(RegisterRequest request) {
-        log.info("Tentative d'inscription pour : {} avec plan : {}", 
+        log.info("Tentative d'inscription pour : {} avec plan : {}",
             request.getEmail(), request.getPlanType());
+
+        // Vérification humaine AVANT tout travail : le but est d'éviter qu'un automate ne déclenche
+        // en volume la création Keycloak et l'envoi de courriels. La contrôler après aurait laissé
+        // passer précisément ce qu'elle protège.
+        String refus = humanChallengeService.verify(request.getChallengeToken());
+        if (refus != null) {
+            throw new RuntimeException(refus);
+        }
 
         // Vérifier si l'email existe déjà dans notre DB (utilisateur complètement enregistré)
         if (userRepository.existsByEmail(request.getEmail())) {
