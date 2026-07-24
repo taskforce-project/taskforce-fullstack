@@ -1,7 +1,10 @@
 package com.taskforce.tf_api.core.api;
 
+import java.util.Map;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -21,6 +24,7 @@ import com.taskforce.tf_api.core.dto.response.RegisterResponse;
 import com.taskforce.tf_api.core.dto.response.SelectPlanResponse;
 import com.taskforce.tf_api.core.dto.response.VerifyOtpResponse;
 import com.taskforce.tf_api.core.service.AuthService;
+import com.taskforce.tf_api.shared.security.HumanChallengeService;
 import com.taskforce.tf_api.shared.dto.ApiResponse;
 
 import jakarta.validation.Valid;
@@ -38,6 +42,24 @@ import lombok.extern.slf4j.Slf4j;
 public class AuthController {
 
     private final AuthService authService;
+    private final HumanChallengeService humanChallengeService;
+
+    /**
+     * Défi de vérification humaine, demandé au chargement du formulaire d'inscription.
+     * GET /api/auth/challenge
+     *
+     * <p>Renvoie toujours 200. Si le mécanisme est désactivé (aucun secret configuré), le jeton est
+     * vide et l'inscription n'est pas filtrée : le client n'a pas à connaître cette distinction, il
+     * renvoie simplement ce qu'on lui a donné.</p>
+     */
+    @GetMapping("/challenge")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> challenge() {
+        Map<String, Object> payload = Map.of(
+            "token", humanChallengeService.issue(),
+            "required", humanChallengeService.isEnabled()
+        );
+        return ResponseEntity.ok(ApiResponse.success("Défi émis", payload));
+    }
 
     /**
      * Inscription d'un nouvel utilisateur (Étape 1/3)
