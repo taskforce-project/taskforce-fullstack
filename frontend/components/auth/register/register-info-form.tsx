@@ -1,14 +1,12 @@
-﻿"use client";
+"use client";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { usePreferencesStore } from "@/lib/store/preferences-store";
-import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import Link from "next/link";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { setRegisterData } from "@/lib/auth/register-storage";
 import {
@@ -19,9 +17,24 @@ import {
   isDisposableEmail,
   calculatePasswordStrength,
 } from "@/lib/utils/validation";
-import { Loader2, ArrowRight } from "lucide-react";
-import { FloatingPaths } from "@/components/auth/floating-paths";
+import { Loader2 } from "lucide-react";
+import { AuthStepper } from "@/components/auth/auth-stepper";
+import { Checkbox } from "@/components/ui/checkbox";
+import { authService } from "@/lib/api/auth-service";
 
+/** Seuil de refus au moment de la soumission — aligné sur la règle métier existante. */
+const STRENGTH_FLOOR = 50;
+
+/**
+ * Inscription, étape 1 sur 3 : identité et mot de passe.
+ *
+ * Prénom et nom partagent une ligne : ce sont deux champs courts, les séparer verticalement
+ * allongeait la page sans rien clarifier, et l'inscription doit tenir sans défilement.
+ *
+ * Une jauge de robustesse a été ajoutée sous le mot de passe. Auparavant, la règle des 50 points
+ * n'existait qu'à la soumission : on découvrait son mot de passe trop faible **après** avoir cliqué,
+ * sans savoir ce qui manquait. Une contrainte qu'on impose doit être visible pendant la saisie.
+ */
 export function SignupForm({
   className,
   ...props
@@ -37,6 +50,12 @@ export function SignupForm({
     confirmPassword: "",
   });
 
+  const [isHuman, setIsHuman] = useState(false);
+  const [challenge, setChallenge] = useState<{ token: string; required: boolean }>({
+    token: "",
+    required: false,
+  });
+
   // Pré-remplissage de l'email depuis une invitation (?email=…, PROD-3.5)
   useEffect(() => {
     const invitedEmail = new URLSearchParams(window.location.search).get("email");
@@ -44,6 +63,33 @@ export function SignupForm({
       setFormData((prev) => ({ ...prev, email: invitedEmail }));
     }
   }, []);
+
+  // Le défi est demandé au chargement, et non à la soumission : c'est l'écart entre son émission et
+  // son usage qui permet au serveur de distinguer une saisie humaine d'un envoi instantané.
+  useEffect(() => {
+    let annule = false;
+    authService.getChallenge().then((c) => {
+      if (!annule) setChallenge(c);
+    });
+    return () => {
+      annule = true;
+    };
+  }, []);
+
+  const strength = useMemo(
+    () => (formData.password ? calculatePasswordStrength(formData.password) : 0),
+    [formData.password]
+  );
+
+  const strengthLabel =
+    strength >= 75 ? "Robuste" : strength >= STRENGTH_FLOOR ? "Correct" : "Trop faible";
+
+  const strengthColor =
+    strength >= 75
+      ? "var(--accent-green)"
+      : strength >= STRENGTH_FLOOR
+        ? "var(--accent-orange)"
+        : "var(--accent-red)";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,9 +123,12 @@ export function SignupForm({
       toast.error(t.common.error, { description: passwordValidation.errors[0] });
       return;
     }
-    const strength = calculatePasswordStrength(formData.password);
-    if (strength < 50) {
+    if (calculatePasswordStrength(formData.password) < STRENGTH_FLOOR) {
       toast.error(t.common.error, { description: "Le mot de passe est trop faible. Utilisez un mot de passe plus complexe." });
+      return;
+    }
+    if (challenge.required && !isHuman) {
+      toast.error(t.common.error, { description: "Veuillez confirmer que vous n'êtes pas un robot" });
       return;
     }
 
@@ -88,14 +137,13 @@ export function SignupForm({
       lastName: sanitizeInput(formData.lastName),
       email: sanitizeInput(formData.email),
       password: formData.password,
+      // Transporté jusqu'à l'étape 3, seul moment où l'inscription part vers le serveur.
+      challengeToken: challenge.token,
     };
 
     setIsLoading(true);
     try {
       setRegisterData(sanitizedData);
-      toast.success("Informations enregistrées", {
-        description: "Passez à l'étape suivante pour choisir votre plan",
-      });
       router.push("/auth/register/plan");
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -106,313 +154,178 @@ export function SignupForm({
   };
 
   return (
-    <div className={cn("relative flex min-h-screen w-full overflow-hidden", className)} {...props}>
+    <div className={cn("auth-panel auth-panel-wide", className)} {...props}>
+      <AuthStepper current={1} />
 
-      {/* ── Left: brand panel ── */}
-      <div
-        className="relative hidden lg:flex lg:w-[45%] flex-col justify-between p-10 overflow-hidden"
-        style={{ background: "#0d0d0d", color: "#ffffff" }}
-      >
-        <FloatingPaths position={1} />
-        <FloatingPaths position={-1} />
+      {/* Pas de sous-titre ici, contrairement aux autres écrans : le fil d'étapes annonce déjà
+          « Étape 1 sur 3 · Votre compte » juste au-dessus, et le titre dit le reste. Une ligne de
+          plus ne dirait rien de neuf et coûterait la marge qui permet à l'écran de ne pas défiler
+          sur un portable court. */}
+      <h1 className="auth-title">Créer votre compte</h1>
 
-        {/* Bottom gradient fade */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute bottom-0 inset-x-0 h-56 z-10"
-          style={{ background: "linear-gradient(to top, #0d0d0d 0%, transparent 100%)" }}
-        />
-        {/* Right edge fade */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-y-0 right-0 w-24 z-10"
-          style={{ background: "linear-gradient(to left, #0d0d0d 0%, transparent 100%)" }}
-        />
-
-        {/* Logo */}
-        <div className="relative z-20 flex items-center gap-2.5">
-          <Image
-            src="/assets/logo/logo_taskforce_tp.png"
-            alt="TaskForce"
-            width={84}
-            height={84}
-            style={{ filter: "brightness(0) invert(1) drop-shadow(0 0 8px rgba(112,0,255,0.6))" }}
-          />
-          <span className="text-base font-semibold" style={{ color: "#ffffff" }}>
-            TaskForce
-          </span>
-        </div>
-
-        {/* Quote */}
-        <div className="relative z-20">
-          <blockquote className="space-y-3">
-            <p
-              className="text-xl font-medium leading-snug"
-              style={{ color: "#ffffff" }}
-            >
-              &ldquo;Rejoignez la plateforme qui révolutionne la gestion d&rsquo;équipes et d&rsquo;agents IA.&rdquo;
-            </p>
-            <footer className="text-sm font-mono" style={{ color: "rgba(255,255,255,0.4)" }}>
-              — TaskForce Team
-            </footer>
-          </blockquote>
-        </div>
-      </div>
-
-      {/* ── Right: form panel ── */}
-      <div
-        className="relative flex flex-1 flex-col items-center justify-center px-6 py-16 sm:px-10 overflow-y-auto"
-        style={{ background: "var(--background)" }}
-      >
-        {/* Subtle radial decoration */}
-        <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-          <div
-            className="absolute -top-32 -right-32 h-125 w-125 rounded-full"
-            style={{
-              background: "radial-gradient(circle, rgba(112,0,255,0.06) 0%, transparent 65%)",
-            }}
-          />
-          <div
-            className="absolute -bottom-24 -left-24 h-100 w-100 rounded-full"
-            style={{
-              background: "radial-gradient(circle, rgba(241,61,212,0.04) 0%, transparent 65%)",
-            }}
-          />
-        </div>
-
-        {/* Mobile logo */}
-        <div className="flex lg:hidden items-center gap-2 mb-8 self-start">
-          <Image
-            src="/assets/logo/logo_taskforce_tp.png"
-            alt="TaskForce"
-            width={22}
-            height={22}
-          />
-          <span className="text-sm font-semibold" style={{ color: "var(--label-primary)" }}>
-            TaskForce
-          </span>
-        </div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-          className="relative z-10 w-full max-w-sm space-y-6"
-        >
-          {/* Step indicator */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              {[1, 2, 3].map((step) => (
-                <div
-                  key={step}
-                  className="h-1 flex-1 rounded-full transition-all"
-                  style={{
-                    background: step === 1
-                      ? "var(--gradient-purple-pink)"
-                      : "var(--fill-tertiary)",
-                  }}
-                />
-              ))}
-            </div>
-            <p className="text-[11px]" style={{ color: "var(--label-quaternary)" }}>
-              Étape 1 sur 3 — Informations personnelles
-            </p>
+      <form onSubmit={handleSubmit} className="mt-3 space-y-2.5">
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label htmlFor="firstName" className="auth-label">
+              Prénom
+            </label>
+            <Input
+              id="firstName"
+              autoComplete="given-name"
+              required
+              value={formData.firstName}
+              onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+              disabled={isLoading}
+              className="auth-input"
+            />
           </div>
-
-          {/* Heading */}
-          <div className="space-y-1.5">
-            <h1
-              className="text-2xl font-bold tracking-tight"
-              style={{ color: "var(--label-primary)" }}
-            >
-              Créer un compte
-            </h1>
-            <p className="text-sm" style={{ color: "var(--label-tertiary)" }}>
-              Entrez vos informations pour commencer
-            </p>
+          <div>
+            <label htmlFor="lastName" className="auth-label">
+              Nom
+            </label>
+            <Input
+              id="lastName"
+              autoComplete="family-name"
+              required
+              value={formData.lastName}
+              onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+              disabled={isLoading}
+              className="auth-input"
+            />
           </div>
+        </div>
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Name row */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label
-                  htmlFor="firstName"
-                  className="text-xs font-medium"
-                  style={{ color: "var(--label-secondary)" }}
-                >
-                  Prénom
-                </label>
-                <Input
-                  id="firstName"
-                  type="text"
-                  placeholder="John"
-                  required
-                  value={formData.firstName}
-                  onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                  disabled={isLoading}
-                  className="h-9 text-sm"
-                  style={{
-                    background: "var(--fill-secondary)",
-                    borderColor: "var(--separator)",
-                    color: "var(--label-primary)",
-                  }}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label
-                  htmlFor="lastName"
-                  className="text-xs font-medium"
-                  style={{ color: "var(--label-secondary)" }}
-                >
-                  Nom
-                </label>
-                <Input
-                  id="lastName"
-                  type="text"
-                  placeholder="Doe"
-                  required
-                  value={formData.lastName}
-                  onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                  disabled={isLoading}
-                  className="h-9 text-sm"
-                  style={{
-                    background: "var(--fill-secondary)",
-                    borderColor: "var(--separator)",
-                    color: "var(--label-primary)",
-                  }}
-                />
-              </div>
-            </div>
+        <div>
+          <label htmlFor="email" className="auth-label">
+            Email
+          </label>
+          <Input
+            id="email"
+            type="email"
+            autoComplete="email"
+            placeholder="vous@entreprise.com"
+            required
+            value={formData.email}
+            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            disabled={isLoading}
+            className="auth-input"
+          />
+        </div>
 
-            {/* Email */}
-            <div className="space-y-1.5">
-              <label
-                htmlFor="email"
-                className="text-xs font-medium"
-                style={{ color: "var(--label-secondary)" }}
-              >
-                Email
-              </label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="john.doe@exemple.com"
-                required
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                disabled={isLoading}
-                className="h-9 text-sm"
+        <div>
+          <label htmlFor="password" className="auth-label">
+            Mot de passe
+          </label>
+          <Input
+            id="password"
+            type="password"
+            autoComplete="new-password"
+            required
+            value={formData.password}
+            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+            disabled={isLoading}
+            className="auth-input"
+          />
+
+          {/* La place de la jauge est réservée en permanence (`invisible` plutôt que démontage).
+              Autrement, la première frappe dans le champ fait grandir le formulaire de 18 pixels et
+              tout ce qui suit sursaute — y compris le bouton, sous le curseur. */}
+          <div
+            className="mt-1.5 flex items-center gap-2"
+            aria-hidden={formData.password.length === 0}
+            style={{ visibility: formData.password.length > 0 ? "visible" : "hidden" }}
+          >
+            <div
+              className="h-0.5 flex-1 overflow-hidden rounded-full"
+              style={{ background: "var(--fill-secondary)" }}
+            >
+              <div
+                className="h-full rounded-full transition-all duration-300"
                 style={{
-                  background: "var(--fill-secondary)",
-                  borderColor: "var(--separator)",
-                  color: "var(--label-primary)",
+                  width: `${Math.min(strength, 100)}%`,
+                  background: strengthColor,
                 }}
               />
             </div>
+            <span className="text-[10px] font-medium" style={{ color: strengthColor }}>
+              {strengthLabel}
+            </span>
+          </div>
+        </div>
 
-            {/* Password row */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label
-                  htmlFor="password"
-                  className="text-xs font-medium"
-                  style={{ color: "var(--label-secondary)" }}
-                >
-                  Mot de passe
-                </label>
-                <Input
-                  id="password"
-                  type="password"
-                  required
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  disabled={isLoading}
-                  className="h-9 text-sm"
-                  style={{
-                    background: "var(--fill-secondary)",
-                    borderColor: "var(--separator)",
-                    color: "var(--label-primary)",
-                  }}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label
-                  htmlFor="confirm-password"
-                  className="text-xs font-medium"
-                  style={{ color: "var(--label-secondary)" }}
-                >
-                  Confirmer
-                </label>
-                <Input
-                  id="confirm-password"
-                  type="password"
-                  required
-                  value={formData.confirmPassword}
-                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                  disabled={isLoading}
-                  className="h-9 text-sm"
-                  style={{
-                    background: "var(--fill-secondary)",
-                    borderColor: "var(--separator)",
-                    color: "var(--label-primary)",
-                  }}
-                />
-              </div>
+        <div>
+          <label htmlFor="confirmPassword" className="auth-label">
+            Confirmer
+          </label>
+          <Input
+            id="confirmPassword"
+            type="password"
+            autoComplete="new-password"
+            required
+            value={formData.confirmPassword}
+            onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+            disabled={isLoading}
+            className="auth-input"
+          />
+        </div>
+
+        {/* Vérification humaine et consentement dans un seul bloc. Ce ne sont pas deux sujets
+            distincts : ce sont les deux conditions pour continuer, et les regrouper est à la fois
+            plus juste et plus court — la hauteur récupérée est celle qui permet à l'écran de tenir
+            sans défilement sur un portable court.
+            Le libellé dit ce qui est réellement vérifié — « je confirme » et non « prouvez-le » : le
+            mécanisme filtre les envois automatisés, il ne prouve pas l'humanité. */}
+        <div
+          className="mt-3 rounded-md border px-3 py-2"
+          style={{ borderColor: "var(--separator)", background: "var(--fill-tertiary)" }}
+        >
+          {challenge.required && (
+            <div className="flex items-center gap-2.5">
+              <Checkbox
+                id="isHuman"
+                checked={isHuman}
+                onCheckedChange={(v) => setIsHuman(v === true)}
+                disabled={isLoading}
+              />
+              <label
+                htmlFor="isHuman"
+                className="cursor-pointer text-xs font-medium select-none"
+                style={{ color: "var(--label-secondary)" }}
+              >
+                Je confirme ne pas être un robot
+              </label>
             </div>
-            <p className="text-[11px]" style={{ color: "var(--label-quaternary)" }}>
-              Au moins 8 caractères, une majuscule, un chiffre et un symbole.
-            </p>
+          )}
 
-            <Button
-              type="submit"
-              disabled={isLoading}
-              className="btn-primary h-9 w-full gap-2 font-medium text-sm mt-1"
-            >
-              {isLoading ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <>
-                  Continuer
-                  <ArrowRight className="size-4" />
-                </>
-              )}
-            </Button>
-          </form>
-
-          {/* Login link */}
-          <p className="text-center text-xs" style={{ color: "var(--label-quaternary)" }}>
-            Vous avez déjà un compte ?{" "}
-            <Link
-              href="/auth/login"
-              className="font-medium transition-colors"
-              style={{ color: "var(--label-secondary)" }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLElement).style.color = "var(--label-primary)";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLElement).style.color = "var(--label-secondary)";
-              }}
-            >
-              Se connecter
-            </Link>
-          </p>
-
-          {/* Legal */}
-          <p className="text-center text-[10px]" style={{ color: "var(--label-quaternary)" }}>
-            En continuant, vous acceptez nos{" "}
+          <p
+            className={challenge.required ? "mt-1.5 pl-6 text-[11px] leading-snug" : "text-[11px] leading-snug"}
+            style={{ color: "var(--label-quaternary)" }}
+          >
+            {/* Formulation resserrée pour tenir sur UNE ligne : sur deux, elle coûtait dix-huit
+                pixels au budget de hauteur de l'écran. Le sens est intact. */}
+            J&apos;accepte les{" "}
             <Link href="/legal-notices" className="underline underline-offset-2">
-              Conditions d&apos;utilisation
-            </Link>
-            {" "}et{" "}
+              conditions
+            </Link>{" "}
+            et la{" "}
             <Link href="/privacy-policy" className="underline underline-offset-2">
-              Politique de confidentialité
+              politique de confidentialité
             </Link>
             .
           </p>
-        </motion.div>
-      </div>
+        </div>
+
+        <Button type="submit" disabled={isLoading} className="auth-submit !mt-3">
+          {isLoading ? (<><Loader2 className="size-4 animate-spin" />Un instant…</>) : "Continuer"}
+        </Button>
+      </form>
+
+      <p className="mt-3 text-center text-xs" style={{ color: "var(--label-tertiary)" }}>
+        Vous avez déjà un compte ?{" "}
+        <Link href="/auth/login" className="auth-link">
+          Se connecter
+        </Link>
+      </p>
     </div>
   );
 }

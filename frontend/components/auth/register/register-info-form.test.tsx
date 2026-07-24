@@ -233,25 +233,27 @@ describe('SignupForm - Step 1: Information Form', () => {
       const submitButton = screen.getByRole('button', { name: /continuer/i });
       await user.click(submitButton);
 
+      // `challengeToken` s'ajoute à la charge stockée : le jeton de vérification humaine est émis au
+      // chargement de cette étape mais consommé à l'étape 3, il doit donc transiter par la session.
+      // Vide ici, la requête de défi n'étant pas simulée dans ce test.
       await waitFor(() => {
         expect(mockSetRegisterData).toHaveBeenCalledWith({
           firstName: 'John',
           lastName: 'Doe',
           email: 'test@example.com',
           password: 'StrongP@ssw0rd!',
+          challengeToken: '',
         });
       });
 
+      // Le message « Informations enregistrées · Passez à l'étape suivante » a été retiré : la
+      // navigation vers l'étape 2 est elle-même la confirmation, et le fil d'étapes montre déjà la
+      // progression. Une notification qui annonce ce que l'écran suivant affiche est du bruit.
       await waitFor(() => {
-        expect(toast.success).toHaveBeenCalledWith(
-          'Informations enregistrées',
-          expect.objectContaining({
-            description: expect.stringContaining('Passez à l\'étape suivante'),
-          })
-        );
+        expect(mockPush).toHaveBeenCalledWith('/auth/register/plan');
       });
 
-      expect(mockPush).toHaveBeenCalledWith('/auth/register/plan');
+      expect(toast.success).not.toHaveBeenCalled();
     });
 
     it('should sanitize inputs before storing', async () => {
