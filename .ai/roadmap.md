@@ -1528,6 +1528,75 @@ Planning prévisionnel (Gantt, jalons DFS, chemin critique), budget prévisionne
 > (Manager, Responsable de Projet) ont été **fusionnés en `ADMIN`**, leurs permissions étant
 > identiques. Documenté dans la correspondance des acteurs.
 
+> **▶ MAJ 23/07/2026 (10) — audit des diagrammes : ton intuition était juste, ils sont périmés.**
+>
+> Mesure contre la base réelle plutôt que relecture. **Tous les chiffres sont faux, dans le même
+> sens** :
+>
+> | Élément | Documenté | Réel (23/07) | Écart |
+> |---|:--:|:--:|:--:|
+> | Tables | 50 | **56** | +6 |
+> | Colonnes | 483 | **555** | +72 |
+> | Clés étrangères | 94 | **104** | +10 |
+> | Migrations | 56 | **72** | +16 |
+> | Entités JPA | 38 | **49** | +11 |
+>
+> **Ce n'est pas un problème de chiffres mais de complétude.** Les diagrammes ont été *dérivés du
+> schéma* le 05/07 : ils sont donc exacts pour l'état d'alors, et **structurellement incomplets**
+> aujourd'hui. La dérive va dans les deux sens :
+>
+> - **10 tables absentes** du MCD/MLD **et** du dictionnaire de données : `ai_conversation`,
+>   `ai_message`, `ai_token_usage`, `analysis_job`, `connector_connection`, `dashboard_cards`,
+>   `decision_brief`, `decision_priority`, `oauth_states`, `saved_chart`.
+> - **`refresh_tokens` encore documentée** dans 3 fichiers alors qu'elle a été supprimée le matin
+>   même (`V72`).
+>
+> **Conséquence méthodologique** : ces documents ne se rattrapent pas au correctif, ils se
+> **régénèrent** depuis le schéma vivant, comme ils l'ont été la première fois. Périmètre :
+> `Modele_Donnees_MCD_MLD.md` (7 diagrammes), `Diagramme_Classes_UML.md` (6),
+> `Diagrammes_Sequence_UML.md` (6), `Diagramme_Etats_UML.md` (5), `Architecture_C4.md` (3),
+> `Diagramme_Cas_Usage_UML.md` (1), plus `Dictionnaire_Donnees.md` (798 l.) et
+> `Table_Reconciliation.md`. Soit **28 diagrammes Mermaid** et 2 documents dérivés.
+>
+> **Leçon à retenir** : un artefact généré depuis le code doit être **régénérable à la demande**,
+> sinon il devient faux au premier commit suivant. Le fait qu'il ait fallu un audit pour s'en
+> apercevoir montre qu'aucune procédure de régénération n'existait.
+
+> **▶ MAJ 23/07/2026 (11) — MCD, MLD et dictionnaire régénérés, et surtout RÉGÉNÉRABLES.**
+>
+> **La cause de la dérive était identifiée mais jamais traitée.** Le §5 du modèle de données portait
+> déjà la consigne « régénérer les diagrammes depuis `information_schema` (script d'introspection)
+> plutôt que d'éditer à la main ». La consigne existait, **le script non**. Même schéma que la règle
+> de synchronisation documentaire ce matin : une consigne sans mécanisme dérive.
+>
+> **Livré : `scripts/generate-schema-docs.mjs`.** Une commande régénère les deux documents depuis la
+> base réelle. Trois propriétés voulues :
+> - **Il échoue si une table n'est classée dans aucun domaine**, et si un domaine cite une table
+>   disparue. C'est exactement ainsi que 10 tables s'étaient évaporées entre le 05/07 et le 23/07.
+> - **Il échoue si une entité conceptuelle ne repose sur aucune table réelle** : un concept sans
+>   support en base serait une invention.
+> - **`--check`** ne réécrit rien et sort en erreur si les documents ont dérivé. Utilisable en CI.
+>
+> **Résultat mesuré** : `Modele_Donnees_MCD_MLD.md` (606 l., 7 diagrammes MLD + 1 MCD) et
+> `Dictionnaire_Donnees.md` (983 l.) reflètent **55 tables métier, 545 colonnes, 104 clés
+> étrangères, 72 migrations**. Les 10 tables absentes sont présentes, `refresh_tokens` a disparu.
+> Génération **idempotente** (deuxième passe : « inchangé »).
+>
+> **Un vrai MCD, enfin.** Le §3 s'intitulait « MCD » mais ne contenait qu'un tableau de volumétrie
+> par domaine. MERISE attend un modèle conceptuel : **12 entités nommées avec le vocabulaire du
+> cahier des charges** (TACHE, PROFIL_COMPETENCES, ABSENCE, DECISION_AFFECTATION…) et des
+> associations verbales. Il est déclaré, non dérivé — abstraire n'est pas décalquer — mais chaque
+> entité est adossée à une table réelle et le rattachement est vérifié à la génération. Rendu
+> contrôlé visuellement, accents et cardinalités compris.
+>
+> Deux défauts de rendu corrigés au passage : les types affichaient `varchar_100_`, et les domaines
+> sans clé étrangère interne produisaient un **diagramme muet** (Facturation n'en avait aucune, ses
+> tables pointant toutes vers `users`). Les relations sortantes sont désormais incluses.
+>
+> **Reste sur les diagrammes** : `Diagramme_Classes_UML` (6), `Diagrammes_Sequence_UML` (6),
+> `Diagramme_Etats_UML` (5), `Architecture_C4` (3), `Diagramme_Cas_Usage_UML` (1) et
+> `Table_Reconciliation`. Le diagramme de déploiement (E21) reste à produire.
+
 ### 4.B — Repoussé APRÈS la soutenance (ne pas empiéter)
 
 > Aucun de ces chantiers n'est rattaché à une compétence C1–C26. Ils restent documentés,
