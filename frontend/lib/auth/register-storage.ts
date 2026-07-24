@@ -14,6 +14,12 @@ export type RegisterData = {
   companyName?: string;
   phoneNumber?: string;
   enterpriseMessage?: string;
+  /**
+   * Jeton de vérification humaine. Émis et validé par la case cochée à l'étape 1, mais consommé à
+   * l'étape 3, seul moment où l'inscription est réellement envoyée au serveur : il doit donc
+   * traverser le choix de la formule.
+   */
+  challengeToken?: string;
 };
 
 const REGISTER_DATA_KEY = "registerData";

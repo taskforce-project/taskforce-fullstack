@@ -42,4 +42,9 @@ export type RegisterCredentials = {
   companyName?: string;
   phoneNumber?: string;
   enterpriseMessage?: string;
+  /**
+   * Jeton de vérification humaine émis à l'étape 1 et transporté jusqu'à l'appel d'inscription
+   * (déclenché à l'étape 3). Facultatif côté type : le serveur peut avoir le mécanisme désactivé.
+   */
+  challengeToken?: string;
 };
