@@ -17,6 +17,7 @@ import com.taskforce.tf_api.core.enums.PlanType;
 import com.taskforce.tf_api.core.model.OtpVerification;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
+import com.taskforce.tf_api.shared.security.HumanChallengeService;
 import com.taskforce.tf_api.util.TestDataBuilder;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -65,6 +66,12 @@ class AuthServiceTest {
 
     // Dépendances ajoutées à AuthService (auto-join workspace + invitations) que le test
     // ne mockait pas → @InjectMocks les laissait null → NPE dans login/verifyOtp. Cf. BT-P5.
+    //
+    // ⚠️ Le même oubli s'est reproduit le 24/07/2026 avec HumanChallengeService : 7 tests de
+    // `register` sont tombés, dont 3 en NullPointerException. La leçon est mécanique — **ajouter une
+    // dépendance au constructeur d'AuthService casse silencieusement ce fichier**, parce que
+    // `@InjectMocks` n'injecte que ce qui est déclaré ici. Toute nouvelle dépendance doit donc
+    // arriver accompagnée de son `@Mock`, dans le même changement.
     @Mock
     private WorkspaceService workspaceService;
 
@@ -73,6 +80,9 @@ class AuthServiceTest {
 
     @Mock
     private AuditService auditService;
+
+    @Mock
+    private HumanChallengeService humanChallengeService;
 
     @InjectMocks
     private AuthService authService;
@@ -192,6 +202,25 @@ class AuthServiceTest {
                 .hasMessageContaining("déjà utilisé");
 
             verify(keycloakService, never()).createUser(anyString(), anyString(), anyString(), anyString());
+        }
+
+        @Test
+        @DisplayName("refuse l'inscription quand la vérification humaine échoue, AVANT tout travail")
+        void register_shouldRefuse_whenHumanChallengeFails() {
+            // La vérification passe en premier, à dessein : elle protège précisément la création
+            // Keycloak et l'envoi de courriels. La contrôler après aurait laissé passer le coût
+            // qu'elle est censée éviter.
+            when(humanChallengeService.verify(any()))
+                .thenReturn("Formulaire soumis trop rapidement. Réessayez.");
+
+            assertThatThrownBy(() -> authService.register(registerRequest))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("trop rapidement");
+
+            verify(userRepository, never()).existsByEmail(anyString());
+            verify(keycloakService, never()).createUser(anyString(), anyString(), anyString(), anyString());
+            verify(otpService, never())
+                .generateAndSendOtp(anyString(), anyString(), any(), any(), anyString(), any());
         }
 
         @Test
