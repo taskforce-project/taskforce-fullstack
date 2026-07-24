@@ -15,11 +15,13 @@ import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.AuthService;
+import com.taskforce.tf_api.shared.security.HumanChallengeService;
 import com.taskforce.tf_api.shared.security.SecurityConfig;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -38,6 +40,8 @@ class AuthControllerWebMvcTest {
     @Autowired private MockMvc mockMvc;
 
     @MockitoBean private AuthService authService;
+    // Dépendance du contrôleur depuis l'ajout du défi de vérification humaine (GET /challenge).
+    @MockitoBean private HumanChallengeService humanChallengeService;
     @MockitoBean private UserRepository userRepository;             // WorkspaceAccessInterceptor
     @MockitoBean private WorkspaceRepository workspaceRepository;
     @MockitoBean private WorkspaceMemberRepository workspaceMemberRepository;
@@ -74,6 +78,31 @@ class AuthControllerWebMvcTest {
         mockMvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"email\":\"a@b.dev\",\"password\":\"password1\",\"firstName\":\"John\",\"lastName\":\"Doe\",\"planType\":\"FREE\"}"))
             .andExpect(status().is2xxSuccessful());
+    }
+
+    @Test
+    @DisplayName("GET /api/auth/challenge → 200, jeton et indicateur d'activation")
+    void challenge_200() throws Exception {
+        when(humanChallengeService.issue()).thenReturn("nonce.1753350000000.signature");
+        when(humanChallengeService.isEnabled()).thenReturn(true);
+
+        mockMvc.perform(get("/api/auth/challenge"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.token").value("nonce.1753350000000.signature"))
+            .andExpect(jsonPath("$.data.required").value(true));
+    }
+
+    @Test
+    @DisplayName("GET /api/auth/challenge est PUBLIC — pas de jeton requis pour l'obtenir")
+    void challenge_is_public() throws Exception {
+        // Le défi est demandé au chargement du formulaire d'inscription, par définition sans session.
+        // S'il exigeait une authentification, personne ne pourrait plus s'inscrire.
+        when(humanChallengeService.issue()).thenReturn("");
+        when(humanChallengeService.isEnabled()).thenReturn(false);
+
+        mockMvc.perform(get("/api/auth/challenge"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.required").value(false));
     }
 
     @Test
