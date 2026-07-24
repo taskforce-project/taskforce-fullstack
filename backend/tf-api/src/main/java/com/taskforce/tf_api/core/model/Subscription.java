@@ -5,7 +5,9 @@ import com.taskforce.tf_api.core.enums.PlanType;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -54,7 +56,12 @@ public class Subscription {
     /**
      * Statut de l'abonnement (ACTIVE, CANCELED, TRIALING, etc.)
      */
+    // La colonne est un type enum PostgreSQL (`plan_status`), pas un varchar : sans NAMED_ENUM,
+    // Hibernate envoie une chaîne et PostgreSQL refuse l'insertion. Découvert le 24/07/2026 en
+    // exerçant un vrai abonnement Stripe : aucune ligne `subscriptions` n'avait jamais pu être
+    // créée par le code, celles présentes venaient du seed SQL. Même traitement que User.planStatus.
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(nullable = false)
     @Builder.Default
     private PlanStatus status = PlanStatus.ACTIVE;

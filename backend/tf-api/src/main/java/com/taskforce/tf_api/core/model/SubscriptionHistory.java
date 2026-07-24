@@ -56,7 +56,11 @@ public class SubscriptionHistory {
     /**
      * Statut du plan au moment de l'événement
      */
+    // La colonne est un type enum PostgreSQL (`plan_status`), pas un varchar : sans NAMED_ENUM,
+    // Hibernate envoie une chaîne et PostgreSQL refuse (« column is of type plan_status but
+    // expression is of type character varying »). Même traitement que User.planStatus.
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(name = "plan_status", nullable = false)
     private PlanStatus planStatus;
 
