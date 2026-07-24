@@ -156,8 +156,10 @@ services:
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
 
-      # Chiffrement au repos des données personnelles (RGPD)
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      # Chiffrement au repos des données personnelles (RGPD).
+      # Le nom DOIT être TF_ENCRYPTION_KEY : c'est celui que lit `security.encryption-key`.
+      # Il s'appelait ENCRYPTION_KEY jusqu'au 24/07/2026 — une variable que rien ne lisait.
+      TF_ENCRYPTION_KEY: ${TF_ENCRYPTION_KEY}
 
       # JVM — aligné sur la limite conteneur ci-dessous (1024 Mio de heap dans 1536 Mio)
       JAVA_OPTS: "-Xmx1024m -Xms512m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Duser.timezone=UTC"
@@ -201,9 +203,11 @@ services:
     container_name: taskforce-ai-service-prod
     environment:
       TZ: UTC
-      # Secours cloud si le LLM local est injoignable.
-      GROQ_API_KEY: ${GROQ_API_KEY:-}
-      GROQ_MODEL: ${GROQ_MODEL:-llama-3.1-8b-instant}
+      # GROQ_API_KEY / GROQ_MODEL retirés le 24/07/2026 : ce service ne les lisait PAS (aucune
+      # occurrence de « groq » dans ai-service/), et le commentaire « secours cloud » décrivait un
+      # repli inexistant. Le laisser contredisait le registre des traitements, qui affirme qu'aucun
+      # contenu de travail ne quitte l'infrastructure — ce qui est vrai, mais devenait invérifiable
+      # pour qui lit ce fichier. L'inférence se fait sur Ollama auto-hébergé, sans repli tiers.
       # LLM : hôte externe (machine dédiée / service managé), PAS ce conteneur. Cf. l'en-tête.
       OLLAMA_BASE_URL: ${AI_OLLAMA_BASE_URL}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:14b}

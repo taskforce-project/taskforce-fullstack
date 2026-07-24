@@ -99,10 +99,9 @@ services:
       # IA interne
       AI_SERVICE_URL: ${AI_SERVICE_URL:-http://ai-service:8000}
       INTEGRATIONS_PLANE_API_BASE: ${INTEGRATIONS_PLANE_API_BASE:-https://api.plane.so}
-      # GROQ_API_KEY : fourni par env_file (.env.dev). Ne PAS le redéclarer ici avec
-      # ${GROQ_API_KEY:-} : l'override 'environment' écrase env_file et, sans variable
-      # d'interpolation côté compose, le vide → clé perdue dans le conteneur (assistant en repli).
-      GROQ_MODEL: ${GROQ_MODEL:-llama-3.1-8b-instant}
+      # GROQ_MODEL retiré le 24/07/2026 : plus aucune propriété ne le lie côté backend. Le bloc
+      # `groq` et la clé `provider` ont été supprimés d'`application-dev.yml` le 16/07
+      # (TF-AI-GROQ-CLEANUP) ; cette variable survivait seule, sans lecteur.
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
 
       # Email Configuration (Mailtrap)
@@ -193,8 +192,7 @@ services:
       - .env.dev
     environment:
       TZ: ${TZ:-America/New_York}
-      GROQ_API_KEY: ${GROQ_API_KEY:-}
-      GROQ_MODEL: ${GROQ_MODEL:-llama-3.1-8b-instant}
+      # GROQ_* retirés le 24/07/2026 : ce service ne les lit pas (aucune occurrence dans ai-service/).
       # AI Gateway → LLM local Ollama (sur l'hôte). host.docker.internal = la machine hôte.
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:14b}
