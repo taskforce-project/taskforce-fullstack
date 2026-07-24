@@ -831,7 +831,7 @@ Planning prévisionnel (Gantt, jalons DFS, chemin critique), budget prévisionne
 | **C3** | **Couverture de tests re-mesurée** front + back, chiffres réels remontés | **C18 et C25 — seuls seuils chiffrés de toute la grille (≥ 50 %)**. ✅ **Front 21/07 : 88,83 % lignes, 785/785 verte.** ✅ **Back 22/07 : 73,71 % lignes, suite verte — 792 tests après l'ajout de `RetentionSchedulerTest` (C7).** | ✅ |
 | **C4** | **Lint + typecheck propres** sur tout le repo (pas seulement les fichiers touchés) | C16 « le code satisfait aux tests d'un outil de revue de code par analyse statique » | ✅ |
 | **C5** | **Sécurité : rejouer ZAP + Semgrep + Trivy**, 0 HIGH | C16 (front), C21/C24 (back) — « composants tiers à jour et sans vulnérabilité connue ». ✅ **22/07 : 0 CRITICAL sur les deux images** (13→0 et 1→0), npm production 0 haute, ZAP backend 0 alerte de risque. Reste 12 hautes dont **11 issues des images de base Alpine** (correctif amont) + 1 Keycloak assumé. ⚠️ **Deux mesures manquantes** : scan de code source (ne termine pas sous Docker/Windows → à rejouer en CI) et re-passage ZAP après les correctifs de CSP/en-têtes | 🟧 |
-| **C6** | **Vérifier le chiffrement au repos** des données personnelles | C24 « toutes les données sensibles sont chiffrées » + CDC §7. 🟧 **Constat du 22/07** : AES-256-GCM (`EncryptedStringConverter`) appliqué aux identifiants de connecteurs, à la config d'intégration et aux demandes Enterprise. **Mais email, `keycloakId` et jetons ne sont PAS chiffrés** — choix documenté et défendable (GCM non déterministe casserait les recherches), à condition de ne **pas** annoncer « toutes les données personnelles sont chiffrées ». Formulation juste : les *secrets* sont chiffrés en base, les identifiants servant de clés de recherche sont protégés par le contrôle d'accès et le chiffrement disque de l'hôte. Reste à formaliser dans le dossier | 🟧 |
+| **C6** | **Vérifier le chiffrement au repos** des données personnelles | C24 « toutes les données sensibles sont chiffrées » + CDC §7. 🟧 **Constat du 22/07** : AES-256-GCM (`EncryptedStringConverter`) appliqué aux identifiants de connecteurs, à la config d'intégration et aux demandes Enterprise. **Mais email, `keycloakId` et jetons ne sont PAS chiffrés** — choix documenté et défendable (GCM non déterministe casserait les recherches), à condition de ne **pas** annoncer « toutes les données personnelles sont chiffrées ». Formulation juste : les *secrets* sont chiffrés en base, les identifiants servant de clés de recherche sont protégés par le contrôle d'accès et le chiffrement disque de l'hôte. ✅ **24/07 — formalisé dans `07-securite/Chiffrement_Au_Repos.md`, et un défaut majeur corrigé au passage : en production le chiffrement aurait été SILENCIEUSEMENT INACTIF** (3 maillons cassés — clé non déclarée en profil prod, nom de variable divergent dans compose et dans `.env.prod.example`). Voir MAJ (15). Le backend refuse désormais de démarrer sans clé | ✅ |
 | **C7** | **Conformité RGPD de bout en bout** | **C11**. ✅ **22/07 — vérifié dans le code, et l'inventaire des « manques » était périmé.** Le **double opt-in EST implémenté** (l'OTP marque l'e-mail vérifié, `AuthService:224`, et la connexion est **bloquée** tant qu'il ne l'est pas, `AuthService:318`). La **purge Keycloak** est faite (`TF-RGPD-007`). Le **registre Art. 30** existe (7 traitements + sous-traitants) — corrigé le 22/07 : Groq y figurait comme destinataire hors UE alors qu'il est retiré du code depuis le 16/07, et le traitement IA réel (modèle auto-hébergé, **aucun transfert**) manquait. ✅ **Rétention automatisée le 22/07** : `RetentionScheduler` (quotidien 03:30) purge OTP expirés, states OAuth et invitations sans suite — voir MAJ (7). Seul point ouvert, **et il n'est pas technique** : la durée de conservation du journal d'audit est une décision du responsable de traitement | ✅ |
 | **C8** | **E9 — audit RGPD d'un cas professionnel externe** | C11. ⚠️ **Vérifié à la source le 23/07** (référentiel p. 8) : « cas professionnel individuel écrit **hors projet fil rouge**, à partir d'**un site web marchand existant fourni** ». **Pèse 4 critères, pas 1** — consentement cookies, vue de confidentialité, formulaire d'accès, double opt-in s'évaluent sur le site fourni. Ils avaient été cochés au vert sur la foi de TaskForce : erreur corrigée. **Sujet à réclamer à l'école, c'est le seul livrable dont la matière ne nous appartient pas** | 🔲 |
 | **C9** | **Mesurer le SEO de la landing** et atteindre ≥ 70 % | **C20**. ✅ **22/07 — mesuré : SEO 92 % sur l'accueil, 100 % sur les 4 autres pages** (seuil grille : 70 %). Le site n'a jamais eu de problème de SEO : le job Lighthouse ne mesurait simplement **rien**. Corrigé, il audite désormais les 5 pages | ✅ |
@@ -839,8 +839,8 @@ Planning prévisionnel (Gantt, jalons DFS, chemin critique), budget prévisionne
 | **C11** | **E6 — trame de compte-rendu d'activité** + 1 exemple rempli | C4, critère `[R17]` : « la trame […] **est opérationnelle** ». ✅ **23/07** : `01-projet/Trame_Compte_Rendu_Activite.md` (dérivée point par point de la méthode E5) + `01-projet/CR_2026-S30_Cloture_V1.md`, exemple rempli sur la semaine réelle du 20 au 23/07, références de commit vérifiables, valeurs toutes mesurées | ✅ |
 | **C12** | **Manuel utilisateur** (collaborateurs + managers) | Livrable explicite du CDC §8. ✅ **23/07 — il existe déjà** : `15-utilisateur/Manuel_Utilisateur.md` (399 l., 12 sections, produit le 05/07), + `FAQ.md` (229 l.), `Release_Notes.md`, `Guid_Installation.md`. Reste optionnel : guide d'administration OWNER/ADMIN | ✅ |
 | **C13** | **Webhooks Stripe** | C23 « l'intégration du système de paiement est **fonctionnelle** ». ✅ **22/07 — vérifié : implémenté, pas « à finaliser ».** `POST /api/webhooks/stripe` (dans `PUBLIC_MATCHERS`, la signature faisant office d'authentification) · signature vérifiée via `Webhook.constructEvent`, 400 si invalide · **5 événements** traités · **idempotence** par `stripe_event_id UNIQUE` · **500 délibéré** sur erreur de traitement pour que Stripe rejoue en backoff (`FIX-005`) · mapping complet des statuts · historique de facturation. **Seule limite** : jamais exercé avec de vrais événements Stripe (nécessite les clés de test du user — cf. ci-dessous) | 🟧 |
-| **C14** | **Actualiser la grille remplie** (`Grille_evaluation_TaskForce_REMPLIE`) | Premier document lu par le jury. Elle déclare encore **< 50 %** de couverture alors que le réel mesuré est **88,83 % (front) / 73,71 % (back)** — cf. `C3`. ⚠️ Cette ligne portait elle-même « 92 % / 78 % », chiffres périmés issus d'une mesure antérieure : corrigé le 22/07 | 🔲 |
-| **C15** | **Récupérer la page de garde imposée** par le certificateur | Obligatoire, non trouvée dans le repo | 🔲 |
+| **C14** | **Actualiser la grille remplie** (`Grille_evaluation_TaskForce_REMPLIE`) | Premier document lu par le jury. ✅ **23–24/07 — à jour : 77 verts, 13 jaunes, 0 rouge.** Elle déclarait **< 50 %** de couverture contre **88,83 % (front) / 73,71 % (back)** réellement mesurés (cf. `C3`) ; les 4 rouges de C11 sont passés au jaune après la décision E9 (MAJ 9). ⚠️ Deux pièges rencontrés, à ne pas réintroduire : cette ligne portait elle-même « 92 % / 78 % », chiffres périmés ; et la grille **ne couvre que les blocs 1 à 3** (s'arrête à C26) — C27+ vit dans `Bloc4_Deploiement_Production.md` | ✅ |
+| **C15** | **Récupérer la page de garde imposée** par le certificateur | Obligatoire. ✅ **24/07 — trouvée : elle est en page 11 de la note pédagogique**, pas dans un fichier séparé (d'où l'échec des recherches précédentes). Extraite telle quelle dans `16-memoire-rncp/assets/Page_de_Garde_Imposee.pdf` + `Page_de_Garde.md`. Reste à trancher au montage : le pied de page « Page 11 sur 11 » hérité de la note | ✅ |
 | **C16** | **Rédiger le dossier 40 pages** (condensation, pas assemblage) | **Livrable n°1 — 14/09** | 🔲 |
 | **C17** | **Support de soutenance + texte oral + répétition chronométrée** | **Livrables n°2 et 3 — 25/09 puis 28–29/09**. 🟧 **23/07 — largement écrit** : `18-soutenance/` contient `Plan_Soutenance.md` (431 l.), `Script_Oral.md` (444 l.) et `Plan_Minute.md` (299 l.). Restent le PPT et la répétition chronométrée — et **les chiffres cités y sont périmés** (cf. Phase A) | 🟧 |
 
@@ -1671,6 +1671,286 @@ Planning prévisionnel (Gantt, jalons DFS, chemin critique), budget prévisionne
 >
 > **Reste** : `Diagramme_Etats_UML` (5) et `Diagramme_Cas_Usage_UML` (1), non audités, plus le
 > support de soutenance qui reste à ouvrir.
+
+> **▶ MAJ 24/07/2026 (14) — les 2 derniers diagrammes audités, et un axe d'autorisation entier manquait.**
+>
+> Fin de l'audit des diagrammes ouvert le 23/07. Les deux documents restants dataient du 05/07 et
+> n'avaient jamais été confrontés au code. Ils décrivent du **comportement**, pas de la structure : ils
+> ont donc été **corrigés**, pas régénérés — il n'existe pas de source mécanique dont on puisse les
+> dériver.
+>
+> **1. `Diagramme_Cas_Usage_UML` → v2.0. Quatre erreurs factuelles, dont une structurelle.**
+>
+> | Affirmation v1.0 | Réalité vérifiée |
+> |---|---|
+> | « Source de vérité : l'enum `WorkspaceRole` » | Il y a **deux axes**. Le second, `ProjectVisibilityGuard`, croise la visibilité du projet (public/privé) avec `ProjectRole` — dont **`VIEWER`, en lecture seule même sur un projet public**. Un 4ᵉ acteur réel, absent du document |
+> | `IssueController` = ouvert à tout membre (`requireMember`) | **Faux** : les issues passent par `assertCanView` (`IssueService:230/246/292`) et `assertCanWrite` (`:999/1007`), jamais par `requireMember` |
+> | « Consulter les analytics » = cas gestionnaire | **Faux** : `AnalyticsService:76` → `requireMember`, périmètre réduit par `viewableProjectIds` (`:486`). Deux collaborateurs voient la **même page avec des chiffres différents** |
+> | « **Approuver** / gérer les congés » = cas gestionnaire | **L'approbation n'existe pas.** `MemberLeave` n'a aucun champ statut ; `MemberLeaveService` expose `list/create/delete`. Ce qui existe est un contrôle d'accès (soi-même vs. les autres), pas un circuit de validation |
+>
+> Cinquième point, mineur : un seul ordonnanceur était cité, il y en a **trois** (`OverloadAlertScheduler`
+> 08:30 → OWNER/ADMIN, `DueDateAlertScheduler` 08:00 → l'**assigné**, `RetentionScheduler` 03:30 → RGPD).
+>
+> Un second diagramme a été ajouté : l'**arbre de décision de la garde de visibilité**, parce que c'est
+> littéralement ce qu'implémente `ProjectVisibilityGuard`. Trois décisions y sont mises en avant, toutes
+> défendables à l'oral : un projet privé invisible renvoie **404 et non 403** (répondre « interdit »
+> confirmerait son existence) ; `VIEWER` reste en lecture seule **même sur un projet public** (un rôle
+> explicite l'emporte sur l'ouverture) ; un non-membre **contribue** à un projet public (modèle « dépôt
+> public », l'ouverture est le défaut). Ajout aussi de la projection des **3 acteurs du CDC** sur le
+> modèle implémenté — elle n'est **pas** de un pour un : le « responsable de projet » du CDC est un
+> `LEAD` sur l'axe projet, pas un rôle workspace.
+>
+> ⚠️ **Piège de vérification évité** : `BrainAccessGuard` semblait être une preuve fantôme (introuvable
+> dans `core/service/`). Il existe, dans `core/service/brain/`. Une citation correcte, pas une erreur —
+> chercher dans tout l'arbre avant de conclure à l'absence.
+>
+> **2. `Diagramme_Etats_UML` → v2.0. Le document se disait exhaustif, il l'est maintenant.**
+>
+> Il modélisait **4 machines à états** ; le dépôt en compte **7 câblées à un champ d'entité**. Les trois
+> manquantes sont ajoutées :
+>
+> - **Projet** (`ProjectStatus`) — avec deux asymétries relevées : il n'existe **aucune action de
+>   désarchivage** (l'archivage a un point d'entrée gardé, le retour passe par la mise à jour générique,
+>   `ProjectService:321`, qui accepte n'importe quelle valeur du client) ; et `PAUSED` n'est posé par
+>   **aucun service**, il n'est atteignable que par cette même mise à jour générique.
+> - **Analyse IA** (`AnalysisJobStatus`) — la FSM la plus riche du dépôt, seule à comporter un état
+>   d'attente humaine (`WAITING_FOR_INPUT`, HITL). La reprise est **gardée** (`AnalysisJobService:129`).
+>   Bon actif de soutenance : c'est le mécanisme qui empêche l'agent de deviner. Signalé honnêtement
+>   comme **non couvert par les tests** (report assumé, §4.B).
+> - **Code OTP** (`OtpStatus`) — c'est la **preuve technique du double opt-in** invoqué au titre du RGPD.
+>   Les 4 états sont réellement posés, dont `EXPIRED` **dès le plafond de tentatives atteint**.
+>
+> Deux sections ajoutées : « ce qui n'est **pas** une machine à états » (workspace, congé, équipe — le
+> dire évite qu'on cherche un cycle inexistant) et le recensement **exhaustif** des enums de statut,
+> y compris les 4 périphériques volontairement non modélisés, avec la raison de chacun.
+>
+> **3. Outil : `scripts/check-mermaid.mjs`.** Un bloc Mermaid invalide **n'échoue pas bruyamment** —
+> Obsidian et GitHub affichent un cadre vide, le document paraît complet, et personne ne le voit avant
+> qu'un lecteur n'ouvre la page. Le contrôle transforme cette défaillance silencieuse en code de sortie.
+> **Résultat : 38/38 diagrammes parsables sur les 10 fichiers du corpus.** Les deux chemins sont
+> vérifiés — le succès (sortie 0) et la détection (sortie 1, `fichier:ligne` + message) sur des
+> diagrammes volontairement cassés.
+>
+> Détail de conception : les autres scripts de `scripts/` n'ont **aucune dépendance externe**, à dessein.
+> Celui-ci ne peut pas (parser du Mermaid exige Mermaid, qui exige un DOM), donc les deux dépendances
+> sont résolues à l'exécution et installées **sans être enregistrées** (`npm i --no-save mermaid jsdom`) :
+> ni `package.json`, ni `node_modules`, ni verrou n'entrent dans le dépôt. `scripts/README.md` gagne la
+> section correspondante — les deux générateurs du 23/07 n'y étaient d'ailleurs pas documentés non plus.
+>
+> **4. Effet de bord : `07-securite/Auth_Autorisation.md` portait les mêmes erreurs, en plus grave.**
+>
+> Le diagramme de cas d'usage renvoyait à `[[Matrice_Habilitations]]` — **document inexistant**, lien
+> mort jamais suivi. La vraie matrice vit dans `Auth_Autorisation.md` §5. En la relisant : **cinq
+> erreurs**, dans un document de **sécurité**, c'est-à-dire là où elles coûtent le plus.
+>
+> | Erreur | Réalité |
+> |---|---|
+> | `ProjectRole` = `MANAGER` \| `MEMBER` | **`MANAGER` n'existe pas.** L'enum est `LEAD, MEMBER, VIEWER` — et `VIEWER`, seule restriction d'écriture du modèle, était absent |
+> | « Créer un projet » interdit au MEMBER | **Faux** : `createProject` n'exige que l'appartenance au workspace |
+> | « Modifier les paramètres workspace » = OWNER seul | **Faux** : `assertCanManage` (`WorkspaceService:490`) rejette `MEMBER` et laisse donc passer `ADMIN` |
+> | « Portail billing Stripe » = OWNER seul | **Aucune garde de rôle** — et c'est structurel, voir ci-dessous |
+> | « OTP utilisé uniquement à l'inscription » | Il sert **aussi à la réinitialisation de mot de passe** (`AuthService:419`) |
+>
+> **Les quatre premières erreurs vont toutes dans le sens restrictif** : le document annonçait des
+> verrous qui n'existent pas. C'est contre-intuitif mais aussi trompeur qu'une matrice trop permissive —
+> elle donne l'illusion d'un contrôle absent. À corriger avant que quelqu'un ne s'appuie dessus.
+>
+> **Fait structurel découvert au passage, et qu'aucun document n'énonçait** : **l'abonnement est porté
+> par le compte utilisateur, pas par le workspace** (`BillingController` → `findByUserId`,
+> `user.getPlanType()`). Il n'y a donc pas de garde de rôle parce qu'il n'y a rien à garder : un
+> utilisateur n'atteint que son propre abonnement. La tarification reste par siège, la quantité étant
+> dérivée des membres des workspaces du compte. **Question de jury à préparer** : « qui peut résilier
+> l'abonnement ? » → le titulaire du compte, pas le propriétaire du workspace. Les deux coïncident en
+> usage nominal, c'est le créateur du workspace qui souscrit.
+>
+> Corrigé aussi : les signatures de `AuthorizationService` étaient fausses (`getMemberOrThrow` n'existe
+> pas ; c'est `requireMember`, et chaque méthode prend l'identifiant de l'appelant en second paramètre).
+> `assertIsOwner` était attribué à ce service alors que c'est une méthode **privée** de `WorkspaceService`.
+>
+> ⚠️ **`OtpType.TWO_FACTOR_AUTH` est déclaré mais jamais généré** — aucune double authentification n'est
+> implémentée. Signalé explicitement dans le document pour qu'il ne soit jamais présenté comme une
+> fonctionnalité. **Point de vigilance pour l'oral** : `01_CdCF.md:440` et `02_CdCT.md` mentionnent un
+> « support 2FA optionnel (TOTP) ». La phrase est **exacte** — elle décrit une capacité **de Keycloak**,
+> pas une fonctionnalité livrée — mais elle appelle une question. Réponse à préparer : « Keycloak le
+> supporte nativement, nous ne l'avons pas activé. » Ces documents sont des livrables datés, ils n'ont
+> pas été réécrits.
+>
+> **Balayage de propagation** : `ProjectRole MANAGER` n'apparaissait nulle part ailleurs, et la règle
+> « OTP pas au login » est cohérente dans le reste du corpus (séquences, `Dossier_Conception`). Le
+> diagramme de cas d'usage était l'unique document divergent — j'y avais d'ailleurs recopié
+> « login + OTP » depuis la v1.0 avant de le vérifier. Corrigé.
+>
+> **Bilan de l'audit des diagrammes (23–24/07)** : **les 5 documents audités comportaient tous** soit une
+> erreur factuelle, soit une omission substantielle — séquence (architecture IA décrite à l'envers),
+> classes (comptage et associations), MCD/MLD et dictionnaire (50 tables documentées contre 56 réelles),
+> cas d'usage (axe d'autorisation manquant), états (3 machines à états sur 7). Un sixième, le diagramme
+> de **déploiement**, n'existait pas alors que son critère était coché.
+>
+> La cause commune n'est pas la négligence : ce sont des documents écrits une fois, à une date où ils
+> étaient justes, sans aucun mécanisme pour signaler leur péremption. C'est le même constat que pour la
+> SOP de synchronisation documentaire et pour la consigne « régénérer depuis `information_schema` » —
+> **une règle écrite sans mécanisme dérive**. D'où les deux générateurs et ce contrôle, qui sont la
+> seule réponse durable.
+
+> **▶ MAJ 24/07/2026 (15) — le chiffrement au repos aurait été INACTIF en production.**
+>
+> C'est le défaut le plus sérieux trouvé pendant toute la phase de clôture, et il ne vient pas du code.
+>
+> **Trois maillons cassés, indépendants, chacun suffisant à lui seul :**
+>
+> | Maillon | État avant | Conséquence |
+> |---|---|---|
+> | `application-prod.yml` | Ne déclarait **pas** `security.encryption-key` — elle n'existait que dans le profil **dev** | `@Value("${security.encryption-key:}")` retombe sur une chaîne vide → le convertisseur devient un **passe-plat** |
+> | `docker-compose.prod.yml:160` | Transmettait `ENCRYPTION_KEY` | L'application lit `TF_ENCRYPTION_KEY` : **la variable n'était lue par personne** |
+> | `.env.prod.example:66` | Proposait `ENCRYPTION_KEY=` | Un opérateur remplissant scrupuleusement le fichier n'aurait **toujours** pas de chiffrement |
+>
+> **Résultat en production** : jetons OAuth GitHub/Slack et identifiants de connecteurs écrits **en
+> clair** en base. Sans erreur, sans avertissement, sans ligne de journal. Et la grille annonce C24
+> « les données sensibles sont chiffrées ».
+>
+> **Ce qui rend ce défaut instructif — et il mérite d'être raconté à l'oral.** Le convertisseur était
+> **correctement testé** : `EncryptedStringConverterTest` compte **10 tests** (round-trip, aléa de l'IV,
+> lecture tolérante, corruption), **dont un qui vérifie explicitement que l'absence de clé produit un
+> passe-plat**. Ce repli était donc écrit, testé, et tenu pour correct. Ce que personne n'avait vérifié,
+> c'est que la configuration de production menait **systématiquement** dans cette branche. **Une suite
+> verte prouve que le code fait ce qu'on lui demande, jamais qu'on lui demande la bonne chose.** C'est
+> exactement le même angle mort que les diagrammes périmés : chaque pièce était juste isolément.
+>
+> **Corrigé :**
+> 1. `application-prod.yml` déclare `security.encryption-key: ${TF_ENCRYPTION_KEY}`.
+> 2. `docker-compose.prod.yml` et `.env.prod.example` passent à `TF_ENCRYPTION_KEY`.
+> 3. **`EncryptionKeyHolder` refuse le démarrage** si le profil `prod` est actif et la clé vide, et
+>    **journalise son état** dans tous les cas (`INFO` actif / `WARN` inactif). Cohérent avec
+>    `ddl-auto=validate` : mieux vaut un échec au démarrage qu'un chiffrement silencieusement inactif.
+>
+> ⚠️ **Mon premier correctif était insuffisant, et le piège vaut d'être retenu.** Je m'étais appuyé sur
+> `${TF_ENCRYPTION_KEY}` **sans valeur par défaut**, en pariant que Spring refuserait de démarrer.
+> **Faux** : Spring n'échoue que sur une propriété **absente**, jamais sur une propriété **vide**. Or
+> compose transmet `TF_ENCRYPTION_KEY: ""` dès que la variable existe sans valeur — soit exactement ce
+> que produit un `.env.prod` recopié de l'exemple et rempli à moitié. Le placeholder se serait résolu
+> sans erreur et le chiffrement serait retombé sur le passe-plat : **le correctif reproduisait le
+> défaut qu'il prétendait supprimer**. Constaté en rendant la config (`docker compose config` →
+> `TF_ENCRYPTION_KEY: ""`), d'où la garde Java qui teste **la valeur** et non sa présence. Figée par
+> 3 cas de test (`null`, `""`, `"   "`) sous profil `prod`.
+>
+> **Nettoyage lié — Groq résiduel en configuration.** `docker-compose.prod.yml` transmettait encore
+> `GROQ_API_KEY` à `ai-service` sous le commentaire « secours cloud si le LLM local est injoignable ».
+> Vérifié : **aucune occurrence de « groq » dans `ai-service/`**, et le bloc `groq` du backend a été
+> supprimé le 16/07 (TF-AI-GROQ-CLEANUP). Ce repli **n'existe pas**. Ma formulation d'hier (« Groq est
+> parti, aucun contenu ne quitte l'infrastructure ») était donc exacte **au niveau du code**, mais la
+> configuration affirmait le contraire à qui la lisait — et c'est la configuration qu'un jury ouvre
+> pour vérifier le registre des traitements. Variables retirées de `docker-compose.dev.yml`,
+> `docker-compose.prod.yml` et `.env.prod.example`. Compose revalidé : `config` sort en 0 sur les deux.
+>
+> Au passage, `.env.prod.example` annonçait « clé AES-256 encodée en base64 » : faux, la clé est dérivée
+> par **SHA-256 de la valeur fournie**, donc n'importe quelle phrase secrète convient. Commentaire
+> corrigé, et la liste des 4 colonnes chiffrées y figure désormais.
+>
+> **Lot `C6` livré** : `07-securite/Chiffrement_Au_Repos.md`. Il fixe la **formulation juste**, celle
+> qui survit à un jury qui ouvre la base : « **les secrets sont chiffrés en base ; les identifiants qui
+> servent de clés de recherche ne le sont pas, ils sont protégés par le contrôle d'accès et le
+> chiffrement disque de l'hôte** ». Ne jamais dire « toutes les données personnelles sont chiffrées ».
+>
+> Le document énonce aussi deux faiblesses plutôt que de les taire :
+> - **Incohérence de transit** : `otp_verifications` porte `phone_number`, `company_name` et
+>   `enterprise_message` **en clair**, alors que le *même* message est chiffré dans
+>   `enterprise_inquiries.message`. Correction triviale (aucune de ces colonnes n'est clé de recherche).
+> - **Codes OTP en clair**, non hachés. Borné par 15 min de TTL, **5 tentatives** et l'usage unique.
+> - **Sauvegardes non chiffrées** : `backup.ps1` produit du `pg_dump -Fc`, compressé mais pas chiffré.
+>
+> **Autres livraisons de la journée :**
+>
+> - **`DueDateAlertSchedulerTest`** — dernier trou de couverture sur une attente fonctionnelle du CDC.
+>   **9 tests, verts.** Le job tient en dix lignes mais tout son comportement non trivial est dans deux
+>   calculs de date, invisibles à la relecture. Le cas figé qui compte : une issue due **aujourd'hui**
+>   n'est **pas** en retard (`isBefore(today)`). Test paramétré sur J-30, J-1, J0, J+1, J+2.
+> - **Lot `C15` fermé — la page de garde existe.** Elle est en **page 11 de la note pédagogique**, ce
+>   qui explique qu'on ne l'ait pas trouvée : on la cherchait comme un fichier séparé. Extraite **telle
+>   quelle** (`16-memoire-rncp/assets/Page_de_Garde_Imposee.pdf`) plutôt que recréée — elle est
+>   *imposée*, la refaire dans un traitement de texte introduirait des écarts sur le premier élément que
+>   le jury regarde. Doc associée : `Page_de_Garde.md`. ⚠️ Un point à trancher au montage : la page
+>   extraite conserve le pied de page « Page 11 sur 11 » de la note. **Rien n'a été modifié**, la
+>   décision revient au candidat.
+> - **⚠️ Étiquette E21 corrigée.** `Diagramme_Deploiement.md` se présentait comme « livrable E21 ».
+>   Vérifié à la source (note pédagogique, p. 7–8) : **E21 à E29 sont produits pendant la mise en
+>   situation du 5 octobre, sur une application fournie par l'école**. Et « le dossier porte sur les 3
+>   premiers blocs » (p. 2). Le document garde deux usages réels — pièce du dossier pour les blocs 1–3
+>   (compréhension de l'architecture) et **répétition** de l'épreuve du 5 octobre — mais ce n'est pas
+>   E21. Mentions similaires dans `Roadmap_Backlog`, `Strategie_Documentation`, `Catalogue_Documentation`
+>   et `Bloc4` : valables comme repères de préparation, pas comme livrables du dossier.
+> - **`Auth_Autorisation` §6** : « 3 essais » corrigé en **5** (`OtpService:80`).
+
+> **▶ MAJ 24/07/2026 (16) — l'intégration Stripe était INERTE. Tous les webhooks répondaient 200 sans rien faire.**
+>
+> Premier passage de vrais événements Stripe, jamais fait jusqu'ici. **C'est exactement ce que cet
+> exercice devait révéler.**
+>
+> **Ce qui marche, vérifié sur de vrais événements :** signature acceptée sur 100 % des webhooks reçus
+> (aucun 400), routage correct des 5 types traités, types non gérés correctement ignorés, endpoint
+> public accessible sans authentification comme prévu. **Tout le transport est bon.**
+>
+> **Ce qui ne marchait pas :** `deserialize()` échouait sur **tous** les événements traités.
+>
+> ```
+> 09:05:35  Impossible de désérialiser l'objet Stripe pour l'événement evt_1Twf2x…  (invoice.payment_succeeded)
+> 09:05:41  Impossible de désérialiser l'objet Stripe pour l'événement evt_1Twf32…  (invoice.payment_failed)
+> 09:10:06  Impossible de désérialiser l'objet Stripe pour l'événement evt_1Twf7J…  (abonnement réel)
+> ```
+>
+> **Cause** : `EventDataObjectDeserializer.getObject()` renvoie un `Optional` **vide** dès que la
+> version d'API du compte diffère de celle que cible le SDK. Compte en **`2026-06-24.dahlia`**, SDK
+> **`stripe-java` 31.2.0**. Écart d'environ neuf mois.
+>
+> **Conséquence, et elle est grave** : le gestionnaire sortait sur un `null`, le contrôleur répondait
+> **200**, Stripe considérait l'événement comme délivré et **ne le rejouait jamais**. Aucun abonnement
+> activé, aucun changement de forfait appliqué, aucun échec de paiement enregistré. **Sans la moindre
+> erreur visible côté Stripe.** Le tableau de bord aurait affiché 100 % de livraisons réussies.
+>
+> C13 était marqué 🟧 « implémenté, vérifié, seule limite : jamais exercé avec de vrais événements ».
+> La limite n'était pas cosmétique : **c'était le défaut.** Et C23 exige que « l'intégration du système
+> de paiement soit **fonctionnelle** ».
+>
+> **Pourquoi les tests ne l'ont pas vu — le point à retenir.** `StripeWebhookServiceTest` couvrait les
+> 5 gestionnaires. Mais son constructeur d'événement mockait `getObject()` en renvoyant **toujours**
+> `Optional.of(obj)` : il simulait le seul cas où les versions concordent, c'est-à-dire **le cas que la
+> production n'emprunte jamais**. Le mock avait effacé le mode de défaillance réel. C'est le même angle
+> mort que le chiffrement au repos ce matin — MAJ (15) : là aussi un test vérifiait le repli sans que
+> personne ne vérifie que la production tombait toujours dedans. **Deux fois dans la même journée : un
+> test vert prouve que le code fait ce qu'on lui demande, jamais qu'on lui demande la bonne chose.**
+>
+> **Correctif** : repli sur `deserializeUnsafe()`, remède documenté par Stripe pour ce cas précis. Il
+> lit la charge utile sans exiger la concordance de version, journalise en `WARN` quand il sert, et
+> abandonne proprement en `ERROR` si même lui échoue — sans propager d'exception, un désaccord de
+> version ne se résolvant pas en rejouant. Risque accepté et borné : les gestionnaires ne lisent que
+> des champs stables (`id`, `customer`, `status`, `amount_paid`, `currency`).
+>
+> **Alternative écartée** : monter `stripe-java` à une version alignée. Plus propre sur le papier, mais
+> neuf mois d'écart de SDK en phase de clôture, c'est un risque de rupture de compilation sans
+> contrepartie. Le repli, lui, protège aussi des **futures** dérives de version. À reconsidérer après
+> la soutenance.
+>
+> **Deux tests ajoutés** dans `StripeWebhookServiceTest` (`@Nested ApiVersionMismatch`) : le repli
+> traite l'événement malgré la divergence, et l'échec du repli abandonne sans exception.
+>
+> ⚠️ **Défaut mineur relevé au passage, non corrigé** : un POST sans en-tête `Stripe-Signature` renvoie
+> **500**, pas 400. `@RequestHeader` est obligatoire, donc Spring lève `MissingRequestHeaderException`
+> **avant** d'entrer dans la méthode, et le gestionnaire global la mappe en 500. La signature
+> *invalide* renvoie bien 400 — la documentation n'est donc pas fausse, elle est incomplète. Sans
+> conséquence pratique (Stripe envoie toujours l'en-tête) mais un endpoint public qui répond 500 sur
+> une entrée triviale, en journalisant une trace, mérite un `required = false` et un 400 explicite.
+>
+> **Méthode employée** — reproductible, et à réutiliser après tout changement de version d'API :
+> `stripe listen --forward-to localhost:8080/api/webhooks/stripe`, puis `stripe trigger` sur les 5
+> types. Les clients créés par `trigger` n'existant pas chez nous, un vrai client de test a été créé,
+> relié à `users.stripe_customer_id` de l'utilisateur 2, muni d'un moyen de paiement et abonné au
+> vrai prix BASIC (19,00 € / mois). **Le secret de signature du CLI coïncidait déjà avec
+> `STRIPE_WEBHOOK_SECRET` : aucune clé n'a eu à être manipulée.**
+>
+> Deux pièges rencontrés, notés pour la prochaine fois : `pm_card_visa` **crée un nouveau moyen de
+> paiement à chaque attachement**, donc le poser comme `default_payment_method` par son nom de jeton
+> ne marche pas — il faut l'identifiant `pm_…` réellement retourné. Et `stripe trigger
+> checkout.session.completed --override checkout_session:customer_email=…` est **rejeté**
+> (`customer_and_confirmation_email_mismatch`) : le fixture crée son propre client.
 
 ### 4.B — Repoussé APRÈS la soutenance (ne pas empiéter)
 
