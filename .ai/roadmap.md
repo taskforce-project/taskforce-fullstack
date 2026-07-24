@@ -1483,6 +1483,51 @@ Planning prévisionnel (Gantt, jalons DFS, chemin critique), budget prévisionne
 > `taskforce-docs/v1/18-soutenance/` (il vivait à la racine du workspace, 15 Mo non suivis par git).
 > ✅ Backend reconstruit et vérifié : `Started TfApiApplication`, conteneur sain, agent OTEL 2.26.1.
 
+> **▶ MAJ 23/07/2026 (8) — grille : E6 passé au vert, et les 4 rouges restants sont TOUS E9.**
+>
+> La grille déclarait encore la trame de compte rendu « non abordée » alors qu'elle avait été
+> produite dans la journée : ma propre trace était périmée de quelques heures. Corrigé.
+>
+> **État : 77 verts, 9 jaunes, 4 rouges.** Les quatre rouges sont les quatre critères de C11, qui
+> s'évaluent tous sur le livrable **E9**. Autrement dit, **la seule chose qui sépare la grille de
+> zéro rouge est un document que l'école doit fournir.** Tout le reste est acquis ou explicitement
+> nuancé en jaune.
+
+> **▶ MAJ 23/07/2026 (9) — E9 tranché, et cahier de recettes recadré sur le cahier des charges.**
+>
+> **E9, décision utilisateur** : l'audit RGPD est conduit sur le fil rouge, à défaut du site externe
+> qui n'a pas été fourni. Les 4 critères de C11 passent donc du **rouge au jaune**, avec une
+> formulation qui dit exactement la vérité : traité, mais pas sur le support attendu, et à refaire
+> si l'école transmet un site. **Jaune et non vert délibérément** — le référentiel est explicite sur
+> le « hors projet fil rouge », et un critère vert qu'un jury peut mettre en défaut coûte plus cher
+> que le jaune correspondant.
+>
+> **Grille : 77 verts, 13 jaunes, 0 rouge.**
+>
+> **Cahier de recettes v2.0.** La v1.0 organisait ses 79 scénarios par cas d'usage applicatif, ce
+> qui plaçait la facturation, la messagerie et le wiki au même rang que l'assignation automatique.
+> **Aucun des trois ne figure au cahier des charges.** Le document est reconstruit sur les **six
+> attentes fonctionnelles du §4**, puis les exigences techniques du §5 et les critères de qualité
+> du §7, chacune avec cas nominaux **et** cas d'échec (le retour du prof visait précisément ce
+> point). Le périmètre étendu est conservé en annexe, sans être présenté comme de la recette
+> contractuelle.
+>
+> **45 scénarios sur le périmètre CDC, dont 41 automatisés**, chaque test cité ayant été vérifié
+> présent dans le dépôt. Le volume apparent baisse par rapport aux 79 annoncés, mais il porte
+> désormais sur ce que le client a demandé.
+>
+> **Quatre écarts déclarés plutôt que masqués** :
+> - `DueDateAlertScheduler` **n'a aucun test**, quand son homologue de surcharge en a un. Seul
+>   manque de couverture sur une attente fonctionnelle du CDC.
+> - Aucune campagne multi-navigateurs : Playwright ne tourne que sur Chromium.
+> - Aucun test de charge : la performance est un choix de conception, pas une mesure.
+> - **Le chiffrement ne couvre ni les compétences ni la charge de travail**, que le CDC cite
+>   pourtant nommément au §7. C'est le point le plus délicat à énoncer, et le plus dangereux à taire.
+>
+> Relevé au passage : le CDC fusionne mal avec nos rôles. Ses **deux acteurs superviseurs**
+> (Manager, Responsable de Projet) ont été **fusionnés en `ADMIN`**, leurs permissions étant
+> identiques. Documenté dans la correspondance des acteurs.
+
 ### 4.B — Repoussé APRÈS la soutenance (ne pas empiéter)
 
 > Aucun de ces chantiers n'est rattaché à une compétence C1–C26. Ils restent documentés,
