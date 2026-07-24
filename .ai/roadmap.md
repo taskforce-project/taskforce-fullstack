@@ -1597,6 +1597,81 @@ Planning prévisionnel (Gantt, jalons DFS, chemin critique), budget prévisionne
 > `Diagramme_Etats_UML` (5), `Architecture_C4` (3), `Diagramme_Cas_Usage_UML` (1) et
 > `Table_Reconciliation`. Le diagramme de déploiement (E21) reste à produire.
 
+> **▶ MAJ 23/07/2026 (12) — diagramme de classes régénéré, et une erreur de comptage que j'avais moi-même propagée.**
+>
+> **Correction d'abord : 48 entités, pas 49.** J'ai écrit 49 toute la journée, y compris dans la
+> MAJ (10) et dans le support de soutenance. La cause est un piège réel :
+> **`@EntityListeners` contient la chaîne `@Entity`**. Un décompte par recherche textuelle compte
+> donc `AuditableEntity`, qui est un `@MappedSuperclass` et non une entité. Corrigé partout.
+>
+> **Livré : `scripts/generate-class-diagram.mjs`**, et extraction du classement par domaine dans
+> `scripts/lib/domaines.mjs`, partagé avec le générateur de schéma. Deux classifications séparées
+> auraient divergé, ce qui est exactement le défaut corrigé aujourd'hui.
+>
+> | Élément | Documenté (05/07) | Réel (23/07) |
+> |---|:--:|:--:|
+> | Entités JPA | 38 | **48** |
+> | Héritages de `AuditableEntity` | 4 | **13** |
+> | Associations entre entités | 60 | **84** |
+> | Références par identifiant nu | non chiffré | **21** |
+>
+> Le document annonçait un « parsing de `core/model/*` » : or **trois entités vivent hors de ce
+> répertoire** (modules `ged` et `sales`). Restreindre l'extraction à `core/model` en oubliait.
+>
+> **Trois défauts de mon propre parseur, trouvés en vérifiant plutôt qu'en supposant** :
+> - Les collections initialisées (`= new ArrayList<>()`) échappaient au motif : **6 associations
+>   trouvées sur 9 pour la seule entité `Issue`**.
+> - Un `@ManyToMany` suivi d'un bloc `@JoinTable` dépassait ma limite de 220 caractères. Remplacée
+>   par une contrainte structurelle — le motif ne peut plus franchir un `;`, donc plus sauter un champ.
+> - Un écart résiduel de 2 entre 86 annotations brutes et 84 parsées : ce sont des annotations
+>   **citées en commentaire**, que le parseur retire à raison. **84 est le chiffre exact.**
+>
+> **Chiffres périmés alignés dans les documents de soutenance** : composants 165 puis 189 → **176**
+> (76 primitives), contrôleurs 35 → **36**, endpoints « 200+ » → **219**, migrations 68 → **72**,
+> entités 49 → **48**. `Plan_Minute` §4 conserve l'historique des valeurs en regard, l'écart étant
+> ce qu'il faut connaître avant l'oral.
+
+> **▶ MAJ 23/07/2026 (13) — diagrammes restants traités, et une architecture décrite à l'envers.**
+>
+> **Le plus grave d'abord.** Six documents d'architecture affirmaient que « `ai-service` est
+> vestigial, non utilisé en production, l'IA tourne en Java via `GroqService` appelant directement
+> Groq ». **Les deux propositions sont fausses, et l'architecture est exactement inverse** :
+>
+> | Le corpus disait | Le code dit |
+> |---|---|
+> | `GroqService` appelle Groq | **`GroqService` n'existe plus** (retiré le 16/07, `TF-AI-GROQ-CLEANUP`) |
+> | `ai-service` est un vestige inutilisé | C'est **la passerelle active**, dont le backend dépend (`AI_SERVICE_URL`) |
+> | L'IA appelle un tiers | `LlmClient` → `AiGatewayClient` → `ai-service` → **Ollama Qwen3 local** |
+>
+> Ce n'est pas un chiffre périmé mais une **erreur structurelle** : un jury demandant à voir
+> `GroqService` ne trouverait rien. Corrigé dans `Diagrammes_Sequence_UML`, `Architecture_C4`,
+> `Architecture`, `Modules`, `Dossier_Conception`, `Table_Reconciliation`. La séquence smart-assign
+> montre désormais la chaîne réelle **et le repli déterministe** si le modèle est injoignable.
+>
+> Conséquence favorable, à exploiter : le retrait de Groq fait que **aucun contenu de travail ne
+> quitte l'infrastructure**, ce qui est l'argument le plus fort du registre des traitements.
+>
+> **Table de réconciliation : 5 des 53 classes de test citées n'existaient pas.** Dans une table
+> dont l'objet est de *prouver* la couverture, une preuve introuvable est pire qu'une absence.
+> `GroqServiceTest` (classe disparue) et `AssistantServiceTest` remplacés par les tests réels ;
+> **chat et discussions n'ont aucun test de service ni de contrôleur** — trou de couverture
+> désormais déclaré, seule la sécurité du transport étant couverte. Une note d'intégrité documente
+> le contrôle et le rend reproductible.
+>
+> **Diagramme de déploiement produit (E21, C29)** : `06-infra/Diagramme_Deploiement.md`. Critère
+> décoché le matin faute d'existence, recoché le soir. Une distinction a permis de ne pas attendre
+> la décision d'hébergement : **la topologie ne dépend pas de l'hébergeur** — il change la machine
+> hôte, pas les 10 conteneurs, ni les flux, ni la surface d'exposition. Point de conception mis en
+> avant : **nginx est le seul service publiant des ports** (80, 443) ; base, Keycloak et stockage
+> objet n'ont aucune route depuis l'extérieur. Rendu vérifié.
+>
+> ⚠️ **Erreur de ma part, corrigée** : j'allais modifier C29 dans le classeur Excel. **Il ne couvre
+> que les blocs 1 à 3** et s'arrête à C26 ; C29 vit dans le Markdown `Bloc4`. Vérifier la portée
+> d'un document avant de l'éditer.
+>
+> **Reste** : `Diagramme_Etats_UML` (5) et `Diagramme_Cas_Usage_UML` (1), non audités, plus le
+> support de soutenance qui reste à ouvrir.
+
 ### 4.B — Repoussé APRÈS la soutenance (ne pas empiéter)
 
 > Aucun de ces chantiers n'est rattaché à une compétence C1–C26. Ils restent documentés,
