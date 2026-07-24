@@ -2,7 +2,6 @@
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Field,
   FieldDescription,
@@ -15,13 +14,10 @@ import {
   InputOTPSeparator,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
-import { Progress } from "@/components/ui/progress";
 import { usePreferencesStore } from "@/lib/store/preferences-store";
 import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
-import Link from "next/link";
 import { getRegisterData, clearRegisterData } from "@/lib/auth/register-storage";
 import { validateOTP, globalRateLimiter } from "@/lib/utils/validation";
 import { authService } from "@/lib/api";
@@ -58,19 +54,15 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
       
       const sendRegistration = async () => {
         try {
-          console.log('[DEBUG] Données d\'inscription:', {
-            email: registerData.email,
-            firstName: registerData.firstName,
-            lastName: registerData.lastName,
-            planType: registerData.planType || "FREE",
-          });
-          
           await authService.register({
             email: registerData.email,
             password: registerData.password,
             firstName: registerData.firstName,
             lastName: registerData.lastName,
             planType: registerData.planType || "FREE",
+            // Émis au chargement de l'étape 1, il n'est consommé qu'ici : c'est le seul appel
+            // d'inscription réellement envoyé au serveur.
+            challengeToken: registerData.challengeToken,
           });
           
           toast.success("Code de vérification envoyé", {
@@ -180,40 +172,18 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
   };
 
   return (
-    <div
-      className={cn("flex flex-col gap-6 md:min-h-112.5 w-[80%]", className)}
-      {...props}
-    >
-      {/* Bouton retour en haut à gauche */}
-      <div className="absolute top-4 left-4">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => router.push('/auth/register/plan')}
-          disabled={isLoading}
-          className="gap-2"
-        >
-          ← Retour
-        </Button>
-      </div>
-
-      {/* Progress indicator */}
-      <div className="w-full space-y-2">
-        <div className="flex justify-between text-sm text-muted-foreground">
-          <span>Étape 3 sur 3</span>
-          <span>100%</span>
-        </div>
-        <Progress value={100} />
-      </div>
-
-      <Card className="flex-1 overflow-hidden p-0">
-        <CardContent className="grid flex-1 p-0 md:grid-cols-2">
-          <form onSubmit={handleSubmit} className="flex flex-col items-center justify-center p-6 md:p-8">
+    <div className={cn("w-full", className)} {...props}>
+      {/* Le fil d'étapes est porté par la page. La barre de progression, le « Étape 3 sur 3 » et le
+          bouton retour en position absolue ont été retirés : doublon pour les deux premiers,
+          recouvrement de la barre supérieure pour le troisième. Le panneau illustré à droite
+          disparaît aussi — il doublait la hauteur de la carte sans rien apporter. */}
+      <div>
+        <div>
+          <form onSubmit={handleSubmit} className="flex flex-col">
             <FieldGroup>
               <Field className="items-center text-center">
-                <h1 className="text-2xl font-bold">Code de vérification</h1>
-                <p className="text-muted-foreground text-sm text-balance">
+                <h1 className="auth-title">Code de vérification</h1>
+                <p className="auth-subtitle">
                   Code envoyé à {userEmail}
                 </p>
               </Field>
@@ -265,23 +235,19 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
               </Field>
             </FieldGroup>
           </form>
-          <div className="bg-gradient relative hidden md:flex md:items-center md:justify-center">
-            <span aria-hidden="true"></span>
-            <Image
-              src="/assets/logo/logo_taskforce_tp.png"
-              alt="TaskForce Logo"
-              width={240}
-              height={240}
-              className="w-60 h-60 object-contain opacity-40 dark:opacity-30 dark:invert relative z-10"
-            />
-          </div>
-        </CardContent>
-      </Card>
-      <FieldDescription className="text-center">
-        En continuant, vous acceptez nos{" "}
-        <Link href="/legal-notices">Conditions d&apos;utilisation</Link> et{" "}
-        <Link href="/privacy-policy">Politique de confidentialité</Link>.
-      </FieldDescription>
+        </div>
+      </div>
+
+      <p className="mt-5 text-center text-xs">
+        <button
+          type="button"
+          onClick={() => router.push("/auth/register/plan")}
+          disabled={isLoading}
+          className="auth-link-muted disabled:opacity-50"
+        >
+          Revenir au choix du plan
+        </button>
+      </p>
     </div>
   );
 }

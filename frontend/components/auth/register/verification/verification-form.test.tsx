@@ -117,11 +117,13 @@ describe('OTPForm - Step 3: Verification', () => {
       });
     });
 
-    it('should show progress indicator for step 3', () => {
+    // Voir plan-form.test.tsx : le fil d'étapes a été remonté au niveau de la page pour cesser
+    // d'être dupliqué dans les trois étapes. Il est testé dans auth-stepper.test.tsx.
+    it('ne porte plus le fil d\'étapes, désormais rendu par la page', () => {
       render(<OTPForm />);
 
-      expect(screen.getByText(/étape 3 sur 3/i)).toBeInTheDocument();
-      expect(screen.getByText(/100%/i)).toBeInTheDocument();
+      expect(screen.queryByText(/étape 3 sur 3/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/100%/i)).not.toBeInTheDocument();
     });
 
     it('should display user email', async () => {
