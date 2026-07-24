@@ -2,20 +2,24 @@
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { FloatingPaths } from "@/components/auth/floating-paths";
 import { usePreferencesStore } from "@/lib/store/preferences-store";
 import { useState } from "react";
 import { toast } from "sonner";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import { authService } from "@/lib/api/auth-service";
-import { ArrowLeft, Mail } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 
 type FormState = "request" | "otp-sent";
 
+/**
+ * Réinitialisation du mot de passe, en deux temps sur la même page.
+ *
+ * Le passage « demande du code » → « saisie du code » se fait sans changer de route : c'est une
+ * seule intention, l'adresse saisie reste en mémoire, et un aller-retour de navigation ferait
+ * perdre le contexte pour rien.
+ */
 export function ForgotPasswordForm({
   className,
   ...props
@@ -81,144 +85,123 @@ export function ForgotPasswordForm({
   };
 
   return (
-    <div className={cn("relative flex min-h-screen w-full overflow-hidden", className)} {...props}>
+    <div className={cn("auth-panel", className)} {...props}>
+      {formState === "request" ? (
+        <>
+          <h1 className="auth-title">Mot de passe oublié</h1>
+          <p className="auth-subtitle">
+            Indiquez votre adresse, nous vous envoyons un code de vérification.
+          </p>
 
-      {/* ── Left: brand panel ── */}
-      <div
-        className="relative hidden lg:flex lg:w-[45%] flex-col justify-between p-10 overflow-hidden"
-        style={{ background: "#0d0d0d", color: "#ffffff" }}
-      >
-        <FloatingPaths position={1} />
-        <FloatingPaths position={-1} />
+          <form onSubmit={handleRequestReset} className="mt-6 space-y-4">
+            <div>
+              <label htmlFor="email" className="auth-label">
+                Email
+              </label>
+              <Input
+                id="email"
+                type="email"
+                autoComplete="email"
+                placeholder="vous@entreprise.com"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={isLoading}
+                className="auth-input"
+              />
+            </div>
 
-        <div aria-hidden className="pointer-events-none absolute bottom-0 inset-x-0 h-56 z-10"
-          style={{ background: "linear-gradient(to top, #0d0d0d 0%, transparent 100%)" }} />
-        <div aria-hidden className="pointer-events-none absolute inset-y-0 right-0 w-24 z-10"
-          style={{ background: "linear-gradient(to left, #0d0d0d 0%, transparent 100%)" }} />
+            <Button type="submit" disabled={isLoading} className="auth-submit">
+              {isLoading ? (<><Loader2 className="size-4 animate-spin" />Envoi en cours…</>) : "Envoyer le code"}
+            </Button>
+          </form>
+        </>
+      ) : (
+        <>
+          <h1 className="auth-title">Code envoyé !</h1>
+          <p className="auth-subtitle">
+            Saisissez le code à 6 chiffres reçu à l&apos;adresse <strong style={{ color: "var(--label-secondary)" }}>{email}</strong>,
+            puis choisissez un nouveau mot de passe.
+          </p>
 
-        <div className="relative z-20 flex items-center gap-2.5">
-          <Image src="/assets/logo/logo_taskforce_tp.png" alt="TaskForce" width={84} height={84}
-            style={{ filter: "brightness(0) invert(1) drop-shadow(0 0 8px rgba(112,0,255,0.6))" }} />
-          <span className="text-base font-semibold" style={{ color: "#ffffff" }}>TaskForce</span>
-        </div>
+          <form onSubmit={handleResetPassword} className="mt-6 space-y-4">
+            <div>
+              <label htmlFor="otpCode" className="auth-label">
+                Code de vérification
+              </label>
+              <Input
+                id="otpCode"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+                placeholder="000000"
+                required
+                value={formData.otpCode}
+                // Filtre à la saisie : `type="text"` accepte tout, et un `maxLength` de 6 sur une
+                // valeur contenant des lettres tronquerait le code réel. On ne garde que les chiffres.
+                onChange={(e) => setFormData({ ...formData, otpCode: e.target.value.replace(/\D/g, "") })}
+                disabled={isLoading}
+                className="auth-input tracking-[0.4em] text-center font-mono"
+              />
+            </div>
 
-        <div className="relative z-20">
-          <blockquote className="space-y-3">
-            <p className="text-xl font-medium leading-snug" style={{ color: "#ffffff" }}>
-              &ldquo;Intelligence artificielle au service de vos opérations.&rdquo;
-            </p>
-            <footer className="text-sm font-mono" style={{ color: "rgba(255,255,255,0.4)" }}>
-              — TaskForce Platform
-            </footer>
-          </blockquote>
-        </div>
-      </div>
+            <div>
+              <label htmlFor="password" className="auth-label">
+                Nouveau mot de passe
+              </label>
+              <Input
+                id="password"
+                type="password"
+                autoComplete="new-password"
+                required
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                disabled={isLoading}
+                className="auth-input"
+              />
+            </div>
 
-      {/* ── Right: form panel ── */}
-      <div
-        className="relative flex flex-1 flex-col items-center justify-center px-6 py-16 sm:px-10"
-        style={{ background: "var(--background)" }}
-      >
-        <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-          <div className="absolute -top-32 -right-32 h-125 w-125 rounded-full"
-            style={{ background: "radial-gradient(circle, rgba(112,0,255,0.06) 0%, transparent 65%)" }} />
-          <div className="absolute -bottom-24 -left-24 h-100 w-100 rounded-full"
-            style={{ background: "radial-gradient(circle, rgba(241,61,212,0.04) 0%, transparent 65%)" }} />
-        </div>
+            <div>
+              <label htmlFor="confirmPassword" className="auth-label">
+                Confirmer le mot de passe
+              </label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                autoComplete="new-password"
+                required
+                value={formData.confirmPassword}
+                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                disabled={isLoading}
+                className="auth-input"
+              />
+            </div>
 
-        {/* Mobile logo */}
-        <div className="flex lg:hidden items-center gap-2 mb-8 self-start">
-          <Image src="/assets/logo/logo_taskforce_tp.png" alt="TaskForce" width={32} height={32}
-            className="h-8 w-8 object-contain dark:invert" />
-          <span className="text-sm font-semibold">TaskForce</span>
-        </div>
+            <Button type="submit" disabled={isLoading} className="auth-submit">
+              {isLoading ? (<><Loader2 className="size-4 animate-spin" />Réinitialisation…</>) : "Réinitialiser le mot de passe"}
+            </Button>
+          </form>
 
-        <div className="relative z-10 w-full max-w-sm">
-          {formState === "request" ? (
-            <form onSubmit={handleRequestReset}>
-              <FieldGroup>
-                <div className="flex flex-col gap-1 mb-6">
-                  <h1 className="text-2xl font-bold tracking-tight">Mot de passe oublié ?</h1>
-                  <p className="text-sm text-muted-foreground">
-                    Entrez votre email pour recevoir un code de vérification
-                  </p>
-                </div>
+          <p className="mt-4 text-center text-xs" style={{ color: "var(--label-tertiary)" }}>
+            Code non reçu ?{" "}
+            <button
+              type="button"
+              onClick={handleResendOtp}
+              disabled={isLoading}
+              className="auth-link underline underline-offset-2 disabled:opacity-50"
+            >
+              Renvoyer
+            </button>
+          </p>
+        </>
+      )}
 
-                <Field>
-                  <FieldLabel htmlFor="email">Adresse email</FieldLabel>
-                  <Input id="email" type="email" placeholder="m@exemple.com" required
-                    value={email} onChange={(e) => setEmail(e.target.value)} disabled={isLoading} />
-                </Field>
-
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? "Envoi en cours…" : "Envoyer le code"}
-                </Button>
-
-                <Link href="/auth/login"
-                  className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors justify-center mt-2">
-                  <ArrowLeft className="h-3.5 w-3.5" />
-                  Retour à la connexion
-                </Link>
-              </FieldGroup>
-            </form>
-          ) : (
-            <form onSubmit={handleResetPassword}>
-              <FieldGroup>
-                <div className="flex flex-col gap-1 mb-6">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 mb-3">
-                    <Mail className="h-5 w-5 text-primary" />
-                  </div>
-                  <h1 className="text-2xl font-bold tracking-tight">Code envoyé !</h1>
-                  <p className="text-sm text-muted-foreground">
-                    Un code à 6 chiffres a été envoyé à <strong className="text-foreground">{email}</strong>
-                  </p>
-                </div>
-
-                <Field>
-                  <FieldLabel htmlFor="otpCode">Code de vérification</FieldLabel>
-                  <Input id="otpCode" type="text" placeholder="123456" required maxLength={6}
-                    value={formData.otpCode}
-                    onChange={(e) => setFormData({ ...formData, otpCode: e.target.value.replace(/\D/g, "") })}
-                    disabled={isLoading} />
-                  <FieldDescription>Code à 6 chiffres reçu par email</FieldDescription>
-                </Field>
-
-                <Field>
-                  <FieldLabel htmlFor="password">Nouveau mot de passe</FieldLabel>
-                  <Input id="password" type="password" required
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    disabled={isLoading} />
-                  <FieldDescription>Au moins 8 caractères</FieldDescription>
-                </Field>
-
-                <Field>
-                  <FieldLabel htmlFor="confirmPassword">Confirmer le mot de passe</FieldLabel>
-                  <Input id="confirmPassword" type="password" required
-                    value={formData.confirmPassword}
-                    onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                    disabled={isLoading} />
-                </Field>
-
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? "Réinitialisation…" : "Réinitialiser le mot de passe"}
-                </Button>
-
-                <div className="flex items-center justify-between text-sm mt-2">
-                  <button type="button" onClick={handleResendOtp} disabled={isLoading}
-                    className="text-muted-foreground hover:text-foreground transition-colors">
-                    Renvoyer le code
-                  </button>
-                  <Link href="/auth/login" className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors">
-                    <ArrowLeft className="h-3.5 w-3.5" />
-                    Connexion
-                  </Link>
-                </div>
-              </FieldGroup>
-            </form>
-          )}
-        </div>
-      </div>
+      <p className="mt-5 text-center text-xs">
+        <Link href="/auth/login" className="auth-link-muted inline-flex items-center gap-1.5">
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Retour à la connexion
+        </Link>
+      </p>
     </div>
   );
 }
