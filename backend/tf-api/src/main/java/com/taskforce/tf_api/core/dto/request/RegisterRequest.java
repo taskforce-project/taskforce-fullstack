@@ -39,4 +39,12 @@ public class RegisterRequest {
 
     @NotNull(message = "Le choix du plan est obligatoire")
     private PlanType planType;
+
+    /**
+     * Jeton de vérification humaine, obtenu via {@code GET /api/auth/challenge} au chargement du
+     * formulaire. Volontairement <b>sans contrainte de validation déclarative</b> : sa validité est
+     * cryptographique, pas syntaxique, et la vérifier ici renverrait un message trompeur (« champ
+     * obligatoire ») là où le vrai motif peut être « expiré » ou « soumis trop vite ».
+     */
+    private String challengeToken;
 }
