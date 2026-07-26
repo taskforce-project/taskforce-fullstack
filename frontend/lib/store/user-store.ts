@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { AuthUser } from "../auth";
-import { getMe, updateMe, type UpdateUserPayload } from "../api/user-service";
+import { completeOnboarding, getMe, updateMe, type UpdateUserPayload } from "../api/user-service";
 
 interface UserState {
   user: AuthUser | null;
@@ -19,6 +19,11 @@ interface UserState {
    * Met à jour le displayName et/ou l'avatarUrl de l'utilisateur connecté.
    */
   updateProfile: (payload: UpdateUserPayload) => Promise<AuthUser | null>;
+
+  /**
+   * Clôt l'onboarding (rôle + drapeau) et met à jour l'utilisateur en mémoire.
+   */
+  finishOnboarding: (jobTitle?: string) => Promise<AuthUser | null>;
 }
 
 export const useUserStore = create<UserState>((set) => ({
@@ -51,5 +56,11 @@ export const useUserStore = create<UserState>((set) => ({
       set({ isLoading: false });
       throw err;
     }
+  },
+
+  finishOnboarding: async (jobTitle) => {
+    const user = await completeOnboarding(jobTitle);
+    set({ user });
+    return user;
   },
 }));
