@@ -44,16 +44,9 @@ spring:
         jwt:
           issuer-uri: ${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM:taskforce}
           jwk-set-uri: ${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM:taskforce}/protocol/openid-connect/certs
-      client:
-        registration:
-          keycloak:
-            client-id: ${KEYCLOAK_CLIENT_ID}
-            client-secret: ${KEYCLOAK_CLIENT_SECRET}
-            authorization-grant-type: authorization_code
-            scope: openid,profile,email
-        provider:
-          keycloak:
-            issuer-uri: ${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM:taskforce}
+      # Pas de bloc `client` : le client OAuth2 de Spring n'est consommé nulle part (la connexion
+      # externe passe par OAuthLoginService, en appels maison lisant `keycloak.*`). Sa présence
+      # déclenchait une découverte OIDC au démarrage, incompatible avec un realm à issuer fixe.
   web:
     error:
       include-stacktrace: never
@@ -75,6 +68,9 @@ cors:
 # Keycloak Configuration
 keycloak:
   url: ${KEYCLOAK_URL}
+  # URL publique de Keycloak, celle que suit le navigateur pour la connexion externe. En production
+  # c'est auth.<domaine> ; en interne le backend peut joindre Keycloak par un autre nom.
+  public-url: ${KEYCLOAK_PUBLIC_URL:${KEYCLOAK_URL}}
   realm: ${KEYCLOAK_REALM:taskforce}
   client-id: ${KEYCLOAK_CLIENT_ID}
   client-secret: ${KEYCLOAK_CLIENT_SECRET}
@@ -102,6 +98,12 @@ security:
   # contrairement à la clé de chiffrement : l'absence de filtre dégrade la protection contre les
   # inscriptions automatisées, elle n'expose pas de donnée. L'état est journalisé au démarrage.
   human-challenge-secret: ${TF_HUMAN_CHALLENGE_SECRET:}
+  # Cloudflare Turnstile. Repli vide toléré, comme le défi signé : l'absence dégrade la protection
+  # contre les inscriptions automatisées, elle n'expose aucune donnée. L'état est journalisé au
+  # démarrage. ⚠️ Turnstile reçoit l'adresse IP des visiteurs → sous-traitant à inscrire au registre.
+  turnstile:
+    site-key: ${TF_TURNSTILE_SITE_KEY:}
+    secret-key: ${TF_TURNSTILE_SECRET_KEY:}
 
 # Intégrations tierces (OAuth) — vides si non configurées
 integrations:

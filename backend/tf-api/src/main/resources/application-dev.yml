@@ -35,34 +35,15 @@ spring:
     validate-on-migrate: false
     baseline-on-migrate: true
 
-  # Security Configuration OAuth2/OIDC
-  security:
-    oauth2:
-      # OAuth2 Client : Pour l'authentification Password Grant
-      # Note: pas de resourceserver.jwt ici — on utilise notre propre JwtDecoder HS512
-      # défini dans SecurityConfig, pas le décodeur auto-configuré RS256 de Keycloak.
-      client:
-        registration:
-          keycloak:
-            client-id: ${KEYCLOAK_CLIENT_ID:taskforce-api}
-            client-secret: ${KEYCLOAK_CLIENT_SECRET:dev-secret-change-me}
-            # Password Grant : Permet l'auth avec email/password sans redirection
-            authorization-grant-type: password
-            scope: openid,profile,email
-            # Nom du provider (référence à la section provider ci-dessous)
-            provider: keycloak
-        provider:
-          keycloak:
-            # Issuer URI : Base URL du realm Keycloak
-            issuer-uri: ${KEYCLOAK_URL:http://localhost:8180}/realms/${KEYCLOAK_REALM:taskforce-dev}
-            # Token Endpoint : Pour obtenir les tokens (Password Grant)
-            token-uri: ${KEYCLOAK_URL:http://localhost:8180}/realms/${KEYCLOAK_REALM:taskforce-dev}/protocol/openid-connect/token
-            # UserInfo Endpoint : Pour récupérer les infos utilisateur
-            user-info-uri: ${KEYCLOAK_URL:http://localhost:8180}/realms/${KEYCLOAK_REALM:taskforce-dev}/protocol/openid-connect/userinfo
-            # JWK Set URI : Clés publiques pour vérifier les signatures
-            jwk-set-uri: ${KEYCLOAK_URL:http://localhost:8180}/realms/${KEYCLOAK_REALM:taskforce-dev}/protocol/openid-connect/certs
-            # User Name Attribute : Claim utilisé comme identifiant
-            user-name-attribute: preferred_username
+  # Pas de bloc `security.oauth2` ici, volontairement.
+  #  - Resource server : le décodeur JWT est fourni EXPLICITEMENT par SecurityConfig.jwtDecoder()
+  #    (issuer PUBLIC attendu, JWKS INTERNE) — pas le décodeur auto-configuré depuis un issuer-uri.
+  #  - Client OAuth2 de Spring : il n'était consommé par PERSONNE (le ROPC passe par KeycloakAuthService,
+  #    la connexion GitHub par OAuthLoginService, tous deux en appels RestTemplate maison). Sa seule
+  #    présence déclenchait une découverte OIDC au démarrage qui, depuis que le realm a un frontendUrl
+  #    fixe, échoue : « Issuer localhost:8180 did not match requested keycloak:8080 ». Les identifiants
+  #    et URLs dont OAuthLoginService a besoin vivent sous `keycloak.*` (client-id, client-secret, url,
+  #    public-url, realm). Ne pas réintroduire ce bloc sans consommateur réel.
 
   web:
     error:
@@ -125,6 +106,13 @@ cors:
 # Keycloak Configuration
 keycloak:
   url: ${KEYCLOAK_URL:http://localhost:8180}
+  # URL telle que le NAVIGATEUR joint Keycloak — distincte de `url`, qui est l'adresse interne au
+  # réseau Docker (`http://keycloak:8080`) utilisée pour les appels serveur à serveur.
+  #
+  # Elle n'existait pas, et son absence a produit une URL d'autorisation pointant vers
+  # `http://keycloak:8080/...` : injoignable depuis un navigateur, donc une connexion externe
+  # cassée. Même piège que l'issuer JWT, déjà rencontré sur ce projet.
+  public-url: ${KEYCLOAK_PUBLIC_URL:http://localhost:8180}
   realm: ${KEYCLOAK_REALM:taskforce-dev}
   client-id: ${KEYCLOAK_CLIENT_ID:taskforce-api}
   client-secret: ${KEYCLOAK_CLIENT_SECRET:dev-secret-change-me}
@@ -177,6 +165,12 @@ security:
   # Défi de vérification humaine à l'inscription (jeton signé, sans service tiers).
   # Vide = mécanisme inactif ; en dev on le laisse actif pour que le parcours soit représentatif.
   human-challenge-secret: ${TF_HUMAN_CHALLENGE_SECRET:dev-only-human-challenge-secret}
+  # Cloudflare Turnstile — second rideau anti-robot à l'inscription, EN PLUS du défi signé ci-dessus.
+  # Vide = inactif (aucun widget affiché, aucune vérification). La clé de SITE est publique, elle est
+  # servie au navigateur par GET /api/auth/challenge ; la clé SECRÈTE ne sort jamais du serveur.
+  turnstile:
+    site-key: ${TF_TURNSTILE_SITE_KEY:}
+    secret-key: ${TF_TURNSTILE_SECRET_KEY:}
 # Integrations tierces
 integrations:
   github:
