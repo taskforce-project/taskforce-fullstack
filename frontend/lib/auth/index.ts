@@ -21,6 +21,10 @@ export type AuthUser = {
   lastName: string;
   displayName: string;
   avatarUrl?: string;
+  /** Rôle/intitulé déclaré à l'onboarding (nullable). */
+  jobTitle?: string;
+  /** Faux tant que le parcours d'onboarding n'a pas été franchi → déclenche le wizard. */
+  onboardingCompleted?: boolean;
   planType: PlanType;
   planStatus?: PlanStatus;
   isActive?: boolean;
