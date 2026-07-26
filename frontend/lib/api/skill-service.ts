@@ -63,3 +63,26 @@ export async function updateMemberSkills(
   );
   return res.data.data;
 }
+
+/**
+ * Suggestion IA de tags de compétences à partir d'un rôle (onboarding, étape 2).
+ * Le backend borne l'appel LLM (~8 s) et retombe sur un repli déterministe : cet appel ne bloque donc
+ * jamais longtemps. En cas d'échec réseau on renvoie une liste vide plutôt que de propager — la saisie
+ * manuelle des compétences reste possible sans suggestion.
+ */
+export async function suggestSkills(
+  slug: string,
+  role: string,
+  existingSkills: string[] = []
+): Promise<string[]> {
+  try {
+    const res = await apiClient.post<{ data: string[] }>(
+      SKILL_ROUTES.SUGGESTIONS(slug),
+      { role, existingSkills },
+      { silentError: true }
+    );
+    return res.data.data ?? [];
+  } catch {
+    return [];
+  }
+}

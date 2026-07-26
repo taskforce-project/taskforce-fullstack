@@ -38,6 +38,15 @@ export async function updateMe(payload: UpdateUserPayload): Promise<AuthUser> {
 }
 
 /**
+ * Clôt le parcours d'onboarding : enregistre le rôle (optionnel) et lève le drapeau
+ * {@code onboardingCompleted} côté serveur. Renvoie l'utilisateur à jour.
+ */
+export async function completeOnboarding(jobTitle?: string): Promise<AuthUser> {
+  const response = await apiClient.post<{ data: AuthUser }>(USER_ROUTES.ONBOARDING, { jobTitle });
+  return response.data.data;
+}
+
+/**
  * Recherche des utilisateurs par email ou displayName (max 10 résultats).
  */
 export async function searchUsers(q: string): Promise<UserSearchResult[]> {
