@@ -48,6 +48,25 @@ public class UserService {
     }
 
     /**
+     * Clôt le parcours d'onboarding : enregistre le rôle déclaré et lève le drapeau
+     * {@code onboarding_completed} pour que le front cesse d'afficher le wizard.
+     * Les compétences, elles, sont posées par leur propre endpoint ({@code MemberSkillController}).
+     */
+    @Transactional
+    public UserResponse completeOnboarding(String email, String jobTitle) {
+        User user = userRepository.findByEmail(email)
+            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+        if (jobTitle != null && !jobTitle.isBlank()) {
+            user.setJobTitle(jobTitle.strip());
+        }
+        user.setOnboardingCompleted(true);
+        user = userRepository.save(user);
+        log.info("Onboarding terminé — email={}", email);
+        UserRepresentation keycloakUser = keycloakService.getUserById(user.getKeycloakId());
+        return buildUserResponse(user, keycloakUser);
+    }
+
+    /**
      * Récupère le profil complet de l'utilisateur par son email (claim "sub" du JWT Keycloak).
      * Utilise l'UUID Keycloak stocké en DB pour enrichir avec les infos Keycloak.
      */
@@ -172,6 +191,8 @@ public class UserService {
             .lastName(keycloakUser.getLastName())
             .displayName(computedDisplayName)
             .avatarUrl(user.getAvatarUrl())
+            .jobTitle(user.getJobTitle())
+            .onboardingCompleted(user.getOnboardingCompleted())
             .planType(user.getPlanType())
             .planStatus(user.getPlanStatus())
             .subscriptionStartDate(user.getSubscriptionStartDate())

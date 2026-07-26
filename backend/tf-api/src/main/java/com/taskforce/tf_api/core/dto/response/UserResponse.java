@@ -25,6 +25,9 @@ public class UserResponse {
     private String lastName;
     private String displayName;
     private String avatarUrl;
+    private String jobTitle;
+    /** Vrai si l'utilisateur a déjà franchi l'onboarding — le front s'en sert pour (ne pas) l'afficher. */
+    private Boolean onboardingCompleted;
     private PlanType planType;
     private PlanStatus planStatus;
     private LocalDateTime subscriptionStartDate;

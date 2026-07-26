@@ -178,6 +178,21 @@ public class User {
     private String avatarUrl;
 
     /**
+     * Rôle / intitulé déclaré à l'onboarding (ex. « Développeur », « Chef de projet »).
+     * Sert à la personnalisation et d'amorce à la suggestion IA de compétences. Nullable.
+     */
+    @Column(name = "job_title", length = 150)
+    private String jobTitle;
+
+    /**
+     * Vrai une fois le parcours de première prise en main franchi. Défaut FALSE : le front
+     * n'affiche le wizard d'onboarding que tant qu'il vaut FALSE.
+     */
+    @Column(name = "onboarding_completed", nullable = false)
+    @Builder.Default
+    private Boolean onboardingCompleted = false;
+
+    /**
      * Vrai si l'utilisateur bénéficie effectivement d'un plan payant : un palier ≠ FREE <b>et</b> un
      * abonnement qui n'est pas en défaut de paiement.
      *

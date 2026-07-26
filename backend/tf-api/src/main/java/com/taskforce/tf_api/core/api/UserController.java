@@ -1,5 +1,6 @@
 package com.taskforce.tf_api.core.api;
 
+import com.taskforce.tf_api.core.dto.request.CompleteOnboardingRequest;
 import com.taskforce.tf_api.core.dto.request.DataRequestRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateUserRequest;
 import com.taskforce.tf_api.core.dto.response.UserResponse;
@@ -66,6 +67,21 @@ public class UserController {
         log.debug("PATCH /api/users/me — email={}", email);
         UserResponse response = userService.updateUserByEmail(email, request);
         return ResponseEntity.ok(ApiResponse.success("Profil mis à jour", response));
+    }
+
+    /**
+     * Clôt le parcours d'onboarding (rôle optionnel + drapeau onboarding_completed).
+     * POST /api/users/me/onboarding
+     */
+    @PostMapping("/me/onboarding")
+    public ResponseEntity<ApiResponse<UserResponse>> completeOnboarding(
+        @AuthenticationPrincipal Jwt jwt,
+        @Valid @RequestBody CompleteOnboardingRequest request
+    ) {
+        String email = identityResolver.resolveEmail(jwt);
+        log.info("POST /api/users/me/onboarding — email={}", email);
+        UserResponse response = userService.completeOnboarding(email, request.getJobTitle());
+        return ResponseEntity.ok(ApiResponse.success("Onboarding terminé", response));
     }
 
     /**
