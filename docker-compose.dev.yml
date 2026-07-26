@@ -241,6 +241,12 @@ services:
       # port du serveur Astro que vous utilisez réellement : 4321 si lancé à la main,
       # ${LANDING_PORT} (18081 par défaut) si c'est le conteneur `landing` de ce compose.
       NEXT_PUBLIC_SITE_URL: ${SITE_PUBLIC_URL:-http://localhost:4321}
+      # Connexion externe. AFFICHÉS = ce que la page montre ; READY = ce qui est réellement câblé
+      # côté serveur (fournisseur d'identité Keycloak + app OAuth). Un bouton affiché non câblé annonce
+      # « bientôt disponible » ; câblé, il démarre le flux. GitHub est prêt depuis le 24/07 ; Google
+      # reste affiché mais non câblé (aucune app OAuth Google déclarée).
+      NEXT_PUBLIC_AUTH_SOCIAL_PROVIDERS: ${AUTH_SOCIAL_PROVIDERS:-github,google}
+      NEXT_PUBLIC_AUTH_SOCIAL_READY: ${AUTH_SOCIAL_READY:-github}
       # Enable polling for hot reload on Docker Desktop (Windows/macOS)
       WATCHPACK_POLLING: "true"
       CHOKIDAR_USEPOLLING: "true"

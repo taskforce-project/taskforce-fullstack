@@ -161,6 +161,12 @@ services:
       # Il s'appelait ENCRYPTION_KEY jusqu'au 24/07/2026 — une variable que rien ne lisait.
       TF_ENCRYPTION_KEY: ${TF_ENCRYPTION_KEY}
 
+      # Vérifications anti-robot à l'inscription (deux rideaux indépendants).
+      # Le défi signé ne dépend d'aucun tiers ; Turnstile juge le visiteur. Vides = inactifs.
+      TF_HUMAN_CHALLENGE_SECRET: ${TF_HUMAN_CHALLENGE_SECRET:-}
+      TF_TURNSTILE_SITE_KEY: ${TF_TURNSTILE_SITE_KEY:-}
+      TF_TURNSTILE_SECRET_KEY: ${TF_TURNSTILE_SECRET_KEY:-}
+
       # JVM — aligné sur la limite conteneur ci-dessous (1024 Mio de heap dans 1536 Mio)
       JAVA_OPTS: "-Xmx1024m -Xms512m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Duser.timezone=UTC"
     depends_on:
