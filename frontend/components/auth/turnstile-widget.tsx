@@ -12,17 +12,17 @@ import { useEffect, useRef } from "react";
  * la panne serait silencieuse (widget affiché, vérification systématiquement en échec). Une seule
  * source, celle qui décide.
  *
- * <h3>Chargement du script, et rendu EXPLICITE</h3>
- * Injecté une seule fois et jamais retiré : Turnstile installe un objet global, et démonter puis
- * remonter le script laisse un état incohérent. Le composant rend le widget dans son conteneur quand
- * l'API globale est disponible.
+ * <h3>Rendu explicite uniquement — pas de scan implicite</h3>
+ * Le script est injecté une seule fois et jamais retiré : Turnstile installe un objet global, et
+ * démonter puis remonter le script laisse un état incohérent. Le composant rend le widget lui-même
+ * via `turnstile.render()` quand l'API globale est disponible.
  *
- * ⚠️ Le script est chargé en <b>{@code ?render=explicit}</b>, et le conteneur n'a <b>pas</b> la classe
- * {@code cf-turnstile}. Sans ces deux points, {@code api.js} scanne le DOM au chargement et rend
- * lui-même tout {@code .cf-turnstile} (« implicit render ») — <b>en plus</b> de notre appel explicite
- * à {@code turnstile.render()}. Résultat : deux tentatives de rendu dans le même conteneur
- * (« Turnstile skipped implicit render because a widget already exists »), et des {@code postMessage}
- * vers une iframe fantôme. En rendu explicite, nous sommes seuls maîtres du cycle de vie du widget.
+ * ⚠️ Le conteneur n'a <b>pas</b> la classe {@code cf-turnstile}. C'est le sélecteur que {@code api.js}
+ * scanne au chargement pour rendre automatiquement les widgets (« implicit render »). Avec la classe,
+ * Turnstile rendait le widget une première fois (implicite) <b>en plus</b> de notre appel explicite →
+ * deux tentatives de rendu dans le même conteneur (« Turnstile skipped implicit render because a
+ * widget already exists ») et des {@code postMessage} vers une iframe fantôme. Sans la classe, seul
+ * notre rendu explicite s'exécute, et nous restons seuls maîtres du cycle de vie du widget.
  */
 
 /** Surface minimale de l'API globale que Turnstile installe sur `window`. */
@@ -39,8 +39,6 @@ interface TurnstileApi {
     }
   ) => string;
   remove: (widgetId: string) => void;
-  /** Exécute le rappel une fois l'API pleinement initialisée. Recommandé avant tout rendu explicite. */
-  ready?: (callback: () => void) => void;
 }
 
 declare global {
@@ -49,9 +47,7 @@ declare global {
   }
 }
 
-// `?render=explicit` : désactive le scan automatique du DOM par Turnstile. Nous rendons le widget
-// nous-mêmes (voir `turnstile.render()` plus bas), une seule fois, avec un cycle de vie maîtrisé.
-const SCRIPT_SRC = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+const SCRIPT_SRC = "https://challenges.cloudflare.com/turnstile/v0/api.js";
 const SCRIPT_ID = "cf-turnstile-script";
 
 interface TurnstileWidgetProps {
@@ -81,13 +77,13 @@ export function TurnstileWidget({ siteKey, onToken }: TurnstileWidgetProps) {
       if (annule || !conteneur.current || !window.turnstile || widgetId.current) return;
       // Repartir d'un conteneur VIDE. En développement, le mode strict de React monte, démonte puis
       // remonte le composant : le démontage appelle `remove()`, mais Turnstile peut laisser un résidu
-      // (l'`<input>` de réponse) dans le conteneur. Rendre par-dessus ce résidu produit un widget
-      // sans iframe — présent dans le DOM, mais invisible et inutilisable. On nettoie donc d'abord.
+      // (l'`<input>` de réponse) dans le conteneur. Rendre par-dessus ce résidu produirait un widget
+      // sans iframe — présent dans le DOM mais inutilisable. On nettoie donc d'abord.
       conteneur.current.innerHTML = "";
       widgetId.current = window.turnstile.render(conteneur.current, {
         sitekey: siteKey,
-        // Marqueur de télémétrie attendu par l'outillage Cloudflare (agrégat par compte, jamais
-        // par utilisateur). Le retirer n'empêche rien de fonctionner, on le conserve par exactitude.
+        // Marqueur de télémétrie attendu par l'outillage Cloudflare (agrégat par compte, jamais par
+        // utilisateur). Le retirer n'empêche rien de fonctionner, on le conserve par exactitude.
         action: "turnstile-spin-v1",
         theme: "auto",
         callback: (token) => rappel.current(token),
@@ -118,7 +114,11 @@ export function TurnstileWidget({ siteKey, onToken }: TurnstileWidgetProps) {
       if (widgetId.current && window.turnstile) {
         // `remove` peut lever si le widget a déjà été retiré (double démontage du mode strict) : on
         // ignore, l'objectif — plus de widget actif — est de toute façon atteint.
-        try { window.turnstile.remove(widgetId.current); } catch { /* déjà retiré */ }
+        try {
+          window.turnstile.remove(widgetId.current);
+        } catch {
+          /* déjà retiré */
+        }
         widgetId.current = null;
       }
       // Effacer tout résidu laissé par Turnstile, pour que le remontage reparte d'un conteneur propre.
@@ -126,8 +126,7 @@ export function TurnstileWidget({ siteKey, onToken }: TurnstileWidgetProps) {
     };
   }, [siteKey]);
 
-  // Pas de classe `cf-turnstile` : c'est le sélecteur que le script scanne pour un rendu implicite.
-  // Le rendu se fait via la ref (rendu explicite), la classe n'est donc pas nécessaire et provoquerait
-  // le double rendu. `min-height` réserve la place du widget pour éviter un saut de mise en page.
+  // Pas de classe `cf-turnstile` (voir l'en-tête) : elle déclencherait un second rendu implicite.
+  // `min-height` réserve la place du widget pour éviter un saut de mise en page pendant son chargement.
   return <div ref={conteneur} style={{ minHeight: 65 }} />;
 }
