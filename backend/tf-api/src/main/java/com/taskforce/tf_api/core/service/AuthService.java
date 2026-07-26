@@ -713,6 +713,8 @@ public class AuthService {
             .lastName(lastName)
             .displayName(user.getDisplayName())
             .avatarUrl(user.getAvatarUrl())
+            .jobTitle(user.getJobTitle())
+            .onboardingCompleted(user.getOnboardingCompleted())
             .planType(user.getPlanType())
             .planStatus(user.getPlanStatus())
             .subscriptionStartDate(user.getSubscriptionStartDate())
