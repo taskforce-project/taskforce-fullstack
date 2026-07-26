@@ -2232,6 +2232,399 @@ Planning prévisionnel (Gantt, jalons DFS, chemin critique), budget prévisionne
 >
 > `tsc` 0 · `eslint` 0 · **107 tests d'authentification verts**.
 
+> **▶ MAJ 24/07/2026 (21) — boutons sociaux visibles, et deux idées fausses levées.**
+>
+> **1. « J'ai déjà configuré une connexion GitHub » — non, c'est l'intégration.** `GITHUB_CLIENT_ID`
+> (20 car.) et `GITHUB_CLIENT_SECRET` (40 car.) sont bien renseignés, mais ils servent
+> `integrations.github` : lier des dépôts et des PR à un workspace, avec pour rappel
+> `{apiUrl}/api/integrations/github/callback`.
+>
+> Pour la **connexion**, Keycloak attend son courtier :
+> `http://localhost:8180/realms/taskforce-dev/broker/github/endpoint`. Une **OAuth App** GitHub
+> n'accepte qu'**une seule** URL de rappel, et GitHub n'autorise qu'un sous-chemin de celle-ci — or
+> ici l'hôte *et* le port diffèrent. **Une seconde application OAuth est donc nécessaire**, elle ne
+> peut pas être réutilisée. Vérifié aussi : aucun `identityProviders` dans le realm dev.
+>
+> **2. Cloudflare Turnstile est possible, mais rien n'est disponible ici.** Aucune variable
+> `CLOUDFLARE_*`/`CF_*` dans l'environnement, pas de configuration `wrangler`, `wrangler` non
+> installé. Il faut une clé de site et une clé secrète depuis le tableau de bord Cloudflare — action
+> utilisateur. Un *skill* dédié (`turnstile-spin`) automatise le reste une fois les clés obtenues.
+> Point RGPD à ne pas escamoter : Turnstile est le captcha le plus respectueux (aucun cookie, aucun
+> suivi inter-sites) mais **reçoit l'adresse IP des visiteurs** → entrée au registre des traitements
+> obligatoire. L'argument « aucun contenu de travail ne quitte l'infrastructure » reste vrai, à
+> condition de dire *contenu de travail* et non *rien*.
+>
+> **Livré** : `AuthSocialButtons` affiche désormais **GitHub et Google**, à la demande de
+> l'utilisateur, avec une distinction qui est le cœur du composant — deux listes séparées.
+> `NEXT_PUBLIC_AUTH_SOCIAL_PROVIDERS` décide de ce qui est **affiché**,
+> `NEXT_PUBLIC_AUTH_SOCIAL_READY` de ce qui est **câblé**. Un bouton affiché mais non câblé ne mène
+> pas à une erreur : il annonce « bientôt disponible » et renvoie vers l'adresse et le mot de passe.
+> Câbler un fournisseur revient à déplacer un nom d'une liste à l'autre, sans toucher au composant.
+>
+> Rendu vérifié : deux `<button>` avec icônes (marque Google en monochrome — la version multicolore
+> est déposée), séparateur « ou », connexion à 400 px sans défilement (195 px de marge à 720 px).
+> `tsc` 0 · `eslint` 0 · **107 tests verts**.
+
+> **▶ MAJ 24/07/2026 (22) — Cloudflare Turnstile intégré, en second rideau (décision utilisateur).**
+>
+> **Écart assumé avec l'outillage officiel.** Le *skill* `turnstile-spin` déploie un **Worker
+> Cloudflare managé** pour relayer `siteverify`, parce qu'il cible des projets **sans backend**.
+> TaskForce en a un, et c'est lui qui traite l'inscription. La vérification se fait donc dans Spring :
+> un saut réseau en moins, une dépendance en moins dans le chemin critique, et la clé secrète reste
+> dans notre environnement au lieu d'un secret de Worker. **La règle de fond est respectée** —
+> `siteverify` est appelé depuis un serveur, jamais depuis le navigateur, ce qui est tout l'enjeu.
+> Le marqueur de télémétrie `data-action="turnstile-spin-v1"` est conservé.
+>
+> Le chemin automatisé était de toute façon bloqué : `auth-probe.sh` → `{"status":"missing_token"}`,
+> aucune variable `CLOUDFLARE_*`, `wrangler` non installé.
+>
+> **Deux rideaux, et ils échouent différemment** — c'est la raison de garder les deux :
+>
+> | Mécanisme | Ce qu'il juge | Dépendance tierce |
+> |---|---|---|
+> | Turnstile | le **visiteur** (empreinte navigateur, réputation) | oui |
+> | Défi signé | la **soumission** (émise par nous, ni instantanée ni périmée) | **aucune** |
+>
+> **Politique de panne, explicite et testée** : si `siteverify` est injoignable, l'inscription est
+> **autorisée** et l'incident journalisé en `WARN`. Refuser laisserait une indisponibilité de
+> Cloudflare fermer les inscriptions — un déni de service offert. Le défi signé, lui, continue de
+> filtrer. Un jeton *explicitement invalide* est en revanche refusé. Deux tests figent ce choix pour
+> qu'il ne soit pas inversé par accident.
+>
+> **La clé de site est servie par l'API**, pas dupliquée dans la configuration du frontend
+> (`GET /api/auth/challenge` renvoie désormais `turnstileSiteKey` et `turnstileRequired`). Dupliquée,
+> elle finirait par diverger de celle que le serveur utilise pour vérifier, et **la panne serait
+> silencieuse** : widget affiché, vérification toujours en échec. Une seule source, celle qui décide.
+>
+> **Une seule sollicitation de l'utilisateur** : quand Turnstile est actif, il **remplace** la case à
+> cocher à l'écran — les deux posaient la même question, Turnstile la pose mieux. Le défi signé reste
+> vérifié côté serveur dans les deux cas, sans rien demander à personne.
+>
+> **Vérification placée dans le contrôleur, pas dans `AuthService`** : l'adresse de l'appelant n'existe
+> qu'au niveau HTTP et affine le jugement de Cloudflare, et c'est une préoccupation de bordure — comme
+> la signature du webhook Stripe. **Effet secondaire voulu : `AuthServiceTest` n'est pas touché.** La
+> leçon des trois incidents précédents a été appliquée d'emblée — `@MockitoBean TurnstileService` posé
+> dans `AuthControllerWebMvcTest` **dans le même changement** que l'ajout au constructeur.
+>
+> **Vérifié** : backend sain, journal « Turnstile inactif … le défi signé maison reste en place » (aucune
+> clé configurée), `GET /api/auth/challenge` → 200 avec `required: true`, `turnstileRequired: false`,
+> `turnstileSiteKey: ""`. **37 tests** (`TurnstileServiceTest` + `AuthControllerWebMvcTest`) verts ·
+> `tsc` 0 · `eslint` 0 · **107 tests front**.
+>
+> ⚠️ **Défaut React corrigé au passage** : le widget écrivait dans une `ref` **pendant le rendu**
+> (`rappel.current = onToken`), ce que `react-hooks/refs` signale à juste titre — cela casse la
+> garantie de pureté du rendu. Déplacé dans un effet.
+>
+> **Reste à faire, côté utilisateur** : créer le widget sur `dash.cloudflare.com → Turnstile → Add
+> widget` (domaines `localhost`, `127.0.0.1`, plus le domaine de production), puis renseigner
+> `TF_TURNSTILE_SITE_KEY` et `TF_TURNSTILE_SECRET_KEY` dans `.env.dev`. **Je ne manipule pas les clés
+> secrètes**, même règle que Stripe. Le `env_file` du compose dev les transmet sans autre changement.
+>
+> ⚠️ **À inscrire au registre des traitements avant mise en service** : Turnstile reçoit l'**adresse IP
+> des visiteurs**, c'est un sous-traitant. Aucun cookie, aucun suivi inter-sites — le choix le moins
+> intrusif de sa catégorie — mais l'affirmation « rien ne quitte l'infrastructure » doit désormais se
+> dire « aucun **contenu de travail** ne quitte l'infrastructure ». Note portée dans les deux fichiers
+> de configuration.
+
+> **▶ MAJ 24/07/2026 (23) — Turnstile actif et prouvé de bout en bout. La CSP le bloquait en silence.**
+>
+> Clés posées par l'utilisateur dans `.env.dev`. Backend recréé → « Turnstile actif à l'inscription ».
+>
+> ⚠️ **Le widget était totalement inerte, et rien ne le disait.** `window.turnstile` restait
+> `undefined`, le conteneur vide, aucune erreur dans le parcours. Cause : la **CSP** du frontend
+> déclarait `script-src 'self' 'unsafe-inline'` et **aucune directive `frame-src`** — `default-src
+> 'self'` s'appliquait donc aussi aux iframes. Turnstile a besoin des deux, plus `connect-src`.
+> Corrigé avec une origine **nommée** (`https://challenges.cloudflare.com`), pas un joker.
+>
+> Choix documenté : l'autorisation est **permanente**, non conditionnée à la présence d'une clé. La CSP
+> est figée dans la configuration alors que la clé de site vient de l'API à l'exécution ; les lier
+> ferait dépendre un en-tête de sécurité d'un état qu'il ne peut pas connaître.
+>
+> **C'est la troisième panne silencieuse par configuration de la journée** — chiffrement au repos,
+> désérialisation Stripe, et maintenant la CSP. Le motif est constant : **le code était juste, la
+> configuration le contournait, et rien ne criait.** Les trois n'ont été trouvées qu'en exerçant le
+> système pour de vrai.
+>
+> **Chaîne complète prouvée, contre le vrai Cloudflare :**
+>
+> | Contrôle | Résultat |
+> |---|---|
+> | `GET /api/auth/challenge` | `turnstileRequired: true`, clé de site servie |
+> | Script + widget dans le navigateur | `window.turnstile` = objet, champ `cf-turnstile-response` **rempli** (jeton de 816 car.) |
+> | Case à cocher maison | **effacée** — Turnstile l'a remplacée, une seule sollicitation |
+> | Jeton Turnstile **fabriqué** | **400** — « Vérification anti-robot échouée » (vrai appel `siteverify`) |
+> | Jeton **réel** du navigateur + défi signé | **201** — les deux rideaux acceptent |
+>
+> Aucune iframe visible : le défi a été résolu **sans interaction**, comportement attendu pour un
+> visiteur jugé sûr. C'est le mode « managed » qui fonctionne, pas un échec de rendu.
+>
+> **Coût en hauteur** : le panneau d'inscription passe de 493 à **564 px**. Marge de 31 px à
+> 1280 × 720 ; à 1280 × 600 il défile à l'intérieur de sa zone. Le levier des 32 px reste disponible
+> (retirer le « Vous avez déjà un compte ? » redondant avec le bouton de la barre).
+>
+> ⚠️ **Rappel RGPD, à traiter avant mise en production** : Turnstile est désormais **actif**, il reçoit
+> l'adresse IP des visiteurs. **Entrée au registre des traitements à créer** — ce n'est plus une
+> hypothèse.
+>
+> **▶ Préparation de la connexion GitHub (décision utilisateur : je prépare, tu crées l'app OAuth).**
+>
+> `scripts/keycloak-idp.ps1` — déclare un fournisseur d'identité dans le realm, **idempotent**
+> (met à jour s'il existe déjà). Syntaxe validée, chemin « identifiants manquants » vérifié : sortie 2
+> et affichage de l'URL de rappel exacte.
+>
+> **Pourquoi un script et non une modification du fichier de realm** : `taskforce-dev-realm.json` n'est
+> importé qu'à la **première création du volume** Keycloak. L'y ajouter n'aurait aucun effet sur
+> l'instance en cours et supposerait de détruire les comptes existants pour être appliqué.
+>
+> **Pourquoi `GITHUB_LOGIN_*` et non `GITHUB_*`** : les variables existantes servent l'**intégration**
+> (lier des dépôts), avec pour rappel `/api/integrations/github/callback`. Une OAuth App GitHub
+> n'accepte qu'**une** URL de rappel et n'autorise qu'un sous-chemin de celle-ci ; le courtier Keycloak
+> est sur un autre hôte et un autre port. **Deux applications OAuth distinctes sont donc nécessaires**,
+> et les confondre casserait l'intégration existante.
+>
+> `kcadm` est exécuté **dans** le conteneur : le mot de passe d'administration ne traverse pas le
+> réseau de l'hôte. Le fichier temporaire contenant le secret est effacé immédiatement, succès ou échec.
+>
+> **Reste à écrire** (flux d'autorisation, après création de l'app OAuth) : `/api/auth/oauth/{p}/authorize`
+> avec état anti-CSRF, `/api/auth/oauth/callback` échangeant le code contre des jetons, création du
+> compte local au premier passage, et la page `/auth/callback` côté client. Chemin critique de
+> sécurité — écrit une fois qu'il est testable de bout en bout, pas à l'aveugle.
+
+> **▶ MAJ 24/07/2026 (24) — fournisseur d'identité GitHub déclaré, et la redirection vers GitHub est prouvée.**
+>
+> `scripts/keycloak-idp.ps1 -Provider github` exécuté. Fournisseur créé puis relancé une seconde fois
+> pour vérifier l'idempotence : « déjà présent : mise à jour », sortie 0. État dans le realm :
+> `{ alias: github, providerId: github, enabled: true, trustEmail: true }`.
+>
+> **Preuve décisive** — suivi de la chaîne de redirections depuis le point d'autorisation avec
+> `kc_idp_hint=github` :
+>
+> ```
+> /protocol/openid-connect/auth?…&kc_idp_hint=github
+>   → /realms/taskforce-dev/broker/github/login?session_code=…
+>   → https://github.com/login?client_id=Ov23lis…&return_to=/login/oauth/authorize…
+> ```
+>
+> GitHub affiche sa **page de connexion**, et non `redirect_uri_mismatch` : l'application OAuth et son
+> URL de rappel sont donc correctement configurées côté GitHub. Le courtier Keycloak est fonctionnel.
+>
+> **Aucune modification de client Keycloak n'a été nécessaire**, vérifié plutôt que supposé : le client
+> `taskforce-api` a déjà `standardFlowEnabled: true` (le flux d'autorisation, en plus du ROPC utilisé
+> aujourd'hui) et liste `http://localhost:3000/*` dans ses URL de retour — la page de rappel du
+> frontend est donc déjà autorisée. C'est un client confidentiel, le secret existe déjà.
+>
+> **Deux pièges PowerShell traversés, tous deux documentés dans le script :**
+>
+> | Symptôme | Cause |
+> |---|---|
+> | Le script s'arrête après une authentification **réussie** | `kcadm.sh` écrit ses traces sur **stderr** ; sous PowerShell 5.1 toute ligne de stderr d'un exécutable natif devient un `ErrorRecord`, et `$ErrorActionPreference = 'Stop'` en fait une erreur fatale. Retiré au profit de contrôles explicites de `$LASTEXITCODE` |
+> | Keycloak : « Not a valid JSON document — Unexpected character (code 65279) » | Pousser le JSON sur stdin depuis PowerShell y ajoute un **BOM UTF-8**. Le fichier temporaire a été supprimé au profit d'arguments `-s`, ce qui évite en plus de faire transiter le secret par un fichier |
+>
+> **Reste à écrire, et c'est désormais testable de bout en bout** : `/api/auth/oauth/{p}/authorize`
+> (construction de l'URL Keycloak + état anti-CSRF), `/api/auth/oauth/callback` (échange du code contre
+> des jetons, création du compte local au premier passage), et la page `/auth/callback` côté client.
+> Puis basculer `github` de `NEXT_PUBLIC_AUTH_SOCIAL_PROVIDERS` vers `NEXT_PUBLIC_AUTH_SOCIAL_READY`.
+
+> **▶ MAJ 24/07/2026 (25) — connexion GitHub fonctionnelle : le bouton mène à la page de connexion GitHub.**
+>
+> Flux d'autorisation complet, vérifié dans un vrai navigateur : **clic sur « GitHub » → API
+> `authorize` → Keycloak → page de connexion GitHub** (`github.com/login`). Le bouton est passé en
+> « câblé » (`NEXT_PUBLIC_AUTH_SOCIAL_READY=github`) ; Google reste affiché en « bientôt disponible ».
+>
+> **Ce qui a été écrit :**
+> - `HmacSigner` — **factorisation** : le jeton court signé était sur le point d'être écrit une
+>   seconde fois pour l'état anti-CSRF. Une implémentation cryptographique dupliquée finit par diverger
+>   sur le détail qui compte (ici la comparaison à temps constant). `HumanChallengeService` réécrit
+>   par-dessus, **23 tests toujours verts** — les politiques (durées, messages) restent chez lui, seule
+>   la mécanique est commune.
+> - `OAuthLoginService` — construction de l'URL d'autorisation, état anti-CSRF, échange du code,
+>   lecture du profil. `OAuthLoginController` — `GET /{provider}/authorize` et `POST /callback`,
+>   publics, liste blanche de fournisseurs.
+> - `AuthService.completeOAuthLogin` — création du compte local **au premier passage, workspace
+>   compris**, résolution **par adresse** (qui s'inscrit par mot de passe puis revient par GitHub
+>   retrouve son compte, n'en crée pas un second).
+> - `app/auth/callback/page.tsx` — relaie le code à l'API, garde par `ref` contre le double envoi du
+>   mode strict React (un code d'autorisation est à usage unique).
+>
+> **État anti-CSRF sans stockage, et pourquoi** : la table `oauth_states` impose un `workspace_id` non
+> nul — cohérent pour une intégration, absurde pour une connexion où la personne n'a ni workspace ni
+> parfois de compte. Réutiliser la table aurait exigé de relâcher cette contrainte pour tout le monde.
+> Le secret réutilise celui du défi anti-robot : même nature, un secret de moins à oublier en prod.
+> ⚠️ Limite énoncée dans le code : sans magasin, l'état n'est pas à usage unique dans sa fenêtre
+> (courte, 15 min). Usage unique = table dédiée, incrément suivant.
+>
+> ⚠️ **Défaut trouvé et corrigé en direct — le piège interne/public, pour la deuxième fois sur ce
+> projet.** L'URL d'autorisation pointait vers `http://keycloak:8080` (nom interne au réseau Docker),
+> **injoignable depuis un navigateur**. Il fallait séparer l'URL que le *backend* joint (échanges
+> serveur à serveur) de celle que le *navigateur* joint (l'autorisation). Nouvelle propriété
+> `keycloak.public-url` ; `OAuthLoginService` construit l'autorisation dessus, les échanges sur
+> l'interne. Après correction : hôte `http://localhost:8180`, chaîne aboutissant à `github.com`.
+> C'est exactement le piège déjà rencontré sur l'issuer JWT — même cause, autre endroit.
+>
+> ⚠️ **Rappel de méthode que je me suis appliqué** : un `up --force-recreate` après une édition YAML ne
+> reconstruit pas le jar. La config packagée restait l'ancienne, et j'ai d'abord cru mon correctif
+> inopérant. Il faut `rebuild backend` (recompile) après tout changement de `application-*.yml`.
+>
+> **Aucun client Keycloak modifié** : `taskforce-api` avait déjà `standardFlowEnabled` et
+> `localhost:3000/*` en URL de retour. **Vérifié** : état anti-CSRF falsifié → **400 avant tout
+> échange**, endpoints publics (200, pas 401), fournisseur hors liste blanche → 400.
+>
+> **Reste, côté utilisateur** : se connecter avec un vrai compte GitHub pour valider le **retour**
+> (création du compte local + workspace) — je ne le fais pas à ta place. Et, pour Google, créer une app
+> OAuth Google puis `keycloak-idp.ps1 -Provider google` + ajouter `google` à `AUTH_SOCIAL_READY`.
+>
+> `tsc` 0 · `eslint` 0 · **107 tests front** · suite backend complète relancée.
+
+> **▶ MAJ 25/07/2026 (26) — connexion GitHub SILENCIEUSE : plus jamais la page Keycloak.**
+>
+> Au premier essai GitHub, l'utilisateur atterrissait sur la page hébergée par Keycloak « Update
+> Account Information » (thème « TASKFORCE DEVELOPMENT »). **Défaut de conception, pas cosmétique** :
+> en production Keycloak n'est pas joignable par le navigateur (seul nginx expose des ports), donc
+> cette page serait une **redirection cassée**. La création de compte au premier passage doit être
+> entièrement silencieuse.
+>
+> **Cause** : l'étape « Review Profile » (`idp-review-profile`) du flux *first-broker-login*, en mode
+> `missing`, s'ouvre dès qu'un champ **requis** manque. Or `email`, `firstName` **et** `lastName`
+> étaient tous requis pour le rôle `user`, et **GitHub ne fournit pas de nom de famille**.
+>
+> **Corrigé, deux réglages globaux au realm :**
+> 1. `firstName`/`lastName` rendus **optionnels** dans le user-profile. Aucune perte : notre propre
+>    inscription les exige déjà côté application (validation Zod + `@Size`), et `completeOAuthLogin`
+>    gère un nom vide via `buildDisplayName`. `email` reste requis (toujours fourni par le scope
+>    `user:email`).
+> 2. Étape « review profile » passée sur **off** — garantie explicite « jamais d'UI Keycloak », même
+>    si un attribut requis venait à manquer.
+>
+> **Rendu reset-proof** : ces réglages vivent dans le H2 de Keycloak, donc perdus à chaque rebuild —
+> exactement comme l'IdP. Ils sont désormais **intégrés à `keycloak-idp.ps1`**, rejoués avec l'IdP.
+> Subtilité gérée : l'ID de la config `review profile` est **régénéré à chaque import de realm**, donc
+> le script le **résout dynamiquement** (recherche de l'exécution `idp-review-profile` dans le flux)
+> plutôt que de le coder en dur — sinon il casserait au reset suivant. Script rejoué : idempotent
+> (« déjà optionnels », review-profile « off »), syntaxe validée.
+>
+> ⚠️ **Deux pièges PowerShell/kcadm traversés, documentés dans le script** : (1) `kcadm update -s
+> 'config."cle.avec.points"=val'` échoue (« Cannot parse the JSON ») → passage par un fichier ;
+> (2) écrire ce fichier via un pipe stdin ajoute un **BOM UTF-8** que Keycloak refuse → écriture
+> hôte en UTF-8 **sans BOM** puis `docker cp`. Le même BOM avait déjà piégé la création de l'IdP.
+>
+> **Vérifié** : profil `firstName/lastName` optionnels, `update.profile.on.first.login = off`, aucun
+> résidu de la tentative abandonnée (ni Keycloak ni Postgres). Le prochain essai GitHub doit créer le
+> compte + workspace sans aucun écran Keycloak et revenir droit sur `/auth/callback`.
+>
+> **Note pour le mémoire (registre RGPD / architecture)** : cet incident illustre concrètement que
+> **Keycloak est une pièce interne, invisible de l'utilisateur** — argument à faire valoir, pas un
+> détail. La page vue était le symptôme d'une fuite de cette couche interne vers l'extérieur.
+
+> **▶ MAJ 25/07/2026 (27) — connexion GitHub : le `userinfo` échouait APRÈS création du compte. Piège interne/public, 3ᵉ occurrence.**
+>
+> Symptôme remonté par l'utilisateur : après GitHub, écran « Connexion impossible — Profil illisible
+> auprès du fournisseur d'identité », et pourtant **le compte apparaissait bien dans Keycloak**. Le
+> correctif (26) tenait donc — plus d'écran Keycloak — mais l'étape suivante, côté backend, cassait.
+>
+> **Cause, explicite dans les logs Keycloak** (pas une supposition) :
+> ```
+> USER_INFO_REQUEST_ERROR  error="invalid_token"
+> reason="Invalid token issuer. Expected 'http://keycloak:8080/realms/taskforce-dev'"
+> ```
+> L'échange du code **réussit** (jeton obtenu), mais le `userinfo` le **refuse en 401**. Mécanique : le
+> navigateur autorise sur l'URL **publique** (`localhost:8180`) → pour un flux démarré au navigateur,
+> Keycloak **ancre l'issuer du jeton sur l'URL frontale** → `iss = localhost:8180`. Le backend lit
+> ensuite le profil par l'URL **interne** (`keycloak:8080`) ; en hostname **dynamique**, Keycloak
+> recalcule l'issuer attendu d'après l'hôte de **chaque** requête (`keycloak:8080`) → discordance → 401.
+> Le plus perfide : l'échec survient **après** la création du compte brokerisé — compte présent,
+> session absente.
+>
+> **C'est la 3ᵉ fois que le même piège interne/public frappe** — issuer JWT (déjà noté), URL
+> d'autorisation (MAJ 25), et maintenant l'issuer du `userinfo`. Même cause racine : deux URL pour une
+> même Keycloak, et un composant qui compare celle qu'il attend à celle qu'il a reçue.
+>
+> **Correctif : figer l'issuer du realm.** Attribut `frontendUrl = http://localhost:8180` posé sur le
+> realm → l'issuer devient **constant** (= URL publique) quel que soit l'hôte d'appel ; le `userinfo`
+> l'accepte alors depuis `keycloak:8080`. C'est précisément ce que la config **déclarait déjà attendre**
+> (`KEYCLOAK_ISSUER_URI=localhost:8180`) : on aligne la réalité sur l'attente, pas l'inverse.
+>
+> **Pourquoi `frontendUrl` du realm et non `KC_HOSTNAME`** (la voie « officielle » en hostname v2) :
+> `KC_HOSTNAME` impose de **recréer le conteneur** → destruction du H2 → perte de l'IdP GitHub et des
+> réglages (26). L'attribut de realm obtient le même résultat par l'API d'admin, **sans recréation**, et
+> se rejoue avec le reste. ⚠️ Vérifié sur KC 26.5.2 : `kcadm get realms/… --fields attributes` ne
+> **projette pas** `frontendUrl` (il ressort vide) — il faut lire le realm **complet** pour le voir.
+> Failli conclure à un échec silencieux ; c'était la projection, pas le stockage.
+>
+> **Rendu reset-proof** : intégré à `keycloak-idp.ps1` (lit `KEYCLOAK_PUBLIC_URL`, repli
+> `localhost:8180`), rejoué avec l'IdP et les réglages (26). Script relancé : idempotent, `frontendUrl
+> fixe sur http://localhost:8180`, sortie 0.
+>
+> **Vérifié — l'appel exact qui échouait, rejoué :**
+>
+> | Contrôle | Résultat |
+> |---|---|
+> | Jeton d'issuer `localhost:8180` présenté au `userinfo` sur `keycloak:8080` | **200** + profil complet (avant : 401) |
+> | Connexion classique email/mot de passe (non-régression) | **200**, jeton de session complet |
+> | `keycloak-idp.ps1` rejoué | `frontendUrl` réappliqué via le vrai chemin PowerShell (splatting `-s`) |
+>
+> **État de la tentative abandonnée** : compte `pierre.michel.work@gmail.com` **présent dans Keycloak**
+> (lié à GitHub, `miche1-pierre`), **absent de Postgres** (`completeOAuthLogin` n'a jamais tourné). Au
+> prochain essai, Keycloak réutilise ce lien et l'app crée l'utilisateur + workspace à neuf. Le parcours
+> aboutit **tel quel** ; supprimer ce résidu Keycloak ne servirait qu'à tester un premier passage *pur*.
+>
+> **Reste, côté utilisateur** : rejouer la connexion GitHub — je ne peux pas le faire sans tes
+> identifiants réels. Elle doit désormais enchaîner GitHub → `/auth/callback` → dashboard, sans écran
+> Keycloak et sans « Profil illisible ».
+
+> **▶ MAJ 25/07/2026 (28) — GitHub bout-en-bout : le compte se créait mais la session restait en 401. Et j'avais cassé la connexion classique au passage.**
+>
+> Après le (27), l'inscription GitHub aboutit (compte + workspace créés, vérifié en base) — mais le
+> dashboard tombait en **401 sur tous les appels** (`/api/users/me`, `/api/workspaces`).
+>
+> **Mon erreur, énoncée franchement** : le (27) — figer l'issuer du realm sur l'URL publique — a aligné
+> TOUS les jetons sur `iss=localhost:8180`, **connexion classique comprise**. Avant, les jetons ROPC
+> (émis en interne) portaient `iss=keycloak:8080` et **coïncidaient** avec ce qu'attendait le back.
+> J'avais « vérifié » la connexion classique en constatant que `/api/auth/login` renvoie un jeton (200)
+> — **sans jamais tester ce jeton sur un endpoint protégé**. Un vert qui prouve que le login émet un
+> jeton, pas que le jeton est accepté.
+>
+> **Cause racine** : l'issuer Keycloak était validé à **trois** endroits qui se contredisaient dès
+> qu'on le rendait public :
+> 1. **Décodeur JWT du resource server** (`SecurityConfig`) — bâtissait l'issuer attendu depuis
+>    `keycloak.url` (**interne**). → rejetait tout jeton `iss=localhost:8180` (« The iss claim is not
+>    valid »), donc classique ET GitHub.
+> 2. **`userinfo`** (connexion GitHub) — réglé au (27).
+> 3. **Client OAuth2 de Spring** — **découverte OIDC** au démarrage vérifiant issuer annoncé
+>    (`localhost:8180`) == issuer demandé (`keycloak:8080`). → le backend **ne démarrait plus**.
+>
+> **Corrigé, tout aligné sur l'URL publique (celle que la config déclarait déjà attendre) :**
+> - `SecurityConfig.jwtDecoder()` — issuer attendu = **public** (`keycloak.public-url`), JWKS récupéré
+>   en **interne** (`keycloak.url`). Le découplage que `KEYCLOAK_ISSUER_URI`/`KEYCLOAK_JWK_SET_URI`
+>   décrivaient déjà mais que le code n'implémentait pas. Repli sur l'interne si pas d'URL publique →
+>   prod à URL unique inchangée.
+> - **Client OAuth2 de Spring supprimé** (`application-dev.yml` + `-prod.yml`). Vérifié : consommé
+>   **par personne** (`grep` `ClientRegistrationRepository`/`OAuth2AuthorizedClient*`/`oauth2Login` :
+>   zéro). ROPC = `KeycloakAuthService`, GitHub = `OAuthLoginService`, tous deux en `RestTemplate`
+>   maison lisant `keycloak.*`. Sa seule présence déclenchait la découverte qui plante. Son unique
+>   lecteur (`OAuthLoginService`, via `@Value`) repointé sur `keycloak.*` (client-id/secret/url).
+>
+> **Vérifié — sur endpoint protégé, pas sur l'émission du jeton :**
+>
+> | Contrôle | Résultat |
+> |---|---|
+> | Démarrage backend | **propre** (la découverte OIDC ne plante plus) |
+> | Jeton `iss=localhost:8180` → `GET /api/users/me` | **200** (avant : 401) |
+> | → `GET /api/workspaces` | **200** (avant : 401) |
+> | Jeton **bidon** → `GET /api/users/me` | **401** (décodeur toujours strict, pas permissif) |
+>
+> Classique et GitHub ont désormais le **même** issuer public : les deux passent. `pierre.michel.work@gmail.com`
+> existe déjà (Keycloak + Postgres, créé au (27)) → le prochain login GitHub le **retrouve** (pas de
+> doublon) et atterrit sur un dashboard qui charge.
+>
+> **Leçon, gravée** : « la connexion marche » ne se prouve pas en regardant si le login rend un jeton,
+> mais en **appelant un endpoint protégé avec**. Toute vérif d'auth qui s'arrête à l'émission est un
+> vert qui ment. (Série issuer/interne-public : userinfo au (27), et ici resource-server + découverte
+> client — même cause racine, deux endroits de plus.)
+>
+> **Reste (avant commit)** : `it.ps1 -Test ALL` — le retrait du bloc `spring.security.oauth2.client`
+> peut toucher un test à contexte Spring complet ; aucun test ne construit `OAuthLoginService` ni ne
+> référence les propriétés retirées (vérifié), mais la suite reste à passer.
+
 ### 4.B — Repoussé APRÈS la soutenance (ne pas empiéter)
 
 > Aucun de ces chantiers n'est rattaché à une compétence C1–C26. Ils restent documentés,

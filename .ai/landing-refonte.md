@@ -162,9 +162,354 @@ puis le checkpoint qui bloque.
 Garde-fous : `IntersectionObserver` (ne tourne que visible) + `prefers-reduced-motion` → état final
 figé. C'est le **gabarit des autres illustrations** : une par fichier, animée, avec de l'insight.
 
+## ⚑ Refonte narrative (24/07, soir) — la home devient un **plan-séquence**
+
+> Spec complète : `taskforce-docs/v1/14-design/landing-refonte/Scenario_Home.md`
+> (6 questions par scène : message, problème, démonstration, progression, moment « Aha », pourquoi mieux)
+
+**Diagnostic.** Les 9 illustrations ci-dessous sont correctes une par une, mais ensemble elles
+échouent : **9 univers séparés** (aucune ne partage un nom, un chiffre ou un artefact avec une
+autre) → on ne suit rien. Elles **bouclent toutes** → une boucle n'atterrit jamais, l'état final
+qui porte le message passe comme les autres. Jusqu'à **3 cartes animées simultanément** → aucun
+point focal. Et ce sont des **schémas** (carte blanche + lignes icône/texte + barre macOS), pas
+des écrans : personne ne croit que le produit existe.
+
+**Principe retenu.** La home est **un seul run, filmé en plan-séquence**. Même workspace, mêmes
+personnes, mêmes chiffres, du hero au dashboard. Chaque section est un **angle de caméra
+différent sur le même run**. Le message du support en haut de page revient à la fin comme un
+point identifiable sur la courbe de lead time.
+
+| Brique | Fichier | Rôle |
+|---|---|---|
+| Décor partagé | `src/lib/story.ts` | Workspace Northwind, projet Customer Portal, **run #147** « Let customers export their invoices », origine = message de Sam (Support, lundi 09:14), casting, 7 checkpoints, chiffres. **Aucune scène ne code en dur un nom ou un chiffre.** |
+| Métronome | `src/lib/useScene.ts` | `useScene(beats)` : partition de durées, démarre à l'entrée à l'écran, se joue **une fois**, **se fige sur l'état final**. `useTypewriter` pour la frappe. `prefers-reduced-motion` → état final direct. |
+| Châssis | `src/components/site/scene/AppWindow.tsx` | Vrai écran TaskForce (voir encadré ci-dessous). **Remplace la barre macOS de `MockFrame`** — trois pastilles + une URL, c'est le signe le plus sûr qu'on regarde un dessin. |
+
+> ### ⚑ v9 (25/07) — un peu d'INTERACTION (hover + badge cliquable)
+> Retour user : « ajoute un peu d'interaction stv, hover, badge cliquable… ».
+> - **`TeamGrid` devient interactif** : les onglets d'équipe sont de vrais `<button aria-pressed>`
+>   qui **filtrent la grille** (chaque équipe a 3 cartes → hauteur stable, 0 CLS). Seul 2ᵉ îlot de
+>   la page (`client:idle`). Testé : clic *Operations* → cartes Route/Balance/Escalate.
+> - **Survol CSS pur** (aucun JS) via `global.css` : `.card-hover` (lift 2px + filet teinté +
+>   ombre) sur les cartes de `TeamGrid`/`FeatureCards`/`Phases` ; `.tile-hover` (logo grayscale →
+>   couleur + `scale(1.08)`) sur les 32 tuiles d'intégrations ; `hover:bg` sur les lignes du
+>   tableau Anatomy et les cartes *Where this goes* ; grayscale→couleur déjà sur le mur de logos.
+>   `prefers-reduced-motion` neutralise les `translate`/`scale`.
+> Page toujours quasi-statique : **2 îlots** (SiteHeader + TeamGrid).
+
+> ### ⚑ v8 (25/07) — VARIER LES GABARITS (façon Relevance) + revrais logos
+> Retour user, après avoir fourni 16 screens de `relevanceai.com` (dans `OneDrive/Pictures/
+> Screenshots`) : « les logos tu les as donc mets-les », « même chose pour Integrations », et
+> surtout « **ça manque de changement dans les sections… c'est ce genre de section qu'il me faut,
+> faut varier** ». Ma page enchaînait le même `FeatureSplit` → monotone.
+>
+> **Archétypes Relevance relevés** (pour référence) : hero à onglets-persona + band de KPI +
+> table · mur de logos clients · **cartes en étapes** (Weeks 1-2/3-6/6+, la carte active se
+> déplie avec un visuel) · **grille d'use-cases tabbée par équipe** (cartes à mini-mockup, hover =
+> pop-over de run) · **gros visuel centré** en bande teintée · testimonial + vidéo à onglets-logos
+> · **badges de conformité + checklist 3 colonnes** · **grille d'intégrations** (10×3 logos) ·
+> **split « one stack » + liste « like X »** · carousel de combo-cards + bento « context layer » ·
+> **framework 4 colonnes L1-L4** · « Featured in » (logos presse). (NB : pas de testimonial/presse
+> pour nous — on n'a pas de clients ; honnêteté D9.)
+>
+> **Fait :**
+> - **Vrais logos rétablis** : `LogoWall` (10 outils réels via `BrandLogo`) et **Integrations en
+>   grille** (32 logos réels, « Connects to 60+ tools », `Browse all`). Vérifié : 42 imgs, 0 cassée.
+> - **`Trust` restructuré** en archétype badges + checklist : panneau de badges (SOC 2/GDPR/ISO,
+>   placeholders) + **3 colonnes** (Security & data · Access & controls · Monitoring), items = vraies
+>   capacités.
+> - **Nouveau fichier `home/Showcase.tsx`** avec 5 archétypes variés (statiques, placeholders) :
+>   `TeamGrid` (grille par équipe, D10 beyond-tech) · `FeatureCards` (bento, remplace 4 `FeatureSplit`
+>   texte : Brain OS/Smart Assign/Models/Analytics) · `StackReplaces` (split visuel + liste « like
+>   X ») · `BigShot` (gros visuel centré) · `Phases` (cartes en étapes, la dernière teintée).
+>
+> **`index.astro` — ordre qui ALTERNE les gabarits** : placeholder-screen → logos → texte → TABLE
+> → band+visuel → 2col → GRILLE → BENTO → split+likeX → visuel-centré → texte → zones → étapes →
+> badges+checklist → grille-logos → liste → CTA. Toujours 100% statique (1 îlot = header).
+>
+> **Débranchés (non supprimés)** : `Features.tsx` (BrainOS/SmartAssign/Models/Analytics remplacés
+> par `FeatureCards`), `Platform.WhyOneSystem` (→ `StackReplaces`), `Narrative.Agents`.
+
+> ### ⚑ v7 (25/07) — ON DÉGONFLE : placeholders + texte seul, page 100% statique
+> Décision user : « à la place des screens, des **placeholders** » · « si une section n'a pas
+> besoin de screen ou d'animation, tu **mets pas** » · « **les images aussi** en placeholder »
+> (« j'en ai partout »). Les faux écrans animés étaient trop nombreux et détournaient de la
+> structure/du contenu.
+>
+> Nouveau composant `site/Placeholder.tsx` : `Placeholder` (cadre pointillés + label + ratio,
+> **statique**) et `LogoPlaceholder` (petit carré). `FeatureSplit`/`FeatureBand` acceptent
+> désormais `children?` **optionnel** → sans visuel, la section passe en **une colonne de texte**.
+>
+> **Visuel gardé (placeholder d'écran) — 4 seulement :** Hero (`Product screen`), Pipeline
+> (`Assignment — Smart Assign`), AgentDelivery (`Agent run`), Integrations (`catalogue`).
+> **Logos → 10 `LogoPlaceholder`** dans `LogoWall`.
+> **Texte seul (aucun visuel) :** Leaks, Approvals, Agents, Brain OS, Smart Assign, Models,
+> Analytics, WhyOneSystem.
+> **Inchangé (contenu, pas un faux écran) :** Anatomy (tableau), Maturity, Trust (icônes lucide),
+> Where this goes, CTA.
+>
+> **Conséquence technique** : plus aucune directive `client:*` dans `index.astro`, **la home est
+> entièrement statique** — 1 seul îlot subsiste (le `SiteHeader`, pour ses méga-menus). Vérifié
+> DOM : 4 placeholders + 10 logos, **0 occurrence** des anciens textes d'animation, 0 erreur Vite.
+>
+> **Fichiers devenus inutilisés (NON supprimés)** : tout `site/illustrations/*`, l'ancien
+> `Hero` film, `scene/AppWindow.tsx`, `BrandLogo.tsx`, `lib/story.ts`, `lib/useScene.ts`. Non
+> importés → non bundlés. À rebrancher si on refait de vrais écrans ; sinon à supprimer plus tard.
+
+> ### ⚑ v6 — le HERO = UNE SEULE SESSION continue, curseur + caméra, overlays sur le contenu
+> (superseded par v7 : le film est débranché, remplacé par un placeholder)
+> Retour user : « c'est vide, pas une vraie interface » · « la PR pop sur un fond blanc, alors
+> qu'elle devrait être un **toast en bas à droite PAR-DESSUS le contenu**, zoom dessus,
+> pending→merge, ça dézoome » · « les **badges de nav je m'en fous, c'est l'animation qui le fait
+> avec la souris** » · puis « **met plus de zoom** ».
+>
+> Réécriture complète de `home/Hero.tsx` : plus d'écrans-maquettes séparés ni de scrubber à
+> chapitres. **Un board réel et permanent**, et tout se joue dessus, piloté par un **curseur** :
+>
+> 1. **New Project** en dialog PAR-DESSUS le board (voile) → relié à Linear → Brain OS ingère.
+> 2. curseur clique **CP-12** → **tiroir d'issue** glisse par-dessus le board (board flouté derrière).
+> 3. Spec IA se remplit → **chat Cortex** dans le tiroir → **critère 4 vert** « From the chat ».
+> 4. curseur → **Smart assign** → **modale par-dessus** (agent Claude + **reviewer humain** par ligne).
+> 5. le tiroir bascule sur **CP-41** → l'agent travaille → **tests ✓ + scan sécu ✓**.
+> 6. **PR #284 en TOAST bas-droite** par-dessus tout → caméra **zoom fort** → **pending→merged**
+>    (`GitMerge` violet) → caméra **dézoome**.
+> 7. transition **Dashboard** : lead time 6,5→1,8 j (−72%), **Shipped**.
+>
+> **Overlays toujours au-dessus du contenu** (voile `#101828`/0.18 pour dialog+modale ; tiroir et
+> toast en `absolute` z-20/40) — plus rien ne « pop » sur du blanc. **Curseur** (`Cursor`,
+> positions en % posées aux battements de déplacement, clics aux battements `CLICK_BEATS`) = la
+> navigation. **Aucun badge de chapitre.**
+>
+> **Caméra : SUPPRIMÉE (décision user, « point barre »).** J'ai d'abord fait des zooms doux, puis
+> musclés (« plus de zoom »), puis le user a tranché : **plus aucun zoom, interface normale, plan
+> fixe**. Le composant `Camera`, le type `Cam`, la map `CAMERA` et `camFor` ont été retirés ; le
+> stage rend ses enfants sans `transform` (`stageHasTransform: "none"` vérifié). La narration
+> repose **uniquement** sur le curseur + les overlays. Ne pas réintroduire de zoom sans feu vert
+> explicite. (Le paramètre d'inspection `?b=N` de `useScene`/`Hero` reste, il est indépendant.)
+>
+> ### ⚠️ Vérif : `?b=N` fige un battement + l'onglet piloté GÈLE (screenshots inexploitables)
+> `useScene` accepte `fixed?: number` ; `Hero` lit `?b=N` dans l'URL → fige le film sur ce
+> battement (invisible en usage normal). Sert à inspecter un moment tardif sans l'attendre.
+> **MAIS** : l'onglet Chrome piloté par l'automatisation **gèle son compositeur hors premier plan**
+> — `setInterval` s'arrête, l'hydratation `client:load` est différée, et **les screenshots
+> renvoient une frame périmée** (souvent l'état SSR = beat 0). La lecture DOM via `javascript_tool`
+> après hydratation est fiable (ex. à `?b=17` : `dialogOpacity 0`, toast `Merged`, `scale 1.5`
+> confirmés). Donc : **vérifier par lecture DOM, pas par capture** ; le film joue normalement dans
+> le vrai navigateur du user (premier plan).
+>
+> **Logos d'agents** ajoutés (fetch ciblé, hors `frontend/`) : `cursor`, `copilot`, `windsurf`,
+> `zed`, `v0`, `replit` → tous dans le Set `THEMED` de `BrandLogo.tsx`.
+
+> ### ⚑ v5 — le HERO devient LE FILM du flow complet (overview de tout, superseded)
+> Retour user : « le hero, la vidéo doit être une **overview de tout** » · « faudrait faire
+> vraiment tout le flow » · « des écrans complets, mais l'animation au bon endroit pour attirer
+> l'œil, rien ne t'empêche de faire des **zoom** comme une vraie vidéo » · « on vend la v2 ».
+>
+> Le hero (`home/Hero.tsx`) n'est plus une scène : c'est un **plan-séquence de 7 actes** sur un
+> seul run (`CP-12` export de factures), joué comme une vidéo de lancement. Les sections plus bas
+> restent les **détails** de chaque étape ; le hero survole tout.
+>
+> | # | Acte | Ce qu'on voit | Caméra |
+> |---|---|---|---|
+> | 1 | Connect | New project → **relié à Linear** → **Brain OS ingère le contexte** (47 issues, docs, ADRs) | zoom 1.05 |
+> | 2 | Board | les issues sont là → **plongeon vers CP-12** | **zoom 1.42** (dive) |
+> | 3 | Issue | Spec IA se remplit → **correction via le chat Cortex** → **critère 4 en vert** | 1.0 |
+> | 4 | Assign | Smart Assign → **agent (Claude Code) + reviewer humain** par issue | 1.0 |
+> | 5 | Build | le log de l'agent → **tests ✓ + scan sécurité ✓** → PR #284 | 1.0 |
+> | 6 | Review | la PR **attend l'approbation** du reviewer, Approve & merge pulse | zoom 1.18 |
+> | 7 | Ship | lead time **6,5 j → 1,8 j (−72%)**, courbe, **Shipped** | 1.0 |
+>
+> **Architecture** (`home/Hero.tsx`) :
+> - **Stage à hauteur fixe** (`h-[372px]`) : tous les actes en `absolute inset-0`, crossfade
+>   d'opacité. Le CLS est **nul par construction** — rien ne peut repousser la page.
+> - **Caméra** = `transform: scale()` + `transform-origin` %, transition 850ms. Un zoom **rogne
+>   les bords** : on ne l'emploie donc QUE sur des écrans centrés avec marges (cartes Connect /
+>   Review) + le plongeon CP-12. Sur les écrans denses (issue/assign/build/ship) la caméra reste à
+>   1 et c'est **l'animation** qui attire l'œil. Leçon : zoomer partout croppe le contenu utile.
+> - **Scrubber cliquable** sous la scène : 7 chapitres = 7 `<button>` → `scene.goTo(act.from)`.
+>   Le film est **jouable**, pas seulement regardable (répond au manque d'interaction signalé).
+> - **Battements** : chaque climax d'acte a SON propre battement, assez long pour être lu. Bug
+>   corrigé : le critère 4 tenait sur le seul battement 7 et se vidait juste après → il a
+>   désormais le battement 8 dédié (chat visible via `at(7)`, réponse+critère via `at(8)`).
+> - Barre latérale + topbar **constantes** entre actes (seuls le breadcrumb et l'item de nav
+>   actif changent, via la prop `active` de `AppWindow`) → sensation d'UN produit qu'on parcourt.
+>
+> **Logos d'agents** récupérés dans `landing-page/public/logos/` (fetch ciblé, sans toucher
+> `frontend/`) : `cursor`, `copilot`, `windsurf`, `zed`, `v0`, `replit` + `anthropic` existant.
+> Ajoutés au Set `THEMED` de `BrandLogo.tsx`. Le sélecteur d'agent en montre 4 (Claude actif).
+>
+> **Smart Assign = exécutant + reviewer** (tranché avec le user) : `Task` porte désormais
+> `reviewer: Person` en plus de `assignee`. Un agent ne livre jamais sans relecture humaine.
+> `AGENT_STEPS` gagne une étape **Scan sécurité** (gate verte, comme les tests).
+
+> ### ⚑ v4 — le plan-séquence en 3 plans, et on vend la **v2**
+> Retour user : « j'aimais bien ton truc de flow général », « pas assez d'interaction, on voit
+> juste un truc se faire », « on peut très bien vendre le workflow futur **jusqu'à l'assignation
+> automatique à Claude** ou n'importe quel agent, et après on passe sur une vue qui **récupère ce
+> que fait l'agent** », « **de toute façon on vend la v2 pas la v1** ».
+>
+> La home redevient un plan-séquence, en **3 plans sur le même run** :
+>
+> | Plan | Composant | Ce qu'il montre |
+> |---|---|---|
+> | 1. Hero | `home/Hero.tsx` | Board → issue `CP-12` → Spec IA → **votre approbation** |
+> | 2. Assignment | `illustrations/AutoAssign.tsx` | Le découpage sort → modale **Smart Assign** → **2 issues sur 4 partent à Claude Code** |
+> | 3. Agent's work | `illustrations/AgentWork.tsx` | Ce que l'agent a fait, étape par étape → **PR #284**, qui revient en revue |
+>
+> **La chaîne est vérifiable de bout en bout** : `CP-41` porte le badge `criterion 4` — le critère
+> né du commentaire humain du plan 1 — et l'étape de l'agent qui édite `InvoiceExportService.java`
+> porte le même badge. Le visiteur peut suivre sa propre phrase jusqu'à la pull request.
+>
+> **Interaction (le manque signalé)** : `Approve` et `Request changes` du Hero sont de **vrais
+> `<button>`**. `useScene.goTo(beat)` repositionne l'horloge au lieu de redémarrer la scène —
+> le clic reprend exactement là où il mène. Le geste qu'on essaie est celui que le produit demande.
+>
+> **Le point qui vend** : un agent de code est un **assigné comme un autre** — même carte, même
+> colonne, même checkpoint. Smart Assign écrit **pourquoi** (« Léo est à 92 % de charge »), donc un
+> routage contestable est contestable. Et la PR **ne se merge pas toute seule**.
+>
+> Types : `Task` est une **union discriminée** sur `agent` (`{agent:true, assignee:Agent}` |
+> `{agent?:false, assignee:Person}`) — sinon `assignee` est inutilisable au rendu. `Agent.logo`
+> et non `brand` : `Person.brand` est un booléen (« c'est vous »), la collision cassait le typage.
+> Un seul agent en dur (`anthropic`) : le catalogue de logos vendorisé n'en contient pas d'autre,
+> le texte dit « or any coding agent » plutôt que d'afficher une marque sans logo.
+
+> ### ⚠️ v3 — l'écran du Hero est le VRAI produit (captures du 24/07)
+> Le user a fourni 3 captures : **Board d'une opération**, **panneau d'édition d'issue**,
+> **modale Smart Assign**. Le Hero montre désormais la vue Board puis le panneau d'édition
+> qui glisse par-dessus — les deux existent réellement.
+>
+> Corrections précises tirées des captures : `Signals` (pas « Signal Center »), **`Brain OS`**
+> (pas « Brain »), **`New Project`** (pas « New operation »), avatar de workspace **rond** avec le
+> **slug en dessous**, fil d'Ariane à **chevrons ›**, recherche en pilule `Search... ⌘K`, icône
+> **workflows** (Layers) + cloche **à badge rouge** + sélecteur de thème, et surtout le contenu
+> est un **panneau blanc à coin haut-gauche arrondi** encastré dans le fond clair.
+>
+> Le panneau d'issue reprend le vrai gabarit : en-tête `CP-12 · statut`, titre, `Description`,
+> **`Spec IA`** (la section existe déjà dans le produit), puis `Sub-tasks / Checklist /
+> Attachments / Relations / GitHub / Activity` repliées, et la colonne **Details** avec
+> Priority, Assignee, le bouton **`Smart assign`**, Labels, Points, Cycle, Due date.
+> Board : colonnes à filet de couleur + compteur, chips de label, clé `CP-xx`, pastille de
+> priorité, avatar d'assigné, barre `Filters / Priority / Assignee / Label` et
+> **`Auto-assign (4)`** — qui existe aussi.
+>
+> **Seule projection assumée : la barre de revue** en bas du panneau. C'est la part « vision ».
+> Le user a validé l'UI/UX et alignera le backend dessus.
+>
+> À intégrer plus tard (signalé par le user) : le **chat IA s'ouvre en panneau à droite façon
+> Claude**, la **liste des workflows** aussi.
+>
+> **Filet anti-frame-drop** : passé la phase de frappe on affiche le texte complet quoi qu'il
+> arrive. Sinon, si le navigateur saute des frames, le critère reste à moitié écrit alors que la
+> suite de la scène s'est déroulée — constaté en capture.
+>
+> Mesuré : **75 échantillons sur 17 s (cycle complet), hauteur 541 px constante, amplitude 0**.
+
+> ### ⚠️ Le châssis est DÉCALQUÉ du vrai shell, pas inventé
+> Retour utilisateur sur la v1 du Hero : « toute plate », « ça ressemble pas à un écran style
+> Linear », « **ça représente même pas TaskForce** ». Direction refusée. La v1 inventait un rail
+> de 52 px avec cinq icônes anonymes : ça ne renvoyait à rien de reconnaissable.
+>
+> La v2 est reprise fichier par fichier de l'app :
+> `frontend/components/layout/sidebar/app-sidebar.tsx` et `.../topbar/app-topbar.tsx`.
+> Donc **sidebar de 216 px** (pas un rail), sélecteur de workspace, groupes
+> **Command / Work / People**, mêmes icônes lucide, **fioles violettes** sur Intelligence et
+> Brain, compte en pied de sidebar ; topbar avec recherche **⌘K**, **Ask AI** (étincelle bleue),
+> cloche à pastille. Libellés du fil d'Ariane = ceux de `segmentLabel` : `projects` s'affiche
+> **« Operations »**, `analytics` **« Intelligence »**.
+> Priorités reprises de `issue-filters.tsx` (`URGENT` red-400 · `HIGH` orange-400 · …).
+>
+> **La densité, pas l'animation, est ce qui rend un écran crédible.** Le contenu porte donc un
+> en-tête de page avec statut et actions, des onglets (`Overview / Spec / Issues 4 / Activity`),
+> un **rail horizontal des 7 checkpoints**, une **colonne de métadonnées** (Status, Checkpoint,
+> Owner, Reviewer, Model, Priority, Created) et un bloc **Open questions** — un agent qui liste
+> ses angles morts explique pourquoi il s'arrête. Le mouvement ne touche que 3 éléments.
+>
+> **Profondeur** : trois plans (sidebar `#f9f9fb` en retrait, contenu blanc au premier plan,
+> ombre à 3 couches) + un dégradé derrière la fenêtre, sinon du blanc sur du blanc = plat.
+>
+> **La barre de revue vit dans la COLONNE DE CONTENU**, pas sur toute la fenêtre : sinon elle
+> recouvre le compte en pied de sidebar, et aucun outil réel ne fait passer une barre d'action
+> par-dessus sa navigation.
+
+**Règles de motion (R1–R7).** Une scène est une partition, pas une boucle · un temps long est un
+silence · un seul point focal (le reste du panneau à 40 % pendant le moment fort) · jamais de
+changement de hauteur · la scène atterrit mais **exactement 2 éléments** restent vivants (chrono
+du run + pastille de présence) · frapper plutôt qu'apparaître · `reduced-motion` saute à la fin.
+
+**Compte : 9 animations automatiques → 5 scènes + 2 zones interactives.**
+Fusions : `RunTimeline` + `ApprovalLoop` + `AgentHandoff` + `ContextRetrieval` → **une** scène de run.
+`AssignRanking` → micro-interaction. `ModelRouting` → interrupteur. `CapabilityPairs` → **supprimé**
+(c'est le schéma d'un argument ; l'argument survit en texte).
+
+**Scène 1 — Hero.** Partition `900/1600/900/1000/700/2200/900/1400/1600` ms, **en boucle** avec
+2,5 s de pause. Un critère s'écrit → statut **ambre** (pas vert) → un **curseur entre et clique
+« Request changes »** → le composeur s'ouvre → **votre commentaire s'écrit** → envoi → le
+checkpoint se rejoue → **le critère 4 apparaît en vert, tiré de votre phrase** (`↑ From your
+comment`, spec v3→v4, `Sent back: 1 time`) → approuvé, le rail avance au checkpoint 3.
+
+> ### ⚠️ Un hero ne peut pas se figer — et il doit montrer un GESTE
+> Retour utilisateur sur la v2 : « **aucune animation, aucune action, aucun insight** ».
+> Trois corrections de principe :
+> 1. **Boucler, pas atterrir.** La règle « une scène se fige sur son état final » vaut pour une
+>    démonstration qu'on regarde une fois. Un hero est vu à n'importe quel moment : arrivé après
+>    la 4ᵉ seconde, on ne voyait plus qu'une capture morte. → `loopAfter: 2500`.
+> 2. **Un curseur.** Sans pointeur, la scène dit « quelque chose change tout seul ». Avec, elle
+>    dit « **quelqu'un fait quelque chose** ». C'est toute la différence entre un écran qui bouge
+>    et une démonstration. `Cursor` est positionné depuis le coin bas-droit du contenu, donc
+>    stable quelle que soit la largeur.
+> 3. **Un insight, pas un changement d'état.** Une pastille qui passe d'ambre à vert n'apprend
+>    rien. Le critère 4 rédigé à partir du commentaire humain, lui, **est** le produit.
+>
+> Retiré : le **chronomètre** (aucun sens sur une fiche) et la **légende sous la fenêtre** (le
+> user a déjà demandé deux fois la suppression de ces petits commentaires — la mention
+> d'honnêteté Spec_Master §1.1 n'a donc plus de support visuel sur le hero, à re-trancher).
+>
+> **La fenêtre passe DERRIÈRE le filet de section** : ombre orientée vers le **haut** (une ombre
+> portée vers le bas déborderait sous le filet, dans la section suivante) + un dégradé sombre de
+> 20 px sur le bas de l'écran, comme si le filet projetait son ombre dessus.
+
+Les **onglets de persona sont supprimés** : ils coupaient l'attention en quatre dès la première
+seconde et signalaient « composant » plutôt que « produit ».
+
+> ### ⚠️ Deux techniques anti-CLS utilisées dans le Hero (à reprendre)
+> 1. **Fantôme de mesure** : pendant la frappe, le texte complet est rendu en `invisible` derrière
+>    le texte tapé. Sans lui, le retour à la ligne agrandit la fenêtre en direct.
+> 2. **Superposition** : la barre d'approbation est en `absolute bottom-0` et le corps réserve sa
+>    hauteur avec `pb-[58px]`. Elle remonte **par-dessus** le contenu — la fenêtre ne bouge pas.
+>
+> Vérifié dans le Brave du user (82 échantillons sur 6,5 s) : frappe **1,12 s** → fin de frappe
+> **2,72 s** → bascule ambre **2,97 s** → barre montée **3,61 → 4,08 s** → anneau **4,33 s**.
+> Hauteur de la fenêtre **412 px constante**, `scrollHeight` **amplitude 0**, la barre reste
+> collée au bord bas (`bar.bottom === window.bottom`). Deux captures à 4 s d'écart après
+> l'atterrissage : **identiques sauf le chrono** — la scène se fige, le produit respire.
+
+> ### ⚠️ Motion piloté par le TEMPS ÉCOULÉ, jamais par des `setTimeout` enchaînés
+> Constaté sur capture : la scène du Hero avait atterri (barre montée, anneau joué) mais le
+> critère 3 affichait encore « Exports ov ». Cause : **Chrome clampe `setTimeout` à 1 s dans un
+> onglet d'arrière-plan**. Les battements de la partition (900 / 1900 / 600 / 700 ms) encaissent ;
+> une frappe à **18 ms/caractère devient 1 caractère/seconde**.
+>
+> `useScene` et `useTypewriter` relisent donc l'horloge à chaque frame (`requestAnimationFrame`
+> + `performance.now()`) au lieu d'enchaîner des incréments fixes. Un retard ne décale plus rien :
+> la frame suivante recalcule la position exacte. Bonus : rAF ne tourne pas du tout en
+> arrière-plan (zéro CPU), et au retour la scène se replace directement où elle devrait être.
+>
+> Conséquence d'implémentation : la boucle rAF **s'arrête** à l'atterrissage, donc `replay()`
+> incrémente un `runId` présent dans les dépendances de l'effet — `setBeat(0)` seul ne relancerait
+> rien.
+
+> ### ⚠️ Vérifier dans le Brave du user, pas dans le panneau Browser
+> Quand le panneau Browser n'est pas affiché, la page est **`document.hidden === true`** : Chrome
+> suspend le cycle de rendu, donc **`IntersectionObserver` ne se déclenche jamais** et
+> **`requestIdleCallback` non plus**. Symptômes observés : les îlots `client:idle` restent en
+> `ssr` et **aucune scène ne démarre** (`typedLen` bloqué à 0 sur 6 s). Ce n'est **pas** un bug du
+> site. Passer par l'extension Claude-in-Chrome (`document.hidden === false`) pour toute mesure
+> d'animation ou d'hydratation.
+
 ## Reste à faire
 
-### Illustrations — traitées **dans l'ordre de la page**
+### Illustrations — l'ancien lot (⚠️ superseded par la refonte narrative ci-dessus)
 
 `site/illustrations/`, une par fichier, animées, coupées quand hors écran + `prefers-reduced-motion`.
 
