@@ -2625,6 +2625,26 @@ Planning prévisionnel (Gantt, jalons DFS, chemin critique), budget prévisionne
 > peut toucher un test à contexte Spring complet ; aucun test ne construit `OAuthLoginService` ni ne
 > référence les propriétés retirées (vérifié), mais la suite reste à passer.
 
+> **▶ MAJ 25/07/2026 (29) — Turnstile : double rendu supprimé (cause : la classe `cf-turnstile`).**
+>
+> Console polluée à l'inscription : « Turnstile skipped implicit render because a widget already
+> exists », plus un `postMessage` vers une origine non concordante. **Pas un endpoint manquant** — un
+> double rendu : `api.js` scanne le DOM au chargement et rend tout `.cf-turnstile` (« implicit »), **en
+> plus** de notre `turnstile.render()` explicite. Le conteneur portait la classe → deux widgets dans le
+> même nœud, d'où l'avertissement et une iframe fantôme.
+>
+> **Correctif minimal** : retirer la classe `cf-turnstile` du conteneur (c'est le sélecteur du scan) ;
+> le rendu explicite via la ref suffit. Ajouté un durcissement StrictMode (conteneur vidé avant rendu +
+> `remove` protégé par try/catch) : en dev, React monte/démonte/remonte, ce qui laissait un résidu
+> (`<input>` de réponse) produisant un widget sans iframe.
+>
+> ⚠️ **Écarté après essai** : `?render=explicit` + `turnstile.ready()`. Plus « canonique », mais **non
+> vérifiable ici** — le navigateur piloté du pane est traité en bot par Turnstile (anti-bot) et
+> supprime le défi quel que soit le code (le response input se crée, l'iframe non). Resté donc au plus
+> près du chemin **éprouvé** (le vrai navigateur rendait déjà l'iframe, avec juste l'avertissement).
+> Vérifié dans le pane : **console sans aucun avertissement Turnstile**. Rendu de l'iframe à confirmer
+> sur un vrai navigateur.
+
 ### 4.B — Repoussé APRÈS la soutenance (ne pas empiéter)
 
 > Aucun de ces chantiers n'est rattaché à une compétence C1–C26. Ils restent documentés,
