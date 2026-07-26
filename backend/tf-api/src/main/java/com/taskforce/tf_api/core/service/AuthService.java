@@ -3,6 +3,8 @@ package com.taskforce.tf_api.core.service;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import java.util.Map;
+
 import org.springframework.transaction.annotation.Transactional;
 
 import com.stripe.exception.StripeException;
@@ -620,6 +622,87 @@ public class AuthService {
     }
 
     /** Construit la réponse d'authentification à partir des tokens Keycloak + du profil DB. */
+    /**
+     * Finalise une connexion via un fournisseur externe (GitHub, Google).
+     *
+     * <p>Appelée après que {@code OAuthLoginService} a échangé le code contre des jetons et lu le
+     * profil. Keycloak a déjà authentifié la personne ; il reste à faire exister son compte
+     * <b>chez nous</b>.</p>
+     *
+     * <h3>Création au premier passage, workspace compris</h3>
+     * Contrairement au repli de {@link #login}, on crée aussi le <b>workspace initial</b>, comme le
+     * fait l'inscription classique. Sans lui, quelqu'un arrivant par GitHub atterrirait dans une
+     * application sans espace de travail : rien à ouvrir, rien à faire. Une identité vérifiée ailleurs
+     * ne dispense pas de lui donner un point de départ.
+     *
+     * <h3>Résolution par adresse, et pourquoi</h3>
+     * On cherche l'utilisateur par son <b>adresse</b>, pas par son identifiant Keycloak : quelqu'un
+     * qui s'est inscrit par mot de passe puis revient par GitHub doit retrouver son compte, pas en
+     * créer un second. Keycloak fusionne les identités sur l'adresse, on suit la même règle.
+     */
+    @Transactional
+    public AuthResponse completeOAuthLogin(Map<String, Object> profil, Map<String, Object> jetons) {
+        String email     = str(profil.get("email"));
+        String firstName = str(profil.get("given_name"));
+        String lastName  = str(profil.get("family_name"));
+        String keycloakId = str(profil.get("sub"));
+
+        if (email == null || email.isBlank()) {
+            // Un compte GitHub peut n'exposer aucune adresse publique. Sans adresse nous ne pouvons
+            // ni rattacher un compte existant, ni en créer un cohérent : mieux vaut le dire.
+            throw new RuntimeException(
+                "Votre compte externe ne fournit pas d'adresse e-mail. "
+                + "Rendez-la visible chez le fournisseur, ou utilisez l'inscription classique.");
+        }
+
+        boolean creation = userRepository.findByEmail(email).isEmpty();
+
+        User user = userRepository.findByEmail(email).orElseGet(() -> {
+            log.info("Première connexion externe pour {} : création du compte local", email);
+            return userRepository.save(User.builder()
+                .keycloakId(keycloakId)
+                .email(email)
+                .planType(PlanType.FREE)
+                .planStatus(PlanStatus.ACTIVE)
+                .isActive(true)
+                .displayName(buildDisplayName(firstName, lastName))
+                .build());
+        });
+
+        if (!user.getIsActive()) {
+            throw new RuntimeException("Ce compte est désactivé");
+        }
+
+        if (creation) {
+            workspaceService.createWorkspace(user, firstName);
+        }
+        workspaceInvitationService.acceptPendingInvitations(user);
+
+        KeycloakTokenResponse kcToken = KeycloakTokenResponse.builder()
+            .accessToken(str(jetons.get("access_token")))
+            .refreshToken(str(jetons.get("refresh_token")))
+            .tokenType("Bearer")
+            .expiresIn(intOf(jetons.get("expires_in")))
+            .refreshExpiresIn(intOf(jetons.get("refresh_expires_in")))
+            .build();
+
+        auditService.record(null, user.getId(), AuditService.USER_LOGIN);
+        log.info("Connexion externe réussie pour : {}", email);
+
+        return buildAuthResponse(user, kcToken, firstName, lastName);
+    }
+
+    private static String str(Object value) {
+        return value == null ? null : String.valueOf(value);
+    }
+
+    private static Integer intOf(Object value) {
+        if (value instanceof Number n) {
+            return n.intValue();
+        }
+        return null;
+    }
+
     private AuthResponse buildAuthResponse(User user, KeycloakTokenResponse kcToken,
                                            String firstName, String lastName) {
         UserResponse userResponse = UserResponse.builder()

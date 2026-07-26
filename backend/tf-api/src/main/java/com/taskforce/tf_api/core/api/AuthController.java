@@ -2,6 +2,8 @@ package com.taskforce.tf_api.core.api;
 
 import java.util.Map;
 
+import org.springframework.beans.factory.annotation.Value;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,9 +27,11 @@ import com.taskforce.tf_api.core.dto.response.SelectPlanResponse;
 import com.taskforce.tf_api.core.dto.response.VerifyOtpResponse;
 import com.taskforce.tf_api.core.service.AuthService;
 import com.taskforce.tf_api.shared.security.HumanChallengeService;
+import com.taskforce.tf_api.shared.security.TurnstileService;
 import com.taskforce.tf_api.shared.dto.ApiResponse;
 
 import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -43,20 +47,29 @@ public class AuthController {
 
     private final AuthService authService;
     private final HumanChallengeService humanChallengeService;
+    private final TurnstileService turnstileService;
+
+    @Value("${security.turnstile.site-key:}")
+    private String turnstileSiteKey;
 
     /**
      * Défi de vérification humaine, demandé au chargement du formulaire d'inscription.
      * GET /api/auth/challenge
      *
-     * <p>Renvoie toujours 200. Si le mécanisme est désactivé (aucun secret configuré), le jeton est
-     * vide et l'inscription n'est pas filtrée : le client n'a pas à connaître cette distinction, il
-     * renvoie simplement ce qu'on lui a donné.</p>
+     * <p>Renvoie toujours 200. Si un mécanisme est désactivé, le client le voit dans la réponse et
+     * n'affiche pas ce qui n'a pas lieu d'être — plutôt que de deviner à partir d'une variable
+     * d'environnement dupliquée côté client, qui dériverait de la configuration serveur.</p>
      */
     @GetMapping("/challenge")
     public ResponseEntity<ApiResponse<Map<String, Object>>> challenge() {
         Map<String, Object> payload = Map.of(
             "token", humanChallengeService.issue(),
-            "required", humanChallengeService.isEnabled()
+            "required", humanChallengeService.isEnabled(),
+            // La clé de SITE est publique par nature : elle est destinée au navigateur. La servir
+            // depuis l'API évite d'avoir à la répliquer dans la configuration du frontend, où elle
+            // pourrait diverger de celle que le serveur utilise réellement pour vérifier.
+            "turnstileSiteKey", turnstileSiteKey == null ? "" : turnstileSiteKey,
+            "turnstileRequired", turnstileService.isEnabled()
         );
         return ResponseEntity.ok(ApiResponse.success("Défi émis", payload));
     }
@@ -68,9 +81,22 @@ public class AuthController {
      */
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<RegisterResponse>> register(
-        @Valid @RequestBody RegisterRequest request
+        @Valid @RequestBody RegisterRequest request,
+        HttpServletRequest httpRequest
     ) {
         log.info("Requête d'inscription reçue pour : {}", request.getEmail());
+
+        // Turnstile est vérifié ICI, et non dans AuthService, pour deux raisons. D'abord l'adresse de
+        // l'appelant n'existe qu'au niveau de la requête HTTP, et elle améliore le jugement rendu par
+        // Cloudflare. Ensuite c'est une préoccupation de bordure — comme la signature du webhook
+        // Stripe, vérifiée dans son contrôleur : on rejette au plus tôt, avant d'entrer dans le
+        // domaine. Le défi signé, lui, reste dans AuthService, où il garde l'inscription elle-même.
+        String refusTurnstile = turnstileService.verify(
+            request.getTurnstileToken(), clientIp(httpRequest));
+        if (refusTurnstile != null) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(refusTurnstile));
+        }
 
         try {
             RegisterResponse response = authService.register(request);
@@ -278,5 +304,22 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error(e.getMessage()));
         }
+    }
+
+    /**
+     * Adresse de l'appelant, transmise à Turnstile pour affiner son jugement.
+     *
+     * <p>Derrière nginx, {@code getRemoteAddr()} renvoie l'adresse du proxy et non celle du visiteur :
+     * on lit donc {@code X-Forwarded-For} en priorité, en ne gardant que le <b>premier</b> élément —
+     * les suivants sont les proxys traversés. Cet en-tête est falsifiable par le client, mais
+     * l'enjeu ici est la qualité d'un signal anti-robot, pas une décision d'autorisation : au pire
+     * Turnstile juge sur une adresse erronée, et le refus reste fondé sur le jeton.</p>
+     */
+    private String clientIp(HttpServletRequest request) {
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            return forwarded.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
     }
 }
