@@ -19,15 +19,30 @@ const IS_PROD = process.env.NODE_ENV === "production";
 // silencieusement — un bug qui ne pouvait pas se voir en développement.
 const WS_ORIGIN = API_ORIGIN.replace(/^http/, "ws");
 
+// Origine unique de Cloudflare Turnstile. Le widget charge un script depuis ce domaine et rend son
+// défi dans une iframe servie par le même : sans l'autoriser explicitement, la CSP le bloque et
+// l'échec est TOTALEMENT SILENCIEUX côté produit — le conteneur reste vide, `window.turnstile` reste
+// indéfini, aucune erreur n'apparaît dans le parcours utilisateur. Constaté le 24/07/2026.
+//
+// Autorisée en permanence, et non conditionnée à la présence d'une clé : la CSP est figée dans la
+// configuration alors que la clé de site vient de l'API à l'exécution. Les lier ferait dépendre un
+// en-tête de sécurité d'un état qu'il ne peut pas connaître. Le coût est une origine nommée, précise,
+// utilisée par ce seul widget — pas un joker.
+const TURNSTILE_ORIGIN = "https://challenges.cloudflare.com";
+
 const cspHeader = [
   "default-src 'self'",
   // `unsafe-eval` n'est requis QUE par le rechargement à chaud du serveur de développement.
   // L'embarquer en production élargissait la surface XSS sans aucune contrepartie.
-  `script-src 'self' 'unsafe-inline'${IS_PROD ? "" : " 'unsafe-eval'"}`,
+  `script-src 'self' 'unsafe-inline' ${TURNSTILE_ORIGIN}${IS_PROD ? "" : " 'unsafe-eval'"}`,
+  // Sans `frame-src`, `default-src 'self'` s'applique aux iframes et le défi Turnstile ne s'affiche
+  // pas. La directive n'existait pas : elle est ajoutée ici, restreinte à cette seule origine.
+  `frame-src 'self' ${TURNSTILE_ORIGIN}`,
   // `unsafe-inline` sur les styles reste nécessaire : Tailwind et l'hydratation de Next.js
   // injectent des styles en ligne. Le lever suppose de passer aux nonces.
   "style-src 'self' 'unsafe-inline'",
-  `connect-src 'self' ${API_ORIGIN} ${STORAGE_ORIGIN} ${WS_ORIGIN}`,
+  // Turnstile émet aussi des requêtes vers son origine depuis l'iframe (défi, télémétrie).
+  `connect-src 'self' ${API_ORIGIN} ${STORAGE_ORIGIN} ${WS_ORIGIN} ${TURNSTILE_ORIGIN}`,
   // `https:` était un joker autorisant les images de N'IMPORTE quelle origine HTTPS. Il n'a de
   // raison d'être qu'en développement, où MinIO est en http:// ; en production les deux origines
   // utiles sont explicites.

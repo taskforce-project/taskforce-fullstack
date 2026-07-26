@@ -13,6 +13,10 @@ export const AUTH_ROUTES = {
   REGISTER: "/api/auth/register",
   /** Défi de vérification humaine, demandé au chargement du formulaire d'inscription. */
   CHALLENGE: "/api/auth/challenge",
+  /** Connexion externe : URL de démarrage à demander au serveur (elle porte l'état anti-CSRF signé). */
+  OAUTH_AUTHORIZE: (provider: string) => `/api/auth/oauth/${provider}/authorize`,
+  /** Connexion externe : échange du code d'autorisation contre une session TaskForce. */
+  OAUTH_CALLBACK: "/api/auth/oauth/callback",
   SELECT_PLAN: "/api/auth/select-plan",
   VERIFY_OTP: "/api/auth/verify-otp",
   RESEND_OTP: "/api/auth/resend-otp",
