@@ -1,15 +1,7 @@
 package com.taskforce.tf_api.shared.security;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
-import java.time.Instant;
-import java.util.Base64;
-
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,10 +14,11 @@ import lombok.extern.slf4j.Slf4j;
  *
  * <h2>Ce que ce mécanisme fait</h2>
  * Le formulaire d'inscription demande un <b>jeton de défi</b> au chargement. Le serveur émet une
- * chaîne signée contenant un aléa et l'instant d'émission. À la soumission, il vérifie que :
+ * chaîne signée contenant un aléa et l'instant d'émission (cf. {@link HmacSigner}). À la soumission,
+ * il vérifie que :
  * <ul>
- *   <li>le jeton porte <b>sa</b> signature — il a donc bien été émis par ce serveur, pour ce
- *       formulaire, et n'a pas été fabriqué ;</li>
+ *   <li>le jeton porte <b>sa</b> signature — il a donc bien été émis par ce serveur et n'a pas été
+ *       fabriqué ;</li>
  *   <li>il n'est pas plus vieux que {@link #MAX_AGE} — un jeton moissonné ne resservira pas demain ;</li>
  *   <li>il n'est pas plus <b>jeune</b> que {@link #MIN_DWELL} — un humain ne remplit pas cinq champs
  *       en moins de trois secondes, un script si.</li>
@@ -42,15 +35,14 @@ import lombok.extern.slf4j.Slf4j;
  * serveur, au détriment de sa réputation d'expéditeur. Contre cela, refuser les soumissions
  * instantanées et non signées est efficace et proportionné.</p>
  *
- * <p>Le choix d'écarter un service tiers (Turnstile, reCAPTCHA) est délibéré : il ferait sortir des
- * adresses IP de visiteurs vers un sous-traitant, à inscrire au registre des traitements, pour un
- * gain qui ne se justifie qu'à une échelle que ce produit n'a pas.</p>
+ * <p>Depuis le 24/07/2026 il ne travaille plus seul : {@link TurnstileService} juge le <b>visiteur</b>
+ * quand il est configuré, là où ce défi juge la <b>soumission</b>. Les deux échouent différemment, et
+ * celui-ci ne dépend d'aucun tiers — il reste donc une barrière si Cloudflare est injoignable.</p>
  *
  * <h2>Sans état, à dessein</h2>
- * Aucun stockage : la signature porte toute l'information. L'infrastructure de développement n'a pas
- * de Redis, et créer une table pour des jetons vivant une heure coûterait plus que le gain.
- * <b>Conséquence à connaître</b> : un même jeton peut servir plusieurs fois dans sa fenêtre de
- * validité. L'usage unique demanderait un magasin partagé — c'est l'incrément suivant, pas un oubli.
+ * Aucun stockage : la signature porte toute l'information. <b>Conséquence à connaître</b> : un même
+ * jeton peut servir plusieurs fois dans sa fenêtre de validité. L'usage unique demanderait un magasin
+ * partagé — c'est l'incrément suivant, pas un oubli.
  */
 @Service
 @Slf4j
@@ -69,31 +61,24 @@ public class HumanChallengeService {
     /** En deçà, la soumission est trop rapide pour une saisie humaine de cinq champs. */
     private static final Duration MIN_DWELL = Duration.ofSeconds(3);
 
-    private static final String HMAC_ALGO = "HmacSHA256";
-    private static final SecureRandom RANDOM = new SecureRandom();
-    private static final Base64.Encoder ENCODER = Base64.getUrlEncoder().withoutPadding();
-    private static final Base64.Decoder DECODER = Base64.getUrlDecoder();
+    private static final String MSG_INVALIDE =
+        "Vérification humaine invalide. Rechargez la page et réessayez.";
 
-    private final byte[] key;
-    private final boolean enabled;
-    private final Clock clock;
+    private final HmacSigner signer;
 
     /**
-     * Horloge injectable. Le mécanisme repose entièrement sur des durées — trois secondes de délai
-     * minimal, une heure de validité — et les vérifier en dormant rendrait la suite lente et
-     * instable. Les tests fournissent deux horloges fixes, une pour l'émission, une pour la
-     * vérification : le jeton étant sans état, cela suffit à parcourir toutes les fenêtres.
+     * Constructeur à horloge injectable, réservé aux tests. Le mécanisme repose entièrement sur des
+     * durées — trois secondes de délai minimal, une heure de validité — et les vérifier en dormant
+     * rendrait la suite lente et instable.
      */
     HumanChallengeService(String secret, Clock clock) {
-        this.enabled = secret != null && !secret.isBlank();
-        this.key = enabled ? secret.getBytes(StandardCharsets.UTF_8) : new byte[0];
-        this.clock = clock;
+        this.signer = new HmacSigner(secret, clock);
     }
 
     /**
-     * Constructeur utilisé par Spring. L'annotation est nécessaire : depuis l'ajout du constructeur
-     * à horloge injectable, la classe en compte deux, et Spring cherchait alors un constructeur sans
-     * argument plutôt que d'en choisir un — le contexte refusait de démarrer.
+     * Constructeur utilisé par Spring. L'annotation est nécessaire : la classe en compte deux, et
+     * Spring chercherait sinon un constructeur sans argument plutôt que d'en choisir un — le contexte
+     * refusait de démarrer.
      */
     @Autowired
     public HumanChallengeService(@Value("${security.human-challenge-secret:}") String secret) {
@@ -102,7 +87,7 @@ public class HumanChallengeService {
         // À défaut de secret dédié, le mécanisme est inactif plutôt que faussement sûr : une clé
         // vide signerait tout et n'importe quoi. L'état est journalisé pour ne pas rester invisible,
         // même leçon que le chiffrement au repos.
-        if (enabled) {
+        if (signer.isEnabled()) {
             log.info("Vérification humaine active à l'inscription (défi signé, sans service tiers).");
         } else {
             log.warn("Vérification humaine INACTIVE : « security.human-challenge-secret » est vide. "
@@ -112,20 +97,12 @@ public class HumanChallengeService {
 
     /** Vrai si un secret est configuré ; sinon la vérification laisse tout passer. */
     public boolean isEnabled() {
-        return enabled;
+        return signer.isEnabled();
     }
 
-    /**
-     * Émet un jeton de défi. Format : {@code base64url(nonce).epochMillis.base64url(hmac)}.
-     */
+    /** Émet un jeton de défi. */
     public String issue() {
-        if (!enabled) {
-            return "";
-        }
-        byte[] nonce = new byte[12];
-        RANDOM.nextBytes(nonce);
-        String payload = ENCODER.encodeToString(nonce) + "." + clock.instant().toEpochMilli();
-        return payload + "." + ENCODER.encodeToString(sign(payload));
+        return signer.issue();
     }
 
     /**
@@ -133,41 +110,17 @@ public class HumanChallengeService {
      * message d'erreur remonté à l'appelant.
      */
     public String verify(String token) {
-        if (!enabled) {
+        if (!signer.isEnabled()) {
             return null;
         }
         if (token == null || token.isBlank()) {
             return "Vérification humaine manquante. Rechargez la page et réessayez.";
         }
 
-        String[] parts = token.split("\\.");
-        if (parts.length != 3) {
-            return "Vérification humaine invalide. Rechargez la page et réessayez.";
+        Duration age = signer.ageOf(token);
+        if (age == null) {
+            return MSG_INVALIDE;
         }
-
-        String payload = parts[0] + "." + parts[1];
-        byte[] attendu = sign(payload);
-        byte[] recu;
-        try {
-            recu = DECODER.decode(parts[2]);
-        } catch (IllegalArgumentException e) {
-            return "Vérification humaine invalide. Rechargez la page et réessayez.";
-        }
-
-        // Comparaison à temps constant : une comparaison naïve laisserait fuiter la signature
-        // attendue, octet par octet, à qui mesure le temps de réponse.
-        if (!MessageDigest.isEqual(attendu, recu)) {
-            return "Vérification humaine invalide. Rechargez la page et réessayez.";
-        }
-
-        long emisA;
-        try {
-            emisA = Long.parseLong(parts[1]);
-        } catch (NumberFormatException e) {
-            return "Vérification humaine invalide. Rechargez la page et réessayez.";
-        }
-
-        Duration age = Duration.between(Instant.ofEpochMilli(emisA), clock.instant());
         if (age.isNegative() || age.compareTo(MAX_AGE) > 0) {
             return "Vérification humaine expirée. Rechargez la page et réessayez.";
         }
@@ -177,15 +130,5 @@ public class HumanChallengeService {
         }
 
         return null;
-    }
-
-    private byte[] sign(String payload) {
-        try {
-            Mac mac = Mac.getInstance(HMAC_ALGO);
-            mac.init(new SecretKeySpec(key, HMAC_ALGO));
-            return mac.doFinal(payload.getBytes(StandardCharsets.UTF_8));
-        } catch (Exception e) {
-            throw new IllegalStateException("Signature du défi impossible", e);
-        }
     }
 }
