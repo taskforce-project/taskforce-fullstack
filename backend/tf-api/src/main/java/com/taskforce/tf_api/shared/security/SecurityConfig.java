@@ -21,8 +21,17 @@ import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWrite
 @EnableWebSecurity
 public class SecurityConfig {
 
+    /** Adresse INTERNE de Keycloak (réseau Docker) — sert à récupérer les clés (JWKS), appel serveur. */
     @Value("${keycloak.url:http://localhost:8080}")
     private String keycloakUrl;
+
+    /**
+     * Adresse PUBLIQUE de Keycloak — celle que le navigateur joint, et donc l'{@code issuer} que
+     * portent les jetons. Distincte de {@link #keycloakUrl}. Repli sur l'interne si non définie, ce
+     * qui préserve le comportement des environnements à URL unique (prod derrière un seul domaine).
+     */
+    @Value("${keycloak.public-url:${keycloak.url:http://localhost:8080}}")
+    private String keycloakPublicUrl;
 
     @Value("${keycloak.realm:taskforce}")
     private String keycloakRealm;
@@ -34,12 +43,22 @@ public class SecurityConfig {
      *
      * <p>La signature est vérifiée via les clés publiques exposées sur {@code /protocol/openid-connect/certs},
      * et l'{@code issuer} est validé (défense contre un token signé par un autre realm/IdP).</p>
+     *
+     * <p><b>Issuer public, clés internes — le piège interne/public, encore.</b> Depuis que le realm
+     * porte un {@code frontendUrl} fixe (URL publique), <b>tous</b> les jetons — connexion classique
+     * (ROPC) comme connexion externe (GitHub) — ont {@code iss = URL publique}. L'issuer attendu doit
+     * donc être l'URL <b>publique</b>. Les clés, elles, se récupèrent sur l'adresse <b>interne</b> :
+     * le backend joint {@code keycloak:8080}, jamais {@code localhost:8180} (qui, dans le conteneur,
+     * désigne le conteneur lui-même). Confondre les deux rejetait les jetons du navigateur, ou rendait
+     * le JWKS injoignable. Auparavant l'issuer était bâti sur l'URL interne et les jetons ROPC, émis
+     * en interne, correspondaient par <b>coïncidence</b> ; le jour où l'issuer est devenu public
+     * (nécessaire à la connexion externe), la coïncidence a cessé et toute l'authentification tombait.</p>
      */
     @Bean
     @ConditionalOnProperty(name = "keycloak.enabled", havingValue = "true", matchIfMissing = true)
     public JwtDecoder jwtDecoder() {
-        String issuer = keycloakUrl + "/realms/" + keycloakRealm;
-        String jwkSetUri = issuer + "/protocol/openid-connect/certs";
+        String issuer = keycloakPublicUrl + "/realms/" + keycloakRealm;
+        String jwkSetUri = keycloakUrl + "/realms/" + keycloakRealm + "/protocol/openid-connect/certs";
 
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
         OAuth2TokenValidator<Jwt> withIssuer = JwtValidators.createDefaultWithIssuer(issuer);
