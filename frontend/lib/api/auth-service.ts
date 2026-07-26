@@ -8,6 +8,24 @@ import type { LoginCredentials, RegisterCredentials, AuthUser } from "../auth";
 import { AUTH_ROUTES } from "../config/api-routes";
 
 /**
+ * État des vérifications anti-robot, tel que le serveur le déclare.
+ *
+ * Le client n'infère rien : c'est le serveur qui dit ce qui est actif et fournit la clé de site.
+ * Dupliquer cette configuration côté client la ferait diverger tôt ou tard, et la panne serait
+ * silencieuse — widget affiché, vérification systématiquement en échec.
+ */
+export interface AuthChallenge {
+  /** Jeton du défi signé maison, à renvoyer à l'inscription. Vide si le mécanisme est inactif. */
+  token: string;
+  /** Le défi signé est-il actif côté serveur ? */
+  required: boolean;
+  /** Clé de site Turnstile (publique). Vide si Turnstile est inactif. */
+  turnstileSiteKey: string;
+  /** Turnstile est-il actif côté serveur ? */
+  turnstileRequired: boolean;
+}
+
+/**
  * Réponse d'authentification (login/register)
  */
 export interface AuthResponse {
@@ -93,16 +111,66 @@ export const authService = {
    * réellement actif côté serveur, l'inscription sera refusée à la soumission avec un motif clair —
    * ce qui est le bon endroit pour le dire.
    */
-  async getChallenge(): Promise<{ token: string; required: boolean }> {
+  async getChallenge(): Promise<AuthChallenge> {
     try {
       const response = await apiClient.get<{
         success: boolean;
         message: string;
-        data: { token: string; required: boolean };
+        data: AuthChallenge;
       }>(AUTH_ROUTES.CHALLENGE);
       return response.data.data;
     } catch {
-      return { token: "", required: false };
+      return { token: "", required: false, turnstileSiteKey: "", turnstileRequired: false };
+    }
+  },
+
+  /**
+   * Connexion externe, étape 1 : demander au serveur l'URL vers laquelle envoyer le navigateur.
+   *
+   * Le client ne construit pas cette URL lui-même : elle porte l'état anti-CSRF, que seul le serveur
+   * peut signer. La composer côté navigateur reviendrait à laisser l'appelant choisir sa propre
+   * protection.
+   */
+  async oauthAuthorizeUrl(provider: string, redirectUri: string): Promise<string> {
+    try {
+      const response = await apiClient.get<{
+        success: boolean;
+        message: string;
+        data: { authUrl: string };
+      }>(AUTH_ROUTES.OAUTH_AUTHORIZE(provider), { params: { redirectUri } });
+      return response.data.data.authUrl;
+    } catch (error) {
+      throw new Error(getErrorMessage(error));
+    }
+  },
+
+  /**
+   * Connexion externe, étape 2 : échanger le code d'autorisation contre une session TaskForce.
+   *
+   * Persiste les jetons exactement comme {@link login} : c'est la même session au bout du compte, et
+   * deux façons de la stocker finiraient par diverger.
+   */
+  async oauthCallback(payload: {
+    code: string;
+    state: string;
+    redirectUri: string;
+  }): Promise<AuthResponse> {
+    try {
+      const response = await apiClient.post<{
+        success: boolean;
+        message: string;
+        data: AuthResponse;
+      }>(AUTH_ROUTES.OAUTH_CALLBACK, payload);
+
+      const authData = response.data.data;
+      if (typeof window !== "undefined") {
+        localStorage.setItem("accessToken", authData.accessToken);
+        localStorage.setItem("refreshToken", authData.refreshToken);
+        localStorage.setItem("user", JSON.stringify(authData.user));
+      }
+      return authData;
+    } catch (error) {
+      throw new Error(getErrorMessage(error));
     }
   },
 
