@@ -2645,6 +2645,66 @@ Planning prévisionnel (Gantt, jalons DFS, chemin critique), budget prévisionne
 > Vérifié dans le pane : **console sans aucun avertissement Turnstile**. Rendu de l'iframe à confirmer
 > sur un vrai navigateur.
 
+> **▶ MAJ 25/07/2026 (30) — Onboarding : décisions produit + fondation backend (incrément 1/2).**
+>
+> Après un reseed propre (DB vidée + Flyway + Keycloak frais + seed démo, **landing intacte** ; pierre
+> absent des deux côtés), lancement du chantier **onboarding**. Décisions actées avec l'utilisateur :
+> - **Nouveau venu GitHub** : plan en **interstitiel** (avant l'app), **pas d'OTP** (e-mail déjà vérifié
+>   par GitHub) ; on saute infos de base + mot de passe.
+> - **Onboarding universel** (tous comptes, 1er login), **sautable**, **4 étapes** : rôle+séniorité ·
+>   compétences · workspace+invitations · option projet-template.
+> - **Compétences** : tags suggérés + saisie libre, avec **suggestion IA** via le Qwen local (rôle → tags).
+>
+> **Constat qui allège le chantier** : le back du Smart Assign **existe déjà** —
+> `PUT /api/workspaces/{slug}/members/{userId}/skills` (`UpsertMemberSkillsRequest` : skills, profileText,
+> seniority, capacité…) → `member_skill_profiles` (embedding vector(384), HNSW) → `SmartAssignService`.
+> Rien ne le remplissait faute d'UI. L'onboarding est ce feeder → surtout du front sur des rails.
+>
+> **Incrément backend livré (1/2) :**
+> - `V73__user_onboarding.sql` : `users.onboarding_completed` (bool, défaut FALSE) + `users.job_title`.
+> - `User` + `UserResponse` : les deux champs exposés (login + `/api/users/me`) → le front sait s'il faut
+>   afficher le wizard. Mappés dans les **deux** constructeurs de `UserResponse` (AuthService + UserService).
+> - `POST /api/users/me/onboarding {jobTitle?}` → pose le rôle + lève le drapeau (`UserService.completeOnboarding`).
+> - **Suggestion IA** : `POST /api/workspaces/{slug}/skills/suggestions {role, existingSkills?}` → tags.
+>   `SkillSuggestionService` : appel LLM **métré** (`AiMeter` : gate quota + tokens) + **repli déterministe**
+>   par mots-clés du rôle si LLM indispo/quota. Contrôleur + service **neufs** (aucune dép ajoutée à un
+>   constructeur existant → pas de test WebMvc à retoucher).
+>
+> **Vérifié (backend rebâti)** : `/api/users/me` renvoie `onboardingCompleted` ; `POST /me/onboarding`
+> lève le drapeau + pose le rôle (puis remis à false pour les tests) ; `POST /skills/suggestions` répond
+> en **≤8s**. ⚠️ Le **Qwen local ne répond pas dans ce dev** (mesuré : **300s**, le timeout max du client
+> IA) → l'appel de suggestion est désormais **borné à 8s** (thread démon + `CompletableFuture.get`), au-delà
+> repli déterministe immédiat. Surchargeable via `AI_SKILL_SUGGESTION_TIMEOUT_SECONDS`. Le client IA garde
+> son timeout long (300s) pour les analyses ; l'onboarding, lui, prime sur la réactivité.
+>
+> **Reste** : incrément 2 = **front** (wizard 4 étapes + interstitiel plan GitHub + branchements), puis
+> `it.ps1 -Test ALL`.
+
+> **▶ MAJ 25/07/2026 (31) — Onboarding : front livré (incrément 2/2, wizard universel).**
+>
+> **Plomberie** : `AuthUser` (front) gagne `onboardingCompleted` + `jobTitle` ; routes `USER_ROUTES.ONBOARDING`
+> + `SKILL_ROUTES.SUGGESTIONS` ; `user-service.completeOnboarding` + `user-store.finishOnboarding` ;
+> `skill-service.suggestSkills` (repli liste vide si réseau KO → la saisie manuelle reste possible).
+> `updateMemberSkills`/`updateWorkspace`/`createInvitation`/`createProject` existaient déjà.
+>
+> **Garde d'onboarding** (`auth-context`) : un utilisateur authentifié dont `onboardingCompleted === false`
+> est redirigé vers `/onboarding` (sauf s'il y est déjà ou sur une page d'auth). Test **strict** `=== false`
+> → un drapeau inconnu ne bloque personne. Le wizard recharge en dur à la fin → retour avec le drapeau à true.
+>
+> **Wizard `/onboarding`** (`app/onboarding/page.tsx`), sautable, 4 étapes : (1) rôle + séniorité ·
+> (2) compétences (tags libres + **« Suggérer avec l'IA »** → Qwen, bornée 8s, repli) + capacité + bio ·
+> (3) workspace (renommer + inviter) · (4) premier projet (optionnel). Sauvegarde **best-effort** à la fin
+> (compétences → `member_skill_profiles`, renommage, invitations, projet) ; seul `finishOnboarding` est
+> bloquant (sinon la garde renverrait en boucle).
+>
+> **Vérifié (navigateur, session test@ drapeau à false)** : compile OK, la garde redirige vers `/onboarding`,
+> le wizard **rend l'étape 1** (« Bienvenue, Test », champ rôle, chips séniorité, navigation), **console sans
+> erreur**. Walk-through interactif complet (étapes 2-4 + clic suggestion IA) à finir sur un vrai navigateur —
+> le pane du dev était instable (viewport 0×0, un autre serveur tournait dans le dossier).
+>
+> **Reste** : (a) l'**interstitiel plan GitHub** (choisi « avant l'app » — PAS encore branché : la connexion
+> GitHub dépose donc en FREE puis passe direct par le wizard) ; (b) `it.ps1 -Test ALL` + `tsc`/`eslint` avant commit.
+
 ### 4.B — Repoussé APRÈS la soutenance (ne pas empiéter)
 
 > Aucun de ces chantiers n'est rattaché à une compétence C1–C26. Ils restent documentés,

@@ -185,6 +185,128 @@ point identifiable sur la courbe de lead time.
 | Métronome | `src/lib/useScene.ts` | `useScene(beats)` : partition de durées, démarre à l'entrée à l'écran, se joue **une fois**, **se fige sur l'état final**. `useTypewriter` pour la frappe. `prefers-reduced-motion` → état final direct. |
 | Châssis | `src/components/site/scene/AppWindow.tsx` | Vrai écran TaskForce (voir encadré ci-dessous). **Remplace la barre macOS de `MockFrame`** — trois pastilles + une URL, c'est le signe le plus sûr qu'on regarde un dessin. |
 
+> ### ⚑ v14 (26/07) — deux gabarits repris de Linear (fidélité max)
+> Demande user : « fais les 2 [gabarits Linear], on se rapproche le plus de Linear possible ».
+> **Home Linear inspectée en direct** (get_page_text) pour caler les signatures exactes : étiquettes
+> monospace **`FIG 0.x`**, blocs de features numérotés **`N.0 Verbe →`** + puces **`N.1 +`**, titres
+> courts + une ligne, et la **rangée de 3 cartes** juste après le hero.
+> - **`Pillars` (NEW, `Showcase.tsx`)** — la rangée de 3 cartes façon Linear (« Purpose-built /
+>   Powered by agents / Designed for speed »). Reprend l'étiquette monospace **`FIG 01/02/03`** +
+>   titre court + une ligne. Contenu = les 3 piliers du différenciateur : *Governed, not autonomous*
+>   · *Yours to run* · *Fully on the record*. Placé **après `Problem`** (la réponse en 3 temps avant
+>   la démonstration). Statique.
+> - **`Foundations` (NEW, îlot `client:idle`, `Showcase.tsx`)** — « Built on strong foundations »
+>   façon Linear : **liste à gauche** (index monospace `01…05` + titre + une ligne) + **visuel à
+>   droite** qui reflète la fondation sélectionnée. **Interactif** (clic → change le visuel ; bordure
+>   gauche + couleur sur l'item actif). Descriptions toujours visibles → aucun repli animé, aucun CLS.
+>   Contenu : self-hosting, audit trail, model per step, access control, real-time core. Placé
+>   **après `Synergy`** (le socle technique entre « un seul système » et la preuve entreprise).
+> - **`index.astro`** réordonné en **17 sections** ; **alternance blanc/gris parfaite** (0 collision,
+>   vérifiée au DOM sur les 17). Bandes basculées entre les deux insertions : Phases→blanc,
+>   RunTimeline→gris, BrainTeaser→blanc, Anatomy→gris, TeamGrid→blanc, Synergy→gris.
+> - Interactif = **3 îlots** désormais (RunTimeline + TeamGrid + Foundations).
+> - Vérifié DOM : `viteError:false`, 17 sections, 0 collision d'alternance, 4 `astro-island` hydratés,
+>   Pillars (FIG 01-03 + 3 titres) OK, Foundations = 5 items + **swap du visuel au clic confirmé**
+>   (Self-hosted → Model routing sur l'item 03).
+
+> ### ⚑ v13 (26/07) — refonte NARRATIVE (le site raconte, il ne liste plus)
+> Retour d'une review « niveau série A » : la structure est bonne (75-85 %), le manque est le
+> **récit**. Le site disait « voilà tout ce que TaskForce fait » ; il doit faire **ressentir le
+> problème** avant de présenter la solution, puis monter en puissance. Arc cible :
+> **Hero → Problem → Solution → How → Why different → Proof → Future → CTA**.
+> - **`index.astro` réordonné** sur cet arc (15 sections). Bandes alternées vérifiées (aucun fond
+>   identique adjacent). `StackReplaces` retiré de la page (redondant avec `Synergy` — « too many
+>   conceptual sections in a row ») ; composant conservé dans le fichier.
+> - **`Problem` (NEW, `Platform.tsx`)** — la douleur AVANT la solution. Litanie « Someone writes a
+>   spec / rewrites it / opens the tickets / explains the architecture again / briefs the agent /
+>   reviews / deploys », puis bascule « Most of that is handoff, not work. TaskForce turns it into
+>   one governed run. » Éditorial, sans carte ni icône. Juste après le hero, avant les logos.
+> - **`RunTimeline` (NEW, îlot animé `client:idle`)** — LA démonstration réclamée (« une vraie
+>   démonstration », « un run qui avance »). Timeline verticale des 7 checkpoints ; chaque étape
+>   passe *awaiting approval* → *approved* (coche) puis avance, jusqu'à *Shipped*, puis reboucle.
+>   Piloté par `useScene` (rAF + horloge de visibilité), figé sur l'état final sous reduced-motion.
+>   **Pas de fausses données** (aucun « 4/4 tests ») : seulement des noms d'étapes + des états, le
+>   flux étant réel. Remplace le placeholder de `FeatureShowcase` comme section « How ».
+> - **`BrainTeaser` (NEW slim, `Narrative.tsx`)** — le moat teasé TÔT (une bande fine : « Every run
+>   needs context. TaskForce builds it as you go. » → *Inside Brain OS*), la démo complète restant
+>   plus bas (`Synergy`).
+> - **Hero** — différenciateur explicite : lead recentré sur *gouvernance + traçabilité* (« every
+>   decision is on the record ») + strip sobre de 3 faits (approve every step · auditable · your
+>   hardware). « Pas une IA qui code, un système de livraison. »
+> - **`Trust`** — mène par des **faits** (« Every run is attributable / Every approval is recorded /
+>   Every model call is logged ») au lieu de la rangée de badges « qui se lit comme une checklist ».
+>   Badges SOC2/GDPR/ISO → une ligne honnête (in progress / ready / planned), `Placeholder` retiré.
+> - **`Integrations`** — message « TaskForce doesn't replace your stack. It connects to it. » (le
+>   « 60+ » descend dans le chapô).
+> - **`Maturity`** — **dates** ajoutées par colonne (Updated July 2026 / Target Q4 2026) → statut
+>   vérifiable, plus déclaratif.
+> - **`WhereThisGoes`** — reframé en **vision** (« Software teams won't hand-write specs forever »)
+>   plutôt qu'en FAQ.
+> - CTA variés selon l'étape (Run → « See a run end to end » ; Brain OS → « Inside Brain OS » ;
+>   Enterprise → « Read the trust center » ; etc.). Interactif = **2 îlots** (RunTimeline + TeamGrid).
+> - Vérifié DOM : `viteError:false`, 15 sections, 3 îlots hydratés, RunTimeline = 7 checkpoints /
+>   1 anneau actif / chip « Awaiting approval » / footer OK, dates présentes (`textContent`).
+
+> ### ⚑ v12 (25/07) — maturité « moins IA » + gabarit Linear
+> Retour user : « trop IA la section *Where the product actually is* » ; puis « inspire-toi aussi
+> de sections de Linear pour pas que ce soit répétitif ».
+> - **Maturity refaite SOBRE** (façon page de statut produit) : plus de cartes à liseré coloré,
+>   plus d'icônes par item, plus de tags fléchés « moved ». **3 colonnes** séparées par un filet,
+>   une **pastille de statut** (vert/ambre/gris) par en-tête, listes en **texte plein**. Copy
+>   plainée : titre « What ships today, and what is planned », notes courtes et factuelles (retiré
+>   « Most AI products blur this line… », « Never sold as shipped », etc.). `LevelBadge` retiré du
+>   fichier.
+> - **Nouveau gabarit `FeatureShowcase`** (inspiré de Linear « Set the product direction ») dans
+>   `Showcase.tsx` : grand visuel placeholder + **3 sous-features** + **rangée de 4 bullets à
+>   icône** (audit trail, self-hosted, any coding agent, model per step). Porte le mécanisme du run
+>   (remplace l'ancien Pipeline/Approvals). Remplace `BigShot` dans `index.astro`.
+> - Sites de référence pour la variété des gabarits : **relevanceai.com** (ordre/archétypes) +
+>   **linear.app** (gros bloc feature + sous-features + bullets ; « strong foundations » ; rangée
+>   de 3 cartes produit). À réutiliser pour placer le bon gabarit au bon endroit.
+
+> ### ⚑ v11 (25/07) — hero SANS faux graphe + maturité redesignée
+> Retour user : « le hero avec les graphs reprend pas du tout l'app, on a aucune donnée, mets un
+> placeholder » · « la partie *Where the product actually is* est naze, mal designée ».
+> - **Hero** : retour au **placeholder** (`Product screen`). Plus de bande de KPI ni de mini-courbes
+>   ni de table de fausses données — on n'a rien de réel. Redevenu **statique** (îlot retiré ;
+>   restent SiteHeader + TeamGrid).
+> - **Maturity** refaite : les chips en `flex-wrap` (brouillon) deviennent **3 cartes** propres
+>   (`card-hover`), filet de couleur en haut selon le statut, et **liste verticale** où chaque item
+>   porte une **icône de statut** (`CheckCircle2` vert / `CircleDashed` ambre / `Circle` violet) +
+>   un tag « moved » discret. Vérifié : 3 cartes, 17 items, 0 erreur.
+
+> ### ⚑ v10 (25/07) — reprendre l'ARCHITECTURE de Relevance (ordre + types de sections)
+> Retour user : « reprends la structure et l'architecture de Relevance, tu peux la copier ».
+> On copie le **pattern de mise en page** (ordre + archétypes), avec NOTRE contenu et des
+> placeholders pour les images — pas leurs textes/visuels. Ordre reproduit :
+>
+> 1. **Hero** — onglets de persona (Engineering/Product/Operations/Founder) + **bande de 4 KPI**
+>    (avec mini-courbe SVG) + **table de runs** (Task/Run by/Model/Checkpoint/Took). `Hero.tsx`
+>    réécrit, interactif → îlot. *(C'est la forme que le user avait aimée au tout début.)*
+> 2. **LogoWall** — vrais logos d'outils.
+> 3. **Phases** — timeline en étapes (« Drive ROI in six weeks »).
+> 4. **TeamGrid** — grille d'use-cases **tabbée par équipe** + ligne CTA en pied. Interactif → îlot.
+> 5. **BigShot** — gros visuel centré (placeholder).
+> 6. **Testimonials** — citation + vidéo + onglets-logos, **tout en placeholder** (pas de clients →
+>    honnêteté D9 ; la structure est là à remplir).
+> 7. **Trust** — badges de conformité + checklist 3 colonnes.
+> 8. **Integrations** — grille de 32 vrais logos.
+> 9. **StackReplaces** — « one stack » (split + liste « like X »).
+> 10. **Synergy** — « pieces make each other better » : combo-cards + bento « context layer ».
+> 11. **Anatomy** — le framework (tableau des 7 checkpoints).
+> 12. **Maturity** → **WhereThisGoes** → **FinalCta**.
+>
+> **Débranchés** (contenu repris dans les archétypes ci-dessus) : `Leaks`, `Pipeline`,
+> `AgentDelivery`, `Approvals`, `FeatureCards`. Nouveaux dans `Showcase.tsx` : `Testimonials`,
+> `Synergy`.
+>
+> **Interactivité = 3 îlots** (SiteHeader + Hero + TeamGrid, `client:idle`). Testé : onglets hero
+> changent KPI+table (Operations → « Assign to the right person »), onglets équipe changent les
+> cartes. 42 logos, **0 cassé**, 0 erreur Vite.
+>
+> ⚠️ **Testimonials + « Featured in »/presse** : archétypes Relevance NON remplis (aucun client ni
+> presse réels). Testimonials est mis en placeholder ; le bloc presse est **omis** (honnêteté).
+
 > ### ⚑ v9 (25/07) — un peu d'INTERACTION (hover + badge cliquable)
 > Retour user : « ajoute un peu d'interaction stv, hover, badge cliquable… ».
 > - **`TeamGrid` devient interactif** : les onglets d'équipe sont de vrais `<button aria-pressed>`
