@@ -60,9 +60,10 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
             firstName: registerData.firstName,
             lastName: registerData.lastName,
             planType: registerData.planType || "FREE",
-            // Émis au chargement de l'étape 1, il n'est consommé qu'ici : c'est le seul appel
+            // Émis au chargement de l'étape 1, ils ne sont consommés qu'ici : c'est le seul appel
             // d'inscription réellement envoyé au serveur.
             challengeToken: registerData.challengeToken,
+            turnstileToken: registerData.turnstileToken,
           });
           
           toast.success("Code de vérification envoyé", {

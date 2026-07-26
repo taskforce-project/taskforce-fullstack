@@ -243,6 +243,7 @@ describe('SignupForm - Step 1: Information Form', () => {
           email: 'test@example.com',
           password: 'StrongP@ssw0rd!',
           challengeToken: '',
+          turnstileToken: '',
         });
       });
 

@@ -20,7 +20,8 @@ import {
 import { Loader2 } from "lucide-react";
 import { AuthStepper } from "@/components/auth/auth-stepper";
 import { Checkbox } from "@/components/ui/checkbox";
-import { authService } from "@/lib/api/auth-service";
+import { authService, type AuthChallenge } from "@/lib/api/auth-service";
+import { TurnstileWidget } from "@/components/auth/turnstile-widget";
 
 /** Seuil de refus au moment de la soumission — aligné sur la règle métier existante. */
 const STRENGTH_FLOOR = 50;
@@ -51,9 +52,12 @@ export function SignupForm({
   });
 
   const [isHuman, setIsHuman] = useState(false);
-  const [challenge, setChallenge] = useState<{ token: string; required: boolean }>({
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [challenge, setChallenge] = useState<AuthChallenge>({
     token: "",
     required: false,
+    turnstileSiteKey: "",
+    turnstileRequired: false,
   });
 
   // Pré-remplissage de l'email depuis une invitation (?email=…, PROD-3.5)
@@ -90,6 +94,12 @@ export function SignupForm({
       : strength >= STRENGTH_FLOOR
         ? "var(--accent-orange)"
         : "var(--accent-red)";
+
+  // Deux vérifications, une seule sollicitation de l'utilisateur. Turnstile juge le visiteur et le
+  // fait mieux qu'une case à cocher : dès qu'il est actif, il la remplace à l'écran. Le défi signé
+  // reste vérifié côté serveur dans les deux cas — il ne demande rien à personne.
+  const afficheTurnstile = challenge.turnstileRequired && Boolean(challenge.turnstileSiteKey);
+  const afficheCaseACocher = !afficheTurnstile && challenge.required;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -131,14 +141,19 @@ export function SignupForm({
       toast.error(t.common.error, { description: "Veuillez confirmer que vous n'êtes pas un robot" });
       return;
     }
+    if (challenge.turnstileRequired && !turnstileToken) {
+      toast.error(t.common.error, { description: "Veuillez compléter la vérification anti-robot" });
+      return;
+    }
 
     const sanitizedData = {
       firstName: sanitizeInput(formData.firstName),
       lastName: sanitizeInput(formData.lastName),
       email: sanitizeInput(formData.email),
       password: formData.password,
-      // Transporté jusqu'à l'étape 3, seul moment où l'inscription part vers le serveur.
+      // Transportés jusqu'à l'étape 3, seul moment où l'inscription part vers le serveur.
       challengeToken: challenge.token,
+      turnstileToken,
     };
 
     setIsLoading(true);
@@ -279,26 +294,44 @@ export function SignupForm({
           className="mt-3 rounded-md border px-3 py-2"
           style={{ borderColor: "var(--separator)", background: "var(--fill-tertiary)" }}
         >
-          {challenge.required && (
-            <div className="flex items-center gap-2.5">
-              <Checkbox
-                id="isHuman"
-                checked={isHuman}
-                onCheckedChange={(v) => setIsHuman(v === true)}
-                disabled={isLoading}
-              />
-              <label
-                htmlFor="isHuman"
-                className="cursor-pointer text-xs font-medium select-none"
-                style={{ color: "var(--label-secondary)" }}
-              >
-                Je confirme ne pas être un robot
-              </label>
-            </div>
+          {/* Turnstile juge le VISITEUR (empreinte navigateur, réputation). Quand il est actif, il
+              remplace la case à cocher : les deux poseraient la même question à l'utilisateur, et
+              Turnstile la pose mieux. Le défi signé, lui, reste actif côté serveur en second rideau —
+              il juge la SOUMISSION, pas le visiteur, et ne dépend d'aucun tiers. */}
+          {afficheTurnstile ? (
+            <TurnstileWidget
+              siteKey={challenge.turnstileSiteKey}
+              onToken={setTurnstileToken}
+            />
+          ) : (
+            afficheCaseACocher && (
+              <div className="flex items-center gap-2.5">
+                <Checkbox
+                  id="isHuman"
+                  checked={isHuman}
+                  onCheckedChange={(v) => setIsHuman(v === true)}
+                  disabled={isLoading}
+                />
+                <label
+                  htmlFor="isHuman"
+                  className="cursor-pointer text-xs font-medium select-none"
+                  style={{ color: "var(--label-secondary)" }}
+                >
+                  Je confirme ne pas être un robot
+                </label>
+              </div>
+            )
           )}
 
+          {/* L'indentation aligne le texte sous le libellé de la case à cocher. Elle ne doit donc
+              s'appliquer QUE si c'est bien la case qui est affichée au-dessus — pas sous le widget
+              Turnstile, qui n'a pas de puce à laquelle s'aligner. */}
           <p
-            className={challenge.required ? "mt-1.5 pl-6 text-[11px] leading-snug" : "text-[11px] leading-snug"}
+            className={
+              afficheCaseACocher
+                ? "mt-1.5 pl-6 text-[11px] leading-snug"
+                : "mt-2 text-[11px] leading-snug"
+            }
             style={{ color: "var(--label-quaternary)" }}
           >
             {/* Formulation resserrée pour tenir sur UNE ligne : sur deux, elle coûtait dix-huit
