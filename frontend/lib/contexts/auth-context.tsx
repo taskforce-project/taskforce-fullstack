@@ -6,7 +6,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { authService } from "../api/auth-service";
 import { useUserStore } from "../store/user-store";
 import type { AuthUser, LoginCredentials } from "../auth";
@@ -43,6 +43,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+  const pathname = usePathname();
   const { fetchMe, setUser: setStoreUser, clearUser } = useUserStore();
 
   /**
@@ -73,16 +74,27 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   /**
-   * Redirection automatique après authentification depuis la page login
+   * Redirections post-authentification : garde d'onboarding + sortie de la page login.
+   *
+   * <p><b>Garde d'onboarding</b> : tant que le parcours n'est pas franchi
+   * ({@code onboardingCompleted === false}), on force le wizard `/onboarding` — sauf si on y est déjà,
+   * ou sur une page d'auth (l'inscription/OAuth est en cours, le rappel gère lui-même la suite). Le
+   * test est strictement {@code === false} : si le drapeau est inconnu (ancien cache, réponse
+   * partielle), on ne bloque personne. Le wizard, à sa fin, recharge en dur → l'utilisateur revient ici
+   * avec {@code onboardingCompleted === true} et n'est plus renvoyé.</p>
    */
   useEffect(() => {
-    if (!isLoading && user && globalThis.window !== undefined) {
-      const currentPath = globalThis.location.pathname;
-      if (currentPath === "/auth/login") {
-        router.replace("/");
-      }
+    if (isLoading || !user || globalThis.window === undefined) return;
+    const path = pathname ?? globalThis.location.pathname;
+
+    if (user.onboardingCompleted === false && path !== "/onboarding" && !path.startsWith("/auth")) {
+      router.replace("/onboarding");
+      return;
     }
-  }, [user, isLoading, router]);
+    if (path === "/auth/login") {
+      router.replace("/");
+    }
+  }, [user, isLoading, router, pathname]);
 
   /**
    * Connexion
