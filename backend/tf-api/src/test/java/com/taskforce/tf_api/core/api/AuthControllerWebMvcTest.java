@@ -17,6 +17,7 @@ import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.AuthService;
 import com.taskforce.tf_api.shared.security.HumanChallengeService;
 import com.taskforce.tf_api.shared.security.SecurityConfig;
+import com.taskforce.tf_api.shared.security.TurnstileService;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -40,8 +41,11 @@ class AuthControllerWebMvcTest {
     @Autowired private MockMvc mockMvc;
 
     @MockitoBean private AuthService authService;
-    // Dépendance du contrôleur depuis l'ajout du défi de vérification humaine (GET /challenge).
+    // Dépendances du contrôleur depuis l'ajout des vérifications anti-robot. Déclarées ici dans le
+    // MÊME changement que l'ajout au constructeur : sans cela la tranche web ne se construit plus et
+    // les 24 tests partent en erreur, ce qui est exactement arrivé le 24/07/2026.
     @MockitoBean private HumanChallengeService humanChallengeService;
+    @MockitoBean private TurnstileService turnstileService;
     @MockitoBean private UserRepository userRepository;             // WorkspaceAccessInterceptor
     @MockitoBean private WorkspaceRepository workspaceRepository;
     @MockitoBean private WorkspaceMemberRepository workspaceMemberRepository;
