@@ -47,4 +47,11 @@ public class RegisterRequest {
      * obligatoire ») là où le vrai motif peut être « expiré » ou « soumis trop vite ».
      */
     private String challengeToken;
+
+    /**
+     * Jeton Cloudflare Turnstile ({@code cf-turnstile-response}) produit par le widget. Facultatif :
+     * le serveur peut avoir Turnstile désactivé, et le défi signé ci-dessus reste alors seul en
+     * place. Vérifié au niveau du contrôleur, qui dispose de l'adresse de l'appelant.
+     */
+    private String turnstileToken;
 }
