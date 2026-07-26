@@ -56,6 +56,8 @@ export const USER_ROUTES = {
   AVATAR: "/api/users/me/avatar",
   DATA_REQUEST: "/api/users/me/data-request",
   SEARCH: (q: string) => `/api/users/search?q=${encodeURIComponent(q)}`,
+  /** Clôture du parcours d'onboarding (rôle + drapeau). */
+  ONBOARDING: "/api/users/me/onboarding",
 } as const;
 
 /**
@@ -104,6 +106,8 @@ export const SKILL_ROUTES = {
   LIST:   (slug: string) => `/api/workspaces/${slug}/skills`,
   /** Profil de compétences d'un membre (GET) / upsert (PUT) */
   MEMBER: (slug: string, userId: number) => `/api/workspaces/${slug}/members/${userId}/skills`,
+  /** Suggestion IA de tags de compétences à partir d'un rôle (onboarding). */
+  SUGGESTIONS: (slug: string) => `/api/workspaces/${slug}/skills/suggestions`,
 } as const;
 
 /**
