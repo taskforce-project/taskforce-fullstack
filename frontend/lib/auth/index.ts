@@ -47,4 +47,6 @@ export type RegisterCredentials = {
    * (déclenché à l'étape 3). Facultatif côté type : le serveur peut avoir le mécanisme désactivé.
    */
   challengeToken?: string;
+  /** Jeton Cloudflare Turnstile (`cf-turnstile-response`). Facultatif : le serveur peut l'avoir désactivé. */
+  turnstileToken?: string;
 };
