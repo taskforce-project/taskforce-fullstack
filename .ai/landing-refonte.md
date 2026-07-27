@@ -185,6 +185,23 @@ point identifiable sur la courbe de lead time.
 | Métronome | `src/lib/useScene.ts` | `useScene(beats)` : partition de durées, démarre à l'entrée à l'écran, se joue **une fois**, **se fige sur l'état final**. `useTypewriter` pour la frappe. `prefers-reduced-motion` → état final direct. |
 | Châssis | `src/components/site/scene/AppWindow.tsx` | Vrai écran TaskForce (voir encadré ci-dessous). **Remplace la barre macOS de `MockFrame`** — trois pastilles + une URL, c'est le signe le plus sûr qu'on regarde un dessin. |
 
+> ### ⚑ v15 (26/07) — propagation de la numérotation Linear (N.0 + puces N.x)
+> Demande user : « propage » le système de numérotation de Linear (`1.0 →`, puces `+`).
+> - **`SectionHeader` étendu** (`Section.tsx`) : props `index?` (numéro monospace « 1.0 » devant
+>   l'eyebrow) et `indexHref?` (rend l'eyebrow cliquable, avec une flèche → façon « 1.0 Intake → »).
+>   Rétro-compatible : sans `index`, rien ne change.
+> - **4 chapitres produit numérotés** (les seuls, comme Linear ne numérote que ses blocs cœur) :
+>   `1.0 The run` (RunTimeline → /product/orchestration), `2.0 For the whole team` (TeamGrid →
+>   /solutions), `3.0 One platform` (Synergy → /product/brain-os), `4.0 Foundations` (Foundations →
+>   /trust). Les sections de cadrage/preuve/futur (Hero, Problem, LogoWall, Pillars, Trust,
+>   Integrations, Testimonials, Maturity, WhereThisGoes, CTA) restent **sans** numéro.
+> - **Puces « + » numérotées** : la rangée de faits de `RunTimeline` devient des pastilles
+>   `1.1 Full audit trail + · 1.2 Self-hosted + · 1.3 Any coding agent + · 1.4 A model per step +`
+>   (mono `1.x` + label + `Plus`, décoratif). Icônes par-fait retirées (`ScrollText/Server/GitBranch/Cpu`).
+> - `Pillars` garde ses étiquettes **`FIG 0x`** (convention « figure » de Linear, distincte des `N.0`).
+> - Vérifié DOM : `viteError:false`, 4 chapitres avec numéro + eyebrow-lien (+ bons href), puces
+>   1.1-1.4 présentes, 4 `astro-island` hydratés, FIG 01/03 toujours là.
+
 > ### ⚑ v14 (26/07) — deux gabarits repris de Linear (fidélité max)
 > Demande user : « fais les 2 [gabarits Linear], on se rapproche le plus de Linear possible ».
 > **Home Linear inspectée en direct** (get_page_text) pour caler les signatures exactes : étiquettes

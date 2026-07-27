@@ -2705,6 +2705,26 @@ Planning prévisionnel (Gantt, jalons DFS, chemin critique), budget prévisionne
 > **Reste** : (a) l'**interstitiel plan GitHub** (choisi « avant l'app » — PAS encore branché : la connexion
 > GitHub dépose donc en FREE puis passe direct par le wizard) ; (b) `it.ps1 -Test ALL` + `tsc`/`eslint` avant commit.
 
+> **▶ MAJ 25/07/2026 (32) — Onboarding : interstitiel plan GitHub branché (clôt l'incrément 2).**
+>
+> Lève le « Reste (a) » de (31). Une inscription GitHub passe désormais par un écran de choix de plan
+> AVANT le wizard (elle n'en voyait aucun, contrairement au stepper classique).
+> - `app/onboarding/plan/page.tsx` : 3 cartes (Free / Basic 10 € / Business 16 €, par membre/mois — données
+>   **alignées sur la page Facturation**, source de vérité ; le `pricing-data.ts` « Pro » est périmé, non
+>   utilisé). Free → wizard ; Basic/Business → `stripeService.createCheckoutSession` (upgrade in-app
+>   existant), retour sur `/onboarding` après paiement.
+> - `app/auth/callback` : un NOUVEAU venu (`onboardingCompleted === false`) est routé vers
+>   `/onboarding/plan` ; un habitué va droit à l'app.
+> - Garde (`auth-context`) élargie : `!path.startsWith("/onboarding")` (au lieu de `!== "/onboarding"`)
+>   pour ne pas rediriger hors de l'interstitiel.
+>
+> **Vérifié** : `/onboarding`, `/onboarding/plan`, `/auth/callback` compilent (HTTP 200, zéro erreur) ;
+> l'interstitiel **rend les 3 cartes** (prix corrects, « Populaire » sur Business), console sans erreur.
+>
+> **Flux GitHub complet** : callback → `/onboarding/plan` → (Free : wizard · payant : Stripe → wizard) →
+> wizard 4 étapes → app. **Reste avant commit** : `it.ps1 -Test ALL` + `tsc`/`eslint` ; walk-through
+> interactif complet sur un vrai navigateur (le pane du dev était instable).
+
 ### 4.B — Repoussé APRÈS la soutenance (ne pas empiéter)
 
 > Aucun de ces chantiers n'est rattaché à une compétence C1–C26. Ils restent documentés,
