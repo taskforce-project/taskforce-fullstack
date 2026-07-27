@@ -50,13 +50,18 @@ export default function OAuthCallbackPage() {
 
     authService
       .oauthCallback({ code, state, redirectUri })
-      .then(() => {
+      .then((auth) => {
         // Navigation DURE, et non `router.replace`. Le service vient d'écrire les jetons et le profil
         // dans le stockage local ; le contexte d'authentification et les stores Zustand sont des
         // singletons de module, déjà initialisés sur « personne n'est connecté ». Un rechargement
         // complet est la façon la plus simple de les reconstruire sur la session fraîche — c'est la
         // symétrie exacte de ce que fait déjà la déconnexion, et pour la même raison.
-        window.location.replace("/");
+        //
+        // Un NOUVEAU venu (onboarding non fait) passe d'abord par l'interstitiel « choix du plan » —
+        // l'inscription GitHub n'a jamais vu d'écran de plan, contrairement au stepper classique. Un
+        // habitué (onboarding déjà fait) va droit à l'app. La garde d'onboarding sécurise le reste.
+        const target = auth?.user?.onboardingCompleted === false ? "/onboarding/plan" : "/";
+        window.location.replace(target);
       })
       .catch((e: unknown) => {
         setEchecReseau(e instanceof Error ? e.message : "Connexion impossible.");
