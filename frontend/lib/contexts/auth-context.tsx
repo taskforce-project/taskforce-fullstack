@@ -87,7 +87,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (isLoading || !user || globalThis.window === undefined) return;
     const path = pathname ?? globalThis.location.pathname;
 
-    if (user.onboardingCompleted === false && path !== "/onboarding" && !path.startsWith("/auth")) {
+    if (user.onboardingCompleted === false && !path.startsWith("/onboarding") && !path.startsWith("/auth")) {
       router.replace("/onboarding");
       return;
     }
