@@ -18,7 +18,8 @@ interface AuthContextType {
   user: AuthUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (credentials: LoginCredentials) => Promise<void>;
+  /** Renvoie l'utilisateur connecté — l'appelant peut ainsi router selon `onboardingCompleted`. */
+  login: (credentials: LoginCredentials) => Promise<AuthUser>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -91,15 +92,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
       router.replace("/onboarding");
       return;
     }
+    // Sortie de la page login : on route direct vers l'onboarding si non fait — pas de passage par
+    // l'app avant (sinon elle « flashe » le temps que la garde ci-dessus se déclenche).
     if (path === "/auth/login") {
-      router.replace("/");
+      router.replace(user.onboardingCompleted === false ? "/onboarding" : "/");
     }
   }, [user, isLoading, router, pathname]);
 
   /**
    * Connexion
    */
-  const login = async (credentials: LoginCredentials) => {
+  const login = async (credentials: LoginCredentials): Promise<AuthUser> => {
     try {
       const response = await authService.login(credentials);
       // Setter immédiat depuis la réponse login → redirection rapide, pas de blocage réseau
@@ -112,7 +115,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
           setStoreUser(remoteUser);
         }
       });
-      // La redirection est gérée par le composant appelant
+      // La redirection est gérée par le composant appelant, qui décide d'après `onboardingCompleted`.
+      return response.user;
     } catch (error) {
       setUser(null);
       throw error;
