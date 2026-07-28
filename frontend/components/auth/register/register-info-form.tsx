@@ -137,7 +137,12 @@ export function SignupForm({
       toast.error(t.common.error, { description: "Le mot de passe est trop faible. Utilisez un mot de passe plus complexe." });
       return;
     }
-    if (challenge.required && !isHuman) {
+    // La case « je ne suis pas un robot » n'est exigée que lorsqu'elle est RÉELLEMENT affichée —
+    // c'est-à-dire quand Turnstile est inactif. Quand Turnstile est actif, il REMPLACE la case à
+    // l'écran (`afficheCaseACocher` est faux) : `isHuman` reste donc false et l'exiger bloquait
+    // l'inscription malgré un Turnstile résolu. Dans ce cas, c'est le jeton Turnstile qui fait foi.
+    // Le défi signé maison, lui, part toujours (`challengeToken`) et est vérifié côté serveur.
+    if (afficheCaseACocher && !isHuman) {
       toast.error(t.common.error, { description: "Veuillez confirmer que vous n'êtes pas un robot" });
       return;
     }
