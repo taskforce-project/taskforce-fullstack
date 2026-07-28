@@ -52,10 +52,11 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
 
     setIsLoading(true)
     try {
-      await login({ email: sanitizedEmail, password: sanitizedPassword })
+      const loggedIn = await login({ email: sanitizedEmail, password: sanitizedPassword })
       globalRateLimiter.reset("login")
       toast.success(t.auth.success.loginSuccess)
-      router.replace("/")
+      // Direct vers l'onboarding si non fait — évite que l'app « flashe » avant le wizard.
+      router.replace(loggedIn?.onboardingCompleted === false ? "/onboarding" : "/")
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
       toast.error(t.common.error, { description: errorMessage || t.auth.errors.loginFailed })
