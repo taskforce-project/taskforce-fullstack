@@ -97,6 +97,16 @@ export default function OnboardingPage() {
     if (user?.jobTitle) setJobTitle(user.jobTitle);
   }, [user]);
 
+  // Étape 2 : dès qu'on y arrive avec un rôle renseigné, l'IA propose des compétences AUTOMATIQUEMENT
+  // (badges cliquables, aucun clic requis de l'utilisateur). Ne se relance pas pour un rôle déjà
+  // suggéré ; se relance si le rôle a changé entre-temps.
+  useEffect(() => {
+    if (step === 2 && slug && jobTitle.trim() && suggestedFor !== jobTitle.trim() && !loadingSuggestions) {
+      void fetchSuggestions();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, jobTitle, slug]);
+
   function addSkill(raw: string) {
     const tag = raw.trim();
     if (!tag) return;
@@ -192,17 +202,6 @@ export default function OnboardingPage() {
     }
   }
 
-  async function skipAll() {
-    setSubmitting(true);
-    try {
-      await finishOnboarding(undefined);
-      window.location.href = "/";
-    } catch {
-      toast.error("Impossible de passer l'onboarding. Réessaie.");
-      setSubmitting(false);
-    }
-  }
-
   if (isLoading) {
     return (
       <div className="grid min-h-svh place-items-center">
@@ -223,19 +222,9 @@ export default function OnboardingPage() {
         className="w-full max-w-xl rounded-2xl border p-8 shadow-sm"
         style={{ borderColor: "var(--border)", background: "var(--surface, var(--background))" }}
       >
-        {/* Progression */}
-        <div className="mb-1 flex items-center justify-between text-xs" style={{ color: "var(--label-tertiary)" }}>
-          <span>
-            Étape {step} sur {TOTAL} · {STEPS[step - 1]}
-          </span>
-          <button
-            type="button"
-            onClick={skipAll}
-            disabled={submitting}
-            className="underline underline-offset-2 hover:opacity-80 disabled:opacity-50"
-          >
-            Passer l&apos;onboarding
-          </button>
+        {/* Progression — l'onboarding n'est pas sautable (il alimente le Smart Assign). */}
+        <div className="mb-1 text-xs" style={{ color: "var(--label-tertiary)" }}>
+          Étape {step} sur {TOTAL} · {STEPS[step - 1]}
         </div>
         <div className="mb-6 flex gap-1.5">
           {Array.from({ length: TOTAL }).map((_, i) => (
@@ -307,22 +296,32 @@ export default function OnboardingPage() {
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={fetchSuggestions}
-              disabled={loadingSuggestions}
-              className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors disabled:opacity-60"
-              style={{ borderColor: "var(--accent-purple)", color: "var(--accent-purple)" }}
-            >
-              {loadingSuggestions ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-              {loadingSuggestions ? "Génération…" : "Suggérer avec l'IA"}
-            </button>
-
-            {suggestions.length > 0 && (
-              <div>
-                <span className="mb-1.5 block text-xs" style={{ color: "var(--label-tertiary)" }}>
-                  Suggestions {suggestedFor ? `pour « ${suggestedFor} »` : ""} — clique pour ajouter
-                </span>
+            {/* Suggestions IA — lancées automatiquement à l'arrivée sur l'étape (cf. useEffect). */}
+            <div>
+              <div className="mb-2 flex items-center gap-2 text-xs" style={{ color: "var(--label-tertiary)" }}>
+                <Sparkles className="h-3.5 w-3.5" style={{ color: "var(--accent-purple)" }} />
+                {loadingSuggestions ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> L&apos;IA propose des compétences pour ton rôle…
+                  </span>
+                ) : (
+                  <>
+                    <span>
+                      Suggestions{suggestedFor ? ` pour « ${suggestedFor} »` : ""} — clique pour ajouter
+                    </span>
+                    {suggestedFor && (
+                      <button
+                        type="button"
+                        onClick={fetchSuggestions}
+                        className="underline underline-offset-2 hover:opacity-80"
+                      >
+                        Regénérer
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+              {!loadingSuggestions && suggestions.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {suggestions
                     .filter((s) => !skills.some((k) => k.toLowerCase() === s.toLowerCase()))
@@ -332,14 +331,14 @@ export default function OnboardingPage() {
                         type="button"
                         onClick={() => addSkill(s)}
                         className="inline-flex items-center gap-1 rounded-full border border-dashed px-3 py-1 text-sm transition-colors hover:opacity-80"
-                        style={{ borderColor: "var(--border)", color: "var(--label-secondary)" }}
+                        style={{ borderColor: "var(--accent-purple)", color: "var(--accent-purple)" }}
                       >
                         <Plus className="h-3 w-3" /> {s}
                       </button>
                     ))}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
             <div>
               <label className="mb-1.5 block text-sm font-medium" style={{ color: "var(--label-secondary)" }}>
