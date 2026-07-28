@@ -185,6 +185,311 @@ point identifiable sur la courbe de lead time.
 | Métronome | `src/lib/useScene.ts` | `useScene(beats)` : partition de durées, démarre à l'entrée à l'écran, se joue **une fois**, **se fige sur l'état final**. `useTypewriter` pour la frappe. `prefers-reduced-motion` → état final direct. |
 | Châssis | `src/components/site/scene/AppWindow.tsx` | Vrai écran TaskForce (voir encadré ci-dessous). **Remplace la barre macOS de `MockFrame`** — trois pastilles + une URL, c'est le signe le plus sûr qu'on regarde un dessin. |
 
+> ### ⚑ v27 (27/07) — review 13 : UNE idée dominante (« context leaks ») + anti product-soup
+> Critique majeure et juste : clarté 6.5/10. La page a beaucoup de concepts forts mais **pas UNE idée
+> dominante** (« tu vends 5 produits »), et il manque le « holy-shit moment ». Reco : tout ramener à
+> « software delivery loses context; TaskForce preserves it from intent to production », le reste devient
+> des PREUVES. Réponse = **concentrer**, pas ajouter :
+> - **Le Before/After devient la DÉMONSTRATION de l'idée unique.** Chaque main du « Before » montre
+>   maintenant ce que le contexte PERD : Intent → « lives in someone's head » · Meetings → « notes
+>   scattered » · Specs → « written once, never updated » · Tickets → « the reason gets dropped » ·
+>   Prompts → « the agent is re-briefed from scratch » · Review → « the original context is already
+>   gone ». Colonne « With TaskForce » reste PROPRE (contexte gardé). L'accumulation des fuites à gauche
+>   vs la colonne nette à droite = la version STATIQUE du holy-shit moment (l'animée = phase design).
+> - **Anti « 5 produits » (product-soup).** Les 4 « systèmes » de la section One-platform (Agent runtime /
+>   Workflow engine / Audit system…) étaient en primaire = lisaient comme 4 produits. Démotés en gris
+>   (descriptifs), les cartes lisent désormais comme des CAPACITÉS d'un seul run (Plan · Remember ·
+>   Execute · Verify), pas 4 marques. TaskForce Memory garde sa prominence via son teaser + le bento.
+> - Vérifié DOM : `viteError:false`, 0 erreur console, 16 sections, 0 débordement, annotations de perte
+>   présentes, After propre, systèmes démotés.
+> - **RESTE (offert au user, pas fait unilatéralement)** : (1) l'animation before/after = le vrai
+>   holy-shit « compris en 10 s » (phase design) ; (2) une passe de RÉDUCTION éditoriale — fusionner des
+>   sections en « preuves » d'une seule promesse pour monter la clarté 6.5→9 (décision à valider, car
+>   chaque section a été endossée tour après tour). Le copy est riche ; le prochain gain est de RETRANCHER.
+
+> ### ⚑ v26 (27/07) — review 12 : élargir le moat, sharpen la différence, ancrer le wedge
+> Review très validante (« la plus aboutie » ; l'ajout « Outcome — Add Stripe billing » « transforme la
+> compréhension »). Trois affinages :
+> - **Élargir le moat au-delà du code.** « Your **codebase** has memory. Your organization should too. »
+>   → « **Your organization has memory. Your AI should too.** » (« codebase » limitait mentalement à
+>   GitHub ; la vision dépasse le code). Le tagline concret « Git remembers what changed… » reste, lui,
+>   dans la section Decision Graph → division claire : teaser = large, bento = comparaison Git concrète.
+> - **Sharpen la différence.** Pilier lead « help you execute tasks / runs the delivery process around
+>   them » → « **Most AI tools optimize execution. TaskForce optimizes the system that decides what gets
+>   executed.** » (l'avantage n'est pas d'exécuter mieux — Claude Code gagnera toujours là — mais de
+>   choisir le bon travail + garder le contexte/décisions).
+> - **Ancrer le wedge (anti « trop mature / 3 ans à construire »).** Getting started : « TaskForce is
+>   **the missing layer between your tracker and your coding agent** — it sits on top of the board, repo
+>   and review you already use. » Entrée concrète et petite, sans toucher au kicker « operating system »
+>   (on garde l'ambition catégorie, on ajoute le point d'entrée graspable Jira↔Claude Code).
+> - Vérifié DOM : `viteError:false`, 0 erreur console, 16 sections, 0 collision, « codebase » remplacé,
+>   « optimizes the system that decides » présent, « missing layer between your tracker and your coding
+>   agent » présent, tagline Git + Outcome Stripe intacts.
+> - Note trace (reviewer) : TaskForce ne concurrence pas Cursor/Claude Code/Copilot — il se place
+>   AU-DESSUS (Human intent → TaskForce reasoning+governance+memory → agents → code). Wedge séquentiel :
+>   software delivery → engineering knowledge graph → organization intelligence layer. Cohérent v24-v26.
+
+> ### ⚑ v25 (27/07) — review 11 : tagline « Git…/…why », démo concrète, nuance autonomie
+> Review stratégique validante. Trois pépites concrètes appliquées :
+> - **Tagline signature** : le bento Decision Graph passe à **« Git remembers what changed. TaskForce
+>   remembers why. »** (jugé « très forte marketing » — comparaison concrète, catégorie-définissante).
+>   « Not a search box over your docs — a map of why » (que le user aimait aussi) est replié en tête de
+>   corps → les deux lignes conservées, la plus forte en titre.
+> - **Démo concrète (« compris en 15 s »)** : la carte run du HERO montre désormais l'ENTRÉE explicite —
+>   **« Outcome — Add Stripe billing to the SaaS »** + Step 4 of 7 → puis les 7 checkpoints. Le
+>   input→output est lisible d'un coup d'œil (avant : « Run · Checkout redesign », le projet, pas l'intent).
+> - **Nuance autonomie (≠ « encore des clics »)** : RUN_SUB « Nothing advances without you » → « Each
+>   checkpoint waits for a human — **which is exactly what lets you hand agents more, not less.** » (le
+>   contrôle VEND l'autonomie/vitesse, pas seulement la gouvernance — critique dev valide).
+> - Vérifié DOM : `viteError:false`, 0 erreur console, 16 sections, 0 collision, hero sans « Checkout
+>   redesign » (outcome Stripe à la place), tagline Git présente, map-of-why conservé.
+> - Note trace : le reviewer confirme que le moat = **Decision Graph + mémoire décisionnelle** (l'audit
+>   trail est une CONSÉQUENCE, copiable) et que le wedge = « mémoire décisionnelle d'une ORGANISATION »,
+>   pas « mémoire IA personnelle ». Cohérent avec le north star planté en v24.
+
+> ### ⚑ v24 (27/07) — north star planté dans la Vision (wedge intact ailleurs)
+> Discussion stratégique (wedge « ship faster » vs moat « think better » / intelligence layer). Décision
+> user : **planter le north star « intelligence layer for organizations » UNIQUEMENT dans la section
+> Direction**, garder le wedge engineering partout ailleurs (ne pas repositionner le hero — « intelligence
+> layer » sans wedge = vaporeux façon Notion/Glean). Le seul endroit qui a le droit de viser plus loin.
+> - **`WhereThisGoes` lead** réécrit : « TaskForce runs software delivery today — **that's the wedge, not
+>   the ceiling**. The memory that keeps one run's context is the same intelligence an organization loses
+>   everywhere else: in meetings, in chat, in people's heads. The destination is to make it **the active
+>   layer every team decides on top of**. » (+ roadmap dated conservé).
+> - **Carte AHEAD** « Beyond engineering » → **« An intelligence layer for the organization »** : « …the
+>   same graph that tells an agent why the system is the way it is can tell any team why the organization
+>   is — **a live model to decide on top of, not a wiki to search**. » (relie au Decision Graph de la v23).
+> - **Wedge vérifié INTACT** ailleurs : hero « operating system for human-AI software delivery » + « Built
+>   for engineering teams first » toujours là. Le drapeau est planté sans casser la discipline.
+> - Vérifié DOM : `viteError:false`, 0 erreur console, 16 sections, 0 collision.
+> - Cadre stratégique (trace) : Memory = wedge (delivery, ship faster) ET moat (world-model, think better),
+>   SÉQUENCÉ pas choisi. Le vrai saut « not a RAG » est produit (modèle causal Brain OS : objets cognitifs
+>   typés + arêtes portant la raison), pas copy — c'est le chèque que la landing a émis (v22-v23).
+
+> ### ⚑ v23 (27/07) — review 9 : Decision Graph + « ce n'est pas un RAG »
+> Review quasi entièrement validante (« ils ne construisent pas juste un agent de coding »). Seul
+> « pousser plus loin » : passer de « stocke de l'intelligence réutilisable » à un **graphe causal de
+> décisions**, et **prouver que TaskForce Memory ≠ RAG amélioré** (RAG = « je retrouve des documents » ;
+> Memory = « je comprends l'état actuel du système, ses raisons et ses contraintes »). Appliqué dans la
+> section plateforme (là où atterrit un CTO) :
+> - **Bento Synergy** : « TaskForce Memory is what every run draws on » → **« Not a search box over your
+>   docs. A map of why. »** + corps réécrit : « links the decisions, constraints and trade-offs behind the
+>   system — and **how they connect**. Every run reads **why the system is the way it is**, and writes its
+>   own decisions back. **Retrieval hands you passages; this hands you the reasoning.** » (not-RAG explicite
+>   sans jargon, graphe causal, boucle lecture/écriture). Placeholder « Memory layer » → « **Decision graph** ».
+> - **Carte système « Remember / TaskForce Memory »** : « Stores the architecture, decisions and conventions »
+>   → « **Links every decision, constraint and trade-off — with the reason attached** » (relier > stocker).
+> - La phrase-moat de la v22 (« Your codebase has memory. Your organization should too. ») reste intacte.
+> - Vérifié DOM : `viteError:false`, 0 erreur console, 16 sections, 0 collision, not-RAG + Decision Graph présents.
+> - **Positionnement de catégorie atteint** (reviewer) : Jira=tâches · GitHub=code · Notion=docs · Linear=workflow ·
+>   Cursor=génération · Devin=autonomie · **TaskForce=contexte + décisions + orchestration**. Le copy est mûr ;
+>   le risque restant est produit (tenir la promesse « mémoire décisionnelle, pas RAG »), pas landing.
+
+> ### ⚑ v22 (27/07) — review 8 : le moat = mémoire décisionnelle + gain quotidien
+> Analyse d'évolution du positionnement (V1 « AI agent qui fait du delivery » → dernière « Knowledge
+> + workflow layer pour équipes engineering »). Risque restant identifié : passer pour « Jira avec IA ».
+> Réponse = marteler le VRAI moat (mémoire organisationnelle active, pas « on fait des checkpoints »)
+> et équilibrer le discours de contrôle par le gain quotidien. Deux changements ciblés :
+> - **TaskForce Memory = énoncé de moat.** Le teaser passe de « The memory layer for every run » +
+>   « stores architecture/decisions/conventions » à **« Your codebase has memory. Your organization
+>   should too. »** + « Every architectural decision, constraint and convention becomes **reusable
+>   intelligence** — so a senior stops re-explaining the system for two hours, and the next run (or
+>   the next hire) never starts from a blank page. » → décision-memory + douleur concrète (onboarding,
+>   ré-explication), ce que Jira/GitHub ne copient pas facilement.
+> - **Équilibrer contrôle ↔ gain quotidien.** La page parlait beaucoup de gouvernance/audit (peu
+>   « sexy » pour un dev). Ligne ajoutée sous les 3 piliers : **« The payoff is daily: fewer meetings,
+>   fewer half-written tickets, less context re-explained — and agents that already understand your
+>   system. »**
+> - Non changé : « audit trail » gardé (nécessaire enterprise), mais désormais contrebalancé.
+> - Vérifié DOM : `viteError:false`, 0 erreur console, 16 sections, 0 collision, les deux phrases présentes.
+
+> ### ⚑ v21 (27/07) — review 7 : les 5 changements « quasi-final » (analyse PMM/fondateur)
+> Positionnement jugé défendable (Linear=tracking, GitHub=code, Cursor=AI coding, **TaskForce=AI
+> delivery orchestration**). Les 5 correctifs demandés + sharpenings :
+> - **1. Hero « intent → delivery ».** Chapô : « agents plan the work, create the artifacts… » (trop
+>   de mécanique) → « **You describe the outcome. TaskForce turns intent into a governed delivery run**
+>   — planning, artifacts, approvals, and implementation through the agents you already use. »
+> - **2. « Built with » → rassurer l'utilisateur.** « Built by engineers shipping with AI every day »
+>   → « **Works with the tools your engineers already trust** » (on ne raconte pas NOTRE stack, on
+>   rassure). Logos réordonnés (Claude · Cursor · OpenAI · Ollama · GitHub · Linear).
+> - **3. « Adaptive by design » (anti-waterfall).** La liste des 7 checkpoints pouvait faire « Jira +
+>   Confluence + Scrum en IA ». Encadré ajouté sous le tableau : « A bug fix doesn't need a strategy
+>   phase; a migration doesn't take the same path as a feature launch. The run adapts… never skips the
+>   approval. »
+> - **4. Brain OS → « TaskForce Memory, powered by Brain OS ».** « Brain OS » seul sonnait recherche/
+>   concept ; le produit doit rester **TaskForce** (façon GitHub Copilot / Anthropic Claude). Renommé
+>   partout dans le rendu (teaser, 4-blocs, bento, liens, Maturity, nav) → « TaskForce Memory » ;
+>   « Brain OS » ne subsiste que comme crédit moteur « powered by Brain OS » (compté 1× au DOM).
+> - **5. CTA « première expérience ».** « Start for free » → « **Run your first workflow** » (le moment
+>   magique de TaskForce = lancer un run), hero + CTA final. « Book a demo » reste en secondaire.
+> - Sharpenings : manifeste « AI changes **who produces the work**. The workflow must evolve **around
+>   human judgment, not replace it** » (human-in-the-loop assumé, ≠ « fully autonomous ») · Before/After
+>   « Conversation/Documentation/Implementation context » → **« Meetings / Specs / Prompts »** (termes
+>   reconnaissables) · Why-different « write code » → « **help you execute tasks** » (concurrent = pas la
+>   génération de code) · orthographe **US** « artifacts » · Problem « The transfer is » en ligne
+>   autonome semi-grasse · Enterprise « SOC 2 in progress » → « **Built for SOC 2 readiness** » (ne pas
+>   inviter « montrez le rapport »).
+> - **Note honnêteté Product status** (reco reviewer, non tranché ici) : « Available now » liste les
+>   capacités v1 réellement livrées (self-hosting, SSO, Smart Assign… existent d'après nos traces).
+>   Si l'une n'est pas *customer-ready*, à retirer — la crédibilité prime sur la quantité.
+> - Vérifié DOM : `viteError:false`, 0 erreur build/console, 16 sections, 0 collision, « Brain OS »
+>   standalone = 1 (powered by), Before/After = Intent/Meetings/Specs/Tickets/Prompts/Review,
+>   « Adaptive by design » présent, « Run your first workflow » ×2, compliance reframé.
+
+> ### ⚑ v20 (27/07) — review 6 : polish final du copy (~90% → contenu mûr)
+> « Première version où la landing raconte un PRODUIT, pas juste une vision. » Réglages fins.
+> - **Hero** : « human **+** AI » → « human**-**AI software delivery » (moins « marketing », plus premium).
+> - **Why different** : « Most AI tools **write code** » (réducteur — Cursor/Devin font plus) → « Most AI
+>   tools **help you execute tasks**. TaskForce runs the delivery process **around** them. » (le concurrent
+>   n'est pas la génération de code, c'est l'orchestration autour des tâches).
+> - **Problem** : l'insight « **The work isn't the problem. The transfer is.** » passe en ligne
+>   autonome, plus grosse et semi-gras (c'est LA phrase de catégorie), la réponse TaskForce en dessous.
+> - **Orthographe US** : « artefacts » → « **artifacts** » (cohérence US, comme catalogs/organizations).
+> - **Brain OS, dernier « Context layer » retiré** : le placeholder du bento Synergy passe « Context
+>   layer » → « **Memory layer** ». Un seul vocabulaire : Brain OS = the memory layer.
+> - **Who it's for** : suppression du « Product and Operations are **next** » (une landing premium ne
+>   parle pas de ce qui MANQUE) → « The same governed run applies **wherever a team ships work through
+>   review** » (direction, pas déficit).
+> - **Preuve sociale (le dernier trou)** : bande « **Built by engineers shipping with AI every day** »
+>   dans le hero, avec de VRAIS logos (Claude/Anthropic · OpenAI · Ollama · Cursor · GitHub · Linear).
+>   Cadrage « **Built with** », jamais « customers » — honnête, on n'invente pas de clients.
+> - **Footer** : nouveau groupe « **Compare** » (TaskForce vs Cursor / Devin / Copilot / Jira) — SEO +
+>   positionnement, le marché cherchera ces requêtes. (« Comparisons » générique retiré de Solutions.)
+> - Vérifié DOM : `viteError:false`, 0 erreur build/console, 16 sections, « human-AI », 6 logos
+>   « Built with » (0 image cassée), « artifacts » (US), « Context layer » absent, footer Compare
+>   présent, **aucun débordement horizontal** (7e colonne footer OK).
+> - **Reste = phase DESIGN** (acté avec le user) : animation du Run dans le hero, design visuel premium,
+>   vrais screenshots, **remplacement de TOUS les placeholders** (« on le fera plus tard »), pages
+>   secondaires (Product / Pricing / Enterprise / Docs). Le copy est déclaré mûr.
+
+> ### ⚑ v19 (27/07) — review 5 : les 5 dernières corrections avant design
+> Contenu jugé mûr. Le reviewer liste 5 correctifs « avant de passer au design ». Tous faits.
+> - **1. Plus de placeholder visible.** Le `Placeholder label="Product screen"` du hero est remplacé
+>   par un **vrai visuel produit** : `HeroRun`, un schéma STATIQUE du run à mi-parcours (Step 4 of 7,
+>   3 done / 1 « Awaiting approval » / 3 pending). Pas de fausse capture, pas de fausses données —
+>   les mêmes checkpoints/états que la section animée plus bas.
+> - **2. Incohérence « Who it's for » résolue (Option A).** Plus d'onglets multi-équipes (l'îlot est
+>   retiré → section **statique**, un souci d'hydratation en moins) : on assume le **wedge engineering**
+>   (les 3 cas Engineering en clair) + « **Product and Operations are next** ». `TeamGrid` n'est plus
+>   un îlot (`client:idle` retiré dans index).
+> - **3. Brain OS = « memory layer ».** « context layer » → **« The memory layer for every run »** ;
+>   bento « what keeps the context » → « **Brain OS is the memory every run draws on** » ; texte système
+>   varié (« Stores the architecture, decisions and conventions… »). Moins de répétition de « context ».
+> - **4. Animation du Run (agent → humain).** Le run passe maintenant par **2 sous-phases par
+>   checkpoint** : l'agent DESSINE (« Generating artifact… » / « Writing code… », discret, gris) puis
+>   le run ATTEND l'humain (« Awaiting approval » / « Running checks », en primaire = focal), puis
+>   coche « Approved ✓ » et avance. 14 battements (`STEP_BEATS.flat()`), état de repos reduced-motion
+>   = Step 4 en review. (Le mouvement se vérifie en vrai navigateur — onglet auto = rAF en pause.)
+> - **5. Phrase de catégorie dans le hero.** Kicker au-dessus du H1 : « **The operating system for
+>   human + AI software delivery** » ; le chapô est allégé (on retire « An operating system for
+>   shipping software… », désormais porté par le kicker).
+> - Autres : manifeste « has to change » → « **must evolve** with it » ; Before/After « Run » → **« Plan »**
+>   (terme compris ; « Run » reste le terme produit ailleurs) ; roadmap « Teams beyond engineering » →
+>   « **Expanding beyond engineering** » (le wedge est engineering, pas d'incertitude de marché).
+> - Non touché (reco reviewer) : footer (crédible), « boring, load-bearing » (gardé), « Remember »
+>   (fonctionne). Product status : capacités « Available now » = réellement livrées (honnêteté maintenue).
+> - Vérifié DOM : `viteError:false`, 0 erreur build/console, 16 sections, 0 collision, hero sans
+>   placeholder (carte run réelle), Who's-for = 0 onglet + « next », Before/After = Outcome→Context→
+>   Plan→Approvals→Ship, Brain OS « memory layer », run initial = « Generating artifact » (phase draft),
+>   îlots = RunTimeline + Foundations.
+> - **Le contenu est déclaré mûr par le reviewer** : la suite = phase **design d'expérience**
+>   (animations avancées, vrais screenshots, interactions), plus du copywriting.
+
+> ### ⚑ v18 (27/07) — review 4 : affinage « catégorie » + une seule marque contexte
+> Notes ~9/10, conversion 8.2. Critiques désormais « est-ce que ça convertit face à Linear/Cursor/
+> Devin ? ». Pass d'affinage (copy + un correctif Run) — pas de nouvelle section.
+> - **Manifeste** recalibré : « AI changes **who can build**. The workflow has to change **with it**. »
+>   (le point n'est pas que l'IA remplace le dev, c'est qu'une équipe augmentée ne peut plus coordonner pareil.)
+> - **Before/After** : titre « lose the plot » → « **Fewer places for context to disappear** » (mot-clé
+>   *context*, moins casual) ; **`Context` ajouté comme étape visible** du flux TaskForce
+>   (Outcome → **Context** → Run → Approvals → Ship) — le contexte n'est plus une feature tardive.
+> - **Brain OS = UN seul nom** (avant : « context layer », « Powered by Brain OS », « Inside Brain OS »,
+>   « Knowledge layer » = 4 noms). Teaser → eyebrow **« Brain OS »** + titre « The context layer for
+>   every run ». Dans One platform, le système « Knowledge layer » devient **« Brain OS »** et le verbe
+>   « Context » devient **« Remember »** (humain, pas technique). Bento : « Brain OS is what keeps the context ».
+> - **One platform** : ajout du « pourquoi les outils actuels ne suffisent pas » en 3 lignes —
+>   « Agents without context become assistants. Context without execution becomes documentation.
+>   **TaskForce connects both.** »
+> - **Run** : signature « **Seven checkpoints. Seven artifacts. One accountable chain.** » ; et
+>   **état de repos corrigé** — sous `prefers-reduced-motion` le run se fige désormais **mi-parcours**
+>   (Step 4 of 7), plus sur « Shipped » (un visiteur ne doit pas arriver sur une simulation terminée).
+> - **Who it's for** : wedge **engineering** resserré — onglets réduits à **Engineering (défaut) ·
+>   Product · Operations** (retiré « Client services » + « Anyone » qui élargissaient trop, façon Monday).
+> - **Hero** : « governed AI agents » **conservé** (le marché enterprise justifie le terme — reco du reviewer).
+> - Non changé (volontaire) : Foundations « boring, load-bearing » (a du caractère, gardé) ; footer
+>   « Compare vs Cursor/Devin/Jira » (le reviewer dit « pas maintenant » ; /vs existe déjà en nav).
+> - **DÉFÉRÉ à la phase design** : rendre le Run pleinement **interactif** (bouton Approve qui pilote
+>   le run). Non testable dans l'onglet caché (rAF en pause) → je ne l'expédie pas à l'aveugle ;
+>   le primitive `scene.goTo` est prête. C'est le 1er item de la phase « design d'expérience ».
+> - Vérifié DOM : `viteError:false`, 16 sections, 0 collision, 0 erreur console, Before/After = 5
+>   étapes (Context inclus), « Brain OS » ×8 / « Knowledge layer » absent, onglets = Eng(défaut)/Product/Ops.
+
+> ### ⚑ v17 (27/07) — review 3 : RÉDUIRE les concepts, affiner, réordonner
+> Base jugée mûre (positionnement 9, storytelling 9). Seul vrai risque : **trop de concepts forts**
+> (« confusion 6.5/10 »). Ce pass RÉDUIT et affine plutôt qu'ajouter. La chose à retenir :
+> « TaskForce keeps software delivery context alive from idea to production ».
+> - **Retiré** : le **mur de logos** du haut (redondant avec Integrations — « les intégrations sont
+>   une preuve, pas une histoire ») et la **section témoignages** placeholder (« un visiteur ne doit
+>   jamais voir une absence » / impression de site en construction). Deux sections en moins.
+> - **Ajouté — `Manifesto`** (entre Hero et Problem) : thèse historique façon Linear — « Software
+>   delivery was built for humans passing documents. AI changes the builder. The workflow has to
+>   change too. »
+> - **Hero** : « shipping work with AI agents » → « shipping software with **governed** AI agents »
+>   (l'avantage n'est pas « des agents », c'est *governed delivery*).
+> - **Problem** : « Every delivery » → « **Most software delivery** » (plus précis).
+> - **Before/After** rendu **universel** (on attaque le système, pas les équipes) : Slack/meeting/
+>   spec/tickets/prompt/PR → **Intent · Conversation · Documentation · Tickets · Implementation
+>   context · Review**.
+> - **Run UI** : « 0 / 7 » → « **Step 1 of 7** » (plus produit) ; agents renommés en fonctionnel
+>   **Product / Architecture / Delivery agent** (au lieu de CPO/CTO/COO qui forçaient une organisation),
+>   dans la timeline ET le tableau ; idem l'item Maturity.
+> - **Brain OS** : eyebrow « The context layer · **Powered by Brain OS** » (Brain OS = le moteur,
+>   pas un produit séparé).
+> - **One platform** simplifié pour un VP Eng : chaque carte mène par un verbe **Plan · Context ·
+>   Execute · Verify**, le nom système (Agent runtime / Knowledge layer / Workflow engine / Audit
+>   system) en sous-titre.
+> - **Vision** : « the coordination becomes a governed run » → « **coordination becomes an automated
+>   workflow. Judgment stays human.** »
+> - **Réordonné** (partie basse, logique d'achat) : Who it's for → Getting started → Integrations →
+>   Foundations → Enterprise. Run toujours tôt (position 6, en preuve).
+> - **16 sections**, alternance blanc/gris parfaite (FinalCta passe en gris-extérieur/panneau-blanc
+>   pour boucler l'alternance). Vérifié DOM : `viteError:false`, 0 collision, 0 erreur console,
+>   tous les changements de copy présents, mur de logos + témoignages absents, run fusionné intact.
+>   (Îlots `client:idle` : hydratation OK — le `PENDING` observé = onglet d'automatisation `hidden`,
+>   `requestIdleCallback` ne se déclenche jamais caché ; se réveille dans un vrai navigateur.)
+
+> ### ⚑ v16 (27/07) — review 2 : contexte = ennemi, run en preuve, démo visuelle
+> Deuxième review (notes 8-9/10). Trois déplacements majeurs + ajustements de copy.
+> - **La perte de CONTEXTE devient l'ennemi central** (pas la coordination). `Problem` retitré
+>   « Teams don't lose time building. They lose it transferring context. » ; cascade « Someone… »
+>   ré-orientée contexte (re-explains, drops the why, re-briefs from scratch, without the original
+>   context) ; pivot « The transfer is [the problem]. TaskForce keeps the context in one governed
+>   run. » Fil tiré jusqu'à Brain OS (« The context layer », plus « The moat » — une startup ne
+>   déclare pas son propre moat) et à Synergy (« context stops leaking between handoffs »).
+> - **Le RUN remonte en preuve** : position 6 (après Pillars + BeforeAfter), et **fusion de
+>   l'ancienne section `Anatomy`** dedans — la démo animée EN HAUT, puis le tableau des 7 checkpoints
+>   EN DESSOUS (plus de section séparée, 0 doublon). Vérifié : 1 section porte timeline + table + chips.
+> - **Démonstration VISUELLE ajoutée — `BeforeAfter`** (« From idea to shipped ») : chaîne longue et
+>   fuyante (6 mains : Slack → meeting → spec → tickets → prompt → PR) vs run court et gouverné
+>   (4 étapes : Outcome → Run → Approvals → Ship). La différence de longueur PORTE le message. Statique.
+> - **Hero élargi** : « draft every step and hand code » → « plan the work, create the artifacts, and
+>   hand implementation » (le produit est la chaîne de décision, pas que du code).
+> - **Pillars** : `FIG 0x` → simple `01/02/03` (« faisait design-document ») ; « Governed, not
+>   autonomous » → **« Governed by design »**.
+> - **Synergy** dit en ARCHITECTURE : 4 systèmes nommés (Agent runtime · Knowledge layer · Workflow
+>   engine · Audit system) au lieu de combos abstraits.
+> - **Foundations** : « Real-time core » → **« Production-grade core »** (ce que cherche un CTO).
+> - **TeamGrid** : assumé **engineering-first** (« Built for engineering teams first ») et **dénumérotée**
+>   (audience, pas capacité) → arrive plus tard dans la page.
+> - **Maturity** orientée valeur : « Shipped/Partial/Planned » → **« Available now / In progress /
+>   Coming next »**, compteurs bruts (7/5/5) retirés (lisaient « produit jeune »).
+> - **Getting started** : « one run » → « one **workflow** » (terme compris d'un nouveau visiteur).
+> - **Renumérotation** en ordre de page : 1.0 The run · 2.0 One platform · 3.0 Foundations.
+>   **Réordonné** en 17 sections, alternance blanc/gris parfaite (0 collision, vérifiée DOM).
+> - Vérifié DOM : `viteError:false`, 17 sections, 0 collision, 4 îlots hydratés, run fusionné
+>   (timeline+table+chips, 7 lignes, 0 section Anatomy résiduelle), BeforeAfter 6→4 étapes,
+>   tous les changements de copy présents, 1.0/2.0/3.0 en ordre, TeamGrid sans numéro.
+
 > ### ⚑ v15 (26/07) — propagation de la numérotation Linear (N.0 + puces N.x)
 > Demande user : « propage » le système de numérotation de Linear (`1.0 →`, puces `+`).
 > - **`SectionHeader` étendu** (`Section.tsx`) : props `index?` (numéro monospace « 1.0 » devant

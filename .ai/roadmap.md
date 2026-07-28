@@ -2725,6 +2725,40 @@ Planning prévisionnel (Gantt, jalons DFS, chemin critique), budget prévisionne
 > wizard 4 étapes → app. **Reste avant commit** : `it.ps1 -Test ALL` + `tsc`/`eslint` ; walk-through
 > interactif complet sur un vrai navigateur (le pane du dev était instable).
 
+> **▶ MAJ 25/07/2026 (33) — Onboarding & Turnstile : 3 correctifs sur retours de test utilisateur.**
+>
+> Flux GitHub validé de bout en bout par l'utilisateur (plan → wizard → workspace + invitation + projet ;
+> invitation bien reçue et gérée). Trois ajustements demandés :
+>
+> 1. **Turnstile — inscription bloquée malgré un défi résolu (BUG).** À l'inscription classique, « Veuillez
+>    confirmer que vous n'êtes pas un robot » s'affichait alors que le widget montrait « Success ». Cause :
+>    les DEUX mécanismes sont actifs (défi signé maison + Turnstile) ; quand Turnstile est affiché, la case
+>    à cocher est masquée → `isHuman` reste false, mais la validation l'exigeait quand même
+>    (`challenge.required && !isHuman`, `register-info-form.tsx`). Corrigé → `afficheCaseACocher && !isHuman`
+>    (la case n'est exigée que quand elle est vraiment affichée, càd Turnstile inactif). Sous Turnstile, le
+>    jeton fait foi ; le défi signé part toujours (`challengeToken`) et reste vérifié côté serveur.
+> 2. **Onboarding non sautable** (demande produit) : bouton « Passer l'onboarding » retiré (il alimente le
+>    Smart Assign, à ne pas contourner).
+> 3. **Suggestion IA automatique** : à l'arrivée sur l'étape 2, l'IA propose les compétences **automatiquement**
+>    (badges cliquables) d'après le rôle — plus de bouton « Suggérer », un lien « Regénérer » reste dispo.
+>    (En dev, toujours le repli déterministe : Qwen ne répond pas sous 8 s.)
+>
+> **Vérifié** : `/auth/register`, `/onboarding`, `/onboarding/plan` compilent (200, zéro erreur) ; le wizard
+> rend l'étape 1 **sans le bouton Passer**. Test interactif Turnstile + auto-suggestion à voir sur un vrai
+> navigateur (pane du dev instable).
+
+> **▶ MAJ 25/07/2026 (34) — Inscription classique : plus de « flash » de l'app avant l'onboarding.**
+>
+> Retour utilisateur : Turnstile validé (correctif (33) OK). Mais après inscription manuelle, à la
+> connexion, l'app s'ouvrait PUIS l'onboarding s'affichait par-dessus — pas fluide. Cause : `login-form`
+> faisait `router.replace("/")` après connexion, et la garde ne renvoyait vers `/onboarding` qu'ensuite
+> (2 redirections en cascade → flash). Corrigé : `auth-context.login` **renvoie l'utilisateur** ;
+> `login-form` **et** la garde routent DIRECTEMENT vers `/onboarding` quand `onboardingCompleted === false`
+> (comme le callback GitHub, déjà fluide). Routes compilent (200).
+>
+> **Reste** : polish design de `/onboarding/plan` (« naze ») et de la page OTP (`verification`, « bancale »)
+> — à préciser avec l'utilisateur ; puis `it.ps1 -Test ALL` + `tsc`/`eslint` avant commit.
+
 ### 4.B — Repoussé APRÈS la soutenance (ne pas empiéter)
 
 > Aucun de ces chantiers n'est rattaché à une compétence C1–C26. Ils restent documentés,
