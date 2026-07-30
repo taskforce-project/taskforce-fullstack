@@ -30,7 +30,7 @@ const PHASES: Phase[] = [
     accent: "bg-amber-400",
     items: [
       { title: "TaskForce Memory retrieval", desc: "Runs recall the decisions and constraints you already set.", level: "beta" },
-      { title: "Scoped agent roles", desc: "CPO, CTO and COO agents rather than one generalist.", level: "labs" },
+      { title: "Specialized agent team", desc: "CPO, CTO and COO agents with distinct responsibilities instead of one generalist.", level: "labs" },
       { title: "Model choice per step", desc: "The right model for each checkpoint — local or hosted.", level: "labs" },
     ],
   },
@@ -40,8 +40,8 @@ const PHASES: Phase[] = [
     blurb: "Where this is going. Direction, not a deadline.",
     accent: "bg-indigo-400",
     items: [
-      { title: "Governed orchestration", desc: "The full intent-to-deploy run, planned end to end.", level: "labs" },
-      { title: "Learning from reviews", desc: "What you send back improves the next run.", level: "labs" },
+      { title: "Full orchestration", desc: "The complete intent-to-deploy run, from product framing to QA and sign-off.", level: "labs" },
+      { title: "Prediction calibration", desc: "Compare what agents predicted with what actually shipped — and calibrate future decisions.", level: "labs" },
       { title: "Beyond engineering", desc: "The same governed run for teams outside software.", level: "labs" },
     ],
   },
@@ -55,7 +55,7 @@ const PHASES: Phase[] = [
   <PageHero
     eyebrow="Roadmap"
     title="What's shipped, what's next, and where this goes"
-    lead="We publish the direction in the open. We commit to sequence, not to dates we can't keep — the changelog firms things up as work actually lands."
+    lead="We publish the direction in the open. Each capability is clearly marked Planned, Beta or Live — and the changelog records what actually ships."
     primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
   />
 
@@ -96,8 +96,8 @@ const PHASES: Phase[] = [
   </section>
 
   <PageCta
-    title="Build on what's live today"
-    lead="The delivery tools are shipped now. Start there, and grow into the run as it hardens."
+    title="Start with what's live today"
+    lead="The delivery foundation is already shipped. Start with your board, issues and integrations — then add governed runs as they become available."
     primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
     secondary={{ label: "Book a demo", href: "/book-a-demo" }}
   />
