@@ -185,6 +185,35 @@ point identifiable sur la courbe de lead time.
 | Métronome | `src/lib/useScene.ts` | `useScene(beats)` : partition de durées, démarre à l'entrée à l'écran, se joue **une fois**, **se fige sur l'état final**. `useTypewriter` pour la frappe. `prefers-reduced-motion` → état final direct. |
 | Châssis | `src/components/site/scene/AppWindow.tsx` | Vrai écran TaskForce (voir encadré ci-dessous). **Remplace la barre macOS de `MockFrame`** — trois pastilles + une URL, c'est le signe le plus sûr qu'on regarde un dessin. |
 
+> ### ⚑ v37 (30/07) — Roadmap : alignée sur le vocabulaire Orchestration/Memory (crédibilité)
+> Review user : la roadmap vend la **crédibilité**, pas le produit ; à aligner sur les 2 pages verrouillées.
+> - **Hero lead** moins défensif : « We commit to sequence, not to dates we can't keep… » → « We publish
+>   the direction in the open. **Each capability moves from Planned to Beta to Live as it becomes real**
+>   — and the changelog records what actually ships. » (⚠️ le user avait écrit « Live → Beta → Planned »
+>   mais « as it becomes real » va vers Live → j'ai remis **Planned → Beta → Live**, à confirmer.)
+> - **Next** : « Scoped agent roles » → **« Specialized agent team »** (« CPO, CTO and COO agents with
+>   distinct responsibilities instead of one generalist ») — reprend le vocabulaire *delivery team*
+>   d'Orchestration. « Model choice per step » gardé. « TaskForce Memory retrieval » Beta gardé (cohérent
+>   avec la page Memory = Beta). « Human approvals » Beta gardé (les checkpoints complets sont Planned).
+> - **Later** : « Governed orchestration » → **« Full orchestration »** (« The complete intent-to-deploy
+>   run, from product framing to QA and sign-off » = reconnecte aux 7 checkpoints). « Learning from
+>   reviews » → **« Prediction calibration »** (« Compare what agents predicted with what actually shipped
+>   — and calibrate future decisions ») = raccord direct avec la section Prediction d'Orchestration,
+>   évite le « l'IA apprend de vos feedbacks » vague. « Beyond engineering » gardé.
+> - **CTA** : « Build on what's live today » / « grow into the run » → **« Start with what's live today »**
+>   / « The delivery foundation is already in production. Start with your board, issues and integrations —
+>   then add governed runs as they become available. » = raconte la stratégie : **delivery platform déjà
+>   là → orchestration = couche supérieure progressive.**
+> Archi narrative à 3 étages assumée : **Roadmap (ce qui est réel) → Orchestration (intention→décisions
+> validées→software) → Memory (le raisonnement derrière).** Produit dessous : **delivery platform →
+> orchestration → organizational memory.**
+> Vérifié DOM : `#main` roadmap = nouvelles formulations, anciennes retirées. **NB : le footer (nav Labs
+> grisée) affiche encore « Learning from reviews » — taxonomie de nav distincte, à aligner si le user veut.**
+> **MAJ (verrou roadmap)** : (1) hero « moves from Planned to Beta to Live » → **« Each capability is
+> clearly marked Planned, Beta or Live »** — n'impose plus un cycle de maturité (une feature peut passer
+> Planned→Live direct). (2) CTA « already **in production** » → « already **shipped** » (plus sûr pour un
+> projet école sans users prod confirmés ; à remettre « in production » si de vrais users en prod). Page figée.
+
 > ### ⚑ v36 (30/07) — TaskForce Memory : passe finale (défendabilité technique + gouvernance)
 > 2ᵉ review user de brain-os (le reste = validé). 2 corrections de fond :
 > - **« causal links » → « relationships »** (point « A map of why ») : « causal » sur-vendait un moteur
