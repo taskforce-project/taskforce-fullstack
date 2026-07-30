@@ -16,7 +16,7 @@ export function DecisionGraph() {
         className="w-full"
         style={{ fontFamily: "var(--font-sans)" }}
         role="img"
-        aria-label="A decision and its causal graph: a requirement drives the choice of Postgres and pgvector, MongoDB is rejected for weaker transactions, and Billing, RAG and Users depend on the decision."
+        aria-label="A decision and the graph around it: a requirement drives the choice of Postgres and pgvector, MongoDB is rejected for weaker transactions, and Billing, Search and Users depend on the decision."
       >
         {/* ── Arêtes ── */}
         {/* Requirement → Decision (drives) */}
@@ -24,17 +24,16 @@ export function DecisionGraph() {
         {/* Decision → Impacts (impacts) */}
         <line x1="180" y1="172" x2="180" y2="232" className="stroke-primary/35" strokeWidth={1.5} />
         {/* Decision → MongoDB (rejected, pointillé) */}
-        <line x1="310" y1="146" x2="360" y2="146" className="stroke-border" strokeWidth={1.5} strokeDasharray="4 4" />
+        <line x1="310" y1="146" x2="348" y2="146" className="stroke-border" strokeWidth={1.5} strokeDasharray="4 4" />
 
         {/* ── Étiquettes d'arêtes (le « pourquoi » sur les liens) ── */}
         <text x="188" y="95" fontSize={9} className="fill-muted-foreground">drives</text>
         <text x="188" y="205" fontSize={9} className="fill-muted-foreground">impacts</text>
-        <text x="316" y="140" fontSize={8.5} className="fill-muted-foreground">rejected</text>
 
         {/* ── Nœud : Requirement ── */}
         <rect x="60" y="20" width="240" height="44" rx="10" className="fill-card stroke-border" />
         <text x="76" y="40" fontSize={12} fontWeight={600} className="fill-foreground">Requirement</text>
-        <text x="76" y="55" fontSize={10} className="fill-muted-foreground">vector search + billing</text>
+        <text x="76" y="55" fontSize={10} className="fill-muted-foreground">Vector search + billing</text>
 
         {/* ── Nœud : Decision (mis en avant) ── */}
         <rect x="50" y="120" width="260" height="52" rx="12" className="fill-card stroke-primary" strokeWidth={1.5} />
@@ -45,12 +44,13 @@ export function DecisionGraph() {
         {/* ── Nœud : Impacts ── */}
         <rect x="60" y="232" width="240" height="44" rx="10" className="fill-card stroke-border" />
         <text x="76" y="250" fontSize={9} fontWeight={600} letterSpacing={0.6} className="fill-muted-foreground">IMPACTS</text>
-        <text x="76" y="266" fontSize={11} className="fill-foreground">Billing · RAG · Users</text>
+        <text x="76" y="266" fontSize={11} className="fill-foreground">Billing · Search · Users</text>
 
-        {/* ── Nœud : rejeté (MongoDB) ── */}
-        <rect x="360" y="125" width="96" height="42" rx="10" className="fill-secondary stroke-border" strokeDasharray="4 4" />
-        <text x="375" y="143" fontSize={10} className="fill-muted-foreground">MongoDB</text>
-        <text x="375" y="157" fontSize={8.5} className="fill-muted-foreground">weaker txns</text>
+        {/* ── Nœud : rejeté (MongoDB) — porte son propre en-tête REJECTED ── */}
+        <rect x="348" y="118" width="120" height="58" rx="10" className="fill-secondary stroke-border" strokeDasharray="4 4" />
+        <text x="362" y="134" fontSize={8} fontWeight={600} letterSpacing={0.6} className="fill-muted-foreground">REJECTED</text>
+        <text x="362" y="150" fontSize={11} className="fill-foreground">MongoDB</text>
+        <text x="362" y="164" fontSize={8.5} className="fill-muted-foreground">Weaker transactions</text>
 
         {/* ── Faisceaux : la causalité qui « coule » le long de la colonne ── */}
         <circle r="3.5" className="fill-primary">
