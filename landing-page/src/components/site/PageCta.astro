@@ -1,0 +1,51 @@
+---
+/**
+ * PageCta — bandeau d'appel à l'action de fin de page (repris de `FinalCta` de la home).
+ * Carte blanche sur bande grise, halo bleu, titre display, jusqu'à deux CTA + note discrète.
+ */
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+
+interface Cta {
+  label: string;
+  href: string;
+}
+
+interface Props {
+  title: string;
+  lead?: string;
+  primary?: Cta;
+  secondary?: Cta;
+  note?: string;
+}
+
+const { title, lead, primary, secondary, note } = Astro.props;
+---
+
+<section class="bg-secondary">
+  <div class="container-rail py-24">
+    <div class="bg-card relative overflow-hidden rounded-3xl border px-8 py-16 text-center sm:py-20">
+      <div
+        aria-hidden
+        class="pointer-events-none absolute top-0 left-1/2 h-72 w-[680px] -translate-x-1/2 rounded-full blur-3xl"
+        style="background: radial-gradient(50% 50% at 50% 50%, color-mix(in oklab, var(--primary) 14%, transparent), transparent 70%)"
+      >
+      </div>
+      <h2 class="t-h2 relative">{title}</h2>
+      {lead && <p class="t-lead relative mx-auto mt-4 max-w-lg">{lead}</p>}
+      {(primary || secondary) && (
+        <div class="relative mt-8 flex flex-wrap justify-center gap-3">
+          {primary && (
+            <a href={primary.href} class={cn(buttonVariants({ size: "pill-lg" }))}>{primary.label}</a>
+          )}
+          {secondary && (
+            <a href={secondary.href} class={cn(buttonVariants({ variant: "outline", size: "pill-lg" }))}>
+              {secondary.label}
+            </a>
+          )}
+        </div>
+      )}
+      {note && <p class="text-muted-foreground relative mt-6 text-[12.5px]">{note}</p>}
+    </div>
+  </div>
+</section>
