@@ -185,6 +185,36 @@ point identifiable sur la courbe de lead time.
 | Métronome | `src/lib/useScene.ts` | `useScene(beats)` : partition de durées, démarre à l'entrée à l'écran, se joue **une fois**, **se fige sur l'état final**. `useTypewriter` pour la frappe. `prefers-reduced-motion` → état final direct. |
 | Châssis | `src/components/site/scene/AppWindow.tsx` | Vrai écran TaskForce (voir encadré ci-dessous). **Remplace la barre macOS de `MockFrame`** — trois pastilles + une URL, c'est le signe le plus sûr qu'on regarde un dessin. |
 
+> ### ⚑ v38 (30/07) — /trust : reconstruit en VRAI Trust Center enterprise (profondeur + honnêteté)
+> Review user dure mais juste : la page (qui réutilisait le composant home `Trust`) = « security overview »,
+> pas un Trust Center. Verdict user : copy 8/10, structure 5/10. La sécu **fait partie du produit** (AI +
+> accès code + agents + intégrations + exécution + mémoire + audit) → page à pousser plus loin que la moyenne.
+> **Refait 100 % custom** (plus de réutilisation du composant home). Règle absolue tenue : **conservateur,
+> rien de non démontrable** — faits ancrés sur le Brain OS (`.ai/soutenance-brief`, `roadmap`, `tests-backend-journal`).
+> **Faits RÉELS mobilisés** (pas inventés) : secrets **AES-256-GCM** au repos (`EncryptedStringConverter`,
+> `enc:`, 0 secret clair) · **Keycloak OIDC RS256** (SSO, sessions/refresh/revoke) · **RBAC** testé
+> (`AuthorizationService` requireMember/Role/Manager, Owner/Admin/Member/Viewer) · **RGPD réel** (`GdprService`
+> export portabilité + effacement/anonymisation + suppression identité Keycloak) · **Semgrep + OWASP ZAP +
+> Trivy, 0 HIGH** · modèles hosted (Anthropic/OpenAI) + local (Ollama) · self-host Docker · OAuth GitHub/Slack ·
+> Postgres + MinIO(S3).
+> **Structure (13 sections + CTA)** : Hero (gardé « Security you can verify, not just claim ») → **Security at a
+> glance** (14 lignes, pastilles Available/Beta/Planned/Not started) → **How your data flows** (diagramme
+> Workspace → TaskForce[Memory·Workflow·Audit] → Model provider[Anthropic·OpenAI·Ollama-local] + « avec
+> self-host + local, rien ne sort du réseau ») → **AI security & governance** (« **AI can propose. It cannot
+> approve itself.** ») → **Identity & access** → **Data lifecycle** (Collection→…→Backups, dont Retention =
+> Planned assumé) → **Auditability** (What is recorded / What stays in your hands — répond « loggez-vous mes
+> prompts ? ») → **Integrations & secrets** (« what can an agent do with the keys? » : scopes du connecteur,
+> jamais le secret brut) → **Deployment models** (Self-hosted **Available** / Managed cloud **Planned**) →
+> **Compliance** (GDPR in place · DPA/Subprocessors on request · **SOC 2 / ISO 27001 Not started** — jamais
+> prétendre les avoir) → **Security operations** (Semgrep/ZAP/Trivy in place ; incident response/monitoring
+> Planned) → **Security roadmap** (Current / Building, anti-theater) → **Documentation hub** (liens gated par
+> `isLive` : 2 live + 6 « Soon ») → CTA « Bring it to your security team » + contact `security@taskforce.dev`.
+> Décisions d'honnêteté clés : SOC 2/ISO = **Not started** ; pentest tiers = **Not yet** ; retention/backups/
+> incident-response = **Planned** ; « no training on your data » nuancé (local=aucun ; hosted=API terms).
+> Vérifié : 200, vite:0, 13 h2, faits présents, ancien composant Trust retiré, console 0 erreur, resources
+> 2 live/6 grisés. **Pane mort (vw=0) → pas de capture ; overflow non mesurable mais layout 100 % responsive
+> (grilles/flex, aucun élément large fixe). Visuel (diagramme de flux, tables) à valider en direct.**
+
 > ### ⚑ v37 (30/07) — Roadmap : alignée sur le vocabulaire Orchestration/Memory (crédibilité)
 > Review user : la roadmap vend la **crédibilité**, pas le produit ; à aligner sur les 2 pages verrouillées.
 > - **Hero lead** moins défensif : « We commit to sequence, not to dates we can't keep… » → « We publish
