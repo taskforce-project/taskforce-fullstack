@@ -5,8 +5,8 @@
  * Chaque page passe `title` / `description` (+ `image` OG optionnelle).
  */
 import "@/styles/global.css";
-import { SiteHeader } from "@/components/layout/SiteHeader";
-import { SiteFooter } from "@/components/layout/SiteFooter";
+import { SiteHeader } from "@/components/site/SiteHeader";
+import { SiteFooter } from "@/components/site/SiteFooter";
 import AudienceTracking from "@/components/AudienceTracking.astro";
 
 interface Props {
@@ -48,20 +48,21 @@ const canonicalURL = Astro.site
     <meta name="theme-color" content="#ffffff" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 
-    <!-- Inter Variable (métrique Linear/Attio) -->
+    <!-- Sora (display) + Inter Variable (corps) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,100..900&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,100..900&family=Sora:wght@300..700&display=swap"
       rel="stylesheet"
     />
 
     <AudienceTracking />
   </head>
 
-  <body class="min-h-screen bg-background font-sans text-foreground antialiased">
+  <body class="min-h-screen bg-white font-sans text-ink antialiased">
+    <a href="#main" class="skip-link">Skip to content</a>
     <SiteHeader client:load />
-    <main class="pt-16">
+    <main id="main" class="pt-16">
       <slot />
     </main>
     <SiteFooter />
