@@ -1,7 +1,7 @@
 import { Check, ShieldCheck, SlidersHorizontal, Activity, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Section, SectionHeader } from "../Section";
-import { Placeholder } from "../Placeholder";
+import { AppShot, Toast } from "../AppShot";
 import { BrandLogo } from "../BrandLogo";
 import { APP_URL } from "../nav";
 
@@ -40,18 +40,43 @@ export function Trust() {
         lead="AI in the delivery path raises exactly the questions you would expect. We would rather answer them on a page than in a questionnaire."
       />
 
-      {/* Panneau de badges de conformité — placeholders (les visuels de certif restent à fournir). */}
-      <div className="bg-secondary/50 mt-12 flex flex-wrap items-center justify-center gap-10 rounded-2xl border p-10">
-        {["SOC 2", "GDPR", "ISO 27001"].map((b) => (
-          <div key={b} className="flex flex-col items-center gap-2.5">
-            <Placeholder label="" ratio="1 / 1" className="size-[84px] rounded-xl" />
-            <span className="text-[13px] font-medium text-foreground">{b}</span>
+      {/* Décision review (26/07) : mener par des FAITS, pas par une rangée de badges qui
+          « se lit comme une checklist ». Trois affirmations concrètes portent la gouvernance. */}
+      <div className="mt-12 grid gap-x-10 gap-y-8 border-t pt-10 sm:grid-cols-3">
+        {[
+          { stat: "Every run is attributable", sub: "Each checkpoint records what produced it and who approved it." },
+          { stat: "Every approval is recorded", sub: "Who signed off, when, and exactly what they were signing off on." },
+          { stat: "Every model call is logged", sub: "Which model ran which step, on whose infrastructure." },
+        ].map((t) => (
+          <div key={t.stat}>
+            <p className="t-h3">{t.stat}</p>
+            <p className="text-muted-foreground mt-2 text-[13.5px] leading-6">{t.sub}</p>
           </div>
         ))}
       </div>
 
+      {/* PREUVE « dure » (phase design) : la vraie UI de l'audit trail. Cadre d'app VIDE, à
+          remplir avec une capture ; toast custom par-dessus (pattern « vrai screen + toasts »). */}
+      <div className="mt-12">
+        <AppShot chrome="app.taskforce.dev/runs/checkout-redesign · audit">
+          <Toast
+            className="right-4 top-4"
+            icon={
+              <span className="flex size-5 items-center justify-center rounded-full bg-emerald-500 text-white">
+                <Check className="size-3" strokeWidth={3} />
+              </span>
+            }
+          >
+            <span className="font-medium">Approved</span> · CTO · logged to the audit trail
+          </Toast>
+        </AppShot>
+        <p className="text-muted-foreground mt-3 text-[12.5px]">
+          Your real audit view drops in here — every approval, rejection and model call, attributable.
+        </p>
+      </div>
+
       {/* Checklist en 3 colonnes */}
-      <div className="mt-12 grid gap-x-10 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-14 grid gap-x-10 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
         {TRUST_COLUMNS.map((col) => (
           <div key={col.group}>
             <p className="text-muted-foreground flex items-center gap-2 text-[13px] font-medium">
@@ -70,9 +95,20 @@ export function Trust() {
         ))}
       </div>
 
-      <div className="mt-12 flex flex-wrap gap-3">
+      {/* Conformité dite sans surpromesse (review 7 : « SOC 2 in progress » invite « montrez le
+          rapport »). On parle d'architecture PRÊTE et de feuille de route, pas de certif obtenue. */}
+      <p className="text-muted-foreground mt-12 text-[13px]">
+        Built for SOC 2 readiness, GDPR-ready by architecture, with a security roadmap you can read
+        on the{" "}
+        <a href="/trust" className="link-underline text-foreground">
+          trust center
+        </a>
+        .
+      </p>
+
+      <div className="mt-8 flex flex-wrap gap-3">
         <Button asChild variant="outline" size="pill">
-          <a href="/trust">Trust center</a>
+          <a href="/trust">Read the trust center</a>
         </Button>
         <Button asChild variant="ghost" size="pill">
           <a href="/legal/ai-transparency">
@@ -97,17 +133,19 @@ const INTEGRATIONS = [
 
 export function Integrations() {
   return (
-    <Section band>
+    <Section>
       <div className="flex flex-wrap items-end justify-between gap-6">
         <SectionHeader
           eyebrow="Integrations"
           level="live"
-          title={
+          title="TaskForce doesn’t replace your stack. It connects to it."
+          lead={
             <>
-              Connects to <span className="text-primary">60+</span> tools you already pay for
+              The same connector catalogue as the app — <span className="text-primary">60+</span>{" "}
+              tools across your tracker, repo, chat and cloud. Adding one is a line of configuration,
+              not a release.
             </>
           }
-          lead="Same connector catalogue as the app. Adding a tool is a line of configuration, not a release."
         />
         <a
           href="/integrations"
@@ -149,8 +187,8 @@ const AHEAD = [
     text: "Every checkpoint that gets reliable is one you stop writing yourself. The direction is not fewer humans — it is humans spending their time on the decisions instead of the paperwork around them.",
   },
   {
-    title: "Beyond engineering",
-    text: "The mechanism is a governed run with a sign-off at each step. Nothing about that is specific to code, and the teams that ship work through review all have the same problem.",
+    title: "An intelligence layer for the organization",
+    text: "The decisions, constraints and trade-offs one run records don’t belong to engineering alone. The same graph that tells an agent why the system is the way it is can tell any team why the organization is — a live model to decide on top of, not a wiki to search.",
   },
   {
     title: "Still your infrastructure",
@@ -164,9 +202,9 @@ export function WhereThisGoes() {
       <div className="grid gap-10 lg:grid-cols-[minmax(0,420px)_1fr] lg:gap-16">
         <div>
           <SectionHeader
-            eyebrow="Direction"
-            title="Where this goes"
-            lead="TaskForce runs software delivery today. What we are building toward is published as a dated roadmap — so you can hold us to it rather than trust a pitch."
+            eyebrow="The direction"
+            title="Software teams won’t hand-write specs forever"
+            lead="TaskForce runs software delivery today — that’s the wedge, not the ceiling. The memory that keeps one run’s context is the same intelligence an organization loses everywhere else: in meetings, in chat, in people’s heads. The destination is to make it the active layer every team decides on top of. The roadmap is dated — hold us to it rather than trust a pitch."
           />
           <Button asChild variant="outline" size="pill" className="mt-8">
             <a href="/roadmap">
@@ -193,9 +231,9 @@ export function WhereThisGoes() {
 
 export function FinalCta() {
   return (
-    <section className="bg-card">
+    <section className="bg-secondary">
       <div className="container-rail py-24">
-        <div className="bg-secondary relative overflow-hidden rounded-3xl border px-8 py-16 text-center sm:py-20">
+        <div className="bg-card relative overflow-hidden rounded-3xl border px-8 py-16 text-center sm:py-20">
           <div
             aria-hidden
             className="pointer-events-none absolute top-0 left-1/2 h-72 w-[680px] -translate-x-1/2 rounded-full blur-3xl"
@@ -211,7 +249,7 @@ export function FinalCta() {
           </p>
           <div className="relative mt-8 flex flex-wrap justify-center gap-3">
             <Button asChild size="pill-lg">
-              <a href={`${APP_URL}/auth/register`}>Start for free</a>
+              <a href={`${APP_URL}/auth/register`}>Run your first workflow</a>
             </Button>
             <Button asChild variant="outline" size="pill-lg">
               <a href="/book-a-demo">Book a demo</a>

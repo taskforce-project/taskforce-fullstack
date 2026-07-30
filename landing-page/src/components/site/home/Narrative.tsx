@@ -1,3 +1,4 @@
+import { ArrowRight } from "lucide-react";
 import { Section, SectionHeader, FeatureBand, LevelBadge } from "../Section";
 import { BrandLogo } from "../BrandLogo";
 import { Placeholder } from "../Placeholder";
@@ -43,6 +44,67 @@ export function LogoWall() {
             </li>
           ))}
         </ul>
+      </div>
+    </section>
+  );
+}
+
+/* ─────────────────────────  1a. Manifeste (entre le hero et le problème)  ─────────────────────────
+ * Décision review 3 (27/07) : une phrase-catégorie à dimension historique, façon Linear —
+ * le workflow a été fait pour des humains qui se passent des documents ; l'IA change le
+ * bâtisseur ; le workflow doit changer aussi. Pose la thèse avant d'énoncer le problème. */
+
+export function Manifesto() {
+  return (
+    <section className="bg-secondary border-b">
+      <div className="container-rail py-20 lg:py-28">
+        <div className="max-w-3xl">
+          <p className="t-eyebrow">Why now</p>
+          <p className="t-h2 mt-4">
+            Software delivery was built for humans passing documents.
+            <br />
+            AI changes who produces the work.
+            <br />
+            <span className="text-primary">
+              The workflow must evolve around human judgment, not replace it.
+            </span>
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─────────────────────────  1b. Teaser Brain OS « memory layer » (tôt)  ─────────────────────────
+ * Décision review (26/07 → 27/07, reviews 5-6) : Brain OS arrivait trop tard. On le TEASE tôt
+ * (bande fine, une phrase), la démonstration complète reste plus bas (Synergy → « Inside Brain
+ * OS »). Un seul nom : « Brain OS », descripteur « the memory layer » (plus « context layer »). */
+
+export function BrainTeaser() {
+  return (
+    <section className="bg-card border-b">
+      <div className="container-rail py-14">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="max-w-2xl">
+            <div className="flex flex-wrap items-baseline gap-x-2.5">
+              <p className="t-eyebrow">TaskForce Memory</p>
+              <span className="text-muted-foreground text-[12px]">powered by Brain OS</span>
+            </div>
+            <h2 className="t-h3 mt-2">Your organization has memory. Your AI should too.</h2>
+            <p className="text-muted-foreground mt-2 text-[14px] leading-6">
+              Every architectural decision, constraint and convention becomes reusable intelligence —
+              so a senior stops re-explaining the system for two hours, and the next run (or the next
+              hire) never starts from a blank page.
+            </p>
+          </div>
+          <a
+            href="/product/brain-os"
+            className="link-underline text-primary inline-flex shrink-0 items-center gap-1 text-[14px] font-medium"
+          >
+            Inside TaskForce Memory
+            <ArrowRight className="size-4" />
+          </a>
+        </div>
       </div>
     </section>
   );
@@ -113,7 +175,7 @@ export function Anatomy() {
       <SectionHeader
         eyebrow="Anatomy of a run"
         title="Every checkpoint leaves something behind that you can read"
-        lead="This is the whole product, in order. Not a black box that returns a pull request — a sequence of artefacts, each one attributable, each one refusable."
+        lead="This is the whole product, in order. Not a black box that returns a pull request — a sequence of artifacts, each one attributable, each one refusable."
       />
 
       <div className="bg-card mt-14 overflow-x-auto rounded-2xl border">
