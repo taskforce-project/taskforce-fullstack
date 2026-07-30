@@ -1,0 +1,80 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import PageHero from "@/components/site/PageHero.astro";
+import PageCta from "@/components/site/PageCta.astro";
+import Prose from "@/components/site/Prose.astro";
+---
+
+<BaseLayout
+  title="AI transparency — TaskForce"
+  description="How AI is used in TaskForce: what it does and doesn't do, which models run where, how a human stays accountable, and why your data is never training data."
+>
+  <PageHero
+    eyebrow="AI transparency"
+    title="How AI is used in TaskForce"
+    lead="TaskForce puts AI in your delivery path, so it should be legible. Here is exactly what the models do, what they never do on their own, and the controls you keep."
+  />
+
+  <section class="bg-card border-b">
+    <div class="container-rail py-16 lg:py-20">
+      <Prose>
+        <h2>What the AI does</h2>
+        <p>
+          Inside a run, AI agents <strong>frame the problem, draft the spec, propose an approach,
+          write the API contract and break the work into issues</strong>. Implementation is handed
+          to the coding agent you already use. Every one of these is a draft, produced from your
+          workspace context — not a decision.
+        </p>
+
+        <h2>What it never does on its own</h2>
+        <p>
+          Nothing advances without a person. Each checkpoint of a run <strong>waits for a human to
+          approve, edit or send it back</strong> before the next step begins. The AI proposes; a
+          named human disposes. That gate is the product, not a setting you can quietly turn off.
+        </p>
+
+        <h2>Which models run, and where</h2>
+        <p>
+          TaskForce is model-agnostic. It can call hosted models (such as Claude or OpenAI) or run
+          local, open models through Ollama on your own hardware. You can choose the model per step,
+          and an enterprise deployment can restrict runs to local models only.
+        </p>
+        <ul>
+          <li>Every model call is logged: which model ran which step, on whose infrastructure.</li>
+          <li>Model choice is a configuration, not a code change.</li>
+          <li>Self-hosting keeps prompts and outputs inside your network.</li>
+        </ul>
+
+        <h2>Your data is not training data</h2>
+        <p>
+          Your code, decisions and documents are <strong>never used to train models</strong>. What
+          enters a run stays in your workspace, and self-hosting keeps it on your infrastructure.
+          The memory a run builds is an asset you own — not a corpus we harvest.
+        </p>
+
+        <h2>Accountability and its limits</h2>
+        <p>
+          AI can be confidently wrong. That is precisely why TaskForce is built around human
+          approval and a full audit trail rather than autonomy: the person who approves a checkpoint
+          is accountable for it, and every approval, rejection and model call is attributable after
+          the fact. You get the leverage of agents without handing them the final say.
+        </p>
+
+        <h2>The controls you keep</h2>
+        <ul>
+          <li>A required human sign-off at every checkpoint.</li>
+          <li>Model selection per step, including local-only deployments.</li>
+          <li>A full audit trail of who approved what, when, and which model ran where.</li>
+          <li>Self-hosting, so data and models stay on your own network.</li>
+        </ul>
+      </Prose>
+    </div>
+  </section>
+
+  <PageCta
+    title="Questions from your security team?"
+    lead="The trust center covers data handling, access and the security roadmap. If something isn't there, ask us."
+    primary={{ label: "Open the trust center", href: "/trust" }}
+    secondary={{ label: "Talk to us", href: "/book-a-demo" }}
+  />
+</BaseLayout>
