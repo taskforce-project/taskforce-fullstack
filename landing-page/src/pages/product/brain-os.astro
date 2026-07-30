@@ -1,0 +1,75 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import PageHero from "@/components/site/PageHero.astro";
+import PageCta from "@/components/site/PageCta.astro";
+import { DecisionGraph } from "@/components/site/home/DecisionGraph";
+import { APP_URL } from "@/components/site/nav";
+
+const POINTS = [
+  {
+    title: "Decisions become objects, not prose",
+    text: "Each decision links to the constraints it answered, the alternatives it beat and the files it shaped — structured, not buried in a doc nobody reopens.",
+  },
+  {
+    title: "A map of why, not a search box",
+    text: "Retrieval follows the causal links between decisions, so a run gets the reason behind the code — not the ten pages that happen to share a keyword.",
+  },
+  {
+    title: "Every run reads it, and writes back to it",
+    text: "Context enters before the first run and compounds after each one. A senior stops re-explaining the system; the next run starts where the last one ended.",
+  },
+  {
+    title: "Your organization's memory — not the model's",
+    text: "It lives in your workspace, on your infrastructure if you want, and is never training data. The memory is an asset you own, not a vendor's.",
+  },
+];
+---
+
+<BaseLayout
+  title="TaskForce Memory — powered by Brain OS"
+  description="The memory layer for every run. Architectural decisions, constraints and conventions become reusable intelligence — a map of why, not a search box over your docs."
+>
+  <PageHero
+    kicker="TaskForce Memory"
+    title="The memory layer for every run"
+    lead="Powered by Brain OS. Every architectural decision, constraint and convention your team makes becomes reusable intelligence — so the next run, and the next hire, never start from a blank page."
+    level="beta"
+    primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
+    secondary={{ label: "See the dated roadmap", href: "/roadmap" }}
+  />
+
+  <section class="bg-secondary border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">Not a RAG over your wiki</p>
+        <h2 class="t-h2">Git remembers what changed.<br class="hidden sm:block" /> TaskForce remembers why.</h2>
+        <p class="t-lead mt-4">
+          TaskForce Memory links each decision to the constraints it answered, the alternatives it
+          beat and the code it shaped — so the reasoning is retrievable long after the thread, the
+          meeting and the person who made it are gone.
+        </p>
+      </div>
+
+      <div class="mt-14 grid gap-10 lg:grid-cols-2 lg:items-center lg:gap-16">
+        <DecisionGraph />
+        <ul class="flex flex-col gap-7">
+          {
+            POINTS.map((p) => (
+              <li class="border-l-2 border-primary/25 pl-5">
+                <h3 class="text-[15px] font-semibold text-foreground">{p.title}</h3>
+                <p class="text-muted-foreground mt-1.5 text-[14px] leading-6">{p.text}</p>
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <PageCta
+    title="Give your organization a memory"
+    lead="It starts filling on your first run — every decision, constraint and trade-off, kept where the next run can use it."
+    primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
+    secondary={{ label: "Book a demo", href: "/book-a-demo" }}
+  />
+</BaseLayout>

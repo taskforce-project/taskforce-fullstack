@@ -1,0 +1,101 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import PageHero from "@/components/site/PageHero.astro";
+import PageCta from "@/components/site/PageCta.astro";
+import { ShieldCheck, KeyRound, ScrollText, SlidersHorizontal, ShieldOff, LifeBuoy, ArrowRight } from "lucide-react";
+import { APP_URL } from "@/components/site/nav";
+
+const PILLARS = [
+  {
+    icon: ShieldCheck,
+    title: "Runs on your infrastructure",
+    text: "Self-host the whole platform on your own network — your models, your data, your hardware. Self-hosting is a first-class way to run TaskForce, not an enterprise upsell.",
+  },
+  {
+    icon: KeyRound,
+    title: "SSO and SAML via Keycloak",
+    text: "Bring identity through your own provider. Sessions, roles and per-project access map to the teams and boundaries you already have.",
+  },
+  {
+    icon: ScrollText,
+    title: "A full audit trail",
+    text: "Every checkpoint records what produced it, who approved it and which model ran where. Every run is attributable by default.",
+  },
+  {
+    icon: SlidersHorizontal,
+    title: "Roles and sign-off controls",
+    text: "Granular permissions, and a required human sign-off at each checkpoint. Nothing ships without someone accountable for it.",
+  },
+  {
+    icon: ShieldOff,
+    title: "No training on your data",
+    text: "Your code, decisions and documents are never used to train models. What is yours stays yours — that is architectural, not a setting.",
+  },
+  {
+    icon: LifeBuoy,
+    title: "Deployment and support",
+    text: "From Docker Compose to your own cluster, with help standing it up and a security roadmap you can read on the trust center.",
+  },
+];
+---
+
+<BaseLayout
+  title="Enterprise — TaskForce"
+  description="TaskForce for engineering organizations: self-hosting, SSO via Keycloak, granular roles, a full audit trail, no training on your data, and human sign-off at every checkpoint."
+>
+  <PageHero
+    kicker="Enterprise"
+    title="AI in your delivery path, on your terms"
+    lead="TaskForce keeps a human accountable at every checkpoint and can run entirely on your own infrastructure — so you get agent leverage without giving up control, attribution or your data."
+    primary={{ label: "Book a demo", href: "/book-a-demo" }}
+    secondary={{ label: "Read the trust center", href: "/trust" }}
+  />
+
+  <section class="bg-secondary border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="grid gap-x-10 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
+        {
+          PILLARS.map((p) => (
+            <div>
+              <span class="bg-card text-foreground flex size-11 items-center justify-center rounded-xl border">
+                <p.icon className="size-5" strokeWidth={1.75} />
+              </span>
+              <h3 class="mt-4 text-[16px] font-semibold text-foreground">{p.title}</h3>
+              <p class="text-muted-foreground mt-2 text-[14px] leading-6">{p.text}</p>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  {/* Renvoi honnête vers le détail plutôt qu'une liste de badges de conformité. */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-16">
+      <div class="flex flex-col items-start justify-between gap-6 sm:flex-row sm:items-center">
+        <div class="max-w-xl">
+          <h2 class="t-h3">Built for SOC 2 readiness, GDPR-ready by architecture</h2>
+          <p class="text-muted-foreground mt-2 text-[14px] leading-6">
+            No obtained-certification theatre. The controls, the data flows and the security
+            roadmap are written down where your team can review them before you commit.
+          </p>
+        </div>
+        <a
+          href="/trust"
+          class="link-underline text-foreground flex shrink-0 items-center gap-1.5 text-[14px] font-medium"
+        >
+          Open the trust center
+          <ArrowRight className="size-4" />
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <PageCta
+    title="Bring TaskForce to your organization"
+    lead="Book a call and we'll walk your team through the architecture, the controls and a deployment that fits your environment."
+    primary={{ label: "Book a demo", href: "/book-a-demo" }}
+    secondary={{ label: "Start free", href: `${APP_URL}/auth/register` }}
+    note="Self-hosting available from day one."
+  />
+</BaseLayout>

@@ -1,54 +1,42 @@
 ---
 import BaseLayout from "@/layouts/BaseLayout.astro";
 import { Hero } from "@/components/site/home/Hero";
-import {
-  LogoWall,
-  Anatomy,
-  Pipeline,
-  Agents,
-  Approvals,
-} from "@/components/site/home/Narrative";
-import { BrainOS, SmartAssign, Models, Analytics } from "@/components/site/home/Features";
-import { Leaks, WhyOneSystem, Maturity } from "@/components/site/home/Platform";
-import { Trust, Integrations, WhereThisGoes, FinalCta } from "@/components/site/home/Proof";
+import { BrainTeaser } from "@/components/site/home/Narrative";
+import { Problem } from "@/components/site/home/Platform";
+import { RunTimeline } from "@/components/site/home/RunTimeline";
+import { BeforeAfter, TeamGrid, Synergy } from "@/components/site/home/Showcase";
+import { Trust, WhereThisGoes, FinalCta } from "@/components/site/home/Proof";
 ---
 
 <BaseLayout
   title="TaskForce — AI Delivery Operating System"
   description="Describe the outcome and TaskForce runs the delivery: agents plan and draft every step, a human approves each checkpoint, and the models can run on your own hardware."
 >
-  {/* Ordre : problème → mécanisme → garantie → composants → conséquence → honnêteté → preuve.
-      Chaque section répond à la question que la précédente vient de poser.
+  {/* PASSE DE RÉDUCTION (review 13, validée) : 16 → 10 sections, tout accroché à l'idée UNIQUE
+      « software delivery loses context; TaskForce preserves it from intent to production ».
+      Coupées / absorbées comme PREUVES (plus des « produits » séparés) :
+        · Manifesto  → l'idée vit dans Problem
+        · Pillars    → fondu dans Synergy (« Why it's different »)
+        · Foundations→ redondant avec les bullets du Run + la checklist Trust
+        · Integrations→ compat couverte par TeamGrid (« sits on your board/repo ») + logos du hero
+        · Phases     → fondu dans TeamGrid (getting started / missing layer)
+        · Maturity   → Vision porte déjà « dated roadmap »
 
-      ⚠️ `client:idle` et non `client:visible` : Astro rend `<astro-island>` en
-      `display: contents`, donc l'élément a une boîte de 0×0 et l'IntersectionObserver du
-      directive `visible` ne se déclenche jamais — les îlots restaient en `ssr` indéfiniment
-      (animations figées, recherche des intégrations inerte). `idle` ne dépend d'aucune
-      géométrie. La paresse n'est pas perdue pour autant : chaque illustration porte son
-      propre IntersectionObserver et ne joue que lorsqu'elle est réellement à l'écran. */}
-  <Hero client:load />
-  <LogoWall />
+      Spine : IDÉE (Problem + Before/After, la démo des fuites) → PRODUIT (Run) → MOAT (Memory) →
+      WHY DIFFERENT (Synergy) → PREUVE (Enterprise) → WHO/HOW (Teams) → FUTUR (Vision) → TRY.
+      Bandes alternées blanc/gris. 1 seul îlot (RunTimeline, `client:idle`). */}
+  <Hero />
 
-  <!-- Le problème, puis ce qu'un run y répond -->
-  <Leaks client:idle />
-  <Anatomy />
-  <Pipeline client:idle />
-  <Approvals client:idle />
+  <Problem />
+  <BeforeAfter />
 
-  <!-- Ce qui fait tourner le run -->
-  <Agents client:idle />
-  <BrainOS client:idle />
-  <SmartAssign client:idle />
-  <Models client:idle />
-  <Analytics client:idle />
+  <RunTimeline client:idle />
+  <BrainTeaser />
+  <Synergy />
 
-  <!-- Pourquoi un seul système, et où en est vraiment le produit -->
-  <WhyOneSystem client:idle />
-  <Maturity />
-
-  <!-- Preuves et sortie -->
   <Trust />
-  <Integrations client:idle />
+  <TeamGrid />
+
   <WhereThisGoes />
   <FinalCta />
 </BaseLayout>

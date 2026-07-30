@@ -1,0 +1,62 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import PageHero from "@/components/site/PageHero.astro";
+import { DemoForm } from "@/components/site/DemoForm";
+import { Check } from "lucide-react";
+import { APP_URL } from "@/components/site/nav";
+
+const EXPECT = [
+  "A working run on a real outcome — not a slide deck.",
+  "How approvals, memory and your existing coding agents fit your process.",
+  "Self-hosting, SSO and the audit trail, if that's on your list.",
+  "Straight answers on what's live today versus on the roadmap.",
+];
+---
+
+<BaseLayout
+  title="Book a demo — TaskForce"
+  description="See TaskForce run on a real outcome. A 30-minute call on your workflow: approvals, memory, your existing agents, and self-hosting if you need it."
+>
+  <PageHero
+    eyebrow="Book a demo"
+    title="See it run on your own workflow"
+    lead="Thirty minutes, on a real outcome from your team. We'll show the governed run end to end and answer the hard questions — no obligation."
+  />
+
+  <section class="bg-secondary border-b">
+    <div class="container-rail py-16 lg:py-20">
+      <div class="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,440px)] lg:gap-16">
+        <div>
+          <h2 class="t-h3">What to expect</h2>
+          <ul class="mt-6 flex flex-col gap-4">
+            {
+              EXPECT.map((e) => (
+                <li class="flex items-start gap-3 text-[14.5px] leading-6 text-foreground">
+                  <Check className="text-primary mt-[3px] size-4 shrink-0" strokeWidth={2.5} />
+                  {e}
+                </li>
+              ))
+            }
+          </ul>
+
+          <div class="mt-10 border-t pt-8">
+            <p class="text-muted-foreground text-[14px] leading-6">
+              Ready to try it now instead? You can start free — no credit card, self-hosting
+              available from day one.
+            </p>
+            <a
+              href={`${APP_URL}/auth/register`}
+              class="link-underline text-foreground mt-3 inline-block text-[14px] font-medium"
+            >
+              Create an account
+            </a>
+          </div>
+        </div>
+
+        <div class="bg-card h-fit rounded-2xl border p-6 shadow-sm sm:p-8">
+          <DemoForm client:load />
+        </div>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

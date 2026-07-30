@@ -1,0 +1,31 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import PageHero from "@/components/site/PageHero.astro";
+import PageCta from "@/components/site/PageCta.astro";
+import { Trust } from "@/components/site/home/Proof";
+---
+
+<BaseLayout
+  title="Trust center — TaskForce"
+  description="Security, privacy and control at TaskForce: self-hosting, SSO via Keycloak, a full audit trail, no training on your data, and a security roadmap you can hold us to."
+>
+  <PageHero
+    band
+    eyebrow="Trust center"
+    title="Security you can verify, not just claim"
+    lead="TaskForce puts AI in your delivery path, so it should answer for it. Here is how data is handled, who can do what, and what every run leaves behind — with a roadmap you can hold us to."
+    primary={{ label: "Read the AI transparency note", href: "/legal/ai-transparency" }}
+    secondary={{ label: "Talk to us", href: "/book-a-demo" }}
+  />
+
+  {/* La section Enterprise de la home, dans son contexte naturel : triade, vue d'audit,
+      checklist sécurité/accès/supervision, et la note conformité sans surpromesse. */}
+  <Trust />
+
+  <PageCta
+    title="Bring it to your security team"
+    lead="Send us the questionnaire, or book a call and we'll walk your team through the architecture, the controls and the roadmap."
+    primary={{ label: "Book a security review", href: "/book-a-demo" }}
+    secondary={{ label: "AI transparency", href: "/legal/ai-transparency" }}
+  />
+</BaseLayout>

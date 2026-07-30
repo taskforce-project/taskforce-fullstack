@@ -1,0 +1,346 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import PageHero from "@/components/site/PageHero.astro";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import {
+  ShieldCheck,
+  Compass,
+  Building2,
+  CalendarClock,
+  BrainCircuit,
+  Boxes,
+  Server,
+  ArrowRight,
+  Target,
+} from "lucide-react";
+import { APP_URL } from "@/components/site/nav";
+
+/* Owner par couleur — lane C-level (produit / techno / delivery / vos outils). */
+const OWNER_STYLE: Record<string, string> = {
+  "CPO agent": "bg-violet-50 text-violet-700 border-violet-200",
+  "CTO agent": "bg-blue-50 text-blue-700 border-blue-200",
+  "COO agent": "bg-amber-50 text-amber-700 border-amber-200",
+  "Coding agent": "bg-slate-100 text-slate-600 border-slate-200",
+};
+
+/* La chaîne de décisions — copie validée par le user (07/30). */
+const RUN = [
+  { n: 1, title: "Frame the problem", agent: "CPO agent", desc: "Problem, users, outcome, definition of done." },
+  { n: 2, title: "Draft the product spec", agent: "CPO agent", desc: "Stories, acceptance criteria, edge cases and priorities." },
+  { n: 3, title: "Propose the approach", agent: "CTO agent", desc: "Architecture, trade-offs, technical risks and constraints." },
+  { n: 4, title: "Write the API contract", agent: "CTO agent", desc: "Endpoints, payloads, errors and data contracts." },
+  { n: 5, title: "Break down the work", agent: "COO agent", desc: "Issues, dependencies, estimates and delivery sequence." },
+  { n: 6, title: "Execute", agent: "Coding agent", desc: "Your approved context is handed to Claude Code, Cursor or the coding agent you already use." },
+  { n: 7, title: "QA and sign-off", agent: "COO agent", desc: "Verification against the original acceptance criteria." },
+];
+
+/* Les 3 rôles — rôles exacts road_to_v2/Agents_C_Level.md, copie user. */
+const AGENTS = [
+  {
+    code: "CPO",
+    owns: "the what",
+    icon: Compass,
+    box: "ring-violet-200 text-violet-600",
+    desc: "Shapes the product: vision, specifications, priorities and acceptance criteria.",
+    predicts: "“This scope should produce 8 issues, require ~6 days, and depends on X.”",
+  },
+  {
+    code: "CTO",
+    owns: "the how",
+    icon: Building2,
+    box: "ring-blue-200 text-blue-600",
+    desc: "Owns technical coherence: architecture, APIs, data, trade-offs and technical risk.",
+    predicts: "“This approach should add ~40ms latency, increase infrastructure cost by X, and carry Y regression risk.”",
+  },
+  {
+    code: "COO",
+    owns: "the when & the risk",
+    icon: CalendarClock,
+    box: "ring-amber-200 text-amber-600",
+    desc: "Owns delivery: sequencing, capacity, dependencies, milestones and drift.",
+    predicts: "“This dependency puts the milestone at risk by ~2 days.”",
+  },
+];
+
+const PRINCIPLES = [
+  { icon: BrainCircuit, title: "Grounded", desc: "Every proposal is built from your architecture, decisions, constraints and conventions." },
+  { icon: Boxes, title: "Specialized", desc: "Each agent operates within a defined responsibility instead of pretending to be an expert at everything." },
+  { icon: ShieldCheck, title: "Governed", desc: "Every transition is a human decision. Approval is part of the workflow, not a checkbox in the settings." },
+  { icon: Server, title: "Model-agnostic", desc: "Use hosted models, local models through Ollama, or different models for different checkpoints." },
+];
+
+const PREDICTION_FLOW = ["Prediction", "Decision", "Execution", "Outcome", "Calibration"];
+const MEMORY_FLOW = ["Memory", "Orchestration", "Decision", "Memory"];
+const PROOF_CHIPS = ["7 checkpoints", "3 specialized agents", "Human approval at every gate"];
+---
+
+<BaseLayout
+  title="Orchestration — TaskForce"
+  description="TaskForce turns a product outcome into a governed delivery run. Specialized agents handle product, architecture and delivery; your team validates every decision before work moves forward. The AI proposes. Your team decides."
+>
+  <PageHero
+    kicker="Orchestration"
+    title="From intention to deploy — through validated decisions."
+    lead="TaskForce is building a governed delivery engine that turns product outcomes into validated decisions — from product framing to deployment. Specialized agents handle product, architecture and delivery; your team validates every decision before work moves forward."
+    level="labs"
+  >
+    <p class="text-foreground mt-7 text-[19px] font-medium tracking-[-0.01em]">
+      The AI proposes. Your team decides.
+    </p>
+    <ul class="mt-8 flex flex-wrap gap-2.5">
+      {
+        PROOF_CHIPS.map((c) => (
+          <li class="bg-secondary/60 text-foreground flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[13px] font-medium">
+            <span class="bg-primary size-1.5 rounded-full" aria-hidden />
+            {c}
+          </li>
+        ))
+      }
+    </ul>
+  </PageHero>
+
+  {/* ────────── The run ────────── */}
+  <section class="bg-secondary border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">The run</p>
+        <h2 class="t-h2">One outcome. Seven decisions. One accountable chain.</h2>
+        <p class="t-lead mt-4">
+          A software project is not one task for an AI to complete. It is a sequence of decisions
+          that compound. TaskForce turns each decision into a checkpoint: the right agent proposes
+          the next step, your team reviews it, and only an approved decision becomes context for
+          what follows.
+        </p>
+      </div>
+
+      <ol class="mt-12 flex flex-col">
+        {
+          RUN.map((step, i) => (
+            <li class="flex gap-5">
+              {/* Rail : numéro + trait de chaîne */}
+              <div class="flex flex-col items-center">
+                <span class="border-primary/30 bg-card text-primary flex size-9 shrink-0 items-center justify-center rounded-full border text-[13px] font-semibold">
+                  {step.n}
+                </span>
+                {i < RUN.length - 1 && <span class="bg-border my-1 w-px flex-1" aria-hidden />}
+              </div>
+              {/* Décision */}
+              <div class:list={["min-w-0 flex-1", i < RUN.length - 1 ? "pb-7" : "pb-0"]}>
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                  <h3 class="text-[15.5px] font-semibold text-foreground">{step.title}</h3>
+                  <span
+                    class:list={[
+                      "rounded border px-1.5 py-px text-[10px] font-medium",
+                      OWNER_STYLE[step.agent],
+                    ]}
+                  >
+                    {step.agent}
+                  </span>
+                </div>
+                <p class="text-muted-foreground mt-1.5 text-[13.5px] leading-6">{step.desc}</p>
+              </div>
+            </li>
+          ))
+        }
+      </ol>
+
+      <div class="border-primary/25 bg-primary/[0.05] mt-10 flex items-start gap-2.5 rounded-xl border px-4 py-3.5">
+        <ShieldCheck className="text-primary mt-0.5 size-4 shrink-0" strokeWidth={2} />
+        <p class="text-[13.5px] leading-6 text-foreground">
+          Every checkpoint waits for approval. Nothing silently becomes the next decision.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  {/* ────────── The team ────────── */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">The team</p>
+        <h2 class="t-h2">Not one agent. A delivery team.</h2>
+        <p class="t-lead mt-4">
+          Most AI coding tools give you one generalist that tries to understand everything.
+          TaskForce splits responsibility the way a strong software organization does.
+        </p>
+      </div>
+
+      <div class="mt-12 grid gap-6 lg:grid-cols-3">
+        {
+          AGENTS.map((a) => (
+            <div class="flex flex-col rounded-2xl border bg-card p-6">
+              <div class="flex items-center gap-3">
+                <span class:list={["bg-card flex size-11 items-center justify-center rounded-xl border ring-1", a.box]}>
+                  <a.icon className="size-5" strokeWidth={1.75} />
+                </span>
+                <div>
+                  <p class="text-[16px] font-semibold text-foreground">{a.code}</p>
+                  <p class="text-muted-foreground text-[12px] italic">{a.owns}</p>
+                </div>
+              </div>
+              <p class="text-muted-foreground mt-4 text-[13.5px] leading-6">{a.desc}</p>
+              <div class="bg-secondary/50 mt-auto flex flex-col gap-1 rounded-lg border px-3 pt-2.5 pb-3">
+                <span class="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">Predicts</span>
+                <span class="text-[12.5px] leading-5 text-foreground">{a.predicts}</span>
+              </div>
+            </div>
+          ))
+        }
+      </div>
+
+      <p class="mt-8 text-[15px] font-medium text-foreground">
+        Three perspectives. One run. No agent gets the final say.
+      </p>
+    </div>
+  </section>
+
+  {/* ────────── Why orchestration is the moat ────────── */}
+  <section class="bg-secondary border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">Why orchestration matters</p>
+        <h2 class="t-h2">The model is replaceable. The orchestration isn't.</h2>
+        <p class="t-lead mt-4">
+          Models will change. Providers will change. Coding agents will change. The hard part is not
+          generating another specification — it is coordinating the chain of decisions that turns an
+          intention into software, while preserving context, exposing trade-offs and keeping humans
+          accountable. TaskForce orchestrates that chain.
+        </p>
+      </div>
+
+      <div class="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        {
+          PRINCIPLES.map((p) => (
+            <div class="rounded-2xl border bg-card p-5">
+              <span class="bg-secondary/60 text-foreground flex size-10 items-center justify-center rounded-lg border">
+                <p.icon className="size-5" strokeWidth={1.75} />
+              </span>
+              <h3 class="mt-4 text-[15px] font-semibold text-foreground">{p.title}</h3>
+              <p class="text-muted-foreground mt-1.5 text-[13px] leading-6">{p.desc}</p>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  {/* ────────── Prediction (le futur moat) ────────── */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">From generation to accountability</p>
+        <h2 class="t-h2">Don't just generate. Predict.</h2>
+        <p class="t-lead mt-4">
+          Most AI systems are evaluated on whether their output looks good. TaskForce can evaluate
+          something harder:
+        </p>
+        <p class="font-display mt-6 text-[26px] font-medium tracking-[-0.02em] text-foreground">
+          Was the decision right?
+        </p>
+        <p class="text-muted-foreground mt-5 text-[15px] leading-7">
+          Each agent makes a prediction before the work moves forward — expected effort,
+          dependencies, risk, performance, cost or delivery impact. Once the work ships, TaskForce
+          can compare the prediction with reality.
+        </p>
+      </div>
+
+      {/* La boucle de calibration — visuel sur-mesure */}
+      <div class="mt-10 rounded-2xl border p-6 sm:p-8 [background:radial-gradient(120%_120%_at_50%_0%,color-mix(in_oklab,var(--primary)_7%,transparent),transparent_70%)]">
+        <div class="flex flex-wrap items-center gap-x-2 gap-y-3 font-mono text-[12.5px]">
+          {
+            PREDICTION_FLOW.map((s, i) => (
+              <span class="flex items-center gap-2">
+                {i > 0 && <ArrowRight className="text-muted-foreground/50 size-3.5" />}
+                <span
+                  class:list={[
+                    "rounded-md border px-2.5 py-1",
+                    i === PREDICTION_FLOW.length - 1
+                      ? "border-primary/30 bg-primary/10 text-primary font-medium"
+                      : "bg-card text-foreground",
+                  ]}
+                >
+                  {s}
+                </span>
+              </span>
+            ))
+          }
+        </div>
+        <p class="text-muted-foreground mt-6 max-w-2xl text-[14px] leading-7">
+          That creates a feedback loop. The long-term goal is a system that doesn't just remember
+          what your organization decided —
+          <span class="text-foreground font-medium"> but learns how reliable its own decisions are.</span>
+        </p>
+        <span class="border-primary/30 bg-primary/5 text-primary mt-6 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-semibold tracking-wide uppercase">
+          <Target className="size-3.5" strokeWidth={2} />
+          Coming next · Prediction calibration
+        </span>
+      </div>
+    </div>
+  </section>
+
+  {/* ────────── Memory ────────── */}
+  <section class="bg-secondary border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">Memory</p>
+        <h2 class="t-h2">Every decision has a reason. Keep it.</h2>
+        <p class="t-lead mt-4">
+          TaskForce Memory gives the orchestration the context behind the system — not just the
+          documents describing it. Architecture decisions. Constraints. Conventions. Trade-offs. Rejected
+          alternatives. The orchestration reads that context before proposing, and approved decisions
+          become context for what comes next. Over time, the system builds a map of why your
+          organization works the way it does.
+        </p>
+      </div>
+
+      <div class="mt-10 flex flex-wrap items-center gap-x-2 gap-y-3 font-mono text-[12.5px]">
+        {
+          MEMORY_FLOW.map((s, i) => (
+            <span class="flex items-center gap-2">
+              {i > 0 && <ArrowRight className="text-muted-foreground/50 size-3.5" />}
+              <span class="bg-card text-foreground rounded-md border px-2.5 py-1">{s}</span>
+            </span>
+          ))
+        }
+      </div>
+
+      <a
+        href="/product/brain-os"
+        class="link-underline text-foreground mt-8 inline-flex items-center gap-1.5 text-[14px] font-medium"
+      >
+        Go deeper on TaskForce Memory
+        <ArrowRight className="size-4" />
+      </a>
+    </div>
+  </section>
+
+  {/* ────────── Conclusion ────────── */}
+  <section class="bg-card">
+    <div class="container-rail py-24">
+      <div class="mx-auto max-w-2xl text-center">
+        <h2 class="t-h2">Describe the outcome. Let the team work the path.</h2>
+        <p class="text-muted-foreground mx-auto mt-6 max-w-xl text-[15px] leading-7">
+          Give TaskForce the outcome you were going to spec by hand. The CPO shapes it, the CTO makes
+          it coherent, the COO makes it deliverable. Your team decides at every gate. Your coding
+          agent builds it.
+        </p>
+        <p class="font-display mt-8 text-[22px] font-medium tracking-[-0.02em] text-foreground">
+          The AI does the work between decisions. You own the decisions.
+        </p>
+        <div class="mt-9 flex flex-wrap justify-center gap-3">
+          <a href={`${APP_URL}/auth/register`} class={cn(buttonVariants({ size: "pill-lg" }))}>
+            Run your first workflow
+          </a>
+          <a href="/roadmap" class={cn(buttonVariants({ variant: "outline", size: "pill-lg" }))}>
+            See the roadmap
+          </a>
+        </div>
+        <p class="text-muted-foreground mt-6 text-[12.5px]">
+          Orchestration is <span class="text-foreground font-medium">Planned</span> — the direction
+          TaskForce is built toward. The board, approvals and memory ship today.
+        </p>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
