@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Check } from "lucide-react";
+import { APP_URL } from "@/components/site/nav";
 
 /**
  * PricingSection — page Pricing (light-only). 3 tiers alignés sur le modèle produit
@@ -27,7 +28,7 @@ const TIERS: Tier[] = [
     priceAnnual: 0,
     unit: "forever",
     tagline: "For individuals trying out AI delivery.",
-    cta: { label: "Get started", href: "http://localhost:3000/auth/register" },
+    cta: { label: "Get started", href: `${APP_URL}/auth/register` },
     features: [
       { label: "2 workspaces" },
       { label: "Up to 5 members" },
@@ -42,7 +43,7 @@ const TIERS: Tier[] = [
     priceAnnual: 10,
     unit: "per user / month",
     tagline: "For teams shipping software with AI agents.",
-    cta: { label: "Start free trial", href: "http://localhost:3000/auth/register" },
+    cta: { label: "Start free trial", href: `${APP_URL}/auth/register` },
     featured: true,
     features: [
       { label: "Everything in Free" },
@@ -59,7 +60,7 @@ const TIERS: Tier[] = [
     priceMonthly: null,
     priceAnnual: null,
     tagline: "For organizations delivering at scale.",
-    cta: { label: "Talk to sales", href: "/contact" },
+    cta: { label: "Talk to sales", href: "/book-a-demo" },
     features: [
       { label: "Everything in Pro" },
       { label: "Unlimited workspaces & members" },
@@ -127,7 +128,7 @@ function PriceCard({ tier, annual }: { tier: Tier; annual: boolean }) {
       <a
         href={tier.cta.href}
         className={
-          "mt-5 inline-flex h-10 items-center justify-center rounded-lg px-4 text-sm font-medium transition " +
+          "mt-5 inline-flex h-10 items-center justify-center rounded-full px-4 text-sm font-medium transition " +
           (tier.featured
             ? "bg-foreground text-white hover:opacity-90"
             : "border border-black/[0.1] text-foreground hover:bg-secondary/60")
@@ -227,7 +228,7 @@ export function PricingSection() {
           </div>
           <p className="mt-10 text-center text-[13px] text-muted-foreground">
             Still have questions?{" "}
-            <a href="/contact" className="font-medium text-foreground underline underline-offset-4">
+            <a href="/book-a-demo" className="font-medium text-foreground underline underline-offset-4">
               Talk to sales
             </a>
           </p>
