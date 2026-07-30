@@ -185,6 +185,225 @@ point identifiable sur la courbe de lead time.
 | Métronome | `src/lib/useScene.ts` | `useScene(beats)` : partition de durées, démarre à l'entrée à l'écran, se joue **une fois**, **se fige sur l'état final**. `useTypewriter` pour la frappe. `prefers-reduced-motion` → état final direct. |
 | Châssis | `src/components/site/scene/AppWindow.tsx` | Vrai écran TaskForce (voir encadré ci-dessous). **Remplace la barre macOS de `MockFrame`** — trois pastilles + une URL, c'est le signe le plus sûr qu'on regarde un dessin. |
 
+> ### ⚑ v34 (30/07) — Orchestration « verrouillée » : 8 correctifs honnêteté/positionnement (user)
+> Le user valide la page (« vraie page produit, positionnement différenciant ») et donne 8 ajustements
+> avant de la considérer figée. Fil rouge : **ne jamais laisser croire qu'Orchestration est déjà dispo
+> (statut Planned)** + clarifier que le **coding agent = exécutant, pas un 4ᵉ membre C-level**.
+> 1. **Hero lead** plus honnête : « TaskForce **is building** a governed delivery engine that turns
+>    product outcomes into validated decisions — from product framing to deployment. » (au lieu de
+>    « turns … into a governed delivery run », qui sonnait déjà-dispo). 2ᵉ phrase descriptive gardée.
+> 2. « The AI proposes. Your team decides. » — gardée (meilleure phrase de la page).
+> 3. **Étape 6** : `Hand off to your coding agent` / `Your tools` → **`Execute` / `Coding agent`**
+>    (« Your approved context is handed to Claude Code, Cursor… »). Architecture conceptuelle propre :
+>    **CPO → CTO → COO → Coding agent** (les 3 = orchestration ; le coding agent = executor, chip slate
+>    distincte des 3 couleurs C-level). `OWNER_STYLE` : clé `Your tools` → `Coding agent`.
+> 4. Eyebrow moat : **`Why it's the moat` → `Why orchestration matters`** (moins « investor language » ;
+>    le h2 « The model is replaceable. The orchestration isn't. » laisse le lecteur conclure).
+> 5. Transition avant Prediction : eyebrow **`Prediction` → `From generation to accountability`**
+>    (le concept = AI output → prediction → outcome → calibration, pas la prédiction en soi).
+> 6. Anti-ambiguïté (c'est `Coming next`, pas actuel) : « That creates a feedback loop. **The long-term
+>    goal is a system** that doesn't just remember what your org decided — but learns how reliable its
+>    own decisions are. »
+> 7. Memory : « TaskForce Memory gives **the orchestration** the context behind the system » (au lieu de
+>    « every agent ») — Memory devient plus grand qu'un contexte d'agent. Boucle `Memory → Orchestration
+>    → Decision → Memory` gardée (quasi-diagramme d'archi).
+> 8. CTA final « The AI does the work between decisions. You own the decisions. » — gardé tel quel.
+> Histoire en 6 actes assumée : Intention → Orchestration → Specialized agents → Human governance →
+> Execution → Organizational intelligence. Positionnement = **couche de coordination entre intention
+> humaine, modèles IA et systèmes d'exécution** (à pousser partout dans le produit).
+> Vérifié SSR : 200, vite:0, toutes les nouvelles formulations présentes, toutes les anciennes retirées
+> (`Your tools`, `Hand off…`, `Why it's the moat`, `gives every agent`, `it learns how reliable` = 0).
+> Pane toujours mort → visuel à valider en direct.
+
+> ### ⚑ v33 (30/07) — Favicon = logo · fix boutons (bug `buttonVariants` brut) · orchestration = narration produit
+> Retours user : favicon logo dans l'onglet · « les boutons d'orchestration ne sont pas rounded » ·
+> **brief de narration complet** pour la page orchestration (structure + copie exacte).
+> - **Favicon** : `public/favicon.svg` portait un vieux logo (montagne) ≠ logo header. Remplacé par le
+>   **vrai logo TaskForce** (path de `logo-taskforce.svg`) centré dans un viewBox carré `180 79 250 250`
+>   + `@media dark` (fill blanc). L'onglet affiche enfin la marque. (BaseLayout pointait déjà `/favicon.svg`.)
+> - **Vrai bug boutons** : dans les composants Astro j'appelais `buttonVariants({…})` **brut** → la
+>   chaîne cva garde **`rounded-md` (base) ET `rounded-full` (pill)**, et `rounded-md` gagnait (8px,
+>   carré). Le composant React `Button` s'en sort parce qu'il fait `cn(buttonVariants(…))` (twMerge
+>   dédup). Fix : envelopper dans **`cn()`** dans `PageHero.astro` + `PageCta.astro`. Vérifié SSR : la
+>   classe n'a plus que `rounded-full`. Corrige **toutes** les pages internes d'un coup. (≠ le fix v32
+>   qui visait Enterprise-nav + boutons Pricing.)
+> - **`/product/orchestration` réécrite selon le brief user** (narration produit, pas une reformulation
+>   de features). Progression **workflow → team → moat → prediction → learning → memory → conclusion** :
+>   - **Hero** : « From intention to deploy — through validated decisions. » + accroche **« The AI
+>     proposes. Your team decides. »** (corrige la contradiction human-in-the-loop du « AI runs the
+>     project ») + 3 chips `7 checkpoints · 3 specialized agents · Human approval at every gate`. Badge **Planned**.
+>   - **The run** : « One outcome. Seven decisions. One accountable chain. » — chaîne verticale des 7
+>     décisions (numéro + owner C-level coloré + description, copie exacte user) + « Nothing silently
+>     becomes the next decision. »
+>   - **The team** : « Not one agent. A delivery team. » — 3 cartes CPO/CTO/COO (the what/how/when) avec
+>     ligne **Predicts** chiffrée + « No agent gets the final say. »
+>   - **Moat** : « The model is replaceable. The orchestration isn't. » + 4 principes (Grounded /
+>     Specialized / Governed / Model-agnostic).
+>   - **Prediction** (le futur moat, poussé fort) : « Don't just generate. Predict. » → **« Was the
+>     decision right? »** + boucle sur-mesure `Prediction → Decision → Execution → Outcome → Calibration`
+>     + badge **`Coming next · Prediction calibration`** (transforme le « Predicts » gadget en vrai
+>     différenciateur).
+>   - **Memory** : « Every decision has a reason. Keep it. » + boucle `Memory → Orchestration → Decision
+>     → Memory` + lien vers `/product/brain-os`. Plus fort qu'un « RAG ».
+>   - **Conclusion** : « Describe the outcome. Let the team work the path. » + « The AI does the work
+>     between decisions. You own the decisions. » + CTAs + rappel Planned honnête.
+>   - Positionnement verrouillé : Platform=le système · Orchestration=le moteur · Memory=la mémoire org ·
+>     CPO/CTO/COO=les rôles · coding agents=les exécutants · human approval=la gouvernance · prediction
+>     loop=le futur moat. Catégorie = **couche d'orchestration au-dessus des modèles/coding agents**.
+>   - Vérifié : 200, vite:0, 7 sections (5 eyebrows + hero + conclusion), 6 h2, badge Coming next,
+>     CTAs pill. **Pane retombé mort** (viewport 0 les 2 onglets) → pas de capture ; l'« overflow » lu
+>     est l'artefact vw=0 (tout est `flex-wrap`/grille responsive). VISUEL à valider en direct.
+
+> ### ⚑ v32 (30/07) — Cohérence des boutons + orchestration REFAITE (custom, vend la v2)
+> Retours user : (a) boutons/nav incohérents (des pill, des carrés) → tout en pill ; (b) orchestration
+> réutilisait **les mêmes sections/visuels que la home** (« ça va pas du tout ») → custom pour la page,
+> DA gardée ; (c) **orchestration vend la v2** (« AI Delivery OS »), à ne pas oublier.
+> - **Boutons cohérents (tous pill/`rounded-full`)** : le seul carré de la nav était **Enterprise**
+>   (le `NavigationMenuLink` shadcn lui injectait `rounded-md` = 6px) → forcé `!rounded-full`. Les CTA
+>   des tiers **Pricing** étaient hand-rolled `rounded-lg` → `rounded-full`. Vérifié DOM : Enterprise ==
+>   Pricing (radius pill), 3 boutons de tiers en pill. (Les items de dropdown restent `rounded-md/sm`
+>   — le user les tolère ; l'`AppWindow` du hero garde sa sidebar `rounded-md` = fidélité à l'app réelle.)
+> - **`/product/orchestration` entièrement refaite, custom + v2.** Plus AUCUN visuel de la home
+>   (supprimé `RunTimeline` îlot + `BeforeAfter` ; vérifié : « Run #145 », « Read the workspace
+>   context », « lives in someone… » = 0). Nouveau, vendu au niveau **quoi/pourquoi** (D11, pas le
+>   mécanisme) :
+>   - Hero : « **The AI runs the project. You execute and supervise.** » (pivot v2 exact : l'IA gère,
+>     l'humain exécute via son agent de code + supervise) · badge **Planned** · bandeau honnête « la v1
+>     ship board/approvals/memory ; le run autonome = direction, daté sur /roadmap ».
+>   - Visuel **sur-mesure #1** : pipeline horizontal des **7 checkpoints** (`lib/story` CHECKPOINTS)
+>     avec **lane d'owner C-level** par couleur (CPO violet / CTO bleu / COO ambre / Your tools) + rappel
+>     « chaque checkpoint attend une validation humaine ».
+>   - Visuel **sur-mesure #2** : 3 cartes **CPO / CTO / COO** (rôles EXACTS de
+>     `road_to_v2/Agents_C_Level.md` : le quoi / le comment / le quand-risque), chacune avec sa ligne
+>     **« Predicts »**. Garde-fou : proposent, n'exécutent jamais, humain au gate.
+>   - Section positionnement : « **The moat is the orchestration, not the model** » + 4 principes
+>     (grounded in memory · proposes-not-executes · model-agnostic/local Ollama sur ton hardware ·
+>     se calibre en comparant prédiction↔réel [roadmap]).
+>   - Vérifié : 200, vite:0, 7 nœuds, 3 agents, 4 principes, 0 overflow (desktop + mobile, pipeline en
+>     `overflow-x-auto`), 0 error overlay.
+> - **Reste / à décider** : `/trust` réutilise encore la section `Trust` de la home (hero + CTA custom
+>   autour) — moins grave (c'est son habitat naturel), à rendre custom si le user veut le même
+>   traitement. `brain-os` réutilise `DecisionGraph` (visuel de mémoire, thématiquement OK).
+>   Rendu VISUEL des nouveaux visuels orchestration à valider en direct.
+
+> ### ⚑ v31 (30/07) — Hero = VRAI board · 8 pages internes · greying des liens non construits
+> Deux demandes user : (1) « le hero devrait être un vrai board avec toasts » ; (2) « commence à
+> faire les autres pages ; celles qu'on peut faire, sinon grise-les et rends-les non cliquables ».
+> - **Hero → vrai board.** Remplacé le schéma `HeroRun` par la **vraie vue Board** rendue dans le
+>   châssis fidèle `AppWindow` (sidebar + topbar + breadcrumb réels) avec les données de `lib/story`
+>   (colonnes Backlog/Todo/In progress/Done, 10 cartes, carte du run **CP-12** surlignée). Deux toasts
+>   overlay : « Approved · Architecture » (gouvernance) + « Smart Assign · 4 issues routed » (IA). Mode
+>   `bleed` (descend dans le filet). **Statique/SSR** (protège le LCP, aucun îlot). Vérifié DOM : 4
+>   colonnes, 10 cartes, ring sur la carte-run, 0 overflow (mobile 375 + desktop). Le board déborde à
+>   droite dans un `overflow-hidden` (comme un vrai board) — pas d'overflow **page**.
+> - **Infra pages (NEW)** : `PageHero.astro` (kicker/eyebrow/h1/lead/CTA + badge maturité),
+>   `Prose.astro` (typo des pages texte via variantes `[&_h2]:…` qui stylent le slot), `PageCta.astro`
+>   (bandeau final). Les boutons réutilisent `buttonVariants` → styles identiques, **zéro JS**.
+> - **8 pages construites** (toutes 200, vite:0) : `/product` (hub des 8 domaines, live vs grisé via
+>   `isLive`), `/product/orchestration` (Run animé `client:idle` + Before/After), `/product/brain-os`
+>   (memory + `DecisionGraph`, « not a RAG »), `/trust` (réutilise la section `Trust`), `/enterprise`
+>   (6 piliers self-host/SSO/audit/rôles/no-training/support + renvoi trust), `/roadmap` (Now/Next/Later
+>   **honnête** : séquence, pas de fausses dates ; badges de maturité), `/legal/ai-transparency`
+>   (Prose : rôle de l'IA, modèles hosted/local, humain dans la boucle, données ≠ training, audit),
+>   `/book-a-demo` (îlot `DemoForm` → **`mailto:` pré-rempli** à l'envoi, honnête sans backend
+>   [besoin-backend: brancher un POST quand l'API existe]).
+> - **Greying (source unique)** : `nav.ts` expose `BUILT_ROUTES` + `isLive(href)`. Header, footer et
+>   menu mobile rendent tout lien **non construit** en **grisé, non cliquable, tag « Soon »**. Les
+>   méga-menus **100 % non construits (Solutions, Labs)** deviennent des **labels grisés** (plus de
+>   panneau plein de liens morts) ; **Product & Resources** gardent leur menu, items non construits
+>   grisés (`MenuCard` inerte). `/status` (footer bas) → texte non cliquable. Pour activer une page :
+>   la créer PUIS ajouter sa route à `BUILT_ROUTES`.
+> - **Fix `/pricing`** (préexistante) : `/contact` (×2) → `/book-a-demo` ; CTA en dur
+>   `localhost:3000/auth/register` → `${APP_URL}/auth/register`.
+> - **Vérif** : le **Browser pane REVIT** cette session (navigate + JS OK) mais **ne composite pas**
+>   → toujours pas de screenshot. Audit **curl SSR sur les 10 routes** : 200, `vite:0`, **0 lien de
+>   page mort** (seuls restants = assets `.svg`), `soon:39`, console **sans erreur** d'hydratation.
+>   DOM : formulaire démo (5 champs + submit) monté, Solutions/Labs = `<span>` grisés, Product/Resources
+>   = boutons de menu, Enterprise/Pricing = liens.
+> - **Reste** : (a) le user dépose ses **vrais screenshots** — le hero board peut aussi devenir un slot
+>   vide `<img>` si préféré ; (b) construire les pages encore grisées (features **live** :
+>   smart-assign / collaboration / analytics / integrations ; puis solutions, vs, docs/blog/changelog/
+>   status, légal) — dire au user lesquelles prioriser ; (c) `DemoForm` → vrai POST quand l'API existe.
+> - **Rendu VISUEL à valider en direct** par le user (localhost:4321) : position des toasts du hero,
+>   densité du board, cohérence des bandes blanc/gris sur les nouvelles pages.
+
+> ### ⚑ v30 (27/07) — pattern « vrai screen d'app + toasts » (règle user)
+> Clarification user : « les slots screenshot réel vont LÀ OÙ les gens doivent avoir CONFIANCE (du dur,
+> de la preuve, de l'argument) ; les animations sont purement démonstratives pour la compréhension. »
+> → Cartographie : **preuve/confiance = vrai screen** ; **compréhension = animation**.
+> - **`AppShot` + `Toast` (NEW, `components/site/AppShot.tsx`)** : un CADRE d'app propre et **VIDE**
+>   (barre de fenêtre + corps neutre, **aucun** placeholder pointillé) prêt à recevoir une vraie
+>   capture, + des toasts/callouts custom posés PAR-DESSUS. Pour insérer le screen : remplacer le corps
+>   par `<img className="absolute inset-0 …">`, les overlays restent au-dessus.
+> - **Placé au moment de PREUVE le plus net → Enterprise/Trust** : un `AppShot` (chrome « …/audit »)
+>   avec toast « **Approved · CTO · logged to the audit trail** » + légende « Your real audit view drops
+>   in here… ». C'est le « prouve-le » d'un CTO. (Trust n'avait aucun visuel avant.)
+> - **Hero** : run card SCHÉMATIQUE conservée (compréhension, élément adoré) + un petit toast « Approved
+>   · Architecture » par-dessus, pour montrer le pattern sans casser le crown jewel.
+> - **Restent des ANIMATIONS (compréhension)** : Before/After (fuites), Run timeline (mécanisme),
+>   Decision Graph (mémoire). Non touchés.
+> - Vérifié via **`curl` (browser pane toujours HS cette session)** : HTTP 200, `vite-error:0`, 10
+>   sections, chrome audit + toast + légende + toast hero présents, Decision Graph intact. Rendu VISUEL
+>   à valider en direct par le user (positionnement des toasts, cadre vide).
+> - Reste : le user dépose ses vraies captures dans les cadres ; on peut ajouter d'autres slots de
+>   preuve (board réel dans Run ?) et, s'il veut, convertir le hero en « vrai board + toasts » (à faire
+>   quand le pane remarche, pour vérifier le crown jewel visuellement).
+> Le user ouvre la phase design (« améliorer les placeholders »). Règle : screen d'app → placeholder
+> VIDE (il fournira les vrais screens) ; concept → animation custom haut de gamme.
+> - **Inventaire** (grep + cross-ref avec l'index réduit) : après la passe de réduction v28, il ne
+>   reste **qu'UN seul placeholder vivant** — « Decision graph » dans Synergy (Memory). Tous les autres
+>   `<Placeholder>` sont dans des composants DROPPÉS (Foundations, Testimonials, Pillars, BigShot,
+>   StackReplaces, FeatureShowcase, Pipeline…), non rendus. Surface design = minuscule.
+> - **`DecisionGraph.tsx` (NEW)** — remplace ce placeholder : graphe CAUSAL 100 % SVG + SMIL
+>   (`animateMotion`), zéro dépendance, s'anime sans hydratation. Nœuds : Requirement → **Decision
+>   (Postgres + pgvector)** → Impacts (Billing · RAG · Users), + branche rejetée (MongoDB, pointillé,
+>   « weaker txns »). Faisceaux primaires qui parcourent la colonne (fade in/out, staggered). Étiquettes
+>   d'arêtes = le « pourquoi » (drives / impacts / rejected). Couleurs = tokens du site. C'est le visuel
+>   du MOAT (« map of why »), sobre (pas « AI template »).
+> - **Capacités outils** (réponse au user) : EN CODE, je fais Framer Motion (micro-motion) + je porte
+>   à la main les effets type Magic UI / Aceternity (animated beams, spotlight, aurora, tracing beams,
+>   shimmer, borders animées) — pur React/CSS/SVG. Rive (.riv) / Spline (scène 3D) / Lottie (JSON) :
+>   je les INTÈGRE si le user fournit l'asset (éditeurs GUI), je ne peux pas les AUTORER.
+> - **Vérif LIMITÉE** : le dev server rend `/` en **200** (multiples fois) → DecisionGraph + rewire
+>   Synergy compilent/rendent côté SSR, aucune erreur build. MAIS le **Browser pane est bloqué cette
+>   session** (navigate timeout 300s, javascript_tool timeout 30s, viewport à 0 px plus tôt) → **pas de
+>   vérif VISUELLE ni de screenshot possible**. Le visuel (beams, alignement, tint) est À REGARDER EN
+>   DIRECT par le user sur localhost:4321, et à itérer. C'est du static SVG donc faible risque de casse.
+> - Plan design proposé (3 niveaux, repris du user) : micro-motion (Framer Motion) · UI-motion (beams/
+>   graph/checkpoints, en code) · pièce maîtresse (Rive/Spline → asset user). On n'en met pas partout.
+> - **Suivi** : un « transport invoke timed out … fetchModule global.css » est apparu = le **dev server
+>   Vite était wedgé** (pas une erreur de code — fichiers non touchés, RPC infra bloqué, cohérent avec le
+>   pane mort toute la session). **Réglé par `preview_stop` + `preview_start`** (ready en 999 ms, propre).
+>   Vérifié ensuite via **`curl localhost:4321` (contourne le browser pane HS)** : HTTP **200**, Decision
+>   Graph présent (aria-label + `Postgres + pgvector` + `MongoDB` + `animateMotion`), **10 sections**,
+>   Git tagline + leaks intacts, **`(placeholder)` = 0** (la page n'a plus AUCUN placeholder rendu),
+>   `vite-error-overlay` = 0. Rendu VISUEL toujours à valider en direct par le user (pane inutilisable).
+> Suite au fork review 13 (« Oui, passe de réduction ») : concentrer la page sur l'idée unique,
+> transformer les « 5 produits » en PREUVES. **16 → 10 sections.**
+> - **Coupées de l'index** (composants conservés, non importés) : `Manifesto`, `Pillars`, `Foundations`,
+>   `Integrations`, `Phases`, `Maturity`.
+> - **Absorptions** (l'essence survit comme preuve, pas comme chapitre) :
+>   · Pillars → fondu dans **Synergy** : eyebrow « Why it's different » + titre « A delivery system, not
+>     an assistant » + lead « Most AI tools optimize execution. TaskForce optimizes the system that
+>     decides what gets executed — one platform where planning, memory, the run and the audit trail
+>     already know about each other… » + la ligne gain-quotidien (« The payoff is daily… »).
+>   · Phases → fondu dans **TeamGrid** (footer) : « Start with one workflow, not a migration. TaskForce
+>     is the missing layer between your tracker and your coding agent — sits on top of the board/repo/review. »
+>   · Foundations → redondant (self-host/audit/model-per-step déjà dans les bullets du Run + checklist Trust).
+>   · Integrations → compat portée par TeamGrid (« sits on your board/repo ») + logos « Built with » du hero.
+>   · Maturity → Vision porte déjà « dated roadmap ».
+>   · Manifesto → l'idée « context » vit dans Problem + Before/After.
+> - **Ordre final (spine) & bandes** : Hero(w) · Problem(g) · Before/After(w) · Run(g) · Memory(w) ·
+>   Why-different/Synergy(g) · Enterprise/Trust(w) · Teams/TeamGrid(g) · Vision(w) · CTA(g). Alternance
+>   parfaite. **1 seul îlot** désormais (RunTimeline ; Foundations-island supprimée → moins de JS).
+> - Vérifié DOM : `viteError:false`, 0 erreur build/console, **10 sections**, 0 collision, drops confirmés
+>   (Manifesto/Foundations/Integrations/Maturity absents ; « A delivery system… » = 1 occurrence, dans
+>   Synergy), folds présents (why-different + daily-gain + missing-layer), Before/After leaks + Git tagline
+>   intacts, **0 débordement horizontal desktop ET mobile** (le « overflow:true » initial était l'artefact
+>   du viewport à 0 px de l'onglet auto — confirmé faux après resize 1280 & 375).
+> - Reste offert : (1) le holy-shit ANIMÉ (Before/After qui se joue) = phase design ; (2) descendre encore
+>   vers ~8 (fusionner p.ex. Problem+Before/After en un mouvement, ou Memory dans Synergy) si le user veut.
+
 > ### ⚑ v27 (27/07) — review 13 : UNE idée dominante (« context leaks ») + anti product-soup
 > Critique majeure et juste : clarté 6.5/10. La page a beaucoup de concepts forts mais **pas UNE idée
 > dominante** (« tu vends 5 produits »), et il manque le « holy-shit moment ». Reco : tout ramener à
