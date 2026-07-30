@@ -53,7 +53,7 @@ const GLANCE: { area: string; label: string; tone: keyof typeof TONE }[] = [
 const AI_GOV = [
   { t: "Model & provider selection", d: "Hosted models (Anthropic, OpenAI) or local models through Ollama — your choice." },
   { t: "Hosted vs local", d: "Run local models to keep every prompt and output inside your own network." },
-  { t: "No training on your data", d: "Local models don't learn from your data; hosted providers are used under API terms that do not permit training on customer API data." },
+  { t: "No training on your data", d: "TaskForce uses provider APIs configured for business use, and never uses your data to train its own models. Training policy for a hosted model depends on the provider and service; local models remove the question entirely." },
   { t: "Human approval", d: "AI proposes a decision; a named human approves it. An agent can never approve its own work." },
   { t: "Model-call auditability", d: "Every call is recorded — which model, which step, on whose infrastructure." },
   { t: "Agent & connector scopes", d: "Agents act only within the connectors and permissions you explicitly grant." },
@@ -67,6 +67,7 @@ const IDENTITY = [
   "Session management: short-lived access tokens, refresh, revoke and provider-side logout.",
   "MFA is managed by your identity provider, not reinvented by us.",
   "Least privilege: sensitive actions are role-gated; audit logs are owner-only.",
+  "Self-hosted, TaskForce personnel have no access to your instance or its data — you run it.",
 ];
 
 const LIFECYCLE = [
@@ -87,13 +88,37 @@ const SECRETS = [
   "Disconnect a connector at any time to revoke access.",
 ];
 
-const SECOPS = [
-  { t: "Static analysis (SAST)", d: "Semgrep runs against the codebase.", tone: "available" },
-  { t: "Dynamic analysis (DAST)", d: "OWASP ZAP scans the running app.", tone: "available" },
-  { t: "Dependency & container scanning", d: "Trivy checks dependencies and images.", tone: "available" },
-  { t: "Latest scan · July 2026", d: "0 high-severity findings across SAST, DAST and dependency scanning at the last run.", tone: "available" },
-  { t: "Responsible disclosure", d: `Report an issue to ${CONTACT} — we'll acknowledge and triage.`, tone: "available" },
-  { t: "Incident response & monitoring", d: "Formal runbooks and 24/7 monitoring are Planned.", tone: "planned" },
+const SDLC = [
+  { t: "Code scanning (SAST)", d: "Static analysis with Semgrep.", tone: "available" },
+  { t: "Dependency scanning", d: "Known-vulnerability checks with Trivy.", tone: "available" },
+  { t: "Container image scanning", d: "Image analysis with Trivy.", tone: "available" },
+  { t: "Dynamic testing (DAST)", d: "OWASP ZAP against the running application.", tone: "available" },
+  { t: "Pull-request review", d: "Changes are reviewed before they merge.", tone: "available" },
+  { t: "Automated CI checks", d: "Security checks run in the pipeline, not after release.", tone: "available" },
+  { t: "Vulnerability triage", d: "Findings are reviewed and prioritized.", tone: "available" },
+];
+
+const AVAILABILITY = [
+  { t: "Backups", items: ["Self-hosted — your backup policy", "Managed cloud — Planned"] },
+  { t: "Recovery", items: ["Backup restoration", "Database recovery", "Object-storage recovery"] },
+  { t: "Monitoring", items: ["Application health", "Infrastructure health", "Model-provider availability"] },
+  { t: "Incident response", items: ["Detection", "Triage", "Containment", "Recovery"] },
+];
+
+const SEC_PRINCIPLES = [
+  { t: "Security by architecture", d: "The more sensitive the decision, the more explicit the control." },
+  { t: "Your infrastructure", d: "Self-host TaskForce and keep model traffic inside your network." },
+  { t: "Human accountability", d: "AI can propose. Named users approve consequential decisions." },
+  { t: "Least privilege", d: "Agents inherit only the permissions granted through their connectors." },
+  { t: "Verifiable execution", d: "Model calls, approvals and artifacts leave an auditable record." },
+];
+
+const BOUNDARIES = [
+  "TaskForce controls the application layer.",
+  "Your organization controls the deployment layer when self-hosted.",
+  "Your identity provider controls authentication and MFA.",
+  "Connected systems control their connector-level permissions.",
+  "Model providers control their own hosted inference infrastructure.",
 ];
 
 const COMPLIANCE: { framework: string; status: string; tone: keyof typeof TONE }[] = [
@@ -154,8 +179,35 @@ const FLOW = [
     secondary={{ label: "Book a security review", href: "/book-a-demo" }}
   />
 
-  {/* ── 1 · Security at a glance ── */}
+  {/* ── Security principles ── */}
   <section class="bg-card border-b">
+    <div class="container-rail py-20 lg:py-24">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">Security principles</p>
+        <h2 class="t-h2">Security by architecture, not by promise</h2>
+        <p class="t-lead mt-4">
+          The philosophy the rest of this page is built on: the more sensitive the decision, the more
+          explicit the control.
+        </p>
+      </div>
+      <div class="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {
+          SEC_PRINCIPLES.map((p, i) => (
+            <div class="rounded-2xl border bg-card p-5">
+              <span class="text-primary font-mono text-[12px] tabular-nums">
+                {String(i + 1).padStart(2, "0")}
+              </span>
+              <h3 class="mt-2 text-[15px] font-semibold text-foreground">{p.t}</h3>
+              <p class="text-muted-foreground mt-1.5 text-[13.5px] leading-6">{p.d}</p>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  {/* ── 1 · Security at a glance ── */}
+  <section class="bg-secondary border-b">
     <div class="container-rail py-20 lg:py-24">
       <div class="max-w-2xl">
         <p class="t-eyebrow mb-3">At a glance</p>
@@ -199,50 +251,56 @@ const FLOW = [
         </p>
       </div>
 
-      <div class="mt-10 rounded-2xl border bg-card p-6 sm:p-8">
-        <div class="mx-auto flex max-w-2xl flex-col items-center gap-4">
-          <div class="grid w-full gap-3 sm:grid-cols-2">
-            <div class="bg-secondary/40 rounded-xl border p-4 text-center">
-              <p class="text-[13px] font-semibold text-foreground">Your identity provider</p>
-              <p class="text-muted-foreground mt-1 text-[11.5px]">authenticates users · OIDC</p>
-            </div>
-            <div class="bg-secondary/40 rounded-xl border p-4 text-center">
-              <p class="text-[13px] font-semibold text-foreground">Your connected systems</p>
-              <p class="text-muted-foreground mt-1 text-[11.5px]">GitHub · Linear · Slack · Postgres</p>
-            </div>
+      <div class="mx-auto mt-10 max-w-xl rounded-2xl border bg-card p-6 sm:p-8">
+        {/* Entrées externes */}
+        <div class="grid gap-3 sm:grid-cols-2">
+          <div class="bg-secondary/40 rounded-xl border p-4 text-center">
+            <p class="text-[13px] font-semibold text-foreground">Your identity provider</p>
+            <p class="text-muted-foreground mt-1 text-[11.5px]">OIDC / SAML · authenticates users</p>
           </div>
+          <div class="bg-secondary/40 rounded-xl border p-4 text-center">
+            <p class="text-[13px] font-semibold text-foreground">Your connected systems</p>
+            <p class="text-muted-foreground mt-1 text-[11.5px]">GitHub · Linear · Slack · Postgres</p>
+          </div>
+        </div>
 
+        <div class="flex justify-center py-2">
           <ArrowRight className="text-muted-foreground/50 size-5 rotate-90" />
+        </div>
 
-          <div class="border-primary/30 bg-primary/[0.04] w-full rounded-xl border p-5 text-center">
+        {/* Trust boundary matérialisée : en self-host, TaskForce + le modèle local vivent DANS ton réseau */}
+        <div class="border-primary/40 relative rounded-2xl border-2 border-dashed p-5 pt-7">
+          <span class="bg-card text-primary absolute -top-2.5 left-4 rounded-full border px-2.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase">
+            Your network — when self-hosted
+          </span>
+          <div class="border-primary/30 bg-primary/[0.04] rounded-xl border p-5 text-center">
             <p class="text-[14px] font-semibold text-foreground">TaskForce</p>
             <div class="mt-3 flex flex-wrap justify-center gap-2">
-              {["Memory", "Workflow engine", "Audit trail"].map((x) => (
+              {["Memory", "Workflow", "Audit", "Permissions"].map((x) => (
                 <span class="bg-card rounded-full border px-3 py-1 text-[11.5px] text-foreground">{x}</span>
               ))}
             </div>
           </div>
-
-          <div class="flex w-full items-center gap-3">
-            <span class="bg-border h-px flex-1" />
-            <span class="text-muted-foreground text-[11px] font-medium tracking-[0.08em] uppercase">
-              Model boundary
-            </span>
-            <span class="bg-border h-px flex-1" />
+          <div class="flex justify-center py-2">
+            <ArrowRight className="text-muted-foreground/50 size-4 rotate-90" />
           </div>
-
-          <div class="grid w-full gap-3 sm:grid-cols-2">
-            <div class="bg-secondary/40 rounded-xl border p-4 text-center">
-              <p class="text-[13px] font-semibold text-foreground">Hosted model</p>
-              <p class="text-muted-foreground mt-1 text-[11.5px]">Anthropic · OpenAI</p>
-              <p class="mt-2 text-[11px] font-medium text-amber-700">leaves your network</p>
-            </div>
-            <div class="bg-secondary/40 rounded-xl border p-4 text-center">
-              <p class="text-[13px] font-semibold text-foreground">Local model</p>
-              <p class="text-muted-foreground mt-1 text-[11.5px]">Ollama</p>
-              <p class="mt-2 text-[11px] font-medium text-emerald-700">stays in your network</p>
-            </div>
+          <div class="bg-card mx-auto max-w-xs rounded-xl border p-4 text-center">
+            <p class="text-[13px] font-semibold text-foreground">Local model — Ollama</p>
+            <p class="mt-1 text-[11px] font-medium text-emerald-700">stays in your network</p>
           </div>
+        </div>
+
+        {/* Franchissement de la frontière : le modèle hosted est EXTERNE */}
+        <div class="mt-4 flex items-center gap-3">
+          <span class="bg-border h-px flex-1" />
+          <span class="text-muted-foreground text-[10.5px] font-medium tracking-[0.08em] uppercase">
+            Model boundary
+          </span>
+          <span class="bg-border h-px flex-1" />
+        </div>
+        <div class="bg-secondary/40 mt-4 rounded-xl border border-dashed p-4 text-center">
+          <p class="text-[13px] font-semibold text-foreground">Hosted model — Anthropic · OpenAI</p>
+          <p class="mt-1 text-[11px] font-medium text-amber-700">external — leaves your network</p>
         </div>
       </div>
     </div>
@@ -484,7 +542,7 @@ const FLOW = [
   </section>
 
   {/* ── Threat model & shared responsibility ── */}
-  <section class="bg-secondary border-b">
+  <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-24">
       <div class="max-w-2xl">
         <p class="t-eyebrow mb-3">Threat model</p>
@@ -523,11 +581,26 @@ const FLOW = [
           </ul>
         </div>
       </div>
+
+      {/* Security boundaries — qui contrôle quoi */}
+      <div class="mt-8 rounded-2xl border bg-card p-6">
+        <p class="text-[14px] font-semibold text-foreground">Security boundaries</p>
+        <ul class="mt-4 grid gap-x-8 gap-y-2.5 sm:grid-cols-2">
+          {
+            BOUNDARIES.map((b) => (
+              <li class="text-muted-foreground flex items-start gap-2 text-[13.5px] leading-6">
+                <span class="bg-primary/60 mt-[9px] size-1.5 shrink-0 rounded-full" aria-hidden />
+                {b}
+              </li>
+            ))
+          }
+        </ul>
+      </div>
     </div>
   </section>
 
   {/* ── 9 · Compliance & certifications ── */}
-  <section class="bg-card border-b">
+  <section class="bg-secondary border-b">
     <div class="container-rail py-20 lg:py-24">
       <div class="max-w-2xl">
         <p class="t-eyebrow mb-3">Compliance</p>
@@ -553,28 +626,73 @@ const FLOW = [
           ))
         }
       </ul>
+      <p class="text-muted-foreground mt-4 text-[12.5px]">
+        Technical controls are not the same as full legal compliance — organizational and contractual
+        obligations depend on your deployment and configuration.
+      </p>
     </div>
   </section>
 
-  {/* ── 10 · Security operations ── */}
-  <section class="bg-secondary border-b">
+  {/* ── Secure development lifecycle ── */}
+  <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-24">
       <div class="max-w-2xl">
-        <p class="t-eyebrow mb-3">Security operations</p>
-        <h2 class="t-h2">How the code is kept honest</h2>
+        <p class="t-eyebrow mb-3">Secure development lifecycle</p>
+        <h2 class="t-h2">Security runs in the pipeline, not after release</h2>
+        <p class="t-lead mt-4">
+          Security checks are part of how code ships, not a review bolted on at the end.
+        </p>
       </div>
       <div class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {
-          SECOPS.map((s) => (
+          SDLC.map((s) => (
             <div class="rounded-2xl border bg-card p-5">
               <div class="flex items-center gap-2">
                 <Radar className="text-primary size-4 shrink-0" strokeWidth={2} />
                 <h3 class="text-[14px] font-semibold text-foreground">{s.t}</h3>
               </div>
               <p class="text-muted-foreground mt-2 text-[13px] leading-6">{s.d}</p>
-              <span class:list={["mt-3 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium", TONE[s.tone as keyof typeof TONE]]}>
-                {s.tone === "available" ? "In place" : "Planned"}
-              </span>
+            </div>
+          ))
+        }
+      </div>
+      <div class="border-primary/25 bg-primary/[0.05] mt-6 flex flex-col gap-1 rounded-xl border px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+        <p class="text-[13.5px] font-medium text-foreground">Latest automated scan · July 2026</p>
+        <p class="text-muted-foreground text-[13px]">
+          No high-severity findings detected across the latest SAST, DAST and dependency scans.
+        </p>
+      </div>
+      <p class="text-muted-foreground mt-4 text-[12.5px]">
+        Found something? Responsible disclosure to
+        <a href={`mailto:${CONTACT}`} class="link-underline text-foreground"> {CONTACT}</a>.
+      </p>
+    </div>
+  </section>
+
+  {/* ── Availability & resilience ── */}
+  <section class="bg-secondary border-b">
+    <div class="container-rail py-20 lg:py-24">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">Availability & resilience</p>
+        <h2 class="t-h2">Keeping it up, and getting it back</h2>
+        <p class="t-lead mt-4">
+          When you self-host, resilience is in your hands; for the managed cloud these are Planned.
+          Either way, here is the shape of it.
+        </p>
+      </div>
+      <div class="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        {
+          AVAILABILITY.map((a) => (
+            <div class="rounded-2xl border bg-card p-5">
+              <h3 class="text-[14px] font-semibold text-foreground">{a.t}</h3>
+              <ul class="mt-3 flex flex-col gap-2">
+                {a.items.map((it) => (
+                  <li class="text-muted-foreground flex items-start gap-2 text-[13px] leading-5">
+                    <span class="bg-primary/50 mt-[7px] size-1.5 shrink-0 rounded-full" aria-hidden />
+                    {it}
+                  </li>
+                ))}
+              </ul>
             </div>
           ))
         }

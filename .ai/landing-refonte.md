@@ -185,7 +185,71 @@ point identifiable sur la courbe de lead time.
 | Métronome | `src/lib/useScene.ts` | `useScene(beats)` : partition de durées, démarre à l'entrée à l'écran, se joue **une fois**, **se fige sur l'état final**. `useTypewriter` pour la frappe. `prefers-reduced-motion` → état final direct. |
 | Châssis | `src/components/site/scene/AppWindow.tsx` | Vrai écran TaskForce (voir encadré ci-dessous). **Remplace la barre macOS de `MockFrame`** — trois pastilles + une URL, c'est le signe le plus sûr qu'on regarde un dessin. |
 
-> ### ⚑ v38 (30/07) — /trust : reconstruit en VRAI Trust Center enterprise (profondeur + honnêteté)
+> ### ⚑ v40 (30/07) — /trust : maturité Trust Center (principes, SDLC, résilience, boundaries)
+> 3ᵉ review (verdict 8.5–9/10). But : la page devient la PREUVE que « governed » n'est pas du marketing.
+> **Ajouts de sections** (→ 16 sections de contenu + CTA, cap ~16 respecté) :
+> - **Security principles** (intro, après hero) : Security by architecture · Your infrastructure · Human
+>   accountability · Least privilege · Verifiable execution. Donne la thèse sécu en 10 s.
+> - **Security architecture** : **trust boundary MATÉRIALISÉE** — boîte pointillée « Your network — when
+>   self-hosted » contenant TaskForce (Memory/Workflow/Audit/Permissions) + **Local model Ollama (stays in
+>   your network)** ; **Hosted model (Anthropic/OpenAI) DEHORS** de la frontière (« external — leaves your
+>   network »). IdP (OIDC/SAML) + connected systems en entrée.
+> - **Threat model** : ajout du 3ᵉ axe **« Security boundaries »** (TaskForce=application layer · vous=deployment
+>   en self-host · IdP=auth/MFA · connected systems=connector perms · providers=leur infra d'inférence).
+> - **Secure development lifecycle** (remplace « Security operations » : processus, pas outils) : SAST/deps/
+>   container/DAST/PR review/CI checks/vuln triage + callout **« Latest automated scan · July 2026 — No
+>   high-severity findings detected »** (reformulé, plus défendable que « 0 high ») + responsible disclosure.
+> - **Availability & resilience** (NEW, lacune comblée) : Backups (self-host=ta policy / managed=Planned) ·
+>   Recovery · Monitoring · Incident response.
+> **Corrections de claims** :
+> - No-training : sépare TaskForce / providers / conditions — « TaskForce uses provider APIs configured for
+>   business use, and never uses your data to train its own models. Training policy … depends on the provider
+>   and service; local models remove the question. » (+ pas de promesse générique sur tous les providers).
+> - GDPR : note ajoutée « Technical controls are not the same as full legal compliance — organizational and
+>   contractual obligations depend on your deployment. »
+> - Scan « 0 high » DATÉ + reformulé « No high-severity findings **detected** … at that time » (≠ « zéro vuln »).
+> - **Production access** intégré à Identity : **« Self-hosted, TaskForce personnel have no access to your
+>   instance or its data — you run it. »** (claim fort ET vrai en self-host).
+> - MFA « managed » (déjà v39), OIDC/SAML désambiguïsé (déjà v39).
+> **Bandes** ré-alternées proprement (flip glance→gris, threat→blanc, compliance→gris, sdlc→blanc ; principes
+> blanc, availability gris). Vérifié DOM : **17 h2**, ordre exact visé, console 0 erreur, boundary présente.
+> Reste factuel (pas de récit produit ici) ; « No badges we haven't earned » gardé. À confirmer user : CI
+> réellement automatisé (j'ai gardé « Automated CI checks » car le user l'a demandé + `.ai` roadmap dit « in CI »).
+> Narratif produit à 3 piliers acté (pour le reste du site) : **Orchestration=what happens · Memory=why ·
+> Trust=who/when approved** → decision infrastructure for AI-native orgs. Pane mort → 2 diagrammes à valider en direct.
+> Review user : page devenue crédible → maintenant **strict sur chaque claim technique** (un claim trop
+> absolu est pire que pas de claim). Verdict 8.5–9/10. 7 corrections + 2 ajouts + datage :
+> 1. **OIDC/SAML désambiguïsé** : « SSO via OIDC brokered through Keycloak » → **« SSO — TaskForce
+>    authenticates through Keycloak over OIDC »** + **« Enterprise IdP federation — Keycloak can federate
+>    with your IdP over SAML or OIDC »** (TaskForce↔Keycloak = OIDC ; Keycloak↔IdP client = SAML/OIDC).
+> 2. **MFA** « enforced by your IdP » → **« managed by your IdP »** (« enforced » impliquait qu'on refuse
+>    toute auth sans MFA).
+> 3. **Data flow** « nothing in this flow leaves your network » → **« your model prompts, outputs and run
+>    context can remain entirely within your network »** (cible précisément, sans promettre l'absence de
+>    toute dépendance externe — telemetry/CDN/etc.).
+> 4. **No training** : « called under API terms that exclude training » → **« used under API terms that do
+>    not permit training on customer API data »** + ligne miroir ajoutée sur **`/legal/ai-transparency`**
+>    (cite les terms providers hosted + local Ollama = rien ne sort).
+> 5. **Secrets** « zero plaintext credentials in the database » → **« encrypted at rest with AES-256-GCM
+>    and never stored as plaintext database values »** + « They are not included in the prompts sent to
+>    models. » (plus précis : ne prétend pas l'absence en mémoire/logs).
+> 6. **« 0 high » DATÉ** : glance label → « In place » ; secops → **« Latest scan · July 2026 · 0
+>    high-severity findings »** (sinon la page afficherait « 0 high » indéfiniment). Re-mesuré 21-22/07 dans
+>    le brief soutenance.
+> 7. **GDPR** « Controls in place — export, erasure, anonymization » → **« Technical controls: export,
+>    erasure, anonymization »** (jamais « GDPR compliant » sans analyse juridique).
+> **+ Section « Security architecture »** (diagramme des frontières de confiance : Your IdP (OIDC) +
+> connected systems → **TaskForce [Memory·Workflow·Audit]** → **Model boundary** → Hosted (leaves your
+> network) / Local Ollama (stays in your network)) — un architecte lit le modèle avant les détails.
+> **+ Section « Threat model & shared responsibility »** : *What TaskForce protects against* (workspace
+> access, credential exposure, agent overreach, cross-project, prompt/context leakage, unauthorized model
+> calls, malicious connectors) / *What remains your responsibility* (infra, IdP+MFA, connector perms,
+> local model, host/network/backup en self-host). Maturité rare pour une startup AI.
+> **Resources hub** : lead « Public where possible, available on request where appropriate » (au lieu de
+> « ask and we'll share ») ; « Soon » → **« Coming soon »** ; + « Vulnerability disclosure », — « Terms ».
+> Philosophie gardée : **« No badges we haven't earned. »** = signal de maturité.
+> Vérifié : trust 200/vite0, **15 sections**, tous les nouveaux claims présents, tous les anciens retirés,
+> scan daté, ai-transparency 200 + ligne providers. Pane mort → visuel (2 diagrammes) à valider en direct.
 > Review user dure mais juste : la page (qui réutilisait le composant home `Trust`) = « security overview »,
 > pas un Trust Center. Verdict user : copy 8/10, structure 5/10. La sécu **fait partie du produit** (AI +
 > accès code + agents + intégrations + exécution + mémoire + audit) → page à pousser plus loin que la moyenne.
