@@ -1,36 +1,77 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-/* ─── Light mode tokens ─── */
+/* ═══════════════════════════════════════════════════════
+   DESIGN TOKENS — repris à l'identique de la webapp
+   Source : frontend/app/globals.css (palette Cloudflare-flat).
+   Le site et le produit partagent la même palette : si elle bouge là-bas,
+   elle bouge ici. Aucune couleur inventée pour le marketing.
+   Light-only (décision D2) — le bloc .dark de l'app n'est pas repris.
+═══════════════════════════════════════════════════════ */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.09 0 0);
-  --card: oklch(0.98 0 0);
-  --card-foreground: oklch(0.09 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.09 0 0);
-  --primary: oklch(0.73 0.14 78);          /* Premium gold */
-  --primary-foreground: oklch(0.09 0 0);   /* dark text on gold */
-  --secondary: oklch(0.96 0 0);
-  --secondary-foreground: oklch(0.09 0 0);
-  --muted: oklch(0.96 0 0);
-  --muted-foreground: oklch(0.45 0 0);
-  --accent: oklch(0.96 0 0);
-  --accent-foreground: oklch(0.09 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(1 0 0);
-  --border: oklch(0.91 0 0);
-  --input: oklch(0.91 0 0);
-  --ring: oklch(0.5 0 0);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.09 0 0);
-  --sidebar-primary: oklch(0.73 0.14 78);
-  --sidebar-primary-foreground: oklch(0.09 0 0);
-  --sidebar-accent: oklch(0.96 0 0);
-  --sidebar-accent-foreground: oklch(0.09 0 0);
-  --sidebar-border: oklch(0.91 0 0);
-  --sidebar-ring: oklch(0.5 0 0);
-  --brand-blue: #006399;
+  --background:         #fbfbfc;
+  --card:               #ffffff;
+  --popover:            #ffffff;
+
+  --foreground:         #1d1d1f;
+  --card-foreground:    #1d1d1f;
+  --popover-foreground: #1d1d1f;
+
+  /* Bleu de marque — porte TOUTES les actions primaires. */
+  --primary:            #2563eb;   /* blue-600 */
+  --primary-foreground: #ffffff;
+  --secondary:          #f2f2f4;
+  --secondary-foreground: #1d1d1f;
+  --muted:              #f2f2f4;
+  --muted-foreground:   #6e6e73;
+  --accent:             #f2f2f4;
+  --accent-foreground:  #1d1d1f;
+  --destructive:        #d92d20;
+  --destructive-foreground: #ffffff;
+
+  --border:             #e6e6e9;
+  --input:              #dededf;
+  --ring:               rgba(37, 99, 235, 0.35);
+
+  /* Accents sémantiques de l'app — le violet n'est QUE le marquage IA. */
+  --accent-green:   #34c759;
+  --accent-red:     #ff3b30;
+  --accent-purple:  #5856d6;
+  --accent-orange:  #ff9500;
+
+  --label-primary:   #1d1d1f;
+  --label-secondary: #4b4b4f;
+  --label-tertiary:  #67676c;
+  --separator:       #e6e6e9;
+
+  --radius: 0.625rem;   /* 10px — radius de référence de l'app */
+
+  /* Ombres très subtiles (flat) — valeurs de l'app */
+  --shadow-2xs: 0 1px 1px rgba(0,0,0,0.03);
+  --shadow-xs:  0 1px 2px rgba(0,0,0,0.04);
+  --shadow-sm:  0 1px 2px rgba(0,0,0,0.05);
+  --shadow:     0 1px 3px rgba(0,0,0,0.06);
+  --shadow-md:  0 2px 6px rgba(0,0,0,0.07);
+  --shadow-lg:  0 4px 12px rgba(0,0,0,0.08);
+  --shadow-xl:  0 8px 24px rgba(0,0,0,0.10);
+  --shadow-2xl: 0 16px 40px rgba(0,0,0,0.12);
+
+  /* ─── Alias propres au site marketing ───
+     Ce sont des *noms*, pas de nouvelles couleurs : tout pointe sur la palette de l'app.
+     Voir taskforce-docs/v1/14-design/landing-refonte/Plan_Refonte_Site.md §4 */
+  --site-bg:         var(--card);              /* #ffffff — sections pleines */
+  --site-band:       var(--secondary);         /* #f2f2f4 — bandes alternées */
+  --site-fg:         var(--foreground);
+  --site-muted:      var(--muted-foreground);
+  --site-border:     var(--border);
+  --site-brand:      var(--primary);           /* CTA, liens, eyebrows */
+  --site-brand-soft: #eff6ff;                  /* blue-50 */
+  --site-ai:         var(--accent-purple);     /* marquage IA uniquement */
+  --site-ai-soft:    #efeefc;
+  --site-container: 1240px;
+
+  /* Sora (display) + Inter (corps) — chargées via <link> Google Fonts */
+  --font-display: 'Sora', 'Inter', ui-sans-serif, system-ui, sans-serif;
   /* Inter Variable (chargée via <link> Google Fonts) — métrique Linear/Attio */
   --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
@@ -67,17 +108,19 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
   --font-serif: var(--font-serif);
+  /* ─── Site marketing ─── */
+  --color-ink: var(--site-fg);
+  --color-ink-muted: var(--site-muted);
+  --color-band: var(--site-band);
+  --color-line: var(--site-border);
+  --color-brand: var(--site-brand);
+  --color-brand-soft: var(--site-brand-soft);
+  --color-ai: var(--site-ai);
+  --color-ai-soft: var(--site-ai-soft);
+  --font-display: var(--font-display);
   --radius-sm: calc(var(--radius) - 2px);
   --radius-md: var(--radius);
   --radius-lg: calc(var(--radius) + 2px);
@@ -222,6 +265,68 @@ body {
   .anim-rise { animation: none; }
 }
 
+/* ── Micro-interactions au survol (CSS pur, aucun JS) ──
+   Une carte qui se soulève légèrement + un filet qui se teinte : le minimum pour
+   qu'une page statique se sente vivante, sans hydrater quoi que ce soit. */
+.card-hover {
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in oklab, var(--primary) 35%, var(--site-border));
+  box-shadow: 0 10px 26px -14px rgba(16, 24, 40, 0.16);
+}
+/* Tuile de logo : s'éclaire au survol. */
+.tile-hover {
+  transition: background-color 160ms ease;
+}
+.tile-hover:hover {
+  background-color: color-mix(in oklab, var(--primary) 5%, var(--card));
+}
+.tile-hover img {
+  transition: filter 180ms ease, transform 180ms ease;
+}
+.tile-hover:hover img {
+  filter: none;
+  transform: scale(1.08);
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-hover:hover,
+  .tile-hover:hover img {
+    transform: none;
+  }
+}
+
+/* ── Scènes produit ──
+   Deux primitives de motion, pas plus. Tout le reste des scènes est piloté par
+   des transitions d'état en React : une transition sait d'où elle part, une
+   keyframe non — et c'est ce qui donne le mouvement continu plutôt que saccadé. */
+
+/* Anneau d'attention : se joue UNE fois, sur l'action que le run attend.
+   Une pulsation qui se répète devient du bruit et on cesse de la voir. */
+@keyframes attention-ring {
+  from { box-shadow: 0 0 0 0 color-mix(in oklab, var(--primary) 42%, transparent); }
+  to   { box-shadow: 0 0 0 9px color-mix(in oklab, var(--primary) 0%, transparent); }
+}
+.anim-attention {
+  animation: attention-ring 1200ms cubic-bezier(0.16, 1, 0.3, 1) 1 both;
+}
+
+/* Curseur de frappe — le signe qu'un agent est en train d'écrire, pas que du
+   texte est apparu. `steps(1)` pour un clignotement franc, jamais un fondu. */
+@keyframes caret-blink {
+  0%, 49%  { opacity: 1; }
+  50%, 99% { opacity: 0; }
+}
+.anim-caret {
+  animation: caret-blink 1s steps(1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-attention,
+  .anim-caret { animation: none; }
+}
+
 /* ── Animations ── */
 @keyframes float {
   0%, 100% { transform: translateY(0px); }
@@ -283,14 +388,8 @@ body {
   50%       { box-shadow: 0 0 0 4px rgba(34,197,94,0); }
 }
 
-/* ── Scrollbar ── */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: #000; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
-
-/* ── Selection ── */
-::selection { background: rgba(0, 99, 153, 0.18); color: inherit; }
+/* ── Selection — alignée sur le primaire de l'app ── */
+::selection { background: rgba(37, 99, 235, 0.16); color: inherit; }
 
 /* ── Glass ── */
 .glass {
@@ -333,4 +432,165 @@ body {
   inset: 1px;
   background: #0a0a0a;
   border-radius: inherit;
+}
+
+/* ═══════════════════════════════════════════════════════
+   SITE MARKETING — primitives de la refonte (24/07/2026)
+   Réf. taskforce-docs/v1/14-design/landing-refonte/Plan_Refonte_Site.md §4
+═══════════════════════════════════════════════════════ */
+
+/* ── Conteneur ── */
+.container-site {
+  width: 100%;
+  max-width: var(--site-container);
+  margin-inline: auto;
+  padding-inline: 1.5rem;
+}
+@media (min-width: 1024px) {
+  .container-site { padding-inline: 2rem; }
+}
+
+/* ── Rails ──
+   La grille de la page : deux filets verticaux aux bords du conteneur, et un
+   séparateur horizontal pleine largeur par section (porté par la <section>).
+   C'est ce qui donne sa forme à la page — sans lui, tout flotte. */
+.container-rail {
+  width: 100%;
+  max-width: var(--site-container);
+  margin-inline: auto;
+  padding-inline: 1.5rem;
+  border-inline: 1px solid var(--site-border);
+}
+@media (min-width: 1024px) {
+  .container-rail { padding-inline: 2.5rem; }
+}
+
+/* Filets internes : séparent les colonnes d'une grille sans casser le rythme. */
+.rail-x { border-inline-start: 1px solid var(--site-border); }
+.rail-y { border-block-start: 1px solid var(--site-border); }
+
+/* ── Échelle typographique (display = Sora) ── */
+.t-h1 {
+  font-family: var(--font-display);
+  font-size: clamp(2.5rem, 5vw, 3.5rem);   /* 40 → 56 px */
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  line-height: 1.06;
+  color: var(--site-fg);
+}
+.t-h2 {
+  font-family: var(--font-display);
+  font-size: clamp(1.875rem, 3.4vw, 2.5rem); /* 30 → 40 px */
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  line-height: 1.14;
+  color: var(--site-fg);
+}
+.t-h3 {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+  color: var(--site-fg);
+}
+.t-eyebrow {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--site-brand);
+}
+.t-lead {
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  color: var(--site-muted);
+  letter-spacing: 0;
+}
+
+/* ── Liens : soulignage animé de gauche à droite ──
+   Repris du breadcrumb de la webapp (frontend/components/ui/breadcrumb.tsx, QA2-3) :
+   after:w-0 → hover:after:w-full, transition sur `width`, 200ms ease-out.
+   En CSS plutôt qu'en 6 classes utilitaires répétées sur chaque lien du site. */
+.link-underline {
+  position: relative;
+  transition: color 150ms ease;
+}
+.link-underline::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  height: 1px;
+  width: 0;
+  background: currentColor;
+  transition: width 200ms ease-out;
+}
+.link-underline:hover,
+.link-underline:focus-visible {
+  color: var(--site-fg);
+}
+.link-underline:hover::after,
+.link-underline:focus-visible::after {
+  width: 100%;
+}
+@media (prefers-reduced-motion: reduce) {
+  .link-underline::after { transition: none; }
+}
+
+/* ── Méga-menus du header ──
+   Le wrapper Radix du viewport est le seul <div> enfant direct de la Root
+   (l'autre enfant est la <ul>). On le centre sur la barre pour qu'un panneau
+   large ne déborde jamais du viewport, quelle que soit la largeur d'écran. */
+.site-nav > div {
+  left: 50%;
+  transform: translateX(-50%);
+}
+.site-nav [data-slot="navigation-menu-viewport"] {
+  margin-top: 0.625rem;
+  border-radius: 16px;
+  border-color: var(--site-border);
+  background: #fff;
+  box-shadow:
+    0 20px 48px -16px rgba(0, 0, 0, 0.18),
+    0 2px 8px -2px rgba(0, 0, 0, 0.06);
+}
+
+/* ── Accessibilité : focus visible homogène (WCAG 2.2 — 2.4.7 / 2.4.11) ── */
+:where(a, button, [role="button"], input, select, textarea, summary):focus-visible {
+  outline: 2px solid var(--site-brand);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Lien d'évitement — visible seulement au focus clavier */
+.skip-link {
+  position: absolute;
+  left: 1rem;
+  top: -100px;
+  z-index: 100;
+  padding: 0.625rem 1rem;
+  border-radius: 9999px;
+  background: var(--site-fg);
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: top 150ms ease;
+}
+.skip-link:focus {
+  top: 1rem;
+}
+
+/* Cible de la navigation par ancre : ne pas passer sous le header collant (2.4.11) */
+:target {
+  scroll-margin-top: 6rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
