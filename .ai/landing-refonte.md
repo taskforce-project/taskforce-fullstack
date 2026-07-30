@@ -185,6 +185,54 @@ point identifiable sur la courbe de lead time.
 | Métronome | `src/lib/useScene.ts` | `useScene(beats)` : partition de durées, démarre à l'entrée à l'écran, se joue **une fois**, **se fige sur l'état final**. `useTypewriter` pour la frappe. `prefers-reduced-motion` → état final direct. |
 | Châssis | `src/components/site/scene/AppWindow.tsx` | Vrai écran TaskForce (voir encadré ci-dessous). **Remplace la barre macOS de `MockFrame`** — trois pastilles + une URL, c'est le signe le plus sûr qu'on regarde un dessin. |
 
+> ### ⚑ v36 (30/07) — TaskForce Memory : passe finale (défendabilité technique + gouvernance)
+> 2ᵉ review user de brain-os (le reste = validé). 2 corrections de fond :
+> - **« causal links » → « relationships »** (point « A map of why ») : « causal » sur-vendait un moteur
+>   de raisonnement causal alors que l'implémentation = pgvector + relations/metadata. Retiré aussi de
+>   l'`aria-label` du `DecisionGraph` (« causal graph » → « the graph around it »). Plus aucun « causal »
+>   user-facing. Plus défendable techniquement.
+> - **Boucle de continuité** : dernière ligne « The decision goes back into Memory. » → **« Validated
+>   decisions go back into Memory. »** — verrouille la gouvernance humaine (Memory n'apprend PAS tout ce
+>   que les agents produisent, seulement le validé).
+> - **Signature CTA** : « …TaskForce should. » → **« …TaskForce should remember why. »** — boucle avec
+>   « Git remembers what changed. TaskForce remembers why. » et évite de suggérer que TaskForce « pense à
+>   la place de l'organisation ».
+> Archi narrative figée : **Orchestration = moteur décision/exécution · Memory = mémoire du raisonnement
+> · Human = autorité · Agents = exécution.** Les deux pages se renforcent (un seul produit).
+> Vérifié DOM : tout présent, « causal » = 0 sur la page. (Trust : review à venir.)
+
+> ### ⚑ v35 (30/07) — TaskForce Memory « verrouillée » : 8 correctifs + phrase conceptuelle + continuité
+> Review user de `/product/brain-os`. Idée poussée : **Memory = la mémoire DÉCISIONNELLE de
+> l'organisation**, pas la mémoire des agents. 8 ajustements :
+> 1. Hero : « The memory layer **for every run** » → « **behind every decision** » (prépare la narration
+>    decisions/why). Meta desc alignée.
+> 2. « Not a RAG over your wiki » + « Git remembers what changed. TaskForce remembers why. » — gardés.
+>    Chapô : « alternatives it **beat** » → « **rejected** » (cohérent avec le modèle de décision).
+> 3. **DecisionGraph** (composant partagé home + brain-os) : « **RAG** » retiré du graphe (on explique
+>    justement qu'on est + qu'un RAG) → impacts « Billing · **Search** · Users » ; nœud rejeté refait
+>    avec en-tête **REJECTED** + « **Weaker transactions** » (au lieu de « weaker txns ») ; « Vector
+>    search + billing ». Le graphe raconte enfin une vraie décision d'archi.
+> 4. Point 1 : « not **prose** » → « not **documents** » ; corps → « …the alternatives it rejected, and
+>    the files it shaped — **structured so it can be reused, traced and challenged later.** » (reuse →
+>    traceability → challenge).
+> 5. Point 2 : « a run gets the **reason** » → « **reasoning** behind the code ».
+> 6. Point 3 : abstrait « Context enters… » → concret **« Every run reads from memory before it starts,
+>    then writes its validated decisions back when it finishes. »** (cycle Read→Decide→Validate→Write→Reuse).
+> 7. Point 4 : « …is **never training data** » → « …**can run on your infrastructure, and stays under
+>    your organization's control.** » (on ne fait pas une promesse juridique forte sur une page marketing ;
+>    la garantie ferme « no training on your data » reste sur `/legal/ai-transparency` + trust center).
+> 8. CTA : « Give your organization a memory » → **« Build institutional memory, one decision at a
+>    time. »** + signature (note) **« Your organization shouldn't have to remember everything. TaskForce
+>    should. »**
+> + **Phrase conceptuelle** (émergente, pas headline) : nouvelle section blanche **« TaskForce Memory
+>    is the decision graph of your organization. »** + **continuité avec Orchestration** (bloc « How it
+>    fits together » : Memory knows why → Orchestration decides → Humans approve → Agents execute → back
+>    into Memory) + lien vers `/product/orchestration`. Les deux pages forment **un seul produit** =
+>    couche de coordination intention humaine ↔ modèles ↔ exécution.
+> Vérifié DOM (textContent, fiable malgré le pane à viewport 0) : tout présent, anciennes formulations
+> retirées, graphe = version user exacte. **Sizing du nœud « Weaker transactions » (SVG w=120, font 8.5)
+> à confirmer à l'œil en direct.** Pas de screenshot (pane mort).
+
 > ### ⚑ v34 (30/07) — Orchestration « verrouillée » : 8 correctifs honnêteté/positionnement (user)
 > Le user valide la page (« vraie page produit, positionnement différenciant ») et donne 8 ajustements
 > avant de la considérer figée. Fil rouge : **ne jamais laisser croire qu'Orchestration est déjà dispo
