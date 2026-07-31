@@ -185,7 +185,49 @@ point identifiable sur la courbe de lead time.
 | Métronome | `src/lib/useScene.ts` | `useScene(beats)` : partition de durées, démarre à l'entrée à l'écran, se joue **une fois**, **se fige sur l'état final**. `useTypewriter` pour la frappe. `prefers-reduced-motion` → état final direct. |
 | Châssis | `src/components/site/scene/AppWindow.tsx` | Vrai écran TaskForce (voir encadré ci-dessous). **Remplace la barre macOS de `MockFrame`** — trois pastilles + une URL, c'est le signe le plus sûr qu'on regarde un dessin. |
 
-> ### ⚑ v40 (30/07) — /trust : maturité Trust Center (principes, SDLC, résilience, boundaries)
+> ### ⚑ v41 (30/07) — /legal/ai-transparency : vraie page AI transparency (10 points user)
+> Review user : passer d'« l'humain garde le contrôle » à une vraie transparency page. Narration en 10
+> étapes (what does AI do → access → autonomy → proposal path → models → data → logged → accountable →
+> controls → CTA). Comblé les 3 vrais trous + schéma + précisions juridiques.
+> - **Hero lead** plus précis (annonce les 3 questions) : « …You should be able to see what it does, what
+>   it can access, and where human judgment stays required. » (au lieu de « legible », abstrait).
+> - **« a named human disposes » → « The AI proposes. A named human decides. »** (raccord au positioning
+>   Orchestration ; « dispose » = faux-ami/juridique en EN).
+> - **« Nothing advances without a person » → « No consequential workflow step advances without human
+>   approval »** (précis : l'IA fait bien des appels modèle seule ; ce qui est gaté = les étapes du run).
+> - **NEW « TaskForce agents vs coding agents »** : TF agents planifient/proposent, n'exécutent pas le code ;
+>   implémentation déléguée au coding agent (Claude Code/Cursor). « TaskForce orchestrates; your coding
+>   agent executes. » (répond à « est-ce que TaskForce exécute du code lui-même ? »).
+> - **NEW « What the AI can access »** : contexte de l'étape + connecteurs du run seulement ; liste
+>   (workspace · Memory · repos · issues · approved artifacts · connector-scoped) ; « never grants broader
+>   access than the scopes you configure ».
+> - **NEW schéma central « The path of a proposal »** (custom, hors Prose) : Workspace+Memory → Agent →
+>   Proposal → Human review (chips **Approve/Edit/Reject**) → Next checkpoint. « Only an approved proposal
+>   becomes the context for what follows. »
+> - **Training reformulé** (séparé TaskForce / providers / conditions) : « TaskForce does not use your …
+>   to train **its own** models. When a hosted provider is used, data handling is governed by that provider
+>   and your service config. Local (Ollama) keeps inference within your infra. » (plus d'absolu « never
+>   used to train models »).
+> - **NEW « What every model call records »** : provider/model/step/timestamp/infra/tokens/status/artifact +
+>   « prompts/outputs may be retained as artifacts … « logged » does not mean every prompt is kept forever ».
+> - **Accountability** + phrase clé : « Human approval does not make an AI-generated decision correct — it
+>   makes responsibility explicit. » (TaskForce ne prétend pas résoudre l'AI-reliability, il rend le process
+>   contrôlable).
+> - **Controls** élargis : + connector perms · per-project access · reject/revise artifacts · owner-only
+>   audit access.
+> Structure : PageHero → Prose1 (do/agents/access/autonomy) → schéma (îlot-free) → Prose2 (models/data/logs/
+> accountability/controls) → CTA trust center. Bandes alternées. Pas de remplissage « responsible/ethical AI »
+> (demande user). Vérifié DOM : 11 h2 ordre exact, schéma + chips présents, anciennes formulations retirées,
+> 0 erreur. Cohérent avec Trust Center (mêmes claims training/logging).
+> **MAJ (verrou, 2ᵉ review)** : (4) « Every model invocation **can be traced** » → « **is recorded** with its
+> execution context » (spéc d'audit, pas promesse). (7) **NEW « Known limitations & risks »** (avant Controls) :
+> l'IA ne garantit pas correct/complet/sans biais ; liste (misunderstand · wrong recs · missed deps · leak si
+> connector mal configuré · artifacts à corriger) ; « reduce these risks but do not eliminate them » → évite
+> l'illusion « AI governance = problème résolu ». (8) comportement des **rejets** ajouté sous le schéma : « A
+> rejection isn't silently discarded — it stays in the run's audit trail with your feedback, and can shape the
+> next proposal » (prépare learning-from-reviews / prediction calibration). (9) **« In governed runs, »** en
+> préfixe de l'autonomie (l'orchestration complète est Planned → pas de surpromesse « déjà partout en prod »).
+> DOM : **12 h2**, Known limitations bien avant Controls. Page = vraie AI governance page.
 > 3ᵉ review (verdict 8.5–9/10). But : la page devient la PREUVE que « governed » n'est pas du marketing.
 > **Ajouts de sections** (→ 16 sections de contenu + CTA, cap ~16 respecté) :
 > - **Security principles** (intro, après hero) : Security by architecture · Your infrastructure · Human

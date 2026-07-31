@@ -3,73 +3,202 @@ import BaseLayout from "@/layouts/BaseLayout.astro";
 import PageHero from "@/components/site/PageHero.astro";
 import PageCta from "@/components/site/PageCta.astro";
 import Prose from "@/components/site/Prose.astro";
+import { ArrowRight, Check, Pencil, X } from "lucide-react";
+
+/* Étapes du chemin d'une proposition — le visuel central de la page (schéma user). */
+const FLOW = ["Workspace context + Memory", "Agent", "Proposal / artifact", "Human review"];
 ---
 
 <BaseLayout
   title="AI transparency — TaskForce"
-  description="How AI is used in TaskForce: what it does and doesn't do, which models run where, how a human stays accountable, and why your data is never training data."
+  description="How AI is used in TaskForce: what it does, what it can access, where human approval stays required, which models run where, what is logged, and why your data is not used to train TaskForce models."
 >
   <PageHero
     eyebrow="AI transparency"
     title="How AI is used in TaskForce"
-    lead="TaskForce puts AI in your delivery path, so it should be legible. Here is exactly what the models do, what they never do on their own, and the controls you keep."
+    lead="TaskForce puts AI in your delivery path. You should be able to see what it does, what it can access, and where human judgment stays required."
   />
 
-  <section class="bg-card border-b">
+  {/* ── Ce que l'IA fait / est / voit / ne fait pas ── */}
+  <section class="bg-secondary border-b">
     <div class="container-rail py-16 lg:py-20">
       <Prose>
         <h2>What the AI does</h2>
         <p>
           Inside a run, AI agents <strong>frame the problem, draft the spec, propose an approach,
-          write the API contract and break the work into issues</strong>. Implementation is handed
-          to the coding agent you already use. Every one of these is a draft, produced from your
-          workspace context — not a decision.
+          write the API contract and break the work into issues</strong>. Every one of these is a
+          draft, produced from your workspace context — a proposal, not a decision.
+        </p>
+
+        <h2>TaskForce agents vs coding agents</h2>
+        <p>
+          TaskForce agents plan and propose delivery artifacts — they don't write and ship your code
+          themselves. Implementation is delegated to the <strong>coding agent you choose</strong> —
+          such as Claude Code or Cursor — within the permissions and workflow configuration you
+          provide. TaskForce orchestrates; your coding agent executes.
+        </p>
+
+        <h2>What the AI can access</h2>
+        <p>
+          Agents only receive the context required for the step they are performing, and only the
+          connectors available to that run. Depending on your configuration, that can include:
+        </p>
+        <ul>
+          <li>Workspace context</li>
+          <li>TaskForce Memory — decisions, constraints and conventions</li>
+          <li>Connected repositories</li>
+          <li>Issues and projects</li>
+          <li>Previously approved artifacts</li>
+          <li>Connector-scoped resources</li>
+        </ul>
+        <p>
+          Connector permissions determine what an agent can reach. TaskForce <strong>never grants an
+          agent broader access</strong> than the credentials and scopes you configure.
         </p>
 
         <h2>What it never does on its own</h2>
         <p>
-          Nothing advances without a person. Each checkpoint of a run <strong>waits for a human to
-          approve, edit or send it back</strong> before the next step begins. The AI proposes; a
-          named human disposes. That gate is the product, not a setting you can quietly turn off.
+          In governed runs, no consequential workflow step advances without human approval. TaskForce does not let an
+          AI-generated decision become the next stage of a governed run on its own — each checkpoint
+          can be <strong>approved, edited, rejected or sent back</strong> before the workflow
+          continues. The AI proposes. A named human decides. That gate is the product, not a setting
+          you can quietly turn off.
         </p>
+      </Prose>
+    </div>
+  </section>
 
+  {/* ── Le schéma central : le chemin d'une proposition ── */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-16 lg:py-20">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">The path of a proposal</p>
+        <h2 class="t-h2">Context in, a proposal out — a human decides</h2>
+      </div>
+
+      <div class="mt-10 rounded-2xl border bg-card p-6 sm:p-8">
+        <div class="mx-auto flex max-w-sm flex-col items-center">
+          {
+            FLOW.map((node, i) => (
+              <>
+                <div
+                  class:list={[
+                    "w-full rounded-xl border px-4 py-3 text-center text-[13.5px] font-medium text-foreground",
+                    i === 1 ? "border-primary/30 bg-primary/[0.05]" : "bg-secondary/40",
+                  ]}
+                >
+                  {node}
+                </div>
+                <ArrowRight className="text-muted-foreground/50 my-2 size-4 rotate-90" />
+              </>
+            ))
+          }
+
+          {/* Le point de décision humaine : trois issues */}
+          <div class="flex flex-wrap justify-center gap-2">
+            <span class="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[12px] font-medium text-emerald-700">
+              <Check className="size-3.5" strokeWidth={2.5} /> Approve
+            </span>
+            <span class="text-muted-foreground inline-flex items-center gap-1.5 rounded-full border bg-secondary px-3 py-1 text-[12px] font-medium">
+              <Pencil className="size-3.5" strokeWidth={2} /> Edit
+            </span>
+            <span class="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-[12px] font-medium text-red-700">
+              <X className="size-3.5" strokeWidth={2.5} /> Reject
+            </span>
+          </div>
+
+          <ArrowRight className="text-muted-foreground/50 my-2 size-4 rotate-90" />
+          <div class="border-primary/30 bg-primary/[0.05] w-full rounded-xl border px-4 py-3 text-center text-[13.5px] font-medium text-foreground">
+            Next checkpoint
+          </div>
+        </div>
+        <p class="text-muted-foreground mt-6 text-center text-[13px]">
+          Only an approved proposal becomes the context for what follows. A rejection isn't silently
+          discarded — it stays in the run's audit trail with your feedback, and can shape the next
+          proposal.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  {/* ── Modèles / données / logs / responsabilité / contrôles ── */}
+  <section class="bg-secondary border-b">
+    <div class="container-rail py-16 lg:py-20">
+      <Prose>
         <h2>Which models run, and where</h2>
         <p>
           TaskForce is model-agnostic. It can call hosted models (such as Claude or OpenAI) or run
           local, open models through Ollama on your own hardware. You can choose the model per step,
-          and an enterprise deployment can restrict runs to local models only.
+          and an enterprise deployment can restrict runs to local models only. Model choice is a
+          configuration, not a code change.
         </p>
-        <ul>
-          <li>Every model call is logged: which model ran which step, on whose infrastructure.</li>
-          <li>Model choice is a configuration, not a code change.</li>
-          <li>Self-hosting keeps prompts and outputs inside your network.</li>
-        </ul>
 
-        <h2>Your data is not training data</h2>
+        <h2>Your data is not used to train TaskForce models</h2>
         <p>
-          Your code, decisions and documents are <strong>never used to train models</strong>. What
-          enters a run stays in your workspace, and self-hosting keeps it on your infrastructure.
-          The memory a run builds is an asset you own — not a corpus we harvest.
+          TaskForce does not use your code, decisions, documents or run artifacts to train its own
+          models. What enters a run stays in your workspace, and self-hosting keeps it on your
+          infrastructure — the memory a run builds is an asset you own, not a corpus we harvest.
         </p>
         <p>
-          For hosted models, provider APIs are used under terms that do not permit training on
-          customer API data. With local models through Ollama, your data never leaves your
-          infrastructure at all.
+          When a hosted model provider is used, data handling is governed by that provider and your
+          service configuration. Local models through Ollama keep inference entirely within your
+          infrastructure.
+        </p>
+
+        <h2>What every model call records</h2>
+        <p>Every model invocation is recorded with its execution context:</p>
+        <ul>
+          <li>Model provider</li>
+          <li>Model identifier</li>
+          <li>Workflow step</li>
+          <li>Timestamp</li>
+          <li>Infrastructure used</li>
+          <li>Token usage</li>
+          <li>Execution status</li>
+          <li>Associated artifact</li>
+        </ul>
+        <p>
+          Depending on your deployment and retention configuration, prompts and outputs may also be
+          retained as run artifacts for review and audit — <strong>“logged” does not mean every
+          prompt is kept forever</strong>.
         </p>
 
         <h2>Accountability and its limits</h2>
         <p>
-          AI can be confidently wrong. That is precisely why TaskForce is built around human
-          approval and a full audit trail rather than autonomy: the person who approves a checkpoint
-          is accountable for it, and every approval, rejection and model call is attributable after
-          the fact. You get the leverage of agents without handing them the final say.
+          AI can be confidently wrong. That is precisely why TaskForce is built around human approval
+          and a full audit trail rather than autonomy: the person who approves a checkpoint is
+          accountable for it, and every approval, rejection and model call is attributable after the
+          fact. You get the leverage of agents without handing them the final say.
+        </p>
+        <p>
+          Human approval does not make an AI-generated decision correct — <strong>it makes
+          responsibility explicit</strong>.
+        </p>
+
+        <h2>Known limitations &amp; risks</h2>
+        <p>
+          TaskForce does not guarantee that an AI-generated proposal is correct, complete or free
+          from bias. A model may:
+        </p>
+        <ul>
+          <li>misunderstand requirements;</li>
+          <li>produce incorrect technical recommendations;</li>
+          <li>miss dependencies or edge cases;</li>
+          <li>expose sensitive information if connector permissions are misconfigured;</li>
+          <li>generate artifacts that need human correction.</li>
+        </ul>
+        <p>
+          Human approval, connector scoping and auditability <strong>reduce these risks but do not
+          eliminate them</strong>. That is precisely why a person stays accountable at every step.
         </p>
 
         <h2>The controls you keep</h2>
         <ul>
-          <li>A required human sign-off at every checkpoint.</li>
-          <li>Model selection per step, including local-only deployments.</li>
-          <li>A full audit trail of who approved what, when, and which model ran where.</li>
+          <li>A required human sign-off at every consequential checkpoint.</li>
+          <li>Hosted vs local model selection, per step, including local-only deployments.</li>
+          <li>Connector-level permissions and per-project access controls.</li>
+          <li>The ability to reject or revise any generated artifact.</li>
+          <li>A full audit trail — with owner-only audit access.</li>
           <li>Self-hosting, so data and models stay on your own network.</li>
         </ul>
       </Prose>
@@ -78,7 +207,7 @@ import Prose from "@/components/site/Prose.astro";
 
   <PageCta
     title="Questions from your security team?"
-    lead="The trust center covers data handling, access and the security roadmap. If something isn't there, ask us."
+    lead="The trust center covers data handling, access, logging and the security roadmap. If something isn't there, ask us."
     primary={{ label: "Open the trust center", href: "/trust" }}
     secondary={{ label: "Talk to us", href: "/book-a-demo" }}
   />
