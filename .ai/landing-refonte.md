@@ -185,6 +185,30 @@ point identifiable sur la courbe de lead time.
 | Métronome | `src/lib/useScene.ts` | `useScene(beats)` : partition de durées, démarre à l'entrée à l'écran, se joue **une fois**, **se fige sur l'état final**. `useTypewriter` pour la frappe. `prefers-reduced-motion` → état final direct. |
 | Châssis | `src/components/site/scene/AppWindow.tsx` | Vrai écran TaskForce (voir encadré ci-dessous). **Remplace la barre macOS de `MockFrame`** — trois pastilles + une URL, c'est le signe le plus sûr qu'on regarde un dessin. |
 
+> ### ⚑ v55 (31/07) — Agents : passe de maturité (review 8.5/10)
+> Risque de positionnement : « 3 agents qui discutent » vs « une ORGANISATION d'agents spécialisés qui produit
+> des artefacts gouvernés ». Corrigé, sans gonfler la page.
+> - **NEW « One run, three perspectives »** (le manque principal) : schéma de l'orchestration ENTRE les rôles —
+>   Outcome → CPO (the what) → CTO (the how) → COO (the when & risk) → Human approval → Delivery, cartes colorées
+>   par rôle + « A human approves at every checkpoint — no role hands off on its own ». Montre la collaboration,
+>   pas juste les rôles.
+> - **Vocabulaire verrouillé proposal/artifact** (langage propriétaire TaskForce, cf. AI Transparency « a proposal,
+>   not a decision ») : hero « each proposing **decisions** » → « each producing **proposals** » ; CTA « proposing
+>   decisions you approve » → « **producing proposals you can review, approve or reject** » ; section « One run » :
+>   « each role **produces an artifact** ».
+> - **« safe to trust » → « governable »** (on ne peut pas promettre qu'un agent est sûr — il peut se tromper avec
+>   assurance). **« Model-agnostic » → « Configurable »** (propriété d'archi, pas de comportement) ; 4 règles
+>   resserrées (Grounded/Specialized/Governed/Configurable).
+> - **Hero** : « Most AI tools give you one model… » (invérifiable/agressif) → « **Most AI workflows start with a
+>   generalist agent** ». **« works your Brain OS »** (bancal) → « **Today, TaskForce ships an assistant grounded
+>   in your Brain OS…** ». **MCP** re-scopé : « exposed over MCP by the systems you've connected » (pas une
+>   abstraction universelle sur les 129). **COO** : + « risk » (symétrie avec le sous-titre).
+> - Bandes réalternées après insertion (team gris → One run blanc → real-today gris → rules blanc → CTA gris).
+> - Vérifié DOM : les 12 points OK, schéma rendu (Outcome/rôles/Human approval/Delivery), 0 erreur build.
+> **⚠ Transverse (comme le checkpoint)** : verrouiller **proposal / artifact / approval / checkpoint** à l'identique
+> sur Agents / AI-Transparency / Orchestration / Analytics / Trust (langage propriétaire) — passe de cohérence à
+> planifier (pages lockées → feu vert user).
+>
 > ### ⚑ v54 (31/07) — Checkpoint lock + Agents + Approvals (Product menu complet)
 > **1. Verrou « checkpoint » (option A, feu vert user)** : définition canonique posée UNE fois à son foyer
 > naturel — section « The run » d'`orchestration.astro` — dans un encart « What a checkpoint is » : *« A checkpoint

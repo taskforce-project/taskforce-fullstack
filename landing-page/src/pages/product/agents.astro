@@ -2,7 +2,7 @@
 import BaseLayout from "@/layouts/BaseLayout.astro";
 import PageHero from "@/components/site/PageHero.astro";
 import PageCta from "@/components/site/PageCta.astro";
-import { Compass, Building2, CalendarClock, BrainCircuit, Boxes, ShieldCheck, Server, Search, PenLine, Plug } from "lucide-react";
+import { Compass, Building2, CalendarClock, BrainCircuit, Boxes, ShieldCheck, SlidersHorizontal, Search, PenLine, Plug, ArrowRight } from "lucide-react";
 import { APP_URL } from "@/components/site/nav";
 
 /* Les 3 rôles — mêmes que la page Orchestration (road_to_v2/Agents_C_Level.md). Direction Planned. */
@@ -26,7 +26,7 @@ const TEAM = [
     owns: "the when & the risk",
     icon: CalendarClock,
     box: "ring-amber-200 text-amber-600",
-    desc: "Owns delivery: sequencing, capacity, dependencies, milestones and drift.",
+    desc: "Owns delivery: sequencing, capacity, dependencies, milestones, risk and drift.",
   },
 ];
 
@@ -34,26 +34,35 @@ const TEAM = [
 const TOOLS = [
   { icon: Search, title: "Search your Memory", text: "Retrieves the decisions, constraints and conventions behind your system before it answers." },
   { icon: PenLine, title: "Take notes", text: "Writes findings back as knowledge nodes, so what it learns stays in the graph." },
-  { icon: Plug, title: "Use connected tools", text: "Calls the external tools you've connected over MCP — and any external write waits for a human." },
+  { icon: Plug, title: "Use connected tools", text: "Calls tools exposed over MCP by the systems you've connected — and any external write waits for a human." },
 ];
 
-/* Les garde-fous — mêmes principes que la page Orchestration. */
+/* Les garde-fous — cohérents avec Orchestration. « Governable » (pas « safe to trust » : l'IA
+   peut se tromper avec assurance, cf. AI Transparency). Model-agnostic → Configurable (propriété
+   d'architecture, pas de comportement). */
 const RULES = [
-  { icon: BrainCircuit, title: "Grounded", desc: "Built from your architecture, decisions and conventions — not generic guesses." },
-  { icon: Boxes, title: "Specialized", desc: "Each agent works within a defined responsibility instead of pretending to know everything." },
-  { icon: ShieldCheck, title: "Governed", desc: "An agent proposes; a human approves. Nothing consequential runs on its own." },
-  { icon: Server, title: "Model-agnostic", desc: "Local models through Ollama, or hosted models — your choice, per step." },
+  { icon: BrainCircuit, title: "Grounded", desc: "Uses your architecture, decisions and conventions — not generic guesses." },
+  { icon: Boxes, title: "Specialized", desc: "Works within a defined responsibility instead of pretending to know everything." },
+  { icon: ShieldCheck, title: "Governed", desc: "Proposes; a human approves. Nothing consequential runs on its own." },
+  { icon: SlidersHorizontal, title: "Configurable", desc: "Hosted or local models through Ollama — your choice, per step." },
+];
+
+/* Comment les 3 rôles s'enchaînent dans un run — chacun produit un artefact, gate humaine à chaque pas. */
+const RUN_ROLES = [
+  { code: "CPO", owns: "the what", items: "Framing · Spec · Acceptance criteria", box: "border-violet-200 bg-violet-50 text-violet-700" },
+  { code: "CTO", owns: "the how", items: "Architecture · APIs · Trade-offs · Risk", box: "border-blue-200 bg-blue-50 text-blue-700" },
+  { code: "COO", owns: "the when & risk", items: "Sequencing · Dependencies · Milestones", box: "border-amber-200 bg-amber-50 text-amber-700" },
 ];
 ---
 
 <BaseLayout
   title="Agents — TaskForce"
-  description="A delivery team, not a single generalist: specialized agents for product, architecture and delivery, grounded in your Memory and approved by a human. Today, one assistant agent works your Brain OS; the specialized team is the direction."
+  description="A delivery team, not a single generalist: specialized agents for product, architecture and delivery, grounded in your Memory and approved by a human. Today, one assistant agent grounded in your Brain OS; the specialized team is the direction."
 >
   <PageHero
     kicker="Agents"
     title="A delivery team, not a single generalist"
-    lead="Most AI tools give you one model that tries to understand everything. TaskForce is building a small team of specialized agents — product, architecture and delivery — each grounded in your Memory, each proposing decisions a human approves."
+    lead="Most AI workflows start with a generalist agent. TaskForce is building a small team of specialized agents — product, architecture and delivery — each grounded in your Memory, each producing proposals a human approves."
     level="labs"
     primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
     secondary={{ label: "See the run", href: "/product/orchestration" }}
@@ -94,16 +103,67 @@ const RULES = [
     </div>
   </section>
 
-  {/* ── What's real today ── */}
+  {/* ── One run, three perspectives : l'orchestration ENTRE les rôles ── */}
   <section class="bg-card border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">Orchestration</p>
+        <h2 class="t-h2">One run, three perspectives</h2>
+        <p class="t-lead mt-4">
+          Each role produces an artifact — a spec, an approach, a breakdown — and hands it to the next
+          only after a human approves it. Three perspectives, one accountable chain.
+        </p>
+      </div>
+
+      <div class="mt-12 overflow-x-auto pb-2">
+        <div class="flex min-w-max items-stretch gap-2.5">
+          <span class="bg-secondary text-muted-foreground flex items-center rounded-xl border px-4 text-[13px] font-medium">
+            Outcome
+          </span>
+          {
+            RUN_ROLES.map((r) => (
+              <Fragment>
+                <span class="text-muted-foreground/45 flex items-center">
+                  <ArrowRight className="size-4" />
+                </span>
+                <div class:list={["flex w-[176px] shrink-0 flex-col rounded-xl border p-3.5", r.box]}>
+                  <span class="text-[14px] font-semibold">{r.code}</span>
+                  <span class="text-[11px] italic opacity-80">{r.owns}</span>
+                  <span class="mt-2 text-[11px] leading-5 opacity-90">{r.items}</span>
+                </div>
+              </Fragment>
+            ))
+          }
+          <span class="text-muted-foreground/45 flex items-center">
+            <ArrowRight className="size-4" />
+          </span>
+          <span class="border-primary/30 bg-primary/10 text-primary flex items-center rounded-xl border px-4 text-center text-[13px] font-medium">
+            Human approval
+          </span>
+          <span class="text-muted-foreground/45 flex items-center">
+            <ArrowRight className="size-4" />
+          </span>
+          <span class="bg-secondary text-muted-foreground flex items-center rounded-xl border px-4 text-[13px] font-medium">
+            Delivery
+          </span>
+        </div>
+      </div>
+      <p class="text-muted-foreground mt-4 text-[12.5px]">
+        A human approves at every checkpoint — no role hands off on its own.
+      </p>
+    </div>
+  </section>
+
+  {/* ── What's real today ── */}
+  <section class="bg-secondary border-b">
     <div class="container-rail py-20 lg:py-28">
       <div class="max-w-2xl">
         <p class="t-eyebrow mb-3">What's real today</p>
         <h2 class="t-h2">One assistant, grounded in your Memory</h2>
         <p class="t-lead mt-4">
-          The specialized team is the direction. What ships today is an assistant agent that works
-          your Brain OS: it retrieves the reasoning behind your system, then uses tools to help — and
-          hands anything consequential to a human.
+          The specialized team is the direction. Today, TaskForce ships an assistant grounded in your
+          Brain OS: it retrieves the reasoning behind your system, uses connected tools — and
+          hands consequential actions to a human.
         </p>
       </div>
       <div class="mt-12 grid gap-6 lg:grid-cols-3">
@@ -131,11 +191,11 @@ const RULES = [
   </section>
 
   {/* ── The rules every agent follows ── */}
-  <section class="bg-secondary border-b">
+  <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-28">
       <div class="max-w-2xl">
         <p class="t-eyebrow mb-3">The rules</p>
-        <h2 class="t-h2">What makes an agent safe to trust</h2>
+        <h2 class="t-h2">What makes an agent governable</h2>
         <p class="t-lead mt-4">
           An agent is only as useful as it is accountable. Every agent — the assistant today, the
           specialized team as it lands — works to the same rules.
@@ -165,7 +225,7 @@ const RULES = [
 
   <PageCta
     title="A team you direct, not a black box you hope for"
-    lead="Specialized agents, grounded in your context, proposing decisions you approve. Start with what ships today."
+    lead="Specialized agents, grounded in your context, producing proposals you can review, approve or reject."
     primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
     secondary={{ label: "See the roadmap", href: "/roadmap" }}
   />
