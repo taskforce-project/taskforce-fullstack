@@ -227,6 +227,41 @@ function ConnLogo({ toolKey, label }: { toolKey: string; label: string }) {
   );
 }
 
+/** Une tuile de connecteur. Cliquable (→ fiche) pour les connecteurs éprouvés. */
+function Tile({ t }: { t: Tool }) {
+  const marker = DEEP[t.key];
+  const hasDetail = DETAIL.has(t.key);
+  const inner = (
+    <>
+      <ConnLogo toolKey={t.key} label={t.label} />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[13px] font-medium text-foreground">{t.label}</span>
+        <span className="text-muted-foreground block text-[11px]">{CAT_LABEL[t.cat]}</span>
+      </span>
+      {marker && (
+        <span className="border-primary/30 text-primary hidden shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium sm:inline">
+          {marker}
+        </span>
+      )}
+      {hasDetail && <ChevronRight className="text-muted-foreground/40 size-4 shrink-0" />}
+    </>
+  );
+  return (
+    <li className="bg-card">
+      {hasDetail ? (
+        <a
+          href={`/product/integrations/${t.key}`}
+          className="hover:bg-secondary/50 flex items-center gap-3 px-4 py-3 transition-colors"
+        >
+          {inner}
+        </a>
+      ) : (
+        <div className="flex items-center gap-3 px-4 py-3">{inner}</div>
+      )}
+    </li>
+  );
+}
+
 export function IntegrationCatalogue() {
   const [q, setQ] = useState("");
   const [cat, setCat] = useState<string | null>(null);
@@ -363,20 +398,7 @@ export function IntegrationCatalogue() {
         {shown.length > 0 ? (
           <ul className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border bg-border sm:grid-cols-3 lg:grid-cols-4">
             {shown.map((t) => (
-              <li key={t.key} className="bg-card flex items-center gap-3 px-4 py-3">
-                <ConnLogo toolKey={t.key} label={t.label} />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px] font-medium text-foreground">
-                    {t.label}
-                  </span>
-                  <span className="text-muted-foreground block text-[11px]">{CAT_LABEL[t.cat]}</span>
-                </span>
-                {DEEP[t.key] && (
-                  <span className="border-primary/30 text-primary hidden shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium sm:inline">
-                    {DEEP[t.key]}
-                  </span>
-                )}
-              </li>
+              <Tile key={t.key} t={t} />
             ))}
           </ul>
         ) : (
