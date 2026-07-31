@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Search, X } from "lucide-react";
+import { Search, X, ChevronRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { logoSrc } from "../BrandLogo";
@@ -62,6 +62,9 @@ const FEATURED = [
   "linear", "jira", "github", "gitlab", "slack", "sentry", "postgresql",
   "notion", "google-drive", "figma", "openai", "anthropic", "ollama", "keycloak",
 ];
+
+/** Connecteurs dotés d'une fiche détaillée (`/product/integrations/{key}`) — tuile cliquable. */
+const DETAIL = new Set(["github", "slack", "plane"]);
 
 /** Transcription fidèle de `ConnectorCatalog.build()` — 129 entrées, ordre du catalogue. */
 const TOOLS: Tool[] = [

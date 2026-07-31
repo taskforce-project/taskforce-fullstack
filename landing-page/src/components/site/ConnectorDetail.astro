@@ -1,0 +1,195 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import PageCta from "@/components/site/PageCta.astro";
+import { BrandLogo } from "@/components/site/BrandLogo";
+import { Plug, Brain, Terminal, Check, ArrowLeft, ArrowRight, ExternalLink, Info, ShieldCheck } from "lucide-react";
+import { APP_URL } from "@/components/site/nav";
+import type { ConnStatus, ConnectorDetail } from "@/lib/connectors";
+
+interface Props {
+  c: ConnectorDetail;
+}
+const { c } = Astro.props;
+
+const STATE_LABEL: Record<ConnStatus, string> = {
+  live: "Live",
+  beta: "Beta",
+  rolling: "Rolling out",
+  na: "Not applicable",
+};
+
+/* Styles des pastilles de statut (mêmes tons que le reste du site). */
+const STATE_STYLE: Record<ConnStatus, string> = {
+  live: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  beta: "border-primary/30 text-primary",
+  rolling: "border-dashed text-muted-foreground",
+  na: "text-muted-foreground/60",
+};
+
+const MATRIX = [
+  { key: "connect" as const, icon: Plug, label: "Connect", sub: "Authenticate & connect" },
+  { key: "remember" as const, icon: Brain, label: "Remember", sub: "Ingestion into Memory" },
+  { key: "act" as const, icon: Terminal, label: "Act", sub: "Actions with the tool" },
+];
+---
+
+<BaseLayout
+  title={`${c.name} integration — TaskForce`}
+  description={`${c.name} on TaskForce: ${c.tagline}`}
+>
+  <section class="bg-card border-b">
+    <div class="container-rail py-16 lg:py-20">
+      <a
+        href="/product/integrations"
+        class="link-underline text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-[13px] font-medium"
+      >
+        <ArrowLeft className="size-3.5" />
+        All integrations
+      </a>
+
+      <div class="mt-8 flex items-start gap-5">
+        <span class="bg-card flex size-16 shrink-0 items-center justify-center rounded-2xl border">
+          <BrandLogo brand={c.key} label={c.name} className="size-9" />
+        </span>
+        <div class="min-w-0">
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <h1 class="font-display text-[30px] font-medium tracking-[-0.02em] text-foreground sm:text-[36px]">
+              {c.name}
+            </h1>
+            <span class="text-muted-foreground text-[13px]">{c.category}</span>
+          </div>
+          <p class="t-lead mt-3 max-w-2xl">{c.tagline}</p>
+        </div>
+      </div>
+
+      {/* Matrice Connect / Remember / Act — le statut RÉEL par capacité. */}
+      <div class="mt-10 grid gap-4 sm:grid-cols-3">
+        {
+          MATRIX.map((m) => {
+            const state = c.matrix[m.key];
+            return (
+              <div class="rounded-2xl border bg-card p-5">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="bg-card text-foreground flex size-10 items-center justify-center rounded-xl border">
+                    <m.icon className="size-[18px]" strokeWidth={1.75} />
+                  </span>
+                  <span class={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${STATE_STYLE[state]}`}>
+                    {STATE_LABEL[state]}
+                  </span>
+                </div>
+                <h3 class="mt-3 text-[15px] font-semibold text-foreground">{m.label}</h3>
+                <p class="text-muted-foreground mt-0.5 text-[12.5px]">{m.sub}</p>
+              </div>
+            );
+          })
+        }
+      </div>
+    </div>
+  </section>
+
+  {/* Ce que TaskForce sait faire — chaque item = un endpoint réel. */}
+  <section class="bg-secondary border-b">
+    <div class="container-rail py-16 lg:py-20">
+      <div class="grid gap-10 lg:grid-cols-[minmax(0,340px)_1fr] lg:gap-16">
+        <div>
+          <p class="t-eyebrow mb-3">Capabilities</p>
+          <h2 class="t-h2">What TaskForce can do with {c.name}</h2>
+          <dl class="mt-6 flex flex-col gap-3 text-[13.5px]">
+            <div class="flex items-center justify-between gap-3 border-b pb-2">
+              <dt class="text-muted-foreground">Authentication</dt>
+              <dd class="text-foreground text-right font-medium">{c.auth}</dd>
+            </div>
+            <div class="flex items-center justify-between gap-3 border-b pb-2">
+              <dt class="text-muted-foreground">Availability</dt>
+              <dd class="text-foreground text-right font-medium">{c.plan}</dd>
+            </div>
+          </dl>
+          {c.flows.length > 0 && (
+            <div class="mt-6">
+              <p class="text-muted-foreground text-[12.5px]">What flows in</p>
+              <ul class="mt-2 flex flex-wrap gap-1.5">
+                {c.flows.map((f) => (
+                  <li class="bg-card text-foreground rounded-full border px-2.5 py-1 text-[11.5px]">{f}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+
+        <ul class="flex flex-col gap-4">
+          {
+            c.can.map((cap) => (
+              <li class="bg-card flex items-start gap-3 rounded-2xl border p-5">
+                <span class="text-primary mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border">
+                  <Check className="size-3.5" strokeWidth={2.5} />
+                </span>
+                <div>
+                  <h3 class="text-[15px] font-semibold text-foreground">{cap.title}</h3>
+                  <p class="text-muted-foreground mt-1 text-[13.5px] leading-6">{cap.text}</p>
+                </div>
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  {/* Honnêteté + gouvernance. */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-16 lg:py-20">
+      <div class="grid gap-8 lg:grid-cols-2 lg:gap-16">
+        <div>
+          <p class="t-eyebrow mb-3">Where it stands</p>
+          <h2 class="t-h3">Honest about the edges</h2>
+          <ul class="mt-5 flex flex-col gap-3">
+            {
+              c.notYet.map((n) => (
+                <li class="text-muted-foreground flex items-start gap-2.5 text-[13.5px] leading-6">
+                  <Info className="mt-0.5 size-4 shrink-0" strokeWidth={1.75} />
+                  {n}
+                </li>
+              ))
+            }
+          </ul>
+        </div>
+        <div>
+          <p class="t-eyebrow mb-3">Access &amp; governance</p>
+          <h2 class="t-h3">Configured by you, bounded by you</h2>
+          <ul class="mt-5 flex flex-col gap-3 text-[13.5px] leading-6 text-foreground">
+            <li class="flex items-start gap-2.5">
+              <ShieldCheck className="text-primary mt-0.5 size-4 shrink-0" strokeWidth={2} />
+              Set up by workspace owners and admins. Credentials are stored encrypted, never in the codebase.
+            </li>
+            <li class="flex items-start gap-2.5">
+              <ShieldCheck className="text-primary mt-0.5 size-4 shrink-0" strokeWidth={2} />
+              Agents can only invoke what the connector exposes, within the scopes you grant.
+            </li>
+          </ul>
+          <div class="mt-6 flex flex-wrap items-center gap-4">
+            <a href="/trust" class="link-underline text-foreground inline-flex items-center gap-1.5 text-[13.5px] font-medium">
+              Security &amp; data handling
+              <ArrowRight className="size-3.5" />
+            </a>
+            <a
+              href={c.docsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="link-underline text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-[13.5px]"
+            >
+              {c.docsLabel}
+              <ExternalLink className="size-3.5" />
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <PageCta
+    title={`Put ${c.name} to work`}
+    lead="Connect your stack and give every run the context it needs — with a human on every external action."
+    primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
+    secondary={{ label: "Browse all integrations", href: "/product/integrations" }}
+  />
+</BaseLayout>
