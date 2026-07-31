@@ -209,6 +209,14 @@ point identifiable sur la courbe de lead time.
 >   **Pricing doit être harmonisé** (self-hosting dispo pour tous ; Enterprise = assistance/support/SSO/SLA).
 >   À CONFIRMER par le user (dépend aussi du statut open-source, toujours ouvert) avant de toucher Pricing.
 > Vérifié DOM : 5 sections + hero, form 6 champs (topic ajouté), 5 topic options, anchor demo-form, console 0 err.
+> **MAJ (verrou, 2e review 9/10)** : (3) « wants to ship » → « **needs to ship** ». (4) « Built for teams
+> shipping with AI » → « **putting AI into production** ». (6) hiérarchie CTA variée : Hero « **See TaskForce
+> in action** » → Form « Request a demo » → « **Start free** » (avant « Request a demo » 3×). (7) phrase
+> self-hosting : « **governance** » retiré (la gouvernance = human approval est DÉJÀ en Pro) → « Enterprise adds
+> deployment assistance, SSO, advanced controls and dedicated support ». (8) « connects to » → « **fits around**
+> the … your team already uses » (TaskForce ne remplace pas les outils). #5 (labels form) déjà OK depuis la
+> réécriture (Name/Work email/Company/Team size/topic/message tous labellisés — vérifié DOM). Console 0 err.
+> **Pages built restant à reviewer avec le user : HOME (index) + /product (hub)** (il croyait avoir tout vu).
 > Review user : la page ressemblait à une version longue de la card Enterprise du pricing. Il faut vendre
 > **l'adoption** (déploiement, garanties opérationnelles, parcours), pas que le contrôle. Refonte complète :
 > - **Hero** gardé (« AI in your delivery path, on your terms » + triptyque leverage/control/attribution/data).
