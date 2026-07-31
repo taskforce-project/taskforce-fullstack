@@ -310,6 +310,11 @@ export const BUILT_ROUTES: ReadonlySet<string> = new Set([
   "/enterprise",
   "/roadmap",
   "/legal/ai-transparency",
+  "/legal/security",
+  "/legal/accessibility",
+  "/company/about",
+  "/company/contact",
+  "/company/media",
   "/book-a-demo",
 ]);
 
