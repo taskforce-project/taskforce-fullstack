@@ -45,7 +45,7 @@ export default function AuthLayout({
   // question précise — l'instantané serveur vaut `false`, l'instantané client `true`, sans appeler
   // `setState` depuis un effet, ce que le linter du projet signale à juste titre.
   const mounted = useSyncExternalStore(
-    () => () => {},
+    () => () => { },
     () => true,
     () => false
   );

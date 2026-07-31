@@ -4,53 +4,91 @@ import PageHero from "@/components/site/PageHero.astro";
 import PageCta from "@/components/site/PageCta.astro";
 import { LevelBadge } from "@/components/site/Section";
 import { IntegrationCatalogue } from "@/components/site/illustrations/IntegrationCatalogue";
-import { Plug, Brain, Terminal } from "lucide-react";
+import { Plug, Brain, Terminal, ArrowRight, ArrowDown, KeyRound, Lock, ShieldCheck, EyeOff } from "lucide-react";
 import { APP_URL } from "@/components/site/nav";
 
+/* Les trois temps d'une intégration — rendus EXPLICITES (review user) :
+   availability → ingestion vers Memory → action via MCP. Chacun dit où il en est. */
 const WAYS = [
   {
     icon: Plug,
     title: "Connect",
+    kind: "Connector availability",
     level: "live" as const,
-    text: "OAuth in a click for GitHub and Slack; a short, encrypted-credentials form for everything else. Keys are stored encrypted, never in the codebase.",
+    text: "A connector can be configured and connected. OAuth is available for supported providers; the rest use encrypted credentials you provide.",
   },
   {
     icon: Brain,
-    title: "Feed the memory",
+    title: "Remember",
+    kind: "Ingestion into Memory",
     level: "beta" as const,
-    text: "A connected tool's data can be ingested into the Brain OS decision graph, so a run starts from your real context. Live for Plane today, rolling out per tool.",
+    text: "A connected tool's data flows into the Brain OS decision graph, so runs can start from the context your team has already built. Live for Plane today, rolling out per tool.",
   },
   {
     icon: Terminal,
-    title: "Act through MCP",
+    title: "Act",
+    kind: "Action via MCP",
     level: "beta" as const,
-    text: "TaskForce speaks MCP: its agents can use tools on the systems you connect — and every external write is proposed, then approved by a human before it runs.",
+    text: "Agents can use the tools you connect. Anything not explicitly read-only is treated as a write — the agent proposes it, and it runs only after a human approves it.",
+  },
+];
+
+/* Le flux produit, de bout en bout — c'est ce qui distingue Integrations d'un annuaire. */
+// (Le flux est rendu en diagramme dans le template, pas en données.)
+
+/* Raccord aux trois piliers : Integrations n'est pas isolé, il alimente le reste. */
+const PILLARS = [
+  { name: "Integrations", text: "brings in the context.", href: null },
+  { name: "Memory", text: "preserves the reasoning.", href: "/product/brain-os" },
+  { name: "Orchestration", text: "decides what happens next.", href: "/product/orchestration" },
+];
+
+const SECURITY = [
+  {
+    icon: KeyRound,
+    title: "OAuth where supported",
+    text: "GitHub and Slack connect over OAuth; the rest use tokens or keys you provide.",
+  },
+  {
+    icon: Lock,
+    title: "Encrypted at rest",
+    text: "Every credential is stored encrypted, never in the codebase.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Bounded by capability",
+    text: "Agents can only invoke what a connector exposes — and only what the credentials and scopes you configure permit.",
+  },
+  {
+    icon: EyeOff,
+    title: "Out of the prompt",
+    text: "Connector secrets are used server-side to reach the tool; they're never placed in a model prompt.",
   },
 ];
 ---
 
 <BaseLayout
   title="Integrations — TaskForce"
-  description="A declarative catalogue of 129 connectors across 16 categories — tracker, repo, cloud, docs and models. Connect in a click and feed your run's context into the Brain OS memory. Connecting is live; deep data sync is rolling out."
+  description="Connect the tools your work already lives in — 129 connectors across 16 categories, from your tracker and repo to your cloud, docs and models. They bring context and capabilities into every run: connect, remember, act — with a human on every external action."
 >
   <PageHero
     kicker="Integrations"
     title="Connect the tools your work already lives in"
-    lead="One declarative catalogue — 129 connectors across 16 categories, from your tracker and repo to your cloud, docs and models. Connect a tool in a click, and its context can feed the memory behind every run."
+    lead="One catalogue, 129 connectors across 16 categories — from your tracker and repo to your cloud, docs and models. Connect them in minutes, then bring their context and capabilities into your runs."
     level="beta"
     primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
     secondary={{ label: "Browse the catalogue", href: "#catalogue" }}
   />
 
-  {/* ── Le vrai catalogue, cherchable ── */}
+  {/* ── Le catalogue : preuve de profondeur, pas le message ── */}
   <section id="catalogue" class="bg-secondary border-b scroll-mt-20">
     <div class="container-rail py-20 lg:py-28">
       <div class="max-w-2xl">
         <p class="t-eyebrow mb-3">The catalogue</p>
         <h2 class="t-h2">Find your stack</h2>
         <p class="t-lead mt-4">
-          Search the pool of connectors. Adding a new one is a line of configuration — not a release.
-          Connecting is live across the catalogue; deeper, per-tool data sync is rolling out.
+          Start with the tools teams reach for first, or open the full catalogue. Adding a new one is
+          a line of configuration — not a release.
         </p>
       </div>
       <div class="mt-10">
@@ -59,17 +97,18 @@ const WAYS = [
     </div>
   </section>
 
-  {/* ── Comment ça marche : 3 façons ── */}
+  {/* ── Comment ça marche : Connect → Remember → Act ── */}
   <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-28">
       <div class="max-w-2xl">
         <p class="t-eyebrow mb-3">How it works</p>
         <h2 class="t-h2">Connect, remember, act</h2>
         <p class="t-lead mt-4">
-          An integration isn't just a logo on a page. In TaskForce it earns its place in three steps —
-          and each one is honest about where it stands.
+          An integration isn't a logo on a page. In TaskForce a tool earns its place in three steps —
+          and each one is explicit about where it stands.
         </p>
       </div>
+
       <div class="mt-12 grid gap-6 lg:grid-cols-3">
         {
           WAYS.map((w) => (
@@ -81,11 +120,69 @@ const WAYS = [
                 <LevelBadge level={w.level} />
               </div>
               <h3 class="mt-4 text-[16px] font-semibold text-foreground">{w.title}</h3>
+              <p class="text-primary mt-1 text-[12px] font-medium">{w.kind}</p>
               <p class="text-muted-foreground mt-2 text-[13.5px] leading-6">{w.text}</p>
             </div>
           ))
         }
       </div>
+
+      {/* Le flux, en diagramme : le contexte entre, l'action sort — un humain autorise au milieu. */}
+      <div class="mx-auto mt-14 flex max-w-md flex-col">
+        <div class="bg-card rounded-2xl border p-5 text-center">
+          <p class="text-[14.5px] font-semibold text-foreground">Your systems</p>
+          <p class="text-muted-foreground mt-1 text-[12px]">GitHub · Linear · Postgres · Notion · …</p>
+        </div>
+
+        <div class="text-muted-foreground flex items-center justify-center gap-2 py-2.5 text-[11px]">
+          <ArrowDown className="size-4" />
+          <span>context</span>
+        </div>
+
+        <div class="border-primary/30 rounded-2xl border p-5 [background:radial-gradient(120%_120%_at_50%_0%,color-mix(in_oklab,var(--primary)_6%,transparent),transparent_70%)]">
+          <p class="t-eyebrow text-center">TaskForce</p>
+          <div class="mt-3 flex flex-wrap items-center justify-center gap-2">
+            <span class="bg-card rounded-full border px-3 py-1 text-[12.5px] font-medium text-foreground">Memory</span>
+            <ArrowRight className="text-muted-foreground/45 size-4 shrink-0" />
+            <span class="bg-card rounded-full border px-3 py-1 text-[12.5px] font-medium text-foreground">Agents</span>
+            <ArrowRight className="text-muted-foreground/45 size-4 shrink-0" />
+            <span class="bg-card rounded-full border px-3 py-1 text-[12.5px] font-medium text-foreground">Human approval</span>
+          </div>
+        </div>
+
+        <div class="text-muted-foreground flex items-center justify-center gap-2 py-2.5 text-[11px]">
+          <ArrowDown className="size-4" />
+          <span>approved action</span>
+        </div>
+
+        <div class="bg-card rounded-2xl border p-5 text-center">
+          <p class="text-[14.5px] font-semibold text-foreground">External systems</p>
+          <p class="text-muted-foreground mt-1 text-[12px]">Open a PR · create an issue · post to Slack</p>
+        </div>
+      </div>
+
+      {/* Raccord aux trois piliers. */}
+      <div class="mt-12 grid gap-4 sm:grid-cols-3">
+        {
+          PILLARS.map((p) => (
+            <div class="rounded-2xl border bg-card p-5">
+              <p class="text-[14.5px] leading-6 text-foreground">
+                <span class="font-semibold">{p.name}</span> {p.text}
+              </p>
+              {p.href && (
+                <a
+                  href={p.href}
+                  class="link-underline text-muted-foreground hover:text-foreground mt-3 inline-flex items-center gap-1 text-[13px] font-medium"
+                >
+                  Learn more
+                  <ArrowRight className="size-3.5" />
+                </a>
+              )}
+            </div>
+          ))
+        }
+      </div>
+
       <p class="text-muted-foreground mt-8 text-[13px] leading-6">
         We mark integrations <span class="text-foreground font-medium">Beta</span> on purpose:
         connecting is here today, deep sync and MCP actions are rolling out. Follow it on the{" "}
@@ -94,9 +191,43 @@ const WAYS = [
     </div>
   </section>
 
+  {/* ── Sécurité & permissions : le pont vers le Trust Center ── */}
+  <section class="bg-secondary border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">Security &amp; permissions</p>
+        <h2 class="t-h2">Your credentials, your scopes, your control</h2>
+        <p class="t-lead mt-4">
+          Connecting real systems to AI raises one question first: what can an agent actually do with
+          that access? The short version is here — the full one lives in the Trust Center.
+        </p>
+      </div>
+      <div class="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        {
+          SECURITY.map((s) => (
+            <div class="rounded-2xl border bg-card p-6">
+              <span class="bg-card text-foreground flex size-11 items-center justify-center rounded-xl border">
+                <s.icon className="size-5" strokeWidth={1.75} />
+              </span>
+              <h3 class="mt-4 text-[15px] font-semibold text-foreground">{s.title}</h3>
+              <p class="text-muted-foreground mt-2 text-[13.5px] leading-6">{s.text}</p>
+            </div>
+          ))
+        }
+      </div>
+      <a
+        href="/trust"
+        class="link-underline text-foreground mt-10 inline-flex items-center gap-1.5 text-[14px] font-medium"
+      >
+        See security &amp; data handling
+        <ArrowRight className="size-4" />
+      </a>
+    </div>
+  </section>
+
   <PageCta
-    title="Bring your stack into one context"
-    lead="Connect the tools your team already uses, and give every run the context it needs — with a human on every external action."
+    title="Your tools become context and capabilities for every run"
+    lead="Connect your stack. Give every run the context it needs. Let agents act through the tools you already use — with humans still in control."
     primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
     secondary={{ label: "Book a demo", href: "/book-a-demo" }}
   />

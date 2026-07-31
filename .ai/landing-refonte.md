@@ -185,6 +185,63 @@ point identifiable sur la courbe de lead time.
 | Métronome | `src/lib/useScene.ts` | `useScene(beats)` : partition de durées, démarre à l'entrée à l'écran, se joue **une fois**, **se fige sur l'état final**. `useTypewriter` pour la frappe. `prefers-reduced-motion` → état final direct. |
 | Châssis | `src/components/site/scene/AppWindow.tsx` | Vrai écran TaskForce (voir encadré ci-dessous). **Remplace la barre macOS de `MockFrame`** — trois pastilles + une URL, c'est le signe le plus sûr qu'on regarde un dessin. |
 
+> ### ⚑ v49 (31/07) — Integrations : passe de PRÉCISION produit (review 8.5/10)
+> Consigne user : « precision and functional depth, not more copy ». Aucune section marketing en +.
+> - **Rewords honnêteté** : Hero « they become context and capabilities » → « **then bring their context and
+>   capabilities into your runs** » (moins absolu). Carte **Connect** : « can be connected — Live across the
+>   catalogue » → « **can be configured and connected. OAuth for supported providers; the rest use encrypted
+>   credentials you provide.** » (lève l'ambiguïté exists/configurable/connected/usable). Carte **Remember** :
+>   « a run starts from your real context » → « runs can start from **the context your team has already built** ».
+>   Sécu **Bounded by capability** : « limited to its declared capabilities » → « **only what a connector exposes —
+>   and only what the credentials and scopes you configure permit** » (défendable en pentest).
+> - **Diagramme de flux réel** (remplace la frise de pilules) : boîtes empilées **Your systems →(context)→
+>   TaskForce [ Memory → Agents → Human approval ] →(approved action)→ External systems**. 2 flèches `ArrowDown`.
+> - **Profondeur des 129 rendue EXPLICITE** (`IntegrationCatalogue.tsx`) : marqueurs = la capability RÉELLE —
+>   **Memory** (Plane), **Actions** (GitHub, Slack) — + **légende** « Every connector is connectable today.
+>   Deeper capabilities — Memory / Actions — are rolling out; Plane, GitHub and Slack lead. » Vérifié en DOM :
+>   memCount=1 (Plane), actCount=2 (GitHub+Slack) sur 129.
+> - **HONNÊTETÉ — ce que j'ai REFUSÉ de faire** (points 4/5/9/10 de la review) : pas de badges Read/Write/Memory/
+>   MCP sur les 129, pas de 129 fiches détaillées. Raison : `ConnectorCatalog` n'a par connecteur qu'un nom +
+>   catégorie + type d'auth + 1 ligne de desc, et **tout est `AVAILABLE`/`observe`** (seuls github/slack ont `act`,
+>   seul Plane a la sync Memory). Inventer des manifests de capabilities = exactement la « credibility debt » que le
+>   user redoute (points 3/7/11). → fiches détaillées **proposées pour les 3 connecteurs éprouvés seulement**.
+> - **Cohérence inter-pages (point 11)** : `enterprise.astro` disait « GitHub · GitLab · Linear · Slack · **+40
+>   more** » (contredit 129) → **« +125 more »** (4 nommés + 125 = 129). Vérifié DOM : +125 oui, +40 non.
+> - Vérifié : integrations 200, vite:0, 0 erreur console, rewords OK, diagramme (5 nœuds + 2 flèches), légende,
+>   marqueurs Memory/Actions corrects, catalogue featured→showAll (129, 0 image cassée) toujours OK.
+>
+> ### ⚑ v48 (31/07) — Integrations : refonte de la HIÉRARCHIE du message (review user)
+> Le fond était bon (9/10) mais « 129 connectors » volait la vedette au vrai message : TaskForce n'est pas un
+> annuaire, c'est **la couche qui transforme les systèmes de l'entreprise en contexte + capacités** pour les runs.
+> Refonte structurelle en 5 blocs (Hero → Catalogue → How it works → Security → Positioning), pas de section en +.
+> - **Hero** : « declarative catalogue » (jargon) retiré du pitch → « One catalogue, 129 connectors across 16
+>   categories — from your tracker and repo to your cloud, docs and models. Connect them in **minutes**, and they
+>   become **context and capabilities** for every run. » (« in a click » → « in minutes » : honnête, seuls
+>   GitHub/Slack sont OAuth 1-clic).
+> - **Catalogue** (`IntegrationCatalogue.tsx`) : ne domine plus. **Vue « Featured » par défaut = 14 connecteurs
+>   stratégiques** (Linear, Jira, GitHub, GitLab, Slack, Sentry, PostgreSQL, Notion, Google Drive, Figma, OpenAI,
+>   Anthropic, Ollama, Keycloak — ils racontent le produit) + bouton **« Show all 129 connectors »** (bascule sur
+>   le catalogue complet ; recherche/filtre y basculent aussi). Compteur « Featured · 129 connectors, 16
+>   categories » puis « X of 129 ».
+> - **How it works** = le vrai cœur. Distinction rendue EXPLICITE : **Connect = availability (Live)** · **Remember
+>   = ingestion into Memory (Beta, Plane live)** · **Act = action via MCP (Beta)**. + **flux** « Your systems →
+>   TaskForce → Memory → Agents → Human approval → External systems » + **raccord aux 3 piliers** (Integrations
+>   brings the context · Memory preserves the reasoning [→brain-os] · Orchestration decides what happens next
+>   [→orchestration]). Note « Beta on purpose » + roadmap conservée.
+> - **MCP — claim sécurisé au périmètre EXACT du code** (le user a prévenu qu'un security engineer testerait) :
+>   `McpClient.ToolDef.readOnly` vient de `annotations.readOnlyHint` **défaut = false** → tout ce qui n'est pas
+>   explicitement read-only est **traité comme une écriture → confirmation humaine** ; `McpActionController.execute`
+>   n'exécute qu'une action **déjà approuvée** (gate BUSINESS+). Formulation retenue : « Anything not explicitly
+>   read-only is treated as a write — the agent proposes it, and it runs only after a human approves it. »
+> - **NEW section Security & permissions** (« Your credentials, your scopes, your control ») = pont vers le Trust
+>   Center : 4 points vérifiés (OAuth where supported · encrypted at rest · bounded by capability observe/act ·
+>   secrets used server-side, never in a model prompt) + lien « See security & data handling → » vers `/trust`.
+> - **CTA** revendique le résultat : « Your tools become context and capabilities for every run » + « …with humans
+>   still in control ».
+> - Vérifié : HTTP 200, vite:0, **0 erreur console**, défaut = **14 featured** (les bons noms, marqueurs OAuth OK),
+>   **Show all → 129 of 129, 0 image cassée**, toggle « Show featured only », flux (6 nœuds), 3 piliers liés
+>   (brain-os + orchestration), 4 points sécu, lien Trust. Screenshot KO (pane vw=0) → DOM = preuve.
+>
 > ### ⚑ v47 (31/07) — Lot produit — Integrations (+ correction d'honnêteté du badge)
 > Page la plus à risque : une grille de 47/60 logos laisse croire « on s'intègre à tout ». **Avant d'écrire,
 > j'ai lu le vrai code** (`ConnectorCatalog.java` + l'UI réelle `components/integrations/integrations-catalog.tsx`).

@@ -43,11 +43,15 @@ const CATS: { id: string; label: string }[] = [
 
 const CAT_LABEL: Record<string, string> = Object.fromEntries(CATS.map((c) => [c.id, c.label]));
 
-/** Les connecteurs éprouvés (sync/OAuth réels aujourd'hui) — cf. `ConnectorCatalog` (AVAILABLE + caps). */
+/**
+ * Profondeur RÉELLE par connecteur (cf. `ConnectorCatalog` caps + l'UI de sync). On n'invente rien :
+ * Plane a l'ingestion Memory aujourd'hui ; GitHub & Slack portent la capability `act` (Actions).
+ * Tout le reste est « connectable » (cap `observe`), la profondeur arrive — dit dans la légende.
+ */
 const DEEP: Record<string, string> = {
-  plane: "Brain OS sync",
-  github: "1-click OAuth",
-  slack: "1-click OAuth",
+  plane: "Memory",
+  github: "Actions",
+  slack: "Actions",
 };
 
 /**
@@ -337,6 +341,19 @@ export function IntegrationCatalogue() {
           </>
         )}
       </div>
+
+      {/* Légende honnête : tout est connectable ; Memory/Actions = la profondeur réelle, en cours. */}
+      <p className="text-muted-foreground mt-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[12px] leading-6">
+        Every connector is connectable today. Deeper capabilities —
+        <span className="border-primary/30 text-primary rounded-full border px-1.5 py-px text-[10px] font-medium">
+          Memory
+        </span>
+        ingestion and
+        <span className="border-primary/30 text-primary rounded-full border px-1.5 py-px text-[10px] font-medium">
+          Actions
+        </span>
+        — are rolling out; Plane, GitHub and Slack lead.
+      </p>
 
       {/* La grille — min-h pour que filtrer ne fasse pas sauter la section */}
       <div className="mt-4 min-h-[336px]">
