@@ -185,6 +185,29 @@ point identifiable sur la courbe de lead time.
 | Métronome | `src/lib/useScene.ts` | `useScene(beats)` : partition de durées, démarre à l'entrée à l'écran, se joue **une fois**, **se fige sur l'état final**. `useTypewriter` pour la frappe. `prefers-reduced-motion` → état final direct. |
 | Châssis | `src/components/site/scene/AppWindow.tsx` | Vrai écran TaskForce (voir encadré ci-dessous). **Remplace la barre macOS de `MockFrame`** — trois pastilles + une URL, c'est le signe le plus sûr qu'on regarde un dessin. |
 
+> ### ⚑ v58 (31/07) — Lot Legal + Company (vague 1 : Company + statements)
+> **⚠ Découverte honnêteté** : `src/config/constants_en.ts` = **boilerplate du template d'origine** (testimonials
+> bidon « Loved by Professionals », features génériques, blocs `terms/privacy/accessibility` en ToS US générique
+> daté « January 7, 2026»). **Ne PAS publier ça comme les CGU/Privacy réelles de TaskForce** (malhonnête) — et je
+> ne fabrique pas de texte juridique contraignant. → découpe du lot par risque.
+> - **NEW `layouts/LegalDoc.astro`** : gabarit légal partagé (en-tête + date « Last updated » + **bandeau
+>   « Working draft — pending legal review »** optionnel via prop `draft` + corps `Prose` + pied contact). Sert de
+>   base honnête pour les docs contraignants à venir.
+> - **Company (3, custom, honnêtes)** : `/company/about` (mission, « why we exist », 4 principes, section « Early,
+>   and honest about it » → roadmap/trust ; **aucun faux client/équipe/levée**), `/company/contact` (canaux réels :
+>   demo/enterprise/security + `hello@taskforce.dev`), `/company/media` (boilerplate 1 ligne + 1 §, **vrais assets**
+>   `logo-taskforce.svg` + `favicon.svg` en download, palette = vrais jetons #2563EB/#1D1D1F/#FBFBFC/#E6E6E9).
+> - **Legal statements (2, honnêtes, non-draft)** : `/legal/security` (approche sécu ancrée sur les faits réels du
+>   Trust Center + **report a vulnerability** via hello@ ; « no badges we haven't earned » ; pas de bug-bounty
+>   promis) ; `/legal/accessibility` (cible **WCAG 2.2 AA** assumée comme intention pas certif ; skip-link/focus/
+>   reduced-motion réels ; section honnête « Where we fall short »).
+> - `nav.ts` BUILT_ROUTES += les 5 routes. Vérifié : 5 pages 200, 0 erreur build ; About (h1+principes+roadmap),
+>   Media (**2 logos chargés, 0 image cassée**, 4 hex, downloads), Accessibility (LegalDoc : h1+date+WCAG+contact).
+> **➜ Vague 2 à cadrer avec le user (docs contraignants)** : Privacy · Terms · Cookies · DPA · Subprocessors ·
+> Legal notice → **scaffolds honnêtes** (bandeau draft + faits réels du Trust Center + placeholders publication),
+> jamais du boilerplate présenté comme définitif. Attend le feu vert sur l'approche + d'éventuels détails de
+> publication réels (raison sociale / adresse / hébergeur — sinon placeholders).
+>
 > ### ⚑ v57 (31/07) — Passe de cohérence : verrou du vocabulaire (transverse)
 > Audit systématique de tout `landing-page/src` (grep `sign-off|disposes|consequential|proposes|checkpoint` +
 > lecture des contextes Enterprise/Trust/AI-Transparency/home). **Constat : le vocabulaire est déjà largement
