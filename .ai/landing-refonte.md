@@ -185,7 +185,100 @@ point identifiable sur la courbe de lead time.
 | Métronome | `src/lib/useScene.ts` | `useScene(beats)` : partition de durées, démarre à l'entrée à l'écran, se joue **une fois**, **se fige sur l'état final**. `useTypewriter` pour la frappe. `prefers-reduced-motion` → état final direct. |
 | Châssis | `src/components/site/scene/AppWindow.tsx` | Vrai écran TaskForce (voir encadré ci-dessous). **Remplace la barre macOS de `MockFrame`** — trois pastilles + une URL, c'est le signe le plus sûr qu'on regarde un dessin. |
 
-> ### ⚑ v41 (30/07) — /legal/ai-transparency : vraie page AI transparency (10 points user)
+> ### ⚑ v44 (30/07) — /book-a-demo : « apporte un vrai problème, on lance TaskForce dessus » (8→9)
+> Review user : éviter la « landing de prise de RDV » ; on vend une DÉMONSTRATION sur leur problème.
+> Structure user : Hero → What to expect → Bring one real outcome → Who this is for → Demo form → Start free.
+> - Hero lead affiné : « …**using** a real outcome from your team. We'll run it end to end, **show where humans
+>   stay in control**, and answer the hard questions. » (remet la gouvernance au centre).
+> - **What to expect** : 5 items concrets titrés (A real workflow not a slide deck · Your existing stack ·
+>   Governance in practice · Security and deployment · **No roadmap theatre** — « what's Live, Beta or Planned »).
+> - **NEW « Bring one real outcome »** (What to bring) : « something your team actually wants to ship … You
+>   don't need to prepare anything — a short description is enough. » → CTA concret.
+> - **NEW « Who this is for »** : Built for teams shipping with AI + 3 profils (Engineering leaders · Product &
+>   engineering · Security & platform teams) → le visiteur se reconnaît.
+> - **Formulaire mieux qualifié** (`DemoForm.tsx`) : + select **« What would you like to explore? »** (Run a real
+>   workflow / Self-hosting / Security & compliance / AI orchestration / Other) + textarea **« What would you like
+>   us to run? »** + helper. Champs : name/email/company/size/topic/message ; mailto inclut le topic. Bouton
+>   « Request a demo ». Formulaire centré/dominant (section `#demo-form`, hero « Request a demo » y ancre).
+> - **Start free instead** : phrase de RÉCONCILIATION self-hosting (voir ⚠️ ci-dessous).
+> - ⚠️ **INCOHÉRENCE SITE-WIDE À RÉGLER (flag user)** : plusieurs CTA + la Vision (« self-hosting is **not** an
+>   enterprise upsell ») disent « **self-hosting available from day one** » (= dispo pour tous), MAIS **Pricing
+>   gate le self-hosted en Enterprise** (feature « Self-hosted deployment » + card « two ways to run AI » finissant
+>   par « Enterprise. » + row table —/—/✓). J'ai mis sur book-a-demo la phrase user « Self-hosting is available
+>   from day one; Enterprise adds deployment assistance, governance, SSO, advanced controls and support. » →
+>   **Pricing doit être harmonisé** (self-hosting dispo pour tous ; Enterprise = assistance/support/SSO/SLA).
+>   À CONFIRMER par le user (dépend aussi du statut open-source, toujours ouvert) avant de toucher Pricing.
+> Vérifié DOM : 5 sections + hero, form 6 champs (topic ajouté), 5 topic options, anchor demo-form, console 0 err.
+> Review user : la page ressemblait à une version longue de la card Enterprise du pricing. Il faut vendre
+> **l'adoption** (déploiement, garanties opérationnelles, parcours), pas que le contrôle. Refonte complète :
+> - **Hero** gardé (« AI in your delivery path, on your terms » + triptyque leverage/control/attribution/data).
+> - **3 piliers regroupés** (au lieu de 6 cards plates) : **Deploy privately** (self-host, local models) ·
+>   **Govern every run** (approvals, RBAC, audit) · **Control your data and models** (hosted/local, no-training,
+>   connector scopes).
+> - **NEW « Built for your environment »** : Identity (Keycloak/OIDC/SAML) · Infrastructure (Docker/Compose) ·
+>   Models (Anthropic/OpenAI/Ollama/local) · Data (PostgreSQL/S3-MinIO) · Integrations (GitHub/GitLab/Linear/
+>   Slack/+40). « TaskForce sits inside the infrastructure you already control. »
+> - **NEW « Enterprise controls »** : contrôle **par couche** (Identity/Access/AI/Data/Delivery/Audit/Deployment/
+>   Security/Operations → contrôle) — la grille que veut un buyer.
+> - **NEW « Deploy your way »** : Self-hosted / Private models / Enterprise deployment + **honnêteté K8s** :
+>   « Docker Compose today. Kubernetes deployment support is on the roadmap. » (pas annoncé comme dispo).
+> - **Security & compliance reformulée (moins provoc)** : « No obtained-certification **theatre** » → « No
+>   certification claims we **can't substantiate** » + « documents the controls… evaluate before deployment ».
+>   No-training aligné sur AI-transparency (« does not use your data to train **its own** models ; hosted =
+>   provider terms ; local = inference on-prem »). Mini-row GDPR=Technical controls / SOC 2=Roadmap / DPA=On request.
+> - **NEW « What happens next »** (le gros manque) : **01 Architecture review → 02 Deployment → 03 Security
+>   validation → 04 First workflow** — transforme l'achat en projet à étapes, réduit le risque perçu.
+> - **CTA + funnel** : « Bring TaskForce to your organization » (Book a demo / trust center) + ligne « **Not
+>   ready for Enterprise? Start with the delivery workspace →** » vers /pricing (Enterprise buyer→demo ;
+>   dev→free). Fini le « Start free / Self-hosting available from day one » incongru.
+> Bandes alternées (8 sections). Vérifié DOM : 6 eyebrows + 7 h2, env/controls/funnel présents, console 0 err.
+> Statuts conservateurs (K8s roadmap, SOC2 roadmap). Page = « comment une org Enterprise adopte TaskForce ».
+> **MAJ (verrou, 2e review 8.5/10)** : 2 ajouts stratégiques + précisions. (a) **NEW « Why TaskForce » (build
+> vs buy)** entre controls et deploy : « Don't build the governance layer yourself » + 4 axes (Governed by
+> default · Model-independent · Context-aware · Built around your agents) — répond à « pourquoi pas Claude API
+> + LangGraph maison ». (b) **NEW diagramme d'architecture** après « Built for your environment » : IdP (OIDC/
+> SAML) → TaskForce (Governance·Memory·Orchestration → Approval·Context·Audit) → Connected systems / Data /
+> Models — l'archi comme argument de vente Enterprise. (c) **4e pilier « Fit your existing stack »** (Why
+> Enterprise passe de 3 à 4). (d) hero « or your data » → « or **ownership of** your data ». (e) env label
+> « Infrastructure » → « **Runtime** » (K8s pas sous-entendu ; reste roadmap dans Deployment). (f) sécurité :
+> GDPR/SOC2/DPA en phrases explicites (« export, erasure and data handling in place » · « Not certified,
+> groundwork on roadmap » · « Available on request »). (g) adoption 04 « validate the operating model ».
+> Bandes réalternées (controls→blanc). DOM : 8 eyebrows (Why Enterprise/Built for env/**Architecture**/Enterprise
+> controls/**Why TaskForce**/Deployment/Security/Adoption) + 9 h2, 4 piliers, 4 why-cards, arch présent, 0 err.
+> Cohérence produit acquise sur 5 pages : Orchestration(what)·Memory(why)·Trust(who/when)·AI-transparency(what
+> agents do)·Enterprise(how it fits an org) → « platform product », pas « SaaS avec agents ».
+> Review user (7/10) : le pricing doit RACONTER la montée en gamme, pas être une grille, et s'aligner sur
+> le reste (Planned/Beta, TaskForce Memory, claims prudents). Réécrit `PricingSection.tsx` :
+> - **Progression** explicite via un kicker par plan : Free = **Delivery workspace** · Pro = **AI-assisted
+>   delivery** · Enterprise = **Governed AI delivery**. + titre de table « Workspace → AI delivery → governed
+>   enterprise delivery ». + **table comparative 15 lignes** (land-and-expand lisible d'un coup).
+> - **Planned/Beta corrigé** : **Orchestration retirée du pricing** (elle est Planned) ; on ne vend que
+>   « **AI agents · Beta** ». Fini « AI agents & orchestration Beta » (contradisait la page Orchestration).
+> - **« Brain OS — auto docs » → « TaskForce Memory · Beta »** (nom public partout).
+> - **Claims prudents** : retiré « GDPR compliance » + « 99.9% uptime » (contredisaient le Trust Center) →
+>   « All plans include TLS encryption and GDPR-oriented data controls. Availability targets and SLAs vary by
+>   plan » + lien trust center. Retiré **« the core is open-source »** de la FAQ (**non vérifiable** — aucune
+>   trace open-source/licence dans les docs ; à confirmer par le user si c'est réellement OSS).
+> - **Enterprise étoffé** : SSO/SAML · **Self-hosted deployment** · local-model deployment & model controls ·
+>   Advanced RBAC & per-project · Audit logs & retention · DPA/subprocessors · Security review & deployment
+>   assistance · Dedicated support & SLA.
+> - **Coût IA clarifié** (aligné [[plan-lifecycle-ai-gating]] AiMeter) : « AI usage metered by tokens » + FAQ
+>   « Are AI models included? » → plateforme incluse, **usage hosted métré par tokens**, **local Ollama = 0 coût
+>   modèle TaskForce** + section **« One platform. Two ways to run AI »** (Hosted usage-based / Self-hosted your infra).
+> - **Membres = per-seat** ([[pricing-members-model]] : membres illimités façon Linear ; seul cap = Free = « up
+>   to 5 collaborators on private projects » façon GitHub). ⚠️ **Diverge de la grille de review du user** (qui
+>   remettait des caps 5/50) — j'ai suivi la décision durable + la FAQ (« adjust seats, prorates ») → **À
+>   CONFIRMER par le user**. Fix aussi vérifié plus tôt : `/contact`→`/book-a-demo`, CTA localhost→APP_URL.
+> - Prix inchangés ($12/$10, placeholders — cf. commentaire ⚠️). Backlog note : limites annoncées pas toutes
+>   enforced (PROD-4.x). Vérifié DOM : 3 kickers, table 15 lignes, toggle hydraté, console 0 err, Brain OS=0.
+> **MAJ (verrou, 2e review ~9/10)** : le user TRANCHE le modele membres -> Free = **5 collaborators** ·
+> Pro = **Unlimited members, billed per seat** · Enterprise = **Unlimited** (⇒ Enterprise se differencie par
+> la GOUVERNANCE/deploiement, plus par le nombre de membres : « Unlimited workspaces & members » -> « Unlimited
+> workspaces »). Table Members : 5 collaborators / Unlimited / Unlimited. « AI usage metered by tokens » (cards)
+> -> « **billed by consumption** » ; sous-ligne « Hosted model usage is metered by tokens … Local models incur
+> no TaskForce model charges » (mecanisme sous le pricing). « no prompts leave your network » -> « **no prompts
+> or outputs** leave your network ». Hero raccourci. Table « AI model usage » -> « Usage-based / Usage-based or
+> local ». Reste ouvert : **prix** (placeholders) + **open-source** (retire, a reconfirmer si OSS).
 > Review user : passer d'« l'humain garde le contrôle » à une vraie transparency page. Narration en 10
 > étapes (what does AI do → access → autonomy → proposal path → models → data → logged → accountable →
 > controls → CTA). Comblé les 3 vrais trous + schéma + précisions juridiques.
