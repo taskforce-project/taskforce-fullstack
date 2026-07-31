@@ -1,0 +1,172 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import PageHero from "@/components/site/PageHero.astro";
+import PageCta from "@/components/site/PageCta.astro";
+import { Compass, Building2, CalendarClock, BrainCircuit, Boxes, ShieldCheck, Server, Search, PenLine, Plug } from "lucide-react";
+import { APP_URL } from "@/components/site/nav";
+
+/* Les 3 rôles — mêmes que la page Orchestration (road_to_v2/Agents_C_Level.md). Direction Planned. */
+const TEAM = [
+  {
+    code: "CPO",
+    owns: "the what",
+    icon: Compass,
+    box: "ring-violet-200 text-violet-600",
+    desc: "Shapes the product: vision, specifications, priorities and acceptance criteria.",
+  },
+  {
+    code: "CTO",
+    owns: "the how",
+    icon: Building2,
+    box: "ring-blue-200 text-blue-600",
+    desc: "Owns technical coherence: architecture, APIs, data, trade-offs and technical risk.",
+  },
+  {
+    code: "COO",
+    owns: "the when & the risk",
+    icon: CalendarClock,
+    box: "ring-amber-200 text-amber-600",
+    desc: "Owns delivery: sequencing, capacity, dependencies, milestones and drift.",
+  },
+];
+
+/* Ce que l'assistant fait RÉELLEMENT aujourd'hui (AgentService : RAG Brain OS + tool-calling). */
+const TOOLS = [
+  { icon: Search, title: "Search your Memory", text: "Retrieves the decisions, constraints and conventions behind your system before it answers." },
+  { icon: PenLine, title: "Take notes", text: "Writes findings back as knowledge nodes, so what it learns stays in the graph." },
+  { icon: Plug, title: "Use connected tools", text: "Calls the external tools you've connected over MCP — and any external write waits for a human." },
+];
+
+/* Les garde-fous — mêmes principes que la page Orchestration. */
+const RULES = [
+  { icon: BrainCircuit, title: "Grounded", desc: "Built from your architecture, decisions and conventions — not generic guesses." },
+  { icon: Boxes, title: "Specialized", desc: "Each agent works within a defined responsibility instead of pretending to know everything." },
+  { icon: ShieldCheck, title: "Governed", desc: "An agent proposes; a human approves. Nothing consequential runs on its own." },
+  { icon: Server, title: "Model-agnostic", desc: "Local models through Ollama, or hosted models — your choice, per step." },
+];
+---
+
+<BaseLayout
+  title="Agents — TaskForce"
+  description="A delivery team, not a single generalist: specialized agents for product, architecture and delivery, grounded in your Memory and approved by a human. Today, one assistant agent works your Brain OS; the specialized team is the direction."
+>
+  <PageHero
+    kicker="Agents"
+    title="A delivery team, not a single generalist"
+    lead="Most AI tools give you one model that tries to understand everything. TaskForce is building a small team of specialized agents — product, architecture and delivery — each grounded in your Memory, each proposing decisions a human approves."
+    level="labs"
+    primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
+    secondary={{ label: "See the run", href: "/product/orchestration" }}
+  />
+
+  {/* ── The team (Planned) ── */}
+  <section class="bg-secondary border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">The team</p>
+        <h2 class="t-h2">Three roles, the way a strong org splits them</h2>
+        <p class="t-lead mt-4">
+          Responsibility is split the way a software organization does it — so no single agent has to
+          be an expert at everything, and no single agent gets the final say.
+        </p>
+      </div>
+      <div class="mt-12 grid gap-6 lg:grid-cols-3">
+        {
+          TEAM.map((a) => (
+            <div class="flex flex-col rounded-2xl border bg-card p-6">
+              <div class="flex items-center gap-3">
+                <span class:list={["bg-card flex size-11 items-center justify-center rounded-xl border ring-1", a.box]}>
+                  <a.icon className="size-5" strokeWidth={1.75} />
+                </span>
+                <div>
+                  <p class="text-[16px] font-semibold text-foreground">{a.code}</p>
+                  <p class="text-muted-foreground text-[12px] italic">{a.owns}</p>
+                </div>
+              </div>
+              <p class="text-muted-foreground mt-4 text-[13.5px] leading-6">{a.desc}</p>
+            </div>
+          ))
+        }
+      </div>
+      <p class="mt-8 text-[15px] font-medium text-foreground">
+        Three perspectives. One run. No agent gets the final say.
+      </p>
+    </div>
+  </section>
+
+  {/* ── What's real today ── */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">What's real today</p>
+        <h2 class="t-h2">One assistant, grounded in your Memory</h2>
+        <p class="t-lead mt-4">
+          The specialized team is the direction. What ships today is an assistant agent that works
+          your Brain OS: it retrieves the reasoning behind your system, then uses tools to help — and
+          hands anything consequential to a human.
+        </p>
+      </div>
+      <div class="mt-12 grid gap-6 lg:grid-cols-3">
+        {
+          TOOLS.map((t) => (
+            <div class="rounded-2xl border bg-card p-6">
+              <span class="bg-card text-foreground flex size-11 items-center justify-center rounded-xl border">
+                <t.icon className="size-5" strokeWidth={1.75} />
+              </span>
+              <h3 class="mt-4 text-[16px] font-semibold text-foreground">{t.title}</h3>
+              <p class="text-muted-foreground mt-2 text-[13.5px] leading-6">{t.text}</p>
+            </div>
+          ))
+        }
+      </div>
+      <div class="mt-8 flex flex-wrap items-center gap-4">
+        <a href="/product/brain-os" class="link-underline text-foreground text-[14px] font-medium">
+          How Memory works →
+        </a>
+        <a href="/product/integrations" class="link-underline text-muted-foreground hover:text-foreground text-[14px]">
+          Connected tools →
+        </a>
+      </div>
+    </div>
+  </section>
+
+  {/* ── The rules every agent follows ── */}
+  <section class="bg-secondary border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">The rules</p>
+        <h2 class="t-h2">What makes an agent safe to trust</h2>
+        <p class="t-lead mt-4">
+          An agent is only as useful as it is accountable. Every agent — the assistant today, the
+          specialized team as it lands — works to the same rules.
+        </p>
+      </div>
+      <div class="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        {
+          RULES.map((r) => (
+            <div class="rounded-2xl border bg-card p-5">
+              <span class="bg-secondary/60 text-foreground flex size-10 items-center justify-center rounded-lg border">
+                <r.icon className="size-5" strokeWidth={1.75} />
+              </span>
+              <h3 class="mt-4 text-[15px] font-semibold text-foreground">{r.title}</h3>
+              <p class="text-muted-foreground mt-1.5 text-[13px] leading-6">{r.desc}</p>
+            </div>
+          ))
+        }
+      </div>
+      <p class="text-muted-foreground mt-8 text-[13px] leading-6">
+        Every proposal an agent makes waits for a human at a
+        <a href="/product/orchestration" class="link-underline text-foreground font-medium"> checkpoint</a>
+        — see how sign-off works in
+        <a href="/product/approvals" class="link-underline text-foreground font-medium"> Approvals</a>.
+      </p>
+    </div>
+  </section>
+
+  <PageCta
+    title="A team you direct, not a black box you hope for"
+    lead="Specialized agents, grounded in your context, proposing decisions you approve. Start with what ships today."
+    primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
+    secondary={{ label: "See the roadmap", href: "/roadmap" }}
+  />
+</BaseLayout>

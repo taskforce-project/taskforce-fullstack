@@ -185,6 +185,41 @@ point identifiable sur la courbe de lead time.
 | Métronome | `src/lib/useScene.ts` | `useScene(beats)` : partition de durées, démarre à l'entrée à l'écran, se joue **une fois**, **se fige sur l'état final**. `useTypewriter` pour la frappe. `prefers-reduced-motion` → état final direct. |
 | Châssis | `src/components/site/scene/AppWindow.tsx` | Vrai écran TaskForce (voir encadré ci-dessous). **Remplace la barre macOS de `MockFrame`** — trois pastilles + une URL, c'est le signe le plus sûr qu'on regarde un dessin. |
 
+> ### ⚑ v53 (31/07) — Analytics : verrou wording (review 9/10)
+> Dernières corrections de formulation, zéro section ajoutée :
+> - **Le CTA réintroduisait le « only »** qu'on venait de retirer du titre → « …your board already contains —
+>   **plus the delivery signals that become possible when work moves through validated checkpoints** ».
+> - **Boucle** : « starts having already learned » → « **can start with context learned from the last** »
+>   (moins anthropomorphe).
+> - **Explainer agents raccourci** → « People and coding agents share the same delivery surface, so analytics
+>   can measure both — just like Smart Assign and Collaboration ».
+> Vérifié DOM : les 4 présents, anciens absents ; 0 erreur console.
+> **⚠ Transverse à faire (point 3 review)** : verrouiller « **checkpoint** » comme primitive produit, définition
+> stable partout — proposée : « *A governed stage where an artifact is produced, reviewed and explicitly approved
+> before the run continues.* » À poser sur Orchestration / Memory / Smart Assign / Trust (pages lockées → feu vert
+> user avant d'éditer).
+>
+> ### ⚑ v52 (31/07) — Analytics : passe de rigueur (review 8.5-9/10)
+> Le haut de page était solide ; la moitié basse mélangeait analytics et gouvernance sans assez de rigueur.
+> - **Affirmation absolue retirée** : « The metric only a checkpoint system can produce » → **« See where
+>   delivery gets sent back »** ; lead « it can tell you where work gets sent back » → « it can **measure not just
+>   what shipped, but where work gets rejected, revised or sent back** ». (Un autre outil avec des states
+>   structurés pourrait le produire — donc pas « only ».)
+> - **Chiffres illustratifs durcis** : « Illustrative — sample data » → **« Illustrative — not a TaskForce
+>   customer metric. »** (2 captions ; un « Approved first time: 94% » capturé hors contexte serait pris pour du
+>   réel).
+> - **Agents mesurés ?** — assumé mais sans survente : explication ajoutée « People and coding agents are
+>   assignees on the same board, so a breakdown by assignee can include either — the same delivery surface as
+>   Smart Assign and Collaboration » (pas de claim d'analytics de perf agent, non vérifié).
+> - **Lien cross-feature** : après les métriques, « See who's overloaded, then **route the next work with Smart
+>   Assign** » (workload → Smart Assign, cohérence entre pages).
+> - **Boucle Analytics → Memory → next run** (le manque fonctionnel pointé) : nouvelle section compacte
+>   **« Measurement that feeds the next run »** badgée **Planned** (c'est la direction calibration, pas Live) +
+>   mini-flux Delivery → Analytics → Recurring pattern → **Memory** → Next run + liens Memory & Roadmap.
+> - Vérifié DOM : nouveau titre, claim absolue absente, « rejected, revised or », explainer agents, lien Smart
+>   Assign, 2 captions explicites (0 « sample data »), section Planned + badge Planned + boucle 5 nœuds + liens
+>   brain-os/roadmap ; **0 erreur console** (scène toujours hydratée).
+>
 > ### ⚑ v51 (31/07) — Lot produit — Analytics (dernière page LIVE)
 > Lu `AnalyticsController` + `analytics-service.ts` avant d'écrire. Analytics est réellement livré et riche :
 > KPIs (resolved, resolution time, velocity, active cycles + deltas), throughput (opened/resolved, week/day),

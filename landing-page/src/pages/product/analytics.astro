@@ -3,7 +3,8 @@ import BaseLayout from "@/layouts/BaseLayout.astro";
 import PageHero from "@/components/site/PageHero.astro";
 import PageCta from "@/components/site/PageCta.astro";
 import { DeliveryInsights } from "@/components/site/illustrations/DeliveryInsights";
-import { BarChart3, Timer, Gauge, CalendarRange, TrendingDown, Users, Sparkles } from "lucide-react";
+import { LevelBadge } from "@/components/site/Section";
+import { BarChart3, Timer, Gauge, CalendarRange, TrendingDown, Users, Sparkles, ArrowRight } from "lucide-react";
 import { APP_URL } from "@/components/site/nav";
 
 /* Les métriques RÉELLEMENT calculées (cf. AnalyticsController /kpis /throughput /burndown /workload). */
@@ -24,6 +25,9 @@ const CHART = [
   { name: "Claude Code", n: 4 },
 ];
 const CHART_MAX = Math.max(...CHART.map((c) => c.n));
+
+/* La boucle produit (direction Planned) : mesurer → détecter → Memory → meilleur run suivant. */
+const LOOP = ["Delivery", "Analytics", "Recurring pattern", "Memory", "Next run"];
 ---
 
 <BaseLayout
@@ -63,6 +67,12 @@ const CHART_MAX = Math.max(...CHART.map((c) => c.n));
           ))
         }
       </div>
+      <p class="text-muted-foreground mt-8 text-[13.5px]">
+        See who's overloaded, then{" "}
+        <a href="/product/smart-assign" class="link-underline text-foreground font-medium">
+          route the next work with Smart Assign
+        </a>.
+      </p>
     </div>
   </section>
 
@@ -81,6 +91,10 @@ const CHART_MAX = Math.max(...CHART.map((c) => c.n));
             <Sparkles className="text-primary mt-0.5 size-4 shrink-0" strokeWidth={2} />
             And when a question can't be answered from your data, it says so — and suggests one it can
             — instead of inventing a number.
+          </p>
+          <p class="text-muted-foreground mt-4 text-[13.5px] leading-6">
+            People and coding agents share the same delivery surface, so analytics can measure
+            both — just like Smart Assign and Collaboration.
           </p>
         </div>
 
@@ -113,7 +127,7 @@ const CHART_MAX = Math.max(...CHART.map((c) => c.n));
               </ul>
             </div>
           </div>
-          <p class="text-muted-foreground mt-3 text-center text-[11px]">Illustrative — sample data.</p>
+          <p class="text-muted-foreground mt-3 text-center text-[11px]">Illustrative — not a TaskForce customer metric.</p>
         </div>
       </div>
     </div>
@@ -124,24 +138,77 @@ const CHART_MAX = Math.max(...CHART.map((c) => c.n));
     <div class="container-rail py-20 lg:py-28">
       <div class="max-w-2xl">
         <p class="t-eyebrow mb-3">Beta</p>
-        <h2 class="t-h2">The metric only a checkpoint system can produce</h2>
+        <h2 class="t-h2">See where delivery gets sent back</h2>
         <p class="t-lead mt-4">
           A classic tracker tells you what's late. Because TaskForce runs through validated
-          checkpoints, it can tell you where work gets <span class="text-foreground font-medium">sent
-          back</span> — the step where your process actually hurts. This one grows with orchestration;
-          it's early.
+          checkpoints, it can measure not just what shipped, but where work gets rejected, revised or <span class="text-foreground font-medium">sent
+          back</span> — the step where your process actually hurts. It's early, and grows as orchestration does.
         </p>
       </div>
       <div class="mx-auto mt-12 max-w-2xl">
         <DeliveryInsights client:idle />
-        <p class="text-muted-foreground mt-3 text-center text-[11px]">Illustrative — sample data.</p>
+        <p class="text-muted-foreground mt-3 text-center text-[11px]">Illustrative — not a TaskForce customer metric.</p>
+      </div>
+    </div>
+  </section>
+
+  {/* ── La boucle Analytics → Memory → next run (Planned, pas vendu comme Live) ── */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="grid gap-10 lg:grid-cols-[minmax(0,430px)_1fr] lg:items-center lg:gap-16">
+        <div>
+          <div class="mb-3 flex items-center gap-2">
+            <p class="t-eyebrow">Where this goes</p>
+            <LevelBadge level="labs" />
+          </div>
+          <h2 class="t-h2">Measurement that feeds the next run</h2>
+          <p class="t-lead mt-4">
+            Reporting is the start. The direction is a loop: a pattern that keeps costing you — an
+            approach repeatedly sent back — can become context in Memory, so the next run can start with context
+            learned from the last.
+          </p>
+          <div class="mt-6 flex flex-wrap items-center gap-4">
+            <a
+              href="/product/brain-os"
+              class="link-underline text-foreground inline-flex items-center gap-1.5 text-[14px] font-medium"
+            >
+              TaskForce Memory
+              <ArrowRight className="size-3.5" />
+            </a>
+            <a
+              href="/roadmap"
+              class="link-underline text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-[14px]"
+            >
+              Roadmap
+              <ArrowRight className="size-3.5" />
+            </a>
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center justify-center gap-x-2 gap-y-2 lg:justify-end">
+          {
+            LOOP.map((node, i) => (
+              <Fragment>
+                {i > 0 && <ArrowRight className="text-muted-foreground/45 size-4 shrink-0" />}
+                <span
+                  class={`rounded-full border px-3 py-1 text-[12.5px] ${
+                    node === "Memory"
+                      ? "border-primary/30 text-primary bg-card font-medium"
+                      : "bg-card text-foreground"
+                  }`}
+                >
+                  {node}
+                </span>
+              </Fragment>
+            ))
+          }
+        </div>
       </div>
     </div>
   </section>
 
   <PageCta
     title="Measure the delivery, not the busywork"
-    lead="Get the metrics your board already contains — and the ones only validated checkpoints can produce."
+    lead="Get the metrics your board already contains — plus the delivery signals that become possible when work moves through validated checkpoints."
     primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
     secondary={{ label: "Book a demo", href: "/book-a-demo" }}
   />

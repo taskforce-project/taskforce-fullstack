@@ -114,6 +114,17 @@ const PROOF_CHIPS = ["7 checkpoints", "3 specialized agents", "Human approval at
         </p>
       </div>
 
+      {/* Définition canonique de la primitive « checkpoint » — source unique du site (lock cross-page). */}
+      <div class="border-primary/25 mt-8 max-w-2xl rounded-xl border p-5 [background:radial-gradient(120%_120%_at_0%_0%,color-mix(in_oklab,var(--primary)_5%,transparent),transparent_70%)]">
+        <p class="text-muted-foreground text-[11px] font-semibold tracking-wide uppercase">
+          What a checkpoint is
+        </p>
+        <p class="mt-2 text-[15px] leading-7 text-foreground">
+          <span class="font-semibold">A checkpoint</span> is a governed stage where an artifact is
+          produced, reviewed and explicitly approved before the run continues.
+        </p>
+      </div>
+
       <ol class="mt-12 flex flex-col">
         {
           RUN.map((step, i) => (
