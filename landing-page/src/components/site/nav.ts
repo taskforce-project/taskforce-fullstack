@@ -296,6 +296,8 @@ export const BUILT_ROUTES: ReadonlySet<string> = new Set([
   "/pricing",
   "/product",
   "/product/orchestration",
+  "/product/agents",
+  "/product/approvals",
   "/product/brain-os",
   "/product/smart-assign",
   "/product/collaboration",

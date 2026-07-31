@@ -185,6 +185,32 @@ point identifiable sur la courbe de lead time.
 | Métronome | `src/lib/useScene.ts` | `useScene(beats)` : partition de durées, démarre à l'entrée à l'écran, se joue **une fois**, **se fige sur l'état final**. `useTypewriter` pour la frappe. `prefers-reduced-motion` → état final direct. |
 | Châssis | `src/components/site/scene/AppWindow.tsx` | Vrai écran TaskForce (voir encadré ci-dessous). **Remplace la barre macOS de `MockFrame`** — trois pastilles + une URL, c'est le signe le plus sûr qu'on regarde un dessin. |
 
+> ### ⚑ v54 (31/07) — Checkpoint lock + Agents + Approvals (Product menu complet)
+> **1. Verrou « checkpoint » (option A, feu vert user)** : définition canonique posée UNE fois à son foyer
+> naturel — section « The run » d'`orchestration.astro` — dans un encart « What a checkpoint is » : *« A checkpoint
+> is a governed stage where an artifact is produced, reviewed and explicitly approved before the run continues. »*
+> Source unique ; les autres pages emploient le terme, Approvals la re-cite. Pages lockées non retouchées au-delà.
+> **2. `/product/agents` (NEW, Planned/labs)** — j'ai lu `AgentService` : l'assistant réel = RAG Brain OS +
+> tool-calling (search brain, create note, ExternalMcp) ; **la team CPO/CTO/COO est la direction (Planned)**.
+> Structure : Hero (Planned) → « The team » (3 rôles, repris d'Orchestration) → **« What's real today » : one
+> assistant grounded in your Memory** (3 outils réels : Search Memory / Take notes / Use connected tools — write
+> externe validé par un humain) → « The rules » (Grounded/Specialized/Governed/Model-agnostic) + liens checkpoint/
+> Approvals → CTA. Honnête : le Planned (team) vs le réel (assistant) est explicite.
+> **3. `/product/approvals` (NEW, Beta)** — surfaces d'approbation RÉELLES (endpoints backend, pas une promesse) :
+> `POST /issues/{id}/ai/spec/approve` → **la spec approuvée devient un KnowledgeNode (Memory)** ; `McpActionController`
+> → action externe **pending → validée par un humain → exécutée** ; Smart Assign → reco approuvée/overridée.
+> Structure : Hero (Beta, « The AI proposes. A human approves. ») → « What you approve » (les 3 surfaces) → « The
+> primitive » (re-cite la définition checkpoint) → « Recorded » (qui a approuvé quoi/quand → Trust + AI
+> transparency) → CTA. Honnêteté Beta : « approving specs, actions and recommendations is here today ;
+> checkpoint-by-checkpoint approval across a full run grows with orchestration ».
+> **4. `nav.ts` BUILT_ROUTES += `/product/agents`, `/product/approvals`** → **le menu Product est 100 % construit**
+> (Orchestration · Agents · Approvals · Memory · Smart Assign · Collaboration · Analytics · Integrations + 3 fiches).
+> Vérifié : orchestration 200 (définition rendue) ; agents 200 badge **Planned**, team/assistant/tools/rules/liens
+> OK ; approvals 200 badge **Beta**, 3 surfaces, spec→Memory, MCP pending, définition checkpoint, recorded, liens
+> Trust/AI-transparency ; vite:0 sur les 3, 0 erreur build.
+> **Reste** (hors produit) : lots **Legal + Company**, **Solutions / Compare**. Transverses ouverts : self-hosting/
+> prix/open-source ; passe de cohérence « checkpoint » optionnelle (option B) sur Memory/Smart Assign/Trust.
+>
 > ### ⚑ v53 (31/07) — Analytics : verrou wording (review 9/10)
 > Dernières corrections de formulation, zéro section ajoutée :
 > - **Le CTA réintroduisait le « only »** qu'on venait de retirer du titre → « …your board already contains —

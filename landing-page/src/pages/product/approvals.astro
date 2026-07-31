@@ -1,0 +1,149 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import PageHero from "@/components/site/PageHero.astro";
+import PageCta from "@/components/site/PageCta.astro";
+import { FileCheck2, Terminal, Sparkles, ClipboardList, ShieldCheck, ArrowRight } from "lucide-react";
+import { APP_URL } from "@/components/site/nav";
+
+/* Les surfaces d'approbation RÉELLES (endpoints backend), pas une promesse.
+   · spec : POST /issues/{id}/ai/spec/approve → devient un KnowledgeNode (Brain OS)
+   · action externe : McpActionController → pending, exécuté après validation humaine
+   · reco : Smart Assign propose, l'humain approuve/override */
+const APPROVE = [
+  {
+    icon: FileCheck2,
+    title: "A drafted spec",
+    text: "The AI drafts a spec; you approve it, and it becomes a validated node in your Memory — the context the next step builds on.",
+  },
+  {
+    icon: Terminal,
+    title: "An external action",
+    text: "Anything an agent wants to write to a connected tool is proposed as a pending action. It runs only after a human approves it.",
+  },
+  {
+    icon: Sparkles,
+    title: "A recommendation",
+    text: "Smart Assign suggests who should own a task, with its reason. You approve it, or override it — the override is a signal too.",
+  },
+];
+---
+
+<BaseLayout
+  title="Approvals — TaskForce"
+  description="The AI proposes; a human approves. TaskForce puts a person at every consequential step — approving specs, external actions and recommendations — and records who signed off on what."
+>
+  <PageHero
+    kicker="Approvals"
+    title="The AI proposes. A human approves."
+    lead="TaskForce is built so consequential steps wait for a person. An agent drafts, suggests or prepares an action — and a human approves it before it becomes the next decision or leaves your walls."
+    level="beta"
+    primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
+    secondary={{ label: "See the run", href: "/product/orchestration" }}
+  />
+
+  {/* ── What you approve ── */}
+  <section class="bg-secondary border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">What you approve</p>
+        <h2 class="t-h2">Sign-off where it actually matters</h2>
+        <p class="t-lead mt-4">
+          Not a settings checkbox. Approval sits at the points where a decision compounds — where
+          getting it wrong would cost you later.
+        </p>
+      </div>
+      <div class="mt-12 grid gap-6 lg:grid-cols-3">
+        {
+          APPROVE.map((a) => (
+            <div class="rounded-2xl border bg-card p-6">
+              <span class="bg-card text-foreground flex size-11 items-center justify-center rounded-xl border">
+                <a.icon className="size-5" strokeWidth={1.75} />
+              </span>
+              <h3 class="mt-4 text-[16px] font-semibold text-foreground">{a.title}</h3>
+              <p class="text-muted-foreground mt-2 text-[13.5px] leading-6">{a.text}</p>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  {/* ── The checkpoint primitive ── */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="grid gap-10 lg:grid-cols-[minmax(0,420px)_1fr] lg:gap-16">
+        <div>
+          <p class="t-eyebrow mb-3">The primitive</p>
+          <h2 class="t-h2">Approval is what a checkpoint is</h2>
+          <span class="text-foreground mt-6 inline-flex size-11 items-center justify-center rounded-xl border bg-card">
+            <ShieldCheck className="size-5" strokeWidth={1.75} />
+          </span>
+        </div>
+        <div class="flex flex-col gap-4 text-[15px] leading-7 text-foreground">
+          <p>
+            A <span class="font-medium">checkpoint</span> is a governed stage where an artifact is
+            produced, reviewed and explicitly approved before the run continues. Approval isn't bolted
+            on afterwards — it's the moment that defines the stage.
+          </p>
+          <p class="text-muted-foreground">
+            That's why the same rule holds across the product: an agent proposes, a human disposes, and
+            only an approved decision becomes context for what follows.
+          </p>
+          <p class="text-muted-foreground text-[13.5px]">
+            <a href="/product/orchestration" class="link-underline text-foreground font-medium">See the full run →</a>
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {/* ── Recorded ── */}
+  <section class="bg-secondary border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">Recorded</p>
+        <h2 class="t-h2">Every approval leaves a trail</h2>
+        <p class="t-lead mt-4">
+          An approval isn't just a click. Who signed off, on what, and when is recorded — so a decision
+          made months ago can still be explained.
+        </p>
+      </div>
+      <ul class="mt-10 flex flex-col gap-3.5">
+        {
+          [
+            "Who approved it, and exactly what they were approving.",
+            "The reasoning the agent proposed, kept next to the decision.",
+            "A record you can read later — in the run, and in the audit trail.",
+          ].map((r) => (
+            <li class="flex items-start gap-3 text-[14.5px] leading-6 text-foreground">
+              <ClipboardList className="text-primary mt-0.5 size-4 shrink-0" strokeWidth={2} />
+              {r}
+            </li>
+          ))
+        }
+      </ul>
+      <div class="mt-8 flex flex-wrap items-center gap-4">
+        <a href="/trust" class="link-underline text-foreground inline-flex items-center gap-1.5 text-[14px] font-medium">
+          Trust Center
+          <ArrowRight className="size-3.5" />
+        </a>
+        <a href="/legal/ai-transparency" class="link-underline text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-[14px]">
+          AI transparency
+          <ArrowRight className="size-3.5" />
+        </a>
+      </div>
+      <p class="text-muted-foreground mt-8 text-[13px] leading-6">
+        Approving specs, actions and recommendations is here today. Checkpoint-by-checkpoint approval
+        across a full governed run grows with
+        <a href="/product/orchestration" class="link-underline text-foreground font-medium"> orchestration</a>.
+      </p>
+    </div>
+  </section>
+
+  <PageCta
+    title="Keep a human on every decision that matters"
+    lead="Let agents draft, suggest and prepare — and keep the sign-off, and the record, with your team."
+    primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
+    secondary={{ label: "Book a demo", href: "/book-a-demo" }}
+  />
+</BaseLayout>
