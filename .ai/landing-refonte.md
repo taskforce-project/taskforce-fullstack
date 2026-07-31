@@ -185,6 +185,30 @@ point identifiable sur la courbe de lead time.
 | Métronome | `src/lib/useScene.ts` | `useScene(beats)` : partition de durées, démarre à l'entrée à l'écran, se joue **une fois**, **se fige sur l'état final**. `useTypewriter` pour la frappe. `prefers-reduced-motion` → état final direct. |
 | Châssis | `src/components/site/scene/AppWindow.tsx` | Vrai écran TaskForce (voir encadré ci-dessous). **Remplace la barre macOS de `MockFrame`** — trois pastilles + une URL, c'est le signe le plus sûr qu'on regarde un dessin. |
 
+> ### ⚑ v50 (31/07) — Fiches connecteur détaillées (GitHub · Slack · Plane)
+> Demande user : de vraies fiches produit par connecteur (point 9/10). Fait **uniquement pour les 3 connecteurs
+> réellement implémentés en profondeur** — les 126 autres restent au catalogue. **Chaque capacité listée = un
+> endpoint réel** ; j'ai lu `IntegrationController` + `integration-service.ts` avant d'écrire. Zéro invention.
+> - **Réalité par connecteur (source : le controller)** :
+>   · **GitHub** : OAuth 1-clic ; **read** repos (visibilité, open-issues) + issues/PR d'un repo ; **link** un PR
+>     ou commit à une issue TaskForce (statut live Open/Merged/Closed). Pas de create issue/branch (donc pas dit).
+>   · **Slack** : OAuth 1-clic ; choix des canaux + types d'events ; **miroir** des events issue/workflow. Sortant
+>     seulement (pas de lecture de conversations).
+>   · **Plane** : clé API + slug ; liste des projets ; **sync des issues → graphe Brain OS** (created/updated/
+>     ingestedNodes). **Le seul connecteur avec ingestion Memory live.** Tous : gate **Business+**.
+> - **Matrice Connect / Remember / Act par connecteur, statut RÉEL** (répond au point 10 sans rien fabriquer) :
+>   GitHub = **Live / Rolling out / Beta** · Slack = **Live / Not applicable / Beta** · Plane = **Live / Live /
+>   Not applicable**. Vérifié en DOM que les 3 diffèrent (pas de copier-coller).
+> - **Bloc « Honest about the edges »** par fiche : ce qui n'est PAS dans l'intégration aujourd'hui (create
+>   issues/branches pour GitHub, lecture de chat pour Slack, write-back pour Plane). + bloc Access & governance
+>   (owners/admins, credentials chiffrés, scopes) + liens Trust + docs fournisseur.
+> - **Fichiers** : `lib/connectors.ts` (données, règle « rien d'inventé »), `components/site/ConnectorDetail.astro`
+>   (template réutilisable), 3 pages fines `pages/product/integrations/{github,slack,plane}.astro`.
+> - **Catalogue** (`IntegrationCatalogue.tsx`) : les 3 tuiles éprouvées deviennent **cliquables** (→ fiche, chevron)
+>   via un composant `Tile` + set `DETAIL`. `nav.ts` BUILT_ROUTES += les 3 routes.
+> - Vérifié : 3 fiches **200, 0 erreur console**, matrices correctes (DOM), capacités/auth/plan/flows/notYet/
+>   governance/back+trust+docs présents ; tuiles catalogue → liens `/product/integrations/{key}` en SSR.
+>
 > ### ⚑ v49 (31/07) — Integrations : passe de PRÉCISION produit (review 8.5/10)
 > Consigne user : « precision and functional depth, not more copy ». Aucune section marketing en +.
 > - **Rewords honnêteté** : Hero « they become context and capabilities » → « **then bring their context and
