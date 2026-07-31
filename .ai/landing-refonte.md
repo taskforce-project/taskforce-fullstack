@@ -185,6 +185,51 @@ point identifiable sur la courbe de lead time.
 | Métronome | `src/lib/useScene.ts` | `useScene(beats)` : partition de durées, démarre à l'entrée à l'écran, se joue **une fois**, **se fige sur l'état final**. `useTypewriter` pour la frappe. `prefers-reduced-motion` → état final direct. |
 | Châssis | `src/components/site/scene/AppWindow.tsx` | Vrai écran TaskForce (voir encadré ci-dessous). **Remplace la barre macOS de `MockFrame`** — trois pastilles + une URL, c'est le signe le plus sûr qu'on regarde un dessin. |
 
+> ### ⚑ v57 (31/07) — Passe de cohérence : verrou du vocabulaire (transverse)
+> Audit systématique de tout `landing-page/src` (grep `sign-off|disposes|consequential|proposes|checkpoint` +
+> lecture des contextes Enterprise/Trust/AI-Transparency/home). **Constat : le vocabulaire est déjà largement
+> cohérent** — `proposes→decides` tenu partout, plus aucun « disposes », read/write précis sur Integrations +
+> Approvals, et « human approval at every checkpoint » est **auto-cohérent avec la définition verrouillée** du
+> checkpoint (l'approbation FAIT le checkpoint → doctrine honnête, pas une claim que le run auto complet est Live).
+> - **NEW `.ai/landing-vocab.md`** = **source unique** du langage propriétaire : les 4 primitives (checkpoint /
+>   proposal-artifact / approval / decision), la signature « The AI proposes. A human decides. », la politique
+>   **read / write / consequential** (calée sur `McpClient.readOnly`), et le split **Live vs Planned** de référence.
+>   À consulter avant toute claim de gouvernance.
+> - **2 corrections réelles** (les seules trouvées) : (1) Trust `AI_GOV` « **AI proposes a decision** » → « **The AI
+>   proposes**; a named human approves it » (proposal-not-decision). (2) Politique **read/write rendue explicite** —
+>   nouveau bullet sur AI Transparency (« The controls you keep ») : « **Read-only actions can run automatically;
+>   anything that writes to a connected system is proposed and runs only after approval.** »
+> - Non touché volontairement : « approve each checkpoint » d'Enterprise/Trust/home (doctrine cohérente avec la
+>   définition ; churner de la copie lockée validée pour un non-problème serait pire). La nuance Live/Planned vit
+>   sur Approvals + Roadmap, là où elle doit être.
+> - Vérifié : trust + ai-transparency 200, changements en HTML, 0 erreur build.
+>
+> ### ⚑ v56 (31/07) — Approvals : cohérence Live/Planned + wording (review 8.5/10)
+> La page transforme « human in the loop » en primitive produit. Resserrage du wording contre les promesses
+> absolues + résolution d'une vraie incohérence inter-pages.
+> - **⚠ LE point majeur (Live vs Planned)** : la dernière phrase « …is here today. Checkpoint-by-checkpoint
+>   approval across a full governed run **grows with** orchestration » créait une tension avec AI-Transparency
+>   (« no consequential workflow step advances… ») et Enterprise (« sign-off at each checkpoint »). → **découpe
+>   nette** : « Approval for specs, external actions and recommendations **is live today**. Full checkpoint-by-
+>   checkpoint governance across the entire delivery run **is on the orchestration roadmap**. »
+> - **Politique read/write/consequential précisée** (colle à `McpClient.readOnly`, défaut false) : carte External
+>   action → « **Reads can run on their own.** Anything that **writes** to a connected tool is proposed as a
+>   pending action — and runs only after a human approves it. »
+> - **Vocabulaire standardisé** : « a human **disposes** » → « a human **decides** » (signature AI proposes →
+>   Human decides). Hero « becomes the next decision or leaves your walls » → « becomes part of the **governed
+>   workflow** or is **executed externally** ».
+> - **Moins de promesse d'implémentation** : « becomes a **validated node** in your Memory » → « the decision
+>   becomes **trusted context** in your Memory » (ne dépend pas d'un champ de provenance robuste). Smart Assign
+>   « the override is a signal too » → « overrides **can also** become signals… » (pas de boucle d'apprentissage
+>   promise si non live). Audit « exactly what they were approving » → « the **exact content they signed off on** »
+>   (identité de l'artefact approuvé — préoccupation enterprise).
+> - **NEW mini-flux dans « The primitive »** : Agent → Artifact → **Human review** (approve / edit / reject) →
+>   Approved decision → Memory → Next checkpoint. Montre que approval = **transition conditionnelle** entre 2 états
+>   (le vrai fil rouge OS), pas un bouton « generate → approve ».
+> - Vérifié DOM : les 9 points OK, flux 6 nœuds rendu, 0 erreur build.
+> **⚠ Transverse** : appliquer la même clarté Live/Planned au « sign-off at each checkpoint » d'Enterprise, et
+> figer read/write/consequential + proposes→decides partout (passe de cohérence, pages lockées → feu vert user).
+>
 > ### ⚑ v55 (31/07) — Agents : passe de maturité (review 8.5/10)
 > Risque de positionnement : « 3 agents qui discutent » vs « une ORGANISATION d'agents spécialisés qui produit
 > des artefacts gouvernés ». Corrigé, sans gonfler la page.

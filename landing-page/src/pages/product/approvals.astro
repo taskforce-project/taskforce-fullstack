@@ -13,19 +13,22 @@ const APPROVE = [
   {
     icon: FileCheck2,
     title: "A drafted spec",
-    text: "The AI drafts a spec; you approve it, and it becomes a validated node in your Memory — the context the next step builds on.",
+    text: "The AI drafts a spec; you approve it, and the decision becomes trusted context in your Memory — what the next step builds on.",
   },
   {
     icon: Terminal,
     title: "An external action",
-    text: "Anything an agent wants to write to a connected tool is proposed as a pending action. It runs only after a human approves it.",
+    text: "Reads can run on their own. Anything that writes to a connected tool is proposed as a pending action — and runs only after a human approves it.",
   },
   {
     icon: Sparkles,
     title: "A recommendation",
-    text: "Smart Assign suggests who should own a task, with its reason. You approve it, or override it — the override is a signal too.",
+    text: "Smart Assign suggests who should own a task, with its reason. You approve it, or override it — overrides can also become signals for improving future recommendations.",
   },
 ];
+
+/* Approval = transition conditionnelle entre deux états du système (le vrai fil rouge produit). */
+const PRIMITIVE_FLOW = ["Agent", "Artifact", "Human review", "Approved decision", "Memory", "Next checkpoint"];
 ---
 
 <BaseLayout
@@ -35,7 +38,7 @@ const APPROVE = [
   <PageHero
     kicker="Approvals"
     title="The AI proposes. A human approves."
-    lead="TaskForce is built so consequential steps wait for a person. An agent drafts, suggests or prepares an action — and a human approves it before it becomes the next decision or leaves your walls."
+    lead="TaskForce is built so consequential steps wait for a person. An agent drafts, suggests or prepares an action — and a human approves it before it becomes part of the governed workflow or is executed externally."
     level="beta"
     primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
     secondary={{ label: "See the run", href: "/product/orchestration" }}
@@ -86,7 +89,7 @@ const APPROVE = [
             on afterwards — it's the moment that defines the stage.
           </p>
           <p class="text-muted-foreground">
-            That's why the same rule holds across the product: an agent proposes, a human disposes, and
+            That's why the same rule holds across the product: an agent proposes, a human decides, and
             only an approved decision becomes context for what follows.
           </p>
           <p class="text-muted-foreground text-[13.5px]">
@@ -94,6 +97,35 @@ const APPROVE = [
           </p>
         </div>
       </div>
+
+      {/* Approval = transition conditionnelle entre deux états : le flux qui DÉFINIT la primitive. */}
+      <div class="mt-12 overflow-x-auto pb-2">
+        <div class="flex min-w-max items-center gap-2.5 font-mono text-[12.5px]">
+          {
+            PRIMITIVE_FLOW.map((s, i) => (
+              <span class="flex items-center gap-2.5">
+                {i > 0 && <ArrowRight className="text-muted-foreground/45 size-3.5 shrink-0" />}
+                <span
+                  class:list={[
+                    "rounded-md border px-2.5 py-1",
+                    s === "Human review"
+                      ? "border-primary/30 bg-primary/10 text-primary font-medium"
+                      : "bg-card text-foreground",
+                  ]}
+                >
+                  {s}
+                </span>
+              </span>
+            ))
+          }
+        </div>
+      </div>
+      <p class="text-muted-foreground mt-3 text-[12.5px]">
+        Human review means <span class="text-foreground font-medium">approve</span>,
+        <span class="text-foreground font-medium">edit</span> or
+        <span class="text-foreground font-medium">reject</span> — only an approved artifact becomes the
+        next stage.
+      </p>
     </div>
   </section>
 
@@ -111,7 +143,7 @@ const APPROVE = [
       <ul class="mt-10 flex flex-col gap-3.5">
         {
           [
-            "Who approved it, and exactly what they were approving.",
+            "Who approved it, and the exact content they signed off on.",
             "The reasoning the agent proposed, kept next to the decision.",
             "A record you can read later — in the run, and in the audit trail.",
           ].map((r) => (
@@ -133,9 +165,9 @@ const APPROVE = [
         </a>
       </div>
       <p class="text-muted-foreground mt-8 text-[13px] leading-6">
-        Approving specs, actions and recommendations is here today. Checkpoint-by-checkpoint approval
-        across a full governed run grows with
-        <a href="/product/orchestration" class="link-underline text-foreground font-medium"> orchestration</a>.
+        Approval for specs, external actions and recommendations is live today. Full
+        checkpoint-by-checkpoint governance across the entire delivery run is on the
+        <a href="/product/orchestration" class="link-underline text-foreground font-medium"> orchestration</a> roadmap.
       </p>
     </div>
   </section>
