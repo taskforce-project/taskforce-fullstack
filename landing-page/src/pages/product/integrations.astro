@@ -1,0 +1,103 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import PageHero from "@/components/site/PageHero.astro";
+import PageCta from "@/components/site/PageCta.astro";
+import { LevelBadge } from "@/components/site/Section";
+import { IntegrationCatalogue } from "@/components/site/illustrations/IntegrationCatalogue";
+import { Plug, Brain, Terminal } from "lucide-react";
+import { APP_URL } from "@/components/site/nav";
+
+const WAYS = [
+  {
+    icon: Plug,
+    title: "Connect",
+    level: "live" as const,
+    text: "OAuth in a click for GitHub and Slack; a short, encrypted-credentials form for everything else. Keys are stored encrypted, never in the codebase.",
+  },
+  {
+    icon: Brain,
+    title: "Feed the memory",
+    level: "beta" as const,
+    text: "A connected tool's data can be ingested into the Brain OS decision graph, so a run starts from your real context. Live for Plane today, rolling out per tool.",
+  },
+  {
+    icon: Terminal,
+    title: "Act through MCP",
+    level: "beta" as const,
+    text: "TaskForce speaks MCP: its agents can use tools on the systems you connect — and every external write is proposed, then approved by a human before it runs.",
+  },
+];
+---
+
+<BaseLayout
+  title="Integrations — TaskForce"
+  description="A declarative catalogue of 129 connectors across 16 categories — tracker, repo, cloud, docs and models. Connect in a click and feed your run's context into the Brain OS memory. Connecting is live; deep data sync is rolling out."
+>
+  <PageHero
+    kicker="Integrations"
+    title="Connect the tools your work already lives in"
+    lead="One declarative catalogue — 129 connectors across 16 categories, from your tracker and repo to your cloud, docs and models. Connect a tool in a click, and its context can feed the memory behind every run."
+    level="beta"
+    primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
+    secondary={{ label: "Browse the catalogue", href: "#catalogue" }}
+  />
+
+  {/* ── Le vrai catalogue, cherchable ── */}
+  <section id="catalogue" class="bg-secondary border-b scroll-mt-20">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">The catalogue</p>
+        <h2 class="t-h2">Find your stack</h2>
+        <p class="t-lead mt-4">
+          Search the pool of connectors. Adding a new one is a line of configuration — not a release.
+          Connecting is live across the catalogue; deeper, per-tool data sync is rolling out.
+        </p>
+      </div>
+      <div class="mt-10">
+        <IntegrationCatalogue client:load />
+      </div>
+    </div>
+  </section>
+
+  {/* ── Comment ça marche : 3 façons ── */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">How it works</p>
+        <h2 class="t-h2">Connect, remember, act</h2>
+        <p class="t-lead mt-4">
+          An integration isn't just a logo on a page. In TaskForce it earns its place in three steps —
+          and each one is honest about where it stands.
+        </p>
+      </div>
+      <div class="mt-12 grid gap-6 lg:grid-cols-3">
+        {
+          WAYS.map((w) => (
+            <div class="rounded-2xl border bg-card p-6">
+              <div class="flex items-center justify-between gap-2">
+                <span class="bg-card text-foreground flex size-11 items-center justify-center rounded-xl border">
+                  <w.icon className="size-5" strokeWidth={1.75} />
+                </span>
+                <LevelBadge level={w.level} />
+              </div>
+              <h3 class="mt-4 text-[16px] font-semibold text-foreground">{w.title}</h3>
+              <p class="text-muted-foreground mt-2 text-[13.5px] leading-6">{w.text}</p>
+            </div>
+          ))
+        }
+      </div>
+      <p class="text-muted-foreground mt-8 text-[13px] leading-6">
+        We mark integrations <span class="text-foreground font-medium">Beta</span> on purpose:
+        connecting is here today, deep sync and MCP actions are rolling out. Follow it on the{" "}
+        <a href="/roadmap" class="link-underline text-foreground font-medium">public roadmap</a>.
+      </p>
+    </div>
+  </section>
+
+  <PageCta
+    title="Bring your stack into one context"
+    lead="Connect the tools your team already uses, and give every run the context it needs — with a human on every external action."
+    primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
+    secondary={{ label: "Book a demo", href: "/book-a-demo" }}
+  />
+</BaseLayout>

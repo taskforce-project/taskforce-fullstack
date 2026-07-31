@@ -185,7 +185,80 @@ point identifiable sur la courbe de lead time.
 | Métronome | `src/lib/useScene.ts` | `useScene(beats)` : partition de durées, démarre à l'entrée à l'écran, se joue **une fois**, **se fige sur l'état final**. `useTypewriter` pour la frappe. `prefers-reduced-motion` → état final direct. |
 | Châssis | `src/components/site/scene/AppWindow.tsx` | Vrai écran TaskForce (voir encadré ci-dessous). **Remplace la barre macOS de `MockFrame`** — trois pastilles + une URL, c'est le signe le plus sûr qu'on regarde un dessin. |
 
-> ### ⚑ v44 (30/07) — /book-a-demo : « apporte un vrai problème, on lance TaskForce dessus » (8→9)
+> ### ⚑ v47 (31/07) — Lot produit — Integrations (+ correction d'honnêteté du badge)
+> Page la plus à risque : une grille de 47/60 logos laisse croire « on s'intègre à tout ». **Avant d'écrire,
+> j'ai lu le vrai code** (`ConnectorCatalog.java` + l'UI réelle `components/integrations/integrations-catalog.tsx`).
+> Vérité : catalogue **DÉCLARATIF de 129 connecteurs / 16 catégories** ; TOUT est *connectable* (identifiants
+> stockés chiffrés — OAuth 1-clic pour GitHub & Slack, formulaire générique pour le reste) **mais la sync des
+> données par outil n'est pas encore active partout** (le LabBanner de l'app le dit noir sur blanc). Seul **Plane**
+> a une vraie sync → Brain OS aujourd'hui. Le **MCP** est réel : les agents peuvent appeler des outils de serveurs
+> MCP externes, et **toute écriture externe est *proposée* puis *validée par un humain*** (`McpActionController`,
+> gate `PlanFeature.INTEGRATIONS` = BUSINESS+). → Même principe « l'IA propose, l'humain décide » que tout le site.
+> - **`/product/integrations` (NEW, badge Beta)** : PageHero (Beta) « Connect the tools your work already lives in »
+>   → « Find your stack » (**catalogue cherchable réutilisé/réécrit `IntegrationCatalogue.tsx`**, îlot `client:load`)
+>   → « Connect, remember, act » (3 façons avec badge de maturité inline : **Connect = Live**, Feed the memory =
+>   Beta [Plane live, rolling out], Act via MCP = Beta [écriture validée par un humain]) + phrase honnête « we mark
+>   integrations Beta on purpose » + lien roadmap → PageCta.
+> - **`IntegrationCatalogue.tsx` réécrit fidèle** : 129 entrées transcrites de `ConnectorCatalog` (mêmes clés →
+>   mêmes logos), 16 vraies catégories, recherche + filtres. Compteur **honnête « 129 of 129 »** (plus de « 60+ »
+>   inventé). Repli **initiales sur `onError`** (le `BrandLogo` de la landing n'a pas de fallback → 0 image cassée
+>   sur 129). Marqueur sur les 3 éprouvés (Plane « Brain OS sync », GitHub/Slack « 1-click OAuth »).
+> - **2 corrections d'honnêteté dans `nav.ts`** : badge Integrations **`live` → `beta`** (l'app elle-même le marque
+>   Lab ; « live » était faux) ; desc **« 47 tools » → « 129 connectors across 16 categories »** (le vrai chiffre).
+>   ⚠️ **Conséquence** : Integrations sort du lot « live ». Reste réellement **live** dans le produit : **Analytics**.
+> - **`BUILT_ROUTES` += `/product/integrations`**.
+> - Vérifié : HTTP **200**, 278 Ko, vite:0, **0 erreur console** (hydratation OK), îlot rendu (recherche présente,
+>   **129 tuiles, 0 image cassée**), compteur « 129 of 129 », 3 marqueurs deep, badges hero=Beta + cartes Live/Beta/
+>   Beta, **interaction testée** : filtre « AI models » → « 10 of 129 » = les 10 vrais modèles (Groq…Replicate).
+>
+> ### ⚑ v46 (31/07) — Lot « Pages produit (live) » — Collaboration
+> Deuxième page du lot. Feature **LIVE** : boards / issues / cycles en temps réel. Le fil rouge du site
+> (une seule surface pour les gens ET les agents) porte la page.
+> - **`/product/collaboration` (NEW)** : PageHero (badge **Live**) « One board for your team and your agents »
+>   → « The board your team already knows » (**nouvelle scène statique `illustrations/CollabBoard.tsx`**) →
+>   « Built to run the work, not just track it » (4 primitives) → « Everyone sees the same board, the moment it
+>   changes » (temps réel, 3 cartes) → « People and agents, on the same board » (fil rouge + lien vers Smart
+>   Assign) → PageCta. Bandes blanc/gris alternées, structure calquée sur Smart Assign.
+> - **`CollabBoard.tsx`** : réutilise `AppWindow` + la fiction `lib/story` (mêmes colonnes/cartes que le hero),
+>   mais raconte la SURFACE PARTAGÉE — chip **Cycle 8**, pastille **« Live »** (le board reçoit les events),
+>   compteurs de **commentaires** sur les cartes, et 2 toasts qui rejouent de VRAIS events diffusés (un
+>   déplacement `updated` « Léo moved CP-9 », une création `created` « Sam created CP-33 »). **Statique (SSR)**.
+> - **HONNÊTETÉ (ancrée dans le code réel du front)** : le temps réel = `use-project-realtime.ts` qui s'abonne à
+>   `/topic/projects.{id}` et ne diffuse que des events d'issues (`created`/`updated`/`deleted` → upsert/remove du
+>   store, STOMP + fallback SockJS). **Aucune présence** (pas de « en ligne », « untel édite », curseurs) : le
+>   backend ne la diffuse pas, donc la page ne la montre pas. Les 4 primitives sont toutes vérifiées réelles :
+>   `cycle-service.ts` (cycles), issue-service `listComments/addComment/…` + `commentCount` (discussion),
+>   board/issues, RBAC `WorkspaceRole/ProjectRole` (VIEWER lecture seule — cf. [[rbac-write-model]]).
+> - **`nav.ts` BUILT_ROUTES += `/product/collaboration`** → dégrisé (menu Product + hub `/product` + footer).
+> - Vérifié : HTTP **200**, 260 Ko, vite:0, DOM `vw=1280` → board rendu (breadcrumb), pastille Live, Cycle 8,
+>   2 toasts, carte héros, 4 colonnes, 4 primitives (entités décodées : « Boards & issues », « Roles & access »),
+>   3 cartes temps réel, lien croisé. **Garde-fou présence : `presenceLeak: []`** (0 fuite). Screenshot KO
+>   (pane non composité) — DOM = source de vérité.
+> **Reste du lot produit** : analytics · integrations (live) ; agents · approvals (beta).
+>
+> ### ⚑ v45 (30/07) — Construction des pages grisées : lot « Pages produit (live) » — Smart Assign
+> Le user valide que les 8 pages existantes sont revues ; on construit maintenant les pages grisées, lot par
+> lot. Choix user : **Pages produit (live)** d'abord (dégrise le menu Product). Step by step, review à chaque.
+> - **`/product/smart-assign` (NEW, feature LIVE)** : PageHero (badge **Live**) « The right work to the right
+>   hands » → section « Recommendations, not decisions » qui **réutilise la vraie scène animée `AutoAssign`**
+>   (`illustrations/AutoAssign.tsx`, `client:idle` : la modale Smart Assign réelle — reco par compétences/charge/
+>   dispo + la RAISON de chaque choix + l'agent assigné comme un membre ; c'est la démo de la feature, pas un
+>   visuel emprunté à la home) → « How it decides » (3 signaux Skills/Load/Availability + « shows its reason » +
+>   profils de compétences nourris par l'onboarding) → « A coding agent is an assignee like any other » (le
+>   différenciateur : même board/card/checkpoint) → « A suggestion, never an autopilot » (reco overridable +
+>   reviewer humain nommé même quand un agent exécute) → PageCta. Contenu honnête (feature shipped).
+> - **`nav.ts` BUILT_ROUTES += `/product/smart-assign`** → dégrisé dans le menu Product + le hub `/product` +
+>   footer. Vérifié : 200, vite:0, 5 h2, scène hydratée (console 0 err), badge Live, lien live sur hub/home.
+> **Reste du lot produit à construire** : collaboration · analytics · integrations (live) ; agents · approvals
+> (beta). Puis lots Légal+Company, Solutions/Compare. + 3 transverses ouverts (self-hosting/prix/open-source).
+> **MAJ (verrou Smart Assign, review 8.5/10)** : (1) « best placed » → « **best matched to the work** » (hero +
+> meta desc — les 2 ! la meta portait encore l'ancienne). (2) « Skill profiles **fill** as your team works » →
+> « **can be enriched** … with a short onboarding capturing the rest » + Skills factor « shipped in before » →
+> « the areas they're strongest in » (pas de survente d'apprentissage auto ; nourri par le wizard onboarding,
+> cf. [[onboarding-flow-design]]). (3) **vocabulaire canonique harmonisé** : décision = approve/approval/human
+> approval ; exécution = named human reviewer ; « sign-off » ambigu retiré (« Nothing ships without human
+> approval »). (4) CTA « ships today » → « **is live today** — route work to teammates or coding agents ».
+> Design principle acté : **AI recommends/proposes, humans decide** (Orchestration/AI-transparency/Smart Assign).
 > Review user : éviter la « landing de prise de RDV » ; on vend une DÉMONSTRATION sur leur problème.
 > Structure user : Hero → What to expect → Bring one real outcome → Who this is for → Demo form → Start free.
 > - Hero lead affiné : « …**using** a real outcome from your team. We'll run it end to end, **show where humans

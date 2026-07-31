@@ -1,0 +1,135 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import PageHero from "@/components/site/PageHero.astro";
+import PageCta from "@/components/site/PageCta.astro";
+import { AutoAssign } from "@/components/site/illustrations/AutoAssign";
+import { Sparkles, Gauge, Clock, Bot, ShieldCheck, Check } from "lucide-react";
+import { APP_URL } from "@/components/site/nav";
+
+const FACTORS = [
+  { icon: Sparkles, title: "Skills", text: "Matched from each member's skill profile — the areas they're strongest in." },
+  { icon: Gauge, title: "Load", text: "Current workload, so no one gets buried while others sit idle." },
+  { icon: Clock, title: "Availability", text: "Who is genuinely free to pick the work up now." },
+];
+
+const REVIEW = [
+  "Every recommendation can be approved or overridden — keep any you'd rather hand to a specific person.",
+  "Every task still carries a named human reviewer, even when a coding agent executes it.",
+  "Nothing ships without human approval. Assignment is a suggestion, not an autopilot.",
+];
+---
+
+<BaseLayout
+  title="Smart Assign — TaskForce"
+  description="TaskForce routes each task to the teammate or coding agent best matched to the work, based on skills, current load and availability. Every recommendation comes with its reason, and a human approves it."
+>
+  <PageHero
+    kicker="Smart Assign"
+    title="The right work to the right hands"
+    lead="TaskForce routes each task to the teammate or coding agent best matched to the work — based on skills, current load and availability. Every recommendation comes with the reason, and a human approves it."
+    level="live"
+    primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
+    secondary={{ label: "See pricing", href: "/pricing" }}
+  />
+
+  {/* ── La vraie modale Smart Assign, animée ── */}
+  <section class="bg-secondary border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">In practice</p>
+        <h2 class="t-h2">Recommendations, not decisions</h2>
+        <p class="t-lead mt-4">
+          When a breakdown produces a batch of issues, Smart Assign proposes an owner for each —
+          with the reason next to it. You approve, adjust, or keep any for a specific person.
+        </p>
+      </div>
+      <div class="mt-12">
+        <AutoAssign client:idle />
+      </div>
+    </div>
+  </section>
+
+  {/* ── How it decides ── */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">How it decides</p>
+        <h2 class="t-h2">Three signals, and its reasoning shown</h2>
+        <p class="t-lead mt-4">
+          Not a black box. Smart Assign weighs three signals and shows the reason behind every
+          suggestion — so a lead can trust it, or overrule it, in a glance.
+        </p>
+      </div>
+      <div class="mt-12 grid gap-6 lg:grid-cols-3">
+        {
+          FACTORS.map((f) => (
+            <div class="rounded-2xl border bg-card p-6">
+              <span class="bg-card text-foreground flex size-11 items-center justify-center rounded-xl border">
+                <f.icon className="size-5" strokeWidth={1.75} />
+              </span>
+              <h3 class="mt-4 text-[16px] font-semibold text-foreground">{f.title}</h3>
+              <p class="text-muted-foreground mt-2 text-[13.5px] leading-6">{f.text}</p>
+            </div>
+          ))
+        }
+      </div>
+      <p class="text-muted-foreground mt-6 flex items-center gap-2 text-[13px]">
+        <Sparkles className="text-primary size-4 shrink-0" strokeWidth={2} />
+        Skill profiles can be enriched as your team works, with a short onboarding capturing the rest
+        — so it gets sharper without a data-entry chore.
+      </p>
+    </div>
+  </section>
+
+  {/* ── Agent as assignee ── */}
+  <section class="bg-secondary border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="grid gap-10 lg:grid-cols-[minmax(0,420px)_1fr] lg:gap-16">
+        <div>
+          <p class="t-eyebrow mb-3">The difference</p>
+          <h2 class="t-h2">A coding agent is an assignee like any other</h2>
+          <span class="text-foreground mt-6 inline-flex size-11 items-center justify-center rounded-xl border bg-card">
+            <Bot className="size-5" strokeWidth={1.75} />
+          </span>
+        </div>
+        <div class="flex flex-col gap-4 text-[15px] leading-7 text-foreground">
+          <p>
+            Same board, same card, same review checkpoint. Assign an issue to Claude Code, Cursor or
+            a teammate — Smart Assign weighs them the same way, by what the work needs.
+          </p>
+          <p class="text-muted-foreground">
+            That's the whole idea: an agent isn't a feature bolted on the side. It's a member of the
+            team that happens not to need sleep — and it still hands its work to a human to approve.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {/* ── Human review ── */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">You stay in control</p>
+        <h2 class="t-h2">A suggestion, never an autopilot</h2>
+      </div>
+      <ul class="mt-10 flex flex-col gap-3.5">
+        {
+          REVIEW.map((r) => (
+            <li class="flex items-start gap-3 text-[14.5px] leading-6 text-foreground">
+              <ShieldCheck className="text-primary mt-0.5 size-4 shrink-0" strokeWidth={2} />
+              {r}
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </section>
+
+  <PageCta
+    title="Put the right work in the right hands"
+    lead="Smart Assign is live today — route work to teammates or coding agents based on what the task actually needs."
+    primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
+    secondary={{ label: "Book a demo", href: "/book-a-demo" }}
+  />
+</BaseLayout>

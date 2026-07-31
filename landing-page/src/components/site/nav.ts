@@ -112,9 +112,9 @@ export const PRODUCT_DELIVERY: NavLink[] = [
   {
     label: "Integrations",
     href: "/product/integrations",
-    desc: "47 tools across 16 categories",
+    desc: "129 connectors across 16 categories",
     icon: Plug,
-    badge: "live",
+    badge: "beta",
   },
 ];
 
@@ -297,6 +297,9 @@ export const BUILT_ROUTES: ReadonlySet<string> = new Set([
   "/product",
   "/product/orchestration",
   "/product/brain-os",
+  "/product/smart-assign",
+  "/product/collaboration",
+  "/product/integrations",
   "/trust",
   "/enterprise",
   "/roadmap",
