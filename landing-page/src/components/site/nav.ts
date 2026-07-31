@@ -105,7 +105,7 @@ export const PRODUCT_DELIVERY: NavLink[] = [
   {
     label: "Analytics",
     href: "/product/analytics",
-    desc: "Lead time, throughput, approval rate",
+    desc: "Throughput, resolution time, workload",
     icon: BarChart3,
     badge: "live",
   },
@@ -303,6 +303,7 @@ export const BUILT_ROUTES: ReadonlySet<string> = new Set([
   "/product/integrations/github",
   "/product/integrations/slack",
   "/product/integrations/plane",
+  "/product/analytics",
   "/trust",
   "/enterprise",
   "/roadmap",

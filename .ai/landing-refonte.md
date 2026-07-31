@@ -185,6 +185,27 @@ point identifiable sur la courbe de lead time.
 | Métronome | `src/lib/useScene.ts` | `useScene(beats)` : partition de durées, démarre à l'entrée à l'écran, se joue **une fois**, **se fige sur l'état final**. `useTypewriter` pour la frappe. `prefers-reduced-motion` → état final direct. |
 | Châssis | `src/components/site/scene/AppWindow.tsx` | Vrai écran TaskForce (voir encadré ci-dessous). **Remplace la barre macOS de `MockFrame`** — trois pastilles + une URL, c'est le signe le plus sûr qu'on regarde un dessin. |
 
+> ### ⚑ v51 (31/07) — Lot produit — Analytics (dernière page LIVE)
+> Lu `AnalyticsController` + `analytics-service.ts` avant d'écrire. Analytics est réellement livré et riche :
+> KPIs (resolved, resolution time, velocity, active cycles + deltas), throughput (opened/resolved, week/day),
+> burndown, capacity/workload, insights IA, et **génération de graphe en langage naturel** (`/chart` →
+> `ChartSpec`, rendu depuis les VRAIES séries, « jamais de données inventées » : mode `unsupported` + suggestions).
+> - **`/product/analytics` (NEW, Live)** : PageHero (Live) « The analytics your delivery actually produces » →
+>   « The numbers, from the work itself » (6 métriques RÉELLES : Throughput, Resolution time, Velocity, Active
+>   cycles, Burndown, Team workload) → « Describe the chart. Get it from your data. » (le NL→chart + la phrase
+>   d'honnêteté **« when a question can't be answered from your data, it says so … instead of inventing a
+>   number »** — colle au code) → « The metric only a checkpoint system can produce » (**Beta** : sent-back par
+>   checkpoint, réutilise la scène animée `DeliveryInsights`, « grows with orchestration; it's early ») → PageCta.
+> - **Honnêteté** : le cœur (métriques board + NL→chart) est **Live** ; la métrique par checkpoint (sent-back /
+>   approval rate) est **Beta** (dépend de l'orchestration Planned) → badge Analytics reste `live`, section Beta
+>   explicite. 2 mentions **« Illustrative — sample data »** sur les visuels à chiffres (règle Spec_Master §1.1).
+> - **`nav.ts`** : desc « Lead time, throughput, approval rate » → **« Throughput, resolution time, workload »**
+>   (approval rate était Beta) ; BUILT_ROUTES += `/product/analytics`.
+> - Vérifié : 200, vite:0, **0 erreur console** (scène `DeliveryInsights` hydratée), 6 métriques, mock NL→chart
+>   (Inès/Léo/Maya/Claude Code), phrase never-invents, section Beta, 2 captions illustratives, badge hero Live.
+> **➜ Le lot produit LIVE est complet** : Smart Assign · Collaboration · Integrations(+3 fiches) · Analytics.
+> Reste en produit : **agents · approvals** (beta). Puis lots Legal+Company, Solutions/Compare.
+>
 > ### ⚑ v50 (31/07) — Fiches connecteur détaillées (GitHub · Slack · Plane)
 > Demande user : de vraies fiches produit par connecteur (point 9/10). Fait **uniquement pour les 3 connecteurs
 > réellement implémentés en profondeur** — les 126 autres restent au catalogue. **Chaque capacité listée = un

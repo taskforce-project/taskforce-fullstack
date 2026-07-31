@@ -1,0 +1,148 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import PageHero from "@/components/site/PageHero.astro";
+import PageCta from "@/components/site/PageCta.astro";
+import { DeliveryInsights } from "@/components/site/illustrations/DeliveryInsights";
+import { BarChart3, Timer, Gauge, CalendarRange, TrendingDown, Users, Sparkles } from "lucide-react";
+import { APP_URL } from "@/components/site/nav";
+
+/* Les métriques RÉELLEMENT calculées (cf. AnalyticsController /kpis /throughput /burndown /workload). */
+const METRICS = [
+  { icon: BarChart3, title: "Throughput", text: "Opened vs resolved over time, by week or by day." },
+  { icon: Timer, title: "Resolution time", text: "How long work takes to close, with the trend vs last period." },
+  { icon: Gauge, title: "Velocity", text: "How much gets resolved per cycle." },
+  { icon: CalendarRange, title: "Active cycles", text: "What's in flight right now, and how full it is." },
+  { icon: TrendingDown, title: "Burndown", text: "Remaining work against the ideal line, per cycle." },
+  { icon: Users, title: "Team workload", text: "Who's carrying what, day by day — before anyone is buried." },
+];
+
+/* Mock du graphe généré depuis une demande en langage naturel — données ILLUSTRATIVES (fiction story). */
+const CHART = [
+  { name: "Inès", n: 9 },
+  { name: "Léo", n: 7 },
+  { name: "Maya", n: 5 },
+  { name: "Claude Code", n: 4 },
+];
+const CHART_MAX = Math.max(...CHART.map((c) => c.n));
+---
+
+<BaseLayout
+  title="Analytics — TaskForce"
+  description="The analytics your delivery actually produces: throughput, resolution time, velocity and workload, computed from your real board. Ask for any chart in plain English — rendered from your data, never invented."
+>
+  <PageHero
+    kicker="Analytics"
+    title="The analytics your delivery actually produces"
+    lead="Throughput, resolution time, velocity and workload — computed from your real board, not a spreadsheet you keep by hand. Ask for any chart in plain English, and get one rendered from your data."
+    level="live"
+    primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
+    secondary={{ label: "See pricing", href: "/pricing" }}
+  />
+
+  {/* ── Les métriques, live ── */}
+  <section class="bg-secondary border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">Live today</p>
+        <h2 class="t-h2">The numbers, from the work itself</h2>
+        <p class="t-lead mt-4">
+          No manual roll-ups. TaskForce reads your board and computes the delivery metrics teams
+          actually track — updated as work moves.
+        </p>
+      </div>
+      <div class="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {
+          METRICS.map((m) => (
+            <div class="rounded-2xl border bg-card p-6">
+              <span class="bg-card text-foreground flex size-11 items-center justify-center rounded-xl border">
+                <m.icon className="size-5" strokeWidth={1.75} />
+              </span>
+              <h3 class="mt-4 text-[16px] font-semibold text-foreground">{m.title}</h3>
+              <p class="text-muted-foreground mt-2 text-[13.5px] leading-6">{m.text}</p>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  {/* ── Ask for a chart en langage naturel ── */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="grid gap-10 lg:grid-cols-[minmax(0,440px)_1fr] lg:items-center lg:gap-16">
+        <div>
+          <p class="t-eyebrow mb-3">Ask in plain English</p>
+          <h2 class="t-h2">Describe the chart. Get it from your data.</h2>
+          <p class="t-lead mt-4">
+            Type a question and TaskForce builds the chart from your real board — then let you pin the
+            ones worth keeping.
+          </p>
+          <p class="text-muted-foreground mt-6 flex items-start gap-2 text-[13.5px] leading-6">
+            <Sparkles className="text-primary mt-0.5 size-4 shrink-0" strokeWidth={2} />
+            And when a question can't be answered from your data, it says so — and suggests one it can
+            — instead of inventing a number.
+          </p>
+        </div>
+
+        {/* Mock : prompt → graphe. Données illustratives. */}
+        <div class="mx-auto w-full max-w-md">
+          <div class="bg-card overflow-hidden rounded-2xl border shadow-sm">
+            <div class="flex items-center gap-2 border-b px-4 py-3">
+              <Sparkles className="text-primary size-4 shrink-0" strokeWidth={2} />
+              <span class="text-foreground text-[13.5px]">Resolved issues by assignee, this cycle</span>
+            </div>
+            <div class="p-5">
+              <p class="text-muted-foreground mb-3 text-[11.5px]">Resolved · this cycle</p>
+              <ul class="flex flex-col gap-2.5">
+                {
+                  CHART.map((c) => (
+                    <li class="flex items-center gap-3">
+                      <span class="text-foreground w-20 shrink-0 truncate text-[12px]">{c.name}</span>
+                      <span class="bg-secondary h-3 flex-1 overflow-hidden rounded-full">
+                        <span
+                          class="bg-primary block h-full rounded-full"
+                          style={`width:${(c.n / CHART_MAX) * 100}%`}
+                        />
+                      </span>
+                      <span class="text-muted-foreground w-5 shrink-0 text-right font-mono text-[12px] tabular-nums">
+                        {c.n}
+                      </span>
+                    </li>
+                  ))
+                }
+              </ul>
+            </div>
+          </div>
+          <p class="text-muted-foreground mt-3 text-center text-[11px]">Illustrative — sample data.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {/* ── La métrique que seul un système à checkpoints peut sortir (Beta) ── */}
+  <section class="bg-secondary border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">Beta</p>
+        <h2 class="t-h2">The metric only a checkpoint system can produce</h2>
+        <p class="t-lead mt-4">
+          A classic tracker tells you what's late. Because TaskForce runs through validated
+          checkpoints, it can tell you where work gets <span class="text-foreground font-medium">sent
+          back</span> — the step where your process actually hurts. This one grows with orchestration;
+          it's early.
+        </p>
+      </div>
+      <div class="mx-auto mt-12 max-w-2xl">
+        <DeliveryInsights client:idle />
+        <p class="text-muted-foreground mt-3 text-center text-[11px]">Illustrative — sample data.</p>
+      </div>
+    </div>
+  </section>
+
+  <PageCta
+    title="Measure the delivery, not the busywork"
+    lead="Get the metrics your board already contains — and the ones only validated checkpoints can produce."
+    primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
+    secondary={{ label: "Book a demo", href: "/book-a-demo" }}
+  />
+</BaseLayout>
