@@ -1,6 +1,6 @@
-# Sitemap
-Sitemap: https://taskforce.app/sitemap.xml
-
 # Allow all crawlers
 User-agent: *
 Allow: /
+
+# Sitemap
+Sitemap: https://taskforce.dev/sitemap.xml
