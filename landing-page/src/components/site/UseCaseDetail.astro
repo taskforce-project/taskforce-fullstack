@@ -1,0 +1,86 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import PageHero from "@/components/site/PageHero.astro";
+import PageCta from "@/components/site/PageCta.astro";
+import { Check, ArrowRight, Info } from "lucide-react";
+import { APP_URL } from "@/components/site/nav";
+import type { UseCase } from "@/lib/use-cases";
+
+interface Props {
+  c: UseCase;
+}
+const { c } = Astro.props;
+---
+
+<BaseLayout title={`${c.name} — Use cases`} description={c.lead}>
+  <PageHero
+    kicker="Use case"
+    title={c.name}
+    lead={c.lead}
+    level={c.level}
+    primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
+    secondary={{ label: "All use cases", href: "/use-cases" }}
+  />
+
+  {/* ── What it is ── */}
+  <section class="bg-secondary border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="mx-auto max-w-2xl">
+        <p class="t-eyebrow mb-3">What it is</p>
+        <h2 class="t-h2">The stage, and what it produces</h2>
+        <p class="mt-6 text-[15px] leading-7 text-foreground">{c.what}</p>
+      </div>
+    </div>
+  </section>
+
+  {/* ── In a run ── */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">In a run</p>
+        <h2 class="t-h2">How it works</h2>
+      </div>
+      <ul class="mt-10 flex flex-col gap-3.5">
+        {
+          c.inRun.map((step) => (
+            <li class="flex items-start gap-3 text-[14.5px] leading-6 text-foreground">
+              <Check className="text-primary mt-0.5 size-4 shrink-0" strokeWidth={2.5} />
+              {step}
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </section>
+
+  {/* ── Where it stands (honnête) ── */}
+  <section class="bg-secondary border-b">
+    <div class="container-rail py-16 lg:py-20">
+      <div class="mx-auto max-w-2xl">
+        <div class="border-primary/25 flex items-start gap-2.5 rounded-xl border bg-primary/[0.05] px-4 py-3.5">
+          <Info className="text-primary mt-0.5 size-4 shrink-0" strokeWidth={2} />
+          <p class="text-[13.5px] leading-6 text-foreground">
+            <span class="font-medium">Where it stands.</span> {c.status}
+          </p>
+        </div>
+        <div class="mt-6 flex flex-wrap gap-4">
+          {
+            c.links.map((l) => (
+              <a href={l.href} class="link-underline text-foreground inline-flex items-center gap-1.5 text-[14px] font-medium">
+                {l.label}
+                <ArrowRight className="size-3.5" />
+              </a>
+            ))
+          }
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <PageCta
+    title="Turn this stage into a governed output"
+    lead="Start with what ships today, and grow into the full run as it lands."
+    primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
+    secondary={{ label: "Book a demo", href: "/book-a-demo" }}
+  />
+</BaseLayout>

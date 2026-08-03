@@ -20,6 +20,7 @@
   },
   "registries": {
     "@magicui": "https://magicui.design/r/{name}",
-    "@shadcnblocks": "https://shadcnblocks.com/r/{name}.json"
+    "@shadcnblocks": "https://shadcnblocks.com/r/{name}.json",
+    "@react-bits": "https://reactbits.dev/r/{name}.json"
   }
 }

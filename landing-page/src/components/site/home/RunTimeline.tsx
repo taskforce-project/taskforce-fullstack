@@ -19,13 +19,13 @@ import { cn } from "@/lib/utils";
  */
 
 const STEPS: { step: string; by: string }[] = [
-  { step: "Vision", by: "Product agent" },
-  { step: "Product spec", by: "Product agent" },
-  { step: "Architecture", by: "Architecture agent" },
-  { step: "API contract", by: "Architecture agent" },
-  { step: "Breakdown", by: "Delivery agent" },
+  { step: "Vision", by: "CPO agent" },
+  { step: "Product spec", by: "CPO agent" },
+  { step: "Architecture", by: "CTO agent" },
+  { step: "API contract", by: "CTO agent" },
+  { step: "Breakdown", by: "COO agent" },
   { step: "Implementation", by: "Claude Code" },
-  { step: "QA & deploy", by: "Delivery agent" },
+  { step: "QA & deploy", by: "COO agent" },
 ];
 
 /**
@@ -66,13 +66,13 @@ const RUN_BULLETS = [
  * « Anatomy » séparée faisait doublon). Ordre = vrai ordre d'exécution.
  */
 const ANATOMY: { step: string; by: string; artifact: string; decision: string; level?: "live" | "beta" | "labs" }[] = [
-  { step: "Vision", by: "Product agent", artifact: "One page: the problem, who has it, what « done » looks like.", decision: "Approve the framing, or reframe it before anything is built on top.", level: "labs" },
-  { step: "Product spec", by: "Product agent", artifact: "Stories with acceptance criteria, and the edge cases nobody asked about.", decision: "Approve, or send it back with what is missing.", level: "labs" },
-  { step: "Architecture", by: "Architecture agent", artifact: "The proposed approach — and the option that was rejected, with the reason.", decision: "Approve the trade-off. This is the decision that is expensive to reverse later.", level: "labs" },
-  { step: "API contract", by: "Architecture agent", artifact: "Endpoints, payloads and error cases, written against your existing conventions.", decision: "Approve or amend. Downstream steps are generated from what you sign here.", level: "labs" },
-  { step: "Breakdown", by: "Delivery agent", artifact: "Issues, sized and ordered, each linked back to the line of spec it came from.", decision: "Approve — then Smart Assign routes each issue to a person.", level: "live" },
+  { step: "Vision", by: "CPO agent", artifact: "One page: the problem, who has it, what « done » looks like.", decision: "Approve the framing, or reframe it before anything is built on top.", level: "labs" },
+  { step: "Product spec", by: "CPO agent", artifact: "Stories with acceptance criteria, and the edge cases nobody asked about.", decision: "Approve, or send it back with what is missing.", level: "labs" },
+  { step: "Architecture", by: "CTO agent", artifact: "The proposed approach — and the option that was rejected, with the reason.", decision: "Approve the trade-off. This is the decision that is expensive to reverse later.", level: "labs" },
+  { step: "API contract", by: "CTO agent", artifact: "Endpoints, payloads and error cases, written against your existing conventions.", decision: "Approve or amend. Downstream steps are generated from what you sign here.", level: "labs" },
+  { step: "Breakdown", by: "COO agent", artifact: "Issues, sized and ordered, each linked back to the line of spec it came from.", decision: "Approve — then Smart Assign routes each issue to a person.", level: "live" },
   { step: "Implementation", by: "Your coding agent", artifact: "A branch. TaskForce hands over the context and stays out of the way.", decision: "Your normal code review. We do not replace it.", level: "live" },
-  { step: "QA & deploy", by: "Delivery agent", artifact: "A checklist derived from the acceptance criteria you approved in step two.", decision: "Sign off. The whole chain is in the audit trail.", level: "beta" },
+  { step: "QA & deploy", by: "COO agent", artifact: "A checklist derived from the acceptance criteria you approved in step two.", decision: "Sign off. The whole chain is in the audit trail.", level: "beta" },
 ];
 
 type Phase = "draft" | "review";
@@ -156,6 +156,12 @@ export function RunTimeline() {
             See a run end to end
             <ArrowRight className="size-4" />
           </a>
+
+          <p className="text-muted-foreground mt-6 text-[12.5px] leading-5">
+            Drafting a spec and the breakdown ship <span className="text-foreground font-medium">today</span>;
+            the full seven-checkpoint run is <span className="text-foreground font-medium">Planned</span> — each
+            step below is labelled.
+          </p>
         </div>
 
         {/* Colonne timeline — l'îlot animé (client:idle dans index.astro). */}

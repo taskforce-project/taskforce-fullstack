@@ -185,6 +185,567 @@ point identifiable sur la courbe de lead time.
 | Métronome | `src/lib/useScene.ts` | `useScene(beats)` : partition de durées, démarre à l'entrée à l'écran, se joue **une fois**, **se fige sur l'état final**. `useTypewriter` pour la frappe. `prefers-reduced-motion` → état final direct. |
 | Châssis | `src/components/site/scene/AppWindow.tsx` | Vrai écran TaskForce (voir encadré ci-dessous). **Remplace la barre macOS de `MockFrame`** — trois pastilles + une URL, c'est le signe le plus sûr qu'on regarde un dessin. |
 
+> ### ⚑ v89 (03/08) — Labs : refonte des 2 sections faibles (boucle = diagramme, graduated = vedette+liste)
+> Retour user : les sections « The system » (boucle) et « graduated » juste en dessous sont **naze / serrées à droite /
+> mêmes cartes** → les refaire, **balancées**, **pas un énième 4-cards**.
+> - **Cause du « serré » :** intros `max-w-2xl` **alignées à gauche** + contenu `max-w-3xl` → tout collé à gauche, vide à droite.
+>   Fix commun : **intros centrées** (`mx-auto text-center`) + contenu pleine largeur.
+> - **Boucle → diagramme de flux centré** : `<ol>` de 6 nœuds numérotés (01→06), **piste horizontale** en dégradé qui les
+>   relie (desktop, cachée en mobile où ça passe en grille 2/3 col), maturité par nœud (point + label), fermeture « ↺ … the loop
+>   closes » entre deux traits dégradés. Plus de pilules qui wrappent.
+> - **Graduated → asymétrique (vedette + liste)** au lieu de 4 cartes égales : **tuile vedette 3/5** (TaskForce Memory) avec
+>   **visuel placeholder** (bandeau `labs-g6` + icône géante + tag « Graduated from Labs ») + blurb + « Explore » ; les **3 autres**
+>   en **lignes compactes 2/5** (icône + nom + blurb + maturité). Blurbs honnêtes ajoutés à `GRADUATED` (fait produit réel).
+> Vérifié : **build 68 OK**, **0 console**, **0 overflow (desktop + 375)**, boucle = 6 nœuds + piste (cachée mobile), vedette
+> `col-span-3` + visuel dégradé + blurb, 3 lignes avec blurb, **0 violet**.
+> **Chantier ouvert (non fait, à cadrer) :** le user veut **repasser tout le site** — trop de « intro + 4 cards » partout (surtout
+> `/product/*`), besoin d'un **storytelling par page** (quoi / pourquoi / comment / démo) et de **structures de section variées**
+> (réf. **Attio**). Placeholders OK pour visuels/animations. → livrer une **bibliothèque d'archétypes de section** + l'appliquer
+> page par page. Voir plan proposé au user (03/08).
+> **➜ Côté user : recharger /labs (Docker : redémarrer le service landing).**
+>
+
+> ### ⚑ v88 (03/08) — Labs : sujets en FEATURES (onglets + storytelling) + carte dropdown = fond du hero
+> Retour user sur la v87 : (1) « le **bouton dans le menu**, mets-y le **même background que le hero** » ; (2) « **rien changé
+> niveau sections**, c'est vide, mal structuré, aligné à gauche, mêmes composants — **faut innover**, un **système de tabs**,
+> les sujets de recherche présentés en **features**, et **chaque partie a son storytelling** : pourquoi, le but, où on en est,
+> les docs/démos ».
+> - **Nouveau `LabsShowcase.tsx`** (îlot React autonome, **zéro dépendance** — onglets `useState` maison, nav clavier ↑↓←→
+>   Home/End, rôles ARIA `tablist`/`tab`/`tabpanel`). Remplace la **grille plate** : rail vertical des 4 sujets à gauche +
+>   **panneau riche** à droite (en-tête EXP + « Research », lead, puis blocs **Why it matters / Where it stands** en 2 colonnes,
+>   **What we're chasing** = les 3 hypothèses en cartes, **Go deeper** = surface produit + maturité + liens roadmap). Données
+>   = prop `SHOWCASE` construite dans `index.astro` depuis `labs.ts` (source unique). **Rien d'inventé** (D11).
+> - **Intro de section centrée** (`text-center`) pour casser le tout-aligné-à-gauche ; sur mobile le rail d'onglets **scrolle
+>   horizontalement** (`overflow-x:auto`). Icônes d'onglet = dégradé de trait (`labs-ic-*`), barre d'accent `labs-g5` sur l'actif.
+> - **`client:load`** (et pas `client:visible`) : le pane de preview a un **viewport 0×0** → l'IntersectionObserver ne déclenche
+>   jamais ; `client:load` garantit l'hydratation (+ vérifiable). Îlot below-the-fold léger, coût négligeable.
+> - **Carte Labs du dropdown (`SiteHeader.tsx`)** : `!isLabs` inchangé ; pour Labs → **image `hero-wave.jpg` en fond** +
+>   voile blanc dégradé (`from-white/90 via-white/75 to-white/45`, comme le hero), tuile d'icône `bg-card/90`, desc assombrie.
+> Vérifié : **build 68 OK**, **0 console**, **0 overflow (desktop + 375)**, **bascule d'onglet OK** (appel du `onClick` React →
+> `aria-selected` + panneau changent, 3 hypothèses par sujet), **0 violet**, `hero-wave.jpg` **200**, rail mobile scrollable.
+> ⚠️ Le **menu déroulant** n'a **pas pu être ouvert visuellement** (pane sans compositing : screenshot/hover coordonnée KO) →
+> vérifié le **markup (build) + l'asset (200)**, pas le rendu ouvert. À confirmer à l'œil côté user.
+> **➜ Côté user : recharger /labs + ouvrir le menu Resources (Docker : redémarrer le service landing).**
+>
+
+> ### ⚑ v87 (03/08) — Header dropdown Labs cohérent (0 violet, icône-dégradé) + une vraie question par carte
+> Retour user sur la v86 : (1) « le **bouton dans le dropdown** respecte pas ce que j'ai dit » ; (2) « les **sections sont
+> naze**, on a rien à raconter ? ».
+> - **Dropdown Labs (`SiteHeader.tsx`)** : la carte Labs violait encore les 2 règles → tuile de fond `labs-g3` (dégradé) +
+>   label `text-violet-700`. Corrigé : **tuile neutre** `border bg-card` (comme les autres cartes, `background-image:none`),
+>   **la fiole prend le dégradé de TRAIT** (`.labs-ic-head { stroke:url(#lgLabsHead) }`), **label en noir** (foreground). Idem
+>   la fiole du **trigger « Resources »** : `text-[#ff6f91]` → `labs-ic-head` (dégradé). Le dégradé `lgLabsHead` (coral→bleu) est
+>   déclaré par un `<svg>` caché **dans le header** (donc dispo sur **toutes** les pages, pas seulement `/labs`).
+>   Vérifié menu ouvert : tuile `background-image:none`, `stroke=url("#lgLabsHead")`, label `rgb(29,29,31)`, **0 classe violet**.
+> - **Sections « naze » → on a de quoi dire** : le hub n'exposait que le `lead` de chaque expérience alors que `labs.ts` porte
+>   déjà, par expérience, **3 hypothèses réelles** (`exploring[]`). J'en affiche **une par carte** (citation en italique, bord
+>   gauche) → chaque carte pose une **vraie question de recherche** (honnête, D11, rien d'inventé). Les 3 autres hypothèses +
+>   le « why » + le statut restent sur la page détail. Vérifié : **4 citations** rendues (« Scoping an agent's responsibility… »).
+> Vérifié : **build 68 OK**, 0 console, **0 overflow (1280)**, fiole header `url("#lgLabsHead")`, hero `url("#lgC")`, 0 violet page + menu.
+> **Reste à trancher (toi) :** section « The system » (la boucle) = la plus abstraite ; on peut la muscler ou surfacer les 12 questions.
+> **➜ Côté user : recharger /labs + ouvrir le menu Resources (Docker : redémarrer le service landing).**
+>
+
+> ### ⚑ v86 (03/08) — Labs clair : image PLEIN CADRE + icônes en dégradé (trait) + plus de violet + card CTA
+> 5 retours user sur la v85 : (1) le bg doit prendre **toute la place** (comme le screen resserré) ; (2) **enlever les rails
+> du hero** ; (3) au CTA **remettre la CARD** (juste l'image derrière) ; (4) **pas de fond derrière les icônes** → c'est le
+> TRAIT de l'icône qui prend le dégradé ; (5) **plus de violet** → blanc/noir/bleu (primaire).
+> - **Hero plein cadre** (`LabsBackdrop`) : image `absolute inset-0 object-cover` (100 % largeur) + voile blanc gauche +
+>   renfort mobile. **Rails du hero retirés** : hero + CTA en `container-site` (les sections de contenu gardent `container-rail`).
+>   Vérifié 1905px : image left 0 / width 100 %, `border-left:0`.
+> - **Icônes en dégradé de TRAIT** : `LabsGradientDefs.astro` (nouveau : `<defs>` SVG `lgA..lgE`) + `global.css`
+>   `.labs-ic-a..e { stroke:url(#..) }`, sur les icônes hero + 4 expériences (aucune pastille de fond). Vérifié `stroke=url("#lgC")`.
+> - **CTA** : la **card** blanche (`rounded-3xl border shadow-xl`) est de retour, avec l'**image en fond de section** derrière
+>   (voile blanc). `PageCta` non utilisé sur le hub.
+> - **Plus de violet** (0 classe `violet`) : dégradés `.labs-g*`/`.labs-gtext` débiaisés (coral/rose/pêche/bleu, sans lavande) ;
+>   « Open » en **bleu primaire** ; « Planned » en neutre (slate) ; header fiole `#ff6f91` + tuile `labs-g3`.
+> Vérifié : **build 68 OK, lint 0**, 0 console, **0 overflow (1905/375)**, icônes dégradé OK, card CTA + image OK.
+> **➜ Côté user : recharger /labs (Docker : redémarrer le service landing).**
+>
+> ### ⚑ v85 (03/08) — Labs clair : fix hero responsive + dégradés « image » + moins de cards + image sous le CTA
+> Retours user sur la v84 (qu'il adore au format laptop) : (1) le hero **casse quand on agrandit** ; (2) reprendre les
+> COULEURS de l'image en dégradés fixes « random » (icônes/labels/bouton Labs du header) ; (3) **trop de cards** → système
+> de sections/rails (façon Linear) ; (4) remettre l'image **derrière le CTA**.
+> - **Fix hero (`LabsBackdrop`)** : l'image occupe la **moitié droite du VIEWPORT** (`right-0 lg:w-[56%] xl:w-1/2`, bord à
+>   bord) au lieu d'un `w-[64%]` qui décrochait du texte quand `container-rail` se centre. Vérifié 1905px : image = moitié
+>   droite pile, H1 finit à 950 → **0 chevauchement, 0 overflow** ; 1145px = 56 % (look « aimé ») ; 375px renfort scrim, OK.
+> - **Dégradés palette image** (`global.css` : `.labs-g1..g6` + `.labs-gtext`, couleurs tirées de `hero-wave.jpg`) : tuiles
+>   d'icônes (hero + 4 expériences, chacune un dégradé distinct), « TaskForce Labs »/eyebrows/EXP en **texte clippé dégradé**,
+>   **bouton Labs du header** (`SiteHeader` : tuile `labs-g3` + fiole `#ff6f91`). Fixes mais « random » dans le mood.
+> - **Moins de cards** : expériences = **grille bordée** (`gap-px bg-border`, 1 bloc, pas 4 cartes) ; boucle = **stepper à
+>   plat** (pills + flèches + point de maturité) ; graduated = **liste bordée** (`divide-y`).
+> - **CTA** : image « verre liquide » en fond (2e `<img>` + voile blanc pour la lisibilité) — remplace `PageCta` sur le hub.
+> Vérifié : **build 68 OK, lint 0**, 0 console, **0 overflow (1905/1145/375)**, gradients rendus (`labs-g4`/`labs-gtext`), 0 canvas.
+> **➜ Côté user : recharger /labs (Docker : redémarrer le service landing).**
+>
+> ### ⚑ v84 (03/08) — Labs : REVIREMENT → CLAIR + images fixes + ZÉRO animation (sobre/pro)
+> User : « laisse le thème en blanc, va chercher des images fixes, pas d'animation, on reste sobre et pro, plus de dark
+> mode ». **Annule le monde sombre (v80-83) : D2 light-only redevient vraie PARTOUT.**
+> - **Image** : `3d-sea-landscape.jpg` (fournie par le user dans Downloads) redimensionnée → `public/labs/hero-wave.jpg`
+>   (2000px, **134 KB**, via System.Drawing PowerShell — pas de dép sharp, safe Docker). Vague « verre liquide » coral, premium.
+> - **`LabsBackdrop.astro`** réécrit CLAIR/STATIQUE : image à droite (`object-cover`, lg:64%) + dégradé blanc (fort à
+>   gauche = texte lisible, révèle la vague à droite) + fondu bas. aria-hidden, zéro animation.
+> - **`labs/index.astro` réécrit** clair/sobre : BaseLayout défaut (blanc, plus de `bodyClass`/`LabsCurtain`), hero image
+>   + violet mono ; expériences en **cartes statiques** ; **boucle en grille statique** (6 étapes, maturité réelle) ;
+>   « graduated » ; `PageCta`. **`LabDetail.astro` réécrit** clair pareil.
+> - **Débranchés mais LAISSÉS dans le repo** (le user a déjà flip-floppé dark↔clair) : FluidBackdrop, LabField, SystemGraph,
+>   ResearchLog, LabsCurtain, ProximityText, DecryptedText, VariableProximity, border-beam, retro-grid. Le bloc CSS
+>   `.labs-*`/`.labs-body` sombre de global.css est INERTE (non utilisé).
+> - Contenu honnête conservé (D11 : aucune expé « Live », tout Research ◌, + surface produit & maturité réelle).
+> Vérifié : **build 68 OK, lint 0 erreur**, 0 erreur console ; body **BLANC**, H1 dark lisible, image chargée (2000×1121),
+> **0 canvas** (plus d'animation), sections présentes, 0 overflow ; détail `/labs/learning-from-reviews` idem.
+> **➜ Côté user : recharger /labs (Docker : redémarrer le service landing). Glass gradients en réserve dans Downloads.**
+>
+> ### ⚑ v83 (03/08) — Labs : fond « verre liquide » fluide (retour user : style Microsoft 365 / glassmorphisme)
+> User veut un fond FLUIDE façon Microsoft 365 (formes en verre, dégradé qui coule), pas le champ de points. Choix :
+> **généré en code** (pas de stock Freepik → licence/perf) et **gardé sombre** (cohérent monde Labs ; flip clair possible).
+> - **`FluidBackdrop.tsx` (nouveau)** — WebGL2 BRUT, zéro dép (comme LabField/RetroGrid, safe Docker) : dégradé
+>   **domain-warpé** (bruit simplex, 3 octaves) qui coule ; palette sombre→violet→bleu→cyan→magenta ; **tiers gauche
+>   assombri par le shader** → H1 lisible ; lueur curseur ; rendu **sous-échantillonné** (0.45–0.58×) pour la perf. IO-pause
+>   + onglet caché, reduced-motion → image statique, tactile → dérive ambiante, 1re image synchrone. `variant="calm"` (détail).
+> - **Hero (`index.astro`)** : `LabField` + son panneau de réglages remplacés par `<FluidBackdrop>` + **2 formes en verre
+>   dépoli** (`backdrop-blur` + `bg-white/5` + bord, à droite, loin du texte) + vignette + scrim gauche.
+>   **`LabsBackdrop.astro`** (héros détail) → `FluidBackdrop variant="calm"`. **`LabField.tsx` laissé mais INUTILISÉ**
+>   (au cas où on re-bascule sur le champ de points).
+> Vérifié : **build 68 OK, lint 0 erreur**, 0 erreur console ; le shader REND (pixel hero=violet [89,61,193], détail=cyan
+> [44,150,189], canvas WebGL2), formes verre présentes, H1 lisible, 0 overflow. **L'animation ne tourne pas dans le pane
+> (rAF/transitions gelés) → à valider en vrai navigateur.**
+> **➜ Côté user : recharger /labs (Docker : redémarrer le service landing).**
+>
+> ### ⚑ v82 (02/08) — Labs : 4 vrais composants React Bits / Magic UI câblés (+ pièges Docker/Astro résolus)
+> User a choisi les 4 : **Decrypted Text** (hero, décodage terminal), **Variable Proximity** (H2 system graph, graisse
+> qui réagit au curseur), **Border Beam** (bord du panel Featured), **Retro Grid** (fond system graph). Tirés via
+> `npx shadcn add @react-bits/… @magicui/…` (registres déjà dans `components.json`).
+> - **`.npmrc` (nouveau)** : `legacy-peer-deps=true`. Le `npm install` interne du CLI plantait sur le conflit de peer
+>   connu (vite@8 vs peer ≤7 de `@tailwindcss/vite`). Le projet s'installe déjà en `--legacy-peer-deps` → on le rend permanent.
+> - **Intégration** (`labs/index.astro`) : DecryptedText enveloppe le H1 (`animateOn="view"`) ; BorderBeam dans le
+>   `labs-panel` Featured (violet→cyan) ; RetroGrid remplace la grille de la section system graph ; VariableProximity via un
+>   wrapper **`ProximityText.tsx`** (VP exige un `containerRef` impossible à passer d'Astro + code en dur « Roboto Flex » →
+>   on force `var(--font-display)`, reduced-motion → `to===from`).
+> - **Pièges résolus** (build passait mais le DEV plantait — esbuild strip les types, le SSR dev les évalue) :
+>   1. **VariableProximity** importait des TYPES react en VALEUR (`MutableRefObject, CSSProperties, HTMLAttributes`) →
+>      `[vite] Named export not found` au SSR dev → `import type`.
+>   2. **`motion/react` dans un îlot = « Invalid hook call »** (double instance React sous Astro/Vite ; dedupe + optimizeDeps
+>      + purge `.vite` n'ont PAS suffi). Fix robuste = **retirer `motion`** des 3 composants (il n'était que cosmétique) :
+>      BorderBeam → animation CSS `offset-path` (`@keyframes border-beam-move`), DecryptedText/VariableProximity
+>      `motion.span`→`span`. **Même parti pris que l'Aurora/ogl.** `astro.config` : `resolve.dedupe:['react','react-dom']` (hygiène).
+>   3. **RetroGrid EST du WebGL** (pas de dép npm, comme LabField) MAIS embarque un voile bas `from-white … dark:from-black` ;
+>      notre page n'a pas de classe `.dark` → blanc → masqué par un dégradé sombre par-dessus.
+>   4. Diagnostic : **`read_console_messages` bufferise à travers les reloads** (montrait 4 erreurs fantômes) → sonde
+>      `console.error` par-load (is:inline) pour valider **0 erreur réelle**.
+> Vérifié : **build 68 pages OK, lint 0 erreur** ; hydratation saine (system graph interactif, clic Model → `/enterprise`),
+> les 4 composants rendus, 2 canvas, 0 overflow, **0 « Invalid hook » (sonde par-load)**.
+> **➜ Côté user : recharger /labs (Docker : redémarrer le service landing).**
+>
+> ### ⚑ v81 (02/08) — Labs : transition light↔dark (rideau noir) + fin de page SOMBRE (fix « blanc qui pique »)
+> Retours user : (1) la cassure blanche en bas de Labs « fait mal aux yeux » ; (2) vouloir un « screen qui passe en noir »
+> à l'entrée/sortie de Labs ; (3) explorer React Bits / 21st.dev.
+> - **Fin de page sombre** : suppression des voiles `bg-gradient-to-b to-white` (index + LabDetail). La section « de la
+>   paillasse au produit » et le CTA passent en SOMBRE (`labs-scope`/`labs-panel`, chips maturité en variantes sombres) →
+>   Labs reste sombre jusqu'au footer (déjà sombre). `PageCta` remplacé par un CTA sombre inline (les 2 pages n'importent
+>   plus `PageCta`). Nouveau `darkOutlineLg`.
+> - **`LabsCurtain.astro`** (nouveau, sur index + LabDetail) : rideau `position:fixed inset-0 z-100 #080910`. Entrée = noir
+>   → se lève (opacity 520ms). Sortie (clic hors /labs) = redescend en noir puis navigue (440ms). Nav INTERNE Labs (référent
+>   /labs) = pas de rideau. `<noscript>` masque, `prefers-reduced-motion` désactive. **Filet** : à 1200ms si l'opacité n'a
+>   pas abouti (env. sans compositing) → `display:none` en dur → la page n'est JAMAIS bloquée en noir. lift via `setTimeout`
+>   (robuste, le rAF est throttlé au 1er paint).
+> - **Lint** : rideau réécrit en `const/let` (règle `no-var`). **build 68 pages OK, lint 0 erreur.** Vérifié : fin de page
+>   100% sombre (aucune section blanche), 0 overflow, rideau se retire (h1 visible), 0 erreur console.
+> - **React Bits / 21st.dev explorés** (browser). **Garde-fou** : la plupart des BACKGROUNDS RB (Aurora, Beams, Balatro,
+>   Liquid Ether, Plasma, Particles…) sont WebGL/OGL/Three → **piège dép Docker** (cf. v79). Picks SÛRS = effets de TEXTE
+>   `motion` (déjà installé) : **Decrypted Text**, Variable Proximity, Text Type ; + **Magic UI** (registre `@magicui` déjà
+>   dans components.json, CSS/SVG) : Retro Grid, Border Beam, Dot Pattern, Meteors. `LabField` maison gardé comme fond
+>   (équivalent DotField sans dépendance). **Proposé au user, à câbler selon son choix (registres prêts).**
+> **➜ Côté user : recharger /labs (Docker : redémarrer le service landing).**
+>
+> ### ⚑ v80 (02/08) — Labs : refonte « laboratoire R&D » — monde SOMBRE scoped + 3 interactions signatures
+> Brief user : Labs doit se sentir « l'endroit où ils construisent le prochain » — dark-first, expérimental mais premium,
+> **même produit / même identité / autre expression**. **Décision : Labs = son propre monde SOMBRE, scoped aux 5 routes
+> `/labs`, PAS un dark-mode global** (D2 light-only reste vraie pour les 62 autres routes). La zone sombre finit par une
+> transition nette vers le CTA/footer clairs (dark = la frontière, light = ce qui shippe).
+> - **`BaseLayout.astro`** : 2 props ADDITIVES `bodyClass` (défaut `bg-white`) + `themeColor` (défaut `#fff`) — inchangé ailleurs.
+> - **`global.css`** : bloc `.labs-scope` (jetons sombres `--labs-bg #080910`/fg/muted/hairlines/violet/blue) + helpers
+>   `.labs-grid` (oscilloscope) `.labs-panel(-hover)` `.labs-vignette` `.labs-pulse` + typo `.labs-h1/2/3/lead/eyebrow`
+>   (miroir des `.t-*` en encre claire ; les `.t-*` portent `color:var(--site-fg)` sombre → inutilisables ici). Rails re-teintés.
+>   **Coque sombre par RE-MAP des jetons sous `.labs-body header/footer`** (bg-card/text-foreground/border… résolvent sombre)
+>   + logo (mono `#1d1d1f`) inversé en blanc + viewport méga-menu (codé blanc dur) repassé sombre. **Zéro réécriture des composants partagés.**
+> - **3 îlots `client:load`** dans `src/components/site/labs/` (les 3 interactions signatures) :
+>   1. **`LabField.tsx`** — champ canvas 2D réactif au curseur (points/grille + sonde + liens de proximité), **zéro dépendance**.
+>      Pause hors-écran (IO) + onglet caché, reduced-motion → image statique, tactile → dérive ambiante, **1re image SYNCHRONE**
+>      (le rAF est throttlé au 1er paint / dans le pane non-composité). Mini-panneau « Customize the field » (Motion/Density/Grid),
+>      ne touche QUE le visuel, `aria-pressed`, clavier, `hidden sm:block`.
+>   2. **`SystemGraph.tsx`** — la boucle `Signal→Memory→Reasoning→Model→Evaluation→Decision→(retour)Memory`. Nœuds = vrais
+>      `<button>` (hover/focus/tap), arêtes qui s'allument, panneau `aria-live`. **Honnêteté D11** : chaque étape → surface produit
+>      RÉELLE + vrai badge (Memory Beta · Model Live · Approvals Beta · Reasoning Planned · Evaluation Research · Signal = Input).
+>   3. **`ResearchLog.tsx`** — carnet « 2026 · Research log » à rail COLLANT (CSS sticky) + scroll-spy (IO). Les entrées SONT les
+>      vraies expériences (`labs.ts`), reformatées. **Aucune fausse note datée.** Prop `omit` pour exclure la featured.
+> - **`labs/index.astro` réécrit** : hero(field+controls) → **featured « Prediction & calibration »** (learning-from-reviews, honnête)
+>   → research log (les 3 autres via `omit`) → **system graph** → transition sombre→clair « de la paillasse au produit »
+>   (ce qui a diplômé : Memory Beta · Your models Live · Approvals Beta · Smart Assign Live) → `PageCta` clair → footer.
+> - **`LabDetail.astro` réécrit** sombre cohérent ; **`LabsBackdrop.astro`** : ex-aurora crème → décor sombre (LabField calme
+>   + vignette + voile). **`Aurora/Aurora.tsx` n'est plus utilisé par Labs** (fichier laissé, inerte).
+> - **Statuts honnêtes** : AUCUNE expérience n'est « Live » — tout est **Research (◌)**, avec l'endroit où la direction affleure
+>   (Live/Beta/Planned). Data `labs.ts` conservée, copie de fond inchangée.
+> Vérifié live (dev:4321) : **build 68 pages OK**, **lint 0 erreur** (import `APP_URL` mort retiré) ; 0 erreur console ; body `#080910`,
+> header/footer sombres + logo blanc ; field peint **287k px** ; graph interactif (clic Model → panneau + `/enterprise` + 2 arêtes) ;
+> mobile 375 **sans overflow** (controls + rail masqués) ; détail `/labs/agent-roles` OK. **rAF throttlé dans le pane → animation en
+> vrai navigateur (user), image statique garantie partout.**
+> **➜ Côté user : recharger `/labs` ; si conteneur Docker, redémarrer le service landing (source montée → pas de rebuild).**
+>
+> ### ⚑ v79 (02/08) — Fix : Aurora sans `ogl` (WebGL brut) — erreur Docker /app
+> User a eu « Cannot find module 'ogl' » au SSR dans son conteneur **Docker (/app)** : j'avais installé `ogl` sur mon
+> host Windows (preview OK) mais le node_modules du conteneur ne l'a pas. Plutôt que rebuild/install dans le conteneur
+> (friction + HMR Docker cassé), **suppression totale de la dépendance** :
+> - **`Aurora/Aurora.tsx` réécrit en WebGL2 BRUT** : même shader React Bits (VERT/FRAG identiques), mais
+>   Renderer/Program/Mesh/Triangle/Color d'`ogl` remplacés par ~40 lignes de WebGL natif (createShader/linkProgram/
+>   triangle plein écran/`uniform3fv`). Tout dans `useEffect` → SSR-safe. `hexToRGB` maison. Garde-fous compile/link.
+> - **`ogl` retiré de `package.json`** (plus aucun import — grep clean, hors commentaires).
+> Vérifié live (host) : canvas **WebGL2 1265×624 rendu**, 0 erreur console, shader compile. Zéro dépendance nouvelle.
+> **➜ Côté user : reload la page ; si bloqué, redémarrer le conteneur landing (source montée → pas de rebuild/install).**
+>
+> ### ⚑ v78 (02/08) — Labs : vraie AURORA ANIMÉE React Bits (WebGL/ogl)
+> User : « rien de tel que du react bits ». Setup registre + install du composant Aurora de React Bits.
+> - **`components.json`** : registre `@react-bits` ajouté (`https://reactbits.dev/r/{name}.json`).
+> - **`src/components/Aurora/Aurora.tsx`** : composant Aurora (variant **Aurora-TS-TW**) récupéré du registre React
+>   Bits (shader **ogl** WebGL ; props `colorStops/amplitude/blend/speed`). Dép **`ogl@^1.0.11`** installée
+>   (`--legacy-peer-deps` : conflit pré-existant vite8 vs @tailwindcss/vite peer ≤7).
+> - **`LabsBackdrop` refait** : `<Aurora client:load colorStops={["#7c3aed","#e879f9","#22d3ee"]} amplitude=1.15
+>   blend=0.6 speed=0.55 />`, **retournée (scaleY -1)** → l'aurora monte du bas ; fond crème + quadrillage + scrim.
+>   **`motion-reduce`** → fallback blobs statiques (a11y). `client:load` (pas `visible` : l'IntersectionObserver ne se
+>   déclenche pas dans le pane non-compositant ; `load` = robuste, comme SiteHeader).
+> Vérifié live : **canvas WebGL2 1265×624 rendu** (Aurora island hydratée, hasCanvas true), 0 erreur console/build,
+>   48/48 routes 200, 0 débordement ; hub + pages détail. NB serveur dev redémarré (nouvelle dép → Vite optimize).
+>
+> ### ⚑ v77 (02/08) — Labs : décor AURORA fluide (réf image user) + entrée Labs customisée
+> Retour user (réf image « AI-generated » : dégradé fluide multicolore) : « plutôt ce genre de trucs, fluide » +
+> « le bouton Labs, personnalise-le exprès ».
+> - **`LabsBackdrop` refait en AURORA FLUIDE** : ~7 blobs colorés très flous (violet/fuchsia/rose/cyan/orange) qui
+>   montent du bas sur fond crème (#faf6f3), mené violet mais multicolore ; quadrillage très léger + scrim crème
+>   haut-gauche pour la lisibilité. Le SVG graphe de nœuds (v76) est retiré.
+> - **Entrée Labs customisée dans le méga-menu Resources** (MenuCard `isLabs`) : **chip icône dégradé
+>   violet→fuchsia→cyan** (au lieu du chip bordé neutre) + label violet. « Personnalisé exprès ».
+> Vérifié live : 0 erreur build, 0 débordement, /labs + detail = aurora (node-graph parti) ; méga-menu Resources
+>   ouvert = carte Labs avec chip dégradé + desc confirmés (hover Radix).
+>
+> ### ⚑ v76 (02/08) — Labs : retour dans Resources (fiole sur le trigger) + fonds « formes abstraites »
+> Retour user : Labs plutôt dans Resources (annule v75) + rappel visuel fiole sur Resources + fonds avec formes
+> abstraites (« des images en bg »).
+> - **Labs re-rangé dans Resources** : retiré du top-nav (annule v75), remis dans `RESOURCES_LINKS`. `LABS_LINKS` +
+>   mobile Labs group retirés de SiteHeader. Nav = Product/Solutions/Resources/Enterprise.
+> - **Fiole violette sur le trigger « Resources »** (rappel visuel pour attirer l'œil vers Labs).
+> - **`LabsBackdrop.astro` (NEW)** : décor réutilisable = dégradé violet + halos + quadrillage + **SVG de formes
+>   abstraites** (graphe de nœuds « recherche » + anneaux + hexagone + ring fuchsia), aria-hidden, masqué < sm.
+>   Câblé dans les 2 héros Labs (hub + LabDetail), GRID retiré de LabDetail.
+> Vérifié live : 0 erreur build, 48/48 routes 200, 0 débordement ; top-nav sans Labs, Resources = fiole, /labs +
+>   detail = backdrop SVG rendu.
+>
+> ### ⚑ v75 (02/08) — Labs : fonds enrichis + bouton Labs remis au header (retour user)
+> Retour user : « je pensais plus à des backgrounds » + « le bouton Labs dans le header, un truc plus sympa ».
+> - **Fonds Labs enrichis** (hub + `LabDetail`) : hero = dégradé violet (`from-violet-100`) + **2 halos flous
+>   violet/fuchsia** + quadrillage, au lieu du simple grid discret. Plus « environnement lab ».
+> - **Bouton Labs REMIS au header** (annule la démotion v69, choix user) : lien direct violet + **fiole** qui pivote
+>   au survol — distinctif des triggers muted. Nav = Product/Solutions/**Labs**/Resources/Enterprise. Mobile idem.
+>   Labs retiré de `RESOURCES_LINKS` (plus de doublon). `FlaskConical` + `LABS_LINKS` réimportés dans SiteHeader.
+> Vérifié live : 0 erreur build, 48/48 routes 200, 0 débordement ; header Labs violet+fiole présent, /labs rich bg rendu.
+>
+> ### ⚑ v74 (02/08) — Legal : remplissage des normes (Hetzner/France/EUR/CNIL/SCC), identité société laissée TBD
+> User a fourni : hébergeur = **Hetzner**, juridiction = **France**, devise = **EUR** ; identité société = « jsp »
+> (boîte pas encore créée). Rempli tout le norm-derivable, laissé l'identité en placeholder sous bannière draft
+> (interdit d'inventer une immatriculation).
+> - **notice** : hôte = **Hetzner Online GmbH, Industriestr. 25, 91710 Gunzenhausen, DE, +49 9831 505-0** (UE).
+>   Publisher (raison sociale/SIREN/siège/directeur) laissé [placeholder] (incorporation).
+> - **privacy** : autorité = **CNIL** ; rétention = « up to 90 days after account closed » ; DPO = « none appointed » ;
+>   transferts = **SCC UE** + « hébergement UE (Hetzner) = pas de transfert hors-UE ». Controller identity laissée.
+> - **terms** : droit **français** + tribunaux français ; prix « indicative until launch » + EUR ; **[limitation of
+>   liability] laissé** (counsel).
+> - **subscription** : **EUR** ; « monthly or annually » ; droit français.
+> - **dpa** : **SCC UE** + hébergement UE ; DPA « available on request ».
+> - **subprocessors** : hôte = **Hetzner** (UE) ; [Transactional email provider] laissé TBD (pas fourni).
+> Bannières draft **conservées**. Vérifié live : 0 erreur build, 10/10 routes legal 200, fills rendus.
+> **Reste user** : raison sociale + forme + siège + SIREN/RCS + capital + directeur de publication (incorporation) ;
+>   fournisseur email transactionnel ; plafond de responsabilité (avocat).
+>
+> ### ⚑ v73 (02/08) — Labs : identité « environnement lab » (retour user)
+> Retour user : « qu'on sente le lab, pas assez accessible / visuellement sympa ». Labs était trop plat (PageHero
+> standard + petit tag). Refonte visuelle sur le **violet réservé Labs** (nav.ts) :
+> - **`labs/index.astro` réécrit** : hero custom (fond **quadrillé violet** type papier millimétré via inline style +
+>   mask radial, fiole, eyebrow mono « Labs · research environment », annotation mono « direction published · mechanism
+>   kept in the lab ») ; cartes = **expériences** (border/bg violet, badge « Research » violet+fiole, index mono **EXP-0x**,
+>   CTA « Open the experiment »).
+> - **`LabDetail.astro` réécrit** (template des 4 pages) : même hero lab (fiole, violet, back-link « All experiments ») ;
+>   « exploring » stylé en **hypothèses H1/H2…** ; « Where it stands » en callout violet+fiole.
+> D11 conservée (direction, pas mécanisme). Boutons via buttonVariants (plus de PageHero sur Labs).
+> Vérifié live : 0 erreur build, 5/5 routes labs 200, 0 débordement ; hub = EXP-01..04 + grid backdrop + violet ;
+>   detail = H1/H2 + status violet + back-link.
+>
+> ### ⚑ v72 (02/08) — Pricing corrigé : Business (cloud) + self-host = Enterprise/Custom
+> Correction user : self-host n'est PAS un tier self-serve → « si tu veux self-host, tu es en entreprise (Custom,
+> Talk to sales) ». Le tier intermédiaire devient **Business** (cloud managé), pas « Self-hosted ».
+> - **`PricingSection` réécrit → Free / Pro / Business / Enterprise.** Business (cloud) = Pro + workspaces illimités +
+>   SSO/SAML + RBAC avancé + audit. **Enterprise (Custom, « Talk to sales ») = self-host + modèles locaux (coût zéro)
+>   + data sur ton réseau + rétention/DPA/SLA/support.** Compare : colonne « Business », self-host/local Enterprise-only.
+>   FAQ self-host = « comes with Enterprise, talk to sales ». Two-ways : self-hosted = Enterprise.
+> - **Conséquence honnêteté** (self-host n'est plus « day one / not an upsell ») corrigée partout : home `Proof`
+>   (WhereThisGoes « comes with Enterprise » + FinalCta « Free forever to start »), `about`, `book-a-demo`, `Today`
+>   (lead « on the models you choose » + callout « Hosted in the cloud, or self-hosted on local models »), `Hero`
+>   (fait 2 → « Runs on your models — local or hosted », fin du « zero cost » universel). `Showcase` (mort) nettoyé.
+> Vérifié live : 0 erreur build, 47/47 routes 200, 0 débordement ; pricing = 4 tiers (Business), self-host Enterprise-only ;
+>   grep « not an enterprise upsell / day one » = 0 rendu.
+> **Restes user** : dark mode = NON (light-only) · prix indicatifs OK · captures = placeholder. **À faire** : Labs
+>   « qu'on sente le lab » (visuel) ; données légales (normes OK, identité société = à fournir).
+>
+> ### ⚑ v71 (02/08) — Balayage canon : terme modèle unifié partout (restes attrapés au grep)
+> Vérif finale du verrou #7 par grep → 3 restes user-facing du terme modèle (je n'avais fait qu'orchestration +
+> agents) + 1 mort :
+> - `enterprise.astro` : WHY « Model-independent » → **« Your models »**.
+> - `legal/ai-transparency` : « TaskForce is model-agnostic… choose the model per step » → « TaskForce runs on your
+>   models… local (le défaut aujourd'hui) ou hosted… tier fast/deep par run » (mène par le local, retire l'implicite
+>   routing auto par étape).
+> - `labs.ts` (model-choice) : « Model-agnostic execution ships today » → « Running on your models ships today » ;
+>   bullet « Staying model-agnostic » → « Staying independent of any single model provider ».
+> - `Proof.tsx` (composant Integrations **mort**, non rendu) : « 60+ » → 129 (retire le landmine de compteur).
+> Grep : plus aucun « Model-agnostic/Model-independent/Configurable » user-facing (reste 1 commentaire interne dans
+> agents.astro). Agent names = 0 reste (CPO/CTO/COO partout). « autonomous » = uniquement Devin (concurrent).
+> Vérifié live : 0 erreur build, enterprise/ai-transparency/model-choice rendent le nouveau terme.
+>
+> ### ⚑ v70 (02/08) — Moat remonté (home) + run tiéré + CTA Planned + legal subprocessors
+> Suite du plan (top 10 #6/#8/#10 → **top 10 complet**).
+> - **#6 Moat remonté** : `index.astro` réordonné — `<Synergy/>` (« A delivery system, not an assistant » + les 2
+>   phrases moat + bento « Git remembers why ») remonte AVANT WhatShipsToday et le run. Ordre : Problem →
+>   BeforeAfter → **Synergy** → WhatShipsToday → RunTimeline → BrainTeaser → Trust…
+> - **#8 Run tiéré** : `RunTimeline` — légende honnête sous la démo animée (« Drafting a spec and the breakdown
+>   ship today; the full seven-checkpoint run is Planned — each step below is labelled »). La table ANATOMY portait
+>   déjà les LevelBadge par checkpoint → split Live/Planned explicite d'un coup d'œil.
+> - **#10 CTA Planned** : `VerticalDetail` (4 verticales exploratoires) — PageCta de clôture ne pousse plus le
+>   signup : « Run your first workflow » → **« See what's proven »** (/solutions/engineering). Import `APP_URL` retiré.
+> - **#10 legal** : `legal/subprocessors` — **banner « Working draft »** (`draft`) car placeholders [Hosting
+>   provider]/[email] ; claim absolu « out of third-party hands entirely » → « can keep your data within your own
+>   infrastructure ». (`legal/notice` déjà en draft.)
+> Vérifié live : 0 erreur build/console, **47/47 routes 200**, 0 débordement ; ordre home OK, caption run présente,
+>   subprocessors draft + softened, verticales sans CTA signup.
+> **Top 10 du plan = 10/10.** Restes = polish P3 : captures produit réelles (cadre audit vide), a11y clavier, décision
+>   dark mode, purge composants morts, use-cases leads au présent ; + données legal réelles (raison sociale, hébergeur).
+>
+> ### ⚑ v69 (02/08) — Pricing : tier self-host + nav : Labs démoté, Trust au header
+> Suite du plan (décisions user : self-host = tier dédié sous Enterprise).
+> - **`PricingSection` réécrit → 4 tiers** : Free / Pro (cloud AI) / **Self-hosted** ($16/$13 per seat — infra
+>   perso + modèles locaux Ollama **coût modèle zéro** + data sur ton réseau + RBAC avancé + audit) / Enterprise
+>   (SSO/SAML, retention, DPA, sécu, SLA, support). Self-host n'est plus « Enterprise-only » → « available from
+>   day one / not an upsell » devient **vrai**. Tableau comparatif +1 colonne. Note **« Prices are indicative »**
+>   (résout aussi prix-fermes vs CGU « à confirmer »). FAQ self-host = « a plan of its own ».
+> - **Nav** : **Labs démoté** du top bar (100% Planned) → rangé dans **Resources** (`RESOURCES_LINKS`) ; **Trust**
+>   ajouté au header (à côté de Pricing) — l'atout CISO n'était qu'en footer. (Footer Labs inchangé.)
+> Vérifié live (:4321) : 0 erreur build/console, **48/48 routes 200**, 0 débordement (1280 + 375) ; pricing = 4 tiers
+>   + colonne Self-hosted ; header = Product/Solutions/Resources/Enterprise + Pricing/Trust (Labs absent des triggers).
+> **Reste (P1/P2)** : CTA pages Planned (orchestration/agents) → « See the roadmap » ; reframe substrat + profond de
+>   Collaboration ; captures produit réelles (cadre audit vide) ; a11y clavier + décision dark mode.
+>
+> ### ⚑ v68 (02/08) — Hero « acte IA » (fin du kanban) + section « What ships today »
+> Suite du plan (décisions user : self-host = **tier sous Enterprise** ; cible = hero acte IA +
+> what-ships-today). But : tuer le signal « PM tool » (le board en hero) et matérialiser « ce qui ship
+> aujourd'hui » = l'**acte IA réel** (Phase B+C `road_to_v2`), pas un kanban.
+> - **`scene/SpecPanel.tsx` (NEW)** : nouveau visuel hero, dans le vrai châssis `AppWindow`. Issue CP-12
+>   (données `lib/story`, **0 inventé**) → spec rédigée (3 critères `SPEC_CRITERIA`) + **prompt d'exécution**
+>   (à coller dans Claude Code) + ancrage **Memory** (« checked against your past decisions ») + barre
+>   **Approve / Edit / Reject** (« Approve → saved to Memory »). Statique SSR (LCP protégé).
+> - **`home/Hero.tsx` réécrit** : `HeroBoard` (kanban) **supprimé** → `<SpecPanel/>` ; toasts recadrés
+>   (« Approved · saved to Memory » + « Claude Code prompt · ready ») ; imports board retirés. Copy hero v67 gardée.
+> - **`home/Today.tsx` (NEW) `WhatShipsToday`** : beat position 5 (après Before/After, avant le run).
+>   2 cartes **Live** — « issue → spec + prompt Claude Code + Approve → Memory » et le **decision board OODA**
+>   (« your 3 priorities ») — + « runs on local models, zero model cost » + chips socle Live (board, realtime,
+>   Smart Assign, analytics, SSO/RBAC, self-host, audit) cadrés comme **support**, pas comme produit.
+> - **`index.astro`** : `<WhatShipsToday/>` inséré entre Before/After et RunTimeline (**10→11 sections**).
+> Vérifié live (:4321) : 0 erreur build/console, 0 débordement (testé 375), hero = acte IA (spec/prompt/
+> memory/approve présents), **kanban absent du hero**, section « what ships today » rendue.
+> **Reste** : PricingSection = ajouter le **tier self-host** sous Enterprise ; P1 (CTA pages Planned, démoter
+> Labs, Trust au header) ; captures produit réelles (P3).
+>
+> ### ⚑ v67 (02/08) — Audit + plan d'exécution v2 → 1re passe d'implémentation (copy/vérité)
+> Contexte : audit complet (artifact) puis **plan d'exécution** ancré sur `road_to_v2`. Matrice de vérité v2 :
+> l'acte atomique — issue → spec + prompt Claude Code + breakdown + RAG « déjà vu ? » + mémoire, et le
+> **decision board OODA** — est **déjà livré** ; seuls le run complet 7-checkpoints + l'équipe CPO/CTO/COO sont
+> Planned. Décision cadrante : **« AI Delivery OS, PAS un outil de gestion de projet »** (narrative C des docs,
+> la plus récente ; les vieux docs disent « SaaS de gestion de projet » → à retirer). Aucun slogan canonique
+> n'existe dans les docs → verrou de message **rédigé**.
+> **Édits appliqués (copy uniquement, 0 feature), vérifiés en live (`astro dev` :4321) :**
+> - **Hero** : eyebrow → « The AI delivery operating system » ; sous-lead → l'acte réel (« drafts the spec, the
+>   plan and the prompt… Today it works issue by issue — the full run is where it is headed ») ; 3 faits →
+>   « You approve every decision · Runs on local models, zero model cost · Self-hosted, your network ».
+> - **Verrou du canon** : `RunTimeline` Product/Architecture/Delivery → **CPO/CTO/COO** (aligné orchestration +
+>   agents + docs) ; terme modèle unifié **« Your models »** (fin de « Model-agnostic »/« Configurable » + de
+>   l'implicite routing auto par étape) ; compteur **129** partout (`roadmap` 47→129, badge live→beta).
+> - **Passe vérité/tense** : pricing FAQ « fully autonomous » → « full multi-checkpoint run » ; remise annuelle
+>   **−20% → −17%** (12→10 = 16,7 %) ; `media` boilerplate présent-des-3-agents → version honnête + catégorie
+>   unifiée ; **« dated roadmap » purgé** (le roadmap n'a pas de dates) : brain-os, home Proof, changelog×2,
+>   blog, about, LabDetail.
+> - **Not-a-PM-tool** : `collaboration` hero recadré (le board = **substrat où le run atterrit**, plus le produit).
+> Vérifié : **48/48 routes 200**, 0 erreur console, 0 erreur build, 0 débordement ; strings neufs présents /
+> anciens absents (DOM live). **Non touché (décisions founder)** : packaging self-hosting (tier vs Enterprise-only),
+> prix définitifs, ICP. **Reste design** (P0/P1 du plan) : hero visuel kanban→acte IA, section « what ships today »,
+> screenshots réels, chips de maturité par checkpoint.
+>
+> ### ⚑ v66 (31/07) — Use-cases 5→10 (plan complet) + /vs/shortcut
+> Choix user : **« compléter aux 10 du plan »**. Les use-cases passent des 5 curés aux **10 job-to-be-done** du
+> plan §3.1, avec **maturité honnête par job** (pas de survente).
+> - **`lib/use-cases.ts` réécrit** aux 10 clés du plan : product-spec (**Planned**), architecture-decision
+>   (**Planned**), backlog-grooming (**Planned**), code-review (**Beta** — approvals + liens PR GitHub),
+>   qa-testing (**Planned**), documentation (**Beta** — Memory), onboarding (**Beta** — Memory + onboarding
+>   wizard → Smart Assign), incident-postmortem (**Planned**, exploratoire), release-notes (**Planned**),
+>   sprint-planning (**Beta** — cycles + workload analytics live). **Tally DOM : 6 Planned / 4 Beta** = honnête
+>   (Planned = dépend de l'orchestration ; Beta = adossé à une feature shippée). `USE_CASE_ORDER` = ordre du plan.
+> - **Anciennes pages supprimées** (rm) : specification/technical-decision/review-signoff/quality-checks → **404**
+>   (review-signoff n'est pas un job-to-be-done, c'est la primitive Approvals). documentation conservée.
+> - **9 nouvelles pages fines** + **hub `/use-cases` réécrit** (itère les 10 depuis `USE_CASES` + icônes + badges).
+> - **`/vs/shortcut` (NEW)** : la 7e→8e comparaison (le plan listait shortcut). Tracker dev (stories/iterations),
+>   traité en fair-play comme les autres trackers. Ajouté à `comparisons.ts` + hub `/vs` (TRACKERS) + nav Compare.
+> - **`nav.ts`** : SOLUTIONS_GROUPS « By use case » 5→10, Compare += shortcut, BUILT_ROUTES maj (−4 vieux, +9
+>   use-cases, +shortcut). **Sitemap.xml auto (BUILT_ROUTES) : 67 URLs**, vieux routes absents, shortcut présent.
+> - Vérifié : 10 use-cases + shortcut 200, vieux routes 404, hub 10 cartes (6 Planned/4 Beta), 0 erreur build.
+> **➜ Le site couvre maintenant l'INTÉGRALITÉ du sitemap du plan §3.1.** (~67 pages/routes.) Restes = polish :
+> placeholders légaux à remplir (publication/prix/juridiction) + relecture juridique ; ~50 pages jamais revues.
+>
+> ### ⚑ v65 (31/07) — Réconciliation avec le PLAN (taskforce-docs) : pages techniques + CGV manquantes
+> User : « on fait VRAIMENT toutes les pages, va voir taskforce-docs (partie lab et tout) ». J'ai lu le plan
+> autoritaire **`taskforce-docs/v1/14-design/landing-refonte/Plan_Refonte_Site.md`** (§3.1 sitemap complet) +
+> `road_to_v2/`.
+> - **Labs — confirmé CORRECT (D11)** : le plan §1.2 **D11 ANNULE** les pages mécanisme (`/labs/world-model-ooda`
+>   = le cœur du moat, `/benchmarks`, `/data-flywheel`, `/local-llm`, `/notes`). Mes 4 Labs (agent-roles / run-memory
+>   / model-choice / learning-from-reviews) sont les reframes « direction, pas mécanisme », ancrés sur road_to_v2
+>   (Agents_C_Level, Guide_Ollama/Benchmark, Data_Flywheel) SANS publier le comment. **Rien à changer, rien à
+>   révéler du moat.**
+> - **Pages mandatées par le plan que j'avais ratées → construites** :
+>   · **`/legal/subscription`** (CGV, distincte des CGU — prix HT, reconduction, résiliation, rétractation ;
+>     LegalDoc + bandeau draft). Ajoutée au footer Legal.
+>   · **`/404`** (page custom « This page took an unvalidated path » + liens).
+>   · **`/sitemap.xml`** (endpoint `src/pages/sitemap.xml.ts` **généré depuis `BUILT_ROUTES`** → 61 URLs, aucune
+>     liste à tenir).
+>   · **`/robots.txt`** (existait mais pointait `taskforce.app` → **corrigé en `taskforce.dev`**, cohérent avec
+>     APP_URL + email).
+>   · **`/.well-known/security.txt`** (RFC 9116 : Contact hello@ + Policy /legal/security + Expires).
+>   · `astro.config.mjs` : `site: 'https://taskforce.dev'`.
+> - **Domaine standardisé `taskforce.dev`** (APP_URL=app.taskforce.dev + hello@taskforce.dev ; le `.app` de
+>   l'ancien robots était l'intrus).
+> - Vérifié : subscription 200 (draft), 404 → HTTP 404 + page custom, sitemap.xml XML valide 61 `<loc>`, robots +
+>   security.txt 200.
+> **➜ Écarts restants vs plan (décisions de périmètre pour le user, pas fait par défaut)** : **use-cases** plan=10
+>   (job-to-be-done : product-spec, code-review, incident-postmortem, sprint-planning…) vs actuel=**5** curés ;
+>   **`/vs`** plan=6 (dont `shortcut`) vs actuel=**7** (nav : +cursor/copilot, −shortcut) ; `/sitemap` HTML humain
+>   (optionnel, le XML est fait). NB : Solutions « par équipe » (D10) déjà bon ; §3.1 « par rôle » est pré-D10.
+>
+> ### ⚑ v64 (31/07) — Labs + Resources + fix header : SITE 100 % CONSTRUIT
+> Dernière vague de « toutes les pages ». Le site n'a **plus aucun lien grisé / « Soon »**.
+> - **Labs (hub + 4)** — `lib/labs.ts` + `LabDetail.astro` + `/labs` + 4 pages (agent-roles, run-memory,
+>   model-choice, learning-from-reviews). **DÉCISION D11 tenue** : chaque page dit le QUOI + le bénéfice, jamais le
+>   COMMENT (« The questions, not the recipe » · « we publish the direction, keep the mechanism in the lab »). Tag
+>   **Research**, encart « Where it stands » qui distingue ce qui shippe vs recherche. Vérifié : D11 OK, 0 mécanisme.
+> - **Resources (5)** — `/learn` (vrai contenu pédago « What an AI delivery OS actually is », 4 parties + cross-
+>   links), `/docs` (hub honnête : getting started/concepts/self-host réels + API « Coming », note « we'd rather
+>   ship accurate docs than pad »), `/blog` (**empty state honnête** « No posts yet »), `/changelog` (**état réel
+>   Live/Beta/Planned, AUCUNE fausse date** — « instead of inventing dated release notes »), `/status` (**placeholder
+>   honnête** « we won't post an uptime number we can't stand behind », pas de faux « all systems operational »).
+> - **FIX header (`SiteHeader.tsx`)** : Solutions & Labs étaient **hardcodés « Soon »** (stub d'avant construction).
+>   Convertis en **vrais méga-menus** : Solutions = 3 colonnes (By team / By use case / Compare) + « All solutions » ;
+>   Labs = 4 `MenuCard` + « All of Labs ». Mobile déjà OK (MobileGroup via isLive). Vérifié DOM : **soonCount = 0**,
+>   4 triggers (Product/Solutions/Labs/Resources), méga-menu Solutions s'ouvre (engineering/specification/jira +
+>   All solutions), 0 erreur console.
+> - `nav.ts` BUILT_ROUTES += labs(5) + resources(5). Vérifié : 10 pages 200, 0 erreur build.
+> **➜ TOUT le site marketing est construit** (~55 pages). Chaque entrée nav/footer est live. Restes = polish :
+> remplacer les `[placeholders]` légaux (infos publication) quand dispo + relecture juridique ; les ~40 pages
+> jamais revues par le user (Legal/Company/Solutions/Compare/Labs/Resources) ; 3 décisions produit (self-host/prix/
+> OSS) ; home + hub /product jamais revus formellement.
+>
+> ### ⚑ v63 (31/07) — Solutions/Compare COMPLET : 5 use-cases + 4 verticales
+> User : **« faire toutes les autres pages, complètement »**. Sous-lots 2 & 3 → Solutions/Compare 100 %.
+> - **5 fiches use-case** (`lib/use-cases.ts` + `UseCaseDetail.astro` + 5 pages) : Specification (**Planned**),
+>   Technical decision (**Planned**), Review & sign-off (**Beta**), Quality checks (**Planned**), Documentation
+>   (**Beta**). Chaque fiche : « What it is » / « In a run » / **encart honnête « Where it stands »** (ex. review :
+>   « Live today for specs/actions/recommendations ; full checkpoint gating on the orchestration roadmap ») +
+>   cross-links produit. Badge de maturité réel dans le hero.
+> - **4 verticales exploratoires** (`lib/verticals.ts` + `VerticalDetail.astro` + 4 pages) : Product / Operations /
+>   Marketing / Client services. **HONNÊTETÉ D10** : tag **« Exploratory · not proven yet »**, « why the pattern
+>   COULD fit » (conditionnel), encart « Why we call this exploratory » (« we haven't run marketing on TaskForce…
+>   we'd rather build it with a real team than claim it »), CTA → Engineering (le prouvé). Zéro workflow inventé.
+> - **`/solutions`** : les 4 verticales deviennent **cliquables** (badge Exploratory conservé) ; logique `live =
+>   href && isLive`. `nav.ts` BUILT_ROUTES += 5 use-cases + 4 verticales.
+> - Vérifié : 9 pages 200, 0 erreur build ; Marketing (exploratory tag + honest unproven + lien Engineering),
+>   Review (badge **Beta** + Live/Planned split + links).
+> **➜ Solutions / Compare = 100 %.** Reste pour « toutes les pages » : **Labs** (hub + 4) et **Resources** (docs,
+> learn, blog, changelog, status).
+>
+> ### ⚑ v62 (31/07) — Compare : les 7 fiches /vs (sous-lot 1 de « tout le détail »)
+> User : **« tout le détail »** (7 vs + 5 use-cases + 4 verticales), par sous-lots avec review. Sous-lot 1 = /vs.
+> - **Pattern data+template** (comme les fiches connecteur) : `lib/comparisons.ts` (7 concurrents) +
+>   `components/site/VsCompare.astro` + 7 pages fines `/vs/{jira,linear,notion,claude-code-alone,devin,cursor,copilot}`.
+> - **Règle fair-play stricte** appliquée : chaque page **MÈNE par « What {X} is great at »** (crédit sincère),
+>   les diffs sont « **not its focus** » jamais « ✗ », **agents de code = COMPLÉMENT** (« They work together »,
+>   « TaskForce uses Claude Code/Cursor/Copilot as the executor »). Tableau côte à côte respectueux (colonne concurrent
+>   neutre, pas de X rouge) + note « if we've got something wrong, tell us and we'll fix it ». Trackers : « they
+>   record, TaskForce governs » ; Devin : « autonomy vs human-governed » (philosophies, sans mépris).
+> - `nav.ts` BUILT_ROUTES += les 7 `/vs/*` → **tout le menu/footer Compare dégrisé**. Vérifié : 7 pages 200, 0
+>   erreur build ; claude-code-alone (le + sensible) OK en DOM (crédit + together + « uses Claude Code » + tableau +
+>   fairness note + bottom line).
+> **➜ Reste de « tout le détail »** : sous-lot 2 = 5 fiches use-case (Specification/Technical decision/Review &
+> sign-off/Quality checks/Documentation) ; sous-lot 3 = 4 verticales exploratoires (Product/Operations/Marketing/
+> Client services) en pages **clairement Planned**. Review du sous-lot 1 (/vs) recommandée avant d'enchaîner.
+>
+> ### ⚑ v61 (31/07) — Solutions/Compare : hub /use-cases (3e hub de catégorie)
+> **`/use-cases` (NEW)** : les 5 étapes d'un run gouverné en cartes, **statut honnête par étape** — Specification /
+> Technical decision / Quality checks = **Planned** (orchestration), Review & sign-off = **Beta** (Approvals),
+> Documentation = **Beta** (Memory). Section « One artifact leads to the next » + cross-links orchestration/
+> approvals/brain-os. `nav.ts` BUILT_ROUTES += `/use-cases`. Vérifié DOM : 5 use-cases, badges [Planned×3, Beta×2]
+> corrects, 0 erreur build.
+> **➜ Les 3 hubs de catégorie sont faits** : Solutions (+ Engineering), Use cases, Compare. Le menu Solutions +
+> footer sont dégrisés au niveau hub. Reste (optionnel, à cadrer user) : 5 fiches use-case, 7 fiches `/vs/{…}`,
+> verticales exploratoires en pages Planned dédiées.
+>
+> ### ⚑ v60 (31/07) — Lot Solutions / Compare (ancrages structurels honnêtes)
+> Le plus gros lot ET le plus à risque (~20 pages possibles, 2 pièges d'honnêteté). **Pas de génération en masse** :
+> je pose les 3 ancrages structurels honnêtes, le reste sera dirigé par le user.
+> - **`/solutions` (hub)** — décision D10 respectée : **Engineering = Proven** (badge vert, cliquable) ; Product /
+>   Operations / Marketing / Client services = **Exploratory** (badge pointillé, grisé, copie « the same governed
+>   model, not yet proven here » — on n'invente PAS de workflows pour des métiers non livrés). Vérifié DOM : 1
+>   Proven, 4 Exploratory.
+> - **`/solutions/engineering` (NEW, Live)** — le métier prouvé : problème (« AI made generating code cheap. It
+>   didn't make the decisions cheaper »), le run en 5 étapes, note honnête « full intent-to-deploy orchestration is
+>   Planned; board/smart-assign/approvals/memory/analytics ship today », 4 cross-links produit. Badge **Live**.
+> - **`/vs` (hub Compare)** — positionnement **honnête et respectueux** : 2 groupes — **vs delivery trackers**
+>   (Jira/Linear/Notion : « they record the work, TaskForce governs the decisions ») et **vs coding agents**
+>   (Claude Code alone/Devin/Cursor/Copilot : « they write the code, TaskForce orchestrates around them **and uses
+>   them** » — complément, pas rival). Note de fair-play « we won't tell you your tracker/agent is bad ». **Pas de
+>   logos concurrents** (0 image cassée + neutralité). Cartes = énoncés complets (pas de lien mort ; « read the full
+>   comparison » n'apparaît que si la fiche existe).
+> - `nav.ts` BUILT_ROUTES += `/solutions`, `/solutions/engineering`, `/vs`. Vérifié : 3 pages 200, 0 erreur build,
+>   badges/maturité corrects, 0 image cassée.
+> **➜ Reste du lot (à cadrer avec le user, pas fait par défaut — risque)** : `/use-cases` hub + 5 use-cases
+>   (Specification / Technical decision / Review & sign-off / Quality checks / Documentation — ancrés sur de vrais
+>   checkpoints) ; fiches `/vs/{jira,linear,notion,claude-code-alone,devin,cursor,copilot}` (traitement juste et
+>   exact requis) ; verticales exploratoires en pages Planned dédiées. + 3 décisions produit (self-hosting/prix/OSS).
+>
+> ### ⚑ v59 (31/07) — Lot Legal (vague 2 : 6 docs contraignants en scaffolds honnêtes)
+> Choix user : **« scaffolds honnêtes maintenant »**. Les 6 docs via `LegalDoc`, ancrés sur les faits RÉELS du
+> produit + placeholders `[…]` clairs + **bandeau « Working draft — pending legal review »** sur les contraignants.
+> - **`/legal/privacy`** (draft) : controller `[…]`, données réelles (compte via Keycloak OIDC, contenu workspace,
+>   creds connecteurs chiffrés, métadonnées d'appels modèle, billing via provider), bases légales, section **AI &
+>   your data** (« we do not use your data to train TaskForce models » + Ollama local), partage → subprocessors,
+>   rétention `[…]`, **droits RGPD**, transferts `[SCC]`. Vérifié : banner + 7 placeholders + faits réels.
+> - **`/legal/terms`** (draft) : service (as available, Live/Beta/Planned), compte, usage, **your content (tu
+>   possèdes)**, **AI outputs = proposals not decisions / AI can be confidently wrong / human approves / tu es
+>   responsable de ce que tu ships**, billing `[prix TBC]`, résiliation, disclaimers `[…]`, droit applicable `[…]`.
+> - **`/legal/cookies`** (draft) : strictement nécessaires (auth/session), préférences, analytics **[none by
+>   default]** ; honnête « we don't track you across the web ».
+> - **`/legal/dpa`** (draft) : rôles controller/processor, sécu → Trust, subprocessors, DSR, transferts, **« DPA
+>   signable sur demande »** (pattern réaliste).
+> - **`/legal/subprocessors`** (PAS draft, factuel) : **Stripe** (payments), **Anthropic/OpenAI** (modèles hostés
+>   *seulement pour les appels que tu routes*), `[hébergeur TBC]`, `[email TBC]` ; **caveat self-host + Ollama = 0
+>   tiers** ; Keycloak/MinIO/PostgreSQL = **dans le déploiement**, pas des subprocessors. Vérifié.
+> - **`/legal/notice`** (draft) : imprint (éditeur/adresse/immat/directeur `[…]`, hébergeur `[…]`, PI + logos tiers
+>   = à leurs propriétaires).
+> - `nav.ts` BUILT_ROUTES += les 6. Vérifié : 6 pages 200, 0 erreur build, banner draft OK sur Privacy, subprocessors
+>   factuel sans banner.
+> **➜ Lot Legal + Company COMPLET** (3 company + 8 legal). **Le footer Legal & Trust + Company est 100 % dégrisé.**
+> À faire quand le user aura les infos : remplacer les `[placeholders]` (raison sociale/adresse/hébergeur/prix/
+> juridiction) + relecture juridique réelle. Reste : lot **Solutions / Compare** + 3 décisions produit.
+>
 > ### ⚑ v58 (31/07) — Lot Legal + Company (vague 1 : Company + statements)
 > **⚠ Découverte honnêteté** : `src/config/constants_en.ts` = **boilerplate du template d'origine** (testimonials
 > bidon « Loved by Professionals », features génériques, blocs `terms/privacy/accessibility` en ToS US générique

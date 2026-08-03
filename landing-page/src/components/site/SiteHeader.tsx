@@ -14,7 +14,6 @@ import { Badge } from "@/components/ui/badge";
 import {
   APP_URL,
   isLive,
-  LABS_LINKS,
   MATURITY_LABEL,
   PRODUCT_DELIVERY,
   PRODUCT_PLATFORM,
@@ -57,6 +56,7 @@ function SoonTag() {
 /** Carte de menu : icône + titre (+ badge) + description. Grisée si la page n'existe pas encore. */
 function MenuCard({ item }: { item: NavLink }) {
   const Icon = item.icon;
+  const isLabs = item.href === "/labs";
 
   // Page non construite : carte inerte, grisée, avec « Soon » à la place du badge.
   if (!isLive(item.href)) {
@@ -87,20 +87,32 @@ function MenuCard({ item }: { item: NavLink }) {
     <NavigationMenuLink asChild>
       <a
         href={item.href}
-        className="!flex-row group items-start gap-3 rounded-xl p-3 transition-colors hover:bg-accent focus:bg-accent"
+        className={cn(
+          "!flex-row group relative items-start gap-3 overflow-hidden rounded-xl p-3 transition-shadow",
+          isLabs ? "border hover:shadow-md" : "transition-colors hover:bg-accent focus:bg-accent",
+        )}
       >
-        {Icon && (
-          <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg border bg-card text-foreground transition-colors group-hover:border-primary/30 group-hover:text-primary">
-            <Icon className="size-[18px]" strokeWidth={1.75} />
+        {/* Labs : même fond que le hero (image + voile blanc dégradé pour la lisibilité). */}
+        {isLabs && (
+          <span aria-hidden className="pointer-events-none absolute inset-0">
+            <img src="/labs/hero-wave.jpg" alt="" className="size-full object-cover object-center" />
+            <span className="absolute inset-0 bg-gradient-to-r from-white/90 via-white/75 to-white/45"></span>
           </span>
         )}
-        <span className="flex flex-col gap-0.5">
+        {Icon && (
+          <span className={cn("relative mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg border transition-colors", isLabs ? "bg-card/90" : "bg-card text-foreground group-hover:border-primary/30 group-hover:text-primary")}>
+            <Icon className={cn("size-[18px]", isLabs && "labs-ic-head")} strokeWidth={1.75} />
+          </span>
+        )}
+        <span className="relative flex flex-col gap-0.5">
           <span className="flex items-center gap-2">
             <span className="text-[14px] font-medium text-foreground">{item.label}</span>
             {item.badge && <LevelBadge level={item.badge} />}
           </span>
           {item.desc && (
-            <span className="text-[12.5px] leading-[1.45] text-muted-foreground">{item.desc}</span>
+            <span className={cn("text-[12.5px] leading-[1.45]", isLabs ? "text-foreground/75" : "text-muted-foreground")}>
+              {item.desc}
+            </span>
           )}
         </span>
       </a>
@@ -126,6 +138,15 @@ export function SiteHeader() {
 
   return (
     <header className="bg-card/85 fixed inset-x-0 top-0 z-50 border-b backdrop-blur-md">
+      {/* Dégradé de la fiole Labs — déclaré ici pour être dispo sur TOUTES les pages (les defs Labs ne vivent que sur /labs). */}
+      <svg aria-hidden focusable="false" width="0" height="0" style={{ position: "absolute", width: 0, height: 0 }}>
+        <defs>
+          <linearGradient id="lgLabsHead" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#ff6f91" />
+            <stop offset="100%" stopColor="#7db8ff" />
+          </linearGradient>
+        </defs>
+      </svg>
       <div className="container-site flex h-16 items-center justify-between gap-6">
         {/* Marque */}
         <a href="/" className="flex shrink-0 items-center gap-2.5" aria-label="TaskForce — home">
@@ -168,28 +189,62 @@ export function SiteHeader() {
 
             {/* ── Solutions (pages pas encore construites → label grisé, non cliquable) ── */}
             <NavigationMenuItem>
-              <span className="text-muted-foreground/45 flex h-9 cursor-default items-center gap-1.5 rounded-full px-3 text-[14px] font-normal select-none">
-                Solutions
-                <SoonTag />
-              </span>
+              <NavigationMenuTrigger className={triggerCls}>Solutions</NavigationMenuTrigger>
+              <NavigationMenuContent className="!p-0">
+                <div className="w-[720px] max-w-[calc(100vw-2rem)]">
+                  <div className="grid grid-cols-3 gap-x-4 p-5">
+                    {SOLUTIONS_GROUPS.map((g) => (
+                      <div key={g.title}>
+                        <p className="text-muted-foreground px-2 pb-1.5 text-[11px] font-semibold tracking-[0.08em] uppercase">
+                          {g.title}
+                        </p>
+                        <div className="flex flex-col">
+                          {g.links.map((l) =>
+                            isLive(l.href) ? (
+                              <NavigationMenuLink key={l.href} asChild>
+                                <a
+                                  href={l.href}
+                                  className="hover:bg-accent rounded-lg px-2 py-1.5 text-[13.5px] text-foreground transition-colors"
+                                >
+                                  {l.label}
+                                </a>
+                              </NavigationMenuLink>
+                            ) : (
+                              <span
+                                key={l.href}
+                                aria-disabled="true"
+                                className="text-muted-foreground/45 flex items-center gap-2 px-2 py-1.5 text-[13.5px] select-none"
+                              >
+                                {l.label}
+                                <SoonTag />
+                              </span>
+                            ),
+                          )}
+                          {g.viewAll && isLive(g.viewAll.href) && (
+                            <NavigationMenuLink asChild>
+                              <a
+                                href={g.viewAll.href}
+                                className="text-primary mt-1 px-2 py-1.5 text-[12.5px] font-medium"
+                              >
+                                {g.viewAll.label}
+                              </a>
+                            </NavigationMenuLink>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <PanelFooter href="/solutions" label="All solutions" />
+                </div>
+              </NavigationMenuContent>
             </NavigationMenuItem>
 
-            {/* ── Labs (idem : le workshop n'est pas encore une page) ── */}
+            {/* ── Resources (contient Labs — fiole violette sur le trigger pour attirer l'œil) ── */}
             <NavigationMenuItem>
-              <span className="text-muted-foreground/45 flex h-9 cursor-default items-center gap-1.5 rounded-full px-3 text-[14px] font-normal select-none">
-                <FlaskConical
-                  className="size-3.5 text-[color:var(--site-ai)]/50"
-                  strokeWidth={1.75}
-                  aria-hidden
-                />
-                Labs
-                <SoonTag />
-              </span>
-            </NavigationMenuItem>
-
-            {/* ── Resources ── */}
-            <NavigationMenuItem>
-              <NavigationMenuTrigger className={triggerCls}>Resources</NavigationMenuTrigger>
+              <NavigationMenuTrigger className={cn(triggerCls, "gap-1.5")}>
+                Resources
+                <FlaskConical className="labs-ic-head size-3" strokeWidth={2} aria-hidden />
+              </NavigationMenuTrigger>
               <NavigationMenuContent className="!p-0">
                 <div className="w-[640px] max-w-[calc(100vw-2rem)]">
                   <div className="grid grid-cols-2 gap-x-2 p-4">
@@ -222,6 +277,12 @@ export function SiteHeader() {
             className="hover:bg-accent hidden h-9 items-center rounded-full px-3 text-[14px] text-muted-foreground transition-colors hover:text-foreground min-[900px]:inline-flex"
           >
             Pricing
+          </a>
+          <a
+            href="/trust"
+            className="hover:bg-accent hidden h-9 items-center rounded-full px-3 text-[14px] text-muted-foreground transition-colors hover:text-foreground min-[900px]:inline-flex"
+          >
+            Trust
           </a>
           <Button asChild variant="outline" size="pill-sm" className="hidden sm:inline-flex">
             <a href={`${APP_URL}/auth/login`}>Sign in</a>
@@ -265,7 +326,6 @@ export function SiteHeader() {
                 {SOLUTIONS_GROUPS.map((g) => (
                   <MobileGroup key={g.title} title={g.title} items={g.links} />
                 ))}
-                <MobileGroup title="Labs" items={LABS_LINKS} />
                 <MobileGroup title="Resources" items={RESOURCES_LINKS} />
                 <MobileGroup
                   title="Company"

@@ -1,0 +1,51 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import PageHero from "@/components/site/PageHero.astro";
+import PageCta from "@/components/site/PageCta.astro";
+import { PenLine, ArrowRight } from "lucide-react";
+import { APP_URL } from "@/components/site/nav";
+---
+
+<BaseLayout
+  title="Blog — TaskForce"
+  description="Engineering and product notes from TaskForce. We haven't published yet — here's what to expect, and where to read in the meantime."
+>
+  <PageHero
+    kicker="Blog"
+    title="Engineering and product notes"
+    lead="We haven't published our first post yet — and we'd rather have an empty page than filler. When we write, it'll be about how TaskForce is built and the decisions behind it."
+    primary={{ label: "Learn the concepts", href: "/learn" }}
+    secondary={{ label: "See the roadmap", href: "/roadmap" }}
+  />
+
+  <section class="bg-secondary border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="mx-auto max-w-2xl">
+        <div class="bg-card flex flex-col items-center rounded-2xl border px-6 py-14 text-center">
+          <span class="bg-secondary/60 text-muted-foreground flex size-12 items-center justify-center rounded-xl border">
+            <PenLine className="size-5" strokeWidth={1.75} />
+          </span>
+          <h2 class="mt-5 text-[18px] font-semibold text-foreground">No posts yet</h2>
+          <p class="text-muted-foreground mt-2 max-w-md text-[14px] leading-6">
+            When we publish, expect honest engineering write-ups, product decisions and the occasional
+            note on governing AI in the delivery path. No growth-hacking, no reheated press releases.
+          </p>
+          <a
+            href="mailto:hello@taskforce.dev"
+            class="link-underline text-foreground mt-6 inline-flex items-center gap-1.5 text-[14px] font-medium"
+          >
+            Want a heads-up? Email us
+            <ArrowRight className="size-3.5" />
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <PageCta
+    title="In the meantime"
+    lead="Read what an AI delivery OS actually is, or follow the public roadmap."
+    primary={{ label: "Learn the concepts", href: "/learn" }}
+    secondary={{ label: "See the roadmap", href: "/roadmap" }}
+  />
+</BaseLayout>

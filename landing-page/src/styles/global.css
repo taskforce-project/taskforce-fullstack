@@ -594,3 +594,176 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* ═══════════════════════════════════════════════════════
+   LABS — surface expérimentale SOMBRE (scoped aux routes /labs)
+   Décision : Labs est son propre « monde » sombre, PAS un dark-mode global
+   (D2 = light-only reste vraie pour les 62 autres routes). Ces jetons ne
+   redéfinissent rien de global — ils vivent sous .labs-scope uniquement.
+   Bleu = action (marque) · Violet = marquage IA/Labs (cf. --site-ai).
+═══════════════════════════════════════════════════════ */
+.labs-scope {
+  --labs-bg:          #080910;   /* encre bleu-noir, pas noir pur */
+  --labs-elev:        #0e1017;
+  --labs-fg:          #f5f6f8;
+  --labs-muted:       #9aa1ac;
+  --labs-faint:       #6b7280;
+  --labs-line:        rgba(255, 255, 255, 0.09);
+  --labs-line-strong: rgba(255, 255, 255, 0.17);
+  --labs-panel:       rgba(255, 255, 255, 0.025);
+  --labs-panel-hover: rgba(255, 255, 255, 0.05);
+  --labs-violet:      #a78bfa;   /* le violet Labs, lisible sur sombre */
+  --labs-blue:        #60a5fa;   /* le bleu de marque, lisible sur sombre */
+  --labs-emerald:     #34d399;
+  --labs-amber:       #fbbf24;
+}
+
+/* Trame « blueprint / oscilloscope » sur fond sombre */
+.labs-grid {
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 30px 30px;
+  -webkit-mask-image: radial-gradient(120% 80% at 50% 0%, #000 30%, transparent 78%);
+          mask-image: radial-gradient(120% 80% at 50% 0%, #000 30%, transparent 78%);
+}
+
+/* Surface : hairline claire sur verre très sombre (pas de glassmorphism appuyé) */
+.labs-panel {
+  background: var(--labs-panel);
+  border: 1px solid var(--labs-line);
+  border-radius: 16px;
+}
+.labs-panel-hover {
+  transition: background-color 200ms ease, border-color 200ms ease, transform 200ms ease;
+}
+.labs-panel-hover:hover {
+  background: var(--labs-panel-hover);
+  border-color: var(--labs-line-strong);
+}
+@media (prefers-reduced-motion: reduce) {
+  .labs-panel-hover:hover { transform: none; }
+}
+
+/* Vignette de bord — donne la profondeur « chambre » sans ajouter de dépendance */
+.labs-vignette {
+  background: radial-gradient(125% 90% at 50% -8%, transparent 52%, rgba(0, 0, 0, 0.55) 100%);
+}
+
+/* Point « live » : une pulsation lente et discrète, coupée en reduced-motion */
+@keyframes labs-ping {
+  0%   { box-shadow: 0 0 0 0 color-mix(in oklab, var(--labs-emerald) 55%, transparent); }
+  100% { box-shadow: 0 0 0 7px color-mix(in oklab, var(--labs-emerald) 0%, transparent); }
+}
+.labs-pulse { animation: labs-ping 2.6s cubic-bezier(0.16, 1, 0.3, 1) infinite; }
+@media (prefers-reduced-motion: reduce) { .labs-pulse { animation: none; } }
+
+/* BorderBeam (Magic UI, réécrit sans `motion`) — le faisceau parcourt le bord via offset-path. */
+@keyframes border-beam-move {
+  to { offset-distance: 100%; }
+}
+
+/* ── Labs : dégradés « verre liquide » (palette de public/labs/hero-wave.jpg, SANS violet) ──
+   Fixes, choisis dans le mood de l'image : coral / rose / pêche / bleu. */
+.labs-g1 { background-image: linear-gradient(135deg, #ff8a7a, #ff6f91); }  /* coral → rose */
+.labs-g2 { background-image: linear-gradient(135deg, #7db8ff, #ff9ec7); }  /* bleu → rose */
+.labs-g3 { background-image: linear-gradient(135deg, #ffb489, #ff7eb3); }  /* pêche → rose */
+.labs-g4 { background-image: linear-gradient(135deg, #ff9a6c, #ff6f91); }  /* orange → rose */
+.labs-g5 { background-image: linear-gradient(135deg, #ff7eb3, #7db8ff); }  /* rose → bleu */
+.labs-g6 { background-image: linear-gradient(135deg, #7db8ff, #ff8a7a); }  /* bleu → coral */
+/* Texte en dégradé (labels) */
+.labs-gtext {
+  background-image: linear-gradient(135deg, #ff6f91, #7db8ff);
+  -webkit-background-clip: text;
+          background-clip: text;
+  color: transparent;
+}
+/* Icônes : l'ICÔNE prend le dégradé (aucun fond) — dégradés déclarés par <LabsGradientDefs/>. */
+.labs-ic-a { stroke: url(#lgA); }
+.labs-ic-b { stroke: url(#lgB); }
+.labs-ic-c { stroke: url(#lgC); }
+.labs-ic-d { stroke: url(#lgD); }
+.labs-ic-e { stroke: url(#lgE); }
+/* Fiole Labs dans le header (site-wide) — dégradé déclaré par le <svg> caché de SiteHeader. */
+.labs-ic-head { stroke: url(#lgLabsHead); }
+
+/* Échelle typographique Labs — miroir des .t-* mais en encre claire.
+   (Les .t-* portent color:var(--site-fg) = sombre : inutilisables ici.) */
+.labs-scope .labs-h1 {
+  font-family: var(--font-display);
+  font-size: clamp(2.5rem, 5vw, 3.5rem);
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  line-height: 1.06;
+  color: var(--labs-fg);
+}
+.labs-scope .labs-h2 {
+  font-family: var(--font-display);
+  font-size: clamp(1.875rem, 3.4vw, 2.5rem);
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  line-height: 1.14;
+  color: var(--labs-fg);
+}
+.labs-scope .labs-h3 {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+  color: var(--labs-fg);
+}
+.labs-scope .labs-lead {
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  color: var(--labs-muted);
+}
+.labs-scope .labs-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--labs-violet);
+}
+
+/* Les rails de page (filets clairs par défaut) passent en hairline claire sur sombre. */
+.labs-scope .container-rail,
+.labs-scope .rail-x,
+.labs-scope .rail-y {
+  border-color: var(--labs-line);
+}
+
+/* ── Coque (header + footer) en SOMBRE sous Labs ──
+   On ne réécrit PAS les composants partagés : on RE-MAPPE leurs jetons, mais UNIQUEMENT dans
+   le sous-arbre header/footer. Les utilitaires (bg-card, text-foreground, border…) résolvent
+   alors des valeurs sombres. Scope = .labs-body → les 62 autres routes ne bougent pas. */
+.labs-body header,
+.labs-body footer {
+  --background: #0b0d15;
+  --card: #0b0d15;
+  --card-foreground: #f5f6f8;
+  --foreground: #f5f6f8;
+  --muted-foreground: #9aa1ac;
+  --secondary: rgba(255, 255, 255, 0.06);
+  --secondary-foreground: #f5f6f8;
+  --accent: rgba(255, 255, 255, 0.08);
+  --accent-foreground: #f5f6f8;
+  --border: rgba(255, 255, 255, 0.1);
+  --input: rgba(255, 255, 255, 0.16);
+  --popover: #0e1017;
+  --popover-foreground: #f5f6f8;
+}
+/* Le logo est monochrome (#1d1d1f) → on le repasse en blanc. */
+.labs-body header img[src*="logo-taskforce"],
+.labs-body footer img[src*="logo-taskforce"] {
+  filter: brightness(0) invert(1);
+}
+/* Le viewport des méga-menus est codé en blanc dur (règle .site-nav plus haut) → on le repasse sombre. */
+.labs-body .site-nav [data-slot="navigation-menu-viewport"] {
+  background: #0e1017;
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 20px 48px -16px rgba(0, 0, 0, 0.6),
+    0 2px 8px -2px rgba(0, 0, 0, 0.4);
+}

@@ -1,0 +1,57 @@
+---
+import LegalDoc from "@/layouts/LegalDoc.astro";
+---
+
+<LegalDoc
+  title="Subprocessors"
+  description="The third parties that help TaskForce run the service, what they process, and where. Self-hosting with local models can keep your data within your own infrastructure."
+  eyebrow="Legal & Trust"
+  updated="31 July 2026"
+  draft={true}
+>
+  <p>
+    To run TaskForce we rely on a small number of subprocessors, each bound by data-protection
+    obligations and given only what they need. This is the current list; it will change as the product
+    grows, and we'll give notice before adding one that handles personal data.
+  </p>
+
+  <h2>The big picture first</h2>
+  <p>
+    Much of TaskForce can run on <strong>your own infrastructure</strong>. On a self-hosted deployment
+    using <strong>local models through Ollama</strong>, your content need not touch any third party — the
+    subprocessors below apply mainly to our hosted service and to hosted-model calls you choose to make.
+  </p>
+
+  <h2>Current subprocessors</h2>
+  <ul>
+    <li>
+      <strong>Stripe</strong> — payments. Processes billing and customer contact details for paid plans.
+      We don't store full card numbers.
+    </li>
+    <li>
+      <strong>Anthropic / OpenAI</strong> — hosted AI models, <em>only for the calls you route to them</em>.
+      They receive the prompt and return the output for that step. Choose local models to avoid this
+      entirely.
+    </li>
+    <li>
+      <strong>Hetzner Online GmbH</strong> — cloud infrastructure for our hosted service (application
+      data at rest and in transit), located in the EU (Germany).
+    </li>
+    <li>
+      <strong>[Transactional email provider]</strong> — account and notification emails, if applicable.
+      <em>To be confirmed.</em>
+    </li>
+  </ul>
+  <p>
+    Components such as identity (Keycloak), object storage (MinIO) and the database (PostgreSQL) run
+    <strong>within the deployment</strong> — on a self-hosted install, they're yours, not third-party
+    subprocessors.
+  </p>
+
+  <h2>Changes</h2>
+  <p>
+    When we add or change a subprocessor that handles personal data, we'll update this page and notify
+    customers with an active agreement so they can object. See the <a href="/legal/dpa">DPA</a> and
+    <a href="/legal/privacy">privacy policy</a> for how this fits together.
+  </p>
+</LegalDoc>

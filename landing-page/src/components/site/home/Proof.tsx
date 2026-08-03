@@ -141,7 +141,7 @@ export function Integrations() {
           title="TaskForce doesn’t replace your stack. It connects to it."
           lead={
             <>
-              The same connector catalogue as the app — <span className="text-primary">60+</span>{" "}
+              The same connector catalogue as the app — <span className="text-primary">129</span>{" "}
               tools across your tracker, repo, chat and cloud. Adding one is a line of configuration,
               not a release.
             </>
@@ -192,7 +192,7 @@ const AHEAD = [
   },
   {
     title: "Still your infrastructure",
-    text: "Self-hosting stays a first-class way to run TaskForce, not an enterprise upsell. Where your models run is your decision, and it stays that way.",
+    text: "Self-hosting is a first-class deployment — it comes with Enterprise, and where your models run stays your decision.",
   },
 ];
 
@@ -204,7 +204,7 @@ export function WhereThisGoes() {
           <SectionHeader
             eyebrow="The direction"
             title="Software teams won’t hand-write specs forever"
-            lead="TaskForce runs software delivery today — that’s the wedge, not the ceiling. The memory that keeps one run’s context is the same intelligence an organization loses everywhere else: in meetings, in chat, in people’s heads. The destination is to make it the active layer every team decides on top of. The roadmap is dated — hold us to it rather than trust a pitch."
+            lead="TaskForce runs software delivery today — that’s the wedge, not the ceiling. The memory that keeps one run’s context is the same intelligence an organization loses everywhere else: in meetings, in chat, in people’s heads. The destination is to make it the active layer every team decides on top of. The roadmap is public — hold us to it rather than trust a pitch."
           />
           <Button asChild variant="outline" size="pill" className="mt-8">
             <a href="/roadmap">
@@ -256,7 +256,7 @@ export function FinalCta() {
             </Button>
           </div>
           <p className="text-muted-foreground relative mt-6 text-[12.5px]">
-            No credit card. Self-hosting available from day one.
+            No credit card. Free forever to start.
           </p>
         </div>
       </div>

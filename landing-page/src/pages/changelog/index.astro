@@ -1,0 +1,66 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import PageHero from "@/components/site/PageHero.astro";
+import PageCta from "@/components/site/PageCta.astro";
+import { LevelBadge } from "@/components/site/Section";
+import { Info, ArrowRight } from "lucide-react";
+
+/* Pas de fausses entrées datées : on montre l'ÉTAT ACTUEL réel (Live/Beta/Planned). Les notes de
+   version datées arriveront quand on shippera pour de vrai. */
+const STATE = [
+  { level: "live" as const, items: ["Delivery workspace — boards, issues and cycles", "Real-time collaboration", "Smart Assign", "Analytics"] },
+  { level: "beta" as const, items: ["TaskForce Memory", "Approvals", "Integrations — connect (deep sync rolling out)"] },
+  { level: "labs" as const, items: ["Orchestration — the full intent-to-deploy run", "Specialized agent team (CPO / CTO / COO)", "Prediction & calibration"] },
+];
+---
+
+<BaseLayout
+  title="Changelog — TaskForce"
+  description="What's shipped in TaskForce right now, by maturity — Live, Beta and Planned. Dated release notes will land here as we ship."
+>
+  <PageHero
+    kicker="Changelog"
+    title="What we've shipped, honestly"
+    lead="We're pre-launch, so instead of inventing dated release notes, here's the real current state — what's Live, what's Beta, and what's Planned. Dated notes will land here as we ship."
+    primary={{ label: "See the roadmap", href: "/roadmap" }}
+    secondary={{ label: "What ships today", href: "/product" }}
+  />
+
+  <section class="bg-secondary border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="mx-auto flex max-w-2xl flex-col gap-8">
+        {
+          STATE.map((group) => (
+            <div>
+              <div class="mb-4 flex items-center gap-2">
+                <LevelBadge level={group.level} />
+                <span class="bg-border h-px flex-1" />
+              </div>
+              <ul class="flex flex-col gap-2.5">
+                {group.items.map((it) => (
+                  <li class="text-foreground flex items-start gap-2.5 text-[14.5px] leading-6">
+                    <span class="bg-primary/60 mt-2 size-1.5 shrink-0 rounded-full" aria-hidden />
+                    {it}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))
+        }
+
+        <p class="text-muted-foreground flex items-start gap-2 border-t pt-6 text-[13px] leading-6">
+          <Info className="mt-0.5 size-4 shrink-0" strokeWidth={1.75} />
+          The public roadmap is the honest source of truth for what's next.
+          <a href="/roadmap" class="link-underline text-foreground font-medium">&nbsp;See the roadmap →</a>
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <PageCta
+    title="Follow what ships next"
+    lead="The roadmap is public. Hold us to it."
+    primary={{ label: "See the roadmap", href: "/roadmap" }}
+    secondary={{ label: "Product overview", href: "/product" }}
+  />
+</BaseLayout>

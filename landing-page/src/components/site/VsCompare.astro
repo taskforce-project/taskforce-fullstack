@@ -1,0 +1,128 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import PageHero from "@/components/site/PageHero.astro";
+import PageCta from "@/components/site/PageCta.astro";
+import { Check, ArrowRight } from "lucide-react";
+import { APP_URL } from "@/components/site/nav";
+import type { Comparison } from "@/lib/comparisons";
+
+interface Props {
+  c: Comparison;
+}
+const { c } = Astro.props;
+const togetherTitle =
+  c.kind === "agent" ? "They work together, not against each other" : "How they fit together";
+---
+
+<BaseLayout
+  title={`TaskForce vs ${c.name} — Compare`}
+  description={c.lead}
+>
+  <PageHero
+    kicker="Compare"
+    title={`TaskForce vs ${c.name}`}
+    lead={c.lead}
+    primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
+    secondary={{ label: "See the run", href: "/product/orchestration" }}
+  />
+
+  {/* ── Crédit au concurrent (fair-play) ── */}
+  <section class="bg-secondary border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">Credit where it's due</p>
+        <h2 class="t-h2">What {c.name} is great at</h2>
+        <p class="t-lead mt-4">
+          You chose {c.name} for good reasons. It does its job well — here's where it shines.
+        </p>
+      </div>
+      <ul class="mt-10 flex flex-col gap-3.5">
+        {
+          c.goodAt.map((g) => (
+            <li class="flex items-start gap-3 text-[14.5px] leading-6 text-foreground">
+              <Check className="text-primary mt-0.5 size-4 shrink-0" strokeWidth={2.5} />
+              {g}
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </section>
+
+  {/* ── Ce que TaskForce ajoute ── */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">What's different</p>
+        <h2 class="t-h2">What TaskForce adds</h2>
+      </div>
+      <ul class="mt-10 flex flex-col gap-3.5">
+        {
+          c.adds.map((a) => (
+            <li class="flex items-start gap-3 text-[14.5px] leading-6 text-foreground">
+              <Check className="text-primary mt-0.5 size-4 shrink-0" strokeWidth={2.5} />
+              {a}
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </section>
+
+  {/* ── Tableau côte à côte (respectueux) ── */}
+  <section class="bg-secondary border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">Side by side</p>
+        <h2 class="t-h2">Where they differ</h2>
+      </div>
+      <div class="mt-10 overflow-x-auto">
+        <div class="bg-border grid min-w-[640px] grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-px overflow-hidden rounded-2xl border">
+          <div class="bg-card px-4 py-3 text-[12px] font-semibold tracking-wide text-muted-foreground uppercase" />
+          <div class="bg-card px-4 py-3 text-[13px] font-semibold text-foreground">{c.name}</div>
+          <div class="bg-primary/[0.06] px-4 py-3 text-[13px] font-semibold text-primary">TaskForce</div>
+          {
+            c.rows.map((r) => (
+              <>
+                <div class="bg-card px-4 py-3 text-[13px] font-medium text-foreground">{r.dim}</div>
+                <div class="bg-card px-4 py-3 text-[13px] leading-5 text-muted-foreground">{r.them}</div>
+                <div class="bg-primary/[0.04] px-4 py-3 text-[13px] leading-5 text-foreground">{r.us}</div>
+              </>
+            ))
+          }
+        </div>
+      </div>
+      <p class="text-muted-foreground mt-4 text-[12px]">
+        We describe {c.name} as we understand it; if we've got something wrong, tell us and we'll fix it.
+      </p>
+    </div>
+  </section>
+
+  {/* ── Ensemble ── */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="mx-auto max-w-2xl text-center">
+        <p class="t-eyebrow mb-3">Better together</p>
+        <h2 class="t-h2">{togetherTitle}</h2>
+        <p class="t-lead mx-auto mt-4">{c.together}</p>
+        <p class="mt-8 text-[15px] font-medium text-foreground">{c.bottomLine}</p>
+        <div class="mt-8 flex flex-wrap justify-center gap-4">
+          <a href="/vs" class="link-underline text-foreground inline-flex items-center gap-1.5 text-[14px] font-medium">
+            All comparisons
+            <ArrowRight className="size-4" />
+          </a>
+          <a href="/product/orchestration" class="link-underline text-muted-foreground hover:text-foreground text-[14px]">
+            See the run →
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <PageCta
+    title={`See what TaskForce adds to ${c.name}`}
+    lead="Bring one outcome you were going to spec by hand, and watch the governed run come back."
+    primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
+    secondary={{ label: "Book a demo", href: "/book-a-demo" }}
+  />
+</BaseLayout>

@@ -1,0 +1,140 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import PageHero from "@/components/site/PageHero.astro";
+import PageCta from "@/components/site/PageCta.astro";
+import { Code2, Compass, Layers, Megaphone, LifeBuoy, ArrowRight } from "lucide-react";
+import { APP_URL, isLive } from "@/components/site/nav";
+
+/* Décision D10 : l'ingénierie logicielle est le métier PROUVÉ ; les autres sont exploratoires et
+   portent un marqueur honnête. On n'invente pas de workflows pour des métiers qu'on n'a pas livrés. */
+const TEAMS = [
+  {
+    icon: Code2,
+    label: "Engineering",
+    href: "/solutions/engineering",
+    desc: "Turn an outcome into a governed run — spec, approach, breakdown, execution through your coding agents, QA — with a human on every decision.",
+    proven: true,
+  },
+  {
+    icon: Compass,
+    label: "Product",
+    href: "/solutions/product",
+    desc: "Turning outcomes into specs, acceptance criteria and sequenced work is a product job too. Not proven as a standalone workflow yet.",
+    proven: false,
+  },
+  {
+    icon: Layers,
+    label: "Operations",
+    href: "/solutions/operations",
+    desc: "The same governed, auditable checkpoints could structure operational delivery. Exploratory — we haven't shipped it.",
+    proven: false,
+  },
+  {
+    icon: Megaphone,
+    label: "Marketing",
+    href: "/solutions/marketing",
+    desc: "Campaigns are reviewed, approved work with dependencies and a paper trail. A natural fit in theory, unproven in practice.",
+    proven: false,
+  },
+  {
+    icon: LifeBuoy,
+    label: "Client services",
+    href: "/solutions/client-services",
+    desc: "Client deliverables that need review and sign-off could run on the same rails. Exploratory.",
+    proven: false,
+  },
+];
+---
+
+<BaseLayout
+  title="Solutions — TaskForce"
+  description="TaskForce is built for software delivery — a governed path from outcome to production. The same pattern could extend to other teams; we're honest about what's proven and what isn't."
+>
+  <PageHero
+    kicker="Solutions"
+    title="Built for software delivery. Designed to go further."
+    lead="TaskForce runs software delivery today — that's the proven wedge. The underlying pattern, governed work through validated checkpoints with the reasoning kept, isn't specific to code. We mark clearly what's proven and what's still exploration."
+    primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
+    secondary={{ label: "See the run", href: "/product/orchestration" }}
+  />
+
+  {/* ── By team ── */}
+  <section class="bg-secondary border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">By team</p>
+        <h2 class="t-h2">One proven use, and where it could extend</h2>
+        <p class="t-lead mt-4">
+          Software engineering is the first team we've proven. Everything else here is the same idea
+          applied elsewhere — labelled honestly as exploration, not a shipped product.
+        </p>
+      </div>
+      <div class="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {
+          TEAMS.map((team) => {
+            const live = team.href && isLive(team.href);
+            const body = (
+              <>
+                <div class="flex items-center justify-between gap-2">
+                  <span class="bg-card text-foreground flex size-10 items-center justify-center rounded-lg border">
+                    <team.icon className="size-[18px]" strokeWidth={1.75} />
+                  </span>
+                  {team.proven ? (
+                    <span class="inline-flex items-center rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-emerald-700 uppercase">
+                      Proven
+                    </span>
+                  ) : (
+                    <span class="text-muted-foreground inline-flex items-center rounded-md border border-dashed px-1.5 py-0.5 text-[10px] font-medium tracking-wide uppercase">
+                      Exploratory
+                    </span>
+                  )}
+                </div>
+                <h3 class="mt-3 text-[15px] font-medium text-foreground">{team.label}</h3>
+                <p class="text-muted-foreground mt-1.5 text-[13px] leading-5">{team.desc}</p>
+              </>
+            );
+            return live ? (
+              <a href={team.href} class="bg-card hover:border-primary/30 hover:bg-secondary/40 rounded-2xl border p-5 transition-colors">
+                {body}
+              </a>
+            ) : (
+              <div class="bg-card rounded-2xl border p-5 opacity-70" aria-disabled="true">
+                {body}
+              </div>
+            );
+          })
+        }
+      </div>
+    </div>
+  </section>
+
+  {/* ── Why the pattern travels ── */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="mx-auto max-w-2xl text-center">
+        <p class="t-eyebrow mb-3">Why the pattern travels</p>
+        <h2 class="t-h2">Any team that ships reviewed work</h2>
+        <p class="t-lead mx-auto mt-4">
+          A governed run — an artifact produced, reviewed and explicitly approved before the next step —
+          isn't specific to engineering. It fits any team whose work is decided in stages, reviewed by a
+          human, and worth remembering afterwards. We'd rather prove that team by team than claim it.
+        </p>
+        <div class="mt-8 flex flex-wrap justify-center gap-4">
+          <a href="/product/orchestration" class="link-underline text-foreground text-[14px] font-medium">
+            See how a run works →
+          </a>
+          <a href="/roadmap" class="link-underline text-muted-foreground hover:text-foreground text-[14px]">
+            What's on the roadmap →
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <PageCta
+    title="Start where it's proven"
+    lead="Run your first software delivery workflow today — and tell us where else the pattern should go."
+    primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
+    secondary={{ label: "Book a demo", href: "/book-a-demo" }}
+  />
+</BaseLayout>

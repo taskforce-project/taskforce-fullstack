@@ -508,7 +508,7 @@ export function Pillars() {
  * toujours visibles : pas de repli animé, donc aucun décalage de mise en page (CLS). */
 
 const FOUNDATIONS = [
-  { n: "01", title: "Self-hosting", text: "Run TaskForce and your models on your own infrastructure — a first-class way to run it, not an enterprise upsell.", visual: "Self-hosted deployment" },
+  { n: "01", title: "Self-hosting", text: "Run TaskForce and your models on your own infrastructure — a first-class Enterprise deployment.", visual: "Self-hosted deployment" },
   { n: "02", title: "Audit trail", text: "Every decision, approval and model call is recorded: who, what, when, and on whose hardware.", visual: "Audit trail" },
   { n: "03", title: "A model per step", text: "Routine steps on a model you host; the hard ones can call something stronger, or never leave your network.", visual: "Model routing" },
   { n: "04", title: "Access control", text: "SSO and SAML through Keycloak, roles and permissions, and per-project access.", visual: "SSO & roles" },

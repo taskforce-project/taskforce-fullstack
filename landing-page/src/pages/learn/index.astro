@@ -1,0 +1,72 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import PageHero from "@/components/site/PageHero.astro";
+import PageCta from "@/components/site/PageCta.astro";
+import { ArrowRight } from "lucide-react";
+import { APP_URL } from "@/components/site/nav";
+
+const PARTS = [
+  {
+    eyebrow: "The problem",
+    title: "AI made generating work cheap. It didn't make deciding cheaper.",
+    body: "A software project isn't one task — it's a chain of decisions that compound: what to build, how, in what order, at what risk. Producing a spec or a pull request takes minutes now. Keeping the chain coherent, exposing the trade-offs, and staying accountable is the part that still costs you — and the context behind it leaks at every handoff.",
+    link: { href: "/product/orchestration", label: "See a run" },
+  },
+  {
+    eyebrow: "A governed run",
+    title: "The unit of work is a checkpoint, not a prompt.",
+    body: "A checkpoint is a governed stage where an artifact is produced, reviewed and explicitly approved before the run continues. The AI proposes; a human decides. Only an approved artifact becomes context for the next step — so a run is an accountable chain, not a pile of AI output.",
+    link: { href: "/product/approvals", label: "How approval works" },
+  },
+  {
+    eyebrow: "Memory",
+    title: "The reasoning is kept, so the next run starts smarter.",
+    body: "Every decision has a reason — a trade-off weighed, a constraint respected, an alternative rejected. An AI delivery OS keeps that reasoning as a graph the next run can read, instead of letting it evaporate into chat threads and people's heads. That's what makes delivery compound instead of repeat.",
+    link: { href: "/product/brain-os", label: "TaskForce Memory" },
+  },
+  {
+    eyebrow: "Why it's different",
+    title: "It's not a tracker with a chatbot bolted on.",
+    body: "A tracker records what happened. A coding agent writes code. An AI delivery OS governs the decisions between them — orchestrating specialized agents, keeping a human accountable at each checkpoint, remembering why, and running on the models and infrastructure you choose. It sits on your board and your coding agents, and adds the layer they were never meant to be.",
+    link: { href: "/vs", label: "How it compares" },
+  },
+];
+---
+
+<BaseLayout
+  title="Learn — TaskForce"
+  description="What an AI delivery operating system actually is: a governed path from intent to production where AI proposes, humans decide, and the reasoning is kept — not a tracker with a chatbot bolted on."
+>
+  <PageHero
+    kicker="Learn"
+    title="What an AI delivery OS actually is"
+    lead="The term gets used loosely. Here's the plain version: what it means to put AI in the delivery path without losing the plot — the problem, the governed run, the memory, and why it's more than a tracker plus a chatbot."
+    primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
+    secondary={{ label: "See the run", href: "/product/orchestration" }}
+  />
+
+  {
+    PARTS.map((p, i) => (
+      <section class={i % 2 === 0 ? "bg-secondary border-b" : "bg-card border-b"}>
+        <div class="container-rail py-20 lg:py-28">
+          <div class="mx-auto max-w-2xl">
+            <p class="t-eyebrow mb-3">{p.eyebrow}</p>
+            <h2 class="t-h2">{p.title}</h2>
+            <p class="mt-6 text-[15px] leading-7 text-foreground">{p.body}</p>
+            <a href={p.link.href} class="link-underline text-foreground mt-6 inline-flex items-center gap-1.5 text-[14px] font-medium">
+              {p.link.label}
+              <ArrowRight className="size-3.5" />
+            </a>
+          </div>
+        </div>
+      </section>
+    ))
+  }
+
+  <PageCta
+    title="See it on your own work"
+    lead="The fastest way to understand it is to give TaskForce one outcome and approve each step."
+    primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
+    secondary={{ label: "Book a demo", href: "/book-a-demo" }}
+  />
+</BaseLayout>
