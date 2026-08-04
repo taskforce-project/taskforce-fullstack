@@ -1,0 +1,40 @@
+---
+/**
+ * ScreenPlaceholder — un « écran » VIDE et propre, en attendant un vrai screenshot (retour user 03/08 :
+ * « tu peux intégrer des screens (placeholder vide) »). Cadre d'app minimal (barre fine) + corps vide
+ * (grille pointillée discrète + halo primaire + mot « Preview »). Volontairement NEUTRE : c'est
+ * clairement un emplacement, pas un faux produit. Remplacer par une <img/> le jour où on a la capture.
+ */
+interface Props {
+  label?: string;
+  ratio?: string;
+  class?: string;
+}
+const { label, ratio = "16 / 10", class: cls } = Astro.props;
+---
+
+<figure class:list={["not-prose", cls]}>
+  <div class="bg-card surface relative overflow-hidden rounded-xl">
+    <div class="bg-secondary/50 flex items-center gap-1.5 border-b px-3 py-2">
+      <span class="bg-border size-2 rounded-full"></span>
+      <span class="bg-border size-2 rounded-full"></span>
+      <span class="bg-border size-2 rounded-full"></span>
+      {label && <span class="text-muted-foreground/70 ml-2 text-[10px] font-medium">{label}</span>}
+    </div>
+    <div class="relative" style={`aspect-ratio:${ratio}`}>
+      <div
+        aria-hidden
+        class="absolute inset-0 [background-image:linear-gradient(to_right,color-mix(in_oklab,var(--foreground)_4%,transparent)_1px,transparent_1px),linear-gradient(to_bottom,color-mix(in_oklab,var(--foreground)_4%,transparent)_1px,transparent_1px)] [background-size:32px_32px]"
+      >
+      </div>
+      <div
+        aria-hidden
+        class="absolute inset-0 [background:radial-gradient(60%_60%_at_50%_45%,color-mix(in_oklab,var(--primary)_7%,transparent),transparent_70%)]"
+      >
+      </div>
+      <div class="absolute inset-0 flex items-center justify-center">
+        <span class="text-muted-foreground/40 font-mono text-[11px] tracking-[0.14em] uppercase">Preview</span>
+      </div>
+    </div>
+  </div>
+</figure>

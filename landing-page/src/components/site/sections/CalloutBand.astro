@@ -1,0 +1,28 @@
+---
+/**
+ * CalloutBand — une affirmation forte, pleine largeur, en gros display. Sert de respiration
+ * entre deux sections denses (le « pourquoi » d'une page). Pas de cartes, pas de grille.
+ */
+interface Props {
+  eyebrow?: string;
+  statement: string;
+  support?: string;
+  align?: "center" | "left";
+  bg?: "card" | "secondary";
+}
+const { eyebrow, statement, support, align = "center", bg = "card" } = Astro.props;
+const center = align === "center";
+---
+
+<section class:list={[bg === "secondary" ? "bg-secondary" : "bg-card", "border-b"]}>
+  <div class="container-rail py-20 lg:py-24">
+    <div class:list={[center ? "mx-auto max-w-3xl text-center" : "max-w-3xl"]}>
+      {eyebrow && <p class="t-eyebrow mb-4">{eyebrow}</p>}
+      <p class="font-display text-foreground text-[27px] leading-[1.25] font-medium tracking-[-0.02em] text-balance sm:text-[34px]">
+        {statement}
+      </p>
+      {support && <p class:list={["t-lead mt-5", center && "mx-auto max-w-2xl"]}>{support}</p>}
+      <slot />
+    </div>
+  </div>
+</section>

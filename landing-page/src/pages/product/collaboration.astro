@@ -2,9 +2,21 @@
 import BaseLayout from "@/layouts/BaseLayout.astro";
 import PageHero from "@/components/site/PageHero.astro";
 import PageCta from "@/components/site/PageCta.astro";
+import FeatureSplit from "@/components/site/sections/FeatureSplit.astro";
+import FeatureRows from "@/components/site/sections/FeatureRows.astro";
+import FeatureRow from "@/components/site/sections/FeatureRow.astro";
+import CalloutBand from "@/components/site/sections/CalloutBand.astro";
+import ScreenPlaceholder from "@/components/site/sections/ScreenPlaceholder.astro";
 import { CollabBoard } from "@/components/site/illustrations/CollabBoard";
 import { KanbanSquare, CalendarRange, MessageSquare, ShieldCheck, Zap, RefreshCw, Bot } from "lucide-react";
 import { APP_URL } from "@/components/site/nav";
+
+/**
+ * Collaboration — décliné sur la grammaire de la page modèle (orchestration) :
+ * board réel (îlot React) en preuve, primitives en FeatureSplit + ScreenPlaceholder,
+ * temps réel en FeatureRows (petits traits), thèse « une seule surface » en CalloutBand.
+ * Copie strictement préservée — on re-met-en-page, on ne réécrit pas.
+ */
 
 const BLOCKS = [
   {
@@ -61,7 +73,7 @@ const LIVE = [
     secondary={{ label: "See pricing", href: "/pricing" }}
   />
 
-  {/* ── Le vrai board, en surface partagée ── */}
+  {/* ── Le vrai board, en surface partagée (îlot React préservé) ── */}
   <section class="bg-secondary border-b">
     <div class="container-rail py-20 lg:py-28">
       <div class="max-w-2xl">
@@ -79,91 +91,68 @@ const LIVE = [
     </div>
   </section>
 
-  {/* ── Les primitives ── */}
-  <section class="bg-card border-b">
-    <div class="container-rail py-20 lg:py-28">
-      <div class="max-w-2xl">
-        <p class="t-eyebrow mb-3">The building blocks</p>
-        <h2 class="t-h2">Built to run the work, not just track it</h2>
-        <p class="t-lead mt-4">
-          The primitives are the ones you'd expect from a modern issue tracker — with the run's
-          context attached to each one.
-        </p>
-      </div>
-      <div class="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        {
-          BLOCKS.map((b) => (
-            <div class="rounded-2xl border bg-card p-6">
-              <span class="bg-card text-foreground flex size-11 items-center justify-center rounded-xl border">
-                <b.icon className="size-5" strokeWidth={1.75} />
-              </span>
-              <h3 class="mt-4 text-[16px] font-semibold text-foreground">{b.title}</h3>
-              <p class="text-muted-foreground mt-2 text-[13.5px] leading-6">{b.text}</p>
+  {/* ── Les primitives — FeatureSplit + écran vide (plus de grille de cartes) ── */}
+  <FeatureSplit
+    bg="card"
+    eyebrow="The building blocks"
+    title="Built to run the work, not just track it"
+    lead="The primitives are the ones you'd expect from a modern issue tracker — with the run's context attached to each one."
+  >
+    <ScreenPlaceholder label="Boards & issues" />
+    <ul slot="aside" class="mt-8 border-t">
+      {
+        BLOCKS.map((b) => (
+          <li class="flex gap-4 border-b py-4">
+            <span class="bg-secondary/60 text-foreground flex size-10 shrink-0 items-center justify-center rounded-lg border">
+              <b.icon className="size-5" strokeWidth={1.75} />
+            </span>
+            <div class="min-w-0">
+              <h3 class="text-foreground text-[14.5px] font-semibold">{b.title}</h3>
+              <p class="text-muted-foreground mt-1 text-[13px] leading-6">{b.text}</p>
             </div>
-          ))
-        }
-      </div>
-    </div>
-  </section>
+          </li>
+        ))
+      }
+    </ul>
+  </FeatureSplit>
 
-  {/* ── Temps réel ── */}
-  <section class="bg-secondary border-b">
-    <div class="container-rail py-20 lg:py-28">
-      <div class="max-w-2xl">
-        <p class="t-eyebrow mb-3">Real time</p>
-        <h2 class="t-h2">Everyone sees the same board, the moment it changes</h2>
-        <p class="t-lead mt-4">
-          When anyone creates, moves, re-labels or re-assigns an issue, it updates on every open board
-          instantly — over a live connection, no refresh. Your agents' changes arrive the same way
-          people's do.
-        </p>
-      </div>
-      <div class="mt-12 grid gap-6 lg:grid-cols-3">
-        {
-          LIVE.map((l) => (
-            <div class="rounded-2xl border bg-card p-6">
-              <span class="bg-card text-foreground flex size-11 items-center justify-center rounded-xl border">
-                <l.icon className="size-5" strokeWidth={1.75} />
-              </span>
-              <h3 class="mt-4 text-[16px] font-semibold text-foreground">{l.title}</h3>
-              <p class="text-muted-foreground mt-2 text-[13.5px] leading-6">{l.text}</p>
-            </div>
-          ))
-        }
-      </div>
-    </div>
-  </section>
+  {/* ── Temps réel — FeatureRows (petits traits), lignes alternées ── */}
+  <FeatureRows
+    bg="secondary"
+    eyebrow="Real time"
+    title="Everyone sees the same board, the moment it changes"
+    lead="When anyone creates, moves, re-labels or re-assigns an issue, it updates on every open board instantly — over a live connection, no refresh. Your agents' changes arrive the same way people's do."
+  >
+    {
+      LIVE.map((l, i) => (
+        <FeatureRow reverse={i % 2 === 1} title={l.title} body={l.text}>
+          <div slot="viz" class="flex w-full justify-center">
+            <span class="bg-secondary/60 text-foreground flex size-14 items-center justify-center rounded-2xl border">
+              <l.icon className="size-6" strokeWidth={1.5} />
+            </span>
+          </div>
+        </FeatureRow>
+      ))
+    }
+  </FeatureRows>
 
-  {/* ── Une seule surface : gens + agents ── */}
-  <section class="bg-card border-b">
-    <div class="container-rail py-20 lg:py-28">
-      <div class="grid gap-10 lg:grid-cols-[minmax(0,420px)_1fr] lg:gap-16">
-        <div>
-          <p class="t-eyebrow mb-3">One surface</p>
-          <h2 class="t-h2">People and agents, on the same board</h2>
-          <span class="text-foreground mt-6 inline-flex size-11 items-center justify-center rounded-xl border bg-card">
-            <Bot className="size-5" strokeWidth={1.75} />
-          </span>
-        </div>
-        <div class="flex flex-col gap-4 text-[15px] leading-7 text-foreground">
-          <p>
-            Assign a card to a teammate or to Claude Code, Cursor or another coding agent — same card,
-            same columns, same review checkpoint. The board doesn't treat an agent as a separate kind
-            of thing.
-          </p>
-          <p class="text-muted-foreground">
-            That's the point: agents aren't a side panel. They work where your team already works, and
-            what they produce still goes to a human to approve.
-          </p>
-          <p class="text-muted-foreground text-[13.5px]">
-            <a href="/product/smart-assign" class="link-underline text-foreground font-medium">
-              See how work gets routed →
-            </a>
-          </p>
-        </div>
-      </div>
-    </div>
-  </section>
+  {/* ── Une seule surface : gens + agents — CalloutBand (la thèse de la page) ── */}
+  <CalloutBand
+    bg="card"
+    eyebrow="One surface"
+    statement="People and agents, on the same board"
+    support="Assign a card to a teammate or to Claude Code, Cursor or another coding agent — same card, same columns, same review checkpoint. The board doesn't treat an agent as a separate kind of thing."
+  >
+    <p class="text-muted-foreground mx-auto mt-5 max-w-2xl text-[15px] leading-7">
+      That's the point: agents aren't a side panel. They work where your team already works, and what
+      they produce still goes to a human to approve.
+    </p>
+    <p class="mt-7">
+      <a href="/product/smart-assign" class="link-underline text-foreground text-[14px] font-medium">
+        See how work gets routed →
+      </a>
+    </p>
+  </CalloutBand>
 
   <PageCta
     title="Bring your team onto one board"

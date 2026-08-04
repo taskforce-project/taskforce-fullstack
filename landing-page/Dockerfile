@@ -10,8 +10,8 @@ FROM node:20-alpine AS deps
 
 WORKDIR /app
 
-# Copier package files
-COPY package.json package-lock.json* ./
+# Copier package files (+ .npmrc = legacy-peer-deps, sinon npm ci casse sur le peer vite@8)
+COPY package.json package-lock.json* .npmrc ./
 
 # Installer les dépendances
 RUN npm ci
@@ -64,5 +64,7 @@ ENV HOST=0.0.0.0
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:4321 || exit 1
 
-# Démarrer avec serve
-CMD ["serve", "-s", "dist", "-l", "4321"]
+# Démarrer avec serve. PAS de `-s` (mode SPA) : le site est MULTI-PAGES (Astro SSG) → `-s` réécrit
+# toutes les sous-pages vers index.html (bug : /product/* renvoyait la home). Sans `-s`, serve rend
+# bien /product/orchestration/index.html, /product/brain-os/index.html, etc. + un vrai 404.
+CMD ["serve", "dist", "-l", "4321"]

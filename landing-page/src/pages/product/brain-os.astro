@@ -2,26 +2,39 @@
 import BaseLayout from "@/layouts/BaseLayout.astro";
 import PageHero from "@/components/site/PageHero.astro";
 import PageCta from "@/components/site/PageCta.astro";
+import FeatureSplit from "@/components/site/sections/FeatureSplit.astro";
+import BorderedGrid from "@/components/site/sections/BorderedGrid.astro";
+import ScreenPlaceholder from "@/components/site/sections/ScreenPlaceholder.astro";
 import { DecisionGraph } from "@/components/site/home/DecisionGraph";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Boxes, Network, RefreshCw, Building2 } from "lucide-react";
 import { APP_URL } from "@/components/site/nav";
 
+/**
+ * TaskForce Memory (Brain OS) — refonte au kit de sections (modèle : orchestration.astro).
+ * DA « petits traits » : le graphe causal (DecisionGraph, visuel RÉEL) porté par un FeatureSplit,
+ * les 4 points en BorderedGrid, la continuité Orchestration en FeatureSplit inversé. On alterne
+ * bg (secondary/card) + reverse pour rythmer la page. Aucune copie modifiée : on RE-LAYOUTE l'existant.
+ */
 const POINTS = [
   {
+    icon: Boxes,
     title: "Decisions become objects, not documents",
-    text: "Each decision links to the constraints it answered, the alternatives it rejected, and the files it shaped — structured so it can be reused, traced and challenged later.",
+    desc: "Each decision links to the constraints it answered, the alternatives it rejected, and the files it shaped — structured so it can be reused, traced and challenged later.",
   },
   {
+    icon: Network,
     title: "A map of why, not a search box",
-    text: "Retrieval follows the relationships between decisions, so a run gets the reasoning behind the code — not the ten pages that happen to share a keyword.",
+    desc: "Retrieval follows the relationships between decisions, so a run gets the reasoning behind the code — not the ten pages that happen to share a keyword.",
   },
   {
+    icon: RefreshCw,
     title: "Every run reads it, and writes back to it",
-    text: "Every run reads from memory before it starts, then writes its validated decisions back when it finishes. A senior stops re-explaining the system; the next run starts where the last one ended.",
+    desc: "Every run reads from memory before it starts, then writes its validated decisions back when it finishes. A senior stops re-explaining the system; the next run starts where the last one ended.",
   },
   {
+    icon: Building2,
     title: "Your organization's memory — not the model's",
-    text: "It lives in your workspace, can run on your infrastructure, and stays under your organization's control. The memory is an asset you own, not a vendor's.",
+    desc: "It lives in your workspace, can run on your infrastructure, and stays under your organization's control. The memory is an asset you own, not a vendor's.",
   },
 ];
 ---
@@ -35,73 +48,58 @@ const POINTS = [
     title="The memory layer behind every decision"
     lead="Powered by Brain OS. Every architectural decision, constraint and convention your team makes becomes reusable intelligence — so the next run, and the next hire, never start from a blank page."
     level="beta"
+    align="center"
     primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
     secondary={{ label: "See the public roadmap", href: "/roadmap" }}
-  />
-
-  <section class="bg-secondary border-b">
-    <div class="container-rail py-20 lg:py-28">
-      <div class="max-w-2xl">
-        <p class="t-eyebrow mb-3">Not a RAG over your wiki</p>
-        <h2 class="t-h2">Git remembers what changed.<br class="hidden sm:block" /> TaskForce remembers why.</h2>
-        <p class="t-lead mt-4">
-          TaskForce Memory links each decision to the constraints it answered, the alternatives it
-          rejected, and the code it shaped — so the reasoning is retrievable long after the thread,
-          the meeting and the person who made it are gone.
-        </p>
-      </div>
-
-      <div class="mt-14 grid gap-10 lg:grid-cols-2 lg:items-center lg:gap-16">
-        <DecisionGraph />
-        <ul class="flex flex-col gap-7">
-          {
-            POINTS.map((p) => (
-              <li class="border-l-2 border-primary/25 pl-5">
-                <h3 class="text-[15px] font-semibold text-foreground">{p.title}</h3>
-                <p class="text-muted-foreground mt-1.5 text-[14px] leading-6">{p.text}</p>
-              </li>
-            ))
-          }
-        </ul>
-      </div>
+  >
+    <div class="mx-auto mt-16 max-w-5xl">
+      <ScreenPlaceholder label="TaskForce Memory" ratio="16 / 9" />
     </div>
-  </section>
+  </PageHero>
 
-  {/* ── La phrase conceptuelle + continuité avec Orchestration (un seul produit) ── */}
-  <section class="bg-card border-b">
-    <div class="container-rail py-16 lg:py-20">
-      <div class="mx-auto max-w-3xl text-center">
-        <p class="font-display text-[24px] leading-[1.2] font-medium tracking-[-0.02em] text-foreground sm:text-[28px]">
-          TaskForce Memory is the decision graph of your organization.
+  {/* ───── Montrer : le graphe causal (DecisionGraph) porté par un FeatureSplit ───── */}
+  <FeatureSplit
+    bg="secondary"
+    eyebrow="Not a RAG over your wiki"
+    title="Git remembers what changed. TaskForce remembers why."
+    lead="TaskForce Memory links each decision to the constraints it answered, the alternatives it rejected, and the code it shaped — so the reasoning is retrievable long after the thread, the meeting and the person who made it are gone."
+  >
+    <DecisionGraph />
+  </FeatureSplit>
+
+  {/* ───── Ce que la mémoire fait — 4 points en grille « petits traits » ───── */}
+  <BorderedGrid bg="card" items={POINTS} cols={2} />
+
+  {/* ───── La phrase conceptuelle + continuité Orchestration (+ emplacement screenshot) ───── */}
+  <FeatureSplit
+    bg="secondary"
+    reverse
+    title="TaskForce Memory is the decision graph of your organization."
+    lead="Documents describe the system. Decisions explain why it is the way it is. The links between them make that reasoning retrievable — and every run adds to it."
+  >
+    <ScreenPlaceholder label="TaskForce Memory" />
+    <div slot="aside">
+      <div class="mt-6 max-w-sm rounded-2xl border bg-card p-6 text-left">
+        <p class="text-muted-foreground mb-3 text-[11px] font-semibold tracking-[0.08em] uppercase">
+          How it fits together
         </p>
-        <p class="text-muted-foreground mx-auto mt-4 max-w-xl text-[14.5px] leading-7">
-          Documents describe the system. Decisions explain why it is the way it is. The links between
-          them make that reasoning retrievable — and every run adds to it.
-        </p>
-
-        <div class="mx-auto mt-10 max-w-sm rounded-2xl border bg-secondary/40 p-6 text-left">
-          <p class="text-muted-foreground mb-3 text-[11px] font-semibold tracking-[0.08em] uppercase">
-            How it fits together
-          </p>
-          <ol class="flex flex-col gap-2 text-[14px] leading-6">
-            <li><span class="text-foreground font-medium">Memory</span> <span class="text-muted-foreground">knows why.</span></li>
-            <li><span class="text-foreground font-medium">Orchestration</span> <span class="text-muted-foreground">decides what happens next.</span></li>
-            <li><span class="text-foreground font-medium">Humans</span> <span class="text-muted-foreground">approve.</span></li>
-            <li><span class="text-foreground font-medium">Agents</span> <span class="text-muted-foreground">execute.</span></li>
-            <li><span class="text-foreground font-medium">Validated decisions</span> <span class="text-muted-foreground">go back into</span> <span class="text-foreground font-medium">Memory.</span></li>
-          </ol>
-        </div>
-
-        <a
-          href="/product/orchestration"
-          class="link-underline text-foreground mt-6 inline-flex items-center gap-1.5 text-[14px] font-medium"
-        >
-          See how orchestration uses it
-          <ArrowRight className="size-4" />
-        </a>
+        <ol class="flex flex-col gap-2 text-[14px] leading-6">
+          <li><span class="text-foreground font-medium">Memory</span> <span class="text-muted-foreground">knows why.</span></li>
+          <li><span class="text-foreground font-medium">Orchestration</span> <span class="text-muted-foreground">decides what happens next.</span></li>
+          <li><span class="text-foreground font-medium">Humans</span> <span class="text-muted-foreground">approve.</span></li>
+          <li><span class="text-foreground font-medium">Agents</span> <span class="text-muted-foreground">execute.</span></li>
+          <li><span class="text-foreground font-medium">Validated decisions</span> <span class="text-muted-foreground">go back into</span> <span class="text-foreground font-medium">Memory.</span></li>
+        </ol>
       </div>
+      <a
+        href="/product/orchestration"
+        class="link-underline text-foreground mt-6 inline-flex items-center gap-1.5 text-[14px] font-medium"
+      >
+        See how orchestration uses it
+        <ArrowRight className="size-4" />
+      </a>
     </div>
-  </section>
+  </FeatureSplit>
 
   <PageCta
     title="Build institutional memory, one decision at a time."

@@ -276,6 +276,198 @@ body {
   border-color: color-mix(in oklab, var(--primary) 35%, var(--site-border));
   box-shadow: 0 10px 26px -14px rgba(16, 24, 40, 0.16);
 }
+
+/* Surface premium façon Vercel : « bordure en ombre » (0 0 0 1px) + élévation douce multi-couches —
+   plus subtil qu'une bordure 1px dure, rendu plus « produit ». À poser avec bg-card + rounded-* (PAS de `border`). */
+.surface {
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.055),
+    0 1px 2px rgba(0, 0, 0, 0.04),
+    0 10px 22px -14px rgba(16, 24, 40, 0.12);
+}
+.surface-hover {
+  transition: box-shadow 200ms ease, transform 200ms ease;
+}
+.surface-hover:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.07),
+    0 2px 4px rgba(0, 0, 0, 0.05),
+    0 16px 30px -14px rgba(16, 24, 40, 0.16);
+}
+
+/* ── Décor : touches subtiles (points + halos) — PARCIMONIE, garde la structure « traits » ──
+   Esthétique DotField (React Bits) en STATIQUE (zéro JS → perf + sobre, sans risque « trop IA »).
+   Couleur = la marque (bleu) ; le dégradé chaud hero-wave reste réservé à Labs (cf. .labs-gradient).
+   Poser `.decor` (crée le contexte) + un modificateur (`.decor-dots` / `.decor-glow-top` / `.decor-tint`). */
+.decor {
+  position: relative;
+  isolation: isolate;
+}
+.decor > * {
+  position: relative;
+  z-index: 1;
+}
+/* nappe de points bleus, fondue par un masque radial → ne « remplit » jamais, ne touche pas les bords */
+.decor-dots::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: radial-gradient(color-mix(in oklab, var(--primary) 42%, transparent) 1px, transparent 1.7px);
+  background-size: 22px 22px;
+  -webkit-mask-image: radial-gradient(100% 100% at 50% 50%, #000 34%, transparent 80%);
+          mask-image: radial-gradient(100% 100% at 50% 50%, #000 34%, transparent 80%);
+  opacity: 0.3;
+}
+/* halo bleu doux en haut d'une section → transition / touche de bord entre deux sections */
+.decor-glow-top::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -1px;
+  height: 240px;
+  width: min(760px, 90%);
+  transform: translateX(-50%);
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(50% 100% at 50% 0%, color-mix(in oklab, var(--primary) 13%, transparent), transparent 72%);
+}
+/* fond « tinté » très léger, pour une section à bg arrondi (bleu de marque, pas de warm) */
+.decor-tint {
+  background:
+    radial-gradient(85% 120% at 50% -10%, color-mix(in oklab, var(--primary) 8%, transparent), transparent 62%),
+    var(--secondary);
+}
+
+/* ── Fonds de SECTION (façon Attio), avec PARCIMONIE : la plupart des sections restent BLANCHES.
+   (≠ `.decor-*` qui décore une carte.) Motif = ::before discret, contenu au-dessus (isolate).
+   Points = seulement le hero (bg n°1), FINS. Rayures = PROGRESSIVES (fondu) → transition entre sections. ── */
+.bg-dots,
+.bg-striped {
+  position: relative;
+  isolation: isolate;
+}
+.bg-dots > *,
+.bg-striped > * {
+  position: relative;
+  z-index: 1;
+}
+.bg-dots::before,
+.bg-striped::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+/* points fins (façon Attio, plus petits) — fondus haut/bas */
+.bg-dots::before {
+  background-image: radial-gradient(color-mix(in oklab, var(--foreground) 9%, transparent) 0.7px, transparent 1.2px);
+  background-size: 20px 20px;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 9%, #000 91%, transparent);
+          mask-image: linear-gradient(to bottom, transparent, #000 9%, #000 91%, transparent);
+}
+/* rayures PROGRESSIVES : nettes en haut, disparaissent vers le milieu → transition depuis la section du dessus */
+.bg-striped::before {
+  background-image: repeating-linear-gradient(90deg, color-mix(in oklab, var(--foreground) 6%, transparent) 0 1px, transparent 1px 13px);
+  -webkit-mask-image: linear-gradient(to bottom, #000, transparent 42%);
+          mask-image: linear-gradient(to bottom, #000, transparent 42%);
+}
+
+/* ── Flow « pro » façon Attio : le tracé se DESSINE UNE FOIS quand la section entre à l'écran
+   (un IntersectionObserver ajoute `.flow-run` sur le conteneur `[data-flow]`), puis se FIGE. Trait PLEIN
+   bleu ; le bord des cartes se REMPLIT en bleu. Aucune boucle permanente. Coupé si prefers-reduced-motion. ── */
+@property --bfill {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+/* traits SVG (connecteurs + bords de nœud) : se dessinent via pathLength="1" */
+.fx-draw,
+.fx-node {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+.flow-run .fx-draw {
+  animation: fx-draw 0.75s ease-in-out forwards;
+  animation-delay: var(--d, 0s);
+}
+.flow-run .fx-node {
+  animation: fx-draw 0.8s ease-in-out forwards;
+  animation-delay: var(--d, 0s);
+}
+@keyframes fx-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+/* connecteur HTML : ligne bleue qui pousse */
+.fx-line {
+  transform: scaleY(0);
+  transform-origin: top center;
+}
+.flow-run .fx-line {
+  animation: fx-grow 0.6s ease-in-out forwards;
+  animation-delay: var(--d, 0s);
+}
+@keyframes fx-grow {
+  to { transform: scaleY(1); }
+}
+
+/* bord de CARTE HTML qui se remplit (anneau conic), une fois, puis reste bleu */
+.fx-border {
+  position: relative;
+}
+.fx-border::after {
+  content: "";
+  position: absolute;
+  inset: -1.5px;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(from -90deg, #2563eb 0deg, #2563eb var(--bfill), transparent var(--bfill));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  opacity: 0;
+  pointer-events: none;
+}
+.flow-run .fx-border::after {
+  animation: fx-bfill 0.9s ease-in-out forwards;
+  animation-delay: var(--d, 0s);
+}
+@keyframes fx-bfill {
+  0% { --bfill: 0deg; opacity: 1; }
+  100% { --bfill: 360deg; opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flow-run .fx-draw,
+  .flow-run .fx-node,
+  .flow-run .fx-line,
+  .flow-run .fx-border::after {
+    animation: none;
+  }
+  .fx-draw,
+  .fx-node { stroke-dashoffset: 0; }
+  .fx-line { transform: none; }
+  .fx-border::after { opacity: 0; }
+}
+
+/* ── Canvas de flux (façon Attio, écran 3) : un cadre à fond POINTILLÉ où « flottent » les nœuds/toasts.
+   NOTRE TEMPLATE pour présenter tous les petits flux. À composer avec `surface bg-card rounded-2xl`. ── */
+.flow-canvas {
+  background-image: radial-gradient(color-mix(in oklab, var(--foreground) 8%, transparent) 1px, transparent 1.5px);
+  background-size: 20px 20px;
+}
+
+/* Retire les rails verticaux d'une section (variété sur les transitions). */
+.container-rail.no-rail {
+  border-inline: 0;
+}
+
 /* Tuile de logo : s'éclaire au survol. */
 .tile-hover {
   transition: background-color 160ms ease;
@@ -686,6 +878,35 @@ body {
 .labs-ic-e { stroke: url(#lgE); }
 /* Fiole Labs dans le header (site-wide) — dégradé déclaré par le <svg> caché de SiteHeader. */
 .labs-ic-head { stroke: url(#lgLabsHead); }
+
+/* PixelBlast FIGÉ (statique) : petits carrés warm (palette hero-wave), concentrés sur les BORDS via un
+   masque → « pixels autour » d'une section, façon transition. Labs uniquement (le warm reste réservé à
+   Labs). Poser avec `.decor` (relève le contenu) + `overflow-hidden`. Zéro JS, zéro three.js. */
+.labs-pixels::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Crect width='2' height='2' fill='%23ff7a97'/%3E%3C/svg%3E");
+  background-size: 8px 8px;
+  -webkit-mask-image: linear-gradient(to bottom, #000, transparent 26%, transparent 74%, #000);
+          mask-image: linear-gradient(to bottom, #000, transparent 26%, transparent 74%, #000);
+  opacity: 0.14;
+}
+/* Halo warm doux en haut d'une section Labs (transition / touche de bord). */
+.labs-glow-top::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -1px;
+  height: 240px;
+  width: min(820px, 92%);
+  transform: translateX(-50%);
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(50% 100% at 50% 0%, rgba(255, 122, 151, 0.14), transparent 72%);
+}
 
 /* Échelle typographique Labs — miroir des .t-* mais en encre claire.
    (Les .t-* portent color:var(--site-fg) = sombre : inutilisables ici.) */

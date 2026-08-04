@@ -2,9 +2,20 @@
 import BaseLayout from "@/layouts/BaseLayout.astro";
 import PageHero from "@/components/site/PageHero.astro";
 import PageCta from "@/components/site/PageCta.astro";
+import FeatureSplit from "@/components/site/sections/FeatureSplit.astro";
+import CalloutBand from "@/components/site/sections/CalloutBand.astro";
+import Panel from "@/components/site/sections/Panel.astro";
+import ScreenPlaceholder from "@/components/site/sections/ScreenPlaceholder.astro";
 import { AutoAssign } from "@/components/site/illustrations/AutoAssign";
-import { Sparkles, Gauge, Clock, Bot, ShieldCheck, Check } from "lucide-react";
+import { Sparkles, Gauge, Clock, Bot, ShieldCheck } from "lucide-react";
 import { APP_URL } from "@/components/site/nav";
+
+/**
+ * Smart Assign — même grammaire de sections que la page modèle `orchestration.astro` :
+ * showcase de l'île réelle (AutoAssign), grille à FILETS pour les signaux (DA « petits traits »),
+ * un FeatureSplit + ScreenPlaceholder pour l'agent-assigné, un CalloutBand pour la gouvernance.
+ * Copie 100 % préservée : on ré-agence, on ne réécrit pas. Pas de StatBand (aucun chiffre réel ici).
+ */
 
 const FACTORS = [
   { icon: Sparkles, title: "Skills", text: "Matched from each member's skill profile — the areas they're strongest in." },
@@ -32,7 +43,7 @@ const REVIEW = [
     secondary={{ label: "See pricing", href: "/pricing" }}
   />
 
-  {/* ── La vraie modale Smart Assign, animée ── */}
+  {/* ── La vraie modale Smart Assign, animée — showcase pleine largeur ── */}
   <section class="bg-secondary border-b">
     <div class="container-rail py-20 lg:py-28">
       <div class="max-w-2xl">
@@ -49,7 +60,7 @@ const REVIEW = [
     </div>
   </section>
 
-  {/* ── How it decides ── */}
+  {/* ── How it decides — grille à FILETS (DA « petits traits »), remplace la grille de cartes ── */}
   <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-28">
       <div class="max-w-2xl">
@@ -60,15 +71,15 @@ const REVIEW = [
           suggestion — so a lead can trust it, or overrule it, in a glance.
         </p>
       </div>
-      <div class="mt-12 grid gap-6 lg:grid-cols-3">
+      <div class="bg-border mt-12 grid gap-px overflow-hidden rounded-2xl border sm:grid-cols-2 lg:grid-cols-3">
         {
           FACTORS.map((f) => (
-            <div class="rounded-2xl border bg-card p-6">
-              <span class="bg-card text-foreground flex size-11 items-center justify-center rounded-xl border">
+            <div class="bg-card flex flex-col p-6">
+              <span class="bg-secondary/60 text-foreground flex size-10 items-center justify-center rounded-lg border">
                 <f.icon className="size-5" strokeWidth={1.75} />
               </span>
-              <h3 class="mt-4 text-[16px] font-semibold text-foreground">{f.title}</h3>
-              <p class="text-muted-foreground mt-2 text-[13.5px] leading-6">{f.text}</p>
+              <h3 class="text-foreground mt-4 text-[15px] font-semibold">{f.title}</h3>
+              <p class="text-muted-foreground mt-1.5 text-[13px] leading-6">{f.text}</p>
             </div>
           ))
         }
@@ -81,50 +92,48 @@ const REVIEW = [
     </div>
   </section>
 
-  {/* ── Agent as assignee ── */}
-  <section class="bg-secondary border-b">
-    <div class="container-rail py-20 lg:py-28">
-      <div class="grid gap-10 lg:grid-cols-[minmax(0,420px)_1fr] lg:gap-16">
-        <div>
-          <p class="t-eyebrow mb-3">The difference</p>
-          <h2 class="t-h2">A coding agent is an assignee like any other</h2>
-          <span class="text-foreground mt-6 inline-flex size-11 items-center justify-center rounded-xl border bg-card">
-            <Bot className="size-5" strokeWidth={1.75} />
-          </span>
-        </div>
-        <div class="flex flex-col gap-4 text-[15px] leading-7 text-foreground">
-          <p>
-            Same board, same card, same review checkpoint. Assign an issue to Claude Code, Cursor or
-            a teammate — Smart Assign weighs them the same way, by what the work needs.
-          </p>
-          <p class="text-muted-foreground">
-            That's the whole idea: an agent isn't a feature bolted on the side. It's a member of the
-            team that happens not to need sleep — and it still hands its work to a human to approve.
-          </p>
-        </div>
+  {/* ── Agent as assignee — FeatureSplit + ScreenPlaceholder ── */}
+  <FeatureSplit
+    reverse
+    bg="secondary"
+    eyebrow="The difference"
+    title="A coding agent is an assignee like any other"
+  >
+    <div slot="aside">
+      <span class="text-foreground mt-6 inline-flex size-11 items-center justify-center rounded-xl border bg-card">
+        <Bot className="size-5" strokeWidth={1.75} />
+      </span>
+      <div class="mt-6 flex flex-col gap-4 text-[15px] leading-7 text-foreground">
+        <p>
+          Same board, same card, same review checkpoint. Assign an issue to Claude Code, Cursor or
+          a teammate — Smart Assign weighs them the same way, by what the work needs.
+        </p>
+        <p class="text-muted-foreground">
+          That's the whole idea: an agent isn't a feature bolted on the side. It's a member of the
+          team that happens not to need sleep — and it still hands its work to a human to approve.
+        </p>
       </div>
     </div>
-  </section>
+    <ScreenPlaceholder label="Board · agent as assignee" />
+  </FeatureSplit>
 
-  {/* ── Human review ── */}
-  <section class="bg-card border-b">
-    <div class="container-rail py-20 lg:py-28">
-      <div class="max-w-2xl">
-        <p class="t-eyebrow mb-3">You stay in control</p>
-        <h2 class="t-h2">A suggestion, never an autopilot</h2>
-      </div>
-      <ul class="mt-10 flex flex-col gap-3.5">
-        {
-          REVIEW.map((r) => (
-            <li class="flex items-start gap-3 text-[14.5px] leading-6 text-foreground">
-              <ShieldCheck className="text-primary mt-0.5 size-4 shrink-0" strokeWidth={2} />
-              {r}
-            </li>
-          ))
-        }
-      </ul>
+  {/* ── Human review — CalloutBand + Panel (la liste réelle dans un visuel) ── */}
+  <CalloutBand eyebrow="You stay in control" statement="A suggestion, never an autopilot" bg="card">
+    <div class="mx-auto mt-10 max-w-xl text-left">
+      <Panel>
+        <ul class="flex flex-col">
+          {
+            REVIEW.map((r) => (
+              <li class="text-foreground flex items-start gap-3 border-b py-3 text-[14px] leading-6 last:border-0">
+                <ShieldCheck className="text-primary mt-0.5 size-4 shrink-0" strokeWidth={2} />
+                <span>{r}</span>
+              </li>
+            ))
+          }
+        </ul>
+      </Panel>
     </div>
-  </section>
+  </CalloutBand>
 
   <PageCta
     title="Put the right work in the right hands"

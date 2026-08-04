@@ -1,0 +1,70 @@
+---
+/**
+ * BentoCell — une cellule de <Bento/> : entête (icône + éventuel chip d'honnêteté), titre, corps,
+ * puis un visuel RÉEL via le slot par défaut (mockup léger en vrai HTML, pas de faux screenshot).
+ * `span` pilote la largeur sur la grille 6 colonnes du Bento. `tag`/`tagTone` = étiquette d'honnêteté
+ * (D11) : « Illustrative » (muted) ou « Coming next » (primary) selon que c'est un concept ou du Planned.
+ */
+import type { LucideIcon } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+
+interface Props {
+  icon?: LucideIcon;
+  title: string;
+  body?: string;
+  span?: "third" | "half" | "twothirds" | "full";
+  tag?: string;
+  tagTone?: "muted" | "primary";
+  link?: { label: string; href: string };
+}
+const { icon: Icon, title, body, span = "third", tag, tagTone = "muted", link } = Astro.props;
+
+const SPAN: Record<NonNullable<Props["span"]>, string> = {
+  third: "md:col-span-2",
+  half: "md:col-span-3",
+  twothirds: "md:col-span-4",
+  full: "md:col-span-6",
+};
+---
+
+<div class:list={["bg-card flex flex-col p-6 sm:p-7", SPAN[span]]}>
+  {
+    (Icon || tag) && (
+      <div class="mb-4 flex items-center justify-between gap-3">
+        {Icon ? (
+          <span class="bg-secondary/60 text-foreground flex size-10 items-center justify-center rounded-lg border">
+            <Icon className="size-5" strokeWidth={1.75} />
+          </span>
+        ) : (
+          <span />
+        )}
+        {tag && (
+          <span
+            class:list={[
+              "inline-flex items-center rounded-full border px-2.5 py-0.5 font-mono text-[9.5px] font-semibold tracking-wide uppercase",
+              tagTone === "primary"
+                ? "border-primary/30 bg-primary/5 text-primary"
+                : "border-border bg-secondary/60 text-muted-foreground/80",
+            ]}
+          >
+            {tag}
+          </span>
+        )}
+      </div>
+    )
+  }
+  <h3 class="t-h3">{title}</h3>
+  {body && <p class="text-muted-foreground mt-2 text-[13.5px] leading-6">{body}</p>}
+  <div class="mt-6 flex-1"><slot /></div>
+  {
+    link && (
+      <a
+        href={link.href}
+        class="link-underline text-foreground mt-5 inline-flex w-fit items-center gap-1.5 text-[13.5px] font-medium"
+      >
+        {link.label}
+        <ArrowRight className="size-3.5" />
+      </a>
+    )
+  }
+</div>
