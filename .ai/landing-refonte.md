@@ -185,6 +185,353 @@ point identifiable sur la courbe de lead time.
 | Métronome | `src/lib/useScene.ts` | `useScene(beats)` : partition de durées, démarre à l'entrée à l'écran, se joue **une fois**, **se fige sur l'état final**. `useTypewriter` pour la frappe. `prefers-reduced-motion` → état final direct. |
 | Châssis | `src/components/site/scene/AppWindow.tsx` | Vrai écran TaskForce (voir encadré ci-dessous). **Remplace la barre macOS de `MockFrame`** — trois pastilles + une URL, c'est le signe le plus sûr qu'on regarde un dessin. |
 
+> ### ⚑ v110 (04/08) — Animations « pro » façon Attio : DRAW-ONCE au scroll (flèches pleines bleues, bords qui se remplissent, puis fige)
+> User : animations plus pro/clean comme Attio — **flèches PLEINES bleues**, anime **une seule fois** quand le flow passe (pas en
+> permanence), le **bord de carte se remplit en bleu** quand la flèche l'atteint puis **se fige** (« un fluide qui remplit les traits »).
+> Animer le hero aussi. Varier les agencements.
+> - **Remplacé `tf-dash`/`tf-pulse`** (boucles permanentes) par un **moteur « draw-once »** (`global.css`) :
+>   - `@property --bfill` + `fx-draw` (trait SVG qui se dessine via `pathLength="1"` + `stroke-dashoffset`→0), `fx-node` (bord de nœud SVG),
+>     `fx-line` (connecteur HTML qui pousse en `scaleY`), `fx-border` (bord de carte HTML : anneau **conic** masqué qui se remplit).
+>     `animation-fill-mode: forwards` → **se fige**. Délais séquentiels via `--d` (le flow « passe »). Coupé si `prefers-reduced-motion`.
+>   - **JS** (script en bas d'`orchestration.astro`) : `IntersectionObserver` ajoute `.flow-run` sur chaque `[data-flow]` à l'entrée à
+>     l'écran puis `unobserve` → **joue UNE fois**. (⚠️ un scroll instantané très rapide peut rater le trigger ; scroll normal = OK.)
+> - Appliqué aux **4 schémas** : hero (cartes `fx-border` + connecteurs `fx-line`), approval loop (SVG `fx-draw`/`fx-node`), handoff (flux
+>   vertical), calibration loop (SVG). Retiré le point « pulse » permanent du hero (RUNNING = point statique).
+> - Vérifié Brave ✅ : mi-parcours = le flow descend/traverse (cartes bleues en séquence, les suivantes encore grises) ; final = **tout bleu
+>   figé** (flèches pleines + bords remplis). Build 68 OK.
+> - **Note structures** : déjà variées (graphe vertical+branche / panneau / colonnes à filets / boucle horizontale / flux vertical / cartes).
+>   Les 2 boucles partagent une structure horizontale — à différencier si besoin (ex. calibration en **cercle**). Option aussi : les bords
+>   pourraient **retomber en gris** après le passage (ne garder que les connecteurs bleus) au lieu de rester bleus.
+
+> ### ⚑ v109 (04/08) — Orchestration = cycle de vie complet du run : +3 schémas animés (grounding, handoff, calibration loop)
+> User a choisi **les 3** pistes. Réorganisé orchestration en **cycle de vie du run** ; le **bento retiré** (son contenu mémoire/
+> prédiction/modèles repris **sans redondance** dans les nouveaux schémas). Ordre : Hero → Problème → **Grounding** → The team → **Approval
+> loop** → **Handoff** → **Calibration loop** → **Your models** → Preuve → Moat → CTA.
+> - **Grounding** (2-col) : « It starts from what you already decided » + panneau « Your context » (4 items) → flèche → « a proposal grounded
+>   in your context ». Lien brain-os. (reprend MEMORY_ITEMS)
+> - **Handoff** (2-col) : « Approved plans go straight to your coding agent » + **flux vertical animé** (Approved plan → Your coding agent →
+>   Pull request), connecteurs SVG `tf-dash`. Générique (« the coding agent you already use ») → honnête, pas de fausse intégration nommée.
+> - **Calibration** (centré, **LOOP animé**) : Predict → Ship → Measure → Recalibrate + **courbe de retour** « the next run starts better
+>   calibrated ». Tag **« Coming next »** (honnêteté). + table échantillon (CALIB : effort ~6d→5d, etc.).
+> - **Your models** (2-col compact) : Local · Ollama `$0/run` / Hosted `optional`.
+> - Imports nettoyés : retiré `Bento`/`BentoCell`/`Target` ; ajouté `Sparkles`/`GitPullRequest`/`ArrowDown`/`ArrowRight`.
+> - Vérifié Brave ✅ : tout rend, **animations `tf-dash` actives** (les tirets se déplacent entre 2 captures). Build 68 OK.
+> - Page = **11 sections** (cycle de vie complet). Riche ; si trop long → on pourra élaguer. **Composants désormais inutilisés** (candidats
+>   à un ménage) : `Bento`, `BentoCell`, `Faq`, `FeatureCards`, `FeatureCard`, `DotField.tsx`.
+
+> ### ⚑ v108 (04/08) — Schémas animés (loops) : boucle d'approbation + hero « live » ; question « + de sections ? »
+> User adore la v107. Demande : « multiplier le petit schéma (comme le hero), tu peux les animer / faire de **vrais loop**, peaufine » +
+> « y a d'autre chose à montrer / on ajoute des sections ? ».
+> - `global.css` : keyframes **`tf-dash`** (tirets qui défilent le long d'un tracé SVG) + **`tf-pulse`** (point « live » qui respire),
+>   **coupés si `prefers-reduced-motion`**.
+> - **Hero** : le nœud « RUNNING » gagne un **point bleu qui respire** (`tf-pulse`).
+> - **NOUVELLE section « Human-in-the-loop »** (après « The team ») : schéma **animé** de la **boucle d'approbation** — Propose → Review →
+>   Approve (connecteurs bleus en **tirets défilants**) + boucle **« Request changes »** (ambre, courbe SVG) qui **reboucle** Review→Propose.
+>   C'est LE différenciateur (human gate), jusque-là seulement écrit. Fond **blanc**, SVG responsive (`viewBox`), honnête (concept).
+> - Vérifié Brave ✅ (nœuds alignés, arrow-heads OK, dashes visibles/animés). Build 68 OK.
+> - **Réponse à « d'autres sections ? »** : la boucle d'approbation était la pièce clé manquante (ajoutée). Pistes proposées au user pour la
+>   suite : (a) **boucle de calibration** (predict → ship → measure → recalibrate) en 2ᵉ schéma animé ; (b) **grounding** (le run lit ton
+>   archi/décisions/conventions avant de proposer). → en attente de son choix.
+
+> ### ⚑ v107 (04/08) — Correctifs Attio : rayures PROGRESSIVES, fonds 100% BLANCS, points fins + hero only, CTA sans points
+> Retours user sur v106 : (1) « t'abuses » — le striped remplissait **toute une section** ; le rendre **progressif** (fondu) = une
+> **transition**. (2) **« pas de bg autre que blanc pour nous »** → retirer le **gris** ET le **NOIR**. (3) points = **seulement le hero**
+> (« bg n°1 ») et **plus petits** (Attio en a des plus petits). (4) **« pk des points dans le bg du CTA ? »** → zéro point sur le CTA.
+> - `global.css` : **`.bg-dots`** points plus fins (`0.7px`, trame `20px`) — hero uniquement. **`.bg-striped`** masque **haut→milieu**
+>   (`linear-gradient(#000, transparent 42%)`) → rayures nettes en haut puis **fondues** = transition depuis la section du dessus (plus de
+>   remplissage). **Supprimé `.section-dark` + `.bg-dots-dark`** (le noir n'est plus utilisé).
+> - `orchestration.astro` : Bento **`bg="card"`** sans `pattern` (blanc, sans points) ; StatBand **`bg="card"`** (blanc) ; **le moat
+>   repasse en BLANC** (énoncé `.t-h2` + 4 colonnes à filets, icônes ligne) ; CTA **sans `field`**.
+> - `PageCta` : retiré `DotField`/`field`/`decor-dots` → **carte propre** (halo bleu discret), **aucun point**. `DotField.tsx` désormais
+>   inutilisé (gardé, réutilisable). `Bento.pattern` et `.decor-dots` dormants aussi.
+> - Résultat : page **quasi tout blanc**, seuls motifs = **points fins du hero** + **rayures progressives** (transition vers « The team »).
+>   Vérifié Brave ✅ (points plus petits confirmés au zoom, rayures fondues, moat blanc, CTA sans points). Build 68 OK.
+> - Note : le **CTA + footer** gardent une bande **gris très clair** (pré-existant, sépare la carte flottante) — à blanchir si tu veux du 100% blanc.
+
+> ### ⚑ v106 (04/08) — Orchestration REFAITE façon Attio : fonds de SECTION alternés + hero à graphe de run
+> User : « je te parle des **fonds de SECTION** (points / striped / vide / **noir**), pas des fonds de cartes ». Ils **alternent** (façon
+> **attio.com/platform/workflows**), une seule couleur en plus = **noir** sur certaines sections. Reprendre le **hero d'Attio** (graphe de
+> workflow) pour orchestration ; **aucun screenshot d'app** (comme Attio → cohérent avec D11, on n'a pas l'app). « Refais orchestration ».
+> - **Recon Attio dans le Brave du user** : motifs = **points** (hero/témoignage/feature), **rayures verticales** (sections agents), **vide**,
+>   et **NOIR** (« Powered by Universal Context™ » : texte blanc + colonnes à filets pointillés + icônes). Confirmé : zéro screenshot d'app.
+>   Leurs **animations** (pluie de traits sur le noir, graphe animé) → nous on reste **statique** (déciz + honnêteté + soutenance).
+> - **`global.css`** : fonds de SECTION **`.bg-dots` / `.bg-striped` / `.bg-dots-dark`** (motif en `::before` masqué haut/bas → transitions
+>   douces ; encre neutre, aucune couleur ajoutée) + **`.section-dark`** (`#0b0b0d`, texte clair). **≠ `.decor-*`** (qui décorent une carte).
+> - **`Bento`** : nouveau prop **`pattern`** (`dots`｜`striped`).
+> - **`orchestration.astro` refait** (alternance des fonds : **points / vide / rayures / points / vide / NOIR / vide**) :
+>   1. **Hero 2 col** — texte + **graphe de run** (Trigger→CPO→CTO→COO→branche Execute/QA), badges Approved/Running/Queued, chips owner
+>      (violet/bleu/ambre). Fond **points**. Badge **PLANNED** + légende **« Illustrative »** (honnêteté).
+>   2. Problème (CalloutBand) — **vide**. 3. **L'équipe** — 3 **colonnes à filets** (structure par traits), fond **rayures**.
+>   4. Inside a run — **bento** (mémoire/prédiction/modèles), fond **points**. 5. Preuve (StatBand) — **vide** (reverti le panel/dots-carte de
+>      v104). 6. **Le moat = SECTION NOIRE** (façon Universal Context) : titre blanc + 4 colonnes à filets blancs. 7. CTA — champ de points gardé.
+> - **Honnêteté** : **aucun screenshot d'app** (comme Attio) ; graphe illustratif + PLANNED + note CTA ; **vert uniquement** sur le badge
+>   sémantique « Approved » (comme le « Completed » d'Attio), **pas de vert de marque**. ⚠️ à confirmer si le user préfère zéro vert du tout.
+> - Vérifié Brave : ✅ transition gris→**NOIR** franche, graphe + colonnes à filets nets, motifs de section subtils. Build 68 pages OK.
+> - Reste : décliner le système (**fonds de section alternés + pas de screenshot d'app**) aux autres pages produit si validé.
+
+> ### ⚑ v105 (04/08) — Décisions user posées : DotField INTERACTIF (CTA) + Labs = PixelBlast FIGÉ (statique, warm)
+> Réponses user à v104 : (1) ajouter le **DotField interactif** sur 1-2 spots ; (2) Labs en **pixel/dégradé statique** (couleurs
+> hero-wave) — on **ne revient PAS** sur « zéro animation Labs » (déciz 03/08 respectée).
+> - **`DotField.tsx`** (nouvel îlot React, `src/components/site/decor/`) : portage React Bits, **zéro dépendance** (canvas natif, 3.9 kB /
+>   1.7 kB gzip). Adapté TaskForce : couleurs **bleu de marque** (pas le violet par défaut), `pointer-events-none`, garde
+>   **`prefers-reduced-motion`** (une image figée, aucun RAF), masque de fondu vers les bords (comme `.decor-dots`).
+> - **`PageCta`** : nouveau prop **`field`** → rend le DotField interactif (`client:visible`) au lieu des points statiques. Activé sur
+>   **orchestration uniquement** (1 spot, parcimonie) ; les autres CTA gardent les points statiques. Vérifié Brave : champ de points bleu
+>   qui réagit au curseur (bulge + halo). ✅
+> - **Labs (statique)** : `.labs-pixels` = **PixelBlast FIGÉ** — petits carrés warm (palette hero-wave) via **data-URI SVG**, concentrés
+>   sur les **bords** par un masque → « pixels autour / transition ». + `.labs-glow-top` (halo warm). Posés (`decor labs-pixels
+>   overflow-hidden`) sur **2 sections Labs** (« experiments » + « loop ») → au bord commun, les deux bandes forment une **transition de
+>   pixels**. **Zéro three.js**, statique. Vérifié Brave. ✅
+> - Reste : calibrer l'intensité si besoin (actuel = très subtil, `opacity .14`) ; décliner ailleurs si validé (hero, autres pages).
+
+> ### ⚑ v104 (04/08) — Décor subtil « bg arrondi + points/dégradé » (façon React Bits DotField) en STATIQUE, parcimonie
+> User : garder la plupart des sections **blanches** ; ajouter **avec parcimonie** des sections à **fond arrondi** + des **touches
+> dégradé/points** (genre `DotField` de React Bits) sur les bords / transitions ; **garder la structure par traits** (page / section /
+> interne) ; **nos couleurs** (pas le violet par défaut). PixelBlast réservé à Labs.
+> - **Choix technique : STATIQUE, zéro JS.** Esthétique DotField reproduite en CSS (pas de canvas/RAF) → perf + sobre + pas de risque
+>   « trop IA » (soutenance). Utilitaires dans `global.css` : **`.decor`** (contexte) + **`.decor-dots`** (nappe de points bleus, masque
+>   radial → ne remplit jamais, ne touche pas les bords) + **`.decor-glow-top`** (halo bleu de transition) + **`.decor-tint`** (fond bleu
+>   très léger pour un panneau arrondi).
+> - **Appliqué avec parcimonie** : `PageCta` (dots + `surface` au lieu de `border`) ; `StatBand` (nouveaux props **`panel`/`dots`** →
+>   panneau arrondi tinté + points), posé sur orchestration (`<StatBand … panel dots />`). Le reste des sections reste blanc. Structure
+>   interne gardée (les `md:border-l` des chiffres, les hairlines du bento).
+> - **Couleur = bleu de marque.** Le dégradé chaud **hero-wave** (`.labs-gradient`, palette de `public/labs/hero-wave.jpg`) reste **réservé
+>   à Labs** (règle DA : warm/violet = marquage Labs/IA uniquement). Vérifié Brave : StatBand = panneau bleu-gris + points fondus ; CTA =
+>   carte arrondie + points + halo bleu. ✅ Build 68 pages OK.
+> - **⚠️ EN ATTENTE de 2 décisions user** : (1) **DotField interactif** (canvas réactif au curseur) sur 1–2 spots, ou rester statique ?
+>   (2) **PixelBlast animé sur Labs** = **revient sur la décision 03/08** « Labs clair, image fixe, **zéro animation** » (cf. mémoire
+>   `labs-dark-scoped-world`) + ajoute `three` + `postprocessing` + risque « trop IA » soutenance. Alternative proposée : fond pixel/dégradé
+>   **statique** aux couleurs hero-wave. → à trancher avant de coder.
+
+> ### ⚑ v103 (04/08) — Orchestration refaite en BENTO (21st.dev adapté) : fini les ScreenPlaceholder vides + les cartes identiques
+> User : page orchestration « naze » (3 placeholders vides + 3 `FeatureCard` identiques) ; « reprends les composants 21st.dev, adapte-les
+> en **vrais composants**, **uniquement orchestration**, et **supprime les composants inutilisés** (vérifie qu'on les utilise nulle part) ».
+> 4 blocs fournis : Aceternity `feature-section-with-bento-grid`, Ruixen `combined-featured-section` + les 2 d'avant (ruixen-feature / tailark).
+> - **Nouvelle primitive réutilisable** : **`Bento.astro`** (grille 6 col, filets `gap-px bg-border` + `.surface`) + **`BentoCell.astro`**
+>   (`span` = third｜half｜twothirds｜full ; icône ; `tag`/`tagTone` = chip d'honnêteté « Coming next »/« Illustrative » ; slot = visuel réel).
+>   Portée à NOTRE système : tokens TaskForce, thème clair, **zéro dépendance** (pas de cobe/framer-motion/recharts/dotted-map — on garde la
+>   structure bento, pas le poids). On prend la **structure**, pas la DA (aucun vert, aucun logo/faux client des exemples).
+> - **`orchestration.astro` refait** : hero = **mock du moment de décision** (proposition CTO + rail de progression 7 étapes + boutons
+>   *Approve* / *Request changes* + « Nothing proceeds until you approve ») au lieu du placeholder vide ; « Inside a run » = **bento 5 cellules**
+>   (7 checkpoints · mémoire · équipe CPO/CTO/COO · prédiction « Coming next » · vos modèles Ollama $0/hosted) — **contenu réel, plus un seul
+>   placeholder vide sur la page**. Gardé CalloutBand (problème) / StatBand (7·3·1·$0) / BorderedGrid (moat) / PageCta.
+> - **Supprimés** (grep : utilisés nulle part ailleurs) : **`FeatureCards.astro`** + **`FeatureCard.astro`** (n'étaient importés QUE par
+>   orchestration) + **`Faq.astro`** (jamais placé). ⚠️ `FeatureCards()` dans `home/Showcase.tsx` = fonction locale distincte → non touchée.
+> - **D11/honnêteté** : pill « Preview » sur la fenêtre, chip « Coming next » sur la prédiction, badge « Planned » + note CTA ; « 9 » hors-cible
+>   en **ambre** (pas de vert, sensibilité user à la DA Relay). Le bandeau sombre en bas des captures = **dev toolbar Astro** (pas un bug).
+> - **Vérifié dans le Brave du user** (`localhost:18081`, `astro dev`) : `npm run build` 68 pages OK + parcours complet capté (hero décision →
+>   problème → bento varié → stats → moat → CTA). Rendu premium et cohérent, aucune section vide. ✅
+> - Reste : décliner le Bento aux autres pages produit **si validé** ; PUIS héberger (Docker + CF tunnel déjà prêts & validés).
+
+> ### ⚑ v102 (03/08) — Évolution DA d'après les design systems (hermes-agent) : surface premium « shadow-as-border »
+> User : « on fait évoluer le site d'abord, hébergement ensuite ». Source design = **`NousResearch/hermes-agent` →
+> `skills/creative/popular-web-designs/templates/*.md`** (54 design systems : linear.app, vercel, raycast, cursor, warp, supabase,
+> stripe, framer, notion, claude…). Cloné en scratchpad. Étudié Linear / Vercel / Raycast.
+> - **Leçon Vercel (light, notre pair)** : « **shadow-as-border** » = `box-shadow 0 0 0 1px rgba(0,0,0,.06)` + élévation douce
+>   multi-couches, au lieu d'une bordure 1px dure → rendu bien plus « produit ». Ajout **`.surface`** (+`.surface-hover`) dans
+>   `global.css`, appliqué à **`FeatureCard` / `Panel` / `ScreenPlaceholder`** (retiré `border shadow-sm`, gardé `bg-card rounded-*`).
+>   **Vérifié dans le Brave du user** : cartes « Inside a run » + écrans = ombre-bordure douce, flottantes, plus premium. ✅
+> - Typo display déjà serrée (Sora, 500, -0.035em) → pas touché. DA = bleu/nos jetons (zéro vert Relay).
+> - **Reste** : décliner `.surface` aux autres cartes (BorderedGrid…), varier + placer FAQ + diversifier via les autres design
+>   systems (Linear/Raycast pour le rythme, sections type Vercel), rollout pages, PUIS héberger (Docker+CF tunnel déjà prêt & validé).
+>
+
+> Le user fournit `github.com/akash3444/shadcn-ui-blocks` pour diversifier + veut **une 1re version en ligne CE SOIR sur la VM**.
+> - **Survey du repo** (cloné en scratchpad) : hero×8, features×18, stats×11, faq×14, cta×7, logo-cloud×15, pricing×10,
+>   testimonials×13, footers×7 — dans `src/registry/blocks/{base,radix,shared}`. `shared` = markup le + portable (Tailwind + nos
+>   jetons `bg-card`/`text-muted-foreground`/`text-primary`, juste `dark:` à retirer). **Pertinents** : features/stats/faq/logo-cloud/cta.
+>   **Skip testimonials** (pas de faux témoignage — D11).
+> - **Livré** : **`Faq.astro`** (adapté de `faq-04`, DA TaskForce, réutilisable via `items`) — nouveau type de section qui nous manquait.
+>   ⚠️ Copie FAQ = à écrire/valider (nouvelle copie → D11). Pas encore placée sur une page.
+> - **DÉPLOIEMENT (réponses user : Docker pas k8s ; expo = Cloudflare Tunnel)** : k8s **inutile** pour un site statique. `Dockerfile`
+>   existant corrigé (**copie `.npmrc`** sinon `npm ci` casse sur le peer vite@8) + **`.dockerignore`** + **`docker-compose.yml`**
+>   (service `landing` = `serve dist` sur 4321 + `cloudflared` avec `TUNNEL_TOKEN`) + `.env.example`. cloudflared = sortant → OK
+>   derrière le NAT école. Public hostname CF → `http://landing:4321`. **Build image en cours (bg) pour valider le Dockerfile.**
+> - **Bug attrapé + corrigé** : le Dockerfile lançait `serve -s dist` (**mode SPA**) → toutes les **sous-pages `/product/*`
+>   renvoyaient la HOME. Corrigé en `serve dist` (multi-pages). **Image BUILD + SERVE validés en local** (docker run + curl) :
+>   `/`, `/product/orchestration` (« Orchestration — TaskForce »), `/product/brain-os`, `/pricing` = **200 + bons titres**.
+> - **Déploiement PRÊT** (Dockerfile + compose + .env.example, image prouvée). Manque juste, côté user : créer le **tunnel CF**
+>   (token) et confirmer **domaine CF** (URL stable) vs **quick tunnel** (`*.trycloudflare.com`).
+> - **Reste (en attente réponse user)** : placement de la **FAQ** (home ? chaque page produit ?) ; adapter d'autres blocs
+>   (features/stats/logo-cloud). ⚠️ La notif de fin de build n'est PAS une réponse user — questions domaine/FAQ toujours ouvertes.
+>
+
+> Retour user : « hero centré OK, la section cards OK, mais **tout le reste n'a pas bougé** » → seules hero+cards avaient le
+> traitement Relay ; le reste = ancien kit plat. Fix : **la section « The run » (liste numérotée nue) → `FeatureSplit` + gros
+> `ScreenPlaceholder` sticky** (les 7 étapes à gauche, écran « run board » à droite). Build 68 OK.
+> - **Vérifié section par section dans le Brave du user** — orchestration cohérente de bout en bout : Hero(écran) → Problem
+>   (statement) → **Run (split + écran)** → StatBand → **Inside a run (cartes mini-mockup)** → **Your models (spotlight + écran)** →
+>   Moat (statement + BorderedGrid) → CTA. **3 écrans d'app + cartes + stat band**, tout en **bleu TaskForce** (0 vert).
+> - Les « statements » (Problem, Moat) restent volontairement texte (respirations, comme les intros de section chez Relay).
+> - **Orchestration = MODÈLE finalisé et validé visuellement.** Prochain : décliner CE niveau (chaque section a un visuel/écran,
+>   pas juste hero+cards) sur brain-os (déjà hero OK) puis approvals/smart-assign/agents/analytics/integrations/collaboration.
+> **➜ Recharger /product/orchestration (scroll complet).**
+>
+
+> ### ⚑ v99 (03/08) — Rollout template : brain-os passe au hero cohérent (centré + ScreenPlaceholder) + rappel DA
+> Rappel user : **la DA reste TaskForce (bleu primaire, noir/blanc, PAS de vert)** — on ne reprend que la STRUCTURE de Relay, pas
+> sa couleur verte. Tout est déjà sur `--primary` (bleu). Aussi : peu d'update VISIBLE sur orchestration ce tour car c'était surtout
+> **interne** (extraction du composant `FeatureCards` réutilisable = même rendu) + 1 section (spotlight « Your models »).
+> - **Vérifié dans le Brave du user** : orchestration EST bien à jour (hero centré + ScreenPlaceholder + cartes) — servi correctement.
+> - **brain-os** : hero passé en **`align="center"` + gros `ScreenPlaceholder`** → **cohérent avec orchestration**. Le reste (DecisionGraph
+>   en FeatureSplit, 4 points en BorderedGrid, « how it fits » en FeatureSplit, CTA) était déjà sur le kit. **Build 68 OK, vu OK Brave.**
+> - **2 pages cohérentes** (orchestration modèle + brain-os). **Reste** : approvals/smart-assign/agents/analytics/integrations/
+>   collaboration → même hero cohérent + template, contenu propre, vérif Brave. (agents/analytics/integrations encore en version
+>   d'origine ; approvals/smart-assign/collaboration en ancien kit → à aligner sur le template.)
+> **➜ Recharger /product/brain-os (onglet piloté) + /product/orchestration.**
+>
+
+> ### ⚑ v98 (03/08) — Orchestration = MODÈLE complet du template (spotlight ajouté) ; `Spotlight` = `FeatureSplit` + `ScreenPlaceholder`
+> **Pas de nouveau composant Spotlight** : un « spotlight » = **`FeatureSplit` + `<ScreenPlaceholder>`** (texte + gros écran vide, côtés
+> alternés). Ajouté à orchestration un spotlight **« Your models »** (FeatureSplit `reverse` + ScreenPlaceholder « runtime & models »)
+> après les FeatureCards ; moat BorderedGrid passé en `bg="secondary"` pour alterner. **Build 68 OK.**
+> - **Template produit COMPLET sur orchestration** (modèle de référence) : Hero centré + ScreenPlaceholder → CalloutBand problème →
+>   timeline « The run » → StatBand → **FeatureCards** (3 mini-mockups) → **Spotlight** (FeatureSplit+ScreenPlaceholder) → **BorderedGrid**
+>   moat → PageCta. Vérifié Brave : hero + FeatureCards OK ; spotlight = build OK (à confirmer au scroll complet).
+> - **Prochain (rollout, feu vert user)** : décliner CE template sur agents/analytics/integrations/brain-os/approvals/smart-assign/
+>   collaboration — contenu propre + honnête à chaque, structure identique, **vérif Brave page par page**. (Les 4 pages « v94 » sont sur
+>   l'ANCIEN kit → à repasser sur le nouveau template.)
+> **➜ Recharger /product/orchestration (scroll complet).**
+>
+
+> ### ⚑ v97 (03/08) — Template produit COHÉRENT (page /feature de Relay) + composant réutilisable FeatureCards
+> Retour user : « t'as regardé le hero mais pas la page /feature ». Les pages feature de Relay ont **toutes la même
+> structure, contenu différent** → il nous faut un **template produit cohérent, réutilisé** sur toutes les pages.
+> - **Étude `relay-nextjs-template.vercel.app/feature` (Brave)** — structure type : (1) hero titre centré + gros screenshot ;
+>   (2) eyebrow + **4 cartes icône** (« Read more ») ; (3) **spotlight + bento de cartes à mini-mockup** (3 + 2 larges) ;
+>   (4) **spotlight feature** (texte + gros mockup d'app, côtés alternés) ; (5) **bandeau CTA** avec visuel.
+> - **Composant réutilisable extrait** : **`FeatureCards.astro`** (section en-tête centré + grille) + **`FeatureCard.astro`**
+>   (carte = mini-mockup encadré via slot `viz` + titre + desc + chip slot `cta` / `link`). Chrome IDENTIQUE partout → cohérence.
+>   Orchestration « Inside a run » **refait avec ces composants** (mêmes cartes validées par le user). Build 68 OK.
+> - **TEMPLATE PRODUIT retenu** (à décliner sur toutes les pages) : Hero(`align=center` + `ScreenPlaceholder`) → `FeatureCards`
+>   (3 mini-mockups) → `Spotlight` (texte + gros ScreenPlaceholder, **à construire**) → `StatBand`|`BorderedGrid` → `PageCta`.
+> - **Reste** : construire `Spotlight.astro`, finir orchestration en modèle, puis **décliner le template** sur agents/analytics/
+>   integrations/brain-os/approvals/smart-assign/collaboration (contenu propre à chaque), vérif Brave à chaque page.
+> **➜ Recharger /product/orchestration (section « Inside a run »).**
+>
+
+> ### ⚑ v96 (03/08) — Hero = screen placeholder + étude Relay (Cruip) + « Inside a run » en cartes Relay
+> Direction user : **hero validé** (centré, ne plus toucher) → remplacer le board par un **écran placeholder VIDE** (l'app à venir) ;
+> et **refaire le reste des sections** en s'inspirant de **Relay** (`relay-nextjs-template.vercel.app`, template Cruip **dark**).
+> - **Hero** : board kanban remplacé par **`<ScreenPlaceholder ratio="16/9">`** (grand, max-w-5xl). Vu OK dans Brave = propre.
+> - **Étude Relay (vue dans Brave)** — patterns à reprendre (adaptés **light + honnête**, pas de faux « 12M builds »/témoignages) :
+>   hero titre géant + **mot en dégradé** + gros **screenshot d'app** + halo ; **feature cards avec MINI-MOCKUP** (petit widget de
+>   contenu réel en haut de carte) ; **onglets verticaux** (liste à filets + soulignage actif) + gros mockup ; **spotlight** (titre
+>   dégradé + diagramme de nœuds reliés) ; **stat band** ; en-têtes centrés (eyebrow accent → gros H2 → sous-titre muted).
+> - **« Inside a run » refait en CARTES façon Relay** : 3 cartes, chacune avec un **mini-mockup encadré de contenu réel** (owners
+>   CPO/CTO/COO ; table prédiction `~6j→5j` ; items mémoire) + titre + desc + chip/lien. Remplace les FeatureRows « maigres ».
+>   `FeatureRows`/`FeatureRow`/`INSIDE` retirés d'orchestration (composants gardés, utilisés ailleurs). **Vu OK dans Brave.**
+> - **Workflow gagnant** : je vois + vérifie chaque change dans le **Brave du user** (2 onglets : orchestration + Relay en réf).
+> - **Reste** : décliner le template (hero + cartes mini-mockup + en-têtes centrés) sur le reste des sections & les autres pages
+>   produit ; option accents dégradés + halo hero. **➜ Recharger /product/orchestration.**
+>
+
+> ### ⚑ v95 (03/08) — ENFIN un vrai retour visuel (Brave) + fix hero orchestration (centré + board)
+> Décisions user : lib = **Tailark** ; vérif = **via son Brave** (extension claude-in-chrome connectée). ✅ J'ai pu **voir** le rendu
+> réel pour la 1re fois (le pane intégré est mort en 0×0 → source des allers-retours à l'aveugle).
+> - **Diag visuel d'orchestration** : le **hero était à moitié vide** (texte à gauche, moitié droite morte) = le vrai « pas bon ».
+>   Le reste est en fait **propre** (board kanban, StatBand, BorderedGrid, timeline). Seul point faible restant : les **visuels
+>   « Inside a run » trop maigres**. Le **truc sombre en bas** = la **dev toolbar d'Astro** (dev only, absente en prod) → pas un bug.
+> - **Fix livré + vérifié** : hero passé en **`align="center"`** + le **board d'un run remonté DANS le hero** comme visuel (fini le
+>   vide à droite ; section « A run » séparée supprimée). Build 68 OK, vu OK dans Brave.
+> - **À suivre** : étoffer les visuels FeatureRows (vrais écrans / ScreenPlaceholder) + accents Tailark, puis décliner le template.
+>   Reste aussi : finir agents/analytics/integrations + hub (non faits, coupés par la limite v94).
+> **Nouveau workflow** : je vérifie désormais dans le Brave du user (screenshot) avant de livrer — plus d'aveugle.
+> **➜ Côté user : recharger /product/orchestration.**
+>
+
+> ### ⚑ v94 (03/08) — Refactor produits sur le kit (4/7 faits) + `ScreenPlaceholder` — batch coupé par la limite de session
+> Demande user : refactor complet de **toutes les pages produit** sur le kit, diversifié, avec **écrans placeholder vides** +
+> anim optionnelles. Ajout **`ScreenPlaceholder.astro`** (écran VIDE propre : barre fine + grille pointillée + halo + « Preview »,
+> ratio réglable) — c'est l'emplacement honnête d'un futur screenshot (pas un faux produit).
+> - **Refactor lancé en parallèle (7 sous-agents, spec « restructure-only » : copie VERBATIM, D11, pas de dark:, kit + modèle
+>   orchestration).** La **limite de session** (reset 19:10 Toronto) a coupé le batch en cours.
+> - **FAITS (build OK, vérifiés : 0 `dark:`, 0 contenu inventé, kit importé)** : **`approvals`** (BorderedGrid + 2 FeatureSplit +
+>   CalloutBand + ScreenPlaceholder), **`brain-os`** (DecisionGraph gardé en FeatureSplit + BorderedGrid + ScreenPlaceholder),
+>   **`collaboration`** (CollabBoard gardé + FeatureSplit+ScreenPlaceholder + FeatureRows + CalloutBand), **`smart-assign`**.
+> - **RESTE À FAIRE** (fichiers **intacts**, versions d'origine, site cohérent) : **`agents`**, **`analytics`**, **`integrations`**
+>   + le hub **`product/index`**. À finir **moi-même** (moins cher que les agents) après reset.
+> Vérifié : **build 68 OK**, `grep dark:|fake` = 0, imports kit présents sur les 4 pages. **Layout non vérifié** (pane 0×0).
+> **➜ Côté user : les 4 pages sont recharge­ables ; je termine les 3 restantes + le hub ensuite.**
+>
+
+> ### ⚑ v93 (03/08) — DA « petits traits » : archétypes FeatureRows + BorderedGrid (façon Tailark/Linear)
+> Le user a fourni 2 composants 21st.dev (Ruixen + Tailark content-block) comme **inspiration de DA** : structurer avec des
+> **FILETS** (dividers) et en faire des **variantes réutilisables** à poser où c'est pertinent.
+> - **On ne copie PAS le code** (framer-motion casse les îlots Astro ; next/image, react-icons, faux « 22M users »/témoignages =
+>   contre D11). On reprend **la DA (petits traits), pas les données**.
+> - **Nouveaux archétypes** : **`FeatureRows.astro` + `FeatureRow.astro`** (lignes visuel↔texte séparées par `sm:divide-y` /
+>   `sm:border-l`, `reverse` alterne le côté, slots `viz`/`aside`) et **`BorderedGrid.astro`** (cellules à filets 1px
+>   `gap-px bg-border`, cols 2｜3｜4). ⚠️ **Slots Astro = noms statiques** (`viz-${i}` refusé → pattern composé wrapper+row).
+> - **Orchestration** : les **3 splits répétés (team/predict/memory) → 1 seule section `FeatureRows`** « Inside a run » (3 lignes
+>   à filets, visuels = **contenu réel léger** : rôles CPO/CTO/COO, prédiction→réel, exemples mémoire + chip « Coming next » +
+>   lien Memory). Les **4 principes → `BorderedGrid`** (4 cellules à filets). Plus court, plus structuré, moins de « splits » d'affilée.
+> Vérifié (DOM) : **build 68 OK**, **0 console**, FeatureRows = **3 lignes** avec **filets `border-l`** + viz réels (team/calib/memory)
+> + chip + lien ; BorderedGrid = **4 cellules** sur `gap-px` (fond = couleur `--border` `rgb(230,230,233)` → filets 1px). 5 h2.
+> ⚠️ **Layout non vérifiable** (pane preview toujours en viewport 0×0) → **rendu 2 col / mobile à juger dans un vrai navigateur.**
+> ⚠️ Violet (×3, lane CPO) toujours là. **➜ Recharger /product/orchestration.**
+>
+
+> ### ⚑ v92 (03/08) — Orchestration : passe « épuré » calée sur la structure d'Attio (call-intelligence)
+> Retour user : « ça me va plus ou moins, **c'est pas très épuré** » + a fourni l'URL `attio.com/platform/call-intelligence`
+> à reprendre. WebFetch de la page → playbook épuré : **hero texte seul** (le gros visuel a SA propre section juste après),
+> **un seul focal + copie très courte (1 ligne) par section**, **beaucoup de blanc**, **jamais de grille de cartes identiques**
+> (séquences numérotées / splits alternés), on **alterne la densité** (texte léger → gros visuel → séquence → chiffres).
+> - **Orchestration réécrite épurée** : hero **texte seul** (board sorti du hero → section « A run » dédiée, board centré `max-w-3xl`).
+>   **Copie coupée fort** (lead hero 45→**13 mots**, tous les leads en 1 ligne, `desc`/`predicts` raccourcis). « The run » = **séquence
+>   numérotée** centrée (les 2 gros encadrés « what a checkpoint is » + note d'approbation → **une seule ligne** discrète).
+>   Team = split + 3 rôles **allégés** (predicts en 1 ligne italique, plus de boîte). Predict/Memory = splits + `Panel` contenu réel.
+>   Moat = affirmation + principes en **ligne d'icônes** (pas de cartes). StatBand sans titre. **10 sections, ~toutes 1 focal.**
+> Vérifié (DOM) : **build 68 OK**, **0 console**, hero **sans** panel (board déplacé), lead hero **13 mots**, 6 h2 de section,
+> 3 `Panel` réels (board/calib/memory), run = 7 étapes, tags « Illustrative ».
+> ⚠️ **Layout TOUJOURS non vérifiable** : le pane de preview est **bloqué en viewport 0×0 depuis plusieurs tours** (aucun
+> compositing → screenshot KO, tout s'effondre en min-content ~250px). **Overflow / 2 colonnes / kanban mobile NON vus.**
+> → build OK + classes std, mais **à juger dans un vrai navigateur** ; si un truc cloche, le user envoie un screen, je fixe au pixel.
+> ⚠️ **Violet (×5)** : lane CPO, non tranché.
+> **➜ Côté user : recharger /product/orchestration dans un vrai navigateur.**
+>
+
+> ### ⚑ v91 (03/08) — Visuels de section = CONTENU RÉEL (Panel), skeleton MockSurface supprimé
+> Retour user sur la v90 : les **placeholders « faux screenshot avec des graphs »** (`MockSurface` skeleton) sont **nazes** →
+> « t'es pas obligé de mettre des screens, intègre du vrai contenu avec les textes/les cards » (réf. Attio).
+> - **`MockSurface.astro` SUPPRIMÉ.** Nouveau **`Panel.astro`** = cadre propre (pas de fausse barre navigateur, pas de skeleton),
+>   à remplir de **contenu RÉEL**. Tag `Illustrative` pour l'honnêteté quand c'est conceptuel/Planned.
+> - **Orchestration — visuels refaits en vrai contenu** :
+>   - Hero → **kanban des VRAIS checkpoints** (les 7 étapes de `RUN` par état Approved/In review/Queued, badges owner).
+>   - Team → les **3 rôles réels** (CPO/CTO/COO : rôle + desc + prédiction) comme visuel du split.
+>   - Predict → **panneau prédiction vs réel** (Effort ~6j→5j, Issues 8→9, Latency +40ms→+32ms), tag « Illustrative · Planned ».
+>   - Memory → **exemples réels de ce que la mémoire retient** (Decision/Constraint/Convention/Rejected) + boucle Memory→…→↺.
+> Vérifié (DOM) : **build 68 OK**, **0 console**, 3 `Panel` rendus avec **vrai contenu** (titres de checkpoints, lignes calib,
+> exemples mémoire), 3 tags « Illustrative », 6 h2 de section OK, plus aucun `MockSurface`.
+> ⚠️ **Layout non mesurable** : le pane de preview a **totalement décroché** (viewport 0×0, aucun compositing → screenshot/scroll KO,
+> tout s'effondre à 284px de min-content). **Overflow + rendu 2 colonnes/kanban NON vérifiés à l'œil** → build OK + classes std,
+> mais **à confirmer dans un vrai navigateur** (extension Brave).
+> ⚠️ **Violet (×5)** : toujours la lane **CPO** — pas encore tranché.
+> **➜ Côté user : recharger /product/orchestration dans un vrai navigateur et juger (surtout mobile + 2 colonnes).**
+>
+
+> ### ⚑ v90 (03/08) — Bibliothèque d'archétypes de section + Orchestration refaite en PAGE MODÈLE
+> Chantier « varier les sections » (retour user : partout « intro + 4 cards », besoin de storytelling quoi/pourquoi/comment/démo,
+> réf. **Attio** — chez eux chaque section montre une **surface produit différente**, la grille de cartes n'apparaît qu'**une fois**).
+> Décision user : **template + 1 page phare** d'abord.
+> - **Nouveau kit `src/components/site/sections/`** (réutilisable, pose-une-fois-décline) :
+>   - **`MockSurface.astro`** — visuel **PLACEHOLDER schématique** d'UI (kinds `board｜roles｜chart｜flow｜table`, `label`, `caption`,
+>     `steps` pour flow). Wireframe volontaire + tag « Preview » + caption « Illustration — » → **honnête** (pas un faux screenshot).
+>     C'est la clé de la variété « à la Attio » sans capture réelle (user : placeholders OK pour visuels/anim).
+>   - **`FeatureSplit.astro`** — texte ↔ visuel alternés (`reverse`, `bg`, `sticky`, slot `aside`). **Remplace les grilles de cartes.**
+>   - **`StatBand.astro`** — bandeau de 2-4 chiffres. **`CalloutBand.astro`** — une affirmation display pleine largeur.
+> - **`/product/orchestration` = page modèle** : colonne vertébrale **Quoi** (hero + MockSurface board) → **Pourquoi** (CalloutBand)
+>   → **Comment** (run = timeline 2-col ; team = FeatureSplit inversé + mock roles ; predict = FeatureSplit + mock chart ; memory =
+>   FeatureSplit inversé + mock flow) → **Preuve** (StatBand 7·3·1·$0) → **CTA**. **9 sections, 9 formes différentes, 0 grille de
+>   4 cartes** (les 3 rôles = lignes dans un split ; les 4 principes = grille SANS bordure). Copie produit conservée (D11 « Planned »).
+> Vérifié : **build 68 OK**, **0 console**, **0 overflow (desktop + 375)**, 4 mocks rendus (board 3 col / roles CPO·CTO·COO / chart 7
+> barres / flow Memory→Orchestration→Decision→Memory), captions « Illustration », StatBand 7·3·1·$0.
+> ⚠️ **Non mesurable dans le pane** (viewport 0×0 → les media queries `lg:` ne calculent pas) : le rendu **2 colonnes** des splits ;
+> classes `lg:grid-cols-2`/`lg:order-1` **présentes + compilées** → OK en vrai navigateur, à confirmer à l'œil.
+> ⚠️ **Violet restant (×4)** : couleur de lane **CPO** (sémantique, validée 07/30) gardée — à trancher si tu veux la retirer aussi.
+> **Reste (à ta validation) :** décliner le kit sur les autres `/product/*`, solutions, home. **➜ Recharger /product/orchestration.**
+>
+
 > ### ⚑ v89 (03/08) — Labs : refonte des 2 sections faibles (boucle = diagramme, graduated = vedette+liste)
 > Retour user : les sections « The system » (boucle) et « graduated » juste en dessous sont **naze / serrées à droite /
 > mêmes cartes** → les refaire, **balancées**, **pas un énième 4-cards**.
