@@ -245,7 +245,8 @@ services:
       # côté serveur (fournisseur d'identité Keycloak + app OAuth). Un bouton affiché non câblé annonce
       # « bientôt disponible » ; câblé, il démarre le flux. GitHub est prêt depuis le 24/07 ; Google
       # reste affiché mais non câblé (aucune app OAuth Google déclarée).
-      NEXT_PUBLIC_AUTH_SOCIAL_PROVIDERS: ${AUTH_SOCIAL_PROVIDERS:-github,google}
+      # Démo : n'afficher que les fournisseurs réellement câblés (Google pas encore branché → masqué).
+      NEXT_PUBLIC_AUTH_SOCIAL_PROVIDERS: ${AUTH_SOCIAL_PROVIDERS:-github}
       NEXT_PUBLIC_AUTH_SOCIAL_READY: ${AUTH_SOCIAL_READY:-github}
       # Enable polling for hot reload on Docker Desktop (Windows/macOS)
       WATCHPACK_POLLING: "true"
