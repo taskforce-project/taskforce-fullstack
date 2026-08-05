@@ -500,9 +500,20 @@ body {
 @keyframes fx-pop {
   to { opacity: 1; transform: none; }
 }
+/* Élément qui apparaît en simple fondu (pas de montée) — pour les connecteurs/flèches façon Attio. */
+.fx-fade {
+  opacity: 0;
+}
+.fx-go.fx-fade {
+  animation: fx-fade var(--dur, 0.4s) ease-out forwards;
+}
+@keyframes fx-fade {
+  to { opacity: 1; }
+}
 @media (prefers-reduced-motion: reduce) {
   .fx-stroke { stroke-dashoffset: 0; }
   .fx-pop { opacity: 1; transform: none; }
+  .fx-fade { opacity: 1; }
   .fx-go { animation: none !important; }
 }
 
@@ -516,6 +527,109 @@ body {
 /* Retire les rails verticaux d'une section (variété sur les transitions). */
 .container-rail.no-rail {
   border-inline: 0;
+}
+
+/* ─── React Flow — schémas d'orchestration (statique, façon Attio) ───
+   Canvas transparent (laisse voir les points de section), aucune interaction, badge masqué.
+   Le handle SOURCE devient le « rond au départ » ; le handle TARGET est invisible (la flèche
+   du marker suffit à l'arrivée). Couleurs = bleu de marque (#2563eb = --primary). */
+.tf-flow.react-flow {
+  background: transparent;
+}
+.tf-flow .react-flow__pane,
+.tf-flow .react-flow__node {
+  cursor: default;
+}
+.tf-flow .react-flow__attribution {
+  display: none;
+}
+.tf-flow .react-flow__handle {
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+  border-radius: 9999px;
+  box-shadow: none;
+}
+.tf-flow .react-flow__handle.tf-handle--source {
+  width: 9px;
+  height: 9px;
+  background: #ffffff;
+  border: 1.5px solid #2563eb;
+}
+.tf-flow .react-flow__handle.tf-handle--target {
+  width: 1px;
+  height: 1px;
+  background: transparent;
+  opacity: 0;
+}
+/* Survol discret des cartes (le « hover par défaut » suffit — cf. retour user). */
+.tf-node {
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.tf-node:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.08),
+    0 2px 4px rgba(0, 0, 0, 0.05),
+    0 14px 28px -16px rgba(16, 24, 40, 0.18);
+}
+/* Apparition en cascade (fondu + légère montée) — c'est l'ENTRÉE des cartes ; le contenu reste
+   statique. Jouée une seule fois, après mesure des nœuds : le composant pose la classe `tf-play`.
+   L'entrée est sur le wrapper `.tf-node-anim` (le hover reste sur `.tf-node` → pas de conflit). */
+.tf-flow .tf-node-anim {
+  opacity: 0;
+}
+.tf-flow.tf-play .tf-node-anim {
+  animation: tf-node-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--tf-delay, 0ms);
+}
+@keyframes tf-node-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+/* Les connecteurs apparaissent juste après leur carte source (effet de chaîne). */
+.tf-flow .react-flow__edge {
+  opacity: 0;
+}
+.tf-flow.tf-play .react-flow__edge {
+  animation: tf-edge-in 0.45s ease-out both;
+}
+.tf-flow.tf-play .react-flow__edge[data-id="e0"] {
+  animation-delay: 70ms;
+}
+.tf-flow.tf-play .react-flow__edge[data-id="e1"] {
+  animation-delay: 210ms;
+}
+.tf-flow.tf-play .react-flow__edge[data-id="e2"] {
+  animation-delay: 350ms;
+}
+.tf-flow.tf-play .react-flow__edge[data-id="e3"],
+.tf-flow.tf-play .react-flow__edge[data-id="e4"] {
+  animation-delay: 490ms;
+}
+@keyframes tf-edge-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tf-flow .tf-node-anim,
+  .tf-flow .react-flow__edge {
+    opacity: 1;
+  }
+  .tf-flow.tf-play .tf-node-anim,
+  .tf-flow.tf-play .react-flow__edge {
+    animation: none;
+  }
 }
 
 /* Tuile de logo : s'éclaire au survol. */

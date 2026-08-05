@@ -7,7 +7,8 @@ import { buttonVariants } from "@/components/ui/button";
 import { LevelBadge } from "@/components/site/Section";
 import { cn } from "@/lib/utils";
 import { APP_URL } from "@/components/site/nav";
-import { Compass, Building2, CalendarClock, BrainCircuit, Boxes, Server, ShieldCheck, Flag, Terminal, Cloud, Sparkles, GitPullRequest, ArrowDown, ArrowRight } from "lucide-react";
+import HeroFlow from "@/components/site/flows/HeroFlow";
+import { Compass, Building2, CalendarClock, BrainCircuit, Boxes, Server, ShieldCheck, Terminal, Cloud, Sparkles, GitPullRequest, ArrowDown, ArrowRight } from "lucide-react";
 
 /**
  * Orchestration — refonte façon Attio (attio.com/platform/workflows, 04/08) : hero 2 colonnes avec un
@@ -15,29 +16,6 @@ import { Compass, Building2, CalendarClock, BrainCircuit, Boxes, Server, ShieldC
  * rayures / vide / NOIR) — pas de fond sur les cartes. « Structure par traits » gardée (colonnes à filets).
  * D11 : le graphe est illustratif (badge PLANNED + légende « Illustrative »), rien n'est présenté comme Live.
  */
-
-const KIND_STYLE: Record<string, string> = {
-  Trigger: "bg-secondary text-muted-foreground border-border",
-  CPO: "bg-violet-50 text-violet-700 border-violet-200",
-  CTO: "bg-blue-50 text-blue-700 border-blue-200",
-  COO: "bg-amber-50 text-amber-700 border-amber-200",
-};
-const STATE: Record<string, { label: string; cls: string }> = {
-  done: { label: "Approved", cls: "border-emerald-200 bg-emerald-50 text-emerald-700" },
-  running: { label: "Running", cls: "border-blue-200 bg-blue-50 text-blue-700" },
-  queued: { label: "Queued", cls: "border-slate-200 bg-slate-100 text-slate-500" },
-};
-
-const FLOW = [
-  { kind: "Trigger", icon: Flag, title: "Outcome set", sub: "“Let customers export their invoices”", state: "done" },
-  { kind: "CPO", icon: Compass, title: "Frame & spec", sub: "Users, acceptance criteria, definition of done", state: "done" },
-  { kind: "CTO", icon: Building2, title: "Approach & contract", sub: "Architecture, endpoints, technical risks", state: "running" },
-  { kind: "COO", icon: CalendarClock, title: "Plan & sequence", sub: "Issues, dependencies, estimates", state: "queued" },
-];
-const BRANCH = [
-  { icon: Terminal, title: "Execute", sub: "Approved context → your coding agent" },
-  { icon: ShieldCheck, title: "QA & sign-off", sub: "Verified against acceptance" },
-];
 
 const AGENTS_FULL = [
   {
@@ -121,62 +99,14 @@ const STATS = [
           </p>
         </div>
 
-        {/* le graphe : tronc étroit (cartes seules resserrées) qui s'ouvre sur une branche large et écartée */}
+        {/* le graphe de run — React Flow (statique, façon Attio). client:only : RF a besoin du DOM navigateur. */}
         <div class="lg:pl-4">
-          <div class="mx-auto flex w-full max-w-[600px] flex-col" data-flow>
-            <div class="mx-auto flex w-full max-w-[250px] flex-col">
-              {
-                FLOW.map((n, i) => (
-                  <>
-                    {i > 0 && <span class="fx-line bg-primary mx-auto h-4 w-0.5" data-o={2 * i} aria-hidden />}
-                    <div class="surface bg-card fx-pop rounded-xl p-3.5" data-o={2 * i + 1}>
-                      <div class="flex items-center gap-2.5">
-                        <span class="bg-secondary/60 flex size-7 shrink-0 items-center justify-center rounded-lg border">
-                          <n.icon className="text-foreground size-3.5" strokeWidth={1.75} />
-                        </span>
-                        <span class="text-foreground text-[12.5px] font-semibold">{n.title}</span>
-                        <span class:list={["ml-auto flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-[9px] font-semibold tracking-wide uppercase", STATE[n.state].cls]}>
-                          {n.state === "running" && <span class="size-1.5 rounded-full bg-current" aria-hidden />}
-                          {STATE[n.state].label}
-                        </span>
-                      </div>
-                      <div class="mt-1.5 flex items-center gap-2 pl-9">
-                        <span class:list={["shrink-0 rounded border px-1.5 py-px text-[9px] font-medium", KIND_STYLE[n.kind]]}>{n.kind}</span>
-                        <span class="text-muted-foreground text-[11px] leading-4">{n.sub}</span>
-                      </div>
-                    </div>
-                  </>
-                ))
-              }
-              {/* drop vers la branche */}
-              <span class="fx-line bg-primary mx-auto h-4 w-0.5" data-o="8" aria-hidden></span>
-            </div>
-            {/* branche : 2 cartes MÊME TAILLE que le tronc, écartées ; connecteur ANIMÉ (le flux continue) */}
-            <div class="relative w-full pt-9">
-              <span aria-hidden class="fx-line bg-primary absolute top-0 left-1/2 h-4 w-0.5 -translate-x-1/2" data-o="9"></span>
-              <span aria-hidden class="fx-line-x bg-primary absolute top-4 right-[21%] left-[21%] h-0.5" data-o="10"></span>
-              <span aria-hidden class="fx-line bg-primary absolute top-4 left-[21%] h-5 w-0.5" data-o="11"></span>
-              <span aria-hidden class="fx-line bg-primary absolute top-4 right-[21%] h-5 w-0.5" data-o="11"></span>
-              <div class="flex justify-between">
-                {
-                  BRANCH.map((b) => (
-                    <div class="surface bg-card fx-pop w-[250px] shrink-0 rounded-xl p-3.5" data-o="12">
-                      <div class="flex items-center gap-2">
-                        <span class="bg-secondary/60 flex size-7 shrink-0 items-center justify-center rounded-lg border">
-                          <b.icon className="text-foreground size-3.5" strokeWidth={1.75} />
-                        </span>
-                        <span class="text-foreground text-[12px] font-semibold">{b.title}</span>
-                      </div>
-                      <p class="text-muted-foreground mt-1.5 pl-9 text-[11px] leading-4">{b.sub}</p>
-                    </div>
-                  ))
-                }
-              </div>
-            </div>
-            <p class="text-muted-foreground/60 mt-5 text-center font-mono text-[10px] tracking-wide uppercase">
-              Illustrative — orchestration is Planned
-            </p>
+          <div class="relative mx-auto w-full max-w-[600px]" style="aspect-ratio: 600 / 600">
+            <HeroFlow client:only="react" />
           </div>
+          <p class="text-muted-foreground/60 mt-6 text-center font-mono text-[10px] tracking-wide uppercase">
+            Illustrative — orchestration is Planned
+          </p>
         </div>
       </div>
     </div>
@@ -568,11 +498,22 @@ const STATS = [
         if (i >= order.length) return;
         const grp = groups.get(order[i]!)!;
         i++;
+        let advanced = false;
+        const go = () => {
+          if (advanced) return;
+          advanced = true;
+          next();
+        };
+        // filet de sécurité : certains éléments (SVG) ne déclenchent pas toujours `animationend`
+        const timer = setTimeout(go, 800);
         let pending = grp.length;
         for (const el of grp) {
           const done = () => {
             el.removeEventListener("animationend", done);
-            if (--pending === 0) next();
+            if (--pending === 0) {
+              clearTimeout(timer);
+              go();
+            }
           };
           el.addEventListener("animationend", done);
           el.classList.add("fx-go");
