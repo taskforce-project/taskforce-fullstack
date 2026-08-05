@@ -100,7 +100,7 @@ const STATS = [
   {/* ───── Hero façon Attio : texte à gauche, GRAPHE de run à droite — fond POINTS ───── */}
   <section class="bg-card bg-dots border-b">
     <div class="container-rail py-16 lg:py-24">
-      <div class="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
+      <div class="grid items-center gap-12 lg:grid-cols-[minmax(0,460px)_minmax(0,1fr)] lg:gap-16">
         <div>
           <div class="flex items-center gap-2.5">
             <span class="t-eyebrow">Orchestration</span>
@@ -121,15 +121,15 @@ const STATS = [
           </p>
         </div>
 
-        {/* le graphe : tronc étroit (cartes seules resserrées) qui s'ouvre sur une branche plus large */}
+        {/* le graphe : tronc étroit (cartes seules resserrées) qui s'ouvre sur une branche large et écartée */}
         <div class="lg:pl-4">
-          <div class="mx-auto flex w-full max-w-lg flex-col" data-flow>
-            <div class="mx-auto flex w-full max-w-[300px] flex-col">
+          <div class="mx-auto flex w-full max-w-[600px] flex-col" data-flow>
+            <div class="mx-auto flex w-full max-w-[250px] flex-col">
               {
                 FLOW.map((n, i) => (
                   <>
-                    {i > 0 && <span class="fx-line bg-primary mx-auto h-4 w-0.5" style={`--d: ${i * 0.9 - 0.6}s`} aria-hidden />}
-                    <div class="surface bg-card fx-border rounded-xl p-3.5" style={`--d: ${i * 0.9}s`}>
+                    {i > 0 && <span class="fx-line bg-primary mx-auto h-4 w-0.5" data-o={2 * i} aria-hidden />}
+                    <div class="surface bg-card fx-pop rounded-xl p-3.5" data-o={2 * i + 1}>
                       <div class="flex items-center gap-2.5">
                         <span class="bg-secondary/60 flex size-7 shrink-0 items-center justify-center rounded-lg border">
                           <n.icon className="text-foreground size-3.5" strokeWidth={1.75} />
@@ -149,18 +149,18 @@ const STATS = [
                 ))
               }
               {/* drop vers la branche */}
-              <span class="fx-line bg-primary mx-auto h-4 w-0.5" style="--d: 3s" aria-hidden></span>
+              <span class="fx-line bg-primary mx-auto h-4 w-0.5" data-o="8" aria-hidden></span>
             </div>
-            {/* branche : 2 cartes plus larges, écartées */}
+            {/* branche : 2 cartes MÊME TAILLE que le tronc, écartées ; connecteur ANIMÉ (le flux continue) */}
             <div class="relative w-full pt-9">
-              <div aria-hidden class="bg-border absolute top-0 left-1/2 h-4 w-px -translate-x-1/2"></div>
-              <div aria-hidden class="bg-border absolute top-4 right-1/4 left-1/4 h-px"></div>
-              <div aria-hidden class="bg-border absolute top-4 left-1/4 h-5 w-px"></div>
-              <div aria-hidden class="bg-border absolute top-4 right-1/4 h-5 w-px"></div>
-              <div class="grid grid-cols-2 gap-4">
+              <span aria-hidden class="fx-line bg-primary absolute top-0 left-1/2 h-4 w-0.5 -translate-x-1/2" data-o="9"></span>
+              <span aria-hidden class="fx-line-x bg-primary absolute top-4 right-[21%] left-[21%] h-0.5" data-o="10"></span>
+              <span aria-hidden class="fx-line bg-primary absolute top-4 left-[21%] h-5 w-0.5" data-o="11"></span>
+              <span aria-hidden class="fx-line bg-primary absolute top-4 right-[21%] h-5 w-0.5" data-o="11"></span>
+              <div class="flex justify-between">
                 {
                   BRANCH.map((b) => (
-                    <div class="surface bg-card fx-border rounded-xl p-4" style="--d: 3.6s">
+                    <div class="surface bg-card fx-pop w-[250px] shrink-0 rounded-xl p-3.5" data-o="12">
                       <div class="flex items-center gap-2">
                         <span class="bg-secondary/60 flex size-7 shrink-0 items-center justify-center rounded-lg border">
                           <b.icon className="text-foreground size-3.5" strokeWidth={1.75} />
@@ -208,12 +208,13 @@ const STATS = [
             <ArrowRight className="size-3.5" />
           </a>
         </div>
-        <div class="surface bg-card rounded-2xl p-5 sm:p-6">
+        <div class="surface bg-card rounded-2xl p-4" data-flow>
+          <div class="bg-card flow-canvas rounded-xl border p-5">
           <p class="text-muted-foreground mb-3 font-mono text-[10px] font-semibold tracking-wide uppercase">Your context</p>
           <div class="grid gap-2">
             {
               MEMORY_ITEMS.map((c) => (
-                <div class="bg-secondary/40 flex items-start gap-2.5 rounded-lg border p-2.5 text-[12px]">
+                <div class="bg-card flex items-start gap-2.5 rounded-lg border p-2.5 text-[12px] shadow-sm">
                   <span class="text-primary mt-0.5 w-16 shrink-0 font-mono text-[9.5px] font-semibold tracking-wide uppercase">{c.t}</span>
                   <span class="text-foreground leading-5">{c.v}</span>
                 </div>
@@ -223,9 +224,10 @@ const STATS = [
           <div class="flex justify-center py-2.5">
             <ArrowDown className="text-primary size-4" strokeWidth={2} />
           </div>
-          <div class="border-primary/30 bg-primary/5 flex items-center gap-2.5 rounded-lg border p-3">
+          <div class="border-primary/30 bg-primary/5 fx-border flex items-center gap-2.5 rounded-lg border p-3" style="--d: 0.35s">
             <Sparkles className="text-primary size-4 shrink-0" strokeWidth={1.75} />
             <span class="text-foreground text-[13px] font-semibold">A proposal grounded in your context</span>
+          </div>
           </div>
         </div>
       </div>
@@ -283,7 +285,8 @@ const STATS = [
         </p>
       </div>
       <div class="mx-auto max-w-3xl" data-flow>
-        <div class="surface bg-card flow-canvas overflow-hidden rounded-2xl p-4 sm:p-7">
+        <div class="surface bg-card rounded-2xl p-4">
+        <div class="bg-card flow-canvas overflow-hidden rounded-xl border p-4 sm:p-6">
         <svg
           viewBox="0 0 760 240"
           class="w-full"
@@ -330,6 +333,7 @@ const STATS = [
           <text x="618" y="94" font-size="10.5" fill="#6b7280">human gate</text>
         </svg>
         </div>
+        </div>
         <p class="text-muted-foreground mx-auto mt-6 max-w-md text-center text-[12.5px]">
           Approved decisions become the context for the next step — nothing moves on its own.
         </p>
@@ -349,7 +353,8 @@ const STATS = [
             already use — it builds, opens a pull request, and reports back into the run.
           </p>
         </div>
-        <div class="surface bg-card flow-canvas mx-auto flex w-full max-w-sm flex-col rounded-2xl p-5 sm:p-6" data-flow>
+        <div class="surface bg-card mx-auto w-full max-w-sm rounded-2xl p-4" data-flow>
+          <div class="bg-card flow-canvas flex flex-col rounded-xl border p-5 sm:p-6">
           {
             HANDOFF.map((h, i) => (
               <>
@@ -370,6 +375,7 @@ const STATS = [
               </>
             ))
           }
+          </div>
         </div>
       </div>
     </div>
@@ -392,6 +398,8 @@ const STATS = [
         </p>
       </div>
       <div class="mx-auto max-w-4xl" data-flow>
+        <div class="surface bg-card rounded-2xl p-4">
+        <div class="bg-card flow-canvas overflow-hidden rounded-xl border p-4 sm:p-6">
         <svg
           viewBox="0 0 940 210"
           class="w-full"
@@ -411,17 +419,17 @@ const STATS = [
           <rect x="758" y="40" width="160" height="60" rx="12" fill="#ffffff" stroke="#e6e6e9"></rect>
 
           {/* connecteurs pleins bleus + boucle de retour — se DESSINENT une fois */}
-          <line x1="180" y1="70" x2="264" y2="70" stroke="#2563eb" stroke-width="2" pathLength="1" class="fx-draw" style="--d: 0.4s" marker-end="url(#tf-arw-cal)"></line>
-          <line x1="426" y1="70" x2="510" y2="70" stroke="#2563eb" stroke-width="2" pathLength="1" class="fx-draw" style="--d: 1.2s" marker-end="url(#tf-arw-cal)"></line>
-          <line x1="672" y1="70" x2="756" y2="70" stroke="#2563eb" stroke-width="2" pathLength="1" class="fx-draw" style="--d: 2s" marker-end="url(#tf-arw-cal)"></line>
-          <path d="M838,100 C838,186 100,186 100,100" fill="none" stroke="#2563eb" stroke-width="2" pathLength="1" class="fx-draw" style="--d: 2.8s" marker-end="url(#tf-arw-cal)"></path>
+          <line x1="180" y1="70" x2="264" y2="70" stroke="#2563eb" stroke-width="2" pathLength="1" class="fx-draw" style="--d: 0.15s" marker-end="url(#tf-arw-cal)"></line>
+          <line x1="426" y1="70" x2="510" y2="70" stroke="#2563eb" stroke-width="2" pathLength="1" class="fx-draw" style="--d: 1.05s" marker-end="url(#tf-arw-cal)"></line>
+          <line x1="672" y1="70" x2="756" y2="70" stroke="#2563eb" stroke-width="2" pathLength="1" class="fx-draw" style="--d: 1.95s" marker-end="url(#tf-arw-cal)"></line>
+          <path d="M838,100 C838,186 100,186 100,100" fill="none" stroke="#2563eb" stroke-width="2" pathLength="1" class="fx-draw" style="--d: 3s" marker-end="url(#tf-arw-cal)"></path>
           <text x="469" y="205" text-anchor="middle" fill="#2563eb" font-size="11.5" font-weight="600">the next run starts better calibrated</text>
 
           {/* bords bleus qui se remplissent quand le flow arrive */}
           <rect class="fx-node" pathLength="1" style="--d: 0s" x="20" y="40" width="160" height="60" rx="12" fill="none" stroke="#2563eb" stroke-width="1.5"></rect>
-          <rect class="fx-node" pathLength="1" style="--d: 0.8s" x="266" y="40" width="160" height="60" rx="12" fill="none" stroke="#2563eb" stroke-width="1.5"></rect>
-          <rect class="fx-node" pathLength="1" style="--d: 1.6s" x="512" y="40" width="160" height="60" rx="12" fill="none" stroke="#2563eb" stroke-width="1.5"></rect>
-          <rect class="fx-node" pathLength="1" style="--d: 2.4s" x="758" y="40" width="160" height="60" rx="12" fill="none" stroke="#2563eb" stroke-width="1.5"></rect>
+          <rect class="fx-node" pathLength="1" style="--d: 0.9s" x="266" y="40" width="160" height="60" rx="12" fill="none" stroke="#2563eb" stroke-width="1.5"></rect>
+          <rect class="fx-node" pathLength="1" style="--d: 1.8s" x="512" y="40" width="160" height="60" rx="12" fill="none" stroke="#2563eb" stroke-width="1.5"></rect>
+          <rect class="fx-node" pathLength="1" style="--d: 2.7s" x="758" y="40" width="160" height="60" rx="12" fill="none" stroke="#2563eb" stroke-width="1.5"></rect>
 
           {/* contenu des nœuds */}
           <circle cx="42" cy="70" r="4" fill="#2563eb"></circle>
@@ -437,6 +445,8 @@ const STATS = [
           <text x="796" y="66" font-size="14" font-weight="600" fill="#1d1d1f">Recalibrate</text>
           <text x="796" y="84" font-size="10.5" fill="#6b7280">improves the next run</text>
         </svg>
+        </div>
+        </div>
         <div class="surface bg-card mx-auto mt-8 max-w-md rounded-xl p-4">
           <div class="text-muted-foreground mb-2 flex items-center justify-between text-[9.5px] font-semibold tracking-wide uppercase">
             <span>Sample checkpoint</span>
@@ -537,25 +547,55 @@ const STATS = [
     note="Orchestration is Planned. The board, approvals and memory ship today."
   />
 
-  {/* Déclenche le « draw-once » des schémas quand ils entrent à l'écran (puis plus jamais). */}
+  {/* Déclenche les schémas quand ils entrent à l'écran (une fois). Si le conteneur a des étapes `[data-o]`,
+      on les ENCHAÎNE réellement : chaque groupe démarre sur la FIN (`animationend`) du groupe précédent. */}
   <script>
+    const play = (root: Element) => {
+      const steps = Array.from(root.querySelectorAll("[data-o]"));
+      if (!steps.length) {
+        root.classList.add("flow-run");
+        return;
+      }
+      const groups = new Map<number, Element[]>();
+      for (const el of steps) {
+        const o = Number(el.getAttribute("data-o"));
+        if (!groups.has(o)) groups.set(o, []);
+        groups.get(o)!.push(el);
+      }
+      const order = Array.from(groups.keys()).sort((a, b) => a - b);
+      let i = 0;
+      const next = () => {
+        if (i >= order.length) return;
+        const grp = groups.get(order[i]!)!;
+        i++;
+        let pending = grp.length;
+        for (const el of grp) {
+          const done = () => {
+            el.removeEventListener("animationend", done);
+            if (--pending === 0) next();
+          };
+          el.addEventListener("animationend", done);
+          el.classList.add("fx-go");
+        }
+      };
+      next();
+    };
     const els = document.querySelectorAll("[data-flow]");
-    const run = (el: Element) => el.classList.add("flow-run");
     if ("IntersectionObserver" in window) {
       const io = new IntersectionObserver(
         (entries) => {
           for (const e of entries) {
             if (e.isIntersecting) {
-              run(e.target);
+              play(e.target);
               io.unobserve(e.target);
             }
           }
         },
-        { threshold: 0.3 },
+        { threshold: 0.25 },
       );
       els.forEach((el) => io.observe(el));
     } else {
-      els.forEach(run);
+      els.forEach(play);
     }
   </script>
 </BaseLayout>

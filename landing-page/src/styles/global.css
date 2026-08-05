@@ -391,32 +391,45 @@ body {
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
 }
+/* Tout est LINÉAIRE (vitesse constante, aucune accélération) ; durée pilotable par élément via `--dur`
+   (on la met ∝ la taille pour que le « fluide » avance à la même vitesse quelle que soit la longueur du bord). */
 .flow-run .fx-draw {
-  animation: fx-draw 0.75s ease-in-out forwards;
+  animation: fx-draw var(--dur, 0.7s) linear forwards;
   animation-delay: var(--d, 0s);
 }
 .flow-run .fx-node {
-  animation: fx-draw 0.8s ease-in-out forwards;
+  animation: fx-draw var(--dur, 1.3s) linear forwards;
   animation-delay: var(--d, 0s);
 }
 @keyframes fx-draw {
   to { stroke-dashoffset: 0; }
 }
 
-/* connecteur HTML : ligne bleue qui pousse */
+/* connecteurs HTML : ligne bleue qui pousse — verticale (fx-line) ou horizontale depuis le centre (fx-line-x) */
 .fx-line {
   transform: scaleY(0);
   transform-origin: top center;
 }
+.fx-line-x {
+  transform: scaleX(0);
+  transform-origin: center;
+}
 .flow-run .fx-line {
-  animation: fx-grow 0.6s ease-in-out forwards;
+  animation: fx-grow var(--dur, 0.45s) linear forwards;
+  animation-delay: var(--d, 0s);
+}
+.flow-run .fx-line-x {
+  animation: fx-grow-x var(--dur, 0.45s) linear forwards;
   animation-delay: var(--d, 0s);
 }
 @keyframes fx-grow {
   to { transform: scaleY(1); }
 }
+@keyframes fx-grow-x {
+  to { transform: scaleX(1); }
+}
 
-/* bord de CARTE HTML qui se remplit (anneau conic), une fois, puis reste bleu */
+/* bord de CARTE HTML qui se remplit (anneau conic), une fois, puis reste bleu. LINÉAIRE + durée via --dur. */
 .fx-border {
   position: relative;
 }
@@ -435,7 +448,7 @@ body {
   pointer-events: none;
 }
 .flow-run .fx-border::after {
-  animation: fx-bfill 0.9s ease-in-out forwards;
+  animation: fx-bfill var(--dur, 1.3s) linear forwards;
   animation-delay: var(--d, 0s);
 }
 @keyframes fx-bfill {
@@ -447,13 +460,50 @@ body {
   .flow-run .fx-draw,
   .flow-run .fx-node,
   .flow-run .fx-line,
+  .flow-run .fx-line-x,
   .flow-run .fx-border::after {
     animation: none;
   }
   .fx-draw,
   .fx-node { stroke-dashoffset: 0; }
-  .fx-line { transform: none; }
+  .fx-line,
+  .fx-line-x { transform: none; }
   .fx-border::after { opacity: 0; }
+}
+
+/* ── Moteur v2 : VRAI enchaînement (le JS ajoute `.fx-go` étape par étape, chaque étape démarrant sur la FIN
+   de la précédente via `animationend`). Bord de CARTE = **tracé SVG** `.fx-stroke` (dessin à vitesse d'ARC
+   CONSTANTE — aucune accélération sur les longueurs, contrairement au conic). Tout LINÉAIRE. ── */
+.fx-stroke {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+.fx-go.fx-draw,
+.fx-go.fx-node,
+.fx-go.fx-stroke {
+  animation: fx-draw var(--dur, 0.8s) linear forwards;
+}
+.fx-go.fx-line {
+  animation: fx-grow var(--dur, 0.32s) linear forwards;
+}
+.fx-go.fx-line-x {
+  animation: fx-grow-x var(--dur, 0.5s) linear forwards;
+}
+/* Carte qui « apparaît » (fondu + légère montée), chaînée — robuste (pas de tracé SVG fragile). */
+.fx-pop {
+  opacity: 0;
+  transform: translateY(10px);
+}
+.fx-go.fx-pop {
+  animation: fx-pop var(--dur, 0.5s) ease-out forwards;
+}
+@keyframes fx-pop {
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fx-stroke { stroke-dashoffset: 0; }
+  .fx-pop { opacity: 1; transform: none; }
+  .fx-go { animation: none !important; }
 }
 
 /* ── Canvas de flux (façon Attio, écran 3) : un cadre à fond POINTILLÉ où « flottent » les nœuds/toasts.
