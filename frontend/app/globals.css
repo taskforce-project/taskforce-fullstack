@@ -278,10 +278,10 @@
 [data-slot="sidebar-inset"] { background: var(--background) !important; }
 [data-slot="sidebar-wrapper"] { background: var(--background); }
 
-/* Sidebar — panneau opaque + bordure solide */
+/* Sidebar — panneau opaque. La bordure droite est portée par le composant shadcn
+   (`group-data-[side=left]:border-r` sur le conteneur) : la doubler ici créait un double trait. */
 [data-sidebar="sidebar"] {
   background: var(--sidebar);
-  border-right: 1px solid var(--sidebar-border);
 }
 
 /* Aucune surface shadcn/radix ne floute son arrière-plan : design plat */

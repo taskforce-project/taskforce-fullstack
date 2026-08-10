@@ -76,8 +76,9 @@ function PaymentSuccessContent() {
   }, [sessionId, refreshUser]);
 
   const handleContinue = () => {
-    // Auth émise par Keycloak (mot de passe requis) : après paiement, l'utilisateur se connecte.
-    router.push("/auth/login");
+    // Upgrade in-app : l'utilisateur est déjà connecté, on le renvoie dans l'app — son forfait est
+    // désormais actif (appliqué par le webhook Stripe).
+    router.push("/");
   };
 
   if (isVerifying) {
@@ -123,14 +124,14 @@ function PaymentSuccessContent() {
             )}
             <div className="flex flex-col gap-2">
               <Button onClick={handleContinue} variant="outline" className="w-full">
-                Aller au tableau de bord
+                Aller à la connexion
               </Button>
-              <Button 
-                onClick={() => router.push("/auth/register/plan")} 
+              <Button
+                onClick={() => router.push("/")}
                 variant="ghost"
                 className="w-full"
               >
-                Retour à la sélection de plan
+                Retour à TaskForce
               </Button>
             </div>
           </CardContent>
