@@ -3,21 +3,14 @@ import { render, screen } from "@testing-library/react";
 import { AuthStepper, REGISTER_STEPS } from "./auth-stepper";
 
 /**
- * Le fil d'étapes vivait auparavant, dupliqué, dans les trois formulaires d'inscription — chacun
- * avec sa propre barre de progression et son propre pourcentage en dur. Il est désormais unique et
- * porté par les pages. Ces tests reprennent la couverture qui était éparpillée dans
- * `plan-form.test.tsx` et `verification-form.test.tsx`.
+ * Le fil d'étapes est unique et porté par les pages d'inscription. Chaque étape porte un libellé
+ * d'un mot, toujours visible (le parcours entier est lisible d'entrée).
  */
 describe("AuthStepper", () => {
-  it.each([
-    [1, "Votre compte"],
-    [2, "Votre formule"],
-    [3, "Vérification"],
-  ] as const)("étape %i : annonce sa position et son libellé", (current, label) => {
-    render(<AuthStepper current={current} />);
-
-    expect(screen.getByText(new RegExp(`étape ${current} sur 3`, "i"))).toBeInTheDocument();
-    expect(screen.getByText(new RegExp(label, "i"))).toBeInTheDocument();
+  it("affiche le libellé d'un mot de chacune des deux étapes", () => {
+    render(<AuthStepper current={1} />);
+    expect(screen.getByText("Compte")).toBeInTheDocument();
+    expect(screen.getByText("Vérification")).toBeInTheDocument();
   });
 
   it("expose la progression aux technologies d'assistance", () => {
@@ -26,18 +19,17 @@ describe("AuthStepper", () => {
     const bar = screen.getByRole("progressbar");
     expect(bar).toHaveAttribute("aria-valuenow", "2");
     expect(bar).toHaveAttribute("aria-valuemin", "1");
-    expect(bar).toHaveAttribute("aria-valuemax", "3");
-    expect(bar).toHaveAttribute("aria-valuetext", "Étape 2 sur 3 : Votre formule");
+    expect(bar).toHaveAttribute("aria-valuemax", "2");
+    expect(bar).toHaveAttribute("aria-valuetext", "Étape 2 sur 2 : Vérification");
   });
 
-  it("marque les étapes franchies, l'étape courante et celles à venir", () => {
+  it("marque l'étape franchie, l'étape courante et celles à venir", () => {
     const { container } = render(<AuthStepper current={2} />);
     const segments = container.querySelectorAll(".auth-step-seg");
 
     expect(segments).toHaveLength(REGISTER_STEPS.length);
     expect(segments[0]).toHaveAttribute("data-state", "done");
     expect(segments[1]).toHaveAttribute("data-state", "current");
-    expect(segments[2]).toHaveAttribute("data-state", "todo");
   });
 
   it("à la première étape, aucune n'est encore franchie", () => {

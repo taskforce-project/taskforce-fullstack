@@ -7,7 +7,6 @@ import {
   ChevronDown,
   ZoomIn,
   ZoomOut,
-  Plus,
   CalendarRange,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -197,7 +196,7 @@ function mapProjectCycles(cycles: ApiCycle[], p: Project): RoadmapItem[] {
       project:   { name: p.name, emoji: p.identifier.slice(0, 2), color: projectColor(p.id) },
       startDate: c.startDate!,
       endDate:   c.endDate!,
-      progress:  0,
+      progress:  c.issueCount > 0 ? Math.round((c.completedCount / c.issueCount) * 100) : 0,
       color:     projectColor(p.id),
     }))
 }
@@ -370,10 +369,6 @@ export function RoadmapGantt({ slug, projectId }: { readonly slug: string; reado
               Timeline across all projects
             </p>
           </div>
-          <Button size="sm" className="gap-2 shrink-0">
-            <Plus className="h-4 w-4" />
-            Add item
-          </Button>
         </div>
       )}
 

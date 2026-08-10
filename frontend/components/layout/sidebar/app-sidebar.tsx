@@ -303,7 +303,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   }
 
   return (
-    <Sidebar collapsible="icon" className="overflow-x-hidden" {...props}>
+    <Sidebar collapsible="icon" className="overflow-x-hidden" data-tour="sidebar" {...props}>
       {/* QA2-27 : hauteur alignée sur la topbar (h-14) → le séparateur tombe au même niveau que la bordure du breadcrumb */}
       <SidebarHeader className="h-14 justify-center py-0">
         <WorkspaceSwitcher />

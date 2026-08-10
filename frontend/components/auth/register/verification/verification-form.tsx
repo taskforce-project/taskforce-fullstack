@@ -22,6 +22,7 @@ import { getRegisterData, clearRegisterData } from "@/lib/auth/register-storage"
 import { validateOTP, globalRateLimiter } from "@/lib/utils/validation";
 import { authService } from "@/lib/api";
 import { useAuth } from "@/lib/contexts/auth-context";
+import { Loader2 } from "lucide-react";
 
 export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
   const router = useRouter();
@@ -188,7 +189,7 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
                   Code envoyé à {userEmail}
                 </p>
               </Field>
-              <Field>
+              <Field className="items-center">
                 <FieldLabel htmlFor="otp" className="sr-only">
                   Code de vérification
                 </FieldLabel>
@@ -199,7 +200,7 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
                   value={otp}
                   onChange={setOtp}
                   disabled={isLoading}
-                  containerClassName="gap-4"
+                  containerClassName="gap-4 justify-center"
                 >
                   <InputOTPGroup>
                     <InputOTPSlot index={0} />
@@ -219,7 +220,7 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
               </Field>
               <Field>
                 <Button type="submit" disabled={isLoading || otp.length !== 6}>
-                  {isLoading ? "Vérification..." : "Vérifier"}
+                  {isLoading ? (<><Loader2 className="size-4 animate-spin" /> Vérification…</>) : "Vérifier"}
                 </Button>
                 <FieldDescription className="text-center">
                   Vous n&apos;avez pas reçu le code ?{" "}
@@ -242,11 +243,11 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
       <p className="mt-5 text-center text-xs">
         <button
           type="button"
-          onClick={() => router.push("/auth/register/plan")}
+          onClick={() => router.push("/auth/register")}
           disabled={isLoading}
           className="auth-link-muted disabled:opacity-50"
         >
-          Revenir au choix du plan
+          Revenir à l'inscription
         </button>
       </p>
     </div>

@@ -12,7 +12,6 @@ import {
   CalendarRange,
   Users,
   BarChart3,
-  MessageSquare,
   Settings,
   Plus,
   User,
@@ -131,19 +130,18 @@ export function CommandPalette({ open, onOpenChange }: Readonly<CommandPalettePr
     { id: "inbox",         label: "Go to Inbox",         group: "Navigation", icon: <Inbox className="h-4 w-4" />,           shortcut: "G I", action: () => go("/inbox") },
     { id: "my-work",       label: "Go to My Work",       group: "Navigation", icon: <ClipboardCheck className="h-4 w-4" />, shortcut: "G W", action: () => go("/my-work") },
     { id: "projects",      label: "Go to Projects",      group: "Navigation", icon: <FolderKanban className="h-4 w-4" />,   shortcut: "G P", action: () => go("/projects") },
-    { id: "issues",        label: "Go to Issues",        group: "Navigation", icon: <CircleDot className="h-4 w-4" />,       shortcut: "G U", action: () => go("/issues") },
+    { id: "issues",        label: "Go to Issues",        group: "Navigation", icon: <CircleDot className="h-4 w-4" />,       shortcut: "G U", action: () => go("/my-work/issues") },
     { id: "cycles",        label: "Go to Cycles",        group: "Navigation", icon: <Repeat className="h-4 w-4" />,          shortcut: "G C", action: () => go("/cycles") },
     { id: "roadmap",       label: "Go to Roadmap",       group: "Navigation", icon: <CalendarRange className="h-4 w-4" />,   shortcut: "G R", action: () => go("/roadmap") },
     { id: "members",       label: "Go to Members",       group: "Navigation", icon: <Users className="h-4 w-4" />,           shortcut: "G T", action: () => go("/members") },
     { id: "analytics",    label: "Go to Analytics",     group: "Navigation", icon: <BarChart3 className="h-4 w-4" />,      shortcut: "G A", action: () => go("/analytics") },
-    { id: "discussions",   label: "Go to Discussions",   group: "Navigation", icon: <MessageSquare className="h-4 w-4" />,  shortcut: "G M", action: () => go("/discussions") },
     { id: "settings",      label: "Go to Settings",      group: "Navigation", icon: <Settings className="h-4 w-4" />,       shortcut: "G S", action: () => go("/settings") },
     { id: "profile",       label: "View my profile",     group: "Navigation", icon: <User className="h-4 w-4" />,           shortcut: "G F", action: () => go("/profile") },
     // Actions
     { id: "ask-ai",        label: "Ask AI",              group: "Actions",    icon: <Sparkles className="h-4 w-4" />,        shortcut: "A",   action: enterAiMode },
-    // « Create new issue » affichait « coming soon » (action morte) → mène à la page issues, où le
-    // bouton de création existe réellement. Honnête et utile plutôt qu'un toast qui ne fait rien.
-    { id: "new-issue",     label: "Créer une issue",     group: "Actions",    icon: <Plus className="h-4 w-4" />,            shortcut: "C",   action: () => go("/issues") },
+    // La création d'issue est propre à un projet : on mène à la liste des projets, où chacun porte
+    // son propre bouton « New issue » — plutôt qu'un dialogue de création sans projet.
+    { id: "new-issue",     label: "Créer une issue",     group: "Actions",    icon: <Plus className="h-4 w-4" />,            shortcut: "C",   action: () => go("/projects") },
     { id: "new-project",   label: "Créer un projet",     group: "Actions",    icon: <Plus className="h-4 w-4" />,                             action: () => go("/projects") },
     { id: "notifications", label: "Ouvrir les notifications", group: "Actions", icon: <Bell className="h-4 w-4" />,                          action: () => go("/inbox") },
     // « Upgrade to Pro » : le plan Pro n'existe pas (cf. TF-PLAN-PRO-GHOST).

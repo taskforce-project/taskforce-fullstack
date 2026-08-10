@@ -84,7 +84,7 @@ export const CARD_DEFINITIONS: readonly CardDefinition[] = [
   },
   {
     type: "ai-usage",
-    label: "Usage IA",
+    label: "Usage Cortex",
     description: "Consommation de tokens du mois vs plafond du forfait.",
     icon: Sparkles,
     defaultSize: "1",

@@ -21,20 +21,23 @@ export function ThinkingBar({
   label,
   className,
   cycle = true,
+  phases = PHASES,
 }: {
   label?: string
   className?: string
   cycle?: boolean
+  /** Phases défilées (sans `label`) — surchargeable par contexte (chat, suggestion de compétences…). */
+  phases?: string[]
 }) {
   const [i, setI] = useState(0)
 
   useEffect(() => {
     if (label || !cycle) return
-    const id = setInterval(() => setI((n) => (n + 1) % PHASES.length), 1600)
+    const id = setInterval(() => setI((n) => (n + 1) % phases.length), 1600)
     return () => clearInterval(id)
-  }, [label, cycle])
+  }, [label, cycle, phases.length])
 
-  const text = label ?? PHASES[i]
+  const text = label ?? phases[i % phases.length]
 
   return (
     <span className={cn("inline-flex items-center gap-2", className)}>

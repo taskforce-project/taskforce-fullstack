@@ -1,9 +1,8 @@
 // Login
 export { LoginForm } from "./login/login-form";
 
-// Register
+// Register (2 étapes : compte → vérification ; plan choisi en Free, upgrade in-app)
 export { SignupForm as RegisterInfoForm } from "./register/register-info-form";
-export { RegisterPlanForm } from "./register/plan/plan-form";
 export { OTPForm as RegisterVerificationForm } from "./register/verification/verification-form";
 
 // Password Reset (forgot & reset fusionnés)

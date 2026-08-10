@@ -8,7 +8,7 @@ import { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { setRegisterData } from "@/lib/auth/register-storage";
+import { getRegisterData, setRegisterData } from "@/lib/auth/register-storage";
 import {
   validateEmail,
   validateName,
@@ -59,6 +59,22 @@ export function SignupForm({
     turnstileSiteKey: "",
     turnstileRequired: false,
   });
+
+  // Retour en arrière depuis l'étape suivante : ré-hydrater le formulaire depuis le stockage de
+  // session plutôt que de repartir d'un écran vide (le mot de passe y figure déjà).
+  useEffect(() => {
+    const saved = getRegisterData();
+    if (saved) {
+      setFormData((prev) => ({
+        ...prev,
+        firstName: saved.firstName || prev.firstName,
+        lastName: saved.lastName || prev.lastName,
+        email: saved.email || prev.email,
+        password: saved.password || prev.password,
+        confirmPassword: saved.password || prev.confirmPassword,
+      }));
+    }
+  }, []);
 
   // Pré-remplissage de l'email depuis une invitation (?email=…, PROD-3.5)
   useEffect(() => {
@@ -156,7 +172,10 @@ export function SignupForm({
       lastName: sanitizeInput(formData.lastName),
       email: sanitizeInput(formData.email),
       password: formData.password,
-      // Transportés jusqu'à l'étape 3, seul moment où l'inscription part vers le serveur.
+      // Tout le monde démarre en FREE (modèle Linear) : le choix d'un forfait payant est un upgrade
+      // in-app (Réglages → Facturation), une fois le compte créé. Plus d'étape « plan » à l'inscription.
+      planType: "FREE",
+      // Transportés jusqu'à la vérification, seul moment où l'inscription part vers le serveur.
       challengeToken: challenge.token,
       turnstileToken,
     };
@@ -164,7 +183,7 @@ export function SignupForm({
     setIsLoading(true);
     try {
       setRegisterData(sanitizedData);
-      router.push("/auth/register/plan");
+      router.push("/auth/register/verification");
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       toast.error(t.common.error, { description: errorMessage || t.auth.errors.registrationFailed });

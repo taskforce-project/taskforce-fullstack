@@ -11,6 +11,7 @@ import { PanelDock } from "@/components/layout/panel-dock"
 import { AppFooter } from "@/components/layout/app-footer"
 import { UpgradeDialog } from "@/components/subscription/upgrade-dialog"
 import { SettingsModal } from "@/components/settings/settings-modal"
+import { ProductTour } from "@/components/tour/product-tour"
 
 interface AppShellProps {
   readonly children: React.ReactNode
@@ -47,6 +48,9 @@ export function AppShell({ children }: AppShellProps) {
       {/* Modals globaux — ouvrables depuis n'importe quel CTA */}
       <UpgradeDialog />
       <SettingsModal />
+
+      {/* Tour produit (coach-marks) — rendu conditionnel via son store ; cible les data-tour du dashboard */}
+      <ProductTour />
     </SidebarProvider>
   )
 }

@@ -74,8 +74,9 @@ describe('SignupForm - Step 1: Information Form', () => {
     it('should render progress indicator showing step 1', () => {
       render(<SignupForm />);
 
-      // L'indicateur affiche « Étape 1 sur 3 » (le pourcentage textuel « 33% » a été retiré).
-      expect(screen.getByText(/étape 1 sur 3/i)).toBeInTheDocument();
+      // Le fil d'étapes est à l'étape 1 : chaque étape porte son libellé d'un mot, l'aria annonce la position.
+      expect(screen.getByText('Compte')).toBeInTheDocument();
+      expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '1');
     });
 
     it('should render login link', () => {
@@ -242,6 +243,7 @@ describe('SignupForm - Step 1: Information Form', () => {
           lastName: 'Doe',
           email: 'test@example.com',
           password: 'StrongP@ssw0rd!',
+          planType: 'FREE',
           challengeToken: '',
           turnstileToken: '',
         });
@@ -251,7 +253,7 @@ describe('SignupForm - Step 1: Information Form', () => {
       // navigation vers l'étape 2 est elle-même la confirmation, et le fil d'étapes montre déjà la
       // progression. Une notification qui annonce ce que l'écran suivant affiche est du bruit.
       await waitFor(() => {
-        expect(mockPush).toHaveBeenCalledWith('/auth/register/plan');
+        expect(mockPush).toHaveBeenCalledWith('/auth/register/verification');
       });
 
       expect(toast.success).not.toHaveBeenCalled();

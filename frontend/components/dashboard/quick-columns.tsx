@@ -73,6 +73,7 @@ function OperationsColumn() {
                 discrète sans être illisible. */}
             <Link
               href="./projects?new=1"
+              data-tour="create-operation"
               className="flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-border py-2 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-muted/30 hover:text-primary"
             >
               <Plus className="size-3.5" /> Créer une opération

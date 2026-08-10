@@ -149,7 +149,7 @@ export function toggleWorkflowPanel() {
     side: "right",
     title: "Workflows IA",
     icon: <Layers className="size-4 text-primary" />,
-    width: 400,
+    width: 420,
     content: <WorkflowPanelContent />,
   })
 }
@@ -161,7 +161,7 @@ export function openWorkflowPanel() {
     side: "right",
     title: "Workflows IA",
     icon: <Layers className="size-4 text-primary" />,
-    width: 400,
+    width: 420,
     content: <WorkflowPanelContent />,
   })
 }

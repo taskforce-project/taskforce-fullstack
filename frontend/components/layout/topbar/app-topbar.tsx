@@ -25,6 +25,7 @@ import { WorkflowsButton } from "@/components/workflows/workflows-button"
 import { useProjectStore } from "@/lib/store/project-store"
 import { usePanelStore } from "@/lib/store/panel-store"
 import { useUserStore } from "@/lib/store/user-store"
+import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { planHasFeature } from "@/lib/config/plan-features"
 import { AgentChat } from "@/components/agent/agent-chat"
 import { toast } from "sonner"
@@ -70,6 +71,8 @@ function segmentLabel(segment: string): string {
 function useBreadcrumbs() {
   const pathname = usePathname()
   const projects = useProjectStore((s) => s.projects)
+  const workspaces = useWorkspaceStore((s) => s.workspaces)
+  const activeWorkspace = useWorkspaceStore((s) => s.activeWorkspace)
 
   return React.useMemo(() => {
     const segments = pathname.replace(/^\//, "").split("/").filter(Boolean)
@@ -79,6 +82,19 @@ function useBreadcrumbs() {
       const seg = segments[i]
       const href = "/" + segments.slice(0, i + 1).join("/")
       const isLast = i === segments.length - 1
+
+      // 1er segment = slug du workspace. Le title-case kebab générique affichait « Pierre 6db5ea »
+      // (le slug porte un suffixe hex d'unicité) et liait vers `/{slug}` — une route SANS page → 404.
+      // On rend le vrai nom du workspace et on pointe vers son accueil réel (`/{slug}/dashboard`).
+      if (i === 0) {
+        const ws = workspaces.find((w) => w.slug === seg)
+        result.push({
+          href: `/${seg}/dashboard`,
+          label: ws?.name ?? activeWorkspace?.name ?? segmentLabel(seg),
+          isLast,
+        })
+        continue
+      }
 
       // Segment numérique après "projects" = ID de projet → remplacer par le nom
       if (/^\d+$/.test(seg) && segments[i - 1] === "projects") {
@@ -94,7 +110,7 @@ function useBreadcrumbs() {
     }
 
     return result
-  }, [pathname, projects])
+  }, [pathname, projects, workspaces, activeWorkspace])
 }
 
 export function AppTopbar() {
@@ -153,7 +169,9 @@ export function AppTopbar() {
           <Breadcrumb>
             <BreadcrumbList>
               {breadcrumbs.map((crumb, i) => (
-                <React.Fragment key={crumb.href}>
+                // Clé = index + href : sur le dashboard, le crumb workspace ET le crumb « Dashboard »
+                // pointent tous deux vers `/{slug}/dashboard` — l'href seul provoquait une clé dupliquée.
+                <React.Fragment key={`${i}-${crumb.href}`}>
                   {i > 0 && <BreadcrumbSeparator className="hidden md:block" />}
                   <BreadcrumbItem className={i > 0 ? "hidden md:block" : ""}>
                     {crumb.isLast ? (
@@ -221,6 +239,7 @@ export function AppTopbar() {
           className="hidden gap-1.5 text-xs sm:inline-flex"
           onClick={openAssistant}
           aria-label="Ouvrir l'assistant IA"
+          data-tour="ask-ai"
         >
           <Sparkles className="size-4 text-primary" />
           <span className="hidden lg:inline">Ask AI</span>

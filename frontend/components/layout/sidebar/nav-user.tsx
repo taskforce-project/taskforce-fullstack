@@ -50,6 +50,15 @@ export function NavUser({
 
   const isPro = authUser?.planType === "BUSINESS" || authUser?.planType === "ENTERPRISE"
 
+  // Le plan s'affiche à côté du profil (façon Claude « Pierre · Max »), plus sur le CTA d'upgrade.
+  const PLAN_LABELS: Record<string, string> = {
+    FREE: "Free",
+    BASIC: "Basic",
+    BUSINESS: "Business",
+    ENTERPRISE: "Enterprise",
+  }
+  const planLabel = PLAN_LABELS[authUser?.planType ?? "FREE"] ?? "Free"
+
   const handleLogout = async () => {
     // logout() fait déjà un reload dur vers /auth/login (vide les stores Zustand en mémoire
     // → plus de mélange de comptes sur un même navigateur). Pas de router.push ici. QA2.
@@ -72,7 +81,12 @@ export function NavUser({
                 className="h-8 w-8"
               />
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">{user.name}</span>
+                <span className="flex items-center gap-1.5">
+                  <span className="truncate font-medium">{user.name}</span>
+                  <Badge variant="secondary" className="h-4 shrink-0 px-1 text-[9px] font-medium leading-none">
+                    {planLabel}
+                  </Badge>
+                </span>
                 <span className="truncate text-xs">{user.email}</span>
               </div>
               <ChevronsUpDown className="ml-auto size-4" />
@@ -93,7 +107,12 @@ export function NavUser({
                   className="h-8 w-8"
                 />
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">{user.name}</span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="truncate font-medium">{user.name}</span>
+                    <Badge variant="secondary" className="h-4 shrink-0 px-1 text-[9px] font-medium leading-none">
+                      {planLabel}
+                    </Badge>
+                  </span>
                   <span className="truncate text-xs text-muted-foreground">{user.email}</span>
                 </div>
               </div>
@@ -108,8 +127,7 @@ export function NavUser({
                     className="gap-2 text-amber-600 focus:text-amber-600 dark:text-amber-500 dark:focus:text-amber-500"
                   >
                     <Sparkles className="size-4" />
-                    <span className="font-medium">Passer à Pro</span>
-                    <Badge variant="secondary" className="ml-auto h-5 px-1.5 text-[10px]">Free</Badge>
+                    <span className="font-medium">Améliorer mon forfait</span>
                   </DropdownMenuItem>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
