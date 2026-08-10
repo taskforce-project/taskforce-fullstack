@@ -68,4 +68,27 @@ public class AiMeter {
             active.remove();
         }
     }
+
+    /**
+     * Variante <b>offerte</b> de {@link #metered} : exécute {@code work} sous le même gate de quota, mais
+     * <b>sans enregistrer</b> la consommation. Réservée aux courtoisies de <b>pré-activation</b> — à ce
+     * jour l'unique appelant est la suggestion de compétences de l'onboarding.
+     *
+     * <p>Décision produit : l'onboarding ne doit pas grignoter le quota du compte avant même que la
+     * personne ait commencé à se servir de l'outil (revue UI/UX, item « tokens onboarding »). Le gate est
+     * <b>conservé</b> — au-dessus du plafond on ne lance pas le LLM local et l'appelant retombe sur son
+     * repli déterministe — mais aucun token n'est décompté. <b>Ne pas étendre à un chemin récurrent</b> :
+     * ce serait un contournement du métrage.</p>
+     *
+     * <p>Si un métrage externe est déjà actif sur ce thread (imbrication), on défère à lui : l'appel LLM
+     * sera compté par l'appelant externe. En pratique l'onboarding n'est jamais imbriqué ; ce cas n'existe
+     * que pour rester correct vis-à-vis de l'accumulateur thread-local du {@link LlmClient}.</p>
+     */
+    public <T> T complimentary(Long workspaceId, AiCall<T> work) throws Exception {
+        if (Boolean.TRUE.equals(active.get())) {
+            return work.call(); // métrage externe en cours → ne pas fausser sa capture ; il comptera
+        }
+        usage.assertWithinQuota(workspaceId); // protège le LLM d'un compte au plafond ; ne consomme rien
+        return work.call();                   // pas de capture ni d'enregistrement : cadeau de bienvenue
+    }
 }

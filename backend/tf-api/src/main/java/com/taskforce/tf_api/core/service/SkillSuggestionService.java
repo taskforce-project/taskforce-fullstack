@@ -30,8 +30,11 @@ import lombok.extern.slf4j.Slf4j;
  * Suggestion de compétences à partir d'un rôle, pour l'onboarding (étape 2).
  *
  * <p>Le rôle saisi à l'étape 1 est envoyé au LLM local (Qwen via {@link AiGatewayClient}), qui propose
- * une liste de tags pertinents. L'appel est <b>métré</b> comme les autres chemins IA ({@link AiMeter} :
- * gate de quota + comptage tokens) — le workspace de la personne sert d'unité de facturation.</p>
+ * une liste de tags pertinents. L'appel est <b>offert</b> ({@link AiMeter#complimentary}) : il passe
+ * par le gate de quota du compte (au-dessus du plafond, on ne lance pas le LLM), mais sa consommation
+ * n'est <b>pas décomptée</b>. Motif : l'onboarding est une courtoisie de pré-activation, il ne doit pas
+ * grignoter le quota avant que la personne ait commencé à se servir de l'outil (revue UI/UX, item
+ * « tokens onboarding »).</p>
  *
  * <p><b>Dégradation gracieuse</b> : si le LLM est indisponible ou le quota atteint, on renvoie une
  * liste déterministe déduite de mots-clés du rôle. La suggestion n'est jamais bloquante pour
@@ -89,10 +92,10 @@ public class SkillSuggestionService {
         Long workspaceId = workspace.getId();
         try {
             // Attente BORNÉE : au-delà de `timeoutSeconds`, on cesse d'attendre le LLM et on rend le
-            // repli déterministe. Le travail IA continue en tâche de fond (métré s'il aboutit) mais
-            // n'est plus attendu — l'onboarding reste réactif quelle que soit la lenteur du modèle.
+            // repli déterministe. Le travail IA continue en tâche de fond mais n'est plus attendu —
+            // l'onboarding reste réactif quelle que soit la lenteur du modèle.
             return CompletableFuture
-                .supplyAsync(() -> meteredSuggest(workspaceId, role, already), executor)
+                .supplyAsync(() -> complimentarySuggest(workspaceId, role, already), executor)
                 .get(timeoutSeconds, TimeUnit.SECONDS);
         } catch (Exception e) {
             String cause = e instanceof TimeoutException
@@ -103,10 +106,10 @@ public class SkillSuggestionService {
         }
     }
 
-    /** Appel LLM métré ; toute défaillance (quota atteint, erreur gateway) retombe déjà sur le repli. */
-    private List<String> meteredSuggest(Long workspaceId, String role, List<String> already) {
+    /** Appel LLM <b>offert</b> (gate quota mais non décompté) ; toute défaillance (quota atteint, erreur gateway) retombe sur le repli. */
+    private List<String> complimentarySuggest(Long workspaceId, String role, List<String> already) {
         try {
-            return aiMeter.metered(workspaceId, () -> viaLlm(role, already));
+            return aiMeter.complimentary(workspaceId, () -> viaLlm(role, already));
         } catch (Exception e) {
             log.warn("Appel LLM de suggestion en échec ({})", e.getClass().getSimpleName());
             return fallback(role, already);
