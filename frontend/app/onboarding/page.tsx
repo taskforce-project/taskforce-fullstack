@@ -10,6 +10,12 @@ import { listWorkspaces, updateWorkspace } from "@/lib/api/workspace-service";
 import { createInvitation } from "@/lib/api/invitation-service";
 import { createProject } from "@/lib/api/project-service";
 import { updateMemberSkills, suggestSkills, type Seniority } from "@/lib/api/skill-service";
+import { ThinkingBar } from "@/components/chat/thinking-bar";
+import { OnboardingShell } from "@/components/onboarding/onboarding-shell";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { getAvatarUrl } from "@/lib/utils/avatar";
 
 /**
  * Wizard d'onboarding — universel (tous les comptes, au 1ᵉʳ login), sautable.
@@ -34,6 +40,13 @@ const SENIORITIES: { value: Seniority; label: string }[] = [
 const STEPS = ["Vous", "Compétences", "Équipe", "Premier projet"];
 const TOTAL = STEPS.length;
 
+/** Phases défilées pendant la génération des suggestions (loader « vivant », sans label). */
+const SUGGESTION_PHASES = [
+  "Analyse de ton rôle…",
+  "Recherche des compétences clés…",
+  "Sélection des tags pertinents…",
+];
+
 /** Dérive un identifiant projet court (3-4 lettres) depuis un nom, pour l'API createProject. */
 function deriveIdentifier(name: string): string {
   const letters = name.toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -46,6 +59,9 @@ export default function OnboardingPage() {
   const finishOnboarding = useUserStore((s) => s.finishOnboarding);
 
   const [step, setStep] = useState(1);
+  // Étape la plus avancée atteinte : borne les sauts arrière/avant depuis la checklist latérale
+  // (on ne peut revenir que sur une étape déjà vue, jamais sauter une étape non encore atteinte).
+  const [maxStep, setMaxStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
 
   // Contexte (workspace de la personne + son id)
@@ -96,6 +112,11 @@ export default function OnboardingPage() {
   useEffect(() => {
     if (user?.jobTitle) setJobTitle(user.jobTitle);
   }, [user]);
+
+  // Mémorise l'étape la plus loin atteinte (jamais décroissante) : c'est la borne des sauts latéraux.
+  useEffect(() => {
+    setMaxStep((m) => Math.max(m, step));
+  }, [step]);
 
   // Étape 2 : dès qu'on y arrive avec un rôle renseigné, l'IA propose des compétences AUTOMATIQUEMENT
   // (badges cliquables, aucun clic requis de l'utilisateur). Ne se relance pas pour un rôle déjà
@@ -216,26 +237,48 @@ export default function OnboardingPage() {
     step === 3 ||
     step === 4;
 
-  return (
-    <div className="grid min-h-svh place-items-center px-4 py-10">
-      <div
-        className="w-full max-w-xl rounded-2xl border p-8 shadow-sm"
-        style={{ borderColor: "var(--border)", background: "var(--surface, var(--background))" }}
-      >
-        {/* Progression — l'onboarding n'est pas sautable (il alimente le Smart Assign). */}
-        <div className="mb-1 text-xs" style={{ color: "var(--label-tertiary)" }}>
-          Étape {step} sur {TOTAL} · {STEPS[step - 1]}
-        </div>
-        <div className="mb-6 flex gap-1.5">
-          {Array.from({ length: TOTAL }).map((_, i) => (
-            <span
-              key={i}
-              className="h-1 flex-1 rounded-full transition-colors"
-              style={{ background: i < step ? "var(--accent-purple)" : "var(--input)" }}
-            />
-          ))}
-        </div>
+  // Saut latéral depuis la checklist : borné aux étapes déjà atteintes (cf. maxStep).
+  const goToStep = (n: number) => {
+    if (n <= maxStep) setStep(n);
+  };
 
+  const account = {
+    name: user?.displayName || [user?.firstName, user?.lastName].filter(Boolean).join(" ") || "Vous",
+    email: user?.email ?? "",
+    avatarUrl: user ? getAvatarUrl(user) : "",
+  };
+
+  return (
+    <OnboardingShell
+      steps={STEPS}
+      current={step}
+      maxReached={maxStep}
+      onSelectStep={goToStep}
+      account={account}
+      footer={
+        <>
+          <Button
+            variant="ghost"
+            onClick={() => setStep((s) => Math.max(1, s - 1))}
+            disabled={step === 1 || submitting}
+          >
+            <ArrowLeft /> Précédent
+          </Button>
+
+          {step < TOTAL ? (
+            <Button onClick={() => setStep((s) => Math.min(TOTAL, s + 1))} disabled={!canNext || submitting}>
+              Suivant <ArrowRight />
+            </Button>
+          ) : (
+            <Button onClick={persistAndLeave} disabled={submitting}>
+              {submitting ? <Loader2 className="animate-spin" /> : <Check />}
+              Terminer
+            </Button>
+          )}
+        </>
+      }
+    >
+      <div className="space-y-8">
         {/* ── Étape 1 : Vous ─────────────────────────────────────────── */}
         {step === 1 && (
           <div className="space-y-5">
@@ -251,12 +294,10 @@ export default function OnboardingPage() {
               <span className="mb-1.5 block text-sm font-medium" style={{ color: "var(--label-secondary)" }}>
                 Quel est ton rôle ?
               </span>
-              <input
+              <Input
                 value={jobTitle}
                 onChange={(e) => setJobTitle(e.target.value)}
                 placeholder="ex. Développeur back-end, Chef de projet, Designer…"
-                className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2"
-                style={{ borderColor: "var(--border)", background: "var(--background)", color: "var(--label-primary)" }}
               />
             </label>
             <div>
@@ -272,7 +313,7 @@ export default function OnboardingPage() {
                     className="rounded-full border px-3 py-1.5 text-sm transition-colors"
                     style={
                       seniority === s.value
-                        ? { borderColor: "var(--accent-purple)", background: "var(--accent-purple)", color: "#fff" }
+                        ? { borderColor: "var(--primary)", background: "var(--primary)", color: "#fff" }
                         : { borderColor: "var(--border)", color: "var(--label-secondary)" }
                     }
                   >
@@ -292,22 +333,20 @@ export default function OnboardingPage() {
                 Tes compétences
               </h1>
               <p className="mt-1 text-sm" style={{ color: "var(--label-tertiary)" }}>
-                Elles aident TaskForce à te proposer les bonnes tâches. Ajoute-les, ou laisse l&apos;IA suggérer.
+                Elles aident TaskForce à te proposer les bonnes tâches. Ajoute-les, ou laisse Cortex te suggérer.
               </p>
             </div>
 
-            {/* Suggestions IA — lancées automatiquement à l'arrivée sur l'étape (cf. useEffect). */}
+            {/* Suggestions — lancées automatiquement à l'arrivée sur l'étape (cf. useEffect). */}
             <div>
               <div className="mb-2 flex items-center gap-2 text-xs" style={{ color: "var(--label-tertiary)" }}>
-                <Sparkles className="h-3.5 w-3.5" style={{ color: "var(--accent-purple)" }} />
                 {loadingSuggestions ? (
-                  <span className="inline-flex items-center gap-1.5">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> L&apos;IA propose des compétences pour ton rôle…
-                  </span>
+                  <ThinkingBar phases={SUGGESTION_PHASES} />
                 ) : (
                   <>
+                    <Sparkles className="h-3.5 w-3.5" style={{ color: "var(--primary)" }} />
                     <span>
-                      Suggestions{suggestedFor ? ` pour « ${suggestedFor} »` : ""} — clique pour ajouter
+                      Suggéré par Cortex{suggestedFor ? ` pour « ${suggestedFor} »` : ""} — clique pour ajouter
                     </span>
                     {suggestedFor && (
                       <button
@@ -331,7 +370,7 @@ export default function OnboardingPage() {
                         type="button"
                         onClick={() => addSkill(s)}
                         className="inline-flex items-center gap-1 rounded-full border border-dashed px-3 py-1 text-sm transition-colors hover:opacity-80"
-                        style={{ borderColor: "var(--accent-purple)", color: "var(--accent-purple)" }}
+                        style={{ borderColor: "var(--primary)", color: "var(--primary)" }}
                       >
                         <Plus className="h-3 w-3" /> {s}
                       </button>
@@ -344,7 +383,7 @@ export default function OnboardingPage() {
               <label className="mb-1.5 block text-sm font-medium" style={{ color: "var(--label-secondary)" }}>
                 Ajouter une compétence
               </label>
-              <input
+              <Input
                 value={skillInput}
                 onChange={(e) => setSkillInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -354,8 +393,6 @@ export default function OnboardingPage() {
                   }
                 }}
                 placeholder="Tape puis Entrée (ex. React, Java, Figma…)"
-                className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2"
-                style={{ borderColor: "var(--border)", background: "var(--background)", color: "var(--label-primary)" }}
               />
               {skills.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-2">
@@ -380,13 +417,11 @@ export default function OnboardingPage() {
                 <span className="mb-1.5 block text-sm font-medium" style={{ color: "var(--label-secondary)" }}>
                   Capacité (h/sem) <span style={{ color: "var(--label-quaternary)" }}>opt.</span>
                 </span>
-                <input
+                <Input
                   value={capacity}
                   onChange={(e) => setCapacity(e.target.value.replace(/[^0-9]/g, "").slice(0, 3))}
                   inputMode="numeric"
                   placeholder="35"
-                  className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2"
-                  style={{ borderColor: "var(--border)", background: "var(--background)", color: "var(--label-primary)" }}
                 />
               </label>
             </div>
@@ -395,13 +430,12 @@ export default function OnboardingPage() {
               <span className="mb-1.5 block text-sm font-medium" style={{ color: "var(--label-secondary)" }}>
                 En une phrase <span style={{ color: "var(--label-quaternary)" }}>(optionnel)</span>
               </span>
-              <textarea
+              <Textarea
                 value={bio}
                 onChange={(e) => setBio(e.target.value.slice(0, 2000))}
                 rows={2}
                 placeholder="ex. J'aime les sujets perf et l'expérience développeur."
-                className="w-full resize-none rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2"
-                style={{ borderColor: "var(--border)", background: "var(--background)", color: "var(--label-primary)" }}
+                className="resize-none"
               />
             </label>
           </div>
@@ -422,12 +456,10 @@ export default function OnboardingPage() {
               <span className="mb-1.5 block text-sm font-medium" style={{ color: "var(--label-secondary)" }}>
                 Nom du workspace
               </span>
-              <input
+              <Input
                 value={wsName}
                 onChange={(e) => setWsName(e.target.value)}
                 placeholder="Mon équipe"
-                className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2"
-                style={{ borderColor: "var(--border)", background: "var(--background)", color: "var(--label-primary)" }}
               />
             </label>
             <div>
@@ -435,7 +467,7 @@ export default function OnboardingPage() {
                 Inviter des coéquipiers <span style={{ color: "var(--label-quaternary)" }}>(optionnel)</span>
               </span>
               <div className="flex gap-2">
-                <input
+                <Input
                   value={inviteInput}
                   onChange={(e) => setInviteInput(e.target.value)}
                   onKeyDown={(e) => {
@@ -445,17 +477,11 @@ export default function OnboardingPage() {
                     }
                   }}
                   placeholder="collegue@entreprise.com"
-                  className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2"
-                  style={{ borderColor: "var(--border)", background: "var(--background)", color: "var(--label-primary)" }}
+                  type="email"
                 />
-                <button
-                  type="button"
-                  onClick={addInvite}
-                  className="shrink-0 rounded-lg border px-3 text-sm"
-                  style={{ borderColor: "var(--border)", color: "var(--label-secondary)" }}
-                >
+                <Button type="button" variant="outline" onClick={addInvite} className="shrink-0">
                   Ajouter
-                </button>
+                </Button>
               </div>
               {invites.length > 0 && (
                 <ul className="mt-3 space-y-1.5">
@@ -496,12 +522,10 @@ export default function OnboardingPage() {
               <span className="mb-1.5 block text-sm font-medium" style={{ color: "var(--label-secondary)" }}>
                 Nom du projet
               </span>
-              <input
+              <Input
                 value={projectName}
                 onChange={(e) => setProjectName(e.target.value)}
                 placeholder="ex. Refonte du site, Sprint 1…"
-                className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2"
-                style={{ borderColor: "var(--border)", background: "var(--background)", color: "var(--label-primary)" }}
               />
               {projectName.trim() && (
                 <span className="mt-1.5 block text-xs" style={{ color: "var(--label-tertiary)" }}>
@@ -511,43 +535,7 @@ export default function OnboardingPage() {
             </label>
           </div>
         )}
-
-        {/* ── Navigation ────────────────────────────────────────────── */}
-        <div className="mt-8 flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => setStep((s) => Math.max(1, s - 1))}
-            disabled={step === 1 || submitting}
-            className="inline-flex items-center gap-1 text-sm disabled:opacity-40"
-            style={{ color: "var(--label-secondary)" }}
-          >
-            <ArrowLeft className="h-4 w-4" /> Précédent
-          </button>
-
-          {step < TOTAL ? (
-            <button
-              type="button"
-              onClick={() => setStep((s) => Math.min(TOTAL, s + 1))}
-              disabled={!canNext || submitting}
-              className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium text-white transition-opacity disabled:opacity-50"
-              style={{ background: "var(--accent-purple)" }}
-            >
-              Suivant <ArrowRight className="h-4 w-4" />
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={persistAndLeave}
-              disabled={submitting}
-              className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium text-white transition-opacity disabled:opacity-60"
-              style={{ background: "var(--accent-purple)" }}
-            >
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-              Terminer
-            </button>
-          )}
-        </div>
       </div>
-    </div>
+    </OnboardingShell>
   );
 }
