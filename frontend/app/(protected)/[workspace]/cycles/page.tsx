@@ -332,9 +332,9 @@ function mapApiCyclesToLocal(
       endDate:   c.endDate ?? "",
       issues: {
         total:      c.issueCount,
-        done:       0,
+        done:       c.completedCount,
         inProgress: 0,
-        todo:       c.issueCount,
+        todo:       Math.max(0, c.issueCount - c.completedCount),
         cancelled:  0,
       },
     }))
