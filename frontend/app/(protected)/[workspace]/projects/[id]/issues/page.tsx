@@ -56,6 +56,19 @@ const PRIORITY_LABEL: Record<IssuePriority, string> = {
   NONE:   "None",
 }
 
+/** Ordre de tri des priorités : la plus haute d'abord. */
+const PRIORITY_RANK: Record<IssuePriority, number> = {
+  URGENT: 0, HIGH: 1, MEDIUM: 2, LOW: 3, NONE: 4,
+}
+
+type SortKey = "priority" | "created" | "due" | "assignee"
+const SORT_LABEL: Record<SortKey, string> = {
+  priority: "Priority",
+  created:  "Created",
+  due:      "Due date",
+  assignee: "Assignee",
+}
+
 function getCategoryIcon(category: IssueStatusCategory): React.ReactNode {
   switch (category) {
     case "STARTED":   return <RefreshCw className="size-3.5 text-blue-400" />
@@ -266,6 +279,7 @@ export default function ProjectIssuesPage() {
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all")
   const [priorityFilter, setPriorityFilter] = useState<IssuePriority | "all">("all")
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null)
+  const [sort, setSort]                   = useState<SortKey | null>(null)
 
   useEffect(() => {
     if (workspace && projectId) {
@@ -284,7 +298,32 @@ export default function ProjectIssuesPage() {
     return list
   }, [issues, search, categoryFilter, priorityFilter])
 
-  const { page, setPage, pageSize, setPageSize, pageCount, pageItems, total } = usePagination(filtered)
+  const sorted = useMemo(() => {
+    if (!sort) return filtered
+    const list = [...filtered]
+    if (sort === "priority") {
+      list.sort((a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority])
+    } else if (sort === "created") {
+      list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    } else if (sort === "due") {
+      const due = (d: string | null) => (d ? new Date(d).getTime() : Number.POSITIVE_INFINITY)
+      list.sort((a, b) => due(a.dueDate) - due(b.dueDate))
+    } else if (sort === "assignee") {
+      // Assignés d'abord (ordre alphabétique), non-assignés en dernier.
+      const name = (i: Issue) => i.assignee?.displayName?.toLowerCase() ?? null
+      list.sort((a, b) => {
+        const na = name(a)
+        const nb = name(b)
+        if (na === nb) return 0
+        if (na === null) return 1
+        if (nb === null) return -1
+        return na.localeCompare(nb)
+      })
+    }
+    return list
+  }, [filtered, sort])
+
+  const { page, setPage, pageSize, setPageSize, pageCount, pageItems, total } = usePagination(sorted)
 
   const hasFilters = categoryFilter !== "all" || priorityFilter !== "all" || search.trim()
 
@@ -346,14 +385,16 @@ export default function ProjectIssuesPage() {
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5">
               <SortAsc className="size-3.5" />
-              Sort
+              {sort ? SORT_LABEL[sort] : "Sort"}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem>Priority (high → low)</DropdownMenuItem>
-            <DropdownMenuItem>Created date</DropdownMenuItem>
-            <DropdownMenuItem>Due date</DropdownMenuItem>
-            <DropdownMenuItem>Assignee</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setSort("priority")}>Priority (high → low)</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setSort("created")}>Created date</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setSort("due")}>Due date</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setSort("assignee")}>Assignee</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => setSort(null)} disabled={!sort}>Default order</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 
