@@ -22,4 +22,5 @@ public class CycleResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private Long          issueCount;
+    private Long          completedCount;
 }

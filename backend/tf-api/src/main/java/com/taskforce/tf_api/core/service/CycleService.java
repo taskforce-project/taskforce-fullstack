@@ -61,7 +61,9 @@ public class CycleService {
         Project project = resolveProject(workspaceSlug, projectId);
         assertWorkspaceMember(project.getWorkspace().getId(), userId);
         return cycleRepository.findByProjectId(project.getId()).stream()
-            .map(c -> toResponse(c, cycleIssueRepository.countByCycleId(c.getId())))
+            .map(c -> toResponse(c,
+                cycleIssueRepository.countByCycleId(c.getId()),
+                cycleIssueRepository.countCompletedByCycleId(c.getId())))
             .toList();
     }
 
@@ -84,16 +86,19 @@ public class CycleService {
         List<Cycle> cycles = cycleRepository.findByProjectIdsWithProject(viewableProjectIds);
         if (cycles.isEmpty()) return List.of();
 
-        Map<Long, Long> issueCounts = cycleIssueRepository
-            .countByCycleIds(cycles.stream().map(Cycle::getId).toList())
-            .stream()
+        List<Long> cycleIds = cycles.stream().map(Cycle::getId).toList();
+        Map<Long, Long> issueCounts = cycleIssueRepository.countByCycleIds(cycleIds).stream()
+            .collect(Collectors.toMap(row -> (Long) row[0], row -> (Long) row[1]));
+        Map<Long, Long> completedCounts = cycleIssueRepository.countCompletedByCycleIds(cycleIds).stream()
             .collect(Collectors.toMap(row -> (Long) row[0], row -> (Long) row[1]));
 
         return cycles.stream()
             .map(c -> MyWorkCycleResponse.builder()
                 .projectId(c.getProject().getId())
                 .projectName(c.getProject().getName())
-                .cycle(toResponse(c, issueCounts.getOrDefault(c.getId(), 0L)))
+                .cycle(toResponse(c,
+                    issueCounts.getOrDefault(c.getId(), 0L),
+                    completedCounts.getOrDefault(c.getId(), 0L)))
                 .build())
             .toList();
     }
@@ -119,7 +124,7 @@ public class CycleService {
             .createdBy(actor)
             .build();
         cycle = cycleRepository.save(cycle);
-        return toResponse(cycle, 0L);
+        return toResponse(cycle, 0L, 0L);
     }
 
     @Transactional(readOnly = true)
@@ -127,7 +132,9 @@ public class CycleService {
         Project project = resolveProject(workspaceSlug, projectId);
         assertWorkspaceMember(project.getWorkspace().getId(), userId);
         Cycle cycle = resolveCycle(cycleId, project.getId());
-        return toResponse(cycle, cycleIssueRepository.countByCycleId(cycle.getId()));
+        return toResponse(cycle,
+            cycleIssueRepository.countByCycleId(cycle.getId()),
+            cycleIssueRepository.countCompletedByCycleId(cycle.getId()));
     }
 
     @Transactional
@@ -168,7 +175,9 @@ public class CycleService {
                 workspaceSlug, project.getWorkspace().getId(), project.getId(), cycle.getId(), userId));
         }
 
-        return toResponse(cycle, cycleIssueRepository.countByCycleId(cycle.getId()));
+        return toResponse(cycle,
+            cycleIssueRepository.countByCycleId(cycle.getId()),
+            cycleIssueRepository.countCompletedByCycleId(cycle.getId()));
     }
 
     @Transactional
@@ -202,7 +211,9 @@ public class CycleService {
             .filter(i -> i.getProject().getId().equals(project.getId()))
             .orElseThrow(() -> new ResourceNotFoundException("Issue introuvable dans ce projet"));
         return cycleIssueRepository.findByIssueId(issue.getId()).stream()
-            .map(ci -> toResponse(ci.getCycle(), cycleIssueRepository.countByCycleId(ci.getCycle().getId())))
+            .map(ci -> toResponse(ci.getCycle(),
+                cycleIssueRepository.countByCycleId(ci.getCycle().getId()),
+                cycleIssueRepository.countCompletedByCycleId(ci.getCycle().getId())))
             .toList();
     }
 
@@ -266,7 +277,7 @@ public class CycleService {
         }
     }
 
-    private CycleResponse toResponse(Cycle c, long issueCount) {
+    private CycleResponse toResponse(Cycle c, long issueCount, long completedCount) {
         return CycleResponse.builder()
             .id(c.getId())
             .name(c.getName())
@@ -278,6 +289,7 @@ public class CycleService {
             .createdAt(c.getCreatedAt())
             .updatedAt(c.getUpdatedAt())
             .issueCount(issueCount)
+            .completedCount(completedCount)
             .build();
     }
 }

@@ -97,6 +97,14 @@ class CycleServiceIntegrationTest extends AbstractIntegrationTest {
             .project(p).status(status).reporter(owner).sequenceNumber(1).title(title).build());
     }
 
+    /** Issue portant un statut d'une catégorie donnée (COMPLETED, BACKLOG…) — pour le taux de complétion. */
+    private Issue persistIssueWithStatus(Project p, String title, int seq, IssueStatusCategory category) {
+        IssueStatus status = issueStatusRepository.save(IssueStatus.builder()
+            .project(p).name(category.name()).category(category).build());
+        return issueRepository.save(Issue.builder()
+            .project(p).status(status).reporter(owner).sequenceNumber(seq).title(title).build());
+    }
+
     // =========================================================================
     @Nested
     @DisplayName("CRUD cycle")
@@ -282,6 +290,41 @@ class CycleServiceIntegrationTest extends AbstractIntegrationTest {
             assertThat(res.getId()).isEqualTo(created.getId());
             assertThat(res.getName()).isEqualTo("Sprint 1");
             assertThat(res.getIssueCount()).isZero();
+            assertThat(res.getCompletedCount()).isZero();
+        }
+
+        @Test
+        @DisplayName("getCycle expose issueCount et completedCount (issues terminées)")
+        void should_expose_completed_count() {
+            CycleResponse cycle = cycleService.createCycle(SLUG, projectId(), req("Sprint 1"), owner.getId());
+            Issue done = persistIssueWithStatus(project, "Done task", 1, IssueStatusCategory.COMPLETED);
+            Issue todo = persistIssueWithStatus(project, "Todo task", 2, IssueStatusCategory.BACKLOG);
+
+            AddIssueToCycleRequest addDone = new AddIssueToCycleRequest();
+            addDone.setIssueId(done.getId());
+            cycleService.addIssueToCycle(SLUG, projectId(), cycle.getId(), addDone, owner.getId());
+            AddIssueToCycleRequest addTodo = new AddIssueToCycleRequest();
+            addTodo.setIssueId(todo.getId());
+            cycleService.addIssueToCycle(SLUG, projectId(), cycle.getId(), addTodo, owner.getId());
+
+            CycleResponse res = cycleService.getCycle(SLUG, projectId(), cycle.getId(), owner.getId());
+            assertThat(res.getIssueCount()).isEqualTo(2);
+            assertThat(res.getCompletedCount()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("listWorkspaceCycles expose aussi le completedCount (requête groupée)")
+        void workspace_cycles_expose_completed_count() {
+            CycleResponse cycle = cycleService.createCycle(SLUG, projectId(), req("Sprint 1"), owner.getId());
+            Issue done = persistIssueWithStatus(project, "Done", 1, IssueStatusCategory.COMPLETED);
+            AddIssueToCycleRequest add = new AddIssueToCycleRequest();
+            add.setIssueId(done.getId());
+            cycleService.addIssueToCycle(SLUG, projectId(), cycle.getId(), add, owner.getId());
+
+            var list = cycleService.listWorkspaceCycles(SLUG, owner.getId());
+            assertThat(list).hasSize(1);
+            assertThat(list.get(0).getCycle().getCompletedCount()).isEqualTo(1);
+            assertThat(list.get(0).getCycle().getIssueCount()).isEqualTo(1);
         }
 
         @Test

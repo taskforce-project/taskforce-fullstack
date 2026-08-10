@@ -32,4 +32,12 @@ public interface CycleIssueRepository extends JpaRepository<CycleIssue, Long> {
      */
     @Query("SELECT ci.cycle.id, COUNT(ci) FROM CycleIssue ci WHERE ci.cycle.id IN :cycleIds GROUP BY ci.cycle.id")
     List<Object[]> countByCycleIds(@Param("cycleIds") List<Long> cycleIds);
+
+    /** Nombre d'issues terminées (catégorie {@code COMPLETED}) d'un cycle — pour le taux de complétion. */
+    @Query("SELECT COUNT(ci) FROM CycleIssue ci WHERE ci.cycle.id = :cycleId AND ci.issue.status.category = 'COMPLETED'")
+    long countCompletedByCycleId(@Param("cycleId") Long cycleId);
+
+    /** Issues terminées par cycle, pour un lot de cycles — une requête (cf. {@link #countByCycleIds}). */
+    @Query("SELECT ci.cycle.id, COUNT(ci) FROM CycleIssue ci WHERE ci.cycle.id IN :cycleIds AND ci.issue.status.category = 'COMPLETED' GROUP BY ci.cycle.id")
+    List<Object[]> countCompletedByCycleIds(@Param("cycleIds") List<Long> cycleIds);
 }
