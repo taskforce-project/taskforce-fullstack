@@ -21,7 +21,7 @@ import { useAuth } from "@/lib/contexts/auth-context"
 import { useUserStore } from "@/lib/store/user-store"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { DeleteConfirmDialog } from "@/components/dialogs/delete-confirm-dialog"
-import { useUpgradeStore } from "@/lib/store/upgrade-store"
+import { useSettingsStore } from "@/lib/store/settings-store"
 import { getAuditLogs, type AuditLogEntry } from "@/lib/api/workspace-service"
 import { useIntegrationStore } from "@/lib/store/integration-store"
 import { getGitHubRepos, getGitHubRepoIssues, type GitHubRepo, type GitHubRepoIssue } from "@/lib/api/integration-service"
@@ -59,7 +59,7 @@ export const SECTIONS: SectionConfig[] = [
   { key: "notifications", label: "Notifications",  icon: <Bell className="h-4 w-4" />,       group: "Personal" },
   { key: "security",      label: "Security",       icon: <Key className="h-4 w-4" />,        group: "Personal" },
   { key: "workspace",     label: "General",        icon: <Globe className="h-4 w-4" />,      group: "Workspace" },
-  { key: "usage",         label: "Usage IA",       icon: <Gauge className="h-4 w-4" />,       group: "Workspace" },
+  { key: "usage",         label: "Usage Cortex",   icon: <Gauge className="h-4 w-4" />,       group: "Workspace" },
   { key: "integrations",  label: "Integrations",   icon: <Webhook className="h-4 w-4" />,    group: "Workspace" },
   { key: "status",        label: "Status",         icon: <Activity className="h-4 w-4" />,    group: "Workspace" },
   { key: "privacy",       label: "Privacy & Data", icon: <Shield className="h-4 w-4" />,     group: "Personal" },
@@ -89,21 +89,23 @@ function FormField({ label, hint, children }: Readonly<{ label: string; hint?: s
   )
 }
 
+/**
+ * Section de réglages « façon Claude » : plus de carte encadrée — juste un titre, une description et le
+ * contenu directement, séparés par un filet discret entre sections (retour user : « pas de cards à
+ * l'intérieur, juste le contenu direct à droite »). Le variant danger garde un titre rouge pour l'alerte.
+ */
 function SectionCard({ title, description, children, danger = false }: Readonly<{ title: string; description?: string; children: React.ReactNode; danger?: boolean }>) {
   return (
-    <div className={cn(
-      "rounded-xl border bg-card [box-shadow:var(--shadow-sm)]",
-      danger ? "border-destructive/40" : "border-border"
+    <section className={cn(
+      "border-b pb-6 last:border-b-0 last:pb-0",
+      danger ? "border-destructive/25" : "border-border/60"
     )}>
-      <div className={cn(
-        "px-5 py-4 border-b",
-        danger ? "border-destructive/30 bg-destructive/5" : "border-border/70"
-      )}>
+      <div className="mb-4">
         <h3 className={cn("text-sm font-semibold", danger ? "text-destructive" : "text-foreground")}>{title}</h3>
-        {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
+        {description && <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>}
       </div>
-      <div className="px-5 py-5">{children}</div>
-    </div>
+      {children}
+    </section>
   )
 }
 
@@ -302,17 +304,7 @@ function ProfilePanel() {
 function AccountPanel() {
   const { user } = useAuth()
   const { locale, setLocale } = useTranslation()
-  // Timezone : pas d'endpoint dédié → préférence client persistée localement (init paresseuse).
-  const [timezone, setTimezone] = useState<string>(() => {
-    if (globalThis.window === undefined) return "Europe/Paris"
-    return localStorage.getItem("tf-timezone") ?? "Europe/Paris"
-  })
   const [deleting, setDeleting] = useState(false)
-
-  function handleSave() {
-    localStorage.setItem("tf-timezone", timezone)
-    toast.success("Préférences du compte enregistrées")
-  }
 
   async function handleDelete() {
     setDeleting(true)
@@ -352,18 +344,6 @@ function AccountPanel() {
               </SelectContent>
             </Select>
           </FormField>
-          <FormField label="Timezone">
-            <Select value={timezone} onValueChange={setTimezone}>
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Europe/Paris">Europe/Paris (UTC+1)</SelectItem>
-                <SelectItem value="America/New_York">America/New_York (UTC-5)</SelectItem>
-                <SelectItem value="UTC">UTC</SelectItem>
-              </SelectContent>
-            </Select>
-          </FormField>
         </div>
       </SectionCard>
       <SectionCard danger title="Danger zone" description="Irreversible actions. Proceed with caution.">
@@ -386,9 +366,6 @@ function AccountPanel() {
           </DeleteConfirmDialog>
         </div>
       </SectionCard>
-      <div className="flex justify-end">
-        <Button size="sm" className="h-8 text-xs" onClick={handleSave}>Save changes</Button>
-      </div>
     </div>
   )
 }
@@ -1224,7 +1201,7 @@ function PrivacyPanel() {
 
 function MiniStat({ label, value }: Readonly<{ label: string; value: number }>) {
   return (
-    <div className="rounded-lg border border-border bg-background px-3 py-2.5">
+    <div>
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="mt-0.5 text-lg font-semibold tabular-nums text-foreground">{value.toLocaleString("fr-FR")}</p>
     </div>
@@ -1233,9 +1210,17 @@ function MiniStat({ label, value }: Readonly<{ label: string; value: number }>) 
 
 function UsagePanel() {
   const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug)
-  const openUpgrade = useUpgradeStore((s) => s.openUpgrade)
+  const router = useRouter()
+  const closeSettings = useSettingsStore((s) => s.closeSettings)
   const [usage, setUsage] = useState<AiUsage | null>(null)
   const [loading, setLoading] = useState(true)
+
+  // Upgrade = navigation vers la page des forfaits (pas un 2e modal par-dessus les réglages). Ferme
+  // d'abord le modal Settings si ouvert, sinon il resterait affiché par-dessus la page facturation.
+  const goToPlans = () => {
+    closeSettings()
+    if (slug) router.push(`/${slug}/billing`)
+  }
 
   useEffect(() => {
     if (!slug) return
@@ -1256,7 +1241,7 @@ function UsagePanel() {
 
   return (
     <div className="flex flex-col gap-4">
-      <SectionCard title="Consommation IA" description="Tokens consommés par l'agent Cortex ce mois-ci, et plafond de votre plan.">
+      <SectionCard title="Consommation Cortex" description="Tokens consommés par l'agent Cortex ce mois-ci, et plafond de votre plan.">
         {loading ? (
           <p className="text-sm text-muted-foreground">Chargement…</p>
         ) : !usage ? (
@@ -1268,9 +1253,9 @@ function UsagePanel() {
                 <p className="text-sm font-medium text-foreground">Plan <span className="uppercase">{usage.plan}</span></p>
                 <p className="text-xs text-muted-foreground mt-0.5">Période {usage.period} · réinitialisation le {usage.resetAt}</p>
               </div>
-              {usage.plan === "FREE" && (
-                <Button size="sm" className="h-8 text-xs gap-1.5 shrink-0" onClick={() => openUpgrade()}>
-                  <Zap className="h-3.5 w-3.5" /> Améliorer le plan
+              {usage.plan !== "BUSINESS" && usage.plan !== "ENTERPRISE" && (
+                <Button size="sm" className="h-8 text-xs gap-1.5 shrink-0" onClick={goToPlans}>
+                  <Zap className="h-3.5 w-3.5" /> Voir les forfaits
                 </Button>
               )}
             </div>
