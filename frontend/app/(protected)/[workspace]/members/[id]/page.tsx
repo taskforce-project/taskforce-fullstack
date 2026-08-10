@@ -53,7 +53,7 @@ function issueDotColor(category: string): string {
   return "text-muted-foreground"
 }
 
-function IssueList({ issues, loading }: Readonly<{ issues: Issue[]; loading: boolean }>) {
+function IssueList({ issues, loading, slug }: Readonly<{ issues: Issue[]; loading: boolean; slug: string }>) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -67,8 +67,9 @@ function IssueList({ issues, loading }: Readonly<{ issues: Issue[]; loading: boo
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden">
       {issues.map((issue) => (
-        <div
+        <Link
           key={issue.id}
+          href={`/${slug}/projects/${issue.projectId}/issues/${issue.id}`}
           className="flex items-center gap-3 px-4 py-2.5 border-b border-border/50 last:border-0 hover:bg-muted/30 transition-colors group"
         >
           <CircleDot className={cn("h-3.5 w-3.5 shrink-0", issueDotColor(issue.status.category))} />
@@ -77,7 +78,7 @@ function IssueList({ issues, loading }: Readonly<{ issues: Issue[]; loading: boo
           </span>
           <span className="flex-1 text-sm text-foreground truncate">{issue.title}</span>
           <ExternalLink className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-        </div>
+        </Link>
       ))}
     </div>
   )
@@ -228,7 +229,7 @@ export default function MemberProfilePage() {
       {/* Recent issues */}
       <section>
         <h2 className="text-sm font-semibold text-foreground mb-3">Issues récentes</h2>
-        <IssueList issues={recentIssues} loading={issuesLoading} />
+        <IssueList issues={recentIssues} loading={issuesLoading} slug={slug} />
       </section>
     </div>
   )

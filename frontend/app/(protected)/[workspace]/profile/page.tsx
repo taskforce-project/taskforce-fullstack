@@ -238,18 +238,18 @@ export default function ProfilePage() {
 
             {/* Follow-style counters */}
             <div className="flex items-center gap-4 mt-4">
-              <button className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+              <Link href={`/${slug}/members`} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
                 <Users className="h-3.5 w-3.5" />
                 <span className="font-medium text-foreground">{stats?.teammateCount ?? "—"}</span> teammates
-              </button>
-              <button className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+              </Link>
+              <Link href={`/${slug}/projects`} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
                 <FolderKanban className="h-3.5 w-3.5" />
                 <span className="font-medium text-foreground">{projects.length}</span> projects
-              </button>
-              <button className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+              </Link>
+              <Link href={`/${slug}/cycles`} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
                 <GitCommitHorizontal className="h-3.5 w-3.5" />
                 <span className="font-medium text-foreground">{stats?.cyclesCompleted ?? "—"}</span> cycles
-              </button>
+              </Link>
             </div>
           </div>
         </div>
