@@ -175,9 +175,6 @@ export default function ProjectMembersPage() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => toast.info("Changement de rôle disponible prochainement")}>
-                      Changer le rôle
-                    </DropdownMenuItem>
                     <DropdownMenuItem
                       className="text-destructive focus:text-destructive [&_svg]:text-destructive"
                       onClick={() => handleRemove(member.id, member.email)}
