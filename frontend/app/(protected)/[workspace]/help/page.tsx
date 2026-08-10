@@ -1,6 +1,8 @@
 "use client"
 
 import { useState, useMemo } from "react"
+import Link from "next/link"
+import { useParams } from "next/navigation"
 import {
   Search,
   Sparkles,
@@ -11,6 +13,7 @@ import {
   CreditCard,
   Shield,
   Mail,
+  Compass,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -134,6 +137,8 @@ const ARTICLES: readonly DocArticle[] = [
 
 export default function HelpPage() {
   const { t } = useTranslation()
+  const params = useParams()
+  const slug = typeof params?.workspace === "string" ? params.workspace : ""
   const [query, setQuery] = useState("")
 
   const q = query.trim().toLowerCase()
@@ -164,9 +169,18 @@ export default function HelpPage() {
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
       {/* Header */}
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">{t("help.title")}</h1>
-        <p className="text-sm text-muted-foreground">{t("help.subtitle")}</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight">{t("help.title")}</h1>
+          <p className="text-sm text-muted-foreground">{t("help.subtitle")}</p>
+        </div>
+        {/* Rejeu de la visite guidée : `?tour=1` force le tour au retour sur le dashboard. */}
+        <Button asChild variant="outline" size="sm" className="shrink-0 gap-1.5">
+          <Link href={`/${slug}/dashboard?tour=1`}>
+            <Compass className="size-4" />
+            Revoir la visite guidée
+          </Link>
+        </Button>
       </div>
 
       {/* Search */}
