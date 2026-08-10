@@ -7,6 +7,8 @@ import {
   Plus,
   ArrowUpRight,
   Search,
+  MoreHorizontal,
+  Trash2,
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 
@@ -14,6 +16,22 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { CreatePageDialog } from "@/components/dialogs/create-page-dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { usePageStore } from "@/lib/store/page-store"
 import { cn } from "@/lib/utils"
 
@@ -23,8 +41,9 @@ export default function ProjectPagesPage() {
   const slug      = typeof params.workspace === "string" ? params.workspace : ""
   const projectId = typeof params.id        === "string" ? params.id        : ""
 
-  const { pages, loading, fetchPages, createPage } = usePageStore()
+  const { pages, loading, fetchPages, createPage, deletePage } = usePageStore()
   const [search, setSearch] = useState("")
+  const [pageToDelete, setPageToDelete] = useState<(typeof pages)[number] | null>(null)
 
   useEffect(() => {
     if (slug && projectId) fetchPages(slug, projectId)
@@ -90,7 +109,30 @@ export default function ProjectPagesPage() {
                     {page.title}
                   </h3>
                 </div>
-                <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5" />
+                <div className="flex items-center gap-1 shrink-0">
+                  <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity mt-0.5" />
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation() }}
+                        className="rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+                        aria-label="Actions de la page"
+                      >
+                        <MoreHorizontal className="h-3.5 w-3.5" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onSelect={() => setPageToDelete(page)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Supprimer
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
 
               <p className="text-xs text-muted-foreground line-clamp-2 flex-1 mb-3">{page.excerpt}</p>
@@ -111,6 +153,34 @@ export default function ProjectPagesPage() {
           ))}
         </div>
       )}
+
+      <AlertDialog open={pageToDelete !== null} onOpenChange={(open) => { if (!open) setPageToDelete(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer la page ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              « {pageToDelete?.title} » sera définitivement supprimée. Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                if (!pageToDelete) return
+                try {
+                  await deletePage(slug, projectId, String(pageToDelete.id))
+                } catch {
+                  // le store gère l'état d'erreur
+                }
+                setPageToDelete(null)
+              }}
+            >
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

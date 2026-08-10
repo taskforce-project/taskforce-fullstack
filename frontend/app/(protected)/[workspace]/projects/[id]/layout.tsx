@@ -11,6 +11,7 @@ import {
   CalendarRange,
   FileText,
   Users,
+  UserRound,
   Settings,
   Plus,
   MoreHorizontal,
@@ -62,6 +63,7 @@ const PROJECT_TABS: ProjectTab[] = [
   { key: "detail.cycles", icon: RefreshCw, pathSuffix: "/cycles" },
   { key: "detail.pages", icon: FileText, pathSuffix: "/pages" },
   { key: "detail.teams", icon: Users, pathSuffix: "/teams" },
+  { key: "detail.members", icon: UserRound, pathSuffix: "/members" },
   { key: "detail.settings", icon: Settings, pathSuffix: "/settings" },
 ]
 
