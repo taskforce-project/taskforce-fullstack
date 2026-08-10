@@ -31,6 +31,7 @@ export interface Cycle {
   createdAt: string;
   updatedAt: string;
   issueCount: number;
+  completedCount: number;
 }
 
 export interface CreateCyclePayload {
