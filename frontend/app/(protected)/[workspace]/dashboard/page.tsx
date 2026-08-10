@@ -7,6 +7,7 @@ import { ChevronDown, Clock, RefreshCw } from "lucide-react"
 import { useAuth } from "@/lib/contexts/auth-context"
 import { useProjectStore } from "@/lib/store/project-store"
 import { useDashboardCardsStore } from "@/lib/store/dashboard-cards-store"
+import { useTourStore } from "@/lib/store/tour-store"
 import { PageContainer } from "@/components/layout/page-shell"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -81,6 +82,23 @@ export default function DashboardPage() {
     if (slug) localStorage.setItem(rangeStorageKey(slug), value)
   }
 
+  // Tour produit : au 1ᵉʳ dashboard (jamais vu), on le lance après un court délai — le temps que la
+  // grille se peigne pour que les cibles `data-tour` existent. `hasSeen` (persisté) évite tout
+  // re-déclenchement. Rejeu depuis l'aide via `?tour=1` (forcé même si déjà vu), puis on nettoie l'URL.
+  const tourHasSeen = useTourStore((s) => s.hasSeen)
+  const tourActive = useTourStore((s) => s.isActive)
+  const startTour = useTourStore((s) => s.start)
+  useEffect(() => {
+    if (tourActive || !slug) return
+    const forceTour = new URLSearchParams(window.location.search).get("tour") === "1"
+    if (tourHasSeen && !forceTour) return
+    const t = setTimeout(() => {
+      startTour()
+      if (forceTour) window.history.replaceState(null, "", `/${slug}/dashboard`)
+    }, forceTour ? 300 : 900)
+    return () => clearTimeout(t)
+  }, [tourHasSeen, tourActive, startTour, slug])
+
   const displayName = user?.displayName?.trim() || user?.firstName || ""
   const rangeLabel = GLOBAL_RANGES.find((r) => r.value === globalRange)?.label ?? globalRange
 
@@ -91,7 +109,7 @@ export default function DashboardPage() {
       <QuickColumns slug={slug} />
 
       {/* Analytics — période globale + refresh global + grille de cartes persistées. */}
-      <section className="space-y-3">
+      <section className="space-y-3" data-tour="analytics">
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-lg font-semibold tracking-tight">Analytics</h2>
           <div className="flex items-center gap-1.5">
