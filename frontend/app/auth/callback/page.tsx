@@ -57,10 +57,10 @@ export default function OAuthCallbackPage() {
         // complet est la façon la plus simple de les reconstruire sur la session fraîche — c'est la
         // symétrie exacte de ce que fait déjà la déconnexion, et pour la même raison.
         //
-        // Un NOUVEAU venu (onboarding non fait) passe d'abord par l'interstitiel « choix du plan » —
-        // l'inscription GitHub n'a jamais vu d'écran de plan, contrairement au stepper classique. Un
-        // habitué (onboarding déjà fait) va droit à l'app. La garde d'onboarding sécurise le reste.
-        const target = auth?.user?.onboardingCompleted === false ? "/onboarding/plan" : "/";
+        // Modèle Linear : tout le monde démarre en Free, il n'y a plus d'écran de choix de plan à
+        // l'inscription. Un NOUVEAU venu (onboarding non fait) va au wizard d'onboarding ; un habitué
+        // va droit à l'app. Le passage payant se fait plus tard, in-app (Réglages → Facturation).
+        const target = auth?.user?.onboardingCompleted === false ? "/onboarding" : "/";
         window.location.replace(target);
       })
       .catch((e: unknown) => {
