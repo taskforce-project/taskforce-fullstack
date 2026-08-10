@@ -7,7 +7,7 @@ import { AuthStepper } from "@/components/auth/auth-stepper";
 export default function RegisterVerificationPage() {
   return (
     <div className="w-full max-w-md py-6">
-      <AuthStepper current={3} />
+      <AuthStepper current={2} />
       <OTPForm />
     </div>
   );

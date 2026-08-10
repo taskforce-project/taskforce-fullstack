@@ -81,7 +81,7 @@ export default function AuthLayout({
               width={120}
               height={80}
               priority
-              className="h-20 w-auto"
+              className="h-20 w-auto dark:invert"
             />
           </a>
 
