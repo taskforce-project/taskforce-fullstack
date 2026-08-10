@@ -185,6 +185,522 @@ point identifiable sur la courbe de lead time.
 | Métronome | `src/lib/useScene.ts` | `useScene(beats)` : partition de durées, démarre à l'entrée à l'écran, se joue **une fois**, **se fige sur l'état final**. `useTypewriter` pour la frappe. `prefers-reduced-motion` → état final direct. |
 | Châssis | `src/components/site/scene/AppWindow.tsx` | Vrai écran TaskForce (voir encadré ci-dessous). **Remplace la barre macOS de `MockFrame`** — trois pastilles + une URL, c'est le signe le plus sûr qu'on regarde un dessin. |
 
+> ### ⚑ v149 (09/08) — Passe STRUCTURE généralisée à toutes les pages (blanc / zéro ombre / radius = flux only)
+> User : « repasse dans toutes les autres pages et applique les mêmes choses » (structure).
+> - **Levier composants partagés (moi)** : `Panel` (`.surface`+`rounded-2xl` → `border rounded-xl`), `Bento` (`.surface`+`rounded-2xl` → `border`), `StatBand` (variant panel : `surface`+`decor-tint`+`rounded-3xl`+`decor-dots` → `border rounded-xl`, plus d'ombre/halo), `UseCaseDetail`/`VerticalDetail`/`VsCompare`/`ConnectorDetail` (bandes `bg-secondary` → blanc ; tableau vs sharp ; matrice + capacités connecteur → **traits**). → couvre use-cases/solutions/vs/connecteurs (~25 pages) d'un coup.
+> - **Balayage pages (4 sous-agents // , spec conservateur : bande→blanc, retrait `.surface`/`shadow-*`/`rounded-2xl,3xl` sur cartes de contenu ; PAS de re-architecture traits ; laisser ui/illustrations/labs/mocks/chips/pills/CTA)** :
+>   trust (8 bandes, 19 radius) · enterprise (4 bandes, 9 radius) · company/about+contact+media · book-a-demo (1 ombre) · docs · status · roadmap · blog · learn · changelog · solutions/index+engineering · use-cases/index · vs/index. **product/*** déjà conforme (rien à changer). Mocks inline (analytics), grosse tuile d'icône (collaboration) et bloc CTA correctement laissés.
+> - **Cartes CTA sharp** : `PageCta` + `FinalCta` `rounded-3xl` → angles vifs (radius = flux only ; l'exception CTA ne porte que sur le fond gris). Grille logos Integrations `rounded-2xl` → sharp. Feuille de règles §5 mise à jour.
+> - `FeatureBand` variant `tinted` (halo + `rounded-3xl`) = **code mort** (aucune page ne l'utilise) → laissé.
+> - Build OK (68). Vérifié rendu (curl) : trust & enterprise = 0 bande grise de contenu, 0 `rounded-2xl/3xl`.
+> - **Exclus (volontaire)** : `components/ui/*` (primitives shadcn), `illustrations/*` (mocks produit), `labs/*` (monde propre), mocks d'app (`AppShot`/`MockFrame`/`SpecPanel`/`ScreenPlaceholder`), chips `bg-secondary/60`, pills. `PricingSection.tsx` non touché (composant tarif complexe — à faire à part si besoin).
+
+> ### ⚑ v148 (09/08) — Hero home refait : CENTRÉ + épuré (façon Linear/Relevance)
+> User (capture, hero entouré) : « trop chargé ; le titre n'est même pas en haut, c'est le texte de droite qui passe au-dessus ; un hero mieux que ça, épuré comme Linear/Relevance ».
+> - **Cause** : layout 2-col `lg:items-end` → la colonne droite (paragraphe + 2 boutons + 3 faits) plus haute et alignée en bas → son haut passait AU-DESSUS du H1. Trop d'éléments.
+> - **Fix** : `Hero.tsx` passe en **une seule colonne centrée** (`mx-auto max-w-3xl text-center`) : eyebrow → H1 → une promesse courte (`max-w-2xl`, raccourcie) → 2 CTA (`pill-lg`) → logos centrés → le screen produit. **3 faits inline supprimés**. Vérifié DOM : ordre top eyebrow 176 < h1 213 < sub 356 < cta 442 < logos 546, h1 `text-align:center`. Build OK (68).
+> - Honnêteté : la promesse décrit les actes réellement livrés (spec/plan/prompt + approbation + mémoire) sans revendiquer le « full governed run » ; la nuance « today / headed » vit déjà en aval (WhatShipsToday, TheRun).
+
+> ### ⚑ v147 (09/08) — Généralisation des couleurs d'icônes à TOUT le site (source unique `hueFor`) + puce Cpu agrandie
+> User : « tous les icônes stp (dont la puce “Hosted in the cloud…” aussi grosse que la hauteur du paragraphe) ; puis généralise à toutes les pages (structure, icônes, workflows) ».
+> - **Source UNIQUE `src/lib/site-icons.ts`** : `hueFor(icon)` (teinte par `displayName` Lucide, 7 familles) + `HUE`. Miroir du `ICON_COLOR` du kit flux (hex alignés : `cpu`→violet, `scale`→cyan). → colorer n'importe quelle icône de contenu partout sans réécrire les data.
+>   - Tuile : `.ic-tile` + `style={`--ic:${hueFor(Icon)}`}` (span natif, chaîne OK). Inline : `style={{ color: hueFor(Icon) }}` (**objet** — une icône Lucide est un composant React qui casse le build avec un `style` chaîne).
+> - **Levier composants partagés** : `BentoCell` + `BorderedGrid` colorent via `hueFor` → toute page qui les utilise est couverte d'un coup. `ConnectorDetail` (matrice Connect/Remember/Act) idem.
+> - **Balayage pages** (sous-agents parallèles, partition propre) : product ×12 · use-cases index · solutions index+engineering · enterprise · trust (9 inline) · blog · company/about · company/contact · `ConnectorDetail`. Sans icône de contenu (inchangés) : pricing, roadmap, learn, changelog, company/media, vs/* (Check/Minus = marques de tableau), use-cases/solutions détail (Info notice), Labs (identité propre, exclu). Chrome (flèches/chevrons/menu/croix/logos/`Info` légal) et puces `Check` laissés tels quels. Agents CPO/CTO/COO gardés (couleurs par rôle déjà voulues).
+> - **Puce Cpu** (`WhatShipsToday`, « Hosted in the cloud… ») : passée `size-4`→`size-10`, violette → **40px pour un paragraphe de 42px** (vérifié DOM, ratio 0.95). Strip `TheRun` (Full audit trail / Self-hosted / Any coding agent / A model per step) : icônes en tuiles colorées.
+> - **Bug corrigé** : les sous-agents (et moi) avaient mis `style={`color:…`}` (chaîne) sur des icônes Lucide → build cassé (React exige un objet). 9 occurrences repassées en `style={{ color: … }}`. Build OK (68).
+> - Vérifié DOM : product/agents = tuiles cyan/ambre/bleu/violet/ardoise + inline colorés ; home Cpu 40px violet.
+> - **RESTE (prochaine passe) — structure** : bandes `bg-secondary` alternées dans les gabarits détail (`UseCaseDetail`/`VerticalDetail`/`VsCompare`/`ConnectorDetail`), cartes `rounded-2xl` (matrice connecteur, tableau vs), `Panel` (`surface` ombre + `rounded-2xl`). Non touché ce tour (changement visuel large, non vérifiable en pane masquée) — à trancher/faire ensuite. Workflows : déjà React Flow partout (v130–v145).
+
+> ### ⚑ v146 (09/08) — Couleurs d'icônes (palette sémantique) + micro-composants + section « The direction » en traits
+> User (capture « The direction » validée) : « couleurs sur les icônes dans les workflows + plus d'insight (badge/loader/petit composant) + couleurs
+> cohérentes sur les autres icônes + le petit tableau de 3, mieux l'intégrer : plus de lignes, **pas de rounded radius, c'est que pour les workflows** ».
+> - **Palette sémantique `ICON_COLOR`** (`OrchestrationFlows.tsx`) : teinte par FAMILLE (bleu=build/spec · violet=IA/pensée · émeraude=livré ·
+>   ambre=gouvernance · cyan=data · rose=rejet · ardoise=neutre). Alignée sur les `dot` déjà posés à la main. `StepChainFlow` la lit par défaut
+>   (`dot ?? ICON_COLOR[icon]`) → **tous les flux pilotés par props se colorent** (Before/After, What ships, use-cases) sans toucher aux data.
+>   `MiniNode` teinte alors la tuile (fond 12 %, filet 26 %) + l'icône. Vérifié DOM : icônes violet/ardoise/bleu/rose, tuiles teintées, highlight=bleu.
+> - **Utilitaire `.ic-tile`** (global.css) : même recette que `MiniNode` mais HORS flux, réutilisable en `.astro`/`.tsx` via `style="--ic:#hex"`
+>   (fond/filet/icône dérivés d'une seule teinte). Une seule source de vérité pour colorer une icône partout.
+> - **Micro-composant `.tf-pulse`** : point « live » pulsé qui reprend `currentColor` → posé sur les badges Live de What ships (émeraude). Loader/badge « sympa », coupé en reduced-motion.
+> - **Icônes colorées hors flux** : en-têtes What ships (bleu/violet), groupes Enterprise/Trust (ambre/bleu/cyan), lignes « The direction » (bleu/violet/ardoise).
+> - **Section « The direction » (`Proof.tsx` → `WhereThisGoes`) en « traits intégrés »** : la carte `rounded-2xl` devient une liste `border-y divide-y` + **filet vertical** `lg:border-l lg:pl-14` qui la relie à la colonne intro. **Radius retiré (0px vérifié)**. Chaque ligne = tuile d'icône colorée + **numéro mono 01/02/03** + titre + texte.
+> - **Nouvelle règle DA** : le rounded radius est **réservé aux canvases de flux** (`flow-canvas rounded-xl`) ; panneaux/cartes de section = **filets, angles vifs**. (Atomes — pills, boutons, tuiles d'icône — gardent leur petit radius.) Gravée dans la feuille de règles §2/§3.
+> - Build OK (68). Reste à passer au crible : radius résiduels hors home (`Integrations` grid, `FinalCta` — section exception, à trancher), pages produit/enterprise.
+
+> ### ⚑ v145 (08/08) — BUG racine : les ports de connexion des flux étaient INVISIBLES → corrigé (partout)
+> User (5e rejet) : « les ronds de départ des flèches, y a rien de tout ça, je peux pas croire que c'est du React Flow ». **Vrai bug** : le composant
+> `Handles` stylait les ports selon un flag `ring` ; or `StepChainFlow`/`vChain` ne mettaient JAMAIS `ring:true` sur leurs handles source → ils
+> tombaient sur le style `tf-handle--target` (**1px transparent, opacity 0**) → aucun port visible. Les arêtes partaient d'un point invisible → ça
+> passait pour une liste faite main. (Orchestration mettait `ring:true` via son helper `src()` → ports visibles → « ça, c'est React Flow ».)
+> - **Fix racine** : `Handles` style désormais par **TYPE** (`h.type === "source"`), pas par un flag oublié. CSS : source = anneau bleu **11px bordure 2px**
+>   + halo ; target = point **8px** (était invisible). → tous les flux du site montrent leurs ports.
+> - Arêtes plus visibles (`strokeWidth` 1.5→1.75, marker 15→18) + espacement vertical `StepChainFlow` 74→90 (l'arête devient une ligne port→flèche).
+>   Hauteurs des cellules Before/After + What ships alignées (×90).
+> - Vérifié DOM (onglet home) : **22 ports source (11px, bordure `rgb(37,99,235)`) + 23 ports target (8px)**. (edges=0 = pane non affichée, connu.)
+> - Feuille de règles §flux : **ports visibles obligatoires** (source=anneau, target=point) — sinon ça passe pour du fait-main.
+> User (4 captures) : « t'utilises aucune lib ». Tranché : 2 des 4 n'étaient VRAIMENT pas React Flow → convertis ; les 2 autres l'étaient déjà
+> (prouvé DOM) mais sans le **canvas à points** → elles ressemblaient à du fait-main.
+> - **Graphe de décision → React Flow** : nouveau `DecisionGraphFlow` (Requirement → Decision(highlight) → Impacts + Rejected en pointillés).
+>   Remplace le `DecisionGraph` SVG maison sur **home (Synergy)** et **brain-os**.
+> - **RunTimeline → React Flow** : l'ancienne timeline animée maison (`client:idle`) remplacée par le run en RF (`HeroFlow`) dans **`home/TheRun.astro`**
+>   (2-col texte/flow + puces + table des 7 checkpoints). Fini le dernier îlot `client:idle` du home → plus de risque de mismatch d'hydratation.
+> - **Before/After + What ships today** : les flux posés sur **`flow-canvas`** (fond pointillé bordé) → se lisent enfin comme des canvas React Flow (comme orchestration).
+> - **Home Synergy → `.astro`** (un composant React ne peut pas héberger un îlot `client:only`). `RunTimeline.tsx`/`DecisionGraph.tsx` devenus morts (laissés).
+> - Résultat : home = **6 îlots React Flow** (Before/After ×2, What ships ×2, graphe décision, le run), tous `client:only`, + hero = screen d'app.
+>   Build OK (68) ; **onglet neuf = 0 log console**. RunTimeline perd son animation (devient le run RF statique) — à confirmer si le user la regrette.
+> User : « la CTA prend le bg du footer (pas blanc, c'est l'exception) ; peaufine le reste, workflows + cards ».
+> - **CTA = gris du footer** (`bg-secondary`) — la SEULE section non-blanche. Footer = `bg-secondary` → la CTA fond dedans (transition douce).
+>   `home/FinalCta` (`bg-card`→`bg-secondary`) ; `PageCta.astro` (déjà `bg-secondary`) → **`surface` (shadow) + halo retirés** → toutes les CTA
+>   du site alignées. Exception consignée dans la feuille de règles (§1 + §5).
+> - **Polish home** : `WhatShipsToday` migré sur `SectionShell` + `TraitGrid` (comme `BeforeAfter`).
+> - **Mismatch d'hydratation `RunTimeline` = FAUX positif bufferisé** : `read_console_messages` ne vide jamais son buffer → l'erreur d'avant le
+>   restart réapparaissait à chaque lecture. Vérifié dans un **onglet neuf** (buffer vierge) : **0 log**. Home propre. (Astuce : ouvrir un onglet
+>   neuf pour un verdict console fiable, pas juste reload.)
+> - Build OK (68) ; pages 200 ; halo PageCta = 0. **RESTE à peaufiner (au fur et à mesure)** : pages non-home encore en DA pré-refonte —
+>   surtout `enterprise` (fonds gris + cards flottantes) ; balayer shadows/halos résiduels ailleurs.
+> User a validé la feuille de règles (« ok go, on affinera au fur et à mesure »). Finalisation home :
+> - **Conformité §1-§3** : Final CTA → halo (dégradé radial) retiré ; `RunTimeline` → shadow de la carte démo retiré + encart « Adaptive »
+>   dé-cardé (gris `bg-secondary/40` → filet gauche). Home 100 % blanc, sans halo.
+> - **Primitives DA sorties** : `sections/SectionShell.astro` (gabarit section blanc + container-rail + en-tête) et `sections/TraitGrid.astro`
+>   (grille à filets edge-to-edge, `cols` 2/3/4). **Adoptées sur `home/BeforeAfter.astro`** (exemple canonique). But : ne plus recopier le gabarit
+>   → fin des incohérences. Backlog : migrer les autres sections au fur et à mesure.
+> - **Gotcha dev** : après avoir changé `<Section band>`→`<Section>` sur `RunTimeline` (îlot `client:idle`), mismatch d'hydratation
+>   (SSR `bg-secondary` vs client `bg-card`) = **SSR du dev-server périmé**. Réglé par `docker restart taskforce-landing-dev` ; vérifié : le HTML
+>   SSR a 0 section `bg-secondary`. En build statique le souci n'existe pas. (Note : éditer un îlot `client:idle` peut nécessiter un restart conteneur.)
+> - Build OK (68) ; home 200. Feuille de règles = `.ai/landing-design-system.md` (à jour, §9 primitives cochées).
+> User (frustré, à juste titre) : « à chaque fois t'oublies ou tu fais différent ». → Créé **`.ai/landing-design-system.md`** : le référentiel
+> unique de la landing (7 lois : blanc-only, zéro shadow, zéro halo, traits intégrés, React Flow OBLIGATOIRE pour tout process, honnêteté D11,
+> couleurs de marque) + gabarits + **inventaire des composants** + checklist de livraison. À lire avant toute modif ; on édite les règles ICI avant d'appliquer.
+> - **Home tout blanc** : bandes grises retirées (`<Section band>` → `<Section>`) sur Problem, Synergy, TeamGrid, RunTimeline.
+> - **Fait factuel tranché** : le Before/After **EST** React Flow (DOM : 4 conteneurs `.react-flow`, 19 nœuds) ; mais `rfEdges=0` dans la pane
+>   d'automatisation **cachée** (RF met la mesure en pause hors-écran → arêtes non calculées). Chez le user (écran affiché) les flèches rendent
+>   (sa capture le montre). ⇒ check visuel des flows = côté user, pas par screenshot. Consigné dans la feuille de règles (§4).
+> - Build OK (68) ; home 200. **EN ATTENTE** : que le user valide/amende la feuille de règles (pour la verrouiller), puis finaliser le home
+>   strictement dessus ; backlog DA : `SectionShell`/`TraitGrid` (arrêter de copier le gabarit à la main), encart interne de `RunTimeline`.
+> User : « en dessous : libs + cards, sur les structures de base à traits » ; « tout d'un coup ». Écart réel à la DA = les **cards flottantes**
+> (`rounded-2xl border`). Converties en **grilles à filets edge-to-edge** (`-mx-6 gap-px border-y bg-border`, cellules `bg-card`) :
+> - `home/BeforeAfter.astro` + `home/WhatShipsToday.astro` : 2 cellules à filets (fini bg-secondary/40 + le panneau dégradé) ; le socle Live =
+>   cellule pleine largeur. Flux RF inchangés dedans.
+> - `Showcase.tsx` : **TeamGrid** (cards → grille à filets), **Synergy** (SYSTEMS contenu-rond → edge-to-edge ; bento du `DecisionGraph` dé-cardé).
+>   `Section` utilise `container-rail` → le breakout `-mx` marche aussi dans les composants React.
+> - `Proof.tsx` : **FinalCta** repassé en blanc (`bg-secondary` → `bg-card`).
+> - **Gardés** (déjà à filets / éditoriaux / démos) : `Problem` (liste `border-l`), `Trust` (colonnes `border-t` + AppShot), `WhereThisGoes`
+>   (grille à filets en colonne), `BrainTeaser` (bande fine), `RunTimeline` (la démo animée du run).
+> - Build OK (68) ; home 200 ; 0 erreur console. **EN ATTENTE** : les **bandes grises** (`<Section band>` sur Problem/Synergy/TeamGrid/RunTimeline)
+>   — le home était pensé en alternance blanc/gris ; à trancher avec le user : tout blanc (comme les pages produit) ou garder l'alternance.
+> User : « on y va étape par étape, d'abord le home. Un screen de l'app au début, pas un workflow. Ensuite en dessous : libs + cards + structures
+> à traits. » → **Revirement assumé** vs v137 (le hero était passé en React Flow). `index.astro` réimporte `home/Hero` (Hero.tsx, `SpecPanel` =
+> vraie UI, SSR → LCP). `Hero.astro` (double-card RF) laissé dans le repo, non importé. Build OK (68) ; home 200 ; SpecPanel présent ; 0 `HeroFlow`
+> dans le hero. **SUITE (à valider avec le user, section par section)** : les sections SOUS le hero → DA « traits intégrés » + React Flow / cards.
+> User (capture Before/After) : ça fait fait-main ; « utilise les mêmes cards que le hero orchestration » (pas besoin de 21st.dev, je les ai
+> déjà = `StepNode`), même système de lignes, sur TOUS les flows plats, **pas de shadow**.
+> - **Composant partagé enrichi** — `MiniNode` (le nœud de tous les flows plats) rend maintenant une **tuile d'icône teintée + titre + sous-titre**
+>   (la DA de la card d'orchestration). La couleur de rôle (`dot`) devient la teinte de la tuile ; fallback `Sparkles` si ni icône ni dot. Donc les
+>   ~10 flows en `mini` deviennent des cards riches **d'un coup**, sans changer leur structure (la variété reste : verticaux / boucles / fourches).
+> - **Zéro shadow** — `surface` (box-shadow « bordure + élévation ») → `border` sur StepNode/MiniNode/CtxNode/RunStepNode ; `.tf-node:hover`
+>   ne met plus d'ombre (juste la bordure) ; `shadow-xl` retiré de la double-card du hero.
+> - **Icônes ajoutées** à toutes les données de flow : Agents/Analytics/Approvals/Integrations/Routing/EngineeringRun (vChain), Brain OS &
+>   Labs (boucles), ai-transparency (fourche), enterprise (archi). Labs élargi (LB_W 168→186) pour loger la tuile.
+> - **Home (props → îlot client:only)** : `StepChainFlow` gagne une **map nom→icône** (`ICON_MAP`) car une `.astro` ne peut pas passer un composant
+>   icône (non sérialisable) ; `BeforeAfter.astro` + `WhatShipsToday.astro` passent des noms d'icônes. `UseCaseRunFlow` garde ses nœuds numérotés (dé-shadow).
+> - Build OK (68 pages) ; 0 erreur console (agents + home, buffer purgé) ; toutes les pages clés en 200.
+
+> ### ⚑ v137 (07/08) — Home : le HERO passe en React Flow, dans la « double-card » façon orchestration
+> User : « sur le hero du home tu utilises pas React Flow, c'est pas possible » + « remets mon template de card : le style double-card
+> d'orchestration — une card blanche, une card à points dedans sur laquelle on pose le flow ».
+> - **`home/Hero.tsx` (SpecPanel, fausse UI, SSR) → `home/Hero.astro`** : hero en **2 colonnes** (texte gauche | visuel droite), comme orchestration.
+> - **Double-card** : card blanche extérieure (`rounded-2xl border shadow-xl`) → card intérieure **à points** (`flow-canvas`) → **`HeroFlow`**
+>   (`client:only`, le run d'orchestration réutilisé = « le style de orchestration »). `aspect-ratio` réserve l'espace → pas de CLS.
+> - **LCP protégé** : le texte (H1 = élément LCP) reste en **SSR** (markup Astro + `BrandLogo`/lucide statiques) ; seul le flow est client-only.
+>   Copie + logos « Built with » 100 % préservés. `index.astro` importe `Hero.astro` (Hero.tsx/SpecPanel/Toast devenus morts, laissés).
+> - Build OK (68 pages). Réseau du chargement home **tout en 200** (`/`, `OrchestrationFlows.tsx`, `@xyflow`, les 6 logos, `global.css`).
+>   2× 500 en console = **bufferisés** (transitoire labs `PixelField`, le buffer traverse les navigations) ; WebSocket fail = socket HMR (bénin).
+
+> ### ⚑ v136 (07/08) — Labs : image vague REMISE (hero+CTA) + section workflow = blanc à points (correction de v135)
+> User : « j'ai plus le bg image, remets-les » (le « pas de bg autre que blanc » de v135 visait le HALO + les gris, PAS l'image identité) ;
+> « le bg là où y a les workflow, remets-le en blanc avec les dots dedans » ; « le reste passe derrière ça rendra bien ».
+> - **Image vague restaurée** : `LabsBackdrop` remis au hero (champ pixels coral du hero retiré) ; bloc `<img hero-wave.jpg>` + voile blanc remis au CTA.
+> - **Section « The system / loop » (le workflow)** : champ PixelBlast violet retiré → **blanc + `flow-canvas`** (canvas à points, comme les flux des
+>   pages produit). `PixelField` n'est plus utilisé sur labs → import retiré (composant gardé dans le repo).
+> - **Transitions PixelBlast gardées** (les 4 bandes full/right/left/center) = « le reste ». Donc labs = image vague (hero/CTA) + bandes de
+>   pixels entre sections + boucle sur points blancs. 4 îlots WebGL.
+> - Build OK (68 pages). Réseau du chargement **tout en 200** (`hero-wave.jpg`, `three`, `postprocessing`, `@xyflow`, `PixelBlast.tsx`). Les 2×
+>   500 vus en console étaient **bufferisés** (`PixelField is not defined` transitoire pendant l'édition, logs conteneur 16:01 < build 16:02).
+
+> ### ⚑ v135 (07/08) — Labs : zéro halo/fond coloré (BLANC pur) + transitions VARIÉES (ligne/droite/gauche/milieu)
+> Retours user : « pas de hallo ou bg autre que blanc » + « les transitions plus variées (droite/gauche, milieu, toute la ligne) ».
+> - **Halo supprimé** : `PixelField` → `glow=false` par défaut (le radial `color-mix` derrière les pixels est parti).
+> - **Blanc PUR partout** : image vague retirée du **hero** (`LabsBackdrop` débranché → champ pixels coral à droite à la place) et du **CTA** ;
+>   bandeau dégradé `labs-g6` de la card « graduated » vedette → blanc (icône filigrane `text-primary/15` + pill bordée). Grep : plus aucun
+>   `radial-gradient`/`hero-wave`/`bg-white/`/`labs-g6` sur labs. (`labs-gtext` = texte en dégradé, pas un fond → gardé.)
+> - **Transitions variées** : `PixelBand` gagne un `align` (full/left/right/center → masque de position + `edgeFade`). Les 4 bandes :
+>   coral **pleine ligne** → rose **droite** → périwinkle **gauche** → bleu **milieu**. Descente du dégradé de la vague conservée.
+> - 6 îlots WebGL (hero + 4 bandes + boucle), `autoPauseOffscreen`. Build OK (68 pages) ; 0 erreur console ; 6 servis (18081). Labs only.
+
+> ### ⚑ v134 (07/08) — Labs : PixelBlast en BANDES de transition + plus visible + fonds tous blancs
+> Retours user (labs only) : « on voit pas assez », « plus de transition de section avec ça », « pas de bg autre que le blanc ».
+> - **Fonds tous blancs** : `bg-secondary` → `bg-card` sur experiments / graduated / CTA (seul reste une pastille d'icône `bg-secondary`, chip UI).
+> - **Bandes de transition** `site/PixelBand.astro` (pleine largeur, ~168px, masque vertical qui fond dans le blanc, `edgeFade=0`,
+>   opacity 0.9 → BIEN visible) insérées **entre chaque section** ; couleurs = descente du dégradé de la vague : coral `#F0897B` → rose
+>   `#EA6A9A` → périwinkle `#8E90E0` → bleu `#63A6E8`. `border-b` retiré des sections au-dessus d'une bande (la bande EST la transition).
+> - Champ ambiant derrière la boucle **monté en visibilité** (opacity 0.5→0.75, densité 1) ; champs ambiants coral/coins retirés (les bandes
+>   portent l'effet). Total 5 îlots WebGL (4 bandes + 1 boucle), `autoPauseOffscreen` → 1-2 actifs à la fois.
+> - Hero + CTA gardent l'**image vague** (identité + source de la palette) — à confirmer si le user veut BLANC pur là aussi.
+> - Build OK (68 pages) ; 0 erreur console ; 5 îlots servis (18081). Scope: labs UNIQUEMENT (user: « nan que dans labs »).
+
+> ### ⚑ v133 (07/08) — Labs : PixelBlast (react-bits, WebGL) à la place des points, tenu par les couleurs de la vague
+> User : sur labs, `npx shadcn add @react-bits/PixelBlast-JS-CS` au lieu des points ; en habillage (coins, derrière les cards),
+> gradient façon `hero-wave.jpg` (idéal = image échantillonnée dans les points, sinon ses couleurs).
+> - **Install** : slug user = typo (`-JS-CS` → HTML 404) ; bon slug `-JS-CSS`. Pris **`@react-bits/PixelBlast-TS-TW`** (repo 100 % TS+Tailwind,
+>   règle #7). Lancé **dans le conteneur** (`MSYS_NO_PATHCONV=1 docker exec -w /app taskforce-landing-dev npx shadcn@latest add … --yes`) →
+>   `src/components/PixelBlast.tsx` (via bind-mount) + `three`+`postprocessing` dans le node_modules du conteneur ET dans `package.json`
+>   (bind-mount) → `npm install` côté HÔTE pour que MON `npm run build` résolve. `@react-bits` déjà dans `components.json`.
+> - PixelBlast = shader **monochrome** (`uColor`), pas d'échantillonnage d'image → « image dans les points » impossible tel quel. Fait le
+>   fallback : couleurs de l'image réparties par zone (coraux haut → violet → bleus bas = le dégradé de la vague).
+> - Wrapper **`site/PixelField.astro`** (`pointer-events-none`, `edgeFade`, `autoPauseOffscreen`, `enableRipples=false`, speed douce, glow
+>   `color-mix`). Câblé sur labs : « experiments » (coral, masqué en fondu), « system/loop » (violet `#8E90E0` DERRIÈRE le flux — cellule
+>   rendue transparente), « graduated » (bleu `#6FA9E6` coin haut-droit + rose `#EC7BA0` coin bas-gauche). `decor labs-pixels` retiré des 2 1res.
+> - Build OK (68 pages) ; **0 erreur console** (three/PixelBlast chargent) ; 4 îlots PixelBlast servis (18081). Screenshot impossible (pane non
+>   affichée → pas de compositing WebGL) → check visuel user. **RESTE possible** : composant custom qui échantillonne vraiment `hero-wave.jpg`
+>   dans les points (« zone random ») ; étendre PixelField au reste du site si voulu.
+
+> ### ⚑ v132 (07/08) — React Flow sur use-cases (×10) + home (What ships today, Before/After) ; RunTimeline gardé
+> User : « oui enchaîne » (use-cases + home).
+> - Kit : +`RunStepNode` (nœud texte qui **wrap**, hauteur mesurée via `respace`) + `UseCaseRunFlow({steps})` ; +`StepChainFlow({steps,dir,highlight,accentAll})`
+>   (chaîne générique pilotée par props, pour les sections home).
+> - **use-cases** : le template partagé `UseCaseDetail.astro` « In a run / How it works » (`<ul>` à coches) → **flux vertical RF** depuis `c.inRun`
+>   (étape « humaine/approve » auto-détectée et mise en avant). **Couvre les 10 pages** d'un coup. Section passée en `bg-dots`. `Check` retiré.
+> - **home** : les composants React SSR → **versions `.astro`** (copie SSR + flux `client:only`), comme les pages produit :
+>   · `home/WhatShipsToday.astro` (ex-`Today.tsx`) : les 2 « actes » (chips colorés + flèches = le pattern critiqué) → 2 flux verticaux RF,
+>     étape humaine mise en avant. · `home/BeforeAfter.astro` (ex-`Showcase.tsx›BeforeAfter`) : les 2 pipelines numérotés → 2 flux verticaux RF
+>     (avant = fuites en sous-texte, après = tout `accentAll`). `index.astro` importe les `.astro` (Today.tsx / Showcase›BeforeAfter devenus morts, laissés).
+> - **RunTimeline GARDÉ** (pas converti) : c'est la démo **animée** volontaire (reviews 26–27/07, « la seule fois où on montre le mécanisme ») ;
+>   en RF statique elle dupliquerait le `HeroFlow` d'orchestration et perdrait la progression draft→review→approve. Décision qualité, à confirmer.
+> - **DecisionGraph** (home ›Synergy) toujours gardé (graphe de connaissances). Build OK (68 pages) ; 4 îlots `StepChainFlow` + `UseCaseRunFlow` servis (18081).
+
+> ### ⚑ v131 (07/08) — React Flow étendu aux pages hors-produit (enterprise, ai-transparency, labs, solutions/engineering)
+> User : « enchaîne sur toutes les autres pages ». Carto (sous-agent Explore) des visuels de process **non-RF** hors les 7 pages produit →
+> 4 diagrammes/steppers schématiques convertis, en **variant la structure** (DA des traits gardée) :
+> - Kit `OrchestrationFlows.tsx` : +`LabsLoopFlow` (boucle horizontale Signal→Memory→…→Decision→↩Memory, dots = maturité) ;
+>   +`ProposalPathFlow` (chaîne + **fourche de décision** Approve/Edit/Reject → Next checkpoint, arêtes `tinted`) ;
+>   +`EnterpriseStackFlow` (IdP → **TaskForce** (hub highlight) → éventail Connected/Data/Models) ; +`EngineeringRunFlow` (run vertical 5 étapes).
+> - **enterprise** : boîtes+flèches `rotate-90` → `EnterpriseStackFlow` (dans la card existante ; page encore en DA pré-refonte, non touchée par ailleurs).
+> - **legal/ai-transparency** : « The path of a proposal » (boîtes+chips) → `ProposalPathFlow` (cellule `flow-canvas`). `FLOW` + imports lucide retirés.
+> - **labs** : stepper « The loop » (`<ol>` numéroté) → `LabsLoopFlow` (cellule bordée, pas de dots pour ne pas doubler `labs-pixels`). `LOOP`/`DOT` retirés.
+> - **solutions/engineering** : run `<ol>` numéroté → **template hero 2-col** (texte | `EngineeringRunFlow` à droite, `bg-dots`). `RUN` retiré.
+> - Build OK (68 pages) ; 4 îlots bien injectés (18081). **LAISSÉ** : `DecisionGraph` (graphe de connaissances, pas un workflow — déjà gardé
+>   sur brain-os), cascades éditoriales (`Problem`/HANDOFFS), composants **orphelins** (morts, non importés). **EN ATTENTE de feu vert** :
+>   (a) **use-cases** (`inRun` = phrases longues, template → 10 pages : rentre mal en nœuds) ; (b) **home** (`RunTimeline`/`BeforeAfter`/
+>   `WhatShipsToday` = îlots React, certains animés, page très validée « review 13 » → refonte plus lourde, à confirmer).
+
+> ### ⚑ v130 (06/08) — React Flow branché sur les 2 pages qui n'en avaient PAS (brain-os, smart-assign)
+> User : « t'as pas utilisé la lib pour les workflow/process, genre React Flow — faut reprendre le template orchestration ». Diagnostic :
+> `orchestration/agents/analytics/approvals/integrations` ont bien RF, mais **brain-os** (boucle « How it fits together » en `<ol>` texte) et
+> **smart-assign** (routage en cartes + îlot `AutoAssign` seul) rendaient leur process **sans la lib**.
+> - Kit `OrchestrationFlows.tsx` : +`BrainLoopFlow` (boucle **horizontale** Memory→Orchestration→Humans→Agents→Validated→↩Memory, arête de
+>   retour `tinted` façon `CalibrationFlow`) ; +`RoutingFlow` (chaîne **verticale** New task→Weigh signals→Best match→Human approves→Assignee).
+> - **brain-os** : le 3e `FeatureSplit` (`<ol>` + `ScreenPlaceholder`) → **section boucle RF pleine largeur** (`flow-canvas rail-y`, DA traits).
+> - **smart-assign** : « How it decides » → **template hero 2-col** (3 signaux en liste à gauche | `RoutingFlow` calé à droite, `bg-dots`).
+>   Copie 100 % préservée (FACTORS + note Sparkles conservés), `DecisionGraph`/`AutoAssign` **gardés** (vrais visuels, pas des schémas).
+> - Variété structurée voulue : brain-os = boucle horizontale pleine largeur ; smart-assign = flux vertical calé à droite. Même DA de traits.
+> - Build OK (68 pages) ; îlots `BrainLoopFlow`/`RoutingFlow` bien injectés dans le HTML servi (18081, 200). **RESTE** : check user ;
+>   `collaboration` n'a pas de process à schématiser (board réel = la preuve) → à confirmer si on lui force un flux « une seule surface ».
+
+> ### ⚑ v129 (06/08) — Correctif : flows VERTICAUX + sections 2-col « template hero » (les bandes pleine largeur étaient nulles)
+> User (annotation rouge sur `agents`) : les dimensions du flow sont mauvaises — je l'avais mis en **bande pleine largeur** avec le flow
+> horizontal riquiqui perdu dedans, ça ne respecte pas le template ni les points du hero, et ça manque de variété structurée.
+> - **Flows repassés en VERTICAL** (`vChain`) : un flux horizontal étiré ne tient pas dans une colonne ; vertical = ça tient et c'est calé
+>   à droite. `hChain` supprimé (plus utilisé). (`vChain` est une fonction déclarée → hoistée, utilisable avant sa définition textuelle.)
+> - **Sections `agents` + `analytics` remises au template hero** : grille 2 colonnes `minmax(0,460px)_1fr`, **texte à gauche | flux vertical
+>   calé à droite** dans une boîte `aspect-ratio`, section **`bg-dots`** (les points blancs comme le hero — pas un fond gris). Fini la bande.
+> - `approvals` (FeatureSplit) + `integrations` : le flux vertical est déjà dans une **cellule dotée** (`flow-canvas` bordé) = le pattern
+>   « demo-cell » du template ; gardés tels quels.
+> - Build OK (68 pages). **RESTE** : user valide le modèle `agents` → aligner `approvals`/`integrations` sur le même traitement si besoin ;
+>   puis gros check + rebuild image landing (`@xyflow`).
+
+> ### ⚑ v128 (06/08) — Pages produit : fonds TOUS blancs + workflows en React Flow (fini les carrés de couleur)
+> Retours user : (1) « les fonds de section **tous de la même couleur** » (blanc — décision de fond, pas d'alternance gris) ; (2)
+> « **les workflows = la même DA** que l'orchestration (React Flow), **pas des carrés de couleur** » — pointe le flow de rôles d'`agents`
+> (chips violet/bleu/ambre), et « t'as rien changé au final dans agents ».
+> - **Fonds → blanc** : balayage `bg-secondary border-b` → `bg-card border-b` et `bg="secondary"` → `bg="card"` sur les **8 pages produit**
+>   (les `bg-secondary/60|/50|/40|/15` = tuiles d'icônes / chrome, **gardés** : ce ne sont pas des fonds de section). Séparation par les
+>   `border-b`. Les composants `FeatureSplit`/`CalloutBand`/`BorderedGrid` reçoivent désormais `bg="card"`.
+> - **`AgentsFlow`** ajouté à `OrchestrationFlows.tsx` : chaîne **horizontale** Outcome → CPO → CTO → COO → Human approval → Delivery, en
+>   nœuds `mini` (cartes blanches + **pastille de rôle** colorée : slate/violet/bleu/ambre/emerald, highlight sur « Human approval »),
+>   arêtes `smoothstep`. Branché dans `agents.astro` (conteneur `flow-canvas rail-y` débordé aux rails) → **remplace les chips colorés** ;
+>   `RUN_ROLES` + import `ArrowRight` retirés. Build OK (68 pages). Conteneur : `@xyflow` déjà installé (v127) → les nouveaux flows le réutilisent.
+> - **Puis fait aussi** (même tour) : les 3 autres workflows convertis en RF via 2 helpers `hChain`/`vChain` ajoutés au kit —
+>   `AnalyticsLoopFlow` (Delivery→Analytics→Recurring pattern→**Memory**→Next run, horizontal), `ApprovalsFlow` (Agent→Artifact→**Human
+>   review**→Approved decision→Memory→Next checkpoint, vertical ; `Panel` retiré → `Panel` désormais inutilisé partout),
+>   `IntegrationsFlow` (Your systems→Memory→Agents→**Human approval**→External systems, vertical ; `ArrowDown` retiré). **Les 4 workflows
+>   sont en React Flow**, cartes blanches + pastilles, highlight sur la gate humaine. Build OK (68 pages).
+> - **RESTE** : gros check visuel user (les flows RF se rendent sur onglet visible) ; **rebuild image landing** pour la permanence de
+>   `@xyflow` (sinon perdu au prochain `compose down`).
+
+> ### ⚑ v127 (06/08) — Fix env : `@xyflow/react` manquait dans le conteneur Docker de la landing (18081)
+> Le user voit une erreur Vite « Failed to resolve import "@xyflow/react" » (stack en `/app/node_modules/...`). Cause : la landing tourne
+> dans le conteneur **`taskforce-landing-dev`** (docker-compose service `landing`, port **18081**→4321), et son `node_modules` est un
+> **volume anonyme** (`/app/node_modules`) isolé de l'hôte → mon `npm install @xyflow/react` fait côté Windows (qui faisait passer les
+> builds locaux) n'atteignait jamais le conteneur.
+> - **Fix** : `docker exec -w /app taskforce-landing-dev npm install @xyflow/react` + `docker restart taskforce-landing-dev` → log Vite
+>   « Re-optimizing dependencies because lockfile has changed », astro ready. **Vérifié** : `GET /src/.../OrchestrationFlows.tsx` = **200**
+>   (71 KB transformés), `GET /product/orchestration` = **200**.
+> - ⚠️ Survit au `restart` mais **pas** à un `compose down`/recreate (volume anonyme) → **permanence = rebuild l'image landing**. Piège noté
+>   en mémoire agent ([[landing-docker-node-modules]]).
+> - NB : le « Use dark theme » du message user était un bouton de l'overlay d'erreur Astro, pas une consigne (landing = light-only, D2).
+
+> ### ⚑ v126 (05/08) — Pages produit : DA « traits intégrés » appliquée PARTOUT (vagues 2 & 3) — prêt pour gros check user
+> User : « continue la vague 2, je ferai un gros check quand on aura terminé ». Fait, sur les **8 pages produit + composants partagés** :
+> - **integrations** : 3 grilles de cartes flottantes (WAYS / PILLARS / SECURITY) → **grilles à filets intégrées** ; le flux vertical
+>   connect→act gardé (variété : c'est un flow).
+> - **analytics** : grille des 6 métriques → intégrée. **Gardé** (contenu déjà varié comme voulu) : la **card mock de chart** (screen déco +
+>   description), le **pill flow**, l'îlot `DeliveryInsights`.
+> - **index** (hub) : les 2 grilles de cartes-liens nav → intégrées (hover conservé).
+> - **smart-assign** : grille « How it decides » **dé-boxée** ; le `Panel` de la liste REVIEW (= « le tableau 3 lignes posé là » que le user
+>   a explicitement rejeté) → **liste à filets** intégrée + import `Panel` retiré.
+> - **`ScreenPlaceholder` (partagé, 5 usages)** : écran VIDE (« Preview ») → **squelette décoratif** (barres grises abstraites, aucune donnée
+>   → **D11-safe** : déco, pas un faux screenshot). Corrige d'un coup les placeholders vides de approvals / collaboration / smart-assign /
+>   brain-os ×2. C'est le « **petit screen écran décoratif** » demandé.
+> - **brain-os** : `BorderedGrid` déjà dé-boxé (v125) ; petite card « How it fits together » → dé-boxée (accent `border-l`).
+> - **approvals** : `BorderedGrid` dé-boxé (v125) + placeholder déco ; `Panel` **gardé** (il encadre un **flux/diagramme** taggé
+>   « Illustrative » = visuel encadré défendable, pas une grille de cartes).
+> - **collaboration** : déjà en traits intégrés (`FeatureRows`) + placeholder désormais déco → rien à refaire.
+> - **agents** (v124) : 3 grilles → intégrées.
+> - `npm run build` OK (68 pages) à chaque vague.
+> - **RESTE** : gros **check visuel user** sur les 8 pages. Points à trancher pendant le check : le rendu du **squelette `ScreenPlaceholder`**
+>   (déco OK ou trop chargé ?) ; le **`Panel` d'approvals** (garder encadré ou intégrer aussi ?). `Panel` n'est plus utilisé que là.
+
+> ### ⚑ v125 (05/08) — Survey des pages produit + `BorderedGrid` dé-boxé (traits intégrés) ; plan par vagues
+> Survey Explore des 8 pages produit. État initial : seul **`collaboration`** est déjà en traits intégrés (via `FeatureRows`/`FeatureRow`
+> = `border-y sm:divide-y` + `sm:border-l`). **Hairline-mais-BOXÉ** (à dé-boxer) : `approvals`, `brain-os`, `smart-assign` (via `BorderedGrid`
+> / grille inline + `Panel`). **Cartes flottantes pures** (à refondre) : `agents`✓, `analytics`, `integrations`, `index`. **`ScreenPlaceholder`
+> VIDES** (approvals, collaboration, smart-assign, brain-os ×2) = les emplacements pour les **mini-mockups d'écran déco** que veut le user.
+> Composants partagés `BorderedGrid`/`Panel`/`ScreenPlaceholder` utilisés **uniquement** sur ces 4 pages → modif globale sûre.
+> - **Fait** : `components/site/sections/BorderedGrid.astro` **dé-boxé** → `-mx-6 lg:-mx-10 grid gap-px border-y border-border bg-border`
+>   (plus de `rounded-2xl border overflow-hidden`) → les grilles de **approvals + brain-os** passent en traits intégrés d'un coup. Build OK.
+> - **PLAN par vagues (RESTE)** :
+>   1. Refondre les grilles de cartes flottantes → intégrées : **integrations** (WAYS/PILLARS/SECURITY), **analytics** (6 métriques), **index** (grilles nav).
+>   2. **smart-assign** : dé-boxer la grille inline « How it decides » ; décider du sort des `Panel`.
+>   3. Remplacer les **`ScreenPlaceholder` vides** par de **vrais mini-mockups déco** (le « petit screen écran » du user) — bespoke par page.
+>   4. **collaboration** : déjà quasi ok (FeatureRows) → juste dé-boxer son placeholder.
+>   5. Îlots existants réutilisables comme visuels de cellule : `DeliveryInsights` (analytics), `DecisionGraph` (brain-os), `CollabBoard`,
+>      `AutoAssign`, `IntegrationCatalogue` ; + îlots d'illustration non utilisés dans `components/site/illustrations/` (à auditer).
+
+> ### ⚑ v124 (05/08) — Orchestration VALIDÉE → réplication de la DA sur les pages produit (agents = 1re faite)
+> User valide orchestration (« beaucoup mieux, ça fait du sens »). Demande : **répliquer la DA** (traits intégrés + grille) sur **les autres
+> pages produit**, en **ALTERNANT** le contenu — pas que des schémas RF : aussi des **petits mockups d'écran décoratifs**, des **cartes
+> descriptives**, adapté par page. « Go ».
+> - Périmètre : 8 pages produit (`agents, approvals, collaboration, smart-assign, analytics, brain-os, integrations, index`) + 3 sous-pages
+>   intégrations (github/slack/plane). Un **survey Explore** a été lancé pour cadrer l'état de chaque page.
+> - **`agents.astro` = 1re convertie** : les 3 grilles de **cartes flottantes** (`rounded-2xl border` : team / what's real today / the rules)
+>   → **grilles à filets intégrées** (`-mx-6 lg:-mx-10` débordé aux rails + `gap-px bg-border` + `border-y`, cellules `bg-card`, zéro carte
+>   flottante). Le flow horizontal "Orchestration" (chips) est gardé → la page **alterne** déjà flow + cartes descriptives. Build OK (68 pages).
+> - **RESTE** : convertir les 7 autres pages sur le même patron ; y **alterner** les visuels (mockups d'écran déco là où ça colle — ex.
+>   `analytics` = mini dashboards ; `brain-os` = graphe ; `approvals` = mini file d'attente d'approbations). Le survey guidera la priorisation.
+
+> ### ⚑ v123 (05/08) — Nœuds à taille homogène + rendu 1:1 + grille VARIÉE (pas ultra-carrée)
+> User valide (« c'est top, rien à dire »). Une remarque : « les **cards des schémas doivent avoir la même taille** ; donc t'auras
+> forcément des décalages, gère ça élégamment » + « pas obligé que ce soit ultra carré » + « un peu de variation c'est pas mal ».
+> - **Nœuds standardisés** : tous les nœuds des 4 schémas → **hauteur 60**, largeur 200–224 (mini approval/calibration w200, handoff w220,
+>   chips w224, proposition w200). 2 sous-titres handoff raccourcis pour tenir en 1 ligne.
+> - **Rendu 1:1** : `maxZoom = 1` (avant 1.5) → les schémas ne sont plus agrandis/rapetissés pour remplir la case, les **nœuds gardent leur
+>   taille réelle** → homogènes d'un schéma à l'autre.
+> - **Grille VARIÉE** (gère les « décalages » élégamment) : les **boucles larges** (Human-in-the-loop, Predict) passent **pleine largeur**
+>   (`md:col-span-6`) pour rendre à 1:1 sans écraser ; **grounding + handoff** restent côte à côte (`md:col-span-3`). Hauteurs de zone schéma :
+>   280 px (grounding/handoff), 150 px (boucles).
+> - Build OK (68 pages). **RESTE** : vérif visuelle user (tailles de nœuds homogènes ? boucles pleine largeur OK ?) → puis appliquer la
+>   même DA (traits intégrés + React Flow) aux **autres pages produit**.
+
+> ### ⚑ v122 (05/08) — Traits intégrés appliqués GLOBALEMENT : les 4 schémas deviennent des cellules d'UNE grille à filets
+> User valide le mécanisme (« oui ») et demande de l'appliquer **à toutes les sections globalement**. Fait :
+> - **4 sections de schéma fusionnées en UNE grille à filets intégrée** « Inside a run » (2×2) : chaque capacité = **cellule** (eyebrow +
+>   titre + texte + le schéma RF dans une zone `flow-canvas` de hauteur fixe `h-[200px]`, séparée du texte par un filet `rail-y`). Grille
+>   débordée jusqu'aux rails (`-mx-6 lg:-mx-10`), filets = `gap-px bg-border` + `border-y` ; **zéro carte flottante**. Supprimé les 3 sections
+>   (approval/handoff/calibration) + la table « sample checkpoint » + la const `CALIB`.
+> - **Ordre de page** désormais cohérent, tout en traits intégrés : hero → problem → **Inside a run** (grille) → team (colonnes à filets) →
+>   **Your models. Your numbers.** (bento intégré) → moat (colonnes à filets) → CTA. Les 5 îlots RF conservés.
+> - Build OK (68 pages). **RESTE** : vérif visuelle user (surveiller le **dimensionnement des 4 schémas** dans des cellules ~196px de haut ;
+>   les boucles horizontales rendront courtes, le handoff étroit centré) ; puis appliquer la même DA aux **autres pages produit**.
+
+> ### ⚑ v121 (05/08) — Correction : les traits sont **INTÉGRÉS à la section** (pas une carte) ; à organiser sur toute la page
+> User rejette le bento v120 : « t'as fait des **cards**, alors que les traits font **partie intégrante** des sections ; ça s'applique **à
+> tout** ; je veux pas juste un flow / un tableau posé isolé, **organise tout ça** ». Le tort : `surface rounded-2xl` = une carte flottante.
+> - **Mécanisme correct repéré** : utilitaires **`.rail-x`** (filet vertical) / **`.rail-y`** (filet horizontal) + `.container-rail`
+>   (`border-inline` = rails, padding 1.5/2.5rem). « Intégré » = grille **débordée jusqu'aux rails** (`-mx-6 lg:-mx-10`), filets =
+>   `border-y` + `gap-px bg-border`, **zéro** arrondi/ombre/carte. Les traits appartiennent à la section (cadrés par les rails).
+> - **Bento refait** en intégré (même contenu : stats 7/3/1 + Your models + $0). Build OK.
+> - **RESTE (à confirmer AVANT de tout refaire — 4 passes déjà à côté)** : organiser TOUTE la page en traits intégrés → les **4 schémas
+>   RF deviennent des CELLULES** de la grille (titre + texte + schéma dans la cellule), fin des double-cartes flottantes. Idem team/moat
+>   (déjà en colonnes à filets = OK). Valider le mécanisme sur le bento, puis dérouler partout, puis autres pages produit.
+
+> ### ⚑ v120 (05/08) — DA de structure = **les traits** : grille bento appliquée (template) ; les schémas RF validés
+> User valide les 5 schémas RF (« je trouve ça good en vrai de vrai »). Nouvelle direction, réfs bento 21st.dev à l'appui : « notre **DA de
+> structure c'est les traits** — une fois l'architecture de filets posée, tu places ce que tu veux dedans ». « Adapte tout, que ce soit
+> sympa ; **on finit là-dessus**, je fais un dernier check, puis on **applique aux autres pages produit** ».
+> - Le composant **`Bento`** (grille `md:grid-cols-6` + `gap-px bg-border` = les filets, cellules `bg-card`) existait déjà mais n'était pas
+>   utilisé. **Template posé** : la section « Your models » + `StatBand` remplacées par **UNE grille à filets** — 3 cellules stats (7 / 3 / 1,
+>   span 2) + une cellule large « Your models » (Ollama $0 / Hosted, span 4) + une cellule « $0 » tintée (span 2). Contenu réel dans les
+>   cellules, filets = `gap-px bg-border`. Retiré l'import `StatBand` + la const `STATS`.
+> - Les **5 schémas RF sont conservés** (validés). Build OK (68 pages). Le bento est **HTML statique** → pas de gotcha onglet caché, il se
+>   rend toujours.
+> - **RESTE** : user valide le template bento → puis **étendre** la structure à filets (team/agents ; le moat est déjà en colonnes à filets)
+>   et l'**appliquer aux autres pages produit** (c'est le but final). Ne pas tout bento-ifier à l'aveugle avant son OK sur le look.
+
+> ### ⚑ v119 (05/08) — TOUT en React Flow, STATIQUE, façon Attio (5 schémas, socle unique) — « déroule tout d'un coup »
+> User : « c'est pas régulier, **oublie les animations** ça me gave » + « **déroule tout** d'un coup » (les 4 autres schémas aussi en RF,
+> structurés Attio). Fait :
+> - **`components/site/flows/OrchestrationFlows.tsx`** — socle unique `StaticFlow` (RF, interactions coupées, badge masqué, canvas
+>   transparent, `client:only`) + **3 types de nœuds** partagés : `step` (carte pipeline), `mini` (icône/pastille + titre + sous-titre,
+>   variante `highlight`), `ctx` (label + valeur). Handles pilotés par data (`ring` = rond visible au départ, sinon invisible).
+> - **ZÉRO animation** : retiré la cascade, les arêtes `animated`, le dash → tout statique (cf. user). CSS d'anim supprimé de `global.css`.
+> - **Espacement régulier** : le souci venait de `node.measured` (pas fiable dans l'îlot) ; je recale le hero à partir des **hauteurs DOM
+>   réelles** (`offsetHeight`) avec un gap constant ; les nœuds des autres schémas ont une **hauteur FIXE** → régulier sans mesure.
+> - **5 flux** : `HeroFlow` (pipeline vertical + branche), `GroundingFlow` (4 chips contexte → 1 proposition, fan-in), `ApprovalFlow`
+>   (Propose→Review→Approve + boucle « Request changes » ambre), `HandoffFlow` (plan→agent→PR, vertical), `CalibrationFlow`
+>   (Predict→Ship→Measure→Recalibrate + boucle bleue). Tous en double-carte (cadre propre + `flow-canvas` pointillé = « 2e bg »).
+> - **Page** : les 4 anciens schémas SVG remplacés par les îlots ; consts `MEMORY_ITEMS`/`HANDOFF` + icônes inutiles retirées ;
+>   `HeroFlow.tsx` = simple ré-export vers `OrchestrationFlows`. `npm run build` OK (68 pages ; bundle RF 63 kB gz, page orchestration only).
+> - **RESTE** : vérif visuelle user (je ne peux pas screenshoter — onglet d'automatisation caché). Points à surveiller : le rendu des
+>   **boucles de retour** (approval/calibration, arêtes bas→bas) et les ratios `aspect-ratio` des cadres. Ajuster selon retour.
+
+> ### ⚑ v118 (05/08) — Hero RF : **alignement corrigé** (re-layout mesuré) + **arêtes `animated` natives** (le trait coule)
+> User voit le hero rendu mais : (1) « tout décalé » = écarts verticaux irréguliers ; (2) « tu peux pas animer React Flow ? y a pas de
+> paramètre natif ? » ; (3) « les autres graphs c'est aussi React Flow ? » ; (4) veut du dynamique dans les sections (« un truc qui tourne »,
+> ex. grounding) et « **organise / structure bien, inspire-toi d'Attio** ».
+> - **Décalage corrigé** : les `initialHeight` sont des estimations → les positions fixes dérivaient. Ajout d'un **re-layout après mesure**
+>   (`useNodesInitialized` → `setNodes`) qui recale le tronc à partir des **hauteurs réelles** (`node.measured.height`) avec un **écart
+>   constant** (GAP 34, BRANCH_GAP 48), puis `fitView`. Branche resserrée (exec x=20, qa x=316 → marges symétriques).
+> - **Animation native** : `animated: true` dans `defaultEdgeOptions` = l'anim NATIVE de RF (pointillé qui défile, façon Attio). CSS
+>   `.tf-flow .react-flow__edge.animated .-path` (dash + keyframe `tf-dashdraw`) ajouté au cas où `base.css` ne l'embarque pas. À NOTER pour
+>   le user : RF anime **nativement les arêtes** ; l'**apparition des nœuds** n'a PAS de param natif → c'est du CSS (normal, pas un hack).
+>   L'apparition en cascade (v117) est conservée EN PLUS.
+> - **Réponse à (3)** : non, les autres schémas sont encore **SVG maison statiques** (v117). Plan : les convertir en RF façon Attio **une fois
+>   le hero validé** (ne pas propager un motif non validé — cf. rejets répétés). `npm run build` OK (68 pages).
+> - **RESTE** : (a) user valide le hero (alignement + garder les arêtes qui coulent OU repasser en trait plein ?) ; (b) ensuite propager RF
+>   à **grounding / handoff / boucles** avec structure Attio + motion sobre (ex. grounding : items du contexte qui « alimentent » la proposition).
+
+> ### ⚑ v117 (05/08) — Hero RF : **apparition en cascade** rendue ; les 4 sections animées passées en **STATIQUE**
+> Retours user sur le hero RF (qu'il voit enfin) : (1) « y a pas d'animation genre fade pour chaque card ? » → il veut **ré-ajouter
+> l'apparition** (validée en v115) ; (2) « pourquoi ce qu'il y a DANS les cards est animé ? tu peux utiliser React Flow mais **statique
+> comme le hero** » → il vise les **anciennes sections** (grounding/handoff/boucles) encore sur le moteur `fx-*` (bordure bleue qui pulse,
+> traits qui se dessinent).
+> - **Apparition hero (cascade)** : chaque nœud enveloppé dans `.tf-node-anim` (wrapper) avec `--tf-delay` (0/140/280/420/560/560 ms) ;
+>   les arêtes fondent juste après leur carte source (delays 70/210/350/490 via `[data-id]`), d'où une vraie **chaîne** carte→flèche→carte.
+>   Contenu **statique**. Le hover reste sur `.tf-node` (pas de conflit avec l'entrée). Déclenché par la classe **`tf-play`** posée quand
+>   `useNodesInitialized()` est vrai (+ filet `setTimeout(900)`), respect `prefers-reduced-motion`. CSS dans `global.css`.
+> - **4 sections rendues STATIQUES** (grounding, boucle d'approbation, handoff, calibration) : retiré `fx-draw`/`fx-node`/`fx-border` +
+>   `data-flow` + `pathLength` → les schémas SVG montrent leur **état final** (connecteurs bleus + bords bleus + flèches, figés). Supprimé
+>   le `<script>` d'enchaînement (mort). **Vérifié en direct** : `.fx-draw/.fx-node/.fx-border` = **0** sur la page.
+> - `npm run build` OK (68 pages). Hero : nouveau code **confirmé chargé** (classe `tf-play` présente) ; rendu visuel de la cascade **en
+>   attente** d'un onglet visible (même gotcha qu'en v116).
+> - **RESTE / à trancher** : les 4 sections sont **statiques mais en SVG maison** (pas RF) → pas raccord visuel avec le hero RF. Prochaine
+>   étape (plan « héro + 1 boucle ») : reconstruire la **boucle d'approbation en React Flow statique** (raccord hero) + simplifier
+>   **grounding / handoff / calibration** en sections variées (feature-split, contenu réel). À confirmer avec le user avant de dérouler.
+
+> ### ⚑ v116 (05/08) — Hero passé à **React Flow** (choix user) : diagramme STATIQUE façon Attio ; gotcha onglet caché
+> Les flèches SVG maison (v115) faisaient des « crochets » → **le user tranche : on utilise une lib (React Flow)** + on **consolide
+> façon Attio** (héro + 1 boucle, le reste en sections variées, plus « un flux par section »). Licence : `@xyflow/react` = **MIT** →
+> usage **commercial** OK, **masquer le badge est légal** (courtoisie, pas une clause). `npm i @xyflow/react` (13 pkgs).
+> - **`src/components/site/flows/HeroFlow.tsx`** (îlot `client:only="react"`) : nœuds custom = nos cartes (icône + badge kind + pastille
+>   d'état), **figées** (aucune anim interne, hover discret) ; arêtes **`smoothstep`** (coins arrondis `borderRadius:16`) + **flèche**
+>   `MarkerType.ArrowClosed` à l'arrivée ; le **handle source = le « rond » au départ** (stylé en blanc/anneau bleu), handle target invisible.
+>   Toutes interactions coupées (pan/zoom/drag/select off, `preventScrolling:false`), badge masqué (`proOptions.hideAttribution`).
+>   CSS dans `global.css` (`.tf-flow`, `.tf-handle--source/--target`, `.tf-node:hover`) ; canvas transparent (laisse voir les points de section).
+> - **Page** : retiré le graphe SVG maison + les consts `FLOW/BRANCH/KIND_STYLE/STATE` + l'icône `Flag` ; le graphe = `<HeroFlow client:only />`
+>   dans un cadre `aspect-ratio: 600/600` (réserve la place, pas de CLS). Légende « Illustrative — orchestration is Planned » gardée (D11).
+> - **⚠️ GOTCHA majeur (diagnostiqué, pas un bug de code)** : dans un onglet **caché/arrière-plan** (`document.visibilityState==='hidden'`),
+>   le navigateur **met en pause `requestAnimationFrame` ET `ResizeObserver`** → React Flow **ne mesure jamais les nœuds** → cartes
+>   `visibility:hidden`, **0 arête**, pas de `fitView`. C'est **exactement** l'état des navigateurs d'automatisation ici (claude-in-chrome
+>   ET le pane in-app sont `hidden`, et le mode « background app » **n'autorise pas** à ramener Brave au premier plan). **Pour un vrai
+>   visiteur (onglet visible), tout se rend normalement.** Robustesse ajoutée : `initialWidth/initialHeight` (dims réelles mesurées :
+>   94/94/104/94/78/78) pour semer le rendu ; `ReactFlowProvider` + `useUpdateNodeInternals` + `fitView` au montage (2×rAF + `setTimeout`) ;
+>   **remesure sur `visibilitychange`** (auto-heal si monté en arrière-plan). `npm run build` OK (68 pages), **zéro erreur console**.
+> - Dev server : 18081 **planté** (port occupé, ne répond pas) → tourne sur **18082**. Vérif visuelle **en attente** : besoin que le user
+>   ramène Brave au premier plan (fenêtre minimisée) — dès qu'il est visible, RF se rend et je screenshote/valide les connecteurs.
+> - **RESTE** : (1) valider visuellement le hero RF ; (2) propager RF à la **boucle d'approbation** (le « +1 boucle ») ; (3) convertir
+>   **grounding / handoff / calibration** en sections variées (feature-split, contenu réel) — plus de flux partout ; (4) à terme, retirer
+>   le moteur `fx-*` devenu inutile une fois tous les flux migrés.
+
+> ### ⚑ v115 (04/08) — Anim CALÉE : apparition des cartes (`fx-pop`) + connecteurs façon Attio (rond + chevron + coins arrondis)
+> User a envoyé des réfs Attio + validé la direction : **l'apparition** (fondu+montée) des cartes = « parfait », à étendre ; **petites
+> cartes de démo peuvent rester statiques** ; **SOIGNER les flèches** = un **rond** au départ, de **vraies flèches** (chevrons) à l'arrivée,
+> et des **coins arrondis** sur les embranchements.
+> - **Connecteurs du hero refaits en SVG** (coords EXPLICITES → plus le bug des `%`) : marqueur chevron `#tf-arr` (défini une fois),
+>   connecteur tronc = `<circle>` (rond) + ligne + `marker-end` chevron ; **branche** = 2 chemins à **coins arrondis** (`q…`) + rings +
+>   chevrons, alignés aux centres des cartes (21%/79% = `justify-between` w-250 dans 600). Connecteurs en **`.fx-fade`** (fondu simple),
+>   cartes en **`.fx-pop`** (apparition), le tout enchaîné.
+> - **Bug chaînage RÉGLÉ** : `animationend` **ne se déclenche pas sur les `<svg>`** (quirk Chromium) → la chaîne stallait après la 1re carte
+>   (les suivantes restaient `opacity:0`). Ajout d'un **filet `setTimeout(800ms)`** par groupe dans le `<script>` → la chaîne avance toujours
+>   (via `animationend` OU timeout). Vérifié Brave ✅ : toutes les cartes apparaissent, connecteurs **ring + chevron + coins arrondis** nets.
+> - **RESTE** : propager (apparition `fx-pop` + connecteurs Attio) aux autres flux (**handoff, grounding**) ; les **boucles**
+>   (approval/calibration) peuvent rester en **SVG statique** (petites démos, pas besoin d'animer — cf. user). Puis démos vivantes si voulu.
+
+> ### ⚑ v114 (04/08) — Tracé SVG de bord ABANDONNÉ (trop fragile) → cartes en `fx-pop` (robuste) ; anim toujours à caler avec le user
+> User : « toujours pas bon » sur le moteur v2. En inspectant : le **tracé SVG du bord des cartes HTML est bugué** — (bug 1) le `<svg>`
+> étant un élément remplacé, sans taille explicite il retombait sur son intrinsèque 300×150 (bord décalé/hors carte) ; (bug 2) après
+> `h-full w-full`, le `pathLength="1"` sur un `<rect width="100%">` ne trace pas tout le périmètre (ça marche pour les nœuds des boucles car
+> ils ont des dimensions px EXPLICITES, pas `%`). Conclusion : **overlay SVG sur carte HTML = trop fragile, abandonné**.
+> - **Revert** : les cartes du hero passent en **`.fx-pop`** (fondu + légère montée, robuste) + `data-o` → apparaissent **en séquence**,
+>   toujours **enchaînées** (`animationend`) avec les connecteurs. Page **propre**, plus de bug. Le **vrai enchaînement** (JS `animationend`)
+>   et les **connecteurs SVG** (déjà à vitesse constante) sont conservés — c'est la partie qui marche.
+> - **⚠️ Anim toujours PAS validée par le user** (5ᵉ itération). Ne plus deviner : demander une **référence/description précise** de
+>   l'animation voulue. Feu vert **démos vivantes** (toasts, cartes qui changent, mini-graphes façon carte budget) toujours valable — sans
+>   doute la vraie direction plutôt que d'animer des bords.
+> - Le moteur v2 CSS (`.fx-stroke`, `.fx-go`, chaînage JS `[data-o]`, `.fx-pop`) reste en place ; les autres flux tournent encore en legacy.
+
+> ### ⚑ v113 (04/08) — MOTEUR v2 : bord en TRACÉ SVG (vitesse d'arc constante) + VRAI enchaînement (animationend) — appliqué au hero
+> QA #3 : le souci n'est pas la vitesse mais (a) **elle n'est pas constante** — le conic balaie par ANGLE → accélère sur les longueurs,
+> ralentit sur les largeurs (« horrible ») ; (b) **pas de vraie séquence** — les flèches partent sur un timing calculé, pas à la FIN de
+> l'anim précédente ; (c) double carte : + d'espace entre partie 1 et 2 ; (d) « oui » aux démos vivantes.
+> - **Bord de carte = TRACÉ SVG** (`.fx-stroke` = `<rect pathLength="1">` + `stroke-dashoffset`, LINÉAIRE) → dessin à **vitesse d'arc
+>   CONSTANTE**, plus d'accélération sur les longueurs. (Les nœuds des boucles étaient déjà des tracés SVG = déjà constants ; c'était le
+>   **conic** des cartes HTML le coupable → supprimé, remplacé par le tracé.) Overlay : `<svg absolute inset-[0.75px]>` + rect `width/height
+>   100%`, `rx=12`, `vector-effect="non-scaling-stroke"`.
+> - **Vrai enchaînement** : le `<script>` chaîne les groupes **`[data-o]`** via **`animationend`** (chaque groupe démarre à la FIN du
+>   précédent, plus de `--d`). Fallback `.flow-run` legacy conservé pour les flux pas encore migrés.
+> - Appliqué au **HERO** (cartes tronc `data-o` 1/3/5/7 + connecteurs 2/4/6, exit 8, stem 9, barre 10, drops 11, cartes branche 12).
+>   Vérifié Brave ✅ : le bord se **trace autour** à vitesse constante, **chaîné** carte→flèche→carte.
+> - **Double carte** : padding extérieur `p-2.5 → p-4` (plus d'espace entre l'extérieur propre et l'intérieur à points).
+> - **RESTE** (à faire après confirmation que le moteur hero est le bon) : (1) migrer le moteur v2 (`fx-stroke` + `data-o` + chaînage) aux
+>   **autres flux** (approval / calibration / handoff / grounding) — ils tournent encore en **legacy** (conic + timing) ; (2) **démos
+>   vivantes** (toasts qui apparaissent, cartes qui changent d'état, mini-graphes façon carte budget) — **feu vert reçu**.
+
+> ### ⚑ v112 (04/08) — QA #2 : anim LINÉAIRE + lente (pas d'accélération), hero branche corrigée + animée, template DOUBLE CARTE
+> QA user :
+> 1. **Anim trop rapide + accélère sur les bords longs** → moteur **LINÉAIRE** partout (vitesse constante, zéro accélération ; remplace
+>    `ease-in-out`), durées **allongées** (fx-border/fx-node **1.3s**), **pilotables par `--dur`** (à mettre ∝ la taille pour une vitesse
+>    px/s constante). Cartes du hero rendues **uniformes** → même durée = même vitesse. Nouveau **`.fx-line-x`** (connecteur horizontal animé).
+> 2. **Hero** : les 2 cartes du bas **même taille** que le tronc (`w-[250px]`, `p-3.5`) et **écartées** (`flex justify-between`, ~100px de
+>    gap) ; graphe élargi (grille hero `[minmax(0,460px)_minmax(0,1fr)]`, container `max-w-[600px]`, tronc `max-w-[250px]`). **Connecteur de
+>    branche ANIMÉ** (stem `fx-line` + barre `fx-line-x` + 2 drops, en bleu, séquencés) → **le flux continue à la séparation** (avant : ça
+>    s'arrêtait). Cadence ~1.0s. Titre CTO déjà « Approach & contract ».
+> 3. **Template DOUBLE CARTE** (« t'as pas compris ») : **carte extérieure propre (sans points)** + **carte intérieure À POINTS** (le 2ᵉ bg).
+>    `.flow-canvas` déplacé sur l'intérieur. Appliqué à **grounding, approval, handoff, calibration**. = notre template pour toute démo/flux
+>    dans une carte.
+> - Vérifié Brave ✅ : hero = entonnoir, branche même-taille + écartée + connecteur bleu **animé** ; grounding = **double carte** (points sur
+>    l'intérieur seulement). Build 68 OK.
+> - **RESTE / proposé au user** : (a) **démos « vivantes »** — toasts qui apparaissent, cartes qui changent d'état, **mini-graphes** (réf.
+>    carte budget Attio $30k + toast $750) — gros chantier créatif, à faire après validation de la **vitesse** ; (b) au besoin ralentir aussi
+>    la cadence des boucles approval/calibration pour matcher le hero.
+
+> ### ⚑ v111 (04/08) — QA orchestration : hero en entonnoir, anim plus smooth, template « canvas à points », rails retirés (team)
+> QA user (4 points) :
+> 1. **Hero** — les cartes seules s'étalaient (bloc carré = impression de vide). → **tronc étroit** (`max-w-[300px]`, centré) qui s'ouvre
+>    sur une **branche plus large et écartée** (`max-w-lg`, cartes `p-4`, `gap-4`) → forme d'**entonnoir**. Titre CTO raccourci
+>    « Approach & contract » pour tenir dans la carte étroite.
+> 2. **Animations trop rapides** → **plus lentes / `ease-in-out`** (fx-draw 0.5→**0.75s**, fx-node 0.55→**0.8s**, fx-line 0.4→**0.6s**,
+>    fx-border 0.6→**0.9s**) + **séquençage « la flèche touche la carte → la carte s'anime »** : cadence **0.9s**, connecteur delay =
+>    `i·0.9 − durée` (arrive pile quand la carte démarre). Délais mis à jour sur hero / approval / handoff / calibration.
+> 3. **Template `.flow-canvas`** (façon **Attio écran 3**) : cadre à **fond POINTILLÉ** où **flottent** les nœuds/toasts. Appliqué à
+>    **grounding** (toasts blancs sur points + proposal qui remplit son bord), **approval loop**, **handoff**, **calibration**.
+>    → NOTRE template réutilisable pour tous les petits flux (à décliner ailleurs).
+> 4. **Section « The team »** : **rails retirés** (`.container-rail.no-rail` → `border-inline: 0`) → variété sur la transition (« on peut
+>    retirer certaines bordures de section »).
+> - Vérifié Brave ✅ : hero entonnoir + anim plus douce (le flow traverse visiblement) ; grounding + approval en **canvas pointillé** ; team
+>    **sans rails** (confirmé au zoom vs grounding qui garde le rail). Build 68 OK.
+> - ⚠️ Repéré (non corrigé, hors scope) : bug latent dans `global.css` — commentaire ouvert par `\*` au lieu de `/*` près de
+>    `.rail-x`/`.rail-y`.
+
 > ### ⚑ v110 (04/08) — Animations « pro » façon Attio : DRAW-ONCE au scroll (flèches pleines bleues, bords qui se remplissent, puis fige)
 > User : animations plus pro/clean comme Attio — **flèches PLEINES bleues**, anime **une seule fois** quand le flow passe (pas en
 > permanence), le **bord de carte se remplit en bleu** quand la flèche l'atteint puis **se fige** (« un fluide qui remplit les traits »).

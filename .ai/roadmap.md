@@ -2759,6 +2759,65 @@ Planning prévisionnel (Gantt, jalons DFS, chemin critique), budget prévisionne
 > **Reste** : polish design de `/onboarding/plan` (« naze ») et de la page OTP (`verification`, « bancale »)
 > — à préciser avec l'utilisateur ; puis `it.ps1 -Test ALL` + `tsc`/`eslint` avant commit.
 
+> **▶ MAJ 05/08/2026 (35) — Audit fonctionnel C2 + passe UI/UX C1 (« câbler un maximum »).**
+>
+> Audit écran par écran des 50 routes (5 lecteurs parallèles) → détail dans `.ai/c2-audit-fonctionnel.md`.
+> **Différenciateur smart-assign / redistribution : fonctionnel de bout en bout** (4 points d'entrée), aucun
+> contrôle mort dans la chaîne. Peu de morts ailleurs, aucun bloquant.
+>
+> **C1 — correctifs livrés (front `tsc` + `eslint` : 0 erreur, 0 nouveau warning) :** tri des issues (client) ·
+> palette nettoyée (« Discussions » morte retirée, « Issues »/« Créer » repointées vers `/my-work/issues` et
+> `/projects`) · bouton social **Google** masqué (config `AUTH_SOCIAL_PROVIDERS=github`) · onglet **Membres**
+> ajouté au projet · roadmap « Add item » retiré · compteurs profil + lignes membre → liens · **suppression de
+> page** câblée (⋯ + confirmation) · `payment/cancel` force le plan gratuit · libellé `payment/success` corrigé ·
+> item « Changer le rôle » (membres projet) retiré · sélecteur de **fuseau** + bouton « Save changes » retirés
+> (faux succès).
+>
+> **Vrai % de complétion des cycles** (était figé à 0 sur cycles / my-work / roadmap) : backend
+> `CycleResponse.completedCount` + `CycleIssueRepository.countCompletedByCycleId(s)` (catégorie `COMPLETED`),
+> `toResponse` + ses 6 appels ; front `Cycle.completedCount` + 3 mappeurs ; **2 tests d'intégration**
+> (`CycleServiceIntegrationTest`). Suite `it.ps1 -Test ALL` lancée ; rebuild backend + restart front requis
+> pour le live.
+>
+> **Décisions actées** : session unique par utilisateur = choix assumé (résout l'ouverture MAJ `C10`) ;
+> E9 (C11) à confirmer avec l'école (référentiel = site marchand externe fourni, hors fil rouge) — la faire
+> sur TaskForce risque les 4 sous-critères.
+
+> **▶ MAJ 09/08/2026 (36) — Onboarding : refonte « dans l'app » + suggestion offerte (revue UI/UX, items 8 & 10).**
+>
+> **Item 8 — « on reste dans l'app »** : nouveau `frontend/components/onboarding/onboarding-shell.tsx` qui donne
+> au wizard le châssis Linear (le reproche « j'ai l'impression d'avoir quitté TaskForce » venait d'une carte
+> flottante sur page vide). Mini-barre latérale (jetons `--sidebar*`) : **logo en haut** (`dark:invert`),
+> **checklist verticale des 4 étapes** au milieu (= la progression ; fait ✓ / courant / à venir ; retour arrière
+> borné à `maxStep`), **compte en bas** (miroir de `NavUser`). Contenu dans un canevas centré + **footer d'actions
+> ancré**. `app/onboarding/page.tsx` recâblé (retrait carte + barre horizontale + « Étape x sur y »). Sous `md`,
+> bandeau logo + « Étape X/N ». `tsc` 0 · `eslint` 0 · `/onboarding` → 200 (restart front). Vue authentifiée
+> impossible côté agent (login/inscription interdits par les règles de sécurité) → **aperçu statique fidèle livré au user**.
+>
+> **Item 10 — tokens onboarding offerts** : `AiMeter.complimentary(workspaceId, work)` — même **gate de quota**
+> que `metered` (au plafond, LLM non lancé → repli) mais **aucun décompte**. `SkillSuggestionService` bascule
+> dessus (`meteredSuggest` → `complimentarySuggest`). Motif : courtoisie de pré-activation, ne pas grignoter le
+> quota FREE (100k) avant usage. **`AiMeterTest` (3 cas) → 3/3 verts**, backend `BUILD SUCCESS` (440 sources).
+>
+> **Reste (revue UI/UX)** : favicon (item 2), sweep loaders des autres boutons (item 7), trancher le nommage
+> Cortex vs « IA » global. **Gate pré-commit non lancé** (`it.ps1 -Test ALL`) — aucun commit demandé.
+
+> **▶ MAJ 09/08/2026 (37) — Tutoriel produit (tour guidé) + polish onboarding + fix fil d'Ariane (retours live).**
+>
+> **Tour produit maison** (choix user via AskUserQuestion : sans dépendance, stylé shadcn) : `tour-store.ts`
+> (Zustand+persist `hasSeen`) + `components/tour/product-tour.tsx` (spotlight `box-shadow` + popover `bg-popover`
+> positionné, clavier, portal). 6 étapes coach-marks sur le dashboard (`data-tour` sur sidebar, Ask AI, créer
+> une opération, analytics) dont un **upsell** final ouvrant le modal d'upgrade. Monté dans `AppShell`, déclenché
+> 1× (`hasSeen`), **rejouable** depuis Help (`?tour=1`). Détail : `.ai/ui-ux-review.md` MAJ (7e).
+>
+> **Polish onboarding** (retours live sur écran authentifié) : logo agrandi (mark `h-9` + wordmark), tous les
+> champs → `Input`/`Textarea` shadcn (bon focus), loader Cortex validé. Détail MAJ (7b/7c/7d).
+>
+> **Bug dashboard fil d'Ariane** : le slug workspace (`pierre-6db5ea`, suffixe hex d'unicité) s'affichait
+> « Pierre 6db5ea » et liait `/{slug}` → **404** (aucune page à ce niveau). Corrigé : nom réel du workspace +
+> href `/{slug}/dashboard` (`app-topbar` `useBreadcrumbs`) **+ redirect** `app/(protected)/[workspace]/page.tsx`.
+> Vérifié : `/pierre-6db5ea` → 200. `tsc` 0 · `eslint` 0 (2 warnings préexistants quick-columns).
+
 ### 4.B — Repoussé APRÈS la soutenance (ne pas empiéter)
 
 > Aucun de ces chantiers n'est rattaché à une compétence C1–C26. Ils restent documentés,
