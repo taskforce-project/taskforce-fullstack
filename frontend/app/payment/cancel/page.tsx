@@ -14,12 +14,14 @@ import Link from "next/link";
 export default function PaymentCancelPage() {
   const router = useRouter();
 
+  // Upgrade in-app annulé : l'utilisateur est connecté et garde son forfait courant. Les deux
+  // actions le ramènent simplement dans l'app (il pourra réessayer depuis Réglages → Facturation).
   const handleRetry = () => {
-    router.push("/auth/register/plan");
+    router.push("/");
   };
 
   const handleContinueFree = () => {
-    router.push("/auth/register/verification");
+    router.push("/");
   };
 
   return (
