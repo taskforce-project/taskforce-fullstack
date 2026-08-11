@@ -205,6 +205,23 @@ public class ConnectorCatalog {
         connectable("perplexity", "Perplexity", ConnectorCategory.AI_MODELS, ConnectorAuthType.API_KEY, "Recherche augmentée par IA");
         connectable("cohere", "Cohere", ConnectorCategory.AI_MODELS, ConnectorAuthType.API_KEY, "LLM & rerank");
         connectable("replicate", "Replicate", ConnectorCategory.AI_MODELS, ConnectorAuthType.TOKEN, "Modèles hébergés à la demande");
+
+        // ── UI & Composants (roadmap) ────────────────────────────────────────
+        // Bibliothèques de composants « génératives/officielles » : la valeur visée est la RECOMMANDATION
+        // de composants par Cortex sur une tâche UI/UX. Déclarées PLANNED (affichées « Bientôt », non
+        // branchables) tant que le moteur de reco n'est pas livré — pas de fausse connexion.
+        planned("shadcn", "shadcn/ui", ConnectorCategory.UI_COMPONENTS,
+            "Composants React (Radix + Tailwind) copiables — reco. via Cortex (à venir)", "https://ui.shadcn.com");
+        planned("21st-dev", "21st.dev", ConnectorCategory.UI_COMPONENTS,
+            "Place de marché de composants React/Tailwind — reco. via Cortex (à venir)", "https://21st.dev");
+        planned("radix-ui", "Radix UI", ConnectorCategory.UI_COMPONENTS,
+            "Primitives accessibles non stylées (base de shadcn) — reco. via Cortex (à venir)", "https://www.radix-ui.com");
+        planned("aceternity-ui", "Aceternity UI", ConnectorCategory.UI_COMPONENTS,
+            "Composants animés prêts à l'emploi (Framer Motion) — reco. via Cortex (à venir)", "https://ui.aceternity.com");
+        planned("magic-ui", "Magic UI", ConnectorCategory.UI_COMPONENTS,
+            "Composants & effets animés open-source — reco. via Cortex (à venir)", "https://magicui.design");
+        planned("origin-ui", "Origin UI", ConnectorCategory.UI_COMPONENTS,
+            "Large collection de composants Tailwind — reco. via Cortex (à venir)", "https://originui.com");
     }
 
     /** Tous les descripteurs, dans l'ordre de déclaration. */
@@ -226,7 +243,18 @@ public class ConnectorCatalog {
     private void available(String key, String name, ConnectorCategory cat, ConnectorAuthType auth,
                            String description, String docsUrl, String setupHint,
                            List<ConnectorField> fields, List<String> caps) {
-        byKey.put(key, new ConnectorDescriptor(key, name, cat, auth, ConnectorStatus.AVAILABLE, fields, caps, docsUrl, description, setupHint));
+        byKey.put(key, new ConnectorDescriptor(key, name, cat, auth, ConnectorStatus.AVAILABLE, fields, caps, docsUrl, description, setupHint, website(key)));
+    }
+
+    /**
+     * Outil du catalogue affiché en <b>roadmap</b> ({@code PLANNED}) : visible dans le pool avec le badge
+     * « Bientôt », mais pas encore branchable (aucun formulaire, aucune fausse connexion). Sert à annoncer
+     * une intégration à venir. La capacité {@code recommend} porte l'intention (recommandation IA de
+     * composants) ; la {@code docsUrl} pointe vers la bibliothèque.
+     */
+    private void planned(String key, String name, ConnectorCategory cat, String description, String docsUrl) {
+        byKey.put(key, new ConnectorDescriptor(key, name, cat, ConnectorAuthType.NONE, ConnectorStatus.PLANNED,
+            List.of(), List.of("recommend"), docsUrl, description, null, website(key)));
     }
 
     /**
@@ -236,7 +264,7 @@ public class ConnectorCatalog {
      */
     private void connectable(String key, String name, ConnectorCategory cat, ConnectorAuthType auth, String description) {
         byKey.put(key, new ConnectorDescriptor(key, name, cat, auth, ConnectorStatus.AVAILABLE,
-            defaultFields(auth), List.of("observe"), null, description, defaultHint(auth)));
+            defaultFields(auth), List.of("observe"), null, description, defaultHint(auth), website(key)));
     }
 
     /** Champs de connexion par défaut selon le mode d'auth (pour les connecteurs génériques). */
@@ -260,5 +288,103 @@ public class ConnectorCatalog {
             case CONFIG  -> "Renseigne l'endpoint et la clé/les identifiants d'accès.";
             case NONE    -> null;
         };
+    }
+
+    /**
+     * Sites officiels (homepage) des services du catalogue — lien RÉEL affiché dans la fiche détaillée.
+     * URLs publiques, jamais inventées. Les services purement génériques (VPS, SMTP) n'en ont pas → {@code null}.
+     */
+    private static final Map<String, String> WEBSITES = Map.ofEntries(
+        // Gestion de projet
+        Map.entry("plane", "https://plane.so"), Map.entry("linear", "https://linear.app"),
+        Map.entry("asana", "https://asana.com"), Map.entry("clickup", "https://clickup.com"),
+        Map.entry("jira", "https://www.atlassian.com/software/jira"), Map.entry("trello", "https://trello.com"),
+        Map.entry("monday", "https://monday.com"), Map.entry("airtable", "https://airtable.com"),
+        Map.entry("shortcut", "https://www.shortcut.com"),
+        // Dev & CI/CD
+        Map.entry("github", "https://github.com"), Map.entry("jenkins", "https://www.jenkins.io"),
+        Map.entry("docker", "https://www.docker.com"), Map.entry("kubernetes", "https://kubernetes.io"),
+        Map.entry("gitlab", "https://gitlab.com"), Map.entry("bitbucket", "https://bitbucket.org"),
+        Map.entry("postman", "https://www.postman.com"), Map.entry("insomnia", "https://insomnia.rest"),
+        Map.entry("vscode", "https://code.visualstudio.com"), Map.entry("cursor", "https://cursor.com"),
+        Map.entry("sentry", "https://sentry.io"), Map.entry("datadog", "https://www.datadoghq.com"),
+        Map.entry("grafana", "https://grafana.com"), Map.entry("sonarqube", "https://www.sonarsource.com/products/sonarqube"),
+        Map.entry("circleci", "https://circleci.com"), Map.entry("terraform", "https://www.terraform.io"),
+        // Hébergement & Infra
+        Map.entry("vercel", "https://vercel.com"), Map.entry("render", "https://render.com"),
+        Map.entry("cloudflare", "https://www.cloudflare.com"), Map.entry("aws", "https://aws.amazon.com"),
+        Map.entry("azure", "https://azure.microsoft.com"), Map.entry("gcp", "https://cloud.google.com"),
+        Map.entry("netlify", "https://www.netlify.com"), Map.entry("railway", "https://railway.app"),
+        Map.entry("fly", "https://fly.io"), Map.entry("digitalocean", "https://www.digitalocean.com"),
+        Map.entry("heroku", "https://www.heroku.com"), Map.entry("firebase", "https://firebase.google.com"),
+        // Bases de données
+        Map.entry("supabase", "https://supabase.com"), Map.entry("neon", "https://neon.tech"),
+        Map.entry("mongodb-atlas", "https://www.mongodb.com/atlas"), Map.entry("redis-cloud", "https://redis.io"),
+        Map.entry("postgresql", "https://www.postgresql.org"), Map.entry("planetscale", "https://planetscale.com"),
+        Map.entry("prisma", "https://www.prisma.io"), Map.entry("elasticsearch", "https://www.elastic.co/elasticsearch"),
+        Map.entry("snowflake", "https://www.snowflake.com"),
+        // Publicité
+        Map.entry("google-ads", "https://ads.google.com"), Map.entry("meta-ads", "https://www.facebook.com/business"),
+        Map.entry("linkedin-ads", "https://business.linkedin.com/marketing-solutions"),
+        // Analytics & Produit
+        Map.entry("google-analytics", "https://analytics.google.com"), Map.entry("posthog", "https://posthog.com"),
+        Map.entry("microsoft-clarity", "https://clarity.microsoft.com"), Map.entry("mixpanel", "https://mixpanel.com"),
+        Map.entry("amplitude", "https://amplitude.com"), Map.entry("segment", "https://segment.com"),
+        Map.entry("plausible", "https://plausible.io"), Map.entry("hotjar", "https://www.hotjar.com"),
+        // Paiements & Finance
+        Map.entry("stripe", "https://stripe.com"), Map.entry("paypal", "https://www.paypal.com"),
+        Map.entry("paddle", "https://www.paddle.com"), Map.entry("lemonsqueezy", "https://www.lemonsqueezy.com"),
+        Map.entry("wise", "https://wise.com"),
+        // CRM & Ventes
+        Map.entry("hubspot", "https://www.hubspot.com"), Map.entry("salesforce", "https://www.salesforce.com"),
+        Map.entry("zoho", "https://www.zoho.com"), Map.entry("intercom", "https://www.intercom.com"),
+        Map.entry("pipedrive", "https://www.pipedrive.com"), Map.entry("zendesk", "https://www.zendesk.com"),
+        Map.entry("freshworks", "https://www.freshworks.com"), Map.entry("attio", "https://attio.com"),
+        // Communication & Email
+        Map.entry("slack", "https://slack.com"), Map.entry("twilio", "https://www.twilio.com"),
+        Map.entry("resend", "https://resend.com"), Map.entry("discord", "https://discord.com"),
+        Map.entry("microsoft-teams", "https://www.microsoft.com/microsoft-teams"), Map.entry("zoom", "https://zoom.us"),
+        Map.entry("telegram", "https://telegram.org"), Map.entry("whatsapp", "https://business.whatsapp.com"),
+        Map.entry("sendgrid", "https://sendgrid.com"), Map.entry("mailchimp", "https://mailchimp.com"),
+        // Identité & Auth
+        Map.entry("clerk", "https://clerk.com"), Map.entry("keycloak", "https://www.keycloak.org"),
+        Map.entry("auth0", "https://auth0.com"), Map.entry("okta", "https://www.okta.com"),
+        // Sécurité & Secrets
+        Map.entry("bitwarden", "https://bitwarden.com"), Map.entry("1password", "https://1password.com"),
+        Map.entry("doppler", "https://www.doppler.com"), Map.entry("snyk", "https://snyk.io"),
+        // Productivité & Docs
+        Map.entry("notion", "https://www.notion.so"), Map.entry("google-workspace", "https://workspace.google.com"),
+        Map.entry("microsoft-365", "https://www.microsoft.com/microsoft-365"), Map.entry("granola", "https://www.granola.ai"),
+        Map.entry("raycast", "https://www.raycast.com"), Map.entry("gmail", "https://mail.google.com"),
+        Map.entry("google-drive", "https://drive.google.com"), Map.entry("google-calendar", "https://calendar.google.com"),
+        Map.entry("google-sheets", "https://sheets.google.com"), Map.entry("google-meet", "https://meet.google.com"),
+        Map.entry("outlook", "https://outlook.com"), Map.entry("onedrive", "https://www.microsoft.com/microsoft-365/onedrive"),
+        Map.entry("confluence", "https://www.atlassian.com/software/confluence"), Map.entry("dropbox", "https://www.dropbox.com"),
+        Map.entry("miro", "https://miro.com"), Map.entry("loom", "https://www.loom.com"),
+        Map.entry("todoist", "https://todoist.com"), Map.entry("obsidian", "https://obsidian.md"),
+        // Design & Média
+        Map.entry("canva", "https://www.canva.com"), Map.entry("figma", "https://www.figma.com"),
+        Map.entry("elevenlabs", "https://elevenlabs.io"), Map.entry("framer", "https://www.framer.com"),
+        Map.entry("sketch", "https://www.sketch.com"), Map.entry("adobe", "https://www.adobe.com/creativecloud.html"),
+        // UI & Composants
+        Map.entry("shadcn", "https://ui.shadcn.com"), Map.entry("21st-dev", "https://21st.dev"),
+        Map.entry("radix-ui", "https://www.radix-ui.com"), Map.entry("aceternity-ui", "https://ui.aceternity.com"),
+        Map.entry("magic-ui", "https://magicui.design"), Map.entry("origin-ui", "https://originui.com"),
+        // E-commerce
+        Map.entry("shopify", "https://www.shopify.com"),
+        // Automatisation
+        Map.entry("n8n", "https://n8n.io"), Map.entry("zapier", "https://zapier.com"),
+        Map.entry("make", "https://www.make.com"), Map.entry("pipedream", "https://pipedream.com"),
+        // Modèles IA
+        Map.entry("groq", "https://groq.com"), Map.entry("openai", "https://openai.com"),
+        Map.entry("anthropic", "https://www.anthropic.com"), Map.entry("gemini", "https://gemini.google.com"),
+        Map.entry("mistral", "https://mistral.ai"), Map.entry("huggingface", "https://huggingface.co"),
+        Map.entry("ollama", "https://ollama.com"), Map.entry("perplexity", "https://www.perplexity.ai"),
+        Map.entry("cohere", "https://cohere.com"), Map.entry("replicate", "https://replicate.com")
+    );
+
+    /** Site officiel d'un connecteur, ou {@code null} s'il n'en a pas de pertinent (services génériques). */
+    private static String website(String key) {
+        return WEBSITES.get(key);
     }
 }

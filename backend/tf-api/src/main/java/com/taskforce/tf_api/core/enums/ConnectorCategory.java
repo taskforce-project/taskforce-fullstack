@@ -18,6 +18,7 @@ public enum ConnectorCategory {
     SECURITY("Sécurité & Secrets"),
     PRODUCTIVITY("Productivité & Docs"),
     DESIGN_MEDIA("Design & Média"),
+    UI_COMPONENTS("UI & Composants"),
     ECOMMERCE("E-commerce"),
     AUTOMATION("Automatisation"),
     AI_MODELS("Modèles IA");

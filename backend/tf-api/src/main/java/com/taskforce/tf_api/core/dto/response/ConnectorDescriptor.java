@@ -24,5 +24,7 @@ public record ConnectorDescriptor(
     String docsUrl,
     String description,
     /** Aide affichée en tooltip : où/comment récupérer la clé quand ce n'est pas du 1-clic OAuth. */
-    String setupHint
+    String setupHint,
+    /** Site officiel du service (homepage) — lien affiché dans la fiche détaillée. Null si inconnu. */
+    String websiteUrl
 ) {}
