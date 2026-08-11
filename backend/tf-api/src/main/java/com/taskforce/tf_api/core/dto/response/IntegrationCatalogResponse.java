@@ -26,6 +26,7 @@ public record IntegrationCatalogResponse(
         List<String> capabilities,
         String description,
         String docsUrl,
-        String setupHint
+        String setupHint,
+        String websiteUrl
     ) {}
 }
