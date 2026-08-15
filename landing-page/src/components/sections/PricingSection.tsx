@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check } from "lucide-react";
+import { Check, CircleCheck } from "lucide-react";
 import { APP_URL } from "@/components/site/nav";
 
 /**
@@ -18,7 +18,6 @@ import { APP_URL } from "@/components/site/nav";
 type Feature = { label: string; badge?: "Beta" };
 type Tier = {
   name: string;
-  kicker: string;
   priceMonthly: number | null; // null = "Custom"
   priceAnnual: number | null;
   unit?: string;
@@ -33,73 +32,68 @@ const REGISTER = `${APP_URL}/auth/register`;
 const TIERS: Tier[] = [
   {
     name: "Free",
-    kicker: "Delivery workspace",
     priceMonthly: 0,
     priceAnnual: 0,
     unit: "forever",
-    tagline: "Run your delivery — boards, issues, cycles and Smart Assign.",
+    tagline: "To explore TaskForce.",
     cta: { label: "Get started", href: REGISTER },
     features: [
+      { label: "Unlimited members" },
       { label: "2 workspaces" },
-      { label: "Up to 5 collaborators on private projects" },
-      { label: "Boards, issues & cycles" },
+      { label: "250 issues" },
+      { label: "Boards, lists & cycles" },
       { label: "Smart Assign" },
-      { label: "Community support" },
+      { label: "100K Cortex AI tokens / month" },
     ],
   },
   {
-    name: "Pro",
-    kicker: "Cloud AI delivery",
-    priceMonthly: 12,
-    priceAnnual: 10,
-    unit: "per user / month",
-    tagline: "Add AI agents and memory to the workflow your team already runs.",
+    name: "Basic",
+    priceMonthly: 10,
+    priceAnnual: 8,
+    unit: "per member / month",
+    tagline: "For small teams getting started.",
     cta: { label: "Start free trial", href: REGISTER },
-    featured: true,
     features: [
       { label: "Everything in Free" },
-      { label: "10 workspaces" },
-      { label: "Unlimited members — billed per seat" },
-      { label: "AI agents", badge: "Beta" },
-      { label: "TaskForce Memory", badge: "Beta" },
-      { label: "Analytics & reporting" },
-      { label: "AI usage billed by consumption" },
-      { label: "Priority support" },
+      { label: "5 workspaces" },
+      { label: "Unlimited issues" },
+      { label: "Unlimited file uploads" },
+      { label: "Admin roles" },
+      { label: "500K Cortex AI tokens / month" },
     ],
   },
   {
     name: "Business",
-    kicker: "Controls & scale",
     priceMonthly: 16,
     priceAnnual: 13,
-    unit: "per user / month",
-    tagline: "Advanced controls and scale — fully managed in the cloud.",
+    unit: "per member / month",
+    tagline: "For teams that ship fast.",
     cta: { label: "Start free trial", href: REGISTER },
+    featured: true,
     features: [
-      { label: "Everything in Pro" },
+      { label: "Everything in Basic" },
       { label: "Unlimited workspaces" },
-      { label: "SSO / SAML" },
-      { label: "Advanced RBAC & per-project access" },
-      { label: "Audit logging" },
-      { label: "Priority support" },
+      { label: "Guests & private projects" },
+      { label: "Advanced analytics + burndown" },
+      { label: "AI decisions & workflows", badge: "Beta" },
+      { label: "GitHub integration" },
+      { label: "2M Cortex AI tokens / month" },
     ],
   },
   {
     name: "Enterprise",
-    kicker: "Self-hosted & governed",
     priceMonthly: null,
     priceAnnual: null,
-    tagline: "Self-hosting, local models and governance for organizations.",
+    tagline: "Security, compliance and dedicated deployment.",
     cta: { label: "Talk to sales", href: "/book-a-demo" },
     features: [
       { label: "Everything in Business" },
-      { label: "Self-hosted deployment (Docker)" },
-      { label: "Local models via Ollama — zero model cost" },
-      { label: "Prompts & data stay on your network" },
-      { label: "Custom data retention" },
-      { label: "DPA & subprocessors" },
-      { label: "Security review & deployment assistance" },
-      { label: "Dedicated support & SLA" },
+      { label: "SSO / SAML / SCIM" },
+      { label: "Granular admin controls" },
+      { label: "Audit & GDPR compliance" },
+      { label: "On-premise deployment" },
+      { label: "Priority support & onboarding" },
+      { label: "Unlimited Cortex AI tokens" },
     ],
   },
 ];
@@ -109,38 +103,39 @@ type Cell = boolean | string; // true = ✓ · false = — · string = libellé 
 type Row = { label: string; free: Cell; pro: Cell; biz: Cell; ent: Cell };
 
 const COMPARE: Row[] = [
-  { label: "Workspaces", free: "2", pro: "10", biz: "Unlimited", ent: "Unlimited" },
-  { label: "Members", free: "5 collaborators", pro: "Unlimited", biz: "Unlimited", ent: "Unlimited" },
-  { label: "Boards, issues & cycles", free: true, pro: true, biz: true, ent: true },
+  { label: "Members", free: "Unlimited", pro: "Unlimited", biz: "Unlimited", ent: "Unlimited" },
+  { label: "Workspaces", free: "2", pro: "5", biz: "Unlimited", ent: "Unlimited" },
+  { label: "Issues", free: "250", pro: "Unlimited", biz: "Unlimited", ent: "Unlimited" },
+  { label: "Boards, lists & cycles", free: true, pro: true, biz: true, ent: true },
   { label: "Smart Assign", free: true, pro: true, biz: true, ent: true },
-  { label: "Analytics", free: false, pro: true, biz: true, ent: true },
-  { label: "AI agents", free: false, pro: "Beta", biz: "Beta", ent: "Beta" },
-  { label: "TaskForce Memory", free: false, pro: "Beta", biz: "Beta", ent: "Beta" },
-  { label: "SSO / SAML", free: false, pro: false, biz: true, ent: true },
-  { label: "Advanced RBAC & per-project access", free: false, pro: false, biz: true, ent: true },
-  { label: "Audit logging", free: false, pro: false, biz: true, ent: true },
-  { label: "AI model usage", free: false, pro: "Usage-based", biz: "Usage-based", ent: "Local or usage-based" },
-  { label: "Self-hosted deployment", free: false, pro: false, biz: false, ent: true },
-  { label: "Local models (zero model cost)", free: false, pro: false, biz: false, ent: true },
-  { label: "Custom retention · DPA · subprocessors", free: false, pro: false, biz: false, ent: true },
-  { label: "Dedicated support & SLA", free: false, pro: false, biz: false, ent: true },
+  { label: "Unlimited file uploads", free: false, pro: true, biz: true, ent: true },
+  { label: "Admin roles", free: false, pro: true, biz: true, ent: true },
+  { label: "Guests & private projects", free: false, pro: false, biz: true, ent: true },
+  { label: "Advanced analytics + burndown", free: false, pro: false, biz: true, ent: true },
+  { label: "AI decisions & workflows", free: false, pro: false, biz: "Beta", ent: "Beta" },
+  { label: "GitHub integration", free: false, pro: false, biz: true, ent: true },
+  { label: "SSO / SAML / SCIM", free: false, pro: false, biz: false, ent: true },
+  { label: "Granular admin controls", free: false, pro: false, biz: false, ent: true },
+  { label: "Audit & GDPR compliance", free: false, pro: false, biz: false, ent: true },
+  { label: "On-premise deployment", free: false, pro: false, biz: false, ent: true },
+  { label: "Cortex AI tokens / month", free: "100K", pro: "500K", biz: "2M", ent: "Unlimited" },
 ];
 
 const FAQ: { q: string; a: string }[] = [
   {
     q: "Can I try TaskForce for free?",
-    a: "Yes — Free is free forever, and Pro and Business include a 14-day trial. No credit card required.",
+    a: "Yes — Free is free forever, and Basic and Business include a 14-day trial. No credit card required.",
   },
   {
     q: "How does billing work?",
-    a: "Pro and Business are billed per seat. A seat is any user you invite to a workspace; you can adjust seats anytime and billing prorates. Enterprise is a custom agreement.",
+    a: "Basic and Business are billed per member. A member is any user you invite to a workspace; you can adjust members anytime and billing prorates. Enterprise is a custom agreement.",
   },
   {
-    q: "Are AI models included in the subscription?",
-    a: "Your subscription covers the platform. On Pro and Business, hosted model usage (Claude, OpenAI…) is metered by tokens and billed on consumption. On a self-hosted Enterprise deployment, local models through Ollama incur no TaskForce model charges.",
+    q: "What are Cortex AI tokens?",
+    a: "Cortex is the AI engine behind TaskForce. Every plan includes a monthly token allotment — 100K on Free, 500K on Basic, 2M on Business, unlimited on Enterprise. Beyond the allotment, usage is metered. A self-hosted Enterprise deployment on local models (Ollama) incurs no token charges.",
   },
   {
-    q: "How do AI agents work today?",
+    q: "How do AI decisions & workflows work today?",
     a: "TaskForce agents propose each delivery step — spec, approach, breakdown — and you approve it before your coding agent (Claude Code, Cursor…) implements. The full multi-checkpoint run is on the roadmap.",
   },
   {
@@ -167,32 +162,26 @@ function Cell({ value }: { value: Cell }) {
   return <span className="text-[13px] text-foreground">{value}</span>;
 }
 
-function PriceCard({ tier, annual }: { tier: Tier; annual: boolean }) {
+/* Une COLONNE du bloc unique (les 4 tiers sont collés, séparés par des filets, et montent crescendo). */
+function PriceColumn({ tier, annual }: { tier: Tier; annual: boolean }) {
   const price = annual ? tier.priceAnnual : tier.priceMonthly;
   return (
-    <div
-      className={
-        "relative flex flex-col rounded-2xl p-6 " +
-        (tier.featured
-          ? "border-primary/30 ring-primary/10 border bg-card shadow-[0_24px_60px_-24px_rgba(0,0,0,0.2)] ring-1"
-          : "border bg-card")
-      }
-    >
-      {tier.featured && (
-        <span className="bg-primary text-primary-foreground absolute -top-3 left-6 rounded-full px-3 py-1 text-[11px] font-medium">
-          Most popular
-        </span>
-      )}
-      <p className="text-primary text-[12px] font-semibold tracking-[0.04em] uppercase">{tier.kicker}</p>
-      <h3 className="mt-1 text-lg font-semibold text-foreground">{tier.name}</h3>
-      <p className="text-muted-foreground mt-1 text-[13px] leading-5">{tier.tagline}</p>
+    <div className={"flex flex-col p-6 " + (tier.featured ? "bg-primary/[0.04]" : "bg-card")}>
+      <div className="flex items-center gap-2">
+        <h3 className="text-lg font-semibold text-foreground">{tier.name}</h3>
+        {tier.featured && (
+          <span className="bg-primary/10 text-primary rounded-full px-2 py-0.5 text-[11px] font-semibold">
+            Most popular
+          </span>
+        )}
+      </div>
 
-      <div className="mt-5 flex items-baseline gap-1.5">
+      <div className="mt-4 flex items-baseline gap-1.5">
         {price === null ? (
           <span className="text-4xl font-semibold tracking-tight text-foreground">Custom</span>
         ) : (
           <>
-            <span className="text-4xl font-semibold tracking-tight text-foreground">${price}</span>
+            <span className="text-4xl font-semibold tracking-tight text-foreground">{price} €</span>
             {tier.unit && <span className="text-muted-foreground text-[13px]">{tier.unit}</span>}
           </>
         )}
@@ -201,10 +190,12 @@ function PriceCard({ tier, annual }: { tier: Tier; annual: boolean }) {
         {price !== null && price > 0 && annual ? "billed annually" : ""}
       </p>
 
+      <p className="text-muted-foreground mt-4 text-[13px] leading-5">{tier.tagline}</p>
+
       <a
         href={tier.cta.href}
         className={
-          "mt-5 inline-flex h-10 items-center justify-center rounded-full px-4 text-sm font-medium transition " +
+          "mt-5 inline-flex h-10 w-full items-center justify-center rounded-full px-4 text-sm font-medium transition " +
           (tier.featured
             ? "bg-primary text-primary-foreground hover:bg-primary/90"
             : "text-foreground hover:bg-secondary/60 border")
@@ -216,7 +207,7 @@ function PriceCard({ tier, annual }: { tier: Tier; annual: boolean }) {
       <ul className="mt-6 space-y-2.5">
         {tier.features.map((f) => (
           <li key={f.label} className="flex items-start gap-2.5 text-[13px]">
-            <Check className="mt-0.5 size-4 shrink-0 text-emerald-600" strokeWidth={2.5} />
+            <CircleCheck className="text-primary mt-0.5 size-4 shrink-0" strokeWidth={2} />
             <span className="text-foreground">
               {f.label}
               {f.badge && <FeatureBadge badge={f.badge} />}
@@ -254,7 +245,7 @@ export function PricingSection() {
               onClick={() => setAnnual(false)}
               className={
                 "rounded-full px-3.5 py-1.5 font-medium transition " +
-                (!annual ? "bg-card text-foreground shadow-sm" : "text-muted-foreground")
+                (!annual ? "bg-card text-foreground" : "text-muted-foreground")
               }
             >
               Monthly
@@ -264,7 +255,7 @@ export function PricingSection() {
               onClick={() => setAnnual(true)}
               className={
                 "inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 font-medium transition " +
-                (annual ? "bg-card text-foreground shadow-sm" : "text-muted-foreground")
+                (annual ? "bg-card text-foreground" : "text-muted-foreground")
               }
             >
               Annual
@@ -275,11 +266,13 @@ export function PricingSection() {
           </div>
         </div>
 
-        {/* Tiers */}
-        <div className="mx-auto mt-14 grid max-w-6xl items-start gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {TIERS.map((tier) => (
-            <PriceCard key={tier.name} tier={tier} annual={annual} />
-          ))}
+        {/* Tiers — UN SEUL BLOC : colonnes collées, séparées par des filets (style app), qui montent crescendo */}
+        <div className="mx-auto mt-14 max-w-6xl overflow-hidden rounded-2xl border">
+          <div className="grid gap-px bg-border sm:grid-cols-2 lg:grid-cols-4">
+            {TIERS.map((tier) => (
+              <PriceColumn key={tier.name} tier={tier} annual={annual} />
+            ))}
+          </div>
         </div>
 
         <p className="text-muted-foreground mt-8 text-center text-[13px]">
@@ -291,14 +284,14 @@ export function PricingSection() {
           .
         </p>
         <p className="text-muted-foreground mt-2 text-center text-[13px]">
-          On Pro and Business, hosted model usage is metered by tokens and billed on consumption. A
-          self-hosted Enterprise deployment runs on local models — no TaskForce model charges.
+          Every plan includes a monthly Cortex AI token allotment; beyond it, usage is metered. A
+          self-hosted Enterprise deployment on local models incurs no token charges.
         </p>
 
         {/* Comparaison — la montée en gamme, ligne par ligne */}
         <div className="mx-auto mt-20 max-w-5xl">
           <h2 className="text-center text-2xl font-semibold tracking-tight text-foreground">
-            Workspace → AI delivery → controls & scale → self-hosted enterprise
+            Everything from a free workspace to a governed enterprise deployment
           </h2>
           <div className="mt-8 overflow-x-auto">
             <table className="w-full min-w-[640px] border-separate border-spacing-0 text-left">
@@ -306,7 +299,7 @@ export function PricingSection() {
                 <tr className="text-[13px]">
                   <th className="w-[34%] pb-3 font-normal"></th>
                   <th className="pb-3 text-center font-semibold text-foreground">Free</th>
-                  <th className="pb-3 text-center font-semibold text-foreground">Pro</th>
+                  <th className="pb-3 text-center font-semibold text-foreground">Basic</th>
                   <th className="pb-3 text-center font-semibold text-foreground">Business</th>
                   <th className="pb-3 text-center font-semibold text-foreground">Enterprise</th>
                 </tr>
@@ -320,7 +313,7 @@ export function PricingSection() {
                     <td className="border-border border-t py-2.5 text-center">
                       <Cell value={row.free} />
                     </td>
-                    <td className="border-border bg-secondary/20 border-t py-2.5 text-center">
+                    <td className="border-border border-t py-2.5 text-center">
                       <Cell value={row.pro} />
                     </td>
                     <td className="border-border border-t py-2.5 text-center">
@@ -346,15 +339,16 @@ export function PricingSection() {
               Use hosted models on the cloud plans, or run your own on a self-hosted Enterprise deployment.
             </p>
           </div>
-          <div className="mt-8 grid gap-6 sm:grid-cols-2">
-            <div className="rounded-2xl border bg-card p-6">
+          <div className="mt-8 grid gap-px overflow-hidden border bg-border sm:grid-cols-2">
+            <div className="bg-card p-6">
               <h3 className="text-[16px] font-semibold text-foreground">Hosted</h3>
-              <p className="text-muted-foreground mt-1 text-[13.5px]">Claude · OpenAI · other providers</p>
+              <p className="text-muted-foreground mt-1 text-[13.5px]">Cortex · Claude · OpenAI · other providers</p>
               <p className="mt-4 text-[13.5px] leading-6 text-foreground">
-                Usage-based model costs, metered by tokens. The simplest way to start — on Pro and Business.
+                Each plan includes a monthly Cortex AI token allotment; beyond it, usage is metered. The
+                simplest way to start — on any cloud plan.
               </p>
             </div>
-            <div className="rounded-2xl border bg-card p-6">
+            <div className="bg-card p-6">
               <h3 className="text-[16px] font-semibold text-foreground">Self-hosted</h3>
               <p className="text-muted-foreground mt-1 text-[13.5px]">Ollama · local models · Enterprise</p>
               <p className="mt-4 text-[13.5px] leading-6 text-foreground">
@@ -380,7 +374,7 @@ export function PricingSection() {
           </div>
           <p className="text-muted-foreground mt-10 text-center text-[13px]">
             Still have questions?{" "}
-            <a href="/book-a-demo" className="text-foreground font-medium underline underline-offset-4">
+            <a href="/book-a-demo" className="link-underline text-foreground font-medium">
               Talk to sales
             </a>
           </p>
