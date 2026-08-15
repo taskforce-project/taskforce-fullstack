@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Check, CircleCheck } from "lucide-react";
-import { APP_URL } from "@/components/site/nav";
 
 /**
  * PricingSection — page Pricing (light-only). Raconte la MONTÉE EN GAMME, pas une grille de features :

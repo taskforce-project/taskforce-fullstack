@@ -6,12 +6,11 @@ import { LevelBadge } from "@/components/site/Section";
 import { USE_CASES, USE_CASE_ORDER } from "@/lib/use-cases";
 import {
   FileText, Building2, ListTree, GitPullRequest, ClipboardCheck,
-  BookOpen, UserPlus, Siren, Megaphone, CalendarRange, ArrowRight,
+  BookOpen, UserPlus, Siren, Megaphone, CalendarRange, ArrowRight, type LucideIcon,
 } from "lucide-react";
-import { APP_URL } from "@/components/site/nav";
 import { hueFor } from "@/lib/site-icons";
 
-const ICONS: Record<string, any> = {
+const ICONS: Record<string, LucideIcon> = {
   "product-spec": FileText,
   "architecture-decision": Building2,
   "backlog-grooming": ListTree,

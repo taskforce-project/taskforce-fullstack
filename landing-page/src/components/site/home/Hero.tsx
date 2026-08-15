@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { BrandLogo } from "../BrandLogo";
 import { Toast } from "../AppShot";
 import { SpecPanel } from "../scene/SpecPanel";
-import { APP_URL } from "../nav";
 
 /**
  * Preuve sociale HONNÊTE (review 6) : « Built with », pas « customers » — on n'a pas de

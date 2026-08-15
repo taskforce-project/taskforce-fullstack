@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Section, SectionHeader } from "../Section";
 import { AppShot, Toast } from "../AppShot";
 import { BrandLogo } from "../BrandLogo";
-import { APP_URL } from "../nav";
 
 /**
  * Proof — conformité, intégrations, direction, CTA final.

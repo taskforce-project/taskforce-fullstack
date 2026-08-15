@@ -185,6 +185,20 @@ point identifiable sur la courbe de lead time.
 | Métronome | `src/lib/useScene.ts` | `useScene(beats)` : partition de durées, démarre à l'entrée à l'écran, se joue **une fois**, **se fige sur l'état final**. `useTypewriter` pour la frappe. `prefers-reduced-motion` → état final direct. |
 | Châssis | `src/components/site/scene/AppWindow.tsx` | Vrai écran TaskForce (voir encadré ci-dessous). **Remplace la barre macOS de `MockFrame`** — trois pastilles + une URL, c'est le signe le plus sûr qu'on regarde un dessin. |
 
+> ### ⚑ v192 (15/08) — Fix CI lint (la PR #85 échouait) : imports inutiles + règle eslint fantôme
+> Le check « Run Landing Tests » échouait : **1 erreur** `react-hooks/exhaustive-deps was not found` (règle citée dans un `eslint-disable` de `DotField.tsx` mais plugin non installé) + 39 warnings (surtout `APP_URL` inutilisé après le repoint waitlist).
+> - `DotField.tsx` : commentaire `// eslint-disable-next-line react-hooks/exhaustive-deps` retiré (inerte — la règle n'est pas installée) → **0 erreur**.
+> - Imports `APP_URL` inutiles supprimés (**25 seuls + Hero/Proof (`../nav`) + 3 multi** ; `SiteHeader` GARDE `APP_URL`, utilisé pour « Sign in ») ; `ArrowRight` (media), `Server` (enterprise) retirés ; `any` → `LucideIcon` (use-cases/index).
+> - Vérifié : `npm run lint` **exit 0** (6 warnings pré-existants non bloquants ; script = `eslint .` sans `--max-warnings`), build prod **69 pages** OK. Commit + push sur `dev` → la CI de la PR #85 se relance.
+
+> ### ⚑ v191 (15/08) — Consolidation git : tout sur `dev`, `main` absorbé, branches nettoyées
+> User : « on descend sur dev, à la fin il reste juste main/dev + branches bot » → choix : **dev seulement (main via PR)** + **retirer Render**.
+> - `dev` ⏩ FF vers `chore/v1-closure` (notre refonte v1 complète, +2400).
+> - **Découverte** : `main` portait une AUTRE landing (ancienne v1.0.0, ~129 fichiers, historiques disjoints → conflits `add/add`) + `render.yaml` + bumps dependabot frontend. → **`git merge -s ours origin/main`** : notre arbre gardé tel quel, `main` absorbé dans l'historique → **`dev → main` = fast-forward propre pour la PR**. Compromis : bumps dependabot de `main` superséded (à rouvrir).
+> - **`render.yaml` supprimé** (Vercel + VMs, fini Render ; les `.svg` = logos Render pour les icônes d'intégration, gardés). Aucun workflow CI ne déployait sur Render.
+> - `dev` poussé (FF depuis origin/dev). Branches supprimées (local + remote) : `feat/dashboard`, `feat/landing-refonte`, `test/v1-hardening`, `dev-config`, `chore/integration`, `chore/v1-closure`. **Restent : `main`, `dev`, `dependabot/*` (16).**
+> - Côté user : PR `dev → main` (release v1, FF), Vercel (Root Directory = `taskforce-fullstack/landing-page`), rerun dependabot (47 vulns signalées).
+
 > ### ⚑ v190 (14/08) — Pré-deploy : page `/waitlist` + tous les CTA d'inscription repointés + build prod OK
 > User : « rediriger vers une waitlist » (les CTA pointaient vers `app.taskforce.dev`, morts tant que l'app n'est pas déployée).
 > - **NOUVEAU `src/pages/waitlist.astro`** : page « Join the waitlist » (PageHero + CTA **mailto** `hello@taskforce.dev`, aucun backend requis sur site statique ; brancher Formspree/Tally plus tard). + perks + lien book-a-demo.
