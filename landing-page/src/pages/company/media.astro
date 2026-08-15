@@ -34,7 +34,7 @@ const LOGOS = [
   />
 
   {/* ── Boilerplate ── */}
-  <section class="bg-secondary border-b">
+  <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-28">
       <div class="mx-auto max-w-2xl">
         <p class="t-eyebrow mb-3">Boilerplate</p>
@@ -67,7 +67,7 @@ const LOGOS = [
       <div class="mt-12 grid gap-6 sm:grid-cols-2">
         {
           LOGOS.map((l) => (
-            <div class="overflow-hidden rounded-2xl border">
+            <div class="overflow-hidden border">
               <div class={`flex h-40 items-center justify-center ${l.box}`}>
                 <img src={l.src} alt={`TaskForce ${l.title}`} class="h-10 w-auto" />
               </div>
@@ -93,7 +93,7 @@ const LOGOS = [
   </section>
 
   {/* ── Colors ── */}
-  <section class="bg-secondary border-b">
+  <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-28">
       <div class="max-w-2xl">
         <p class="t-eyebrow mb-3">Color</p>
@@ -102,7 +102,7 @@ const LOGOS = [
       <div class="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {
           COLORS.map((c) => (
-            <div class="overflow-hidden rounded-2xl border bg-card">
+            <div class="overflow-hidden border bg-card">
               <div
                 class:list={["h-24 w-full", c.ink ? "border-b" : ""]}
                 style={`background:${c.hex}`}

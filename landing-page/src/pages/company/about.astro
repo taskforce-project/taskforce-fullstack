@@ -4,6 +4,7 @@ import PageHero from "@/components/site/PageHero.astro";
 import PageCta from "@/components/site/PageCta.astro";
 import { Brain, ShieldCheck, Server, GitBranch } from "lucide-react";
 import { APP_URL } from "@/components/site/nav";
+import { hueFor } from "@/lib/site-icons";
 
 const BELIEFS = [
   {
@@ -42,7 +43,7 @@ const BELIEFS = [
   />
 
   {/* ── Why we exist ── */}
-  <section class="bg-secondary border-b">
+  <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-28">
       <div class="mx-auto max-w-2xl">
         <p class="t-eyebrow mb-3">Why we exist</p>
@@ -75,8 +76,8 @@ const BELIEFS = [
       <div class="mt-12 grid gap-6 sm:grid-cols-2">
         {
           BELIEFS.map((b) => (
-            <div class="rounded-2xl border bg-card p-6">
-              <span class="bg-card text-foreground flex size-11 items-center justify-center rounded-xl border">
+            <div class="border bg-card p-6">
+              <span class="ic-tile flex size-11 items-center justify-center rounded-xl border" style={`--ic:${hueFor(b.icon)}`}>
                 <b.icon className="size-5" strokeWidth={1.75} />
               </span>
               <h3 class="mt-4 text-[16px] font-semibold text-foreground">{b.title}</h3>
@@ -89,7 +90,7 @@ const BELIEFS = [
   </section>
 
   {/* ── Where we are (honnête) ── */}
-  <section class="bg-secondary border-b">
+  <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-28">
       <div class="mx-auto max-w-2xl">
         <p class="t-eyebrow mb-3">Where we are</p>
