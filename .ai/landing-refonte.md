@@ -185,6 +185,10 @@ point identifiable sur la courbe de lead time.
 | Métronome | `src/lib/useScene.ts` | `useScene(beats)` : partition de durées, démarre à l'entrée à l'écran, se joue **une fois**, **se fige sur l'état final**. `useTypewriter` pour la frappe. `prefers-reduced-motion` → état final direct. |
 | Châssis | `src/components/site/scene/AppWindow.tsx` | Vrai écran TaskForce (voir encadré ci-dessous). **Remplace la barre macOS de `MockFrame`** — trois pastilles + une URL, c'est le signe le plus sûr qu'on regarde un dessin. |
 
+> ### ⚑ v194 (15/08) — Fix CI Lighthouse : `staticDistDir` pointait la racine
+> `Lighthouse Performance` échouait `ENOENT .../dist` : l'action `uses:` tourne depuis la RACINE (le `defaults.working-directory: landing-page` ne s'applique qu'aux `run:`), donc `staticDistDir: "./dist"` cherchait `racine/dist` au lieu de `landing-page/dist`. → `.lighthouserc.json` : `"staticDistDir": "./landing-page/dist"`. Seuil bloquant unique = accessibility ≥ 0.95 (perf/bp/seo en warn).
+> **Hors périmètre landing** : `Run Frontend Tests` échoue (tests de l'app `frontend/` — auth/subscription), pas causé par mes changements (je n'ai touché que `landing-page/`) — à traiter côté frontend/autre agent.
+
 > ### ⚑ v193 (15/08) — Fix CI typecheck (`tsc --noEmit`) : l'étape APRÈS le lint échouait
 > Le lint vert, le job landing-tests atteint `npm run typecheck` (`tsc --noEmit`) → 8 erreurs pré-existantes (jamais atteintes avant, le lint plantait en premier) :
 > - Refs React 19 : hooks `useInViewReduced`/`useSequence`/`useReveal` typés `RefObject<HTMLElement>` → **`RefObject<HTMLElement | null>`** (AgentToolDemos, LiveSchematics, UseCaseDemo, LabsConcepts).
