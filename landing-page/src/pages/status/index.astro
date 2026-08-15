@@ -2,7 +2,15 @@
 import BaseLayout from "@/layouts/BaseLayout.astro";
 import PageHero from "@/components/site/PageHero.astro";
 import PageCta from "@/components/site/PageCta.astro";
+import FaqSection from "@/components/site/sections/FaqSection.astro";
 import { Activity, ArrowRight } from "lucide-react";
+
+const FAQ = [
+  { q: "Why isn't there an uptime number?", a: "We're pre-launch and won't post availability figures we can't yet stand behind. A public monitoring page is on the way." },
+  { q: "How do I report an incident?", a: "Email hello@taskforce.dev — it reaches us directly while public monitoring is being set up." },
+  { q: "Where's your approach to reliability?", a: "Availability, resilience and incident handling are documented in the Trust Center." },
+  { q: "Will there be incident history?", a: "Yes. When public monitoring launches, real-time component status and past incidents will show here." },
+];
 ---
 
 <BaseLayout
@@ -17,10 +25,10 @@ import { Activity, ArrowRight } from "lucide-react";
     secondary={{ label: "Trust Center", href: "/trust" }}
   />
 
-  <section class="bg-secondary border-b">
+  <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-28">
       <div class="mx-auto max-w-2xl">
-        <div class="bg-card flex flex-col items-center rounded-2xl border px-6 py-14 text-center">
+        <div class="bg-card flex flex-col items-center border px-6 py-14 text-center">
           <span class="flex size-12 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-600">
             <Activity className="size-5" strokeWidth={1.75} />
           </span>
@@ -44,6 +52,8 @@ import { Activity, ArrowRight } from "lucide-react";
       </div>
     </div>
   </section>
+
+  <FaqSection title="Status & reliability questions" items={FAQ} />
 
   <PageCta
     title="Questions about reliability?"
