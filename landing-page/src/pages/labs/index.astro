@@ -1,11 +1,15 @@
 ---
 import BaseLayout from "@/layouts/BaseLayout.astro";
-import LabsBackdrop from "@/components/site/LabsBackdrop.astro";
 import LabsGradientDefs from "@/components/site/labs/LabsGradientDefs.astro";
-import { LabsShowcase } from "@/components/site/LabsShowcase";
+import LabsBackdrop from "@/components/site/LabsBackdrop.astro";
+import { LabsSubjects } from "@/components/site/LabsSubjects";
+import { LabsLoopFlow } from "@/components/site/flows/OrchestrationFlows";
+import PixelBleed from "@/components/site/PixelBleed.astro";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import PageCta from "@/components/site/PageCta.astro";
 import { LABS } from "@/lib/labs";
+import { hueFor } from "@/lib/site-icons";
 import { FlaskConical, ArrowRight, Bot, Brain, Cpu, ShieldCheck, Sparkles } from "lucide-react";
 
 /**
@@ -25,13 +29,6 @@ const MAT_LIGHT: Record<Mat, string> = {
   research: "border-sky-200 bg-sky-50 text-sky-700",
 };
 const MAT_LABEL: Record<Mat, string> = { live: "Live", beta: "Beta", planned: "Planned", research: "Research" };
-const DOT: Record<string, string> = {
-  live: "bg-emerald-500",
-  beta: "bg-amber-500",
-  planned: "bg-slate-400",
-  research: "bg-sky-500",
-  input: "bg-slate-300",
-};
 
 const SURFACES: Record<string, { at: string; href: string; mat: Mat }> = {
   "agent-roles": { at: "Orchestration", href: "/product/orchestration", mat: "planned" },
@@ -40,7 +37,7 @@ const SURFACES: Record<string, { at: string; href: string; mat: Mat }> = {
   "learning-from-reviews": { at: "Prediction & calibration", href: "/product/orchestration", mat: "planned" },
 };
 
-/* Données pour l'îlot LabsShowcase (onglets) — 1 sujet = 1 feature avec son storytelling complet. */
+/* Données pour l'îlot LabsSubjects — 1 sujet = 1 section empilée (barre d'onglets sticky + ancre). */
 const SHOWCASE = ITEMS.map((lab, i) => ({
   key: lab.key,
   name: lab.name,
@@ -54,15 +51,6 @@ const SHOWCASE = ITEMS.map((lab, i) => ({
   mat: SURFACES[lab.key].mat,
   exp: `EXP-${String(i + 1).padStart(2, "0")}`,
 }));
-
-const LOOP: { label: string; mat: Mat | null }[] = [
-  { label: "Signal", mat: null },
-  { label: "Memory", mat: "beta" },
-  { label: "Reasoning", mat: "planned" },
-  { label: "Model", mat: "live" },
-  { label: "Evaluation", mat: "research" },
-  { label: "Decision", mat: "beta" },
-];
 
 type Grad = { name: string; blurb: string; href: string; icon: typeof Bot; mat: Exclude<Mat, "planned" | "research"> };
 const GRADUATED: Grad[] = [
@@ -107,9 +95,9 @@ const FeatIcon = GRAD_FEATURED.icon;
   <LabsGradientDefs />
 
   {/* ── Hero : image plein cadre, sans rails ── */}
-  <section class="relative overflow-hidden border-b bg-card">
+  <section class="relative overflow-hidden bg-card">
     <LabsBackdrop />
-    <div class="container-site relative py-20 lg:py-28">
+    <div class="container-site relative z-10 py-20 lg:py-28">
       <div class="max-w-xl">
         <div class="flex flex-wrap items-center gap-2.5">
           <FlaskConical className="labs-ic-c size-7" strokeWidth={1.9} />
@@ -136,24 +124,29 @@ const FeatIcon = GRAD_FEATURED.icon;
     </div>
   </section>
 
-  {/* ── Les sujets de recherche en features (onglets) ── */}
-  <section class="bg-secondary border-b decor labs-pixels overflow-hidden">
-    <div class="container-rail py-20 lg:py-28">
-      <div class="mx-auto mb-12 max-w-2xl text-center">
+  {/* ── Les sujets de recherche : nav sticky ancrée + sections empilées (une page) ── */}
+  <section class="relative isolate bg-card">
+    <PixelBleed color="#F0897B" edge="top" align="left" />
+    <PixelBleed patch color="#8E90E0" class="left-0 top-[44%] h-64 w-[44%]" opacity={0.28} />
+    <div class="relative z-10 container-rail pt-20 lg:pt-28">
+      <div class="mx-auto max-w-2xl text-center">
         <p class="labs-gtext font-mono text-[12px] font-semibold tracking-[0.14em] uppercase">The experiments</p>
-        <h2 class="t-h2 mt-3">Pick a subject. See the whole story.</h2>
+        <h2 class="t-h2 mt-3">Four directions we're chasing</h2>
         <p class="t-lead mt-4">
-          Each research direction as a feature — why it matters, what we're chasing, where it stands today,
-          and where to go deeper. We publish the direction; the mechanism stays in the lab until it ships.
+          Each one as its own section — why it matters, what we're exploring, and where it stands. Jump with the
+          bar, or scroll the whole story. We publish the direction; the mechanism stays in the lab until it ships.
         </p>
       </div>
-      <LabsShowcase subjects={SHOWCASE} client:load />
+    </div>
+    <div class="relative z-10 mt-12">
+      <LabsSubjects subjects={SHOWCASE} client:load />
     </div>
   </section>
 
-  {/* ── La boucle = diagramme de flux centré (plus un stepper serré) ── */}
-  <section class="bg-card border-b decor labs-pixels overflow-hidden">
-    <div class="container-rail py-20 lg:py-28">
+  {/* ── La boucle = diagramme de flux centré ── */}
+  <section class="relative isolate bg-card">
+    <PixelBleed color="#EA6A9A" edge="top" align="right" />
+    <div class="relative z-10 container-rail py-20 lg:py-28">
       <div class="mx-auto max-w-2xl text-center">
         <p class="labs-gtext font-mono text-[12px] font-semibold tracking-[0.14em] uppercase">The system</p>
         <h2 class="t-h2 mt-3">The pieces are one loop</h2>
@@ -163,52 +156,23 @@ const FeatIcon = GRAD_FEATURED.icon;
         </p>
       </div>
 
-      <div class="relative mt-16">
-        {/* Piste horizontale reliant les étapes (desktop). */}
-        <div
-          aria-hidden
-          class="via-border absolute inset-x-[9%] top-6 hidden h-px bg-gradient-to-r from-transparent to-transparent md:block"
-        >
-        </div>
-        <ol class="grid grid-cols-2 gap-x-4 gap-y-10 sm:grid-cols-3 md:grid-cols-6 md:gap-y-0">
-          {
-            LOOP.map((step, i) => (
-              <li class="relative flex flex-col items-center text-center">
-                <span class="bg-card relative z-10 flex size-12 items-center justify-center rounded-full border font-mono text-[13px] font-semibold text-foreground shadow-sm">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
-                <span class="mt-3.5 text-[13.5px] font-semibold text-foreground">{step.label}</span>
-                {step.mat ? (
-                  <span class="text-muted-foreground mt-1.5 inline-flex items-center gap-1.5 font-mono text-[10px] tracking-wide uppercase">
-                    <span class={cn("size-1.5 rounded-full", DOT[step.mat])} />
-                    {MAT_LABEL[step.mat]}
-                  </span>
-                ) : (
-                  <span class="text-muted-foreground/70 mt-1.5 font-mono text-[10px] tracking-wide uppercase">
-                    Input
-                  </span>
-                )}
-              </li>
-            ))
-          }
-        </ol>
-
-        {/* Fermeture de la boucle. */}
-        <div class="mt-14 flex items-center justify-center gap-3">
-          <span aria-hidden class="labs-g5 hidden h-px w-12 sm:block"></span>
-          <span class="text-muted-foreground inline-flex items-center gap-2 font-mono text-[11.5px]">
-            <span aria-hidden class="text-[15px] leading-none">↺</span>
-            the decision feeds back into memory — the loop closes
-          </span>
-          <span aria-hidden class="labs-g6 hidden h-px w-12 sm:block"></span>
-        </div>
+      {/* La boucle en React Flow (statique), posée sur un canvas à points (blanc + dots). */}
+      <div class="flow-canvas relative -mx-6 mt-14 h-[240px] border-y border-border lg:-mx-10">
+        <LabsLoopFlow client:only="react" />
       </div>
+      <p class="text-muted-foreground mt-8 inline-flex w-full items-center justify-center gap-2 font-mono text-[11.5px]">
+        <span aria-hidden class="text-[15px] leading-none">↺</span>
+        the decision feeds back into memory — the loop closes
+      </p>
     </div>
   </section>
 
   {/* ── De la paillasse au produit : une vedette + une liste (asymétrique, pas 4 cartes) ── */}
-  <section class="bg-secondary border-b">
-    <div class="container-rail py-20 lg:py-28">
+  <section class="relative isolate bg-card">
+    <PixelBleed color="#8E90E0" edge="top" align="left" />
+    <PixelBleed color="#63A6E8" edge="bottom" align="center" />
+    <PixelBleed patch color="#EA6A9A" class="right-0 top-[34%] h-72 w-[46%]" opacity={0.3} />
+    <div class="relative z-10 container-rail py-20 lg:py-28">
       <div class="mx-auto max-w-2xl text-center">
         <p class="t-eyebrow">From the lab to the product</p>
         <h2 class="t-h2 mt-3">What has already graduated</h2>
@@ -222,16 +186,15 @@ const FeatIcon = GRAD_FEATURED.icon;
         {/* Vedette (produit phare) avec un visuel placeholder. */}
         <a
           href={GRAD_FEATURED.href}
-          class="group bg-card hover:border-primary/30 relative flex flex-col overflow-hidden rounded-2xl border transition-colors lg:col-span-3"
+          class="group bg-card hover:border-primary/30 flex flex-col border p-6 transition-colors sm:p-7 lg:col-span-3"
         >
-          <div aria-hidden class="labs-g6 relative h-44 overflow-hidden sm:h-52">
-            <div class="absolute inset-0 bg-[radial-gradient(120%_120%_at_15%_15%,transparent,rgba(255,255,255,0.28))]"></div>
-            <FeatIcon className="absolute right-6 bottom-4 size-24 text-white/85" strokeWidth={1.25} />
-            <span class="absolute top-4 left-4 inline-flex items-center gap-1.5 rounded-full bg-white/85 px-2 py-0.5 font-mono text-[10px] font-semibold tracking-wide text-slate-700 uppercase backdrop-blur-sm">
+          <div class="flex items-center gap-3">
+            <FeatIcon className="size-6 shrink-0" strokeWidth={1.75} style={{ color: hueFor(GRAD_FEATURED.icon) }} />
+            <span class="inline-flex items-center gap-1.5 rounded-full border bg-card px-2 py-0.5 font-mono text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
               Graduated from Labs
             </span>
           </div>
-          <div class="flex flex-1 flex-col p-6 sm:p-7">
+          <div class="mt-4 flex flex-1 flex-col">
             <div class="flex items-center gap-2.5">
               <h3 class="t-h3">{GRAD_FEATURED.name}</h3>
               <span class={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold", MAT_LIGHT[GRAD_FEATURED.mat])}>
@@ -254,11 +217,9 @@ const FeatIcon = GRAD_FEATURED.icon;
               return (
                 <a
                   href={g.href}
-                  class="group bg-card hover:border-primary/30 flex flex-1 items-start gap-3.5 rounded-2xl border p-5 transition-colors"
+                  class="group bg-card hover:border-primary/30 flex flex-1 items-start gap-3.5 border p-5 transition-colors"
                 >
-                  <span class="bg-secondary flex size-9 shrink-0 items-center justify-center rounded-lg border">
-                    <Icon className="text-foreground size-[18px]" strokeWidth={1.75} />
-                  </span>
+                  <Icon className="mt-0.5 size-5 shrink-0" strokeWidth={1.75} style={{ color: hueFor(Icon) }} />
                   <span class="flex min-w-0 flex-1 flex-col">
                     <span class="flex items-center gap-2">
                       <span class="text-foreground text-[14px] font-semibold">{g.name}</span>
@@ -277,25 +238,11 @@ const FeatIcon = GRAD_FEATURED.icon;
     </div>
   </section>
 
-  {/* ── CTA : la card, avec l'image derrière ── */}
-  <section class="bg-secondary relative overflow-hidden border-b">
-    <div aria-hidden class="pointer-events-none absolute inset-0 overflow-hidden">
-      <img src="/labs/hero-wave.jpg" alt="" class="absolute inset-0 size-full object-cover object-center" />
-      <div class="absolute inset-0 bg-white/45"></div>
-    </div>
-    <div class="container-site relative py-20 lg:py-24">
-      <div class="bg-card relative mx-auto max-w-4xl overflow-hidden rounded-3xl border px-8 py-16 text-center shadow-xl sm:py-20">
-        <h2 class="t-h2">Follow where this goes</h2>
-        <p class="t-lead mx-auto mt-4 max-w-xl">
-          The roadmap is public — hold us to it. And start with what already ships today.
-        </p>
-        <div class="mt-8 flex flex-wrap justify-center gap-3">
-          <a href="/roadmap" class={cn(buttonVariants({ size: "pill-lg" }))}>See the roadmap</a>
-          <a href="/product" class={cn(buttonVariants({ variant: "outline", size: "pill-lg" }))}>
-            What ships today
-          </a>
-        </div>
-      </div>
-    </div>
-  </section>
+  {/* ── CTA : le bandeau standard (PageCta), à plat — plus de card flottante à ombre ── */}
+  <PageCta
+    title="Follow where this goes"
+    lead="The roadmap is public — hold us to it. And start with what already ships today."
+    primary={{ label: "See the roadmap", href: "/roadmap" }}
+    secondary={{ label: "What ships today", href: "/product" }}
+  />
 </BaseLayout>
