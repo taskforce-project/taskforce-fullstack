@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Menu, X, ChevronRight, FlaskConical } from "lucide-react";
+import { Menu, X, ChevronRight, ChevronDown, FlaskConical } from "lucide-react";
+import { hueFor } from "@/lib/site-icons";
 import {
   NavigationMenu,
   NavigationMenuContent,
@@ -66,7 +67,7 @@ function MenuCard({ item }: { item: NavLink }) {
         className="!flex-row flex cursor-default items-start gap-3 rounded-xl p-3 opacity-55 select-none"
       >
         {Icon && (
-          <span className="bg-card text-muted-foreground mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg border">
+          <span className="text-muted-foreground mt-0.5 flex size-9 shrink-0 items-center justify-center">
             <Icon className="size-[18px]" strokeWidth={1.75} />
           </span>
         )}
@@ -100,8 +101,17 @@ function MenuCard({ item }: { item: NavLink }) {
           </span>
         )}
         {Icon && (
-          <span className={cn("relative mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg border transition-colors", isLabs ? "bg-card/90" : "bg-card text-foreground group-hover:border-primary/30 group-hover:text-primary")}>
-            <Icon className={cn("size-[18px]", isLabs && "labs-ic-head")} strokeWidth={1.75} />
+          <span
+            className={cn(
+              "relative mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg transition-colors",
+              isLabs && "border bg-card/90",
+            )}
+          >
+            <Icon
+              className={cn("size-[18px]", isLabs && "labs-ic-head")}
+              strokeWidth={1.75}
+              style={isLabs ? undefined : { color: hueFor(Icon) }}
+            />
           </span>
         )}
         <span className="relative flex flex-col gap-0.5">
@@ -135,6 +145,7 @@ function PanelFooter({ href, label }: { href: string; label: string }) {
 
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
+  const [section, setSection] = useState<string | null>(null);
 
   return (
     <header className="bg-card/85 fixed inset-x-0 top-0 z-50 border-b backdrop-blur-md">
@@ -157,7 +168,7 @@ export function SiteHeader() {
         </a>
 
         {/* Navigation principale */}
-        <NavigationMenu className="site-nav hidden min-[900px]:flex" aria-label="Main">
+        <NavigationMenu className="site-nav hidden lg:flex" aria-label="Main">
           <NavigationMenuList className="gap-0.5">
             {/* ── Product ── */}
             <NavigationMenuItem>
@@ -274,13 +285,13 @@ export function SiteHeader() {
         <div className="flex shrink-0 items-center gap-2">
           <a
             href="/pricing"
-            className="hover:bg-accent hidden h-9 items-center rounded-full px-3 text-[14px] text-muted-foreground transition-colors hover:text-foreground min-[900px]:inline-flex"
+            className="hover:bg-accent hidden h-9 items-center rounded-full px-3 text-[14px] text-muted-foreground transition-colors hover:text-foreground lg:inline-flex"
           >
             Pricing
           </a>
           <a
             href="/trust"
-            className="hover:bg-accent hidden h-9 items-center rounded-full px-3 text-[14px] text-muted-foreground transition-colors hover:text-foreground min-[900px]:inline-flex"
+            className="hover:bg-accent hidden h-9 items-center rounded-full px-3 text-[14px] text-muted-foreground transition-colors hover:text-foreground lg:inline-flex"
           >
             Trust
           </a>
@@ -294,15 +305,11 @@ export function SiteHeader() {
           {/* Menu mobile */}
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="Open menu" className="rounded-full min-[900px]:hidden">
+              <Button variant="ghost" size="icon" aria-label="Open menu" className="rounded-full lg:hidden">
                 <Menu className="size-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent
-              side="right"
-              showClose={false}
-              className="w-full gap-0 p-0 sm:max-w-sm"
-            >
+            <SheetContent side="right" showClose={false} className="w-full gap-0 p-0">
               <div className="flex h-16 items-center justify-between border-b px-6">
                 <SheetTitle className="flex items-center gap-2.5">
                   <img src="/logo-taskforce.svg" alt="" aria-hidden className="h-7 w-auto" />
@@ -321,20 +328,37 @@ export function SiteHeader() {
                 </Button>
               </div>
 
-              <nav aria-label="Mobile" className="flex-1 overflow-y-auto px-6 py-6">
-                <MobileGroup title="Product" items={[...PRODUCT_PLATFORM, ...PRODUCT_DELIVERY]} />
-                {SOLUTIONS_GROUPS.map((g) => (
-                  <MobileGroup key={g.title} title={g.title} items={g.links} />
-                ))}
-                <MobileGroup title="Resources" items={RESOURCES_LINKS} />
-                <MobileGroup
-                  title="Company"
-                  items={[
-                    { label: "Pricing", href: "/pricing" },
-                    { label: "Enterprise", href: "/enterprise" },
-                    { label: "Book a demo", href: "/book-a-demo" },
+              <nav aria-label="Mobile" className="flex-1 overflow-y-auto">
+                <MobileAccordion
+                  label="Product"
+                  groups={[
+                    { title: "Platform", items: PRODUCT_PLATFORM },
+                    { title: "Delivery", items: PRODUCT_DELIVERY },
                   ]}
+                  footer={{ label: "Explore the platform", href: "/product" }}
+                  isOpen={section === "product"}
+                  onToggle={() => setSection((s) => (s === "product" ? null : "product"))}
+                  onNavigate={() => setOpen(false)}
                 />
+                <MobileAccordion
+                  label="Solutions"
+                  groups={SOLUTIONS_GROUPS.map((g) => ({ title: g.title, items: g.links, viewAll: g.viewAll }))}
+                  footer={{ label: "All solutions", href: "/solutions" }}
+                  isOpen={section === "solutions"}
+                  onToggle={() => setSection((s) => (s === "solutions" ? null : "solutions"))}
+                  onNavigate={() => setOpen(false)}
+                />
+                <MobileAccordion
+                  label="Resources"
+                  groups={[{ items: RESOURCES_LINKS }]}
+                  isOpen={section === "resources"}
+                  onToggle={() => setSection((s) => (s === "resources" ? null : "resources"))}
+                  onNavigate={() => setOpen(false)}
+                />
+                <MobileLink label="Pricing" href="/pricing" onNavigate={() => setOpen(false)} />
+                <MobileLink label="Enterprise" href="/enterprise" onNavigate={() => setOpen(false)} />
+                <MobileLink label="Trust" href="/trust" onNavigate={() => setOpen(false)} />
+                <MobileLink label="Book a demo" href="/book-a-demo" onNavigate={() => setOpen(false)} />
               </nav>
 
               <div className="flex gap-2 border-t px-6 py-4">
@@ -353,35 +377,126 @@ export function SiteHeader() {
   );
 }
 
-function MobileGroup({ title, items }: { title: string; items: NavLink[] }) {
+/** Un lien du menu mobile : icône colorée + label (+ badge/desc) si présents, sinon label seul. */
+function MobileItem({ item, onNavigate }: { item: NavLink; onNavigate: () => void }) {
+  if (!isLive(item.href)) {
+    return (
+      <span
+        aria-disabled="true"
+        className="text-muted-foreground/45 flex cursor-default items-center gap-2 p-2 text-[14.5px] select-none"
+      >
+        {item.label}
+        <SoonTag />
+      </span>
+    );
+  }
   return (
-    <div className="mb-6">
-      <p className="text-muted-foreground mb-1 text-[11px] font-semibold tracking-[0.08em] uppercase">
-        {title}
-      </p>
-      <div className="flex flex-col items-start">
-        {items.map((i) =>
-          isLive(i.href) ? (
-            <a
-              key={i.href}
-              href={i.href}
-              className="flex items-center gap-2 py-2 text-[15px] text-muted-foreground hover:text-foreground"
-            >
-              {i.label}
-              {i.badge && <LevelBadge level={i.badge} />}
-            </a>
-          ) : (
-            <span
-              key={i.href}
-              aria-disabled="true"
-              className="text-muted-foreground/45 flex cursor-default items-center gap-2 py-2 text-[15px] select-none"
-            >
-              {i.label}
-              <SoonTag />
-            </span>
-          ),
+    <a
+      href={item.href}
+      onClick={onNavigate}
+      className="hover:bg-accent flex items-start gap-3 rounded-lg p-2 transition-colors"
+    >
+      {item.icon && (
+        <span className="flex size-8 shrink-0 items-center justify-center">
+          <item.icon className="size-4" strokeWidth={1.75} style={{ color: hueFor(item.icon) }} />
+        </span>
+      )}
+      <span className="flex min-w-0 flex-col">
+        <span className="flex items-center gap-2">
+          <span className="text-foreground text-[14.5px] font-medium">{item.label}</span>
+          {item.badge && <LevelBadge level={item.badge} />}
+        </span>
+        {item.desc && (
+          <span className="text-muted-foreground text-[12.5px] leading-[1.4]">{item.desc}</span>
         )}
-      </div>
+      </span>
+    </a>
+  );
+}
+
+type MobileGroupData = { title?: string; items: NavLink[]; viewAll?: { label: string; href: string } | null };
+
+/** Section repliable du menu mobile (façon Attio) — COPIE fidèle du méga-menu : groupes + titres +
+ *  « view all » par groupe + lien de pied. Rien de retiré, juste ré-agencé en accordéon. */
+function MobileAccordion({
+  label,
+  groups,
+  footer,
+  isOpen,
+  onToggle,
+  onNavigate,
+}: {
+  label: string;
+  groups: MobileGroupData[];
+  footer?: { label: string; href: string };
+  isOpen: boolean;
+  onToggle: () => void;
+  onNavigate: () => void;
+}) {
+  return (
+    <div className="border-b">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={isOpen}
+        className="text-foreground flex w-full items-center justify-between px-6 py-4 text-[17px] font-medium"
+      >
+        {label}
+        <ChevronDown
+          className={cn("text-muted-foreground size-5 transition-transform", isOpen && "rotate-180")}
+          aria-hidden
+        />
+      </button>
+      {isOpen && (
+        <div className="px-4 pb-4">
+          {groups.map((g, gi) => (
+            <div key={g.title ?? gi} className={cn(gi > 0 && "mt-3")}>
+              {g.title && (
+                <p className="text-muted-foreground px-2 pt-1 pb-1 text-[11px] font-semibold tracking-[0.08em] uppercase">
+                  {g.title}
+                </p>
+              )}
+              <div className="flex flex-col gap-0.5">
+                {g.items.map((i) => (
+                  <MobileItem key={i.href} item={i} onNavigate={onNavigate} />
+                ))}
+                {g.viewAll && isLive(g.viewAll.href) && (
+                  <a
+                    href={g.viewAll.href}
+                    onClick={onNavigate}
+                    className="text-primary px-2 py-1.5 text-[13px] font-medium"
+                  >
+                    {g.viewAll.label}
+                  </a>
+                )}
+              </div>
+            </div>
+          ))}
+          {footer && (
+            <a
+              href={footer.href}
+              onClick={onNavigate}
+              className="text-foreground mt-3 flex items-center gap-1.5 px-2 py-2 text-[14px] font-medium"
+            >
+              {footer.label}
+              <ChevronRight className="size-3.5" aria-hidden />
+            </a>
+          )}
+        </div>
+      )}
     </div>
+  );
+}
+
+/** Lien direct du menu mobile (pas de déroulant). */
+function MobileLink({ label, href, onNavigate }: { label: string; href: string; onNavigate: () => void }) {
+  return (
+    <a
+      href={href}
+      onClick={onNavigate}
+      className="text-foreground flex items-center border-b px-6 py-4 text-[17px] font-medium"
+    >
+      {label}
+    </a>
   );
 }

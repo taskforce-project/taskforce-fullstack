@@ -2,6 +2,7 @@
 import BaseLayout from "@/layouts/BaseLayout.astro";
 import PageCta from "@/components/site/PageCta.astro";
 import { BrandLogo } from "@/components/site/BrandLogo";
+import { hueFor } from "@/lib/site-icons";
 import { Plug, Brain, Terminal, Check, ArrowLeft, ArrowRight, ExternalLink, Info, ShieldCheck } from "lucide-react";
 import { APP_URL } from "@/components/site/nav";
 import type { ConnStatus, ConnectorDetail } from "@/lib/connectors";
@@ -48,7 +49,7 @@ const MATRIX = [
       </a>
 
       <div class="mt-8 flex items-start gap-5">
-        <span class="bg-card flex size-16 shrink-0 items-center justify-center rounded-2xl border">
+        <span class="bg-card flex size-16 shrink-0 items-center justify-center rounded-xl border">
           <BrandLogo brand={c.key} label={c.name} className="size-9" />
         </span>
         <div class="min-w-0">
@@ -62,15 +63,18 @@ const MATRIX = [
         </div>
       </div>
 
-      {/* Matrice Connect / Remember / Act — le statut RÉEL par capacité. */}
-      <div class="mt-10 grid gap-4 sm:grid-cols-3">
+      {/* Matrice Connect / Remember / Act — le statut RÉEL par capacité (traits, edge-to-edge). */}
+      <div class="-mx-6 mt-10 grid gap-px border-y border-border bg-border sm:grid-cols-3 lg:-mx-10">
         {
           MATRIX.map((m) => {
             const state = c.matrix[m.key];
             return (
-              <div class="rounded-2xl border bg-card p-5">
+              <div class="bg-card p-5">
                 <div class="flex items-center justify-between gap-2">
-                  <span class="bg-card text-foreground flex size-10 items-center justify-center rounded-xl border">
+                  <span
+                    class="ic-tile flex size-10 items-center justify-center rounded-xl border"
+                    style={`--ic:${hueFor(m.icon)}`}
+                  >
                     <m.icon className="size-[18px]" strokeWidth={1.75} />
                   </span>
                   <span class={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${STATE_STYLE[state]}`}>
@@ -88,7 +92,7 @@ const MATRIX = [
   </section>
 
   {/* Ce que TaskForce sait faire — chaque item = un endpoint réel. */}
-  <section class="bg-secondary border-b">
+  <section class="bg-card border-b">
     <div class="container-rail py-16 lg:py-20">
       <div class="grid gap-10 lg:grid-cols-[minmax(0,340px)_1fr] lg:gap-16">
         <div>
@@ -116,10 +120,10 @@ const MATRIX = [
           )}
         </div>
 
-        <ul class="flex flex-col gap-4">
+        <ul class="divide-border border-border divide-y border-y">
           {
             c.can.map((cap) => (
-              <li class="bg-card flex items-start gap-3 rounded-2xl border p-5">
+              <li class="flex items-start gap-3 py-5">
                 <span class="text-primary mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border">
                   <Check className="size-3.5" strokeWidth={2.5} />
                 </span>

@@ -77,7 +77,7 @@ const { c } = Astro.props;
       <ul class="mt-10 flex max-w-2xl flex-col gap-3">
         {
           c.exploring.map((e, i) => (
-            <li class="flex items-start gap-3.5 rounded-xl border bg-secondary px-4 py-3.5">
+            <li class="flex items-start gap-3.5 border bg-card px-4 py-3.5">
               <span class="text-primary mt-0.5 font-mono text-[11px] font-semibold">H{i + 1}</span>
               <span class="text-[14.5px] leading-6 text-foreground">{e}</span>
             </li>
@@ -91,7 +91,7 @@ const { c } = Astro.props;
   <section class="bg-secondary border-b">
     <div class="container-rail py-16 lg:py-20">
       <div class="max-w-2xl">
-        <div class="flex items-start gap-2.5 rounded-xl border bg-card px-4 py-3.5">
+        <div class="flex items-start gap-2.5 border bg-card px-4 py-3.5">
           <FlaskConical className="labs-ic-c mt-0.5 size-4 shrink-0" strokeWidth={2} />
           <p class="text-[13.5px] leading-6 text-foreground">
             <span class="font-medium">Where it stands.</span> {c.status}

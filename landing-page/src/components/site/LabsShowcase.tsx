@@ -101,9 +101,9 @@ export function LabsShowcase({ subjects }: { subjects: Subject[] }) {
               onClick={() => setActive(i)}
               onKeyDown={(e) => onKey(e, i)}
               className={cn(
-                "group relative flex min-w-[230px] shrink-0 items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all lg:min-w-0",
+                "group relative flex min-w-[230px] shrink-0 items-center gap-3 border px-4 py-3 text-left transition-all lg:min-w-0",
                 on
-                  ? "border-border bg-card shadow-sm"
+                  ? "border-border bg-card"
                   : "border-transparent hover:border-border hover:bg-card/60",
               )}
             >
@@ -136,7 +136,7 @@ export function LabsShowcase({ subjects }: { subjects: Subject[] }) {
               role="tabpanel"
               aria-labelledby={`labtab-${s.key}`}
               hidden={i !== active}
-              className="bg-card overflow-hidden rounded-2xl border p-6 sm:p-8 lg:p-10"
+              className="bg-card overflow-hidden border p-6 sm:p-8 lg:p-10"
             >
               {/* En-tête */}
               <div className="flex flex-wrap items-center gap-2.5">
@@ -175,7 +175,7 @@ export function LabsShowcase({ subjects }: { subjects: Subject[] }) {
                   {s.exploring.map((e, j) => (
                     <li
                       key={j}
-                      className="bg-secondary/50 flex flex-col gap-2 rounded-xl border p-4"
+                      className="bg-card flex flex-col gap-2 border p-4"
                     >
                       <span className="text-primary font-mono text-[11px] font-semibold">H{j + 1}</span>
                       <span className="text-[13.5px] leading-5 text-foreground">{e}</span>

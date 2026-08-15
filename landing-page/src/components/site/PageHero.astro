@@ -34,7 +34,10 @@ const {
   title,
   lead,
   level,
-  align = "left",
+  // Défaut CENTRÉ (review user : « si rien de démonstratif → contenu centré », + mobile).
+  // Les héros internes n'ont pas de visuel latéral ; une page qui glisse un visuel via <slot/>
+  // peut repasser à align="left" (cf. brain-os qui reste center avec son visuel centré).
+  align = "center",
   primary,
   secondary,
   band = false,

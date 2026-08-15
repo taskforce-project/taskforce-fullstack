@@ -25,13 +25,7 @@ const { title, lead, primary, secondary, note } = Astro.props;
 
 <section class="bg-secondary">
   <div class="container-rail py-24">
-    <div class="bg-card surface relative overflow-hidden rounded-3xl px-8 py-16 text-center sm:py-20">
-      <div
-        aria-hidden
-        class="pointer-events-none absolute top-0 left-1/2 h-72 w-[680px] -translate-x-1/2 rounded-full blur-3xl"
-        style="background: radial-gradient(50% 50% at 50% 50%, color-mix(in oklab, var(--primary) 14%, transparent), transparent 70%)"
-      >
-      </div>
+    <div class="bg-card relative overflow-hidden rounded-3xl border px-8 py-16 text-center sm:py-20">
       <h2 class="t-h2 relative">{title}</h2>
       {lead && <p class="t-lead relative mx-auto mt-4 max-w-lg">{lead}</p>}
       {(primary || secondary) && (
