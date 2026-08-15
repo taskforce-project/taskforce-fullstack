@@ -2,8 +2,17 @@
 import BaseLayout from "@/layouts/BaseLayout.astro";
 import PageHero from "@/components/site/PageHero.astro";
 import PageCta from "@/components/site/PageCta.astro";
+import FaqSection from "@/components/site/sections/FaqSection.astro";
 import { PenLine, ArrowRight } from "lucide-react";
 import { APP_URL } from "@/components/site/nav";
+import { hueFor } from "@/lib/site-icons";
+
+const FAQ = [
+  { q: "Why is there nothing here yet?", a: "We haven't published our first post, and we'd rather show an empty page than filler. When we write, it'll be about how TaskForce is built and the decisions behind it." },
+  { q: "What will you write about?", a: "Honest engineering write-ups, product decisions, and notes on governing AI in the delivery path — no growth-hacking, no reheated press releases." },
+  { q: "How do I get notified?", a: "Email hello@taskforce.dev and we'll give you a heads-up when the first posts land." },
+  { q: "Where can I read in the meantime?", a: "Learn covers what an AI delivery OS actually is, and the public roadmap shows where we're headed." },
+];
 ---
 
 <BaseLayout
@@ -18,11 +27,11 @@ import { APP_URL } from "@/components/site/nav";
     secondary={{ label: "See the roadmap", href: "/roadmap" }}
   />
 
-  <section class="bg-secondary border-b">
+  <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-28">
       <div class="mx-auto max-w-2xl">
-        <div class="bg-card flex flex-col items-center rounded-2xl border px-6 py-14 text-center">
-          <span class="bg-secondary/60 text-muted-foreground flex size-12 items-center justify-center rounded-xl border">
+        <div class="bg-card flex flex-col items-center border px-6 py-14 text-center">
+          <span class="ic-tile flex size-12 items-center justify-center rounded-xl border" style={`--ic:${hueFor(PenLine)}`}>
             <PenLine className="size-5" strokeWidth={1.75} />
           </span>
           <h2 class="mt-5 text-[18px] font-semibold text-foreground">No posts yet</h2>
@@ -41,6 +50,8 @@ import { APP_URL } from "@/components/site/nav";
       </div>
     </div>
   </section>
+
+  <FaqSection title="About the blog" items={FAQ} />
 
   <PageCta
     title="In the meantime"
