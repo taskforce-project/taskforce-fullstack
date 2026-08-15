@@ -9,6 +9,7 @@ import {
   Search,
   MoreHorizontal,
   Trash2,
+  FileText,
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 
@@ -34,6 +35,8 @@ import {
 } from "@/components/ui/alert-dialog"
 import { usePageStore } from "@/lib/store/page-store"
 import { cn } from "@/lib/utils"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty"
 
 export default function ProjectPagesPage() {
   const params  = useParams()
@@ -87,20 +90,42 @@ export default function ProjectPagesPage() {
       </div>
 
       {loading && (
-        <div className="text-sm text-muted-foreground py-8 text-center">Loading pages…</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-28 rounded-xl" />
+          ))}
+        </div>
       )}
 
       {!loading && filtered.length === 0 && (
-        <div className="text-sm text-muted-foreground py-8 text-center">No pages yet.</div>
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon"><FileText /></EmptyMedia>
+            <EmptyTitle>{search ? "Aucun résultat" : "Aucune page"}</EmptyTitle>
+            <EmptyDescription>
+              {search ? "Aucune page ne correspond à votre recherche." : "Créez une page pour documenter cette opération."}
+            </EmptyDescription>
+          </EmptyHeader>
+          {!search && (
+            <EmptyContent>
+              <CreatePageDialog onCreated={handlePageCreated}>
+                <Button size="sm" className="gap-1.5">
+                  <Plus className="h-3.5 w-3.5" />
+                  New Page
+                </Button>
+              </CreatePageDialog>
+            </EmptyContent>
+          )}
+        </Empty>
       )}
 
-      {!loading && (
+      {!loading && filtered.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {filtered.map((page) => (
             <Link
               key={page.id}
               href={`/${slug}/projects/${projectId}/pages/${page.id}`}
-              className="group flex flex-col rounded-xl border border-border bg-card p-4 hover:border-primary/40 transition-all [box-shadow:var(--shadow-sm)] hover:[box-shadow:var(--shadow-md)]"
+              className="group flex flex-col rounded-xl border border-border bg-card p-4 hover:border-primary/40 transition-all shadow-sm hover:shadow-md"
             >
               <div className="flex items-start justify-between gap-2 mb-2">
                 <div className="flex items-center gap-2 min-w-0">

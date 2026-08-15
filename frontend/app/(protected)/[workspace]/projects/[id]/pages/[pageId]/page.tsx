@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
-import { ArrowLeft, Save } from "lucide-react"
+import { ArrowLeft, Save, FileText } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 
 import { Button } from "@/components/ui/button"
@@ -11,6 +11,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { TipTapEditor } from "@/components/editor/tiptap-editor"
 import { usePageStore } from "@/lib/store/page-store"
 import { cn } from "@/lib/utils"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty"
 
 export default function ProjectPageDetailPage() {
   const params    = useParams()
@@ -44,17 +46,29 @@ export default function ProjectPageDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64 text-sm text-muted-foreground">
-        Loading…
+      <div className="flex flex-col gap-4">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-64 w-full rounded-xl" />
       </div>
     )
   }
 
   if (!currentPage) {
     return (
-      <div className="flex items-center justify-center h-64 text-sm text-muted-foreground">
-        Page not found.
-      </div>
+      <Empty>
+        <EmptyHeader>
+          <EmptyMedia variant="icon"><FileText /></EmptyMedia>
+          <EmptyTitle>Page introuvable</EmptyTitle>
+          <EmptyDescription>Cette page n&apos;existe pas ou a été supprimée.</EmptyDescription>
+        </EmptyHeader>
+        <EmptyContent>
+          <Link href={`/${slug}/projects/${projectId}/pages`}>
+            <Button variant="outline" size="sm" className="gap-2">
+              <ArrowLeft className="h-3.5 w-3.5" /> Retour aux pages
+            </Button>
+          </Link>
+        </EmptyContent>
+      </Empty>
     )
   }
 
@@ -98,7 +112,7 @@ export default function ProjectPageDetailPage() {
       </div>
 
       {/* Editor */}
-      <div className="rounded-xl border border-border bg-card p-4 [box-shadow:var(--shadow-sm)]">
+      <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
         <TipTapEditor
           content={content}
           onChange={setContent}
