@@ -2,8 +2,16 @@
 import BaseLayout from "@/layouts/BaseLayout.astro";
 import PageHero from "@/components/site/PageHero.astro";
 import PageCta from "@/components/site/PageCta.astro";
-import { Code2, Compass, Layers, Megaphone, LifeBuoy, ArrowRight } from "lucide-react";
-import { APP_URL, isLive } from "@/components/site/nav";
+import {
+  Code2, Compass, Layers, Megaphone, LifeBuoy, ArrowRight,
+  FileText, GitBranch, ListChecks, GitPullRequest, ShieldCheck,
+  BookOpen, UserPlus, Siren, CalendarRange, KanbanSquare, Bot,
+  type LucideIcon,
+} from "lucide-react";
+import { APP_URL, isLive, MATURITY_LABEL } from "@/components/site/nav";
+import { USE_CASES, USE_CASE_ORDER } from "@/lib/use-cases";
+import { COMPARISONS } from "@/lib/comparisons";
+import { hueFor } from "@/lib/site-icons";
 
 /* Décision D10 : l'ingénierie logicielle est le métier PROUVÉ ; les autres sont exploratoires et
    portent un marqueur honnête. On n'invente pas de workflows pour des métiers qu'on n'a pas livrés. */
@@ -44,6 +52,42 @@ const TEAMS = [
     proven: false,
   },
 ];
+
+const engineering = TEAMS.find((t) => t.proven)!;
+const exploratory = TEAMS.filter((t) => !t.proven);
+
+/* ── By use case : les 10 jobs-to-be-done, dérivés de la source unique (use-cases.ts).
+   Une icône par use-case (teintée par la palette sémantique via hueFor). ── */
+const UC_ICON: Record<string, LucideIcon> = {
+  "product-spec": FileText,
+  "architecture-decision": GitBranch,
+  "backlog-grooming": ListChecks,
+  "code-review": GitPullRequest,
+  "qa-testing": ShieldCheck,
+  documentation: BookOpen,
+  onboarding: UserPlus,
+  "incident-postmortem": Siren,
+  "release-notes": Megaphone,
+  "sprint-planning": CalendarRange,
+};
+const useCases = USE_CASE_ORDER.map((k) => ({
+  name: USE_CASES[k].name,
+  level: USE_CASES[k].level,
+  icon: UC_ICON[k],
+  href: `/use-cases/${k}`,
+}));
+
+/* ── Compare : on reflète EXACTEMENT le groupe « Compare » du menu (6 fiches), regroupées
+   par nature. Trackers (4) et agents de code (2) remplissent leurs grilles → aucune cellule vide. ── */
+const COMPARE_ORDER = ["jira", "linear", "notion", "shortcut", "claude-code-alone", "devin"];
+const compares = COMPARE_ORDER.map((k) => ({
+  name: COMPARISONS[k].name,
+  kind: COMPARISONS[k].kind,
+  goodAt: COMPARISONS[k].goodAt[0],
+  href: `/vs/${k}`,
+}));
+const trackers = compares.filter((c) => c.kind === "tracker");
+const codingAgents = compares.filter((c) => c.kind === "agent");
 ---
 
 <BaseLayout
@@ -59,7 +103,7 @@ const TEAMS = [
   />
 
   {/* ── By team ── */}
-  <section class="bg-secondary border-b">
+  <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-28">
       <div class="max-w-2xl">
         <p class="t-eyebrow mb-3">By team</p>
@@ -69,42 +113,174 @@ const TEAMS = [
           applied elsewhere — labelled honestly as exploration, not a shipped product.
         </p>
       </div>
-      <div class="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {/* Engineering — le métier PROUVÉ, mis en avant (traitement distinct des exploratoires). */}
+      <a
+        href={engineering.href}
+        class="border-primary/30 bg-primary/[0.03] hover:border-primary/50 mt-12 flex flex-col gap-5 border p-6 transition-colors sm:flex-row sm:items-center sm:gap-6 sm:p-8"
+      >
+        <span class="ic-tile flex size-12 shrink-0 items-center justify-center rounded-xl border" style={`--ic:${hueFor(engineering.icon)}`}>
+          <engineering.icon className="size-6" strokeWidth={1.75} />
+        </span>
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-2">
+            <h3 class="text-[17px] font-semibold text-foreground">{engineering.label}</h3>
+            <span class="inline-flex items-center rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-emerald-700 uppercase">
+              Proven
+            </span>
+          </div>
+          <p class="text-muted-foreground mt-1.5 text-[14px] leading-6">{engineering.desc}</p>
+        </div>
+        <span class="link-underline text-foreground inline-flex shrink-0 items-center gap-1.5 text-[14px] font-medium">
+          Explore engineering
+          <ArrowRight className="size-4" />
+        </span>
+      </a>
+
+      {/* Les autres métiers — exploratoires, en traits (4 items → remplissent, pas de cellule vide). */}
+      <div class="-mx-6 mt-6 grid gap-px border-y border-border bg-border sm:grid-cols-2 lg:grid-cols-4 lg:-mx-10">
         {
-          TEAMS.map((team) => {
+          exploratory.map((team) => {
             const live = team.href && isLive(team.href);
-            const body = (
+            const inner = (
               <>
                 <div class="flex items-center justify-between gap-2">
-                  <span class="bg-card text-foreground flex size-10 items-center justify-center rounded-lg border">
+                  <span class="ic-tile flex size-10 items-center justify-center rounded-lg border" style={`--ic:${hueFor(team.icon)}`}>
                     <team.icon className="size-[18px]" strokeWidth={1.75} />
                   </span>
-                  {team.proven ? (
-                    <span class="inline-flex items-center rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-emerald-700 uppercase">
-                      Proven
-                    </span>
-                  ) : (
-                    <span class="text-muted-foreground inline-flex items-center rounded-md border border-dashed px-1.5 py-0.5 text-[10px] font-medium tracking-wide uppercase">
-                      Exploratory
-                    </span>
-                  )}
+                  <span class="text-muted-foreground inline-flex items-center rounded-md border border-dashed px-1.5 py-0.5 text-[10px] font-medium tracking-wide uppercase">
+                    Exploratory
+                  </span>
                 </div>
                 <h3 class="mt-3 text-[15px] font-medium text-foreground">{team.label}</h3>
                 <p class="text-muted-foreground mt-1.5 text-[13px] leading-5">{team.desc}</p>
               </>
             );
             return live ? (
-              <a href={team.href} class="bg-card hover:border-primary/30 hover:bg-secondary/40 rounded-2xl border p-5 transition-colors">
-                {body}
+              <a href={team.href} class="bg-card hover:bg-secondary/40 flex flex-col p-5 transition-colors">
+                {inner}
               </a>
             ) : (
-              <div class="bg-card rounded-2xl border p-5 opacity-70" aria-disabled="true">
-                {body}
+              <div class="bg-card flex flex-col p-5 opacity-70" aria-disabled="true">
+                {inner}
               </div>
             );
           })
         }
       </div>
+    </div>
+  </section>
+
+  {/* ── By use case ── (structure LISTE, distincte des cartes « By team » — index 2 colonnes) */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">By use case</p>
+        <h2 class="t-h2">Or by the job to be done</h2>
+        <p class="t-lead mt-4">
+          The same governed run, pointed at one job. Each is marked for what ships today and
+          what's part of the Planned orchestration — no overselling.
+        </p>
+      </div>
+      {/* Liste en 2 colonnes — style « traits » (border-b, sans bg-border) : 10 items → 5 par colonne, zéro cellule grise. */}
+      <div class="mt-12 grid gap-x-10 border-t border-border sm:grid-cols-2">
+        {
+          useCases.map((uc) => (
+            <a href={uc.href} class="group flex items-center gap-4 border-b border-border py-4">
+              <span class="ic-tile flex size-9 shrink-0 items-center justify-center rounded-lg border" style={`--ic:${hueFor(uc.icon)}`}>
+                <uc.icon className="size-[17px]" strokeWidth={1.75} />
+              </span>
+              <span class="min-w-0 flex-1 text-[14.5px] font-medium text-foreground underline-offset-4 group-hover:underline">
+                {uc.name}
+              </span>
+              {uc.level === "beta" ? (
+                <span class="inline-flex shrink-0 items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-emerald-700 uppercase">
+                  {MATURITY_LABEL.beta}
+                </span>
+              ) : (
+                <span class="text-muted-foreground inline-flex shrink-0 items-center rounded-full border border-dashed px-2 py-0.5 text-[10px] font-medium tracking-wide uppercase">
+                  {MATURITY_LABEL.labs}
+                </span>
+              )}
+              <ArrowRight class="text-muted-foreground size-4 shrink-0 transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
+            </a>
+          ))
+        }
+      </div>
+      <a href="/use-cases" class="link-underline text-foreground mt-8 inline-flex items-center gap-1.5 text-[14px] font-medium">
+        See all use cases in detail
+        <ArrowRight className="size-4" />
+      </a>
+    </div>
+  </section>
+
+  {/* ── Compare ── (fond à points pour varier ; deux sous-grilles de largeurs différentes) */}
+  <section class="bg-card bg-dots border-b">
+    <div class="container-rail pt-24 pb-20 lg:pt-32 lg:pb-28">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">Compare</p>
+        <h2 class="t-h2">How TaskForce sits next to what you use</h2>
+        <p class="t-lead mt-4">
+          We lead with what each tool does well, then show what a governed delivery layer adds.
+          Trackers and coding agents are complements, not competitors.
+        </p>
+      </div>
+
+      {/* Project trackers — 4 items remplissent une grille 4 colonnes (aucun trou). */}
+      <div class="mt-12">
+        <div class="flex items-center gap-2.5">
+          <span class="ic-tile flex size-7 items-center justify-center rounded-md border" style={`--ic:${hueFor(KanbanSquare)}`}>
+            <KanbanSquare className="size-4" strokeWidth={1.75} />
+          </span>
+          <h3 class="text-[12px] font-semibold tracking-wider text-foreground uppercase">Project trackers</h3>
+        </div>
+        <div class="-mx-6 mt-4 grid gap-px border-y border-border bg-border sm:grid-cols-2 lg:grid-cols-4 lg:-mx-10">
+          {
+            trackers.map((c) => (
+              <a href={c.href} class="bg-card hover:bg-secondary/40 group flex flex-col p-6">
+                <span class="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">vs</span>
+                <span class="mt-0.5 text-[16px] font-semibold text-foreground">{c.name}</span>
+                <p class="text-muted-foreground mt-2 flex-1 text-[13px] leading-6">{c.goodAt}</p>
+                <span class="text-foreground mt-4 inline-flex items-center gap-1.5 text-[13px] font-medium underline-offset-4 group-hover:underline">
+                  Compare
+                  <ArrowRight class="size-3.5 transition-transform group-hover:translate-x-0.5" />
+                </span>
+              </a>
+            ))
+          }
+        </div>
+      </div>
+
+      {/* Coding agents — 2 items en 2 colonnes larges (remplissent ; structure différente = variété). */}
+      <div class="mt-10">
+        <div class="flex items-center gap-2.5">
+          <span class="ic-tile flex size-7 items-center justify-center rounded-md border" style={`--ic:${hueFor(Bot)}`}>
+            <Bot className="size-4" strokeWidth={1.75} />
+          </span>
+          <h3 class="text-[12px] font-semibold tracking-wider text-foreground uppercase">Coding agents</h3>
+        </div>
+        <div class="-mx-6 mt-4 grid gap-px border-y border-border bg-border sm:grid-cols-2 lg:-mx-10">
+          {
+            codingAgents.map((c) => (
+              <a href={c.href} class="bg-card hover:bg-secondary/40 group flex flex-col p-6 sm:flex-row sm:items-center sm:gap-6">
+                <span class="min-w-0 flex-1">
+                  <span class="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">vs&nbsp;</span>
+                  <span class="text-[16px] font-semibold text-foreground">{c.name}</span>
+                  <p class="text-muted-foreground mt-1.5 text-[13px] leading-6">{c.goodAt}</p>
+                </span>
+                <span class="text-foreground mt-4 inline-flex shrink-0 items-center gap-1.5 text-[13px] font-medium underline-offset-4 group-hover:underline sm:mt-0">
+                  Compare
+                  <ArrowRight class="size-3.5 transition-transform group-hover:translate-x-0.5" />
+                </span>
+              </a>
+            ))
+          }
+        </div>
+      </div>
+
+      <a href="/vs" class="link-underline text-foreground mt-8 inline-flex items-center gap-1.5 text-[14px] font-medium">
+        See all comparisons
+        <ArrowRight className="size-4" />
+      </a>
     </div>
   </section>
 

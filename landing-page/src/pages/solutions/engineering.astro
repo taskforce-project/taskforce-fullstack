@@ -4,20 +4,14 @@ import PageHero from "@/components/site/PageHero.astro";
 import PageCta from "@/components/site/PageCta.astro";
 import { GitBranch, Bot, Brain, BarChart3, ArrowRight } from "lucide-react";
 import { APP_URL } from "@/components/site/nav";
+import { EngineeringRunFlow } from "@/components/site/flows/OrchestrationFlows";
+import { hueFor } from "@/lib/site-icons";
 
 const FITS = [
   { icon: GitBranch, title: "Your board and repo", text: "Boards, issues and cycles in real time, alongside the repositories your team already ships from.", href: "/product/collaboration", label: "Collaboration" },
   { icon: Bot, title: "Your coding agents", text: "Claude Code, Cursor or Copilot are assignees like anyone else — routed the work, reviewed the same way.", href: "/product/smart-assign", label: "Smart Assign" },
   { icon: Brain, title: "Your decisions, kept", text: "Architecture calls, trade-offs and rejected alternatives stay as context the next run can read.", href: "/product/brain-os", label: "TaskForce Memory" },
   { icon: BarChart3, title: "Your delivery, measured", text: "Throughput, resolution time and workload from the board itself — plus where work gets sent back.", href: "/product/analytics", label: "Analytics" },
-];
-
-const RUN = [
-  "Frame the problem and draft the spec",
-  "Propose an approach and write the API contract",
-  "Break the work into issues",
-  "Hand off to your coding agent",
-  "QA against the original acceptance criteria",
 ];
 ---
 
@@ -35,7 +29,7 @@ const RUN = [
   />
 
   {/* ── The problem ── */}
-  <section class="bg-secondary border-b">
+  <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-28">
       <div class="mx-auto max-w-2xl">
         <p class="t-eyebrow mb-3">The problem</p>
@@ -56,49 +50,44 @@ const RUN = [
     </div>
   </section>
 
-  {/* ── The run ── */}
-  <section class="bg-card border-b">
+  {/* ── The run — texte | flux vertical (React Flow) à droite, fond à points ── */}
+  <section class="bg-card bg-dots border-b">
     <div class="container-rail py-20 lg:py-28">
-      <div class="max-w-2xl">
-        <p class="t-eyebrow mb-3">What a run looks like</p>
-        <h2 class="t-h2">From an outcome to a reviewed delivery</h2>
-        <p class="t-lead mt-4">
-          You describe the outcome. Specialized agents work the path; your team approves each checkpoint;
-          your coding agent builds it.
-        </p>
+      <div class="grid items-center gap-12 lg:grid-cols-[minmax(0,460px)_minmax(0,1fr)] lg:gap-16">
+        <div>
+          <p class="t-eyebrow mb-3">What a run looks like</p>
+          <h2 class="t-h2">From an outcome to a reviewed delivery</h2>
+          <p class="t-lead mt-4">
+            You describe the outcome. Specialized agents work the path; your team approves each
+            checkpoint; your coding agent builds it.
+          </p>
+          <p class="text-muted-foreground mt-6 text-[13px] leading-6">
+            Full intent-to-deploy orchestration is
+            <a href="/product/orchestration" class="link-underline text-foreground font-medium">Planned</a>;
+            the board, smart assignment, approvals, memory and analytics ship today.
+          </p>
+        </div>
+        <div class="lg:pl-4">
+          <div class="relative mx-auto w-full max-w-[320px]" style="aspect-ratio: 320 / 470">
+            <EngineeringRunFlow client:only="react" />
+          </div>
+        </div>
       </div>
-      <ol class="mt-10 flex flex-col gap-3">
-        {
-          RUN.map((step, i) => (
-            <li class="flex items-start gap-3.5 text-[14.5px] leading-6 text-foreground">
-              <span class="border-primary/30 bg-card text-primary flex size-7 shrink-0 items-center justify-center rounded-full border text-[12px] font-semibold">
-                {i + 1}
-              </span>
-              {step}
-            </li>
-          ))
-        }
-      </ol>
-      <p class="text-muted-foreground mt-8 text-[13px] leading-6">
-        Full intent-to-deploy orchestration is
-        <a href="/product/orchestration" class="link-underline text-foreground font-medium">Planned</a>;
-        the board, smart assignment, approvals, memory and analytics ship today.
-      </p>
     </div>
   </section>
 
   {/* ── Fits your stack ── */}
-  <section class="bg-secondary border-b">
+  <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-28">
       <div class="max-w-2xl">
         <p class="t-eyebrow mb-3">Fits your stack</p>
         <h2 class="t-h2">It sits on what you already use</h2>
       </div>
-      <div class="mt-12 grid gap-6 sm:grid-cols-2">
+      <div class="-mx-6 mt-12 grid gap-px border-y border-border bg-border sm:grid-cols-2 lg:-mx-10">
         {
           FITS.map((f) => (
-            <div class="flex flex-col rounded-2xl border bg-card p-6">
-              <span class="bg-card text-foreground flex size-11 items-center justify-center rounded-xl border">
+            <div class="bg-card flex flex-col p-6 sm:p-8">
+              <span class="ic-tile flex size-11 items-center justify-center rounded-xl border" style={`--ic:${hueFor(f.icon)}`}>
                 <f.icon className="size-5" strokeWidth={1.75} />
               </span>
               <h3 class="mt-4 text-[16px] font-semibold text-foreground">{f.title}</h3>
