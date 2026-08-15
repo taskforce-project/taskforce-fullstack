@@ -59,8 +59,8 @@ const DEEP: Record<string, string> = {
  * que « 129 ». Le catalogue complet reste à un clic (« Show all »). L'ordre suit la narration.
  */
 const FEATURED = [
-  "linear", "jira", "github", "gitlab", "slack", "sentry", "postgresql",
-  "notion", "google-drive", "figma", "openai", "anthropic", "ollama", "keycloak",
+  "github", "slack", "linear", "notion", "salesforce", "stripe",
+  "shopify", "google-drive", "figma", "postgresql", "anthropic", "sentry",
 ];
 
 /** Connecteurs dotés d'une fiche détaillée (`/product/integrations/{key}`) — tuile cliquable. */
@@ -247,16 +247,16 @@ function Tile({ t }: { t: Tool }) {
     </>
   );
   return (
-    <li className="bg-card">
+    <li className="bg-card border">
       {hasDetail ? (
         <a
           href={`/product/integrations/${t.key}`}
-          className="hover:bg-secondary/50 flex items-center gap-3 px-4 py-3 transition-colors"
+          className="hover:bg-secondary/50 flex h-full items-center gap-3 px-4 py-3 transition-colors"
         >
           {inner}
         </a>
       ) : (
-        <div className="flex items-center gap-3 px-4 py-3">{inner}</div>
+        <div className="flex h-full items-center gap-3 px-4 py-3">{inner}</div>
       )}
     </li>
   );
@@ -396,13 +396,13 @@ export function IntegrationCatalogue() {
       {/* La grille — min-h pour que filtrer ne fasse pas sauter la section */}
       <div className="mt-4 min-h-[336px]">
         {shown.length > 0 ? (
-          <ul className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border bg-border sm:grid-cols-3 lg:grid-cols-4">
+          <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
             {shown.map((t) => (
               <Tile key={t.key} t={t} />
             ))}
           </ul>
         ) : (
-          <div className="flex flex-col items-start gap-3 rounded-2xl border border-dashed p-8">
+          <div className="flex flex-col items-start gap-3 border border-dashed p-8">
             <p className="text-[14px] text-foreground">Nothing matches &laquo; {q} &raquo;.</p>
             <p className="text-muted-foreground text-[13px]">
               The catalogue is declarative — adding a tool is a line of configuration. Ask, and it lands

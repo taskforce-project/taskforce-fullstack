@@ -73,7 +73,7 @@ export function DeliveryInsights() {
   const explained = at >= 3;
 
   return (
-    <div ref={rootRef} className="bg-card overflow-hidden rounded-2xl border shadow-lg">
+    <div ref={rootRef} className="bg-card overflow-hidden border">
       {/* Les chiffres qu'on attend */}
       <div className="grid grid-cols-3 divide-x border-b">
         {KPIS.map((k) => (
