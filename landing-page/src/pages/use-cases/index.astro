@@ -9,6 +9,7 @@ import {
   BookOpen, UserPlus, Siren, Megaphone, CalendarRange, ArrowRight,
 } from "lucide-react";
 import { APP_URL } from "@/components/site/nav";
+import { hueFor } from "@/lib/site-icons";
 
 const ICONS: Record<string, any> = {
   "product-spec": FileText,
@@ -37,7 +38,7 @@ const ITEMS = USE_CASE_ORDER.map((k) => USE_CASES[k]);
     secondary={{ label: "See the run", href: "/product/orchestration" }}
   />
 
-  <section class="bg-secondary border-b">
+  <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-28">
       <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {
@@ -46,10 +47,10 @@ const ITEMS = USE_CASE_ORDER.map((k) => USE_CASES[k]);
             return (
               <a
                 href={`/use-cases/${u.key}`}
-                class="bg-card hover:border-primary/30 hover:bg-secondary/40 flex flex-col rounded-2xl border p-6 transition-colors"
+                class="bg-card hover:border-primary/30 hover:bg-secondary/40 flex flex-col border p-6 transition-colors"
               >
                 <div class="flex items-center justify-between gap-2">
-                  <span class="bg-card text-foreground flex size-11 items-center justify-center rounded-xl border">
+                  <span class="ic-tile flex size-11 items-center justify-center rounded-xl border" style={`--ic:${hueFor(Icon)}`}>
                     {Icon && <Icon className="size-5" strokeWidth={1.75} />}
                   </span>
                   <LevelBadge level={u.level} />
