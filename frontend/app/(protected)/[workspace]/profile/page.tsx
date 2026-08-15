@@ -24,6 +24,7 @@ import { MemberAvailabilityCard } from "@/components/members/member-availability
 import { useAuth } from "@/lib/contexts/auth-context"
 import { cn } from "@/lib/utils"
 import { useProjectStore } from "@/lib/store/project-store"
+import { useSettingsStore } from "@/lib/store/settings-store"
 import { useProfileStore, type HeatWeek, type HeatCell } from "@/lib/store/profile-store"
 // `planLabel` existait déjà et n'était importé NULLE PART — écrit exactement pour ce besoin, puis oublié
 // au profit d'un littéral « Pro » en dur. Cf. TF-PLAN-PRO-GHOST.
@@ -169,6 +170,7 @@ export default function ProfilePage() {
   const { user } = useAuth()
   const params   = useParams()
   const slug     = typeof params.workspace === "string" ? params.workspace : ""
+  const openSettings = useSettingsStore((s) => s.openSettings)
 
   const { projects, fetchProjects } = useProjectStore()
   const { stats, activity, heatmap, fetchProfile } = useProfileStore()
@@ -218,14 +220,9 @@ export default function ProfilePage() {
                     <Star className="h-3 w-3" />{planLabel(plan)}
                   </Badge>
                 )}
-                <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" asChild>
-                  {/* Le lien pointait `/settings` — chemin ABSOLU, sans le workspace. `app/settings`
-                      n'existe pas (seul `app/(protected)/[workspace]/settings`) → 404. C'est le bug
-                      signalé « l'edit profil fonctionne pas ». */}
-                  <Link href={`/${slug}/settings`}>
-                    <Settings className="h-3.5 w-3.5" />
-                    Modifier le profil
-                  </Link>
+                <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={() => openSettings("profile")}>
+                  <Settings className="h-3.5 w-3.5" />
+                  Modifier le profil
                 </Button>
               </div>
             </div>
@@ -368,7 +365,7 @@ export default function ProfilePage() {
                   l&apos;historique illimité.
                 </p>
                 <Button size="sm" className="h-8 text-xs w-full gap-1.5" asChild>
-                  <Link href={`/${slug}/settings`}>
+                  <Link href={`/${slug}/billing`}>
                     <Star className="h-3.5 w-3.5" />
                     Voir les forfaits
                   </Link>
