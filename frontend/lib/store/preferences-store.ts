@@ -27,6 +27,14 @@ interface PreferencesState {
   highContrast: boolean;
   setHighContrast: (value: boolean) => void;
 
+  // Confort de lecture (dyslexie) — police lisible + espacements accrus.
+  dyslexiaFont: boolean;
+  setDyslexiaFont: (value: boolean) => void;
+
+  // Mode daltonien (option, en plus du contraste élevé) — filtre de correction appliqué au contenu.
+  colorblindMode: "none" | "protanopia" | "deuteranopia" | "tritanopia";
+  setColorblindMode: (mode: "none" | "protanopia" | "deuteranopia" | "tritanopia") => void;
+
   // Utility function to get translations
   getTranslations: () => typeof CONSTANTS_EN | typeof CONSTANTS_FR;
 }
@@ -97,6 +105,24 @@ export const usePreferencesStore = create<PreferencesState>()(
         }
       },
 
+      dyslexiaFont: false,
+      setDyslexiaFont: (value) => {
+        set({ dyslexiaFont: value });
+        if (typeof window !== "undefined") {
+          document.documentElement.classList.toggle("a11y-dyslexia", value);
+        }
+      },
+
+      colorblindMode: "none",
+      setColorblindMode: (mode) => {
+        set({ colorblindMode: mode });
+        if (typeof window !== "undefined") {
+          const el = document.documentElement;
+          el.classList.remove("cb-protanopia", "cb-deuteranopia", "cb-tritanopia");
+          if (mode !== "none") el.classList.add(`cb-${mode}`);
+        }
+      },
+
       // Utility
       getTranslations: () => getTranslations(get().language),
     }),
@@ -109,6 +135,8 @@ export const usePreferencesStore = create<PreferencesState>()(
         reducedMotion: state.reducedMotion,
         fontSize: state.fontSize,
         highContrast: state.highContrast,
+        dyslexiaFont: state.dyslexiaFont,
+        colorblindMode: state.colorblindMode,
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
@@ -123,6 +151,12 @@ export const usePreferencesStore = create<PreferencesState>()(
             }
             if (state.highContrast) {
               document.documentElement.classList.add("high-contrast");
+            }
+            if (state.dyslexiaFont) {
+              document.documentElement.classList.add("a11y-dyslexia");
+            }
+            if (state.colorblindMode && state.colorblindMode !== "none") {
+              document.documentElement.classList.add(`cb-${state.colorblindMode}`);
             }
           }
           // Set translations based on saved language
