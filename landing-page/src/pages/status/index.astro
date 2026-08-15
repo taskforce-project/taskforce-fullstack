@@ -1,0 +1,64 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import PageHero from "@/components/site/PageHero.astro";
+import PageCta from "@/components/site/PageCta.astro";
+import FaqSection from "@/components/site/sections/FaqSection.astro";
+import { Activity, ArrowRight } from "lucide-react";
+
+const FAQ = [
+  { q: "Why isn't there an uptime number?", a: "We're pre-launch and won't post availability figures we can't yet stand behind. A public monitoring page is on the way." },
+  { q: "How do I report an incident?", a: "Email hello@taskforce.dev — it reaches us directly while public monitoring is being set up." },
+  { q: "Where's your approach to reliability?", a: "Availability, resilience and incident handling are documented in the Trust Center." },
+  { q: "Will there be incident history?", a: "Yes. When public monitoring launches, real-time component status and past incidents will show here." },
+];
+---
+
+<BaseLayout
+  title="Status — TaskForce"
+  description="TaskForce service status. Public availability monitoring is on the way; in the meantime, report any incident to hello@taskforce.dev."
+>
+  <PageHero
+    kicker="Status"
+    title="Service status"
+    lead="We're pre-launch, so we won't post an uptime number we can't yet stand behind. A public availability page is on the way — until then, here's how to reach us if something's wrong."
+    primary={{ label: "Report an incident", href: "mailto:hello@taskforce.dev" }}
+    secondary={{ label: "Trust Center", href: "/trust" }}
+  />
+
+  <section class="bg-card border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="mx-auto max-w-2xl">
+        <div class="bg-card flex flex-col items-center border px-6 py-14 text-center">
+          <span class="flex size-12 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-600">
+            <Activity className="size-5" strokeWidth={1.75} />
+          </span>
+          <h2 class="mt-5 text-[18px] font-semibold text-foreground">Live status monitoring is coming</h2>
+          <p class="text-muted-foreground mt-2 max-w-md text-[14px] leading-6">
+            When we launch public monitoring, real-time component status and incident history will show
+            here. We'd rather leave it honest than display a fabricated “all systems operational”.
+          </p>
+          <a
+            href="mailto:hello@taskforce.dev"
+            class="link-underline text-foreground mt-6 inline-flex items-center gap-1.5 text-[14px] font-medium"
+          >
+            Report an incident
+            <ArrowRight className="size-3.5" />
+          </a>
+        </div>
+        <p class="text-muted-foreground mt-6 text-center text-[13px] leading-6">
+          For our security posture and how we handle availability and resilience, see the
+          <a href="/trust" class="link-underline text-foreground font-medium">&nbsp;Trust Center</a>.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <FaqSection title="Status & reliability questions" items={FAQ} />
+
+  <PageCta
+    title="Questions about reliability?"
+    lead="Our approach to availability, resilience and incidents lives in the Trust Center."
+    primary={{ label: "Trust Center", href: "/trust" }}
+    secondary={{ label: "Contact us", href: "/company/contact" }}
+  />
+</BaseLayout>

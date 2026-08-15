@@ -1,0 +1,163 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import PageHero from "@/components/site/PageHero.astro";
+import PageCta from "@/components/site/PageCta.astro";
+import FeatureSplit from "@/components/site/sections/FeatureSplit.astro";
+import FeatureRows from "@/components/site/sections/FeatureRows.astro";
+import FeatureRow from "@/components/site/sections/FeatureRow.astro";
+import CalloutBand from "@/components/site/sections/CalloutBand.astro";
+import ScreenPlaceholder from "@/components/site/sections/ScreenPlaceholder.astro";
+import { CollabBoard } from "@/components/site/illustrations/CollabBoard";
+import { KanbanSquare, CalendarRange, MessageSquare, ShieldCheck, Zap, RefreshCw, Bot } from "lucide-react";
+import { hueFor } from "@/lib/site-icons";
+
+/**
+ * Collaboration — décliné sur la grammaire de la page modèle (orchestration) :
+ * board réel (îlot React) en preuve, primitives en FeatureSplit + ScreenPlaceholder,
+ * temps réel en FeatureRows (petits traits), thèse « une seule surface » en CalloutBand.
+ * Copie strictement préservée — on re-met-en-page, on ne réécrit pas.
+ */
+
+const BLOCKS = [
+  {
+    icon: KanbanSquare,
+    title: "Boards & issues",
+    text: "Kanban boards with issues, keys, priorities, labels and assignees. Move a card and it moves for everyone.",
+  },
+  {
+    icon: CalendarRange,
+    title: "Cycles",
+    text: "Group issues into cycles, and see what's in flight, what shipped and what slipped.",
+  },
+  {
+    icon: MessageSquare,
+    title: "Discussion",
+    text: "Comment on any issue. The conversation stays attached to the work — not buried in a separate chat.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Roles & access",
+    text: "Owners, admins, members and viewers. Viewers read; collaborators contribute; private projects stay private.",
+  },
+];
+
+const LIVE = [
+  {
+    icon: Zap,
+    title: "Instant",
+    text: "Create, move, re-label or re-assign an issue — it propagates to everyone with the board open.",
+  },
+  {
+    icon: RefreshCw,
+    title: "No refresh",
+    text: "The board patches itself as events arrive. Nobody works off a stale view.",
+  },
+  {
+    icon: Bot,
+    title: "Agents too",
+    text: "A coding agent's changes are broadcast exactly like a teammate's — same board, same instant.",
+  },
+];
+---
+
+<BaseLayout
+  title="Collaboration — TaskForce"
+  description="Boards, issues and cycles your team already knows, kept in sync in real time. People and coding agents work the same board, and every change is broadcast live to everyone."
+>
+  <PageHero
+    kicker="Collaboration"
+    title="Where a run's work lands — one shared board"
+    lead="The surface a governed run delivers onto — boards, issues and cycles your team already knows — kept in sync in real time. People and coding agents work the same board, and every change shows up for everyone the moment it happens."
+    level="live"
+    primary={{ label: "Run your first workflow", href: "/waitlist" }}
+    secondary={{ label: "See pricing", href: "/pricing" }}
+  />
+
+  {/* ── Le vrai board, en surface partagée (îlot React préservé) ── */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">In practice</p>
+        <h2 class="t-h2">The board your team already knows</h2>
+        <p class="t-lead mt-4">
+          Columns, issues, keys, priorities, labels and assignees — nothing to relearn. What changes
+          is that it stays in sync for everyone at once, and a coding agent can own a card just like a
+          teammate.
+        </p>
+      </div>
+      <div class="mt-12">
+        <CollabBoard />
+      </div>
+    </div>
+  </section>
+
+  {/* ── Les primitives — FeatureSplit + écran vide (plus de grille de cartes) ── */}
+  <FeatureSplit
+    bg="card"
+    eyebrow="The building blocks"
+    title="Built to run the work, not just track it"
+    lead="The primitives are the ones you'd expect from a modern issue tracker — with the run's context attached to each one."
+  >
+    <ScreenPlaceholder label="Boards & issues" />
+    <ul slot="aside" class="mt-8 border-t">
+      {
+        BLOCKS.map((b) => (
+          <li class="flex gap-4 border-b py-4">
+            <span class="ic-tile flex size-10 shrink-0 items-center justify-center rounded-lg border" style={`--ic:${hueFor(b.icon)}`}>
+              <b.icon className="size-5" strokeWidth={1.75} />
+            </span>
+            <div class="min-w-0">
+              <h3 class="text-foreground text-[14.5px] font-semibold">{b.title}</h3>
+              <p class="text-muted-foreground mt-1 text-[13px] leading-6">{b.text}</p>
+            </div>
+          </li>
+        ))
+      }
+    </ul>
+  </FeatureSplit>
+
+  {/* ── Temps réel — FeatureRows (petits traits), lignes alternées ── */}
+  <FeatureRows
+    bg="card"
+    eyebrow="Real time"
+    title="Everyone sees the same board, the moment it changes"
+    lead="When anyone creates, moves, re-labels or re-assigns an issue, it updates on every open board instantly — over a live connection, no refresh. Your agents' changes arrive the same way people's do."
+  >
+    {
+      LIVE.map((l, i) => (
+        <FeatureRow reverse={i % 2 === 1} title={l.title} body={l.text}>
+          <div slot="viz" class="flex w-full justify-center">
+            <span class="ic-tile flex size-14 items-center justify-center rounded-2xl border" style={`--ic:${hueFor(l.icon)}`}>
+              <l.icon className="size-6" strokeWidth={1.5} />
+            </span>
+          </div>
+        </FeatureRow>
+      ))
+    }
+  </FeatureRows>
+
+  {/* ── Une seule surface : gens + agents — CalloutBand (la thèse de la page) ── */}
+  <CalloutBand
+    bg="card"
+    eyebrow="One surface"
+    statement="People and agents, on the same board"
+    support="Assign a card to a teammate or to Claude Code, Cursor or another coding agent — same card, same columns, same review checkpoint. The board doesn't treat an agent as a separate kind of thing."
+  >
+    <p class="text-muted-foreground mx-auto mt-5 max-w-2xl text-[15px] leading-7">
+      That's the point: agents aren't a side panel. They work where your team already works, and what
+      they produce still goes to a human to approve.
+    </p>
+    <p class="mt-7">
+      <a href="/product/smart-assign" class="link-underline text-foreground text-[14px] font-medium">
+        See how work gets routed →
+      </a>
+    </p>
+  </CalloutBand>
+
+  <PageCta
+    title="Bring your team onto one board"
+    lead="Start with the delivery workspace — boards, issues, cycles and real-time collaboration, free. Invite your team and your agents to the same place."
+    primary={{ label: "Run your first workflow", href: "/waitlist" }}
+    secondary={{ label: "Book a demo", href: "/book-a-demo" }}
+  />
+</BaseLayout>

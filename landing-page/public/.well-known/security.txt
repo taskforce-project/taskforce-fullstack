@@ -1,0 +1,6 @@
+# TaskForce — security contact (RFC 9116)
+Contact: mailto:hello@taskforce.dev
+Preferred-Languages: en, fr
+Canonical: https://taskforce.dev/.well-known/security.txt
+Policy: https://taskforce.dev/legal/security
+Expires: 2027-07-31T00:00:00.000Z

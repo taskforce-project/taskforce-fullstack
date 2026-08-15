@@ -1,0 +1,16 @@
+---
+/**
+ * LabsBackdrop — image « verre liquide » PLEIN CADRE (retour user : « prend pas toute la place, je veux
+ * comme le screen resserré »). L'image couvre tout le hero ; un voile blanc côté gauche garde le texte
+ * lisible (renfort en mobile où le texte prend toute la largeur). aria-hidden, aucune animation.
+ * Les rails du hero sont retirés côté page (conteneur `container-site`).
+ */
+---
+
+<div aria-hidden class="pointer-events-none absolute inset-0 overflow-hidden">
+  <img src="/labs/hero-wave.jpg" alt="" class="absolute inset-0 size-full object-cover object-center" />
+  <div class="absolute inset-0 bg-gradient-to-r from-white from-30% via-white/55 to-transparent"></div>
+  {/* Renfort mobile : le texte prend toute la largeur. */}
+  <div class="absolute inset-0 bg-white/40 lg:hidden"></div>
+  <div class="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white to-transparent"></div>
+</div>

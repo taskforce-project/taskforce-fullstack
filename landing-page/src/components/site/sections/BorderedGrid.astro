@@ -1,0 +1,60 @@
+---
+/**
+ * BorderedGrid — DA « petits traits » en grille : des cellules séparées par des FILETS de 1px
+ * (`gap-px bg-border` + cellules `bg-card`), façon Linear/Vercel. Remplace proprement les grilles de
+ * cartes flottantes. `cols` = 2｜3｜4. Icônes lucide en prop (facultatif).
+ */
+import type { LucideIcon } from "lucide-react";
+import { hueFor } from "@/lib/site-icons";
+
+interface Item {
+  icon?: LucideIcon;
+  title: string;
+  desc: string;
+}
+interface Props {
+  eyebrow?: string;
+  title?: string;
+  lead?: string;
+  items: Item[];
+  cols?: 2 | 3 | 4;
+  bg?: "card" | "secondary";
+  align?: "left" | "center";
+}
+const { eyebrow, title, lead, items, cols = 4, bg = "card", align = "center" } = Astro.props;
+const center = align === "center";
+// cols=3 saute le palier 2-col (sinon 3 items → 1 cellule VIDE grise sur tablette, cf. review user).
+const colClass = cols === 2 ? "sm:grid-cols-2" : cols === 3 ? "md:grid-cols-3" : "sm:grid-cols-2 lg:grid-cols-4";
+---
+
+<section class:list={[bg === "secondary" ? "bg-secondary" : "bg-card", "border-b"]}>
+  <div class="container-rail py-20 lg:py-28">
+    {
+      (eyebrow || title || lead) && (
+        <div class:list={["mb-12", center ? "mx-auto max-w-3xl text-center" : "max-w-2xl"]}>
+          {eyebrow && <p class="t-eyebrow mb-3">{eyebrow}</p>}
+          {title && <h2 class="t-h2 text-balance">{title}</h2>}
+          {lead && <p class:list={["t-lead mt-4", center && "mx-auto max-w-2xl"]}>{lead}</p>}
+        </div>
+      )
+    }
+    <div class:list={["-mx-6 grid gap-px border-y border-border bg-border lg:-mx-10", colClass]}>
+      {
+        items.map((it) => (
+          <div class="bg-card flex flex-col p-6">
+            {it.icon && (
+              <span
+                class="ic-tile flex size-10 items-center justify-center rounded-lg border"
+                style={`--ic:${hueFor(it.icon)}`}
+              >
+                <it.icon className="size-5" strokeWidth={1.75} />
+              </span>
+            )}
+            <h3 class="text-foreground mt-4 text-[15px] font-semibold">{it.title}</h3>
+            <p class="text-muted-foreground mt-1.5 text-[13px] leading-6">{it.desc}</p>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</section>

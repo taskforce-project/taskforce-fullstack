@@ -1,0 +1,58 @@
+---
+/**
+ * PixelBand — transition entre deux sections (fond BLANC, aucun halo). Un champ PixelBlast bien
+ * visible, fondu en haut/bas (masque vertical) pour se raccorder au blanc. `align` varie l'empreinte
+ * horizontale d'une transition à l'autre (pleine ligne / droite / gauche / milieu) pour éviter la
+ * monotonie. Couleur = descente du dégradé de la vague `hero-wave.jpg`.
+ */
+import PixelBlast from "@/components/PixelBlast";
+
+interface Props {
+  color?: string;
+  height?: number;
+  align?: "full" | "left" | "right" | "center";
+  density?: number;
+  pixelSize?: number;
+  opacity?: number;
+  speed?: number;
+}
+
+const {
+  color = "#EC6B86",
+  height = 172,
+  align = "full",
+  density = 1,
+  pixelSize = 5,
+  opacity = 0.9,
+  speed = 0.3,
+} = Astro.props;
+
+const POS: Record<string, string> = {
+  full: "inset-0",
+  left: "left-0 top-0 bottom-0 w-[56%]",
+  right: "right-0 top-0 bottom-0 w-[56%]",
+  center: "left-1/2 top-0 bottom-0 w-[52%] -translate-x-1/2",
+};
+---
+
+<div
+  class="bg-card relative w-full overflow-hidden [mask-image:linear-gradient(to_bottom,transparent,black_26%,black_74%,transparent)]"
+  style={`height:${height}px`}
+  aria-hidden="true"
+>
+  <div class:list={["absolute", POS[align]]} style={`opacity:${opacity}`}>
+    <PixelBlast
+      client:only="react"
+      variant="circle"
+      color={color}
+      pixelSize={pixelSize}
+      patternDensity={density}
+      patternScale={3}
+      pixelSizeJitter={0.5}
+      enableRipples={false}
+      speed={speed}
+      edgeFade={align === "full" ? 0 : 0.5}
+      transparent={true}
+    />
+  </div>
+</div>

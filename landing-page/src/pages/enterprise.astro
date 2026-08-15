@@ -1,0 +1,331 @@
+---
+/**
+ * Enterprise — refonte « à fond » (review user, réf. plane.so/self-hosted + /solutions/enterprise-teams) :
+ * on casse la suite de grilles quasi identiques par des FeatureSplits alternés (texte + visuel),
+ * un bloc de specs concret, une section compliance en 3 cartes, un stepper d'adoption et une FAQ.
+ * Rythme de fonds varié (blanc / points / stripe). Diagramme d'archi en React Flow ; les autres
+ * visuels sont des SCHÉMAS en composants (pas des workflows) — cf. feu vert user.
+ */
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import PageHero from "@/components/site/PageHero.astro";
+import PageCta from "@/components/site/PageCta.astro";
+import FeatureSplit from "@/components/site/sections/FeatureSplit.astro";
+import { EnterpriseStackFlow } from "@/components/site/flows/OrchestrationFlows";
+import { hueFor } from "@/lib/site-icons";
+import { ShieldCheck, KeyRound, Database, Plug, Boxes, Cpu, Check, ArrowRight, Lock, ScrollText } from "lucide-react";
+
+/* Split 1 — déployer chez soi. */
+const DEPLOY_POINTS = [
+  "Self-host the whole platform on your own network, with Docker.",
+  "Keep model inference local with Ollama — prompts and data never leave.",
+  "Your infrastructure, your models, your data — no exceptions.",
+];
+
+/* Split 2 — gouverner. */
+const GOVERN_POINTS = [
+  "A human approves each consequential checkpoint before the run continues.",
+  "RBAC and per-project access scope exactly who can do what.",
+  "Every approval and model call is attributable — who, what, when, which model.",
+];
+
+/* Environnement — l'infra que tu fais déjà tourner. */
+const ENV = [
+  { icon: KeyRound, label: "Identity", items: "Keycloak · OIDC · SAML" },
+  { icon: Boxes, label: "Runtime", items: "Docker · Docker Compose" },
+  { icon: Cpu, label: "Models", items: "Anthropic · OpenAI · Ollama · local" },
+  { icon: Database, label: "Data", items: "PostgreSQL · S3 / MinIO" },
+  { icon: Plug, label: "Integrations", items: "GitHub · GitLab · Linear · Slack · +125" },
+];
+/* Specs — le plancher PLATEFORME est léger ; le vrai coût, c'est les modèles locaux (RAM/GPU). */
+const SPECS = [
+  { v: "2+", u: "vCPU for the platform" },
+  { v: "4 GB", u: "RAM for TaskForce itself" },
+  { v: "16 GB+", u: "RAM to run local models (Ollama)" },
+  { v: "GPU", u: "recommended for the larger models" },
+];
+
+/* Contrôle par couche. */
+const CONTROLS = [
+  { layer: "Identity", control: "OIDC / SAML / IdP federation" },
+  { layer: "Access", control: "RBAC + project-level permissions" },
+  { layer: "AI", control: "Hosted or local models, per step" },
+  { layer: "Data", control: "Private infrastructure + retention controls" },
+  { layer: "Delivery", control: "Human approval at every checkpoint" },
+  { layer: "Audit", control: "Run, approval and model-call history" },
+  { layer: "Deployment", control: "Self-hosted (Docker)" },
+  { layer: "Security", control: "Security review + DPA" },
+  { layer: "Operations", control: "Dedicated support + SLA" },
+];
+
+/* Parcours d'adoption. */
+const STEPS = [
+  { n: "01", title: "Architecture review", text: "We map identity, data flows, connectors and model providers." },
+  { n: "02", title: "Deployment", text: "Your team deploys TaskForce in your environment, with our assistance." },
+  { n: "03", title: "Security validation", text: "Review controls, permissions, data flows and retention." },
+  { n: "04", title: "First workflow", text: "Start with one delivery workflow, validate the model, and expand." },
+];
+
+/* FAQ — objections d'un acheteur entreprise (remplace la grille « build vs buy »). */
+const FAQ = [
+  { q: "Can we run TaskForce fully self-hosted?", a: "Yes — self-hosting is a first-class Enterprise deployment. TaskForce runs inside your own infrastructure with Docker, and local models through Ollama keep prompts and outputs on your network." },
+  { q: "Do our prompts or data train your models?", a: "No. TaskForce does not use your data to train its own models. On hosted providers, data handling follows the provider and your configured terms; local models keep inference inside your infrastructure." },
+  { q: "Why not just assemble this ourselves?", a: "You could wire model providers, an approval system, audit logs and connector permissions together yourself. TaskForce puts those behind one governed delivery workflow — so your team ships instead of maintaining an orchestration layer." },
+  { q: "How does access control work?", a: "SSO and SAML through Keycloak, RBAC with per-project permissions, and connector scopes you grant explicitly. Agents can only invoke what you allow." },
+  { q: "What about compliance?", a: "GDPR-oriented technical controls (export, erasure, retention) are in place. SOC 2 groundwork is on the roadmap; a DPA is available on request. We document the current state rather than claim certifications we can't substantiate." },
+  { q: "How do we get started?", a: "It's a guided project: architecture review, deployment with our assistance, a security validation pass, then a first workflow. Book a call and we'll map it to your environment." },
+];
+---
+
+<BaseLayout
+  title="Enterprise — TaskForce"
+  description="TaskForce for engineering organizations: self-hosted deployment, governance at every run, and full control of your data and models — with a clear path from architecture review to first workflow."
+>
+  <PageHero
+    kicker="Enterprise"
+    title="AI in your delivery path, on your terms"
+    lead="TaskForce keeps a human accountable at every checkpoint and can run entirely on your own infrastructure — so you get agent leverage without giving up control, attribution or ownership of your data."
+    primary={{ label: "Book a demo", href: "/book-a-demo" }}
+    secondary={{ label: "Read the trust center", href: "/trust" }}
+  />
+
+  {/* ── 1. Déployer chez soi — texte (2 col) PUIS le diagramme d'archi en PLEINE LARGEUR.
+       (Le fan est large : dans une demi-colonne il débordait — cf. review.) ── */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="grid gap-10 lg:grid-cols-2 lg:items-end lg:gap-16">
+        <div>
+          <p class="t-eyebrow mb-3">Self-hosted</p>
+          <h2 class="t-h2">Run TaskForce inside your own walls</h2>
+          <p class="t-lead mt-4">
+            Authentication in front, your systems and models around it, and everything in between
+            left auditable. Nothing has to leave your network.
+          </p>
+        </div>
+        <div>
+          <ul class="flex flex-col gap-3.5">
+            {
+              DEPLOY_POINTS.map((p) => (
+                <li class="flex items-start gap-3 text-[14.5px] leading-6 text-foreground">
+                  <Check className="text-primary mt-0.5 size-4 shrink-0" strokeWidth={2.5} />
+                  {p}
+                </li>
+              ))
+            }
+          </ul>
+          <a
+            href="/trust"
+            class="link-underline text-foreground mt-6 inline-flex items-center gap-1.5 text-[14px] font-medium"
+          >
+            See security &amp; data handling
+            <ArrowRight className="size-4" />
+          </a>
+        </div>
+      </div>
+
+      <div class="flow-canvas relative mt-12 h-[420px] w-full overflow-hidden border">
+        <EnterpriseStackFlow client:only="react" />
+      </div>
+    </div>
+  </section>
+
+  {/* ── 2. Gouverner — schéma « décision approuvée » (composants, pas un workflow) + texte ── */}
+  <FeatureSplit
+    reverse
+    bg="card"
+    eyebrow="Governance"
+    title="A human on every consequential step"
+    lead="Approval isn't a settings toggle. It sits where a decision compounds — and it leaves a record you can read months later."
+  >
+    <div slot="aside">
+      <ul class="mt-8 flex flex-col gap-3.5">
+        {
+          GOVERN_POINTS.map((p) => (
+            <li class="flex items-start gap-3 text-[14.5px] leading-6 text-foreground">
+              <ShieldCheck className="mt-0.5 size-4 shrink-0" strokeWidth={2} style={{ color: hueFor(ShieldCheck) }} />
+              {p}
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+
+    {/* Schéma : une décision gouvernée, telle qu'elle est consignée. */}
+    <div class="bg-card border p-5 sm:p-6">
+      <div class="flex items-center justify-between gap-2 border-b pb-3">
+        <span class="text-muted-foreground font-mono text-[11px] tracking-wide uppercase">Decision record</span>
+        <span class="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-emerald-700 uppercase">
+          <Check className="size-3" strokeWidth={3} />
+          Approved
+        </span>
+      </div>
+      <p class="mt-4 text-[15px] font-semibold text-foreground">Postgres over Mongo — tenant isolation</p>
+      <p class="text-muted-foreground mt-1 text-[13px] leading-6">Proposed by the CTO agent, with the rejected option and its reason kept alongside.</p>
+      <dl class="mt-5 flex flex-col gap-px overflow-hidden border bg-border text-[12.5px]">
+        {
+          [
+            { icon: ShieldCheck, k: "Approved by", v: "Priya · CTO · Mon 14:20" },
+            { icon: Cpu, k: "Model", v: "Local · Llama 3 (self-hosted)" },
+            { icon: ScrollText, k: "Recorded to", v: "Audit trail · run #147" },
+            { icon: Lock, k: "Scope", v: "Stayed on your network" },
+          ].map((r) => (
+            <div class="bg-card flex items-center gap-2.5 px-3.5 py-2.5">
+              <r.icon className="size-3.5 shrink-0" strokeWidth={2} style={{ color: hueFor(r.icon) }} />
+              <span class="text-muted-foreground w-[92px] shrink-0">{r.k}</span>
+              <span class="text-foreground font-medium">{r.v}</span>
+            </div>
+          ))
+        }
+      </dl>
+      <p class="text-muted-foreground/70 mt-3 text-[11px]">Illustrative — a governed decision as it's recorded.</p>
+    </div>
+  </FeatureSplit>
+
+  {/* ── 3. Environnement + specs — bloc concret (points) ── */}
+  <section class="bg-card bg-dots border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">Built for your environment</p>
+        <h2 class="t-h2">Fits the infrastructure you already run</h2>
+        <p class="t-lead mt-4">
+          Connect the identity provider, repositories, trackers and model providers your organization
+          already uses. The platform itself runs on modest hardware — the models are the heavy part.
+        </p>
+      </div>
+      <div class="-mx-6 mt-12 grid gap-px border-y border-border bg-border sm:grid-cols-2 lg:grid-cols-5 lg:-mx-10">
+        {
+          ENV.map((e) => (
+            <div class="bg-card flex flex-col p-5">
+              <span class="ic-tile flex size-10 items-center justify-center rounded-lg border" style={`--ic:${hueFor(e.icon)}`}>
+                <e.icon className="size-5" strokeWidth={1.75} />
+              </span>
+              <p class="mt-3 text-[14px] font-semibold text-foreground">{e.label}</p>
+              <p class="text-muted-foreground mt-1 text-[12.5px] leading-5">{e.items}</p>
+            </div>
+          ))
+        }
+      </div>
+      {/* Specs minimales — bande de chiffres (rythme différent d'une grille). */}
+      <dl class="mt-6 grid grid-cols-2 gap-y-6 border-t pt-8 md:grid-cols-4">
+        {
+          SPECS.map((s, i) => (
+            <div class:list={["px-2", i > 0 && "md:border-l md:pl-6"]}>
+              <dt class="font-display text-foreground text-[28px] font-semibold tracking-[-0.02em] tabular-nums">{s.v}</dt>
+              <dd class="text-muted-foreground mt-0.5 text-[12.5px]">{s.u}</dd>
+            </div>
+          ))
+        }
+      </dl>
+      <p class="text-muted-foreground mt-4 text-[12.5px]">
+        Deploys with <span class="text-foreground font-medium">Docker Compose</span> today; Kubernetes
+        is on the roadmap. Real requirements scale with the local models you choose to run.
+      </p>
+    </div>
+  </section>
+
+  {/* ── 4. Contrôle par couche — grille dense à filets (distincte des splits) ── */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">Enterprise controls</p>
+        <h2 class="t-h2">Control at every layer</h2>
+      </div>
+      <ul class="-mx-6 mt-10 grid gap-px border-y border-border bg-border sm:grid-cols-2 lg:grid-cols-3 lg:-mx-10">
+        {
+          CONTROLS.map((c) => (
+            <li class="bg-card flex flex-col gap-1 px-5 py-4">
+              <span class="text-muted-foreground text-[11px] font-semibold tracking-[0.08em] uppercase">{c.layer}</span>
+              <span class="text-[13.5px] leading-5 text-foreground">{c.control}</span>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </section>
+
+  {/* ── 5. Sécurité & conformité — 2 col : texte + 3 cartes. Padding-top augmenté : le motif
+       stripe est dense en haut, on descend le titre pour ne pas chevaucher les traits (cf. review). ── */}
+  <section class="bg-card bg-striped border-b">
+    <div class="container-rail no-rail pt-32 pb-20 lg:pt-40 lg:pb-28">
+      <div class="grid gap-10 lg:grid-cols-[minmax(0,420px)_1fr] lg:gap-16">
+        <div>
+          <p class="t-eyebrow mb-3">Security &amp; compliance</p>
+          <h2 class="t-h2">No certification claims we can't substantiate</h2>
+          <p class="t-lead mt-4">
+            TaskForce documents the controls, data flows and security roadmap so your team can evaluate
+            the current state before deployment.
+          </p>
+          <a
+            href="/trust"
+            class="link-underline text-foreground mt-6 inline-flex items-center gap-1.5 text-[14px] font-medium"
+          >
+            Open the trust center
+            <ArrowRight className="size-4" />
+          </a>
+        </div>
+        <div class="-mx-6 grid gap-px border-y border-border bg-border sm:-mx-0 sm:grid-cols-3 sm:border">
+          {
+            [
+              { k: "GDPR", v: "Technical controls for export, erasure and retention are in place." },
+              { k: "SOC 2", v: "Not certified. SOC 2 groundwork is on the roadmap." },
+              { k: "DPA", v: "Available on request, with our subprocessor list." },
+            ].map((x) => (
+              <div class="bg-card flex flex-col p-5">
+                <p class="text-[14px] font-semibold text-foreground">{x.k}</p>
+                <p class="text-muted-foreground mt-1.5 text-[12.5px] leading-5">{x.v}</p>
+              </div>
+            ))
+          }
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {/* ── 6. Adoption — stepper horizontal (séquence, distinct des grilles) ── */}
+  <section class="bg-card bg-dots border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">Adoption</p>
+        <h2 class="t-h2">From security review to first run</h2>
+        <p class="t-lead mt-4">A clear path, so adopting TaskForce is a project with steps — not a leap of faith.</p>
+      </div>
+      <ol class="-mx-6 mt-12 grid gap-px border-y border-border bg-border sm:grid-cols-2 lg:grid-cols-4 lg:-mx-10">
+        {
+          STEPS.map((s) => (
+            <li class="bg-card flex flex-col p-6">
+              <span class="text-primary font-display text-[26px] font-semibold tabular-nums">{s.n}</span>
+              <h3 class="mt-2 text-[15px] font-semibold text-foreground">{s.title}</h3>
+              <p class="text-muted-foreground mt-1.5 text-[13.5px] leading-6">{s.text}</p>
+            </li>
+          ))
+        }
+      </ol>
+    </div>
+  </section>
+
+  {/* ── 7. FAQ — objections d'acheteur (bloc distinct, façon Plane) ── */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">Common questions</p>
+        <h2 class="t-h2">What a security team asks first</h2>
+      </div>
+      <dl class="mt-12 grid gap-x-12 gap-y-8 border-t pt-10 sm:grid-cols-2">
+        {
+          FAQ.map((f) => (
+            <div>
+              <dt class="text-[15px] font-semibold text-foreground">{f.q}</dt>
+              <dd class="text-muted-foreground mt-2 text-[13.5px] leading-6">{f.a}</dd>
+            </div>
+          ))
+        }
+      </dl>
+    </div>
+  </section>
+
+  <PageCta
+    title="Bring TaskForce to your organization"
+    lead="Book a call and we'll map the architecture, the controls and a deployment that fits your environment."
+    primary={{ label: "Book a demo", href: "/book-a-demo" }}
+    secondary={{ label: "Read the trust center", href: "/trust" }}
+  />
+</BaseLayout>

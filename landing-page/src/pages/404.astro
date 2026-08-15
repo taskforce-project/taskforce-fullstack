@@ -1,0 +1,43 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { ArrowRight } from "lucide-react";
+
+const LINKS = [
+  { label: "Product", href: "/product" },
+  { label: "Solutions", href: "/solutions" },
+  { label: "Pricing", href: "/pricing" },
+  { label: "Docs", href: "/docs" },
+  { label: "Roadmap", href: "/roadmap" },
+];
+---
+
+<BaseLayout title="Page not found — TaskForce" description="The page you're looking for doesn't exist.">
+  <section class="bg-card">
+    <div class="container-rail flex min-h-[70vh] flex-col items-center justify-center py-24 text-center">
+      <p class="text-primary font-mono text-[14px] font-medium">404</p>
+      <h1 class="t-h1 mt-3">This page took an unvalidated path</h1>
+      <p class="t-lead mx-auto mt-4 max-w-md">
+        The page you're looking for doesn't exist, moved, or was never built. Let's get you back to
+        something real.
+      </p>
+      <div class="mt-8 flex flex-wrap justify-center gap-3">
+        <a href="/" class={cn(buttonVariants({ size: "pill" }))}>Back home</a>
+        <a href="/product" class={cn(buttonVariants({ variant: "outline", size: "pill" }))}>
+          See the product
+          <ArrowRight className="size-4" />
+        </a>
+      </div>
+      <div class="mt-10 flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
+        {
+          LINKS.map((l) => (
+            <a href={l.href} class="link-underline text-muted-foreground hover:text-foreground text-[13.5px]">
+              {l.label}
+            </a>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+</BaseLayout>

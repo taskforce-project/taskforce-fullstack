@@ -1,0 +1,36 @@
+---
+/**
+ * FeatureSplit — la brique « comment ça marche » : texte d'un côté, visuel de l'autre, alternés.
+ * C'est ce qui REMPLACE les grilles de cartes répétées (retour user 03/08 : trop de cards partout).
+ * `reverse` inverse le sens (visuel à gauche) — on alterne d'une section à l'autre pour rythmer la page.
+ * Slots : défaut = le visuel (souvent un <Panel/> rempli de contenu réel) ; `aside` = texte en plus (liste, puces, CTA).
+ */
+interface Props {
+  eyebrow?: string;
+  title: string;
+  lead?: string;
+  reverse?: boolean;
+  bg?: "card" | "secondary";
+  sticky?: boolean;
+  id?: string;
+}
+const { eyebrow, title, lead, reverse = false, bg = "card", sticky = false, id } = Astro.props;
+---
+
+<section id={id} class:list={[bg === "secondary" ? "bg-secondary" : "bg-card", "border-b"]}>
+  <div class="container-rail py-20 lg:py-28">
+    <div class:list={["grid gap-10 lg:grid-cols-2 lg:gap-16", sticky ? "items-start" : "items-center"]}>
+      {/* Texte */}
+      <div class:list={[reverse && "lg:order-2"]}>
+        {eyebrow && <p class="t-eyebrow mb-3">{eyebrow}</p>}
+        <h2 class="t-h2">{title}</h2>
+        {lead && <p class="t-lead mt-4">{lead}</p>}
+        <slot name="aside" />
+      </div>
+      {/* Visuel */}
+      <div class:list={[reverse && "lg:order-1", sticky && "lg:sticky lg:top-24"]}>
+        <slot />
+      </div>
+    </div>
+  </div>
+</section>

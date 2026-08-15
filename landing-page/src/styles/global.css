@@ -1,115 +1,95 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@custom-variant dark (&:is(.dark, .dark *));
-
+/* ═══════════════════════════════════════════════════════
+   DESIGN TOKENS — repris à l'identique de la webapp
+   Source : frontend/app/globals.css (palette Cloudflare-flat).
+   Le site et le produit partagent la même palette : si elle bouge là-bas,
+   elle bouge ici. Aucune couleur inventée pour le marketing.
+   Light-only (décision D2) — le bloc .dark de l'app n'est pas repris.
+═══════════════════════════════════════════════════════ */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.1450 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.1450 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.1450 0 0);
-  --primary: oklch(0.2050 0 0);
-  --primary-foreground: oklch(0.9850 0 0);
-  --secondary: oklch(0.9700 0 0);
-  --secondary-foreground: oklch(0.2050 0 0);
-  --muted: oklch(0.9700 0 0);
-  --muted-foreground: oklch(0.5560 0 0);
-  --accent: oklch(0.9700 0 0);
-  --accent-foreground: oklch(0.2050 0 0);
-  --destructive: oklch(0.5770 0.2450 27.3250);
-  --destructive-foreground: oklch(1 0 0);
-  --border: oklch(0.9220 0 0);
-  --input: oklch(0.9220 0 0);
-  --ring: oklch(0.7080 0 0);
-  --chart-1: oklch(0.8100 0.1000 252);
-  --chart-2: oklch(0.6200 0.1900 260);
-  --chart-3: oklch(0.5500 0.2200 263);
-  --chart-4: oklch(0.4900 0.2200 264);
-  --chart-5: oklch(0.4200 0.1800 266);
-  --sidebar: oklch(0.9850 0 0);
-  --sidebar-foreground: oklch(0.1450 0 0);
-  --sidebar-primary: oklch(0.2050 0 0);
-  --sidebar-primary-foreground: oklch(0.9850 0 0);
-  --sidebar-accent: oklch(0.9700 0 0);
-  --sidebar-accent-foreground: oklch(0.2050 0 0);
-  --sidebar-border: oklch(0.9220 0 0);
-  --sidebar-ring: oklch(0.7080 0 0);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  /* Site light-only (décision actée) : force les contrôles natifs — champs, scrollbars — en
+     clair même quand l'OS du visiteur est en sombre. Sans ça, un OS dark rend un « faux sombre ». */
+  color-scheme: light;
+  --background:         #fbfbfc;
+  --card:               #ffffff;
+  --popover:            #ffffff;
+
+  --foreground:         #1d1d1f;
+  --card-foreground:    #1d1d1f;
+  --popover-foreground: #1d1d1f;
+
+  /* Bleu de marque — porte TOUTES les actions primaires. */
+  --primary:            #2563eb;   /* blue-600 */
+  --primary-foreground: #ffffff;
+  --secondary:          #f2f2f4;
+  --secondary-foreground: #1d1d1f;
+  --muted:              #f2f2f4;
+  --muted-foreground:   #6e6e73;
+  --accent:             #f2f2f4;
+  --accent-foreground:  #1d1d1f;
+  --destructive:        #d92d20;
+  --destructive-foreground: #ffffff;
+
+  --border:             #e6e6e9;
+  --input:              #dededf;
+  --ring:               rgba(37, 99, 235, 0.35);
+
+  /* Accents sémantiques de l'app — le violet n'est QUE le marquage IA. */
+  --accent-green:   #34c759;
+  --accent-red:     #ff3b30;
+  --accent-purple:  #5856d6;
+  --accent-orange:  #ff9500;
+
+  --label-primary:   #1d1d1f;
+  --label-secondary: #4b4b4f;
+  --label-tertiary:  #67676c;
+  --separator:       #e6e6e9;
+
+  --radius: 0.625rem;   /* 10px — radius de référence de l'app */
+
+  /* Ombres très subtiles (flat) — valeurs de l'app */
+  --shadow-2xs: 0 1px 1px rgba(0,0,0,0.03);
+  --shadow-xs:  0 1px 2px rgba(0,0,0,0.04);
+  --shadow-sm:  0 1px 2px rgba(0,0,0,0.05);
+  --shadow:     0 1px 3px rgba(0,0,0,0.06);
+  --shadow-md:  0 2px 6px rgba(0,0,0,0.07);
+  --shadow-lg:  0 4px 12px rgba(0,0,0,0.08);
+  --shadow-xl:  0 8px 24px rgba(0,0,0,0.10);
+  --shadow-2xl: 0 16px 40px rgba(0,0,0,0.12);
+
+  /* ─── Alias propres au site marketing ───
+     Ce sont des *noms*, pas de nouvelles couleurs : tout pointe sur la palette de l'app.
+     Voir taskforce-docs/v1/14-design/landing-refonte/Plan_Refonte_Site.md §4 */
+  --site-bg:         var(--card);              /* #ffffff — sections pleines */
+  --site-band:       var(--secondary);         /* #f2f2f4 — bandes alternées */
+  --site-fg:         var(--foreground);
+  --site-muted:      var(--muted-foreground);
+  --site-border:     var(--border);
+  --site-brand:      var(--primary);           /* CTA, liens, eyebrows */
+  --site-brand-soft: #eff6ff;                  /* blue-50 */
+  --site-ai:         var(--accent-purple);     /* marquage IA uniquement */
+  --site-ai-soft:    #efeefc;
+  --site-container: 1240px;
+
+  /* Sora (display) + Inter (corps) — chargées via <link> Google Fonts */
+  --font-display: 'Sora', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  /* Inter Variable (chargée via <link> Google Fonts) — métrique Linear/Attio */
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  --radius: 0.625rem;
-  --shadow-x: 0;
-  --shadow-y: 1px;
-  --shadow-blur: 3px;
-  --shadow-spread: 0px;
-  --shadow-opacity: 0.1;
-  --shadow-color: oklch(0 0 0);
-  --shadow-2xs: 0 2px 6px 0px rgba(236,72,153,0.22), 0 0 12px 0px rgba(255,122,0,0.18);
-  --shadow-xs: 0 2px 6px 0px rgba(168,85,247,0.22), 0 0 16px 0px rgba(255,0,85,0.18);
-  --shadow-sm: 0 4px 16px 0px rgba(255,0,85,0.22), 0 2px 4px -2px rgba(251,191,36,0.18);
-  --shadow: 0 4px 24px 0px rgba(236,72,153,0.28), 0 2px 4px -2px rgba(168,85,247,0.18);
-  --shadow-md: 0 8px 32px 0px rgba(251,191,36,0.22), 0 4px 8px -2px rgba(255,0,85,0.18);
-  --shadow-lg: 0 16px 48px 0px rgba(255,122,0,0.22), 0 8px 12px -2px rgba(236,72,153,0.18);
-  --shadow-xl: 0 24px 64px 0px rgba(168,85,247,0.28), 0 16px 20px -2px rgba(255,0,85,0.18);
-  --shadow-2xl: 0 40px 80px 0px rgba(255,0,85,0.32), 0 2px 6px 0px rgba(251,191,36,0.22);
-  --tracking-normal: 0em;
+  --radius: 0.5rem;
+  --shadow-sm: 0 1px 2px 0 rgba(0,0,0,0.05);
+  --shadow: 0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px -1px rgba(0,0,0,0.1);
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1);
+  --shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1);
+  --tracking-normal: -0.011em;
   --spacing: 0.25rem;
 }
 
-.dark {
-  --background: oklch(0.1450 0 0);
-  --foreground: oklch(0.9850 0 0);
-  --card: oklch(0.2050 0 0);
-  --card-foreground: oklch(0.9850 0 0);
-  --popover: oklch(0.2690 0 0);
-  --popover-foreground: oklch(0.9850 0 0);
-  --primary: oklch(0.9220 0 0);
-  --primary-foreground: oklch(0.2050 0 0);
-  --secondary: oklch(0.2690 0 0);
-  --secondary-foreground: oklch(0.9850 0 0);
-  --muted: oklch(0.2690 0 0);
-  --muted-foreground: oklch(0.7080 0 0);
-  --accent: oklch(0.3710 0 0);
-  --accent-foreground: oklch(0.9850 0 0);
-  --destructive: oklch(0.7040 0.1910 22.2160);
-  --destructive-foreground: oklch(0.9850 0 0);
-  --border: oklch(0.2750 0 0);
-  --input: oklch(0.3250 0 0);
-  --ring: oklch(0.5560 0 0);
-  --chart-1: oklch(0.8100 0.1000 252);
-  --chart-2: oklch(0.6200 0.1900 260);
-  --chart-3: oklch(0.5500 0.2200 263);
-  --chart-4: oklch(0.4900 0.2200 264);
-  --chart-5: oklch(0.4200 0.1800 266);
-  --sidebar: oklch(0.2050 0 0);
-  --sidebar-foreground: oklch(0.9850 0 0);
-  --sidebar-primary: oklch(0.4880 0.2430 264.3760);
-  --sidebar-primary-foreground: oklch(0.9850 0 0);
-  --sidebar-accent: oklch(0.2690 0 0);
-  --sidebar-accent-foreground: oklch(0.9850 0 0);
-  --sidebar-border: oklch(0.2750 0 0);
-  --sidebar-ring: oklch(0.4390 0 0);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
-  --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  --radius: 0.625rem;
-  --shadow-x: 0;
-  --shadow-y: 1px;
-  --shadow-blur: 3px;
-  --shadow-spread: 0px;
-  --shadow-opacity: 0.1;
-  --shadow-color: oklch(0 0 0);
-  --shadow-2xs: 0 2px 6px 0px rgba(236,72,153,0.22), 0 0 12px 0px rgba(255,122,0,0.18);
-  --shadow-xs: 0 2px 6px 0px rgba(168,85,247,0.22), 0 0 16px 0px rgba(255,0,85,0.18);
-  --shadow-sm: 0 4px 16px 0px rgba(255,0,85,0.22), 0 2px 4px -2px rgba(251,191,36,0.18);
-  --shadow: 0 4px 24px 0px rgba(236,72,153,0.28), 0 2px 4px -2px rgba(168,85,247,0.18);
-  --shadow-md: 0 8px 32px 0px rgba(251,191,36,0.22), 0 4px 8px -2px rgba(255,0,85,0.18);
-  --shadow-lg: 0 16px 48px 0px rgba(255,122,0,0.22), 0 8px 12px -2px rgba(236,72,153,0.18);
-  --shadow-xl: 0 24px 64px 0px rgba(168,85,247,0.28), 0 16px 20px -2px rgba(255,0,85,0.18);
-  --shadow-2xl: 0 40px 80px 0px rgba(255,0,85,0.32), 0 2px 6px 0px rgba(251,191,36,0.22);
-}
+
 
 @theme inline {
   --color-background: var(--background);
@@ -131,29 +111,23 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
-
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
   --font-serif: var(--font-serif);
-
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-
+  /* ─── Site marketing ─── */
+  --color-ink: var(--site-fg);
+  --color-ink-muted: var(--site-muted);
+  --color-band: var(--site-band);
+  --color-line: var(--site-border);
+  --color-brand: var(--site-brand);
+  --color-brand-soft: var(--site-brand-soft);
+  --color-ai: var(--site-ai);
+  --color-ai-soft: var(--site-ai-soft);
+  --font-display: var(--font-display);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 6px);
   --shadow-2xs: var(--shadow-2xs);
   --shadow-xs: var(--shadow-xs);
   --shadow-sm: var(--shadow-sm);
@@ -166,30 +140,994 @@
 
 body {
   letter-spacing: var(--tracking-normal);
+  font-feature-settings: "rlig" 1, "calt" 1;
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
-
   body {
     @apply bg-background text-foreground;
   }
 }
 
-@keyframes fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
+/* ═══════════════════════════════════════════════════════
+   VERCEL-STYLE DARK LANDING UTILITIES
+   Colors: black/white base + 3 accent palettes from docs cards
+   • Accent A: Blue/Cyan   (from-blue-500/20 to-cyan-500/20)
+   • Accent B: Purple/Pink (from-purple-500/20 to-pink-500/20)
+   • Accent C: Orange/Amber(from-orange-500/20 to-yellow-500/20)
+═══════════════════════════════════════════════════════ */
 
-  to {
-    opacity: 1;
-    transform: translateY(0);
+/* ── Gradient text ── */
+/* Gold premium — both modes */
+.gradient-text {
+  background: linear-gradient(135deg, #C9A84C 0%, #D4AF37 60%, #E8C96B 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+
+/* Blue/Cyan variant (Accent A) */
+.gradient-text-blue {
+  background: linear-gradient(135deg, #60a5fa 0%, #22d3ee 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Purple/Pink variant (Accent B) */
+.gradient-text-purple {
+  background: linear-gradient(135deg, #c084fc 0%, #f472b6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Orange/Yellow variant (Accent C) */
+.gradient-text-warm {
+  background: linear-gradient(135deg, #fb923c 0%, #fbbf24 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Card hover gradients (from docs cards) ── */
+.card-hover-blue {
+  background: linear-gradient(135deg, rgba(59,130,246,0.08), rgba(6,182,212,0.06));
+}
+.card-hover-purple {
+  background: linear-gradient(135deg, rgba(168,85,247,0.08), rgba(236,72,153,0.06));
+}
+.card-hover-warm {
+  background: linear-gradient(135deg, rgba(249,115,22,0.08), rgba(234,179,8,0.06));
+}
+
+/* ── Base card ── */
+.card-dark {
+  background: #0a0a0a;
+  border: 1px solid rgba(255,255,255,0.07);
+  transition: border-color 200ms ease, background 200ms ease;
+}
+.card-dark:hover {
+  border-color: rgba(255,255,255,0.14);
+}
+
+/* ── Section badge ── */
+.badge-dark {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.5);
+}
+
+/* ── Section divider ── */
+.section-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.06) 50%, transparent 100%);
+}
+
+/* ── Subtle grid ── */
+.bg-grid {
+  background-image:
+    linear-gradient(rgba(0,0,0,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+
+/* ── Noise overlay ── */
+.noise-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Entrance reveals (CSS-first : visibles sans JS, robustes au throttling rAF) ── */
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.anim-rise {
+  animation: rise-in 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--rise-delay, 0ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .anim-rise { animation: none; }
+}
+
+/* ── Micro-interactions au survol (CSS pur, aucun JS) ──
+   Une carte qui se soulève légèrement + un filet qui se teinte : le minimum pour
+   qu'une page statique se sente vivante, sans hydrater quoi que ce soit. */
+.card-hover {
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in oklab, var(--primary) 35%, var(--site-border));
+  box-shadow: 0 10px 26px -14px rgba(16, 24, 40, 0.16);
+}
+
+/* Surface premium façon Vercel : « bordure en ombre » (0 0 0 1px) + élévation douce multi-couches —
+   plus subtil qu'une bordure 1px dure, rendu plus « produit ». À poser avec bg-card + rounded-* (PAS de `border`). */
+.surface {
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.055),
+    0 1px 2px rgba(0, 0, 0, 0.04),
+    0 10px 22px -14px rgba(16, 24, 40, 0.12);
+}
+.surface-hover {
+  transition: box-shadow 200ms ease, transform 200ms ease;
+}
+.surface-hover:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.07),
+    0 2px 4px rgba(0, 0, 0, 0.05),
+    0 16px 30px -14px rgba(16, 24, 40, 0.16);
+}
+
+/* ── Décor : touches subtiles (points + halos) — PARCIMONIE, garde la structure « traits » ──
+   Esthétique DotField (React Bits) en STATIQUE (zéro JS → perf + sobre, sans risque « trop IA »).
+   Couleur = la marque (bleu) ; le dégradé chaud hero-wave reste réservé à Labs (cf. .labs-gradient).
+   Poser `.decor` (crée le contexte) + un modificateur (`.decor-dots` / `.decor-glow-top` / `.decor-tint`). */
+.decor {
+  position: relative;
+  isolation: isolate;
+}
+.decor > * {
+  position: relative;
+  z-index: 1;
+}
+/* nappe de points bleus, fondue par un masque radial → ne « remplit » jamais, ne touche pas les bords */
+.decor-dots::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: radial-gradient(color-mix(in oklab, var(--primary) 42%, transparent) 1px, transparent 1.7px);
+  background-size: 22px 22px;
+  -webkit-mask-image: radial-gradient(100% 100% at 50% 50%, #000 34%, transparent 80%);
+          mask-image: radial-gradient(100% 100% at 50% 50%, #000 34%, transparent 80%);
+  opacity: 0.3;
+}
+/* halo bleu doux en haut d'une section → transition / touche de bord entre deux sections */
+.decor-glow-top::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -1px;
+  height: 240px;
+  width: min(760px, 90%);
+  transform: translateX(-50%);
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(50% 100% at 50% 0%, color-mix(in oklab, var(--primary) 13%, transparent), transparent 72%);
+}
+/* fond « tinté » très léger, pour une section à bg arrondi (bleu de marque, pas de warm) */
+.decor-tint {
+  background:
+    radial-gradient(85% 120% at 50% -10%, color-mix(in oklab, var(--primary) 8%, transparent), transparent 62%),
+    var(--secondary);
+}
+
+/* ── Fonds de SECTION (façon Attio), avec PARCIMONIE : la plupart des sections restent BLANCHES.
+   (≠ `.decor-*` qui décore une carte.) Motif = ::before discret, contenu au-dessus (isolate).
+   Points = seulement le hero (bg n°1), FINS. Rayures = PROGRESSIVES (fondu) → transition entre sections. ── */
+.bg-dots,
+.bg-striped {
+  position: relative;
+  isolation: isolate;
+}
+.bg-dots > *,
+.bg-striped > * {
+  position: relative;
+  z-index: 1;
+}
+.bg-dots::before,
+.bg-striped::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+/* points fins (façon Attio, plus petits) — fondus haut/bas */
+.bg-dots::before {
+  background-image: radial-gradient(color-mix(in oklab, var(--foreground) 9%, transparent) 0.7px, transparent 1.2px);
+  background-size: 20px 20px;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 9%, #000 91%, transparent);
+          mask-image: linear-gradient(to bottom, transparent, #000 9%, #000 91%, transparent);
+}
+/* rayures PROGRESSIVES : nettes en haut, disparaissent vers le milieu → transition depuis la section du dessus */
+.bg-striped::before {
+  background-image: repeating-linear-gradient(90deg, color-mix(in oklab, var(--foreground) 6%, transparent) 0 1px, transparent 1px 13px);
+  -webkit-mask-image: linear-gradient(to bottom, #000, transparent 42%);
+          mask-image: linear-gradient(to bottom, #000, transparent 42%);
+}
+
+/* ── Flow « pro » façon Attio : le tracé se DESSINE UNE FOIS quand la section entre à l'écran
+   (un IntersectionObserver ajoute `.flow-run` sur le conteneur `[data-flow]`), puis se FIGE. Trait PLEIN
+   bleu ; le bord des cartes se REMPLIT en bleu. Aucune boucle permanente. Coupé si prefers-reduced-motion. ── */
+@property --bfill {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+/* traits SVG (connecteurs + bords de nœud) : se dessinent via pathLength="1" */
+.fx-draw,
+.fx-node {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+/* Tout est LINÉAIRE (vitesse constante, aucune accélération) ; durée pilotable par élément via `--dur`
+   (on la met ∝ la taille pour que le « fluide » avance à la même vitesse quelle que soit la longueur du bord). */
+.flow-run .fx-draw {
+  animation: fx-draw var(--dur, 0.7s) linear forwards;
+  animation-delay: var(--d, 0s);
+}
+.flow-run .fx-node {
+  animation: fx-draw var(--dur, 1.3s) linear forwards;
+  animation-delay: var(--d, 0s);
+}
+@keyframes fx-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+/* connecteurs HTML : ligne bleue qui pousse — verticale (fx-line) ou horizontale depuis le centre (fx-line-x) */
+.fx-line {
+  transform: scaleY(0);
+  transform-origin: top center;
+}
+.fx-line-x {
+  transform: scaleX(0);
+  transform-origin: center;
+}
+.flow-run .fx-line {
+  animation: fx-grow var(--dur, 0.45s) linear forwards;
+  animation-delay: var(--d, 0s);
+}
+.flow-run .fx-line-x {
+  animation: fx-grow-x var(--dur, 0.45s) linear forwards;
+  animation-delay: var(--d, 0s);
+}
+@keyframes fx-grow {
+  to { transform: scaleY(1); }
+}
+@keyframes fx-grow-x {
+  to { transform: scaleX(1); }
+}
+
+/* bord de CARTE HTML qui se remplit (anneau conic), une fois, puis reste bleu. LINÉAIRE + durée via --dur. */
+.fx-border {
+  position: relative;
+}
+.fx-border::after {
+  content: "";
+  position: absolute;
+  inset: -1.5px;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(from -90deg, #2563eb 0deg, #2563eb var(--bfill), transparent var(--bfill));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  opacity: 0;
+  pointer-events: none;
+}
+.flow-run .fx-border::after {
+  animation: fx-bfill var(--dur, 1.3s) linear forwards;
+  animation-delay: var(--d, 0s);
+}
+@keyframes fx-bfill {
+  0% { --bfill: 0deg; opacity: 1; }
+  100% { --bfill: 360deg; opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flow-run .fx-draw,
+  .flow-run .fx-node,
+  .flow-run .fx-line,
+  .flow-run .fx-line-x,
+  .flow-run .fx-border::after {
+    animation: none;
+  }
+  .fx-draw,
+  .fx-node { stroke-dashoffset: 0; }
+  .fx-line,
+  .fx-line-x { transform: none; }
+  .fx-border::after { opacity: 0; }
+}
+
+/* ── Moteur v2 : VRAI enchaînement (le JS ajoute `.fx-go` étape par étape, chaque étape démarrant sur la FIN
+   de la précédente via `animationend`). Bord de CARTE = **tracé SVG** `.fx-stroke` (dessin à vitesse d'ARC
+   CONSTANTE — aucune accélération sur les longueurs, contrairement au conic). Tout LINÉAIRE. ── */
+.fx-stroke {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+.fx-go.fx-draw,
+.fx-go.fx-node,
+.fx-go.fx-stroke {
+  animation: fx-draw var(--dur, 0.8s) linear forwards;
+}
+.fx-go.fx-line {
+  animation: fx-grow var(--dur, 0.32s) linear forwards;
+}
+.fx-go.fx-line-x {
+  animation: fx-grow-x var(--dur, 0.5s) linear forwards;
+}
+/* Carte qui « apparaît » (fondu + légère montée), chaînée — robuste (pas de tracé SVG fragile). */
+.fx-pop {
+  opacity: 0;
+  transform: translateY(10px);
+}
+.fx-go.fx-pop {
+  animation: fx-pop var(--dur, 0.5s) ease-out forwards;
+}
+@keyframes fx-pop {
+  to { opacity: 1; transform: none; }
+}
+/* Élément qui apparaît en simple fondu (pas de montée) — pour les connecteurs/flèches façon Attio. */
+.fx-fade {
+  opacity: 0;
+}
+.fx-go.fx-fade {
+  animation: fx-fade var(--dur, 0.4s) ease-out forwards;
+}
+@keyframes fx-fade {
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fx-stroke { stroke-dashoffset: 0; }
+  .fx-pop { opacity: 1; transform: none; }
+  .fx-fade { opacity: 1; }
+  .fx-go { animation: none !important; }
+}
+
+/* ── Canvas de flux (façon Attio, écran 3) : un cadre à fond POINTILLÉ où « flottent » les nœuds/toasts.
+   NOTRE TEMPLATE pour présenter tous les petits flux. À composer avec `surface bg-card rounded-2xl`. ── */
+.flow-canvas {
+  background-image: radial-gradient(color-mix(in oklab, var(--foreground) 8%, transparent) 1px, transparent 1.5px);
+  background-size: 20px 20px;
+}
+
+/* Retire les rails verticaux d'une section (variété sur les transitions). */
+.container-rail.no-rail {
+  border-inline: 0;
+}
+
+/* ─── React Flow — schémas d'orchestration (statique, façon Attio) ───
+   Canvas transparent (laisse voir les points de section), aucune interaction, badge masqué.
+   Le handle SOURCE devient le « rond au départ » ; le handle TARGET est invisible (la flèche
+   du marker suffit à l'arrivée). Couleurs = bleu de marque (#2563eb = --primary). */
+.tf-flow.react-flow {
+  background: transparent;
+}
+.tf-flow .react-flow__pane,
+.tf-flow .react-flow__node {
+  cursor: default;
+}
+.tf-flow .react-flow__attribution {
+  display: none;
+}
+.tf-flow .react-flow__handle {
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+  border-radius: 9999px;
+  box-shadow: none;
+}
+.tf-flow .react-flow__handle.tf-handle--source {
+  width: 11px;
+  height: 11px;
+  background: #ffffff;
+  border: 2px solid #2563eb;
+  box-shadow: 0 0 0 3px color-mix(in oklab, #2563eb 12%, transparent);
+}
+.tf-flow .react-flow__handle.tf-handle--target {
+  width: 8px;
+  height: 8px;
+  background: #ffffff;
+  border: 1.5px solid color-mix(in oklab, var(--foreground) 24%, transparent);
+  opacity: 1;
+}
+/* Survol discret des cartes (le « hover par défaut » suffit — cf. retour user). */
+.tf-node {
+  transition: border-color 0.18s ease;
+}
+.tf-node:hover {
+  border-color: color-mix(in oklab, var(--primary) 30%, var(--border));
+}
+
+/* Tuile de logo : s'éclaire au survol. */
+.tile-hover {
+  transition: background-color 160ms ease;
+}
+.tile-hover:hover {
+  background-color: color-mix(in oklab, var(--primary) 5%, var(--card));
+}
+.tile-hover img {
+  transition: filter 180ms ease, transform 180ms ease;
+}
+.tile-hover:hover img {
+  filter: none;
+  transform: scale(1.08);
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-hover:hover,
+  .tile-hover:hover img {
+    transform: none;
   }
 }
 
-.animate-fade-in {
-  animation: fade-in 0.6s ease-out forwards;
+/* ── Scènes produit ──
+   Deux primitives de motion, pas plus. Tout le reste des scènes est piloté par
+   des transitions d'état en React : une transition sait d'où elle part, une
+   keyframe non — et c'est ce qui donne le mouvement continu plutôt que saccadé. */
+
+/* Anneau d'attention : se joue UNE fois, sur l'action que le run attend.
+   Une pulsation qui se répète devient du bruit et on cesse de la voir. */
+@keyframes attention-ring {
+  from { box-shadow: 0 0 0 0 color-mix(in oklab, var(--primary) 42%, transparent); }
+  to   { box-shadow: 0 0 0 9px color-mix(in oklab, var(--primary) 0%, transparent); }
+}
+.anim-attention {
+  animation: attention-ring 1200ms cubic-bezier(0.16, 1, 0.3, 1) 1 both;
+}
+
+/* Curseur de frappe — le signe qu'un agent est en train d'écrire, pas que du
+   texte est apparu. `steps(1)` pour un clignotement franc, jamais un fondu. */
+@keyframes caret-blink {
+  0%, 49%  { opacity: 1; }
+  50%, 99% { opacity: 0; }
+}
+.anim-caret {
+  animation: caret-blink 1s steps(1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-attention,
+  .anim-caret { animation: none; }
+}
+
+/* ── Animations ── */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+.animate-float { animation: float 6s ease-in-out infinite; }
+
+@keyframes mega-blob {
+  0%, 100% { transform: translateY(0) scale(1);   opacity: 0.07; }
+  50%       { transform: translateY(-18px) scale(1.08); opacity: 0.12; }
+}
+
+/* ── Testimonial column infinite scroll ── */
+@keyframes scroll-up {
+  0%   { transform: translateY(0); }
+  100% { transform: translateY(-50%); }
+}
+@keyframes scroll-up-reverse {
+  0%   { transform: translateY(-50%); }
+  100% { transform: translateY(0); }
+}
+.animate-scroll-up {
+  animation: scroll-up linear infinite;
+}
+.animate-scroll-up-reverse {
+  animation: scroll-up-reverse linear infinite;
+}
+.animate-scroll-up:hover,
+.animate-scroll-up-reverse:hover {
+  animation-play-state: paused;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in { animation: fade-in 0.5s ease-out forwards; }
+
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+.animate-shimmer {
+  background: linear-gradient(90deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 100%);
+  background-size: 200% auto;
+  animation: shimmer 2s linear infinite;
+}
+
+/* ── Status dot ── */
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #22c55e;
+  animation: pulse-green 2s ease-in-out infinite;
+}
+@keyframes pulse-green {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.4); }
+  50%       { box-shadow: 0 0 0 4px rgba(34,197,94,0); }
+}
+
+/* ── Icône de contenu (HORS flux) — règle user : CHAQUE icône = UNE couleur, et SANS fond.
+   On pose la teinte via `style="--ic: #2563eb"` → seul le glyphe est coloré (currentColor).
+   Fond + bordure neutralisés ici, donc les ~30 usages `.ic-tile ... border bg-card` deviennent
+   des glyphes colorés nus d'un coup, sans toucher chaque page. La taille/centrage du wrapper
+   restent (boîte invisible) pour ne pas casser l'alignement. ── */
+.ic-tile {
+  background: transparent;
+  border: 0;
+  color: var(--ic, var(--primary));
+}
+
+/* ── Point « live » (badge / loader) — pulsation douce qui reprend la couleur du texte parent.
+   Poser sur un point plein : `<span class="tf-pulse size-1.5 rounded-full bg-current" />`. ── */
+.tf-pulse {
+  position: relative;
+}
+.tf-pulse::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  animation: tf-ping 2.2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+@keyframes tf-ping {
+  0%        { box-shadow: 0 0 0 0 color-mix(in oklab, currentColor 55%, transparent); }
+  70%, 100% { box-shadow: 0 0 0 6px color-mix(in oklab, currentColor 0%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tf-pulse::before { animation: none; }
+}
+
+/* ── Selection — alignée sur le primaire de l'app ── */
+::selection { background: rgba(37, 99, 235, 0.16); color: inherit; }
+
+/* ── Glass ── */
+.glass {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+  backdrop-filter: blur(16px);
+}
+
+/* ── Animated glow card borders ── */
+@keyframes border-spin {
+  0%   { --angle: 0deg; }
+  100% { --angle: 360deg; }
+}
+
+@property --angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.glow-card-border {
+  background: conic-gradient(
+    from var(--angle, 0deg),
+    transparent 0%,
+    var(--glow-color, rgba(255,255,255,0.15)) 10%,
+    transparent 20%
+  );
+  animation: border-spin 4s linear infinite;
+  padding: 1px;
+  border-radius: inherit;
+}
+
+.glow-card-wrapper:hover .glow-card-border {
+  opacity: 1;
+}
+
+.glow-card-border::before {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  background: #0a0a0a;
+  border-radius: inherit;
+}
+
+/* ═══════════════════════════════════════════════════════
+   SITE MARKETING — primitives de la refonte (24/07/2026)
+   Réf. taskforce-docs/v1/14-design/landing-refonte/Plan_Refonte_Site.md §4
+═══════════════════════════════════════════════════════ */
+
+/* ── Conteneur ── */
+.container-site {
+  width: 100%;
+  max-width: var(--site-container);
+  margin-inline: auto;
+  padding-inline: 1.5rem;
+}
+@media (min-width: 1024px) {
+  .container-site { padding-inline: 2rem; }
+}
+
+/* ── Rails ──
+   La grille de la page : deux filets verticaux aux bords du conteneur, et un
+   séparateur horizontal pleine largeur par section (porté par la <section>).
+   C'est ce qui donne sa forme à la page — sans lui, tout flotte. */
+.container-rail {
+  width: 100%;
+  max-width: var(--site-container);
+  margin-inline: auto;
+  padding-inline: 1.5rem;
+  border-inline: 1px solid var(--site-border);
+}
+@media (min-width: 1024px) {
+  .container-rail { padding-inline: 2.5rem; }
+}
+
+/* Filets internes : séparent les colonnes d'une grille sans casser le rythme. */
+.rail-x { border-inline-start: 1px solid var(--site-border); }
+.rail-y { border-block-start: 1px solid var(--site-border); }
+
+/* ── Échelle typographique (display = Sora) ── */
+.t-h1 {
+  font-family: var(--font-display);
+  font-size: clamp(2.5rem, 5vw, 3.5rem);   /* 40 → 56 px */
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  line-height: 1.06;
+  color: var(--site-fg);
+}
+.t-h2 {
+  font-family: var(--font-display);
+  font-size: clamp(1.875rem, 3.4vw, 2.5rem); /* 30 → 40 px */
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  line-height: 1.14;
+  color: var(--site-fg);
+}
+.t-h3 {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+  color: var(--site-fg);
+}
+.t-eyebrow {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--site-brand);
+}
+.t-lead {
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  color: var(--site-muted);
+  letter-spacing: 0;
+}
+
+/* ── Liens : soulignage animé de gauche à droite ──
+   Repris du breadcrumb de la webapp (frontend/components/ui/breadcrumb.tsx, QA2-3) :
+   after:w-0 → hover:after:w-full, transition sur `width`, 200ms ease-out.
+   En CSS plutôt qu'en 6 classes utilitaires répétées sur chaque lien du site. */
+.link-underline {
+  position: relative;
+  transition: color 150ms ease;
+  /* Ne pas s'étirer quand le lien est un flex-item (parent `flex flex-col`) : sinon le souligné
+     animé court jusqu'au bord de la carte. `fit-content` = largeur du texte, et reste centré si
+     le parent centre (align-items). Ignoré sur les liens inline (dans un paragraphe). */
+  width: fit-content;
+  max-width: 100%;
+}
+.link-underline::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  height: 1px;
+  width: 0;
+  background: currentColor;
+  transition: width 200ms ease-out;
+}
+.link-underline:hover,
+.link-underline:focus-visible {
+  color: var(--site-fg);
+}
+.link-underline:hover::after,
+.link-underline:focus-visible::after {
+  width: 100%;
+}
+@media (prefers-reduced-motion: reduce) {
+  .link-underline::after { transition: none; }
+}
+
+/* ── Méga-menus du header ──
+   Le wrapper Radix du viewport est le seul <div> enfant direct de la Root
+   (l'autre enfant est la <ul>). On le centre sur la barre pour qu'un panneau
+   large ne déborde jamais du viewport, quelle que soit la largeur d'écran. */
+.site-nav > div {
+  left: 50%;
+  transform: translateX(-50%);
+}
+.site-nav [data-slot="navigation-menu-viewport"] {
+  margin-top: 0.625rem;
+  border-radius: 16px;
+  border-color: var(--site-border);
+  background: #fff;
+  box-shadow:
+    0 20px 48px -16px rgba(0, 0, 0, 0.18),
+    0 2px 8px -2px rgba(0, 0, 0, 0.06);
+}
+
+/* ── Accessibilité : focus visible homogène (WCAG 2.2 — 2.4.7 / 2.4.11) ── */
+:where(a, button, [role="button"], input, select, textarea, summary):focus-visible {
+  outline: 2px solid var(--site-brand);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Lien d'évitement — visible seulement au focus clavier */
+.skip-link {
+  position: absolute;
+  left: 1rem;
+  top: -100px;
+  z-index: 100;
+  padding: 0.625rem 1rem;
+  border-radius: 9999px;
+  background: var(--site-fg);
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: top 150ms ease;
+}
+.skip-link:focus {
+  top: 1rem;
+}
+
+/* Cible de la navigation par ancre : ne pas passer sous le header collant (2.4.11) */
+:target {
+  scroll-margin-top: 6rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   LABS — surface expérimentale SOMBRE (scoped aux routes /labs)
+   Décision : Labs est son propre « monde » sombre, PAS un dark-mode global
+   (D2 = light-only reste vraie pour les 62 autres routes). Ces jetons ne
+   redéfinissent rien de global — ils vivent sous .labs-scope uniquement.
+   Bleu = action (marque) · Violet = marquage IA/Labs (cf. --site-ai).
+═══════════════════════════════════════════════════════ */
+.labs-scope {
+  --labs-bg:          #080910;   /* encre bleu-noir, pas noir pur */
+  --labs-elev:        #0e1017;
+  --labs-fg:          #f5f6f8;
+  --labs-muted:       #9aa1ac;
+  --labs-faint:       #6b7280;
+  --labs-line:        rgba(255, 255, 255, 0.09);
+  --labs-line-strong: rgba(255, 255, 255, 0.17);
+  --labs-panel:       rgba(255, 255, 255, 0.025);
+  --labs-panel-hover: rgba(255, 255, 255, 0.05);
+  --labs-violet:      #a78bfa;   /* le violet Labs, lisible sur sombre */
+  --labs-blue:        #60a5fa;   /* le bleu de marque, lisible sur sombre */
+  --labs-emerald:     #34d399;
+  --labs-amber:       #fbbf24;
+}
+
+/* Trame « blueprint / oscilloscope » sur fond sombre */
+.labs-grid {
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 30px 30px;
+  -webkit-mask-image: radial-gradient(120% 80% at 50% 0%, #000 30%, transparent 78%);
+          mask-image: radial-gradient(120% 80% at 50% 0%, #000 30%, transparent 78%);
+}
+
+/* Surface : hairline claire sur verre très sombre (pas de glassmorphism appuyé) */
+.labs-panel {
+  background: var(--labs-panel);
+  border: 1px solid var(--labs-line);
+  border-radius: 16px;
+}
+.labs-panel-hover {
+  transition: background-color 200ms ease, border-color 200ms ease, transform 200ms ease;
+}
+.labs-panel-hover:hover {
+  background: var(--labs-panel-hover);
+  border-color: var(--labs-line-strong);
+}
+@media (prefers-reduced-motion: reduce) {
+  .labs-panel-hover:hover { transform: none; }
+}
+
+/* Vignette de bord — donne la profondeur « chambre » sans ajouter de dépendance */
+.labs-vignette {
+  background: radial-gradient(125% 90% at 50% -8%, transparent 52%, rgba(0, 0, 0, 0.55) 100%);
+}
+
+/* Point « live » : une pulsation lente et discrète, coupée en reduced-motion */
+@keyframes labs-ping {
+  0%   { box-shadow: 0 0 0 0 color-mix(in oklab, var(--labs-emerald) 55%, transparent); }
+  100% { box-shadow: 0 0 0 7px color-mix(in oklab, var(--labs-emerald) 0%, transparent); }
+}
+.labs-pulse { animation: labs-ping 2.6s cubic-bezier(0.16, 1, 0.3, 1) infinite; }
+@media (prefers-reduced-motion: reduce) { .labs-pulse { animation: none; } }
+
+/* BorderBeam (Magic UI, réécrit sans `motion`) — le faisceau parcourt le bord via offset-path. */
+@keyframes border-beam-move {
+  to { offset-distance: 100%; }
+}
+
+/* ── Labs : dégradés « verre liquide » (palette de public/labs/hero-wave.jpg, SANS violet) ──
+   Fixes, choisis dans le mood de l'image : coral / rose / pêche / bleu. */
+.labs-g1 { background-image: linear-gradient(135deg, #ff8a7a, #ff6f91); }  /* coral → rose */
+.labs-g2 { background-image: linear-gradient(135deg, #7db8ff, #ff9ec7); }  /* bleu → rose */
+.labs-g3 { background-image: linear-gradient(135deg, #ffb489, #ff7eb3); }  /* pêche → rose */
+.labs-g4 { background-image: linear-gradient(135deg, #ff9a6c, #ff6f91); }  /* orange → rose */
+.labs-g5 { background-image: linear-gradient(135deg, #ff7eb3, #7db8ff); }  /* rose → bleu */
+.labs-g6 { background-image: linear-gradient(135deg, #7db8ff, #ff8a7a); }  /* bleu → coral */
+/* Texte en dégradé (labels) */
+.labs-gtext {
+  background-image: linear-gradient(135deg, #ff6f91, #7db8ff);
+  -webkit-background-clip: text;
+          background-clip: text;
+  color: transparent;
+}
+/* Icônes : l'ICÔNE prend le dégradé (aucun fond) — dégradés déclarés par <LabsGradientDefs/>. */
+.labs-ic-a { stroke: url(#lgA); }
+.labs-ic-b { stroke: url(#lgB); }
+.labs-ic-c { stroke: url(#lgC); }
+.labs-ic-d { stroke: url(#lgD); }
+.labs-ic-e { stroke: url(#lgE); }
+/* Fiole Labs dans le header (site-wide) — dégradé déclaré par le <svg> caché de SiteHeader. */
+.labs-ic-head { stroke: url(#lgLabsHead); }
+
+/* PixelBlast FIGÉ (statique) : petits carrés warm (palette hero-wave), concentrés sur les BORDS via un
+   masque → « pixels autour » d'une section, façon transition. Labs uniquement (le warm reste réservé à
+   Labs). Poser avec `.decor` (relève le contenu) + `overflow-hidden`. Zéro JS, zéro three.js. */
+.labs-pixels::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Crect width='2' height='2' fill='%23ff7a97'/%3E%3C/svg%3E");
+  background-size: 8px 8px;
+  -webkit-mask-image: linear-gradient(to bottom, #000, transparent 26%, transparent 74%, #000);
+          mask-image: linear-gradient(to bottom, #000, transparent 26%, transparent 74%, #000);
+  opacity: 0.14;
+}
+/* Halo warm doux en haut d'une section Labs (transition / touche de bord). */
+.labs-glow-top::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -1px;
+  height: 240px;
+  width: min(820px, 92%);
+  transform: translateX(-50%);
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(50% 100% at 50% 0%, rgba(255, 122, 151, 0.14), transparent 72%);
+}
+
+/* Échelle typographique Labs — miroir des .t-* mais en encre claire.
+   (Les .t-* portent color:var(--site-fg) = sombre : inutilisables ici.) */
+.labs-scope .labs-h1 {
+  font-family: var(--font-display);
+  font-size: clamp(2.5rem, 5vw, 3.5rem);
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  line-height: 1.06;
+  color: var(--labs-fg);
+}
+.labs-scope .labs-h2 {
+  font-family: var(--font-display);
+  font-size: clamp(1.875rem, 3.4vw, 2.5rem);
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  line-height: 1.14;
+  color: var(--labs-fg);
+}
+.labs-scope .labs-h3 {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+  color: var(--labs-fg);
+}
+.labs-scope .labs-lead {
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  color: var(--labs-muted);
+}
+.labs-scope .labs-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--labs-violet);
+}
+
+/* Les rails de page (filets clairs par défaut) passent en hairline claire sur sombre. */
+.labs-scope .container-rail,
+.labs-scope .rail-x,
+.labs-scope .rail-y {
+  border-color: var(--labs-line);
+}
+
+/* ── Coque (header + footer) en SOMBRE sous Labs ──
+   On ne réécrit PAS les composants partagés : on RE-MAPPE leurs jetons, mais UNIQUEMENT dans
+   le sous-arbre header/footer. Les utilitaires (bg-card, text-foreground, border…) résolvent
+   alors des valeurs sombres. Scope = .labs-body → les 62 autres routes ne bougent pas. */
+.labs-body header,
+.labs-body footer {
+  --background: #0b0d15;
+  --card: #0b0d15;
+  --card-foreground: #f5f6f8;
+  --foreground: #f5f6f8;
+  --muted-foreground: #9aa1ac;
+  --secondary: rgba(255, 255, 255, 0.06);
+  --secondary-foreground: #f5f6f8;
+  --accent: rgba(255, 255, 255, 0.08);
+  --accent-foreground: #f5f6f8;
+  --border: rgba(255, 255, 255, 0.1);
+  --input: rgba(255, 255, 255, 0.16);
+  --popover: #0e1017;
+  --popover-foreground: #f5f6f8;
+}
+/* Le logo est monochrome (#1d1d1f) → on le repasse en blanc. */
+.labs-body header img[src*="logo-taskforce"],
+.labs-body footer img[src*="logo-taskforce"] {
+  filter: brightness(0) invert(1);
+}
+/* Le viewport des méga-menus est codé en blanc dur (règle .site-nav plus haut) → on le repasse sombre. */
+.labs-body .site-nav [data-slot="navigation-menu-viewport"] {
+  background: #0e1017;
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 20px 48px -16px rgba(0, 0, 0, 0.6),
+    0 2px 8px -2px rgba(0, 0, 0, 0.4);
 }

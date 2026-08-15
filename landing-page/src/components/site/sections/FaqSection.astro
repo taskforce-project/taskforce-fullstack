@@ -1,0 +1,33 @@
+---
+/**
+ * FaqSection — bloc FAQ réutilisable (motif repris d'enterprise.astro), posé en bas de page
+ * JUSTE avant le <PageCta>. DA « traits » : section pleine + filet 1px, `dl` en 2 colonnes,
+ * zéro carte flottante / ombre / radius. On passe l'eyebrow, le titre et les items {q,a}.
+ */
+interface Props {
+  eyebrow?: string;
+  title: string;
+  items: { q: string; a: string }[];
+  class?: string;
+}
+const { eyebrow = "Common questions", title, items, class: cls } = Astro.props;
+---
+
+<section class:list={["bg-card border-b", cls]}>
+  <div class="container-rail py-20 lg:py-28">
+    <div class="max-w-2xl">
+      {eyebrow && <p class="t-eyebrow mb-3">{eyebrow}</p>}
+      <h2 class="t-h2">{title}</h2>
+    </div>
+    <dl class="mt-12 grid gap-x-12 gap-y-8 border-t pt-10 sm:grid-cols-2">
+      {
+        items.map((f) => (
+          <div>
+            <dt class="text-[15px] font-semibold text-foreground">{f.q}</dt>
+            <dd class="text-muted-foreground mt-2 text-[13.5px] leading-6">{f.a}</dd>
+          </div>
+        ))
+      }
+    </dl>
+  </div>
+</section>

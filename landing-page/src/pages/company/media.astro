@@ -1,0 +1,127 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import PageHero from "@/components/site/PageHero.astro";
+import PageCta from "@/components/site/PageCta.astro";
+import { Download } from "lucide-react";
+
+const CONTACT = "hello@taskforce.dev";
+
+/* Jetons de marque réels (src/styles/global.css). */
+const COLORS = [
+  { name: "Primary", hex: "#2563EB", note: "CTAs and links", ink: false },
+  { name: "Ink", hex: "#1D1D1F", note: "Text and logo", ink: false },
+  { name: "Canvas", hex: "#FBFBFC", note: "Background", ink: true },
+  { name: "Border", hex: "#E6E6E9", note: "Lines and cards", ink: true },
+];
+
+const LOGOS = [
+  { title: "Logo", note: "Full wordmark — light backgrounds", src: "/logo-taskforce.svg", box: "bg-card" },
+  { title: "Icon", note: "Square mark — avatars and favicons", src: "/favicon.svg", box: "bg-card" },
+];
+---
+
+<BaseLayout
+  title="Press & brand — TaskForce"
+  description="TaskForce brand assets and boilerplate: logo, icon, colors and a short description for press and partners."
+>
+  <PageHero
+    eyebrow="Press & brand"
+    title="Brand assets"
+    lead="Logo, icon, colors and a short description of TaskForce. Please keep the mark legible and don't recolor or distort it."
+    primary={{ label: "Email press", href: `mailto:${CONTACT}` }}
+    secondary={{ label: "About TaskForce", href: "/company/about" }}
+  />
+
+  {/* ── Boilerplate ── */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="mx-auto max-w-2xl">
+        <p class="t-eyebrow mb-3">Boilerplate</p>
+        <h2 class="t-h2">What TaskForce is, in a line and a paragraph</h2>
+        <div class="mt-6 flex flex-col gap-5">
+          <p class="text-[15px] leading-7 text-foreground">
+            <span class="font-medium">One line —</span> TaskForce is the AI delivery operating system: a governed path from intent to production,
+            where AI runs the delivery and a human owns every decision.
+          </p>
+          <p class="text-muted-foreground text-[14px] leading-7">
+            <span class="text-foreground font-medium">Paragraph —</span> TaskForce turns a product outcome into a governed delivery run: it drafts each step for a
+            human to approve, hands the build to the coding agent you already use, and keeps the
+            reasoning behind every decision in a memory the next run builds on. Today it works issue by
+            issue — the spec, the plan and a ready-to-run prompt, on local models; the full run and a
+            specialized team of agents are the direction. It sits on the board, repositories and coding
+            agents teams already use, and can run on your own infrastructure and models.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {/* ── Logos ── */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">Logo</p>
+        <h2 class="t-h2">Download the mark</h2>
+      </div>
+      <div class="mt-12 grid gap-6 sm:grid-cols-2">
+        {
+          LOGOS.map((l) => (
+            <div class="overflow-hidden border">
+              <div class={`flex h-40 items-center justify-center ${l.box}`}>
+                <img src={l.src} alt={`TaskForce ${l.title}`} class="h-10 w-auto" />
+              </div>
+              <div class="bg-secondary/40 flex items-center justify-between gap-3 border-t px-5 py-3.5">
+                <div>
+                  <p class="text-[14px] font-semibold text-foreground">{l.title}</p>
+                  <p class="text-muted-foreground text-[12px]">{l.note}</p>
+                </div>
+                <a
+                  href={l.src}
+                  download
+                  class="link-underline text-foreground inline-flex items-center gap-1.5 text-[13px] font-medium"
+                >
+                  <Download className="size-3.5" />
+                  SVG
+                </a>
+              </div>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  {/* ── Colors ── */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">Color</p>
+        <h2 class="t-h2">The palette</h2>
+      </div>
+      <div class="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        {
+          COLORS.map((c) => (
+            <div class="overflow-hidden border bg-card">
+              <div
+                class:list={["h-24 w-full", c.ink ? "border-b" : ""]}
+                style={`background:${c.hex}`}
+              />
+              <div class="px-5 py-3.5">
+                <p class="text-[14px] font-semibold text-foreground">{c.name}</p>
+                <p class="text-muted-foreground font-mono text-[12px]">{c.hex}</p>
+                <p class="text-muted-foreground mt-1 text-[12px]">{c.note}</p>
+              </div>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <PageCta
+    title="Writing about TaskForce?"
+    lead="Reach out and we'll help with assets, facts and a straight answer on what's live versus planned."
+    primary={{ label: "Email press", href: `mailto:${CONTACT}` }}
+    secondary={{ label: "About TaskForce", href: "/company/about" }}
+  />
+</BaseLayout>

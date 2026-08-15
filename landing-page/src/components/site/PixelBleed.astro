@@ -1,0 +1,58 @@
+---
+/**
+ * PixelBleed — champ PixelBlast en OVERLAY absolu (aucune hauteur de flux) : les sections restent
+ * COLLÉES, le pixel vient transitionner / faire un effet et passe DERRIÈRE le contenu (les cartes le
+ * recouvrent, il apparaît autour). À poser dans une section `relative isolate` dont le contenu est
+ * `relative z-10`. Deux modes :
+ *   - défaut : bord (`edge` top/bottom) masqué en fondu vers l'intérieur — pour la couture entre sections ;
+ *   - `patch` : tache libre (masque RADIAL doux) positionnée via `class` — pour semer des effets derrière les cartes.
+ * Remplace l'ancien `PixelBand` (qui, lui, ajoutait une bande de 172px et SÉPARAIT les sections).
+ */
+import PixelBlast from "@/components/PixelBlast";
+
+interface Props {
+  color?: string;
+  edge?: "top" | "bottom";
+  height?: number;
+  align?: "full" | "left" | "right" | "center";
+  opacity?: number;
+  patch?: boolean;
+  class?: string;
+}
+
+const { color = "#EC6B86", edge = "top", height = 230, align = "full", opacity = 0.45, patch = false, class: cls } = Astro.props;
+
+const POS: Record<string, string> = {
+  full: "inset-x-0",
+  left: "left-0 w-[62%]",
+  right: "right-0 w-[62%]",
+  center: "left-1/2 w-[64%] -translate-x-1/2",
+};
+const edgeCls = edge === "top" ? "top-0" : "bottom-0";
+const edgeMask =
+  edge === "top"
+    ? "[mask-image:linear-gradient(to_bottom,black,black_22%,transparent)]"
+    : "[mask-image:linear-gradient(to_top,black,black_22%,transparent)]";
+const patchMask = "[mask-image:radial-gradient(ellipse_at_center,black,transparent_72%)]";
+
+const wrapCls = patch
+  ? ["pointer-events-none absolute z-0 overflow-hidden", patchMask, cls]
+  : ["pointer-events-none absolute z-0 overflow-hidden", edgeCls, POS[align], edgeMask];
+const wrapStyle = patch ? `opacity:${opacity}` : `height:${height}px;opacity:${opacity}`;
+---
+
+<div class:list={wrapCls} style={wrapStyle} aria-hidden="true">
+  <PixelBlast
+    client:only="react"
+    variant="circle"
+    color={color}
+    pixelSize={5}
+    patternDensity={1}
+    patternScale={3}
+    pixelSizeJitter={0.5}
+    enableRipples={false}
+    speed={0.3}
+    edgeFade={0.5}
+    transparent={true}
+  />
+</div>

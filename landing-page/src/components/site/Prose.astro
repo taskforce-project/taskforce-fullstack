@@ -1,0 +1,31 @@
+---
+/**
+ * Prose — conteneur typographique pour les pages texte (légal, transparence…).
+ * Style les enfants slottés via des variantes Tailwind arbitraires (`[&_h2]:…`), qui
+ * génèrent de vrais sélecteurs descendants — ils s'appliquent donc au contenu du `<slot/>`
+ * (contrairement aux styles scoped d'Astro). Pas de plugin typography, juste des utilitaires.
+ */
+interface Props {
+  class?: string;
+}
+const { class: className } = Astro.props;
+---
+
+<div
+  class:list={[
+    "text-foreground max-w-2xl text-[15px] leading-7",
+    "[&_h2]:font-display [&_h2]:mt-12 [&_h2]:mb-4 [&_h2]:text-[22px] [&_h2]:font-medium [&_h2]:tracking-[-0.02em] [&_h2]:text-foreground",
+    "[&_h3]:mt-8 [&_h3]:mb-2 [&_h3]:text-[16px] [&_h3]:font-semibold [&_h3]:text-foreground",
+    "[&_p]:text-muted-foreground [&_p]:mb-4",
+    "[&_ul]:mb-4 [&_ul]:flex [&_ul]:flex-col [&_ul]:gap-2 [&_ul]:pl-0",
+    "[&_li]:text-muted-foreground [&_li]:relative [&_li]:pl-5 [&_li]:marker:content-none",
+    "[&_li]:before:bg-primary [&_li]:before:absolute [&_li]:before:left-0 [&_li]:before:top-[10px] [&_li]:before:size-1.5 [&_li]:before:rounded-full",
+    "[&_a]:text-foreground [&_a]:underline [&_a]:underline-offset-2",
+    "[&_strong]:text-foreground [&_strong]:font-semibold",
+    "[&_code]:bg-secondary [&_code]:rounded [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[13px]",
+    "[&_h2:first-child]:mt-0",
+    className,
+  ]}
+>
+  <slot />
+</div>

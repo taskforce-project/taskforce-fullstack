@@ -1,0 +1,58 @@
+---
+/**
+ * StatBand — bandeau de 2 à 4 chiffres de preuve. Un archétype de section à part entière
+ * (change la forme visuelle de la page, ne pas rendre ça avec des cartes).
+ */
+interface Stat {
+  value: string;
+  label: string;
+  sub?: string;
+}
+interface Props {
+  eyebrow?: string;
+  title?: string;
+  lead?: string;
+  stats: Stat[];
+  bg?: "card" | "secondary";
+  align?: "center" | "left";
+  /** Enveloppe les chiffres dans un panneau arrondi tinté (fond « bg rounded »). */
+  panel?: boolean;
+  /** Nappe de points discrète dans le panneau (nécessite `panel`). */
+  dots?: boolean;
+}
+const { eyebrow, title, lead, stats, bg = "secondary", align = "center", panel = false, dots = false } = Astro.props;
+const center = align === "center";
+---
+
+<section class:list={[bg === "secondary" ? "bg-secondary" : "bg-card", "border-b"]}>
+  <div class="container-rail py-16 lg:py-20">
+    {
+      (eyebrow || title || lead) && (
+        <div class:list={["mb-10", center ? "mx-auto max-w-2xl text-center" : "max-w-2xl"]}>
+          {eyebrow && <p class="t-eyebrow mb-3">{eyebrow}</p>}
+          {title && <h2 class="t-h2">{title}</h2>}
+          {lead && <p class="t-lead mt-4">{lead}</p>}
+        </div>
+      )
+    }
+    <div
+      class:list={[
+        panel && "overflow-hidden rounded-xl border px-6 py-12 sm:px-10",
+      ]}
+    >
+      <dl class="grid grid-cols-2 gap-y-8 md:grid-cols-4">
+        {
+          stats.map((s, i) => (
+            <div class:list={["px-4 text-center md:px-6", i > 0 && "md:border-l"]}>
+              <dt class="font-display text-foreground text-[34px] font-semibold tracking-[-0.02em] tabular-nums sm:text-[40px]">
+                {s.value}
+              </dt>
+              <dd class="text-foreground mt-1 text-[14px] font-medium">{s.label}</dd>
+              {s.sub && <dd class="text-muted-foreground mt-0.5 text-[12px]">{s.sub}</dd>}
+            </div>
+          ))
+        }
+      </dl>
+    </div>
+  </div>
+</section>

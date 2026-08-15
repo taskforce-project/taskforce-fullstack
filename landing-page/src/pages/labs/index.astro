@@ -1,0 +1,248 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import LabsGradientDefs from "@/components/site/labs/LabsGradientDefs.astro";
+import LabsBackdrop from "@/components/site/LabsBackdrop.astro";
+import { LabsSubjects } from "@/components/site/LabsSubjects";
+import { LabsLoopFlow } from "@/components/site/flows/OrchestrationFlows";
+import PixelBleed from "@/components/site/PixelBleed.astro";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import PageCta from "@/components/site/PageCta.astro";
+import { LABS } from "@/lib/labs";
+import { hueFor } from "@/lib/site-icons";
+import { FlaskConical, ArrowRight, Bot, Brain, Cpu, ShieldCheck, Sparkles } from "lucide-react";
+
+/**
+ * Labs — CLAIR, STATIQUE, SOBRE. Retours user 03/08 : image de fond plein cadre, pas de rails sur le hero,
+ * icônes en dégradé (le TRAIT prend le dégradé, aucun fond), accents en BLEU (primaire)/neutre — plus de
+ * violet ; dégradés tirés de l'image (sans violet). Système de sections/rails plutôt que des cartes flottantes.
+ * D11 : on publie la DIRECTION, pas le mécanisme ; aucune expérience n'est « Live ».
+ */
+
+const ITEMS = Object.values(LABS);
+
+type Mat = "live" | "beta" | "planned" | "research";
+const MAT_LIGHT: Record<Mat, string> = {
+  live: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  beta: "border-amber-200 bg-amber-50 text-amber-700",
+  planned: "border-slate-200 bg-slate-100 text-slate-600",
+  research: "border-sky-200 bg-sky-50 text-sky-700",
+};
+const MAT_LABEL: Record<Mat, string> = { live: "Live", beta: "Beta", planned: "Planned", research: "Research" };
+
+const SURFACES: Record<string, { at: string; href: string; mat: Mat }> = {
+  "agent-roles": { at: "Orchestration", href: "/product/orchestration", mat: "planned" },
+  "run-memory": { at: "TaskForce Memory", href: "/product/brain-os", mat: "beta" },
+  "model-choice": { at: "Your models", href: "/enterprise", mat: "live" },
+  "learning-from-reviews": { at: "Prediction & calibration", href: "/product/orchestration", mat: "planned" },
+};
+
+/* Données pour l'îlot LabsSubjects — 1 sujet = 1 section empilée (barre d'onglets sticky + ancre). */
+const SHOWCASE = ITEMS.map((lab, i) => ({
+  key: lab.key,
+  name: lab.name,
+  lead: lab.lead,
+  why: lab.why,
+  exploring: lab.exploring,
+  status: lab.status,
+  links: lab.links,
+  at: SURFACES[lab.key].at,
+  href: SURFACES[lab.key].href,
+  mat: SURFACES[lab.key].mat,
+  exp: `EXP-${String(i + 1).padStart(2, "0")}`,
+}));
+
+type Grad = { name: string; blurb: string; href: string; icon: typeof Bot; mat: Exclude<Mat, "planned" | "research"> };
+const GRADUATED: Grad[] = [
+  {
+    name: "TaskForce Memory",
+    blurb: "Runs start from what your team already decided — decisions, constraints and rejected paths, carried forward.",
+    href: "/product/brain-os",
+    icon: Brain,
+    mat: "beta",
+  },
+  {
+    name: "Your models — local or hosted",
+    blurb: "Run on Ollama locally or a hosted model. Your models, your call — per deployment.",
+    href: "/enterprise",
+    icon: Cpu,
+    mat: "live",
+  },
+  {
+    name: "Approvals",
+    blurb: "A human sign-off on the actions that matter, with a trail of who approved what.",
+    href: "/product/approvals",
+    icon: ShieldCheck,
+    mat: "beta",
+  },
+  {
+    name: "Smart Assign",
+    blurb: "Work routed to the right person, from their skills and current load.",
+    href: "/product/smart-assign",
+    icon: Sparkles,
+    mat: "live",
+  },
+];
+const GRAD_FEATURED = GRADUATED[0];
+const GRAD_REST = GRADUATED.slice(1);
+const FeatIcon = GRAD_FEATURED.icon;
+---
+
+<BaseLayout
+  title="Labs — TaskForce"
+  description="TaskForce Labs — research in public. The delivery loop we're building, the experiments behind it, and what has already graduated to the product. We publish the direction; the mechanism stays in the lab until it ships."
+>
+  <LabsGradientDefs />
+
+  {/* ── Hero : image plein cadre, sans rails ── */}
+  <section class="relative overflow-hidden bg-card">
+    <LabsBackdrop />
+    <div class="container-site relative z-10 py-20 lg:py-28">
+      <div class="max-w-xl">
+        <div class="flex flex-wrap items-center gap-2.5">
+          <FlaskConical className="labs-ic-c size-7" strokeWidth={1.9} />
+          <span class="labs-gtext font-mono text-[12px] font-semibold tracking-[0.16em] uppercase">
+            TaskForce Labs
+          </span>
+        </div>
+        <h1 class="t-h1 mt-6">Research in public.</h1>
+        <p class="t-lead mt-5">
+          Where we're honest about the frontier: the problems we're chasing and the benefit we're after.
+          We publish the direction, and keep the mechanism in the lab until it ships.
+        </p>
+        <div class="mt-8 flex flex-wrap gap-3">
+          <a href="/roadmap" class={cn(buttonVariants({ size: "pill" }))}>See the roadmap</a>
+          <a href="/product" class={cn(buttonVariants({ variant: "outline", size: "pill" }))}>
+            What ships today
+          </a>
+        </div>
+        <p class="mt-7 flex items-center gap-2 font-mono text-[11.5px] text-muted-foreground">
+          <span aria-hidden class="labs-g1 inline-block size-1.5 rounded-full"></span>
+          // direction published · mechanism kept · nothing here is a shipped feature
+        </p>
+      </div>
+    </div>
+  </section>
+
+  {/* ── Les sujets de recherche : nav sticky ancrée + sections empilées (une page) ── */}
+  <section class="relative isolate bg-card">
+    <PixelBleed color="#F0897B" edge="top" align="left" />
+    <PixelBleed patch color="#8E90E0" class="left-0 top-[44%] h-64 w-[44%]" opacity={0.28} />
+    <div class="relative z-10 container-rail pt-20 lg:pt-28">
+      <div class="mx-auto max-w-2xl text-center">
+        <p class="labs-gtext font-mono text-[12px] font-semibold tracking-[0.14em] uppercase">The experiments</p>
+        <h2 class="t-h2 mt-3">Four directions we're chasing</h2>
+        <p class="t-lead mt-4">
+          Each one as its own section — why it matters, what we're exploring, and where it stands. Jump with the
+          bar, or scroll the whole story. We publish the direction; the mechanism stays in the lab until it ships.
+        </p>
+      </div>
+    </div>
+    <div class="relative z-10 mt-12">
+      <LabsSubjects subjects={SHOWCASE} client:load />
+    </div>
+  </section>
+
+  {/* ── La boucle = diagramme de flux centré ── */}
+  <section class="relative isolate bg-card">
+    <PixelBleed color="#EA6A9A" edge="top" align="right" />
+    <div class="relative z-10 container-rail py-20 lg:py-28">
+      <div class="mx-auto max-w-2xl text-center">
+        <p class="labs-gtext font-mono text-[12px] font-semibold tracking-[0.14em] uppercase">The system</p>
+        <h2 class="t-h2 mt-3">The pieces are one loop</h2>
+        <p class="t-lead mt-4">
+          The experiments aren't separate features — they're steps of one loop TaskForce reasons over. Intent
+          enters, runs against what your organisation already decided, and every decision feeds back into memory.
+        </p>
+      </div>
+
+      {/* La boucle en React Flow (statique), posée sur un canvas à points (blanc + dots). */}
+      <div class="flow-canvas relative -mx-6 mt-14 h-[240px] border-y border-border lg:-mx-10">
+        <LabsLoopFlow client:only="react" />
+      </div>
+      <p class="text-muted-foreground mt-8 inline-flex w-full items-center justify-center gap-2 font-mono text-[11.5px]">
+        <span aria-hidden class="text-[15px] leading-none">↺</span>
+        the decision feeds back into memory — the loop closes
+      </p>
+    </div>
+  </section>
+
+  {/* ── De la paillasse au produit : une vedette + une liste (asymétrique, pas 4 cartes) ── */}
+  <section class="relative isolate bg-card">
+    <PixelBleed color="#8E90E0" edge="top" align="left" />
+    <PixelBleed color="#63A6E8" edge="bottom" align="center" />
+    <PixelBleed patch color="#EA6A9A" class="right-0 top-[34%] h-72 w-[46%]" opacity={0.3} />
+    <div class="relative z-10 container-rail py-20 lg:py-28">
+      <div class="mx-auto max-w-2xl text-center">
+        <p class="t-eyebrow">From the lab to the product</p>
+        <h2 class="t-h2 mt-3">What has already graduated</h2>
+        <p class="t-lead mt-4">
+          When something works, it leaves Labs and ships with a maturity label. These started as questions
+          here — they're in the product today.
+        </p>
+      </div>
+
+      <div class="mt-12 grid gap-4 lg:grid-cols-5">
+        {/* Vedette (produit phare) avec un visuel placeholder. */}
+        <a
+          href={GRAD_FEATURED.href}
+          class="group bg-card hover:border-primary/30 flex flex-col border p-6 transition-colors sm:p-7 lg:col-span-3"
+        >
+          <div class="flex items-center gap-3">
+            <FeatIcon className="size-6 shrink-0" strokeWidth={1.75} style={{ color: hueFor(GRAD_FEATURED.icon) }} />
+            <span class="inline-flex items-center gap-1.5 rounded-full border bg-card px-2 py-0.5 font-mono text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
+              Graduated from Labs
+            </span>
+          </div>
+          <div class="mt-4 flex flex-1 flex-col">
+            <div class="flex items-center gap-2.5">
+              <h3 class="t-h3">{GRAD_FEATURED.name}</h3>
+              <span class={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold", MAT_LIGHT[GRAD_FEATURED.mat])}>
+                {MAT_LABEL[GRAD_FEATURED.mat]}
+              </span>
+            </div>
+            <p class="text-muted-foreground mt-2.5 flex-1 text-[14.5px] leading-6">{GRAD_FEATURED.blurb}</p>
+            <span class="text-primary mt-5 inline-flex items-center gap-1.5 text-[13.5px] font-medium">
+              Explore
+              <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
+            </span>
+          </div>
+        </a>
+
+        {/* Les autres, en lignes compactes. */}
+        <div class="grid gap-4 lg:col-span-2">
+          {
+            GRAD_REST.map((g) => {
+              const Icon = g.icon;
+              return (
+                <a
+                  href={g.href}
+                  class="group bg-card hover:border-primary/30 flex flex-1 items-start gap-3.5 border p-5 transition-colors"
+                >
+                  <Icon className="mt-0.5 size-5 shrink-0" strokeWidth={1.75} style={{ color: hueFor(Icon) }} />
+                  <span class="flex min-w-0 flex-1 flex-col">
+                    <span class="flex items-center gap-2">
+                      <span class="text-foreground text-[14px] font-semibold">{g.name}</span>
+                      <span class={cn("ml-auto shrink-0 inline-flex items-center rounded-full border px-1.5 py-px text-[10px] font-semibold", MAT_LIGHT[g.mat])}>
+                        {MAT_LABEL[g.mat]}
+                      </span>
+                    </span>
+                    <span class="text-muted-foreground mt-1 text-[12.5px] leading-5">{g.blurb}</span>
+                  </span>
+                </a>
+              );
+            })
+          }
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {/* ── CTA : le bandeau standard (PageCta), à plat — plus de card flottante à ombre ── */}
+  <PageCta
+    title="Follow where this goes"
+    lead="The roadmap is public — hold us to it. And start with what already ships today."
+    primary={{ label: "See the roadmap", href: "/roadmap" }}
+    secondary={{ label: "What ships today", href: "/product" }}
+  />
+</BaseLayout>

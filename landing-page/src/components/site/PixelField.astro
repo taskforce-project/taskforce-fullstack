@@ -1,0 +1,68 @@
+---
+/**
+ * PixelField — habillage décoratif réutilisable : un champ PixelBlast (WebGL, react-bits) posé en
+ * fond, tenu par les couleurs du visuel Labs (`hero-wave.jpg`). `pointer-events-none`, `edgeFade` et
+ * `autoPauseOffscreen` (défaut du composant) → purement décoratif et économe (rendu figé hors écran).
+ * Sert à « habiller » le contenu : fonds de section, coins, derrière les cards. Couleur unique par
+ * instance → on répartit coraux (haut) → violets → bleus (bas) pour évoquer le dégradé de la vague.
+ */
+import PixelBlast from "@/components/PixelBlast";
+
+interface Props {
+  color?: string;
+  variant?: "square" | "circle" | "triangle" | "diamond";
+  pixelSize?: number;
+  density?: number;
+  scale?: number;
+  jitter?: number;
+  speed?: number;
+  opacity?: number;
+  edgeFade?: number;
+  /** Positionnement du champ (défaut plein cadre ; sinon un coin, ex. `right-0 top-0 h-2/3 w-1/2`). */
+  pos?: string;
+  class?: string;
+  /** Halo doux de la même couleur derrière les pixels (évoque le dégradé de l'image). */
+  glow?: boolean;
+}
+
+const {
+  color = "#EC6B86",
+  variant = "circle",
+  pixelSize = 4,
+  density = 0.9,
+  scale = 3,
+  jitter = 0.4,
+  speed = 0.25,
+  opacity = 0.5,
+  edgeFade = 0.6,
+  pos = "inset-0",
+  class: className = "",
+  glow = false,
+} = Astro.props;
+---
+
+<div class:list={["pointer-events-none absolute overflow-hidden", pos, className]} aria-hidden="true">
+  {
+    glow && (
+      <div
+        class="absolute inset-0"
+        style={`background: radial-gradient(75% 75% at 50% 45%, color-mix(in oklab, ${color} 24%, transparent), transparent 72%)`}
+      />
+    )
+  }
+  <div class="absolute inset-0" style={`opacity:${opacity}`}>
+    <PixelBlast
+      client:only="react"
+      variant={variant}
+      color={color}
+      pixelSize={pixelSize}
+      patternDensity={density}
+      patternScale={scale}
+      pixelSizeJitter={jitter}
+      enableRipples={false}
+      speed={speed}
+      edgeFade={edgeFade}
+      transparent={true}
+    />
+  </div>
+</div>

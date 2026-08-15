@@ -1,0 +1,38 @@
+---
+/**
+ * Bento — grille de cellules de tailles VARIÉES séparées par des filets (DA « petits traits »),
+ * adaptée des blocs bento 21st.dev (Aceternity « feature-section-with-bento-grid » + Ruixen
+ * « combined-featured-section ») à notre système : tokens TaskForce, thème clair, zéro dépendance.
+ * Grille 6 colonnes ; chaque <BentoCell/> pose son `span` (third｜half｜twothirds｜full).
+ * Le relief vient de `.surface` (ombre-bordure façon Vercel), les séparations de `gap-px bg-border`.
+ */
+interface Props {
+  eyebrow?: string;
+  title?: string;
+  lead?: string;
+  bg?: "card" | "secondary";
+  align?: "left" | "center";
+  /** Motif de fond de section (façon Attio) : points ou rayures. */
+  pattern?: "dots" | "striped";
+}
+const { eyebrow, title, lead, bg = "card", align = "left", pattern } = Astro.props;
+const center = align === "center";
+const patternClass = pattern === "dots" ? "bg-dots" : pattern === "striped" ? "bg-striped" : "";
+---
+
+<section class:list={[bg === "secondary" ? "bg-secondary" : "bg-card", "border-b", patternClass]}>
+  <div class="container-rail py-20 lg:py-28">
+    {
+      (eyebrow || title || lead) && (
+        <div class:list={["mb-12", center ? "mx-auto max-w-3xl text-center" : "max-w-2xl"]}>
+          {eyebrow && <p class="t-eyebrow mb-3">{eyebrow}</p>}
+          {title && <h2 class="t-h2 text-balance">{title}</h2>}
+          {lead && <p class:list={["t-lead mt-4", center && "mx-auto max-w-2xl"]}>{lead}</p>}
+        </div>
+      )
+    }
+    <div class="bg-border grid grid-cols-1 gap-px overflow-hidden border md:grid-cols-6">
+      <slot />
+    </div>
+  </div>
+</section>

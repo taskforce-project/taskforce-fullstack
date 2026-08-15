@@ -1,0 +1,196 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import PageHero from "@/components/site/PageHero.astro";
+import PageCta from "@/components/site/PageCta.astro";
+import { ArrowRight, Info, Check } from "lucide-react";
+import { UseCaseDemo } from "@/components/site/illustrations/UseCaseDemo";
+import { USE_CASE_DEMOS, USE_CASE_ORDER, type UseCase } from "@/lib/use-cases";
+
+interface Props {
+  c: UseCase;
+}
+const { c } = Astro.props;
+const demo = USE_CASE_DEMOS[c.key];
+
+/* Variété : la mise en page TOURNE (0/1/2) selon l'ordre du cas → deux pages voisines n'ont pas la
+   même structure (steps liste/cards/checklist · demo droite/pleine/gauche · fond dots/rayures/blanc
+   · works-with cards/liens). Le contenu est identique, l'AGENCEMENT change. */
+const v = ((Math.max(0, USE_CASE_ORDER.indexOf(c.key)) % 3) + 3) % 3;
+const worksInline = v === 1;
+---
+
+<BaseLayout title={`${c.name} — Use cases`} description={c.lead}>
+  <PageHero
+    kicker="Use case"
+    title={c.name}
+    lead={c.lead}
+    level={c.level}
+    primary={{ label: "Run your first workflow", href: "/waitlist" }}
+    secondary={{ label: "All use cases", href: "/use-cases" }}
+  />
+
+  {/* ── What it is ── */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-20 lg:py-28">
+      {
+        v === 2 ? (
+          <div class="grid gap-8 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)] lg:gap-16">
+            <h2 class="t-h2 text-balance">The stage, and what it produces</h2>
+            <div>
+              <p class="t-eyebrow mb-3">What it is</p>
+              <p class="text-[15px] leading-7 text-foreground">{c.what}</p>
+            </div>
+          </div>
+        ) : (
+          <div class="mx-auto max-w-2xl">
+            <p class="t-eyebrow mb-3">What it is</p>
+            <h2 class="t-h2">The stage, and what it produces</h2>
+            <p class="mt-6 text-[15px] leading-7 text-foreground">{c.what}</p>
+          </div>
+        )
+      }
+    </div>
+  </section>
+
+  {/* ── In a run — TROIS agencements distincts ── */}
+  {
+    v === 0 && (
+      /* A · steps en LISTE numérotée à gauche, demo à droite, fond à points */
+      <section class="bg-card bg-dots border-b">
+        <div class="container-rail py-20 lg:py-28">
+          <div class="grid gap-12 lg:grid-cols-2 lg:items-center lg:gap-16">
+            <div>
+              <p class="t-eyebrow mb-3">In a run</p>
+              <h2 class="t-h2">How it works, step by step</h2>
+              <ol class="mt-8 flex flex-col">
+                {c.inRun.map((s, i) => (
+                  <li class="flex items-start gap-4 border-t border-border py-4 last:border-b">
+                    <span class="text-primary mt-0.5 font-mono text-[12px] tabular-nums">{`0${i + 1}`}</span>
+                    <span class="text-foreground text-[14px] leading-6">{s}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+            <div>
+              {demo && <UseCaseDemo demo={demo} client:visible />}
+              <p class="text-muted-foreground mt-3 text-center text-[11px]">
+                Illustrative — produced, reviewed and approved before the next step.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+    )
+  }
+  {
+    v === 1 && (
+      /* B · steps en CARTES (traits), demo pleine largeur centrée, fond rayé (marge haute) */
+      <section class="bg-card bg-striped border-b">
+        <div class="container-rail pt-28 pb-20 lg:pt-40 lg:pb-28">
+          <div class="max-w-2xl">
+            <p class="t-eyebrow mb-3">In a run</p>
+            <h2 class="t-h2">How it works, step by step</h2>
+          </div>
+          <div class="-mx-6 mt-10 grid grid-cols-1 gap-px border-y border-border bg-border sm:grid-cols-2 lg:grid-cols-4 lg:-mx-10">
+            {c.inRun.map((s, i) => (
+              <div class="bg-card flex flex-col p-6">
+                <span class="text-primary font-mono text-[12px] tabular-nums">{`0${i + 1}`}</span>
+                <p class="text-foreground mt-2 text-[13.5px] leading-6">{s}</p>
+              </div>
+            ))}
+          </div>
+          <div class="mx-auto mt-12 max-w-xl">
+            {demo && <UseCaseDemo demo={demo} client:visible />}
+            <p class="text-muted-foreground mt-3 text-center text-[11px]">
+              Illustrative — produced, reviewed and approved before the next step.
+            </p>
+          </div>
+        </div>
+      </section>
+    )
+  }
+  {
+    v === 2 && (
+      /* C · demo à GAUCHE, steps en CHECKLIST à droite, fond blanc */
+      <section class="bg-card border-b">
+        <div class="container-rail py-20 lg:py-28">
+          <div class="grid gap-12 lg:grid-cols-2 lg:items-center lg:gap-16">
+            <div>
+              {demo && <UseCaseDemo demo={demo} client:visible />}
+              <p class="text-muted-foreground mt-3 text-center text-[11px]">
+                Illustrative — produced, reviewed and approved before the next step.
+              </p>
+            </div>
+            <div>
+              <p class="t-eyebrow mb-3">In a run</p>
+              <h2 class="t-h2">What the stage runs through</h2>
+              <ul class="mt-8 flex flex-col gap-3.5">
+                {c.inRun.map((s) => (
+                  <li class="text-foreground flex items-start gap-3 text-[14px] leading-6">
+                    <Check className="text-primary mt-0.5 size-4 shrink-0" strokeWidth={2.5} />
+                    {s}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  {/* ── Works with — cartes (A/C) ou liens inline (B) ── */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-16 lg:py-20">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">Works with</p>
+        <h2 class="t-h2">The parts of the platform it leans on</h2>
+      </div>
+      {
+        worksInline ? (
+          <div class="mt-6 flex flex-wrap gap-x-8 gap-y-3">
+            {c.links.map((l) => (
+              <a href={l.href} class="link-underline text-foreground inline-flex items-center gap-1.5 text-[14px] font-medium">
+                {l.label}
+                <ArrowRight className="size-3.5" />
+              </a>
+            ))}
+          </div>
+        ) : (
+          <div class="mt-8 grid gap-3 sm:grid-cols-2">
+            {c.links.map((l) => (
+              <a
+                href={l.href}
+                class="bg-card group flex items-center justify-between gap-3 border p-5 transition-colors hover:bg-secondary/40"
+              >
+                <span class="text-foreground text-[14.5px] font-medium">{l.label}</span>
+                <ArrowRight class="text-muted-foreground size-4 shrink-0 transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
+              </a>
+            ))}
+          </div>
+        )
+      }
+    </div>
+  </section>
+
+  {/* ── Where it stands (honnête) ── */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-16 lg:py-20">
+      <div class="mx-auto max-w-2xl">
+        <div class="border-primary/25 flex items-start gap-2.5 border bg-primary/[0.05] px-4 py-3.5">
+          <Info className="text-primary mt-0.5 size-4 shrink-0" strokeWidth={2} />
+          <p class="text-foreground text-[13.5px] leading-6">
+            <span class="font-medium">Where it stands.</span> {c.status}
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <PageCta
+    title="Turn this stage into a governed output"
+    lead="Start with what ships today, and grow into the full run as it lands."
+    primary={{ label: "Run your first workflow", href: "/waitlist" }}
+    secondary={{ label: "Book a demo", href: "/book-a-demo" }}
+  />
+</BaseLayout>

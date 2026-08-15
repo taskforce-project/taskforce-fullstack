@@ -1,0 +1,25 @@
+---
+/**
+ * FeatureRow — une ligne de <FeatureRows/> : visuel d'un côté (slot `viz`), texte de l'autre, séparés
+ * par un FILET (`sm:border-l`). `reverse` met le visuel à droite. Slot `aside` = chip/lien sous le texte.
+ */
+interface Props {
+  title: string;
+  body: string;
+  reverse?: boolean;
+}
+const { title, body, reverse = false } = Astro.props;
+---
+
+<div class="grid gap-8 py-10 sm:grid-cols-5 sm:gap-0 sm:py-0">
+  {/* Visuel */}
+  <div class:list={["flex items-center sm:col-span-2 sm:py-12", reverse ? "sm:order-2 sm:border-l sm:pl-12" : "sm:pr-12"]}>
+    <slot name="viz" />
+  </div>
+  {/* Texte */}
+  <div class:list={["sm:col-span-3 sm:py-12", reverse ? "sm:order-1 sm:pr-12" : "sm:border-l sm:pl-12"]}>
+    <h3 class="text-foreground text-xl font-semibold">{title}</h3>
+    <p class="text-muted-foreground mt-4 text-[15px] leading-7">{body}</p>
+    <slot name="aside" />
+  </div>
+</div>

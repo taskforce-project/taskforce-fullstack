@@ -1,0 +1,27 @@
+# Déploiement landing TaskForce — Docker seul (pas besoin de Kubernetes pour un site statique).
+# cloudflared expose le site via un Cloudflare Tunnel (connexion SORTANTE → fonctionne derrière le NAT école).
+#
+# 1) Dashboard Cloudflare Zero Trust → Networks → Tunnels → créer un tunnel → copier le TOKEN dans .env
+#    puis ajouter un "public hostname" (ex. taskforce.tondomaine.dev) → Service = http://landing:4321
+# 2) cp .env.example .env  (y coller TUNNEL_TOKEN)
+# 3) docker compose up -d --build
+services:
+  landing:
+    build:
+      context: .
+      args:
+        PUBLIC_UMAMI_SRC: ${PUBLIC_UMAMI_SRC:-}
+        PUBLIC_UMAMI_WEBSITE_ID: ${PUBLIC_UMAMI_WEBSITE_ID:-}
+    image: taskforce-landing:latest
+    restart: unless-stopped
+    expose:
+      - "4321" # atteint par cloudflared via le réseau interne compose ; aucun port publié sur la VM
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?Cloudflare tunnel token requis — voir .env.example}
+    depends_on:
+      - landing

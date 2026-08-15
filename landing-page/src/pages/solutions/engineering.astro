@@ -1,0 +1,111 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import PageHero from "@/components/site/PageHero.astro";
+import PageCta from "@/components/site/PageCta.astro";
+import { GitBranch, Bot, Brain, BarChart3, ArrowRight } from "lucide-react";
+import { EngineeringRunFlow } from "@/components/site/flows/OrchestrationFlows";
+import { hueFor } from "@/lib/site-icons";
+
+const FITS = [
+  { icon: GitBranch, title: "Your board and repo", text: "Boards, issues and cycles in real time, alongside the repositories your team already ships from.", href: "/product/collaboration", label: "Collaboration" },
+  { icon: Bot, title: "Your coding agents", text: "Claude Code, Cursor or Copilot are assignees like anyone else — routed the work, reviewed the same way.", href: "/product/smart-assign", label: "Smart Assign" },
+  { icon: Brain, title: "Your decisions, kept", text: "Architecture calls, trade-offs and rejected alternatives stay as context the next run can read.", href: "/product/brain-os", label: "TaskForce Memory" },
+  { icon: BarChart3, title: "Your delivery, measured", text: "Throughput, resolution time and workload from the board itself — plus where work gets sent back.", href: "/product/analytics", label: "Analytics" },
+];
+---
+
+<BaseLayout
+  title="TaskForce for engineering — Solutions"
+  description="Governed software delivery for engineering teams: turn an outcome into a validated run, route work to people and coding agents, keep the reasoning, and measure what ships — with a human on every decision."
+>
+  <PageHero
+    kicker="Solutions · Engineering"
+    title="Ship with AI, without losing the decision trail"
+    lead="Engineering teams are already delivering with coding agents. TaskForce governs the decisions around them — turning an outcome into a validated run, keeping the reasoning, and putting a human on every step."
+    level="live"
+    primary={{ label: "Run your first workflow", href: "/waitlist" }}
+    secondary={{ label: "See the run", href: "/product/orchestration" }}
+  />
+
+  {/* ── The problem ── */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="mx-auto max-w-2xl">
+        <p class="t-eyebrow mb-3">The problem</p>
+        <h2 class="t-h2">AI made generating code cheap. It didn't make the decisions cheaper.</h2>
+        <div class="mt-6 flex flex-col gap-5 text-[15px] leading-7 text-foreground">
+          <p>
+            Your team can produce a spec, an approach or a pull request in minutes now. What still costs
+            you is the chain around it: why this approach, what it trades off, what it conflicts with,
+            who signed off — and where that reasoning goes once the PR is merged.
+          </p>
+          <p class="text-muted-foreground">
+            Today that context lives in threads and people's heads, and it evaporates at every handoff.
+            TaskForce keeps it: every decision has a reason, a human approves it, and the next run starts
+            from what was actually decided.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {/* ── The run — texte | flux vertical (React Flow) à droite, fond à points ── */}
+  <section class="bg-card bg-dots border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="grid items-center gap-12 lg:grid-cols-[minmax(0,460px)_minmax(0,1fr)] lg:gap-16">
+        <div>
+          <p class="t-eyebrow mb-3">What a run looks like</p>
+          <h2 class="t-h2">From an outcome to a reviewed delivery</h2>
+          <p class="t-lead mt-4">
+            You describe the outcome. Specialized agents work the path; your team approves each
+            checkpoint; your coding agent builds it.
+          </p>
+          <p class="text-muted-foreground mt-6 text-[13px] leading-6">
+            Full intent-to-deploy orchestration is
+            <a href="/product/orchestration" class="link-underline text-foreground font-medium">Planned</a>;
+            the board, smart assignment, approvals, memory and analytics ship today.
+          </p>
+        </div>
+        <div class="lg:pl-4">
+          <div class="relative mx-auto w-full max-w-[320px]" style="aspect-ratio: 320 / 470">
+            <EngineeringRunFlow client:only="react" />
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {/* ── Fits your stack ── */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">Fits your stack</p>
+        <h2 class="t-h2">It sits on what you already use</h2>
+      </div>
+      <div class="-mx-6 mt-12 grid gap-px border-y border-border bg-border sm:grid-cols-2 lg:-mx-10">
+        {
+          FITS.map((f) => (
+            <div class="bg-card flex flex-col p-6 sm:p-8">
+              <span class="ic-tile flex size-11 items-center justify-center rounded-xl border" style={`--ic:${hueFor(f.icon)}`}>
+                <f.icon className="size-5" strokeWidth={1.75} />
+              </span>
+              <h3 class="mt-4 text-[16px] font-semibold text-foreground">{f.title}</h3>
+              <p class="text-muted-foreground mt-2 flex-1 text-[13.5px] leading-6">{f.text}</p>
+              <a href={f.href} class="link-underline text-foreground mt-4 inline-flex items-center gap-1.5 text-[13.5px] font-medium">
+                {f.label}
+                <ArrowRight className="size-3.5" />
+              </a>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <PageCta
+    title="Give TaskForce one outcome"
+    lead="Take something you were going to spec by hand this week, and see the governed run come back. Free to start."
+    primary={{ label: "Run your first workflow", href: "/waitlist" }}
+    secondary={{ label: "Book a demo", href: "/book-a-demo" }}
+  />
+</BaseLayout>

@@ -1,0 +1,33 @@
+---
+/**
+ * SectionShell — le gabarit de section standard de la landing (cf. `.ai/landing-design-system.md` §3).
+ * Fond BLANC + `container-rail` + rythme vertical + en-tête optionnel. À utiliser au lieu de recopier
+ * `<section class="bg-card border-b"><div class="container-rail py-20 lg:py-28">…` partout.
+ * Le contenu (grille à filets, flow, etc.) passe par le <slot/>.
+ */
+interface Props {
+  eyebrow?: string;
+  title?: string;
+  lead?: string;
+  align?: "left" | "center";
+  id?: string;
+  class?: string;
+}
+const { eyebrow, title, lead, align = "left", id, class: className = "" } = Astro.props;
+const hasHeader = Boolean(eyebrow || title || lead);
+---
+
+<section id={id} class:list={["bg-card border-b", className]}>
+  <div class="container-rail py-20 lg:py-28">
+    {
+      hasHeader && (
+        <div class:list={[align === "center" ? "mx-auto max-w-2xl text-center" : "max-w-2xl"]}>
+          {eyebrow && <p class="t-eyebrow mb-3">{eyebrow}</p>}
+          {title && <h2 class="t-h2 text-balance">{title}</h2>}
+          {lead && <p class="t-lead mt-4">{lead}</p>}
+        </div>
+      )
+    }
+    <slot />
+  </div>
+</section>

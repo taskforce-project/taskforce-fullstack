@@ -1,0 +1,36 @@
+---
+/**
+ * Panel — cadre PROPRE pour un visuel de section (pas de fausse barre de navigateur, pas de skeleton).
+ * On y met du CONTENU RÉEL (vrais checkpoints, vraies prédictions, vrais exemples) — retour user 03/08 :
+ * les placeholders « faux screenshot avec des graphs » étaient nazes, il faut intégrer du vrai contenu.
+ * `tag` = petite étiquette d'honnêteté (« Illustrative ») quand le contenu illustre un concept / du Planned.
+ */
+interface Props {
+  label?: string;
+  tag?: string;
+  caption?: string;
+  class?: string;
+}
+const { label, tag, caption, class: cls } = Astro.props;
+---
+
+<figure class:list={["not-prose", cls]}>
+  <div class="bg-card overflow-hidden border">
+    {
+      (label || tag) && (
+        <div class="bg-secondary/40 flex items-center justify-between gap-2 border-b px-4 py-2.5">
+          {label && <span class="text-foreground text-[11.5px] font-medium">{label}</span>}
+          {tag && (
+            <span class="text-muted-foreground/70 bg-card rounded-full border px-2 py-0.5 font-mono text-[9px] tracking-wide uppercase">
+              {tag}
+            </span>
+          )}
+        </div>
+      )
+    }
+    <div class="p-4 sm:p-5">
+      <slot />
+    </div>
+  </div>
+  {caption && <figcaption class="text-muted-foreground mt-2.5 text-[12px]">{caption}</figcaption>}
+</figure>

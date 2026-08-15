@@ -1,0 +1,146 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import PageHero from "@/components/site/PageHero.astro";
+import PageCta from "@/components/site/PageCta.astro";
+import BorderedGrid from "@/components/site/sections/BorderedGrid.astro";
+import FeatureSplit from "@/components/site/sections/FeatureSplit.astro";
+import CalloutBand from "@/components/site/sections/CalloutBand.astro";
+import { ApprovalsFlow } from "@/components/site/flows/OrchestrationFlows";
+import { AuditTrailDemo } from "@/components/site/illustrations/LiveSchematics";
+import { FileCheck2, Terminal, Sparkles, ClipboardList, ShieldCheck, ArrowRight } from "lucide-react";
+import { hueFor } from "@/lib/site-icons";
+
+/* Les surfaces d'approbation RÉELLES (endpoints backend), pas une promesse.
+   · spec : POST /issues/{id}/ai/spec/approve → devient un KnowledgeNode (Brain OS)
+   · action externe : McpActionController → pending, exécuté après validation humaine
+   · reco : Smart Assign propose, l'humain approuve/override
+   Rendu en BorderedGrid (petits traits) pour remplacer la grille de cartes flottantes. */
+const APPROVE = [
+  {
+    icon: FileCheck2,
+    title: "A drafted spec",
+    desc: "The AI drafts a spec; you approve it, and the decision becomes trusted context in your Memory — what the next step builds on.",
+  },
+  {
+    icon: Terminal,
+    title: "An external action",
+    desc: "Reads can run on their own. Anything that writes to a connected tool is proposed as a pending action — and runs only after a human approves it.",
+  },
+  {
+    icon: Sparkles,
+    title: "A recommendation",
+    desc: "Smart Assign suggests who should own a task, with its reason. You approve it, or override it — overrides can also become signals for improving future recommendations.",
+  },
+];
+
+
+/* Ce que la trace d'approbation retient (liste réelle, rendue dans l'aside du FeatureSplit « Recorded »). */
+const RECORDED = [
+  "Who approved it, and the exact content they signed off on.",
+  "The reasoning the agent proposed, kept next to the decision.",
+  "A record you can read later — in the run, and in the audit trail.",
+];
+---
+
+<BaseLayout
+  title="Approvals — TaskForce"
+  description="The AI proposes; a human approves. TaskForce puts a person at every consequential step — approving specs, external actions and recommendations — and records who signed off on what."
+>
+  {/* ───── Hero ───── */}
+  <PageHero
+    kicker="Approvals"
+    title="The AI proposes. A human approves."
+    lead="TaskForce is built so consequential steps wait for a person. An agent drafts, suggests or prepares an action — and a human approves it before it becomes part of the governed workflow or is executed externally."
+    level="beta"
+    primary={{ label: "Run your first workflow", href: "/waitlist" }}
+    secondary={{ label: "See the run", href: "/product/orchestration" }}
+  />
+
+  {/* ───── What you approve — BorderedGrid (remplace la grille de cartes) ───── */}
+  <BorderedGrid
+    bg="card"
+    align="left"
+    eyebrow="What you approve"
+    title="Sign-off where it actually matters"
+    lead="Not a settings checkbox. Approval sits at the points where a decision compounds — where getting it wrong would cost you later."
+    items={APPROVE}
+    cols={3}
+  />
+
+  {/* ───── The primitive — FeatureSplit : texte + Panel (flux réel) ───── */}
+  <FeatureSplit bg="card" eyebrow="The primitive" title="Approval is what a checkpoint is">
+    <div slot="aside" class="mt-6">
+      <span class="ic-tile inline-flex size-11 items-center justify-center rounded-xl border" style={`--ic:${hueFor(ShieldCheck)}`}>
+        <ShieldCheck className="size-5" strokeWidth={1.75} />
+      </span>
+      <p class="text-foreground mt-6 text-[15px] leading-7">
+        A <span class="font-medium">checkpoint</span> is a governed stage where an artifact is
+        produced, reviewed and explicitly approved before the run continues. Approval isn't bolted
+        on afterwards — it's the moment that defines the stage.
+      </p>
+    </div>
+
+    {/* Visuel : le flux qui DÉFINIT la primitive — React Flow (même DA que l'orchestration). */}
+    <div class="flow-canvas relative h-[500px] overflow-hidden border">
+      <ApprovalsFlow client:only="react" />
+    </div>
+  </FeatureSplit>
+
+  {/* ───── La règle qui tient partout — CalloutBand (respiration) ───── */}
+  <CalloutBand
+    bg="card"
+    statement="That's why the same rule holds across the product: an agent proposes, a human decides, and only an approved decision becomes context for what follows."
+  >
+    <p class="text-muted-foreground mt-6 text-[13.5px]">
+      <a href="/product/orchestration" class="link-underline text-foreground font-medium">See the full run →</a>
+    </p>
+  </CalloutBand>
+
+  {/* ───── Recorded — FeatureSplit inversé : liste réelle + ScreenPlaceholder (trace) ───── */}
+  <FeatureSplit
+    reverse
+    bg="card"
+    eyebrow="Recorded"
+    title="Every approval leaves a trail"
+    lead="An approval isn't just a click. Who signed off, on what, and when is recorded — so a decision made months ago can still be explained."
+  >
+    <div slot="aside">
+      <ul class="mt-8 flex flex-col gap-3.5">
+        {
+          RECORDED.map((r) => (
+            <li class="flex items-start gap-3 text-[14.5px] leading-6 text-foreground">
+              <ClipboardList className="mt-0.5 size-4 shrink-0" strokeWidth={2} style={{ color: hueFor(ClipboardList) }} />
+              {r}
+            </li>
+          ))
+        }
+      </ul>
+      <div class="mt-8 flex flex-wrap items-center gap-4">
+        <a href="/trust" class="link-underline text-foreground inline-flex items-center gap-1.5 text-[14px] font-medium">
+          Trust Center
+          <ArrowRight className="size-3.5" />
+        </a>
+        <a href="/legal/ai-transparency" class="link-underline text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-[14px]">
+          AI transparency
+          <ArrowRight className="size-3.5" />
+        </a>
+      </div>
+      <p class="text-muted-foreground mt-8 text-[13px] leading-6">
+        Approval for specs, external actions and recommendations is live today. Full
+        checkpoint-by-checkpoint governance across the entire delivery run is on the
+        <a href="/product/orchestration" class="link-underline text-foreground font-medium"> orchestration</a> roadmap.
+      </p>
+    </div>
+
+    {/* Visuel : la piste d'audit, animée — les approbations tombent une à une (who · what · when). */}
+    <AuditTrailDemo client:visible />
+  </FeatureSplit>
+
+  {/* ───── CTA ───── */}
+  <PageCta
+    title="Keep a human on every decision that matters"
+    lead="Let agents draft, suggest and prepare — and keep the sign-off, and the record, with your team."
+    primary={{ label: "Run your first workflow", href: "/waitlist" }}
+    secondary={{ label: "Book a demo", href: "/book-a-demo" }}
+  />
+</BaseLayout>
