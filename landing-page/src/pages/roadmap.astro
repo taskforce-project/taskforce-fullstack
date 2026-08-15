@@ -2,24 +2,28 @@
 import BaseLayout from "@/layouts/BaseLayout.astro";
 import PageHero from "@/components/site/PageHero.astro";
 import PageCta from "@/components/site/PageCta.astro";
+import FaqSection from "@/components/site/sections/FaqSection.astro";
 import { LevelBadge } from "@/components/site/Section";
 import type { Maturity } from "@/components/site/nav";
 import { APP_URL } from "@/components/site/nav";
 
 type Item = { title: string; desc: string; level: Maturity };
-type Phase = { key: string; heading: string; blurb: string; accent: string; items: Item[] };
+type Phase = { key: string; heading: string; blurb: string; dot: string; edge: string; items: Item[] };
 
+/* Now / Next / Later — direction publique, séquence sans dates promises (D11). Teintes calées sur
+   la palette sémantique : émeraude = livré, ambre = en cours, violet = planifié. */
 const PHASES: Phase[] = [
   {
     key: "now",
     heading: "Now",
     blurb: "Shipped and in your hands today.",
-    accent: "bg-emerald-500",
+    dot: "bg-emerald-500",
+    edge: "border-emerald-500",
     items: [
       { title: "Real-time collaboration", desc: "Boards, issues and cycles, live for the whole team.", level: "live" },
       { title: "Smart Assign", desc: "The right task to the right person — an agent counts as an assignee.", level: "live" },
       { title: "Delivery analytics", desc: "Lead time, throughput and approval rate, per project.", level: "live" },
-      { title: "Integrations", desc: "129 connectors across your tracker, repo, chat and cloud — connect today, deep sync rolling out.", level: "beta" },
+      { title: "Integrations", desc: "129 connectors across tracker, repo, chat and cloud — connect today, deep sync rolling out.", level: "beta" },
       { title: "Human approvals", desc: "A required sign-off at each checkpoint of a run.", level: "beta" },
     ],
   },
@@ -27,7 +31,8 @@ const PHASES: Phase[] = [
     key: "next",
     heading: "Next",
     blurb: "In progress — usable, still hardening.",
-    accent: "bg-amber-400",
+    dot: "bg-amber-500",
+    edge: "border-amber-500",
     items: [
       { title: "TaskForce Memory retrieval", desc: "Runs recall the decisions and constraints you already set.", level: "beta" },
       { title: "Specialized agent team", desc: "CPO, CTO and COO agents with distinct responsibilities instead of one generalist.", level: "labs" },
@@ -38,13 +43,21 @@ const PHASES: Phase[] = [
     key: "later",
     heading: "Later",
     blurb: "Where this is going. Direction, not a deadline.",
-    accent: "bg-indigo-400",
+    dot: "bg-violet-500",
+    edge: "border-violet-500",
     items: [
       { title: "Full orchestration", desc: "The complete intent-to-deploy run, from product framing to QA and sign-off.", level: "labs" },
       { title: "Prediction calibration", desc: "Compare what agents predicted with what actually shipped — and calibrate future decisions.", level: "labs" },
       { title: "Beyond engineering", desc: "The same governed run for teams outside software.", level: "labs" },
     ],
   },
+];
+
+const FAQ = [
+  { q: "Why are there no dates?", a: "We commit to sequence, not to dates we can't keep. Now is shipped, Next is in progress, Later is direction." },
+  { q: "Do these labels change?", a: "Yes — a capability moves from Planned to Beta to Live as it matures, and the changelog records what actually shipped." },
+  { q: "Can I influence what's next?", a: "Yes. Tell us what you need at hello@taskforce.dev — real usage shapes priority far more than a wishlist does." },
+  { q: "Is “Later” a commitment?", a: "It's direction, not a deadline. We'd rather under-promise on timing and stay honest about what's real today." },
 ];
 ---
 
@@ -57,23 +70,29 @@ const PHASES: Phase[] = [
     title="What's shipped, what's next, and where this goes"
     lead="We publish the direction in the open. Each capability is clearly marked Planned, Beta or Live — and the changelog records what actually ships."
     primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
+    secondary={{ label: "See the changelog", href: "/changelog" }}
   />
 
-  <section class="bg-secondary border-b">
+  <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-28">
-      <div class="grid gap-8 lg:grid-cols-3">
+      {/* Trois phases en timeline : chaque colonne porte un bord coloré (Now/Next/Later) et sa liste. */}
+      <div class="grid gap-8 sm:grid-cols-3 sm:gap-6 lg:gap-10">
         {
           PHASES.map((phase) => (
-            <div class="bg-card flex flex-col rounded-2xl border p-6">
-              <div class="flex items-center gap-2.5">
-                <span class:list={["size-2.5 rounded-full", phase.accent]} aria-hidden />
-                <h2 class="text-[17px] font-semibold text-foreground">{phase.heading}</h2>
+            <div class="flex flex-col">
+              <div class:list={["border-t-2 pt-4", phase.edge]}>
+                <div class="flex items-center gap-2.5">
+                  <span class:list={["size-2.5 rounded-full", phase.dot]} aria-hidden />
+                  <h2 class="text-[13px] font-semibold tracking-wider text-foreground uppercase">{phase.heading}</h2>
+                  <span class="text-muted-foreground ml-auto font-mono text-[12px] tabular-nums">{phase.items.length}</span>
+                </div>
+                <p class="text-muted-foreground mt-2 text-[13px] leading-5">{phase.blurb}</p>
               </div>
-              <p class="text-muted-foreground mt-1.5 text-[13px]">{phase.blurb}</p>
 
-              <ul class="mt-6 flex flex-col gap-5 border-t pt-6">
+              {/* Liste en filets (divide-y) : colonnes de hauteurs différentes = blanc en bas, jamais gris. */}
+              <ul class="mt-5 flex flex-col divide-y divide-border border-t border-border">
                 {phase.items.map((item) => (
-                  <li>
+                  <li class="py-4">
                     <div class="flex items-center gap-2">
                       <h3 class="text-[14px] font-medium text-foreground">{item.title}</h3>
                       <LevelBadge level={item.level} />
@@ -87,13 +106,16 @@ const PHASES: Phase[] = [
         }
       </div>
 
-      <p class="text-muted-foreground mt-10 text-[13px]">
+      <p class="text-muted-foreground mt-12 text-[13px] leading-6">
         Maturity labels are honest on purpose: <span class="text-foreground">Live</span> is in
         production, <span class="text-foreground">Beta</span> works with rough edges, and
-        <span class="text-foreground">Planned</span> is direction we're building toward.
+        <span class="text-foreground">Planned</span> is direction we're building toward — sequence, not
+        a dated promise.
       </p>
     </div>
   </section>
+
+  <FaqSection title="How to read this roadmap" items={FAQ} />
 
   <PageCta
     title="Start with what's live today"

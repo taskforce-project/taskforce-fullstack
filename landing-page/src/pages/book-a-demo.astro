@@ -33,7 +33,7 @@ const PROFILES = [
   />
 
   {/* ── What to expect ── */}
-  <section class="bg-secondary border-b">
+  <section class="bg-card border-b">
     <div class="container-rail py-16 lg:py-20">
       <div class="max-w-2xl">
         <p class="t-eyebrow mb-3">What to expect</p>
@@ -58,7 +58,7 @@ const PROFILES = [
   {/* ── Bring one real outcome ── */}
   <section class="bg-card border-b">
     <div class="container-rail py-16 lg:py-20">
-      <div class="border-primary/25 mx-auto max-w-3xl rounded-2xl border p-6 sm:p-8 [background:radial-gradient(120%_120%_at_50%_0%,color-mix(in_oklab,var(--primary)_6%,transparent),transparent_70%)]">
+      <div class="border-primary/25 mx-auto max-w-3xl border p-6 sm:p-8 [background:radial-gradient(120%_120%_at_50%_0%,color-mix(in_oklab,var(--primary)_6%,transparent),transparent_70%)]">
         <p class="t-eyebrow mb-3">What to bring</p>
         <h2 class="font-display text-[26px] font-medium tracking-[-0.02em] text-foreground sm:text-[30px]">
           Bring one real outcome
@@ -76,7 +76,7 @@ const PROFILES = [
   </section>
 
   {/* ── Who this is for ── */}
-  <section class="bg-secondary border-b">
+  <section class="bg-card border-b">
     <div class="container-rail py-16 lg:py-20">
       <div class="max-w-2xl">
         <p class="t-eyebrow mb-3">Who this is for</p>
@@ -89,7 +89,7 @@ const PROFILES = [
       <div class="mt-10 grid gap-6 lg:grid-cols-3">
         {
           PROFILES.map((p) => (
-            <div class="rounded-2xl border bg-card p-6">
+            <div class="border bg-card p-6">
               <h3 class="text-[15px] font-semibold text-foreground">{p.t}</h3>
               <p class="text-muted-foreground mt-2 text-[13.5px] leading-6">{p.d}</p>
             </div>
@@ -108,14 +108,14 @@ const PROFILES = [
           Tell us who you are and what you'd like us to run. We'll come back with a time.
         </p>
       </div>
-      <div class="bg-card mx-auto mt-10 max-w-xl rounded-2xl border p-6 shadow-sm sm:p-8">
+      <div class="bg-card mx-auto mt-10 max-w-xl border p-6 sm:p-8">
         <DemoForm client:load />
       </div>
     </div>
   </section>
 
   {/* ── Start free instead ── */}
-  <section class="bg-secondary">
+  <section class="bg-card">
     <div class="container-rail py-14">
       <div class="mx-auto flex max-w-3xl flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div>

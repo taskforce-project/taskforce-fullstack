@@ -41,7 +41,7 @@ const GROUPS = [
 
   {
     GROUPS.map((group, gi) => (
-      <section class={gi % 2 === 0 ? "bg-secondary border-b" : "bg-card border-b"}>
+      <section class={gi % 2 === 0 ? "bg-card border-b" : "bg-card border-b"}>
         <div class="container-rail py-20 lg:py-28">
           <div class="max-w-2xl">
             <p class="t-eyebrow mb-3">{group.title}</p>
@@ -49,7 +49,7 @@ const GROUPS = [
           </div>
           <div class="mt-12 grid gap-6 lg:grid-cols-2">
             {group.items.map((item) => (
-              <div class="flex flex-col rounded-2xl border bg-card p-6">
+              <div class="flex flex-col border bg-card p-6">
                 <h3 class="text-[16px] font-semibold text-foreground">{item.label}</h3>
                 <p class="text-muted-foreground mt-2 flex-1 text-[13.5px] leading-6">{item.diff}</p>
                 {isLive(item.href) && (
@@ -67,7 +67,7 @@ const GROUPS = [
   }
 
   {/* ── Honnêteté ── */}
-  <section class="bg-secondary border-b">
+  <section class="bg-card border-b">
     <div class="container-rail py-16 lg:py-20">
       <div class="mx-auto max-w-2xl text-center">
         <p class="text-muted-foreground text-[14px] leading-7">

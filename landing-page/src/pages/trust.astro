@@ -14,6 +14,7 @@ import {
   Minus,
 } from "lucide-react";
 import { isLive } from "@/components/site/nav";
+import { hueFor } from "@/lib/site-icons";
 
 /**
  * Trust Center — profond et HONNÊTE (review user 30/07). Plus un « security overview »
@@ -28,8 +29,8 @@ const CONTACT = "security@taskforce.dev";
 const TONE: Record<string, string> = {
   available: "bg-emerald-50 text-emerald-700 border-emerald-200",
   beta: "bg-amber-50 text-amber-700 border-amber-200",
-  planned: "border-dashed bg-secondary text-muted-foreground",
-  none: "bg-secondary text-muted-foreground",
+  planned: "border-dashed bg-card text-muted-foreground",
+  none: "bg-card text-muted-foreground",
 };
 
 /* ── Security at a glance ── */
@@ -171,7 +172,6 @@ const FLOW = [
   description="Security you can verify, not just claim. How TaskForce handles data, who can do what, what every run leaves behind, and exactly where each control stands — Available, Beta, Planned or not started."
 >
   <PageHero
-    band
     eyebrow="Trust center"
     title="Security you can verify, not just claim"
     lead="TaskForce puts AI in your delivery path, so it should answer for it. Here is how data is handled, who can do what, and what every run leaves behind — with a public roadmap you can hold us to."
@@ -190,10 +190,10 @@ const FLOW = [
           explicit the control.
         </p>
       </div>
-      <div class="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <div class="mt-10 grid gap-x-10 border-t border-border sm:grid-cols-2 lg:grid-cols-3">
         {
           SEC_PRINCIPLES.map((p, i) => (
-            <div class="rounded-2xl border bg-card p-5">
+            <div class="flex flex-col border-b border-border py-5">
               <span class="text-primary font-mono text-[12px] tabular-nums">
                 {String(i + 1).padStart(2, "0")}
               </span>
@@ -207,7 +207,7 @@ const FLOW = [
   </section>
 
   {/* ── 1 · Security at a glance ── */}
-  <section class="bg-secondary border-b">
+  <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-24">
       <div class="max-w-2xl">
         <p class="t-eyebrow mb-3">At a glance</p>
@@ -218,7 +218,7 @@ const FLOW = [
         </p>
       </div>
 
-      <ul class="mt-10 grid gap-x-8 gap-y-px overflow-hidden rounded-2xl border bg-border sm:grid-cols-2">
+      <ul class="mt-10 grid gap-x-8 gap-y-px overflow-hidden border bg-border sm:grid-cols-2">
         {
           GLANCE.map((row) => (
             <li class="bg-card flex items-center justify-between gap-3 px-4 py-3">
@@ -251,14 +251,14 @@ const FLOW = [
         </p>
       </div>
 
-      <div class="mx-auto mt-10 max-w-xl rounded-2xl border bg-card p-6 sm:p-8">
+      <div class="mx-auto mt-10 max-w-xl border bg-card p-6 sm:p-8">
         {/* Entrées externes */}
         <div class="grid gap-3 sm:grid-cols-2">
-          <div class="bg-secondary/40 rounded-xl border p-4 text-center">
+          <div class="bg-card rounded-xl border p-4 text-center">
             <p class="text-[13px] font-semibold text-foreground">Your identity provider</p>
             <p class="text-muted-foreground mt-1 text-[11.5px]">OIDC / SAML · authenticates users</p>
           </div>
-          <div class="bg-secondary/40 rounded-xl border p-4 text-center">
+          <div class="bg-card rounded-xl border p-4 text-center">
             <p class="text-[13px] font-semibold text-foreground">Your connected systems</p>
             <p class="text-muted-foreground mt-1 text-[11.5px]">GitHub · Linear · Slack · Postgres</p>
           </div>
@@ -298,7 +298,7 @@ const FLOW = [
           </span>
           <span class="bg-border h-px flex-1" />
         </div>
-        <div class="bg-secondary/40 mt-4 rounded-xl border border-dashed p-4 text-center">
+        <div class="bg-card mt-4 rounded-xl border border-dashed p-4 text-center">
           <p class="text-[13px] font-semibold text-foreground">Hosted model — Anthropic · OpenAI</p>
           <p class="mt-1 text-[11px] font-medium text-amber-700">external — leaves your network</p>
         </div>
@@ -307,7 +307,7 @@ const FLOW = [
   </section>
 
   {/* ── 2 · How your data flows ── */}
-  <section class="bg-secondary border-b">
+  <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-24">
       <div class="max-w-2xl">
         <p class="t-eyebrow mb-3">Data flow</p>
@@ -318,7 +318,7 @@ const FLOW = [
         </p>
       </div>
 
-      <div class="mt-10 rounded-2xl border bg-card p-6 sm:p-8">
+      <div class="mt-10 border bg-card p-6 sm:p-8">
         <div class="flex flex-col items-stretch gap-3 lg:flex-row lg:items-center">
           {
             FLOW.map((stage, i) => (
@@ -326,7 +326,7 @@ const FLOW = [
                 <div
                   class:list={[
                     "flex-1 rounded-xl border p-4",
-                    stage.tone === "primary" ? "border-primary/30 bg-primary/[0.04]" : "bg-secondary/40",
+                    stage.tone === "primary" ? "border-primary/30 bg-primary/[0.04]" : "bg-card",
                   ]}
                 >
                   <p class="text-[13.5px] font-semibold text-foreground">{stage.title}</p>
@@ -346,7 +346,7 @@ const FLOW = [
           }
         </div>
         <p class="border-primary/25 bg-primary/[0.05] mt-5 flex items-start gap-2.5 rounded-lg border px-4 py-3 text-[13px] leading-6 text-foreground">
-          <ShieldCheck className="text-primary mt-0.5 size-4 shrink-0" strokeWidth={2} />
+          <ShieldCheck className="mt-0.5 size-4 shrink-0" strokeWidth={2} style={{ color: hueFor(ShieldCheck) }} />
           With self-hosting and local models, your model prompts, outputs and run context can remain
           entirely within your network.
         </p>
@@ -355,7 +355,7 @@ const FLOW = [
   </section>
 
   {/* ── 3 · AI security & governance ── */}
-  <section class="bg-card border-b">
+  <section class="bg-card bg-dots border-b">
     <div class="container-rail py-20 lg:py-24">
       <div class="max-w-2xl">
         <p class="t-eyebrow mb-3">AI security & governance</p>
@@ -366,10 +366,10 @@ const FLOW = [
         </p>
       </div>
 
-      <div class="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <div class="-mx-6 mt-10 grid gap-px border-y border-border bg-border sm:grid-cols-2 lg:grid-cols-3 lg:-mx-10">
         {
           AI_GOV.map((p) => (
-            <div class="rounded-2xl border bg-card p-5">
+            <div class="bg-card flex flex-col p-5">
               <h3 class="text-[15px] font-semibold text-foreground">{p.t}</h3>
               <p class="text-muted-foreground mt-1.5 text-[13.5px] leading-6">{p.d}</p>
             </div>
@@ -384,13 +384,13 @@ const FLOW = [
   </section>
 
   {/* ── 4 · Identity & access ── */}
-  <section class="bg-secondary border-b">
+  <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-24">
       <div class="grid gap-10 lg:grid-cols-[minmax(0,360px)_1fr] lg:gap-16">
         <div>
           <p class="t-eyebrow mb-3">Identity & access</p>
           <h2 class="t-h2">Your identity provider, your rules</h2>
-          <span class="text-foreground mt-6 inline-flex size-11 items-center justify-center rounded-xl border bg-card">
+          <span class="ic-tile mt-6 inline-flex size-11 items-center justify-center rounded-xl border" style={`--ic:${hueFor(KeyRound)}`}>
             <KeyRound className="size-5" strokeWidth={1.75} />
           </span>
         </div>
@@ -409,7 +409,7 @@ const FLOW = [
   </section>
 
   {/* ── 5 · Data lifecycle ── */}
-  <section class="bg-card border-b">
+  <section class="bg-card bg-dots border-b">
     <div class="container-rail py-20 lg:py-24">
       <div class="max-w-2xl">
         <p class="t-eyebrow mb-3">Data lifecycle</p>
@@ -419,10 +419,10 @@ const FLOW = [
           are still on the roadmap.
         </p>
       </div>
-      <div class="mt-10 grid gap-px overflow-hidden rounded-2xl border bg-border sm:grid-cols-2 lg:grid-cols-3">
+      <div class="mt-10 grid gap-x-10 border-t border-border sm:grid-cols-2 lg:grid-cols-3">
         {
           LIFECYCLE.map((s) => (
-            <div class="bg-card p-5">
+            <div class="flex flex-col border-b border-border py-5">
               <p class="text-muted-foreground text-[11px] font-semibold tracking-[0.08em] uppercase">{s.t}</p>
               <p class="mt-2 text-[13.5px] leading-6 text-foreground">{s.d}</p>
             </div>
@@ -433,7 +433,7 @@ const FLOW = [
   </section>
 
   {/* ── 6 · Auditability & monitoring ── */}
-  <section class="bg-secondary border-b">
+  <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-24">
       <div class="max-w-2xl">
         <p class="t-eyebrow mb-3">Auditability</p>
@@ -444,9 +444,9 @@ const FLOW = [
         </p>
       </div>
       <div class="mt-10 grid gap-6 lg:grid-cols-2">
-        <div class="rounded-2xl border bg-card p-6">
+        <div class="border bg-card p-6">
           <p class="flex items-center gap-2 text-[14px] font-semibold text-foreground">
-            <ScrollText className="text-primary size-4" strokeWidth={2} /> What is recorded
+            <ScrollText className="size-4" strokeWidth={2} style={{ color: hueFor(ScrollText) }} /> What is recorded
           </p>
           <ul class="mt-4 flex flex-col gap-2.5">
             {["Who approved what, and when", "Which model ran which step, on whose infrastructure", "Workspace, project, timestamp, token usage and status", "Run artifacts — the drafts an agent produced, kept for your review"].map((x) => (
@@ -457,9 +457,9 @@ const FLOW = [
             ))}
           </ul>
         </div>
-        <div class="rounded-2xl border bg-card p-6">
+        <div class="border bg-card p-6">
           <p class="flex items-center gap-2 text-[14px] font-semibold text-foreground">
-            <ShieldCheck className="text-primary size-4" strokeWidth={2} /> What stays in your hands
+            <ShieldCheck className="size-4" strokeWidth={2} style={{ color: hueFor(ShieldCheck) }} /> What stays in your hands
           </p>
           <ul class="mt-4 flex flex-col gap-2.5">
             {["With local models, prompts and outputs never leave your network", "You choose the provider per deployment — or none but local", "Audit access is owner-only, not open to every member", "Run artifacts live in your workspace, deletable with it"].map((x) => (
@@ -496,8 +496,8 @@ const FLOW = [
             ))
           }
         </ul>
-        <div class="border-primary/25 bg-primary/[0.04] flex flex-col justify-center rounded-2xl border p-6">
-          <Plug className="text-primary size-5" strokeWidth={1.75} />
+        <div class="border-primary/25 bg-primary/[0.04] flex flex-col justify-center border p-6">
+          <Plug className="size-5" strokeWidth={1.75} style={{ color: hueFor(Plug) }} />
           <p class="mt-3 text-[14px] leading-6 text-foreground">
             An agent inherits the <span class="font-medium">scopes of the connector</span>, nothing
             more — and never the raw secret behind it.
@@ -508,16 +508,16 @@ const FLOW = [
   </section>
 
   {/* ── 8 · Infrastructure & self-hosting ── */}
-  <section class="bg-secondary border-b">
+  <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-24">
       <div class="max-w-2xl">
         <p class="t-eyebrow mb-3">Infrastructure</p>
         <h2 class="t-h2">Deployment models</h2>
       </div>
       <div class="mt-10 grid gap-6 lg:grid-cols-2">
-        <div class="rounded-2xl border bg-card p-6">
+        <div class="border bg-card p-6">
           <div class="flex items-center gap-2.5">
-            <Server className="text-foreground size-5" strokeWidth={1.75} />
+            <Server className="size-5" strokeWidth={1.75} style={{ color: hueFor(Server) }} />
             <h3 class="text-[16px] font-semibold text-foreground">Self-hosted</h3>
             <span class:list={["ml-auto rounded-full border px-2.5 py-0.5 text-[11px] font-medium", TONE.available]}>Available</span>
           </div>
@@ -526,9 +526,9 @@ const FLOW = [
             traffic stays entirely inside your network.
           </p>
         </div>
-        <div class="rounded-2xl border bg-card p-6">
+        <div class="border bg-card p-6">
           <div class="flex items-center gap-2.5">
-            <Server className="text-muted-foreground size-5" strokeWidth={1.75} />
+            <Server className="size-5" strokeWidth={1.75} style={{ color: hueFor(Server) }} />
             <h3 class="text-[16px] font-semibold text-foreground">Managed cloud</h3>
             <span class:list={["ml-auto rounded-full border px-2.5 py-0.5 text-[11px] font-medium", TONE.planned]}>Planned</span>
           </div>
@@ -554,9 +554,9 @@ const FLOW = [
       </div>
 
       <div class="mt-10 grid gap-6 lg:grid-cols-2">
-        <div class="rounded-2xl border bg-card p-6">
+        <div class="border bg-card p-6">
           <p class="flex items-center gap-2 text-[14px] font-semibold text-foreground">
-            <ShieldCheck className="text-primary size-4" strokeWidth={2} /> What TaskForce protects against
+            <ShieldCheck className="size-4" strokeWidth={2} style={{ color: hueFor(ShieldCheck) }} /> What TaskForce protects against
           </p>
           <ul class="mt-4 flex flex-col gap-2.5">
             {["Unauthorized workspace access", "Credential exposure", "Agent overreach beyond granted scopes", "Cross-project data access", "Prompt and context leakage", "Unauthorized model calls", "Malicious connector actions"].map((x) => (
@@ -567,9 +567,9 @@ const FLOW = [
             ))}
           </ul>
         </div>
-        <div class="rounded-2xl border bg-card p-6">
+        <div class="border bg-card p-6">
           <p class="flex items-center gap-2 text-[14px] font-semibold text-foreground">
-            <Server className="text-muted-foreground size-4" strokeWidth={2} /> What remains your responsibility
+            <Server className="size-4" strokeWidth={2} style={{ color: hueFor(Server) }} /> What remains your responsibility
           </p>
           <ul class="mt-4 flex flex-col gap-2.5">
             {["Your own infrastructure and its hardening", "Your identity provider and its MFA policy", "The connector permissions you grant", "Local model hosting and its security", "Host, network and backup security when self-hosted"].map((x) => (
@@ -583,7 +583,7 @@ const FLOW = [
       </div>
 
       {/* Security boundaries — qui contrôle quoi */}
-      <div class="mt-8 rounded-2xl border bg-card p-6">
+      <div class="mt-8 border bg-card p-6">
         <p class="text-[14px] font-semibold text-foreground">Security boundaries</p>
         <ul class="mt-4 grid gap-x-8 gap-y-2.5 sm:grid-cols-2">
           {
@@ -600,7 +600,7 @@ const FLOW = [
   </section>
 
   {/* ── 9 · Compliance & certifications ── */}
-  <section class="bg-secondary border-b">
+  <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-24">
       <div class="max-w-2xl">
         <p class="t-eyebrow mb-3">Compliance</p>
@@ -610,7 +610,7 @@ const FLOW = [
           says “Not started,” that's the truth.
         </p>
       </div>
-      <ul class="mt-10 overflow-hidden rounded-2xl border bg-border grid gap-px">
+      <ul class="mt-10 overflow-hidden border bg-border grid gap-px">
         {
           COMPLIANCE.map((c) => (
             <li class="bg-card flex flex-wrap items-center justify-between gap-3 px-5 py-4">
@@ -634,7 +634,7 @@ const FLOW = [
   </section>
 
   {/* ── Secure development lifecycle ── */}
-  <section class="bg-card border-b">
+  <section class="bg-card bg-dots border-b">
     <div class="container-rail py-20 lg:py-24">
       <div class="max-w-2xl">
         <p class="t-eyebrow mb-3">Secure development lifecycle</p>
@@ -643,12 +643,12 @@ const FLOW = [
           Security checks are part of how code ships, not a review bolted on at the end.
         </p>
       </div>
-      <div class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div class="mt-10 grid gap-x-10 border-t border-border sm:grid-cols-2 lg:grid-cols-3">
         {
           SDLC.map((s) => (
-            <div class="rounded-2xl border bg-card p-5">
+            <div class="flex flex-col border-b border-border py-5">
               <div class="flex items-center gap-2">
-                <Radar className="text-primary size-4 shrink-0" strokeWidth={2} />
+                <Radar className="size-4 shrink-0" strokeWidth={2} style={{ color: hueFor(Radar) }} />
                 <h3 class="text-[14px] font-semibold text-foreground">{s.t}</h3>
               </div>
               <p class="text-muted-foreground mt-2 text-[13px] leading-6">{s.d}</p>
@@ -670,7 +670,7 @@ const FLOW = [
   </section>
 
   {/* ── Availability & resilience ── */}
-  <section class="bg-secondary border-b">
+  <section class="bg-card bg-dots border-b">
     <div class="container-rail py-20 lg:py-24">
       <div class="max-w-2xl">
         <p class="t-eyebrow mb-3">Availability & resilience</p>
@@ -680,10 +680,10 @@ const FLOW = [
           Either way, here is the shape of it.
         </p>
       </div>
-      <div class="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <div class="-mx-6 mt-10 grid gap-px border-y border-border bg-border sm:grid-cols-2 lg:grid-cols-4 lg:-mx-10">
         {
           AVAILABILITY.map((a) => (
-            <div class="rounded-2xl border bg-card p-5">
+            <div class="bg-card flex flex-col p-5">
               <h3 class="text-[14px] font-semibold text-foreground">{a.t}</h3>
               <ul class="mt-3 flex flex-col gap-2">
                 {a.items.map((it) => (
@@ -711,7 +711,7 @@ const FLOW = [
         </p>
       </div>
       <div class="mt-10 grid gap-6 lg:grid-cols-2">
-        <div class="rounded-2xl border bg-card p-6">
+        <div class="border bg-card p-6">
           <p class="flex items-center gap-2 text-[14px] font-semibold text-foreground">
             <span class="size-2.5 rounded-full bg-emerald-500" aria-hidden /> Current
           </p>
@@ -724,7 +724,7 @@ const FLOW = [
             ))}
           </ul>
         </div>
-        <div class="rounded-2xl border bg-card p-6">
+        <div class="border bg-card p-6">
           <p class="flex items-center gap-2 text-[14px] font-semibold text-foreground">
             <span class="size-2.5 rounded-full bg-amber-400" aria-hidden /> Building
           </p>
@@ -742,7 +742,7 @@ const FLOW = [
   </section>
 
   {/* ── 12 · Security resources ── */}
-  <section class="bg-secondary border-b">
+  <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-24">
       <div class="max-w-2xl">
         <p class="t-eyebrow mb-3">Security resources</p>

@@ -3,10 +3,12 @@ import BaseLayout from "@/layouts/BaseLayout.astro";
 import { Hero } from "@/components/site/home/Hero";
 import { BrainTeaser } from "@/components/site/home/Narrative";
 import { Problem } from "@/components/site/home/Platform";
-import { RunTimeline } from "@/components/site/home/RunTimeline";
-import { BeforeAfter, TeamGrid, Synergy } from "@/components/site/home/Showcase";
+import { TeamGrid } from "@/components/site/home/Showcase";
 import { Trust, WhereThisGoes, FinalCta } from "@/components/site/home/Proof";
-import { WhatShipsToday } from "@/components/site/home/Today";
+import BeforeAfter from "@/components/site/home/BeforeAfter.astro";
+import WhatShipsToday from "@/components/site/home/WhatShipsToday.astro";
+import Synergy from "@/components/site/home/Synergy.astro";
+import TheRun from "@/components/site/home/TheRun.astro";
 ---
 
 <BaseLayout
@@ -33,7 +35,7 @@ import { WhatShipsToday } from "@/components/site/home/Today";
   <Synergy />
   <WhatShipsToday />
 
-  <RunTimeline client:idle />
+  <TheRun />
   <BrainTeaser />
 
   <Trust />
