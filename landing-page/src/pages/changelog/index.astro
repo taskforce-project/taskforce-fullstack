@@ -2,15 +2,52 @@
 import BaseLayout from "@/layouts/BaseLayout.astro";
 import PageHero from "@/components/site/PageHero.astro";
 import PageCta from "@/components/site/PageCta.astro";
-import { LevelBadge } from "@/components/site/Section";
-import { Info, ArrowRight } from "lucide-react";
+import FaqSection from "@/components/site/sections/FaqSection.astro";
+import { Info } from "lucide-react";
 
-/* Pas de fausses entrées datées : on montre l'ÉTAT ACTUEL réel (Live/Beta/Planned). Les notes de
-   version datées arriveront quand on shippera pour de vrai. */
-const STATE = [
-  { level: "live" as const, items: ["Delivery workspace — boards, issues and cycles", "Real-time collaboration", "Smart Assign", "Analytics"] },
-  { level: "beta" as const, items: ["TaskForce Memory", "Approvals", "Integrations — connect (deep sync rolling out)"] },
-  { level: "labs" as const, items: ["Orchestration — the full intent-to-deploy run", "Specialized agent team (CPO / CTO / COO)", "Prediction & calibration"] },
+/* Pas de fausses entrées datées (D11) : on montre l'ÉTAT ACTUEL réel, groupé par maturité, en
+   FEED style Vercel (méta à gauche, contenu à droite). Les notes datées commenceront à la GA. */
+type Entry = { area: string; title: string; desc: string };
+type Group = { label: string; note: string; dot: string; entries: Entry[] };
+
+const GROUPS: Group[] = [
+  {
+    label: "Live",
+    note: "In production today",
+    dot: "bg-emerald-500",
+    entries: [
+      { area: "Delivery", title: "Delivery workspace", desc: "Boards, issues and cycles for the whole team, updating in real time." },
+      { area: "Delivery", title: "Smart Assign", desc: "The right task to the right owner — a coding agent counts as an assignee." },
+      { area: "Insights", title: "Delivery analytics", desc: "Lead time, throughput, velocity and workload, computed straight from your board." },
+    ],
+  },
+  {
+    label: "Beta",
+    note: "Usable, still hardening",
+    dot: "bg-amber-500",
+    entries: [
+      { area: "Memory", title: "TaskForce Memory", desc: "Decisions, constraints and trade-offs kept as a graph the next run can read." },
+      { area: "Governance", title: "Human approvals", desc: "A required sign-off at each checkpoint of a run, recorded with the decision." },
+      { area: "Integrations", title: "Connector catalogue", desc: "129 connectors across 16 categories — connect today, deep sync rolling out." },
+    ],
+  },
+  {
+    label: "Planned",
+    note: "Building toward it, in the open",
+    dot: "bg-violet-500",
+    entries: [
+      { area: "Runs", title: "Full orchestration", desc: "The complete intent-to-deploy run, from product framing to QA and sign-off." },
+      { area: "AI", title: "Specialized agent team", desc: "CPO, CTO and COO agents with distinct responsibilities instead of one generalist." },
+      { area: "Insights", title: "Prediction & calibration", desc: "Compare what agents predicted with what actually shipped, and calibrate the next run." },
+    ],
+  },
+];
+
+const FAQ = [
+  { q: "Why no dated release notes?", a: "We're pre-launch. Rather than invent a version history, we show the real current state grouped by maturity. Dated entries begin at general availability." },
+  { q: "What do Live, Beta and Planned mean?", a: "Live is in production, Beta is usable with rough edges, and Planned is direction we're building toward — sequence, not a dated promise." },
+  { q: "Where do I see what's coming?", a: "The public roadmap is the source of truth for what's next; this page records what has actually landed." },
+  { q: "How often will this update?", a: "From general availability onward, shipped changes land here as dated notes. Until then, it reflects the honest state of the product." },
 ];
 ---
 
@@ -21,41 +58,53 @@ const STATE = [
   <PageHero
     kicker="Changelog"
     title="What we've shipped, honestly"
-    lead="We're pre-launch, so instead of inventing dated release notes, here's the real current state — what's Live, what's Beta, and what's Planned. Dated notes will land here as we ship."
+    lead="We're pre-launch, so instead of inventing dated release notes, here's the real current state — what's Live, what's Beta, and what's Planned. Dated entries begin at general availability."
     primary={{ label: "See the roadmap", href: "/roadmap" }}
     secondary={{ label: "What ships today", href: "/product" }}
   />
 
-  <section class="bg-secondary border-b">
+  <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-28">
-      <div class="mx-auto flex max-w-2xl flex-col gap-8">
+      <div class="mx-auto max-w-3xl">
         {
-          STATE.map((group) => (
-            <div>
-              <div class="mb-4 flex items-center gap-2">
-                <LevelBadge level={group.level} />
-                <span class="bg-border h-px flex-1" />
+          GROUPS.map((group) => (
+            <div class="mt-16 first:mt-0">
+              {/* En-tête de groupe = la maturité (le feed en dessous porte l'area en méta gauche). */}
+              <div class="flex items-center gap-2.5">
+                <span class:list={["size-2 rounded-full", group.dot]} aria-hidden />
+                <h2 class="text-[13px] font-semibold tracking-wider text-foreground uppercase">{group.label}</h2>
+                <span class="text-muted-foreground text-[12.5px]">· {group.note}</span>
               </div>
-              <ul class="flex flex-col gap-2.5">
-                {group.items.map((it) => (
-                  <li class="text-foreground flex items-start gap-2.5 text-[14.5px] leading-6">
-                    <span class="bg-primary/60 mt-2 size-1.5 shrink-0 rounded-full" aria-hidden />
-                    {it}
-                  </li>
+
+              {/* Feed deux colonnes : méta (area) à gauche, entrée à droite. Filets, zéro cellule grise. */}
+              <div class="mt-5 divide-y divide-border border-t border-border">
+                {group.entries.map((e) => (
+                  <div class="grid gap-x-8 gap-y-1.5 py-6 sm:grid-cols-[140px_minmax(0,1fr)]">
+                    <div class="text-muted-foreground text-[12.5px] font-medium">{e.area}</div>
+                    <div>
+                      <h3 class="text-[16px] font-semibold text-foreground">{e.title}</h3>
+                      <p class="text-muted-foreground mt-1.5 text-[14px] leading-6">{e.desc}</p>
+                    </div>
+                  </div>
                 ))}
-              </ul>
+              </div>
             </div>
           ))
         }
 
-        <p class="text-muted-foreground flex items-start gap-2 border-t pt-6 text-[13px] leading-6">
+        <p class="text-muted-foreground mt-14 flex items-start gap-2 border-t pt-6 text-[13px] leading-6">
           <Info className="mt-0.5 size-4 shrink-0" strokeWidth={1.75} />
-          The public roadmap is the honest source of truth for what's next.
-          <a href="/roadmap" class="link-underline text-foreground font-medium">&nbsp;See the roadmap →</a>
+          <span>
+            We don't publish dated release notes before launch — the{" "}
+            <a href="/roadmap" class="link-underline text-foreground font-medium">public roadmap</a>{" "}
+            is the source of truth for what's next.
+          </span>
         </p>
       </div>
     </div>
   </section>
+
+  <FaqSection title="How this changelog works" items={FAQ} />
 
   <PageCta
     title="Follow what ships next"
