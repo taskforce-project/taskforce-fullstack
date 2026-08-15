@@ -1,0 +1,103 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import PageHero from "@/components/site/PageHero.astro";
+import PageCta from "@/components/site/PageCta.astro";
+import { Check, Info, ArrowRight } from "lucide-react";
+import { UseCaseDemo } from "@/components/site/illustrations/UseCaseDemo";
+import { VERTICALS, VERTICAL_DEMOS, type Vertical } from "@/lib/verticals";
+
+interface Props {
+  c: Vertical;
+}
+const { c } = Astro.props;
+const demo = VERTICAL_DEMOS[c.key];
+/* Variété entre les 4 verticales : demo à droite/points (pair) vs à gauche/rayures + couldApply en cartes (impair). */
+const vv = ((Math.max(0, Object.keys(VERTICALS).indexOf(c.key)) % 2) + 2) % 2;
+---
+
+<BaseLayout
+  title={`TaskForce for ${c.name} — Solutions`}
+  description={c.lead}
+>
+  <PageHero
+    kicker="Solutions · Exploratory"
+    title={`TaskForce for ${c.name}`}
+    lead={c.lead}
+    primary={{ label: "See what's proven", href: "/solutions/engineering" }}
+    secondary={{ label: "Tell us about your team", href: "/company/contact" }}
+  >
+    <span class="text-muted-foreground mt-7 inline-flex items-center rounded-md border border-dashed px-2 py-0.5 text-[11px] font-medium tracking-wide uppercase">
+      Exploratory · not proven yet
+    </span>
+  </PageHero>
+
+  {/* ── The idea — 2 agencements selon la verticale (côté demo, fond, couldApply liste/cartes) ── */}
+  <section class:list={["bg-card border-b", vv === 1 ? "bg-striped" : "bg-dots"]}>
+    <div class:list={["container-rail", vv === 1 ? "pt-28 pb-20 lg:pt-40 lg:pb-28" : "py-20 lg:py-28"]}>
+      <div class="grid gap-12 lg:grid-cols-2 lg:items-center lg:gap-16">
+        <div class:list={[vv === 1 && "lg:order-2"]}>
+          <p class="t-eyebrow mb-3">The idea</p>
+          <h2 class="t-h2">Why the pattern could fit</h2>
+          <p class="mt-6 text-[15px] leading-7 text-foreground">{c.idea}</p>
+          {
+            vv === 1 ? (
+              <div class="mt-8 grid gap-3 sm:grid-cols-2">
+                {c.couldApply.map((point) => (
+                  <div class="bg-card flex items-start gap-2.5 border p-4 text-[13px] leading-6 text-foreground">
+                    <Check className="text-primary mt-0.5 size-4 shrink-0" strokeWidth={2.5} />
+                    {point}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <ul class="mt-8 flex flex-col gap-3.5">
+                {c.couldApply.map((point) => (
+                  <li class="flex items-start gap-3 text-[14px] leading-6 text-foreground">
+                    <Check className="text-primary mt-0.5 size-4 shrink-0" strokeWidth={2.5} />
+                    {point}
+                  </li>
+                ))}
+              </ul>
+            )
+          }
+        </div>
+        <div class:list={[vv === 1 && "lg:order-1"]}>
+          {demo && <UseCaseDemo demo={demo} client:visible />}
+          <p class="text-muted-foreground mt-3 text-center text-[11px]">
+            Illustrative — the shape of a governed run, not a shipped {c.name} workflow.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {/* ── Honnêteté ── */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-16 lg:py-20">
+      <div class="mx-auto max-w-2xl">
+        <div class="flex items-start gap-2.5 border px-4 py-3.5">
+          <Info className="text-muted-foreground mt-0.5 size-4 shrink-0" strokeWidth={2} />
+          <p class="text-[13.5px] leading-6 text-foreground">
+            <span class="font-medium">Why we call this exploratory.</span> {c.honest}
+          </p>
+        </div>
+        <div class="mt-6 flex flex-wrap gap-4">
+          <a href="/solutions/engineering" class="link-underline text-foreground inline-flex items-center gap-1.5 text-[14px] font-medium">
+            The proven use: Engineering
+            <ArrowRight className="size-3.5" />
+          </a>
+          <a href="/roadmap" class="link-underline text-muted-foreground hover:text-foreground text-[14px]">
+            What's on the roadmap →
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <PageCta
+    title={`Think TaskForce fits ${c.name}?`}
+    lead="We'd rather prove it with a real team than claim it. Tell us how your team ships — or see the workflow we've already proven."
+    primary={{ label: "See what's proven", href: "/solutions/engineering" }}
+    secondary={{ label: "Talk to us", href: "/company/contact" }}
+  />
+</BaseLayout>

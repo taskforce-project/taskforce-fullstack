@@ -1,0 +1,122 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import PageCta from "@/components/site/PageCta.astro";
+import LabsBackdrop from "@/components/site/LabsBackdrop.astro";
+import LabsGradientDefs from "@/components/site/labs/LabsGradientDefs.astro";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { FlaskConical, ArrowRight, ChevronLeft } from "lucide-react";
+import type { Lab } from "@/lib/labs";
+
+/**
+ * LabDetail — page détail d'une expérience. CLAIR, STATIQUE, SOBRE. Image plein cadre + pas de rails sur le
+ * hero, icônes en dégradé (le trait), accents bleu/neutre (plus de violet). D11 : direction, pas mécanisme.
+ */
+interface Props {
+  c: Lab;
+}
+const { c } = Astro.props;
+---
+
+<BaseLayout title={`${c.name} — Labs`} description={c.lead}>
+  <LabsGradientDefs />
+
+  {/* ── Hero (image plein cadre, sans rails) ── */}
+  <section class="relative overflow-hidden border-b bg-card">
+    <LabsBackdrop />
+    <div class="container-site relative py-20 lg:py-28">
+      <div class="max-w-xl">
+        <a
+          href="/labs"
+          class="text-primary inline-flex items-center gap-1 text-[13px] font-medium hover:underline"
+        >
+          <ChevronLeft className="size-3.5" />
+          All experiments
+        </a>
+        <div class="mt-6 flex flex-wrap items-center gap-2.5">
+          <FlaskConical className="labs-ic-c size-7" strokeWidth={1.9} />
+          <span class="labs-gtext font-mono text-[12px] font-semibold tracking-[0.16em] uppercase">
+            Labs · Research
+          </span>
+        </div>
+        <h1 class="t-h1 mt-5">{c.name}</h1>
+        <p class="t-lead mt-5">{c.lead}</p>
+        <div class="mt-8 flex flex-wrap gap-3">
+          <a href="/roadmap" class={cn(buttonVariants({ size: "pill" }))}>See the roadmap</a>
+          <a href="/labs" class={cn(buttonVariants({ variant: "outline", size: "pill" }))}>All of Labs</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {/* ── Why it matters ── */}
+  <section class="bg-secondary border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="max-w-2xl">
+        <p class="labs-gtext font-mono text-[12px] font-semibold tracking-[0.14em] uppercase">Why it matters</p>
+        <h2 class="t-h2 mt-3">The problem we're chasing</h2>
+        <p class="mt-6 text-[15px] leading-7 text-foreground">{c.why}</p>
+      </div>
+    </div>
+  </section>
+
+  {/* ── What we're exploring — hypothèses ── */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="max-w-2xl">
+        <p class="labs-gtext font-mono text-[12px] font-semibold tracking-[0.14em] uppercase">
+          What we're exploring
+        </p>
+        <h2 class="t-h2 mt-3">The questions, not the recipe</h2>
+        <p class="t-lead mt-4">
+          We publish the direction we're working in — not how we build it. The mechanism is what makes
+          TaskForce different, so it stays in the lab until it ships.
+        </p>
+      </div>
+      <ul class="mt-10 flex max-w-2xl flex-col gap-3">
+        {
+          c.exploring.map((e, i) => (
+            <li class="flex items-start gap-3.5 border bg-card px-4 py-3.5">
+              <span class="text-primary mt-0.5 font-mono text-[11px] font-semibold">H{i + 1}</span>
+              <span class="text-[14.5px] leading-6 text-foreground">{e}</span>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </section>
+
+  {/* ── Where it stands ── */}
+  <section class="bg-secondary border-b">
+    <div class="container-rail py-16 lg:py-20">
+      <div class="max-w-2xl">
+        <div class="flex items-start gap-2.5 border bg-card px-4 py-3.5">
+          <FlaskConical className="labs-ic-c mt-0.5 size-4 shrink-0" strokeWidth={2} />
+          <p class="text-[13.5px] leading-6 text-foreground">
+            <span class="font-medium">Where it stands.</span> {c.status}
+          </p>
+        </div>
+        <div class="mt-6 flex flex-wrap gap-4">
+          {
+            c.links.map((l) => (
+              <a
+                href={l.href}
+                class="link-underline text-foreground inline-flex items-center gap-1.5 text-[14px] font-medium"
+              >
+                {l.label}
+                <ArrowRight className="size-3.5" />
+              </a>
+            ))
+          }
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <PageCta
+    title="Follow where this goes"
+    lead="The roadmap is public. Hold us to it — and start with what ships today."
+    primary={{ label: "See the roadmap", href: "/roadmap" }}
+    secondary={{ label: "Run your first workflow", href: "/waitlist" }}
+  />
+</BaseLayout>

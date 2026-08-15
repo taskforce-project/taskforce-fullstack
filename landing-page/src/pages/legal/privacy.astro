@@ -1,0 +1,89 @@
+---
+import LegalDoc from "@/layouts/LegalDoc.astro";
+---
+
+<LegalDoc
+  title="Privacy Policy"
+  description="How TaskForce collects, uses, protects and shares personal data — and the rights you have over it. A working draft, grounded in how the product actually handles data."
+  eyebrow="Legal & Trust"
+  updated="31 July 2026"
+  draft={true}
+>
+  <p>
+    This policy explains what personal data TaskForce processes, why, and the choices and rights you
+    have. It is written to reflect how the product actually handles data. Placeholders in
+    <code>[brackets]</code> mark details we will confirm before launch.
+  </p>
+
+  <h2>Who is responsible</h2>
+  <p>
+    The controller for personal data is <strong>[Company legal name]</strong>, <strong>[registered
+    address]</strong>. For any privacy question, contact
+    <a href="mailto:hello@taskforce.dev">hello@taskforce.dev</a> <strong>(no data-protection officer is
+    appointed; this address reaches the team responsible for data protection)</strong>.
+  </p>
+
+  <h2>What we collect</h2>
+  <ul>
+    <li><strong>Account</strong> — your name and email, managed through our identity provider (Keycloak over OIDC).</li>
+    <li><strong>Workspace content</strong> — the projects, issues, cycles, comments and documents you and your team create.</li>
+    <li><strong>Connector credentials</strong> — when you connect a tool, its keys or tokens, stored encrypted.</li>
+    <li><strong>AI usage metadata</strong> — which model ran which step, and token counts, for metering and auditability.</li>
+    <li><strong>Billing</strong> — plan and payment status, processed by our payment provider (see <a href="/legal/subprocessors">subprocessors</a>). We do not store full card numbers.</li>
+    <li><strong>Technical data</strong> — logs needed to run and secure the service.</li>
+  </ul>
+
+  <h2>Why we process it</h2>
+  <ul>
+    <li>To <strong>provide the service</strong> you asked for (performance of a contract).</li>
+    <li>To <strong>secure and maintain</strong> it, and prevent abuse (legitimate interest).</li>
+    <li>To <strong>bill</strong> paid plans (contract and legal obligation).</li>
+    <li>With your <strong>consent</strong>, for anything optional — which you can withdraw at any time.</li>
+  </ul>
+
+  <h2>AI and your data</h2>
+  <p>
+    Inside a run, agents process your workspace context to produce drafts and proposals. Model calls go
+    to the provider you configure: a hosted provider, or a local model through Ollama that keeps prompts
+    and outputs inside your own network. <strong>We do not use your data to train TaskForce models.</strong>
+    Training policy for a hosted model depends on that provider; local models remove the question
+    entirely. See <a href="/legal/ai-transparency">AI transparency</a>.
+  </p>
+
+  <h2>Who we share it with</h2>
+  <p>
+    We do not sell your data. We share it only with the subprocessors that help us run the service — and
+    only what they need. The current list, with purpose and location, is on our
+    <a href="/legal/subprocessors">subprocessors page</a>. On a self-hosted deployment with local models,
+    your content need not leave your infrastructure at all.
+  </p>
+
+  <h2>How long we keep it</h2>
+  <p>
+    We keep personal data for as long as your account is active, then for <strong>up to 90 days after your account is closed</strong> unless a longer period is required by law. You can request deletion at any time, and
+    the product supports removing your data on request.
+  </p>
+
+  <h2>Your rights</h2>
+  <p>
+    Under the GDPR and similar laws you can <strong>access, correct, delete, export, restrict or object
+    to</strong> the processing of your personal data. To exercise a right, email
+    <a href="mailto:hello@taskforce.dev">hello@taskforce.dev</a>. You also have the right to lodge a
+    complaint with your supervisory authority — in France, the <strong>CNIL</strong> (cnil.fr).
+  </p>
+
+  <h2>International transfers</h2>
+  <p>
+    Where data is processed outside your region, we rely on appropriate safeguards
+    <strong>such as the EU Standard Contractual Clauses</strong>. Our hosting is in the EU (Hetzner,
+    Germany), so hosting itself involves no transfer outside the EU. Self-hosting and local models let you keep data
+    in a region of your choosing.
+  </p>
+
+  <h2>Security & changes</h2>
+  <p>
+    We protect data with encryption in transit and at rest, access controls and tested infrastructure —
+    see the <a href="/trust">Trust Center</a>. If this policy changes materially, we'll update the date
+    above and notify account holders.
+  </p>
+</LegalDoc>

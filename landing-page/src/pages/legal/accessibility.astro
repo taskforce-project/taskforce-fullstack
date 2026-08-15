@@ -1,0 +1,40 @@
+---
+import LegalDoc from "@/layouts/LegalDoc.astro";
+---
+
+<LegalDoc
+  title="Accessibility"
+  description="TaskForce aims to meet WCAG 2.2 AA. What we've done, what we know is imperfect, and how to tell us about a barrier."
+  eyebrow="Legal & Trust"
+  updated="31 July 2026"
+>
+  <p>
+    We want TaskForce to be usable by everyone, regardless of how they navigate the web. We build to
+    the <strong>Web Content Accessibility Guidelines (WCAG) 2.2, Level AA</strong> as our target. This
+    is a statement of intent and current practice — not a claim of certified, complete conformance.
+  </p>
+
+  <h2>What we do</h2>
+  <ul>
+    <li><strong>Keyboard</strong> — interactive elements are reachable and operable by keyboard, with a skip link to the main content.</li>
+    <li><strong>Focus</strong> — a visible focus style is applied globally so you always know where you are.</li>
+    <li><strong>Motion</strong> — animations respect <code>prefers-reduced-motion</code>; illustrations settle to a static state when reduced motion is requested.</li>
+    <li><strong>Structure</strong> — semantic headings, landmarks and labels; images that carry meaning have text alternatives.</li>
+    <li><strong>Contrast</strong> — text and interface colors are chosen to meet AA contrast, and information is never carried by color alone.</li>
+    <li><strong>Responsive</strong> — layouts reflow down to small screens and support browser zoom.</li>
+  </ul>
+
+  <h2>Where we fall short</h2>
+  <p>
+    We're honest about the gaps. Some animated product illustrations are decorative and may not convey
+    their full meaning to assistive technology; we treat them as supplementary to the text around them.
+    Accessibility is ongoing work, and we're improving it as the product grows.
+  </p>
+
+  <h2>Tell us about a barrier</h2>
+  <p>
+    If something on this site or in the product is hard to use with assistive technology, please tell us
+    at <a href="mailto:hello@taskforce.dev">hello@taskforce.dev</a>. Describe the page and what went
+    wrong, and we'll do our best to fix it and to offer the information another way in the meantime.
+  </p>
+</LegalDoc>

@@ -1,0 +1,45 @@
+---
+/**
+ * ScreenPlaceholder — un « écran » décoratif propre (retour user 08/08 : « petits screens écran
+ * décoratifs »). Cadre d'app minimal (barre fine + label) + un corps en SQUELETTE abstrait (barres
+ * grises, aucune donnée/chiffre) → lit comme un écran produit SANS être un faux screenshot (D11 :
+ * décoratif, pas un faux produit). Remplacer par une <img/> le jour où on a la vraie capture.
+ */
+interface Props {
+  label?: string;
+  ratio?: string;
+  class?: string;
+}
+const { label, ratio = "16 / 10", class: cls } = Astro.props;
+---
+
+<figure class:list={["not-prose", cls]}>
+  <div class="bg-card surface relative overflow-hidden rounded-xl">
+    <div class="bg-secondary/50 flex items-center gap-1.5 border-b px-3 py-2">
+      <span class="bg-border size-2 rounded-full"></span>
+      <span class="bg-border size-2 rounded-full"></span>
+      <span class="bg-border size-2 rounded-full"></span>
+      {label && <span class="text-muted-foreground/70 ml-2 text-[10px] font-medium">{label}</span>}
+    </div>
+    <div class="bg-secondary/15 relative" style={`aspect-ratio:${ratio}`} aria-hidden>
+      <div class="absolute inset-0 flex flex-col gap-3 p-4 sm:p-5">
+        <div class="flex items-center gap-2">
+          <span class="bg-primary/40 size-2.5 shrink-0 rounded-full"></span>
+          <span class="bg-border h-2.5 w-28 max-w-[45%] rounded-full"></span>
+          <span class="border-border bg-card ml-auto h-6 w-16 rounded-md border"></span>
+        </div>
+        <div class="flex flex-1 flex-col justify-center gap-2.5">
+          {
+            [70, 50, 78, 40].map((w) => (
+              <div class="flex items-center gap-3">
+                <span class="bg-secondary size-6 shrink-0 rounded-md"></span>
+                <span class="bg-border block h-2.5 rounded-full" style={`width:${w}%`} />
+                <span class="bg-primary/15 ml-auto h-4 w-12 shrink-0 rounded-full" />
+              </div>
+            ))
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+</figure>

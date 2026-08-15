@@ -1093,8 +1093,8 @@ export const constants_en = {
           {
             category: "Service Providers",
             description:
-              "Cloud hosting, payment processing, analytics, email delivery",
-            examples: "AWS, Stripe, Google Analytics",
+              "Cloud hosting, payment processing, and AI-powered features",
+            examples: "Stripe (payments), Groq (AI features)",
           },
           {
             category: "Business Transfers",

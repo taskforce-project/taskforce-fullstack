@@ -1,0 +1,88 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import PageHero from "@/components/site/PageHero.astro";
+import PageCta from "@/components/site/PageCta.astro";
+import { ArrowRight } from "lucide-react";
+import { isLive } from "@/components/site/nav";
+
+/* Positionnement HONNÊTE et respectueux : on dit ce qui est DIFFÉRENT, jamais « le concurrent est
+   mauvais ». Les agents de code sont COMPLÉMENTAIRES (TaskForce les utilise), pas des rivaux. */
+const TRACKERS = [
+  { label: "vs Jira", href: "/vs/jira", diff: "Jira tracks tickets and workflows. TaskForce adds the layer above them: validated decisions, a human sign-off, and the reasoning kept for next time." },
+  { label: "vs Linear", href: "/vs/linear", diff: "Linear is a fast, elegant tracker. TaskForce sits on the same kind of board and adds checkpoints, memory and AI orchestration around the work." },
+  { label: "vs Notion", href: "/vs/notion", diff: "Notion is where docs live. TaskForce makes the spec, the decision and the sign-off outputs of the run itself — not pages you maintain by hand." },
+  { label: "vs Shortcut", href: "/vs/shortcut", diff: "Shortcut is a developer-friendly tracker with stories and iterations. TaskForce adds the governed decision, memory and AI-orchestration layer around the same kind of board." },
+];
+
+const AGENTS = [
+  { label: "vs Claude Code alone", href: "/vs/claude-code-alone", diff: "A coding agent writes and ships code. TaskForce frames the work first, keeps a human on each decision, and remembers why — then hands the build to that same agent." },
+  { label: "vs Devin", href: "/vs/devin", diff: "Autonomous agents aim to do the whole job. TaskForce keeps people accountable at each checkpoint and orchestrates the agent you choose, rather than replacing your judgment." },
+  { label: "vs Cursor", href: "/vs/cursor", diff: "Cursor helps you write code in the editor. TaskForce governs the delivery around it — and can route work to it as an assignee like any other." },
+  { label: "vs GitHub Copilot", href: "/vs/copilot", diff: "Copilot completes code as you type. TaskForce orchestrates the decisions that code is meant to implement, and keeps the trail." },
+];
+
+const GROUPS = [
+  { title: "vs delivery trackers", note: "They record the work. TaskForce governs the decisions behind it.", items: TRACKERS },
+  { title: "vs coding agents", note: "They write the code. TaskForce orchestrates around them — and uses them.", items: AGENTS },
+];
+---
+
+<BaseLayout
+  title="Compare — TaskForce"
+  description="Where TaskForce fits next to delivery trackers and coding agents: it doesn't replace your board or your coding agent — it adds the governed decisions, human approval and memory around them."
+>
+  <PageHero
+    kicker="Compare"
+    title="Where TaskForce fits"
+    lead="TaskForce isn't another tracker, and it isn't another coding agent. It's the governed decision layer between them — so here's an honest read of what's different, and what it complements rather than replaces."
+    primary={{ label: "Run your first workflow", href: "/waitlist" }}
+    secondary={{ label: "See the run", href: "/product/orchestration" }}
+  />
+
+  {
+    GROUPS.map((group, gi) => (
+      <section class={gi % 2 === 0 ? "bg-card border-b" : "bg-card border-b"}>
+        <div class="container-rail py-20 lg:py-28">
+          <div class="max-w-2xl">
+            <p class="t-eyebrow mb-3">{group.title}</p>
+            <h2 class="t-h2">{group.note}</h2>
+          </div>
+          <div class="mt-12 grid gap-6 lg:grid-cols-2">
+            {group.items.map((item) => (
+              <div class="flex flex-col border bg-card p-6">
+                <h3 class="text-[16px] font-semibold text-foreground">{item.label}</h3>
+                <p class="text-muted-foreground mt-2 flex-1 text-[13.5px] leading-6">{item.diff}</p>
+                {isLive(item.href) && (
+                  <a href={item.href} class="link-underline text-foreground mt-4 inline-flex items-center gap-1.5 text-[13.5px] font-medium">
+                    Read the full comparison
+                    <ArrowRight className="size-3.5" />
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+    ))
+  }
+
+  {/* ── Honnêteté ── */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-16 lg:py-20">
+      <div class="mx-auto max-w-2xl text-center">
+        <p class="text-muted-foreground text-[14px] leading-7">
+          We won't tell you your tracker or your coding agent is bad — you chose them for good reasons.
+          TaskForce adds what they were never meant to do: keep a human accountable for each decision,
+          and remember why it was made.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <PageCta
+    title="See the difference on your own work"
+    lead="Bring one outcome you were going to spec by hand, and watch the governed run come back."
+    primary={{ label: "Run your first workflow", href: "/waitlist" }}
+    secondary={{ label: "Book a demo", href: "/book-a-demo" }}
+  />
+</BaseLayout>

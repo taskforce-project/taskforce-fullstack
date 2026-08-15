@@ -1,0 +1,125 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import PageHero from "@/components/site/PageHero.astro";
+import PageCta from "@/components/site/PageCta.astro";
+import FaqSection from "@/components/site/sections/FaqSection.astro";
+import { LevelBadge } from "@/components/site/Section";
+import type { Maturity } from "@/components/site/nav";
+
+type Item = { title: string; desc: string; level: Maturity };
+type Phase = { key: string; heading: string; blurb: string; dot: string; edge: string; items: Item[] };
+
+/* Now / Next / Later — direction publique, séquence sans dates promises (D11). Teintes calées sur
+   la palette sémantique : émeraude = livré, ambre = en cours, violet = planifié. */
+const PHASES: Phase[] = [
+  {
+    key: "now",
+    heading: "Now",
+    blurb: "Shipped and in your hands today.",
+    dot: "bg-emerald-500",
+    edge: "border-emerald-500",
+    items: [
+      { title: "Real-time collaboration", desc: "Boards, issues and cycles, live for the whole team.", level: "live" },
+      { title: "Smart Assign", desc: "The right task to the right person — an agent counts as an assignee.", level: "live" },
+      { title: "Delivery analytics", desc: "Lead time, throughput and approval rate, per project.", level: "live" },
+      { title: "Integrations", desc: "129 connectors across tracker, repo, chat and cloud — connect today, deep sync rolling out.", level: "beta" },
+      { title: "Human approvals", desc: "A required sign-off at each checkpoint of a run.", level: "beta" },
+    ],
+  },
+  {
+    key: "next",
+    heading: "Next",
+    blurb: "In progress — usable, still hardening.",
+    dot: "bg-amber-500",
+    edge: "border-amber-500",
+    items: [
+      { title: "TaskForce Memory retrieval", desc: "Runs recall the decisions and constraints you already set.", level: "beta" },
+      { title: "Specialized agent team", desc: "CPO, CTO and COO agents with distinct responsibilities instead of one generalist.", level: "labs" },
+      { title: "Model choice per step", desc: "The right model for each checkpoint — local or hosted.", level: "labs" },
+    ],
+  },
+  {
+    key: "later",
+    heading: "Later",
+    blurb: "Where this is going. Direction, not a deadline.",
+    dot: "bg-violet-500",
+    edge: "border-violet-500",
+    items: [
+      { title: "Full orchestration", desc: "The complete intent-to-deploy run, from product framing to QA and sign-off.", level: "labs" },
+      { title: "Prediction calibration", desc: "Compare what agents predicted with what actually shipped — and calibrate future decisions.", level: "labs" },
+      { title: "Beyond engineering", desc: "The same governed run for teams outside software.", level: "labs" },
+    ],
+  },
+];
+
+const FAQ = [
+  { q: "Why are there no dates?", a: "We commit to sequence, not to dates we can't keep. Now is shipped, Next is in progress, Later is direction." },
+  { q: "Do these labels change?", a: "Yes — a capability moves from Planned to Beta to Live as it matures, and the changelog records what actually shipped." },
+  { q: "Can I influence what's next?", a: "Yes. Tell us what you need at hello@taskforce.dev — real usage shapes priority far more than a wishlist does." },
+  { q: "Is “Later” a commitment?", a: "It's direction, not a deadline. We'd rather under-promise on timing and stay honest about what's real today." },
+];
+---
+
+<BaseLayout
+  title="Roadmap — TaskForce"
+  description="What is live, what is in progress and where TaskForce is going — in the open. We commit to sequence, not to dates we can't keep."
+>
+  <PageHero
+    eyebrow="Roadmap"
+    title="What's shipped, what's next, and where this goes"
+    lead="We publish the direction in the open. Each capability is clearly marked Planned, Beta or Live — and the changelog records what actually ships."
+    primary={{ label: "Run your first workflow", href: "/waitlist" }}
+    secondary={{ label: "See the changelog", href: "/changelog" }}
+  />
+
+  <section class="bg-card border-b">
+    <div class="container-rail py-20 lg:py-28">
+      {/* Trois phases en timeline : chaque colonne porte un bord coloré (Now/Next/Later) et sa liste. */}
+      <div class="grid gap-8 sm:grid-cols-3 sm:gap-6 lg:gap-10">
+        {
+          PHASES.map((phase) => (
+            <div class="flex flex-col">
+              <div class:list={["border-t-2 pt-4", phase.edge]}>
+                <div class="flex items-center gap-2.5">
+                  <span class:list={["size-2.5 rounded-full", phase.dot]} aria-hidden />
+                  <h2 class="text-[13px] font-semibold tracking-wider text-foreground uppercase">{phase.heading}</h2>
+                  <span class="text-muted-foreground ml-auto font-mono text-[12px] tabular-nums">{phase.items.length}</span>
+                </div>
+                <p class="text-muted-foreground mt-2 text-[13px] leading-5">{phase.blurb}</p>
+              </div>
+
+              {/* Liste en filets (divide-y) : colonnes de hauteurs différentes = blanc en bas, jamais gris. */}
+              <ul class="mt-5 flex flex-col divide-y divide-border border-t border-border">
+                {phase.items.map((item) => (
+                  <li class="py-4">
+                    <div class="flex items-center gap-2">
+                      <h3 class="text-[14px] font-medium text-foreground">{item.title}</h3>
+                      <LevelBadge level={item.level} />
+                    </div>
+                    <p class="text-muted-foreground mt-1 text-[13px] leading-5">{item.desc}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))
+        }
+      </div>
+
+      <p class="text-muted-foreground mt-12 text-[13px] leading-6">
+        Maturity labels are honest on purpose: <span class="text-foreground">Live</span> is in
+        production, <span class="text-foreground">Beta</span> works with rough edges, and
+        <span class="text-foreground">Planned</span> is direction we're building toward — sequence, not
+        a dated promise.
+      </p>
+    </div>
+  </section>
+
+  <FaqSection title="How to read this roadmap" items={FAQ} />
+
+  <PageCta
+    title="Start with what's live today"
+    lead="The delivery foundation is already shipped. Start with your board, issues and integrations — then add governed runs as they become available."
+    primary={{ label: "Run your first workflow", href: "/waitlist" }}
+    secondary={{ label: "Book a demo", href: "/book-a-demo" }}
+  />
+</BaseLayout>

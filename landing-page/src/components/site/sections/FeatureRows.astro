@@ -1,0 +1,31 @@
+---
+/**
+ * FeatureRows — DA « petits traits » (façon Tailark) : conteneur de lignes visuel↔texte séparées par
+ * des FILETS (`sm:divide-y`). Chaque ligne est un <FeatureRow/> (slots `viz` + `aside`), on alterne le
+ * côté du visuel via la prop `reverse`. Aucune dépendance (Astro pur). Le contenu réel vit dans les slots.
+ */
+interface Props {
+  eyebrow?: string;
+  title?: string;
+  lead?: string;
+  bg?: "card" | "secondary";
+}
+const { eyebrow, title, lead, bg = "secondary" } = Astro.props;
+---
+
+<section class:list={[bg === "secondary" ? "bg-secondary" : "bg-card", "border-b"]}>
+  <div class="container-rail py-20 lg:py-28">
+    {
+      (eyebrow || title || lead) && (
+        <div class="mb-12 max-w-2xl">
+          {eyebrow && <p class="t-eyebrow mb-3">{eyebrow}</p>}
+          {title && <h2 class="t-h2">{title}</h2>}
+          {lead && <p class="t-lead mt-4">{lead}</p>}
+        </div>
+      )
+    }
+    <div class="border-y sm:divide-y">
+      <slot />
+    </div>
+  </div>
+</section>

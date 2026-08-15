@@ -17,6 +17,12 @@ const badgeVariants = cva(
           "border-transparent bg-destructive text-white [a&]:hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
         outline:
           "text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
+        /* ── Maturité (garde-fou d'honnêteté, Spec_Master §1.1) ──
+           L'information passe par le TEXTE du badge, jamais par la couleur seule (WCAG 1.4.1). */
+        live: "border-emerald-200 bg-emerald-50 text-emerald-700",
+        beta: "border-amber-200 bg-amber-50 text-amber-700",
+        /** Violet = --accent-purple de l'app, réservé au marquage IA / recherche. */
+        labs: "border-[#d9d7f7] bg-[color:var(--site-ai-soft)] text-[color:var(--site-ai)]",
       },
     },
     defaultVariants: {

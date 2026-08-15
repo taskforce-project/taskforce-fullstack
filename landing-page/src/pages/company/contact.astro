@@ -1,0 +1,109 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import PageHero from "@/components/site/PageHero.astro";
+import { Mail, CalendarCheck, ShieldCheck, Building2, ArrowRight } from "lucide-react";
+import { hueFor } from "@/lib/site-icons";
+
+const CONTACT = "hello@taskforce.dev";
+
+const CHANNELS = [
+  {
+    icon: CalendarCheck,
+    title: "See it on your workflow",
+    text: "The fastest way to understand TaskForce is to run it against a real outcome from your team.",
+    cta: { label: "Book a demo", href: "/book-a-demo" },
+  },
+  {
+    icon: Building2,
+    title: "Enterprise & self-hosting",
+    text: "Private deployment, SSO, governance and data control — discuss what a rollout looks like for your org.",
+    cta: { label: "Enterprise", href: "/enterprise" },
+  },
+  {
+    icon: ShieldCheck,
+    title: "Security & privacy",
+    text: "Questions about data handling, model calls or compliance? The Trust Center answers most of them.",
+    cta: { label: "Trust Center", href: "/trust" },
+  },
+];
+---
+
+<BaseLayout
+  title="Contact — TaskForce"
+  description="Get in touch with TaskForce — book a demo, ask about enterprise and self-hosting, raise a security question, or just say hello."
+>
+  <PageHero
+    eyebrow="Contact"
+    title="Talk to us"
+    lead="Whether you want to see TaskForce run, discuss a private deployment, or ask a hard security question — here's where to start."
+    primary={{ label: "Email us", href: `mailto:${CONTACT}` }}
+    secondary={{ label: "Book a demo", href: "/book-a-demo" }}
+  />
+
+  {/* ── Channels ── */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="grid gap-6 lg:grid-cols-3">
+        {
+          CHANNELS.map((c) => (
+            <div class="flex flex-col border bg-card p-6">
+              <span class="ic-tile flex size-11 items-center justify-center rounded-xl border" style={`--ic:${hueFor(c.icon)}`}>
+                <c.icon className="size-5" strokeWidth={1.75} />
+              </span>
+              <h3 class="mt-4 text-[16px] font-semibold text-foreground">{c.title}</h3>
+              <p class="text-muted-foreground mt-2 flex-1 text-[13.5px] leading-6">{c.text}</p>
+              <a
+                href={c.cta.href}
+                class="link-underline text-foreground mt-4 inline-flex items-center gap-1.5 text-[14px] font-medium"
+              >
+                {c.cta.label}
+                <ArrowRight className="size-3.5" />
+              </a>
+            </div>
+          ))
+        }
+      </div>
+
+      {/* Email direct */}
+      <div class="bg-card mt-6 flex flex-col items-start justify-between gap-4 border p-6 sm:flex-row sm:items-center">
+        <div class="flex items-start gap-4">
+          <span class="ic-tile flex size-11 shrink-0 items-center justify-center rounded-xl border" style={`--ic:${hueFor(Mail)}`}>
+            <Mail className="size-5" strokeWidth={1.75} />
+          </span>
+          <div>
+            <h3 class="text-[16px] font-semibold text-foreground">Prefer to write?</h3>
+            <p class="text-muted-foreground mt-1 text-[13.5px] leading-6">
+              Reach us directly and we'll route you to the right person.
+            </p>
+          </div>
+        </div>
+        <a
+          href={`mailto:${CONTACT}`}
+          class="link-underline text-foreground shrink-0 text-[15px] font-medium"
+        >
+          {CONTACT}
+        </a>
+      </div>
+    </div>
+  </section>
+
+  {/* ── Start free ── */}
+  <section class="bg-card">
+    <div class="container-rail py-16">
+      <div class="mx-auto flex max-w-3xl flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h2 class="t-h3">Rather just try it?</h2>
+          <p class="text-muted-foreground mt-1.5 text-[14px] leading-6">
+            Start with the delivery workspace — free, no credit card.
+          </p>
+        </div>
+        <a
+          href={"/waitlist"}
+          class="link-underline text-foreground shrink-0 text-[14px] font-medium"
+        >
+          Start free
+        </a>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

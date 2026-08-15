@@ -1,0 +1,65 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import Prose from "@/components/site/Prose.astro";
+import { Info } from "lucide-react";
+
+/**
+ * LegalDoc — gabarit partagé des pages légales : en-tête (fil d'Ariane léger + titre + date),
+ * bandeau de brouillon optionnel (HONNÊTETÉ : ne jamais présenter un texte non relu comme des
+ * conditions définitives), corps en `Prose`, pied « une question ? ». Le contenu passe en `<slot />`.
+ */
+interface Props {
+  title: string;
+  description: string;
+  updated: string;
+  eyebrow?: string;
+  /** Affiche un bandeau « brouillon, en attente de relecture juridique ». */
+  draft?: boolean;
+}
+const { title, description, updated, eyebrow = "Legal", draft = false } = Astro.props;
+const CONTACT = "hello@taskforce.dev";
+---
+
+<BaseLayout title={`${title} — TaskForce`} description={description}>
+  <section class="bg-card border-b">
+    <div class="container-rail py-16 lg:py-20">
+      <div class="mx-auto max-w-2xl">
+        <p class="t-eyebrow mb-3">{eyebrow}</p>
+        <h1 class="t-h1">{title}</h1>
+        <p class="text-muted-foreground mt-4 text-[13.5px]">Last updated: {updated}</p>
+
+        {
+          draft && (
+            <div class="border-primary/25 mt-6 flex items-start gap-2.5 rounded-xl border bg-primary/[0.05] px-4 py-3.5">
+              <Info className="text-primary mt-0.5 size-4 shrink-0" strokeWidth={2} />
+              <p class="text-[13px] leading-6 text-foreground">
+                <span class="font-medium">Working draft.</span> TaskForce is pre-launch. This document
+                is provided for transparency and is pending final legal review — it is not yet a binding
+                agreement. Questions?{" "}
+                <a href={`mailto:${CONTACT}`} class="link-underline text-foreground font-medium">
+                  {CONTACT}
+                </a>
+              </p>
+            </div>
+          )
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="bg-card">
+    <div class="container-rail pb-20 lg:pb-28">
+      <div class="mx-auto max-w-2xl">
+        <Prose>
+          <slot />
+        </Prose>
+
+        <hr class="border-border my-12" />
+        <p class="text-muted-foreground text-[13.5px] leading-6">
+          Questions about this document? Write to{" "}
+          <a href={`mailto:${CONTACT}`} class="link-underline text-foreground font-medium">{CONTACT}</a>.
+        </p>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

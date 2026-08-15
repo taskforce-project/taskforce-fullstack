@@ -1,0 +1,136 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import PageHero from "@/components/site/PageHero.astro";
+import { DemoForm } from "@/components/site/DemoForm";
+import { Check } from "lucide-react";
+
+const EXPECT = [
+  { t: "A real workflow, not a slide deck", d: "We use an outcome from your team and walk through the delivery path." },
+  { t: "Your existing stack", d: "See how TaskForce fits around the repositories, trackers, memory and coding agents your team already uses." },
+  { t: "Governance in practice", d: "See approvals, auditability and model controls as they actually work." },
+  { t: "Security and deployment", d: "Discuss self-hosting, identity, data flows and local models if relevant." },
+  { t: "No roadmap theatre", d: "We'll tell you what's Live, Beta or Planned." },
+];
+
+const PROFILES = [
+  { t: "Engineering leaders", d: "Standardize AI-assisted delivery without centralizing every decision in one model." },
+  { t: "Product & engineering teams", d: "Turn outcomes into validated specs, technical decisions and executable work." },
+  { t: "Security & platform teams", d: "Keep identity, permissions, model choice and auditability under organizational control." },
+];
+---
+
+<BaseLayout
+  title="Book a demo — TaskForce"
+  description="Bring us a real outcome from your team and we'll run TaskForce against it — the governed delivery path end to end, where humans stay in control, and straight answers on what's live versus planned."
+>
+  <PageHero
+    eyebrow="Book a demo"
+    title="See it run on your own workflow"
+    lead="Thirty minutes, using a real outcome from your team. We'll run it end to end, show where humans stay in control, and answer the hard questions — no obligation."
+    primary={{ label: "See TaskForce in action", href: "#demo-form" }}
+    secondary={{ label: "See pricing", href: "/pricing" }}
+  />
+
+  {/* ── What to expect ── */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-16 lg:py-20">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">What to expect</p>
+        <h2 class="t-h2">Thirty minutes on your problem, not our pitch</h2>
+      </div>
+      <div class="mt-10 grid gap-x-10 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
+        {
+          EXPECT.map((e) => (
+            <div class="flex items-start gap-3">
+              <Check className="text-primary mt-0.5 size-4 shrink-0" strokeWidth={2.5} />
+              <div>
+                <h3 class="text-[14.5px] font-semibold text-foreground">{e.t}</h3>
+                <p class="text-muted-foreground mt-1 text-[13.5px] leading-6">{e.d}</p>
+              </div>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  {/* ── Bring one real outcome ── */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-16 lg:py-20">
+      <div class="border-primary/25 mx-auto max-w-3xl border p-6 sm:p-8 [background:radial-gradient(120%_120%_at_50%_0%,color-mix(in_oklab,var(--primary)_6%,transparent),transparent_70%)]">
+        <p class="t-eyebrow mb-3">What to bring</p>
+        <h2 class="font-display text-[26px] font-medium tracking-[-0.02em] text-foreground sm:text-[30px]">
+          Bring one real outcome
+        </h2>
+        <p class="text-muted-foreground mt-4 text-[15px] leading-7">
+          The best demo starts with something your team actually needs to ship. Bring a feature,
+          product change, migration or technical initiative you'd normally spend time turning into a
+          spec.
+        </p>
+        <p class="mt-4 text-[14px] font-medium text-foreground">
+          You don't need to prepare anything — a short description is enough.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  {/* ── Who this is for ── */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-16 lg:py-20">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">Who this is for</p>
+        <h2 class="t-h2">Built for teams putting AI into production</h2>
+        <p class="t-lead mt-4">
+          TaskForce is most useful when your team already has software delivery processes, coding
+          agents or AI tooling — and needs more structure, context and accountability around them.
+        </p>
+      </div>
+      <div class="mt-10 grid gap-6 lg:grid-cols-3">
+        {
+          PROFILES.map((p) => (
+            <div class="border bg-card p-6">
+              <h3 class="text-[15px] font-semibold text-foreground">{p.t}</h3>
+              <p class="text-muted-foreground mt-2 text-[13.5px] leading-6">{p.d}</p>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  {/* ── Le formulaire (dominant) ── */}
+  <section id="demo-form" class="bg-card border-b scroll-mt-20">
+    <div class="container-rail py-16 lg:py-24">
+      <div class="mx-auto max-w-xl text-center">
+        <h2 class="t-h2">Request a demo</h2>
+        <p class="t-lead mx-auto mt-4">
+          Tell us who you are and what you'd like us to run. We'll come back with a time.
+        </p>
+      </div>
+      <div class="bg-card mx-auto mt-10 max-w-xl border p-6 sm:p-8">
+        <DemoForm client:load />
+      </div>
+    </div>
+  </section>
+
+  {/* ── Start free instead ── */}
+  <section class="bg-card">
+    <div class="container-rail py-14">
+      <div class="mx-auto flex max-w-3xl flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h2 class="t-h3">Not ready for a call?</h2>
+          <p class="text-muted-foreground mt-1.5 text-[14px] leading-6">
+            Start with the delivery workspace — free, no credit card. Self-hosting comes with
+            Enterprise, alongside deployment assistance, SSO, advanced controls and dedicated support.
+          </p>
+        </div>
+        <a
+          href={"/waitlist"}
+          class="link-underline text-foreground shrink-0 text-[14px] font-medium"
+        >
+          Start free
+        </a>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

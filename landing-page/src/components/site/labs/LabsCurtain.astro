@@ -1,0 +1,91 @@
+---
+/**
+ * LabsCurtain — rideau NOIR de transition à la frontière light ↔ dark de /labs (retour user 02/08).
+ * Entrée (depuis le site clair) : le rideau part noir puis se lève → « le screen passe en noir » puis révèle.
+ * Sortie (clic vers une page hors /labs) : le rideau redescend en noir, PUIS on navigue.
+ * Navigation INTERNE à Labs (hub ↔ détail) : aucun rideau (référent /labs détecté).
+ * No-JS : masqué (noscript). prefers-reduced-motion : totalement désactivé.
+ */
+---
+
+<div id="labs-curtain" aria-hidden="true"></div>
+<noscript><style>#labs-curtain{display:none !important}</style></noscript>
+
+<style>
+  #labs-curtain {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: #080910;
+    opacity: 1;
+    pointer-events: none;
+    transition: opacity 520ms ease;
+  }
+  #labs-curtain.tf-lift {
+    opacity: 0;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #labs-curtain {
+      display: none !important;
+    }
+  }
+</style>
+
+<script is:inline>
+  (() => {
+    const c = document.getElementById("labs-curtain");
+    if (!c) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      c.style.display = "none";
+      return;
+    }
+    // Navigation interne à Labs → pas de rideau (on ne l'a pas quitté).
+    let ref = null;
+    try {
+      ref = document.referrer ? new URL(document.referrer) : null;
+    } catch (e) {
+      ref = null;
+    }
+    if (ref && ref.origin === location.origin && ref.pathname.indexOf("/labs") === 0) {
+      c.style.display = "none";
+      return;
+    }
+    // Lever le rideau (reveal) après le 1er paint. setTimeout = robuste même si le rAF est throttlé.
+    const lift = function () {
+      c.classList.add("tf-lift");
+    };
+    window.setTimeout(lift, 60);
+    // Filet : si la transition d'opacité n'aboutit pas (env. sans compositing), retirer le rideau en dur
+    // pour ne JAMAIS laisser la page masquée. En vrai navigateur, à 1200ms l'opacité est déjà 0 → no-op.
+    window.setTimeout(function () {
+      if (parseFloat(getComputedStyle(c).opacity) > 0.05) c.style.display = "none";
+    }, 1200);
+    window.addEventListener("pageshow", function (e) {
+      if (e.persisted) c.classList.add("tf-lift");
+    });
+    // Redescendre le rideau quand on QUITTE Labs.
+    document.addEventListener("click", function (e) {
+      const a = e.target && e.target.closest ? e.target.closest("a[href]") : null;
+      if (!a) return;
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      if (a.target === "_blank" || a.hasAttribute("download")) return;
+      const href = a.getAttribute("href");
+      if (!href || href.charAt(0) === "#") return;
+      let url;
+      try {
+        url = new URL(href, location.href);
+      } catch (err) {
+        return;
+      }
+      if (url.origin !== location.origin) return; // externe → laisser faire
+      if (url.pathname === location.pathname) return; // même page
+      if (url.pathname.indexOf("/labs") === 0) return; // reste dans Labs → pas de rideau
+      e.preventDefault();
+      c.style.pointerEvents = "auto";
+      c.classList.remove("tf-lift");
+      window.setTimeout(function () {
+        window.location.href = url.href;
+      }, 440);
+    });
+  })();
+</script>

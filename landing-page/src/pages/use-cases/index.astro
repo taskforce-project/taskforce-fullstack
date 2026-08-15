@@ -1,0 +1,96 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import PageHero from "@/components/site/PageHero.astro";
+import PageCta from "@/components/site/PageCta.astro";
+import { LevelBadge } from "@/components/site/Section";
+import { USE_CASES, USE_CASE_ORDER } from "@/lib/use-cases";
+import {
+  FileText, Building2, ListTree, GitPullRequest, ClipboardCheck,
+  BookOpen, UserPlus, Siren, Megaphone, CalendarRange, ArrowRight, type LucideIcon,
+} from "lucide-react";
+import { hueFor } from "@/lib/site-icons";
+
+const ICONS: Record<string, LucideIcon> = {
+  "product-spec": FileText,
+  "architecture-decision": Building2,
+  "backlog-grooming": ListTree,
+  "code-review": GitPullRequest,
+  "qa-testing": ClipboardCheck,
+  documentation: BookOpen,
+  onboarding: UserPlus,
+  "incident-postmortem": Siren,
+  "release-notes": Megaphone,
+  "sprint-planning": CalendarRange,
+};
+const ITEMS = USE_CASE_ORDER.map((k) => USE_CASES[k]);
+---
+
+<BaseLayout
+  title="Use cases — TaskForce"
+  description="The jobs TaskForce turns into governed, remembered outputs — from product spec and architecture decision to code review, QA, onboarding and sprint planning. We mark clearly what ships today and what's Planned."
+>
+  <PageHero
+    kicker="Use cases"
+    title="One pattern, many jobs"
+    lead="A run isn't one task — it's a chain of decisions, each producing a reviewed artifact. These are the jobs TaskForce turns from busywork into governed, remembered outputs. Each carries an honest maturity badge."
+    primary={{ label: "Run your first workflow", href: "/waitlist" }}
+    secondary={{ label: "See the run", href: "/product/orchestration" }}
+  />
+
+  <section class="bg-card border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {
+          ITEMS.map((u) => {
+            const Icon = ICONS[u.key];
+            return (
+              <a
+                href={`/use-cases/${u.key}`}
+                class="bg-card hover:border-primary/30 hover:bg-secondary/40 flex flex-col border p-6 transition-colors"
+              >
+                <div class="flex items-center justify-between gap-2">
+                  <span class="ic-tile flex size-11 items-center justify-center rounded-xl border" style={`--ic:${hueFor(Icon)}`}>
+                    {Icon && <Icon className="size-5" strokeWidth={1.75} />}
+                  </span>
+                  <LevelBadge level={u.level} />
+                </div>
+                <h3 class="mt-4 text-[15.5px] font-semibold text-foreground">{u.name}</h3>
+                <p class="text-muted-foreground mt-2 flex-1 text-[13px] leading-6">{u.lead}</p>
+                <span class="link-underline text-foreground mt-4 inline-flex items-center gap-1.5 text-[13px] font-medium">
+                  Read more
+                  <ArrowRight className="size-3.5" />
+                </span>
+              </a>
+            );
+          })
+        }
+      </div>
+    </div>
+  </section>
+
+  {/* ── The thread ── */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="mx-auto max-w-2xl text-center">
+        <p class="t-eyebrow mb-3">The thread</p>
+        <h2 class="t-h2">Same rails, different jobs</h2>
+        <p class="t-lead mx-auto mt-4">
+          Every job here runs on the same idea: an artifact is produced, a human approves it, and the
+          approved decision becomes context for what's next. That's why the reasoning survives long
+          after the work ships — whatever the job.
+        </p>
+        <a href="/product/orchestration" class="link-underline text-foreground mt-8 inline-flex items-center gap-1.5 text-[14px] font-medium">
+          See how a run works
+          <ArrowRight className="size-4" />
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <PageCta
+    title="Turn a job into a governed output"
+    lead="Start with what ships today — approvals and memory — and grow into the full run as it lands."
+    primary={{ label: "Run your first workflow", href: "/waitlist" }}
+    secondary={{ label: "Book a demo", href: "/book-a-demo" }}
+  />
+</BaseLayout>

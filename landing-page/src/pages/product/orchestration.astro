@@ -1,0 +1,324 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import PageCta from "@/components/site/PageCta.astro";
+import CalloutBand from "@/components/site/sections/CalloutBand.astro";
+import { buttonVariants } from "@/components/ui/button";
+import { LevelBadge } from "@/components/site/Section";
+import { cn } from "@/lib/utils";
+import { HeroFlow, GroundingFlow, ApprovalFlow, HandoffFlow, CalibrationFlow } from "@/components/site/flows/OrchestrationFlows";
+import { Compass, Building2, CalendarClock, BrainCircuit, Boxes, Server, ShieldCheck, Cloud, ArrowRight } from "lucide-react";
+import { hueFor } from "@/lib/site-icons";
+
+/**
+ * Orchestration — refonte façon Attio (attio.com/platform/workflows, 04/08) : hero 2 colonnes avec un
+ * GRAPHE de run à droite (pas de screenshot d'app), et des FONDS DE SECTION qui alternent (points /
+ * rayures / vide / NOIR) — pas de fond sur les cartes. « Structure par traits » gardée (colonnes à filets).
+ * D11 : le graphe est illustratif (badge PLANNED + légende « Illustrative »), rien n'est présenté comme Live.
+ */
+
+const AGENTS_FULL = [
+  {
+    code: "CPO",
+    owns: "the what",
+    icon: Compass,
+    box: "ring-violet-200 text-violet-600",
+    steps: ["Frame the problem — users, outcome, DoD", "Draft the product spec — stories, acceptance"],
+  },
+  {
+    code: "CTO",
+    owns: "the how",
+    icon: Building2,
+    box: "ring-blue-200 text-blue-600",
+    steps: ["Propose the approach — architecture, risks", "Write the API contract — endpoints, payloads"],
+  },
+  {
+    code: "COO",
+    owns: "the when & risk",
+    icon: CalendarClock,
+    box: "ring-amber-200 text-amber-600",
+    steps: ["Break down & sequence the work", "QA and sign-off against acceptance"],
+  },
+];
+
+const PRINCIPLES = [
+  { icon: BrainCircuit, title: "Grounded", desc: "Built from your architecture, decisions and conventions." },
+  { icon: Boxes, title: "Specialized", desc: "Each agent stays within a defined responsibility." },
+  { icon: ShieldCheck, title: "Governed", desc: "Every transition is a human decision, not a setting." },
+  { icon: Server, title: "Your models", desc: "Local via Ollama at zero model cost, or hosted." },
+];
+---
+
+<BaseLayout
+  title="Orchestration — TaskForce"
+  description="TaskForce turns a product outcome into a governed delivery run. Specialized agents handle product, architecture and delivery; your team validates every decision. The AI proposes. Your team decides."
+>
+  {/* ───── Hero façon Attio : texte à gauche, GRAPHE de run à droite — fond POINTS ───── */}
+  <section class="bg-card bg-dots border-b">
+    <div class="container-rail py-16 lg:py-24">
+      <div class="grid items-center gap-12 lg:grid-cols-[minmax(0,460px)_minmax(0,1fr)] lg:gap-16">
+        <div class="text-center lg:text-left">
+          <div class="flex items-center justify-center gap-2.5 lg:justify-start">
+            <span class="t-eyebrow">Orchestration</span>
+            <LevelBadge level="labs" />
+          </div>
+          <h1 class="t-h1 mt-4">Set the outcome.<br />The team runs the play.</h1>
+          <p class="t-lead mx-auto mt-5 max-w-xl lg:mx-0">
+            Specialized agents propose every step — spec, architecture, plan, QA. Your team approves each
+            decision before it becomes the next.
+          </p>
+          <div class="mt-8 flex flex-wrap justify-center gap-3 lg:justify-start">
+            <a href={"/waitlist"} class={cn(buttonVariants({ size: "pill" }))}>Run your first workflow</a>
+            <a href="/roadmap" class={cn(buttonVariants({ variant: "outline", size: "pill" }))}>See the roadmap</a>
+          </div>
+          <p class="text-muted-foreground mt-7 flex items-center justify-center gap-2 text-[13px] lg:justify-start">
+            <ShieldCheck className="size-4 shrink-0" strokeWidth={2} style={{ color: hueFor(ShieldCheck) }} />
+            The AI proposes. Your team decides.
+          </p>
+        </div>
+
+        {/* le graphe de run — React Flow (statique, façon Attio). client:only : RF a besoin du DOM navigateur. */}
+        <div class="lg:pl-4">
+          <div class="relative mx-auto w-full max-w-[600px]" style="aspect-ratio: 600 / 620">
+            <HeroFlow client:only="react" />
+          </div>
+          <p class="text-muted-foreground/60 mt-6 text-center font-mono text-[10px] tracking-wide uppercase">
+            Illustrative — orchestration is Planned
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {/* ───── Pourquoi — fond VIDE ───── */}
+  <CalloutBand
+    eyebrow="The problem"
+    statement="A software project isn't one task. It's a chain of decisions that compound."
+    support="TaskForce turns each into a checkpoint — proposed, reviewed, approved before it becomes context for the next."
+  />
+
+  {/* ───── Comment tourne un run — GRILLE À FILETS INTÉGRÉS : 4 capacités = 4 cellules (titre + texte + schéma) ───── */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="mb-12 max-w-2xl">
+        <p class="t-eyebrow mb-3">Inside a run</p>
+        <h2 class="t-h2 text-balance">One outcome. Every safeguard, in the open.</h2>
+        <p class="t-lead mt-4">
+          A run reads your context, proposes each step, waits for a human decision, hands the approved work to
+          your coding agent, then measures itself against the forecast.
+        </p>
+      </div>
+      {/* Grille VARIÉE (pas ultra-carrée) : nœuds à taille identique (rendu 1:1) → les schémas larges
+          prennent plus de place → boucles en pleine largeur, grounding + handoff côte à côte. */}
+      <div class="-mx-6 grid grid-cols-1 gap-px border-y border-border bg-border md:grid-cols-6 lg:-mx-10">
+        {/* Grounded (span 3) */}
+        <div class="bg-card flex flex-col md:col-span-3">
+          <div class="p-6 sm:p-8">
+            <p class="t-eyebrow mb-2">Grounded</p>
+            <h3 class="t-h3">It starts from what you already decided</h3>
+            <p class="text-muted-foreground mt-2 text-[13.5px] leading-6">
+              Before proposing anything, the run reads your decisions, constraints and conventions.
+            </p>
+            <a
+              href="/product/brain-os"
+              class="link-underline text-foreground mt-4 inline-flex w-fit items-center gap-1.5 text-[13px] font-medium"
+            >
+              Go deeper on Memory
+              <ArrowRight className="size-3.5" />
+            </a>
+          </div>
+          <div class="flow-canvas rail-y relative mt-auto h-[280px]">
+            <GroundingFlow client:only="react" />
+          </div>
+        </div>
+        {/* Handoff (span 3) */}
+        <div class="bg-card flex flex-col md:col-span-3">
+          <div class="p-6 sm:p-8">
+            <p class="t-eyebrow mb-2">Handoff</p>
+            <h3 class="t-h3">Approved plans go straight to your coding agent</h3>
+            <p class="text-muted-foreground mt-2 text-[13.5px] leading-6">
+              TaskForce hands the full approved context to the agent you already use — it builds and opens a PR.
+            </p>
+          </div>
+          <div class="flow-canvas rail-y relative mt-auto h-[280px]">
+            <HandoffFlow client:only="react" />
+          </div>
+        </div>
+        {/* Human-in-the-loop (span 6 : boucle large, pleine largeur) */}
+        <div class="bg-card flex flex-col md:col-span-6">
+          <div class="p-6 sm:p-8">
+            <p class="t-eyebrow mb-2">Human-in-the-loop</p>
+            <h3 class="t-h3">Every checkpoint is a decision, not a setting</h3>
+            <p class="text-muted-foreground mt-2 max-w-xl text-[13.5px] leading-6">
+              The agent proposes. Your team approves it or sends it back — nothing moves on its own.
+            </p>
+          </div>
+          <div class="flow-canvas rail-y relative mt-auto h-[150px]">
+            <ApprovalFlow client:only="react" />
+          </div>
+        </div>
+        {/* Predict & recalibrate (span 6 : boucle large, pleine largeur) */}
+        <div class="bg-card flex flex-col md:col-span-6">
+          <div class="p-6 sm:p-8">
+            <div class="mb-2 flex items-center gap-2.5">
+              <p class="t-eyebrow">Predict &amp; recalibrate</p>
+              <span class="border-primary/30 bg-primary/5 text-primary inline-flex items-center rounded-full border px-2 py-0.5 font-mono text-[9px] font-semibold tracking-wide uppercase">Coming next</span>
+            </div>
+            <h3 class="t-h3">It predicts, then checks itself</h3>
+            <p class="text-muted-foreground mt-2 max-w-xl text-[13.5px] leading-6">
+              Each step forecasts effort, risk and cost, then compares the forecast with what actually shipped.
+            </p>
+          </div>
+          <div class="flow-canvas rail-y relative mt-auto h-[150px]">
+            <CalibrationFlow client:only="react" />
+          </div>
+        </div>
+      </div>
+      <p class="text-muted-foreground/60 mt-6 font-mono text-[10px] tracking-wide uppercase">
+        Illustrative — orchestration is Planned
+      </p>
+    </div>
+  </section>
+
+  {/* ───── L'équipe — colonnes à filets (structure par traits) — fond RAYURES ───── */}
+  <section class="bg-card bg-striped border-b">
+    <div class="container-rail no-rail pt-28 pb-20 lg:pt-44 lg:pb-28">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">The team</p>
+        <h2 class="t-h2 text-balance">One outcome. Three specialists. Seven checkpoints.</h2>
+        <p class="t-lead mt-4">
+          Responsibility is split the way a strong software org does — each agent proposes in its lane, and
+          your team approves before it moves.
+        </p>
+      </div>
+      <div class="mt-14 grid gap-y-10 sm:grid-cols-3 sm:gap-y-0">
+        {
+          AGENTS_FULL.map((a, i) => (
+            <div class:list={["sm:px-8 sm:first:pl-0 sm:last:pr-0", i > 0 && "sm:border-l"]}>
+              <div class="flex items-center gap-3">
+                <a.icon className="size-6 shrink-0" strokeWidth={1.75} style={{ color: hueFor(a.icon) }} />
+                <div class="min-w-0">
+                  <div class="text-foreground text-[14px] font-semibold">{a.code}</div>
+                  <div class="text-muted-foreground text-[12px]">owns {a.owns}</div>
+                </div>
+              </div>
+              <ul class="mt-5 flex flex-col gap-2.5">
+                {a.steps.map((s) => (
+                  <li class="text-foreground flex items-start gap-2 text-[13px] leading-5">
+                    <span class="text-primary mt-px">—</span>
+                    <span>{s}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  {/* ───── Modèles + preuve — GRILLE À FILETS (bento : notre DA de structure = les traits ; on pose le contenu dans les cellules) ───── */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="mb-12 max-w-2xl">
+        <p class="t-eyebrow mb-3">Run it your way</p>
+        <h2 class="t-h2 text-balance">Your models. Your numbers. One human gate.</h2>
+        <p class="t-lead mt-4">
+          Run every agent on the model you choose — local at zero cost or hosted for depth — and keep the
+          whole run legible: seven checkpoints, three specialists, one decision-maker.
+        </p>
+      </div>
+      <div class="-mx-6 grid grid-cols-1 gap-px border-y border-border bg-border sm:grid-cols-2 md:grid-cols-6 lg:-mx-10">
+        <div class="bg-card flex flex-col justify-center p-6 sm:p-7 md:col-span-2">
+          <div class="text-foreground font-display text-[40px] leading-none font-semibold tabular-nums">7</div>
+          <div class="text-foreground mt-3 text-[14px] font-semibold">Checkpoints</div>
+          <div class="text-muted-foreground text-[12.5px]">in a standard run</div>
+        </div>
+        <div class="bg-card flex flex-col justify-center p-6 sm:p-7 md:col-span-2">
+          <div class="text-foreground font-display text-[40px] leading-none font-semibold tabular-nums">3</div>
+          <div class="text-foreground mt-3 text-[14px] font-semibold">Specialized agents</div>
+          <div class="text-muted-foreground text-[12.5px]">CPO · CTO · COO</div>
+        </div>
+        <div class="bg-card flex flex-col justify-center p-6 sm:p-7 md:col-span-2">
+          <div class="text-foreground font-display text-[40px] leading-none font-semibold tabular-nums">1</div>
+          <div class="text-foreground mt-3 text-[14px] font-semibold">Human gate</div>
+          <div class="text-muted-foreground text-[12.5px]">at every decision</div>
+        </div>
+        <div class="bg-card flex flex-col p-6 sm:p-7 md:col-span-4">
+          <div class="flex items-center justify-between gap-3">
+            <h3 class="t-h3">Your models, your call</h3>
+            <span class="text-muted-foreground/70 font-mono text-[9.5px] tracking-wide uppercase">Per run</span>
+          </div>
+          <p class="text-muted-foreground mt-2 text-[13.5px] leading-6">
+            Local through Ollama at zero model cost, or a hosted model when you want more depth.
+          </p>
+          <div class="mt-6 grid flex-1 content-end gap-3 sm:grid-cols-2">
+            <div class="bg-card flex items-center justify-between border px-4 py-3.5">
+              <div class="flex items-center gap-3">
+                <span class="ic-tile flex size-9 items-center justify-center rounded-lg border" style={`--ic:${hueFor(Server)}`}>
+                  <Server className="size-[18px]" strokeWidth={1.75} />
+                </span>
+                <div>
+                  <div class="text-foreground text-[13.5px] font-semibold">Local · Ollama</div>
+                  <div class="text-muted-foreground text-[12px]">on your hardware</div>
+                </div>
+              </div>
+              <span class="border-primary/30 bg-primary/5 text-primary rounded-full border px-2.5 py-0.5 text-[11px] font-semibold">$0 / run</span>
+            </div>
+            <div class="bg-card flex items-center justify-between border px-4 py-3.5">
+              <div class="flex items-center gap-3">
+                <span class="ic-tile flex size-9 items-center justify-center rounded-lg border" style={`--ic:${hueFor(Cloud)}`}>
+                  <Cloud className="size-[18px]" strokeWidth={1.75} />
+                </span>
+                <div>
+                  <div class="text-foreground text-[13.5px] font-semibold">Hosted model</div>
+                  <div class="text-muted-foreground text-[12px]">when you want depth</div>
+                </div>
+              </div>
+              <span class="text-muted-foreground/70 font-mono text-[10px] tracking-wide uppercase">Optional</span>
+            </div>
+          </div>
+        </div>
+        <div class="bg-primary/[0.04] flex flex-col justify-center p-6 sm:p-7 md:col-span-2">
+          <div class="text-primary font-display text-[40px] leading-none font-semibold tabular-nums">$0</div>
+          <div class="text-foreground mt-3 text-[14px] font-semibold">Model cost</div>
+          <div class="text-muted-foreground text-[12.5px]">local via Ollama today</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {/* ───── Le moat — fond VIDE (blanc), gros énoncé + colonnes à filets ───── */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="mx-auto max-w-3xl text-center">
+        <p class="t-eyebrow mb-3">Why orchestration matters</p>
+        <h2 class="t-h2 text-balance">The model is replaceable.<br />The orchestration isn't.</h2>
+        <p class="t-lead mx-auto mt-4 max-w-2xl">
+          Models and agents will change. The hard part is coordinating the chain of decisions — preserving
+          context, exposing trade-offs, keeping humans accountable.
+        </p>
+      </div>
+      <div class="mt-14 grid grid-cols-2 gap-y-10 sm:grid-cols-4 sm:gap-y-0">
+        {
+          PRINCIPLES.map((p, i) => (
+            <div class:list={["px-5 sm:px-7", i > 0 && "sm:border-l"]}>
+              <p.icon className="size-5" strokeWidth={1.6} style={{ color: hueFor(p.icon) }} />
+              <h3 class="text-foreground mt-4 text-[14px] font-semibold">{p.title}</h3>
+              <p class="text-muted-foreground mt-1.5 text-[12.5px] leading-5">{p.desc}</p>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  {/* ───── CTA — fond VIDE, carte propre (aucun point) ───── */}
+  <PageCta
+    title="Describe the outcome. Let the team work the path."
+    lead="Your team decides at every gate. Your coding agent builds it."
+    primary={{ label: "Run your first workflow", href: "/waitlist" }}
+    secondary={{ label: "See the roadmap", href: "/roadmap" }}
+    note="Orchestration is Planned. The board, approvals and memory ship today."
+  />
+
+</BaseLayout>
