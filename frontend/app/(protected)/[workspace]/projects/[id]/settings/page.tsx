@@ -24,6 +24,7 @@ import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
+import { useSettingsStore } from "@/lib/store/settings-store"
 import {
   Select,
   SelectContent,
@@ -85,6 +86,7 @@ export default function ProjectSettingsPage() {
   const params    = useParams()
   const router    = useRouter()
   const workspace  = typeof params.workspace === "string" ? params.workspace : ""
+  const openSettings = useSettingsStore((s) => s.openSettings)
   const projectId  = typeof params.id        === "string" ? Number(params.id)  : 0
 
   const { activeProject, updateProject, archiveProject, deleteProject } = useProjectStore()
@@ -481,7 +483,7 @@ export default function ProjectSettingsPage() {
           <p className="text-sm text-muted-foreground">
             GitHub, Slack et tous les connecteurs se branchent au niveau du <span className="font-medium text-foreground">workspace</span>, puis s&apos;appliquent à ce projet — un seul endroit à gérer.
           </p>
-          <Button className="gap-2" onClick={() => router.push(`/${workspace}/settings`)}>
+          <Button className="gap-2" onClick={() => openSettings("integrations")}>
             <Plug className="size-4" /> Gérer les intégrations
           </Button>
         </div>
