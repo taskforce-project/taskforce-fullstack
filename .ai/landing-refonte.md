@@ -185,7 +185,332 @@ point identifiable sur la courbe de lead time.
 | Métronome | `src/lib/useScene.ts` | `useScene(beats)` : partition de durées, démarre à l'entrée à l'écran, se joue **une fois**, **se fige sur l'état final**. `useTypewriter` pour la frappe. `prefers-reduced-motion` → état final direct. |
 | Châssis | `src/components/site/scene/AppWindow.tsx` | Vrai écran TaskForce (voir encadré ci-dessous). **Remplace la barre macOS de `MockFrame`** — trois pastilles + une URL, c'est le signe le plus sûr qu'on regarde un dessin. |
 
-> ### ⚑ v149 (09/08) — Passe STRUCTURE généralisée à toutes les pages (blanc / zéro ombre / radius = flux only)
+> ### ⚑ v189 (14/08) — Revert de l'habillage « stripes » (user : « j'ai rien dit, enlève »)
+> Demande C annulée : `.bg-diagonal` (global.css) + prop `decor` (BorderedGrid) + `decor="diagonal"` (approvals) **supprimés**. **A (no-rail) et B (flèches à angle droit) conservés.** Vérifié : 0 `bg-diagonal` servi, approvals 200 clean.
+
+> ### ⚑ v188 (14/08) — Corrections pré-déploiement : rails, flèches à angle droit, habillage des zones vides
+> User (3 corrections avant deploy) : (A) retirer les borders G/D de la section striped ; (B) flèches orchestration à angle droit ; (C) habiller les zones vides (rayures/biais/points), audit tout le site.
+> - **A** — `enterprise.astro` §5 (Security & compliance, `bg-striped`) : `container-rail` → `container-rail no-rail` (`border-inline:0`). Vérifié : borders G/D = 0px ici, 0.8px ailleurs (scopé).
+> - **B** — `OrchestrationFlows.tsx` : `EDGE.pathOptions.borderRadius` **14 → 0** → arêtes smoothstep à **angle droit** (comme les boucles `tinted`, déjà à 0). Config OK ; les edges React Flow ne se rendent pas dans le pane caché (nodes oui : 21) → à confirmer dans un vrai navigateur.
+> - **C** — nouveau **`.bg-diagonal`** (rayures 45°, fondu haut/bas) à côté de `.bg-dots` / `.bg-striped` ; prop **`decor`** ajoutée à `BorderedGrid`. Démo : la section « What you approve » (celle entourée) → `decor="diagonal"`, motif rendu derrière le contenu, habille la zone vide sous les cartes. Vérifié (::before repeating-linear-gradient 45deg + masque + isolate).
+> - **Reste (C) — rollout site-wide** : mécanisme prêt (dots/striped/diagonal). Pas encore appliqué partout — c'est exploratoire (« pour voir ce que ça donne ») → OK utilisateur attendu sur look/intensité avant d'auditer & habiller toutes les pages.
+
+> ### ⚑ v187 (14/08) — Labs : chaque insight interne entre en REVEAL staggered (one-shot, plus de boucle)
+> User : « les petits composants à l'intérieur, tu peux les faire animer avec un reveal ou autre ? Tous les insights ».
+> - **`LabsConcepts` refondu** : `useSequence` passe de BOUCLE à **one-shot staggered** (IntersectionObserver, joue 0→count UNE fois à l'entrée, garde l'état complet). Chaque petit composant (rôle+artefact, porte « human », décision nommée, Run1/Memory/Run2, ligne modèle+raison, tour de calibration) ENTRE en fade+translate à son tour, puis reste — façon Attio. `useInViewReduced` (boucle) supprimé.
+> - **2 niveaux de reveal** : la carte illustration (fade, 700ms) puis ses insights internes (stagger, 500ms).
+> - Garde-fous : tout visible d'emblée si `prefers-reduced-motion` ou `IntersectionObserver` absent.
+> - Vérifié LIVE (1280px) : **19** éléments-insight (`duration-500`) + 4 cartes (`duration-700`) portent les classes reveal, état non-entré correct (`opacity:0 / translate`), overflow-x = 0, 0 erreur d'app. (l'IO ne se déclenche pas dans le pane caché → jouera dans un vrai navigateur.)
+
+> ### ⚑ v186 (14/08) — Labs : fix scrollbar horizontale + reveal-on-enter (façon Attio)
+> User : « une scroll bar horizontale s'est ajoutée (je peux décaler à gauche) ; possible + d'insight dans les anims ? sinon façon Attio : quasi-statique + une anim reveal/fade à l'arrivée qui attire l'œil — c'est aussi sympa que d'animer trop ».
+> - **Fix scrollbar** : mes 2 patches débordaient (`left-[-4%]` / `right-[-3%]`) → overflow-x → barre horizontale. Ramenés dans les bornes (`left-0` / `right-0`, largeurs ajustées). Vérifié `scrollWidth - clientWidth === 0` à 1280px.
+> - **Reveal-on-enter (`LabsConcepts`)** : nouveau hook `useReveal(ref)` (IntersectionObserver, 1 fois, threshold .15) ; chaque illustration entre en **fade + translate-y** à l'arrivée à l'écran, puis sa boucle joue. Garde-fous : visible d'emblée si `prefers-reduced-motion` OU `IntersectionObserver` absent (jamais bloquée invisible).
+> - Vérifié LIVE (1280px) : overflow-x = 0, 4 illustrations avec la transition reveal (état non-entré `opacity:0 / translate 16px` correct ; l'IO ne se déclenche pas dans le pane caché — normal, comme toutes les anims IO, jouera dans un vrai navigateur), nav toujours sticky, 6 champs pixel, 0 erreur d'app.
+> - **Insight** : pas d'anim en boucle ajoutée (on suit ton point « le reveal vaut mieux que trop animer ») ; les 4 concepts gardent leur insight actuel. Enrichir un concept précis reste dispo sur demande.
+
+> ### ⚑ v185 (14/08) — Labs : taches de pixels DANS les sections (derrière les cards)
+> User : « mets-en aussi dans les sections, par ci par là, derrière les cards, pour des effets sympa — pas trop non plus ».
+> - **`PixelBleed` — mode `patch`** ajouté : tache libre (masque RADIAL doux) positionnée via `class`, en plus du mode bord. Toujours overlay `z-0`, aucune hauteur de flux.
+> - **`labs/index.astro`** : 2 patches semés DERRIÈRE le contenu — subjects (violet `#8E90E0`, mi-section, bas-gauche) et graduated (rose `#EA6A9A`, derrière les cartes, haut-droite). Total = **6 champs pixel** (4 coutures + 2 taches), couleurs/positions variées, dosé « pas trop ».
+> - Vérifié LIVE : /labs 200, 6 overlays tous `z-0` (dont 2 radiaux) DERRIÈRE le contenu `z-10`, nav toujours sticky, 6 canvas PixelBlast OK, 0 erreur d'app. ⚠️ 6 contextes WebGL — si ça chauffe, réduire nombre/opacité (réglage simple).
+
+> ### ⚑ v184 (14/08) — Labs : séparations = transitions AMBIANTES (pixel derrière le contenu, sans ajouter d'espace)
+> User : « les séparations de section... c'est pas fait pour séparer ; les sections sont collées, le truc vient entre juste pour transitionner SANS ajouter d'espace, et ça peut passer DERRIÈRE les cards, un peu partout ».
+> - **NOUVEAU `PixelBleed.astro`** : champ PixelBlast en OVERLAY absolu (`pointer-events-none absolute z-0`, **aucune hauteur de flux**), masqué en fondu vers l'intérieur. À poser en 1er enfant d'une `section relative isolate` dont le contenu est `relative z-10` → le pixel passe DERRIÈRE les cartes (elles le recouvrent, il apparaît autour), les sections restent COLLÉES.
+> - **`labs/index.astro`** : les 4 `<PixelBand>` (bandes de 172px qui écartaient/séparaient) **supprimés**. Remplacés par `PixelBleed` derrière le contenu : haut de subjects (coral/gauche), loop (rose/droite), graduated (périwinkle/gauche) + bas de graduated (bleu/centre → fondu vers le CTA gris). Couleurs/alignements variés.
+> - **`PixelBand.astro` = orphelin** (plus importé) — laissé (pré-existant) ; à supprimer sur feu vert (idem `LabsShowcase.tsx`).
+> - Vérifié LIVE : /labs 200, 4 overlays `z-0` (h 230, op .45 ; 3 top + 1 bottom) DERRIÈRE le contenu `z-10`, nav toujours `sticky top:64px` (isolate/z-10 ne l'ont pas cassée), 4 canvas PixelBlast (pas de régression perf), 0 erreur d'app.
+
+> ### ⚑ v183 (14/08) — Labs : animations riches en INSIGHT + sections dévariées
+> User : « ils ont tous la mm structure, faut innover de temps en temps ; plus d'animation, plus d'insight animé — c'est ça le truc ».
+> - **`LabsConcepts.tsx` réécrit** — chaque illustration RACONTE l'insight (plusieurs étapes, contenu concret qui bouge) : agent-roles = 3 rôles produisent chacun un artefact reviewé (Spec → API contract → 3 issues) + porte « human ✓ » entre chaque · run-memory = Run 1 pond 3 décisions nommées (Postgres/EU, idempotent, Mongo rejeté) → Memory (compteur) → Run 2 « loads 3 · starts ahead » · model-choice = un modèle par étape AVEC la raison (privacy/strength/cost) · learning-from-reviews = 3 tours, l'édition rétrécit (big → small → accepted). Toujours self-play/fluide, D11 (chip « concept »).
+> - **`LabsSubjects.tsx` — compositions VARIÉES** (fini les 4 sections identiques) : **hero** (illustration vedette pleine largeur en haut, puis why + hypothèses en 2 colonnes, hypothèses en LISTE) pour agent-roles & learning-from-reviews ; **split miroir** (why | canvas, hypothèses en GRILLE 3) pour run-memory (illus. à droite) & model-choice (à gauche). Séquence : hero · split-R · split-L · hero.
+> - Vérifié LIVE (restart) : /labs 200, contenus riches présents dans le DOM hydraté, shapes = hero/split/split/hero, 4 canvas sujets (+1 boucle), **0 erreur d'app** (seul un warn Vite HMR websocket, bénin en dev Docker).
+
+> ### ⚑ v182 (14/08) — Labs : combler les « gros trous » (densité, inspi railway.com/features)
+> User : « j'aime bien, ça fait juste bizarre qu'il y ait de gros trou des fois » + réf. railway.com/features.
+> - **Sections sujets restructurées** (`LabsSubjects.tsx`) : au lieu de « texte haut | petite illustration » (→ vide), 3 blocs qui REMPLISSENT : en-tête (nom + maturité + lead) → **why + illustration sur un canvas POINTILLÉ (`flow-canvas`) qui s'étire** (colonnes égales `items-stretch`, `min-h-[240px]` → plus de trou blanc, lecture « spécimen sur paillasse ») → **hypothèses en grille de 3 cartes pleine largeur** (densité). Liens poussés en bas (`mt-auto`).
+> - **Carte « Graduated » vedette** (`labs/index.astro`) : suppression du **gros en-tête vide `h-44`** (watermark) → carte de contenu propre, icône colorée boxless (`hueFor` → Brain fuchsia).
+> - Inspi Railway retenue : nav d'ancres sticky (déjà là) + une section se REMPLIT d'une grille de cartes compactes, jamais un filet de texte à côté d'un vide.
+> - Vérifié LIVE (restart) : /labs 200, **0 erreur console**, 4 canvas `flow-canvas`, 4 grilles `sm:grid-cols-3` avec contenu réel, `h-44` supprimé (0 en class + 0 en CSS), 4 illustrations « concept ».
+
+> ### ⚑ v181 (14/08) — Labs : refonte « experiments » (onglets EN HAUT sticky + ancre + sections empilées)
+> User : « j'aime pas les tabs à droite + contenu au milieu ; onglets en haut alignés, contenu dessous, une page ; sections empilées, tabs sticky sous le header, ancre sur la bonne section ; potentiellement des animations ».
+> - **NOUVEAU `LabsSubjects.tsx`** (remplace l'usage de `LabsShowcase`) : barre d'onglets **sticky `top-16 z-40`** (sous le header h-16) qui **ancre-scrolle** (`scrollIntoView`) vers **4 sections empilées** (`id=lab-*`, `scroll-mt-[116px]`). **Scroll-spy** (IntersectionObserver `-140px/-55%`) surligne l'onglet actif (soulignage `labs-g5`). Par section : EXP + maturité, lead, why, hypothèses H1–H3 (filets carrés), « Where it stands », liens. Illustration alternée G/D.
+> - **NOUVEAU `LabsConcepts.tsx`** : 1 illustration **self-play** par direction, honnête (D11 — chip « concept », jamais un mécanisme livré) : agent-roles = relais de rôles cadrés + revue humaine · run-memory = décision portée Run 1 → Memory → Run 2 · model-choice = un modèle par étape (local/hébergé) · learning-from-reviews = override → signal → jauge de calibration.
+> - `labs/index.astro` : intro réécrite (« Four directions we're chasing »), `<LabsSubjects>` posé hors `container-rail` (barre sticky pleine largeur). Conservé : hero image, `PixelBand`, boucle `LabsLoopFlow`, graduated, `PageCta`.
+> - **`LabsShowcase.tsx` = orphelin** (plus importé) — laissé en place (fichier pré-existant, pas créé par moi) ; à supprimer sur feu vert.
+> - Vérifié LIVE (restart) : /labs + sous-pages 200, **0 erreur console** (îlots hydratés), 4 onglets + 4 sections `lab-*`, nav `position:sticky / top:64px`, soulignage actif, 4 illustrations « concept », `scroll-mt 116px`, DA toujours **0** `rounded-2xl`/`shadow`.
+
+> ### ⚑ v180 (14/08) — Labs : alignement DA ciblé (index + 4 sous-pages + showcase)
+> User : « Labs, refactor, reprendre la DA » → choix confirmé : **alignement DA ciblé** (on garde l'identité Labs : image plein cadre, PixelBlast, gradients de trait, boucle React Flow).
+> - **CTA** (`labs/index.astro`) : la card flottante `rounded-3xl border shadow-xl` posée sur image → remplacée par le **`<PageCta>` standard** (à plat, cohérent avec tout le site). Fini la carte à ombre.
+> - **« Graduated »** : vedette + liste en **carré** (`rounded-2xl` retiré) ; icônes de la liste **sans fond gris**, colorées via `hueFor` (Cpu bleu, ShieldCheck ambre, Sparkles rose).
+> - **`LabsShowcase.tsx`** (onglets) : panneau + onglets **carrés** (`rounded-2xl`/`rounded-xl` retirés), `shadow-sm` de l'onglet actif retiré, tuiles hypothèses `bg-secondary/50 rounded-xl` → **`bg-card` carré** (filet, plus de gris).
+> - **`LabDetail.astro`** (les 4 sous-pages) : tuiles « exploring » + « where it stands » `rounded-xl` (+ gris) → **carré `bg-card`** (filet).
+> - Vérifié LIVE (restart) : 5 routes `/labs*` en 200, **0** `rounded-2xl`/`rounded-xl`/`shadow` en attribut `class`, 3 icônes couleur boxless, 0 boîte grise, 0 overlay.
+> - Conservé (identité Labs) : hero image (`LabsBackdrop`), `PixelBand`, la boucle `LabsLoopFlow`.
+
+> ### ⚑ v179 (14/08) — Ressources : FAQ avant le CTA (6 pages) + Learn dévarié
+> User : « docs/blog/learn/changelog/roadmap/status → ajouter une FAQ en bas, juste avant le CTA » ; « Learn : voir si on refactor les sections ».
+> - **`sections/FaqSection.astro`** (NOUVEAU, réutilisable) — motif repris d'`enterprise.astro` : section pleine + filet 1px, `dl` en 2 colonnes, props `eyebrow/title/items`. Zéro carte flottante/ombre/radius.
+> - **FAQ posée JUSTE avant `<PageCta>`** sur : docs, blog, learn, changelog, roadmap, status. Contenu honnête (D11), spécifique à chaque page (pré-lancement assumé : pas d'API livrée, pas d'uptime, pas de notes datées, labels de maturité…).
+> - **Learn — sections dévariées** : les 4 PARTS étaient rendus À L'IDENTIQUE (ternaire mort `i%2 ? "bg-card border-b" : "bg-card border-b"`). Refaits en récit numéroté **01–04** sur 2 colonnes **alternées** (rail numéro+eyebrow ↔ prose), fini les 4 blocs centrés identiques.
+> - Vérifié LIVE : 6 routes 200, FAQ présente, 0 overlay ; Learn = 4 sections `grid-cols-12`, alternance 2+2 (`lg:col-start-9` / `lg:col-start-6`), numéros 01–04 rendus.
+> - **Reste du lot Ressources** : **Labs** (refonte DA « à fond ») — pas encore fait, prochaine étape ciblée.
+
+> ### ⚑ v178 (13/08) — Light-only VERROUILLÉ (`color-scheme: light`) + fix dev-server
+> User : « use dark theme » → clarifié : **pas de mode sombre, clair uniquement** (confirmé). Rien de sombre ajouté ; la décision light-only tient.
+> - **Incident dev-server** : Astro/Vite « transport invoke timed out … fetchModule `global.css` » → **500 sur toutes les routes** (aggravé par mes restarts en série). Réglé en vidant le cache dev (`node_modules/.vite` + `.astro`) puis restart. Pas un bug de code, pas lié aux îlots.
+> - **`global.css`** : ajout de `color-scheme: light` sur `:root`. Sans ça, un visiteur dont l'OS est en sombre voit les contrôles natifs (champs, scrollbars) rendus en sombre = « faux dark » involontaire. Verrouille le light-only. Vérifié : servi 1× dans le CSS compilé (Tailwind v4), routes 200.
+
+> ### ⚑ v177 (13/08) — Cards animées : MÊME taille, alignées (hauteur de démo uniforme)
+> User : « faut que les cards soient au même niveau, de même taille si possible ». Vrai : dans les grilles Home, les démos avaient chacune leur hauteur (draft 4 items ≠ graph ≠ pipeline ≠ audit) → cards décalées. La page Agents, elle, aligne déjà car ses démos sont en `h-[132px]` fixe.
+> - **`UseCaseDemo.tsx`** — ajout d'un `className?` passé à chaque renderer (`cn(SHELL, className)`) ; **aucun** autre changement de structure (SHELL reste un bloc `overflow-hidden`, contenu ancré en haut, comme la page Agents). Sans `className` → hauteur naturelle inchangée (pages use-case standalone intactes).
+> - **`LiveSchematics.tsx › AuditTrailDemo`** — props `className` + **`compact`** (padding `py-1.5`, entrées sur **1 ligne** avec `who` à droite au lieu du « approved by » sur 2 lignes) pour tenir dans le cadre. Non-`compact` (page Approvals) **inchangé**.
+> - **Home `Synergy`** (2×2) : les 4 démos en **`h-[172px]`** (`<AuditTrailDemo compact className="h-[172px]">`), Plan `draft` réduit à **3 items** pour ne jamais déborder.
+> - **Home `WhatShipsToday`** (2 actes) : les 2 démos en **`h-[172px]`**, acte 1 `draft` réduit à 3 items (3ᵉ item raccourci pour ne pas wrapper en étroit).
+> - **Hauteur 172 choisie** = tient le plus grand contenu réel (audit compact 169) sans rogner les courts (graph 134, pipeline 121, board 164) → mesuré au clone à largeur forcée (le pane caché force `vw=0`, les mesures live sont donc trompeuses). 6/6 démos à 172, contenu ≤172, 0 rognage ; standalone (split 202, graph) et Approvals (audit 2 lignes) non régressés ; 0 overlay.
+> - **Écueil noté** : un `flex-1 justify-center` en hauteur AUTO rogne ~4px (basis sous-pixel) → abandonné ; le cadre à hauteur fixe + bloc `overflow-hidden` (motif Agents) suffit et ne rogne jamais.
+
+> ### ⚑ v176 (12/08) — Animations DIVERSIFIÉES : des métaphores, plus « que des listes »
+> User : « faut diversifier les animations, c'est que des listes ; trouve une animation en rapport avec le titre/description, qui illustre vraiment ». Vrai : draft/recall/check/split = tous « des items qui apparaissent en liste ».
+> - **`UseCaseDemo.tsx`** — 3 nouveaux `kind` VISUELLEMENT distincts (data-driven, réutilisables) :
+>   - **`graph`** : SVG nœud central + satellites, arêtes qui se **connectent** en séquence → illustre la mémoire / les liens de décision.
+>   - **`pipeline`** : étapes horizontales qui **s'allument l'une après l'autre** + statut « Running · X / Run complete » → illustre l'exécution / le run.
+>   - **`board`** : mini-**kanban** 3 colonnes, cartes qui se posent → illustre « lire ton board » / la collaboration.
+> - **Réassignation par SENS** (l'anim colle au titre) :
+>   - Home `Synergy` : Plan=`draft` (doc) · Remember=**`graph`** · Execute=**`pipeline`** · Verify=`AuditTrail` → 4 métaphores distinctes.
+>   - Home `WhatShipsToday` : acte 1=`draft` · acte 2=**`board`** (« reads your board »).
+>   - Use-cases : architecture-decision=**`graph`**, onboarding=**`graph`**, sprint-planning=**`board`** (les autres : split/pr/check/recall/draft) → **7 kinds** sur 10 pages.
+> - Vérifié LIVE (restart) : Home graph+pipeline+board+draft+audit rendus, use-cases arch=graph (svg viewBox) + sprint=board, 0 erreur.
+> - **Règle** : une animation doit ILLUSTRER le concept (métaphore : graphe pour des liens, pipeline pour un run, board pour un tableau), pas juste « une liste qui apparaît » répétée partout.
+
+> ### ⚑ v175 (12/08) — Pricing aligné sur la webapp + Home : cards animées (à la place des workflows)
+> **Pricing — alignement contenu sur l'app** (user : « aligne ce qu'on a sur la webapp », capture fournie) : `PricingSection.tsx`
+> - Tiers : Free / **Basic** (ex-Pro) / Business (**Most popular**, ex-Pro) / Enterprise. Prix en **€** (Basic 10/8, Business 16/13, Free 0, Ent Custom). Features réelles de l'app (250 issues, unlimited uploads, admin roles, guests & private projects, advanced analytics + burndown, AI decisions & workflows [Beta], GitHub integration, SSO/SAML/SCIM, granular admin, GDPR audit, on-premise). **Tokens Cortex AI** par palier (100K/500K/2M/unlimited). Kicker supprimé (type `kicker` retiré).
+> - COMPARE (table) réécrit sur les mêmes lignes ; en-tête Pro→Basic ; titre « Everything from a free workspace to a governed enterprise deployment ». FAQ : Pro→Basic, nouvelle Q « What are Cortex AI tokens? », « two ways to run AI » → mention Cortex. Notes → Cortex.
+> - ⚠️ Décisions pricing antérieures (Pro, self-host=Enterprise) écrasées par l'app = source de vérité (choix user).
+> - Vérifié LIVE : Free/Basic/Business/Enterprise, Business = Most popular, €, Cortex, plus de « Pro », 0 erreur.
+> **Home — cards animées façon Agents** (user : « fais la mm chose sur la Home, à la place des workflows ») :
+> - `home/WhatShipsToday.astro` : les 2 actes « Live » remplacent `StepChainFlow` par **`UseCaseDemo`** — acte 1 = `draft` (« Spec · issue #142 » + prompt Claude Code → « Approved → Memory ») ; acte 2 = `recall` (« What should we do next? » → P1/P2/P3).
+> - `home/Synergy.astro` : les 4 systèmes (Plan/Remember/Execute/Verify), avant cartes texte en `TraitGrid cols=4`, deviennent une **grille 2×2 de cards animées** — Plan=`draft`, Remember=`recall`, Execute=`check`, Verify=**`AuditTrailDemo`** (piste d'audit réutilisée). Le bento DecisionGraph reste dessous.
+> - Réutilise la lib de demos existante (UseCaseDemo / LiveSchematics) → cohérence + zéro nouveau composant. Vérifié LIVE : 6 demos rendues, 0 trou, 0 erreur.
+> - **Reste** : hubs `/use-cases` `/vs`, pages company. « Et après c'est good » (user) → on approche de la fin.
+
+> ### ⚑ v174 (12/08) — Pricing en UN SEUL BLOC (style app) + `/vs` vérifié (réel, propre)
+> **Pricing** — user (capture de l'app) : « vaut mieux quelque chose comme ça : colle en 1 bloc et ça monte crescendo, adapte les boutons ». Les 4 cartes `rounded-2xl` flottantes (gap-5) → **UN SEUL BLOC** : conteneur `overflow-hidden rounded-2xl border` + grille `gap-px bg-border sm:grid-cols-2 lg:grid-cols-4` → colonnes collées séparées par des filets (4 tiers remplissent → 0 trou). `PriceCard`→`PriceColumn` : plus de bordure/radius par carte, fond teinté sur la colonne featured (Pro), badge « Most popular » **inline** (plus de `-top-3` flottant), bouton **pleine largeur** (style pill du site conservé). Contenu/tiers/prix/toggle inchangés (décisions pricing préservées : Free/Pro/Business/Enterprise, self-host=Enterprise). ⚠️ la capture app montre « Basic » + « Cortex tokens » + Business populaire — PAS repris (ce serait une refonte de contenu à décision produit ; on n'a touché QUE la mise en page comme demandé).
+> - Vérifié LIVE (restart, île React) : 1 bloc, 4 colonnes, 0 cellule vide, 1 colonne featured teintée, badge inline, plus de carte `rounded-2xl` individuelle, plus de badge flottant, 0 erreur.
+> **`/vs`** — user : « fais la comparaison, mais chaque comparaison doit être RÉELLE et le design suit ; pas grave si c'est plutôt similaire ». Constat : `VsCompare` (1 template, 8 pages) est déjà propre + honnête (crédit au concurrent → ce que TaskForce ajoute (traits) → tableau côte à côte tinté TaskForce → « better together »), `comparisons.ts` déjà fair-play (« not its focus », jamais « ✗ »). **Similarité assumée = OK** (pas de variété forcée, contrairement aux use-cases). Seule retouche : kicker du hero = **« Compare · Project tracker / Coding agent »** (cadre honnête par `c.kind`).
+> - Vérifié : 4 pages vs (jira/devin/notion/copilot) → grille adds remplie (4/0), tableau OK (le « 1 empty » = coin haut-gauche blanc volontaire, pas un trou gris), 0 erreur.
+> - **Reste** : hubs `/use-cases` `/vs` (index), pages company, balayage copy. Domaines majeurs tous faits.
+
+> ### ⚑ v173 (12/08) — Solutions : VARIÉTÉ de mise en page (l'agencement tourne, plus 1 seul gabarit)
+> User : « à chaque fois tu mets la même chose sur toutes les pages, varie — des cards, des listes, différencie ». Vrai problème : même avec 5 demos, la STRUCTURE de page était identique sur les 10 use-cases (1 gabarit) → effet copié.
+> - **`UseCaseDetail`** : la mise en page **TOURNE** sur 3 variantes selon `USE_CASE_ORDER.indexOf(key) % 3` (contenu identique, agencement différent) :
+>   - **v0** (product-spec, code-review, onboarding, sprint-planning) : fond **à points**, steps en **liste numérotée** à gauche, demo à droite.
+>   - **v1** (architecture-decision, qa-testing, incident-postmortem) : fond **rayé** (marge haute), steps en **cartes** (traits `lg:grid-cols-4`), demo **pleine largeur** dessous, works-with en **liens inline**.
+>   - **v2** (backlog-grooming, documentation, release-notes) : fond **blanc**, demo **à gauche**, steps en **checklist** à droite, « what it is » en **intro 2 colonnes**.
+>   Deux pages voisines n'ont jamais la même structure. Vérifié : product-spec=dots/list, architecture=striped/cards, backlog=plain/checklist.
+> - **`VerticalDetail`** : 2 variantes selon l'index (`% 2`) — pair (product, marketing) = points + demo à droite + couldApply **liste** ; impair (operations, client-services) = rayures + demo à **gauche** + couldApply en **cartes**. Vérifié.
+> - Zéro trou gris (steps-cards 4 → `sm:grid-cols-2 lg:grid-cols-4` remplit ; couldApply-cards 4 → `sm:grid-cols-2` remplit). Pas de restart (`.astro` recompile).
+> - **Règle** : un gabarit partagé DOIT faire varier l'agencement (fond/ordre/liste-vs-cards-vs-checklist) selon l'item, sinon N pages identiques = effet copié-collé — même si le contenu diffère.
+
+> ### ⚑ v172 (12/08) — Solutions : 10 use-cases + 4 verticales enrichis + différenciés + animés (via 2 templates)
+> User : Solutions = vide + copié-collé + non différenciant ; « c'est le genre de truc qui se démontre facilement, mets des animations comme sur Agents ». Constat : les 10 use-cases partagent **1 template** (`UseCaseDetail`) rendant le MÊME flux React Flow ; les 5 équipes partagent **1 template** (`VerticalDetail`) très mince. Levier = enrichir les 2 templates.
+> - **Nouveau `illustrations/UseCaseDemo.tsx`** — 1 composant, **5 formes animées distinctes** pilotées par la donnée : `draft` (l'artefact s'écrit → chip « Approved »), `check` (cases QA qui se cochent en vert), `split` (un spec → issues avec estimations), `recall` (souvenirs Memory qui remontent sur une requête), `pr` (statut PR Open→In review→Approved→Merged, linked to TF-142). Self-play, in-view, reduced-motion, carré/hairline/sans ombre.
+> - **`use-cases.ts`** : ajout `USE_CASE_DEMOS` (map par clé, fil rouge cohérent « checkout/payments ») → draft×4 (spec/architecture/documentation/release-notes), split×2 (backlog/sprint), recall×2 (onboarding/postmortem), check (qa), pr (code-review). 5 looks répartis sur 10 pages.
+> - **`UseCaseDetail` refait** : hero → « what it is » → **« In a run » = étapes lisibles (`inRun` en liste numérotée) + demo animé propre au cas** (remplace le flux copié) → **« Works with »** (cartes bordées individuelles = 1 ou 2 liens sans trou gris) → « Where it stands » (honnête, bandeau carré). Fini le copié-collé.
+> - **`verticals.ts` + `VerticalDetail`** (4 métiers exploratoires) : ajout `VERTICAL_DEMOS` (draft illustratif par métier : Spec onboarding / Runbook vendor / Campaign Q3 / Deliverable audit). Section « The idea » repensée en 2 col (idée + couldApply à gauche, **demo à droite**) + légende **« the shape, not a shipped X workflow »** → HONNÊTETÉ D10 préservée (badge « Exploratory · not proven yet » gardé). Bandeau honnêteté carré.
+> - Vérifié LIVE (restart) : code-review PR animé (4 stages + linked TF-142), product-spec/documentation/release-notes draft, backlog/sprint split (estimations), onboarding/postmortem recall, qa check ; 4 verticales = demo + badge Exploratory + légende illustrative ; 0 overlay d'erreur. (`err:true` initial = faux positif de mon regex trop large `Invalid|undefined|is not`.)
+> - **Engineering** (`solutions/engineering`, page custom, la plus complète) : laissée telle quelle — « un peu vide mais OK » côté user, moindre priorité.
+> - **Reste Solutions** : rien de bloquant. Prochain domaine : **Pricing**, puis balayage global copy (« parfois un peu court »).
+
+> ### ⚑ v171 (12/08) — Revue page-par-page : Approvals · Brain-os · Smart Assign · Collaboration · Analytics (fin Product)
+> User : « improve what you see » sur chaque + « ajoute des animations là où ça colle » + Analytics « anime les schémas + ne finis pas sur un workflow, ajoute une section » + « parfois le copy est un peu court ».
+> - **Nouveau `illustrations/LiveSchematics.tsx`** (self-play, in-view, reduced-motion, carré/hairline/sans ombre) :
+>   - `AuditTrailDemo` → **Approvals** : remplace le `ScreenPlaceholder "Audit trail"` par les approbations qui tombent une à une (who · what · when, chip `write` pour l'action externe). Vérifié : 4 entrées + « approved by ».
+>   - `DecisionRecordDemo` → **Brain-os** hero : remplace le gros `ScreenPlaceholder` par une **décision-OBJET** dont les champs se remplissent (Decision/Because/Rejected/Shaped) puis « linked in Memory » (pulse). Distinct des 2 graphes React Flow de la page. Vérifié : 4 champs.
+> - **Analytics** : ajout d'une **section de clôture non-workflow** avant le CTA — « The questions it answers, day to day » (6 questions ↔ 6 métriques réelles, liste 2 col remplie, icônes distinctes) → la page ne finit plus sur `AnalyticsLoopFlow`. Les 2 schémas (ask-chart + DeliveryInsights) étaient déjà animés (intacts, carré/sans ombre).
+> - **Icônes (alias Lucide, suite)** : `KanbanSquare` = alias → svg `lucide-square-kanban`/displayName `SquareKanban` → repli bleu → collision avec MessageSquare (BLOCKS collab). Ajouté `SquareKanban: HUE.cyan`. (2e alias après `ChartColumn`.) BLOCKS = cyan/sky/blue/amber (4 distinctes).
+> - Vérifié LIVE (restart) : les 5 pages 200, 0 erreur ; Approvals AuditTrail rendu + APPROVE distinctes + ic-tiles transparents ; Brain-os DecisionRecord + POINTS 4 distinctes (indigo/violet/teal/slate) ; Analytics closer + QUESTIONS 6 distinctes + DeliveryInsights `border` carré ; Collaboration BLOCKS 4 + LIVE 3 distinctes, ic propres ; Smart Assign (AutoAssign/SmartAssignFlow déjà riches) 0 erreur.
+> - **Smart Assign / Collaboration** : déjà des îlots animés (AutoAssign, CollabBoard) → surtout appliqué la règle icônes (glyphe nu, distinctes) ; laissé le reste (solide).
+> - **Règle (alias Lucide)** : `BarChart3→ChartColumn`, `KanbanSquare→SquareKanban` retombent en bleu si non mappés. Sur une nouvelle page, vérifier la classe `lucide-*` du svg vs la couleur attendue.
+> - **Bilan Product** : hub + 8 sous-pages toutes passées (orchestration, agents, approvals, brain-os, smart-assign, collaboration, analytics, integrations). Prochain domaine : Solutions (engineering/product/operations/marketing/client-services + use-cases/vs) ou Pricing.
+
+> ### ⚑ v170 (12/08) — Revue page-par-page : Orchestration + Agents
+> **Orchestration** (`product/orchestration`) :
+> - Hero **centré en mobile** (`text-center lg:text-left` + rows `justify-center lg:justify-start`, lead `mx-auto lg:mx-0`) — comme les héros PageHero.
+> - **Arêtes en angle droit** : `OrchestrationFlows` `EDGE`+`tinted()` → `pathOptions.borderRadius 14 → 0` (smoothstep à coins nets = angle droit ; « pour rester aligné »). Impacte tous les flux du site (cohérent).
+> - Section rayée « The team » : `py-20 lg:py-28` → **`pt-28 pb-20 lg:pt-44 lg:pb-28`** (les rayures ne touchent plus le texte).
+> - **Cartes/boîtes** : cartes modèle `rounded-xl` → carrées ; boîtes d'icônes CPO/CTO/COO (`bg-card rounded-lg border ring-1` + couleurs en dur) **supprimées** → glyphe `hueFor` nu.
+> **Agents** (`product/agents`) :
+> - Boîtes CPO/CTO/COO idem → glyphe `hueFor` nu.
+> - **3 mini-demos animées** (nouveau `illustrations/AgentToolDemos.tsx`, sans dépendance) en haut des cartes TOOLS : `MemorySearchDemo` (requête qui se tape → 2 souvenirs), `TakeNotesDemo` (3 lignes qui s'écrivent → « Saved to graph »), `ConnectedToolsDemo` (outils github/slack/linear, actif qui défile, read=done / write=waits for you). Self-play, `IntersectionObserver` (jouées à l'écran), `prefers-reduced-motion` figé. DA : carré, filet, sans ombre. Câblées via `{i===n && <Demo client:visible/>}` (tags statiques → directive client fiable, pas de tag dynamique). ic-tile TOOLS remplacée par glyphe inline coloré.
+> **Icônes (global, `site-icons.ts`)** — collisions de sections levées, « même icône = même couleur » conservé : `Boxes → indigo` (PRINCIPLES `Boxes/Server`, RULES `Boxes/SlidersHorizontal`), `Building2 → slate` (TEAM `Building2/CalendarClock` étaient 2 bleus). CPO/CTO/COO = Compass violet · Building2 slate · CalendarClock bleu (3 distinctes).
+> - Vérifié LIVE : Agents TEAM 3 distinctes + 3 demos rendues (search/notes/tools, 3 logos) ; Orchestration hero centré, AGENTS 3 distinctes, PRINCIPLES 4 distinctes, `lg:pt-44`, 0 rounded-xl, 0 ring, ic-tiles transparents, 0 erreur. Arêtes angle-droit = œil user (React Flow ne rend pas en pane masqué).
+
+> ### ⚑ v169 (12/08) — Règle icônes appliquée AUX PAGES : glyphe nu (sans fond) + une couleur par icône dans une section
+> User : « la règle des icônes est passée où ? des icônes ont un fond, la même couleur ; chaque icône = une couleur, SANS fond » — donc partout, pas juste le menu.
+> - **SANS FOND (global, 1 seule règle CSS)** : `global.css` `.ic-tile` = `background: transparent; border: 0` (garde `color: var(--ic)`). Les **~34 usages `.ic-tile ... border bg-card`** sur 23 fichiers deviennent des **glyphes colorés nus** d'un coup, sans éditer chaque page (la taille/centrage du wrapper restent = boîte invisible, alignement préservé).
+> - **Menu sans boîte** : `SiteHeader` — carte active non-Labs, carte grisée (désactivée) et `MobileItem` : retiré `bg-card`+`border` → glyphe seul. Labs garde son cadre spécial (image + voile).
+> - **UNE COULEUR PAR ICÔNE DANS UNE SECTION** : le vrai manque = `hueFor` colorait par FAMILLE → une section thématique (SECURITY = ambre, ANALYTICS = cyan) répétait la teinte. Cassé les 2 familles les plus denses **globalement** (`site-icons.ts`, +`purple`/`red`) : data → `Gauge teal · TrendingDown orange · Radar sky · CalendarRange sky` ; gouvernance → `Lock rose · KeyRound orange · EyeOff slate · Pencil/PenLine purple · TriangleAlert rose · CalendarCheck emerald`. « Même icône = même couleur » conservé (change partout où l'icône apparaît).
+> - Vérifié LIVE (restart) : Analytics 6 icônes **6 couleurs distinctes** + fond absent ; Integrations 7 icônes **7 distinctes** + fond absent ; menu inchangé (Product 8 / Resources 7 distincts).
+> - **Reste** : la famille build (bleu, ex. FileText/Terminal/GitBranch) peut encore se répéter dans une section très « code » — à désambiguïser **au cas par cas pendant la revue page-par-page** (pas de shuffle global aveugle : risque de nouveaux clashs + perte de cohérence). Règle actée : sur chaque page, vérifier qu'aucune section ne répète une teinte d'icône.
+
+> ### ⚑ v168 (12/08) — Home : 2 trous gris comblés + règle icônes (début de la revue page-par-page)
+> User (revue page par page, commence par Home) : « combler le trou gris à droite en étirant le contenu (1 ligne 1 colonne), autre trou 2e screen, appliquer la règle des icônes même dans les pages ».
+> - **`home/WhatShipsToday.astro`** — le « socle Live » (Hosted in the cloud… + chips) était `lg:col-span-2` dans une grille `TraitGrid cols=2` = `sm:grid-cols-2`. Donc **640→1024px : span 1 seule colonne → moitié droite grise**. Fix : **`sm:col-span-2`** (pleine largeur dès que la grille est à 2 col). + cartes ACTS : hex en dur (`ic:"#2563eb"/"#7c3aed"`) → **`hueFor(a.icon)`** (source unique, règle icônes).
+> - **`home/Showcase.tsx` `TeamGrid`** — grille `sm:grid-cols-2 lg:grid-cols-3` avec **3** cartes → à `sm` (640–1024) la 4e cellule est **grise**. Fix : **`sm:grid-cols-3`** (3 cartes = 1 rangée pleine à tous les breakpoints ; mobile reste 1 col).
+> - Vérifié DOM : socle `sm:col-span-2` (plus de `lg:`), eng = 3 cartes `sm:grid-cols-3`, ic-tiles ACTS #2563eb/#7c3aed, 0 erreur.
+> - **Règle (piège col-span)** : une cellule pleine largeur dans une grille `bg-border` doit avoir son `col-span-N` au **même breakpoint** que le passage à N colonnes (`sm:grid-cols-2` → `sm:col-span-2`, pas `lg:`), sinon trou gris dans la plage intermédiaire. Et 3 items → `sm:grid-cols-3` (jamais `sm:grid-cols-2` qui laisse un trou).
+> - **Revue page-par-page lancée** : Home ✓. Reste à balayer les autres pages pour les 2 mêmes défauts mécaniques (grilles `bg-border` non remplies + `--ic` en dur au lieu de `hueFor`).
+
+> ### ⚑ v167 (12/08) — Icônes du menu : une couleur PAR icône + glyphe seul coloré (pas de fond teinté)
+> User : « dans la sidebar des icônes ont la même couleur que d'autres ; une couleur PAR icône, et juste l'icône, pas le bg ».
+> - **Cause 1 (couleurs qui se répètent)** : `hueFor` colorait par FAMILLE sémantique → plusieurs icônes d'un même dropdown partageaient une teinte. → **`site-icons.ts`** : +7 teintes (`indigo/fuchsia/pink/teal/sky/orange/green`) et **réassignation SINGULIÈRE** des icônes de menu pour qu'aucun panneau n'ait deux fois la même. Product(8) : Workflow bleu·Bot violet·ShieldCheck ambre·Brain fuchsia·Sparkles rose·Users vert·BarChart3 cyan·Plug indigo. Resources(7) : BookOpen sky·Newspaper ardoise·GraduationCap émeraude·History orange·Map bleu·FlaskConical (fiole spéciale)·Activity rose. Même icône = même teinte partout (contenu inclus) → cohérence conservée.
+> - **Cause 2 (bug caché)** : `BarChart3` est un **alias Lucide** → son `displayName` réel est `ChartColumn` (svg `lucide-chart-column`), absent de la map → **repli bleu silencieux** = la collision. Mappé `ChartColumn: HUE.cyan` (garde `BarChart3` aussi). ⚠️ règle : un alias Lucide non mappé retombe sur le fallback bleu → toujours vérifier le `lucide-*` du svg.
+> - **Cause 3 (le fond)** : les icônes de menu étaient dans une tuile `.ic-tile` (fond teinté). → **`SiteHeader.tsx`** desktop `MenuCard` + mobile `MobileItem` : `ic-tile` → **`bg-card` neutre** (glyphe seul coloré via `hueFor`) ; retiré le `--ic` du wrapper + import `CSSProperties` devenu inutile. Interprétation : « pas le bg » = ne pas COLORER le fond (tuile neutre conservée pour l'alignement, pas supprimée).
+> - Vérifié LIVE (menu ouvert au DOM, île React → `docker restart`) : Product 8 couleurs distinctes, Resources 7 distinctes, `tintedBg:false` partout, `chart-column` = cyan. Ripple contenu (Plug indigo sur /integrations, etc.) confirmé sans erreur.
+> - ⚠️ **Dette** : le miroir `ICON_COLOR` dans `flows/OrchestrationFlows.tsx` (dots des flux) n'a PAS été resynchronisé sur ces nouvelles teintes — hors périmètre « sidebar », à faire si on veut l'alignement flux/menu.
+
+> ### ⚑ v166 (12/08) — Roadmap + Changelog refaits « style Vercel » (variés, honnêtes, sans trou)
+> User (review) : « Roadmap comme Vercel, Changelog pareil Vercel ». Contrainte D11 : AUCUNE date inventée (pré-lancement).
+> - **`changelog/index`** : ancien = groupes maturité en puces. Refait en **FEED deux colonnes** (méta `area` à gauche · titre+desc à droite), filets `divide-y`, groupé Live/Beta/Planned (dot émeraude/ambre/violet). Pas de dates → note « dated entries begin at GA ». Contenu enrichi (area + desc par capacité). 9 entrées.
+> - **`roadmap`** : ancien = 3 cartes bordées Now/Next/Later. Refait en **phases timeline** : chaque colonne = **bord haut coloré** (`border-t-2` émeraude/ambre/violet) + compteur + liste en filets `divide-y`. Remplacé `bg-indigo-400` (hors palette) par violet. Cross-links hero → changelog/roadmap.
+> - **Variété assurée entre les 2 pages** : Changelog = feed vertical 2 colonnes ; Roadmap = 3 colonnes phases à bord coloré. Zéro cellule grise (listes `divide-y`, colonnes indépendantes → bas blanc, pas gris). Carrés, chips ronds, hero centré (hérite v165).
+> - Vérifié DOM (.astro, recompile à chaud) : changelog 3 groupes + 9 rows + note no-dates + `rounded-2xl` 0 ; roadmap 3 colonnes edges emerald/amber/violet, compteurs 5/3/3, 3 listes divide-y, `rounded-2xl` 0. Pane masqué → DA visuelle = œil user.
+> - **Bilan review** : items « gros » de la review du 06/08 tous traités (CTA radius, trous, menu icons, double-dots, link-hover, Enterprise/Plane, Pricing screen-4, Trust, Solutions, menu mobile Attio, /solutions=miroir menu, Analytics toasts, Integrations Claude+hub business, hero centré, Roadmap/Changelog Vercel). Reste volontairement minimal : `VerticalDetail` (gabarit honnête), + skips (docs/learn/status/blog/legal/SEO/i18n).
+
+> ### ⚑ v165 (12/08) — PageHero centré par défaut (règle « rien de démonstratif → centré » + mobile)
+> User (review) : « le hero, si y a rien de démonstratif, mettre le contenu centré, + sur mobile ».
+> - **`PageHero.astro`** : défaut `align` **`left` → `center`**. Les héros internes n'ont pas de visuel latéral (le `<slot/>` est un visuel EN DESSOUS, une seule page l'utilise = brain-os, déjà `center`). Donc basculer le défaut centre les 24 héros sans visuel d'un coup, mobile inclus (eyebrow/CTA passent `justify-center`). Aucune page à éditer (le seul `align` explicite sur un PageHero = brain-os center ; le `align="left"` de `approvals` était sur un **BorderedGrid**, pas le hero).
+> - Vérifié : `/product/agents` `/product/integrations` `/solutions` `/product/brain-os` → tous `mx-auto max-w-3xl text-center`.
+> - **Règle** : une future page qui glisse un visuel de hero via `<slot/>` peut repasser `align="left"` ; sinon on laisse le défaut centré.
+
+> ### ⚑ v164 (12/08) — Integrations : catalogue « style Claude sans trou » + hub graph business
+> User (review) : « Integrations, un truc style Claude, sans trou » + « le graph est cool, mets des tools business au lieu de full tech ».
+> - **`IntegrationCatalogue.tsx`** : la grille passait par la technique traits `gap-px bg-border overflow-hidden rounded-2xl` → **cellules grises** en fin de rangée (= les « trous ») + coins arrondis (pas carré). Refait **façon Claude** : `grid gap-2.5` + **tuiles individuelles carrées bordées** (`bg-card border`, `h-full`) → rangée incomplète = **blanc**, jamais gris ; empty-state dé-`rounded`.
+>   - `FEATURED` recalé à **12** (LCM 2·3·4 → remplit 2/3/4 colonnes, zéro rangée bancale) avec **mix business** (Salesforce/Stripe/Shopify/Google-Drive) + ancrages prouvés (github/slack → marqueur Actions) ; tous les logos existent sur disque (vérifié `public/logos/`, sinon repli initiales géré).
+> - **`OrchestrationFlows.tsx` `IH_TOOLS`** (hub radial) : `linear/postgres/anthropic` (full tech) → **`salesforce/stripe/shopify`** (CRM/paiement/e-commerce) ; on garde 1 ancrage dev (github) + slack + notion. Positions/handles/arêtes inchangés (le graph validé). Logos business dispo : salesforce, stripe, shopify, slack, notion, zoom, google-drive (⚠️ pas de hubspot/attio/jira/monday/plane sur disque → éviter en featured/hub).
+> - Vérifié DOM (2 îles React → `docker restart`) : grille `gap-2.5` sans `bg-border`, tuile `bg-card border`, **12** featured, brands business présents, `rounded-2xl` **0** ; hub monté = [github, salesforce, slack, stripe, notion, shopify], tous logos résolus. Arêtes React Flow non vérifiables (pane masqué) = œil user, mais inchangées.
+> - **Règle** : un **catalogue/annuaire** = tuiles carrées bordées + `gap` (jamais la grille `gap-px bg-border`, qui laisse des trous gris dès que le compte ne remplit pas la rangée). La grille traits `bg-border` reste pour les sections de features à compte maîtrisé.
+
+> ### ⚑ v163 (12/08) — Analytics : les 2 « toasts/modal » flottants → panneaux carrés intégrés (DA traits)
+> User (review) : « Analytics faudrait refaire les sortes de toast là ou modal ». Deux cartes flottantes cassaient la DA « traits intégrés » (radius + ombre = look toast/modal posé sur le blanc).
+> - **`DeliveryInsights.tsx`** (bloc « sent back by checkpoint ») : root `rounded-2xl border shadow-lg` → **`border`** (carré, hairline, **sans ombre**). Contenu/anim inchangés (substance validée) — seul le cadre était faux.
+> - **`product\analytics`** mock « Ask in plain English » : `rounded-2xl border shadow-sm` → **`border`** carré + **refait pour se lire comme une surface produit**, pas un toast : (1) barre de **prompt** façon champ de saisie (Sparkles teinté + `CornerDownLeft`), (2) réponse « Rendered from your board » avec **point live `tf-pulse`** émeraude, (3) **garde-fou** en pied (`Info`) montrant concrètement « pas dans tes données → il le dit et suggère autre chose » (illustre le §honnêteté au lieu de le répéter).
+> - Vérifié DOM (île React → **`docker restart` obligatoire** avant vérif) : les 2 panneaux = `bg-card overflow-hidden border`, `rounded-2xl` **0**, prompt+rendered+pulse+guardrail présents. Les `shadow-*` restants = uniquement boutons shadcn (`shadow-xs`, baseline site). Pane masqué → DA visuelle = œil user.
+> - **Règle** : un mock produit sur le site = panneau **carré + hairline + sans ombre** (jamais radius+shadow facon toast/modal flottant) ; chips/barres ronds OK.
+
+> ### ⚑ v162 (12/08) — Page `/solutions` = miroir du menu (navigabilité : By use case + Compare)
+> User : « dans /solutions y a pas tout ce que le menu contient, je peux pas naviguer ». La page n'exposait QUE « By team » ; le menu Solutions a 3 groupes → les use-cases et comparaisons étaient injoignables depuis le hub.
+> - **`solutions\index`** : ajout de **2 sections** dérivées des sources uniques (`use-cases.ts`, `comparisons.ts`), zéro chaîne dupliquée.
+>   - **By use case** — structure LISTE (distincte des cartes) : index 2 colonnes, style traits (`border-t` + cellules `border-b`, **pas de `bg-border`**) → 10 items = 5/colonne, **zéro cellule grise**. Icône colorée par use-case (`UC_ICON` → `hueFor`) + **chip de maturité rond** (`MATURITY_LABEL` : 4 Beta / 6 Planned) + « See all use cases in detail » (`/use-cases`).
+>   - **Compare** — fond `bg-dots` (variété) + **2 sous-grilles de largeurs différentes** : Trackers (4 → `lg:grid-cols-4`, remplit) et Coding agents (2 → `sm:grid-cols-2`, remplit) ; reflète EXACTEMENT les 6 du menu (jira/linear/notion/shortcut + claude-code-alone/devin), mène par `goodAt[0]` (règle fair-play). « See all comparisons » (`/vs`).
+> - Variété page respectée : By team (cartes) → By use case (liste) → Compare (2 sous-grilles, dotted) → Why the pattern travels (prose centrée). Chips ronds, conteneurs carrés, teintes sémantiques.
+> - Vérifié DOM (pane masqué → pas de screenshot, DA visuelle = œil user) : 4 eyebrows, 10 use-cases (6 Planned/4 Beta), Compare = [Jira,Linear,Notion,Shortcut]+[Claude Code alone,Devin] **0 cellule vide**, les 2 « See all », ic-tile #2563eb (coloré), aucun overlay d'erreur Astro.
+> - **Règle** : une page-hub (`/solutions`, `/product`, `/use-cases`, `/vs`) doit **refléter les groupes de son méga-menu** — sinon on ne peut pas naviguer depuis la page.
+
+> ### ⚑ v161 (09/08) — Menu mobile = COPIE FIDÈLE du desktop (groupes + view-all + footer)
+> User : « en mobile j'ai pas “All solutions”, et sur Solutions j'ai pas tout — c'est un copier-coller du desktop ». Mon accordéon avait APPAUVRI le contenu (`SOLUTIONS_GROUPS.flatMap(g=>g.links)` → perte des titres de groupe, des « view all » par groupe et du « All solutions »).
+> - `MobileAccordion` refait : prend des **`groups` {title?, items, viewAll?}** + un **`footer`**. Product → groupes Platform/Delivery + « Explore the platform ». Solutions → les 3 groupes (By team/By use case/Compare) + « view all » par groupe + « All solutions ». Resources → ses items. `MobileItem` extrait (icône colorée + label + badge/desc, ou label seul).
+> - Vérifié DOM (scopé au dialog mobile — ⚠️ le trigger DESKTOP reste dans le DOM même caché en `lg:hidden`, ne pas le confondre) : Solutions mobile = 3 groupes, 25 liens, les 3 « View all » + « All solutions ». Build OK (68).
+> - **Rappel process** : pour vérifier un composant responsive au DOM, SCOPER au `[data-slot="sheet-content"]`/dialog (sinon on lit le nav desktop caché).
+
+> ### ⚑ v160 (09/08) — Solutions : hiérarchie proven/exploratoire + traits
+> User : « mieux présenter Solutions, les sections se ressemblent ; l'améliorer à fond ».
+> - **`solutions/index`** : la grille « By team » (5 cartes flottantes à plat, proven+exploratoires mélangés, compte impair) devient une **hiérarchie** : **Engineering (proven) MIS EN AVANT** (bloc large, tint `bg-primary/[0.03]` + bordure primaire + « Explore engineering ») ; les **4 exploratoires en traits** (`lg:grid-cols-4` → remplissent, 0 trou). Distinction visuelle proven vs exploratoire.
+> - **`solutions/engineering`** : « Fits your stack » (4 cartes flottantes) → traits edge-to-edge.
+> - `VerticalDetail` (4 pages exploratoires) laissé tel quel (gabarit honnête et volontairement minimal). Comparaisons (vs) déjà variées en v153.
+> - Vérifié DOM : bloc featured (bordure/bg primaire), 4 cellules exploratoires. Build OK (68).
+> - **Reste** : Analytics (toasts) + Integrations (catalogue « style Claude »), Hero centré (pas de visuel + mobile), Roadmap/Changelog (Vercel).
+
+> ### ⚑ v159 (09/08) — Header mobile façon Attio + Trust (fonds gris, trous, variété)
+> - **Header mobile → overlay PLEINE PAGE + accordéon** (façon Attio) : `SiteHeader.tsx`, Sheet `w-full` (plus `sm:max-w-sm`), `MobileGroup` (colonne à plat) remplacé par `MobileAccordion` (Product/Solutions/Resources repliables, chevron, sous-liens à **icônes colorées** via hueFor) + `MobileLink` (Pricing/Enterprise/Trust/Book a demo). État `section` (un ouvert à la fois). Vérifié : overlay 375px, 3 accordéons, Product déplié = 8 sous-liens à icônes.
+> - **Trust — 3 corrections** :
+>   - **Trous dans les grilles** (screen 2 : LIFECYCLE 7 items en `grid gap-px bg-border` → 1 cellule VIDE grise). ⇒ **règle** : une grille à filets `bg-border` montre du GRIS dans les cellules non remplies. Fix : les grilles à compte IMPAIR (SEC_PRINCIPLES 5, SDLC 7, LIFECYCLE 7) passent en **listes à filets** (`grid gap-x-10 border-t` + cellules `border-b`, pas de `bg-border`) → 0 cellule vide + variété. Les grilles qui REMPLISSENT (AI_GOV 6, AVAILABILITY 4, GLANCE 14) restent en traits.
+>   - **Fonds gris** : `bg-secondary/40` des schémas (frontière + flux) → `bg-card` (blanc, distinction via bordures/labels) ; pastilles `TONE.planned/none` `bg-secondary` → `bg-card` ; **hero Trust `band` (gris) retiré** → blanc. Vérifié : hero blanc, seule section non-blanche = la CTA (exception).
+>   - **Variété** : mix listes / grilles pleines / 2 schémas / cartes comparatives 2-col / table glance / rythme de points → plus le même pattern partout.
+> - Build OK (68). **Reste** : Solutions & comparaisons, Analytics/Integrations, Hero centré, Roadmap/Changelog.
+
+> ### ⚑ v158 (09/08) — Trust : cohérence DA + rythme (le contenu, déjà exhaustif/honnête, gardé)
+> User : « Trust à refaire selon ce qu'on veut communiquer ; j'aime le style de graph que t'as mis, réutilise-le pour la démo visuelle (schémas en composants shadcn, hors workflow) ». Le contenu Trust est déjà un vrai portail sécu honnête → je n'ai pas réécrit le fond, j'ai réglé le vrai souci = **répétition/mur de blanc** :
+> - **4 grilles de cartes flottantes → traits** edge-to-edge (SEC_PRINCIPLES, AI_GOV, SDLC, AVAILABILITY).
+> - **Rythme de fonds** : `bg-dots` sur 4 sections espacées (AI-gov, Data lifecycle, SDLC, Availability) ; les 2 sections à **schéma** (frontière de confiance self-host + flux de données) restent BLANCHES pour les mettre en valeur. 0 double-points.
+> - Les 2 **schémas en composants** (le « graph » validé) gardés tels quels — c'est le modèle à réutiliser ailleurs pour la démo visuelle hors-workflow. Les blocs 2-col comparatifs (recorded/hands, protège/responsabilité, current/building) gardés en cartes (pattern distinct voulu). CTA arrondie.
+> - Build OK (68). ⚠️ **En attente** : si le user veut changer le MESSAGE (ce qu'on communique), me le préciser — là j'ai fait la cohérence visuelle, pas une réécriture du fond.
+> **Suite** : Solutions & comparaisons (améliorer le pattern), Analytics (toasts) + Integrations (catalogue), Hero centré, Roadmap/Changelog (Vercel).
+
+> ### ⚑ v157 (09/08) — Pricing repris sur le style de l'app (screen 4)
+> `PricingSection.tsx` : cards de plan **arrondies** (`rounded-2xl` — exception radius pricing/CTA), tier featured en **panneau bleu clair** (`bg-primary/[0.03]` + badge « Most popular »), checks de features en **pastille `CircleCheck` bleu de marque** (au lieu du check émeraude plat). Toggle Monthly/Annual + 4 tiers conservés ; contenu marketing gardé (on adapte le STYLE, pas le contenu app). Vérifié DOM : 4 cards radius 16px, featured teinté, 27 `CircleCheck` `rgb(37,99,235)`. Build OK (68). Prochain : **Trust**.
+
+> ### ⚑ v156 (09/08) — Enterprise : 3 retours post-review + règles pour la suite
+> User : « pas mal du tout ». 3 fixes :
+> - **Diagramme d'archi overflow** : le fan `EnterpriseStackFlow` (large) débordait dans la demi-colonne du FeatureSplit → section 1 passée en **texte 2-col + diagramme PLEINE LARGEUR** (vérifié : canvas 1158px). ⇒ **règle** : un flow/diagramme large ne va PAS dans une demi-colonne, le mettre pleine largeur.
+> - **Specs irréalistes** (4 Go RAM ne fait pas tourner de modèle) → specs **conscientes des modèles** : `2+ vCPU (plateforme)` · `4 GB (TaskForce)` · `16 GB+ (modèles locaux Ollama)` · `GPU (gros modèles)` + note « les besoins réels dépendent des modèles ».
+> - **Motif stripe chevauché** par le titre → `padding-top` de la section augmenté (`lg:pt-40` = 160px). ⇒ **règle** : les sections texturées (stripe/points) denses en haut prennent plus de padding-top.
+> Build OK (68). Prochain : **Pricing** (style app).
+
+> ### ⚑ v155 (09/08) — Header responsive + Enterprise refait « à fond » (réf. Plane)
+> - **Header non responsive** (la « sidebar » = le header, screen 5 : « Get started » tronqué en « Get » au-dessus de 900px) : bascule desktop remontée `min-[900px]` → **`lg` (1024px)**. En dessous = menu hamburger (qui contient tout). Nav + Pricing/Trust + Sign-in n'apparaissent qu'à ≥1024.
+> - **Enterprise réécrit** (`enterprise.astro`) d'après plane.so/self-hosted + /solutions/enterprise-teams — casse la suite de grilles quasi identiques :
+>   - **2 FeatureSplits alternés** (texte + visuel) : « Run inside your walls » (+ diagramme d'archi `EnterpriseStackFlow` remonté ici) · « A human on every step » (+ **schéma “Decision record”** en COMPOSANTS — pas un workflow : carte bordée, pastille Approved, lignes approved-by/model/audit/scope).
+>   - **Bloc environnement + specs concrètes** (2 vCPU · 4 Go · 20 Go · Docker) en bande de chiffres.
+>   - Controls (traits denses) · Security **2-col + 3 cartes compliance** (bg-striped) · Adoption **stepper** (bg-dots) · **FAQ** (nouveau bloc, objections acheteur).
+>   - **Fondu/supprimé** : grilles « Why Enterprise » (pillars), « Why TaskForce » (→ FAQ), « Deploy your way » (→ specs), section Architecture isolée (→ split 1).
+>   - Rythme de fonds varié, 0 double-points, CTA re-arrondie (radius). Vérifié DOM : 2 splits, decision-record, FAQ, specs, 5 nœuds diagramme, 0 double-dots. Build OK (68).
+> - **Confirmé** : les schémas de démo HORS workflow se font en **composants** (shadcn/HTML), pas forcément en React Flow (feu vert user). Ordre de la file d'attente validé → **prochain : Pricing** (style de l'app : toggle, checks colorés, « Populaire », cards arrondies).
+
+> ### ⚑ v154 (09/08) — Review site (lot 1 : corrections globales rapides)
+> Grosse review user. **Fait ce tour (global, vérifié DOM)** :
+> - **CTA re-arrondies** : `PageCta` + `FinalCta` + CTA enterprise → `rounded-3xl` rendu (user : « laisse un radius aux CTA comme avant »). Exception : CTA + (bientôt) pricing gardent un radius ; le reste des conteneurs reste carré.
+> - **Double trame de points** : Smart Assign avait une section `bg-dots` CONTENANT un `flow-canvas` (déjà à points) → `bg-dots` retiré de la section. Règle : jamais 2 trames à la fois (blanc + points OU blanc + stripe, pas les deux). Les autres sections `bg-dots` ne contiennent pas de flow-canvas → OK.
+> - **Icônes des dropdowns du menu colorées** (`SiteHeader.tsx`) via `hueFor`. ⚠️ piège : le `<a>` shadcn/Radix a `[&_svg:not([class*='text-'])]:text-muted-foreground` qui force le gris → couleur mise **inline sur l'icône** (`style={{color:hueFor(Icon)}}`), l'inline bat le sélecteur. Vérifié : bleu/violet/ambre/ardoise.
+> - **Trou vide dans les cards** (`BorderedGrid cols={3}`) : 3 items au palier `sm:grid-cols-2` = 1 cellule VIDE grise → colClass `md:grid-cols-3` (1→3, jamais 2).
+> - **Souligné de lien qui court jusqu'au bord de la card** : `link-underline inline-flex` étiré par un parent `flex flex-col` → fix GLOBAL dans `.link-underline` : `width: fit-content` (largeur texte, reste centré si le parent centre, ignoré sur les liens inline). + `PricingSection` : `underline underline-offset-4` → `.link-underline`.
+> - Build OK (68).
+>
+> **File d'attente (gros re-designs, tours suivants)** — réf. à récupérer via WebFetch quand j'y suis :
+> - **Enterprise à refaire à fond** (moins de répétition) façon Plane : plane.so/self-hosted + plane.so/solutions/enterprise-teams.
+> - **Trust à refaire** selon le message à faire passer ; le style de graph que j'y ai mis est validé → réutiliser des **schémas en composants shadcn** pour la démo visuelle (hors workflow).
+> - **Pricing** : reprendre le style du **screen app** (toggle, checks colorés, badge « Populaire », cards arrondies) — adapter au marketing.
+> - **Solutions** & **comparaisons (vs)** : améliorer le pattern à fond (sections trop semblables).
+> - **Analytics** : refaire les toasts/modal (pas la bonne DA). **Integrations** : le catalogue (pas le hub, qui est validé) « style Claude, sans trou » ; + mettre des outils **business** (pas full-tech) dans le hub.
+> - **Hero** : centrer le contenu quand pas de visuel démonstratif à côté + en mobile (sinon 2-col OK).
+> - **Roadmap / Changelog** : modèle Vercel (copywriting à documenter).
+> - **Sidebar non responsive** : à localiser + corriger.
+> **SKIP (plus tard)** : docs, learn, status, blog, placeholders de screens, légal/RGPD/RGAA/WCAG/sitemap/SEO, i18n (full EN pour l'instant). **Rappel** : 1 couleur par icône, mêmes couleurs pour mêmes icônes (`hueFor`).
+
+> ### ⚑ v153 (09/08) — Variété (lot 2) : The run (timeline horizontale) + vs (rythme, 9 pages)
+> - **The run** (`home/TheRun.astro`) : utilisait `HeroFlow` (pipeline VERTICAL) = le même que la page orchestration → répétition inter-pages. Remplacé par une **timeline HORIZONTALE** (`StepChainFlow dir="h"` : Outcome → Frame&spec → Approach(highlight) → Plan → Ship), pleine largeur sous le texte, les 3 garanties passées en 3 colonnes. Vérifié DOM : 5 nœuds, layout horizontal.
+> - **vs** (`VsCompare.astro`, partagé → 9 pages) : les 2 sections « Credit » et « What TaskForce adds » étaient des LISTES à puces identiques. « adds » passe en **grille à traits 2-col + fond à points** ; « Credit » reste une liste simple ; le **tableau côte-à-côte** (le miroir them/us) reste. → les deux ne se ressemblent plus. Vérifié DOM : 1 liste + 1 grille traits + 1 tableau, 1 section à points, 0 radius.
+> - Build OK (68). **Reste** : pages produit (orchestration, agents, analytics, approvals, collaboration, brain-os) — mêmes principes (forme distincte + rythme de sections).
+
+> ### ⚑ v152 (09/08) — Variété (lot 1) : Smart Assign (nouveau graphe) + Enterprise (rythme de sections)
+> User : « on y va » (rollout variété). Formes distinctes + fonds/layouts/intérieurs qui varient.
+> - **Smart Assign** : chaîne verticale `RoutingFlow` → nouveau **`SmartAssignFlow`** = CONVERGENCE + fan-out (3 signaux Skills/Load/Availability → « Weigh & match » → 3 candidats, le choisi « Best match » en vert). Layout changé : 2-col texte/signaux PUIS graphe **large pleine largeur** (avant : colonne étroite à droite). Vérifié DOM : 7 nœuds, ports OK, carrés.
+> - **Enterprise** : le flow était déjà varié (fan) mais **8 sections quasi identiques** (« titre + grille de cartes ») = le « même pattern dans une page ». Corrigé :
+>   - **rythme de fonds** : `bg-dots` (Built-for-env, Adoption) + `bg-striped` (Architecture), le reste blanc.
+>   - **grilles de cartes flottantes → traits** edge-to-edge, **largeurs variées** (piliers 2-col · env 5-col · why 4-col · deploy 3-col · steps 4-col).
+>   - **intérieur varié** : numéros d'étapes Adoption en **gros display** (26px) au lieu du petit mono.
+>   - **CTA nettoyée** : `rounded-3xl` + **halo blur** retirés (restaient) → carrée, sans halo. Vérifié DOM : 0 `rounded-2xl/3xl`, 0 `blur-3xl`, 5 grilles traits, 3 sections texturées.
+> - Build OK (68). **Reste** : vs (split/miroir), The run (timeline), pages produit (orchestration/agents/analytics/approvals/collaboration/brain-os) — mêmes principes.
+
+> ### ⚑ v151 (09/08) — « Cards carrées » généralisées (y compris les nœuds de flux + les canvas)
+> User : « les cards carré c'est parfait, faut le généraliser — même les cards des workflow ». + la variété passera aussi par les fonds de section (stripe/traits/rien), l'intérieur et le layout.
+> - **Nœuds de flux carrés** (`OrchestrationFlows.tsx`) : `StepNode`/`MiniNode`/`CtxNode`/`RunStepNode`/`HubNode` — `rounded-lg/xl` retiré. Les puces d'icône internes restent arrondies.
+> - **Canvas de flux carrés** : `rounded-xl` retiré des 9 `flow-canvas` (approvals, brain-os, integrations, Hero, WhatShipsToday, TheRun, Synergy, Before/After ×2) + `Panel` carré.
+> - **Nouvelle règle DA** : *angles vifs partout (conteneurs), chips ronds* — l'ancienne exception « radius = flux only » tombe (le user préfère tout carré). Feuille de règles §2/§4 à jour. Vérifié DOM : nœuds + canvas = `border-radius 0`. Build OK (68).
+> - **Suite (variété)** : rollout formes distinctes + traitements de section variés (bg-dots/bg-striped/rien, traits ou pas, layouts différents) — Enterprise → Smart Assign → vs → The run…
+
+> ### ⚑ v150 (09/08) — Variété des flows : hub radial custom (Integrations) + fix border « The direction »
+> User : « toutes les pages se ressemblent trop, pas de variation dans les workflows (ex. integrations pas bonne) ; le but = illustrer l'IDÉE, pas le réel → tu peux faire des flow/graph CUSTOM ; plus d'insight ; ne pas copier le même pattern d'une page à l'autre NI dans une même page. Fais un passage. » + « The direction : enlève le border autour, garde juste les traits entre points ».
+> - **Fix `WhereThisGoes`** : `border-y`+`lg:border-l` retirés → il ne reste que `divide-y` (traits entre items). Plus de cadre.
+> - **Nouveau type de nœud `HubNode`** (kit) : cœur (TaskForce/Memory, highlight) OU outil connecté (**vrai logo** via `BrandLogo`). Pour des graphes RADIAUX — une FORME différente des chaînes.
+> - **`IntegrationsHubFlow`** (remplace la chaîne verticale `IntegrationsFlow` sur `product/integrations`) : hub radial, cœur au centre + 6 outils (github/linear/slack/postgres/notion/claude) qui s'y connectent (arêtes droites, flèches vers le cœur). Illustre « connecter ton stack », pas un pipeline. Légende insight « 129 connectors across 16 categories ». Vérifié DOM : 7 nœuds, 6 logos, 6 ports source + 4 cibles.
+> - **Direction actée** : les diagrammes de la landing sont **illustratifs** (pas une repro fidèle du système) → on peut créer des formes custom (hub, matrice, orbite, timeline, split…). Objectif = **une forme distincte par page, jamais deux fois le même pattern dans une page**. Reste à décliner sur les autres pages (chaînes verticales répétées = `Agents/Analytics/Approvals/Routing/EngineeringRun/vChain`). Build OK (68).
 > User : « repasse dans toutes les autres pages et applique les mêmes choses » (structure).
 > - **Levier composants partagés (moi)** : `Panel` (`.surface`+`rounded-2xl` → `border rounded-xl`), `Bento` (`.surface`+`rounded-2xl` → `border`), `StatBand` (variant panel : `surface`+`decor-tint`+`rounded-3xl`+`decor-dots` → `border rounded-xl`, plus d'ombre/halo), `UseCaseDetail`/`VerticalDetail`/`VsCompare`/`ConnectorDetail` (bandes `bg-secondary` → blanc ; tableau vs sharp ; matrice + capacités connecteur → **traits**). → couvre use-cases/solutions/vs/connecteurs (~25 pages) d'un coup.
 > - **Balayage pages (4 sous-agents // , spec conservateur : bande→blanc, retrait `.surface`/`shadow-*`/`rounded-2xl,3xl` sur cartes de contenu ; PAS de re-architecture traits ; laisser ui/illustrations/labs/mocks/chips/pills/CTA)** :
@@ -193,7 +518,8 @@ point identifiable sur la courbe de lead time.
 > - **Cartes CTA sharp** : `PageCta` + `FinalCta` `rounded-3xl` → angles vifs (radius = flux only ; l'exception CTA ne porte que sur le fond gris). Grille logos Integrations `rounded-2xl` → sharp. Feuille de règles §5 mise à jour.
 > - `FeatureBand` variant `tinted` (halo + `rounded-3xl`) = **code mort** (aucune page ne l'utilise) → laissé.
 > - Build OK (68). Vérifié rendu (curl) : trust & enterprise = 0 bande grise de contenu, 0 `rounded-2xl/3xl`.
-> - **Exclus (volontaire)** : `components/ui/*` (primitives shadcn), `illustrations/*` (mocks produit), `labs/*` (monde propre), mocks d'app (`AppShot`/`MockFrame`/`SpecPanel`/`ScreenPlaceholder`), chips `bg-secondary/60`, pills. `PricingSection.tsx` non touché (composant tarif complexe — à faire à part si besoin).
+> - **Exclus (volontaire)** : `components/ui/*` (primitives shadcn), `illustrations/*` (mocks produit), `labs/*` (monde propre), mocks d'app (`AppShot`/`MockFrame`/`SpecPanel`/`ScreenPlaceholder`), chips `bg-secondary/60`, pills.
+> - **`PricingSection.tsx` fait (suite)** : cartes de prix `rounded-2xl`+ombre+ring → angles vifs, carte « featured » emphasée par **bordure primaire** (`border-primary/50`) ; toggle facturation `shadow-sm` retiré ; colonne Pro `bg-secondary/20` du tableau → blanc ; 2 cartes Hosted/Self-hosted `rounded-2xl` → **traits** (`gap-px`). Vérifié rendu (`/pricing` 200) : contenu tarif = 0 radius/ombre (les résidus = shell header/footer + `ui/`, hors périmètre).
 
 > ### ⚑ v148 (09/08) — Hero home refait : CENTRÉ + épuré (façon Linear/Relevance)
 > User (capture, hero entouré) : « trop chargé ; le titre n'est même pas en haut, c'est le texte de droite qui passe au-dessus ; un hero mieux que ça, épuré comme Linear/Relevance ».

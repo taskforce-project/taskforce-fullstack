@@ -30,7 +30,7 @@
   **SOURCE UNIQUE : `src/lib/site-icons.ts`** → `hueFor(icon)` (teinte par `displayName` Lucide) + `HUE` (constantes). Le kit flux a son miroir `ICON_COLOR` (mêmes hex). **Le violet reste réservé IA/Labs** — ici il marque bien « pensée/IA/modèle », cohérent avec la loi 7.
 - **Colorer une icône de CONTENU, partout** : tuile → `.ic-tile` + `style={`--ic:${hueFor(Icon)}`}` (span natif) ; inline → `style={{ color: hueFor(Icon) }}` (⚠️ **objet**, jamais une chaîne : une icône Lucide est un composant React qui refuse `style="…"`). Les composants partagés `BentoCell`/`BorderedGrid` colorent déjà via `hueFor` → toute page qui les utilise est couverte.
 - **Ne PAS colorer le CHROME** : flèches (`ArrowRight/Left/UpRight`), chevrons, `Menu`, `PanelLeft`, `ExternalLink`, `Download`, `Loader2`, croix de fermeture, logos de marque (`Github/Twitter/Linkedin`), `Info` de bandeau légal, et les **puces `Check`** de liste (marqueurs, pas des icônes de feature).
-- **Radius = réservé aux canvases de flux.** Seul `flow-canvas` porte un `rounded-xl`. Panneaux et cartes de section = **filets, angles vifs** (pas de `rounded-2xl/3xl`). Les **atomes** (pills, boutons, tuiles d'icône `size-7/10`) gardent leur petit radius — ce n'est pas une « card qui flotte ».
+- **Angles vifs PARTOUT — c'est l'identité (« cards carrées », validé user).** TOUS les conteneurs sont carrés : cartes de section, panneaux (`Panel`), **nœuds de flux** (`Step`/`Mini`/`Ctx`/`Hub`/`RunStep`) ET les **canvas de flux** (`flow-canvas`). Aucun `rounded-lg/xl/2xl/3xl` sur un conteneur. Restent arrondis uniquement les **chips/atomes** : pills & boutons (`rounded-full`), puces d'icône (`.ic-tile`, `rounded-lg/md`), badges, points, avatars. Règle mentale : **conteneurs carrés, chips ronds.**
 
 ---
 
@@ -76,7 +76,10 @@ Règles :
 
 **Ports de connexion VISIBLES (OBLIGATOIRE — sinon ça passe pour du fait-main, cf. bug v145).** Chaque nœud montre ses ports : **source = anneau bleu** (`tf-handle--source`, 11px, bordure 2px) + **target = point** (`tf-handle--target`, 8px). Les handles sont stylés **par TYPE** dans `Handles` (`h.type === "source"`), jamais par un flag oublié. Arêtes bleues `smoothstep` + pointe de flèche, espacement suffisant pour voir la ligne port→flèche.
 - `RunStepNode` (type `runStep`) — étape numérotée à texte long (use-cases).
-- **Tous** : `border bg-card`, **pas de `surface`/shadow**.
+- `HubNode` (type `hub`) — cœur (highlight) OU outil connecté (**vrai logo** `BrandLogo`). Pour les graphes RADIAUX (cf. `IntegrationsHubFlow`).
+- **Tous** : `border bg-card`, **carrés (angles vifs)**, **pas de `surface`/shadow**. Puce d'icône interne = seul élément arrondi.
+
+**VARIÉTÉ (validé user) — les diagrammes sont ILLUSTRATIFS, pas une repro fidèle du système.** On a le droit d'inventer des formes custom pour illustrer une IDÉE. Objectif : **une forme distincte par page, jamais deux fois le même pattern dans une même page.** Catalogue de formes : chaîne (`vChain`), boucle (Brain/Calibration), **hub radial** (`IntegrationsHubFlow`), fork/arbre (`DecisionGraph`/`ProposalPath`), fan/stack (`EnterpriseStack`), timeline. Éviter d'empiler des `vChain` verticaux partout — c'est ce qui rendait les pages identiques.
 
 **Arêtes :** `EDGE` = smoothstep bleu `#2563eb` + `MarkerType.ArrowClosed`. Boucles de retour = `tinted(color)` avec label.
 
