@@ -19,7 +19,7 @@ export type UseCaseDemoSpec =
   | { kind: "pipeline"; title: string; stages: string[] }
   | { kind: "board"; title: string; columns: { name: string; cards: string[] }[] };
 
-function useInViewReduced(ref: RefObject<HTMLElement>) {
+function useInViewReduced(ref: RefObject<HTMLElement | null>) {
   const [inView, setInView] = useState(false);
   const [reduced, setReduced] = useState(false);
   useEffect(() => {
@@ -34,7 +34,7 @@ function useInViewReduced(ref: RefObject<HTMLElement>) {
 }
 
 /** Révèle les items 1→count en boucle ; renvoie combien sont visibles (count = tous si reduced). */
-function useSequence(ref: RefObject<HTMLElement>, count: number, step = 620, hold = 2600) {
+function useSequence(ref: RefObject<HTMLElement | null>, count: number, step = 620, hold = 2600) {
   const { inView, reduced } = useInViewReduced(ref);
   const [shown, setShown] = useState(0);
   useEffect(() => {

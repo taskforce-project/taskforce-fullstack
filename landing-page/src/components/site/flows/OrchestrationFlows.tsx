@@ -270,12 +270,12 @@ const nodeTypes: NodeTypes = { step: StepNode, mini: MiniNode, ctx: CtxNode, run
 
 /* ── Arêtes ── */
 
-const EDGE: DefaultEdgeOptions = {
+const EDGE = {
   type: "smoothstep",
   style: { stroke: "#2563eb", strokeWidth: 1.75 },
   markerEnd: { type: MarkerType.ArrowClosed, width: 18, height: 18, color: "#2563eb" },
   pathOptions: { borderRadius: 0 },
-};
+} as DefaultEdgeOptions;
 // arête colorée (boucles de retour) avec libellé
 function tinted(color: string) {
   return {
@@ -1193,7 +1193,7 @@ const DG_EDGES: Edge[] = [
     labelBgStyle: { fill: "#ffffff" },
     labelBgPadding: [6, 2] as [number, number],
     labelBgBorderRadius: 4,
-  },
+  } as Edge,
 ];
 export function DecisionGraphFlow() {
   return <StaticFlow flowClass="tf-decision" nodes={DG_NODES} edges={DG_EDGES} padding={0.12} />;

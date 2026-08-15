@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
  * DA « traits » : carré, filet 1px, aucun ombrage, accents teintés.
  */
 
-function useInViewReduced(ref: RefObject<HTMLElement>) {
+function useInViewReduced(ref: RefObject<HTMLElement | null>) {
   const [inView, setInView] = useState(false);
   const [reduced, setReduced] = useState(false);
   useEffect(() => {

@@ -185,6 +185,14 @@ point identifiable sur la courbe de lead time.
 | Métronome | `src/lib/useScene.ts` | `useScene(beats)` : partition de durées, démarre à l'entrée à l'écran, se joue **une fois**, **se fige sur l'état final**. `useTypewriter` pour la frappe. `prefers-reduced-motion` → état final direct. |
 | Châssis | `src/components/site/scene/AppWindow.tsx` | Vrai écran TaskForce (voir encadré ci-dessous). **Remplace la barre macOS de `MockFrame`** — trois pastilles + une URL, c'est le signe le plus sûr qu'on regarde un dessin. |
 
+> ### ⚑ v193 (15/08) — Fix CI typecheck (`tsc --noEmit`) : l'étape APRÈS le lint échouait
+> Le lint vert, le job landing-tests atteint `npm run typecheck` (`tsc --noEmit`) → 8 erreurs pré-existantes (jamais atteintes avant, le lint plantait en premier) :
+> - Refs React 19 : hooks `useInViewReduced`/`useSequence`/`useReveal` typés `RefObject<HTMLElement>` → **`RefObject<HTMLElement | null>`** (AgentToolDemos, LiveSchematics, UseCaseDemo, LabsConcepts).
+> - `DotField.tsx` : `canvas` possibly null → guard `if (!canvas) return;`.
+> - `OrchestrationFlows.tsx` : `pathOptions` inconnu du type RF (mais garde l'angle droit) → `EDGE` cast `as DefaultEdgeOptions`, edge `dg3` cast `as Edge`.
+> - `three` sans types → **`@types/three` installé** (un `@ts-nocheck` corrigeait tsc mais eslint le bannit → vraie solution = les types).
+> - Vérifié local : **lint 0 / typecheck 0 / build 69 pages**. Commit + push `dev`.
+
 > ### ⚑ v192 (15/08) — Fix CI lint (la PR #85 échouait) : imports inutiles + règle eslint fantôme
 > Le check « Run Landing Tests » échouait : **1 erreur** `react-hooks/exhaustive-deps was not found` (règle citée dans un `eslint-disable` de `DotField.tsx` mais plugin non installé) + 39 warnings (surtout `APP_URL` inutilisé après le repoint waitlist).
 > - `DotField.tsx` : commentaire `// eslint-disable-next-line react-hooks/exhaustive-deps` retiré (inerte — la règle n'est pas installée) → **0 erreur**.

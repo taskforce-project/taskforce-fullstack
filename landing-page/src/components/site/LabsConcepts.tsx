@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
  */
 
 /** Révèle UNE fois quand l'élément entre à l'écran (fade+slide du conteneur). */
-function useReveal(ref: RefObject<HTMLElement>) {
+function useReveal(ref: RefObject<HTMLElement | null>) {
   const [entered, setEntered] = useState(false);
   useEffect(() => {
     if (typeof IntersectionObserver === "undefined" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
@@ -35,7 +35,7 @@ function useReveal(ref: RefObject<HTMLElement>) {
 }
 
 /** Avance 0→count en STAGGER, UNE fois à l'entrée, puis garde l'état complet (pas de boucle). */
-function useSequence(ref: RefObject<HTMLElement>, count: number, step = 300) {
+function useSequence(ref: RefObject<HTMLElement | null>, count: number, step = 300) {
   const [n, setN] = useState(0);
   useEffect(() => {
     if (typeof IntersectionObserver === "undefined" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
