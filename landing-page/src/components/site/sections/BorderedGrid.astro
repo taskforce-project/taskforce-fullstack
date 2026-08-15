@@ -5,6 +5,7 @@
  * cartes flottantes. `cols` = 2｜3｜4. Icônes lucide en prop (facultatif).
  */
 import type { LucideIcon } from "lucide-react";
+import { hueFor } from "@/lib/site-icons";
 
 interface Item {
   icon?: LucideIcon;
@@ -22,7 +23,8 @@ interface Props {
 }
 const { eyebrow, title, lead, items, cols = 4, bg = "card", align = "center" } = Astro.props;
 const center = align === "center";
-const colClass = cols === 2 ? "sm:grid-cols-2" : cols === 3 ? "sm:grid-cols-2 lg:grid-cols-3" : "sm:grid-cols-2 lg:grid-cols-4";
+// cols=3 saute le palier 2-col (sinon 3 items → 1 cellule VIDE grise sur tablette, cf. review user).
+const colClass = cols === 2 ? "sm:grid-cols-2" : cols === 3 ? "md:grid-cols-3" : "sm:grid-cols-2 lg:grid-cols-4";
 ---
 
 <section class:list={[bg === "secondary" ? "bg-secondary" : "bg-card", "border-b"]}>
@@ -36,12 +38,15 @@ const colClass = cols === 2 ? "sm:grid-cols-2" : cols === 3 ? "sm:grid-cols-2 lg
         </div>
       )
     }
-    <div class:list={["bg-border grid gap-px overflow-hidden rounded-2xl border", colClass]}>
+    <div class:list={["-mx-6 grid gap-px border-y border-border bg-border lg:-mx-10", colClass]}>
       {
         items.map((it) => (
           <div class="bg-card flex flex-col p-6">
             {it.icon && (
-              <span class="bg-secondary/60 text-foreground flex size-10 items-center justify-center rounded-lg border">
+              <span
+                class="ic-tile flex size-10 items-center justify-center rounded-lg border"
+                style={`--ic:${hueFor(it.icon)}`}
+              >
                 <it.icon className="size-5" strokeWidth={1.75} />
               </span>
             )}

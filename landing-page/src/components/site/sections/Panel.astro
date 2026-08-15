@@ -15,7 +15,7 @@ const { label, tag, caption, class: cls } = Astro.props;
 ---
 
 <figure class:list={["not-prose", cls]}>
-  <div class="bg-card surface overflow-hidden rounded-2xl">
+  <div class="bg-card overflow-hidden border">
     {
       (label || tag) && (
         <div class="bg-secondary/40 flex items-center justify-between gap-2 border-b px-4 py-2.5">
