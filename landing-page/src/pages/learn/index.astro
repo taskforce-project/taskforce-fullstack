@@ -2,6 +2,7 @@
 import BaseLayout from "@/layouts/BaseLayout.astro";
 import PageHero from "@/components/site/PageHero.astro";
 import PageCta from "@/components/site/PageCta.astro";
+import FaqSection from "@/components/site/sections/FaqSection.astro";
 import { ArrowRight } from "lucide-react";
 import { APP_URL } from "@/components/site/nav";
 
@@ -31,6 +32,13 @@ const PARTS = [
     link: { href: "/vs", label: "How it compares" },
   },
 ];
+
+const FAQ = [
+  { q: "Isn't this just a project tracker with AI?", a: "No. A tracker records what happened; an AI delivery OS governs the decisions between intent and production — orchestrating agents, keeping a human accountable at each checkpoint, and remembering why." },
+  { q: "Does the AI decide for me?", a: "The AI proposes; a human decides. Only an approved artifact becomes context for the next step, so a run stays an accountable chain, not a pile of AI output." },
+  { q: "What exactly is a checkpoint?", a: "A governed stage where an artifact is produced, reviewed and explicitly approved before the run continues." },
+  { q: "How is this different from a coding agent?", a: "A coding agent writes code. TaskForce governs the decisions around it and runs on the models and infrastructure you choose — it sits on top of your board and your agents." },
+];
 ---
 
 <BaseLayout
@@ -45,23 +53,39 @@ const PARTS = [
     secondary={{ label: "See the run", href: "/product/orchestration" }}
   />
 
+  {/* Récit en 4 temps : numéroté, en 2 colonnes ALTERNÉES (rail ↔ prose) — plus 4 blocs identiques. */}
   {
-    PARTS.map((p, i) => (
-      <section class={i % 2 === 0 ? "bg-secondary border-b" : "bg-card border-b"}>
-        <div class="container-rail py-20 lg:py-28">
-          <div class="mx-auto max-w-2xl">
-            <p class="t-eyebrow mb-3">{p.eyebrow}</p>
-            <h2 class="t-h2">{p.title}</h2>
-            <p class="mt-6 text-[15px] leading-7 text-foreground">{p.body}</p>
-            <a href={p.link.href} class="link-underline text-foreground mt-6 inline-flex items-center gap-1.5 text-[14px] font-medium">
-              {p.link.label}
-              <ArrowRight className="size-3.5" />
-            </a>
+    PARTS.map((p, i) => {
+      const railRight = i % 2 === 1;
+      return (
+        <section class="bg-card border-b">
+          <div class="container-rail py-20 lg:py-28">
+            <div class="grid items-start gap-x-12 gap-y-6 lg:grid-cols-12">
+              <div class:list={["lg:col-span-4 lg:row-start-1", railRight ? "lg:col-start-9" : "lg:col-start-1"]}>
+                <div class="flex items-center gap-3">
+                  <span class="text-primary font-mono text-[13px] font-semibold tracking-[0.14em] tabular-nums">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <span aria-hidden class="bg-border h-px flex-1"></span>
+                </div>
+                <p class="t-eyebrow mt-4">{p.eyebrow}</p>
+              </div>
+              <div class:list={["lg:col-span-7 lg:row-start-1", railRight ? "lg:col-start-1" : "lg:col-start-6"]}>
+                <h2 class="t-h2">{p.title}</h2>
+                <p class="text-foreground mt-6 text-[15px] leading-7">{p.body}</p>
+                <a href={p.link.href} class="link-underline text-foreground mt-6 inline-flex items-center gap-1.5 text-[14px] font-medium">
+                  {p.link.label}
+                  <ArrowRight className="size-3.5" />
+                </a>
+              </div>
+            </div>
           </div>
-        </div>
-      </section>
-    ))
+        </section>
+      );
+    })
   }
+
+  <FaqSection title="Straight answers" items={FAQ} />
 
   <PageCta
     title="See it on your own work"
