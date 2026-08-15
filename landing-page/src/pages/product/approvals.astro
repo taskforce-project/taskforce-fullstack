@@ -5,9 +5,10 @@ import PageCta from "@/components/site/PageCta.astro";
 import BorderedGrid from "@/components/site/sections/BorderedGrid.astro";
 import FeatureSplit from "@/components/site/sections/FeatureSplit.astro";
 import CalloutBand from "@/components/site/sections/CalloutBand.astro";
-import Panel from "@/components/site/sections/Panel.astro";
-import ScreenPlaceholder from "@/components/site/sections/ScreenPlaceholder.astro";
+import { ApprovalsFlow } from "@/components/site/flows/OrchestrationFlows";
+import { AuditTrailDemo } from "@/components/site/illustrations/LiveSchematics";
 import { FileCheck2, Terminal, Sparkles, ClipboardList, ShieldCheck, ArrowRight } from "lucide-react";
+import { hueFor } from "@/lib/site-icons";
 import { APP_URL } from "@/components/site/nav";
 
 /* Les surfaces d'approbation RÉELLES (endpoints backend), pas une promesse.
@@ -33,9 +34,6 @@ const APPROVE = [
   },
 ];
 
-/* Approval = transition conditionnelle entre deux états du système (le vrai fil rouge produit).
-   Rendu VERTICAL dans un Panel pour tenir dans la colonne d'un FeatureSplit. */
-const PRIMITIVE_FLOW = ["Agent", "Artifact", "Human review", "Approved decision", "Memory", "Next checkpoint"];
 
 /* Ce que la trace d'approbation retient (liste réelle, rendue dans l'aside du FeatureSplit « Recorded »). */
 const RECORDED = [
@@ -61,7 +59,7 @@ const RECORDED = [
 
   {/* ───── What you approve — BorderedGrid (remplace la grille de cartes) ───── */}
   <BorderedGrid
-    bg="secondary"
+    bg="card"
     align="left"
     eyebrow="What you approve"
     title="Sign-off where it actually matters"
@@ -73,7 +71,7 @@ const RECORDED = [
   {/* ───── The primitive — FeatureSplit : texte + Panel (flux réel) ───── */}
   <FeatureSplit bg="card" eyebrow="The primitive" title="Approval is what a checkpoint is">
     <div slot="aside" class="mt-6">
-      <span class="text-foreground inline-flex size-11 items-center justify-center rounded-xl border bg-card">
+      <span class="ic-tile inline-flex size-11 items-center justify-center rounded-xl border" style={`--ic:${hueFor(ShieldCheck)}`}>
         <ShieldCheck className="size-5" strokeWidth={1.75} />
       </span>
       <p class="text-foreground mt-6 text-[15px] leading-7">
@@ -83,39 +81,15 @@ const RECORDED = [
       </p>
     </div>
 
-    {/* Visuel : le flux qui DÉFINIT la primitive, en contenu réel (vertical). */}
-    <Panel label="Checkpoint" tag="Illustrative">
-      <div class="flex flex-col items-start font-mono text-[12.5px]">
-        {
-          PRIMITIVE_FLOW.map((s, i) => (
-            <div class="flex flex-col items-start">
-              <span
-                class:list={[
-                  "rounded-md border px-2.5 py-1",
-                  s === "Human review"
-                    ? "border-primary/30 bg-primary/10 text-primary font-medium"
-                    : "bg-card text-foreground",
-                ]}
-              >
-                {s}
-              </span>
-              {i < PRIMITIVE_FLOW.length - 1 && <span class="bg-border my-1 ml-4 h-4 w-px" aria-hidden />}
-            </div>
-          ))
-        }
-      </div>
-      <p class="text-muted-foreground mt-4 text-[12.5px] leading-6">
-        Human review means <span class="text-foreground font-medium">approve</span>,
-        <span class="text-foreground font-medium">edit</span> or
-        <span class="text-foreground font-medium">reject</span> — only an approved artifact becomes the
-        next stage.
-      </p>
-    </Panel>
+    {/* Visuel : le flux qui DÉFINIT la primitive — React Flow (même DA que l'orchestration). */}
+    <div class="flow-canvas relative h-[500px] overflow-hidden border">
+      <ApprovalsFlow client:only="react" />
+    </div>
   </FeatureSplit>
 
   {/* ───── La règle qui tient partout — CalloutBand (respiration) ───── */}
   <CalloutBand
-    bg="secondary"
+    bg="card"
     statement="That's why the same rule holds across the product: an agent proposes, a human decides, and only an approved decision becomes context for what follows."
   >
     <p class="text-muted-foreground mt-6 text-[13.5px]">
@@ -136,7 +110,7 @@ const RECORDED = [
         {
           RECORDED.map((r) => (
             <li class="flex items-start gap-3 text-[14.5px] leading-6 text-foreground">
-              <ClipboardList className="text-primary mt-0.5 size-4 shrink-0" strokeWidth={2} />
+              <ClipboardList className="mt-0.5 size-4 shrink-0" strokeWidth={2} style={{ color: hueFor(ClipboardList) }} />
               {r}
             </li>
           ))
@@ -159,8 +133,8 @@ const RECORDED = [
       </p>
     </div>
 
-    {/* Visuel : emplacement d'un vrai screenshot de la piste d'audit (vide, honnête). */}
-    <ScreenPlaceholder label="Audit trail" />
+    {/* Visuel : la piste d'audit, animée — les approbations tombent une à une (who · what · when). */}
+    <AuditTrailDemo client:visible />
   </FeatureSplit>
 
   {/* ───── CTA ───── */}

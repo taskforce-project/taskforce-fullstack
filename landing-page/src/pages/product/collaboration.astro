@@ -9,6 +9,7 @@ import CalloutBand from "@/components/site/sections/CalloutBand.astro";
 import ScreenPlaceholder from "@/components/site/sections/ScreenPlaceholder.astro";
 import { CollabBoard } from "@/components/site/illustrations/CollabBoard";
 import { KanbanSquare, CalendarRange, MessageSquare, ShieldCheck, Zap, RefreshCw, Bot } from "lucide-react";
+import { hueFor } from "@/lib/site-icons";
 import { APP_URL } from "@/components/site/nav";
 
 /**
@@ -74,7 +75,7 @@ const LIVE = [
   />
 
   {/* ── Le vrai board, en surface partagée (îlot React préservé) ── */}
-  <section class="bg-secondary border-b">
+  <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-28">
       <div class="max-w-2xl">
         <p class="t-eyebrow mb-3">In practice</p>
@@ -103,7 +104,7 @@ const LIVE = [
       {
         BLOCKS.map((b) => (
           <li class="flex gap-4 border-b py-4">
-            <span class="bg-secondary/60 text-foreground flex size-10 shrink-0 items-center justify-center rounded-lg border">
+            <span class="ic-tile flex size-10 shrink-0 items-center justify-center rounded-lg border" style={`--ic:${hueFor(b.icon)}`}>
               <b.icon className="size-5" strokeWidth={1.75} />
             </span>
             <div class="min-w-0">
@@ -118,7 +119,7 @@ const LIVE = [
 
   {/* ── Temps réel — FeatureRows (petits traits), lignes alternées ── */}
   <FeatureRows
-    bg="secondary"
+    bg="card"
     eyebrow="Real time"
     title="Everyone sees the same board, the moment it changes"
     lead="When anyone creates, moves, re-labels or re-assigns an issue, it updates on every open board instantly — over a live connection, no refresh. Your agents' changes arrive the same way people's do."
@@ -127,7 +128,7 @@ const LIVE = [
       LIVE.map((l, i) => (
         <FeatureRow reverse={i % 2 === 1} title={l.title} body={l.text}>
           <div slot="viz" class="flex w-full justify-center">
-            <span class="bg-secondary/60 text-foreground flex size-14 items-center justify-center rounded-2xl border">
+            <span class="ic-tile flex size-14 items-center justify-center rounded-2xl border" style={`--ic:${hueFor(l.icon)}`}>
               <l.icon className="size-6" strokeWidth={1.5} />
             </span>
           </div>

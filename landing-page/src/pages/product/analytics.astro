@@ -3,8 +3,10 @@ import BaseLayout from "@/layouts/BaseLayout.astro";
 import PageHero from "@/components/site/PageHero.astro";
 import PageCta from "@/components/site/PageCta.astro";
 import { DeliveryInsights } from "@/components/site/illustrations/DeliveryInsights";
+import { AnalyticsLoopFlow } from "@/components/site/flows/OrchestrationFlows";
 import { LevelBadge } from "@/components/site/Section";
-import { BarChart3, Timer, Gauge, CalendarRange, TrendingDown, Users, Sparkles, ArrowRight } from "lucide-react";
+import { BarChart3, Timer, Gauge, CalendarRange, TrendingDown, Users, Sparkles, ArrowRight, Info, CornerDownLeft } from "lucide-react";
+import { hueFor } from "@/lib/site-icons";
 import { APP_URL } from "@/components/site/nav";
 
 /* Les métriques RÉELLEMENT calculées (cf. AnalyticsController /kpis /throughput /burndown /workload). */
@@ -26,8 +28,16 @@ const CHART = [
 ];
 const CHART_MAX = Math.max(...CHART.map((c) => c.n));
 
-/* La boucle produit (direction Planned) : mesurer → détecter → Memory → meilleur run suivant. */
-const LOOP = ["Delivery", "Analytics", "Recurring pattern", "Memory", "Next run"];
+/* Clôture non-workflow : les réponses concrètes qu'un lead attend, mappées 1:1 sur les métriques
+   réelles (mêmes icônes → mêmes teintes distinctes). 6 items → 2 colonnes remplies, zéro trou. */
+const QUESTIONS = [
+  { icon: BarChart3, q: "Opened vs resolved this week?", a: "Throughput at a glance, by day or by cycle." },
+  { icon: Timer, q: "Is resolution time getting worse?", a: "The trend on how long work takes to close, against last period." },
+  { icon: CalendarRange, q: "What slipped this cycle?", a: "What's in flight, what shipped, and what carried over." },
+  { icon: Users, q: "Who's overloaded right now?", a: "Workload by person, day by day — before anyone gets buried." },
+  { icon: Gauge, q: "How much ships per cycle?", a: "Velocity, so planning starts from reality instead of a guess." },
+  { icon: TrendingDown, q: "Where do runs get sent back?", a: "The checkpoint that keeps costing you — only a checkpoint system sees it." },
+];
 ---
 
 <BaseLayout
@@ -44,7 +54,7 @@ const LOOP = ["Delivery", "Analytics", "Recurring pattern", "Memory", "Next run"
   />
 
   {/* ── Les métriques, live ── */}
-  <section class="bg-secondary border-b">
+  <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-28">
       <div class="max-w-2xl">
         <p class="t-eyebrow mb-3">Live today</p>
@@ -54,11 +64,11 @@ const LOOP = ["Delivery", "Analytics", "Recurring pattern", "Memory", "Next run"
           actually track — updated as work moves.
         </p>
       </div>
-      <div class="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <div class="-mx-6 mt-12 grid grid-cols-1 gap-px border-y border-border bg-border sm:grid-cols-2 lg:grid-cols-3 lg:-mx-10">
         {
           METRICS.map((m) => (
-            <div class="rounded-2xl border bg-card p-6">
-              <span class="bg-card text-foreground flex size-11 items-center justify-center rounded-xl border">
+            <div class="bg-card flex flex-col p-6 sm:p-8">
+              <span class="ic-tile flex size-11 items-center justify-center rounded-xl border" style={`--ic:${hueFor(m.icon)}`}>
                 <m.icon className="size-5" strokeWidth={1.75} />
               </span>
               <h3 class="mt-4 text-[16px] font-semibold text-foreground">{m.title}</h3>
@@ -88,7 +98,7 @@ const LOOP = ["Delivery", "Analytics", "Recurring pattern", "Memory", "Next run"
             ones worth keeping.
           </p>
           <p class="text-muted-foreground mt-6 flex items-start gap-2 text-[13.5px] leading-6">
-            <Sparkles className="text-primary mt-0.5 size-4 shrink-0" strokeWidth={2} />
+            <Sparkles className="mt-0.5 size-4 shrink-0" strokeWidth={2} style={{ color: hueFor(Sparkles) }} />
             And when a question can't be answered from your data, it says so — and suggests one it can
             — instead of inventing a number.
           </p>
@@ -98,15 +108,21 @@ const LOOP = ["Delivery", "Analytics", "Recurring pattern", "Memory", "Next run"
           </p>
         </div>
 
-        {/* Mock : prompt → graphe. Données illustratives. */}
+        {/* Mock : prompt → graphe → garde-fou. Panneau carré intégré (pas de toast/modal flottant). Données illustratives. */}
         <div class="mx-auto w-full max-w-md">
-          <div class="bg-card overflow-hidden rounded-2xl border shadow-sm">
-            <div class="flex items-center gap-2 border-b px-4 py-3">
-              <Sparkles className="text-primary size-4 shrink-0" strokeWidth={2} />
-              <span class="text-foreground text-[13.5px]">Resolved issues by assignee, this cycle</span>
+          <div class="bg-card overflow-hidden border">
+            {/* La demande — barre façon champ de saisie */}
+            <div class="flex items-center gap-2.5 border-b px-4 py-3">
+              <Sparkles className="size-4 shrink-0" strokeWidth={2} style={{ color: hueFor(Sparkles) }} />
+              <span class="text-foreground flex-1 text-[13px]">Resolved issues by assignee, this cycle</span>
+              <CornerDownLeft className="text-muted-foreground size-3.5 shrink-0" strokeWidth={2} />
             </div>
-            <div class="p-5">
-              <p class="text-muted-foreground mb-3 text-[11.5px]">Resolved · this cycle</p>
+            {/* La réponse — rendue depuis le board */}
+            <div class="px-4 py-4">
+              <p class="text-muted-foreground mb-3 flex items-center gap-1.5 text-[11.5px]">
+                <span class="tf-pulse size-1.5 rounded-full bg-emerald-500 text-emerald-500" />
+                Rendered from your board · this cycle
+              </p>
               <ul class="flex flex-col gap-2.5">
                 {
                   CHART.map((c) => (
@@ -126,6 +142,16 @@ const LOOP = ["Delivery", "Analytics", "Recurring pattern", "Memory", "Next run"
                 }
               </ul>
             </div>
+            {/* Le garde-fou — illustre « il ne l'invente pas » */}
+            <div class="bg-secondary/30 border-t px-4 py-2.5">
+              <p class="text-muted-foreground flex items-start gap-2 text-[11px] leading-5">
+                <Info className="mt-px size-3.5 shrink-0" strokeWidth={2} />
+                <span>
+                  <span class="text-foreground">"Revenue by region"</span> isn't in your data — it says so and
+                  suggests <span class="text-foreground">resolved by label</span> instead.
+                </span>
+              </p>
+            </div>
           </div>
           <p class="text-muted-foreground mt-3 text-center text-[11px]">Illustrative — not a TaskForce customer metric.</p>
         </div>
@@ -134,7 +160,7 @@ const LOOP = ["Delivery", "Analytics", "Recurring pattern", "Memory", "Next run"
   </section>
 
   {/* ── La métrique que seul un système à checkpoints peut sortir (Beta) ── */}
-  <section class="bg-secondary border-b">
+  <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-28">
       <div class="max-w-2xl">
         <p class="t-eyebrow mb-3">Beta</p>
@@ -153,7 +179,7 @@ const LOOP = ["Delivery", "Analytics", "Recurring pattern", "Memory", "Next run"
   </section>
 
   {/* ── La boucle Analytics → Memory → next run (Planned, pas vendu comme Live) ── */}
-  <section class="bg-card border-b">
+  <section class="bg-card bg-dots border-b">
     <div class="container-rail py-20 lg:py-28">
       <div class="grid gap-10 lg:grid-cols-[minmax(0,430px)_1fr] lg:items-center lg:gap-16">
         <div>
@@ -184,25 +210,40 @@ const LOOP = ["Delivery", "Analytics", "Recurring pattern", "Memory", "Next run"
             </a>
           </div>
         </div>
-        <div class="flex flex-wrap items-center justify-center gap-x-2 gap-y-2 lg:justify-end">
-          {
-            LOOP.map((node, i) => (
-              <Fragment>
-                {i > 0 && <ArrowRight className="text-muted-foreground/45 size-4 shrink-0" />}
-                <span
-                  class={`rounded-full border px-3 py-1 text-[12.5px] ${
-                    node === "Memory"
-                      ? "border-primary/30 text-primary bg-card font-medium"
-                      : "bg-card text-foreground"
-                  }`}
-                >
-                  {node}
-                </span>
-              </Fragment>
-            ))
-          }
+        <div class="relative mx-auto w-full max-w-[300px]" style="aspect-ratio: 300 / 440">
+          <AnalyticsLoopFlow client:only="react" />
         </div>
       </div>
+    </div>
+  </section>
+
+  {/* ── Clôture : on ne finit pas sur le graphe — les réponses concrètes, straight from the board ── */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">In plain terms</p>
+        <h2 class="t-h2">The questions it answers, day to day</h2>
+        <p class="t-lead mt-4">
+          Not a wall of dashboards — the handful of answers a lead actually needs, computed straight
+          from the board.
+        </p>
+      </div>
+      <div class="mt-12 grid gap-x-10 border-t border-border sm:grid-cols-2">
+        {
+          QUESTIONS.map((item) => (
+            <div class="flex items-start gap-3.5 border-b border-border py-5">
+              <item.icon className="mt-0.5 size-5 shrink-0" strokeWidth={1.75} style={{ color: hueFor(item.icon) }} />
+              <div class="min-w-0">
+                <p class="text-foreground text-[14.5px] font-medium">{item.q}</p>
+                <p class="text-muted-foreground mt-1 text-[13px] leading-6">{item.a}</p>
+              </div>
+            </div>
+          ))
+        }
+      </div>
+      <p class="text-muted-foreground mt-8 text-[13px]">
+        Ask any of these in plain English, or pin the ones your team checks every week.
+      </p>
     </div>
   </section>
 

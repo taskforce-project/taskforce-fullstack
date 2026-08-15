@@ -4,8 +4,8 @@ import PageHero from "@/components/site/PageHero.astro";
 import PageCta from "@/components/site/PageCta.astro";
 import FeatureSplit from "@/components/site/sections/FeatureSplit.astro";
 import BorderedGrid from "@/components/site/sections/BorderedGrid.astro";
-import ScreenPlaceholder from "@/components/site/sections/ScreenPlaceholder.astro";
-import { DecisionGraph } from "@/components/site/home/DecisionGraph";
+import { DecisionRecordDemo } from "@/components/site/illustrations/LiveSchematics";
+import { BrainLoopFlow, DecisionGraphFlow } from "@/components/site/flows/OrchestrationFlows";
 import { ArrowRight, Boxes, Network, RefreshCw, Building2 } from "lucide-react";
 import { APP_URL } from "@/components/site/nav";
 
@@ -52,54 +52,52 @@ const POINTS = [
     primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
     secondary={{ label: "See the public roadmap", href: "/roadmap" }}
   >
-    <div class="mx-auto mt-16 max-w-5xl">
-      <ScreenPlaceholder label="TaskForce Memory" ratio="16 / 9" />
+    <div class="mx-auto mt-16 max-w-3xl">
+      <DecisionRecordDemo client:visible />
     </div>
   </PageHero>
 
   {/* ───── Montrer : le graphe causal (DecisionGraph) porté par un FeatureSplit ───── */}
   <FeatureSplit
-    bg="secondary"
+    bg="card"
     eyebrow="Not a RAG over your wiki"
     title="Git remembers what changed. TaskForce remembers why."
     lead="TaskForce Memory links each decision to the constraints it answered, the alternatives it rejected, and the code it shaped — so the reasoning is retrievable long after the thread, the meeting and the person who made it are gone."
   >
-    <DecisionGraph />
+    <div class="flow-canvas relative h-[360px] overflow-hidden border">
+      <DecisionGraphFlow client:only="react" />
+    </div>
   </FeatureSplit>
 
   {/* ───── Ce que la mémoire fait — 4 points en grille « petits traits » ───── */}
   <BorderedGrid bg="card" items={POINTS} cols={2} />
 
-  {/* ───── La phrase conceptuelle + continuité Orchestration (+ emplacement screenshot) ───── */}
-  <FeatureSplit
-    bg="secondary"
-    reverse
-    title="TaskForce Memory is the decision graph of your organization."
-    lead="Documents describe the system. Decisions explain why it is the way it is. The links between them make that reasoning retrievable — and every run adds to it."
-  >
-    <ScreenPlaceholder label="TaskForce Memory" />
-    <div slot="aside">
-      <div class="mt-6 max-w-sm rounded-2xl border bg-card p-6 text-left">
-        <p class="text-muted-foreground mb-3 text-[11px] font-semibold tracking-[0.08em] uppercase">
-          How it fits together
+  {/* ───── How it fits together — la boucle en React Flow (même DA que l'orchestration) ───── */}
+  <section class="bg-card border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="max-w-2xl">
+        <p class="t-eyebrow mb-3">How it fits together</p>
+        <h2 class="t-h2 text-balance">Memory is the decision graph of your organization</h2>
+        <p class="t-lead mt-4">
+          Documents describe the system. Decisions explain why it is the way it is — every run reads
+          that reasoning before it starts, then writes its validated decisions back when it finishes.
         </p>
-        <ol class="flex flex-col gap-2 text-[14px] leading-6">
-          <li><span class="text-foreground font-medium">Memory</span> <span class="text-muted-foreground">knows why.</span></li>
-          <li><span class="text-foreground font-medium">Orchestration</span> <span class="text-muted-foreground">decides what happens next.</span></li>
-          <li><span class="text-foreground font-medium">Humans</span> <span class="text-muted-foreground">approve.</span></li>
-          <li><span class="text-foreground font-medium">Agents</span> <span class="text-muted-foreground">execute.</span></li>
-          <li><span class="text-foreground font-medium">Validated decisions</span> <span class="text-muted-foreground">go back into</span> <span class="text-foreground font-medium">Memory.</span></li>
-        </ol>
       </div>
-      <a
-        href="/product/orchestration"
-        class="link-underline text-foreground mt-6 inline-flex items-center gap-1.5 text-[14px] font-medium"
-      >
-        See how orchestration uses it
-        <ArrowRight className="size-4" />
-      </a>
+      <div class="flow-canvas rail-y relative -mx-6 mt-12 h-[240px] border-y border-border lg:-mx-10">
+        <BrainLoopFlow client:only="react" />
+      </div>
+      <div class="mt-8 flex flex-wrap items-center justify-between gap-4">
+        <a
+          href="/product/orchestration"
+          class="link-underline text-foreground inline-flex items-center gap-1.5 text-[14px] font-medium"
+        >
+          See how orchestration uses it
+          <ArrowRight className="size-4" />
+        </a>
+        <span class="text-muted-foreground/60 font-mono text-[10px] tracking-wide uppercase">Illustrative</span>
+      </div>
     </div>
-  </FeatureSplit>
+  </section>
 
   <PageCta
     title="Build institutional memory, one decision at a time."

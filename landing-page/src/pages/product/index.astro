@@ -4,6 +4,7 @@ import PageHero from "@/components/site/PageHero.astro";
 import PageCta from "@/components/site/PageCta.astro";
 import { LevelBadge } from "@/components/site/Section";
 import { PRODUCT_PLATFORM, PRODUCT_DELIVERY, isLive, APP_URL } from "@/components/site/nav";
+import { hueFor } from "@/lib/site-icons";
 
 const GROUPS = [
   { title: "Platform", items: PRODUCT_PLATFORM },
@@ -23,19 +24,19 @@ const GROUPS = [
     secondary={{ label: "See the run", href: "/product/orchestration" }}
   />
 
-  <section class="bg-secondary border-b">
+  <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-28">
       {
         GROUPS.map((group) => (
           <div class="mb-14 last:mb-0">
             <p class="t-eyebrow mb-6">{group.title}</p>
-            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div class="-mx-6 grid grid-cols-1 gap-px border-y border-border bg-border sm:grid-cols-2 lg:grid-cols-4 lg:-mx-10">
               {group.items.map((item) => {
                 const Icon = item.icon;
                 const live = isLive(item.href);
                 const body = (
                   <>
-                    <span class="bg-card text-foreground flex size-10 items-center justify-center rounded-lg border">
+                    <span class="ic-tile flex size-10 items-center justify-center rounded-lg border" style={`--ic:${hueFor(Icon)}`}>
                       {Icon && <Icon className="size-[18px]" strokeWidth={1.75} />}
                     </span>
                     <div class="mt-3 flex items-center gap-2">
@@ -54,12 +55,12 @@ const GROUPS = [
                 return live ? (
                   <a
                     href={item.href}
-                    class="bg-card hover:border-primary/30 hover:bg-secondary/40 rounded-2xl border p-5 transition-colors"
+                    class="bg-card hover:bg-secondary/40 flex flex-col p-6 transition-colors"
                   >
                     {body}
                   </a>
                 ) : (
-                  <div class="bg-card rounded-2xl border p-5 opacity-60" aria-disabled="true">
+                  <div class="bg-card flex flex-col p-6 opacity-60" aria-disabled="true">
                     {body}
                   </div>
                 );

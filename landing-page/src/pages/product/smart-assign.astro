@@ -4,10 +4,11 @@ import PageHero from "@/components/site/PageHero.astro";
 import PageCta from "@/components/site/PageCta.astro";
 import FeatureSplit from "@/components/site/sections/FeatureSplit.astro";
 import CalloutBand from "@/components/site/sections/CalloutBand.astro";
-import Panel from "@/components/site/sections/Panel.astro";
 import ScreenPlaceholder from "@/components/site/sections/ScreenPlaceholder.astro";
 import { AutoAssign } from "@/components/site/illustrations/AutoAssign";
+import { SmartAssignFlow } from "@/components/site/flows/OrchestrationFlows";
 import { Sparkles, Gauge, Clock, Bot, ShieldCheck } from "lucide-react";
+import { hueFor } from "@/lib/site-icons";
 import { APP_URL } from "@/components/site/nav";
 
 /**
@@ -44,7 +45,7 @@ const REVIEW = [
   />
 
   {/* ── La vraie modale Smart Assign, animée — showcase pleine largeur ── */}
-  <section class="bg-secondary border-b">
+  <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-28">
       <div class="max-w-2xl">
         <p class="t-eyebrow mb-3">In practice</p>
@@ -60,34 +61,48 @@ const REVIEW = [
     </div>
   </section>
 
-  {/* ── How it decides — grille à FILETS (DA « petits traits »), remplace la grille de cartes ── */}
+  {/* ── How it decides — texte + signaux en 2 col, PUIS le routage en graphe LARGE pleine largeur
+       (convergence → match → owner). Layout volontairement différent du reste.
+       Fond BLANC : le graphe a déjà son canvas à points (jamais 2 trames de points en même temps). ── */}
   <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-28">
-      <div class="max-w-2xl">
-        <p class="t-eyebrow mb-3">How it decides</p>
-        <h2 class="t-h2">Three signals, and its reasoning shown</h2>
-        <p class="t-lead mt-4">
-          Not a black box. Smart Assign weighs three signals and shows the reason behind every
-          suggestion — so a lead can trust it, or overrule it, in a glance.
-        </p>
+      <div class="grid gap-12 lg:grid-cols-2 lg:items-start lg:gap-16">
+        <div>
+          <p class="t-eyebrow mb-3">How it decides</p>
+          <h2 class="t-h2">Three signals, and its reasoning shown</h2>
+          <p class="t-lead mt-4">
+            Not a black box. Smart Assign weighs three signals and shows the reason behind every
+            suggestion — so a lead can trust it, or overrule it, in a glance.
+          </p>
+          <p class="text-muted-foreground mt-6 flex items-start gap-2 text-[13px] leading-6">
+            <Sparkles className="mt-0.5 size-4 shrink-0" strokeWidth={2} style={{ color: hueFor(Sparkles) }} />
+            Skill profiles can be enriched as your team works, with a short onboarding capturing the
+            rest — so it gets sharper without a data-entry chore.
+          </p>
+        </div>
+        <ul class="flex flex-col border-y">
+          {
+            FACTORS.map((f) => (
+              <li class="flex items-start gap-4 border-b py-4 last:border-0">
+                <span class="ic-tile flex size-10 shrink-0 items-center justify-center rounded-lg border" style={`--ic:${hueFor(f.icon)}`}>
+                  <f.icon className="size-5" strokeWidth={1.75} />
+                </span>
+                <div class="min-w-0">
+                  <h3 class="text-foreground text-[14.5px] font-semibold">{f.title}</h3>
+                  <p class="text-muted-foreground mt-1 text-[13px] leading-6">{f.text}</p>
+                </div>
+              </li>
+            ))
+          }
+        </ul>
       </div>
-      <div class="bg-border mt-12 grid gap-px overflow-hidden rounded-2xl border sm:grid-cols-2 lg:grid-cols-3">
-        {
-          FACTORS.map((f) => (
-            <div class="bg-card flex flex-col p-6">
-              <span class="bg-secondary/60 text-foreground flex size-10 items-center justify-center rounded-lg border">
-                <f.icon className="size-5" strokeWidth={1.75} />
-              </span>
-              <h3 class="text-foreground mt-4 text-[15px] font-semibold">{f.title}</h3>
-              <p class="text-muted-foreground mt-1.5 text-[13px] leading-6">{f.text}</p>
-            </div>
-          ))
-        }
+
+      {/* Le routage : 3 signaux convergent → pondération → le bon owner parmi plusieurs (le choisi en vert). */}
+      <div class="flow-canvas relative mt-14 h-[320px] w-full overflow-hidden border">
+        <SmartAssignFlow client:only="react" />
       </div>
-      <p class="text-muted-foreground mt-6 flex items-center gap-2 text-[13px]">
-        <Sparkles className="text-primary size-4 shrink-0" strokeWidth={2} />
-        Skill profiles can be enriched as your team works, with a short onboarding capturing the rest
-        — so it gets sharper without a data-entry chore.
+      <p class="text-muted-foreground mt-3 text-center text-[12.5px]">
+        Illustrative — the proposed owner always comes with its reason, and a human approves it.
       </p>
     </div>
   </section>
@@ -95,12 +110,12 @@ const REVIEW = [
   {/* ── Agent as assignee — FeatureSplit + ScreenPlaceholder ── */}
   <FeatureSplit
     reverse
-    bg="secondary"
+    bg="card"
     eyebrow="The difference"
     title="A coding agent is an assignee like any other"
   >
     <div slot="aside">
-      <span class="text-foreground mt-6 inline-flex size-11 items-center justify-center rounded-xl border bg-card">
+      <span class="ic-tile mt-6 inline-flex size-11 items-center justify-center rounded-xl border" style={`--ic:${hueFor(Bot)}`}>
         <Bot className="size-5" strokeWidth={1.75} />
       </span>
       <div class="mt-6 flex flex-col gap-4 text-[15px] leading-7 text-foreground">
@@ -119,19 +134,17 @@ const REVIEW = [
 
   {/* ── Human review — CalloutBand + Panel (la liste réelle dans un visuel) ── */}
   <CalloutBand eyebrow="You stay in control" statement="A suggestion, never an autopilot" bg="card">
-    <div class="mx-auto mt-10 max-w-xl text-left">
-      <Panel>
-        <ul class="flex flex-col">
-          {
-            REVIEW.map((r) => (
-              <li class="text-foreground flex items-start gap-3 border-b py-3 text-[14px] leading-6 last:border-0">
-                <ShieldCheck className="text-primary mt-0.5 size-4 shrink-0" strokeWidth={2} />
-                <span>{r}</span>
-              </li>
-            ))
-          }
-        </ul>
-      </Panel>
+    <div class="mx-auto mt-10 max-w-xl border-y text-left">
+      <ul class="flex flex-col">
+        {
+          REVIEW.map((r) => (
+            <li class="text-foreground flex items-start gap-3 border-b py-3.5 text-[14px] leading-6 last:border-0">
+              <ShieldCheck className="mt-0.5 size-4 shrink-0" strokeWidth={2} style={{ color: hueFor(ShieldCheck) }} />
+              <span>{r}</span>
+            </li>
+          ))
+        }
+      </ul>
     </div>
   </CalloutBand>
 

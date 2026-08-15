@@ -2,13 +2,13 @@
 import BaseLayout from "@/layouts/BaseLayout.astro";
 import PageCta from "@/components/site/PageCta.astro";
 import CalloutBand from "@/components/site/sections/CalloutBand.astro";
-import StatBand from "@/components/site/sections/StatBand.astro";
 import { buttonVariants } from "@/components/ui/button";
 import { LevelBadge } from "@/components/site/Section";
 import { cn } from "@/lib/utils";
 import { APP_URL } from "@/components/site/nav";
-import HeroFlow from "@/components/site/flows/HeroFlow";
-import { Compass, Building2, CalendarClock, BrainCircuit, Boxes, Server, ShieldCheck, Terminal, Cloud, Sparkles, GitPullRequest, ArrowDown, ArrowRight } from "lucide-react";
+import { HeroFlow, GroundingFlow, ApprovalFlow, HandoffFlow, CalibrationFlow } from "@/components/site/flows/OrchestrationFlows";
+import { Compass, Building2, CalendarClock, BrainCircuit, Boxes, Server, ShieldCheck, Cloud, ArrowRight } from "lucide-react";
+import { hueFor } from "@/lib/site-icons";
 
 /**
  * Orchestration — refonte façon Attio (attio.com/platform/workflows, 04/08) : hero 2 colonnes avec un
@@ -41,33 +41,11 @@ const AGENTS_FULL = [
   },
 ];
 
-const CALIB = [
-  { m: "Effort", p: "~6 days", a: "5 days", ok: true },
-  { m: "Issues opened", p: "8", a: "9", ok: false },
-  { m: "Added latency", p: "+40ms", a: "+32ms", ok: true },
-];
-const MEMORY_ITEMS = [
-  { t: "Decision", v: "Postgres over Mongo — tenant isolation" },
-  { t: "Constraint", v: "EU data residency (GDPR)" },
-  { t: "Convention", v: "Trunk-based, squash-merge" },
-  { t: "Rejected", v: "Third-party billing — lock-in" },
-];
-const HANDOFF = [
-  { icon: ShieldCheck, title: "Approved plan", sub: "full context + acceptance criteria" },
-  { icon: Terminal, title: "Your coding agent", sub: "receives the approved context" },
-  { icon: GitPullRequest, title: "Pull request", sub: "built, then reported back to the run" },
-];
 const PRINCIPLES = [
   { icon: BrainCircuit, title: "Grounded", desc: "Built from your architecture, decisions and conventions." },
   { icon: Boxes, title: "Specialized", desc: "Each agent stays within a defined responsibility." },
   { icon: ShieldCheck, title: "Governed", desc: "Every transition is a human decision, not a setting." },
   { icon: Server, title: "Your models", desc: "Local via Ollama at zero model cost, or hosted." },
-];
-const STATS = [
-  { value: "7", label: "Checkpoints", sub: "in a standard run" },
-  { value: "3", label: "Specialized agents", sub: "CPO · CTO · COO" },
-  { value: "1", label: "Human gate", sub: "at every decision" },
-  { value: "$0", label: "Model cost", sub: "local via Ollama today" },
 ];
 ---
 
@@ -79,29 +57,29 @@ const STATS = [
   <section class="bg-card bg-dots border-b">
     <div class="container-rail py-16 lg:py-24">
       <div class="grid items-center gap-12 lg:grid-cols-[minmax(0,460px)_minmax(0,1fr)] lg:gap-16">
-        <div>
-          <div class="flex items-center gap-2.5">
+        <div class="text-center lg:text-left">
+          <div class="flex items-center justify-center gap-2.5 lg:justify-start">
             <span class="t-eyebrow">Orchestration</span>
             <LevelBadge level="labs" />
           </div>
           <h1 class="t-h1 mt-4">Set the outcome.<br />The team runs the play.</h1>
-          <p class="t-lead mt-5 max-w-xl">
+          <p class="t-lead mx-auto mt-5 max-w-xl lg:mx-0">
             Specialized agents propose every step — spec, architecture, plan, QA. Your team approves each
             decision before it becomes the next.
           </p>
-          <div class="mt-8 flex flex-wrap gap-3">
+          <div class="mt-8 flex flex-wrap justify-center gap-3 lg:justify-start">
             <a href={`${APP_URL}/auth/register`} class={cn(buttonVariants({ size: "pill" }))}>Run your first workflow</a>
             <a href="/roadmap" class={cn(buttonVariants({ variant: "outline", size: "pill" }))}>See the roadmap</a>
           </div>
-          <p class="text-muted-foreground mt-7 flex items-center gap-2 text-[13px]">
-            <ShieldCheck className="text-primary size-4 shrink-0" strokeWidth={2} />
+          <p class="text-muted-foreground mt-7 flex items-center justify-center gap-2 text-[13px] lg:justify-start">
+            <ShieldCheck className="size-4 shrink-0" strokeWidth={2} style={{ color: hueFor(ShieldCheck) }} />
             The AI proposes. Your team decides.
           </p>
         </div>
 
         {/* le graphe de run — React Flow (statique, façon Attio). client:only : RF a besoin du DOM navigateur. */}
         <div class="lg:pl-4">
-          <div class="relative mx-auto w-full max-w-[600px]" style="aspect-ratio: 600 / 600">
+          <div class="relative mx-auto w-full max-w-[600px]" style="aspect-ratio: 600 / 620">
             <HeroFlow client:only="react" />
           </div>
           <p class="text-muted-foreground/60 mt-6 text-center font-mono text-[10px] tracking-wide uppercase">
@@ -119,54 +97,92 @@ const STATS = [
     support="TaskForce turns each into a checkpoint — proposed, reviewed, approved before it becomes context for the next."
   />
 
-  {/* ───── Grounding : le run lit ton contexte avant de proposer — fond VIDE ───── */}
+  {/* ───── Comment tourne un run — GRILLE À FILETS INTÉGRÉS : 4 capacités = 4 cellules (titre + texte + schéma) ───── */}
   <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-28">
-      <div class="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
-        <div>
-          <p class="t-eyebrow mb-3">Grounded</p>
-          <h2 class="t-h2 text-balance">It starts from what you already decided.</h2>
-          <p class="t-lead mt-4 max-w-xl">
-            Before it proposes anything, a run reads the decisions, constraints and conventions behind your
-            system — so every step fits your reality, not a generic template.
-          </p>
-          <a
-            href="/product/brain-os"
-            class="link-underline text-foreground mt-6 inline-flex w-fit items-center gap-1.5 text-[13.5px] font-medium"
-          >
-            Go deeper on Memory
-            <ArrowRight className="size-3.5" />
-          </a>
+      <div class="mb-12 max-w-2xl">
+        <p class="t-eyebrow mb-3">Inside a run</p>
+        <h2 class="t-h2 text-balance">One outcome. Every safeguard, in the open.</h2>
+        <p class="t-lead mt-4">
+          A run reads your context, proposes each step, waits for a human decision, hands the approved work to
+          your coding agent, then measures itself against the forecast.
+        </p>
+      </div>
+      {/* Grille VARIÉE (pas ultra-carrée) : nœuds à taille identique (rendu 1:1) → les schémas larges
+          prennent plus de place → boucles en pleine largeur, grounding + handoff côte à côte. */}
+      <div class="-mx-6 grid grid-cols-1 gap-px border-y border-border bg-border md:grid-cols-6 lg:-mx-10">
+        {/* Grounded (span 3) */}
+        <div class="bg-card flex flex-col md:col-span-3">
+          <div class="p-6 sm:p-8">
+            <p class="t-eyebrow mb-2">Grounded</p>
+            <h3 class="t-h3">It starts from what you already decided</h3>
+            <p class="text-muted-foreground mt-2 text-[13.5px] leading-6">
+              Before proposing anything, the run reads your decisions, constraints and conventions.
+            </p>
+            <a
+              href="/product/brain-os"
+              class="link-underline text-foreground mt-4 inline-flex w-fit items-center gap-1.5 text-[13px] font-medium"
+            >
+              Go deeper on Memory
+              <ArrowRight className="size-3.5" />
+            </a>
+          </div>
+          <div class="flow-canvas rail-y relative mt-auto h-[280px]">
+            <GroundingFlow client:only="react" />
+          </div>
         </div>
-        <div class="surface bg-card rounded-2xl p-4">
-          <div class="bg-card flow-canvas rounded-xl border p-5">
-          <p class="text-muted-foreground mb-3 font-mono text-[10px] font-semibold tracking-wide uppercase">Your context</p>
-          <div class="grid gap-2">
-            {
-              MEMORY_ITEMS.map((c) => (
-                <div class="bg-card flex items-start gap-2.5 rounded-lg border p-2.5 text-[12px] shadow-sm">
-                  <span class="text-primary mt-0.5 w-16 shrink-0 font-mono text-[9.5px] font-semibold tracking-wide uppercase">{c.t}</span>
-                  <span class="text-foreground leading-5">{c.v}</span>
-                </div>
-              ))
-            }
+        {/* Handoff (span 3) */}
+        <div class="bg-card flex flex-col md:col-span-3">
+          <div class="p-6 sm:p-8">
+            <p class="t-eyebrow mb-2">Handoff</p>
+            <h3 class="t-h3">Approved plans go straight to your coding agent</h3>
+            <p class="text-muted-foreground mt-2 text-[13.5px] leading-6">
+              TaskForce hands the full approved context to the agent you already use — it builds and opens a PR.
+            </p>
           </div>
-          <div class="flex justify-center py-2.5">
-            <ArrowDown className="text-primary size-4" strokeWidth={2} />
+          <div class="flow-canvas rail-y relative mt-auto h-[280px]">
+            <HandoffFlow client:only="react" />
           </div>
-          <div class="border-primary/30 bg-primary/5 flex items-center gap-2.5 rounded-lg border p-3" style="--d: 0.35s">
-            <Sparkles className="text-primary size-4 shrink-0" strokeWidth={1.75} />
-            <span class="text-foreground text-[13px] font-semibold">A proposal grounded in your context</span>
+        </div>
+        {/* Human-in-the-loop (span 6 : boucle large, pleine largeur) */}
+        <div class="bg-card flex flex-col md:col-span-6">
+          <div class="p-6 sm:p-8">
+            <p class="t-eyebrow mb-2">Human-in-the-loop</p>
+            <h3 class="t-h3">Every checkpoint is a decision, not a setting</h3>
+            <p class="text-muted-foreground mt-2 max-w-xl text-[13.5px] leading-6">
+              The agent proposes. Your team approves it or sends it back — nothing moves on its own.
+            </p>
           </div>
+          <div class="flow-canvas rail-y relative mt-auto h-[150px]">
+            <ApprovalFlow client:only="react" />
+          </div>
+        </div>
+        {/* Predict & recalibrate (span 6 : boucle large, pleine largeur) */}
+        <div class="bg-card flex flex-col md:col-span-6">
+          <div class="p-6 sm:p-8">
+            <div class="mb-2 flex items-center gap-2.5">
+              <p class="t-eyebrow">Predict &amp; recalibrate</p>
+              <span class="border-primary/30 bg-primary/5 text-primary inline-flex items-center rounded-full border px-2 py-0.5 font-mono text-[9px] font-semibold tracking-wide uppercase">Coming next</span>
+            </div>
+            <h3 class="t-h3">It predicts, then checks itself</h3>
+            <p class="text-muted-foreground mt-2 max-w-xl text-[13.5px] leading-6">
+              Each step forecasts effort, risk and cost, then compares the forecast with what actually shipped.
+            </p>
+          </div>
+          <div class="flow-canvas rail-y relative mt-auto h-[150px]">
+            <CalibrationFlow client:only="react" />
           </div>
         </div>
       </div>
+      <p class="text-muted-foreground/60 mt-6 font-mono text-[10px] tracking-wide uppercase">
+        Illustrative — orchestration is Planned
+      </p>
     </div>
   </section>
 
   {/* ───── L'équipe — colonnes à filets (structure par traits) — fond RAYURES ───── */}
   <section class="bg-card bg-striped border-b">
-    <div class="container-rail no-rail py-20 lg:py-28">
+    <div class="container-rail no-rail pt-28 pb-20 lg:pt-44 lg:pb-28">
       <div class="max-w-2xl">
         <p class="t-eyebrow mb-3">The team</p>
         <h2 class="t-h2 text-balance">One outcome. Three specialists. Seven checkpoints.</h2>
@@ -179,10 +195,8 @@ const STATS = [
         {
           AGENTS_FULL.map((a, i) => (
             <div class:list={["sm:px-8 sm:first:pl-0 sm:last:pr-0", i > 0 && "sm:border-l"]}>
-              <div class="flex items-center gap-2.5">
-                <span class:list={["bg-card flex size-9 shrink-0 items-center justify-center rounded-lg border ring-1", a.box]}>
-                  <a.icon className="size-[18px]" strokeWidth={1.75} />
-                </span>
+              <div class="flex items-center gap-3">
+                <a.icon className="size-6 shrink-0" strokeWidth={1.75} style={{ color: hueFor(a.icon) }} />
                 <div class="min-w-0">
                   <div class="text-foreground text-[14px] font-semibold">{a.code}</div>
                   <div class="text-muted-foreground text-[12px]">owns {a.owns}</div>
@@ -203,245 +217,76 @@ const STATS = [
     </div>
   </section>
 
-  {/* ───── Le checkpoint : boucle d'approbation (schéma animé, loop) — fond VIDE ───── */}
+  {/* ───── Modèles + preuve — GRILLE À FILETS (bento : notre DA de structure = les traits ; on pose le contenu dans les cellules) ───── */}
   <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-28">
-      <div class="mx-auto mb-12 max-w-2xl text-center">
-        <p class="t-eyebrow mb-3">Human-in-the-loop</p>
-        <h2 class="t-h2 text-balance">Every checkpoint is a decision, not a setting.</h2>
-        <p class="t-lead mx-auto mt-4">
-          The agent proposes. Your team reviews and either approves or sends it back. Nothing becomes the next
-          step's context until someone signs off.
+      <div class="mb-12 max-w-2xl">
+        <p class="t-eyebrow mb-3">Run it your way</p>
+        <h2 class="t-h2 text-balance">Your models. Your numbers. One human gate.</h2>
+        <p class="t-lead mt-4">
+          Run every agent on the model you choose — local at zero cost or hosted for depth — and keep the
+          whole run legible: seven checkpoints, three specialists, one decision-maker.
         </p>
       </div>
-      <div class="mx-auto max-w-3xl">
-        <div class="surface bg-card rounded-2xl p-4">
-        <div class="bg-card flow-canvas overflow-hidden rounded-xl border p-4 sm:p-6">
-        <svg
-          viewBox="0 0 760 240"
-          class="w-full"
-          font-family="ui-sans-serif, system-ui, -apple-system, sans-serif"
-          role="img"
-          aria-label="Approval loop: the agent proposes, your team reviews, and either approves or requests changes — which loops back to the agent."
-        >
-          <defs>
-            <marker id="tf-arw-b" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
-              <path d="M0,0 L6,3 L0,6 Z" fill="#2563eb"></path>
-            </marker>
-            <marker id="tf-arw-a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
-              <path d="M0,0 L6,3 L0,6 Z" fill="#b45309"></path>
-            </marker>
-          </defs>
-
-          {/* base : bords gris (toujours visibles) */}
-          <rect x="30" y="52" width="150" height="56" rx="12" fill="#ffffff" stroke="#e6e6e9"></rect>
-          <rect x="305" y="52" width="150" height="56" rx="12" fill="#ffffff" stroke="#e6e6e9"></rect>
-          <rect x="580" y="52" width="150" height="56" rx="12" fill="#ffffff" stroke="#e6e6e9"></rect>
-
-          {/* connecteurs pleins bleus — se DESSINENT une fois */}
-          <line x1="180" y1="80" x2="303" y2="80" stroke="#2563eb" stroke-width="2" style="--d: 0.15s" marker-end="url(#tf-arw-b)"></line>
-          <line x1="455" y1="80" x2="578" y2="80" stroke="#2563eb" stroke-width="2" style="--d: 1.05s" marker-end="url(#tf-arw-b)"></line>
-
-          {/* boucle « Request changes » (ambre) : Review → Propose */}
-          <path d="M380,110 C380,200 105,200 105,110" fill="none" stroke="#b45309" stroke-width="2" style="--d: 2.2s" marker-end="url(#tf-arw-a)"></path>
-          <text x="242" y="223" text-anchor="middle" fill="#b45309" font-size="11.5" font-weight="600">Request changes</text>
-
-          {/* bords bleus qui se remplissent quand le flow arrive */}
-          <rect style="--d: 0s" x="30" y="52" width="150" height="56" rx="12" fill="none" stroke="#2563eb" stroke-width="1.5"></rect>
-          <rect style="--d: 0.9s" x="305" y="52" width="150" height="56" rx="12" fill="none" stroke="#2563eb" stroke-width="1.5"></rect>
-          <rect style="--d: 1.8s" x="580" y="52" width="150" height="56" rx="12" fill="none" stroke="#2563eb" stroke-width="1.5"></rect>
-
-          {/* contenu des nœuds */}
-          <circle cx="52" cy="80" r="4" fill="#2563eb"></circle>
-          <text x="68" y="77" font-size="14" font-weight="600" fill="#1d1d1f">Propose</text>
-          <text x="68" y="94" font-size="10.5" fill="#6b7280">the agent</text>
-          <circle cx="327" cy="80" r="4" fill="#b45309"></circle>
-          <text x="343" y="77" font-size="14" font-weight="600" fill="#1d1d1f">Review</text>
-          <text x="343" y="94" font-size="10.5" fill="#6b7280">your team</text>
-          <circle cx="602" cy="80" r="4" fill="#059669"></circle>
-          <text x="618" y="77" font-size="14" font-weight="600" fill="#1d1d1f">Approve</text>
-          <text x="618" y="94" font-size="10.5" fill="#6b7280">human gate</text>
-        </svg>
+      <div class="-mx-6 grid grid-cols-1 gap-px border-y border-border bg-border sm:grid-cols-2 md:grid-cols-6 lg:-mx-10">
+        <div class="bg-card flex flex-col justify-center p-6 sm:p-7 md:col-span-2">
+          <div class="text-foreground font-display text-[40px] leading-none font-semibold tabular-nums">7</div>
+          <div class="text-foreground mt-3 text-[14px] font-semibold">Checkpoints</div>
+          <div class="text-muted-foreground text-[12.5px]">in a standard run</div>
         </div>
+        <div class="bg-card flex flex-col justify-center p-6 sm:p-7 md:col-span-2">
+          <div class="text-foreground font-display text-[40px] leading-none font-semibold tabular-nums">3</div>
+          <div class="text-foreground mt-3 text-[14px] font-semibold">Specialized agents</div>
+          <div class="text-muted-foreground text-[12.5px]">CPO · CTO · COO</div>
         </div>
-        <p class="text-muted-foreground mx-auto mt-6 max-w-md text-center text-[12.5px]">
-          Approved decisions become the context for the next step — nothing moves on its own.
-        </p>
-      </div>
-    </div>
-  </section>
-
-  {/* ───── Handoff : plan approuvé → agent de code (flux vertical animé) — fond VIDE ───── */}
-  <section class="bg-card border-b">
-    <div class="container-rail py-20 lg:py-28">
-      <div class="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
-        <div>
-          <p class="t-eyebrow mb-3">Handoff</p>
-          <h2 class="t-h2 text-balance">Approved plans go straight to your coding agent.</h2>
-          <p class="t-lead mt-4 max-w-xl">
-            Once a plan is signed off, TaskForce hands the full approved context to the coding agent you
-            already use — it builds, opens a pull request, and reports back into the run.
+        <div class="bg-card flex flex-col justify-center p-6 sm:p-7 md:col-span-2">
+          <div class="text-foreground font-display text-[40px] leading-none font-semibold tabular-nums">1</div>
+          <div class="text-foreground mt-3 text-[14px] font-semibold">Human gate</div>
+          <div class="text-muted-foreground text-[12.5px]">at every decision</div>
+        </div>
+        <div class="bg-card flex flex-col p-6 sm:p-7 md:col-span-4">
+          <div class="flex items-center justify-between gap-3">
+            <h3 class="t-h3">Your models, your call</h3>
+            <span class="text-muted-foreground/70 font-mono text-[9.5px] tracking-wide uppercase">Per run</span>
+          </div>
+          <p class="text-muted-foreground mt-2 text-[13.5px] leading-6">
+            Local through Ollama at zero model cost, or a hosted model when you want more depth.
           </p>
-        </div>
-        <div class="surface bg-card mx-auto w-full max-w-sm rounded-2xl p-4">
-          <div class="bg-card flow-canvas flex flex-col rounded-xl border p-5 sm:p-6">
-          {
-            HANDOFF.map((h, i) => (
-              <>
-                {i > 0 && (
-                  <svg width="2" height="26" class="mx-auto" aria-hidden>
-                    <line x1="1" y1="0" x2="1" y2="26" stroke="#2563eb" stroke-width="2" style={`--d: ${i * 0.9 - 0.75}s`} />
-                  </svg>
-                )}
-                <div class="surface bg-card flex items-center gap-3 rounded-xl p-3.5" style={`--d: ${i * 0.9}s`}>
-                  <span class="bg-secondary/60 flex size-9 shrink-0 items-center justify-center rounded-lg border">
-                    <h.icon className="text-foreground size-[18px]" strokeWidth={1.75} />
-                  </span>
-                  <div class="min-w-0">
-                    <div class="text-foreground text-[13.5px] font-semibold">{h.title}</div>
-                    <div class="text-muted-foreground text-[12px] leading-5">{h.sub}</div>
-                  </div>
-                </div>
-              </>
-            ))
-          }
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  {/* ───── Calibration : boucle predict → ship → measure → recalibrate (animée, loop) — fond VIDE ───── */}
-  <section class="bg-card border-b">
-    <div class="container-rail py-20 lg:py-28">
-      <div class="mx-auto mb-12 max-w-2xl text-center">
-        <div class="mb-3 flex items-center justify-center gap-2.5">
-          <p class="t-eyebrow">Predict &amp; recalibrate</p>
-          <span class="border-primary/30 bg-primary/5 text-primary inline-flex items-center rounded-full border px-2.5 py-0.5 font-mono text-[9.5px] font-semibold tracking-wide uppercase">
-            Coming next
-          </span>
-        </div>
-        <h2 class="t-h2 text-balance">It predicts, then checks itself.</h2>
-        <p class="t-lead mx-auto mt-4">
-          Each step forecasts effort, risk and cost. Once it ships, TaskForce compares the forecast with what
-          actually happened — so the next run starts better calibrated.
-        </p>
-      </div>
-      <div class="mx-auto max-w-4xl">
-        <div class="surface bg-card rounded-2xl p-4">
-        <div class="bg-card flow-canvas overflow-hidden rounded-xl border p-4 sm:p-6">
-        <svg
-          viewBox="0 0 940 210"
-          class="w-full"
-          font-family="ui-sans-serif, system-ui, -apple-system, sans-serif"
-          role="img"
-          aria-label="Calibration loop: predict, ship, measure, recalibrate — feeding the next run."
-        >
-          <defs>
-            <marker id="tf-arw-cal" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
-              <path d="M0,0 L6,3 L0,6 Z" fill="#2563eb"></path>
-            </marker>
-          </defs>
-          {/* base : bords gris (toujours visibles) */}
-          <rect x="20" y="40" width="160" height="60" rx="12" fill="#ffffff" stroke="#e6e6e9"></rect>
-          <rect x="266" y="40" width="160" height="60" rx="12" fill="#ffffff" stroke="#e6e6e9"></rect>
-          <rect x="512" y="40" width="160" height="60" rx="12" fill="#ffffff" stroke="#e6e6e9"></rect>
-          <rect x="758" y="40" width="160" height="60" rx="12" fill="#ffffff" stroke="#e6e6e9"></rect>
-
-          {/* connecteurs pleins bleus + boucle de retour — se DESSINENT une fois */}
-          <line x1="180" y1="70" x2="264" y2="70" stroke="#2563eb" stroke-width="2" style="--d: 0.15s" marker-end="url(#tf-arw-cal)"></line>
-          <line x1="426" y1="70" x2="510" y2="70" stroke="#2563eb" stroke-width="2" style="--d: 1.05s" marker-end="url(#tf-arw-cal)"></line>
-          <line x1="672" y1="70" x2="756" y2="70" stroke="#2563eb" stroke-width="2" style="--d: 1.95s" marker-end="url(#tf-arw-cal)"></line>
-          <path d="M838,100 C838,186 100,186 100,100" fill="none" stroke="#2563eb" stroke-width="2" style="--d: 3s" marker-end="url(#tf-arw-cal)"></path>
-          <text x="469" y="205" text-anchor="middle" fill="#2563eb" font-size="11.5" font-weight="600">the next run starts better calibrated</text>
-
-          {/* bords bleus qui se remplissent quand le flow arrive */}
-          <rect style="--d: 0s" x="20" y="40" width="160" height="60" rx="12" fill="none" stroke="#2563eb" stroke-width="1.5"></rect>
-          <rect style="--d: 0.9s" x="266" y="40" width="160" height="60" rx="12" fill="none" stroke="#2563eb" stroke-width="1.5"></rect>
-          <rect style="--d: 1.8s" x="512" y="40" width="160" height="60" rx="12" fill="none" stroke="#2563eb" stroke-width="1.5"></rect>
-          <rect style="--d: 2.7s" x="758" y="40" width="160" height="60" rx="12" fill="none" stroke="#2563eb" stroke-width="1.5"></rect>
-
-          {/* contenu des nœuds */}
-          <circle cx="42" cy="70" r="4" fill="#2563eb"></circle>
-          <text x="58" y="66" font-size="14" font-weight="600" fill="#1d1d1f">Predict</text>
-          <text x="58" y="84" font-size="10.5" fill="#6b7280">effort · risk · cost</text>
-          <circle cx="288" cy="70" r="4" fill="#64748b"></circle>
-          <text x="304" y="66" font-size="14" font-weight="600" fill="#1d1d1f">Ship</text>
-          <text x="304" y="84" font-size="10.5" fill="#6b7280">the step goes live</text>
-          <circle cx="534" cy="70" r="4" fill="#b45309"></circle>
-          <text x="550" y="66" font-size="14" font-weight="600" fill="#1d1d1f">Measure</text>
-          <text x="550" y="84" font-size="10.5" fill="#6b7280">actual vs forecast</text>
-          <circle cx="780" cy="70" r="4" fill="#059669"></circle>
-          <text x="796" y="66" font-size="14" font-weight="600" fill="#1d1d1f">Recalibrate</text>
-          <text x="796" y="84" font-size="10.5" fill="#6b7280">improves the next run</text>
-        </svg>
-        </div>
-        </div>
-        <div class="surface bg-card mx-auto mt-8 max-w-md rounded-xl p-4">
-          <div class="text-muted-foreground mb-2 flex items-center justify-between text-[9.5px] font-semibold tracking-wide uppercase">
-            <span>Sample checkpoint</span>
-            <span>Predicted → Actual</span>
-          </div>
-          {
-            CALIB.map((r) => (
-              <div class="flex items-center justify-between gap-3 border-b py-2 text-[12px] last:border-0">
-                <span class="text-foreground font-medium">{r.m}</span>
-                <span class="text-muted-foreground font-mono tabular-nums">
-                  {r.p} <span class="text-muted-foreground/40">→</span>{" "}
-                  <span class:list={["font-medium", r.ok ? "text-foreground" : "text-amber-700"]}>{r.a}</span>
+          <div class="mt-6 grid flex-1 content-end gap-3 sm:grid-cols-2">
+            <div class="bg-card flex items-center justify-between border px-4 py-3.5">
+              <div class="flex items-center gap-3">
+                <span class="ic-tile flex size-9 items-center justify-center rounded-lg border" style={`--ic:${hueFor(Server)}`}>
+                  <Server className="size-[18px]" strokeWidth={1.75} />
                 </span>
+                <div>
+                  <div class="text-foreground text-[13.5px] font-semibold">Local · Ollama</div>
+                  <div class="text-muted-foreground text-[12px]">on your hardware</div>
+                </div>
               </div>
-            ))
-          }
+              <span class="border-primary/30 bg-primary/5 text-primary rounded-full border px-2.5 py-0.5 text-[11px] font-semibold">$0 / run</span>
+            </div>
+            <div class="bg-card flex items-center justify-between border px-4 py-3.5">
+              <div class="flex items-center gap-3">
+                <span class="ic-tile flex size-9 items-center justify-center rounded-lg border" style={`--ic:${hueFor(Cloud)}`}>
+                  <Cloud className="size-[18px]" strokeWidth={1.75} />
+                </span>
+                <div>
+                  <div class="text-foreground text-[13.5px] font-semibold">Hosted model</div>
+                  <div class="text-muted-foreground text-[12px]">when you want depth</div>
+                </div>
+              </div>
+              <span class="text-muted-foreground/70 font-mono text-[10px] tracking-wide uppercase">Optional</span>
+            </div>
+          </div>
+        </div>
+        <div class="bg-primary/[0.04] flex flex-col justify-center p-6 sm:p-7 md:col-span-2">
+          <div class="text-primary font-display text-[40px] leading-none font-semibold tabular-nums">$0</div>
+          <div class="text-foreground mt-3 text-[14px] font-semibold">Model cost</div>
+          <div class="text-muted-foreground text-[12.5px]">local via Ollama today</div>
         </div>
       </div>
     </div>
   </section>
-
-  {/* ───── Vos modèles — compact — fond VIDE ───── */}
-  <section class="bg-card border-b">
-    <div class="container-rail py-16 lg:py-20">
-      <div class="grid items-center gap-8 lg:grid-cols-2 lg:gap-16">
-        <div>
-          <p class="t-eyebrow mb-3">Your models</p>
-          <h2 class="t-h2 text-balance">Run it on your models — local or hosted.</h2>
-          <p class="t-lead mt-4 max-w-lg">
-            Local through Ollama at zero model cost, or a hosted model when you want more depth — your call,
-            per run.
-          </p>
-        </div>
-        <div class="grid gap-3">
-          <div class="surface bg-card flex items-center justify-between rounded-xl px-4 py-3.5">
-            <div class="flex items-center gap-3">
-              <span class="bg-secondary/60 flex size-9 items-center justify-center rounded-lg border">
-                <Server className="text-foreground size-[18px]" strokeWidth={1.75} />
-              </span>
-              <div>
-                <div class="text-foreground text-[13.5px] font-semibold">Local · Ollama</div>
-                <div class="text-muted-foreground text-[12px]">on your hardware</div>
-              </div>
-            </div>
-            <span class="border-primary/30 bg-primary/5 text-primary rounded-full border px-2.5 py-0.5 text-[11px] font-semibold">$0 / run</span>
-          </div>
-          <div class="surface bg-card flex items-center justify-between rounded-xl px-4 py-3.5">
-            <div class="flex items-center gap-3">
-              <span class="bg-secondary/60 flex size-9 items-center justify-center rounded-lg border">
-                <Cloud className="text-foreground size-[18px]" strokeWidth={1.75} />
-              </span>
-              <div>
-                <div class="text-foreground text-[13.5px] font-semibold">Hosted model</div>
-                <div class="text-muted-foreground text-[12px]">when you want depth</div>
-              </div>
-            </div>
-            <span class="text-muted-foreground/70 font-mono text-[10px] tracking-wide uppercase">Optional</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  {/* ───── Preuve — fond VIDE (blanc) ───── */}
-  <StatBand stats={STATS} bg="card" />
 
   {/* ───── Le moat — fond VIDE (blanc), gros énoncé + colonnes à filets ───── */}
   <section class="bg-card border-b">
@@ -458,7 +303,7 @@ const STATS = [
         {
           PRINCIPLES.map((p, i) => (
             <div class:list={["px-5 sm:px-7", i > 0 && "sm:border-l"]}>
-              <p.icon className="text-foreground size-5" strokeWidth={1.6} />
+              <p.icon className="size-5" strokeWidth={1.6} style={{ color: hueFor(p.icon) }} />
               <h3 class="text-foreground mt-4 text-[14px] font-semibold">{p.title}</h3>
               <p class="text-muted-foreground mt-1.5 text-[12.5px] leading-5">{p.desc}</p>
             </div>

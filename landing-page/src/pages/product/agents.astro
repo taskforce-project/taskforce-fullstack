@@ -2,7 +2,10 @@
 import BaseLayout from "@/layouts/BaseLayout.astro";
 import PageHero from "@/components/site/PageHero.astro";
 import PageCta from "@/components/site/PageCta.astro";
-import { Compass, Building2, CalendarClock, BrainCircuit, Boxes, ShieldCheck, SlidersHorizontal, Search, PenLine, Plug, ArrowRight } from "lucide-react";
+import { AgentsFlow } from "@/components/site/flows/OrchestrationFlows";
+import { MemorySearchDemo, TakeNotesDemo, ConnectedToolsDemo } from "@/components/site/illustrations/AgentToolDemos";
+import { Compass, Building2, CalendarClock, BrainCircuit, Boxes, ShieldCheck, SlidersHorizontal, Search, PenLine, Plug } from "lucide-react";
+import { hueFor } from "@/lib/site-icons";
 import { APP_URL } from "@/components/site/nav";
 
 /* Les 3 rôles — mêmes que la page Orchestration (road_to_v2/Agents_C_Level.md). Direction Planned. */
@@ -47,12 +50,6 @@ const RULES = [
   { icon: SlidersHorizontal, title: "Your models", desc: "Local through Ollama at zero model cost, or hosted — your call, fast or deep per run." },
 ];
 
-/* Comment les 3 rôles s'enchaînent dans un run — chacun produit un artefact, gate humaine à chaque pas. */
-const RUN_ROLES = [
-  { code: "CPO", owns: "the what", items: "Framing · Spec · Acceptance criteria", box: "border-violet-200 bg-violet-50 text-violet-700" },
-  { code: "CTO", owns: "the how", items: "Architecture · APIs · Trade-offs · Risk", box: "border-blue-200 bg-blue-50 text-blue-700" },
-  { code: "COO", owns: "the when & risk", items: "Sequencing · Dependencies · Milestones", box: "border-amber-200 bg-amber-50 text-amber-700" },
-];
 ---
 
 <BaseLayout
@@ -69,7 +66,7 @@ const RUN_ROLES = [
   />
 
   {/* ── The team (Planned) ── */}
-  <section class="bg-secondary border-b">
+  <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-28">
       <div class="max-w-2xl">
         <p class="t-eyebrow mb-3">The team</p>
@@ -79,14 +76,12 @@ const RUN_ROLES = [
           be an expert at everything, and no single agent gets the final say.
         </p>
       </div>
-      <div class="mt-12 grid gap-6 lg:grid-cols-3">
+      <div class="-mx-6 mt-12 grid grid-cols-1 gap-px border-y border-border bg-border sm:grid-cols-3 lg:-mx-10">
         {
           TEAM.map((a) => (
-            <div class="flex flex-col rounded-2xl border bg-card p-6">
+            <div class="bg-card flex flex-col p-6 sm:p-8">
               <div class="flex items-center gap-3">
-                <span class:list={["bg-card flex size-11 items-center justify-center rounded-xl border ring-1", a.box]}>
-                  <a.icon className="size-5" strokeWidth={1.75} />
-                </span>
+                <a.icon className="size-7 shrink-0" strokeWidth={1.75} style={{ color: hueFor(a.icon) }} />
                 <div>
                   <p class="text-[16px] font-semibold text-foreground">{a.code}</p>
                   <p class="text-muted-foreground text-[12px] italic">{a.owns}</p>
@@ -103,59 +98,33 @@ const RUN_ROLES = [
     </div>
   </section>
 
-  {/* ── One run, three perspectives : l'orchestration ENTRE les rôles ── */}
-  <section class="bg-card border-b">
+  {/* ── One run, three perspectives : texte | flux vertical (React Flow) à droite, fond à points (template hero) ── */}
+  <section class="bg-card bg-dots border-b">
     <div class="container-rail py-20 lg:py-28">
-      <div class="max-w-2xl">
-        <p class="t-eyebrow mb-3">Orchestration</p>
-        <h2 class="t-h2">One run, three perspectives</h2>
-        <p class="t-lead mt-4">
-          Each role produces an artifact — a spec, an approach, a breakdown — and hands it to the next
-          only after a human approves it. Three perspectives, one accountable chain.
-        </p>
-      </div>
-
-      <div class="mt-12 overflow-x-auto pb-2">
-        <div class="flex min-w-max items-stretch gap-2.5">
-          <span class="bg-secondary text-muted-foreground flex items-center rounded-xl border px-4 text-[13px] font-medium">
-            Outcome
-          </span>
-          {
-            RUN_ROLES.map((r) => (
-              <Fragment>
-                <span class="text-muted-foreground/45 flex items-center">
-                  <ArrowRight className="size-4" />
-                </span>
-                <div class:list={["flex w-[176px] shrink-0 flex-col rounded-xl border p-3.5", r.box]}>
-                  <span class="text-[14px] font-semibold">{r.code}</span>
-                  <span class="text-[11px] italic opacity-80">{r.owns}</span>
-                  <span class="mt-2 text-[11px] leading-5 opacity-90">{r.items}</span>
-                </div>
-              </Fragment>
-            ))
-          }
-          <span class="text-muted-foreground/45 flex items-center">
-            <ArrowRight className="size-4" />
-          </span>
-          <span class="border-primary/30 bg-primary/10 text-primary flex items-center rounded-xl border px-4 text-center text-[13px] font-medium">
-            Human approval
-          </span>
-          <span class="text-muted-foreground/45 flex items-center">
-            <ArrowRight className="size-4" />
-          </span>
-          <span class="bg-secondary text-muted-foreground flex items-center rounded-xl border px-4 text-[13px] font-medium">
-            Delivery
-          </span>
+      <div class="grid items-center gap-12 lg:grid-cols-[minmax(0,460px)_minmax(0,1fr)] lg:gap-16">
+        <div>
+          <p class="t-eyebrow mb-3">Orchestration</p>
+          <h2 class="t-h2">One run, three perspectives</h2>
+          <p class="t-lead mt-4 max-w-xl">
+            Each role produces an artifact — a spec, an approach, a breakdown — and hands it to the next
+            only after a human approves it. Three perspectives, one accountable chain.
+          </p>
+          <p class="text-muted-foreground mt-6 flex items-center gap-2 text-[13px]">
+            <ShieldCheck className="size-4 shrink-0" strokeWidth={2} style={{ color: hueFor(ShieldCheck) }} />
+            A human approves at every checkpoint — no role hands off on its own.
+          </p>
+        </div>
+        <div class="lg:pl-4">
+          <div class="relative mx-auto w-full max-w-[320px]" style="aspect-ratio: 320 / 500">
+            <AgentsFlow client:only="react" />
+          </div>
         </div>
       </div>
-      <p class="text-muted-foreground mt-4 text-[12.5px]">
-        A human approves at every checkpoint — no role hands off on its own.
-      </p>
     </div>
   </section>
 
   {/* ── What's real today ── */}
-  <section class="bg-secondary border-b">
+  <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-28">
       <div class="max-w-2xl">
         <p class="t-eyebrow mb-3">What's real today</p>
@@ -166,14 +135,17 @@ const RUN_ROLES = [
           hands consequential actions to a human.
         </p>
       </div>
-      <div class="mt-12 grid gap-6 lg:grid-cols-3">
+      <div class="-mx-6 mt-12 grid grid-cols-1 gap-px border-y border-border bg-border sm:grid-cols-3 lg:-mx-10">
         {
-          TOOLS.map((t) => (
-            <div class="rounded-2xl border bg-card p-6">
-              <span class="bg-card text-foreground flex size-11 items-center justify-center rounded-xl border">
-                <t.icon className="size-5" strokeWidth={1.75} />
-              </span>
-              <h3 class="mt-4 text-[16px] font-semibold text-foreground">{t.title}</h3>
+          TOOLS.map((t, i) => (
+            <div class="bg-card flex flex-col p-6 sm:p-8">
+              {i === 0 && <MemorySearchDemo client:visible />}
+              {i === 1 && <TakeNotesDemo client:visible />}
+              {i === 2 && <ConnectedToolsDemo client:visible />}
+              <div class="mt-5 flex items-center gap-2.5">
+                <t.icon className="size-5 shrink-0" strokeWidth={1.75} style={{ color: hueFor(t.icon) }} />
+                <h3 class="text-[16px] font-semibold text-foreground">{t.title}</h3>
+              </div>
               <p class="text-muted-foreground mt-2 text-[13.5px] leading-6">{t.text}</p>
             </div>
           ))
@@ -201,11 +173,11 @@ const RUN_ROLES = [
           specialized team as it lands — works to the same rules.
         </p>
       </div>
-      <div class="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <div class="-mx-6 mt-12 grid grid-cols-1 gap-px border-y border-border bg-border sm:grid-cols-2 lg:grid-cols-4 lg:-mx-10">
         {
           RULES.map((r) => (
-            <div class="rounded-2xl border bg-card p-5">
-              <span class="bg-secondary/60 text-foreground flex size-10 items-center justify-center rounded-lg border">
+            <div class="bg-card flex flex-col p-6 sm:p-8">
+              <span class="ic-tile flex size-10 items-center justify-center rounded-lg border" style={`--ic:${hueFor(r.icon)}`}>
                 <r.icon className="size-5" strokeWidth={1.75} />
               </span>
               <h3 class="mt-4 text-[15px] font-semibold text-foreground">{r.title}</h3>
