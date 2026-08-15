@@ -10,6 +10,7 @@ import { SectionCard } from "@/components/ui/section-card"
 import { ProjectIcon } from "@/components/ui/project-icon"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useProjectStore } from "@/lib/store/project-store"
+import { useCreateProjectStore } from "@/lib/store/create-project-store"
 import { listMyIssuesQuiet } from "@/lib/api/dashboard-card-service"
 import type { Issue } from "@/lib/api/issue-service"
 import { listNotifications, type NotificationResponse } from "@/lib/api/notification-service"
@@ -45,6 +46,7 @@ const ROW_CLASS =
 function OperationsColumn() {
   const projects = useProjectStore((s) => s.projects)
   const isLoading = useProjectStore((s) => s.isLoading)
+  const openCreateProject = useCreateProjectStore((s) => s.openCreateProject)
 
   // Actives d'abord, archivées exclues — la page complète reste à un clic (en-tête).
   const rows = projects
@@ -66,18 +68,19 @@ function OperationsColumn() {
               <span className="shrink-0 font-mono text-[11px] uppercase text-muted-foreground">{p.identifier}</span>
             </Link>
           ))}
-          {/* Tuile fantôme : `?new=1` ouvre le modal de création côté page Opérations (PROD-8.7). */}
+          {/* Tuile fantôme : ouvre le modal GLOBAL de création en place (plus de navigation `?new=1`). */}
           <div className="mt-auto p-2">
             {/* `text-muted-foreground` sans le modificateur `/70` : l'opacité faisait tomber le
                 contraste sous le seuil WCAG AA (audit axe-core du 22/07). La couleur reste
                 discrète sans être illisible. */}
-            <Link
-              href="./projects?new=1"
+            <button
+              type="button"
+              onClick={openCreateProject}
               data-tour="create-operation"
-              className="flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-border py-2 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-muted/30 hover:text-primary"
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border py-2 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-muted/30 hover:text-primary"
             >
               <Plus className="size-3.5" /> Créer une opération
-            </Link>
+            </button>
           </div>
         </div>
       )}

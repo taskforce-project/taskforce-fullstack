@@ -125,11 +125,13 @@ export function InboxView({ defaultTab = "all" }: InboxViewProps) {
     else if (s.operationUrl) router.push(s.operationUrl) // repli : au moins le contexte projet
   }
 
-  // Bouton « ↗ » : sortie explicite vers la page pleine (seul chemin qui quitte la liste).
+  // Bouton « ↗ » : sortie explicite vers le board avec le sheet ouvert (`?issue=`) — la page pleine
+  // a été retirée (redondante avec le sheet). Reste le seul chemin qui QUITTE la liste de triage.
   function openSignalFullPage(s: Signal) {
     if (slug) markAsRead(slug, s.id)
-    const destination = s.issueUrl || s.operationUrl
-    if (destination) router.push(destination)
+    const target = parseIssueTarget(s.issueUrl)
+    if (target) { router.push(`/${slug}/projects/${target.projectId}?issue=${target.issueId}`); return }
+    if (s.operationUrl) router.push(s.operationUrl) // repli : au moins le contexte projet
   }
 
   // Colonnes construites dans le composant : les actions (Ack/Open) ont besoin des handlers du store.

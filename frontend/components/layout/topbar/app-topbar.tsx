@@ -155,9 +155,8 @@ export function AppTopbar() {
     <header
       className={cn(
         "sticky top-0 z-40 flex h-14 shrink-0 items-center gap-2 border-b px-4 transition-colors",
-        isLab
-          ? "border-blue-300 bg-blue-100 dark:border-blue-900/60 dark:bg-blue-950/50"
-          : "border-border bg-background",
+        // Pages Labs : le bandeau prend l'image du site (hero-wave) sous un voile lisible, plus la teinte bleue.
+        isLab ? "lab-banner-bg border-border" : "border-border bg-background",
       )}
     >
       {/* Left: sidebar trigger + breadcrumb */}
@@ -192,14 +191,14 @@ export function AppTopbar() {
       {/* Indicateur « Lab » centré dans le header (feature en expérimentation). */}
       {isLab && (
         <div className="pointer-events-none absolute left-1/2 flex -translate-x-1/2 items-center gap-2">
-          {/* Violet : le bleu porte les actions primaires, un marqueur d'état doit s'en distinguer. */}
-          <span className="flex items-center gap-1.5 rounded-full bg-violet-200/70 px-2.5 py-0.5 text-[11px] font-medium text-violet-800 dark:bg-violet-900/60 dark:text-violet-200">
-            <FlaskConical className="size-3.5" />
-            Expérimentation
+          {/* Identité Labs alignée sur le site : flask + label en dégradé (pêche→rose→bleu), pilule neutre. */}
+          <span className="flex items-center gap-1.5 rounded-full border border-border bg-background/80 px-2.5 py-0.5 text-[11px] font-semibold backdrop-blur">
+            <FlaskConical className="tf-labs-icon size-3.5" strokeWidth={2} />
+            <span className="tf-labs-gtext">Expérimentation</span>
           </span>
           <a
             href="mailto:feedback@taskforce.dev?subject=Feedback"
-            className="pointer-events-auto hidden text-[11px] font-medium text-violet-700 underline-offset-2 hover:underline md:inline dark:text-violet-300"
+            className="pointer-events-auto hidden text-[11px] font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline md:inline"
           >
             Donner mon feedback
           </a>

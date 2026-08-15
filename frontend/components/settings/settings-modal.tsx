@@ -1,7 +1,5 @@
 "use client"
 
-import { Settings2 } from "lucide-react"
-
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { useSettingsStore } from "@/lib/store/settings-store"
 import {
@@ -29,17 +27,14 @@ export function SettingsModal() {
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) closeSettings() }}>
       <DialogContent
-        className="max-w-4xl sm:max-w-4xl w-[93vw] h-[82vh] gap-0 overflow-hidden p-0 sm:rounded-2xl"
+        className="max-w-5xl sm:max-w-5xl w-[94vw] h-[84vh] gap-0 overflow-hidden p-0 sm:rounded-2xl"
       >
         <DialogTitle className="sr-only">Réglages</DialogTitle>
         {/* min-w-0 : DialogContent est en display:grid ; sans lui, ce grid-item flex gonfle à la
             largeur min-content de son contenu (ex. catalogue d'intégrations) et déborde/coupe à droite. */}
         <div className="flex h-full min-h-0 min-w-0">
-          {/* Navigation latérale */}
+          {/* Navigation latérale — la recherche (dans SettingsNav) tient lieu d'en-tête. */}
           <aside className="hidden w-56 shrink-0 flex-col overflow-y-auto border-r bg-muted/30 p-4 sm:flex">
-            <div className="mb-4 flex items-center gap-2 px-3 text-sm font-semibold">
-              <Settings2 className="size-4 text-muted-foreground" /> Réglages
-            </div>
             <SettingsNav active={active} onSelect={setSection} />
           </aside>
 

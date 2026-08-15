@@ -1,23 +1,21 @@
 "use client"
 
-import { Sparkles, ArrowRight } from "lucide-react"
+import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
 import { useUpgradeStore } from "@/lib/store/upgrade-store"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 
 /**
- * Modal d'upgrade léger — monté une fois globalement (AppShell), piloté par `useUpgradeStore`.
- * Renvoie vers la page **Facturation** (grille complète des 4 forfaits) plutôt que de dupliquer
- * les cartes dans un dialogue étroit.
+ * Pont « upgrade » — monté une fois globalement (AppShell), piloté par `useUpgradeStore`.
+ *
+ * <p>Historiquement un petit modal intermédiaire ; désormais une <b>redirection directe</b> vers la page
+ * <b>Facturation</b> (grille complète des 4 forfaits). Motif (retour user) : cliquer « abonnement / améliorer »
+ * ne doit pas ouvrir une pop-up, mais envoyer <b>directement sur les plans</b>. Comme tous les CTA d'upgrade
+ * de l'app appellent `openUpgrade()` (menu compte, switcher de workspace, conso Cortex, membres, analytics…),
+ * centraliser la redirection ici les couvre <b>tous</b> d'un coup, sans toucher chaque appelant.</p>
+ *
+ * <p>Ne rend rien : dès que le store passe {@code open=true}, on referme (reset) et on navigue.</p>
  */
 export function UpgradeDialog() {
   const open = useUpgradeStore((s) => s.open)
@@ -25,31 +23,11 @@ export function UpgradeDialog() {
   const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug)
   const router = useRouter()
 
-  function seePlans() {
-    closeUpgrade()
+  useEffect(() => {
+    if (!open) return
+    closeUpgrade() // reset immédiat du drapeau (évite de re-déclencher au prochain rendu)
     if (slug) router.push(`/${slug}/billing`)
-  }
+  }, [open, slug, closeUpgrade, router])
 
-  return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) closeUpgrade() }}>
-      <DialogContent className="max-w-md">
-        <DialogHeader className="items-center text-center">
-          <div className="mx-auto mb-1 flex size-11 items-center justify-center rounded-full bg-primary/10">
-            <Sparkles className="size-5 text-primary" />
-          </div>
-          <DialogTitle className="text-xl">Passez à la vitesse supérieure</DialogTitle>
-          <DialogDescription>
-            Débloquez plus de workspaces, l&apos;analytics avancée, les décisions IA et davantage de tokens Cortex.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="mt-2 flex flex-col gap-2">
-          <Button className="w-full gap-1.5" onClick={seePlans}>
-            Voir les forfaits <ArrowRight className="size-4" />
-          </Button>
-          <Button variant="ghost" className="w-full" onClick={closeUpgrade}>Plus tard</Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
+  return null
 }

@@ -26,6 +26,7 @@ import { useAuth } from "@/lib/contexts/auth-context"
 import { useTranslation } from "@/lib/i18n"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { useSettingsStore } from "@/lib/store/settings-store"
+import { useCreateProjectStore } from "@/lib/store/create-project-store"
 import {
   Sidebar,
   SidebarContent,
@@ -158,6 +159,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname()
   const activeWorkspace = useWorkspaceStore((s) => s.activeWorkspace)
   const openSettings = useSettingsStore((s) => s.openSettings)
+  const openCreateProject = useCreateProjectStore((s) => s.openCreateProject)
   const { state, isMobile } = useSidebar()
   const slug = activeWorkspace?.slug ?? ""
 
@@ -291,8 +293,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <span>{t(item.key)}</span>
             {item.lab && (
               <FlaskConical
-                /* Violet : le bleu est réservé aux actions primaires (cf. `--primary`). */
-                className="ml-auto size-3.5 shrink-0 text-violet-500 group-data-[collapsible=icon]:hidden"
+                /* Identité Labs alignée sur le site : le TRAIT prend le dégradé (pêche→rose→bleu),
+                   plus de violet plat. Cf. `.tf-labs-icon` + <LabsGradientDefs/>. */
+                className="tf-labs-icon ml-auto size-3.5 shrink-0 group-data-[collapsible=icon]:hidden"
+                strokeWidth={2}
                 aria-label="Fonctionnalité en cours de finition"
               />
             )}
@@ -341,11 +345,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarGroup className="group-data-[collapsible=icon]:hidden mt-auto">
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild className="text-muted-foreground">
-                <Link href={`/${activeWorkspace?.slug}/projects?new=1`}>
-                  <Plus className="size-4" />
-                  <span>{t("nav.createProject")}</span>
-                </Link>
+              {/* Ouvre le modal GLOBAL en place (plus de navigation `?new=1` qui faisait clignoter le modal). */}
+              <SidebarMenuButton onClick={openCreateProject} className="text-muted-foreground">
+                <Plus className="size-4" />
+                <span>{t("nav.createProject")}</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>

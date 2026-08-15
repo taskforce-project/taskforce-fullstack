@@ -169,7 +169,7 @@ export function ProjectTeamsSection({ workspace, projectId }: ProjectTeamsSectio
       </div>
 
       {/* Créer une équipe */}
-      <div className="flex items-center gap-2 rounded-xl border border-border bg-card p-3 [box-shadow:var(--shadow-sm)]">
+      <div className="flex items-center gap-2 rounded-xl border border-border bg-card p-3 shadow-sm">
         <Users className="size-4 shrink-0 text-muted-foreground" />
         <Input
           value={newName}
@@ -205,7 +205,7 @@ export function ProjectTeamsSection({ workspace, projectId }: ProjectTeamsSectio
               <div
                 key={team.id}
                 className={cn(
-                  "rounded-xl border bg-card overflow-hidden [box-shadow:var(--shadow-sm)] transition-colors",
+                  "rounded-xl border bg-card overflow-hidden shadow-sm transition-colors",
                   isLinked ? "border-primary/30" : "border-border hover:border-foreground/15"
                 )}
               >

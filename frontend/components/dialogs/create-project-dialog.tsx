@@ -1,11 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import {
-  Plus,
-  FolderKanban,
-  Loader2,
-} from "lucide-react"
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { FolderKanban, Loader2 } from "lucide-react"
+import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -16,46 +14,33 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import { ProjectIconPicker } from "@/components/ui/project-icon-picker"
 import { ColorPalettePicker, PROJECT_COLORS } from "@/components/ui/color-palette-picker"
 import { ProjectVisibilityPicker } from "@/components/ui/project-visibility-picker"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { useProjectStore } from "@/lib/store/project-store"
-import type { Project } from "@/lib/api/project-service"
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 interface CreateProjectDialogProps {
-  readonly children?: React.ReactNode
-  readonly onCreated?: (project: Project) => void
-  /** Ouvre le modal d'emblée (ex : arrivée via « New project » de la sidebar — PROD-8.7). */
-  readonly defaultOpen?: boolean
-  /** Notifie chaque changement d'état — permet à l'appelant de nettoyer l'URL à la fermeture. */
-  readonly onOpenChange?: (open: boolean) => void
+  /** Contrôlé : ouvert/fermé piloté par l'appelant (le modal est global, cf. `useCreateProjectStore`). */
+  readonly open: boolean
+  readonly onOpenChange: (open: boolean) => void
 }
 
 // ---------------------------------------------------------------------------
-// CreateProjectDialog
+// CreateProjectDialog — contrôlé, sans trigger (ouvert « en place » par le store global)
 // ---------------------------------------------------------------------------
 
-export function CreateProjectDialog({ children, onCreated, defaultOpen = false, onOpenChange }: CreateProjectDialogProps) {
+export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogProps) {
+  const router = useRouter()
   const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug)
   const createProject = useProjectStore((s) => s.createProject)
 
-  const [open, setOpen] = useState(defaultOpen)
   const [isLoading, setIsLoading] = useState(false)
-
-  // `defaultOpen` vient d'un paramètre d'URL (`?new=1`). Or `useState` ne lit sa valeur initiale
-  // qu'au PREMIER rendu : si l'utilisateur est déjà sur la page Opérations et clique « New Project »,
-  // la navigation ne remonte pas le composant, la prop passait de `false` à `true` sans effet, et
-  // le modal ne s'ouvrait jamais — le clic semblait ne rien faire. On suit donc les passages à vrai.
-  useEffect(() => {
-    if (defaultOpen) setOpen(true)
-  }, [defaultOpen])
   const [name, setName] = useState("")
   const [identifier, setIdentifier] = useState("")
   const [description, setDescription] = useState("")
@@ -72,6 +57,21 @@ export function CreateProjectDialog({ children, onCreated, defaultOpen = false, 
     }
   }
 
+  function resetForm() {
+    setName("")
+    setIdentifier("")
+    setDescription("")
+    setIconUrl(null)
+    setColor(PROJECT_COLORS[0])
+    setIsPublic(false)
+  }
+
+  /** Point de passage unique : prévient l'appelant (store) et réinitialise le formulaire à la fermeture. */
+  function changeOpen(next: boolean) {
+    onOpenChange(next)
+    if (!next) resetForm()
+  }
+
   async function handleCreate() {
     if (!name.trim() || !identifier.trim() || !slug) return
     setIsLoading(true)
@@ -85,47 +85,21 @@ export function CreateProjectDialog({ children, onCreated, defaultOpen = false, 
         isPublic,
       })
       if (project) {
-        onCreated?.(project)
-        changeOpen(false) // passe par le point unique : réinitialise ET prévient l'appelant
+        toast.success(`Projet « ${project.name} » créé`)
+        changeOpen(false)
+        router.push(`/${slug}/projects/${project.id}`)
+      } else {
+        toast.error("Impossible de créer le projet")
       }
+    } catch {
+      toast.error("Une erreur est survenue lors de la création du projet")
     } finally {
       setIsLoading(false)
     }
   }
 
-  /**
-   * Point de passage UNIQUE pour ouvrir/fermer.
-   *
-   * Le bouton « Cancel » et la création appelaient `setOpen(false)` en direct, ce qui
-   * court-circuitait `onOpenChange` : l'appelant n'était jamais prévenu de la fermeture, et le
-   * paramètre `?new=1` restait collé dans l'URL — bloquant toute réouverture ultérieure.
-   */
-  function changeOpen(next: boolean) {
-    setOpen(next)
-    onOpenChange?.(next)
-    if (!next) resetForm()
-  }
-
-  function resetForm() {
-    setName("")
-    setIdentifier("")
-    setDescription("")
-    setIconUrl(null)
-    setColor(PROJECT_COLORS[0])
-    setIsPublic(false)
-  }
-
   return (
     <Dialog open={open} onOpenChange={changeOpen}>
-      <DialogTrigger asChild>
-        {children ?? (
-          <Button size="sm" className="gap-2">
-            <Plus className="size-4" />
-            New project
-          </Button>
-        )}
-      </DialogTrigger>
-
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Create project</DialogTitle>

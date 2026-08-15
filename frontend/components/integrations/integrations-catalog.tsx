@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo } from "react"
-import { Info, Loader2, ExternalLink, Check, Plug, Search } from "lucide-react"
+import { Info, Loader2, ExternalLink, Check, Plug, Search, ChevronLeft, Globe, BookOpen } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog"
-import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip"
+import { TooltipProvider } from "@/components/ui/tooltip"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { BrandLogo } from "@/components/ui/brand-logo"
 import { LabBanner } from "@/components/layout/lab-banner"
@@ -22,8 +22,21 @@ import {
   type IntegrationCatalog, type ConnectorView, type PlaneProject, type PlaneStatus,
 } from "@/lib/api/integration-service"
 
-const CAP_LABEL: Record<string, string> = { observe: "Observe", act: "Agit", metrics: "Métriques" }
+const CAP_LABEL: Record<string, string> = { observe: "Observe", act: "Agit", metrics: "Métriques", recommend: "Composants" }
+const CAP_DESC: Record<string, string> = {
+  observe: "Alimente le Brain OS avec les données du service (lecture).",
+  act: "Peut agir dans le service depuis TaskForce (écriture).",
+  metrics: "Remonte des métriques et indicateurs.",
+  recommend: "Recommandations de composants par Cortex (à venir).",
+}
 const AUTH_LABEL: Record<string, string> = { OAUTH2: "OAuth", API_KEY: "Clé API", TOKEN: "Token", CONFIG: "Config", NONE: "Sans auth" }
+const AUTH_HELP: Record<string, string> = {
+  OAUTH2: "Connexion via OAuth (redirection vers le service).",
+  API_KEY: "Connexion par clé API.",
+  TOKEN: "Connexion par token d'accès personnel.",
+  CONFIG: "Connexion par endpoint + identifiants.",
+  NONE: "Aucune authentification requise.",
+}
 
 /** Puce de filtre par catégorie (façon marketplace). */
 function CatPill({ active, onClick, children }: Readonly<{ active: boolean; onClick: () => void; children: React.ReactNode }>) {
@@ -49,6 +62,8 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [dialogTool, setDialogTool] = useState<ConnectorView | null>(null)
+  // Connecteur affiché en fiche détaillée (clic sur une carte). null = grille.
+  const [detailTool, setDetailTool] = useState<ConnectorView | null>(null)
   const [query, setQuery] = useState("")
   const [activeCat, setActiveCat] = useState<string>("all")
   const { connectGitHub, connectSlack } = useIntegrationStore()
@@ -57,7 +72,14 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
     setLoading(true)
     setError(false)
     getIntegrationCatalog(slug)
-      .then((c) => { setCatalog(c); setError(false) })
+      .then((c) => {
+        setCatalog(c)
+        setError(false)
+        // Garde la fiche ouverte à jour (ex. état « connecté » après connexion).
+        setDetailTool((prev) => prev
+          ? c.categories.flatMap((g) => g.tools).find((t) => t.key === prev.key) ?? prev
+          : null)
+      })
       .catch(() => setError(true))
       .finally(() => setLoading(false))
   }, [slug])
@@ -114,9 +136,18 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
   return (
     <TooltipProvider delayDuration={200}>
       <div className="flex flex-col gap-5">
+        {detailTool ? (
+          <ConnectorDetailView
+            tool={detailTool}
+            categoryLabel={catalog.categories.find((c) => c.category === detailTool.category)?.label ?? detailTool.category}
+            onBack={() => setDetailTool(null)}
+            onConnect={() => handleAction(detailTool)}
+          />
+        ) : (
+        <>
         <LabBanner
           feature="integrations"
-          message="Intégrations : les 129 connecteurs sont branchables (identifiants stockés), mais la synchronisation des données par outil n'est pas encore active."
+          message="Intégrations : la plupart des connecteurs sont branchables (identifiants stockés), mais la synchronisation des données par outil n'est pas encore active. Quelques intégrations (UI & composants) sont sur la roadmap, affichées « Bientôt »."
         />
         {/* Recherche */}
         <div className="relative">
@@ -159,11 +190,13 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
               <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{group.label}</h4>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {group.tools.map((tool) => (
-                  <ConnectorCard key={tool.key} tool={tool} onAction={() => handleAction(tool)} />
+                  <ConnectorCard key={tool.key} tool={tool} onOpenDetail={() => setDetailTool(tool)} />
                 ))}
               </div>
             </section>
           ))
+        )}
+        </>
         )}
 
         {dialogTool && (
@@ -179,15 +212,19 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
   )
 }
 
-/** Tuile d'un connecteur — façon marketplace (logo, description, capacités, action). */
-function ConnectorCard({ tool, onAction }: Readonly<{ tool: ConnectorView; onAction: () => void }>) {
+/** Tuile d'un connecteur — clic → fiche détaillée (façon Claude). Logo, état, description, capacités. */
+function ConnectorCard({ tool, onOpenDetail }: Readonly<{ tool: ConnectorView; onOpenDetail: () => void }>) {
   const planned = tool.status === "PLANNED"
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      onClick={onOpenDetail}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpenDetail() } }}
       className={cn(
-        "flex flex-col gap-3 rounded-xl border border-border bg-card p-4 transition-all",
-        planned ? "opacity-70" : "hover:border-foreground/20 hover:shadow-sm",
+        "flex cursor-pointer flex-col gap-3 rounded-xl border border-border bg-card p-4 text-left transition-all hover:border-foreground/20 hover:shadow-sm",
+        planned && "opacity-80",
       )}
     >
       {/* Ligne haute : logo + état */}
@@ -208,41 +245,120 @@ function ConnectorCard({ tool, onAction }: Readonly<{ tool: ConnectorView; onAct
 
       {/* Nom + description */}
       <div className="flex-1">
-        <div className="flex items-center gap-1.5">
-          <span className="text-sm font-semibold text-foreground">{tool.name}</span>
-          {tool.setupHint && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button type="button" className="text-muted-foreground/50 hover:text-foreground" aria-label="Aide à la connexion">
-                  <Info className="size-3" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed">{tool.setupHint}</TooltipContent>
-            </Tooltip>
-          )}
-        </div>
+        <span className="text-sm font-semibold text-foreground">{tool.name}</span>
         {tool.description && <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">{tool.description}</p>}
       </div>
 
-      {/* Ligne basse : capacités + action */}
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex min-w-0 flex-wrap gap-1">
-          {tool.capabilities.slice(0, 3).map((c) => (
-            <span key={c} className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{CAP_LABEL[c] ?? c}</span>
-          ))}
+      {/* Capacités */}
+      <div className="flex min-w-0 flex-wrap gap-1">
+        {tool.capabilities.slice(0, 3).map((c) => (
+          <span key={c} className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{CAP_LABEL[c] ?? c}</span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Fiche détaillée d'un connecteur (façon Claude) — infos honnêtes UNIQUEMENT : description, ce que
+ * permet le connecteur (capacités), mode de connexion, catégorie et liens RÉELS (site officiel + docs).
+ * Pas de listes d'outils/auteurs inventées pour les services qu'on n'intègre pas réellement.
+ */
+function ConnectorDetailView({
+  tool, categoryLabel, onBack, onConnect,
+}: Readonly<{ tool: ConnectorView; categoryLabel: string; onBack: () => void; onConnect: () => void }>) {
+  const planned = tool.status === "PLANNED"
+
+  return (
+    <div className="flex flex-col gap-6">
+      {/* Retour */}
+      <button type="button" onClick={onBack} className="flex w-fit items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground">
+        <ChevronLeft className="size-4" /> Retour
+      </button>
+
+      {/* En-tête */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted p-2">
+            <BrandLogo slug={tool.key} name={tool.name} className="size-full" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-lg font-semibold text-foreground">{tool.name}</h3>
+              {tool.connected && (
+                <Badge variant="outline" className="gap-1 border-emerald-500/25 bg-emerald-500/10 text-[10px] text-emerald-500">
+                  <Check className="size-3" /> Connecté
+                </Badge>
+              )}
+              {planned && <Badge variant="outline" className="text-[10px] text-muted-foreground">Bientôt</Badge>}
+            </div>
+            {tool.description && <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{tool.description}</p>}
+          </div>
         </div>
         {!planned && (
-          tool.connected ? (
-            <Button variant="outline" size="sm" className="h-7 shrink-0 text-xs" onClick={onAction}>
-              {tool.authType === "OAUTH2" ? "Gérer" : "Configurer"}
-            </Button>
-          ) : (
-            <Button size="sm" className="h-7 shrink-0 gap-1 text-xs" onClick={onAction}>
-              <Plug className="size-3" /> Connecter
-            </Button>
-          )
+          <Button size="sm" className="shrink-0 gap-1.5" variant={tool.connected ? "outline" : "default"} onClick={onConnect}>
+            <Plug className="size-3.5" />
+            {tool.connected ? (tool.authType === "OAUTH2" ? "Gérer" : "Configurer") : "Connecter"}
+          </Button>
         )}
       </div>
+
+      {/* Ce que ça permet */}
+      {tool.capabilities.length > 0 && (
+        <section className="flex flex-col gap-2">
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Ce que ce connecteur permet</h4>
+          <ul className="flex flex-col gap-1.5">
+            {tool.capabilities.map((c) => (
+              <li key={c} className="flex items-start gap-2 text-sm text-foreground">
+                <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary/60" />
+                <span><span className="font-medium">{CAP_LABEL[c] ?? c}</span>{CAP_DESC[c] ? ` — ${CAP_DESC[c]}` : ""}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* Connexion */}
+      <section className="flex flex-col gap-2">
+        <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Connexion</h4>
+        <p className="text-sm text-muted-foreground">
+          <span className="font-medium text-foreground">{AUTH_LABEL[tool.authType] ?? tool.authType}</span>
+          {AUTH_HELP[tool.authType] ? ` — ${AUTH_HELP[tool.authType]}` : ""}
+        </p>
+        {tool.setupHint && (
+          <div className="flex gap-2 rounded-md border border-border bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground">
+            <Info className="mt-0.5 size-3.5 shrink-0" />
+            <span>{tool.setupHint}</span>
+          </div>
+        )}
+      </section>
+
+      {/* Catégorie */}
+      <section className="flex flex-col gap-2">
+        <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Catégorie</h4>
+        <Badge variant="secondary" className="w-fit font-normal">{categoryLabel}</Badge>
+      </section>
+
+      {/* Liens réels */}
+      {(tool.websiteUrl || tool.docsUrl) && (
+        <section className="flex flex-col gap-2">
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Liens</h4>
+          <div className="flex flex-wrap gap-2">
+            {tool.websiteUrl && (
+              <a href={tool.websiteUrl} target="_blank" rel="noopener noreferrer"
+                 className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted">
+                <Globe className="size-3.5" /> Site officiel <ExternalLink className="size-3 text-muted-foreground" />
+              </a>
+            )}
+            {tool.docsUrl && (
+              <a href={tool.docsUrl} target="_blank" rel="noopener noreferrer"
+                 className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted">
+                <BookOpen className="size-3.5" /> Documentation <ExternalLink className="size-3 text-muted-foreground" />
+              </a>
+            )}
+          </div>
+        </section>
+      )}
     </div>
   )
 }

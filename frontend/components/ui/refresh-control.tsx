@@ -59,7 +59,9 @@ export function RefreshControl({
   async function handleRefresh() {
     setRefreshing(true)
     try {
-      await onRefresh()
+      // Durée minimale de spin (~550 ms) : un refresh instantané (données en cache / API rapide) ne
+      // laissait pas voir l'animation → l'utilisateur ne « sentait » pas que ça s'était rechargé.
+      await Promise.all([onRefresh(), new Promise((resolve) => setTimeout(resolve, 550))])
     } finally {
       setRefreshing(false)
     }

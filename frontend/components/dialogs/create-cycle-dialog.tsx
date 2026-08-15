@@ -51,13 +51,15 @@ interface CreateCycleDialogProps {
   readonly children?: React.ReactNode
   /** Notifié APRÈS persistance réussie, avec le cycle créé. Optionnel : la création n'en dépend pas. */
   readonly onCreated?: (cycle: Cycle) => void
+  /** Verrouille le cycle sur un projet précis (masque le sélecteur) — page cycles d'un projet. */
+  readonly projectId?: number
 }
 
 // ---------------------------------------------------------------------------
 // CreateCycleDialog
 // ---------------------------------------------------------------------------
 
-export function CreateCycleDialog({ children, onCreated }: CreateCycleDialogProps) {
+export function CreateCycleDialog({ children, onCreated, projectId }: CreateCycleDialogProps) {
   const params = useParams()
   const slug = typeof params?.workspace === "string" ? params.workspace : ""
   const { projects, fetchProjects } = useProjectStore()
@@ -66,7 +68,9 @@ export function CreateCycleDialog({ children, onCreated }: CreateCycleDialogProp
   const [open, setOpen] = useState(false)
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
-  const [projectId, setProjectId] = useState<string>("")
+  const [pickedProjectId, setPickedProjectId] = useState<string>("")
+  // Projet effectif : verrouillé par la prop (page d'un projet) sinon choisi dans le sélecteur.
+  const effectiveProjectId = projectId != null ? String(projectId) : pickedProjectId
   const [startDate, setStartDate] = useState<Date | undefined>(undefined)
   const [endDate, setEndDate] = useState<Date | undefined>(undefined)
   const [startOpen, setStartOpen] = useState(false)
@@ -79,12 +83,12 @@ export function CreateCycleDialog({ children, onCreated }: CreateCycleDialogProp
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, slug])
 
-  // Set default project once projects are loaded
+  // Set default project once projects are loaded (sauf si un projet est verrouillé par la prop).
   useEffect(() => {
-    if (projects.length > 0 && !projectId) setProjectId(String(projects[0].id))
-  }, [projects, projectId])
+    if (projectId == null && projects.length > 0 && !pickedProjectId) setPickedProjectId(String(projects[0].id))
+  }, [projects, pickedProjectId, projectId])
 
-  const selectedProject = projects.find((p) => String(p.id) === projectId) ?? projects[0]
+  const selectedProject = projects.find((p) => String(p.id) === effectiveProjectId) ?? projects[0]
   const canCreate = name.trim().length > 0 && startDate !== undefined && endDate !== undefined
 
   /**
@@ -96,7 +100,7 @@ export function CreateCycleDialog({ children, onCreated }: CreateCycleDialogProp
    */
   async function handleCreate() {
     if (!name.trim() || !startDate || !endDate || !slug) return
-    const pid = Number(projectId)
+    const pid = projectId ?? Number(pickedProjectId)
     if (!Number.isFinite(pid) || pid <= 0) return
 
     setIsLoading(true)
@@ -123,7 +127,7 @@ export function CreateCycleDialog({ children, onCreated }: CreateCycleDialogProp
   function resetForm() {
     setName("")
     setDescription("")
-    setProjectId(projects.length > 0 ? String(projects[0].id) : "")
+    setPickedProjectId(projects.length > 0 ? String(projects[0].id) : "")
     setStartDate(undefined)
     setEndDate(undefined)
     setStartOpen(false)
@@ -182,36 +186,38 @@ export function CreateCycleDialog({ children, onCreated }: CreateCycleDialogProp
             />
           </div>
 
-          {/* Project */}
-          <div className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Project</span>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="justify-between w-full font-normal">
-                  <span className="flex items-center gap-2">
-                    <FolderKanban className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span>{selectedProject ? `${selectedProject.identifier.slice(0, 2)} ${selectedProject.name}` : "Select project…"}</span>
-                  </span>
-                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-56">
-                {projects.length === 0 && (
-                  <DropdownMenuItem disabled>No projects found</DropdownMenuItem>
-                )}
-                {projects.map((p) => (
-                  <DropdownMenuItem
-                    key={p.id}
-                    onClick={() => setProjectId(String(p.id))}
-                    className={cn("gap-2", String(p.id) === projectId && "bg-accent")}
-                  >
-                    <span className="font-mono text-xs text-muted-foreground">{p.identifier.slice(0, 2)}</span>
-                    {p.name}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          {/* Project — masqué quand le dialogue est verrouillé sur un projet (page cycles d'un projet). */}
+          {projectId == null && (
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Project</span>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="justify-between w-full font-normal">
+                    <span className="flex items-center gap-2">
+                      <FolderKanban className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span>{selectedProject ? `${selectedProject.identifier.slice(0, 2)} ${selectedProject.name}` : "Select project…"}</span>
+                    </span>
+                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-56">
+                  {projects.length === 0 && (
+                    <DropdownMenuItem disabled>No projects found</DropdownMenuItem>
+                  )}
+                  {projects.map((p) => (
+                    <DropdownMenuItem
+                      key={p.id}
+                      onClick={() => setPickedProjectId(String(p.id))}
+                      className={cn("gap-2", String(p.id) === effectiveProjectId && "bg-accent")}
+                    >
+                      <span className="font-mono text-xs text-muted-foreground">{p.identifier.slice(0, 2)}</span>
+                      {p.name}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )}
 
           {/* Dates */}
           <div className="grid grid-cols-2 gap-3">

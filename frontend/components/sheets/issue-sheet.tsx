@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react"
-import { useRouter } from "next/navigation"
 import {
   X, RefreshCw, Clock, CheckCircle2, AlertTriangle, CircleDot,
   Flag, Tag, Calendar, Layers, GitBranch, Activity,
@@ -17,6 +16,8 @@ import {
 } from "@/components/ui/sheet"
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { UserAvatar } from "@/components/ui/user-avatar"
@@ -28,7 +29,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
 import {
-  Select, SelectContent, SelectItem, SelectTrigger,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 import { SmartAssignPanel } from "@/components/smart-assign/smart-assign-panel"
@@ -134,14 +135,17 @@ function formatCommentTime(iso: string): string {
 // ---------------------------------------------------------------------------
 
 function MetaRow({ icon, label, children }: Readonly<{ icon: React.ReactNode; label: string; children: React.ReactNode }>) {
-  // Label au-dessus, valeur en dessous (façon GitHub) → lisible même en colonne étroite, aucune info coupée.
+  // Ligne de propriété inline façon Linear : libellé à gauche (icône + texte), valeur à droite.
+  // Plus compact et scannable que le libellé au-dessus ; la sidebar (288px) tient largement une
+  // colonne libellé (~88px) + un contrôle shadcn à droite. `items-center` + min-h-8 alignent le
+  // libellé sur les contrôles h-8 ; une valeur multi-ligne (labels, échéance en retard) reste lisible.
   return (
-    <div className="flex flex-col gap-1 py-2.5 border-b border-border/50 last:border-0">
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+    <div className="flex items-center gap-3 min-h-9 py-1.5">
+      <div className="flex w-[92px] shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
         <span className="shrink-0">{icon}</span>
-        <span>{label}</span>
+        <span className="truncate">{label}</span>
       </div>
-      <div className="min-w-0 text-sm">{children}</div>
+      <div className="min-w-0 flex-1 text-sm">{children}</div>
     </div>
   )
 }
@@ -182,7 +186,9 @@ function CollapsibleSection({
         <SectionHeading icon={icon} title={title} count={count} />
         <ChevronRight className="ml-auto size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" />
       </CollapsibleTrigger>
-      <CollapsibleContent className="pt-3">{children}</CollapsibleContent>
+      {/* -mx-1 px-1 + pb-1 : réserve interne pour que le focus-ring des inputs ne soit pas rogné
+          par l'overflow-hidden du CollapsibleContent (animation Radix), sans décaler le contenu. */}
+      <CollapsibleContent className="-mx-1 px-1 pt-3 pb-1">{children}</CollapsibleContent>
     </Collapsible>
   )
 }
@@ -330,23 +336,23 @@ function GitHubTab({ issueId, workspaceSlug }: Readonly<{ issueId: number; works
               </button>
             ))}
           </div>
-          <input
-            className="h-8 w-full rounded-md border border-border bg-muted px-3 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+          <Input
+            className="h-8 w-full text-xs"
             placeholder="owner/repo"
             value={repoFullName}
             onChange={(e) => setRepoFullName(e.target.value)}
           />
           {linkType === "PR" && (
             <>
-              <input
-                className="h-8 w-full rounded-md border border-border bg-muted px-3 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+              <Input
+                className="h-8 w-full text-xs"
                 placeholder="PR number"
                 type="number"
                 value={prNumber}
                 onChange={(e) => setPrNumber(e.target.value)}
               />
-              <input
-                className="h-8 w-full rounded-md border border-border bg-muted px-3 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+              <Input
+                className="h-8 w-full text-xs"
                 placeholder="PR URL (optional)"
                 value={prUrl}
                 onChange={(e) => setPrUrl(e.target.value)}
@@ -355,22 +361,22 @@ function GitHubTab({ issueId, workspaceSlug }: Readonly<{ issueId: number; works
           )}
           {linkType === "COMMIT" && (
             <>
-              <input
-                className="h-8 w-full rounded-md border border-border bg-muted px-3 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+              <Input
+                className="h-8 w-full text-xs"
                 placeholder="Commit SHA"
                 value={commitSha}
                 onChange={(e) => setCommitSha(e.target.value)}
               />
-              <input
-                className="h-8 w-full rounded-md border border-border bg-muted px-3 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+              <Input
+                className="h-8 w-full text-xs"
                 placeholder="Commit URL (optional)"
                 value={commitUrl}
                 onChange={(e) => setCommitUrl(e.target.value)}
               />
             </>
           )}
-          <input
-            className="h-8 w-full rounded-md border border-border bg-muted px-3 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+          <Input
+            className="h-8 w-full text-xs"
             placeholder="Title (optional)"
             value={linkTitle}
             onChange={(e) => setLinkTitle(e.target.value)}
@@ -405,16 +411,25 @@ type FeedEntry =
   | { kind: "comment"; at: string; data: IssueComment }
   | { kind: "event";   at: string; data: IssueActivity }
 
+/** Pagination du fil : nb d'entrées visibles au départ, puis pas du « charger plus ». */
+const ACTIVITY_INITIAL = 5
+const ACTIVITY_STEP = 10
+
 /**
- * Fil d'activité unifié (commentaires + évènements, triés chronologiquement) + zone de
- * saisie — tout en bas de l'issue, façon GitHub/Linear. Remplace les onglets séparés.
+ * Fil d'activité unifié (commentaires + évènements) : le plus récent EN HAUT, zone de saisie
+ * en tête (le commentaire posté apparaît juste en dessous) et bouton « charger plus » pour
+ * dérouler les entrées plus anciennes. Façon GitHub/Linear.
  */
 function ActivityFeed({ comments, activity, loading, comment, onChange, onSend, onDelete }: Readonly<ActivityFeedProps>) {
   const currentUser = useUserStore((s) => s.user)
+  // Combien d'entrées afficher (pagination « charger plus ») — départ court pour garder l'issue lisible.
+  const [visible, setVisible] = useState(ACTIVITY_INITIAL)
   const entries: FeedEntry[] = [
     ...comments.map((c) => ({ kind: "comment" as const, at: c.createdAt, data: c })),
     ...activity.map((a) => ({ kind: "event"   as const, at: a.createdAt, data: a })),
-  ].sort((x, y) => new Date(x.at).getTime() - new Date(y.at).getTime())
+  ].sort((x, y) => new Date(y.at).getTime() - new Date(x.at).getTime()) // plus récent d'abord
+  const shown = entries.slice(0, visible)
+  const remaining = entries.length - shown.length
 
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) onSend()
@@ -422,14 +437,35 @@ function ActivityFeed({ comments, activity, loading, comment, onChange, onSend, 
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Zone de saisie — en tête : le commentaire posté apparaît juste en dessous (plus récent d'abord). */}
+      <div className="flex gap-3">
+        <UserAvatar email={currentUser?.email} name={currentUser?.displayName ?? currentUser?.email} avatarUrl={currentUser?.avatarUrl} className="size-7 shrink-0 mt-0.5" fallbackClassName="text-[9px]" />
+        <div className="flex flex-1 flex-col gap-2">
+          <Textarea
+            placeholder="Ajouter un commentaire…  (Ctrl+Entrée pour envoyer)"
+            value={comment}
+            onChange={(e) => onChange(e.target.value)}
+            onKeyDown={onKeyDown}
+            className="min-h-16 resize-none"
+          />
+          {comment.trim() && (
+            <div className="flex justify-end">
+              <Button size="sm" className="h-7 gap-1.5 text-xs" onClick={onSend}>
+                <Send className="size-3" /> Commenter
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+
       {loading && <p className="text-xs text-muted-foreground text-center py-4">Chargement…</p>}
       {!loading && entries.length === 0 && (
         <p className="text-xs text-muted-foreground italic py-2">Aucune activité pour l&apos;instant.</p>
       )}
 
-      {entries.length > 0 && (
+      {shown.length > 0 && (
         <div className="flex flex-col gap-3">
-          {entries.map((entry) => {
+          {shown.map((entry) => {
             if (entry.kind === "comment") {
               const c = entry.data
               const isMe = currentUser?.email === c.author.email
@@ -473,26 +509,15 @@ function ActivityFeed({ comments, activity, loading, comment, onChange, onSend, 
         </div>
       )}
 
-      {/* Zone de saisie */}
-      <div className="flex gap-3">
-        <UserAvatar email={currentUser?.email} name={currentUser?.displayName ?? currentUser?.email} avatarUrl={currentUser?.avatarUrl} className="size-7 shrink-0 mt-0.5" fallbackClassName="text-[9px]" />
-        <div className="flex flex-1 flex-col gap-2">
-          <textarea
-            placeholder="Ajouter un commentaire…  (Ctrl+Entrée pour envoyer)"
-            value={comment}
-            onChange={(e) => onChange(e.target.value)}
-            onKeyDown={onKeyDown}
-            className="min-h-16 w-full resize-none rounded-lg border border-border bg-muted/20 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none transition-all focus:border-primary/50 focus:ring-1 focus:ring-primary/20"
-          />
-          {comment.trim() && (
-            <div className="flex justify-end">
-              <Button size="sm" className="h-7 gap-1.5 text-xs" onClick={onSend}>
-                <Send className="size-3" /> Commenter
-              </Button>
-            </div>
-          )}
-        </div>
-      </div>
+      {remaining > 0 && (
+        <button
+          type="button"
+          onClick={() => setVisible((v) => v + ACTIVITY_STEP)}
+          className="mx-auto flex items-center gap-1.5 rounded-md px-3 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+        >
+          <ChevronDown className="size-3.5" /> Charger plus ({remaining})
+        </button>
+      )}
     </div>
   )
 }
@@ -716,12 +741,12 @@ export function SubtasksTab({
         </div>
       ))}
       <div className="mt-1 flex items-center gap-2">
-        <input
+        <Input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add() } }}
           placeholder="Nouvelle sous-tâche…"
-          className="h-8 flex-1 rounded-md border border-border bg-transparent px-2 text-xs outline-none focus:border-primary/50"
+          className="h-8 flex-1 text-xs"
         />
         <Button size="sm" className="h-8 gap-1 text-xs" onClick={add} disabled={!title.trim() || adding}>
           <Plus className="size-3.5" /> Ajouter
@@ -825,12 +850,12 @@ function ChecklistTab({
         </div>
       ))}
       <div className="mt-1 flex items-center gap-2">
-        <input
+        <Input
           value={content}
           onChange={(e) => setContent(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add() } }}
           placeholder="Ajouter un item…"
-          className="h-8 flex-1 rounded-md border border-border bg-transparent px-2 text-xs outline-none focus:border-primary/50"
+          className="h-8 flex-1 text-xs"
         />
         <Button size="sm" className="h-8 gap-1 text-xs" onClick={add} disabled={!content.trim() || adding}>
           <Plus className="size-3.5" /> Ajouter
@@ -937,20 +962,20 @@ function WorklogTab({
         </div>
       ))}
       <div className="mt-1 flex flex-wrap items-center gap-2">
-        <input
+        <Input
           type="number"
           min={1}
           value={minutes}
           onChange={(e) => setMinutes(e.target.value)}
           placeholder="Min."
-          className="h-8 w-16 rounded-md border border-border bg-transparent px-2 text-xs outline-none focus:border-primary/50"
+          className="h-8 w-16 text-xs"
         />
-        <input
+        <Input
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add() } }}
           placeholder="Description (optionnel)"
-          className="h-8 min-w-0 flex-1 rounded-md border border-border bg-transparent px-2 text-xs outline-none focus:border-primary/50"
+          className="h-8 min-w-0 flex-1 text-xs"
         />
         <Button size="sm" className="h-8 shrink-0 gap-1 text-xs" onClick={add} disabled={!minutes || adding}>
           <Plus className="size-3.5" /> Logger
@@ -1014,8 +1039,6 @@ function RelationsTab({
     }
   }
 
-  const selectClass = "h-8 rounded-md border border-border bg-transparent px-2 text-xs outline-none focus:border-primary/50"
-
   return (
     <div className="flex flex-col gap-2">
       {loading && <p className="text-xs text-muted-foreground text-center py-3">Chargement…</p>}
@@ -1039,22 +1062,32 @@ function RelationsTab({
       ))}
 
       <div className="mt-1 flex items-center gap-2">
-        <select value={type} onChange={(e) => setType(e.target.value as IssueRelationType)} className={selectClass}>
-          {(Object.keys(RELATION_LABELS) as IssueRelationType[]).map((t) => (
-            <option key={t} value={t}>{RELATION_LABELS[t]}</option>
-          ))}
-        </select>
-        <select
-          value={targetId ?? ""}
-          onChange={(e) => setTargetId(e.target.value ? Number(e.target.value) : undefined)}
-          className={cn(selectClass, "flex-1 min-w-0")}
+        <Select value={type} onValueChange={(v) => setType(v as IssueRelationType)}>
+          <SelectTrigger size="sm" className="w-[132px] shrink-0 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {(Object.keys(RELATION_LABELS) as IssueRelationType[]).map((t) => (
+              <SelectItem key={t} value={t} className="text-xs">{RELATION_LABELS[t]}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={targetId ? String(targetId) : ""}
+          onValueChange={(v) => setTargetId(v ? Number(v) : undefined)}
         >
-          <option value="">Choisir une issue…</option>
-          {candidates.map((i) => (
-            <option key={i.id} value={i.id}>{i.identifier} — {i.title}</option>
-          ))}
-        </select>
-        <Button size="sm" className="h-8 gap-1 text-xs" onClick={add} disabled={!targetId || adding}>
+          <SelectTrigger size="sm" className="min-w-0 flex-1 text-xs">
+            <SelectValue placeholder="Choisir une issue…" />
+          </SelectTrigger>
+          <SelectContent>
+            {candidates.map((i) => (
+              <SelectItem key={i.id} value={String(i.id)} className="text-xs">
+                <span className="font-mono text-muted-foreground">{i.identifier}</span> — {i.title}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button size="sm" className="h-8 shrink-0 gap-1 text-xs" onClick={add} disabled={!targetId || adding}>
           <Plus className="size-3.5" /> Lier
         </Button>
       </div>
@@ -1073,11 +1106,11 @@ interface IssueSheetProps {
 }
 
 export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId }: Readonly<IssueSheetProps>) {
-  const router = useRouter()
   const { fetchComments, addComment, deleteComment, fetchActivity, updateIssue, deleteIssue,
           archiveIssue, pinIssue, fetchStatuses, fetchIssue,
           comments: storeComments, activity: storeActivity, statuses: storeStatuses } = useIssueStore()
   const { labelsByProject, fetchLabels } = useLabelStore()
+  const { githubLinks, githubStatus, fetchGitHubLinks } = useIntegrationStore()
 
   const initDescription = issue?.description ?? ""
   const [comment, setComment] = useState("")
@@ -1113,6 +1146,8 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
   // Cycle courant de l'issue + cycles du projet (options du sélecteur) — CYC-03b.
   const [cycleId, setCycleId] = useState<number | null>(null)
   const [projectCycles, setProjectCycles] = useState<Cycle[]>([])
+  // Compteurs des sections repliées (badges façon Linear) — chargés à l'ouverture, visibles repliés.
+  const [sectionCounts, setSectionCounts] = useState({ checklist: 0, attachments: 0, relations: 0 })
 
   useEffect(() => { if (editingTitle) titleRef.current?.focus() }, [editingTitle])
 
@@ -1168,6 +1203,19 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
       .finally(() => setLoadingActivity(false))
   }, [open, issue, workspaceSlug, projectId, fetchComments, fetchActivity])
 
+  // Compteurs des sections repliées — on charge juste les longueurs à l'ouverture pour afficher un
+  // badge « n » (façon Linear) sans avoir à déplier. Les onglets rechargent leur détail à l'ouverture.
+  useEffect(() => {
+    if (!open || !workspaceSlug || !projectId || !issue) return
+    const id = Number(issue.id)
+    const put = (key: "checklist" | "attachments" | "relations", n: number) =>
+      setSectionCounts((c) => (c[key] === n ? c : { ...c, [key]: n }))
+    listChecklist(workspaceSlug, projectId, id).then((a) => put("checklist", a.length)).catch(() => { /* silent */ })
+    listRelations(workspaceSlug, projectId, id).then((a) => put("relations", a.length)).catch(() => { /* silent */ })
+    listAttachments(workspaceSlug, projectId, id).then((a) => put("attachments", a.length)).catch(() => { /* silent */ })
+    if (githubStatus?.connected) fetchGitHubLinks(workspaceSlug, id).catch(() => { /* silent */ })
+  }, [open, workspaceSlug, projectId, issue, githubStatus?.connected, fetchGitHubLinks])
+
   if (!issue) return null
 
   const statusCfg   = getStatusCfg(statusCategory)
@@ -1201,12 +1249,6 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
     } catch {
       toast.error("Échec de la suppression")
     }
-  }
-
-  function openFullPage() {
-    if (!workspaceSlug || !projectId) return
-    router.push(`/${workspaceSlug}/projects/${projectId}/issues/${issue!.id}`)
-    onOpenChange(false)
   }
 
   async function copyToClipboard(text: string, label: string) {
@@ -1376,18 +1418,6 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
 
           <div className="flex-1" />
 
-          {/* Ouvrir en page pleine — accès direct conservé */}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-            onClick={openFullPage}
-            title="Ouvrir l'issue en page pleine"
-          >
-            <ExternalLink className="size-3.5" />
-            Open
-          </Button>
-
           {/* Menu d'actions façon GitHub */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -1493,30 +1523,30 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
               </Section>
             )}
 
-            {/* Checklist */}
+            {/* Checklist — repliable (secondaire ; le contenu ne se charge qu'à l'ouverture) */}
             {workspaceSlug && projectId && (
-              <Section icon={<CheckCircle2 className="size-4" />} title="Checklist">
+              <CollapsibleSection icon={<CheckCircle2 className="size-4" />} title="Checklist" count={sectionCounts.checklist}>
                 <ChecklistTab issueId={issueId} projectId={projectId} workspaceSlug={workspaceSlug} />
-              </Section>
+              </CollapsibleSection>
             )}
 
-            {/* Pièces jointes */}
+            {/* Pièces jointes — repliable (secondaire) */}
             {workspaceSlug && projectId && (
-              <Section icon={<Paperclip className="size-4" />} title="Pièces jointes">
+              <CollapsibleSection icon={<Paperclip className="size-4" />} title="Pièces jointes" count={sectionCounts.attachments}>
                 <AttachmentsTab issueId={issueId} projectId={projectId} workspaceSlug={workspaceSlug} />
-              </Section>
+              </CollapsibleSection>
             )}
 
             {/* Relations — repliable */}
             {workspaceSlug && projectId && (
-              <CollapsibleSection icon={<Link2 className="size-4" />} title="Relations">
+              <CollapsibleSection icon={<Link2 className="size-4" />} title="Relations" count={sectionCounts.relations}>
                 <RelationsTab issueId={issueId} projectId={projectId} workspaceSlug={workspaceSlug} />
               </CollapsibleSection>
             )}
 
             {/* GitHub — repliable (le contenu ne se charge qu'à l'ouverture) */}
             {workspaceSlug && (
-              <CollapsibleSection icon={<BrandLogo slug="github" name="GitHub" className="size-4" />} title="GitHub">
+              <CollapsibleSection icon={<BrandLogo slug="github" name="GitHub" className="size-4" />} title="GitHub" count={githubLinks[issueId]?.length ?? 0}>
                 <GitHubTab issueId={issueId} workspaceSlug={workspaceSlug} />
               </CollapsibleSection>
             )}
@@ -1538,8 +1568,8 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
           </div>
 
           {/* Right: metadata sidebar (fully editable) — empilée sous le contenu en mobile */}
-          <div className="w-full shrink-0 border-t border-border px-4 py-5 sm:w-72 sm:border-t-0 sm:border-l sm:overflow-y-auto">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Details</p>
+          <div className="w-full shrink-0 border-t border-border px-5 py-5 sm:w-96 sm:border-t-0 sm:border-l sm:overflow-y-auto">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Details</p>
 
             {/* Priority */}
             <MetaRow icon={<Flag className="size-3.5" />} label="Priority">
@@ -1637,8 +1667,8 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
             <MetaRow icon={<Tag className="size-3.5" />} label="Labels">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button type="button" className="flex items-start gap-1 hover:bg-muted/50 rounded px-1 -mx-1 py-0.5 w-full text-left transition-colors min-h-6">
-                    <div className="flex flex-wrap gap-1 flex-1">
+                  <button type="button" className="flex min-h-8 w-full items-center justify-between gap-2 rounded-md border border-input bg-transparent px-3 py-1 text-left text-sm shadow-xs outline-none transition-colors hover:bg-muted/30 dark:bg-input/30 dark:hover:bg-input/50">
+                    <div className="flex min-w-0 flex-wrap gap-1">
                       {labels.length > 0
                         ? labels.map((l) => (
                             <Badge
@@ -1650,9 +1680,9 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                               {l.name}
                             </Badge>
                           ))
-                        : <span className="text-xs text-muted-foreground">Add label</span>}
+                        : <span className="text-muted-foreground">Add label</span>}
                     </div>
-                    <ChevronDown className="size-3 opacity-40 shrink-0 mt-0.5" />
+                    <ChevronDown className="size-4 shrink-0 opacity-50" />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="min-w-40">
@@ -1758,21 +1788,24 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
               )}
             </MetaRow>
 
-            {/* Suivi du temps — déplacé des onglets vers la sidebar */}
-            {workspaceSlug && projectId && (
-              <div className="flex flex-col gap-2 py-2.5 border-b border-border/50">
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Clock className="size-3.5 shrink-0" />
-                  <span>Suivi du temps</span>
-                </div>
-                <WorklogTab issueId={issueId} projectId={projectId} workspaceSlug={workspaceSlug} />
-              </div>
-            )}
-
-            {/* Created — read-only */}
+            {/* Created — read-only (reste dans la liste de propriétés) */}
             <MetaRow icon={<Activity className="size-3.5" />} label="Created">
               <span className="text-xs text-muted-foreground">{issue.createdAt}</span>
             </MetaRow>
+
+            {/* Suivi du temps — bloc dédié en bas (plus lourd que les propriétés → isolé sous un séparateur) */}
+            {workspaceSlug && projectId && (
+              <>
+                <Separator className="my-3" />
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Clock className="size-3.5 shrink-0" />
+                    <span>Suivi du temps</span>
+                  </div>
+                  <WorklogTab issueId={issueId} projectId={projectId} workspaceSlug={workspaceSlug} />
+                </div>
+              </>
+            )}
           </div>
         </div>
       </SheetContent>

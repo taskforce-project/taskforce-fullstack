@@ -11,7 +11,7 @@ import {
   Repeat,
   CalendarRange,
   Users,
-  BarChart3,
+  Activity,
   Settings,
   Plus,
   User,
@@ -24,9 +24,13 @@ import {
   Loader2,
   CornerDownLeft,
   ArrowLeft,
+  ArrowRight,
+  Brain,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 
+import { cn } from "@/lib/utils"
+import { useCreateProjectStore } from "@/lib/store/create-project-store"
 import { sendAssistantMessage } from "@/lib/api/assistant-service"
 
 import {
@@ -37,7 +41,6 @@ import {
   CommandItem,
   CommandList,
   CommandSeparator,
-  CommandShortcut,
 } from "@/components/ui/command"
 
 // ─── Hook IA — appelle le VRAI assistant (Cortex), plus de mock ──────────────
@@ -85,6 +88,7 @@ export function CommandPalette({ open, onOpenChange }: Readonly<CommandPalettePr
   const router = useRouter()
   const params = useParams()
   const slug = typeof params?.workspace === "string" ? params.workspace : ""
+  const openCreateProject = useCreateProjectStore((s) => s.openCreateProject)
   const { setTheme } = useTheme()
 
   // ─── État mode IA ──────────────────────────────────────────────────────────
@@ -134,18 +138,21 @@ export function CommandPalette({ open, onOpenChange }: Readonly<CommandPalettePr
     { id: "cycles",        label: "Go to Cycles",        group: "Navigation", icon: <Repeat className="h-4 w-4" />,          shortcut: "G C", action: () => go("/cycles") },
     { id: "roadmap",       label: "Go to Roadmap",       group: "Navigation", icon: <CalendarRange className="h-4 w-4" />,   shortcut: "G R", action: () => go("/roadmap") },
     { id: "members",       label: "Go to Members",       group: "Navigation", icon: <Users className="h-4 w-4" />,           shortcut: "G T", action: () => go("/members") },
-    { id: "analytics",    label: "Go to Analytics",     group: "Navigation", icon: <BarChart3 className="h-4 w-4" />,      shortcut: "G A", action: () => go("/analytics") },
     { id: "settings",      label: "Go to Settings",      group: "Navigation", icon: <Settings className="h-4 w-4" />,       shortcut: "G S", action: () => go("/settings") },
     { id: "profile",       label: "View my profile",     group: "Navigation", icon: <User className="h-4 w-4" />,           shortcut: "G F", action: () => go("/profile") },
+    // Labs — accès rapide aux fonctionnalités en finition. Mêmes icônes que la sidebar (Activity / Brain),
+    // en couleur normale (pas de dégradé) : la carte « Labs » suffit à les signaler.
+    { id: "intelligence",  label: "Intelligence",        group: "Labs",       icon: <Activity className="h-4 w-4" />, shortcut: "G A", action: () => go("/analytics") },
+    { id: "brain",         label: "Brain OS",            group: "Labs",       icon: <Brain className="h-4 w-4" />,                     action: () => go("/brain") },
     // Actions
     { id: "ask-ai",        label: "Ask AI",              group: "Actions",    icon: <Sparkles className="h-4 w-4" />,        shortcut: "A",   action: enterAiMode },
     // La création d'issue est propre à un projet : on mène à la liste des projets, où chacun porte
     // son propre bouton « New issue » — plutôt qu'un dialogue de création sans projet.
     { id: "new-issue",     label: "Créer une issue",     group: "Actions",    icon: <Plus className="h-4 w-4" />,            shortcut: "C",   action: () => go("/projects") },
-    { id: "new-project",   label: "Créer un projet",     group: "Actions",    icon: <Plus className="h-4 w-4" />,                             action: () => go("/projects") },
+    { id: "new-project",   label: "Créer un projet",     group: "Actions",    icon: <Plus className="h-4 w-4" />,                             action: () => { openCreateProject(); onOpenChange(false) } },
     { id: "notifications", label: "Ouvrir les notifications", group: "Actions", icon: <Bell className="h-4 w-4" />,                          action: () => go("/inbox") },
-    // « Upgrade to Pro » : le plan Pro n'existe pas (cf. TF-PLAN-PRO-GHOST).
-    { id: "upgrade",       label: "Voir les forfaits",   group: "Actions",    icon: <Zap className="h-4 w-4" />,                              action: () => go("/settings") },
+    // « Voir les forfaits » → page des plans (facturation), pas les réglages génériques.
+    { id: "upgrade",       label: "Voir les forfaits",   group: "Actions",    icon: <Zap className="h-4 w-4" />,                              action: () => go("/billing") },
     // Appearance
     { id: "theme-light",   label: "Switch to light mode", group: "Appearance", icon: <Sun className="h-4 w-4" />,    action: () => { setTheme("light"); onOpenChange(false) } },
     { id: "theme-dark",    label: "Switch to dark mode",  group: "Appearance", icon: <Moon className="h-4 w-4" />,   action: () => { setTheme("dark"); onOpenChange(false) } },
@@ -155,7 +162,7 @@ export function CommandPalette({ open, onOpenChange }: Readonly<CommandPalettePr
   const groups = [...new Set(ACTIONS.map((a) => a.group))]
 
   return (
-    <CommandDialog open={open} onOpenChange={onOpenChange} showCloseButton={false} className="max-w-lg overflow-hidden">
+    <CommandDialog open={open} onOpenChange={onOpenChange} showCloseButton={false} className="max-w-2xl overflow-hidden rounded-xl border shadow-2xl">
       {/* ── Mode IA ────────────────────────────────────────────────────────── */}
       {aiMode ? (
         <div className="flex flex-col">
@@ -231,29 +238,49 @@ export function CommandPalette({ open, onOpenChange }: Readonly<CommandPalettePr
                 {gi > 0 && <CommandSeparator />}
                 <CommandGroup heading={group}>
                   {ACTIONS.filter((a) => a.group === group).map((action) => (
-                    <CommandItem key={action.id} onSelect={action.action} className="gap-3">
+                    <CommandItem
+                      key={action.id}
+                      onSelect={action.action}
+                      className={cn("group gap-3", action.group === "Labs" && "lab-cmd-row")}
+                    >
                       <span className={action.id === "ask-ai" ? "text-primary" : "text-muted-foreground"}>
                         {action.icon}
                       </span>
                       <span className={action.id === "ask-ai" ? "font-medium" : ""}>{action.label}</span>
-                      {action.shortcut && (
-                        <CommandShortcut>
-                          {action.shortcut.split(" ").map((k) => (
-                            <kbd
-                              key={k}
-                              className="ml-1 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
-                            >
-                              {k}
-                            </kbd>
-                          ))}
-                        </CommandShortcut>
-                      )}
+                      {/* Côté droit façon Cloudflare : raccourci + flèche visible sur la ligne active */}
+                      <span className="ml-auto flex items-center gap-2 pl-2">
+                        {action.shortcut && (
+                          <span className="flex items-center gap-1">
+                            {action.shortcut.split(" ").map((k) => (
+                              <kbd key={k} className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{k}</kbd>
+                            ))}
+                          </span>
+                        )}
+                        <ArrowRight className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-data-[selected=true]:opacity-100" />
+                      </span>
                     </CommandItem>
                   ))}
                 </CommandGroup>
               </div>
             ))}
           </CommandList>
+
+          {/* Pied façon Cloudflare : rappels clavier */}
+          <div className="flex items-center gap-4 border-t border-border px-4 py-2.5 text-[11px] text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <kbd className="inline-flex size-4 items-center justify-center rounded border border-border bg-muted text-[10px]">↑</kbd>
+              <kbd className="inline-flex size-4 items-center justify-center rounded border border-border bg-muted text-[10px]">↓</kbd>
+              pour naviguer
+            </span>
+            <span className="flex items-center gap-1.5">
+              <kbd className="inline-flex h-4 items-center justify-center rounded border border-border bg-muted px-1 text-[10px]">↵</kbd>
+              pour sélectionner
+            </span>
+            <span className="ml-auto flex items-center gap-1.5">
+              <kbd className="inline-flex h-4 items-center justify-center rounded border border-border bg-muted px-1 text-[10px]">esc</kbd>
+              pour fermer
+            </span>
+          </div>
         </>
       )}
     </CommandDialog>

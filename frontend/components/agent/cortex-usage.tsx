@@ -64,11 +64,16 @@ export function CortexUsage({ sessionTokens, className }: { sessionTokens: numbe
   const [refreshing, setRefreshing] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
-  const load = useCallback(async () => {
+  // `minSpin` : durée minimale de l'animation, uniquement au clic manuel (pas à l'ouverture) — sinon un
+  // refresh instantané ne laisse pas voir le spin et on ne « sent » pas que ça a rechargé.
+  const load = useCallback(async (minSpin = false) => {
     if (!slug) return
     setRefreshing(true)
     try {
-      setUsage(await getAiUsage(slug))
+      await Promise.all([
+        getAiUsage(slug).then(setUsage),
+        minSpin ? new Promise((resolve) => setTimeout(resolve, 550)) : Promise.resolve(),
+      ])
     } catch {
       /* non bloquant */
     } finally {
@@ -172,7 +177,7 @@ export function CortexUsage({ sessionTokens, className }: { sessionTokens: numbe
             <div className="flex items-center gap-1">
               <button
                 type="button"
-                onClick={() => void load()}
+                onClick={() => void load(true)}
                 className="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 title="Actualiser"
               >
