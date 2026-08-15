@@ -229,6 +229,8 @@ export interface ConnectorView {
   docsUrl: string | null;
   /** Aide (tooltip) : où récupérer la clé quand ce n'est pas du 1-clic OAuth. */
   setupHint: string | null;
+  /** Site officiel du service (homepage) — affiché dans la fiche détaillée. */
+  websiteUrl: string | null;
 }
 
 export interface CategoryGroup {
