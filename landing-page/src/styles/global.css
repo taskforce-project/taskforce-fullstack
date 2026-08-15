@@ -9,6 +9,9 @@
    Light-only (décision D2) — le bloc .dark de l'app n'est pas repris.
 ═══════════════════════════════════════════════════════ */
 :root {
+  /* Site light-only (décision actée) : force les contrôles natifs — champs, scrollbars — en
+     clair même quand l'OS du visiteur est en sombre. Sans ça, un OS dark rend un « faux sombre ». */
+  color-scheme: light;
   --background:         #fbfbfc;
   --card:               #ffffff;
   --popover:            #ffffff;
@@ -551,85 +554,25 @@ body {
   box-shadow: none;
 }
 .tf-flow .react-flow__handle.tf-handle--source {
-  width: 9px;
-  height: 9px;
+  width: 11px;
+  height: 11px;
   background: #ffffff;
-  border: 1.5px solid #2563eb;
+  border: 2px solid #2563eb;
+  box-shadow: 0 0 0 3px color-mix(in oklab, #2563eb 12%, transparent);
 }
 .tf-flow .react-flow__handle.tf-handle--target {
-  width: 1px;
-  height: 1px;
-  background: transparent;
-  opacity: 0;
+  width: 8px;
+  height: 8px;
+  background: #ffffff;
+  border: 1.5px solid color-mix(in oklab, var(--foreground) 24%, transparent);
+  opacity: 1;
 }
 /* Survol discret des cartes (le « hover par défaut » suffit — cf. retour user). */
 .tf-node {
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  transition: border-color 0.18s ease;
 }
 .tf-node:hover {
-  transform: translateY(-1px);
-  box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.08),
-    0 2px 4px rgba(0, 0, 0, 0.05),
-    0 14px 28px -16px rgba(16, 24, 40, 0.18);
-}
-/* Apparition en cascade (fondu + légère montée) — c'est l'ENTRÉE des cartes ; le contenu reste
-   statique. Jouée une seule fois, après mesure des nœuds : le composant pose la classe `tf-play`.
-   L'entrée est sur le wrapper `.tf-node-anim` (le hover reste sur `.tf-node` → pas de conflit). */
-.tf-flow .tf-node-anim {
-  opacity: 0;
-}
-.tf-flow.tf-play .tf-node-anim {
-  animation: tf-node-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
-  animation-delay: var(--tf-delay, 0ms);
-}
-@keyframes tf-node-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-/* Les connecteurs apparaissent juste après leur carte source (effet de chaîne). */
-.tf-flow .react-flow__edge {
-  opacity: 0;
-}
-.tf-flow.tf-play .react-flow__edge {
-  animation: tf-edge-in 0.45s ease-out both;
-}
-.tf-flow.tf-play .react-flow__edge[data-id="e0"] {
-  animation-delay: 70ms;
-}
-.tf-flow.tf-play .react-flow__edge[data-id="e1"] {
-  animation-delay: 210ms;
-}
-.tf-flow.tf-play .react-flow__edge[data-id="e2"] {
-  animation-delay: 350ms;
-}
-.tf-flow.tf-play .react-flow__edge[data-id="e3"],
-.tf-flow.tf-play .react-flow__edge[data-id="e4"] {
-  animation-delay: 490ms;
-}
-@keyframes tf-edge-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .tf-flow .tf-node-anim,
-  .tf-flow .react-flow__edge {
-    opacity: 1;
-  }
-  .tf-flow.tf-play .tf-node-anim,
-  .tf-flow.tf-play .react-flow__edge {
-    animation: none;
-  }
+  border-color: color-mix(in oklab, var(--primary) 30%, var(--border));
 }
 
 /* Tuile de logo : s'éclaire au survol. */
@@ -742,6 +685,37 @@ body {
 @keyframes pulse-green {
   0%, 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.4); }
   50%       { box-shadow: 0 0 0 4px rgba(34,197,94,0); }
+}
+
+/* ── Icône de contenu (HORS flux) — règle user : CHAQUE icône = UNE couleur, et SANS fond.
+   On pose la teinte via `style="--ic: #2563eb"` → seul le glyphe est coloré (currentColor).
+   Fond + bordure neutralisés ici, donc les ~30 usages `.ic-tile ... border bg-card` deviennent
+   des glyphes colorés nus d'un coup, sans toucher chaque page. La taille/centrage du wrapper
+   restent (boîte invisible) pour ne pas casser l'alignement. ── */
+.ic-tile {
+  background: transparent;
+  border: 0;
+  color: var(--ic, var(--primary));
+}
+
+/* ── Point « live » (badge / loader) — pulsation douce qui reprend la couleur du texte parent.
+   Poser sur un point plein : `<span class="tf-pulse size-1.5 rounded-full bg-current" />`. ── */
+.tf-pulse {
+  position: relative;
+}
+.tf-pulse::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  animation: tf-ping 2.2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+@keyframes tf-ping {
+  0%        { box-shadow: 0 0 0 0 color-mix(in oklab, currentColor 55%, transparent); }
+  70%, 100% { box-shadow: 0 0 0 6px color-mix(in oklab, currentColor 0%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tf-pulse::before { animation: none; }
 }
 
 /* ── Selection — alignée sur le primaire de l'app ── */
@@ -871,6 +845,11 @@ body {
 .link-underline {
   position: relative;
   transition: color 150ms ease;
+  /* Ne pas s'étirer quand le lien est un flex-item (parent `flex flex-col`) : sinon le souligné
+     animé court jusqu'au bord de la carte. `fit-content` = largeur du texte, et reste centré si
+     le parent centre (align-items). Ignoré sur les liens inline (dans un paragraphe). */
+  width: fit-content;
+  max-width: 100%;
 }
 .link-underline::after {
   content: "";
