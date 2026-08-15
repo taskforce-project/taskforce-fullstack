@@ -39,47 +39,36 @@ export function Hero() {
       />
 
       <div className="container-rail relative pt-20 pb-0 lg:pt-28">
-        <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_400px] lg:items-end lg:gap-16">
-          <div>
-            <p className="text-primary mb-4 text-[14px] font-medium tracking-[-0.01em]">
-              The AI delivery operating system
-            </p>
-            <h1 className="t-h1">
-              Describe the outcome.
-              <br className="hidden sm:block" /> TaskForce runs the delivery.
-            </h1>
-          </div>
-          <div>
-            <p className="t-lead">
-              You describe the outcome. TaskForce drafts the spec, the plan and the prompt your coding
-              agent runs, keeps you on every decision, and remembers why. Today it works issue by issue —
-              the full governed run is where it is headed.
-            </p>
-            <div className="mt-7 flex flex-wrap gap-3">
-              <Button asChild size="pill">
-                <a href={`${APP_URL}/auth/register`}>Run your first workflow</a>
-              </Button>
-              <Button asChild variant="outline" size="pill">
-                <a href="/book-a-demo">Book a demo</a>
-              </Button>
-            </div>
-            {/* Trois faits sobres — le différenciateur : gouverné, local à coût zéro, self-hostable. */}
-            <p className="text-muted-foreground mt-6 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]">
-              <span>You approve every decision</span>
-              <span aria-hidden className="text-border">·</span>
-              <span>Runs on your models — local or hosted</span>
-              <span aria-hidden className="text-border">·</span>
-              <span>Self-hosted, your network</span>
-            </p>
+        {/* Copie du hero — CENTRÉE et épurée (façon Linear/Relevance) : titre en haut, une promesse,
+            deux actions. Une seule colonne → fini le désalignement titre/texte du layout 2-col. */}
+        <div className="mx-auto max-w-3xl text-center">
+          <p className="text-primary mb-4 text-[14px] font-medium tracking-[-0.01em]">
+            The AI delivery operating system
+          </p>
+          <h1 className="t-h1 text-balance">
+            Describe the outcome.
+            <br className="hidden sm:block" /> TaskForce runs the delivery.
+          </h1>
+          <p className="t-lead mx-auto mt-6 max-w-2xl text-balance">
+            TaskForce turns an outcome into the spec, the plan and the prompt your coding agent runs —
+            a human approves every step, and the reasons are remembered.
+          </p>
+          <div className="mt-8 flex flex-wrap justify-center gap-3">
+            <Button asChild size="pill-lg">
+              <a href={`${APP_URL}/auth/register`}>Run your first workflow</a>
+            </Button>
+            <Button asChild variant="outline" size="pill-lg">
+              <a href="/book-a-demo">Book a demo</a>
+            </Button>
           </div>
         </div>
 
-        {/* Preuve sociale honnête : « Built with » (pas « customers ») — l'écosystème qu'on utilise. */}
-        <div className="mt-12 flex flex-col gap-5 border-t pt-8 sm:flex-row sm:items-center sm:gap-8">
-          <span className="text-muted-foreground shrink-0 text-[12.5px]">
+        {/* Preuve sociale honnête : « Works with » (pas « customers ») — l'écosystème qu'on utilise. Centré. */}
+        <div className="mt-14 flex flex-col items-center gap-5">
+          <span className="text-muted-foreground text-[12.5px]">
             Works with the tools your engineers already trust
           </span>
-          <ul className="flex flex-wrap items-center gap-x-8 gap-y-4">
+          <ul className="flex flex-wrap items-center justify-center gap-x-8 gap-y-4">
             {BUILT_WITH.map((b) => (
               <li key={b.key}>
                 <BrandLogo

@@ -1,4 +1,5 @@
-import { Check, ShieldCheck, SlidersHorizontal, Activity, ArrowRight } from "lucide-react";
+import type { CSSProperties } from "react";
+import { Check, ShieldCheck, SlidersHorizontal, Activity, ArrowRight, PenLine, Network, Server } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Section, SectionHeader } from "../Section";
 import { AppShot, Toast } from "../AppShot";
@@ -13,19 +14,22 @@ import { APP_URL } from "../nav";
 /* ─────────────────────────  Entreprise & conformité (badges + checklist 3 colonnes)  ───────────────────────── */
 
 /** Trois colonnes façon Relevance, chaque item = une vraie capacité produit. */
-const TRUST_COLUMNS: { icon: typeof ShieldCheck; group: string; items: string[] }[] = [
+const TRUST_COLUMNS: { icon: typeof ShieldCheck; ic: string; group: string; items: string[] }[] = [
   {
     icon: ShieldCheck,
+    ic: "#d97706",
     group: "Security & data",
     items: ["Self-hosting, your network", "Encryption in transit & at rest", "Secrets out of the codebase", "No training on your data"],
   },
   {
     icon: SlidersHorizontal,
+    ic: "#2563eb",
     group: "Access & controls",
     items: ["SSO / SAML via Keycloak", "Roles & permissions", "A human sign-off at each checkpoint", "Per-project access"],
   },
   {
     icon: Activity,
+    ic: "#0891b2",
     group: "Monitoring & oversight",
     items: ["Full audit trail", "Who approved what, and when", "Which model ran where", "Delivery analytics"],
   },
@@ -79,8 +83,13 @@ export function Trust() {
       <div className="mt-14 grid gap-x-10 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
         {TRUST_COLUMNS.map((col) => (
           <div key={col.group}>
-            <p className="text-muted-foreground flex items-center gap-2 text-[13px] font-medium">
-              <col.icon className="size-4" strokeWidth={1.75} />
+            <p className="flex items-center gap-2.5 text-[13px] font-semibold text-foreground">
+              <span
+                className="ic-tile flex size-7 items-center justify-center rounded-md border"
+                style={{ "--ic": col.ic } as CSSProperties}
+              >
+                <col.icon className="size-4" strokeWidth={1.9} />
+              </span>
               {col.group}
             </p>
             <ul className="mt-3 flex flex-col gap-2.5">
@@ -156,7 +165,7 @@ export function Integrations() {
         </a>
       </div>
 
-      <ul className="bg-border mt-12 grid grid-cols-4 gap-px overflow-hidden rounded-2xl border sm:grid-cols-6 lg:grid-cols-8">
+      <ul className="bg-border mt-12 grid grid-cols-4 gap-px overflow-hidden border sm:grid-cols-6 lg:grid-cols-8">
         {INTEGRATIONS.map((key) => (
           <li
             key={key}
@@ -183,14 +192,20 @@ export function Integrations() {
  */
 const AHEAD = [
   {
+    icon: PenLine,
+    ic: "#2563eb",
     title: "Less drafting, more deciding",
     text: "Every checkpoint that gets reliable is one you stop writing yourself. The direction is not fewer humans — it is humans spending their time on the decisions instead of the paperwork around them.",
   },
   {
+    icon: Network,
+    ic: "#7c3aed",
     title: "An intelligence layer for the organization",
     text: "The decisions, constraints and trade-offs one run records don’t belong to engineering alone. The same graph that tells an agent why the system is the way it is can tell any team why the organization is — a live model to decide on top of, not a wiki to search.",
   },
   {
+    icon: Server,
+    ic: "#64748b",
     title: "Still your infrastructure",
     text: "Self-hosting is a first-class deployment — it comes with Enterprise, and where your models run stays your decision.",
   },
@@ -199,8 +214,8 @@ const AHEAD = [
 export function WhereThisGoes() {
   return (
     <Section>
-      <div className="grid gap-10 lg:grid-cols-[minmax(0,420px)_1fr] lg:gap-16">
-        <div>
+      <div className="grid gap-10 lg:grid-cols-[minmax(0,400px)_1fr] lg:gap-0">
+        <div className="lg:pr-14">
           <SectionHeader
             eyebrow="The direction"
             title="Software teams won’t hand-write specs forever"
@@ -214,11 +229,26 @@ export function WhereThisGoes() {
           </Button>
         </div>
 
-        <ul className="grid gap-px overflow-hidden rounded-2xl border bg-border">
-          {AHEAD.map((n) => (
-            <li key={n.title} className="bg-card p-6 transition-colors hover:bg-secondary/40">
-              <h3 className="text-[15px] font-semibold text-foreground">{n.title}</h3>
-              <p className="text-muted-foreground mt-2 text-[13.5px] leading-6">{n.text}</p>
+        {/* « Traits intégrés » : filet vertical qui relie la colonne au reste de la page, rails
+            haut/bas + séparateurs entre lignes. Pas de radius (réservé aux canvases de flux). */}
+        <ul className="divide-border divide-y lg:pl-14">
+          {AHEAD.map((n, i) => (
+            <li key={n.title} className="hover:bg-secondary/30 flex gap-5 py-6 transition-colors">
+              <span
+                className="ic-tile flex size-10 shrink-0 items-center justify-center rounded-lg border"
+                style={{ "--ic": n.ic } as CSSProperties}
+              >
+                <n.icon className="size-5" strokeWidth={1.75} />
+              </span>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground font-mono text-[11px] tabular-nums">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <h3 className="text-[15px] font-semibold text-foreground">{n.title}</h3>
+                </div>
+                <p className="text-muted-foreground mt-2 text-[13.5px] leading-6">{n.text}</p>
+              </div>
             </li>
           ))}
         </ul>
@@ -234,14 +264,6 @@ export function FinalCta() {
     <section className="bg-secondary">
       <div className="container-rail py-24">
         <div className="bg-card relative overflow-hidden rounded-3xl border px-8 py-16 text-center sm:py-20">
-          <div
-            aria-hidden
-            className="pointer-events-none absolute top-0 left-1/2 h-72 w-[680px] -translate-x-1/2 rounded-full blur-3xl"
-            style={{
-              background:
-                "radial-gradient(50% 50% at 50% 50%, color-mix(in oklab, var(--primary) 14%, transparent), transparent 70%)",
-            }}
-          />
           <h2 className="t-h2 relative">Start with one run</h2>
           <p className="t-lead relative mx-auto mt-4 max-w-lg">
             Describe an outcome you were going to spec by hand this week. See what comes back, then

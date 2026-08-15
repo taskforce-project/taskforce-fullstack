@@ -27,7 +27,7 @@ const HANDOFFS = [
 
 export function Problem() {
   return (
-    <Section band>
+    <Section>
       <div className="grid gap-10 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1fr)] lg:items-center lg:gap-16">
         <SectionHeader
           eyebrow="The problem"

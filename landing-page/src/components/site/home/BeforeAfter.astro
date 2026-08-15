@@ -1,0 +1,60 @@
+---
+/**
+ * BeforeAfter (.astro) — 2 pipelines React Flow, sur la DA « traits intégrés » via les primitives
+ * `SectionShell` + `TraitGrid` (cf. `.ai/landing-design-system.md`). Le message tient dans la LONGUEUR :
+ * 6 mains (le contexte fuit à chacune) vs 5 étapes gouvernées.
+ */
+import SectionShell from "@/components/site/sections/SectionShell.astro";
+import TraitGrid from "@/components/site/sections/TraitGrid.astro";
+import { StepChainFlow } from "@/components/site/flows/OrchestrationFlows";
+
+const BEFORE = [
+  { icon: "lightbulb", title: "Intent", sub: "lives in someone's head" },
+  { icon: "users", title: "Meetings", sub: "notes scattered, half-remembered" },
+  { icon: "file", title: "Specs", sub: "written once, never updated" },
+  { icon: "ticket", title: "Tickets", sub: "the reason gets dropped" },
+  { icon: "terminal", title: "Prompts", sub: "the agent is re-briefed from scratch" },
+  { icon: "eye", title: "Review", sub: "the original context is already gone" },
+];
+const AFTER = [
+  { icon: "flag", title: "Outcome" },
+  { icon: "brain", title: "Context" },
+  { icon: "calendar", title: "Plan" },
+  { icon: "shield", title: "Approvals" },
+  { icon: "rocket", title: "Ship" },
+];
+---
+
+<SectionShell
+  align="center"
+  eyebrow="From idea to shipped"
+  title="Same outcome. Fewer places for context to disappear."
+  lead="The building is the same. What changes is how many times the context has to survive a handoff."
+>
+  <TraitGrid cols={2} class="mt-12">
+    {/* Avant */}
+    <div class="bg-card p-6 sm:p-8">
+      <div class="mb-6 flex flex-wrap items-center justify-between gap-2">
+        <span class="text-muted-foreground text-[12px] font-semibold tracking-[0.06em] uppercase">
+          Before TaskForce
+        </span>
+        <span class="text-muted-foreground text-[12px]">6 handoffs · context leaks at each</span>
+      </div>
+      <div class="flow-canvas relative border" style={`height:${BEFORE.length * 90}px`}>
+        <StepChainFlow steps={BEFORE} id="ba-before" w={260} client:only="react" />
+      </div>
+    </div>
+    {/* Après */}
+    <div class="bg-card p-6 sm:p-8">
+      <div class="mb-6 flex flex-wrap items-center justify-between gap-2">
+        <span class="text-primary text-[12px] font-semibold tracking-[0.06em] uppercase">
+          With TaskForce
+        </span>
+        <span class="text-muted-foreground text-[12px]">One governed run · context kept</span>
+      </div>
+      <div class="flow-canvas relative border" style={`height:${AFTER.length * 90}px`}>
+        <StepChainFlow steps={AFTER} id="ba-after" w={260} accentAll client:only="react" />
+      </div>
+    </div>
+  </TraitGrid>
+</SectionShell>

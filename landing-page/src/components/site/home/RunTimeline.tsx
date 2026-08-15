@@ -128,7 +128,7 @@ export function RunTimeline() {
   const allDone = beat >= STEPS.length * 2;
 
   return (
-    <Section band>
+    <Section>
       <div className="grid gap-12 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-start lg:gap-16">
         {/* Colonne texte */}
         <div className="lg:sticky lg:top-28">
@@ -165,7 +165,7 @@ export function RunTimeline() {
         </div>
 
         {/* Colonne timeline — l'îlot animé (client:idle dans index.astro). */}
-        <div ref={scene.ref} className="bg-card overflow-hidden rounded-2xl border shadow-lg">
+        <div ref={scene.ref} className="bg-card overflow-hidden rounded-2xl border">
           {/* En-tête du run */}
           <div className="flex items-center justify-between border-b px-5 py-3.5">
             <div className="flex items-center gap-2.5">
@@ -306,7 +306,7 @@ export function RunTimeline() {
           </table>
         </div>
 
-        <div className="bg-secondary/40 mt-6 rounded-xl border px-5 py-4">
+        <div className="border-primary/40 mt-6 border-l-2 pl-5">
           <p className="text-[14px] font-semibold text-foreground">Adaptive by design</p>
           <p className="text-muted-foreground mt-1 text-[13.5px] leading-6">
             A bug fix doesn’t need a strategy phase; a migration doesn’t take the same path as a

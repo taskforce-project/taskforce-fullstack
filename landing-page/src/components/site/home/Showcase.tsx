@@ -53,7 +53,7 @@ export function TeamGrid() {
   const eng = TEAMS[0]; // Engineering — le wedge assumé (review 5, Option A). Statique, plus d'onglet.
 
   return (
-    <Section band>
+    <Section>
       <SectionHeader
         eyebrow="Who it’s for"
         title="Built for engineering teams first"
@@ -68,9 +68,9 @@ export function TeamGrid() {
         <span className="bg-border h-px flex-1" />
       </div>
 
-      <ul className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      <ul className="bg-border -mx-6 mt-6 grid gap-px border-y border-border sm:grid-cols-3 lg:-mx-10">
         {eng.cards.map((c) => (
-          <li key={c.title} className="card-hover bg-card flex flex-col rounded-2xl border p-5">
+          <li key={c.title} className="bg-card flex flex-col p-6">
             <h3 className="text-[15px] font-semibold text-foreground">{c.title}</h3>
             <p className="text-muted-foreground mt-1.5 text-[13.5px] leading-6">{c.text}</p>
           </li>
@@ -342,7 +342,7 @@ const SYSTEMS = [
 
 export function Synergy() {
   return (
-    <Section band>
+    <Section>
       <SectionHeader
         index="2.0"
         indexHref="/product"
@@ -360,7 +360,7 @@ export function Synergy() {
         <span className="text-primary">TaskForce connects both.</span>
       </p>
 
-      <ul className="bg-border mt-12 grid gap-px overflow-hidden rounded-2xl border sm:grid-cols-2 lg:grid-cols-4">
+      <ul className="bg-border -mx-6 mt-12 grid gap-px border-y border-border sm:grid-cols-2 lg:-mx-10 lg:grid-cols-4">
         {SYSTEMS.map((s, i) => (
           <li key={s.part} className="bg-card flex flex-col p-6">
             <span className="text-muted-foreground font-mono text-[12px] tracking-[0.12em]">
@@ -373,8 +373,9 @@ export function Synergy() {
         ))}
       </ul>
 
-      {/* Bento : la couche de savoir — c'est elle qui retient le contexte (lien avec « The problem »). */}
-      <div className="bg-card mt-5 grid items-center gap-8 rounded-2xl border p-6 sm:p-8 lg:grid-cols-2 lg:gap-14">
+      {/* Bento : la couche de savoir — c'est elle qui retient le contexte (lien avec « The problem »).
+          De-cardé : bande edge-to-edge à filet (pas de card flottante). */}
+      <div className="bg-card -mx-6 mt-6 grid items-center gap-8 border-y border-border px-6 py-8 sm:px-8 lg:-mx-10 lg:grid-cols-2 lg:gap-14 lg:px-10">
         <div>
           <h3 className="t-h3">Git remembers what changed. TaskForce remembers why.</h3>
           <p className="text-muted-foreground mt-3 text-[14px] leading-7">
