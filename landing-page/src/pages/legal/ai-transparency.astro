@@ -3,10 +3,7 @@ import BaseLayout from "@/layouts/BaseLayout.astro";
 import PageHero from "@/components/site/PageHero.astro";
 import PageCta from "@/components/site/PageCta.astro";
 import Prose from "@/components/site/Prose.astro";
-import { ArrowRight, Check, Pencil, X } from "lucide-react";
-
-/* Étapes du chemin d'une proposition — le visuel central de la page (schéma user). */
-const FLOW = ["Workspace context + Memory", "Agent", "Proposal / artifact", "Human review"];
+import { ProposalPathFlow } from "@/components/site/flows/OrchestrationFlows";
 ---
 
 <BaseLayout
@@ -76,48 +73,15 @@ const FLOW = ["Workspace context + Memory", "Agent", "Proposal / artifact", "Hum
         <h2 class="t-h2">Context in, a proposal out — a human decides</h2>
       </div>
 
-      <div class="mt-10 rounded-2xl border bg-card p-6 sm:p-8">
-        <div class="mx-auto flex max-w-sm flex-col items-center">
-          {
-            FLOW.map((node, i) => (
-              <>
-                <div
-                  class:list={[
-                    "w-full rounded-xl border px-4 py-3 text-center text-[13.5px] font-medium text-foreground",
-                    i === 1 ? "border-primary/30 bg-primary/[0.05]" : "bg-secondary/40",
-                  ]}
-                >
-                  {node}
-                </div>
-                <ArrowRight className="text-muted-foreground/50 my-2 size-4 rotate-90" />
-              </>
-            ))
-          }
-
-          {/* Le point de décision humaine : trois issues */}
-          <div class="flex flex-wrap justify-center gap-2">
-            <span class="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[12px] font-medium text-emerald-700">
-              <Check className="size-3.5" strokeWidth={2.5} /> Approve
-            </span>
-            <span class="text-muted-foreground inline-flex items-center gap-1.5 rounded-full border bg-secondary px-3 py-1 text-[12px] font-medium">
-              <Pencil className="size-3.5" strokeWidth={2} /> Edit
-            </span>
-            <span class="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-[12px] font-medium text-red-700">
-              <X className="size-3.5" strokeWidth={2.5} /> Reject
-            </span>
-          </div>
-
-          <ArrowRight className="text-muted-foreground/50 my-2 size-4 rotate-90" />
-          <div class="border-primary/30 bg-primary/[0.05] w-full rounded-xl border px-4 py-3 text-center text-[13.5px] font-medium text-foreground">
-            Next checkpoint
-          </div>
-        </div>
-        <p class="text-muted-foreground mt-6 text-center text-[13px]">
-          Only an approved proposal becomes the context for what follows. A rejection isn't silently
-          discarded — it stays in the run's audit trail with your feedback, and can shape the next
-          proposal.
-        </p>
+      {/* Le schéma en React Flow (même DA que l'orchestration) — statique. */}
+      <div class="flow-canvas relative -mx-6 mt-10 h-[320px] border-y border-border lg:-mx-10">
+        <ProposalPathFlow client:only="react" />
       </div>
+      <p class="text-muted-foreground mt-6 max-w-2xl text-[13px] leading-6">
+        Only an approved proposal becomes the context for what follows. A rejection isn't silently
+        discarded — it stays in the run's audit trail with your feedback, and can shape the next
+        proposal.
+      </p>
     </div>
   </section>
 
