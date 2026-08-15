@@ -185,6 +185,13 @@ point identifiable sur la courbe de lead time.
 | Métronome | `src/lib/useScene.ts` | `useScene(beats)` : partition de durées, démarre à l'entrée à l'écran, se joue **une fois**, **se fige sur l'état final**. `useTypewriter` pour la frappe. `prefers-reduced-motion` → état final direct. |
 | Châssis | `src/components/site/scene/AppWindow.tsx` | Vrai écran TaskForce (voir encadré ci-dessous). **Remplace la barre macOS de `MockFrame`** — trois pastilles + une URL, c'est le signe le plus sûr qu'on regarde un dessin. |
 
+> ### ⚑ v190 (14/08) — Pré-deploy : page `/waitlist` + tous les CTA d'inscription repointés + build prod OK
+> User : « rediriger vers une waitlist » (les CTA pointaient vers `app.taskforce.dev`, morts tant que l'app n'est pas déployée).
+> - **NOUVEAU `src/pages/waitlist.astro`** : page « Join the waitlist » (PageHero + CTA **mailto** `hello@taskforce.dev`, aucun backend requis sur site statique ; brancher Formspree/Tally plus tard). + perks + lien book-a-demo.
+> - **Repoint** : `` `${APP_URL}/auth/register` `` → `"/waitlist"` sur **49 occurrences / 28 fichiers** (perl scripté). 0 `auth/register` restant. Les imports `APP_URL` devenus inutilisés ne cassent pas le build (esbuild les strippe) ; « sign in » (`APP_URL` seul) laissé tel quel.
+> - **Build prod vérifié** (`docker exec taskforce-landing-dev npm run build`) : **69 pages statiques en 32 s, « Complete! »** incl. `/waitlist`. Sortie **statique** → OK Vercel / tout hébergeur statique.
+> - **Déploiement (non fait par moi)** : pas d'accès au compte Vercel de l'utilisateur → deploy = son action (dashboard : import repo GitHub → **Root Directory = `taskforce-fullstack/landing-page`** → auto-detect Astro). Git : branche `chore/v1-closure` **partagée** + bcp de changements `frontend/` non commités (pas les miens) → **pas de merge dev/main de ma part**. Pour n'amener QUE le dossier : `git checkout dev && git checkout chore/v1-closure -- landing-page/`.
+
 > ### ⚑ v189 (14/08) — Revert de l'habillage « stripes » (user : « j'ai rien dit, enlève »)
 > Demande C annulée : `.bg-diagonal` (global.css) + prop `decor` (BorderedGrid) + `decor="diagonal"` (approvals) **supprimés**. **A (no-rail) et B (flèches à angle droit) conservés.** Vérifié : 0 `bg-diagonal` servi, approvals 200 clean.
 
