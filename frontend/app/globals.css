@@ -284,6 +284,96 @@
   background: var(--sidebar);
 }
 
+/* Identité « Labs » — alignée sur le site : l'ICÔNE prend un dégradé sur le TRAIT (pêche→rose→bleu, sans
+   violet), et les labels Labs sont en texte dégradé. Le dégradé SVG est déclaré par <LabsGradientDefs/>
+   (monté dans AppShell) ; ces classes le référencent. */
+.tf-labs-icon { stroke: url(#tf-labs-grad); }
+.tf-labs-gtext {
+  background-image: linear-gradient(135deg, #ff6f91, #7db8ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Fond « Labs » = l'image du site (hero-wave), UNIQUEMENT sur le bandeau (topbar) des pages Labs.
+   Un « blob » dégradé côté GAUCHE (couleur `--background`, thème-aware) masque l'image là où se trouve
+   le texte (fil d'Ariane) ; l'image reste DISCRÈTE à droite (jamais totalement dévoilée). */
+.lab-banner-bg {
+  background-image:
+    radial-gradient(160% 190% at 4% 50%,
+      var(--background) 0%,
+      var(--background) 24%,
+      color-mix(in srgb, var(--background) 28%, transparent) 100%),
+    url("/assets/tour/labs-wave.jpg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* Lignes « Labs » du Ctrl+K : la même vague, en accent à droite (voile à gauche pour garder icône +
+   libellé lisibles). Sur `--popover` (fond du modal de recherche). */
+.lab-cmd-row {
+  background-image:
+    linear-gradient(to right, var(--popover) 0%, var(--popover) 42%, color-mix(in srgb, var(--popover) 48%, transparent) 100%),
+    url("/assets/tour/labs-wave.jpg");
+  background-size: cover;
+  background-position: right center;
+  background-repeat: no-repeat;
+}
+
+
+/* ── Accessibilité (réglages Apparence) ────────────────────────────────────── */
+/* Taille du texte : on échelle la RACINE → tout le texte en rem suit (Tailwind = rem). */
+html.font-large   { font-size: 112.5%; } /* ~18px base */
+html.font-x-large { font-size: 125%; }   /* ~20px base */
+
+/* Confort de lecture (dyslexie) : police lisible + espacements accrus (les vraies aides). OpenDyslexic
+   si installée sur le système, sinon repli sur des polices lisibles largement disponibles.
+   Sur <body> → couvre AUSSI les portails (modals, toasts, Ctrl+K), pas seulement le contenu principal. */
+html.a11y-dyslexia body {
+  font-family: "OpenDyslexic", "Comic Sans MS", Verdana, Tahoma, sans-serif;
+  letter-spacing: 0.03em;
+  word-spacing: 0.06em;
+  line-height: 1.75;
+}
+
+/* Contraste élevé : on ne « transforme » PAS les couleurs (un filtre CSS global déforme le design et
+   n'aide pas vraiment) — on surcharge les tokens sémantiques pour maximiser le contraste (texte noir,
+   fonds blancs, bordures franches, muted lisible, primaire/danger renforcés). Spécificité `html.classe`
+   (0,1,1) > `.dark` (0,1,0) → l'emporte même en thème sombre. L'accessibilité daltonienne se joue
+   surtout côté design (couleur + icône + libellé, jamais la couleur seule) ; le filtre daltonien
+   ci-dessous est proposé EN PLUS (option demandée), pas comme substitut au contraste/design. */
+html.high-contrast {
+  --background: #ffffff;
+  --card: #ffffff;
+  --popover: #ffffff;
+  --sidebar: #ffffff;
+  --foreground: #000000;
+  --card-foreground: #000000;
+  --popover-foreground: #000000;
+  --sidebar-foreground: #000000;
+  --muted: #ebebeb;
+  --muted-foreground: #1a1a1a;   /* bien plus foncé que #6e6e73 → passe WCAG AA */
+  --secondary: #ebebeb;
+  --secondary-foreground: #000000;
+  --accent: #ebebeb;
+  --accent-foreground: #000000;
+  --primary: #0b3d91;            /* bleu profond, fort contraste sur blanc */
+  --primary-foreground: #ffffff;
+  --destructive: #b00020;
+  --destructive-foreground: #ffffff;
+  --border: #000000;
+  --input: #000000;
+  --ring: rgba(0, 0, 0, 0.65);
+  --sidebar-border: #000000;
+}
+
+/* Mode daltonien (option) : filtre de correction (daltonisation) sur <body> → toute l'app, portails
+   inclus. Défs SVG dans <A11yFilters/>. Sans effet sur le layout (body ≈ viewport, ne scrolle pas). */
+html.cb-protanopia   body { filter: url("#cb-protanopia"); }
+html.cb-deuteranopia body { filter: url("#cb-deuteranopia"); }
+html.cb-tritanopia   body { filter: url("#cb-tritanopia"); }
+
 /* Aucune surface shadcn/radix ne floute son arrière-plan : design plat */
 [data-sidebar="sidebar"],
 header[class*="sticky"],

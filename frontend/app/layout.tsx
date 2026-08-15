@@ -7,6 +7,7 @@ import { ThemeProvider } from "next-themes";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorBoundary } from "@/components/providers/error-boundary";
 import { CookieBanner } from "@/components/common/cookie-banner";
+import { A11yFilters } from "@/components/a11y/a11y-filters";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -48,6 +49,8 @@ export default function RootLayout({
                   <CookieBanner />
                 </AuthProvider>
               </ErrorBoundary>
+              {/* Défs SVG des filtres daltonisme — appliquées à <body> via globals.css (en plus du contraste élevé) */}
+              <A11yFilters />
             </TooltipProvider>
           </I18nProvider>
         </ThemeProvider>

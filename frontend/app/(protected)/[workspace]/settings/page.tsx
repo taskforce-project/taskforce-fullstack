@@ -1,11 +1,11 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { useSearchParams, useRouter } from "next/navigation"
+import { useSearchParams, useRouter, useParams } from "next/navigation"
 import {
   User, Bell, Mail, Zap, Globe, Key, Palette, Webhook,
   Upload, Camera, Link2, Trash2, Shield, Loader2,
-  Activity, CheckCircle2, AlertTriangle, Gauge,
+  Activity, CheckCircle2, AlertTriangle, Gauge, Search,
 } from "lucide-react"
 import { toast } from "sonner"
 import { useTheme } from "next-themes"
@@ -13,10 +13,12 @@ import { useTheme } from "next-themes"
 import { useTranslation } from "@/lib/i18n"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Zone } from "@/components/ui/zone"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { Separator } from "@/components/ui/separator"
-import { PageContainer, PageHeader } from "@/components/layout/page-shell"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
+import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useAuth } from "@/lib/contexts/auth-context"
 import { useUserStore } from "@/lib/store/user-store"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
@@ -160,8 +162,11 @@ function ProfilePanel() {
     try {
       const formData = new FormData()
       formData.append("file", file)
+      // `Content-Type: undefined` (et NON "multipart/form-data") : le client Axios a un défaut
+      // `application/json` ; en le forçant à undefined, Axios détecte le FormData et pose lui-même
+      // `multipart/form-data; boundary=…`. Sans le boundary, le back ne parse pas → upload cassé.
       const res = await apiClient.post<{ data: { avatarUrl: string } }>(USER_ROUTES.AVATAR, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
+        headers: { "Content-Type": undefined },
       })
       const newUrl = res.data.data.avatarUrl ?? ""
       setAvatarUrl(newUrl)
@@ -346,8 +351,8 @@ function AccountPanel() {
           </FormField>
         </div>
       </SectionCard>
-      <SectionCard danger title="Danger zone" description="Irreversible actions. Proceed with caution.">
-        <div className="flex items-center justify-between">
+      <Zone variant="danger" title="Danger zone" description="Irreversible actions. Proceed with caution.">
+        <div className="flex items-center justify-between gap-4">
           <div>
             <p className="text-sm font-medium text-foreground">Delete your account</p>
             <p className="text-xs text-muted-foreground mt-0.5">Permanently delete your account and all associated data.</p>
@@ -365,7 +370,7 @@ function AccountPanel() {
             </Button>
           </DeleteConfirmDialog>
         </div>
-      </SectionCard>
+      </Zone>
     </div>
   )
 }
@@ -378,6 +383,28 @@ function AppearancePanel() {
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setMounted(true), [])
   const current = mounted ? (theme ?? "system") : "system"
+
+  // Accessibilité — persistée dans le store de préférences (appliquée en direct via des classes racine).
+  const fontSize = usePreferencesStore((s) => s.fontSize)
+  const setFontSize = usePreferencesStore((s) => s.setFontSize)
+  const dyslexiaFont = usePreferencesStore((s) => s.dyslexiaFont)
+  const setDyslexiaFont = usePreferencesStore((s) => s.setDyslexiaFont)
+  const highContrast = usePreferencesStore((s) => s.highContrast)
+  const setHighContrast = usePreferencesStore((s) => s.setHighContrast)
+  const colorblindMode = usePreferencesStore((s) => s.colorblindMode)
+  const setColorblindMode = usePreferencesStore((s) => s.setColorblindMode)
+
+  const FONT_SIZES: { value: "normal" | "large" | "x-large"; label: string }[] = [
+    { value: "normal", label: "Normal" },
+    { value: "large", label: "Grand" },
+    { value: "x-large", label: "Très grand" },
+  ]
+  const COLORBLIND_MODES: { value: "none" | "protanopia" | "deuteranopia" | "tritanopia"; label: string }[] = [
+    { value: "none", label: "Aucun" },
+    { value: "protanopia", label: "Protanopie (rouge)" },
+    { value: "deuteranopia", label: "Deutéranopie (vert)" },
+    { value: "tritanopia", label: "Tritanopie (bleu)" },
+  ]
 
   return (
     <div className="flex flex-col gap-4">
@@ -403,6 +430,80 @@ function AppearancePanel() {
               <span className="text-xs font-medium text-foreground">{opt}</span>
             </button>
           ))}
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Accessibilité" description="Confort de lecture et adaptations visuelles. Appliqué immédiatement et mémorisé.">
+        <div className="flex flex-col gap-6">
+          {/* Taille du texte */}
+          <div>
+            <p className="mb-1.5 text-sm font-medium text-foreground">Taille du texte</p>
+            <div className="inline-flex rounded-lg border border-border p-0.5">
+              {FONT_SIZES.map((f) => (
+                <button
+                  key={f.value}
+                  type="button"
+                  onClick={() => setFontSize(f.value)}
+                  className={cn(
+                    "rounded-md px-3 py-1.5 text-sm transition-colors",
+                    fontSize === f.value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Confort de lecture (dyslexie) */}
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-foreground">Confort de lecture (dyslexie)</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Police plus lisible et espacements accrus (interlignes, lettres, mots).
+              </p>
+            </div>
+            <Switch checked={dyslexiaFont} onCheckedChange={setDyslexiaFont} aria-label="Confort de lecture" />
+          </div>
+
+          <Separator />
+
+          {/* Contraste élevé — alternative saine au « filtre daltonien » : on renforce les contrastes
+              (WCAG) plutôt que de transformer les couleurs. L'info n'est jamais portée par la couleur
+              seule (couleur + icône + libellé dans les composants d'état). */}
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-foreground">Contraste élevé</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Renforce les contrastes texte/fond/bordures (utile en cas de basse vision ou de forte luminosité).
+              </p>
+            </div>
+            <Switch checked={highContrast} onCheckedChange={setHighContrast} aria-label="Contraste élevé" />
+          </div>
+
+          <Separator />
+
+          {/* Mode daltonien (option) — filtre de correction, EN PLUS du contraste et des repères non colorés. */}
+          <div className="grid grid-cols-[1fr_auto] items-start gap-4">
+            <div>
+              <p className="text-sm font-medium text-foreground">Mode daltonien</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Filtre de correction des couleurs selon le type de daltonisme (rouge-vert / bleu-jaune).
+              </p>
+            </div>
+            <Select value={colorblindMode} onValueChange={(v) => setColorblindMode(v as typeof colorblindMode)}>
+              <SelectTrigger className="w-52 shrink-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {COLORBLIND_MODES.map((m) => (
+                  <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </SectionCard>
     </div>
@@ -556,7 +657,7 @@ function WorkspacePanel() {
       </SectionCard>
 
       {isOwner && (
-        <SectionCard danger title="Danger zone" description="Actions irréversibles. À utiliser avec précaution.">
+        <Zone variant="danger" title="Danger zone" description="Actions irréversibles. À utiliser avec précaution.">
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-sm font-medium text-foreground">Supprimer ce workspace</p>
@@ -575,7 +676,7 @@ function WorkspacePanel() {
               </Button>
             </DeleteConfirmDialog>
           </div>
-        </SectionCard>
+        </Zone>
       )}
     </div>
   )
@@ -1151,7 +1252,7 @@ function PrivacyPanel() {
         </div>
       </SectionCard>
 
-      <SectionCard title="Delete account" description="Permanently remove your account and all associated data.">
+      <Zone variant="danger" title="Delete account" description="Permanently remove your account and all associated data.">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-sm font-medium text-foreground">Delete my account</p>
@@ -1190,7 +1291,7 @@ function PrivacyPanel() {
             </div>
           )}
         </div>
-      </SectionCard>
+      </Zone>
     </div>
   )
 }
@@ -1302,29 +1403,58 @@ export function SettingsNav({
   onSelect,
   className,
 }: Readonly<{ active: SettingsSection; onSelect: (s: SettingsSection) => void; className?: string }>) {
+  const [q, setQ] = useState("")
+  const query = q.trim().toLowerCase()
+
+  const renderBtn = (s: SectionConfig) => (
+    <button
+      key={s.key}
+      onClick={() => onSelect(s.key)}
+      className={cn(
+        "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm text-left transition-colors w-full",
+        active === s.key
+          ? "bg-muted text-foreground font-medium"
+          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+      )}
+    >
+      {s.icon}
+      {s.label}
+    </button>
+  )
+
+  const results = query ? SECTIONS.filter((s) => s.label.toLowerCase().includes(query)) : []
+
   return (
-    <nav className={cn("flex flex-col gap-6", className)}>
-      {SECTION_GROUPS.map((group) => (
-        <div key={group.label} className="flex flex-col gap-0.5">
-          <p className="px-3 mb-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">{group.label}</p>
-          {SECTIONS.filter((s) => (group.keys as readonly string[]).includes(s.key)).map((s) => (
-            <button
-              key={s.key}
-              onClick={() => onSelect(s.key)}
-              className={cn(
-                "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm text-left transition-colors w-full",
-                active === s.key
-                  ? "bg-muted text-foreground font-medium"
-                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-              )}
-            >
-              {s.icon}
-              {s.label}
-            </button>
-          ))}
-        </div>
-      ))}
-    </nav>
+    <div className={cn("flex flex-col gap-3", className)}>
+      {/* Recherche dans les réglages */}
+      <div className="relative px-0.5">
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Rechercher un réglage…"
+          aria-label="Rechercher un réglage"
+          className="h-8 w-full rounded-md border border-border bg-background pl-8 pr-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary/50"
+        />
+      </div>
+
+      <nav className="flex flex-col gap-6">
+        {query ? (
+          results.length === 0 ? (
+            <p className="px-3 py-2 text-sm text-muted-foreground">Aucun réglage trouvé.</p>
+          ) : (
+            <div className="flex flex-col gap-0.5">{results.map(renderBtn)}</div>
+          )
+        ) : (
+          SECTION_GROUPS.map((group) => (
+            <div key={group.label} className="flex flex-col gap-0.5">
+              <p className="px-3 mb-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">{group.label}</p>
+              {SECTIONS.filter((s) => (group.keys as readonly string[]).includes(s.key)).map(renderBtn)}
+            </div>
+          ))
+        )}
+      </nav>
+    </div>
   )
 }
 
@@ -1346,39 +1476,35 @@ export function SettingsPanels({ active }: Readonly<{ active: SettingsSection }>
   )
 }
 
+/**
+ * Route `/settings` — la page standalone a été RETIRÉE (redondante avec le modal Settings, monté
+ * globalement dans `app-shell` et ouvrable depuis n'importe quel CTA via `useSettingsStore`). Cette
+ * route se contente désormais d'OUVRIR le modal par-dessus le dashboard, en préservant le deep-link
+ * `?section=` et le retour OAuth GitHub/Slack (toast + ouverture directe sur « Integrations »).
+ * Les briques (`SECTIONS`, `SettingsNav`, `SettingsPanels`, panneaux) restent exportées ci-dessus
+ * et sont réutilisées par le modal.
+ */
 export default function SettingsPage() {
+  const router = useRouter()
+  const params = useParams()
   const searchParams = useSearchParams()
-  const [active, setActive] = useState<SettingsSection>(() => {
-    const section = searchParams.get("section") as SettingsSection | null
-    return section && SECTIONS.some((s) => s.key === section) ? section : "profile"
-  })
+  const openSettings = useSettingsStore((s) => s.openSettings)
+  const workspace = typeof params.workspace === "string" ? params.workspace : ""
 
-  const activeSection = SECTIONS.find((s) => s.key === active)
-
-  // Afficher un toast après retour OAuth GitHub/Slack
   useEffect(() => {
+    const section = searchParams.get("section")
     const github = searchParams.get("github")
-    const slack  = searchParams.get("slack")
+    const slack = searchParams.get("slack")
     if (github === "connected") toast.success("GitHub connecté avec succès !")
-    if (slack  === "connected") toast.success("Slack connecté avec succès !")
-  }, [searchParams])
+    if (slack === "connected") toast.success("Slack connecté avec succès !")
+    const target = github || slack
+      ? "integrations"
+      : section && SECTIONS.some((s) => s.key === section)
+        ? section
+        : undefined
+    openSettings(target)
+    router.replace(workspace ? `/${workspace}/dashboard` : "/")
+  }, [searchParams, openSettings, router, workspace])
 
-  return (
-    <PageContainer>
-      <PageHeader
-        title="Settings"
-        description="Profil, workspace, facturation, sécurité et confidentialité."
-      />
-      <div className="flex flex-col md:flex-row gap-8 w-full min-h-0">
-        <SettingsNav active={active} onSelect={setActive} className="sticky top-0 self-start w-full md:w-48 shrink-0" />
-
-        <Separator orientation="vertical" className="hidden md:block self-stretch" />
-
-        <div className="flex-1 min-w-0">
-          <h2 className="text-base font-semibold text-foreground mb-5">{activeSection?.label}</h2>
-          <SettingsPanels active={active} />
-        </div>
-      </div>
-    </PageContainer>
-  )
+  return null
 }
