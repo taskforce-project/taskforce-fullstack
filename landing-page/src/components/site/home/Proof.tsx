@@ -271,7 +271,7 @@ export function FinalCta() {
           </p>
           <div className="relative mt-8 flex flex-wrap justify-center gap-3">
             <Button asChild size="pill-lg">
-              <a href={`${APP_URL}/auth/register`}>Run your first workflow</a>
+              <a href={"/waitlist"}>Run your first workflow</a>
             </Button>
             <Button asChild variant="outline" size="pill-lg">
               <a href="/book-a-demo">Book a demo</a>

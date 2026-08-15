@@ -27,7 +27,7 @@ type Tier = {
   features: Feature[];
 };
 
-const REGISTER = `${APP_URL}/auth/register`;
+const REGISTER = "/waitlist";
 
 const TIERS: Tier[] = [
   {

@@ -14,7 +14,7 @@ const FAQ = [
 ];
 
 const CARDS = [
-  { icon: Rocket, title: "Getting started", text: "Create a workspace, invite your team, and run your first workflow.", href: `${APP_URL}/auth/register`, cta: "Start free", ready: true },
+  { icon: Rocket, title: "Getting started", text: "Create a workspace, invite your team, and run your first workflow.", href: "/waitlist", cta: "Start free", ready: true },
   { icon: BookOpen, title: "Core concepts", text: "Runs, checkpoints, approvals and memory — what an AI delivery OS actually is.", href: "/learn", cta: "Learn", ready: true },
   { icon: Server, title: "Self-hosting & security", text: "Deployment models, data handling and the security posture, in the Trust Center.", href: "/trust", cta: "Trust Center", ready: true },
   { icon: Code2, title: "API reference", text: "Programmatic access to workspaces, issues and runs.", href: null, cta: "Coming", ready: false },
@@ -29,7 +29,7 @@ const CARDS = [
     kicker="Documentation"
     title="Start here"
     lead="TaskForce is early, and so are its docs. Here's where to begin today — with the full guides and API reference on the way."
-    primary={{ label: "Start free", href: `${APP_URL}/auth/register` }}
+    primary={{ label: "Start free", href: "/waitlist" }}
     secondary={{ label: "Book a demo", href: "/book-a-demo" }}
   />
 
@@ -84,7 +84,7 @@ const CARDS = [
   <PageCta
     title="The best doc is a first run"
     lead="Create a workspace and give TaskForce one outcome — it explains itself faster than a guide."
-    primary={{ label: "Start free", href: `${APP_URL}/auth/register` }}
+    primary={{ label: "Start free", href: "/waitlist" }}
     secondary={{ label: "Learn the concepts", href: "/learn" }}
   />
 </BaseLayout>
