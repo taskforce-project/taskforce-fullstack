@@ -13,13 +13,9 @@ export default function ProjectTeamsPage() {
   const projectId = typeof params.id        === "string" ? Number(params.id)  : 0
 
   return (
+    // En-tête retiré : `ProjectTeamsSection` porte déjà le sien (« Membres & équipes » + invitation),
+    // on évitait un double en-tête empilé.
     <div className="flex w-full flex-col gap-4">
-      <div className="space-y-0.5">
-        <h2 className="text-sm font-semibold text-foreground">Équipes</h2>
-        <p className="text-xs text-muted-foreground">
-          Créez des équipes, gérez leurs membres et associez-les à cette opération.
-        </p>
-      </div>
       <ProjectTeamsSection workspace={workspace} projectId={projectId} />
     </div>
   )

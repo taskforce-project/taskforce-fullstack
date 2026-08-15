@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
-import { useParams, useRouter, useSearchParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import {
   Plus,
   Search,
@@ -22,7 +22,6 @@ import {
   Globe,
 } from "lucide-react"
 
-import { CreateProjectDialog } from "@/components/dialogs/create-project-dialog"
 import { EditProjectDialog } from "@/components/dialogs/edit-project-dialog"
 import { ProjectIcon } from "@/components/ui/project-icon"
 import { Button } from "@/components/ui/button"
@@ -54,6 +53,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
 import { useProjectStore } from "@/lib/store/project-store"
+import { useCreateProjectStore } from "@/lib/store/create-project-store"
 import { getProjectsHealthHistory, getWorkspaceProjectsActivity } from "@/lib/api/project-service"
 import type { Project } from "@/lib/api/project-service"
 
@@ -482,6 +482,7 @@ function ProjectsSkeleton({ cards }: { readonly cards: boolean }) {
 // ─── Empty state ──────────────────────────────────────────────────────────────
 
 function EmptyState({ isSearch }: { readonly isSearch: boolean }) {
+  const openCreateProject = useCreateProjectStore((s) => s.openCreateProject)
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
       {isSearch ? (
@@ -498,9 +499,9 @@ function EmptyState({ isSearch }: { readonly isSearch: boolean }) {
             <p className="text-sm font-semibold text-foreground">No active operations</p>
             <p className="text-xs text-muted-foreground">Create your first operation to start tracking work</p>
           </div>
-          <CreateProjectDialog>
-            <Button size="sm" className="gap-1.5"><Plus className="size-3.5" /> New Operation</Button>
-          </CreateProjectDialog>
+          <Button size="sm" className="gap-1.5" onClick={openCreateProject}>
+            <Plus className="size-3.5" /> New Operation
+          </Button>
         </>
       )}
     </div>
@@ -512,22 +513,15 @@ function EmptyState({ isSearch }: { readonly isSearch: boolean }) {
 export default function ProjectsPage() {
   const params = useParams<{ workspace: string }>()
   const slug = params.workspace
-  // « New project » depuis la sidebar → ?new=1 ouvre le modal d'emblée (PROD-8.7)
-  const autoNew = useSearchParams().get("new") === "1"
-  const router = useRouter()
-
-  // Le paramètre est nettoyé à la FERMETURE du modal, jamais à son ouverture : `router.replace`
-  // déclenche une navigation qui remonte le modal, et l'aurait donc refermé aussitôt ouvert.
-  // Sans ce nettoyage, `?new=1` resterait dans l'URL et le clic suivant sur « New project » ne
-  // produirait aucune transition de prop — donc aucune réouverture.
-  const clearNewParam = () => {
-    if (autoNew && slug) router.replace(`/${slug}/projects`, { scroll: false })
-  }
+  // « New project » ouvre le modal GLOBAL en place (cf. useCreateProjectStore) — plus de `?new=1`,
+  // donc plus de changement de page qui faisait clignoter le modal.
+  const openCreateProject = useCreateProjectStore((s) => s.openCreateProject)
 
   const { projects, isLoading, fetchProjects } = useProjectStore()
   const [filter, setFilter] = useState<FilterTab>("active")
   const [search, setSearch] = useState("")
-  const [view, setView] = useState<"list" | "cards">("cards")
+  // Liste par défaut (façon Linear : dense, typographique) — les cartes restent dispo via le sélecteur.
+  const [view, setView] = useState<"list" | "cards">("list")
   const [sortBy, setSortBy] = useState<SortKey>("health")
 
   // Historique de santé (courbe rouge) + activité de TOUS les projets (sparklines) : deux appels
@@ -594,9 +588,9 @@ export default function ProjectsPage() {
         title="Active Operations"
         description="Real-time health and velocity across all workstreams"
         actions={
-          <CreateProjectDialog defaultOpen={autoNew} onOpenChange={(o) => { if (!o) clearNewParam() }}>
-            <Button size="sm" className="gap-1.5"><Plus className="size-4" /> New Operation</Button>
-          </CreateProjectDialog>
+          <Button size="sm" className="gap-1.5" onClick={openCreateProject}>
+            <Plus className="size-4" /> New Operation
+          </Button>
         }
       />
 
@@ -642,17 +636,8 @@ export default function ProjectsPage() {
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-          {/* Vue liste / cartes */}
-          {/* Cartes en PREMIER : c'est la vue par défaut, elle doit occuper la position de tête. */}
+          {/* Vue liste / cartes — LISTE en premier (vue par défaut, façon Linear). */}
           <div className="flex items-center rounded-md border border-border p-0.5">
-            <button
-              type="button"
-              onClick={() => setView("cards")}
-              aria-label="Card view"
-              className={cn("flex size-7 items-center justify-center rounded transition-colors", view === "cards" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground")}
-            >
-              <LayoutGrid className="size-4" />
-            </button>
             <button
               type="button"
               onClick={() => setView("list")}
@@ -660,6 +645,14 @@ export default function ProjectsPage() {
               className={cn("flex size-7 items-center justify-center rounded transition-colors", view === "list" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground")}
             >
               <ListIcon className="size-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setView("cards")}
+              aria-label="Card view"
+              className={cn("flex size-7 items-center justify-center rounded transition-colors", view === "cards" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground")}
+            >
+              <LayoutGrid className="size-4" />
             </button>
           </div>
         </div>
