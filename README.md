@@ -3,19 +3,19 @@
 <div align="center">
 
 <!-- BADGES:START -->
-![Version](https://img.shields.io/badge/version-0.2.0--rc1-blue.svg)
-![License](https://img.shields.io/badge/license-Fair%20Use-green.svg)
+![Version](https://img.shields.io/badge/Version-0.2.0--rc1-blue.svg)
+![License](https://img.shields.io/badge/License-Fair_Use-green.svg)
 ![Java](https://img.shields.io/badge/Java-21-orange.svg)
-![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.4.1-brightgreen.svg)
-![Next.js](https://img.shields.io/badge/Next.js-16-black.svg)
+![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.0.6-brightgreen.svg)
+![Next.js](https://img.shields.io/badge/Next.js-16.2.6-black.svg)
 ![TailwindCSS](https://img.shields.io/badge/TailwindCSS-4-38bdf8.svg)
-![Keycloak](https://img.shields.io/badge/Keycloak-26-blue.svg)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-blue.svg)
+![Keycloak](https://img.shields.io/badge/Keycloak-25.0.6-blue.svg)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)
 ![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)
-![Backend App](https://img.shields.io/badge/backend-0.0.1--SNAPSHOT-6f42c1.svg)
-![Frontend App](https://img.shields.io/badge/frontend-0.1.0-0ea5e9.svg)
-![Landing App](https://img.shields.io/badge/landing-0.0.1-f59e0b.svg)
-![Runtime](https://img.shields.io/badge/runtime-local%20docker-informational.svg)
+![Backend App](https://img.shields.io/badge/Backend_App-0.0.1--SNAPSHOT-6f42c1.svg)
+![Frontend App](https://img.shields.io/badge/Frontend_App-0.1.0-0ea5e9.svg)
+![Landing App](https://img.shields.io/badge/Landing_App-0.0.1-f59e0b.svg)
+![Runtime](https://img.shields.io/badge/Runtime-ci-blueviolet.svg)
 <!-- BADGES:END -->
 
 **Plateforme ERP complète pour la gestion de projets, ressources et compétences**
