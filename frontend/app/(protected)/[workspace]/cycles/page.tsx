@@ -30,6 +30,9 @@ import { CreateCycleDialog } from "@/components/dialogs/create-cycle-dialog"
 import { useCycleStore } from "@/lib/store/cycle-store"
 import { useProjectStore } from "@/lib/store/project-store"
 import type { CycleStatus as ApiCycleStatus } from "@/lib/api/cycle-service"
+import { PageContainer, PageHeader } from "@/components/layout/page-shell"
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty"
+import { Skeleton } from "@/components/ui/skeleton"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -145,7 +148,7 @@ function CycleCard({ cycle, slug, reload }: Readonly<{ cycle: Cycle; slug: strin
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card p-5 [box-shadow:var(--shadow-sm)] flex flex-col gap-4 hover:border-border/80 transition-colors">
+    <div className="rounded-xl border border-border bg-card p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col gap-4">
       {/* Top row */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3 min-w-0">
@@ -368,22 +371,19 @@ export default function CyclesPage() {
   const completed = cycles.filter((c) => c.status === "completed")
 
   return (
-    <div className="flex flex-col gap-8 w-full max-w-6xl mx-auto">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Cycles</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {isLoading ? "Loading…" : `${active.length} active · ${upcoming.length} upcoming · ${completed.length} completed`}
-          </p>
-        </div>
-        <CreateCycleDialog>
-          <Button size="sm" className="gap-2 shrink-0">
-            <Plus className="h-4 w-4" />
-            New cycle
-          </Button>
-        </CreateCycleDialog>
-      </div>
+    <PageContainer>
+      <PageHeader
+        title="Cycles"
+        description={isLoading ? "Chargement…" : `${active.length} actifs · ${upcoming.length} à venir · ${completed.length} terminés`}
+        actions={
+          <CreateCycleDialog>
+            <Button size="sm" className="gap-2 shrink-0">
+              <Plus className="h-4 w-4" />
+              New cycle
+            </Button>
+          </CreateCycleDialog>
+        }
+      />
 
       {/* Active cycles */}
       {active.length > 0 && (
@@ -400,20 +400,33 @@ export default function CyclesPage() {
         <CycleSection title="Completed" cycles={completed} defaultOpen={false} slug={slug} reload={reload} />
       )}
 
-      {/* Empty state */}
-      {!isLoading && cycles.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-24 text-center">
-          <RefreshCw className="h-10 w-10 text-muted-foreground/30 mb-4" />
-          <p className="text-base font-medium text-foreground">No cycles yet</p>
-          <p className="text-sm text-muted-foreground mt-1">Create a cycle to track a sprint or milestone.</p>
-          <CreateCycleDialog>
-            <Button size="sm" className="mt-4 gap-2">
-              <Plus className="h-4 w-4" />
-              New cycle
-            </Button>
-          </CreateCycleDialog>
+      {/* Chargement — skeleton calqué sur la grille de cartes */}
+      {isLoading && cycles.length === 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-44 rounded-xl" />
+          ))}
         </div>
       )}
-    </div>
+
+      {/* État vide — primitive partagée (Empty) */}
+      {!isLoading && cycles.length === 0 && (
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon"><CalendarRange /></EmptyMedia>
+            <EmptyTitle>Aucun cycle</EmptyTitle>
+            <EmptyDescription>Créez un cycle pour suivre un sprint ou un jalon.</EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <CreateCycleDialog>
+              <Button size="sm" className="gap-2">
+                <Plus className="h-4 w-4" />
+                New cycle
+              </Button>
+            </CreateCycleDialog>
+          </EmptyContent>
+        </Empty>
+      )}
+    </PageContainer>
   )
 }

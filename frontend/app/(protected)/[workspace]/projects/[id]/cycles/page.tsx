@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import {
@@ -9,24 +9,14 @@ import {
   ArrowUpRight,
   CheckCircle2,
   Clock,
-  Loader2,
   AlertCircle,
 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { DatePicker } from "@/components/ui/date-picker"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty"
+import { CreateCycleDialog } from "@/components/dialogs/create-cycle-dialog"
 import { cn } from "@/lib/utils"
 import { useCycleStore } from "@/lib/store/cycle-store"
 import type { Cycle, CycleStatus } from "@/lib/api/cycle-service"
@@ -57,83 +47,6 @@ function daysLeft(endDate: string | null | undefined): number | null {
 }
 
 // ---------------------------------------------------------------------------
-// New Cycle Dialog
-// ---------------------------------------------------------------------------
-
-interface NewCycleDialogProps {
-  readonly open: boolean
-  readonly onClose: () => void
-  readonly onCreate: (name: string, description: string, startDate: string, endDate: string) => Promise<void>
-}
-
-function NewCycleDialog({ open, onClose, onCreate }: NewCycleDialogProps) {
-  const [name, setName]               = useState("")
-  const [description, setDescription] = useState("")
-  const [startDate, setStartDate]     = useState("")
-  const [endDate, setEndDate]         = useState("")
-  const [saving, setSaving]           = useState(false)
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!name.trim()) return
-    setSaving(true)
-    await onCreate(name.trim(), description.trim(), startDate, endDate)
-    setSaving(false)
-    setName(""); setDescription(""); setStartDate(""); setEndDate("")
-    onClose()
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose() }}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>New Cycle</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="cycle-name">Name *</Label>
-            <Input
-              id="cycle-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Sprint 5 — Feature X"
-              required
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="cycle-desc">Description</Label>
-            <Textarea
-              id="cycle-desc"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="What this cycle is about…"
-              rows={2}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="cycle-start">Start date</Label>
-              <DatePicker id="cycle-start" value={startDate} onChange={setStartDate} placeholder="Début" />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="cycle-end">End date</Label>
-              <DatePicker id="cycle-end" value={endDate} onChange={setEndDate} placeholder="Fin" />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>Cancel</Button>
-            <Button type="submit" disabled={saving || !name.trim()}>
-              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Create
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-// ---------------------------------------------------------------------------
 // CycleCard
 // ---------------------------------------------------------------------------
 
@@ -144,7 +57,7 @@ function CycleCard({ cycle, href }: { readonly cycle: Cycle; readonly href: stri
   return (
     <Link
       href={href}
-      className="group flex items-center gap-4 rounded-xl border border-border bg-card px-5 py-4 hover:border-primary/40 transition-all [box-shadow:var(--shadow-sm)] hover:[box-shadow:var(--shadow-md)]"
+      className="group flex items-center gap-4 rounded-xl border border-border bg-card px-5 py-4 hover:border-primary/40 transition-all shadow-sm hover:shadow-md"
     >
       <div className="shrink-0">{cfg.icon}</div>
 
@@ -193,23 +106,13 @@ export default function ProjectCyclesPage() {
   if (typeof idRaw === "string") projectId = Number(idRaw)
   else if (Array.isArray(idRaw)) projectId = Number(idRaw[0] ?? "0")
 
-  const { cycles, isLoading, error, fetchCycles, createCycle } = useCycleStore()
-  const [dialogOpen, setDialogOpen] = useState(false)
+  const { cycles, isLoading, error, fetchCycles } = useCycleStore()
 
   useEffect(() => {
     if (workspace && projectId) {
       fetchCycles(workspace, projectId)
     }
   }, [workspace, projectId, fetchCycles])
-
-  async function handleCreate(name: string, description: string, startDate: string, endDate: string) {
-    await createCycle(workspace, projectId, {
-      name,
-      description: description || undefined,
-      startDate: startDate || undefined,
-      endDate: endDate || undefined,
-    })
-  }
 
   if (isLoading) {
     return (
@@ -243,17 +146,30 @@ export default function ProjectCyclesPage() {
         ) : (
           <p className="text-sm text-muted-foreground">{cycles.length} cycle{cycles.length !== 1 ? "s" : ""}</p>
         )}
-        <Button size="sm" className="gap-1.5 h-8 text-xs" onClick={() => setDialogOpen(true)}>
-          <Plus className="h-3.5 w-3.5" />
-          New Cycle
-        </Button>
+        <CreateCycleDialog projectId={projectId} onCreated={() => fetchCycles(workspace, projectId)}>
+          <Button size="sm" className="gap-1.5 h-8 text-xs">
+            <Plus className="h-3.5 w-3.5" />
+            New Cycle
+          </Button>
+        </CreateCycleDialog>
       </div>
 
       {cycles.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-3 py-24 text-muted-foreground">
-          <RefreshCw className="h-8 w-8 opacity-30" />
-          <p className="text-sm">Aucun cycle. Créez un sprint pour planifier vos issues dans le temps.</p>
-        </div>
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon"><RefreshCw /></EmptyMedia>
+            <EmptyTitle>Aucun cycle</EmptyTitle>
+            <EmptyDescription>Créez un sprint pour planifier vos issues dans le temps.</EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <CreateCycleDialog projectId={projectId} onCreated={() => fetchCycles(workspace, projectId)}>
+              <Button size="sm" className="gap-1.5">
+                <Plus className="h-3.5 w-3.5" />
+                New Cycle
+              </Button>
+            </CreateCycleDialog>
+          </EmptyContent>
+        </Empty>
       ) : (
         <div className="flex flex-col gap-3">
           {cycles.map((cycle) => (
@@ -265,12 +181,6 @@ export default function ProjectCyclesPage() {
           ))}
         </div>
       )}
-
-      <NewCycleDialog
-        open={dialogOpen}
-        onClose={() => setDialogOpen(false)}
-        onCreate={handleCreate}
-      />
     </div>
   )
 }

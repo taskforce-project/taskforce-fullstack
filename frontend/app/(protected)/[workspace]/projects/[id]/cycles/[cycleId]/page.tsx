@@ -13,7 +13,6 @@ import {
   TrendingUp,
   Calendar,
   Loader2,
-  AlertCircle,
   Plus,
   X,
   MoreHorizontal,
@@ -42,6 +41,9 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { DeleteConfirmDialog } from "@/components/dialogs/delete-confirm-dialog"
 import { cn } from "@/lib/utils"
+import { Progress } from "@/components/ui/progress"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty"
 import { useCycleStore } from "@/lib/store/cycle-store"
 import { useIssueStore } from "@/lib/store/issue-store"
 import type { CycleStatus } from "@/lib/api/cycle-service"
@@ -312,24 +314,37 @@ export default function CycleDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-24 text-muted-foreground gap-2">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        <span className="text-sm">Loading cycle…</span>
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-3">
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-7 w-64" />
+          <Skeleton className="h-2 w-full" />
+        </div>
+        <div className="flex flex-col gap-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 rounded-xl" />
+          ))}
+        </div>
       </div>
     )
   }
 
   if (error || !cycle) {
     return (
-      <div className="flex flex-col items-center justify-center gap-4 py-24 text-muted-foreground">
-        {error && <p className="flex items-center gap-1.5 text-sm text-destructive"><AlertCircle className="h-3.5 w-3.5" />{error}</p>}
-        {!cycle && !error && <p className="text-sm">Cycle not found.</p>}
-        <Link href={`/${workspace}/projects/${projectId}/cycles`}>
-          <Button variant="outline" size="sm" className="gap-2">
-            <ArrowLeft className="h-3.5 w-3.5" /> Back to cycles
-          </Button>
-        </Link>
-      </div>
+      <Empty>
+        <EmptyHeader>
+          <EmptyMedia variant="icon"><RefreshCw /></EmptyMedia>
+          <EmptyTitle>{error ? "Erreur" : "Cycle introuvable"}</EmptyTitle>
+          <EmptyDescription>{error ?? "Ce cycle n'existe pas ou a été supprimé."}</EmptyDescription>
+        </EmptyHeader>
+        <EmptyContent>
+          <Link href={`/${workspace}/projects/${projectId}/cycles`}>
+            <Button variant="outline" size="sm" className="gap-2">
+              <ArrowLeft className="h-3.5 w-3.5" /> Retour aux cycles
+            </Button>
+          </Link>
+        </EmptyContent>
+      </Empty>
     )
   }
 
@@ -364,7 +379,7 @@ export default function CycleDetailPage() {
       </Link>
 
       {/* Header */}
-      <div className="rounded-xl border border-border bg-card p-5 [box-shadow:var(--shadow-sm)]">
+      <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3">
             {cfg.icon}
@@ -450,12 +465,7 @@ export default function CycleDetailPage() {
 
         {totalCount > 0 && (
           <div className="mt-4">
-            <div className="h-2 rounded-full bg-muted overflow-hidden">
-              <div
-                className="h-full rounded-full transition-all bg-gradient-to-r from-blue-600 to-blue-400 dark:from-blue-500 dark:to-blue-300"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
+            <Progress value={progress} className="h-2" />
           </div>
         )}
       </div>
@@ -489,7 +499,7 @@ export default function CycleDetailPage() {
                   </span>
                   <Badge variant="secondary" className="h-4 min-w-4 px-1 text-[10px]">{group.length}</Badge>
                 </div>
-                <div className="rounded-xl border border-border bg-card overflow-hidden [box-shadow:var(--shadow-sm)]">
+                <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
                   {group.map((issue) => (
                     <IssueRow
                       key={issue.id}
