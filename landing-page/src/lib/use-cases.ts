@@ -4,6 +4,7 @@
  * `beta` quand une feature shippée l'adosse (approvals, memory, cycles/analytics, onboarding). Zéro survente.
  */
 import type { Maturity } from "@/components/site/nav";
+import type { UseCaseDemoSpec } from "@/components/site/illustrations/UseCaseDemo";
 
 export type UseCase = {
   key: string;
@@ -170,6 +171,103 @@ export const USE_CASES: Record<string, UseCase> = {
     ],
     status: "Cycles and workload analytics ship today (Beta). AI-assisted planning is part of the Planned orchestration.",
     links: [{ href: "/product/analytics", label: "Analytics" }, { href: "/product/collaboration", label: "Collaboration" }],
+  },
+};
+
+/**
+ * Un mini-demo ANIMÉ par use-case (rendu par `UseCaseDemo`), pour que chaque page se DÉMONTRE au lieu
+ * de reprendre le même flux. Illustratif (fil rouge « checkout/payments » cohérent d'un cas à l'autre) ;
+ * la maturité réelle reste portée par `status`. 5 formes distinctes réparties sur les 10 cas.
+ */
+export const USE_CASE_DEMOS: Record<string, UseCaseDemoSpec> = {
+  "product-spec": {
+    kind: "draft",
+    title: "Spec · Checkout",
+    chip: "Approved → Memory",
+    items: [
+      "As a buyer, I can pay with a saved card",
+      "AC: a declined card shows a retry path",
+      "AC: idempotent on double-submit",
+      "Edge: card expires mid-checkout",
+    ],
+  },
+  "architecture-decision": {
+    kind: "graph",
+    title: "Approach · Payments",
+    center: "Approach",
+    nodes: ["Idempotent", "API 201/409", "vs 2-phase"],
+  },
+  "backlog-grooming": {
+    kind: "split",
+    source: "Spec · Checkout",
+    items: [
+      { label: "Card vault integration", est: "3d" },
+      { label: "Idempotency keys", est: "1d" },
+      { label: "Retry + decline UX", est: "2d" },
+      { label: "E2E checkout tests", est: "2d" },
+    ],
+  },
+  "code-review": {
+    kind: "pr",
+    title: "Add idempotency keys",
+    issue: "TF-142",
+    stages: ["Open", "In review", "Approved", "Merged"],
+  },
+  "qa-testing": {
+    kind: "check",
+    title: "QA · from acceptance criteria",
+    items: [
+      "Declined card shows a retry path",
+      "Double-submit stays idempotent",
+      "Expired card handled mid-checkout",
+      "Receipt emailed on success",
+    ],
+  },
+  documentation: {
+    kind: "draft",
+    title: "Kept from the run",
+    chip: "In Memory",
+    items: [
+      "Decision: idempotency via keys",
+      "Constraint: PCI scope minimized",
+      "Spec + acceptance criteria",
+      "Sign-off: Inès · 12 Aug",
+    ],
+  },
+  onboarding: {
+    kind: "graph",
+    title: "Why is checkout idempotent?",
+    center: "Memory",
+    nodes: ["ADR-142", "GDPR", "Owner · Inès"],
+  },
+  "incident-postmortem": {
+    kind: "recall",
+    query: "What caused the double-charge?",
+    hits: [
+      { k: "Timeline", t: "Retry fired before the ack" },
+      { k: "Cause", t: "Missing idempotency key" },
+      { k: "Action", t: "Enforce key on /charges" },
+    ],
+  },
+  "release-notes": {
+    kind: "draft",
+    title: "Release notes · v1.4",
+    chip: "From shipped artifacts",
+    items: [
+      "Checkout: idempotent payments",
+      "Fix: expired-card retry path",
+      "Perf: 120ms faster settlement",
+      "Docs: payments API updated",
+    ],
+  },
+  "sprint-planning": {
+    kind: "board",
+    title: "Cycle 14 · plan",
+    columns: [
+      { name: "Backlog", cards: ["Decline UX", "Docs", "Perf"] },
+      { name: "This cycle", cards: ["Checkout", "E2E tests"] },
+      { name: "Done", cards: ["Login"] },
+    ],
   },
 };
 

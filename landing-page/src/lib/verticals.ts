@@ -4,6 +4,8 @@
  * pas de workflow qu'on n'a pas livré. Engineering est le seul métier prouvé (page séparée).
  */
 
+import type { UseCaseDemoSpec } from "@/components/site/illustrations/UseCaseDemo";
+
 export type Vertical = {
   key: string;
   name: string;
@@ -11,6 +13,58 @@ export type Vertical = {
   idea: string;
   couldApply: string[];
   honest: string;
+};
+
+/**
+ * Un demo ILLUSTRATIF par verticale — la FORME d'un run gouverné appliquée à un artefact de ce métier.
+ * Honnêteté (D10) : c'est le *pattern* (prouvé sur l'ingénierie), pas un workflow livré pour ce métier —
+ * la page garde le badge « Exploratory » et une légende « the shape, not a shipped workflow ».
+ */
+export const VERTICAL_DEMOS: Record<string, UseCaseDemoSpec> = {
+  product: {
+    kind: "draft",
+    title: "Spec · Onboarding revamp",
+    chip: "Reviewed → approved",
+    items: [
+      "Outcome: activation +10% in 30 days",
+      "AC: 3-step signup, no dead ends",
+      "Sequenced: research → spec → build",
+      "Owner signs off before build",
+    ],
+  },
+  operations: {
+    kind: "draft",
+    title: "Runbook · Vendor onboarding",
+    chip: "Reviewed → approved",
+    items: [
+      "Steps: KYC → contract → access",
+      "Dependency: legal sign-off first",
+      "An owner and an approver per step",
+      "Kept as an auditable record",
+    ],
+  },
+  marketing: {
+    kind: "draft",
+    title: "Campaign · Q3 launch",
+    chip: "Reviewed → approved",
+    items: [
+      "Brief: audience, message, channels",
+      "Assets reviewed before they publish",
+      "Dependencies and approvals explicit",
+      "Reasoning kept for the next campaign",
+    ],
+  },
+  "client-services": {
+    kind: "draft",
+    title: "Deliverable · Security audit",
+    chip: "Sign-off before client",
+    items: [
+      "Scope agreed and recorded",
+      "Findings drafted, then reviewed",
+      "Explicit sign-off before delivery",
+      "An audit trail the client can rely on",
+    ],
+  },
 };
 
 export const VERTICALS: Record<string, Vertical> = {
