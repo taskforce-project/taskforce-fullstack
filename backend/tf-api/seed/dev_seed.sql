@@ -292,7 +292,7 @@ BEGIN
     JOIN project_labels l ON l.project_id = i.project_id
     WHERE i.project_id = v_web AND (i.sequence_number, l.name) IN (
         (1,'react'),(1,'ui'),(2,'react'),(2,'css'),(3,'react'),(3,'typescript'),
-        (4,'css'),(4,'ui'),(5,'react'),(5,'ui'),(6,'testing'),(7,'ui'),(7,'design'),(8,'react'),(8,'css'));
+        (4,'css'),(4,'ui'),(5,'react'),(5,'typescript'),(6,'testing'),(7,'ui'),(7,'design'),(8,'react'),(8,'css'));
 
     INSERT INTO issue_label_assignments (issue_id, label_id)
     SELECT i.id, l.id
@@ -345,6 +345,30 @@ BEGIN
         (v_ws, (SELECT id FROM issues WHERE project_id=v_ops AND sequence_number=2), v_tom,    v_admin, 'MANUAL',       true, true),
         (v_ws, NULL,                                                                 v_omar,   v_admin, 'MANUAL',       true, true),
         (v_ws, NULL,                                                                 v_diego,  v_admin, 'SMART_ASSIGN', true, false);
+
+    -- ----------------------------------------------------------------
+    -- 10b. Charge réaliste PAR DOMAINE (PROD-1.8) — le vrai levier d'un best-match net.
+    --      Smart Assign dérive la « disponibilité » et le « workloadScore » des POINTS OUVERTS
+    --      assignés (cross-projets). Sans charge, tous les spécialistes peu chargés se retrouvent
+    --      à ~60 % (un QA « libre » remonte sur une issue React). On les occupe donc chez eux :
+    --      les issues WEB (React) restent surtout NON assignées → un dev React dispo gagne nettement.
+    -- ----------------------------------------------------------------
+    UPDATE issues SET assignee_id = v_marcus WHERE project_id = v_api AND sequence_number IN (4, 5, 8); -- backend chargé (rate-limit, index, export)
+    UPDATE issues SET assignee_id = v_omar   WHERE project_id = v_api AND sequence_number = 6;          -- QA sur les tests d'intégration
+    UPDATE issues SET assignee_id = v_tom    WHERE project_id = v_ops AND sequence_number IN (4, 5, 6); -- devops chargé (monitoring, vault, autoscaling)
+
+    -- ----------------------------------------------------------------
+    -- 10c. Indisponibilités calendaires (member_leaves, US-006) : de VRAIES contraintes pour la démo.
+    --      VACATION/SICK actifs AUJOURD'HUI plafonnent la dispo dans Smart Assign (on n'auto-assigne
+    --      pas un absent) ; REMOTE = présent (n'impacte pas la reco, mais illustre le type). Dates
+    --      RELATIVES à CURRENT_DATE → toujours pertinentes au rejeu. Histoire jury : sur une issue
+    --      UI, Lina (designer) matcherait, mais elle est en congés → Cortex écarte l'absente.
+    -- ----------------------------------------------------------------
+    INSERT INTO member_leaves (workspace_id, user_id, type, start_date, end_date, note) VALUES
+        (v_ws, v_lina,   'VACATION', CURRENT_DATE - 1, CURRENT_DATE + 5,  'Congés'),
+        (v_ws, v_marcus, 'SICK',     CURRENT_DATE,     CURRENT_DATE + 1,  'Arrêt maladie'),
+        (v_ws, v_nina,   'REMOTE',   CURRENT_DATE,     CURRENT_DATE + 3,  'Télétravail'),
+        (v_ws, v_tom,    'VACATION', CURRENT_DATE + 7, CURRENT_DATE + 14, 'Congés à venir');
 
     -- ================================================================
     -- ENRICHISSEMENT QA — couvre tous les écrans / détails
