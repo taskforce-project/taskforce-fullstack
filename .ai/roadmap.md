@@ -70,6 +70,18 @@
 > - **Vérif** : `it.ps1 -Verify` (**874 tests, gate 74,11 %** ✅) + Vitest `--coverage` (821 tests, 90,03 %, gate ✅)
 >   + `next build` ✅ + `tsc`/`eslint` verts.
 
+> **▶ MAJ 17/08/2026 (suite) — P0 IA + faux positifs du registre.**
+> - **PC-022 (P0) — `AgentService.run` ne tient plus de transaction pendant le LLM** : `@Transactional` retiré.
+>   Les collaborateurs (BrainAccessGuard, BrainSearchService, KnowledgeService via les outils, AiUsageService)
+>   sont **déjà** `@Transactional` → tx courte par opération, jamais tenue pendant l'appel au modèle (patron
+>   `AnalysisJobRunner`). Fin du risque « ~20 chats Cortex simultanés = pool Hikari (20) épuisé = API down ».
+>   Vérifié `it.ps1 -Verify` : **874 tests, 0 échec, gate vert**. **Reste, même famille** : `SmartAssignService.bulkRecommend` +
+>   `PlaneIntegrationService.sync` (N LLM en 1 tx) — refonte read→LLM→write plus lourde, sur des actions
+>   **mono-utilisateur** (bouton bulk / sync) → à cadrer à part, pas à bâcler. `[PC-022]`
+> - **PC-029 / PC-030 — déjà corrigés (registre périmé, vérifié 17/08)** : le Cmd+K appelle le vrai
+>   `sendAssistantMessage` (Cortex, plus de mock) ; la page `/agents` (faux chiffres) n'existe plus (aucune
+>   route ni référence). Statuts corrigés dans `Problemes_Connus`.
+
 > **▶ MAJ 16/08/2026 — audit de livrabilité pré-soutenance + 3 correctifs + bascule IA VM.** Topo complet :
 > `.ai/audit-livrable-pfr.md` (couverture des 32 compétences, paiement, sécurité, tests). Verdict : **livrable
 > pour la soutenance Blocs 2-3**, gaps résiduels = C11/E9 (cas RGPD externe non reçu) et Bloc 4 non déployé
