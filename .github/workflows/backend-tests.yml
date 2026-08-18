@@ -23,6 +23,25 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
+    # Postgres pgvector RÉEL : les tests d'intégration (@SpringBootTest) ont besoin d'un vrai Postgres
+    # + pgvector (type `vector`) + Flyway — H2 ne suffit pas. Sans ce service, `mvn test` échouait en CI
+    # (intégration en erreur → rapport JaCoCo à ~4 % et « Backend Tests » rouge). On réplique `it.ps1`
+    # (mêmes image/creds, surchargés via SPRING_DATASOURCE_* dans l'étape de test). Cf. PC-028.
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: tf
+          POSTGRES_USER: tf
+          POSTGRES_PASSWORD: tf
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tf -d tf"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
     defaults:
       run:
         working-directory: backend/tf-api
@@ -52,10 +71,19 @@ jobs:
           fi
           chmod +x mvnw
 
-      - name: 🧪 Run tests with JaCoCo coverage
-        run: ./mvnw clean test jacoco:report
+      - name: 🧪 Run tests + JaCoCo coverage gate (mvn verify)
+        # `verify` (au lieu de `test jacoco:report`) déclenche l'exécution `jacoco-check` du pom
+        # (BUNDLE LINE ≥ 70 %, périmètre gate) — jusqu'ici INERTE en CI faute d'appeler `verify`
+        # (PC-028). Le rapport JaCoCo reste généré en phase `test`, donc les artefacts et le résumé
+        # ci-dessous existent même si le gate casse le build.
+        run: ./mvnw clean verify
         env:
           MAVEN_OPTS: -Xmx2048m
+          # Surcharge la datasource H2 du profil `test` vers le Postgres pgvector du service ci-dessus
+          # (identique à it.ps1) → les tests d'intégration tournent contre un vrai PG + Flyway + pgvector.
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/tf
+          SPRING_DATASOURCE_USERNAME: tf
+          SPRING_DATASOURCE_PASSWORD: tf
 
       - name: 📊 Generate coverage summary
         if: always()

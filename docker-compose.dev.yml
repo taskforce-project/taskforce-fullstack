@@ -192,14 +192,17 @@ services:
       - .env.dev
     environment:
       TZ: ${TZ:-America/New_York}
-      # GROQ_* retirés le 24/07/2026 : ce service ne les lit pas (aucune occurrence dans ai-service/).
       # AI Gateway → LLM local Ollama (sur l'hôte). host.docker.internal = la machine hôte.
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:14b}
-      OLLAMA_MODEL_FAST: ${OLLAMA_MODEL_FAST:-qwen3:8b}
+      OLLAMA_MODEL_FAST: ${OLLAMA_MODEL_FAST:-qwen2.5:7b-instruct}
       OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL:-bge-m3}
       # Analyse approfondie sur 14B local = longue → 300s (doit rester ≤ ai.gateway.read-timeout-ms côté backend).
       OLLAMA_TIMEOUT: ${OLLAMA_TIMEOUT:-300}
+      # Provider CHAT alternatif : GROQ_API_KEY / GROQ_MODEL / GROQ_MODEL_FAST sont fournis par `.env.dev`
+      # (env_file ci-dessus). Clé RENSEIGNÉE ⇒ le chat (smart-assign, Cortex, orchestration) bascule sur
+      # Groq (hébergé, zéro compute local → petite VM) ; clé VIDE ⇒ Ollama local. Détection auto dans
+      # ai-service/app/config.py (use_groq). Les EMBEDDINGS restent sur Ollama (Groq n'en fournit pas).
       LOG_LEVEL: ${AI_SERVICE_LOG_LEVEL:-INFO}
     extra_hosts:
       - "host.docker.internal:host-gateway"

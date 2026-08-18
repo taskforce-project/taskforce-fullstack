@@ -38,13 +38,17 @@
 
 		  `tomcat` : le parent 4.0.6 embarque encore une version portant 3 CVE CRITICAL — c'est le
 		  dernier bloc critique de l'image backend.
-		  `netty` : 4.2.12 → 4.2.15, correctif de niveau patch (mêmes majeure et mineure).
+		  `netty` : 4.2.12 → 4.2.16, correctif de niveau patch (mêmes majeure et mineure).
 
 		  À RETIRER dès que le BOM rattrape ces versions, sinon on fige une version en arrière.
 		-->
 		<tomcat.version>11.0.22</tomcat.version>
-		<netty.version>4.2.15.Final</netty.version>
-		<keycloak.version>25.0.6</keycloak.version>
+		<netty.version>4.2.16.Final</netty.version>
+		<!-- 25.0.6 → 26.0.6 : CVE HIGH sur keycloak-core (tiré par keycloak-admin-client, audit Trivy
+		     17/08/2026). L'API admin-client réellement utilisée (KeycloakService : users().create/get/
+		     search/update/resetPassword/remove/logout) est stable entre 25 et 26. Le serveur Keycloak
+		     (image) est indépendant de cette lib. -->
+		<keycloak.version>26.0.6</keycloak.version>
 		<springdoc.version>3.0.3</springdoc.version>
 		<dotenv.version>3.2.0</dotenv.version>
 		<flyway.version>11.20.0</flyway.version>
@@ -52,6 +56,11 @@
 		<jjwt.version>0.12.6</jjwt.version>
 		<lombok.version>1.18.36</lombok.version>
 		<minio.version>8.6.0</minio.version>
+		<!-- Overrides CVE HIGH (audit Trivy 17/08/2026) — patchs sur des versions gouvernées par le
+		     BOM Spring Boot 4.0.6. spring-framework 7.0.7→7.0.8 (spring-webmvc, spring-expression) et
+		     micrometer 1.16.5→1.16.6. À RETIRER quand le parent rattrape. -->
+		<spring-framework.version>7.0.8</spring-framework.version>
+		<micrometer.version>1.16.6</micrometer.version>
 	</properties>
 	<dependencies>
 		<!-- Core Dependencies -->
@@ -344,6 +353,13 @@
 				<groupId>org.postgresql</groupId>
 				<artifactId>postgresql</artifactId>
 				<version>42.7.12</version>
+			</dependency>
+			<!-- CVE HIGH (audit Trivy 17/08/2026) : spring-data-commons, patch 4.0.5 → 4.0.6
+			     (compatible spring-data-jpa 4.0.x). À retirer quand le BOM rattrape. -->
+			<dependency>
+				<groupId>org.springframework.data</groupId>
+				<artifactId>spring-data-commons</artifactId>
+				<version>4.0.6</version>
 			</dependency>
 		</dependencies>
 	</dependencyManagement>
