@@ -32,6 +32,76 @@
 > - **A anticiper (Q&A jury)** : questions du type "montre les tests de ton Model X", "cheminement d'une
 >   requete HTTP dans tes 5 couches" - preparer 1 exemple concret de chacune.
 
+> **▶ MAJ 17/08/2026 — durcissement tests/couverture + portes CI bloquantes (chantiers A+B).** Déclenché
+> par un regard critique sur la couverture réelle (vues package-level sous le gate). Détail : rapports
+> `taskforce-docs/v1/08-operations/Rapport_Tests.md` et `…/07-securite/Rapport_Securite.md`.
+> - **Couverture front HONNÊTE (C18) ✅** : exclusion du **généré / déco / barrels** (`*.generated.ts`,
+>   `floating-paths.tsx` fond SVG animé, `index.ts`) — même logique que i18n/constants/mocks — au lieu de les
+>   compter à 0 % (chiffre gonflé). Tests ajoutés sur la **vraie logique** : `client-logger.ts` **0 → 100 %**
+>   (throttle/dédup/token-gate, E25) et `turnstile-widget.tsx` (cycle render/remove anti-bot, frontière
+>   d'intégration). Gate Vitest **vert : All files 85,19 → 90,03 %**, `components/auth` 79,9 → 86,3 %.
+>   **+14 tests** (front = **821**). `[FE-COV-01]`
+> - **Slices contrôleurs backend (C25) ✅** : **+13 `@WebMvcTest`** sur 7 contrôleurs démo-critiques qui étaient
+>   à ~0 % (`Analytics`, `Knowledge/Brain`, `Analysis`, `Cortex`, `User`, `OAuth`, `webhook Stripe`) — routage,
+>   résolution JWT→userId, 200/401, gardes de bordure (liste blanche OAuth, état anti-CSRF, signature Stripe
+>   invalide → 400). `it.ps1 -Verify` = **865 tests / 0 échec** ; gate JaCoCo (périmètre) **72,99 → 73,64 %**,
+>   « All coverage checks have been met ». `[BE-COV-01]`
+> - **Portes CI BLOQUANTES (C25/C26, PC-028) ✅** : `backend-tests.yml` passe de `mvn test jacoco:report` à
+>   **`mvn verify`** → l'exécution `jacoco-check` (BUNDLE LINE ≥ 70 %), **inerte** jusqu'ici en CI, **bloque** enfin.
+>   Nouveau workflow **`security-scan.yml`** : **Trivy** (deps/secrets/misconfig) + **Semgrep** (SAST), rapport
+>   complet en artefact + **gate sur le plus haut niveau** (CRITICAL / ERROR, 0 aujourd'hui) + run **hebdo** planifié.
+>   ZAP DAST reste manuel (stack requise). `[CI-GATE-01]`
+> - **2e lot de slices contrôleurs (C25) ✅** : **+9 `@WebMvcTest`** sur 8 contrôleurs CRUD workspace restés à
+>   ~0 % (Cycle/Page/DashboardCard/MemberLeave/MemberSkill/AiUsage/SkillSuggestion/Webhook). Back = **874 tests**,
+>   gate JaCoCo **73,64 → 74,11 %**. `[BE-COV-02]`
+> - **DAST en CI (C26) ✅** : nouveau `zap-dast.yml` — OWASP ZAP baseline **planifié hebdo + manuel**, lève la
+>   stack (comme les E2E), gate sur alerte HIGH. Complète Trivy/Semgrep de `security-scan.yml`. `[CI-DAST-01]`
+> - **Durcissement prod P0 (C24/C26) ✅** : PC-024 (Dockerfile défaut `prod` fail-safe), PC-026 (seeds
+>   V17/18/31/40 déplacés en `db/seed`, chargés en **dev seulement** → prod/`it` ne les voient plus),
+>   PC-027 (`CorsConfig` lit `cors.allowed-origins`), **PC-025** (compose « par défaut » aligné sur
+>   `pgvector/pgvector:pg18`, prod/dev l'étaient déjà). Vérifié `it.ps1 -Verify` : chaîne de migration **sans
+>   seeds** (= chemin prod), V73, 0 erreur Flyway. `[PROD-P0-01]`
+> - **Montée des CVE HIGH (C24) ✅** : `spring-framework` 7.0.8, `netty` 4.2.16, `micrometer` 1.16.6,
+>   `spring-data-commons` 4.0.6, `next` 16.2.11 + `apk upgrade` (paquets OS). Vérifié back (874) + `next build`
+>   (au passage, **fix pré-existant** : `/auth/callback` manquait sa frontière `<Suspense>`) ; **`keycloak`
+>   25→26 fait** (bump majeur, testé — 874 verts, API admin stable, 0 conflit transitif). `[SEC-DEPS-01]`
+> - **Reste (action user)** : roter les secrets `.env.dev` (Groq / OAuth GitHub / Stripe test) avant rendu ;
+>   `stripe listen` + démo paiement Business sur un compte frais.
+> - **Vérif** : `it.ps1 -Verify` (**874 tests, gate 74,11 %** ✅) + Vitest `--coverage` (821 tests, 90,03 %, gate ✅)
+>   + `next build` ✅ + `tsc`/`eslint` verts.
+
+> **▶ MAJ 16/08/2026 — audit de livrabilité pré-soutenance + 3 correctifs + bascule IA VM.** Topo complet :
+> `.ai/audit-livrable-pfr.md` (couverture des 32 compétences, paiement, sécurité, tests). Verdict : **livrable
+> pour la soutenance Blocs 2-3**, gaps résiduels = C11/E9 (cas RGPD externe non reçu) et Bloc 4 non déployé
+> (mise en situation séparée). ⚠️ **Brain OS réel = `C:\Taskforce\taskforce-docs\`** (chemin `CLAUDE.md` périmé).
+> - **Smart Assign — démo qui claque ✅** : `dev_seed.sql` **curé** (charge par domaine + `member_leaves`) →
+>   best-match net (WEB-5 react+ts → Aïcha 66 %). Congés = **vraie contrainte** : `SmartAssignService`
+>   exclut du vivier les membres en VACATION/SICK du jour (`resolveCandidates`, REMOTE = présent). **Rééquilibrage
+>   du scoring** (labelScore 0.08→0.22) → le bulk auto-assign **distribue par métier** au lieu de concentrer sur
+>   le moins chargé. `it.ps1 -Test SmartAssignServiceTest` = **35/35**. `[PROD-1.8]`
+> - **Bascule IA Groq (déployabilité VM, C29-C30) ✅** : détection auto — si `GROQ_API_KEY` présente, le **chat**
+>   (smart-assign, Cortex, orchestration) passe sur **Groq** (hébergé, zéro compute local → VM 4 Go) ; sinon
+>   Ollama local. Embeddings toujours Ollama. `ai-service/app/{config.py,services/ollama_gateway.py,routers/health.py}`
+>   + `docker-compose.dev.yml` + `.env*`. Vérifié no-op en dev (`chat_provider: ollama`). ⚠️ clé `.env.dev` **morte
+>   (403)** → vidée ; mettre une clé valide (console.groq.com) pour la VM. `[IA-DEPLOY-01]`
+> - **Paiement Stripe — anti-rétrogradation (C23) ✅** : bug `STRIPE_PRICE_ID_BASIC == BUSINESS` → le webhook
+>   `subscription.updated` rétrogradait Business→Basic. Fix : `getPlanForPriceId` renvoie **null si le price-id est
+>   ambigu** (matche plusieurs forfaits) → le plan reste celui posé par `checkout.session.completed` (metadata).
+>   `StripeServiceTest` **10/10** (nouveau cas ambigu). Reste **action user** : créer un price Business distinct +
+>   lancer `stripe listen` pour la démo. `[PROD-PAY-02]`
+> - **CI backend réparée (C25/C26, PC-028) ✅** : `backend-tests.yml` faisait `mvn test` **sans Postgres** → intégration
+>   en erreur, JaCoCo disque ~4 %, « Backend Tests » rouge. Ajout d'un **service `pgvector/pgvector:pg16`** +
+>   `SPRING_DATASOURCE_*` (réplique `it.ps1`) → les tests d'intégration tournent en CI. Couverture réelle (via
+>   `it.ps1 -Full`) = **back ~75-78 %** / **front ~92 %** (781 tests). `[SOUT-02 / PC-028]`
+> - **Validation front Zod (C16/C22, règle d'or #8) ✅** : Zod était déclaré mais **inutilisé**. Nouveau
+>   `lib/validation/auth-schemas.ts` (réutilise les helpers existants) câblé sur **login + register** (`safeParse`).
+>   tsc/eslint verts. `[FE-SEC-ZOD-01]`
+> - **Visite guidée — logique corrigée ✅** : terminée→bloquée ; fermée sans cocher→revient au prochain accès ;
+>   case « Ne plus afficher » créée→bloquée. Flag `dismissed` éphémère (anti-boucle). `[FE-TOUR-01]`
+> - **⚠️ Reste P0 prod (dossier)** : CORS en dur (PC-027), prod en profil `dev` (PC-024), seeds à mots de passe
+>   en clair en prod (PC-026), **roter** clé Groq + secrets OAuth GitHub des `.env.dev` (absents de l'historique git,
+>   vérifié). Détail : `Problemes_Connus.md` + `.ai/audit-livrable-pfr.md`.
+
 > **▶ MAJ 05/07/2026 — round « V1-hardening » (branche `test/v1-hardening`).** Correctifs livrés + vérifiés (658 tests back + 54 front verts) :
 > - **Sécurité** — migration de l'émission des tokens vers **Keycloak OIDC RS256** (`JwtService` HS512 custom supprimé ; refresh/logout natifs IdP) → ferme **PC-019 / TF-SEC-009**. Détail : Brain OS `taskforce-docs` [ADR-011].
 > - **Sécurité** — **rate limiting distribué** (Bucket4j/Lettuce Redis, fallback local) → **TF-SEC-011** ; Redis ajouté au compose prod + `render.yaml`.
