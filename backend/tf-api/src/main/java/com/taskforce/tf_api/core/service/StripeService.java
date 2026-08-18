@@ -153,10 +153,17 @@ public class StripeService {
      */
     public PlanType getPlanForPriceId(String priceId) {
         if (priceId == null || priceId.isBlank()) return null;
-        if (priceId.equals(basicPriceId)) return PlanType.BASIC;
-        if (priceId.equals(businessPriceId)) return PlanType.BUSINESS;
-        if (priceId.equals(enterprisePriceId)) return PlanType.ENTERPRISE;
-        return null;
+        // Un même price-id peut être MAL configuré pour plusieurs forfaits (ex. STRIPE_PRICE_ID_BASIC ==
+        // STRIPE_PRICE_ID_BUSINESS). Dans ce cas le reverse-mapping est AMBIGU : on renvoie null pour NE
+        // PAS resynchroniser le plan depuis un signal non fiable — surtout ne pas RÉTROGRADER un Business
+        // en Basic sur `customer.subscription.updated`. Le plan fiable reste celui posé par
+        // `checkout.session.completed` (metadata `planType`). Cf. audit-livrable-pfr.md §2.
+        int matches = 0;
+        PlanType result = null;
+        if (priceId.equals(basicPriceId))      { matches++; result = PlanType.BASIC; }
+        if (priceId.equals(businessPriceId))   { matches++; result = PlanType.BUSINESS; }
+        if (priceId.equals(enterprisePriceId)) { matches++; result = PlanType.ENTERPRISE; }
+        return matches == 1 ? result : null;
     }
 
     /**

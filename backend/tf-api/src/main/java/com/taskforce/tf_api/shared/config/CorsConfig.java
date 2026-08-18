@@ -3,6 +3,7 @@ package com.taskforce.tf_api.shared.config;
 import java.util.Arrays;
 import java.util.List;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
@@ -16,6 +17,17 @@ import org.springframework.web.filter.CorsFilter;
 @Configuration
 public class CorsConfig {
 
+    /**
+     * Origines autorisées, lues depuis {@code cors.allowed-origins} (CSV). PC-027 : la liste était
+     * codée en dur (localhost + {@code *.taskforce.com}) et <b>aucun</b> code ne lisait
+     * {@code cors.allowed-origins} → {@code CORS_ALLOWED_ORIGINS} (application-prod.yml,
+     * docker-compose.prod.yml, render.yaml) était de la <b>config morte</b>, et tout front déployé
+     * hors {@code *.taskforce.com} voyait ses appels bloqués par le navigateur. Défaut = origines de
+     * développement usuelles (surchargées par le profil / l'env).
+     */
+    @Value("${cors.allowed-origins:http://localhost:3000,http://localhost:5173,http://localhost:4200}")
+    private List<String> allowedOrigins;
+
     @Bean
     public CorsFilter corsFilter() {
         CorsConfiguration config = new CorsConfiguration();
@@ -23,13 +35,10 @@ public class CorsConfig {
         // Autoriser les credentials (cookies, auth headers...)
         config.setAllowCredentials(true);
 
-        // Origines autorisées (frontend)
-        config.setAllowedOriginPatterns(List.of(
-                "http://localhost:3000",      // React dev
-                "http://localhost:5173",      // Vite dev
-                "http://localhost:4200",      // Angular dev
-                "https://*.taskforce.com"
-        ));
+        // Origines autorisées (frontend), lues depuis la configuration (cf. champ `allowedOrigins`).
+        // `setAllowedOriginPatterns` (et non `setAllowedOrigins`) pour accepter les motifs à joker que
+        // la prod peut fournir (ex. https://*.taskforce.com) via CORS_ALLOWED_ORIGINS.
+        config.setAllowedOriginPatterns(allowedOrigins);
 
         // Headers autorisés
         config.setAllowedHeaders(Arrays.asList(

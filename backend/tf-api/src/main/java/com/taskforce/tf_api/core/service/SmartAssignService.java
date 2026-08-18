@@ -3,10 +3,12 @@ package com.taskforce.tf_api.core.service;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -45,6 +47,10 @@ public class SmartAssignService {
     private static final String FEATURE_NAME = "smart_assign";
     /** Points attribués à une tâche non estimée (calibré pour reproduire le scoring basé sur le nombre). */
     private static final int DEFAULT_STORY_POINTS = 3;
+    /** Taille de la shortlist envoyée au LLM (pré-filtre heuristique). Au-delà, le modèle scannait TOUS
+     *  les membres du workspace (projet public → beaucoup de candidats) → prompt/génération très longs
+     *  = smart-assign lent. On ne lui fait rerank que le top N. La réponse finale renvoie top + 4 alt. */
+    private static final int SHORTLIST_SIZE = 5;
 
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceMemberRepository workspaceMemberRepository;
@@ -200,6 +206,15 @@ public class SmartAssignService {
         Map<Long, CandidateMetrics> metricsByUser =
             buildCandidateMetrics(workspace, issueLabels, candidates, issueStoryPoints, priority, project.isGrowthMode());
 
+        // Pré-filtre HEURISTIQUE avant le LLM : on ne fait rerank par le modèle que les N meilleurs
+        // candidats (skills + charge + dispo + historique) plutôt que TOUS les membres du workspace →
+        // prompt et génération bien plus courts = smart-assign nettement plus rapide, sans perdre en
+        // qualité (les candidats manifestement mauvais sont écartés en Java, gratuitement).
+        List<User> shortlist = candidates.stream()
+            .sorted((a, b) -> Integer.compare(preScore(metricsByUser.get(b.getId())), preScore(metricsByUser.get(a.getId()))))
+            .limit(SHORTLIST_SIZE)
+            .toList();
+
         GroqResult groq = GroqResult.empty();
         boolean fallbackUsed = false;
         // `useAi=false` (redistribution) : on saute le LLM et on classe au heuristique Java pur —
@@ -208,7 +223,7 @@ public class SmartAssignService {
             try {
                 // Métré : gate quota (au-dessus du plafond → repli heuristique, aucun token brûlé) + comptage réel.
                 groq = aiMeter.metered(workspace.getId(),
-                    () -> fetchGroqScores(issueText, priority, candidates, metricsByUser));
+                    () -> fetchGroqScores(project, issueText, priority, shortlist, metricsByUser));
             } catch (Exception ex) {
                 fallbackUsed = true;
                 log.warn("Smart assign Groq fallback triggered: {}", ex.getMessage());
@@ -216,7 +231,7 @@ public class SmartAssignService {
         }
 
         List<SmartAssignCandidateResponse> ranked =
-            rankCandidates(candidates, metricsByUser, groq.scores(), groq.reasons());
+            rankCandidates(shortlist, metricsByUser, groq.scores(), groq.reasons());
         SmartAssignCandidateResponse recommended = ranked.isEmpty() ? null : ranked.getFirst();
         List<SmartAssignCandidateResponse> alternatives = ranked.size() <= 1
             ? List.of()
@@ -233,6 +248,13 @@ public class SmartAssignService {
             .build();
     }
 
+    /** Pré-score HEURISTIQUE (sans LLM) pour bâtir la shortlist : compétences + charge + dispo + historique. */
+    private static int preScore(CandidateMetrics m) {
+        if (m == null) return 0;
+        int historical = (int) Math.round(m.historyStats().resolvedRate() * 100);
+        return (int) Math.round(m.labelScore() * 0.40 + m.workloadScore() * 0.25 + m.availability() * 0.20 + historical * 0.15);
+    }
+
     private void assertWorkspaceMember(Long workspaceId, Long userId) {
         if (!workspaceMemberRepository.existsByWorkspaceIdAndUserId(workspaceId, userId)) {
             throw new ResourceNotFoundException("Accès refusé au workspace");
@@ -240,16 +262,29 @@ public class SmartAssignService {
     }
 
     private List<User> resolveCandidates(Workspace workspace, Project project) {
+        // Absents aujourd'hui (member_leaves VACATION/SICK) : hors vivier — on ne recommande pas
+        // d'assigner à quelqu'un en congé/arrêt. REMOTE = présent, donc conservé.
+        Set<Long> onLeave = onLeaveUserIds(workspace.getId());
         if (project.isPublic()) {
             return workspaceMemberRepository.findByWorkspaceId(workspace.getId()).stream()
                 .map(WorkspaceMember::getUser)
                 .filter(u -> Boolean.TRUE.equals(u.getIsActive()))
+                .filter(u -> !onLeave.contains(u.getId()))
                 .toList();
         }
         return projectMemberRepository.findByProjectId(project.getId()).stream()
             .map(ProjectMember::getUser)
             .filter(u -> Boolean.TRUE.equals(u.getIsActive()))
+            .filter(u -> !onLeave.contains(u.getId()))
             .toList();
+    }
+
+    /** IDs des membres en congé calendaire (VACATION/SICK) chevauchant aujourd'hui. REMOTE = présent. */
+    private Set<Long> onLeaveUserIds(Long workspaceId) {
+        return new HashSet<>(jdbcTemplate.queryForList(
+            "SELECT user_id FROM member_leaves WHERE workspace_id = ? AND type IN ('VACATION','SICK') "
+                + "AND start_date <= CURRENT_DATE AND end_date >= CURRENT_DATE",
+            Long.class, workspaceId));
     }
 
     private String buildIssueText(Issue issue, List<String> labels) {
@@ -476,24 +511,36 @@ public class SmartAssignService {
      * Le LLM retourne un JSON de la forme :
      * { "scores": [ { "candidate_id": 42, "score": 0.87, "reason": "..." }, ... ] }
      */
-    private GroqResult fetchGroqScores(String issueText, IssuePriority priority,
+    private GroqResult fetchGroqScores(Project project, String issueText, IssuePriority priority,
                                        List<User> candidates,
                                        Map<Long, CandidateMetrics> metricsByUser) {
         String systemPrompt = """
             You are a project management assistant.
-            Given an issue and a list of team members, score each candidate
+            Given a project, an issue and a list of team members, score each candidate
             on their suitability to be assigned this issue (score between 0.0 and 1.0).
-            Consider their skills, current workload, and past performance.
+            Consider their skills, current workload, and past performance, and how well they
+            fit the project's context and desired outcomes.
             Some candidates are flagged growthStretch:yes — this issue is a healthy "stretch"
             slightly above their usual complexity and matches a skill they are growing toward
             (see targets). When that is the case, you may modestly favor giving them the learning
             opportunity, and mention it in the reason — but never at the expense of delivery on
             urgent or critical work.
             Respond ONLY with valid JSON in this exact format:
-            {"scores":[{"candidate_id":1,"score":0.85,"reason":"Short explanation"},{...}]}
+            {"scores":[{"candidate_id":1,"score":0.85,"reason":"why they fit, max 12 words"},{...}]}
+            Keep each reason to a single short clause — no more than 12 words.
             """;
 
         StringBuilder userMsg = new StringBuilder();
+        // Contexte du projet (nom + description/outcomes) : le scoring doit tenir compte de la finalité
+        // du projet, pas seulement du texte de l'issue. Description optionnelle → on ne met que le nom.
+        if (project != null) {
+            String projectDesc = project.getDescription() != null ? project.getDescription().trim() : "";
+            userMsg.append("Project: ").append(Objects.toString(project.getName(), ""));
+            if (!projectDesc.isEmpty()) {
+                userMsg.append(" — ").append(projectDesc);
+            }
+            userMsg.append("\n");
+        }
         userMsg.append("Issue: ").append(issueText).append("\n");
         userMsg.append("Priority: ").append(priority).append("\n\n");
         userMsg.append("Team members:\n");
@@ -571,14 +618,19 @@ public class SmartAssignService {
                 int semantic = toScore(semanticScores.getOrDefault(u.getId(), 0.0));
                 int historical = toScore(m.historyStats().resolvedRate());
 
-                // PROD-1.8 : l'historique (taux de résolution réussie) entre désormais dans le score
-                // (auparavant calculé mais pondéré à 0). Poids ∑ = 1.0.
+                // PROD-1.8 : l'historique (taux de résolution réussie) entre dans le score. Poids ∑ = 1.0.
+                // Rééquilibrage (16/08) : le **skill match déterministe** (labelScore) passe de 0.08 à 0.22,
+                // repris sur la charge/dispo et un léger retrait du sémantique LLM. Motif : le LLM local
+                // (qwen) note trop généreusement les profils hors-domaine (un QA à ~0.6 sur une issue React) ;
+                // combiné à un labelScore quasi nul, un membre peu chargé mais NON qualifié remontait à ~60 %
+                // et le multi-assign se concentrait sur lui. Le sémantique peut toujours dominer (cf. test
+                // « score sémantique élevé fait remonter un candidat sans skill »), mais le fit métier compte.
                 int base = (int) Math.round(
-                    semantic    * 0.45
-                        + m.workloadScore()  * 0.22
-                        + historical         * 0.15
-                        + m.availability()   * 0.10
-                        + m.labelScore()     * 0.08
+                    semantic    * 0.40
+                        + m.labelScore()     * 0.22
+                        + m.workloadScore()  * 0.16
+                        + historical         * 0.14
+                        + m.availability()   * 0.08
                 );
                 // PROD-1.8 Phase 3 : bonus « montée en compétence » BORNÉ (+15 max) — nudge, ne domine pas.
                 // Growth ciblé (membre opt-in, score 100) → +15 ; growth auto mode projet (score 80) → +12.
