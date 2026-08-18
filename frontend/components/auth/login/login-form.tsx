@@ -9,7 +9,8 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import Link from "next/link"
 import { useAuth } from "@/lib/contexts/auth-context"
-import { validateEmail, sanitizeInput, globalRateLimiter } from "@/lib/utils/validation"
+import { sanitizeInput, globalRateLimiter } from "@/lib/utils/validation"
+import { loginSchema, firstZodError } from "@/lib/validation/auth-schemas"
 import { Loader2 } from "lucide-react"
 import { AuthSocialButtons } from "@/components/auth/auth-social-buttons"
 
@@ -33,17 +34,15 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!formData.email || !formData.password) {
-      toast.error(t.common.error, { description: "Veuillez remplir tous les champs" })
+    // Validation front via Zod (règle d'or #8) — remplace les vérifications ad-hoc champ + email.
+    const parsed = loginSchema.safeParse(formData)
+    if (!parsed.success) {
+      toast.error(t.common.error, { description: firstZodError(parsed.error) })
       return
     }
     if (!globalRateLimiter.isAllowed("login", 5, 15 * 60 * 1000)) {
       const timeLeft = globalRateLimiter.getTimeUntilReset("login", 15 * 60 * 1000)
       toast.error(t.common.error, { description: `Trop de tentatives. Réessayez dans ${timeLeft} secondes` })
-      return
-    }
-    if (!validateEmail(formData.email)) {
-      toast.error(t.common.error, { description: "Format d'email invalide" })
       return
     }
 

@@ -87,17 +87,20 @@ export default function DashboardPage() {
   // re-déclenchement. Rejeu depuis l'aide via `?tour=1` (forcé même si déjà vu), puis on nettoie l'URL.
   const tourHasSeen = useTourStore((s) => s.hasSeen)
   const tourActive = useTourStore((s) => s.isActive)
+  const tourDismissed = useTourStore((s) => s.dismissed)
   const startTour = useTourStore((s) => s.start)
   useEffect(() => {
     if (tourActive || !slug) return
     const forceTour = new URLSearchParams(window.location.search).get("tour") === "1"
-    if (tourHasSeen && !forceTour) return
+    // `hasSeen` (persisté) = terminé/opt-out définitif ; `dismissed` (session) = fermé sans cocher →
+    // pas de re-déclenchement tant qu'on n'a pas rechargé l'app, mais la visite reviendra au prochain accès.
+    if ((tourHasSeen || tourDismissed) && !forceTour) return
     const t = setTimeout(() => {
       startTour()
       if (forceTour) window.history.replaceState(null, "", `/${slug}/dashboard`)
     }, forceTour ? 300 : 900)
     return () => clearTimeout(t)
-  }, [tourHasSeen, tourActive, startTour, slug])
+  }, [tourHasSeen, tourDismissed, tourActive, startTour, slug])
 
   const displayName = user?.displayName?.trim() || user?.firstName || ""
   const rangeLabel = GLOBAL_RANGES.find((r) => r.value === globalRange)?.label ?? globalRange

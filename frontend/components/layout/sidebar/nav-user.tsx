@@ -134,7 +134,7 @@ export function NavUser({
               </>
             )}
             <DropdownMenuGroup>
-              <DropdownMenuItem onClick={() => router.push(`/${slug}/profile`)}>
+              <DropdownMenuItem onClick={() => openSettings("profile")}>
                 <BadgeCheck />
                 Account
                 {isPro && (

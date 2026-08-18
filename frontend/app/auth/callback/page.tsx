@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Loader2, AlertCircle } from "lucide-react";
@@ -18,7 +18,7 @@ import { authService } from "@/lib/api/auth-service";
  * échouerait et afficherait une erreur sur une connexion pourtant réussie. D'où le garde par `ref`,
  * qui survit au remontage là où un état serait réinitialisé.
  */
-export default function OAuthCallbackPage() {
+function OAuthCallbackInner() {
   const params = useSearchParams();
   const [echecReseau, setEchecReseau] = useState<string | null>(null);
   const dejaEnvoye = useRef(false);
@@ -89,5 +89,26 @@ export default function OAuthCallbackPage() {
       <h1 className="auth-title mt-3">Connexion en cours</h1>
       <p className="auth-subtitle">Un instant, nous finalisons votre session.</p>
     </div>
+  );
+}
+
+/**
+ * Enveloppe Suspense OBLIGATOIRE : `useSearchParams()` provoque un « CSR bailout » au prérendu
+ * statique — sans cette frontière, `next build` échoue (missing-suspense-with-csr-bailout, page
+ * exportée en erreur). Le fallback réutilise l'écran « Connexion en cours ».
+ */
+export default function OAuthCallbackPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="auth-panel text-center">
+          <Loader2 className="mx-auto h-7 w-7 animate-spin" style={{ color: "var(--label-tertiary)" }} />
+          <h1 className="auth-title mt-3">Connexion en cours</h1>
+          <p className="auth-subtitle">Un instant, nous finalisons votre session.</p>
+        </div>
+      }
+    >
+      <OAuthCallbackInner />
+    </Suspense>
   );
 }

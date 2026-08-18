@@ -126,6 +126,9 @@ export function ProductTour() {
 
   const [mounted, setMounted] = React.useState(false);
   const [rect, setRect] = React.useState<DOMRect | null>(null);
+  // « Ne plus afficher » : coché → la fermeture (croix/Échap) bloque définitivement (hasSeen) ; sinon la
+  // visite revient au prochain accès.
+  const [dontShowAgain, setDontShowAgain] = React.useState(false);
   const popoverRef = React.useRef<HTMLDivElement>(null);
 
   const step = STEPS[stepIndex];
@@ -149,6 +152,11 @@ export function ProductTour() {
   }, [close, router, slug]);
 
   React.useEffect(() => setMounted(true), []);
+
+  // Chaque (ré)ouverture de la visite repart avec « Ne plus afficher » décochée.
+  React.useEffect(() => {
+    if (isActive) setDontShowAgain(false);
+  }, [isActive]);
 
   // Position de la cible — recalculée à chaque étape + au scroll/resize. Les hero sont centrés (pas de
   // cible). Intervalle léger : suit le défilement fluide de scrollIntoView sans dépendre d'un événement.
@@ -180,7 +188,7 @@ export function ProductTour() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
-        close(true);
+        close(dontShowAgain); // fermeture « tôt » : bloque seulement si la case est cochée
       } else if (e.key === "ArrowRight") {
         e.preventDefault();
         goNext();
@@ -191,7 +199,7 @@ export function ProductTour() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [isActive, goNext, goPrev, close]);
+  }, [isActive, goNext, goPrev, close, dontShowAgain]);
 
   // a11y : porte le focus sur le popover à chaque étape.
   React.useEffect(() => {
@@ -262,7 +270,7 @@ export function ProductTour() {
             </span>
             <button
               type="button"
-              onClick={() => close(true)}
+              onClick={() => close(dontShowAgain)}
               aria-label="Fermer la visite"
               className="text-muted-foreground transition-colors hover:text-foreground"
             >
@@ -287,7 +295,7 @@ export function ProductTour() {
                   </span>
                   <button
                     type="button"
-                    onClick={() => close(true)}
+                    onClick={() => close(dontShowAgain)}
                     aria-label="Fermer la visite"
                     className="flex size-7 items-center justify-center rounded-full bg-background/80 text-muted-foreground backdrop-blur transition-colors hover:text-foreground"
                   >
@@ -333,42 +341,58 @@ export function ProductTour() {
           </div>
         )}
 
-        {/* Pied : progression + actions */}
+        {/* Pied : opt-out (fermeture « tôt ») + progression + actions */}
         <div
           className={cn(
-            "mt-4 flex items-center justify-between gap-2 border-t border-border px-3 py-2.5",
+            "mt-4 border-t border-border px-3 py-2.5",
             isHero && "mt-6 px-4 py-3",
           )}
         >
-          <div className="flex items-center gap-1.5 pl-1">
-            {STEPS.map((s, i) => (
-              <span
-                key={s.title}
-                className={cn("size-1.5 rounded-full transition-colors", i === stepIndex ? "bg-primary" : "bg-border")}
+          {/* « Ne plus afficher » — masquée sur la dernière étape (là, « Terminer » = visite complétée,
+              qui bloque de toute façon). Cochée + fermeture (croix/Échap) → blocage définitif. */}
+          {!isLast && (
+            <label className="mb-2.5 flex w-fit cursor-pointer select-none items-center gap-2 text-xs text-muted-foreground transition-colors hover:text-foreground">
+              <input
+                type="checkbox"
+                checked={dontShowAgain}
+                onChange={(e) => setDontShowAgain(e.target.checked)}
+                style={{ accentColor: "var(--primary)" }}
+                className="size-3.5 rounded border-border"
               />
-            ))}
-          </div>
-          <div className="flex items-center gap-1.5">
-            {!isFirst && (
-              <Button variant="ghost" size="sm" onClick={goPrev}>
-                <ArrowLeft /> Précédent
-              </Button>
-            )}
-            {step.cta === "upgrade" ? (
-              <>
-                <Button variant="ghost" size="sm" onClick={() => close(true)}>
-                  Terminer
+              Ne plus afficher cette visite
+            </label>
+          )}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 pl-1">
+              {STEPS.map((s, i) => (
+                <span
+                  key={s.title}
+                  className={cn("size-1.5 rounded-full transition-colors", i === stepIndex ? "bg-primary" : "bg-border")}
+                />
+              ))}
+            </div>
+            <div className="flex items-center gap-1.5">
+              {!isFirst && (
+                <Button variant="ghost" size="sm" onClick={goPrev}>
+                  <ArrowLeft /> Précédent
                 </Button>
-                <Button size="sm" onClick={handleUpgrade}>
-                  Voir les forfaits <Sparkles />
+              )}
+              {step.cta === "upgrade" ? (
+                <>
+                  <Button variant="ghost" size="sm" onClick={() => close(true)}>
+                    Terminer
+                  </Button>
+                  <Button size="sm" onClick={handleUpgrade}>
+                    Voir les forfaits <Sparkles />
+                  </Button>
+                </>
+              ) : (
+                <Button size="sm" onClick={goNext}>
+                  {isFirst ? "C'est parti" : isLast ? "Terminer" : "Suivant"}
+                  {!isLast && <ArrowRight />}
                 </Button>
-              </>
-            ) : (
-              <Button size="sm" onClick={goNext}>
-                {isFirst ? "C'est parti" : isLast ? "Terminer" : "Suivant"}
-                {!isLast && <ArrowRight />}
-              </Button>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </div>

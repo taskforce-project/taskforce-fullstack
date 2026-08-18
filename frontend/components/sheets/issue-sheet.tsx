@@ -1143,6 +1143,10 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
   const [labels, setLabels] = useState<IssueLabel[]>(issue?.labels ?? [])
   const [points, setPoints] = useState<number | null>(issue?.storyPoints ?? null)
   const [dueDate, setDueDate] = useState<string | null>(issue?.dueDate ?? null)
+  // Smart Assign : déclenché par l'étoile IA dans la ligne Assignee (pas un bloc pleine largeur).
+  // `smartRun` = jeton incrémenté au clic pour relancer l'analyse ; l'ouverture par défaut n'analyse pas.
+  const [smartOpen, setSmartOpen] = useState(false)
+  const [smartRun, setSmartRun] = useState(0)
   // Cycle courant de l'issue + cycles du projet (options du sélecteur) — CYC-03b.
   const [cycleId, setCycleId] = useState<number | null>(null)
   const [projectCycles, setProjectCycles] = useState<Cycle[]>([])
@@ -1166,6 +1170,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
     setStatusCategory(issue.statusCategory)
     setPinned(issue.pinned ?? false)
     setCycleId(null)
+    setSmartOpen(false)   // ne pas laisser le panneau Smart Assign ouvert d'une issue à l'autre
   }, [issue])
 
   // Load project members + statuses + labels when sheet opens
@@ -1598,60 +1603,90 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
               </Select>
             </MetaRow>
 
-            {/* Assignee */}
+            {/* Assignee — Select + étoile Smart Assign IA inline (taille input, pas un bloc pleine largeur) */}
             <MetaRow icon={<Avatar className="size-3.5"><AvatarFallback className="text-[7px]">?</AvatarFallback></Avatar>} label="Assignee">
-              <Select
-                value={assignee ? String(assignee.userId) : "none"}
-                onValueChange={async (val) => {
-                  if (val === "none") {
-                    setAssignee(null)
-                    await callUpdate({ assigneeId: null })
-                    toast.success("Unassigned")
-                    return
-                  }
-                  const m = projectMembers.find((x) => String(x.userId) === val)
-                  if (!m) return
-                  const name = m.displayName ?? m.email
-                  setAssignee({ initials: memberInitials(m), color: memberColor(m.userId), name, userId: m.userId, email: m.email })
-                  await callUpdate({ assigneeId: m.userId })
-                  toast.success(`Assigned to ${name}`)
-                }}
-              >
-                <SelectTrigger size="sm" className="w-full">
-                  {assignee ? (
-                    <span className="flex items-center gap-1.5 min-w-0">
-                      <UserAvatar email={assignee.email} name={assignee.name} className="size-4 shrink-0" fallbackClassName="text-[8px]" />
-                      <span className="truncate">{assignee.name}</span>
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground">Unassigned</span>
-                  )}
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none"><span className="text-muted-foreground">No assignee</span></SelectItem>
-                  {projectMembers.map((m) => {
+              <div className="flex w-full items-center gap-1.5">
+                <Select
+                  value={assignee ? String(assignee.userId) : "none"}
+                  onValueChange={async (val) => {
+                    if (val === "none") {
+                      setAssignee(null)
+                      await callUpdate({ assigneeId: null })
+                      toast.success("Unassigned")
+                      return
+                    }
+                    const m = projectMembers.find((x) => String(x.userId) === val)
+                    if (!m) return
                     const name = m.displayName ?? m.email
-                    return (
-                      <SelectItem key={m.userId} value={String(m.userId)}>
-                        <UserAvatar email={m.email} name={name} avatarUrl={m.avatarUrl} className="size-4 shrink-0" fallbackClassName="text-[8px]" />
-                        {name}
-                      </SelectItem>
-                    )
-                  })}
-                </SelectContent>
-              </Select>
+                    setAssignee({ initials: memberInitials(m), color: memberColor(m.userId), name, userId: m.userId, email: m.email })
+                    await callUpdate({ assigneeId: m.userId })
+                    toast.success(`Assigned to ${name}`)
+                  }}
+                >
+                  <SelectTrigger size="sm" className="w-full min-w-0 flex-1">
+                    {assignee ? (
+                      <span className="flex items-center gap-1.5 min-w-0">
+                        <UserAvatar email={assignee.email} name={assignee.name} className="size-4 shrink-0" fallbackClassName="text-[8px]" />
+                        <span className="truncate">{assignee.name}</span>
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">Unassigned</span>
+                    )}
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none"><span className="text-muted-foreground">No assignee</span></SelectItem>
+                    {projectMembers.map((m) => {
+                      const name = m.displayName ?? m.email
+                      return (
+                        <SelectItem key={m.userId} value={String(m.userId)}>
+                          <UserAvatar email={m.email} name={name} avatarUrl={m.avatarUrl} className="size-4 shrink-0" fallbackClassName="text-[8px]" />
+                          {name}
+                        </SelectItem>
+                      )
+                    })}
+                  </SelectContent>
+                </Select>
+
+                {/* Étoile IA : petit bouton de la hauteur de l'input. Quand personne n'est assigné,
+                    il « brille » (primary) pour appeler l'action ; sinon discret (re-analyse). */}
+                {workspaceSlug && projectId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (smartOpen) { setSmartOpen(false); return }
+                      setSmartOpen(true)
+                      setSmartRun((t) => t + 1)
+                    }}
+                    title="Assigner avec l'IA"
+                    aria-label="Assigner avec l'IA"
+                    aria-pressed={smartOpen}
+                    className={cn(
+                      "flex size-8 shrink-0 items-center justify-center rounded-md border transition-colors",
+                      smartOpen
+                        ? "border-primary/40 bg-primary/15 text-primary"
+                        : noAssignee
+                          ? "border-primary/30 bg-primary/10 text-primary ring-1 ring-inset ring-primary/15 hover:bg-primary/20"
+                          : "border-input text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+                    )}
+                  >
+                    <Sparkles className="size-4" />
+                  </button>
+                )}
+              </div>
             </MetaRow>
 
-            {/* Smart Auto-Assign */}
+            {/* Smart Auto-Assign — panneau contrôlé, ouvert par l'étoile IA ci-dessus */}
             {workspaceSlug && projectId && (
               <SmartAssignPanel
+                open={smartOpen}
+                onOpenChange={setSmartOpen}
+                runToken={smartRun}
                 workspaceSlug={workspaceSlug}
                 projectId={projectId}
                 issueId={issueId}
                 issueLabels={labels.map((l) => l.name)}
                 issuePriority={priority}
                 currentAssignee={assignee}
-                defaultOpen={noAssignee}
                 onAssign={async (m) => {
                   const initials = (m.displayName ?? m.email).slice(0, 2).toUpperCase()
                   const color = memberColor(m.userId)

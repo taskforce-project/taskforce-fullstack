@@ -7,6 +7,7 @@ import { AUTH_ROUTES } from '../config/api-routes';
 vi.mock('./client', () => ({
   apiClient: {
     post: vi.fn(),
+    get: vi.fn(),
   },
   getErrorMessage: vi.fn((error: any) => error.message || 'An error occurred'),
 }));
@@ -523,5 +524,77 @@ describe('authService - API Service', () => {
 
       expect(isAuth).toBe(false);
     });
+  });
+});
+
+describe('authService — couverture OAuth / challenge / fallbacks / garde-fous', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorageMock.clear();
+    // Isolation : un test précédent peut avoir surchargé getErrorMessage (clearAllMocks ne réinitialise
+    // pas les implémentations) → on rétablit le comportement par défaut pour des assertions déterministes.
+    vi.mocked(client.getErrorMessage).mockImplementation((e: any) => e?.message || 'An error occurred');
+  });
+
+  it('getChallenge renvoie le défi en cas de succès', async () => {
+    const challenge = { token: 't', required: true, turnstileSiteKey: 'sk', turnstileRequired: true };
+    vi.mocked(client.apiClient.get).mockResolvedValue({ data: { success: true, message: 'ok', data: challenge } } as any);
+    await expect(authService.getChallenge()).resolves.toEqual(challenge);
+  });
+
+  it('getChallenge renvoie un défi inactif si le serveur est injoignable', async () => {
+    vi.mocked(client.apiClient.get).mockRejectedValue(new Error('réseau'));
+    await expect(authService.getChallenge()).resolves.toEqual({ token: '', required: false, turnstileSiteKey: '', turnstileRequired: false });
+  });
+
+  it("oauthAuthorizeUrl renvoie l'URL d'autorisation signée", async () => {
+    vi.mocked(client.apiClient.get).mockResolvedValue({ data: { data: { authUrl: 'https://idp/auth?state=x' } } } as any);
+    await expect(authService.oauthAuthorizeUrl('github', 'http://cb')).resolves.toBe('https://idp/auth?state=x');
+  });
+
+  it('oauthAuthorizeUrl propage une erreur', async () => {
+    vi.mocked(client.apiClient.get).mockRejectedValue(new Error('boom'));
+    await expect(authService.oauthAuthorizeUrl('github', 'http://cb')).rejects.toThrow('boom');
+  });
+
+  it('oauthCallback persiste les jetons et renvoie la session', async () => {
+    const data = { user: { id: '1', email: 'a@b.co', firstName: 'A', lastName: 'B', role: 'USER' }, accessToken: 'at', refreshToken: 'rt', expiresIn: 3600 };
+    vi.mocked(client.apiClient.post).mockResolvedValue({ data: { data } } as any);
+    await expect(authService.oauthCallback({ code: 'c', state: 's', redirectUri: 'r' })).resolves.toEqual(data);
+    expect(localStorageMock.setItem).toHaveBeenCalledWith('accessToken', 'at');
+    expect(localStorageMock.setItem).toHaveBeenCalledWith('refreshToken', 'rt');
+  });
+
+  it('oauthCallback propage une erreur', async () => {
+    vi.mocked(client.apiClient.post).mockRejectedValue(new Error('bad-code'));
+    await expect(authService.oauthCallback({ code: 'c', state: 's', redirectUri: 'r' })).rejects.toThrow('bad-code');
+  });
+
+  it('selectPlan propage une erreur', async () => {
+    vi.mocked(client.apiClient.post).mockRejectedValue(new Error('plan-fail'));
+    await expect(authService.selectPlan('a@b.co', 'BUSINESS')).rejects.toThrow('plan-fail');
+  });
+
+  it('forgotPassword retombe sur un message par défaut si le serveur ne renvoie rien', async () => {
+    vi.mocked(client.apiClient.post).mockResolvedValue({ data: { message: '' } } as any);
+    await expect(authService.forgotPassword('a@b.co')).resolves.toEqual({ message: 'Email envoyé' });
+  });
+
+  it('resetPassword retombe sur un message par défaut si le serveur ne renvoie rien', async () => {
+    vi.mocked(client.apiClient.post).mockResolvedValue({ data: { message: '' } } as any);
+    await expect(authService.resetPassword('a@b.co', '123456', 'New@Pass1')).resolves.toEqual({ message: 'Mot de passe réinitialisé' });
+  });
+
+  it("logout purge le localStorage même si l'appel serveur échoue", async () => {
+    vi.mocked(client.apiClient.post).mockRejectedValue(new Error('session déjà expirée'));
+    await authService.logout();
+    expect(localStorageMock.removeItem).toHaveBeenCalledWith('accessToken');
+    expect(localStorageMock.removeItem).toHaveBeenCalledWith('refreshToken');
+    expect(localStorageMock.removeItem).toHaveBeenCalledWith('user');
+  });
+
+  it('getCurrentUser renvoie null si le JSON stocké est corrompu', () => {
+    localStorageMock.setItem('user', '{ceci-nest-pas-du-json');
+    expect(authService.getCurrentUser()).toBeNull();
   });
 });

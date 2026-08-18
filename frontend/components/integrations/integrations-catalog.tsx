@@ -66,6 +66,8 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
   const [detailTool, setDetailTool] = useState<ConnectorView | null>(null)
   const [query, setQuery] = useState("")
   const [activeCat, setActiveCat] = useState<string>("all")
+  // Filtre « ce que j'ai connecté ou pas » (en plus du filtre par catégorie).
+  const [statusFilter, setStatusFilter] = useState<"all" | "connected" | "disconnected">("all")
   const { connectGitHub, connectSlack } = useIntegrationStore()
 
   const refresh = useCallback(() => {
@@ -108,12 +110,12 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
       .filter((g) => activeCat === "all" || g.category === activeCat)
       .map((g) => ({
         ...g,
-        tools: q
-          ? g.tools.filter((t) => t.name.toLowerCase().includes(q) || (t.description ?? "").toLowerCase().includes(q))
-          : g.tools,
+        tools: g.tools
+          .filter((t) => statusFilter === "all" || (statusFilter === "connected" ? t.connected : !t.connected))
+          .filter((t) => !q || t.name.toLowerCase().includes(q) || (t.description ?? "").toLowerCase().includes(q)),
       }))
       .filter((g) => g.tools.length > 0)
-  }, [catalog, query, activeCat])
+  }, [catalog, query, activeCat, statusFilter])
 
   if (loading) {
     return (
@@ -149,6 +151,20 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
           feature="integrations"
           message="Intégrations : la plupart des connecteurs sont branchables (identifiants stockés), mais la synchronisation des données par outil n'est pas encore active. Quelques intégrations (UI & composants) sont sur la roadmap, affichées « Bientôt »."
         />
+
+        {/* Filtre par statut de connexion — « ce que j'ai connecté ou pas » (en tête). */}
+        <div className="flex gap-1.5">
+          <CatPill active={statusFilter === "all"} onClick={() => setStatusFilter("all")}>
+            Toutes <span className="tabular-nums opacity-60">{catalog.total}</span>
+          </CatPill>
+          <CatPill active={statusFilter === "connected"} onClick={() => setStatusFilter("connected")}>
+            Connectées <span className="tabular-nums opacity-60">{catalog.connected}</span>
+          </CatPill>
+          <CatPill active={statusFilter === "disconnected"} onClick={() => setStatusFilter("disconnected")}>
+            Non connectées <span className="tabular-nums opacity-60">{Math.max(0, catalog.total - catalog.connected)}</span>
+          </CatPill>
+        </div>
+
         {/* Recherche */}
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -183,7 +199,11 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
 
         {/* Grille */}
         {groups.length === 0 ? (
-          <p className="py-12 text-center text-sm text-muted-foreground">Aucun connecteur ne correspond à ta recherche.</p>
+          <p className="py-12 text-center text-sm text-muted-foreground">
+            {statusFilter === "connected"
+              ? "Aucune intégration connectée pour l'instant."
+              : "Aucun connecteur ne correspond à ta recherche."}
+          </p>
         ) : (
           groups.map((group) => (
             <section key={group.category} className="flex flex-col gap-3">

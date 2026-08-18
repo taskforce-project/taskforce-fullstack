@@ -35,6 +35,10 @@ const Toaster = ({ ...props }: ToasterProps) => {
           "--border-radius": "var(--radius)",
         } as React.CSSProperties
       }
+      // `pointer-events-auto` sur CHAQUE toast : quand un sheet/dialog Radix modal est ouvert (ex.
+      // l'issue-sheet), Radix pose `body { pointer-events: none }` → le portail sonner (dans le body)
+      // devenait NON cliquable (× injoignable). On réactive les événements au niveau du toast.
+      toastOptions={{ className: "pointer-events-auto" }}
       {...props}
     />
   )

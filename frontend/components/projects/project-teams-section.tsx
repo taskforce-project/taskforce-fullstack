@@ -204,8 +204,10 @@ export function ProjectTeamsSection({ workspace, projectId }: ProjectTeamsSectio
             return (
               <div
                 key={team.id}
+                // Pas d'overflow-hidden : il clippait le dropdown de recherche de membres (absolute) sous
+                // la card → invisible. On arrondit à la place les coins des bandes internes du bas.
                 className={cn(
-                  "rounded-xl border bg-card overflow-hidden shadow-sm transition-colors",
+                  "rounded-xl border bg-card shadow-sm transition-colors",
                   isLinked ? "border-primary/30" : "border-border hover:border-foreground/15"
                 )}
               >
@@ -241,7 +243,7 @@ export function ProjectTeamsSection({ workspace, projectId }: ProjectTeamsSectio
                 </div>
 
                 {/* Barre d'actions */}
-                <div className="flex items-center gap-1.5 border-t border-border/60 bg-muted/20 px-3 py-2">
+                <div className={cn("flex items-center gap-1.5 border-t border-border/60 bg-muted/20 px-3 py-2", !isOpen && "rounded-b-xl")}>
                   <Button
                     size="sm"
                     variant={isLinked ? "secondary" : "outline"}
@@ -272,7 +274,7 @@ export function ProjectTeamsSection({ workspace, projectId }: ProjectTeamsSectio
 
                 {/* Membres (déplié) */}
                 {isOpen && (
-                  <div className="border-t border-border/60 bg-muted/10 px-4 py-3">
+                  <div className="border-t border-border/60 bg-muted/10 px-4 py-3 rounded-b-xl">
                     <div className="flex flex-col gap-1.5">
                       {team.members.length === 0 ? (
                         <p className="py-1 text-xs text-muted-foreground">Aucun membre dans cette équipe.</p>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Sparkles, Loader2, Check, X, ChevronDown, AlertCircle } from "lucide-react"
 import { toast } from "sonner"
 
@@ -27,8 +27,11 @@ interface SmartAssignProps {
   issuePriority: IssuePriority
   currentAssignee: { userId: number; name: string; initials: string; color: string } | null
   onAssign: (member: SmartAssignCandidate) => void
-  /** Ouvre le panneau d'emblée (ex : issue sans assigné) pour mettre en avant la reco. */
-  defaultOpen?: boolean
+  /** Ouverture contrôlée par le parent (l'étoile IA vit dans la ligne Assignee du sheet). */
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  /** Jeton incrémenté à chaque clic d'analyse ; toute nouvelle valeur (>0) relance l'analyse. */
+  runToken?: number
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -100,9 +103,10 @@ export function SmartAssignPanel({
   issuePriority,
   currentAssignee,
   onAssign,
-  defaultOpen = false,
+  open,
+  onOpenChange,
+  runToken = 0,
 }: Readonly<SmartAssignProps>) {
-  const [open, setOpen] = useState(defaultOpen)
   const [loading, setLoading] = useState(false)
   const [ran, setRan] = useState(false)
   const [showAll, setShowAll] = useState(false)
@@ -110,6 +114,13 @@ export function SmartAssignPanel({
 
   const top = result?.recommended ?? null
   const rest = result?.alternatives ?? []
+
+  // Relance l'analyse quand le parent bump `runToken` (clic sur l'étoile IA). On passe par une ref
+  // pour garder l'effet clé sur le seul jeton, sans redéclencher à chaque recréation de handleAnalyze.
+  const analyzeRef = useRef<() => Promise<void>>(async () => {})
+  useEffect(() => {
+    if (runToken > 0) void analyzeRef.current()
+  }, [runToken])
 
   async function handleAnalyze() {
     setLoading(true)
@@ -128,37 +139,16 @@ export function SmartAssignPanel({
       setLoading(false)
     }
   }
+  analyzeRef.current = handleAnalyze
 
   function handleConfirm(member: SmartAssignCandidate) {
     onAssign(member)
-    setOpen(false)
+    onOpenChange(false)
     setRan(false)
   }
 
-  /**
-   * Ouvre le panneau ET lance l'analyse dans la foulée.
-   *
-   * Le panneau demandait auparavant un SECOND clic (« Find best match ») : l'utilisateur qui
-   * cliquait « Smart assign » obtenait un formulaire, pas un résultat. L'intention du clic est
-   * sans ambiguïté — on la sert directement, le loader tenant lieu de retour immédiat.
-   */
-  function handleOpenAndAnalyze() {
-    setOpen(true)
-    void handleAnalyze()
-  }
-
-  if (!open) {
-    return (
-      <button
-        type="button"
-        onClick={handleOpenAndAnalyze}
-        className="mt-1 flex w-full items-center justify-center gap-1.5 rounded-md border border-primary/30 bg-primary/10 px-2 py-1.5 text-xs font-medium text-primary hover:bg-primary/15 transition-colors"
-      >
-        <Sparkles className="size-3.5" />
-        Smart assign
-      </button>
-    )
-  }
+  // Le trigger (étoile IA) vit dans la ligne Assignee du sheet ; replié, le panneau ne rend rien.
+  if (!open) return null
 
   return (
     <div className="mt-2 rounded-lg border border-border bg-muted/20 overflow-hidden">
@@ -170,7 +160,7 @@ export function SmartAssignPanel({
         </div>
         <button
           type="button"
-          onClick={() => { setOpen(false); setRan(false); setLoading(false) }}
+          onClick={() => { onOpenChange(false); setRan(false); setLoading(false) }}
           className="text-muted-foreground hover:text-foreground transition-colors"
         >
           <X className="size-3.5" />

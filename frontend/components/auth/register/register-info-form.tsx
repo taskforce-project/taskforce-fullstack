@@ -9,14 +9,8 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getRegisterData, setRegisterData } from "@/lib/auth/register-storage";
-import {
-  validateEmail,
-  validateName,
-  validatePassword,
-  sanitizeInput,
-  isDisposableEmail,
-  calculatePasswordStrength,
-} from "@/lib/utils/validation";
+import { sanitizeInput, calculatePasswordStrength } from "@/lib/utils/validation";
+import { registerSchema, firstZodError } from "@/lib/validation/auth-schemas";
 import { Loader2 } from "lucide-react";
 import { AuthStepper } from "@/components/auth/auth-stepper";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -120,37 +114,11 @@ export function SignupForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.firstName || !formData.lastName || !formData.email || !formData.password || !formData.confirmPassword) {
-      toast.error(t.common.error, { description: "Veuillez remplir tous les champs" });
-      return;
-    }
-    if (!validateName(formData.firstName)) {
-      toast.error(t.common.error, { description: "Le prénom n'est pas valide (2-50 caractères, lettres uniquement)" });
-      return;
-    }
-    if (!validateName(formData.lastName)) {
-      toast.error(t.common.error, { description: "Le nom n'est pas valide (2-50 caractères, lettres uniquement)" });
-      return;
-    }
-    if (!validateEmail(formData.email)) {
-      toast.error(t.common.error, { description: "Format d'email invalide" });
-      return;
-    }
-    if (isDisposableEmail(formData.email)) {
-      toast.error(t.common.error, { description: "Les adresses email temporaires ne sont pas autorisées" });
-      return;
-    }
-    if (formData.password !== formData.confirmPassword) {
-      toast.error(t.common.error, { description: t.auth.errors.passwordsDoNotMatch });
-      return;
-    }
-    const passwordValidation = validatePassword(formData.password);
-    if (!passwordValidation.isValid) {
-      toast.error(t.common.error, { description: passwordValidation.errors[0] });
-      return;
-    }
-    if (calculatePasswordStrength(formData.password) < STRENGTH_FLOOR) {
-      toast.error(t.common.error, { description: "Le mot de passe est trop faible. Utilisez un mot de passe plus complexe." });
+    // Validation front via Zod (règle d'or #8) : identité, email (format + jetables), robustesse du mot
+    // de passe et concordance de la confirmation — schéma qui réutilise les mêmes helpers qu'avant.
+    const parsed = registerSchema.safeParse(formData);
+    if (!parsed.success) {
+      toast.error(t.common.error, { description: firstZodError(parsed.error) });
       return;
     }
     // La case « je ne suis pas un robot » n'est exigée que lorsqu'elle est RÉELLEMENT affichée —

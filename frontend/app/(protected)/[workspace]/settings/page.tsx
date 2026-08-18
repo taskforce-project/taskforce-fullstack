@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { useSearchParams, useRouter, useParams } from "next/navigation"
 import {
   User, Bell, Mail, Zap, Globe, Key, Palette, Webhook,
-  Upload, Camera, Link2, Trash2, Shield, Loader2,
+  Upload, Camera, Trash2, Shield, Loader2,
   Activity, CheckCircle2, AlertTriangle, Gauge, Search,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -29,6 +29,9 @@ import { useIntegrationStore } from "@/lib/store/integration-store"
 import { getGitHubRepos, getGitHubRepoIssues, type GitHubRepo, type GitHubRepoIssue } from "@/lib/api/integration-service"
 import { IntegrationsCatalog } from "@/components/integrations/integrations-catalog"
 import { BrandLogo } from "@/components/ui/brand-logo"
+import { ProfileOverview } from "@/components/profile/profile-overview"
+import { MemberSkillsCard } from "@/components/members/member-skills-card"
+import { MemberAvailabilityCard } from "@/components/members/member-availability-card"
 import { exportMyData, deleteMyAccount } from "@/lib/api/gdpr-service"
 import { getAiUsage, type AiUsage } from "@/lib/api/ai-usage-service"
 import { apiClient } from "@/lib/api/client"
@@ -140,6 +143,8 @@ function ProfilePanel() {
   const [saving, setSaving] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
 
+  // Reset SUR CHANGEMENT D'IDENTITÉ uniquement (pas à chaque refresh du user) : sinon un refreshUser()
+  // — par ex. après upload d'avatar — écraserait les champs nom en cours d'édition non sauvegardés.
   useEffect(() => {
     if (user) {
       setFirstName(user.firstName)
@@ -147,7 +152,8 @@ function ProfilePanel() {
       setDisplayName(user.displayName)
       setAvatarUrl(user.avatarUrl ?? "")
     }
-  }, [user])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id])
 
   const hasCustomAvatar = Boolean(avatarUrl)
 
@@ -170,6 +176,9 @@ function ProfilePanel() {
       })
       const newUrl = res.data.data.avatarUrl ?? ""
       setAvatarUrl(newUrl)
+      // L'upload PERSISTE déjà l'avatar côté backend, mais sans resynchroniser le user global la nouvelle
+      // photo ne se propageait NULLE PART (sidebar, nav-user, cartes membres) → « ça ne marche pas ».
+      await refreshUser()
       toast.success("Avatar mis à jour")
     } catch {
       toast.error("Impossible d'uploader l'avatar")
@@ -302,6 +311,15 @@ function ProfilePanel() {
           {saving ? "Saving…" : "Save profile"}
         </Button>
       </div>
+
+      {/* Compétences & disponibilité — attributs de profil (utilisés par le Smart Assign). Rapatriés de
+          l'ancienne section « Compétences » du menu : tout dans Profile (retour user « tout dans profil »). */}
+      <Separator className="mt-2" />
+      <CompetencesPanel />
+
+      {/* Aperçu « Mon profil » (ex-page /profile, supprimée) : stats + heatmap + activité — tout dans le modal. */}
+      <Separator className="mt-2" />
+      <ProfileOverview />
     </div>
   )
 }
@@ -309,26 +327,7 @@ function ProfilePanel() {
 function AccountPanel() {
   const { user } = useAuth()
   const { locale, setLocale } = useTranslation()
-  const [deleting, setDeleting] = useState(false)
-
-  async function handleDelete() {
-    setDeleting(true)
-    try {
-      await deleteMyAccount()
-      toast.success("Compte supprimé. Déconnexion…")
-      // Purge cliente + reload dur : le compte est anonymisé et la session Keycloak supprimée
-      // côté serveur — rester « connecté » dessus provoquait des 403 en cascade (flow brisé). RGPD-02.
-      if (globalThis.window !== undefined) {
-        localStorage.removeItem("accessToken")
-        localStorage.removeItem("refreshToken")
-        localStorage.removeItem("user")
-        window.location.href = "/auth/login"
-      }
-    } catch {
-      toast.error("Échec de la suppression. Réessayez ou contactez privacy@taskforce.dev.")
-      setDeleting(false)
-    }
-  }
+  const setSection = useSettingsStore((s) => s.setSection)
 
   return (
     <div className="flex flex-col gap-4">
@@ -349,28 +348,22 @@ function AccountPanel() {
               </SelectContent>
             </Select>
           </FormField>
+          <Separator />
+          {/* Suppression de compte + export des données → regroupés dans « Privacy & Data » (RGPD Art. 17/20).
+              Plus de doublon « Delete account » ici : Account = identité de connexion + langue. */}
+          <p className="text-xs text-muted-foreground">
+            Suppression du compte et export de vos données :{" "}
+            <button
+              type="button"
+              onClick={() => setSection("privacy")}
+              className="underline underline-offset-2 transition-colors hover:text-foreground"
+            >
+              Privacy &amp; Data
+            </button>
+            .
+          </p>
         </div>
       </SectionCard>
-      <Zone variant="danger" title="Danger zone" description="Irreversible actions. Proceed with caution.">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-sm font-medium text-foreground">Delete your account</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Permanently delete your account and all associated data.</p>
-          </div>
-          <DeleteConfirmDialog
-            title="Supprimer votre compte ?"
-            description="Votre compte et toutes les données associées seront supprimés définitivement (RGPD — droit à l'effacement, art. 17). Cette action est irréversible."
-            confirmLabel="Supprimer mon compte"
-            variant="danger"
-            confirmText={user?.email ?? undefined}
-            onConfirm={handleDelete}
-          >
-            <Button variant="destructive" size="sm" className="h-8 text-xs shrink-0" disabled={deleting}>
-              {deleting ? "Suppression…" : "Delete account"}
-            </Button>
-          </DeleteConfirmDialog>
-        </div>
-      </Zone>
     </div>
   )
 }
@@ -871,36 +864,11 @@ function IntegrationsPanel() {
   const slug = activeWorkspace?.slug ?? ""
   const {
     githubStatus, slackStatus, slackChannels, webhooks,
-    fetchGitHubStatus, connectGitHub, disconnectGitHub,
-    fetchSlackStatus, connectSlack, disconnectSlack,
+    fetchGitHubStatus, disconnectGitHub,
+    fetchSlackStatus, disconnectSlack,
     fetchSlackChannels, addSlackChannel, removeSlackChannel,
     fetchWebhooks, addWebhook, removeWebhook,
   } = useIntegrationStore()
-
-  // Démarrage OAuth (XHR → URL → navigation vers GitHub/Slack). Sur succès la page quitte,
-  // donc on ne réinitialise l'état de chargement qu'en cas d'échec.
-  const [connectingGitHub, setConnectingGitHub] = useState(false)
-  const [connectingSlack,  setConnectingSlack]  = useState(false)
-
-  async function handleConnectGitHub() {
-    setConnectingGitHub(true)
-    try {
-      await connectGitHub(slug)
-    } catch {
-      toast.error("Impossible de démarrer la connexion GitHub")
-      setConnectingGitHub(false)
-    }
-  }
-
-  async function handleConnectSlack() {
-    setConnectingSlack(true)
-    try {
-      await connectSlack(slug)
-    } catch {
-      toast.error("Impossible de démarrer la connexion Slack")
-      setConnectingSlack(false)
-    }
-  }
 
   // Slack channel form
   const [channelId,   setChannelId]   = useState("")
@@ -987,118 +955,101 @@ function IntegrationsPanel() {
         {slug && <IntegrationsCatalog slug={slug} />}
       </SectionCard>
 
-      {/* ---- GitHub ---- */}
-      <SectionCard title="GitHub" description="Link issues to pull requests and commits.">
-        <div className="flex items-center gap-4">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted p-2">
-            <BrandLogo slug="github" name="GitHub" className="size-full" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-foreground">GitHub</p>
-            {githubStatus?.connected && githubStatus.meta?.login && (
-              <p className="text-xs text-muted-foreground">Connected as <span className="font-medium">@{githubStatus.meta.login}</span></p>
-            )}
-            {!githubStatus?.connected && (
-              <p className="text-xs text-muted-foreground">Not connected</p>
-            )}
-          </div>
-          {githubStatus?.connected ? (
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="text-xs text-emerald-400 border-emerald-500/20 bg-emerald-500/10">Connected</Badge>
-              <Button variant="outline" size="sm" className="h-7 text-xs text-destructive border-destructive/30 hover:bg-destructive/10" onClick={handleDisconnectGitHub}>
-                Disconnect
-              </Button>
-            </div>
-          ) : (
-            <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleConnectGitHub} disabled={connectingGitHub}>
-              <Link2 className="h-3 w-3 mr-1.5" />{connectingGitHub ? "Connexion…" : "Connect"}
-            </Button>
-          )}
-        </div>
-        {githubStatus?.connected && <GitHubRepoBrowser slug={slug} />}
-      </SectionCard>
-
-      {/* ---- Slack ---- */}
-      <SectionCard title="Slack" description="Connectez votre espace Slack pour recevoir les notifications d'activité.">
-        <div className="flex flex-col gap-4">
+      {/* ---- GitHub — affiché UNIQUEMENT une fois connecté (gestion des dépôts). La connexion se fait
+             via le Catalogue ci-dessus ; plus de card « Connect » redondante ici. ---- */}
+      {githubStatus?.connected && (
+        <SectionCard title="GitHub" description="Dépôts liés aux issues (PR et commits).">
           <div className="flex items-center gap-4">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted p-2">
-              <BrandLogo slug="slack" name="Slack" className="size-full" />
+              <BrandLogo slug="github" name="GitHub" className="size-full" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground">Slack</p>
-              {slackStatus?.connected && slackStatus.meta?.teamName && (
-                <p className="text-xs text-muted-foreground">Connected to <span className="font-medium">{slackStatus.meta.teamName}</span></p>
-              )}
-              {!slackStatus?.connected && (
-                <p className="text-xs text-muted-foreground">Not connected</p>
+              <p className="text-sm font-medium text-foreground">GitHub</p>
+              {githubStatus.meta?.login && (
+                <p className="text-xs text-muted-foreground">Connecté en tant que <span className="font-medium">@{githubStatus.meta.login}</span></p>
               )}
             </div>
-            {slackStatus?.connected ? (
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="text-xs text-emerald-400 border-emerald-500/20 bg-emerald-500/10">Connecté</Badge>
+              <Button variant="outline" size="sm" className="h-7 text-xs text-destructive border-destructive/30 hover:bg-destructive/10" onClick={handleDisconnectGitHub}>
+                Déconnecter
+              </Button>
+            </div>
+          </div>
+          <GitHubRepoBrowser slug={slug} />
+        </SectionCard>
+      )}
+
+      {/* ---- Slack — affiché UNIQUEMENT une fois connecté (canaux de notification). Connexion via le Catalogue. ---- */}
+      {slackStatus?.connected && (
+        <SectionCard title="Slack" description="Notifications d'activité dans vos canaux Slack.">
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted p-2">
+                <BrandLogo slug="slack" name="Slack" className="size-full" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground">Slack</p>
+                {slackStatus.meta?.teamName && (
+                  <p className="text-xs text-muted-foreground">Connecté à <span className="font-medium">{slackStatus.meta.teamName}</span></p>
+                )}
+              </div>
               <div className="flex items-center gap-2">
-                <Badge variant="outline" className="text-xs text-emerald-400 border-emerald-500/20 bg-emerald-500/10">Connected</Badge>
+                <Badge variant="outline" className="text-xs text-emerald-400 border-emerald-500/20 bg-emerald-500/10">Connecté</Badge>
                 <Button variant="outline" size="sm" className="h-7 text-xs text-destructive border-destructive/30 hover:bg-destructive/10" onClick={handleDisconnectSlack}>
-                  Disconnect
+                  Déconnecter
                 </Button>
               </div>
-            ) : (
-              <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleConnectSlack} disabled={connectingSlack}>
-                <Link2 className="h-3 w-3 mr-1.5" />{connectingSlack ? "Connexion…" : "Connect"}
-              </Button>
-            )}
-          </div>
+            </div>
 
-          {/* Slack channels — shown only when connected */}
-          {slackStatus?.connected && (
-            <>
-              <Separator />
-              <div className="flex flex-col gap-2">
-                <p className="text-xs font-medium text-foreground">Notification channels</p>
-                {slackChannels.length === 0 && (
-                  <p className="text-xs text-muted-foreground">No channels configured yet.</p>
-                )}
-                {slackChannels.map((ch) => (
-                  <div key={ch.id} className="flex items-center justify-between rounded-md border border-border px-3 py-2">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">#{ch.channelName}</p>
-                      <p className="text-xs text-muted-foreground">{ch.eventTypes.join(", ")}</p>
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-destructive hover:bg-destructive/10"
-                        onClick={async () => {
-                          try { await removeSlackChannel(slug, ch.id); toast.success("Canal supprimé") }
-                          catch { toast.error("Impossible de supprimer le canal") }
-                        }}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
+            {/* Canaux de notification */}
+            <Separator />
+            <div className="flex flex-col gap-2">
+              <p className="text-xs font-medium text-foreground">Notification channels</p>
+              {slackChannels.length === 0 && (
+                <p className="text-xs text-muted-foreground">No channels configured yet.</p>
+              )}
+              {slackChannels.map((ch) => (
+                <div key={ch.id} className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">#{ch.channelName}</p>
+                    <p className="text-xs text-muted-foreground">{ch.eventTypes.join(", ")}</p>
                   </div>
-                ))}
-                {/* Add channel form */}
-                <div className="flex gap-2 mt-1">
-                  <StyledInput
-                    placeholder="Channel ID (e.g. C0123456789)"
-                    value={channelId}
-                    onChange={(e) => setChannelId(e.target.value)}
-                  />
-                  <StyledInput
-                    placeholder="Channel name"
-                    value={channelName}
-                    onChange={(e) => setChannelName(e.target.value)}
-                  />
-                  <Button size="sm" className="h-9 text-xs shrink-0" onClick={handleAddChannel} disabled={addingChannel || !channelId || !channelName}>
-                    {addingChannel ? "Adding…" : "Add"}
-                  </Button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-destructive hover:bg-destructive/10"
+                      onClick={async () => {
+                        try { await removeSlackChannel(slug, ch.id); toast.success("Canal supprimé") }
+                        catch { toast.error("Impossible de supprimer le canal") }
+                      }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </div>
+              ))}
+              {/* Add channel form */}
+              <div className="flex gap-2 mt-1">
+                <StyledInput
+                  placeholder="Channel ID (e.g. C0123456789)"
+                  value={channelId}
+                  onChange={(e) => setChannelId(e.target.value)}
+                />
+                <StyledInput
+                  placeholder="Channel name"
+                  value={channelName}
+                  onChange={(e) => setChannelName(e.target.value)}
+                />
+                <Button size="sm" className="h-9 text-xs shrink-0" onClick={handleAddChannel} disabled={addingChannel || !channelId || !channelName}>
+                  {addingChannel ? "Adding…" : "Add"}
+                </Button>
               </div>
-            </>
-          )}
-        </div>
-      </SectionCard>
+            </div>
+          </div>
+        </SectionCard>
+      )}
 
       {/* ---- Webhooks ---- */}
       <SectionCard title="Webhooks" description="Receive HTTP POST events for workspace activity.">
@@ -1454,6 +1405,20 @@ export function SettingsNav({
           ))
         )}
       </nav>
+    </div>
+  )
+}
+
+/** Compétences + disponibilité de SON propre profil (mêmes cartes que la fiche membre). Rendu à
+ *  l'intérieur de « Profile » (plus une section de menu séparée) — retour user « tout dans profil ». */
+function CompetencesPanel() {
+  const { user } = useAuth()
+  const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug ?? "")
+  if (!user || !slug || !Number.isFinite(Number(user.id))) return null
+  return (
+    <div className="flex flex-col gap-6">
+      <MemberSkillsCard slug={slug} userId={Number(user.id)} canEdit />
+      <MemberAvailabilityCard slug={slug} userId={Number(user.id)} canEdit />
     </div>
   )
 }
