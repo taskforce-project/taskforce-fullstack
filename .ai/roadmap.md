@@ -10,6 +10,35 @@
 >
 > Sources : `.ai/qa.md` (QA produit détaillée), `.ai/known-issues.md` (bugs vérifiés), `.ai/module-map.md` (domaines↔code), `.ai/architecture-map.md` (archi réelle), `.ai/P0-fix-plan.md` (correctifs P0 paste-ready).
 
+> **▶ MAJ 18/08/2026 — Déploiement Phase 1 (backend sur VM1) + correctifs config prod.** `[DEPLOY-01]`
+> Premier déploiement prod réel sur la VM école `MNS-VMD-DFS5-033` (pilotée en SSH via Tailscale). Pile
+> backend **6/6 healthy** (postgres pgvector + keycloak + backend + ai-service + minio + redis), migrations
+> Flyway OK, realm `taskforce-prod` importé, **chat Groq opérationnel** (gpt-oss-120b/20b) + embeddings en
+> **repli lexical** (pas d'Ollama sur 4 Go). Le déploiement a révélé que **le profil `prod` n'avait jamais
+> bootté en entier** → correctifs appliqués au repo (branche `fix/pre-soutenance-qa`, à committer) :
+> - **`application-prod.yml`** : ajout des blocs **`mail`/`minio`/`stripe`/`otp`** (absents, requis par
+>   MailConfig/MinioConfig/StripeConfig/OtpService) + `keycloak.admin.client-id`/`keycloak.endpoints` +
+>   `management.health.mail.enabled=false`.
+> - **`docker-compose.prod.yml`** : mount realm `./keycloak/realms`→`./keycloak/realms/prod` (import récursif
+>   KO), healthcheck backend `/api/actuator/health`→`/actuator/health`, Keycloak (`--optimized` retiré,
+>   healthcheck `curl`→`/dev/tcp`, env placeholders realm), passthrough env backend (APP_URL/FRONTEND_URL/
+>   KEYCLOAK_ADMIN_*), `PGDATA` pg18, env Groq sur ai-service.
+> - **`ai-service`** : header `User-Agent` (Cloudflare devant Groq bloque `Python-urllib` → 403) + modèles
+>   Groq **actuels** (`llama-3.3` décommissionné). Cf. `.ai` mémoire agent [[groq-cloudflare-ua-block]].
+> - **`.env.prod.example`** : realm/client alignés sur le realm réel (`taskforce-prod`/`taskforce-api`).
+>
+> Les valeurs spécifiques au déploiement interne (placeholders localhost, `KC_HOSTNAME_STRICT=false`) restent
+> dans un **override VM `docker-compose.vm1.yml`** (hors repo), pas dans le compose committé. **Reste Phase 2** :
+> alignement issuer Keycloak + vrai **domaine** → **Cloudflare Tunnel + Access**, puis **VM2** (frontend +
+> observabilité PLG). Plan complet : `taskforce-docs/v1/08-operations/Plan_Deploiement_2VM.md`.
+>
+> **Correctifs repo appliqués le 18/08** (working tree `fix/pre-soutenance-qa`, NON commités — à review) :
+> `ai-service/app/services/ollama_gateway.py` (User-Agent), `ai-service/app/config.py` (modèles Groq),
+> `backend/tf-api/src/main/resources/application-prod.yml` (blocs mail/minio/stripe/otp + keycloak.endpoints
+> + health.mail off), `docker-compose.prod.yml` (mount realm prod, healthchecks, Keycloak, passthrough env,
+> PGDATA, Groq ai-service), `.env.prod.example` (realm/client alignés + URLs + Groq), `backend/tf-api/Dockerfile`
+> (chemin healthcheck). Non encore validés EN TANT QUE version committée (la VM tourne via l'override).
+
 > **▶ SOUTENANCE — auto-audit contre les critères jury (12/07/2026).** Un camarade a reçu un retour du
 > **prof** sur son projet QualiTrack et l'a partagé ; ce retour révèle **ce que le jury attend**. On auto-audite
 > TaskForce contre ces critères (ce ne sont pas des critiques de TaskForce). Detail dans le Brain OS :

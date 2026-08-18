@@ -34,8 +34,10 @@ class Settings(BaseModel):
     # d'API d'embeddings. Sur une VM sans Ollama, les features « chat » marchent (Groq), le knowledge-graph non.
     groq_api_key: str = os.getenv("GROQ_API_KEY", "")
     groq_base_url: str = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
-    groq_model: str = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")        # tier standard/deep (hébergé)
-    groq_model_fast: str = os.getenv("GROQ_MODEL_FAST", "llama-3.1-8b-instant") # tier "fast" (hébergé, très rapide)
+    groq_model: str = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")        # tier standard/deep (hébergé)
+    groq_model_fast: str = os.getenv("GROQ_MODEL_FAST", "openai/gpt-oss-20b") # tier "fast" (hébergé, très rapide)
+    # NB (18/08/2026) : llama-3.3-70b-versatile / llama-3.1-8b-instant ont été DÉCOMMISSIONNÉS par Groq
+    # (403 à l'appel). Défauts basculés sur openai/gpt-oss-*. Modèles alternatifs : qwen/qwen3.6-27b, groq/compound.
 
     model_config = {"frozen": True}
 

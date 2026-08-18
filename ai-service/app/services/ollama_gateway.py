@@ -150,7 +150,9 @@ class OllamaGateway:
             body["tools"] = tools
             body["tool_choice"] = "auto"
 
-        headers = {"Content-Type": "application/json"}
+        # User-Agent applicatif OBLIGATOIRE : Groq est derrière Cloudflare, qui renvoie 403 aux
+        # requêtes dont l'UA est `Python-urllib/x.y` (défaut urllib). Sans lui, tout appel Groq échoue.
+        headers = {"Content-Type": "application/json", "User-Agent": "TaskForce-AI/1.0"}
         if self._api_key:                                  # Groq exige le Bearer ; Ollama local n'en a pas
             headers["Authorization"] = f"Bearer {self._api_key}"
         request = urllib.request.Request(

@@ -77,6 +77,14 @@ keycloak:
   admin:
     username: ${KEYCLOAK_ADMIN_USERNAME}
     password: ${KEYCLOAK_ADMIN_PASSWORD}
+    client-id: ${KEYCLOAK_ADMIN_CLIENT_ID:admin-cli}
+  # Endpoints OIDC (dérivés de keycloak.url/realm) — consommés par KeycloakAuthService / OAuthLoginService.
+  endpoints:
+    token: ${keycloak.url}/realms/${keycloak.realm}/protocol/openid-connect/token
+    logout: ${keycloak.url}/realms/${keycloak.realm}/protocol/openid-connect/logout
+    userinfo: ${keycloak.url}/realms/${keycloak.realm}/protocol/openid-connect/userinfo
+    introspect: ${keycloak.url}/realms/${keycloak.realm}/protocol/openid-connect/token/introspect
+    certs: ${keycloak.url}/realms/${keycloak.realm}/protocol/openid-connect/certs
 
 # Application URLs (OAuth callbacks, liens e-mail)
 app:
@@ -85,6 +93,58 @@ app:
   frontend-url: ${FRONTEND_URL}
   # Base publique du BACKEND (callbacks OAuth). Souvent = APP_URL (même domaine derrière nginx).
   api-url: ${APP_API_URL:${APP_URL}}
+
+# ── Blocs ajoutés le 18/08/2026 (1er déploiement VM) : absents du profil prod alors que le code les
+#    lit (MailConfig / MinioConfig / StripeConfig / OtpService) → le backend ne DÉMARRAIT PAS sans eux.
+#    Valeurs renseignées via .env.prod. ──
+# Email transactionnel (OTP, invitations, réinitialisation). Vide = SMTP inactif.
+mail:
+  host: ${MAIL_HOST:}
+  port: ${MAIL_PORT:587}
+  username: ${MAIL_USERNAME:}
+  password: ${MAIL_PASSWORD:}
+  from: ${MAIL_FROM:noreply@taskforce.com}
+  from-name: ${MAIL_FROM_NAME:TaskForce}
+  properties:
+    mail:
+      smtp:
+        auth: ${MAIL_SMTP_AUTH:true}
+        starttls:
+          enable: ${MAIL_SMTP_STARTTLS_ENABLE:true}
+          required: ${MAIL_SMTP_STARTTLS_REQUIRED:false}
+      debug: false
+
+# Stockage objet MinIO (S3). `endpoint` = réseau interne ; `public-endpoint` SIGNE les URLs présignées.
+minio:
+  endpoint: ${MINIO_ENDPOINT:http://minio:9000}
+  public-endpoint: ${MINIO_PUBLIC_ENDPOINT}
+  access-key: ${MINIO_ROOT_USER}
+  secret-key: ${MINIO_ROOT_PASSWORD}
+  bucket: ${MINIO_BUCKET:taskforce-attachments}
+
+# Paiement Stripe (vide = facturation inactive, l'app démarre quand même).
+stripe:
+  api-key: ${STRIPE_SECRET_KEY:}
+  publishable-key: ${STRIPE_PUBLIC_KEY:}
+  webhook-secret: ${STRIPE_WEBHOOK_SECRET:}
+  plans:
+    basic:
+      price-id: ${STRIPE_PRICE_ID_BASIC:}
+    business:
+      price-id: ${STRIPE_PRICE_ID_BUSINESS:}
+    enterprise:
+      price-id: ${STRIPE_ENTERPRISE_PRICE_ID:}
+  checkout:
+    success-url: ${STRIPE_SUCCESS_URL:${APP_URL}/settings/billing?success=true}
+    cancel-url: ${STRIPE_CANCEL_URL:${APP_URL}/settings/billing?canceled=true}
+
+# OTP (codes à usage unique). En prod, l'échec d'envoi BLOQUE l'inscription (pas de fallback log).
+otp:
+  expiration-minutes: ${OTP_EXPIRATION_MINUTES:15}
+  length: ${OTP_LENGTH:6}
+  max-attempts: ${OTP_MAX_ATTEMPTS:5}
+  max-requests-per-hour: ${OTP_MAX_REQUESTS_PER_HOUR:5}
+  dev-fallback-log: ${OTP_DEV_FALLBACK_LOG:false}
 
 # Chiffrement au repos des colonnes sensibles (AES-256-GCM, RGPD C11.2 / C24).
 #
@@ -150,6 +210,11 @@ management:
   endpoint:
     health:
       show-details: never
+  health:
+    mail:
+      # Ne pas jauger le SMTP dans /health : check flaky, et un mail down ne doit pas rendre l'app "DOWN"
+      # (sinon 503 sur /actuator/health → le conteneur passe unhealthy alors que l'app fonctionne).
+      enabled: false
   prometheus:
     metrics:
       export:
