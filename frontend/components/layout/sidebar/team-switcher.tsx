@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { useUserStore } from "@/lib/store/user-store"
 import { useUpgradeStore } from "@/lib/store/upgrade-store"
 import { planLimit } from "@/lib/config/plan-limits"
+import { usePreferencesStore } from "@/lib/store/preferences-store"
 
 import {
   DropdownMenu,
@@ -51,6 +52,7 @@ export function WorkspaceSwitcher() {
   const openUpgrade = useUpgradeStore((s) => s.openUpgrade)
   const fetchWorkspaces = useWorkspaceStore((s) => s.fetchWorkspaces)
   const createWorkspace = useWorkspaceStore((s) => s.createWorkspace)
+  const { t } = usePreferencesStore()
 
   const [dialogOpen, setDialogOpen] = React.useState(false)
   const [newName, setNewName] = React.useState("")
@@ -115,7 +117,7 @@ export function WorkspaceSwitcher() {
               sideOffset={4}
             >
               <DropdownMenuLabel className="text-xs text-muted-foreground">
-                Workspaces
+                {t.shell.workspaces}
               </DropdownMenuLabel>
               {workspaces.map((ws) => (
                 <DropdownMenuItem
@@ -133,7 +135,7 @@ export function WorkspaceSwitcher() {
                   />
                   <span className="flex-1 truncate">{ws.name}</span>
                   {ws.slug === activeWorkspace?.slug && (
-                    <span className="ml-auto text-xs text-muted-foreground">actif</span>
+                    <span className="ml-auto text-xs text-muted-foreground">{t.shell.active}</span>
                   )}
                 </DropdownMenuItem>
               ))}
@@ -145,7 +147,7 @@ export function WorkspaceSwitcher() {
                   <>
                     {Number.isFinite(limit) && (
                       <div className="px-2 py-1 text-[11px] text-muted-foreground">
-                        {workspaces.length}/{limit} workspaces
+                        {t.shell.workspacesCount.replace("{count}", String(workspaces.length)).replace("{limit}", String(limit))}
                       </div>
                     )}
                     {atLimit ? (
@@ -156,7 +158,7 @@ export function WorkspaceSwitcher() {
                         <div className="flex size-6 items-center justify-center rounded-md border bg-transparent">
                           <Crown className="size-4 text-amber-500" />
                         </div>
-                        <span className="font-medium text-amber-500">Limite atteinte — Améliorer</span>
+                        <span className="font-medium text-amber-500">{t.shell.limitReachedUpgrade}</span>
                       </DropdownMenuItem>
                     ) : (
                       <DropdownMenuItem
@@ -166,7 +168,7 @@ export function WorkspaceSwitcher() {
                         <div className="flex size-6 items-center justify-center rounded-md border bg-transparent">
                           <Plus className="size-4" />
                         </div>
-                        <span className="font-medium text-muted-foreground">Nouveau workspace</span>
+                        <span className="font-medium text-muted-foreground">{t.shell.newWorkspace}</span>
                       </DropdownMenuItem>
                     )}
                   </>
@@ -183,15 +185,15 @@ export function WorkspaceSwitcher() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Building2 className="size-5" />
-              Créer un workspace
+              {t.shell.createWorkspace}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="space-y-1">
-              <Label htmlFor="workspace-name">Nom du workspace</Label>
+              <Label htmlFor="workspace-name">{t.shell.workspaceName}</Label>
               <Input
                 id="workspace-name"
-                placeholder="Mon équipe"
+                placeholder={t.shell.workspaceNamePlaceholder}
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleCreate()}
@@ -199,30 +201,30 @@ export function WorkspaceSwitcher() {
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="workspace-template">Brain OS — gabarit de départ</Label>
+              <Label htmlFor="workspace-template">{t.shell.brainTemplate}</Label>
               <Select value={newTemplate} onValueChange={setNewTemplate}>
                 <SelectTrigger id="workspace-template">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="BLANK">Vierge (16 domaines)</SelectItem>
-                  <SelectItem value="SAAS">SaaS (expert)</SelectItem>
-                  <SelectItem value="ECOMMERCE">E-commerce (expert)</SelectItem>
-                  <SelectItem value="MARKETPLACE">Marketplace (expert)</SelectItem>
-                  <SelectItem value="AGENTIC">Produit agentique (expert)</SelectItem>
+                  <SelectItem value="BLANK">{t.shell.templateBlank}</SelectItem>
+                  <SelectItem value="SAAS">{t.shell.templateSaas}</SelectItem>
+                  <SelectItem value="ECOMMERCE">{t.shell.templateEcommerce}</SelectItem>
+                  <SelectItem value="MARKETPLACE">{t.shell.templateMarketplace}</SelectItem>
+                  <SelectItem value="AGENTIC">{t.shell.templateAgentic}</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Pré-remplit la mémoire de connaissance (ADR, SOP, décisions…) selon ton activité.
+                {t.shell.templateHint}
               </p>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              Annuler
+              {t.common.cancel}
             </Button>
             <Button onClick={handleCreate} disabled={!newName.trim() || creating}>
-              {creating ? "Création..." : "Créer"}
+              {creating ? t.shell.creating : t.common.createNew}
             </Button>
           </DialogFooter>
         </DialogContent>

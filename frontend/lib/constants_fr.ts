@@ -551,4 +551,37 @@ export const CONSTANTS_FR: TranslationKeys = {
       a5: "Configurer les notifications",
     },
   },
+
+  // Coquille de l'app — footer, barre supérieure, sélecteur d'espace (sur chaque écran authentifié).
+  shell: {
+    // Footer
+    privacy: "Confidentialité",
+    legalNotices: "Mentions légales",
+    // Barre supérieure
+    search: "Rechercher…",
+    searchAria: "Rechercher",
+    openCommandPalette: "Ouvrir la palette de commandes",
+    askAi: "Demander à l'IA",
+    openAiAssistant: "Ouvrir l'assistant IA",
+    aiProFeature: "L'assistant IA est une fonctionnalité Pro. Passez à Pro pour l'activer.",
+    experimental: "Expérimentation",
+    giveFeedback: "Donner mon feedback",
+    // Sélecteur d'espace de travail
+    workspaces: "Espaces de travail",
+    active: "actif",
+    workspacesCount: "{count}/{limit} espaces",
+    limitReachedUpgrade: "Limite atteinte — Améliorer",
+    newWorkspace: "Nouveau workspace",
+    createWorkspace: "Créer un workspace",
+    workspaceName: "Nom du workspace",
+    workspaceNamePlaceholder: "Mon équipe",
+    brainTemplate: "Brain OS — gabarit de départ",
+    templateBlank: "Vierge (16 domaines)",
+    templateSaas: "SaaS (expert)",
+    templateEcommerce: "E-commerce (expert)",
+    templateMarketplace: "Marketplace (expert)",
+    templateAgentic: "Produit agentique (expert)",
+    templateHint: "Pré-remplit la mémoire de connaissance (ADR, SOP, décisions…) selon ton activité.",
+    creating: "Création…",
+  },
 } as const

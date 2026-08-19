@@ -76,6 +76,40 @@
 > à ajuster au rebuild. ⚠️ La **landing déploie depuis `main` (Vercel)** : le fix `APP_URL` doit atteindre `main`
 > pour passer en prod. Backend (APP_URL/CORS/issuer) : même pattern possible en suivi (dérive dans
 > `docker-compose.prod.yml`), non fait ici (risque sur le boot prod, à valider via `docker compose config`).
+> Déployé + vérifié EN LIVE sur VM2 (build.args composés depuis `${BASE_DOMAIN}` dans `~/taskforce/.env`).
+>
+> **MAJ (Batch 2 i18n in-app — DÉMARRÉ, 18/08)** : constat clé — contrairement au flux d'auth (100 % FR),
+> **l'in-app est majoritairement en anglais codé en dur** (breadcrumbs, `Account`/`Billing`/`Search…`/`Ask AI`)
+> avec des **îlots de français**. L'approche proportionnée pour « tout en anglais » = **remplacer ces îlots FR
+> par de l'anglais en place** (pas de re-routage bilingue complet de milliers de chaînes déjà anglaises).
+> **Décision d'approche tranchée par l'utilisateur : BILINGUE COMPLET** (routage `t.xxx` EN/FR, toggle FR/EN
+> fonctionnel in-app comme l'auth) — pas de simple swap. Donc on route TOUT vers `constants_en/fr`.
+>
+> **Zone 1/N — App shell FAITE (bilingue)** : nouveau namespace **`shell`** (mirroré EN/FR) + réemploi de
+> `common.*`/`settings.*`. Routés vers `t` : `app-footer` (privacy/legalNotices), `nav-user`
+> (settings.upgrade/account/billing, common.notifications/logout), `team-switcher` (workspaces, active,
+> workspacesCount interpolé, templates, create/cancel…), `app-topbar` (search/askAi/experimental/giveFeedback,
+> arias, toast Pro). `tsc --noEmit` **0**, ESLint **0**. ⚠️ Breadcrumbs `segmentLabel` (déjà EN, module-level)
+> non encore routés — suivi. **Reste ~55-60 fichiers** (settings-modal, dashboard, projects, onboarding, dialogs,
+> analytics, brain, agent, members, integrations…). `settings-modal` (titre) routé.
+>
+> **⚠️ DÉCOUVERTE BLOQUANTE (18/08)** : l'app a **DEUX systèmes i18n déconnectés** — (1) `lib/i18n/index.tsx`
+> (`useTranslation`, clé localStorage **`tf-locale`**), utilisé par le sélecteur **Réglages→Langue** ;
+> (2) `lib/store/preferences-store.ts` (`usePreferencesStore`, clé **`taskforce-preferences`**), utilisé par
+> l'auth + le shell + tout ce que je route. **Ils ne partagent AUCUN état** → le toggle de langue est en réalité
+> **cassé** (changer dans Réglages ne bouge pas l'auth/shell, et inversement). Un vrai bilingue exige d'abord
+> d'**UNIFIER** les deux (cible = `preferences-store` ; faire pointer le sélecteur Réglages + adapter `useTranslation`),
+> PUIS de router ~1000 chaînes. C'est un chantier à part entière (plusieurs sessions). En plus, `settings/page.tsx`
+> à lui seul ≈ 1475 lignes / ~100 chaînes. Décision de cap redemandée à l'utilisateur.
+>
+> **CAP TRANCHÉ (18/08) : ANGLAIS SEULEMENT, on ignore le toggle.** L'utilisateur choisit de rendre l'app 100 %
+> anglaise au plus vite par **remplacement des littéraux FR → EN en place** (pas de routage `t`, pas d'unification
+> des 2 systèmes i18n — le toggle reste non fonctionnel, comme aujourd'hui). Le shell déjà routé en `t` reste tel
+> quel (il affiche l'anglais par défaut). **`settings/page.tsx` (≈50 chaînes) + `settings-modal` FAITS en anglais**
+> (Profile/Account/Appearance/Notifications/Security/Workspace/Status/Integrations/Privacy/Usage/Nav + toasts +
+> `toLocaleString("fr-FR")`→`"en-US"`). Gardé « Français » (label de l'option de langue). `tsc`/ESLint **0**.
+> **Reste ~55 fichiers** : dashboard/*, projects/*, onboarding/*, dialogs/*, analytics/*, brain/*, agent/*,
+> members/*, sales/*, subscription/*, issues/*, sheets/*, tour, workflows, profile, smart-assign, a11y…
 
 > **▶ SOUTENANCE — auto-audit contre les critères jury (12/07/2026).** Un camarade a reçu un retour du
 > **prof** sur son projet QualiTrack et l'a partagé ; ce retour révèle **ce que le jury attend**. On auto-audite

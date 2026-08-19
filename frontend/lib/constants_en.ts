@@ -550,6 +550,39 @@ export const CONSTANTS_EN = {
       a5: "Configuring notifications",
     },
   },
+
+  // App shell — footer, top bar, workspace switcher (rendered on every authenticated screen).
+  shell: {
+    // Footer
+    privacy: "Privacy",
+    legalNotices: "Legal notices",
+    // Top bar
+    search: "Search…",
+    searchAria: "Search",
+    openCommandPalette: "Open command palette",
+    askAi: "Ask AI",
+    openAiAssistant: "Open the AI assistant",
+    aiProFeature: "The AI assistant is a Pro feature. Upgrade to Pro to enable it.",
+    experimental: "Experimental",
+    giveFeedback: "Give feedback",
+    // Workspace switcher
+    workspaces: "Workspaces",
+    active: "active",
+    workspacesCount: "{count}/{limit} workspaces",
+    limitReachedUpgrade: "Limit reached — Upgrade",
+    newWorkspace: "New workspace",
+    createWorkspace: "Create a workspace",
+    workspaceName: "Workspace name",
+    workspaceNamePlaceholder: "My team",
+    brainTemplate: "Brain OS — starter template",
+    templateBlank: "Blank (16 domains)",
+    templateSaas: "SaaS (expert)",
+    templateEcommerce: "E-commerce (expert)",
+    templateMarketplace: "Marketplace (expert)",
+    templateAgentic: "Agentic product (expert)",
+    templateHint: "Pre-fills the knowledge memory (ADRs, SOPs, decisions…) based on your activity.",
+    creating: "Creating…",
+  },
 } as const
 
 // Type récursif pour transformer les literal types en string
