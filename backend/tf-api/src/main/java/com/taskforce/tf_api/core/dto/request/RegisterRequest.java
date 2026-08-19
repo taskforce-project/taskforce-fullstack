@@ -1,0 +1,57 @@
+package com.taskforce.tf_api.core.dto.request;
+
+import com.taskforce.tf_api.core.enums.PlanType;
+
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+/**
+ * DTO pour la requête d'inscription
+ * Le frontend envoie ces données, l'API Java crée le compte dans Keycloak
+ */
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class RegisterRequest {
+
+    @NotBlank(message = "L'email est obligatoire")
+    @Email(message = "Format d'email invalide")
+    private String email;
+
+    @NotBlank(message = "Le mot de passe est obligatoire")
+    @Size(min = 8, message = "Le mot de passe doit contenir au moins 8 caractères")
+    private String password;
+
+    @NotBlank(message = "Le prénom est obligatoire")
+    @Size(min = 2, max = 50, message = "Le prénom doit contenir entre 2 et 50 caractères")
+    private String firstName;
+
+    @NotBlank(message = "Le nom est obligatoire")
+    @Size(min = 2, max = 50, message = "Le nom doit contenir entre 2 et 50 caractères")
+    private String lastName;
+
+    @NotNull(message = "Le choix du plan est obligatoire")
+    private PlanType planType;
+
+    /**
+     * Jeton de vérification humaine, obtenu via {@code GET /api/auth/challenge} au chargement du
+     * formulaire. Volontairement <b>sans contrainte de validation déclarative</b> : sa validité est
+     * cryptographique, pas syntaxique, et la vérifier ici renverrait un message trompeur (« champ
+     * obligatoire ») là où le vrai motif peut être « expiré » ou « soumis trop vite ».
+     */
+    private String challengeToken;
+
+    /**
+     * Jeton Cloudflare Turnstile ({@code cf-turnstile-response}) produit par le widget. Facultatif :
+     * le serveur peut avoir Turnstile désactivé, et le défi signé ci-dessus reste alors seul en
+     * place. Vérifié au niveau du contrôleur, qui dispose de l'adresse de l'appelant.
+     */
+    private String turnstileToken;
+}

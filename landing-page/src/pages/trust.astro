@@ -52,7 +52,7 @@ const GLANCE: { area: string; label: string; tone: keyof typeof TONE }[] = [
 ];
 
 const AI_GOV = [
-  { t: "Model & provider selection", d: "Hosted models (Anthropic, OpenAI) or local models through Ollama — your choice." },
+  { t: "Model & provider selection", d: "Local models through Ollama by default, or an optional hosted provider (Groq) — your choice." },
   { t: "Hosted vs local", d: "Run local models to keep every prompt and output inside your own network." },
   { t: "No training on your data", d: "TaskForce uses provider APIs configured for business use, and never uses your data to train its own models. Training policy for a hosted model depends on the provider and service; local models remove the question entirely." },
   { t: "Human approval", d: "The AI proposes; a named human approves it. An agent can never approve its own work." },
@@ -162,7 +162,7 @@ const RESOURCES = [
 const FLOW = [
   { title: "Your workspace", items: ["Repos, issues, docs", "and the outcomes you describe"], tone: "plain" },
   { title: "TaskForce", items: ["Memory", "Workflow engine", "Audit trail"], tone: "primary" },
-  { title: "Model provider", items: ["Anthropic", "OpenAI", "Ollama — local"], tone: "plain" },
+  { title: "Model provider", items: ["Ollama — local (default)", "Groq — optional"], tone: "plain" },
 ];
 
 ---
@@ -299,7 +299,7 @@ const FLOW = [
           <span class="bg-border h-px flex-1" />
         </div>
         <div class="bg-card mt-4 rounded-xl border border-dashed p-4 text-center">
-          <p class="text-[13px] font-semibold text-foreground">Hosted model — Anthropic · OpenAI</p>
+          <p class="text-[13px] font-semibold text-foreground">Hosted model — Groq (optional)</p>
           <p class="mt-1 text-[11px] font-medium text-amber-700">external — leaves your network</p>
         </div>
       </div>

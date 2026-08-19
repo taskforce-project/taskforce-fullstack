@@ -1,0 +1,105 @@
+version: '3.8'
+
+services:
+  # PostgreSQL pour Keycloak
+  postgres-keycloak:
+    image: postgres:15-alpine
+    container_name: taskforce-keycloak-db
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: keycloak
+    ports:
+      - "5433:5432"
+    volumes:
+      - keycloak_postgres_data:/var/lib/postgresql/data
+    networks:
+      - taskforce-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Keycloak avec import de realm
+  keycloak:
+    image: quay.io/keycloak/keycloak:23.0.4
+    container_name: taskforce-keycloak
+    environment:
+      # Database
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres-keycloak:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: keycloak
+
+      # Hostname
+      KC_HOSTNAME: localhost
+      KC_HOSTNAME_PORT: 8180
+      KC_HOSTNAME_STRICT: false
+      KC_HOSTNAME_STRICT_HTTPS: false
+
+      # HTTP
+      KC_HTTP_ENABLED: true
+      KC_HTTP_PORT: 8080
+
+      # Admin
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+
+      # Mailtrap (remplacer par vos credentials)
+      MAILTRAP_HOST: sandbox.smtp.mailtrap.io
+      MAILTRAP_PORT: 2525
+      MAILTRAP_USERNAME: ${MAILTRAP_USERNAME:-41bc6508eb1568}
+      MAILTRAP_PASSWORD: ${MAILTRAP_PASSWORD:-6f5505ff791ede}
+
+      # Client Secret
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:-dev-secret-change-me}
+    ports:
+      - "8180:8080"
+    depends_on:
+      postgres-keycloak:
+        condition: service_healthy
+    command:
+      - start-dev
+      - --import-realm
+    volumes:
+      - ./keycloak-realm-corrected.json:/opt/keycloak/data/import/taskforce-dev-realm.json:ro
+    networks:
+      - taskforce-network
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080;echo -e 'GET /health/ready HTTP/1.1\r\nhost: 127.0.0.1\r\nConnection: close\r\n\r\n' >&3;grep 'HTTP/1.1 200' <&3"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  # PostgreSQL pour l'application Taskforce
+  postgres-app:
+    image: postgres:15-alpine
+    container_name: taskforce-app-db
+    environment:
+      POSTGRES_DB: taskforce-db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: PostgreSQLP54!
+    ports:
+      - "5432:5432"
+    volumes:
+      - app_postgres_data:/var/lib/postgresql/data
+    networks:
+      - taskforce-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  keycloak_postgres_data:
+    name: taskforce_keycloak_postgres_data
+  app_postgres_data:
+    name: taskforce_app_postgres_data
+
+networks:
+  taskforce-network:
+    name: taskforce-network
+    driver: bridge

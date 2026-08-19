@@ -1,0 +1,177 @@
+package com.taskforce.tf_api.core.service;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
+
+import com.taskforce.tf_api.core.enums.PlanType;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+/**
+ * Tests unitaires pour StripeService
+ * 
+ * Note: Ces tests valident principalement la logique métier (getPriceIdForPlan).
+ * Les tests des appels Stripe API nécessiteraient MockedStatic ou...
+ * 
+ *  Pour tester les interactions Stripe complètes:
+ * - Utiliser Stripe CLI: `stripe listen --forward-to localhost:8080/api/webhooks/stripe`
+ * - Ou Stripe Mock Server pour tests d'intégration automatisés
+ */
+@ExtendWith(MockitoExtension.class)
+@DisplayName("StripeService Tests")
+class StripeServiceTest {
+
+    @InjectMocks
+    private StripeService stripeService;
+
+    @BeforeEach
+    void setup() {
+        ReflectionTestUtils.setField(stripeService, "stripeSecretKey", "sk_test_mock_key");
+        ReflectionTestUtils.setField(stripeService, "basicPriceId", "price_basic_mock");
+        ReflectionTestUtils.setField(stripeService, "businessPriceId", "price_business_mock");
+        ReflectionTestUtils.setField(stripeService, "enterprisePriceId", "price_enterprise_mock");
+    }
+
+    @Nested
+    @DisplayName("Get Price ID For Plan Tests")
+    class GetPriceIdForPlanTests {
+
+        @Test
+        @DisplayName("devrait retourner price ID pour plan BUSINESS")
+        void getPriceIdForPlan_withBusiness_shouldReturnBusinessPriceId() {
+            // When
+            String result = stripeService.getPriceIdForPlan("BUSINESS");
+
+            // Then
+            assertThat(result).isEqualTo("price_business_mock");
+        }
+
+        @Test
+        @DisplayName("devrait retourner price ID pour plan ENTERPRISE")
+        void getPriceIdForPlan_withEnterprise_shouldReturnEnterprisePriceId() {
+            // When
+            String result = stripeService.getPriceIdForPlan("ENTERPRISE");
+
+            // Then
+            assertThat(result).isEqualTo("price_enterprise_mock");
+        }
+
+        @Test
+        @DisplayName("devrait lancer exception pour plan invalide")
+        void getPriceIdForPlan_withInvalidPlan_shouldThrowException() {
+            // When/Then
+            assertThatThrownBy(() -> stripeService.getPriceIdForPlan("INVALID"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Type de plan invalide : INVALID");
+        }
+
+        @Test
+        @DisplayName("devrait accepter plan en minuscules")
+        void getPriceIdForPlan_withLowercase_shouldWork() {
+            // When
+            String result = stripeService.getPriceIdForPlan("business");
+
+            // Then
+            assertThat(result).isEqualTo("price_business_mock");
+        }
+
+        @Test
+        @DisplayName("devrait accepter plan ENTERPRISE en minuscules")
+        void getPriceIdForPlan_withEnterpriseLowercase_shouldWork() {
+            // When
+            String result = stripeService.getPriceIdForPlan("enterprise");
+
+            // Then
+            assertThat(result).isEqualTo("price_enterprise_mock");
+        }
+    }
+
+    @Nested
+    @DisplayName("Get Plan For Price ID (reverse) Tests")
+    class GetPlanForPriceIdTests {
+
+        @Test
+        @DisplayName("mappe un price-id distinct vers le bon forfait")
+        void getPlanForPriceId_distinct_mapsCorrectly() {
+            assertThat(stripeService.getPlanForPriceId("price_basic_mock")).isEqualTo(PlanType.BASIC);
+            assertThat(stripeService.getPlanForPriceId("price_business_mock")).isEqualTo(PlanType.BUSINESS);
+            assertThat(stripeService.getPlanForPriceId("price_enterprise_mock")).isEqualTo(PlanType.ENTERPRISE);
+        }
+
+        @Test
+        @DisplayName("renvoie null pour un price-id inconnu, null ou vide")
+        void getPlanForPriceId_unknownOrBlank_returnsNull() {
+            assertThat(stripeService.getPlanForPriceId("price_unknown")).isNull();
+            assertThat(stripeService.getPlanForPriceId(null)).isNull();
+            assertThat(stripeService.getPlanForPriceId("   ")).isNull();
+        }
+
+        @Test
+        @DisplayName("price-id AMBIGU (BASIC == BUSINESS) → null : pas de rétrogradation Business→Basic")
+        void getPlanForPriceId_ambiguous_returnsNull() {
+            // Mauvaise config : un même price-id partagé par Basic ET Business (cf. .env.dev réel).
+            ReflectionTestUtils.setField(stripeService, "businessPriceId", "price_basic_mock");
+
+            // Le reverse-mapping est ambigu → null (le webhook ne resynchronisera donc pas le plan, il
+            // gardera celui posé par checkout.session.completed via metadata).
+            assertThat(stripeService.getPlanForPriceId("price_basic_mock")).isNull();
+        }
+    }
+
+    @Nested
+    @DisplayName("Configuration Tests")
+    class ConfigurationTests {
+
+        @Test
+        @DisplayName("devrait avoir les price IDs configurés")
+        void shouldHaveConfiguredPriceIds() {
+            // When
+            String businessPriceId = (String) ReflectionTestUtils.getField(stripeService, "businessPriceId");
+            String enterprisePriceId = (String) ReflectionTestUtils.getField(stripeService, "enterprisePriceId");
+
+            // Then
+            assertThat(businessPriceId).isNotNull().isEqualTo("price_business_mock");
+            assertThat(enterprisePriceId).isNotNull().isEqualTo("price_enterprise_mock");
+        }
+
+        @Test
+        @DisplayName("devrait avoir la clé API configurée")
+        void shouldHaveConfiguredApiKey() {
+            // When
+            String apiKey = (String) ReflectionTestUtils.getField(stripeService, "stripeSecretKey");
+
+            // Then
+            assertThat(apiKey).isNotNull().isNotEmpty();
+        }
+    }
+
+    /**
+     * Note sur les tests Stripe API:
+     * 
+     * Pour tester createCustomer(), createCheckoutSession(), getSubscription(), etc.:
+     * 
+     * 1. Tests Manuels avec Stripe CLI:
+     * ```bash
+     * stripe listen --forward-to localhost:8080/api/webhooks/stripe
+     * stripe trigger checkout.session.completed
+     * ```
+     * 
+     * 2. Tests automatisés avec Mockito MockedStatic:
+     * Nécessite de mocker les classes statiques Stripe (Customer.create(), etc.)
+     * Exemple dans AuthServiceTest qui utilise MockedStatic pour Keycloak.
+     * 
+     * 3. Tests d'intégration avec Stripe Mock Server:
+     * https://github.com/stripe/stripe-mock
+     * Lance un serveur mock qui simule l'API Stripe complète.
+     * 
+     * La logique métier principale (getPriceIdForPlan) est couverte par ces tests.
+     */
+}
+

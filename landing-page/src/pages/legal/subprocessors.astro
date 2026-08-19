@@ -29,9 +29,11 @@ import LegalDoc from "@/layouts/LegalDoc.astro";
       We don't store full card numbers.
     </li>
     <li>
-      <strong>Anthropic / OpenAI</strong> — hosted AI models, <em>only for the calls you route to them</em>.
-      They receive the prompt and return the output for that step. Choose local models to avoid this
-      entirely.
+      <strong>Groq, Inc.</strong> — United States — <em>optional subprocessor, active only when the Groq
+      provider is configured (<code>GROQ_API_KEY</code>)</em>. Receives the <strong>task context</strong> for
+      inference (no direct PII). <strong>By default the AI runs locally (Ollama/Qwen)</strong>, so there is no
+      transfer. Safeguards when enabled: a <strong>DPA</strong> plus an out-of-EU transfer mechanism
+      (<strong>Standard Contractual Clauses (SCCs)</strong> or the EU-US Data Privacy Framework).
     </li>
     <li>
       <strong>Hetzner Online GmbH</strong> — cloud infrastructure for our hosted service (application

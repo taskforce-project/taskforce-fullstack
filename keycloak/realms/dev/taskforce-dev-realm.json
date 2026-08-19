@@ -1,0 +1,329 @@
+{
+  "realm": "taskforce-dev",
+  "enabled": true,
+  "displayName": "Taskforce Development",
+  "registrationAllowed": true,
+  "resetPasswordAllowed": true,
+  "rememberMe": true,
+  "verifyEmail": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "registrationEmailAsUsername": true,
+  "smtpServer": {
+    "host": "${env.MAILTRAP_HOST:sandbox.smtp.mailtrap.io}",
+    "port": "${env.MAILTRAP_PORT:2525}",
+    "from": "noreply@taskforce.dev",
+    "fromDisplayName": "Taskforce Platform",
+    "auth": "true",
+    "user": "${env.MAILTRAP_USERNAME}",
+    "password": "${env.MAILTRAP_PASSWORD}",
+    "ssl": "false",
+    "starttls": "true"
+  },
+  "clients": [
+    {
+      "clientId": "taskforce-api",
+      "name": "Taskforce API",
+      "description": "Backend API with Password Grant and Resource Server",
+      "enabled": true,
+      "publicClient": false,
+      "bearerOnly": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${env.KEYCLOAK_CLIENT_SECRET:dev-secret-change-me}",
+      "rootUrl": "http://localhost:8081",
+      "baseUrl": "/api",
+      "redirectUris": [
+        "http://localhost:8081/*",
+        "http://localhost:3000/*",
+        "http://localhost:5173/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://localhost:8081"
+      ],
+      "fullScopeAllowed": true,
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "profile",
+        "roles",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access",
+        "microprofile-jwt"
+      ],
+      "attributes": {
+        "access.token.lifespan": "3600"
+      }
+    }
+  ],
+  "users": [
+    {
+      "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "username": "admin@taskforce.dev",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Admin",
+      "lastName": "Taskforce",
+      "email": "admin@taskforce.dev",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Admin@2024",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "user"
+      ]
+    },
+    {
+      "id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      "username": "test@taskforce.dev",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Test",
+      "lastName": "User",
+      "email": "test@taskforce.dev",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Test@2024",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "user"
+      ]
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000001",
+      "username": "user01@taskforce.dev",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "User",
+      "lastName": "01",
+      "email": "user01@taskforce.dev",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Taskforce@2024",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "user"
+      ]
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000002",
+      "username": "user02@taskforce.dev",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "User",
+      "lastName": "02",
+      "email": "user02@taskforce.dev",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Taskforce@2024",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "user"
+      ]
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000003",
+      "username": "user03@taskforce.dev",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "User",
+      "lastName": "03",
+      "email": "user03@taskforce.dev",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Taskforce@2024",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "user"
+      ]
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000004",
+      "username": "user04@taskforce.dev",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "User",
+      "lastName": "04",
+      "email": "user04@taskforce.dev",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Taskforce@2024",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "user"
+      ]
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000005",
+      "username": "user05@taskforce.dev",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "User",
+      "lastName": "05",
+      "email": "user05@taskforce.dev",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Taskforce@2024",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "user"
+      ]
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000006",
+      "username": "user06@taskforce.dev",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "User",
+      "lastName": "06",
+      "email": "user06@taskforce.dev",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Taskforce@2024",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "user"
+      ]
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000007",
+      "username": "user07@taskforce.dev",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "User",
+      "lastName": "07",
+      "email": "user07@taskforce.dev",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Taskforce@2024",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "user"
+      ]
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000008",
+      "username": "user08@taskforce.dev",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "User",
+      "lastName": "08",
+      "email": "user08@taskforce.dev",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Taskforce@2024",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "user"
+      ]
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000009",
+      "username": "user09@taskforce.dev",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "User",
+      "lastName": "09",
+      "email": "user09@taskforce.dev",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Taskforce@2024",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "user"
+      ]
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000010",
+      "username": "user10@taskforce.dev",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "User",
+      "lastName": "10",
+      "email": "user10@taskforce.dev",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Taskforce@2024",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "user"
+      ]
+    }
+  ],
+  "roles": {
+    "realm": [
+      {
+        "name": "user",
+        "description": "Utilisateur standard",
+        "composite": false,
+        "clientRole": false
+      }
+    ]
+  },
+  "defaultRoles": [
+    "user"
+  ],
+  "requiredActions": [],
+  "accessTokenLifespan": 28800,
+  "ssoSessionIdleTimeout": 86400,
+  "ssoSessionMaxLifespan": 86400,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "maxFailureWaitSeconds": 900,
+  "minimumQuickLoginWaitSeconds": 60,
+  "waitIncrementSeconds": 60,
+  "quickLoginCheckMilliSeconds": 1000,
+  "maxDeltaTimeSeconds": 43200,
+  "failureFactor": 30,
+  "internationalizationEnabled": true,
+  "supportedLocales": [
+    "fr",
+    "en"
+  ],
+  "defaultLocale": "fr"
+}

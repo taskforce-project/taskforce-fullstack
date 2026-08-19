@@ -1,0 +1,46 @@
+name: Sync README Badges
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+    paths:
+      - README.md
+      - backend/tf-api/pom.xml
+      - frontend/package.json
+      - landing-page/package.json
+      - scripts/update-readme-badges.ps1
+      - docker-compose.dev.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-readme-badges:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Update README badges
+        shell: pwsh
+        run: ./scripts/update-readme-badges.ps1 -SkipRuntime
+
+      - name: Commit and push if changed
+        shell: pwsh
+        run: |
+          if (git diff --quiet -- README.md) {
+            Write-Host "No README changes to commit."
+            exit 0
+          }
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          git commit -m "docs(readme): auto-update version badges"
+          git push

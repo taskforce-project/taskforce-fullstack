@@ -1,0 +1,75 @@
+# Docker Compose par défaut (pointe vers dev)
+# Pour utiliser: docker-compose up
+# Pour production: docker-compose -f docker-compose-prod.yml up
+
+version: '3.8'
+
+services:
+  postgres:
+    # pgvector OBLIGATOIRE : les migrations V32/V33/V52/V59 déclarent des colonnes `vector(384)` ; un
+    # `postgres:*-alpine` standard n'embarque pas l'extension → Flyway échoue au 1er démarrage (PC-025).
+    # Aligné sur dev/prod. Le user applicatif (superuser du conteneur) exécute `CREATE EXTENSION vector`.
+    image: ${POSTGRES_IMAGE:-pgvector/pgvector:pg18}
+    container_name: taskforce-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-taskforce_dev}
+      POSTGRES_USER: ${POSTGRES_USER:-taskforce_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-taskforce_pass}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - taskforce-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-taskforce_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend/tf-api
+      dockerfile: Dockerfile
+    container_name: taskforce-backend
+    restart: unless-stopped
+    environment:
+      # Ce compose « par défaut » pointe vers dev (cf. en-tête). Depuis que le Dockerfile a un défaut
+      # `prod` fail-safe (PC-024), il faut déclarer le profil ici, sinon le backend démarrerait en prod
+      # sans les secrets prod et échouerait.
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-taskforce_dev}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-taskforce_user}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-taskforce_pass}
+      SERVER_PORT: 8080
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - taskforce-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: taskforce-frontend
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      - backend
+    networks:
+      - taskforce-network
+
+networks:
+  taskforce-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

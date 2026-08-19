@@ -1,0 +1,155 @@
+name: Backend Tests
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+      - 'feature/**'
+      - 'fix/**'
+    paths:
+      - 'backend/tf-api/**'
+      - '.github/workflows/backend-tests.yml'
+  pull_request:
+    branches:
+      - main
+      - dev
+    paths:
+      - 'backend/tf-api/**'
+
+jobs:
+  test:
+    name: Run Backend Tests with Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # Postgres pgvector RÉEL : les tests d'intégration (@SpringBootTest) ont besoin d'un vrai Postgres
+    # + pgvector (type `vector`) + Flyway — H2 ne suffit pas. Sans ce service, `mvn test` échouait en CI
+    # (intégration en erreur → rapport JaCoCo à ~4 % et « Backend Tests » rouge). On réplique `it.ps1`
+    # (mêmes image/creds, surchargés via SPRING_DATASOURCE_* dans l'étape de test). Cf. PC-028.
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: tf
+          POSTGRES_USER: tf
+          POSTGRES_PASSWORD: tf
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tf -d tf"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    defaults:
+      run:
+        working-directory: backend/tf-api
+
+    strategy:
+      matrix:
+        java-version: [21]
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: ☕ Setup Java ${{ matrix.java-version }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ matrix.java-version }}
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: 🔍 Verify Maven Wrapper
+        run: |
+          if [ ! -f mvnw ]; then
+            echo "❌ Maven wrapper not found!"
+            exit 1
+          fi
+          chmod +x mvnw
+
+      - name: 🧪 Run tests + JaCoCo coverage gate (mvn verify)
+        # `verify` (au lieu de `test jacoco:report`) déclenche l'exécution `jacoco-check` du pom
+        # (BUNDLE LINE ≥ 70 %, périmètre gate) — jusqu'ici INERTE en CI faute d'appeler `verify`
+        # (PC-028). Le rapport JaCoCo reste généré en phase `test`, donc les artefacts et le résumé
+        # ci-dessous existent même si le gate casse le build.
+        run: ./mvnw clean verify
+        env:
+          MAVEN_OPTS: -Xmx2048m
+          # Surcharge la datasource H2 du profil `test` vers le Postgres pgvector du service ci-dessus
+          # (identique à it.ps1) → les tests d'intégration tournent contre un vrai PG + Flyway + pgvector.
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/tf
+          SPRING_DATASOURCE_USERNAME: tf
+          SPRING_DATASOURCE_PASSWORD: tf
+
+      - name: 📊 Generate coverage summary
+        if: always()
+        run: |
+          echo "## 📊 Test Coverage Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f target/site/jacoco/index.html ]; then
+            # Extract coverage from JaCoCo HTML report
+            COVERAGE=$(grep -oP 'Total.*?<td class="ctr2" id="c\d+">\K\d+' target/site/jacoco/index.html | head -1)
+            echo "✅ Coverage: ${COVERAGE}%" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "📁 Full report available in artifacts" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Coverage report not generated" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: 📈 Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          files: ./backend/tf-api/target/site/jacoco/jacoco.xml
+          flags: backend
+          name: backend-coverage
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        continue-on-error: true
+
+      - name: 💾 Archive JaCoCo coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jacoco-coverage-report
+          path: backend/tf-api/target/site/jacoco/
+          retention-days: 30
+
+      - name: 💾 Archive test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: backend/tf-api/target/surefire-reports/
+          retention-days: 7
+
+      - name: 📋 Display test results
+        if: always()
+        run: |
+          echo "## 🧪 Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -d target/surefire-reports ]; then
+            TOTAL=$(find target/surefire-reports -name "TEST-*.xml" -exec grep -oP 'tests="\K\d+' {} \; | awk '{s+=$1} END {print s}')
+            FAILURES=$(find target/surefire-reports -name "TEST-*.xml" -exec grep -oP 'failures="\K\d+' {} \; | awk '{s+=$1} END {print s}')
+            ERRORS=$(find target/surefire-reports -name "TEST-*.xml" -exec grep -oP 'errors="\K\d+' {} \; | awk '{s+=$1} END {print s}')
+            SKIPPED=$(find target/surefire-reports -name "TEST-*.xml" -exec grep -oP 'skipped="\K\d+' {} \; | awk '{s+=$1} END {print s}')
+            
+            echo "- ✅ Tests passed: $((TOTAL - FAILURES - ERRORS - SKIPPED))" >> $GITHUB_STEP_SUMMARY
+            echo "- ❌ Tests failed: ${FAILURES}" >> $GITHUB_STEP_SUMMARY
+            echo "- ⚠️ Tests errors: ${ERRORS}" >> $GITHUB_STEP_SUMMARY
+            echo "- ⏭️ Tests skipped: ${SKIPPED}" >> $GITHUB_STEP_SUMMARY
+            echo "- 📊 **Total: ${TOTAL} tests**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ No test results found" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: ❌ Fail if tests failed
+        if: failure()
+        run: |
+          echo "::error::Tests failed! Check the test results artifact for details."
+          exit 1

@@ -1,0 +1,436 @@
+# ===============================
+# DOCKER COMPOSE - PRODUCTION
+# ===============================
+# Utilisation:
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+#
+# ── Périmètre ────────────────────────────────────────────────────────────────
+# Décrit la pile COMPLÈTE : postgres, keycloak, backend, ai-service, frontend, landing, minio,
+# redis, nginx. (Avant le 22/07 il n'en déclarait que cinq — l'application ne pouvait pas démarrer.)
+#
+# ── Hors de ce fichier : le LLM ──────────────────────────────────────────────
+# Ollama n'est PAS conteneurisé ici. Les modèles configurés pèsent ~15,7 Go sur disque et doivent
+# rester résidents en mémoire pour servir ; les héberger avec le reste imposerait ~24 Gio de RAM et,
+# sans GPU, des temps de réponse de l'ordre de la minute (cf. OLLAMA_TIMEOUT=300 côté ai-service).
+# `AI_OLLAMA_BASE_URL` pointe donc vers un hôte au choix : machine dédiée, service managé, ou un
+# endpoint compatible. Le service reste fonctionnel avec Groq en secours côté backend.
+#
+# ── Mono-instance ────────────────────────────────────────────────────────────
+# Le temps réel utilise le broker STOMP EN MÉMOIRE (défaut `taskforce.realtime.relay.enabled=false`,
+# cf. WebSocketConfig / TF-RT-PROD) : pas de RabbitMQ ici, il n'est nécessaire que pour partager les
+# topics entre PLUSIEURS instances backend. Passer à l'échelle horizontale = ajouter RabbitMQ avec
+# le plugin `rabbitmq_stomp` (port 61613) et poser `TASKFORCE_REALTIME_RELAY_ENABLED=true`.
+# ===============================
+
+name: taskforce-prod
+
+services:
+  # ================================
+  # PostgreSQL + pgvector
+  # ================================
+  postgres:
+    # pgvector OBLIGATOIRE : les migrations V32/V33/V52/V59 déclarent des colonnes `vector(384)`.
+    # Un `postgres:*-alpine` standard n'embarque pas l'extension → Flyway échoue au démarrage.
+    image: ${POSTGRES_IMAGE:-pgvector/pgvector:pg18}
+    container_name: taskforce-postgres-prod
+    environment:
+      TZ: UTC
+      PGTZ: UTC
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      # pg18 : le layout refuse les données à la RACINE du mount → les placer dans un sous-répertoire.
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+      # Crée la base `keycloak_prod` et l'extension `vector`. Joué UNE SEULE FOIS, au premier
+      # démarrage d'un volume vide.
+      - ./backend/tf-api/src/main/resources/db/init-prod:/docker-entrypoint-initdb.d:ro
+    networks:
+      - taskforce-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+    # Sécurité: pas de port exposé, accès uniquement via le réseau Docker
+
+  # ================================
+  # Keycloak (Production)
+  # ================================
+  keycloak:
+    image: quay.io/keycloak/keycloak:23.0
+    container_name: taskforce-keycloak-prod
+    # `--optimized` exige que la config DB soit bakée au BUILD (kc.sh build) ; l'image stock ne l'a pas
+    # → on laisse Keycloak s'auto-configurer au démarrage avec les KC_* runtime. `--import-realm` importe
+    # le realm monté sous /opt/keycloak/data/import.
+    command: start --import-realm
+    environment:
+      # Database — base dédiée, créée par db/init-prod/01
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak_prod
+      KC_DB_USERNAME: ${DB_USER}
+      KC_DB_PASSWORD: ${DB_PASSWORD}
+
+      # Admin
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN_USERNAME}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+
+      # Production settings
+      KC_HOSTNAME: ${KEYCLOAK_HOSTNAME}
+      KC_HOSTNAME_STRICT: true
+      KC_HOSTNAME_STRICT_HTTPS: true
+      KC_PROXY: edge
+      KC_HTTP_ENABLED: true
+
+      # Cache local : `kubernetes` sonde le DNS d'un cluster k8s et n'a pas de sens sur un
+      # déploiement mono-hôte Docker Compose.
+      KC_CACHE: local
+
+      # Expose /health/* (sinon le healthcheck ne répond pas). Requis par KC 23.
+      KC_HEALTH_ENABLED: "true"
+      # Substitution des placeholders du realm importé : redirectUris/webOrigins (${FRONTEND_URL}/${API_URL})
+      # et le secret du client taskforce-api (${KEYCLOAK_CLIENT_SECRET}). Sans eux → "Invalid redirect URI".
+      FRONTEND_URL: ${FRONTEND_URL}
+      API_URL: ${API_URL}
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - taskforce-network
+    volumes:
+      # Import du realm production
+      # Monter le SOUS-dossier prod : Keycloak n'importe QUE les .json directement dans le dossier
+      # (pas de récursion) — monter `./keycloak/realms` (qui contient prod/ et dev/) n'importe rien.
+      - ./keycloak/realms/prod:/opt/keycloak/data/import:ro
+    healthcheck:
+      # L'image Keycloak (ubi-micro) n'embarque PAS curl → test TCP via bash /dev/tcp.
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+    restart: always
+    # Exposé via reverse proxy (Nginx/Traefik)
+
+  # ================================
+  # Backend API
+  # ================================
+  backend:
+    build:
+      context: ./backend/tf-api
+      dockerfile: Dockerfile
+    container_name: taskforce-backend-prod
+    environment:
+      TZ: UTC
+      SPRING_PROFILES_ACTIVE: prod
+      SERVER_PORT: 8080
+
+      # Database
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME}
+      SPRING_DATASOURCE_USERNAME: ${DB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+
+      # Keycloak — service Docker en interne, issuer PUBLIC pour valider les jetons du navigateur
+      KEYCLOAK_URL: http://keycloak:8080
+      # URL PUBLIQUE de Keycloak = issuer attendu des tokens (SecurityConfig.jwtDecoder) ; JWKS reste interne via KEYCLOAK_URL.
+      KEYCLOAK_PUBLIC_URL: ${KEYCLOAK_PUBLIC_URL:-http://keycloak:8080}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID}
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI}
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/${KEYCLOAK_REALM}/protocol/openid-connect/certs
+      # Creds admin Keycloak (provisioning users via l'API admin) — requis par keycloak.admin.* au boot.
+      KEYCLOAK_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+
+      # URLs publiques applicatives — lues au boot (app.url / frontend-url / api-url). Sans elles → crash.
+      APP_URL: ${APP_URL}
+      FRONTEND_URL: ${FRONTEND_URL}
+      APP_API_URL: ${APP_API_URL}
+
+      # CORS
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+
+      # Service IA interne (passe-plat vers le LLM)
+      AI_SERVICE_URL: http://ai-service:8000
+
+      # Stockage objet — joint par nom de service (règle d'or #9). MINIO_PUBLIC_ENDPOINT est l'hôte
+      # qui SIGNE les URL présignées : il doit être joignable depuis le navigateur, donc public.
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET:-taskforce-attachments}
+
+      # Email transactionnel (OTP, invitations, réinitialisation)
+      MAIL_HOST: ${MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      MAIL_FROM: ${MAIL_FROM}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-TaskForce}
+
+      # Redis — rate limiting distribué (TF-SEC-011)
+      RATELIMIT_DISTRIBUTED_ENABLED: "true"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+
+      # Paiement
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+
+      # Chiffrement au repos des données personnelles (RGPD).
+      # Le nom DOIT être TF_ENCRYPTION_KEY : c'est celui que lit `security.encryption-key`.
+      # Il s'appelait ENCRYPTION_KEY jusqu'au 24/07/2026 — une variable que rien ne lisait.
+      TF_ENCRYPTION_KEY: ${TF_ENCRYPTION_KEY}
+
+      # Vérifications anti-robot à l'inscription (deux rideaux indépendants).
+      # Le défi signé ne dépend d'aucun tiers ; Turnstile juge le visiteur. Vides = inactifs.
+      TF_HUMAN_CHALLENGE_SECRET: ${TF_HUMAN_CHALLENGE_SECRET:-}
+      TF_TURNSTILE_SITE_KEY: ${TF_TURNSTILE_SITE_KEY:-}
+      TF_TURNSTILE_SECRET_KEY: ${TF_TURNSTILE_SECRET_KEY:-}
+
+      # JVM — aligné sur la limite conteneur ci-dessous (1024 Mio de heap dans 1536 Mio)
+      JAVA_OPTS: "-Xmx1024m -Xms512m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Duser.timezone=UTC"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      ai-service:
+        condition: service_healthy
+    networks:
+      - taskforce-network
+    healthcheck:
+      # L'actuator n'a PAS de préfixe /api (aucun context-path) → chemin = /actuator/health (curl installé au build).
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+    restart: always
+    # Exposé via reverse proxy (Nginx/Traefik)
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1536M
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # ================================
+  # AI Service (FastAPI — passerelle LLM)
+  # ================================
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    container_name: taskforce-ai-service-prod
+    environment:
+      TZ: UTC
+      # GROQ_API_KEY / GROQ_MODEL retirés le 24/07/2026 : ce service ne les lisait PAS (aucune
+      # occurrence de « groq » dans ai-service/), et le commentaire « secours cloud » décrivait un
+      # repli inexistant. Le laisser contredisait le registre des traitements, qui affirme qu'aucun
+      # contenu de travail ne quitte l'infrastructure — ce qui est vrai, mais devenait invérifiable
+      # pour qui lit ce fichier. L'inférence se fait sur Ollama auto-hébergé, sans repli tiers.
+      # LLM : hôte externe (machine dédiée / service managé), PAS ce conteneur. Cf. l'en-tête.
+      # LLM CHAT via Groq si GROQ_API_KEY présente (⚠️ le commentaire du 24/07 ci-dessus est PÉRIMÉ :
+      # ai-service/config.py lit GROQ_API_KEY depuis le 16/07). Groq = hébergé, aucun compute local requis.
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-120b}
+      GROQ_MODEL_FAST: ${GROQ_MODEL_FAST:-openai/gpt-oss-20b}
+      GROQ_BASE_URL: ${GROQ_BASE_URL:-https://api.groq.com/openai/v1}
+      # Embeddings : toujours Ollama. Sans Ollama, pointer un hôte qui refuse vite → repli lexical immédiat.
+      OLLAMA_BASE_URL: ${AI_OLLAMA_BASE_URL:-http://127.0.0.1:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:14b}
+      OLLAMA_MODEL_FAST: ${OLLAMA_MODEL_FAST:-qwen3:8b}
+      OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL:-bge-m3}
+      # Doit rester ≤ ai.gateway.read-timeout-ms côté backend.
+      OLLAMA_TIMEOUT: ${OLLAMA_TIMEOUT:-300}
+      LOG_LEVEL: ${AI_SERVICE_LOG_LEVEL:-INFO}
+    networks:
+      - taskforce-network
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)\" || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    # Simple passe-plat (fastapi/uvicorn/pydantic) : aucun modèle chargé en mémoire.
+
+  # ================================
+  # Frontend Next.js
+  # ================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      # ⚠️ Les NEXT_PUBLIC_* sont figées PENDANT le build (Next.js les inline dans le bundle envoyé
+      # au navigateur). Les passer en `environment:` n'aurait aucun effet côté client : elles doivent
+      # être des build args. Changer une URL publique impose donc un `--build` du frontend.
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL}
+        NEXT_PUBLIC_API_URL_SSR: http://backend:8080
+        NEXT_PUBLIC_STORAGE_URL: ${MINIO_PUBLIC_ENDPOINT}
+        # Site vitrine : autre origine que l'application (www.<domaine> face à app.<domaine>).
+        # Cible du logo et de « Retour au site » sur les pages d'authentification.
+        NEXT_PUBLIC_SITE_URL: ${SITE_PUBLIC_URL}
+    container_name: taskforce-frontend-prod
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - taskforce-network
+    restart: always
+    # Exposé via reverse proxy (Nginx/Traefik)
+
+  # ================================
+  # Landing Page (Astro — statique)
+  # ================================
+  landing:
+    build:
+      context: ./landing-page
+      dockerfile: Dockerfile
+      # Astro inline les variables `PUBLIC_*` AU BUILD : les passer en `environment:` n'aurait
+      # aucun effet, le site étant généré statiquement. Elles doivent donc être des arguments de
+      # construction, et tout changement impose de reconstruire l'image.
+      args:
+        PUBLIC_UMAMI_SRC: ${PUBLIC_UMAMI_SRC:-}
+        PUBLIC_UMAMI_WEBSITE_ID: ${PUBLIC_UMAMI_WEBSITE_ID:-}
+    container_name: taskforce-landing-prod
+    environment:
+      NODE_ENV: production
+    networks:
+      - taskforce-network
+    restart: always
+    # Exposé via reverse proxy (Nginx/Traefik)
+
+  # ================================
+  # Umami — mesure d'audience de la landing (CERT-C20)
+  # ================================
+  # Auto-hébergé et sans cookie : aucun transfert hors UE et aucun consentement à recueillir.
+  # Le registre des traitements reste ainsi sans destinataire étranger, ce qui serait impossible
+  # avec une solution hébergée outre-Atlantique.
+  umami:
+    image: ghcr.io/umami-software/umami:postgresql-v2.11.2
+    container_name: taskforce-umami-prod
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/umami
+      DATABASE_TYPE: postgresql
+      APP_SECRET: ${UMAMI_APP_SECRET}
+      # Mesurer notre audience ne doit pas créer un flux sortant vers un tiers : ce serait
+      # contradictoire avec la raison même du choix de cet outil.
+      DISABLE_TELEMETRY: "1"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - taskforce-network
+    restart: always
+    # Exposé via reverse proxy, la console étant une interface d'administration
+
+  # ================================
+  # MinIO — stockage objet S3-compatible (pièces jointes, avatars)
+  # ================================
+  minio:
+    image: minio/minio:latest
+    container_name: taskforce-minio-prod
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      # Région explicite : les URL présignées sont signées avec elle. Une valeur absente pousse le
+      # client à interroger le service pour la découvrir, appel qui échoue depuis le conteneur.
+      MINIO_REGION: ${MINIO_REGION:-us-east-1}
+    volumes:
+      - minio_prod_data:/data
+    networks:
+      - taskforce-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    restart: always
+    # Console (9001) et API (9000) non exposées en direct : le navigateur atteint les URL présignées
+    # via le reverse proxy, sur l'hôte déclaré dans MINIO_PUBLIC_ENDPOINT.
+
+  # ================================
+  # Redis (rate limiting distribué)
+  # ================================
+  redis:
+    image: redis:7-alpine
+    container_name: taskforce-redis-prod
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru"]
+    networks:
+      - taskforce-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+    # Buckets de rate limiting uniquement (données éphémères) : pas de persistance, pas de port exposé.
+
+  # ================================
+  # Nginx Reverse Proxy
+  # ================================
+  nginx:
+    image: nginx:alpine
+    container_name: taskforce-nginx-prod
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - nginx_cache:/var/cache/nginx
+    depends_on:
+      - backend
+      - keycloak
+      - frontend
+      - landing
+      - minio
+    networks:
+      - taskforce-network
+    restart: always
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+# ================================
+# Volumes
+# ================================
+volumes:
+  postgres_prod_data:
+    driver: local
+  minio_prod_data:
+    driver: local
+  nginx_cache:
+    driver: local
+
+# ================================
+# Networks
+# ================================
+networks:
+  taskforce-network:
+    driver: bridge
+    name: taskforce-prod-network

@@ -1,0 +1,445 @@
+# ===============================
+# DOCKER COMPOSE - DÉVELOPPEMENT
+# ===============================
+# Utilisation:
+#   .\dev-docker.ps1
+#   ou
+#   docker-compose -f docker-compose.dev.yml up
+# 
+# Le fichier .env.dev à la racine contient TOUTES les variables
+# ===============================
+
+name: taskforce-app
+
+services:
+  # ================================
+  # PostgreSQL Database
+  # ================================
+  postgres:
+    image: ${POSTGRES_IMAGE:-pgvector/pgvector:pg18}
+    container_name: taskforce-postgres-dev
+    environment:
+      TZ: UTC
+      PGTZ: UTC
+      POSTGRES_DB: ${POSTGRES_DB:-taskforce-db}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-PostgreSQLP54!}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql
+      - ./backend/tf-api/src/main/resources/db/init:/docker-entrypoint-initdb.d
+    networks:
+      - taskforce-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ================================
+  # Keycloak
+  # ================================
+  keycloak:
+    build:
+      context: ./keycloak
+      dockerfile: Dockerfile
+    container_name: taskforce-keycloak-dev
+    command: start-dev --import-realm --verbose
+    environment:
+      # Admin Keycloak
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN_USERNAME:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+
+      # HTTP Configuration
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME_STRICT: "false"
+    ports:
+      - "8180:8080"
+    networks:
+      - taskforce-network
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 1 bash -c '</dev/tcp/localhost/8080' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  # ================================
+  # Backend API
+  # ================================
+  backend:
+    build:
+      context: ./backend/tf-api
+      dockerfile: Dockerfile
+    container_name: taskforce-backend-dev
+    env_file:
+      - .env.dev
+    environment:
+      # Timezone
+      TZ: ${TZ:-America/New_York}
+      
+      # Spring Profile
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+
+      # Server Port
+      SERVER_PORT: 8080
+
+      # Database
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-taskforce-db}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-PostgreSQLP54!}
+
+      # Keycloak (utilise le nom du service docker)
+      KEYCLOAK_URL: http://keycloak:8080
+      # Validation JWT: issuer public (token navigateur) + JWKS interne (réseau Docker)
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:-http://localhost:8180/realms/taskforce-dev}
+      KEYCLOAK_JWK_SET_URI: ${KEYCLOAK_JWK_SET_URI:-http://keycloak:8080/realms/taskforce-dev/protocol/openid-connect/certs}
+
+      # IA interne
+      AI_SERVICE_URL: ${AI_SERVICE_URL:-http://ai-service:8000}
+      INTEGRATIONS_PLANE_API_BASE: ${INTEGRATIONS_PLANE_API_BASE:-https://api.plane.so}
+      # GROQ_MODEL retiré le 24/07/2026 : plus aucune propriété ne le lie côté backend. Le bloc
+      # `groq` et la clé `provider` ont été supprimés d'`application-dev.yml` le 16/07
+      # (TF-AI-GROQ-CLEANUP) ; cette variable survivait seule, sans lecteur.
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
+
+      # Email Configuration (Mailtrap)
+      MAIL_HOST: ${MAILTRAP_HOST:-sandbox.smtp.mailtrap.io}
+      MAIL_PORT: ${MAILTRAP_PORT:-2525}
+      MAIL_USERNAME: ${MAILTRAP_USERNAME}
+      MAIL_PASSWORD: ${MAILTRAP_PASSWORD}
+      MAIL_FROM: ${MAIL_FROM:-noreply@taskforce.com}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-TaskForce}
+
+      # RabbitMQ — nom du service Docker pour le STOMP relay
+      RABBITMQ_HOST: rabbitmq
+
+      # MinIO — joint par nom de service (pas localhost, cf. règle d'or #9)
+      MINIO_ENDPOINT: http://minio:9000
+      # URL présignées : signées avec l'hôte PUBLIC joignable par le navigateur (port mappé 9000:9000).
+      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-http://localhost:9000}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-taskforce-attachments}
+
+      # Flyway : lire les migrations depuis le volume src monté (évite un rebuild après changement de migration)
+      # classpath couvre les migrations embarquées dans le JAR
+      # filesystem couvre les migrations modifiées en dev via volume monté
+      SPRING_FLYWAY_ENABLED: "true"
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: "true"
+      SPRING_FLYWAY_LOCATIONS: classpath:db/migration,filesystem:/app/src/main/resources/db/migration
+
+      # JVM Options
+      JAVA_OPTS: "-Xmx512m -Xms256m -Duser.timezone=UTC -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
+
+      # ── OpenTelemetry (actif si la stack outils est démarrée) ────────────────
+      # Démarrer SigNoz via docker-compose.tools.yml et passer OTEL_SDK_DISABLED=false
+      OTEL_SERVICE_NAME: taskforce-backend
+      OTEL_RESOURCE_ATTRIBUTES: "deployment.environment=dev,service.version=1.0.0"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://signoz-otel-collector:4317
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      # Désactivé par défaut - passer à "false" pour exporter vers SigNoz
+      OTEL_SDK_DISABLED: "${OTEL_SDK_DISABLED:-true}"
+      # Force les exporters à none quand SigNoz n'est pas disponible
+      # (OTEL_SDK_DISABLED seul ne suffit pas sur certaines versions de l'agent)
+      OTEL_TRACES_EXPORTER: "${OTEL_TRACES_EXPORTER:-none}"
+      OTEL_METRICS_EXPORTER: "${OTEL_METRICS_EXPORTER:-none}"
+      OTEL_LOGS_EXPORTER: "${OTEL_LOGS_EXPORTER:-none}"
+      # Agent Java OTel - active l'instrumentation automatique (traces, métriques, logs)
+      # Le JAR est téléchargé au build du Dockerfile. OTEL_SDK_DISABLED contrôle l'export.
+      OTEL_JAVA_AGENT: "-javaagent:/otel/opentelemetry-javaagent.jar"
+    ports:
+      - "${BACKEND_PORT:-8080}:8080" # API
+      - "5005:5005" # Debug
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      ai-service:
+        condition: service_healthy
+    networks:
+      - taskforce-network
+    volumes:
+      # Hot reload (optionnel)
+      - ./backend/tf-api/src:/app/src
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "code=$$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/api/actuator/health); [ \"$$code\" = \"200\" ] || [ \"$$code\" = \"401\" ]",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+
+  # ================================
+  # AI Service (FastAPI interne)
+  # ================================
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    container_name: taskforce-ai-service-dev
+    env_file:
+      - .env.dev
+    environment:
+      TZ: ${TZ:-America/New_York}
+      # AI Gateway → LLM local Ollama (sur l'hôte). host.docker.internal = la machine hôte.
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:14b}
+      OLLAMA_MODEL_FAST: ${OLLAMA_MODEL_FAST:-qwen2.5:7b-instruct}
+      OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL:-bge-m3}
+      # Analyse approfondie sur 14B local = longue → 300s (doit rester ≤ ai.gateway.read-timeout-ms côté backend).
+      OLLAMA_TIMEOUT: ${OLLAMA_TIMEOUT:-300}
+      # Provider CHAT alternatif : GROQ_API_KEY / GROQ_MODEL / GROQ_MODEL_FAST sont fournis par `.env.dev`
+      # (env_file ci-dessus). Clé RENSEIGNÉE ⇒ le chat (smart-assign, Cortex, orchestration) bascule sur
+      # Groq (hébergé, zéro compute local → petite VM) ; clé VIDE ⇒ Ollama local. Détection auto dans
+      # ai-service/app/config.py (use_groq). Les EMBEDDINGS restent sur Ollama (Groq n'en fournit pas).
+      LOG_LEVEL: ${AI_SERVICE_LOG_LEVEL:-INFO}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - taskforce-network
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)\" || exit 1",
+        ]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  # ================================
+  # Frontend Next.js
+  # ================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: taskforce-frontend-dev
+    env_file:
+      - .env.dev
+    environment:
+      NODE_ENV: development
+      # API URL pour les appels côté client (navigateur)
+      NEXT_PUBLIC_API_URL: http://localhost:8080
+      # API URL pour les appels côté serveur (SSR dans Docker)
+      NEXT_PUBLIC_API_URL_SSR: http://backend:8080
+      # Origine MinIO telle que le navigateur la joint (URLs présignées des pièces jointes).
+      # Doit rester alignée sur MINIO_PUBLIC_ENDPOINT côté backend : c'est l'hôte signé.
+      NEXT_PUBLIC_STORAGE_URL: http://localhost:9000
+      # Site vitrine (projet Astro distinct, autre origine) — cible du logo et de « Retour au site »
+      # sur les pages d'authentification. En production ce sera www.<domaine> ; en développement, le
+      # port du serveur Astro que vous utilisez réellement : 4321 si lancé à la main,
+      # ${LANDING_PORT} (18081 par défaut) si c'est le conteneur `landing` de ce compose.
+      NEXT_PUBLIC_SITE_URL: ${SITE_PUBLIC_URL:-http://localhost:4321}
+      # Connexion externe. AFFICHÉS = ce que la page montre ; READY = ce qui est réellement câblé
+      # côté serveur (fournisseur d'identité Keycloak + app OAuth). Un bouton affiché non câblé annonce
+      # « bientôt disponible » ; câblé, il démarre le flux. GitHub est prêt depuis le 24/07 ; Google
+      # reste affiché mais non câblé (aucune app OAuth Google déclarée).
+      # Démo : n'afficher que les fournisseurs réellement câblés (Google pas encore branché → masqué).
+      NEXT_PUBLIC_AUTH_SOCIAL_PROVIDERS: ${AUTH_SOCIAL_PROVIDERS:-github}
+      NEXT_PUBLIC_AUTH_SOCIAL_READY: ${AUTH_SOCIAL_READY:-github}
+      # Enable polling for hot reload on Docker Desktop (Windows/macOS)
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+
+      # ── OpenTelemetry (actif si la stack outils est démarrée) ────────────────
+      # Démarrer SigNoz via docker-compose.tools.yml et passer OTEL_SDK_DISABLED=false
+      OTEL_SERVICE_NAME: taskforce-frontend
+      OTEL_RESOURCE_ATTRIBUTES: "deployment.environment=dev"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://signoz-otel-collector:4318
+      OTEL_SDK_DISABLED: "${OTEL_SDK_DISABLED:-true}"
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      - backend
+    networks:
+      - taskforce-network
+    volumes:
+      # Hot reload pour développement - monter tout le code source
+      - ./frontend:/app
+      # Volume anonyme pour node_modules (évite d'écraser les dépendances du container)
+      - /app/node_modules
+      - /app/.next
+    develop:
+      watch:
+        - action: sync
+          path: ./frontend
+          target: /app
+          ignore:
+            - node_modules/
+            - .next/
+        - action: rebuild
+          path: ./frontend/package.json
+    restart: unless-stopped
+
+  # ================================
+  # Landing Page (Astro)
+  # ================================
+  landing:
+    build:
+      context: ./landing-page
+      dockerfile: Dockerfile.dev
+    container_name: taskforce-landing-dev
+    env_file:
+      - .env.dev
+    environment:
+      NODE_ENV: development
+    ports:
+      - "${LANDING_PORT:-18081}:4321"
+    networks:
+      - taskforce-network
+    volumes:
+      # Hot reload pour développement
+      - ./landing-page:/app
+      # Volume anonyme pour node_modules
+      - /app/node_modules
+    develop:
+      watch:
+        - action: sync
+          path: ./landing-page
+          target: /app
+          ignore:
+            - node_modules/
+        - action: rebuild
+          path: ./landing-page/package.json
+    restart: unless-stopped
+
+  # ================================
+  # RabbitMQ — broker STOMP pour WebSocket
+  # ================================
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    container_name: taskforce-rabbitmq-dev
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"        # AMQP
+      - "${RABBITMQ_MGMT_PORT:-15672}:15672" # Management UI
+      - "${RABBITMQ_STOMP_PORT:-61613}:61613" # STOMP
+    volumes:
+      - rabbitmq_dev_data:/var/lib/rabbitmq
+      - ./rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+    networks:
+      - taskforce-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  # ================================
+  # Minio — stockage objet local (S3-compatible)
+  # ================================
+  minio:
+    image: minio/minio:latest
+    container_name: taskforce-minio-dev
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"      # API S3
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"  # Console web
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_dev_data:/data
+    networks:
+      - taskforce-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  # ================================
+  # pgAdmin (optionnel - pour gérer la DB)
+  # ================================
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: taskforce-pgadmin-dev
+    env_file:
+      - .env.dev
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@taskforce.dev}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_SERVER_JSON_FILE: /pgadmin4/servers.json
+      PGADMIN_LOAD_SERVERS: "true"
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    networks:
+      - taskforce-network
+    volumes:
+      - pgadmin_dev_data:/var/lib/pgadmin
+      # Auto-import de la configuration du serveur PostgreSQL
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
+      - ./pgadmin/pgpass:/pgpass
+
+  # ================================
+  # Umami — mesure d'audience de la landing (CERT-C20)
+  # ================================
+  # Choisi contre Google Analytics et Plausible Cloud pour deux raisons de conformité, pas de
+  # confort : il ne dépose AUCUN cookie (donc pas de consentement à recueillir, pas de bannière
+  # supplémentaire) et il est auto-hébergé (donc aucun transfert hors UE). Le registre des
+  # traitements reste ainsi sans destinataire étranger, ce qui est cohérent avec le retrait de
+  # Groq et l'auto-hébergement du modèle de langage.
+  #
+  # Il réutilise le Postgres existant via une base dédiée `umami` (cf. db/init/03-init-umami-db.sql).
+  umami:
+    image: ghcr.io/umami-software/umami:postgresql-v2.11.2
+    container_name: taskforce-umami-dev
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-PostgreSQLP54!}@postgres:5432/umami
+      DATABASE_TYPE: postgresql
+      # Sert à signer les sessions de la console Umami. Valeur de développement uniquement :
+      # en production elle doit venir de l'environnement, comme tous les autres secrets.
+      APP_SECRET: ${UMAMI_APP_SECRET:-dev-only-not-a-production-secret}
+      # Désactive la télémétrie sortante de l'outil lui-même : mesurer notre audience ne doit pas
+      # créer un flux vers un tiers, ce serait contradictoire avec la raison de l'avoir choisi.
+      DISABLE_TELEMETRY: "1"
+    ports:
+      - "${UMAMI_PORT:-3001}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - taskforce-network
+    restart: unless-stopped
+
+# ================================
+# Volumes
+# ================================
+volumes:
+  postgres_dev_data:
+    driver: local
+  pgadmin_dev_data:
+    driver: local
+  rabbitmq_dev_data:
+    driver: local
+  minio_dev_data:
+    driver: local
+
+# ================================
+# Networks
+# ================================
+networks:
+  taskforce-network:
+    driver: bridge
+    name: taskforce-dev-network

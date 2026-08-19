@@ -1,0 +1,69 @@
+---
+description: Architecture, structure du projet, conventions backend/frontend/Docker pour Taskforce
+alwaysApply: true
+---
+
+# Architecture - Taskforce
+
+## Structure Monorepo
+
+```
+taskforce-fullstack/
+├── backend/tf-api/          # Spring Boot API (Java 21)
+├── frontend/                # Next.js 15 (TypeScript)
+├── landing-page/            # Astro (site vitrine)
+├── keycloak/                # Configuration Keycloak
+├── .env.dev / .env.prod     # Variables d'environnement
+└── docker-compose.dev.yml   # Orchestration Docker DEV
+```
+
+⚠️ **Cohérence OBLIGATOIRE** : Tout changement doit être vérifié dans TOUS les fichiers de l'environnement concerné
+
+## Backend (Spring Boot)
+
+- **Port** : `8080`, **Context Path** : `/api`
+- **Auth** : Keycloak OAuth2/OIDC, **Migrations** : Flyway
+- **Packages** : `com.taskforce.tf_api.<module>.<type>`
+- **DTOs** : `*Request.java`, `*Response.java`
+- **Controllers** : Validation `@Valid`, retourner `ApiResponse<T>`
+- **JAMAIS de champs optionnels "par flemme"** - créer des endpoints séparés
+
+## Frontend (Next.js)
+
+- **Port** : `3000`, **Framework** : Next.js 15 App Router
+- **UI** : Shadcn/UI + Tailwind CSS, **API Client** : Axios avec intercepteurs JWT
+- **Pas de `any`** - Toujours typer correctement
+- **Interfaces** : PascalCase, **Composants** : PascalCase, **Utils** : camelCase
+
+## Docker Networking
+
+**Règle d'or** : Dans Docker, les services communiquent via **noms de services**, pas `localhost`
+
+```yaml
+NEXT_PUBLIC_API_URL: http://backend:8080/api  # ✅ dans Docker
+NEXT_PUBLIC_API_URL: http://localhost:8080/api # ✅ hors Docker
+```
+
+| Service  | Port Hôte | URL                         |
+| -------- | --------- | --------------------------- |
+| postgres | 5432      | `localhost:5432`            |
+| keycloak | 8180      | `http://localhost:8180`     |
+| backend  | 8080      | `http://localhost:8080/api` |
+| frontend | 3000      | `http://localhost:3000`     |
+
+## Anti-Patterns ❌
+
+1. Champs optionnels par simplicité → Découper en endpoints séparés
+2. Hardcoder des valeurs → Variables d'environnement
+3. Mélanger `localhost` et noms de services Docker
+4. Ignorer les migrations Flyway
+5. Modifier `application.yml` au lieu de `application-dev.yml`
+6. Créer des PR sans label `release:*`
+
+## Checklist Avant Modification
+
+**Config DEV** : `.env.dev`, `docker-compose.dev.yml`, `application-dev.yml`, `realm-dev/`
+
+**Backend** : DTO → Service → Controller → Repository → Migration Flyway
+
+**Frontend** : Types TS → API Service → Composant UI → Validation Zod

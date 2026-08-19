@@ -98,15 +98,23 @@ jobs:
       - name: 🏗️ Build site
         run: npm run build
 
+      # Ce job n'a JAMAIS rien mesuré jusqu'au 22/07/2026. Trois défauts cumulés :
+      #
+      #  1. `urls: http://localhost:4321` pointait un serveur que rien ne démarrait. La config
+      #     déclarait bien `startServerCommand`, mais `defaults.run.working-directory` ne s'applique
+      #     PAS aux étapes `uses:` — l'action tournait donc depuis la racine du dépôt, où le script
+      #     `preview` n'existe pas.
+      #  2. L'entrée `urls` de l'action supplantait de toute façon l'URL de la config.
+      #  3. `continue-on-error: true` avalait l'échec, et un job en erreur tolérée remonte « success ».
+      #
+      # Corrigé par `staticDistDir` côté `.lighthouserc.json` : LHCI sert lui-même le dossier
+      # construit, sans processus serveur ni dépendance au répertoire courant.
       - name: 🚀 Run Lighthouse CI
         uses: treosh/lighthouse-ci-action@v11
         with:
-          urls: |
-            http://localhost:4321
           configPath: './landing-page/.lighthouserc.json'
           temporaryPublicStorage: true
           uploadArtifacts: true
-        continue-on-error: true
 
   # Job de sécurité (analyse des dépendances)
   security:

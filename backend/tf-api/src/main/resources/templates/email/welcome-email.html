@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bienvenue sur TaskForce</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #fafafa;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 600px;
+            margin:0 auto;
+            background: #ffffff;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid #e5e5e5;
+        }
+        .header {
+            background: #171717;
+            padding: 32px 24px;
+            text-align: center;
+        }
+        .logo {
+            height: 50px;
+            width: auto;
+            max-width: 200px;
+        }
+        .content {
+            padding: 40px 32px;
+        }
+        .greeting {
+            font-size: 28px;
+            font-weight: 600;
+            color: #0a0a0a;
+            margin-bottom: 12px;
+        }
+        .subtitle {
+            color: #737373;
+            font-size: 16px;
+            margin-bottom: 32px;
+        }
+        .button {
+            display: inline-block;
+            background: #171717;
+            color: #ffffff;
+            padding: 14px 32px;
+            text-decoration: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 500;
+            margin: 24px 0;
+            transition: background 0.2s;
+        }
+        .button:hover {
+            background: #0a0a0a;
+        }
+        .features {
+            margin: 40px 0;
+        }
+        .feature-card {
+            background: #fafafa;
+            border: 1px solid #e5e5e5;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 16px 0;
+        }
+        .feature-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #0a0a0a;
+            margin-bottom: 8px;
+        }
+        .feature-desc {
+            font-size: 14px;
+            color: #737373;
+            line-height: 1.5;
+        }
+        .help-section {
+            background: #fafafa;
+            border: 1px solid #e5e5e5;
+            border-radius: 10px;
+            padding: 24px;
+            margin-top: 32px;
+            text-align: center;
+        }
+        .help-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #0a0a0a;
+            margin-bottom: 12px;
+        }
+        .help-text {
+            font-size: 14px;
+            color: #737373;
+            margin-bottom: 16px;
+        }
+        .help-link {
+            color: #171717;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .help-link:hover {
+            text-decoration: underline;
+        }
+        .footer {
+            background: #fafafa;
+            padding: 32px 24px;
+            text-align: center;
+            border-top: 1px solid #e5e5e5;
+        }
+        .footer-text {
+            color: #a3a3a3;
+            font-size: 13px;
+            margin-bottom: 16px;
+        }
+        .footer-links {
+            margin-top: 12px;
+        }
+        .footer-link {
+            color: #525252;
+            text-decoration: none;
+            margin: 0 12px;
+            font-size: 13px;
+        }
+        .footer-link:hover {
+            color: #171717;
+        }
+        @media only screen and (max-width: 600px) {
+            .content {
+                padding: 32px 24px;
+            }
+            .greeting {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAmQAAAGYCAYAAADsqf5DAAAQAElEQVR4AeydB5xU1f32Z3aBpRd7w5rYK4o1f7GBGOz6iiVIUFEQ6YhiRLCBotJEBQvWaKJiRwUEuyIqRaPGxKjRKGKld3be5zm7Z7k7O33uzNzy8OG3p/1O+57be585585sWUT/REAEREAEfEsgFotFfTt4DVwERKCGgARZDQpFREAERMB/BKLRaMwfo9YovUJACj7VSpSOjgRZqnVRWRYESvcizmKQchUBERCB0BOQgk/1EigdHQmyVOuisiwIlO5FnMUgC+qqxkVABERABEQgVwISZLmSUz0REAEREAEREAERcIlAFoLMpR7VTGoCOvlLzUelIiACIiACIhBAAhJkXltUnfx5bUU0HhEQgWITUH8iEEICEmQhXHTXp6xdPdeRqkEREAERKDYBXcqLTbx2fxJktXkolQsB7eplS03+IiACIuA5ArqUl3ZJJMhKy1+9i4AIiIAIiIAIiEAkA0GWwyamwIqACJSegH51S78GGoEIiIAIZEggA0GmTcwMWcpNBLxFQL+63loPjaYgBNSoCASFQAaCLChT1TxSEtBuSko8KhQBERABERCBQhKQICskXT+1rd0Uj66WhiUCIiACIhAGAhJkYVhlzVEEREAEREAERMDTBEouyDxNR4MTAREQAREQgQAT0NMq3llcCTLvrIVGYgjo8mAw6EcgCcRiMb3AS7ey6jkBAT2tkgBKibIkyEoEXt0mI6DLQzIyyvc/gWg0qhe4/5dRMxCBghCQICsIVjUqAiUgoC5FQAREQAR8S0CCzLdLp4GLgAiIgAiElYCOv4O38n4SZMGjrxmJgAgUkICOhwsIV00Xm4C3dnck/ry79hJkXn91aXwiIAIiUDACEn8FQ1u6hsUP4bXXngRZ6V4u6lkERKD0BHw7z9JzVv8ikAsB/S57bfUlyLy2IhqPCIiAEwH1XU4UlBdOAt7adw9gxYIoyCTU8nmDoCnkuZqhoQQRyO8dTxCZaRoiUEoCXvvOkSAr5etCfUsgk5uHB8l3xSq8v5vP5B2PO2PSnEQgGAR0Gw3GOgZiFhJkgVjGQk9C/VdhCft9A+kNNqpUBHKi4/c+K9X66ZpXegISZKVfg2RPfZf+AuN9XWqW+QbyyLsul/s0Ua/Sc8+0h0TBnDbEPz1mZ07L9Kbv+/nKj4DX9kElyPJ5WQayrg+Cy/tfOvmvxMb5eH2u1V35T6F64W1e/n7MtBflvT5fL/SfSVup/KX/MqQS1jJfC3YfT6tAgsxv5D0wXvVdXltEH/Q+njgOLKRb/vU+v9dK8fo7LBcxqj4LRyArPxcbkCDz8upkNzZfvNnNbx7+vL6r85lFGOv68I0Pj5rCuO71ZqyfufyW3nvjliDz8npqbCIgAvkS8G0vke+kVT8QBCTIArGMmXVc3v1Sz3dGqhVoAl7/YgrqZR8CoBoWgfATkCAL/xp4Ygba5fLEMnhuEL64WTojr5V4d2XE3eP3JRGvL5DGJwIikDsBCbLc2flllf06a7+sRiBHqleesgWyf+0FNSsRCBMBCbIwrfZ/56r59vdFFP/Z6DW/8fV97f9fp7xnEN9P/p9WmBn4dv+k+BOvJcgkvL3wYvPFLPOdpe9fW779pfLF62uDaupPkOVoLkGWIzhVEwERyI2A3hblxk21ykJAgqws2N3rVPIti2t48f0W+G6ChV+I0M1Yc04koNc//qosEAPTFERABDInIEGWOatgevriaycYyx/WWeqXLqyrLFFf+grJbyr63/rxwpzqj9fdwXhz/rxwpzqj9fdgXhz/C608cqrSu+JAD9P9w6UEuRIkJWx/9L8w7jkXnwvfl+K3Feo+C8l7yv0go86Udf+upv8G3NiE+qv/uzJffn68RoZsTPUX7Evfz/jVIxg==" alt="TaskForce" class="logo" />
+        </div>
+        
+        <div class="content">
+            <div class="greeting">Bienvenue <span th:text="${firstName}">Prénom</span> 🎉</div>
+            <div class="subtitle">Votre compte a été créé avec succès</div>
+            
+            <p style="color: #737373; font-size: 15px; margin-bottom: 24px;">
+                Nous sommes ravis de vous accueillir sur TaskForce. Vous pouvez maintenant commencer 
+                à organiser vos projets et collaborer avec votre équipe.
+            </p>
+            
+            <a th:href="${appUrl}" class="button">Accéder à mon compte</a>
+            
+            <div class="features">
+                <div class="feature-card">
+                    <div class="feature-title">🚀 Gestion de projets</div>
+                    <div class="feature-desc">
+                        Créez et organisez vos projets avec des outils intuitifs et puissants.
+                    </div>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-title">👥 Collaboration d'équipe</div>
+                    <div class="feature-desc">
+                        Invitez votre équipe et travaillez ensemble en temps réel.
+                    </div>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-title">📊 Suivi des progrès</div>
+                    <div class="feature-desc">
+                        Suivez l'avancement de vos tâches avec des tableaux de bord clairs.
+                    </div>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-title">🤖 Automatisations</div>
+                    <div class="feature-desc">
+                        Automatisez vos workflows et gagnez du temps sur les tâches répétitives.
+                    </div>
+                </div>
+            </div>
+            
+            <div class="help-section">
+                <div class="help-title">Besoin d'aide ?</div>
+                <div class="help-text">
+                    Notre équipe est là pour vous accompagner dans votre découverte de TaskForce.
+                </div>
+                <a th:href="${supportUrl}" class="help-link">Consulter le centre d'aide →</a>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p class="footer-text">© 2026 TaskForce. Tous droits réservés.</p>
+            <div class="footer-links">
+                <a th:href="${supportUrl}" class="footer-link">Centre d'aide</a>
+                <a href="#" class="footer-link">Confidentialité</a>
+                <a th:href="${contactUrl}" class="footer-link">Contact</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

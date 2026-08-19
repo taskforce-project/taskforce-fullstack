@@ -1,0 +1,246 @@
+# ===============================
+# ENVIRONNEMENT DÉVELOPPEMENT
+# ===============================
+spring:
+  # Upload de fichiers (pièces jointes) — défaut Spring = 1 MB, on aligne sur la limite service (25 MB)
+  servlet:
+    multipart:
+      max-file-size: 25MB
+      max-request-size: 30MB
+
+  # Database Configuration
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:taskforce-db}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:PostgreSQLP54!}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+
+  # JPA Development Settings
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:validate}
+    properties:
+      hibernate:
+        format_sql: true
+
+  # Flyway Development
+  flyway:
+    enabled: true
+    clean-disabled: false
+    validate-on-migrate: false
+    baseline-on-migrate: true
+    # PC-026 : les seeds de dev (V17/V18/V31/V40 — mots de passe en clair, comptes QA) vivent dans
+    # `db/seed`, chargé UNIQUEMENT ici (dev). La base `application.yml` ne liste que `db/migration` →
+    # ni la prod ni le profil `it` (tests d'intégration) ne voient les seeds. Flyway ignore sans erreur
+    # les versions absentes sur une base neuve (V17/18/31/40 simplement non appliquées hors dev).
+    locations: classpath:db/migration,classpath:db/seed
+
+  # Pas de bloc `security.oauth2` ici, volontairement.
+  #  - Resource server : le décodeur JWT est fourni EXPLICITEMENT par SecurityConfig.jwtDecoder()
+  #    (issuer PUBLIC attendu, JWKS INTERNE) — pas le décodeur auto-configuré depuis un issuer-uri.
+  #  - Client OAuth2 de Spring : il n'était consommé par PERSONNE (le ROPC passe par KeycloakAuthService,
+  #    la connexion GitHub par OAuthLoginService, tous deux en appels RestTemplate maison). Sa seule
+  #    présence déclenchait une découverte OIDC au démarrage qui, depuis que le realm a un frontendUrl
+  #    fixe, échoue : « Issuer localhost:8180 did not match requested keycloak:8080 ». Les identifiants
+  #    et URLs dont OAuthLoginService a besoin vivent sous `keycloak.*` (client-id, client-secret, url,
+  #    public-url, realm). Ne pas réintroduire ce bloc sans consommateur réel.
+
+  web:
+    error:
+      include-stacktrace: always
+
+  # RabbitMQ — STOMP broker relay pour WebSocket
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    stomp:
+      port: ${RABBITMQ_STOMP_PORT:61613}
+
+  # Thymeleaf Configuration
+  thymeleaf:
+    enabled: true
+    prefix: classpath:/templates/
+    suffix: .html
+    mode: HTML
+    encoding: UTF-8
+    cache: false  # Désactiver le cache en DEV pour voir les changements immédiatement
+
+# Email Configuration (Mailtrap for development)
+mail:
+  host: ${MAIL_HOST:sandbox.smtp.mailtrap.io}
+  port: ${MAIL_PORT:2525}
+  username: ${MAIL_USERNAME:your_mailtrap_username}
+  password: ${MAIL_PASSWORD:your_mailtrap_password}
+  from: ${MAIL_FROM:noreply@taskforce.com}
+  from-name: ${MAIL_FROM_NAME:TaskForce}
+  properties:
+    mail:
+      smtp:
+        auth: true
+        starttls:
+          enable: true
+          required: true
+      debug: true
+
+# Minio — stockage objet S3-compatible
+minio:
+  endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+  # Endpoint PUBLIC (joignable depuis le navigateur) utilisé pour SIGNER les URLs présignées.
+  # En Docker, `endpoint` vise le réseau interne (minio:9000) ; une URL présignée signée avec cet
+  # hôte est injoignable côté client. On signe donc avec l'hôte public (localhost:9000).
+  public-endpoint: ${MINIO_PUBLIC_ENDPOINT:http://localhost:9000}
+  access-key: ${MINIO_ROOT_USER:minioadmin}
+  secret-key: ${MINIO_ROOT_PASSWORD:minioadmin}
+  bucket: ${MINIO_BUCKET:taskforce-attachments}
+
+# CORS Configuration
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
+  allowed-methods: GET,POST,PUT,DELETE,PATCH,OPTIONS
+  allowed-headers: "*"
+  allow-credentials: true
+  max-age: 3600
+
+# Keycloak Configuration
+keycloak:
+  url: ${KEYCLOAK_URL:http://localhost:8180}
+  # URL telle que le NAVIGATEUR joint Keycloak — distincte de `url`, qui est l'adresse interne au
+  # réseau Docker (`http://keycloak:8080`) utilisée pour les appels serveur à serveur.
+  #
+  # Elle n'existait pas, et son absence a produit une URL d'autorisation pointant vers
+  # `http://keycloak:8080/...` : injoignable depuis un navigateur, donc une connexion externe
+  # cassée. Même piège que l'issuer JWT, déjà rencontré sur ce projet.
+  public-url: ${KEYCLOAK_PUBLIC_URL:http://localhost:8180}
+  realm: ${KEYCLOAK_REALM:taskforce-dev}
+  client-id: ${KEYCLOAK_CLIENT_ID:taskforce-api}
+  client-secret: ${KEYCLOAK_CLIENT_SECRET:dev-secret-change-me}
+
+  # Admin Client (pour créer/gérer les utilisateurs)
+  admin:
+    username: ${KEYCLOAK_ADMIN_USERNAME:admin}
+    password: ${KEYCLOAK_ADMIN_PASSWORD:admin}
+    client-id: ${KEYCLOAK_ADMIN_CLIENT_ID:admin-cli}
+
+  # OAuth2/OIDC Endpoints
+  endpoints:
+    # Token Endpoint : Pour obtenir access_token et refresh_token (Password Grant)
+    token: ${keycloak.url}/realms/${keycloak.realm}/protocol/openid-connect/token
+    # Logout Endpoint : Pour révoquer les tokens
+    logout: ${keycloak.url}/realms/${keycloak.realm}/protocol/openid-connect/logout
+    # UserInfo Endpoint : Pour récupérer les infos de l'utilisateur authentifié
+    userinfo: ${keycloak.url}/realms/${keycloak.realm}/protocol/openid-connect/userinfo
+    # Token Introspection : Pour valider un token
+    introspect: ${keycloak.url}/realms/${keycloak.realm}/protocol/openid-connect/token/introspect
+    # JWK Set : Clés publiques pour vérifier les signatures JWT
+    certs: ${keycloak.url}/realms/${keycloak.realm}/protocol/openid-connect/certs
+
+# Stripe Configuration
+stripe:
+  api-key: ${STRIPE_SECRET_KEY:sk_test_your_stripe_key_here}
+  publishable-key: ${STRIPE_PUBLIC_KEY:pk_test_your_publishable_key_here}
+  webhook-secret: ${STRIPE_WEBHOOK_SECRET:whsec_your_webhook_secret_here}
+  plans:
+    basic:
+      price-id: ${STRIPE_PRICE_ID_BASIC:price_basic_test}
+    business:
+      price-id: ${STRIPE_PRICE_ID_BUSINESS:price_business_test}
+    enterprise:
+      price-id: ${STRIPE_ENTERPRISE_PRICE_ID:price_enterprise_test}
+  checkout:
+    success-url: ${STRIPE_SUCCESS_URL:http://localhost:3000/payment/success}
+    cancel-url: ${STRIPE_CANCEL_URL:http://localhost:3000/payment/cancel}
+
+# Application Configuration
+app:
+  name: ${APP_NAME:TaskForce}
+  url: ${APP_URL:http://localhost:3000}
+  frontend-url: ${FRONTEND_URL:http://localhost:3000}
+  # Base publique du BACKEND (callbacks OAuth GitHub/Slack) — distincte de `url` (= front).
+  api-url: ${APP_API_URL:http://localhost:8080}
+# Chiffrement au repos des PII (RGPD C11.2). En prod : clé forte via env, jamais en dur.
+security:
+  encryption-key: ${TF_ENCRYPTION_KEY:dev-only-encryption-key-change-me}
+  # Défi de vérification humaine à l'inscription (jeton signé, sans service tiers).
+  # Vide = mécanisme inactif ; en dev on le laisse actif pour que le parcours soit représentatif.
+  human-challenge-secret: ${TF_HUMAN_CHALLENGE_SECRET:dev-only-human-challenge-secret}
+  # Cloudflare Turnstile — second rideau anti-robot à l'inscription, EN PLUS du défi signé ci-dessus.
+  # Vide = inactif (aucun widget affiché, aucune vérification). La clé de SITE est publique, elle est
+  # servie au navigateur par GET /api/auth/challenge ; la clé SECRÈTE ne sort jamais du serveur.
+  turnstile:
+    site-key: ${TF_TURNSTILE_SITE_KEY:}
+    secret-key: ${TF_TURNSTILE_SECRET_KEY:}
+# Integrations tierces
+integrations:
+  github:
+    client-id: ${GITHUB_CLIENT_ID:}
+    client-secret: ${GITHUB_CLIENT_SECRET:}
+  slack:
+    client-id: ${SLACK_CLIENT_ID:}
+    client-secret: ${SLACK_CLIENT_SECRET:}
+    # Miroir Slack → chat : poller de sync auto des canaux miroir
+    mirror:
+      poll-enabled: ${SLACK_MIRROR_POLL_ENABLED:true}
+      poll-interval-ms: ${SLACK_MIRROR_POLL_INTERVAL_MS:60000}
+  # MCP — TaskForce = hôte MCP : Cortex pilote des serveurs MCP externes (cf. McpClient / WorkspaceMcpService)
+  mcp:
+    connect-timeout-ms: ${MCP_CONNECT_TIMEOUT_MS:10000}
+    read-timeout-ms: ${MCP_READ_TIMEOUT_MS:60000}
+    tools-cache-ttl-ms: ${MCP_TOOLS_CACHE_TTL_MS:60000}   # cache tools/list par workspace
+    confirm-writes: ${MCP_CONFIRM_WRITES:true}            # écritures externes proposées (validation humaine)
+    tool-tier: ${MCP_TOOL_TIER:fast}                      # tier LLM des tours avec outils externes (fast|standard|deep)
+# JWT Configuration
+jwt:
+  secret: ${JWT_SECRET:myVerySecretKeyForJWTTokenGenerationThatIsLongEnoughToBeSecure256Bits}
+  access-token:
+    expiration: ${JWT_ACCESS_TOKEN_EXPIRATION:3600}  # 1 heure en secondes
+  refresh-token:
+    expiration: ${JWT_REFRESH_TOKEN_EXPIRATION:2592000}  # 30 jours en secondes
+
+# OTP Configuration
+otp:
+  expiration-minutes: ${OTP_EXPIRATION_MINUTES:15}
+  length: ${OTP_LENGTH:6}
+  max-attempts: ${OTP_MAX_ATTEMPTS:5}
+  max-requests-per-hour: ${OTP_MAX_REQUESTS_PER_HOUR:5}
+  # Dev sans SMTP : si l'envoi de l'e-mail OTP échoue, on logge le code et on laisse
+  # l'inscription réussir (code récupérable dans les logs). En prod (défaut false) l'échec bloque.
+  dev-fallback-log: ${OTP_DEV_FALLBACK_LOG:true}
+
+# Logging Configuration
+logging:
+  level:
+    root: ${LOGGING_LEVEL_ROOT:INFO}
+    com.taskforce: ${LOGGING_LEVEL_COM_TASKFORCE:DEBUG}
+    org.springframework.web: ${LOGGING_LEVEL_SPRING_WEB:DEBUG}
+    org.springframework.security: DEBUG
+    org.hibernate.SQL: ${LOGGING_LEVEL_HIBERNATE_SQL:DEBUG}
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.flywaydb: DEBUG
+
+# Server Configuration
+server:
+  port: ${SERVER_PORT:8080}
+
+# AI Configuration (Phase 4)
+ai:
+  # Un seul chemin LLM : l'AI Gateway (service Python ai-service) → notre modèle local Ollama, gratuit.
+  # Le bloc `groq` et la clé `provider` ont été SUPPRIMÉS le 16/07 (TF-AI-GROQ-CLEANUP) : Groq était
+  # bloqué sur ce réseau (403), écarté par la décision du 07/07, et son client n'implémentait pas la
+  # capture d'usage → le sélectionner désarmait silencieusement tout le quota IA.
+  model:
+    # Décoratif : l'AI Gateway IGNORE volontairement le modèle qu'on lui passe (AiGatewayClient.callChat)
+    # et applique le sien (OLLAMA_MODEL, routé par tier fast/standard/deep dans l'ai-service).
+    # Conservé parce que LlmClient.chatCompletion(model, …) le prend encore en paramètre.
+    assistant: ${AI_ASSISTANT_MODEL:gateway-default}
+    smart-assign: ${AI_SMART_ASSIGN_MODEL:gateway-default}
+  # Le routing modèle + l'URL Ollama vivent dans l'ai-service (OLLAMA_BASE_URL/OLLAMA_MODEL).
+  gateway:
+    base-url: ${AI_GATEWAY_BASE_URL:http://ai-service:8000}
+

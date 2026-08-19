@@ -1,0 +1,295 @@
+package com.taskforce.tf_api.core.service;
+
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.taskforce.tf_api.core.dto.request.AddIssueToCycleRequest;
+import com.taskforce.tf_api.core.dto.request.CreateCycleRequest;
+import com.taskforce.tf_api.core.dto.request.UpdateCycleRequest;
+import com.taskforce.tf_api.core.dto.response.CycleResponse;
+import com.taskforce.tf_api.core.dto.response.IssueResponse;
+import com.taskforce.tf_api.core.dto.response.MyWorkCycleResponse;
+import com.taskforce.tf_api.core.enums.CycleStatus;
+import com.taskforce.tf_api.core.event.CycleCompletedEvent;
+import com.taskforce.tf_api.core.model.Cycle;
+import com.taskforce.tf_api.core.model.CycleIssue;
+import com.taskforce.tf_api.core.model.Issue;
+import com.taskforce.tf_api.core.model.Project;
+import com.taskforce.tf_api.core.model.User;
+import com.taskforce.tf_api.core.model.Workspace;
+import com.taskforce.tf_api.core.repository.CycleIssueRepository;
+import com.taskforce.tf_api.core.repository.CycleRepository;
+import com.taskforce.tf_api.core.repository.IssueRepository;
+import com.taskforce.tf_api.core.repository.ProjectRepository;
+import com.taskforce.tf_api.core.repository.UserRepository;
+import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
+import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.shared.exception.BusinessException;
+import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class CycleService {
+
+    private final CycleRepository            cycleRepository;
+    private final CycleIssueRepository       cycleIssueRepository;
+    private final IssueRepository            issueRepository;
+    private final ProjectRepository          projectRepository;
+    private final WorkspaceRepository        workspaceRepository;
+    private final WorkspaceMemberRepository  workspaceMemberRepository;
+    private final UserRepository             userRepository;
+    private final IssueService               issueService;
+    private final SlackIntegrationService    slackService;
+    private final ApplicationEventPublisher  events;
+    private final ProjectVisibilityGuard     visibilityGuard;
+
+    // =========================================================================
+    // CRUD cycles
+    // =========================================================================
+
+    @Transactional(readOnly = true)
+    public List<CycleResponse> listCycles(String workspaceSlug, Long projectId, Long userId) {
+        Project project = resolveProject(workspaceSlug, projectId);
+        assertWorkspaceMember(project.getWorkspace().getId(), userId);
+        return cycleRepository.findByProjectId(project.getId()).stream()
+            .map(c -> toResponse(c,
+                cycleIssueRepository.countByCycleId(c.getId()),
+                cycleIssueRepository.countCompletedByCycleId(c.getId())))
+            .toList();
+    }
+
+    /**
+     * Tous les cycles du workspace visibles par l'utilisateur, en <b>un seul appel</b> (« Ma file »).
+     *
+     * <p>Remplace un appel par projet côté client : la vue en émettait autant qu'il y a de projets,
+     * ce qui vidait le quota de rate limiting à chaque affichage. Le décompte d'issues est groupé
+     * en une requête plutôt qu'un {@code COUNT} par cycle.</p>
+     */
+    @Transactional(readOnly = true)
+    public List<MyWorkCycleResponse> listWorkspaceCycles(String workspaceSlug, Long userId) {
+        Workspace workspace = workspaceRepository.findBySlug(workspaceSlug)
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace introuvable"));
+        assertWorkspaceMember(workspace.getId(), userId);
+
+        List<Long> viewableProjectIds = visibilityGuard.viewableProjectIds(workspace.getId(), userId);
+        if (viewableProjectIds.isEmpty()) return List.of();
+
+        List<Cycle> cycles = cycleRepository.findByProjectIdsWithProject(viewableProjectIds);
+        if (cycles.isEmpty()) return List.of();
+
+        List<Long> cycleIds = cycles.stream().map(Cycle::getId).toList();
+        Map<Long, Long> issueCounts = cycleIssueRepository.countByCycleIds(cycleIds).stream()
+            .collect(Collectors.toMap(row -> (Long) row[0], row -> (Long) row[1]));
+        Map<Long, Long> completedCounts = cycleIssueRepository.countCompletedByCycleIds(cycleIds).stream()
+            .collect(Collectors.toMap(row -> (Long) row[0], row -> (Long) row[1]));
+
+        return cycles.stream()
+            .map(c -> MyWorkCycleResponse.builder()
+                .projectId(c.getProject().getId())
+                .projectName(c.getProject().getName())
+                .cycle(toResponse(c,
+                    issueCounts.getOrDefault(c.getId(), 0L),
+                    completedCounts.getOrDefault(c.getId(), 0L)))
+                .build())
+            .toList();
+    }
+
+    @Transactional
+    public CycleResponse createCycle(String workspaceSlug, Long projectId,
+                                      CreateCycleRequest request, Long userId) {
+        Project project = resolveProject(workspaceSlug, projectId);
+        assertWorkspaceMember(project.getWorkspace().getId(), userId);
+
+        if (cycleRepository.existsByNameAndProjectId(request.getName(), project.getId())) {
+            throw new BusinessException("Un cycle avec ce nom existe déjà dans ce projet");
+        }
+
+        User actor = resolveUser(userId);
+        Cycle cycle = Cycle.builder()
+            .project(project)
+            .name(request.getName())
+            .description(request.getDescription())
+            .startDate(request.getStartDate())
+            .endDate(request.getEndDate())
+            .status(CycleStatus.DRAFT)
+            .createdBy(actor)
+            .build();
+        cycle = cycleRepository.save(cycle);
+        return toResponse(cycle, 0L, 0L);
+    }
+
+    @Transactional(readOnly = true)
+    public CycleResponse getCycle(String workspaceSlug, Long projectId, Long cycleId, Long userId) {
+        Project project = resolveProject(workspaceSlug, projectId);
+        assertWorkspaceMember(project.getWorkspace().getId(), userId);
+        Cycle cycle = resolveCycle(cycleId, project.getId());
+        return toResponse(cycle,
+            cycleIssueRepository.countByCycleId(cycle.getId()),
+            cycleIssueRepository.countCompletedByCycleId(cycle.getId()));
+    }
+
+    @Transactional
+    public CycleResponse updateCycle(String workspaceSlug, Long projectId, Long cycleId,
+                                      UpdateCycleRequest request, Long userId) {
+        Project project = resolveProject(workspaceSlug, projectId);
+        assertWorkspaceMember(project.getWorkspace().getId(), userId);
+        Cycle cycle = resolveCycle(cycleId, project.getId());
+        CycleStatus previousStatus = cycle.getStatus();
+
+        if (request.getName() != null) {
+            if (!request.getName().equals(cycle.getName())
+                    && cycleRepository.existsByNameAndProjectId(request.getName(), project.getId())) {
+                throw new BusinessException("Un cycle avec ce nom existe déjà dans ce projet");
+            }
+            cycle.setName(request.getName());
+        }
+        if (request.getDescription() != null) cycle.setDescription(request.getDescription());
+        if (request.getStartDate()   != null) cycle.setStartDate(request.getStartDate());
+        if (request.getEndDate()     != null) cycle.setEndDate(request.getEndDate());
+        if (request.getStatus()      != null) {
+            try {
+                cycle.setStatus(CycleStatus.valueOf(request.getStatus()));
+            } catch (IllegalArgumentException e) {
+                throw new BusinessException("Statut de cycle invalide : " + request.getStatus());
+            }
+        }
+
+        cycle = cycleRepository.save(cycle);
+
+        // Push Slack à la transition vers COMPLETED (une seule fois)
+        if (cycle.getStatus() == CycleStatus.COMPLETED && previousStatus != CycleStatus.COMPLETED) {
+            slackService.notifyEvent(project.getWorkspace().getId(), "cycle.completed",
+                "🏁 Cycle *" + cycle.getName() + "* terminé");
+            // … et le Brain OS écrit la rétro du cycle. Publié ici (même garde « une seule fois »),
+            // consommé après commit et hors requête — cf. BrainIngestionListener.
+            events.publishEvent(new CycleCompletedEvent(
+                workspaceSlug, project.getWorkspace().getId(), project.getId(), cycle.getId(), userId));
+        }
+
+        return toResponse(cycle,
+            cycleIssueRepository.countByCycleId(cycle.getId()),
+            cycleIssueRepository.countCompletedByCycleId(cycle.getId()));
+    }
+
+    @Transactional
+    public void deleteCycle(String workspaceSlug, Long projectId, Long cycleId, Long userId) {
+        Project project = resolveProject(workspaceSlug, projectId);
+        assertWorkspaceMember(project.getWorkspace().getId(), userId);
+        Cycle cycle = resolveCycle(cycleId, project.getId());
+        cycleRepository.delete(cycle);
+    }
+
+    // =========================================================================
+    // Issues d'un cycle
+    // =========================================================================
+
+    @Transactional(readOnly = true)
+    public List<IssueResponse> listCycleIssues(String workspaceSlug, Long projectId, Long cycleId, Long userId) {
+        Project project = resolveProject(workspaceSlug, projectId);
+        assertWorkspaceMember(project.getWorkspace().getId(), userId);
+        resolveCycle(cycleId, project.getId());
+        return cycleIssueRepository.findByCycleId(cycleId).stream()
+            .map(ci -> issueService.toResponse(ci.getIssue()))
+            .toList();
+    }
+
+    /** Cycles auxquels une issue est rattachée (reverse-lookup pour le sélecteur du sheet — CYC-03b). */
+    @Transactional(readOnly = true)
+    public List<CycleResponse> listCyclesForIssue(String workspaceSlug, Long projectId, Long issueId, Long userId) {
+        Project project = resolveProject(workspaceSlug, projectId);
+        assertWorkspaceMember(project.getWorkspace().getId(), userId);
+        Issue issue = issueRepository.findById(issueId)
+            .filter(i -> i.getProject().getId().equals(project.getId()))
+            .orElseThrow(() -> new ResourceNotFoundException("Issue introuvable dans ce projet"));
+        return cycleIssueRepository.findByIssueId(issue.getId()).stream()
+            .map(ci -> toResponse(ci.getCycle(),
+                cycleIssueRepository.countByCycleId(ci.getCycle().getId()),
+                cycleIssueRepository.countCompletedByCycleId(ci.getCycle().getId())))
+            .toList();
+    }
+
+    @Transactional
+    public void addIssueToCycle(String workspaceSlug, Long projectId, Long cycleId,
+                                 AddIssueToCycleRequest request, Long userId) {
+        Project project = resolveProject(workspaceSlug, projectId);
+        assertWorkspaceMember(project.getWorkspace().getId(), userId);
+        Cycle cycle = resolveCycle(cycleId, project.getId());
+
+        Issue issue = issueRepository.findById(request.getIssueId())
+            .filter(i -> i.getProject().getId().equals(project.getId()))
+            .orElseThrow(() -> new ResourceNotFoundException("Issue introuvable dans ce projet"));
+
+        if (cycleIssueRepository.existsByCycleIdAndIssueId(cycle.getId(), issue.getId())) {
+            throw new BusinessException("Cette issue fait déjà partie du cycle");
+        }
+
+        User actor = resolveUser(userId);
+        cycleIssueRepository.save(CycleIssue.builder()
+            .cycle(cycle)
+            .issue(issue)
+            .addedBy(actor)
+            .build());
+    }
+
+    @Transactional
+    public void removeIssueFromCycle(String workspaceSlug, Long projectId, Long cycleId,
+                                      Long issueId, Long userId) {
+        Project project = resolveProject(workspaceSlug, projectId);
+        assertWorkspaceMember(project.getWorkspace().getId(), userId);
+        resolveCycle(cycleId, project.getId());
+        CycleIssue ci = cycleIssueRepository.findByCycleIdAndIssueId(cycleId, issueId)
+            .orElseThrow(() -> new ResourceNotFoundException("Issue non trouvée dans ce cycle"));
+        cycleIssueRepository.delete(ci);
+    }
+
+    // =========================================================================
+    // Helpers privés
+    // =========================================================================
+
+    private Project resolveProject(String workspaceSlug, Long projectId) {
+        return workspaceRepository.findBySlug(workspaceSlug)
+            .flatMap(ws -> projectRepository.findByIdAndWorkspaceId(projectId, ws.getId()))
+            .orElseThrow(() -> new ResourceNotFoundException("Projet introuvable"));
+    }
+
+    private Cycle resolveCycle(Long cycleId, Long projectId) {
+        return cycleRepository.findByIdAndProjectId(cycleId, projectId)
+            .orElseThrow(() -> new ResourceNotFoundException("Cycle introuvable"));
+    }
+
+    private User resolveUser(Long userId) {
+        return userRepository.findById(userId)
+            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+    }
+
+    private void assertWorkspaceMember(Long workspaceId, Long userId) {
+        if (!workspaceMemberRepository.existsByWorkspaceIdAndUserId(workspaceId, userId)) {
+            throw new BusinessException("Accès refusé");
+        }
+    }
+
+    private CycleResponse toResponse(Cycle c, long issueCount, long completedCount) {
+        return CycleResponse.builder()
+            .id(c.getId())
+            .name(c.getName())
+            .description(c.getDescription())
+            .startDate(c.getStartDate())
+            .endDate(c.getEndDate())
+            .status(c.getStatus())
+            .createdBy(issueService.toUserSummaryPublic(c.getCreatedBy()))
+            .createdAt(c.getCreatedAt())
+            .updatedAt(c.getUpdatedAt())
+            .issueCount(issueCount)
+            .completedCount(completedCount)
+            .build();
+    }
+}

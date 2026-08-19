@@ -1,0 +1,875 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark, .dark *));
+
+/* ============================================================================
+   DESIGN TOKENS — Cloudflare-flat palette (light + dark)
+   ============================================================================ */
+
+/* ── LIGHT MODE (default) ── Cloudflare dashboard palette (flat, opaque) ─────── */
+:root {
+  --background:         #fbfbfc;   /* near-white unifié (sidebar = contenu, façon Cloudflare) */
+  --card:               #ffffff;
+  --popover:            #ffffff;
+  --sidebar:            #fbfbfc;   /* identique au background — pas de rupture sidebar/contenu */
+
+  --foreground:         #1d1d1f;
+  --card-foreground:    #1d1d1f;
+  --popover-foreground: #1d1d1f;
+  --sidebar-foreground: #3a3a3c;
+
+  /* Bleu de marque — même famille que les barres de progression (blue-600 → blue-400) et que les
+     courbes d'activité. Porte TOUTES les actions primaires : bouton principal, case cochée,
+     interrupteur actif, curseur. Auparavant noir : rien ne distinguait alors une action engageante
+     d'un simple élément de texte. */
+  --primary:            #2563eb;   /* blue-600 */
+  --primary-foreground: #ffffff;
+  --secondary:          #f2f2f4;
+  --secondary-foreground: #1d1d1f;
+  --muted:              #f2f2f4;
+  --muted-foreground:   #6e6e73;
+  --accent:             #f2f2f4;
+  --accent-foreground:  #1d1d1f;
+  --destructive:        #d92d20;
+  --destructive-foreground: #ffffff;
+
+  --border:             #e6e6e9;   /* gris clair solide, façon Cloudflare */
+  --input:              #dededf;
+  --ring:               rgba(37, 99, 235, 0.35);   /* anneau de focus aligné sur le primaire */
+
+  --sidebar-primary:            #1d1d1f;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent:             #f2f2f4;
+  --sidebar-accent-foreground:  #1d1d1f;
+  --sidebar-border:             #e6e6e9;
+  --sidebar-ring:               rgba(29, 29, 31, 0.15);
+
+  --chart-1: #1d1d1f;
+  --chart-2: #6e6e73;
+  --chart-3: #a1a1a6;
+  --chart-4: #c7c7cc;
+  --chart-5: #f48120;   /* orange Cloudflare — réservé aux graphiques */
+
+  --font-sans: var(--font-inter), "SF Pro Text", -apple-system, system-ui, sans-serif;
+  --font-serif: Georgia, serif;
+  --font-mono: var(--font-jetbrains-mono), "SF Mono", ui-monospace, monospace;
+
+  --radius:          0.625rem;   /* 10px — radius de référence unique : cartes du dashboard + popover Cortex.
+                                    Tout le reste (panneaux, dialogs, inputs, boutons) s'aligne dessus via l'échelle. */
+  --spacing:         0.25rem;
+  --tracking-normal: -0.011em;
+
+  /* Ombres très subtiles (flat) */
+  --shadow-2xs: 0 1px 1px rgba(0,0,0,0.03);
+  --shadow-xs:  0 1px 2px rgba(0,0,0,0.04);
+  --shadow-sm:  0 1px 2px rgba(0,0,0,0.05);
+  --shadow:     0 1px 3px rgba(0,0,0,0.06);
+  --shadow-md:  0 2px 6px rgba(0,0,0,0.07);
+  --shadow-lg:  0 4px 12px rgba(0,0,0,0.08);
+  --shadow-xl:  0 8px 24px rgba(0,0,0,0.10);
+  --shadow-2xl: 0 16px 40px rgba(0,0,0,0.12);
+
+  --label-primary:    #1d1d1f;
+  --label-secondary:  #4b4b4f;
+  /* Assombris le 22/07 (audit axe-core). Les valeurs précédentes — #8e8e93 et #b5b5ba, reprises de
+     la palette iOS — donnaient respectivement ~3,1:1 et ~2,0:1 sur le fond clair, là où WCAG 2.1 AA
+     (critère 1.4.3) exige 4,5:1 pour du texte normal. Elles portaient du vrai contenu, pas de la
+     décoration : sous-titre de connexion, « Pas encore de compte ? », liens légaux.
+     La hiérarchie entre les quatre niveaux est conservée, simplement resserrée. */
+  --label-tertiary:   #67676c;
+  --label-quaternary: #6e6e73;
+  --fill-primary:     rgba(0, 0, 0, 0.08);
+  --fill-secondary:   rgba(0, 0, 0, 0.05);
+  --fill-tertiary:    rgba(0, 0, 0, 0.03);
+  --separator:        #e6e6e9;
+
+  /* ── Gradient accents (auth / décoratif) */
+  --gradient-purple-pink: linear-gradient(61.1307deg, rgb(248, 58, 58) 10%, rgb(241, 61, 212) 50%, rgb(112, 0, 255) 90%);
+  --gradient-red-pink:    linear-gradient(100.41deg, rgb(255, 91, 55) 0.52%, rgb(171, 0, 82) 100%);
+
+  /* ── Semantic accent palette */
+  --accent-green:   #34c759;
+  --accent-red:     #ff3b30;
+  --accent-pink:    #ff2d55;
+  --accent-purple:  #5856d6;
+  --accent-orange:  #ff9500;
+
+  /* ── Glow effects */
+  --shadow-glow-purple: 0px 0px 27px 0px rgba(88, 86, 214, 0.35);
+  --shadow-glow-red:    0px 0px 27px 0px rgba(255, 59, 48, 0.35);
+}
+
+/* ── DARK MODE ── Cloudflare dashboard dark (flat, opaque) ──────────────────── */
+.dark {
+  --background:         #0b0b0c;
+  --card:               #161617;
+  --popover:            #161617;
+  --sidebar:            #0b0b0c;   /* identique au background */
+
+  --foreground:         #f5f5f7;
+  --card-foreground:    #f5f5f7;
+  --popover-foreground: #f5f5f7;
+  --sidebar-foreground: #c7c7cc;
+
+  /* Bleu remonté d'un cran (blue-500) : sur fond sombre, le blue-600 du thème clair manque de
+     luminance et l'action primaire passe inaperçue. Texte blanc conservé — contraste suffisant. */
+  --primary:            #3b82f6;   /* blue-500 */
+  --primary-foreground: #ffffff;
+  --secondary:          #202022;
+  --secondary-foreground: #f5f5f7;
+  --muted:              #202022;
+  --muted-foreground:   #98989d;
+  --accent:             #202022;
+  --accent-foreground:  #f5f5f7;
+  --destructive:        #f04438;
+  --destructive-foreground: #ffffff;
+
+  --border:             #2a2a2c;
+  --input:              #2a2a2c;
+  --ring:               rgba(59, 130, 246, 0.45);   /* anneau de focus aligné sur le primaire */
+
+  --sidebar-primary:            #ffffff;
+  --sidebar-primary-foreground: #0b0b0c;
+  --sidebar-accent:             #202022;
+  --sidebar-accent-foreground:  #f5f5f7;
+  --sidebar-border:             #2a2a2c;
+  --sidebar-ring:               rgba(255, 255, 255, 0.25);
+
+  --chart-1: #f5f5f7;
+  --chart-2: #98989d;
+  --chart-3: #6e6e73;
+  --chart-4: #3a3a3c;
+  --chart-5: #f48120;
+
+  --label-primary:    #f5f5f7;
+  --label-secondary:  #aeaeb2;
+  /* En sombre, `tertiary` passait déjà (~6:1) ; seul `quaternary` échouait (~3:1). Éclairci. */
+  --label-tertiary:   #8e8e93;
+  --label-quaternary: #7a7a7f;
+  --fill-primary:     rgba(255, 255, 255, 0.10);
+  --fill-secondary:   rgba(255, 255, 255, 0.06);
+  --fill-tertiary:    rgba(255, 255, 255, 0.035);
+  --separator:        #2a2a2c;
+
+  --shadow-2xs: 0 1px 2px rgba(0,0,0,0.40);
+  --shadow-xs:  0 1px 3px rgba(0,0,0,0.45);
+  --shadow-sm:  0 1px 3px rgba(0,0,0,0.50);
+  --shadow:     0 2px 6px rgba(0,0,0,0.55);
+  --shadow-md:  0 4px 10px rgba(0,0,0,0.60);
+  --shadow-lg:  0 8px 20px rgba(0,0,0,0.65);
+  --shadow-xl:  0 12px 28px rgba(0,0,0,0.70);
+  --shadow-2xl: 0 20px 44px rgba(0,0,0,0.80);
+
+  --accent-green:   #59d499;
+  --accent-red:     #f83a3a;
+  --accent-pink:    #f13dd4;
+  --accent-purple:  #7000ff;
+  --accent-orange:  #ff5b37;
+
+  --shadow-glow-purple: 0px 0px 27px 0px rgba(112, 0, 255, 0.48);
+  --shadow-glow-red:    0px 0px 27px 0px rgba(248, 58, 58, 0.48);
+}
+
+/* ============================================================================
+   TAILWIND THEME MAPPING
+   ============================================================================ */
+
+@theme inline {
+  --color-background:               var(--background);
+  --color-foreground:               var(--foreground);
+  --color-card:                     var(--card);
+  --color-card-foreground:          var(--card-foreground);
+  --color-popover:                  var(--popover);
+  --color-popover-foreground:       var(--popover-foreground);
+  --color-primary:                  var(--primary);
+  --color-primary-foreground:       var(--primary-foreground);
+  --color-secondary:                var(--secondary);
+  --color-secondary-foreground:     var(--secondary-foreground);
+  --color-muted:                    var(--muted);
+  --color-muted-foreground:         var(--muted-foreground);
+  --color-accent:                   var(--accent);
+  --color-accent-foreground:        var(--accent-foreground);
+  --color-destructive:              var(--destructive);
+  --color-destructive-foreground:   var(--destructive-foreground);
+  --color-border:                   var(--border);
+  --color-input:                    var(--input);
+  --color-ring:                     var(--ring);
+  --color-chart-1:                  var(--chart-1);
+  --color-chart-2:                  var(--chart-2);
+  --color-chart-3:                  var(--chart-3);
+  --color-chart-4:                  var(--chart-4);
+  --color-chart-5:                  var(--chart-5);
+  --color-sidebar:                  var(--sidebar);
+  --color-sidebar-foreground:       var(--sidebar-foreground);
+  --color-sidebar-primary:          var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent:           var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border:           var(--sidebar-border);
+  --color-sidebar-ring:             var(--sidebar-ring);
+
+  --font-sans:  var(--font-sans);
+  --font-mono:  var(--font-mono);
+  --font-serif: var(--font-serif);
+
+  --radius-sm: calc(var(--radius) - 4px);  /*  6px — badges, petits contrôles */
+  --radius-md: calc(var(--radius) - 2px);  /*  8px — boutons, inputs */
+  --radius-lg: var(--radius);              /* 10px — panneaux, dialogs, popovers */
+  /* Aligné sur --radius (et non +4px) : les cartes/popovers en `rounded-xl` gardent le radius
+     de référence au lieu de sur-arrondir, ce qui unifie tout l'app sur une seule valeur. */
+  --radius-xl: var(--radius);              /* 10px — cartes (Card shadcn, cartes dashboard) */
+
+  --shadow-2xs: var(--shadow-2xs);
+  --shadow-xs:  var(--shadow-xs);
+  --shadow-sm:  var(--shadow-sm);
+  --shadow:     var(--shadow);
+  --shadow-md:  var(--shadow-md);
+  --shadow-lg:  var(--shadow-lg);
+  --shadow-xl:  var(--shadow-xl);
+  --shadow-2xl: var(--shadow-2xl);
+}
+
+/* ============================================================================
+   BASE
+   ============================================================================ */
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    box-sizing: border-box;
+  }
+
+  html {
+    text-rendering: optimizeLegibility;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: var(--tracking-normal);
+    min-height: 100svh;
+  }
+
+  /* Flat design — pas d'orbes de gradient ambiants (style Cloudflare) */
+
+  ::selection       { background: rgba(29, 29, 31, 0.12); color: inherit; }
+  .dark ::selection { background: rgba(255, 255, 255, 0.20); color: inherit; }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  /* Placeholder */
+  ::placeholder { color: var(--label-tertiary); opacity: 1; }
+}
+
+/* ============================================================================
+   FLAT SURFACE SYSTEM  (style Cloudflare — opaque, sans blur)
+   ============================================================================ */
+
+/* Le shell de contenu montre le --background (gris très clair) */
+[data-slot="sidebar-inset"] { background: var(--background) !important; }
+[data-slot="sidebar-wrapper"] { background: var(--background); }
+
+/* Sidebar — panneau opaque. La bordure droite est portée par le composant shadcn
+   (`group-data-[side=left]:border-r` sur le conteneur) : la doubler ici créait un double trait. */
+[data-sidebar="sidebar"] {
+  background: var(--sidebar);
+}
+
+/* Identité « Labs » — alignée sur le site : l'ICÔNE prend un dégradé sur le TRAIT (pêche→rose→bleu, sans
+   violet), et les labels Labs sont en texte dégradé. Le dégradé SVG est déclaré par <LabsGradientDefs/>
+   (monté dans AppShell) ; ces classes le référencent. */
+.tf-labs-icon { stroke: url(#tf-labs-grad); }
+.tf-labs-gtext {
+  background-image: linear-gradient(135deg, #ff6f91, #7db8ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Fond « Labs » = l'image du site (hero-wave), UNIQUEMENT sur le bandeau (topbar) des pages Labs.
+   Un « blob » dégradé côté GAUCHE (couleur `--background`, thème-aware) masque l'image là où se trouve
+   le texte (fil d'Ariane) ; l'image reste DISCRÈTE à droite (jamais totalement dévoilée). */
+.lab-banner-bg {
+  background-image:
+    radial-gradient(160% 190% at 4% 50%,
+      var(--background) 0%,
+      var(--background) 24%,
+      color-mix(in srgb, var(--background) 28%, transparent) 100%),
+    url("/assets/tour/labs-wave.jpg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* Lignes « Labs » du Ctrl+K : la même vague, en accent à droite (voile à gauche pour garder icône +
+   libellé lisibles). Sur `--popover` (fond du modal de recherche). */
+.lab-cmd-row {
+  background-image:
+    linear-gradient(to right, var(--popover) 0%, var(--popover) 42%, color-mix(in srgb, var(--popover) 48%, transparent) 100%),
+    url("/assets/tour/labs-wave.jpg");
+  background-size: cover;
+  background-position: right center;
+  background-repeat: no-repeat;
+}
+
+
+/* ── Accessibilité (réglages Apparence) ────────────────────────────────────── */
+/* Taille du texte : on échelle la RACINE → tout le texte en rem suit (Tailwind = rem). */
+html.font-large   { font-size: 112.5%; } /* ~18px base */
+html.font-x-large { font-size: 125%; }   /* ~20px base */
+
+/* Confort de lecture (dyslexie) : police lisible + espacements accrus (les vraies aides). OpenDyslexic
+   si installée sur le système, sinon repli sur des polices lisibles largement disponibles.
+   Sur <body> → couvre AUSSI les portails (modals, toasts, Ctrl+K), pas seulement le contenu principal. */
+html.a11y-dyslexia body {
+  font-family: "OpenDyslexic", "Comic Sans MS", Verdana, Tahoma, sans-serif;
+  letter-spacing: 0.03em;
+  word-spacing: 0.06em;
+  line-height: 1.75;
+}
+
+/* Contraste élevé : on ne « transforme » PAS les couleurs (un filtre CSS global déforme le design et
+   n'aide pas vraiment) — on surcharge les tokens sémantiques pour maximiser le contraste (texte noir,
+   fonds blancs, bordures franches, muted lisible, primaire/danger renforcés). Spécificité `html.classe`
+   (0,1,1) > `.dark` (0,1,0) → l'emporte même en thème sombre. L'accessibilité daltonienne se joue
+   surtout côté design (couleur + icône + libellé, jamais la couleur seule) ; le filtre daltonien
+   ci-dessous est proposé EN PLUS (option demandée), pas comme substitut au contraste/design. */
+html.high-contrast {
+  --background: #ffffff;
+  --card: #ffffff;
+  --popover: #ffffff;
+  --sidebar: #ffffff;
+  --foreground: #000000;
+  --card-foreground: #000000;
+  --popover-foreground: #000000;
+  --sidebar-foreground: #000000;
+  --muted: #ebebeb;
+  --muted-foreground: #1a1a1a;   /* bien plus foncé que #6e6e73 → passe WCAG AA */
+  --secondary: #ebebeb;
+  --secondary-foreground: #000000;
+  --accent: #ebebeb;
+  --accent-foreground: #000000;
+  --primary: #0b3d91;            /* bleu profond, fort contraste sur blanc */
+  --primary-foreground: #ffffff;
+  --destructive: #b00020;
+  --destructive-foreground: #ffffff;
+  --border: #000000;
+  --input: #000000;
+  --ring: rgba(0, 0, 0, 0.65);
+  --sidebar-border: #000000;
+}
+
+/* Mode daltonien (option) : filtre de correction (daltonisation) sur <body> → toute l'app, portails
+   inclus. Défs SVG dans <A11yFilters/>. Sans effet sur le layout (body ≈ viewport, ne scrolle pas). */
+html.cb-protanopia   body { filter: url("#cb-protanopia"); }
+html.cb-deuteranopia body { filter: url("#cb-deuteranopia"); }
+html.cb-tritanopia   body { filter: url("#cb-tritanopia"); }
+
+/* Aucune surface shadcn/radix ne floute son arrière-plan : design plat */
+[data-sidebar="sidebar"],
+header[class*="sticky"],
+.rounded-xl.border:not(button):not(input):not(select):not(textarea),
+.rounded-lg.border:not(button):not(input):not(select):not(textarea),
+[data-slot="card"],
+[role="dialog"],
+[role="alertdialog"],
+[data-radix-popper-content-wrapper] > *,
+[role="menu"],
+[role="listbox"] {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* ============================================================================
+   SCROLLBAR
+   ============================================================================ */
+
+::-webkit-scrollbar        { width: 6px; height: 6px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: var(--fill-primary); border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--fill-secondary); }
+
+/* Sidebar : scrollbar encore plus discrète (n'apparaît qu'au survol) */
+[data-slot="sidebar"] ::-webkit-scrollbar       { width: 4px; }
+[data-slot="sidebar"] ::-webkit-scrollbar-thumb { background: transparent; }
+[data-slot="sidebar"]:hover ::-webkit-scrollbar-thumb { background: var(--fill-primary); }
+
+/* ============================================================================
+   CURSORS
+   ============================================================================ */
+
+button:not([disabled]),
+[role="button"]:not([aria-disabled="true"]),
+a[href],
+select:not([disabled]),
+input[type="checkbox"]:not([disabled]),
+input[type="radio"]:not([disabled]),
+input[type="submit"]:not([disabled]),
+input[type="reset"]:not([disabled]),
+input[type="button"]:not([disabled]),
+label[for],
+[data-radix-collection-item],
+[tabindex="0"]:not(input):not(textarea) { cursor: pointer; }
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([disabled]),
+textarea:not([disabled]) { cursor: text; }
+
+/* ============================================================================
+   ANIMATIONS
+   ============================================================================ */
+
+@keyframes fade-in  { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fade-up  { from { opacity: 0; transform: translateY(10px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes scale-in { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+@keyframes fadeIn   { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pulse    { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+@keyframes tf-shimmer { to { background-position: -200% 0; } }
+
+.animate-fade-in  { animation: fade-in  0.30s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.animate-fade-up  { animation: fade-up  0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.animate-scale-in { animation: scale-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+/* Dépliage fluide des onglets repliables (Radix Collapsible — sidebar, etc.) */
+@keyframes collapsible-down { from { height: 0; } to { height: var(--radix-collapsible-content-height); } }
+@keyframes collapsible-up   { from { height: var(--radix-collapsible-content-height); } to { height: 0; } }
+.animate-collapsible-down { animation: collapsible-down 0.22s cubic-bezier(0.16, 1, 0.3, 1); }
+.animate-collapsible-up   { animation: collapsible-up   0.18s cubic-bezier(0.16, 1, 0.3, 1); }
+
+/* ============================================================================
+   THEME TRANSITION
+   ============================================================================ */
+
+::view-transition-old(root) { animation: none; mix-blend-mode: normal; }
+::view-transition-new(root) {
+  animation: theme-reveal 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  mix-blend-mode: normal;
+}
+@keyframes theme-reveal {
+  from { clip-path: circle(0%   at var(--theme-x, 50%) var(--theme-y, 50%)); }
+  to   { clip-path: circle(150% at var(--theme-x, 50%) var(--theme-y, 50%)); }
+}
+
+/* ============================================================================
+   TIPTAP / PROSEMIRROR
+   ============================================================================ */
+
+.ProseMirror {
+  padding: 1.5rem; min-height: 400px; outline: none;
+  font-size: 0.875rem; line-height: 1.7; color: var(--foreground);
+}
+.ProseMirror > * + * { margin-top: 0.75em; }
+.ProseMirror h1 { font-size:1.25rem; font-weight:700; letter-spacing:-0.02em; margin:1.5rem 0 0.5rem; }
+.ProseMirror h2 { font-size:1.1rem;  font-weight:600; letter-spacing:-0.015em; margin:1.25rem 0 0.5rem; }
+.ProseMirror h3 { font-size:1rem;   font-weight:600; margin:1rem 0 0.25rem; }
+.ProseMirror p  { margin:0.25rem 0; }
+.ProseMirror ul { list-style-type:disc;    padding-left:1.5rem; }
+.ProseMirror ol { list-style-type:decimal; padding-left:1.5rem; }
+.ProseMirror li { margin:0.25rem 0; }
+.ProseMirror blockquote { border-left:2px solid var(--border); padding-left:1rem; color:var(--muted-foreground); margin:0.75rem 0; }
+.ProseMirror code { background:var(--fill-secondary); padding:0.125rem 0.375rem; border-radius:0.25rem; font-size:0.8125rem; font-family:var(--font-mono); }
+.ProseMirror pre  { background:var(--fill-secondary); border-radius:var(--radius); padding:1rem; overflow-x:auto; margin:0.75rem 0; }
+.ProseMirror pre code { background:transparent; padding:0; }
+.ProseMirror hr { border:none; border-top:1px solid var(--border); margin:1.5rem 0; }
+.ProseMirror a  { color: var(--accent-purple); text-decoration:underline; text-underline-offset:2px; }
+.ProseMirror ul[data-type="taskList"]           { list-style:none; padding:0; }
+.ProseMirror ul[data-type="taskList"] li        { display:flex; align-items:flex-start; gap:0.5rem; }
+.ProseMirror ul[data-type="taskList"] li label  { display:flex; align-items:center; cursor:pointer; margin-top:0.15rem; }
+.ProseMirror ul[data-type="taskList"] li > div  { flex:1; }
+.ProseMirror p.is-editor-empty:first-child::before { content:attr(data-placeholder); float:left; color:var(--label-tertiary); pointer-events:none; height:0; }
+.ProseMirror table            { border-collapse:collapse; table-layout:fixed; width:100%; margin:0.75rem 0; }
+.ProseMirror table td,
+.ProseMirror table th         { border:1px solid var(--border); padding:0.375rem 0.75rem; font-size:0.875rem; vertical-align:top; }
+.ProseMirror table th         { font-weight:600; background:var(--fill-tertiary); }
+
+/* ============================================================================
+   AUTH / DÉCORATIF  (seules classes "maison" conservées — pages d'auth)
+   ============================================================================ */
+
+@layer components {
+
+  /* ══════════════════════════════════════════════════════════════════════════
+     AUTH — coquille plein écran, sans défilement
+     ─────────────────────────────────────────────────────────────────────────
+     Parti pris : une seule colonne centrée sur fond calme. Pas de panneau
+     latéral, pas de décor animé. Les pages d'authentification sont un passage,
+     pas une destination — tout ce que l'œil n'a pas besoin de voir est retiré.
+     La hauteur est verrouillée à 100svh (`svh` et non `vh` : sur mobile, la
+     barre d'URL rétractable fausse `vh` et réintroduit un défilement).
+     ══════════════════════════════════════════════════════════════════════════ */
+
+  .auth-shell {
+    height: 100svh;
+    background: var(--background);
+    display: grid;
+    grid-template-rows: auto 1fr auto;  /* barre · contenu · mention légale */
+    overflow: hidden;
+  }
+
+  /* ── Barre supérieure : marque à gauche, rien au centre, actions à droite ── */
+  /* La hauteur suit le logo, pas l'inverse : 80 px de signe plus 6 px d'air de part et d'autre.
+     Passer de 56 à 92 px prend 36 px sur le budget vertical du contenu — assumé, c'est le prix
+     demandé pour un logo deux fois plus grand. */
+  .auth-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    height: 5.75rem;
+    padding: 0 1rem;
+  }
+  @media (min-width: 640px) {
+    .auth-topbar { padding: 0 1.5rem; }
+  }
+
+  /* Marque et retour au site forment un bloc à gauche, séparés par un filet vertical : deux
+     éléments distincts mais de même famille, plutôt que deux items perdus aux extrémités. */
+  .auth-topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+  }
+
+  /* Ne contient plus que le logo : la taille de police et l'écart n'ont plus d'objet depuis que le
+     mot « TaskForce » a été retiré. Une classe qui déclare des propriétés sans effet fait croire à
+     un style maîtrisé. */
+  .auth-brand {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  .auth-back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding-left: 0.75rem;
+    border-left: 1px solid var(--separator);
+    font-size: 0.8125rem;
+    color: var(--label-tertiary);
+    white-space: nowrap;
+    transition: color 140ms ease;
+  }
+  .auth-back-link:hover { color: var(--label-primary); }
+
+  @media (max-width: 480px) {
+    /* Sur mobile la barre doit rester lisible : le retour au site cède la place, la marque cliquable
+       et le bouton d'action suffisent. */
+    .auth-back-link { display: none; }
+  }
+
+  .auth-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+
+  /* Action opposée à la page courante (créer un compte / se connecter). */
+  .auth-cta-btn {
+    display: inline-flex;
+    align-items: center;
+    height: 2rem;
+    padding: 0 0.875rem;
+    margin-left: 0.25rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    background: var(--card);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--label-primary);
+    white-space: nowrap;
+    transition: background 140ms ease, border-color 140ms ease;
+  }
+  .auth-cta-btn:hover {
+    background: var(--fill-secondary);
+    border-color: var(--label-quaternary);
+  }
+
+  /* Bouton icône discret (thème, langue) */
+  .auth-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: var(--radius-md);
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--label-tertiary);
+    transition: background 140ms ease, color 140ms ease;
+    cursor: pointer;
+  }
+  .auth-icon-btn:hover {
+    background: var(--fill-secondary);
+    color: var(--label-primary);
+  }
+
+  /* Retour au site : discret mais lisible, seule action textuelle de la barre */
+  /* ── Zone centrale ── */
+  .auth-main {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 1.25rem;
+    min-height: 0;      /* indispensable : sans cela l'enfant peut déborder de la grille */
+    overflow-y: auto;   /* filet de sécurité sur très petit écran, jamais visible sinon */
+  }
+
+  .auth-panel {
+    width: 100%;
+    max-width: 22.5rem;   /* 360px — largeur de lecture confortable pour un formulaire court */
+  }
+  .auth-panel-wide {
+    max-width: 26.5rem;   /* 424px — inscription : deux colonnes prénom / nom */
+  }
+
+  /* ── Titres ── */
+  .auth-title {
+    font-size: 1.375rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    color: var(--label-primary);
+  }
+  .auth-subtitle {
+    margin-top: 0.375rem;
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    color: var(--label-tertiary);
+  }
+
+  /* ── Champs ── */
+  .auth-label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--label-secondary);
+    margin-bottom: 0.25rem;
+  }
+  /* Uniquement la taille. La couleur, la bordure et l'anneau de focus appartiennent au composant
+     `Input` du système : les redéclarer ici était sans effet (les utilitaires Tailwind du composant
+     l'emportent sur la couche `components`) et laissait croire à un style qui n'existait pas. */
+  .auth-input {
+    height: 2.25rem;
+    font-size: 0.875rem;
+  }
+
+  /* ── Connexion via un fournisseur externe ── */
+  .auth-social-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    height: 2.375rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    background: var(--card);
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--label-primary);
+    transition: background 140ms ease, border-color 140ms ease;
+  }
+  .auth-social-btn:hover {
+    background: var(--fill-secondary);
+    border-color: var(--label-quaternary);
+  }
+
+  /* Séparateur « ou » : filet continu barré par le libellé, plutôt que deux traits à ajuster. */
+  .auth-separator {
+    position: relative;
+    margin: 1.25rem 0 0;
+    text-align: center;
+  }
+  .auth-separator::before {
+    content: "";
+    position: absolute;
+    inset: 50% 0 auto;
+    height: 1px;
+    background: var(--separator);
+  }
+  .auth-separator > span {
+    position: relative;
+    padding: 0 0.625rem;
+    background: var(--background);
+    font-size: 0.75rem;
+    color: var(--label-tertiary);
+  }
+
+  /* ── Action principale ── */
+  .auth-submit {
+    width: 100%;
+    height: 2.375rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+
+  /* ── Liens ── */
+  .auth-link {
+    color: var(--label-secondary);
+    font-weight: 500;
+    transition: color 140ms ease;
+  }
+  .auth-link:hover { color: var(--label-primary); }
+
+  .auth-link-muted {
+    color: var(--label-tertiary);
+    transition: color 140ms ease;
+  }
+  .auth-link-muted:hover { color: var(--label-primary); }
+
+  /* ── Mention légale : une ligne, jamais plus ── */
+  .auth-legal {
+    padding: 0 1.5rem 1rem;
+    text-align: center;
+    font-size: 0.6875rem;
+    line-height: 1.4;
+    color: var(--label-quaternary);
+  }
+
+  /* ── Fil d'étapes (inscription) ──
+     Segments pleine largeur plutôt que pastilles numérotées : l'information utile
+     est « où j'en suis dans une barre de progression », pas « l'étape porte le
+     numéro 2 ». Le libellé de l'étape courante suffit à la nommer. */
+  .auth-steps {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+  .auth-step-seg {
+    flex: 1;
+    height: 0.1875rem;
+    border-radius: 9999px;
+    background: var(--fill-secondary);
+    transition: background 220ms ease;
+  }
+  .auth-step-seg[data-state="done"]    { background: color-mix(in srgb, var(--primary) 45%, transparent); }
+  .auth-step-seg[data-state="current"] { background: var(--primary); }
+
+  /* ── Gradient text (titres décoratifs auth) ── */
+  .gradient-text {
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-image: var(--gradient-purple-pink);
+  }
+  .gradient-text-red {
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-image: var(--gradient-red-pink);
+  }
+
+  /* ── Glass surfaces (référence décorative) ── */
+  .glass {
+    background: var(--card);
+    border: 1px solid var(--separator);
+  }
+  .glass-strong {
+    background: var(--fill-primary);
+    border: 1px solid var(--border);
+  }
+
+  /* ── Boutons décoratifs auth ── */
+  .btn-primary {
+    background: rgba(255, 255, 255, 0.90);
+    color: #0d0d0d;
+    padding: 0.75rem 1.5rem;
+    border-radius: var(--radius-md);
+    font-weight: 500;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+    border: 2px solid rgba(255, 255, 255, 0.30);
+    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.30);
+    cursor: pointer;
+  }
+  .btn-primary:hover {
+    background: rgba(255, 255, 255, 1);
+    transform: translateY(-1px);
+    box-shadow: 0px 8px 16px rgba(0, 0, 0, 0.15);
+  }
+
+  .btn-secondary {
+    background: rgba(255, 255, 255, 0.20);
+    color: white;
+    padding: 0.75rem 1.25rem;
+    border-radius: var(--radius-md);
+    font-weight: 500;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+    cursor: pointer;
+  }
+  .btn-secondary:hover { background: rgba(255, 255, 255, 0.25); }
+
+  .btn-gradient {
+    background: linear-gradient(100.41deg, rgba(255, 91, 55, 0.10) 0.52%, rgba(171, 0, 82, 0.10) 100%);
+    border-radius: var(--radius-md);
+    padding: 0.5rem 1rem;
+    transition: all 0.2s ease;
+    cursor: pointer;
+  }
+  .btn-gradient:hover {
+    background: linear-gradient(100.41deg, rgba(255, 91, 55, 0.15) 0.52%, rgba(171, 0, 82, 0.15) 100%);
+  }
+
+  /* ── Card décorative (hover lift) — utilisée hors dashboard ── */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--separator);
+    border-radius: var(--radius-lg);
+    padding: 2rem;
+    transition: all 0.3s ease;
+  }
+  .card:hover {
+    background: var(--fill-primary);
+    transform: translateY(-2px);
+  }
+
+  .card-glow {
+    position: relative;
+    overflow: hidden;
+  }
+  .card-glow::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.30) 0%, transparent 100%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+  }
+  .card-glow:hover::before { opacity: 1; }
+
+  /* ── Dégradés / overlays décoratifs ── */
+  .bg-gradient-purple-pink { background-image: var(--gradient-purple-pink); }
+  .bg-gradient-red-pink    { background-image: var(--gradient-red-pink); }
+  .bg-gradient-radial      { background: radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.30) 0%, transparent 100%); }
+
+  .overlay-gradient { position: relative; }
+  .overlay-gradient::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, transparent 0%, rgba(13, 13, 13, 0.80) 100%);
+    pointer-events: none;
+  }
+  .mix-blend-overlay { mix-blend-mode: overlay; }
+
+  /* ── Dividers ── */
+  .divider          { height: 1px; background: var(--separator); width: 100%; }
+  .divider-vertical { width: 1px;  background: var(--separator); height: 100%; }
+
+  /* ── Animation aliases ── */
+  .fade-in { animation: fadeIn 0.6s ease-out; }
+  .pulse   { animation: pulse  2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+
+}

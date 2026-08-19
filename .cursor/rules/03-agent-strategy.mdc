@@ -1,0 +1,82 @@
+---
+description: Stratégie d'analyse, lecture des fichiers et exploration du dépôt pour Taskforce
+alwaysApply: true
+---
+
+# Agent Strategy - Taskforce
+
+## Analyse Ciblée par Défaut
+
+Toujours assumer le périmètre d'analyse minimal. Ne jamais faire de scan global sauf demande explicite.
+
+Avant de chercher, identifier :
+1. La feature concernée
+2. Le module frontend concerné
+3. Le module backend concerné
+
+## Priorité de Lecture
+
+1. Fichiers explicitement fournis par l'utilisateur
+2. Fichiers référencés par imports directs
+3. Fichiers référencés par routes
+4. Fichiers référencés par dépendances
+5. Exploration globale (dernier recours)
+
+## Budget de Lecture
+
+- Investigation standard : **max 10 fichiers** initialement, **max 30** en extension
+- Si plus de fichiers sont nécessaires → fournir les findings d'abord, expliquer ce qui manque
+
+## Condition d'Arrêt
+
+Stopper l'analyse immédiatement quand :
+- La cause racine est identifiée
+- La dépendance manquante est identifiée
+- La route cassée est identifiée
+- Le problème de compilation est identifié
+
+## Stratégie d'Investigation API
+
+Ordre d'inspection pour audits frontend/backend :
+1. Définitions de routes
+2. Service API frontend
+3. Controller backend
+4. DTO Request/Response
+5. Couche Service
+
+Ne pas inspecter repositories, entités, tests ou modules non liés sauf nécessité.
+
+## Prévention de Double Lecture
+
+Si un fichier a déjà été analysé dans la conversation courante, ne pas le rouvrir sauf :
+- Nouvelles informations contredisent les findings précédents
+- L'utilisateur demande une vérification
+- Le fichier a changé
+
+## Memory First
+
+Avant d'explorer le dépôt, vérifier si la documentation d'architecture existe :
+
+1. `.ai/api-contracts.md`
+2. `.ai/architecture-map.md`
+3. `API_SPECIFICATION.md`
+4. Documentation projet existante
+5. Exploration du code source (dernier recours)
+
+## Mise à Jour des Connaissances
+
+Lors de découverte d'architecture, contrats API ou patterns récurrents, mettre à jour :
+- `.ai/api-contracts.md`
+- `.ai/architecture-map.md`
+- `.ai/module-map.md`
+
+## Modes d'Audit
+
+| Mode              | Scope                          | Déclenchement            |
+| ----------------- | ------------------------------ | ------------------------ |
+| Small Audit       | 1 feature, 1 module front/back | Par défaut               |
+| Medium Audit      | 1 domaine, fichiers liés       | Si nécessaire            |
+| Full Audit        | Application entière            | Demande explicite seule  |
+| Architecture Audit| Cross-module + cohérence       | Demande explicite seule  |
+
+Ne jamais escalader automatiquement de Small à Full Audit.

@@ -1,0 +1,108 @@
+name: DAST (OWASP ZAP)
+
+# Scan dynamique de la surface HTTP (en-têtes, CSP, cookies, fuites, config) contre l'app RÉELLE.
+# Contrairement à Trivy/Semgrep (statiques, sur chaque push), le DAST exige toute la stack levée →
+# il est **lourd** et ne tourne que sur **planification hebdo** + **déclenchement manuel**, jamais sur PR.
+#
+# ⚠️ GATE (comme e2e-tests.yml) : lever la stack a besoin de `backend/tf-api/.env.dev` (secrets non
+# versionnés). Le job est donc SKIPPÉ (statut neutre) tant que le dépôt n'a pas opté-in via la variable
+# `E2E_ENABLED=true` ET fourni le secret `E2E_ENV_FILE` (le même que pour les E2E). Localement, le DAST
+# reste lançable via `scripts/security-scan.ps1 -Dast` (app en marche).
+
+on:
+  schedule:
+    - cron: '30 3 * * 1'    # lundi 03:30 UTC (après le scan statique de security-scan.yml)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  zap:
+    name: OWASP ZAP baseline (frontend + backend)
+    if: ${{ vars.E2E_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🔐 Reconstruire backend/tf-api/.env.dev depuis le secret
+        env:
+          E2E_ENV_FILE: ${{ secrets.E2E_ENV_FILE }}
+        run: |
+          if [ -z "$E2E_ENV_FILE" ]; then
+            echo "::error::E2E_ENABLED=true mais le secret E2E_ENV_FILE est absent — impossible de lever la stack."
+            exit 1
+          fi
+          printf '%s' "$E2E_ENV_FILE" > backend/tf-api/.env.dev
+
+      - name: 🐳 Lever la stack (dev)
+        run: docker compose -f docker-compose.dev.yml --env-file backend/tf-api/.env.dev up -d --build postgres keycloak backend frontend minio rabbitmq
+
+      - name: ⏳ Attendre le backend (santé)
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:8080/actuator/health >/dev/null 2>&1; then echo "backend up"; break; fi
+            sleep 5
+          done
+
+      - name: 🌱 Seed de démo
+        run: docker exec -i taskforce-postgres-dev psql -U postgres -d taskforce-db < backend/tf-api/seed/dev_seed.sql
+
+      - name: ⏳ Attendre le frontend
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:3000 >/dev/null 2>&1; then echo "frontend up"; break; fi
+            sleep 5
+          done
+
+      - name: 📁 Préparer le dossier de rapports
+        run: mkdir -p zap-out && chmod 777 zap-out
+
+      # `--network host` : sur un runner Linux, le conteneur ZAP joint ainsi directement les ports publiés
+      # par la stack sur localhost (3000 / 8080). `-I` = ne pas échouer sur les warnings (on gate nous-mêmes
+      # sur le HIGH ci-dessous) ; `-m 3` = 3 min de spider passif max par cible.
+      - name: 🕷️ ZAP baseline — frontend
+        run: |
+          docker run --rm --network host -v "$PWD/zap-out:/zap/wrk:rw" \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py -t http://localhost:3000 -r zap-frontend.html -J zap-frontend.json -m 3 -I || true
+
+      - name: 🕷️ ZAP baseline — backend
+        run: |
+          docker run --rm --network host -v "$PWD/zap-out:/zap/wrk:rw" \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py -t http://localhost:8080 -r zap-backend.html -J zap-backend.json -m 3 -I || true
+
+      - name: 💾 Archiver les rapports ZAP
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-dast-reports
+          path: zap-out/
+          retention-days: 30
+
+      # Gate : casse le build s'il reste une alerte de risque HIGH (riskcode 3). 0 aujourd'hui (audit 16/08).
+      - name: 🚦 Gate — échec si alerte HIGH
+        run: |
+          total=0
+          for f in zap-out/zap-frontend.json zap-out/zap-backend.json; do
+            if [ -f "$f" ]; then
+              n=$(jq '[.site[]?.alerts[]? | select(.riskcode=="3")] | length' "$f")
+              echo "  $f → HIGH=$n"
+              total=$((total + n))
+            else
+              echo "::warning::$f manquant (cible injoignable ?)"
+            fi
+          done
+          echo "## 🛡️ ZAP DAST — alertes HIGH : $total" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$total" -gt 0 ]; then
+            echo "::error::ZAP a trouvé $total alerte(s) de risque HIGH."
+            exit 1
+          fi
+
+      - name: 🧹 Logs stack en cas d'échec
+        if: failure()
+        run: docker compose -f docker-compose.dev.yml logs --tail 100 backend frontend
