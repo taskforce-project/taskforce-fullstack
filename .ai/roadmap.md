@@ -137,6 +137,17 @@
 > en EN ; le test « language changes » repartait d'un défaut FR → réécrit EN→FR + **reset du singleton** (fuite
 > d'état inter-tests). **RÉSULTAT : `tsc` 0, `vitest` 821/821 verts, ESLint 0 nouvelle erreur.** ⚠️ Reste : commit
 > (dashboard + sweep complet) + rebuild VM2 + vérif live. Un seul « Français » (label d'option de langue) gardé.
+>
+> **▶ MAJ 19/08 — Flow release + auto-déploiement VM (choix user : « tout sur main + auto-deploy VM sur main »).**
+> Vérifié : (1) **aucun CI/CD ne déploie vers les VM** (pas de ssh/deploy dans `.github/workflows`, pas de
+> cron/timer/webhook sur les VM) → MAJ VM toujours **manuelles**. (2) `release.yml` se déclenche sur push **dev ET main**,
+> détecte les services changés **par file-diff** (`backend/`/`frontend/`/`landing/`), **build+push images vers ghcr.io** +
+> releases/tags (labels `release:{major|minor|patch}` requis) — ces images vont sur **ghcr, pas la VM** (la VM build depuis
+> les sources). (3) Tests en CI. **Fait (VM, hors repo)** : `scripts/auto-deploy.sh` (poll `origin/main` ; rebuild ciblé du
+> rôle ; **garde-fous** : déploie SEULEMENT si HEAD==main ET fast-forward) + `.deploy-role` (backend=VM1 / frontend=VM2) +
+> units `tf-autodeploy.{service,timer}` (poll 3 min) — **DÉSACTIVÉS + INACTIFS**. **Activation** : (a) user commit le lot
+> i18n (86 fichiers) sur `fix/pre-soutenance-qa` ; (b) merge → `dev` (CI) → `main` (PR+label) ; (c) MOI : `git checkout main`
+> + rebuild 1× par VM + `systemctl enable --now tf-autodeploy.timer`. Ensuite « push main = déploie ». Rollback = `disable`.
 
 > **▶ SOUTENANCE — auto-audit contre les critères jury (12/07/2026).** Un camarade a reçu un retour du
 > **prof** sur son projet QualiTrack et l'a partagé ; ce retour révèle **ce que le jury attend**. On auto-audite
