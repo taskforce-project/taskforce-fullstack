@@ -23,21 +23,14 @@ vi.mock('sonner', () => ({
   },
 }));
 
-vi.mock('@/lib/store/preferences-store', () => ({
-  usePreferencesStore: () => ({
-    t: {
-      common: {
-        error: 'Erreur',
-      },
-      auth: {
-        errors: {
-          passwordsDoNotMatch: 'Les mots de passe ne correspondent pas',
-          registrationFailed: 'Échec de l\'inscription',
-        },
-      },
-    },
-  }),
-}));
+// Real French constants (importActual avoids the vi.mock hoisting trap) — keeps text queries valid
+// and drift-proof; also feeds the embedded <AuthStepper/>, which now reads the store.
+vi.mock('@/lib/store/preferences-store', async () => {
+  const { CONSTANTS_FR } = await vi.importActual<typeof import('@/lib/constants_fr')>('@/lib/constants_fr');
+  return {
+    usePreferencesStore: () => ({ t: CONSTANTS_FR }),
+  };
+});
 
 vi.mock('@/lib/auth/register-storage', () => ({
   setRegisterData: (data: Parameters<typeof mockSetRegisterData>[0]) => mockSetRegisterData(data),

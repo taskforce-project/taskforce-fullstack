@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Loader2, AlertCircle } from "lucide-react";
 import { authService } from "@/lib/api/auth-service";
+import { usePreferencesStore } from "@/lib/store/preferences-store";
 
 /**
  * Page de rappel de la connexion externe.
@@ -20,6 +21,7 @@ import { authService } from "@/lib/api/auth-service";
  */
 function OAuthCallbackInner() {
   const params = useSearchParams();
+  const { t } = usePreferencesStore();
   const [echecReseau, setEchecReseau] = useState<string | null>(null);
   const dejaEnvoye = useRef(false);
 
@@ -32,7 +34,7 @@ function OAuthCallbackInner() {
   const refusFournisseur =
     params.get("error_description") ??
     params.get("error") ??
-    (!code || !state ? "Réponse incomplète du fournisseur d'identité." : null);
+    (!code || !state ? t.auth.ui.callbackIncomplete : null);
 
   const erreur = refusFournisseur ?? echecReseau;
 
@@ -64,19 +66,19 @@ function OAuthCallbackInner() {
         window.location.replace(target);
       })
       .catch((e: unknown) => {
-        setEchecReseau(e instanceof Error ? e.message : "Connexion impossible.");
+        setEchecReseau(e instanceof Error ? e.message : t.auth.ui.callbackConnectFailed);
       });
-  }, [code, state, refusFournisseur]);
+  }, [code, state, refusFournisseur, t]);
 
   if (erreur) {
     return (
       <div className="auth-panel text-center">
         <AlertCircle className="mx-auto h-8 w-8" style={{ color: "var(--accent-red)" }} />
-        <h1 className="auth-title mt-3">Connexion impossible</h1>
+        <h1 className="auth-title mt-3">{t.auth.ui.callbackFailedTitle}</h1>
         <p className="auth-subtitle">{erreur}</p>
         <p className="mt-5 text-xs">
           <Link href="/auth/login" className="auth-link">
-            Revenir à la connexion
+            {t.auth.ui.callbackBackToLogin}
           </Link>
         </p>
       </div>
@@ -86,8 +88,8 @@ function OAuthCallbackInner() {
   return (
     <div className="auth-panel text-center">
       <Loader2 className="mx-auto h-7 w-7 animate-spin" style={{ color: "var(--label-tertiary)" }} />
-      <h1 className="auth-title mt-3">Connexion en cours</h1>
-      <p className="auth-subtitle">Un instant, nous finalisons votre session.</p>
+      <h1 className="auth-title mt-3">{t.auth.ui.callbackInProgressTitle}</h1>
+      <p className="auth-subtitle">{t.auth.ui.callbackInProgressSubtitle}</p>
     </div>
   );
 }
@@ -98,13 +100,14 @@ function OAuthCallbackInner() {
  * exportée en erreur). Le fallback réutilise l'écran « Connexion en cours ».
  */
 export default function OAuthCallbackPage() {
+  const { t } = usePreferencesStore();
   return (
     <Suspense
       fallback={
         <div className="auth-panel text-center">
           <Loader2 className="mx-auto h-7 w-7 animate-spin" style={{ color: "var(--label-tertiary)" }} />
-          <h1 className="auth-title mt-3">Connexion en cours</h1>
-          <p className="auth-subtitle">Un instant, nous finalisons votre session.</p>
+          <h1 className="auth-title mt-3">{t.auth.ui.callbackInProgressTitle}</h1>
+          <p className="auth-subtitle">{t.auth.ui.callbackInProgressSubtitle}</p>
         </div>
       }
     >

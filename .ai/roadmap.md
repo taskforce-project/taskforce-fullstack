@@ -44,9 +44,21 @@
 > (bloc `stripe` : `success-url`/`cancel-url` **à plat**, pas sous `checkout`), `backend/tf-api/Dockerfile`
 > (`mkdir /var/log/taskforce-api` + chown spring), `frontend/lib/store/preferences-store.ts` (défaut `language: "en"`
 > + `t: CONSTANTS_EN` — c'était `fr`/`CONSTANTS_FR`), `frontend/Dockerfile` (bake `NEXT_PUBLIC_SITE_URL`). Déploiement
-> VM1 (033) + VM2 (014) publiques via Cloudflare (`api.`/`auth.`/`app.taskforce-project.fr`). ⚠️ **Reste un vrai lot
-> i18n (Étape 2)** : du **français codé en dur** dans les composants (ex. `register-info-form.tsx`
-> `<h1>Créer votre compte</h1>`, toasts) → à sortir vers `constants_en/fr` + `t.xxx`.
+> VM1 (033) + VM2 (014) publiques via Cloudflare (`api.`/`auth.`/`app.taskforce-project.fr`).
+>
+> **MAJ (consolidation committée + déployée, 18/08)** : commit `db73b031` sur `fix/pre-soutenance-qa`
+> poussé ; **les 2 VM ont `git pull` + rebuild** (VM1 backend : healthy, boot 26 s, actuator UP ; VM2 frontend :
+> rebuild, sert 200). Fini les patchs sed sur la VM — les deux tournent du **code committé** (0 drift).
+>
+> **MAJ (lot i18n — Batch 1 : flux d'authentification, 18/08)** : le français codé en dur du **flux d'auth**
+> est sorti vers `constants_en/fr` + `t.auth.ui.*`. Composants routés : `login-form`, `register-info-form`,
+> `forgot-password-form`, `register/verification/verification-form`, `auth-social-buttons`, `auth-stepper`
+> (libellés via clés stables `account`/`verification`), `app/auth/layout`, `app/auth/callback/page`. Bloc
+> **`auth.ui`** ajouté et **mirroré EN/FR** (interpolation par jetons `{provider}`/`{email}`/`{seconds}` via
+> `String.replace`). Les **mocks de test** (`login`/`register-info`/`verification`/`forgot`/`auth-stepper`)
+> renvoient désormais les **vraies `CONSTANTS_FR`** (`vi.importActual`, anti-drift). Vérifié : `tsc --noEmit`
+> **0 erreur**, **83/83** tests auth verts, ESLint **0 erreur**. ⚠️ **Reste Batch 2** : français in-app
+> (`settings`, `integrations-catalog`, `onboarding`, `product-tour`, nav, dialogs entreprise…).
 
 > **▶ SOUTENANCE — auto-audit contre les critères jury (12/07/2026).** Un camarade a reçu un retour du
 > **prof** sur son projet QualiTrack et l'a partagé ; ce retour révèle **ce que le jury attend**. On auto-audite

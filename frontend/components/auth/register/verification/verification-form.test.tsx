@@ -25,15 +25,14 @@ vi.mock('sonner', () => ({
   },
 }));
 
-vi.mock('@/lib/store/preferences-store', () => ({
-  usePreferencesStore: () => ({
-    t: {
-      common: {
-        error: 'Erreur',
-      },
-    },
-  }),
-}));
+// Real French constants (importActual avoids the vi.mock hoisting trap) — keeps the many French
+// text queries valid and drift-proof.
+vi.mock('@/lib/store/preferences-store', async () => {
+  const { CONSTANTS_FR } = await vi.importActual<typeof import('@/lib/constants_fr')>('@/lib/constants_fr');
+  return {
+    usePreferencesStore: () => ({ t: CONSTANTS_FR }),
+  };
+});
 
 vi.mock('@/lib/auth/register-storage', () => ({
   getRegisterData: () => mockGetRegisterData(),

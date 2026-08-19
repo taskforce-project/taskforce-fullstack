@@ -42,7 +42,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
     }
     if (!globalRateLimiter.isAllowed("login", 5, 15 * 60 * 1000)) {
       const timeLeft = globalRateLimiter.getTimeUntilReset("login", 15 * 60 * 1000)
-      toast.error(t.common.error, { description: `Trop de tentatives. Réessayez dans ${timeLeft} secondes` })
+      toast.error(t.common.error, { description: t.auth.ui.tooManyAttempts.replace("{seconds}", String(timeLeft)) })
       return
     }
 
@@ -66,8 +66,8 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
 
   return (
     <div className={cn("auth-panel", className)} {...props}>
-      <h1 className="auth-title">Connexion</h1>
-      <p className="auth-subtitle">Accédez à votre espace de travail.</p>
+      <h1 className="auth-title">{t.auth.ui.loginTitle}</h1>
+      <p className="auth-subtitle">{t.auth.ui.loginSubtitle}</p>
 
       {/* Fournisseurs externes, au-dessus du formulaire comme partout : quand ils existent, ils sont
           le chemin le plus rapide. Absents tant que le flux d'autorisation n'est pas implémenté. */}
@@ -76,13 +76,13 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">
         <div>
           <label htmlFor="email" className="auth-label">
-            Email
+            {t.auth.ui.email}
           </label>
           <Input
             id="email"
             type="email"
             autoComplete="email"
-            placeholder="vous@entreprise.com"
+            placeholder={t.auth.ui.emailPlaceholder}
             required
             value={formData.email}
             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
@@ -94,10 +94,10 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
         <div>
           <div className="flex items-baseline justify-between">
             <label htmlFor="password" className="auth-label">
-              Mot de passe
+              {t.auth.ui.password}
             </label>
             <Link href="/auth/forgot-password" className="auth-link-muted mb-1.5 text-[11px]">
-              Mot de passe oublié ?
+              {t.auth.ui.forgotPassword}
             </Link>
           </div>
           <Input
@@ -113,14 +113,14 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
         </div>
 
         <Button type="submit" disabled={isLoading} className="auth-submit">
-          {isLoading ? (<><Loader2 className="size-4 animate-spin" />Connexion…</>) : "Se connecter"}
+          {isLoading ? (<><Loader2 className="size-4 animate-spin" />{t.auth.ui.signingIn}</>) : t.auth.ui.signIn}
         </Button>
       </form>
 
       <p className="mt-5 text-center text-xs" style={{ color: "var(--label-tertiary)" }}>
-        Pas encore de compte ?{" "}
+        {t.auth.ui.noAccount}{" "}
         <Link href="/auth/register" className="auth-link">
-          Créer un compte
+          {t.auth.ui.createAccount}
         </Link>
       </p>
     </div>

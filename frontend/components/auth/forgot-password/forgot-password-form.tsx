@@ -33,14 +33,14 @@ export function ForgotPasswordForm({
 
   const handleRequestReset = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) { toast.error(t.common.error, { description: "Veuillez entrer votre adresse email" }); return; }
+    if (!email) { toast.error(t.common.error, { description: t.auth.ui.enterEmail }); return; }
     setIsLoading(true);
     try {
       await authService.forgotPassword(email);
       setFormState("otp-sent");
-      toast.success("Code envoyé", { description: "Vérifiez votre boîte de réception" });
+      toast.success(t.auth.ui.toastCodeSentTitle, { description: t.auth.ui.toastCodeSentDesc });
     } catch (error) {
-      toast.error(t.common.error, { description: error instanceof Error ? error.message : "Erreur lors de l'envoi de l'email" });
+      toast.error(t.common.error, { description: error instanceof Error ? error.message : t.auth.ui.sendEmailError });
     } finally {
       setIsLoading(false);
     }
@@ -49,10 +49,10 @@ export function ForgotPasswordForm({
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.otpCode || !formData.password || !formData.confirmPassword) {
-      toast.error(t.common.error, { description: "Veuillez remplir tous les champs" }); return;
+      toast.error(t.common.error, { description: t.auth.ui.fillAllFields }); return;
     }
     if (formData.otpCode.length !== 6 || !/^\d{6}$/.test(formData.otpCode)) {
-      toast.error(t.common.error, { description: "Le code OTP doit contenir 6 chiffres" }); return;
+      toast.error(t.common.error, { description: t.auth.ui.otpSixDigits }); return;
     }
     if (formData.password !== formData.confirmPassword) {
       toast.error(t.common.error, { description: t.auth.errors.passwordsDoNotMatch }); return;
@@ -63,10 +63,10 @@ export function ForgotPasswordForm({
     setIsLoading(true);
     try {
       await authService.resetPassword(email, formData.otpCode, formData.password);
-      toast.success("Mot de passe réinitialisé", { description: "Vous pouvez maintenant vous connecter" });
+      toast.success(t.auth.ui.resetSuccessTitle, { description: t.auth.ui.resetSuccessDesc });
       router.push("/auth/login");
     } catch (error) {
-      toast.error(t.common.error, { description: error instanceof Error ? error.message : "Erreur lors de la réinitialisation" });
+      toast.error(t.common.error, { description: error instanceof Error ? error.message : t.auth.ui.resetError });
     } finally {
       setIsLoading(false);
     }
@@ -76,9 +76,9 @@ export function ForgotPasswordForm({
     setIsLoading(true);
     try {
       await authService.forgotPassword(email);
-      toast.success("Code renvoyé", { description: "Un nouveau code a été envoyé à votre adresse email" });
+      toast.success(t.auth.ui.codeResentTitle, { description: t.auth.ui.codeResentDesc });
     } catch (error) {
-      toast.error(t.common.error, { description: error instanceof Error ? error.message : "Erreur lors du renvoi du code" });
+      toast.error(t.common.error, { description: error instanceof Error ? error.message : t.auth.ui.resendError });
     } finally {
       setIsLoading(false);
     }
@@ -88,21 +88,21 @@ export function ForgotPasswordForm({
     <div className={cn("auth-panel", className)} {...props}>
       {formState === "request" ? (
         <>
-          <h1 className="auth-title">Mot de passe oublié</h1>
+          <h1 className="auth-title">{t.auth.ui.forgotTitle}</h1>
           <p className="auth-subtitle">
-            Indiquez votre adresse, nous vous envoyons un code de vérification.
+            {t.auth.ui.forgotSubtitle}
           </p>
 
           <form onSubmit={handleRequestReset} className="mt-6 space-y-4">
             <div>
               <label htmlFor="email" className="auth-label">
-                Email
+                {t.auth.ui.email}
               </label>
               <Input
                 id="email"
                 type="email"
                 autoComplete="email"
-                placeholder="vous@entreprise.com"
+                placeholder={t.auth.ui.emailPlaceholder}
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -112,22 +112,23 @@ export function ForgotPasswordForm({
             </div>
 
             <Button type="submit" disabled={isLoading} className="auth-submit">
-              {isLoading ? (<><Loader2 className="size-4 animate-spin" />Envoi en cours…</>) : "Envoyer le code"}
+              {isLoading ? (<><Loader2 className="size-4 animate-spin" />{t.auth.ui.sending}</>) : t.auth.ui.sendCode}
             </Button>
           </form>
         </>
       ) : (
         <>
-          <h1 className="auth-title">Code envoyé !</h1>
+          <h1 className="auth-title">{t.auth.ui.codeSentTitle}</h1>
           <p className="auth-subtitle">
-            Saisissez le code à 6 chiffres reçu à l&apos;adresse <strong style={{ color: "var(--label-secondary)" }}>{email}</strong>,
-            puis choisissez un nouveau mot de passe.
+            {t.auth.ui.codeSentSubtitle.split("{email}")[0]}
+            <strong style={{ color: "var(--label-secondary)" }}>{email}</strong>
+            {t.auth.ui.codeSentSubtitle.split("{email}")[1]}
           </p>
 
           <form onSubmit={handleResetPassword} className="mt-6 space-y-4">
             <div>
               <label htmlFor="otpCode" className="auth-label">
-                Code de vérification
+                {t.auth.ui.verificationCode}
               </label>
               <Input
                 id="otpCode"
@@ -147,7 +148,7 @@ export function ForgotPasswordForm({
 
             <div>
               <label htmlFor="password" className="auth-label">
-                Nouveau mot de passe
+                {t.auth.ui.newPassword}
               </label>
               <Input
                 id="password"
@@ -163,7 +164,7 @@ export function ForgotPasswordForm({
 
             <div>
               <label htmlFor="confirmPassword" className="auth-label">
-                Confirmer le mot de passe
+                {t.auth.ui.confirmPassword}
               </label>
               <Input
                 id="confirmPassword"
@@ -178,19 +179,19 @@ export function ForgotPasswordForm({
             </div>
 
             <Button type="submit" disabled={isLoading} className="auth-submit">
-              {isLoading ? (<><Loader2 className="size-4 animate-spin" />Réinitialisation…</>) : "Réinitialiser le mot de passe"}
+              {isLoading ? (<><Loader2 className="size-4 animate-spin" />{t.auth.ui.resetting}</>) : t.auth.ui.resetPassword}
             </Button>
           </form>
 
           <p className="mt-4 text-center text-xs" style={{ color: "var(--label-tertiary)" }}>
-            Code non reçu ?{" "}
+            {t.auth.ui.codeNotReceived}{" "}
             <button
               type="button"
               onClick={handleResendOtp}
               disabled={isLoading}
               className="auth-link underline underline-offset-2 disabled:opacity-50"
             >
-              Renvoyer
+              {t.auth.ui.resend}
             </button>
           </p>
         </>
@@ -199,7 +200,7 @@ export function ForgotPasswordForm({
       <p className="mt-5 text-center text-xs">
         <Link href="/auth/login" className="auth-link-muted inline-flex items-center gap-1.5">
           <ArrowLeft className="h-3.5 w-3.5" />
-          Retour à la connexion
+          {t.auth.ui.backToLogin}
         </Link>
       </p>
     </div>

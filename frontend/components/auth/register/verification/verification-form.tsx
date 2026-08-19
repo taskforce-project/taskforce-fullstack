@@ -39,8 +39,8 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
     // Récupérer les données des étapes précédentes et envoyer l'inscription
     const registerData = getRegisterData();
     if (!registerData?.email || !registerData?.password || !registerData?.firstName || !registerData?.lastName || !registerData?.planType) {
-      toast.error("Session expirée ou données incomplètes", {
-        description: "Veuillez recommencer le processus d'inscription",
+      toast.error(t.auth.ui.verifySessionExpired, {
+        description: t.auth.ui.verifySessionExpiredDesc,
       });
       router.push('/auth/register');
       return;
@@ -67,13 +67,13 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
             turnstileToken: registerData.turnstileToken,
           });
           
-          toast.success("Code de vérification envoyé", {
-            description: "Consultez votre boîte mail",
+          toast.success(t.auth.ui.verifyCodeSentTitle, {
+            description: t.auth.ui.verifyCodeSentDesc,
           });
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error);
           toast.error(t.common.error, {
-            description: errorMessage || "Erreur lors de l'inscription",
+            description: errorMessage || t.auth.ui.verifyRegisterError,
           });
           // Ne pas revenir à l'étape 1 si l'utilisateur existe déjà (cas idempotent)
           // L'utilisateur peut toujours entrer son code OTP
@@ -82,7 +82,7 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
 
       sendRegistration();
     }
-  }, [router, t.common.error]);
+  }, [router, t]);
 
   useEffect(() => {
     if (countdown > 0) {
@@ -96,7 +96,7 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
     if (!globalRateLimiter.isAllowed("resend-otp", 1, 60 * 1000)) {
       const timeLeft = globalRateLimiter.getTimeUntilReset("resend-otp", 60 * 1000);
       toast.error(t.common.error, {
-        description: `Veuillez attendre ${timeLeft} secondes avant de renvoyer le code`,
+        description: t.auth.ui.verifyResendWait.replace("{seconds}", String(timeLeft)),
       });
       return;
     }
@@ -107,12 +107,12 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
       // Appel API pour renvoyer l'OTP
       await authService.resendOtp(userEmail);
       
-      toast.success("Code de vérification renvoyé");
+      toast.success(t.auth.ui.verifyCodeResent);
       setCountdown(60);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       toast.error(t.common.error, {
-        description: errorMessage || "Erreur lors de l'envoi du code",
+        description: errorMessage || t.auth.ui.verifySendError,
       });
     } finally {
       setIsResending(false);
@@ -125,7 +125,7 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
     // Validation format OTP
     if (!validateOTP(otp)) {
       toast.error(t.common.error, {
-        description: "Veuillez entrer un code à 6 chiffres valide",
+        description: t.auth.ui.verifyInvalidCode6,
       });
       return;
     }
@@ -144,8 +144,8 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
 
       // Si checkout URL présente (plan payant), rediriger vers Stripe
       if (result.checkoutSessionUrl) {
-        toast.info("Redirection vers la page de paiement...", {
-          description: "Finalisation de votre abonnement",
+        toast.info(t.auth.ui.verifyRedirectPayment, {
+          description: t.auth.ui.verifyRedirectPaymentDesc,
         });
         globalThis.window.location.href = result.checkoutSessionUrl;
         return;
@@ -153,8 +153,8 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
 
       // Plan gratuit : compte vérifié, mais plus d'auto-login (tokens émis par Keycloak,
       // qui exige le mot de passe). On redirige vers la connexion.
-      toast.success("Compte vérifié avec succès !", {
-        description: "Connectez-vous pour accéder à votre espace.",
+      toast.success(t.auth.ui.verifySuccessTitle, {
+        description: t.auth.ui.verifySuccessDesc,
       });
       router.push('/auth/login');
     } catch (error) {
@@ -168,9 +168,9 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
   };
 
   const getResendButtonText = () => {
-    if (countdown > 0) return `Renvoyer le code dans ${countdown}s`;
-    if (isResending) return "Envoi...";
-    return "Renvoyer le code";
+    if (countdown > 0) return t.auth.ui.resendIn.replace("{seconds}", String(countdown));
+    if (isResending) return t.auth.ui.sendingShort;
+    return t.auth.ui.resendCode;
   };
 
   return (
@@ -184,14 +184,14 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
           <form onSubmit={handleSubmit} className="flex flex-col">
             <FieldGroup>
               <Field className="items-center text-center">
-                <h1 className="auth-title">Code de vérification</h1>
+                <h1 className="auth-title">{t.auth.ui.verifyTitle}</h1>
                 <p className="auth-subtitle">
-                  Code envoyé à {userEmail}
+                  {t.auth.ui.verifySentTo.replace("{email}", userEmail)}
                 </p>
               </Field>
               <Field className="items-center">
                 <FieldLabel htmlFor="otp" className="sr-only">
-                  Code de vérification
+                  {t.auth.ui.verifyTitle}
                 </FieldLabel>
                 <InputOTP
                   maxLength={6}
@@ -215,15 +215,15 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
                   </InputOTPGroup>
                 </InputOTP>
                 <FieldDescription className="text-center">
-                  Entrez le code à 6 chiffres envoyé par email.
+                  {t.auth.ui.verifyOtpHint}
                 </FieldDescription>
               </Field>
               <Field>
                 <Button type="submit" disabled={isLoading || otp.length !== 6}>
-                  {isLoading ? (<><Loader2 className="size-4 animate-spin" /> Vérification…</>) : "Vérifier"}
+                  {isLoading ? (<><Loader2 className="size-4 animate-spin" /> {t.auth.ui.verifying}</>) : t.auth.ui.verifyButton}
                 </Button>
                 <FieldDescription className="text-center">
-                  Vous n&apos;avez pas reçu le code ?{" "}
+                  {t.auth.ui.verifyNotReceived}{" "}
                   <Button
                     type="button"
                     variant="link"
@@ -247,7 +247,7 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
           disabled={isLoading}
           className="auth-link-muted disabled:opacity-50"
         >
-          Revenir à l'inscription
+          {t.auth.ui.backToRegister}
         </button>
       </p>
     </div>

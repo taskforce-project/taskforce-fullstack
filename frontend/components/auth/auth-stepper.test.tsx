@@ -1,6 +1,16 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { AuthStepper, REGISTER_STEPS } from "./auth-stepper";
+
+// Le stepper lit désormais les libellés depuis le store i18n : on fournit les constantes FR réelles
+// (importActual évite le hoisting de vi.mock) pour que « Compte »/« Vérification » et l'aria restent
+// en français dans ce test.
+vi.mock("@/lib/store/preferences-store", async () => {
+  const { CONSTANTS_FR } = await vi.importActual<typeof import("@/lib/constants_fr")>("@/lib/constants_fr");
+  return {
+    usePreferencesStore: () => ({ t: CONSTANTS_FR }),
+  };
+});
 
 /**
  * Le fil d'étapes est unique et porté par les pages d'inscription. Chaque étape porte un libellé

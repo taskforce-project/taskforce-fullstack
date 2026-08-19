@@ -24,21 +24,14 @@ vi.mock('@/lib/api/auth-service', () => ({
   },
 }));
 
-vi.mock('@/lib/store/preferences-store', () => ({
-  usePreferencesStore: () => ({
-    t: {
-      common: {
-        error: 'Erreur',
-      },
-      auth: {
-        errors: {
-          passwordsDoNotMatch: 'Les mots de passe ne correspondent pas',
-          passwordTooShort: 'Le mot de passe doit contenir au moins 8 caractères',
-        },
-      },
-    },
-  }),
-}));
+// Real French constants (importActual avoids the vi.mock hoisting trap) — every French toast/label
+// asserted here is byte-identical to the constants, so the suite stays green and drift-proof.
+vi.mock('@/lib/store/preferences-store', async () => {
+  const { CONSTANTS_FR } = await vi.importActual<typeof import('@/lib/constants_fr')>('@/lib/constants_fr');
+  return {
+    usePreferencesStore: () => ({ t: CONSTANTS_FR }),
+  };
+});
 
 describe('ForgotPasswordForm', () => {
   const mockRouter = {

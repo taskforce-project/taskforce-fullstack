@@ -53,8 +53,8 @@ export default function AuthLayout({
   // Sur la connexion on propose l'inscription, partout ailleurs on propose la connexion.
   const onLoginPage = pathname?.startsWith("/auth/login") ?? false;
   const opposite = onLoginPage
-    ? { href: "/auth/register", label: "Créer un compte" }
-    : { href: "/auth/login", label: "Se connecter" };
+    ? { href: "/auth/register", label: t.auth.ui.createAccount }
+    : { href: "/auth/login", label: t.auth.ui.signIn };
 
   // « Le site » n'est PAS la racine de cette application : le site vitrine est un projet Astro
   // distinct, servi sur une autre origine — `www.example.com` face à `app.example.com` en
@@ -87,7 +87,7 @@ export default function AuthLayout({
 
           <a href={siteUrl} className="auth-back-link">
             <ArrowLeft className="h-3.5 w-3.5" />
-            Retour au site
+            {t.auth.ui.backToSite}
           </a>
         </div>
 
