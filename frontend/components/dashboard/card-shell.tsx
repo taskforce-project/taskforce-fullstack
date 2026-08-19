@@ -113,7 +113,7 @@ export function CardShell({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-52">
             <DropdownMenuItem className="gap-2 text-xs" onClick={onRefresh}>
-              <RefreshCw className="size-3.5" /> Actualiser
+              <RefreshCw className="size-3.5" /> Refresh
             </DropdownMenuItem>
 
             {timeRanges && timeRanges.length > 0 && (

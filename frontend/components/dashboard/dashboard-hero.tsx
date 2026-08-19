@@ -24,13 +24,13 @@ const PILL_TOOLS = [
 
 /** Même contenu que la palette Ctrl+K — navigation + Labs (les actions spéciales sont ajoutées à part). */
 const NAV_ITEMS = [
-  { label: "Tableau de bord", path: "/dashboard", icon: LayoutDashboard },
+  { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
   { label: "Inbox", path: "/inbox", icon: Inbox },
-  { label: "Mon travail", path: "/my-work", icon: ClipboardCheck },
-  { label: "Opérations", path: "/projects", icon: FolderKanban },
+  { label: "My work", path: "/my-work", icon: ClipboardCheck },
+  { label: "Operations", path: "/projects", icon: FolderKanban },
   { label: "Issues", path: "/my-work/issues", icon: CircleDot },
   { label: "Cycles", path: "/cycles", icon: Repeat },
-  { label: "Membres", path: "/members", icon: Users },
+  { label: "Members", path: "/members", icon: Users },
 ] as const
 const LAB_ITEMS = [
   { label: "Intelligence", path: "/analytics", icon: Activity },
@@ -38,10 +38,10 @@ const LAB_ITEMS = [
 ] as const
 
 function greetingFor(hour: number): string {
-  if (hour < 5) return "Encore debout"
-  if (hour < 12) return "Bonjour"
-  if (hour < 18) return "Bon après-midi"
-  return "Bonsoir"
+  if (hour < 5) return "Still up"
+  if (hour < 12) return "Good morning"
+  if (hour < 18) return "Good afternoon"
+  return "Good evening"
 }
 
 /** Une ligne de la palette inline (aplatie pour la navigation clavier). */
@@ -93,8 +93,8 @@ export function DashboardHero({ displayName }: DashboardHeroProps) {
 
   // Actions spéciales (pas de simple navigation) — mêmes que dans la palette Ctrl+K.
   const ACTIONS = useMemo(() => [
-    { label: "Créer une opération", icon: Plus, run: () => { openCreateProject(); reset() } },
-    { label: "Réglages", icon: Settings, run: () => { openSettings(); reset() } },
+    { label: "Create an operation", icon: Plus, run: () => { openCreateProject(); reset() } },
+    { label: "Settings", icon: Settings, run: () => { openSettings(); reset() } },
   ], [openCreateProject, openSettings])
 
   const match = (label: string) => label.toLowerCase().includes(query)
@@ -109,7 +109,7 @@ export function DashboardHero({ displayName }: DashboardHeroProps) {
   // Liste APLATIE (opérations → navigation → Labs → actions) : une seule séquence pour les flèches.
   const rows: Row[] = []
   projMatches.forEach((p) => rows.push({
-    key: `p-${p.id}`, section: "Opérations",
+    key: `p-${p.id}`, section: "Operations",
     icon: <ProjectIcon iconUrl={p.iconUrl} name={p.name} color={p.color} size={20} className="shrink-0 rounded" />,
     label: p.name,
     trailing: <span className="shrink-0 font-mono text-[11px] uppercase text-muted-foreground">{p.identifier}</span>,
@@ -162,7 +162,7 @@ export function DashboardHero({ displayName }: DashboardHeroProps) {
             <BrandLogo key={t.slug} slug={t.slug} name={t.name} className="size-3.5 text-[7px]" />
           ))}
         </span>
-        <span>Branchez vos outils sur le Brain OS</span>
+        <span>Connect your tools to the Brain OS</span>
         <ChevronRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
       </button>
 
@@ -171,7 +171,7 @@ export function DashboardHero({ displayName }: DashboardHeroProps) {
           {greeting}
           {displayName ? `, ${displayName}` : ""}
         </p>
-        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Reprenez là où vous en étiez.</h1>
+        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Pick up where you left off.</h1>
       </div>
 
       {/* Palette inline : la barre + un dropdown au focus (même contenu que Ctrl+K). */}
@@ -190,8 +190,8 @@ export function DashboardHero({ displayName }: DashboardHeroProps) {
               else if (e.key === "Enter") { e.preventDefault(); rows[activeIdx]?.run() }
               else if (e.key === "Escape") reset()
             }}
-            aria-label="Rechercher une opération, une action, une page"
-            placeholder="Rechercher une opération, une issue, une action…"
+            aria-label="Search an operation, an action, a page"
+            placeholder="Search an operation, an issue, an action…"
             className="min-w-0 flex-1 bg-transparent text-left text-foreground outline-none placeholder:text-muted-foreground"
           />
           <kbd className="hidden shrink-0 items-center gap-1 rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground sm:flex">
@@ -207,7 +207,7 @@ export function DashboardHero({ displayName }: DashboardHeroProps) {
           >
             <div className="min-h-0 flex-1 overflow-y-auto p-1">
             {rows.length === 0 ? (
-              <p className="px-3 py-6 text-center text-sm text-muted-foreground">Aucun résultat pour « {q.trim()} »</p>
+              <p className="px-3 py-6 text-center text-sm text-muted-foreground">No results for “{q.trim()}”</p>
             ) : (
               rows.map((row, i) => (
                 <Fragment key={row.key}>

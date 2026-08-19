@@ -98,5 +98,5 @@ export function KpiOpenCard({ slug, refreshToken }: DashboardCardBodyProps) {
   if (error && projects.length === 0) return <CardError onRetry={() => void fetchProjects(slug)} />
 
   const openIssues = projects.reduce((s, p) => s + p.openIssues, 0)
-  return <KpiBody value={openIssues.toLocaleString("fr-FR")} unit={`sur ${projects.length} opération${projects.length > 1 ? "s" : ""}`} />
+  return <KpiBody value={openIssues.toLocaleString("en-US")} unit={`of ${projects.length} operation${projects.length > 1 ? "s" : ""}`} />
 }

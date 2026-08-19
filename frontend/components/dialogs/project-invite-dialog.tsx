@@ -98,7 +98,7 @@ export function ProjectInviteDialog({ workspace, projectId, onInvited }: Project
   async function handleSubmit() {
     if (!selected || submitting) return
     if (teamChoice === NEW_TEAM && !newTeamName.trim()) {
-      toast.error("Nom de l'équipe requis")
+      toast.error("Team name required")
       return
     }
     setSubmitting(true)
@@ -117,7 +117,7 @@ export function ProjectInviteDialog({ workspace, projectId, onInvited }: Project
         await teamService.addMember(workspace, Number(teamChoice), { userId: selected.id })
       }
 
-      toast.success(`${selected.displayName ?? selected.email} ajouté au projet`)
+      toast.success(`${selected.displayName ?? selected.email} added to the project`)
       onInvited()
       reset()
       setOpen(false)
@@ -125,12 +125,12 @@ export function ProjectInviteDialog({ workspace, projectId, onInvited }: Project
       // 409 = plafond du forfait Free sur un projet privé (façon GitHub) → upsell.
       const e = err as { response?: { status?: number; data?: { message?: string } } }
       if (e?.response?.status === 409) {
-        toast.error(e.response?.data?.message ?? "Limite du forfait Free atteinte sur ce projet privé.", {
-          description: "Rendez le projet public, ou passez à un forfait payant pour inviter sans limite.",
-          action: { label: "Voir les forfaits", onClick: () => router.push(`/${workspace}/billing`) },
+        toast.error(e.response?.data?.message ?? "Free plan limit reached on this private project.", {
+          description: "Make the project public, or upgrade to a paid plan to invite without limits.",
+          action: { label: "View plans", onClick: () => router.push(`/${workspace}/billing`) },
         })
       } else {
-        toast.error("Erreur lors de l'invitation")
+        toast.error("Error while inviting")
       }
     } finally {
       setSubmitting(false)
@@ -142,22 +142,22 @@ export function ProjectInviteDialog({ workspace, projectId, onInvited }: Project
       <DialogTrigger asChild>
         <Button size="sm" className="gap-1.5 h-8 text-xs">
           <UserPlus className="h-3.5 w-3.5" />
-          Inviter un membre
+          Invite a member
         </Button>
       </DialogTrigger>
 
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Inviter un membre</DialogTitle>
+          <DialogTitle>Invite a member</DialogTitle>
           <DialogDescription>
-            Recherchez un utilisateur Taskforce par nom ou email, puis choisissez son rôle.
+            Search for a Taskforce user by name or email, then choose their role.
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-4 py-2">
           {/* Recherche / sélection */}
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="project-invite-search" className="text-sm font-medium">Utilisateur</label>
+            <label htmlFor="project-invite-search" className="text-sm font-medium">User</label>
             {selected ? (
               <div className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-2.5 py-1.5">
                 <UserAvatar
@@ -182,7 +182,7 @@ export function ProjectInviteDialog({ workspace, projectId, onInvited }: Project
                   id="project-invite-search"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Nom ou email…"
+                  placeholder="Name or email…"
                   className="pl-9 h-9"
                   autoComplete="off"
                 />
@@ -212,7 +212,7 @@ export function ProjectInviteDialog({ workspace, projectId, onInvited }: Project
                   </div>
                 )}
                 {!searching && query.trim().length >= 2 && results.length === 0 && (
-                  <p className="mt-1.5 text-xs text-muted-foreground">Aucun compte Taskforce ne correspond.</p>
+                  <p className="mt-1.5 text-xs text-muted-foreground">No matching Taskforce account.</p>
                 )}
               </div>
             )}
@@ -222,13 +222,13 @@ export function ProjectInviteDialog({ workspace, projectId, onInvited }: Project
           {selected && !alreadyInWorkspace && (
             <div className="flex items-start gap-2 rounded-md border border-amber-500/20 bg-amber-500/10 px-2.5 py-2 text-xs text-amber-500">
               <Info className="mt-0.5 size-3.5 shrink-0" />
-              <span>Cet utilisateur n&apos;est pas encore dans le workspace — il y sera ajouté automatiquement.</span>
+              <span>This user isn&apos;t in the workspace yet — they&apos;ll be added automatically.</span>
             </div>
           )}
 
           {/* Rôle projet */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium">Rôle</label>
+            <label className="text-sm font-medium">Role</label>
             <Select value={role} onValueChange={(v) => setRole(v as ProjectRole)}>
               <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -241,22 +241,22 @@ export function ProjectInviteDialog({ workspace, projectId, onInvited }: Project
 
           {/* Équipe optionnelle */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium">Équipe <span className="font-normal text-muted-foreground">(optionnel)</span></label>
+            <label className="text-sm font-medium">Team <span className="font-normal text-muted-foreground">(optional)</span></label>
             <Select value={teamChoice} onValueChange={setTeamChoice}>
               <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value={NO_TEAM}>Aucune équipe</SelectItem>
+                <SelectItem value={NO_TEAM}>No team</SelectItem>
                 {teams.map((t) => (
                   <SelectItem key={t.id} value={String(t.id)}>{t.emoji} {t.name}</SelectItem>
                 ))}
-                <SelectItem value={NEW_TEAM}>＋ Créer une équipe…</SelectItem>
+                <SelectItem value={NEW_TEAM}>＋ Create a team…</SelectItem>
               </SelectContent>
             </Select>
             {teamChoice === NEW_TEAM && (
               <Input
                 value={newTeamName}
                 onChange={(e) => setNewTeamName(e.target.value)}
-                placeholder="Nom de la nouvelle équipe"
+                placeholder="New team name"
                 className="h-9 mt-1"
               />
             )}
@@ -264,10 +264,10 @@ export function ProjectInviteDialog({ workspace, projectId, onInvited }: Project
         </div>
 
         <DialogFooter className="gap-2">
-          <Button variant="outline" size="sm" onClick={() => setOpen(false)} disabled={submitting}>Annuler</Button>
+          <Button variant="outline" size="sm" onClick={() => setOpen(false)} disabled={submitting}>Cancel</Button>
           <Button size="sm" onClick={handleSubmit} disabled={!selected || submitting} className="gap-2">
             {submitting ? <Loader2 className="size-4 animate-spin" /> : <UserPlus className="size-4" />}
-            Inviter
+            Invite
           </Button>
         </DialogFooter>
       </DialogContent>

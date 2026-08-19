@@ -12,10 +12,10 @@ interface EnterpriseConfirmationDialogProps {
 }
 
 const FREE_FEATURES = [
-  "Jusqu'à 5 utilisateurs",
-  "Projets et tâches illimités",
-  "Dashboard basique",
-  "Pas de carte bancaire requise",
+  "Up to 5 users",
+  "Unlimited projects and tasks",
+  "Basic dashboard",
+  "No credit card required",
 ];
 
 export function EnterpriseConfirmationDialog({
@@ -34,22 +34,22 @@ export function EnterpriseConfirmationDialog({
               <CheckCircle2 className="h-7 w-7 text-white" strokeWidth={1.5} />
             </div>
           </div>
-          <h2 className="text-lg font-semibold tracking-tight">Demande envoyée !</h2>
+          <h2 className="text-lg font-semibold tracking-tight">Request sent!</h2>
           <p className="mt-1 text-sm text-emerald-100/80">
-            Notre équipe vous contactera sous 48h
+            Our team will contact you within 48 hours
           </p>
         </div>
 
         {/* Body */}
         <div className="p-6 space-y-5">
           <p className="text-center text-sm text-muted-foreground">
-            En attendant, créez un compte gratuit pour découvrir la plateforme.
+            In the meantime, create a free account to explore the platform.
           </p>
 
           {/* Plan card */}
           <div className="rounded-xl border border-border bg-secondary p-4 space-y-3">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold">Compte gratuit</span>
+              <span className="text-sm font-semibold">Free account</span>
               <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs font-medium text-emerald-500">
                 FREE
               </span>
@@ -69,7 +69,7 @@ export function EnterpriseConfirmationDialog({
           {/* Actions */}
           <div className="flex flex-col gap-2 pt-1">
             <Button onClick={onAccept} size="lg" className="w-full">
-              Créer un compte gratuit
+              Create a free account
             </Button>
             <Button
               onClick={onDecline}
@@ -77,7 +77,7 @@ export function EnterpriseConfirmationDialog({
               size="lg"
               className="w-full text-muted-foreground hover:text-foreground"
             >
-              Non merci, revenir à l&apos;accueil
+              No thanks, back to home
             </Button>
           </div>
         </div>

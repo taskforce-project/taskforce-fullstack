@@ -25,7 +25,7 @@ export function OpsHealthCard({ slug, refreshToken }: DashboardCardBodyProps) {
 
   if (isLoading && projects.length === 0) return <CardSkeleton />
   if (error && projects.length === 0) return <CardError onRetry={() => void fetchProjects(slug)} />
-  if (projects.length === 0) return <CardEmpty message="Aucune opération pour l'instant" />
+  if (projects.length === 0) return <CardEmpty message="No operations yet" />
 
   const health = healthCounts(projects)
   const atRisk = health.atRisk + health.critical
@@ -46,7 +46,7 @@ export function OpsHealthCard({ slug, refreshToken }: DashboardCardBodyProps) {
 
       <div className="space-y-1.5">
         <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-          <span>Santé des opérations</span>
+          <span>Operations health</span>
           <span className="tabular-nums">
             {health.healthy} sain · {atRisk} à risque · {health.paused} en pause
           </span>

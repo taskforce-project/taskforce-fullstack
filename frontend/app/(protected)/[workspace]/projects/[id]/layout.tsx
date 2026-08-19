@@ -142,7 +142,7 @@ export default function ProjectLayout({ children }: { readonly children: React.R
               className="h-8 w-8 p-0 hidden sm:flex"
               disabled={!project}
               onClick={() => project && toggleFavorite(workspace, project.id, !project.isFavorite)}
-              title={project?.isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}
+              title={project?.isFavorite ? "Remove from favorites" : "Add to favorites"}
             >
               <Star className={cn("h-4 w-4", project?.isFavorite && "fill-yellow-400 text-yellow-400")} />
             </Button>

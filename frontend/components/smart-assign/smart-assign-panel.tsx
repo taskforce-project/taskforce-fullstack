@@ -130,10 +130,10 @@ export function SmartAssignPanel({
       setResult(data)
       setRan(true)
       if (!data.recommended) {
-        toast.warning("Aucune recommandation disponible pour cette issue")
+        toast.warning("No recommendation available for this issue")
       }
     } catch {
-      toast.error("Impossible de générer Smart Assign")
+      toast.error("Could not generate Smart Assign")
       setResult(null)
     } finally {
       setLoading(false)

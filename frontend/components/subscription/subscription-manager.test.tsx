@@ -75,8 +75,8 @@ describe('SubscriptionManager', () => {
       render(<SubscriptionManager />);
 
       await waitFor(() => {
-        expect(screen.getByText('Erreur')).toBeInTheDocument();
-        expect(screen.getByText(/Impossible de charger les informations d'abonnement/i)).toBeInTheDocument();
+        expect(screen.getByText('Error')).toBeInTheDocument();
+        expect(screen.getByText(/Unable to load subscription information/i)).toBeInTheDocument();
       });
     });
 
@@ -88,8 +88,8 @@ describe('SubscriptionManager', () => {
       render(<SubscriptionManager />);
 
       await waitFor(() => {
-        expect(toast.error).toHaveBeenCalledWith('Erreur', {
-          description: 'Impossible de charger les informations d\'abonnement',
+        expect(toast.error).toHaveBeenCalledWith('Error', {
+          description: 'Unable to load subscription information',
         });
       });
     });
@@ -105,10 +105,10 @@ describe('SubscriptionManager', () => {
       render(<SubscriptionManager />);
 
       await waitFor(() => {
-        expect(screen.getByText('Erreur')).toBeInTheDocument();
+        expect(screen.getByText('Error')).toBeInTheDocument();
       });
 
-      const retryButton = screen.getByRole('button', { name: /Réessayer/i });
+      const retryButton = screen.getByRole('button', { name: /Retry/i });
       fireEvent.click(retryButton);
 
       await waitFor(() => {
@@ -140,10 +140,10 @@ describe('SubscriptionManager', () => {
       render(<SubscriptionManager />);
 
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /Passer à Basic/i })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: /Passer à Business/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Upgrade to Basic/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Upgrade to Business/i })).toBeInTheDocument();
       });
-      expect(screen.queryByRole('button', { name: /Passer à Enterprise/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /Upgrade to Enterprise/i })).not.toBeInTheDocument();
     });
 
     it('should redirect to Stripe checkout when upgrading to BUSINESS', async () => {
@@ -154,10 +154,10 @@ describe('SubscriptionManager', () => {
       render(<SubscriptionManager />);
 
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /Passer à Business/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Upgrade to Business/i })).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByRole('button', { name: /Passer à Business/i }));
+      fireEvent.click(screen.getByRole('button', { name: /Upgrade to Business/i }));
 
       await waitFor(() => {
         expect(stripeService.stripeService.createCheckoutSession).toHaveBeenCalledWith('BUSINESS');
@@ -173,10 +173,10 @@ describe('SubscriptionManager', () => {
       render(<SubscriptionManager />);
 
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /Passer à Basic/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Upgrade to Basic/i })).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByRole('button', { name: /Passer à Basic/i }));
+      fireEvent.click(screen.getByRole('button', { name: /Upgrade to Basic/i }));
 
       await waitFor(() => {
         expect(stripeService.stripeService.createCheckoutSession).toHaveBeenCalledWith('BASIC');
@@ -192,14 +192,14 @@ describe('SubscriptionManager', () => {
       render(<SubscriptionManager />);
 
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /Passer à Business/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Upgrade to Business/i })).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByRole('button', { name: /Passer à Business/i }));
+      fireEvent.click(screen.getByRole('button', { name: /Upgrade to Business/i }));
 
       await waitFor(() => {
-        expect(toast.error).toHaveBeenCalledWith('Erreur', {
-          description: 'Impossible de créer la session de paiement',
+        expect(toast.error).toHaveBeenCalledWith('Error', {
+          description: 'Unable to create payment session',
         });
       });
     });
@@ -224,7 +224,7 @@ describe('SubscriptionManager', () => {
         expect(screen.getByText(/Plan BUSINESS/i)).toBeInTheDocument();
         expect(screen.getByText(/49/i)).toBeInTheDocument();
         expect(screen.getByText(/EUR/i)).toBeInTheDocument();
-        expect(screen.getByText(/mois/i)).toBeInTheDocument();
+        expect(screen.getByText(/month/i)).toBeInTheDocument();
       });
     });
 
@@ -232,7 +232,7 @@ describe('SubscriptionManager', () => {
       render(<SubscriptionManager />);
 
       await waitFor(() => {
-        expect(screen.getByText(/Prochaine facturation/i)).toBeInTheDocument();
+        expect(screen.getByText(/Next billing/i)).toBeInTheDocument();
         // Date format can vary, just check it exists
         expect(screen.getByText(/2024/i)).toBeInTheDocument();
       });
@@ -246,14 +246,14 @@ describe('SubscriptionManager', () => {
       await waitFor(() => {
         expect(screen.getByText(/Plan BUSINESS/i)).toBeInTheDocument();
       });
-      expect(screen.queryByRole('button', { name: /Passer à/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /Upgrade to/i })).not.toBeInTheDocument();
     });
 
     it('should show cancel subscription button', async () => {
       render(<SubscriptionManager />);
 
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /Annuler l'abonnement/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Cancel subscription/i })).toBeInTheDocument();
       });
     });
 
@@ -261,15 +261,15 @@ describe('SubscriptionManager', () => {
       render(<SubscriptionManager />);
 
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /Annuler l'abonnement/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Cancel subscription/i })).toBeInTheDocument();
       });
 
-      const cancelButton = screen.getByRole('button', { name: /Annuler l'abonnement/i });
+      const cancelButton = screen.getByRole('button', { name: /Cancel subscription/i });
       fireEvent.click(cancelButton);
 
       await waitFor(() => {
-        expect(screen.getByText(/Confirmer l'annulation/i)).toBeInTheDocument();
-        expect(screen.getByText(/Annuler à la fin de la période/i)).toBeInTheDocument();
+        expect(screen.getByText(/Confirm cancellation/i)).toBeInTheDocument();
+        expect(screen.getByText(/Cancel at end of period/i)).toBeInTheDocument();
       });
     });
 
@@ -299,23 +299,23 @@ describe('SubscriptionManager', () => {
       render(<SubscriptionManager />);
 
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /Annuler l'abonnement/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Cancel subscription/i })).toBeInTheDocument();
       });
 
-      const cancelButton = screen.getByRole('button', { name: /Annuler l'abonnement/i });
+      const cancelButton = screen.getByRole('button', { name: /Cancel subscription/i });
       fireEvent.click(cancelButton);
 
       await waitFor(() => {
-        expect(screen.getByText(/Annuler à la fin de la période/i)).toBeInTheDocument();
+        expect(screen.getByText(/Cancel at end of period/i)).toBeInTheDocument();
       });
 
-      const confirmButton = screen.getByRole('button', { name: /Annuler à la fin de la période/i });
+      const confirmButton = screen.getByRole('button', { name: /Cancel at end of period/i });
       fireEvent.click(confirmButton);
 
       await waitFor(() => {
         expect(stripeService.stripeService.cancelSubscription).toHaveBeenCalledWith(false);
-        expect(toast.success).toHaveBeenCalledWith('Abonnement annulé', {
-          description: 'Votre abonnement sera annulé à la fin de la période en cours',
+        expect(toast.success).toHaveBeenCalledWith('Subscription cancelled', {
+          description: 'Your subscription will be cancelled at the end of the current period',
         });
         expect(mockRefreshUser).toHaveBeenCalled();
       });
@@ -334,7 +334,7 @@ describe('SubscriptionManager', () => {
       render(<SubscriptionManager />);
 
       await waitFor(() => {
-        expect(screen.getByText(/Votre abonnement sera annulé à la fin de la période en cours/i)).toBeInTheDocument();
+        expect(screen.getByText(/Your subscription will be cancelled at the end of the current period/i)).toBeInTheDocument();
       });
     });
 
@@ -346,22 +346,22 @@ describe('SubscriptionManager', () => {
       render(<SubscriptionManager />);
 
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /Annuler l'abonnement/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Cancel subscription/i })).toBeInTheDocument();
       });
 
-      const cancelButton = screen.getByRole('button', { name: /Annuler l'abonnement/i });
+      const cancelButton = screen.getByRole('button', { name: /Cancel subscription/i });
       fireEvent.click(cancelButton);
 
       await waitFor(() => {
-        expect(screen.getByText(/Annuler à la fin de la période/i)).toBeInTheDocument();
+        expect(screen.getByText(/Cancel at end of period/i)).toBeInTheDocument();
       });
 
-      const confirmButton = screen.getByRole('button', { name: /Annuler à la fin de la période/i });
+      const confirmButton = screen.getByRole('button', { name: /Cancel at end of period/i });
       fireEvent.click(confirmButton);
 
       await waitFor(() => {
-        expect(toast.error).toHaveBeenCalledWith('Erreur', {
-          description: 'Impossible d\'annuler l\'abonnement',
+        expect(toast.error).toHaveBeenCalledWith('Error', {
+          description: 'Unable to cancel subscription',
         });
       });
     });
@@ -392,7 +392,7 @@ describe('SubscriptionManager', () => {
       render(<SubscriptionManager />);
 
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /Annuler l'abonnement/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Cancel subscription/i })).toBeInTheDocument();
       });
     });
 
@@ -409,8 +409,8 @@ describe('SubscriptionManager', () => {
       render(<SubscriptionManager />);
 
       await waitFor(() => {
-        expect(screen.queryByRole('button', { name: /Annuler l'abonnement/i })).not.toBeInTheDocument();
-        expect(screen.getByText(/Votre abonnement sera annulé à la fin de la période en cours/i)).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /Cancel subscription/i })).not.toBeInTheDocument();
+        expect(screen.getByText(/Your subscription will be cancelled at the end of the current period/i)).toBeInTheDocument();
       });
     });
   });

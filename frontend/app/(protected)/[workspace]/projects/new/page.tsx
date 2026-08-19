@@ -49,13 +49,13 @@ export default function NewProjectPage() {
         isPublic,
       })
       if (project) {
-        toast.success(`Projet "${project.name}" créé`)
+        toast.success(`Project "${project.name}" created`)
         router.push(`/${slug}/projects/${project.id}/issues`)
       } else {
-        toast.error("Impossible de créer le projet")
+        toast.error("Could not create the project")
       }
     } catch {
-      toast.error("Une erreur est survenue lors de la création du projet")
+      toast.error("An error occurred while creating the project")
     } finally {
       setIsLoading(false)
     }

@@ -34,7 +34,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error("[ErrorBoundary]", error, info)
     reportClientError("error", error.message, info.componentStack ?? "ErrorBoundary", error.stack)
-    toast.error("Une erreur inattendue s'est produite", {
+    toast.error("An unexpected error occurred", {
       description: error.message,
       duration: 6000,
     })
@@ -50,7 +50,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
             <AlertTriangle className="h-7 w-7 text-destructive" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-foreground">Quelque chose s&apos;est mal passé</h2>
+            <h2 className="text-lg font-semibold text-foreground">Something went wrong</h2>
             <p className="text-sm text-muted-foreground mt-1">{this.state.error?.message}</p>
           </div>
           <Button
@@ -58,7 +58,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
             size="sm"
             onClick={() => this.setState({ hasError: false, error: null })}
           >
-            Réessayer
+            Try again
           </Button>
         </div>
       )

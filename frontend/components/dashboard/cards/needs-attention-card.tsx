@@ -41,8 +41,8 @@ export function NeedsAttentionCard({ slug, refreshToken }: DashboardCardBodyProp
     return (
       <div className="flex h-full flex-col items-center justify-center gap-1.5 p-4 text-center">
         <CheckCircle2 className="size-5 text-emerald-500" />
-        <p className="text-sm font-medium text-muted-foreground">Rien à signaler</p>
-        <p className="text-xs text-muted-foreground/70">Toutes les opérations sont saines.</p>
+        <p className="text-sm font-medium text-muted-foreground">Nothing to report</p>
+        <p className="text-xs text-muted-foreground/70">All operations are healthy.</p>
       </div>
     )
   }

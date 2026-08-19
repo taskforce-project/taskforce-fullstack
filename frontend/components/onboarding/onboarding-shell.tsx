@@ -145,7 +145,7 @@ export function OnboardingShell({
             <span className="font-medium text-foreground">{steps[current - 1]}</span>
           </div>
           <span className="ml-auto text-sm text-muted-foreground md:hidden">
-            Étape {current} / {steps.length}
+            Step {current} / {steps.length}
           </span>
         </header>
 

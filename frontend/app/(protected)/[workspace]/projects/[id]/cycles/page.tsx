@@ -81,7 +81,7 @@ function CycleCard({ cycle, href }: { readonly cycle: Cycle; readonly href: stri
           {cycle.issueCount} issue{cycle.issueCount !== 1 ? "s" : ""}
         </span>
       ) : (
-        <span className="text-xs text-amber-400/80 hidden md:block shrink-0">Aucune issue — à remplir</span>
+        <span className="text-xs text-amber-400/80 hidden md:block shrink-0">No issues — add some</span>
       )}
 
       <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
@@ -134,8 +134,8 @@ export default function ProjectCyclesPage() {
   return (
     <div className="flex flex-col gap-4">
       <p className="text-xs text-muted-foreground">
-        Les <span className="font-medium text-foreground">cycles</span> (sprints) sont des itérations limitées dans le temps :
-        regroupez-y des issues pour suivre la vélocité, la charge et les échéances de l&apos;équipe.
+        <span className="font-medium text-foreground">Cycles</span> (sprints) are time-boxed iterations:
+        group issues into them to track your team&apos;s velocity, workload, and deadlines.
       </p>
       <div className="flex items-center justify-between">
         {error ? (
@@ -158,8 +158,8 @@ export default function ProjectCyclesPage() {
         <Empty>
           <EmptyHeader>
             <EmptyMedia variant="icon"><RefreshCw /></EmptyMedia>
-            <EmptyTitle>Aucun cycle</EmptyTitle>
-            <EmptyDescription>Créez un sprint pour planifier vos issues dans le temps.</EmptyDescription>
+            <EmptyTitle>No cycles</EmptyTitle>
+            <EmptyDescription>Create a sprint to schedule your issues over time.</EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
             <CreateCycleDialog projectId={projectId} onCreated={() => fetchCycles(workspace, projectId)}>

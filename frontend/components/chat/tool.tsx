@@ -20,10 +20,10 @@ export interface ToolProps {
 }
 
 const STATUS: Record<ToolStatus, { label: string; cls: string; icon: React.ElementType; spin?: boolean }> = {
-  pending: { label: "En attente", cls: "text-muted-foreground", icon: Wrench },
-  running: { label: "En cours", cls: "text-amber-500", icon: Loader2, spin: true },
-  success: { label: "Terminé", cls: "text-emerald-500", icon: Check },
-  error: { label: "Erreur", cls: "text-destructive", icon: X },
+  pending: { label: "Pending", cls: "text-muted-foreground", icon: Wrench },
+  running: { label: "Running", cls: "text-amber-500", icon: Loader2, spin: true },
+  success: { label: "Completed", cls: "text-emerald-500", icon: Check },
+  error: { label: "Error", cls: "text-destructive", icon: X },
 }
 
 function asText(v: unknown): string {
@@ -52,13 +52,13 @@ export function Tool({ name, status = "success", input, output, defaultOpen = fa
         <div className="space-y-2 border-t px-3 py-2">
           {input != null && (
             <div>
-              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Entrée</div>
+              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Input</div>
               <pre className="overflow-x-auto rounded bg-background p-2 font-mono text-xs">{asText(input)}</pre>
             </div>
           )}
           {output != null && (
             <div>
-              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Sortie</div>
+              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Output</div>
               <pre className="overflow-x-auto rounded bg-background p-2 font-mono text-xs">{asText(output)}</pre>
             </div>
           )}

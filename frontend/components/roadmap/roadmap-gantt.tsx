@@ -462,7 +462,7 @@ export function RoadmapGantt({ slug, projectId }: { readonly slug: string; reado
           <div style={{ minWidth: LABEL_W + totalPx }}>
             {projectGroups.length === 0 && (
               <div className="px-4 py-10 text-center text-sm text-muted-foreground">
-                Aucun élément planifié à afficher.
+                No planned items to display.
               </div>
             )}
             {projectGroups.map(([projectName, groupItems]) => {

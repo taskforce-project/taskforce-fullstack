@@ -10,7 +10,7 @@ import { DashboardSpecChart } from "../spec-chart"
  */
 export function AiChartCard({ slug, card, refreshToken }: DashboardCardBodyProps) {
   const spec = card.config.spec
-  if (!spec) return <CardEmpty message="Aucune spec de graphe attachée à cette carte" />
+  if (!spec) return <CardEmpty message="No chart spec attached to this card" />
 
   return (
     <div className="flex h-full flex-col p-4 pb-2">

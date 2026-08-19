@@ -106,7 +106,7 @@ export function CortexUsage({ sessionTokens, className }: { sessionTokens: numbe
         type="button"
         onClick={() => setOpen((o) => !o)}
         className="flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        title="Fenêtre de contexte & utilisation"
+        title="Context window & usage"
       >
         <Ring pct={ctxPct} />
         <span className="font-medium">Cortex</span>
@@ -122,7 +122,7 @@ export function CortexUsage({ sessionTokens, className }: { sessionTokens: numbe
               onClick={openDetails}
               className="flex w-full items-center justify-between text-left text-xs transition-colors hover:text-foreground"
             >
-              <span className="text-muted-foreground">Fenêtre de contexte</span>
+              <span className="text-muted-foreground">Context window</span>
               <span className="flex items-center gap-1 tabular-nums font-medium">
                 {fmt(sessionTokens)} / {fmt(CONTEXT_WINDOW)} <span className="text-muted-foreground">({ctxPct}%)</span>
                 <ChevronRight className="size-3 text-muted-foreground" />
@@ -140,18 +140,18 @@ export function CortexUsage({ sessionTokens, className }: { sessionTokens: numbe
               onClick={openDetails}
               className="flex w-full items-center justify-between text-left text-xs font-semibold transition-colors hover:text-foreground"
             >
-              <span>Utilisation du forfait · <span className="uppercase text-muted-foreground">{usage?.plan ?? "…"}</span></span>
+              <span>Plan usage · <span className="uppercase text-muted-foreground">{usage?.plan ?? "…"}</span></span>
               <ChevronRight className="size-3 text-muted-foreground" />
             </button>
 
             <div className="mt-2 space-y-1">
               <div className="flex items-center justify-between text-[11px]">
-                <span className="text-muted-foreground">Ce mois</span>
+                <span className="text-muted-foreground">This month</span>
                 <span className="tabular-nums">
                   {usage
                     ? (unlimited
-                      ? <>Réinit. le {usage.resetAt} · <span className="font-medium">illimité</span></>
-                      : <>Réinit. le {usage.resetAt} · <span className="font-medium">{usePct}%</span></>)
+                      ? <>Resets {usage.resetAt} · <span className="font-medium">unlimited</span></>
+                      : <>Resets {usage.resetAt} · <span className="font-medium">{usePct}%</span></>)
                     : "…"}
                 </span>
               </div>
@@ -161,7 +161,7 @@ export function CortexUsage({ sessionTokens, className }: { sessionTokens: numbe
                   <span className="tabular-nums">
                     {fmt(usage.usedTokens)} {unlimited ? "" : `/ ${fmt(usage.limitTokens)} `}tokens
                   </span>
-                  <span className="tabular-nums">{usage.promptTokens.toLocaleString("fr-FR")}↑ · {usage.completionTokens.toLocaleString("fr-FR")}↓ · {usage.requestCount} req.</span>
+                  <span className="tabular-nums">{usage.promptTokens.toLocaleString("en-US")}↑ · {usage.completionTokens.toLocaleString("en-US")}↓ · {usage.requestCount} req.</span>
                 </div>
               )}
             </div>
@@ -188,14 +188,14 @@ export function CortexUsage({ sessionTokens, className }: { sessionTokens: numbe
                 onClick={openDetails}
                 className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] font-medium transition-colors hover:bg-muted"
               >
-                <ExternalLink className="size-3" /> Détails
+                <ExternalLink className="size-3" /> Details
               </button>
               <button
                 type="button"
                 onClick={() => { setOpen(false); openUpgrade() }}
                 className="flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-[11px] font-medium text-primary-foreground transition-opacity hover:opacity-90"
               >
-                <Zap className="size-3" /> Améliorer
+                <Zap className="size-3" /> Upgrade
               </button>
             </div>
           </div>

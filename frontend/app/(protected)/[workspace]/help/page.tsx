@@ -39,95 +39,95 @@ interface DocArticle {
 }
 
 const CATEGORIES: readonly DocCategory[] = [
-  { id: "start",       label: "Démarrage",            icon: <Sparkles className="h-4 w-4" />,   color: "text-amber-500 bg-amber-500/10 border-amber-500/20" },
-  { id: "operations",  label: "Opérations & tâches",  icon: <Layers className="h-4 w-4" />,     color: "text-blue-500 bg-blue-500/10 border-blue-500/20" },
-  { id: "smart",       label: "Smart Assign (IA)",    icon: <Cpu className="h-4 w-4" />,         color: "text-violet-500 bg-violet-500/10 border-violet-500/20" },
-  { id: "people",      label: "Membres & équipes",    icon: <Users className="h-4 w-4" />,      color: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20" },
+  { id: "start",       label: "Getting started",      icon: <Sparkles className="h-4 w-4" />,   color: "text-amber-500 bg-amber-500/10 border-amber-500/20" },
+  { id: "operations",  label: "Operations & tasks",   icon: <Layers className="h-4 w-4" />,     color: "text-blue-500 bg-blue-500/10 border-blue-500/20" },
+  { id: "smart",       label: "Smart Assign (AI)",    icon: <Cpu className="h-4 w-4" />,         color: "text-violet-500 bg-violet-500/10 border-violet-500/20" },
+  { id: "people",      label: "Members & teams",      icon: <Users className="h-4 w-4" />,      color: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20" },
   { id: "analytics",   label: "Analytics & Assistant",icon: <Activity className="h-4 w-4" />,   color: "text-cyan-500 bg-cyan-500/10 border-cyan-500/20" },
-  { id: "billing",     label: "Plans & facturation",  icon: <CreditCard className="h-4 w-4" />, color: "text-orange-500 bg-orange-500/10 border-orange-500/20" },
-  { id: "security",    label: "Sécurité & données",   icon: <Shield className="h-4 w-4" />,      color: "text-rose-500 bg-rose-500/10 border-rose-500/20" },
+  { id: "billing",     label: "Plans & billing",      icon: <CreditCard className="h-4 w-4" />, color: "text-orange-500 bg-orange-500/10 border-orange-500/20" },
+  { id: "security",    label: "Security & data",      icon: <Shield className="h-4 w-4" />,      color: "text-rose-500 bg-rose-500/10 border-rose-500/20" },
 ]
 
 const ARTICLES: readonly DocArticle[] = [
   {
     id: "start-workspace", category: "start",
-    title: "Créer un workspace et inviter votre équipe",
-    body: "Un workspace regroupe vos opérations, membres et équipes. Créez-en un depuis le sélecteur en haut de la barre latérale (« Nouveau workspace »). Invitez ensuite des membres depuis People → Members : par email (ils reçoivent un lien d'invitation) ou en recherchant un utilisateur existant. Chaque membre reçoit un rôle (Owner, Admin ou Member).",
+    title: "Create a workspace and invite your team",
+    body: "A workspace brings together your operations, members and teams. Create one from the selector at the top of the sidebar ('New workspace'). Then invite members from People → Members: by email (they receive an invitation link) or by searching for an existing user. Each member is given a role (Owner, Admin or Member).",
   },
   {
     id: "start-operation", category: "start",
-    title: "Créer votre première opération (projet)",
-    body: "Une « opération » est un projet. Cliquez sur « New project » dans la barre latérale ou « New Operation » sur la page Operations. Donnez-lui un nom, une icône et une couleur. L'opération ouvre un board kanban prêt à l'emploi (Backlog, Todo, In Progress, Done, Cancelled).",
+    title: "Create your first operation (project)",
+    body: "An 'operation' is a project. Click 'New project' in the sidebar or 'New Operation' on the Operations page. Give it a name, an icon and a color. The operation opens a ready-to-use kanban board (Backlog, Todo, In Progress, Done, Cancelled).",
   },
   {
     id: "start-nav", category: "start",
-    title: "Se repérer : Dashboard, Signaux, My Queue",
-    body: "Le Dashboard donne une vue d'ensemble (opérations actives, charge, complétion). Signaux (inbox) regroupe vos notifications par type (alertes, mentions, assignations). My Queue liste tout ce qui vous est assigné (issues, sprints, pages) avec des onglets de tri.",
+    title: "Finding your way: Dashboard, Signals, My Queue",
+    body: "The Dashboard gives you an overview (active operations, workload, completion). Signals (inbox) groups your notifications by type (alerts, mentions, assignments). My Queue lists everything assigned to you (issues, sprints, pages) with sorting tabs.",
   },
   {
     id: "ops-board", category: "operations",
-    title: "Le board kanban : colonnes, drag & drop, statuts",
-    body: "Chaque colonne correspond à un statut. Glissez une carte d'une colonne à l'autre pour changer son statut (le déplacement est instantané et synchronisé en temps réel). Double-cliquez sur un titre de colonne pour le renommer, ou changez sa couleur via le menu « … ». Ajoutez une colonne avec le bouton à droite du board.",
+    title: "The kanban board: columns, drag & drop, statuses",
+    body: "Each column maps to a status. Drag a card from one column to another to change its status (the move is instant and synced in real time). Double-click a column title to rename it, or change its color from the '…' menu. Add a column with the button to the right of the board.",
   },
   {
     id: "ops-views", category: "operations",
-    title: "Vues List, Backlog et Cycles",
-    body: "En plus du board, chaque opération propose : List (toutes les issues groupées par statut), Backlog (à planifier), et Cycles (sprints limités dans le temps). Les filtres en ligne (Priorité / Assigné / Label) s'appliquent à toutes ces vues.",
+    title: "List, Backlog and Cycles views",
+    body: "In addition to the board, each operation offers: List (all issues grouped by status), Backlog (to be planned), and Cycles (time-boxed sprints). The inline filters (Priority / Assignee / Label) apply to all of these views.",
   },
   {
     id: "ops-issue", category: "operations",
-    title: "Créer et enrichir une issue",
-    body: "Ouvrez une issue pour éditer son titre, sa description, sa priorité, son assigné, son échéance et ses labels. Les onglets permettent d'ajouter : commentaires, sous-tâches, relations, checklist (avec % d'avancement), pièces jointes et temps passé (worklogs).",
+    title: "Create and enrich an issue",
+    body: "Open an issue to edit its title, description, priority, assignee, due date and labels. The tabs let you add: comments, sub-tasks, relations, a checklist (with % progress), attachments and time spent (worklogs).",
   },
   {
     id: "smart-how", category: "smart",
-    title: "Comment fonctionne le Smart Assign",
-    body: "Le Smart Assign recommande le meilleur assigné pour une issue en combinant plusieurs signaux : adéquation des compétences (sémantique), charge de travail actuelle (cross-projets), disponibilité/capacité déclarée, et historique de résolution. Une explication (le « pourquoi ») et un breakdown de score sont affichés.",
+    title: "How Smart Assign works",
+    body: "Smart Assign recommends the best assignee for an issue by combining several signals: skill fit (semantic), current workload (cross-project), declared availability/capacity, and resolution history. An explanation (the 'why') and a score breakdown are shown.",
   },
   {
     id: "smart-skills", category: "smart",
-    title: "Renseigner les compétences d'un membre",
-    body: "Les recommandations s'améliorent quand les profils sont remplis. Sur la fiche d'un membre, éditez sa carte de compétences (skills + texte d'expertise + séniorité + capacité h/sem). Vous pouvez aussi activer le mode « montée en compétence » pour favoriser l'apprentissage sur des tâches adjacentes.",
+    title: "Set a member's skills",
+    body: "Recommendations improve when profiles are filled in. On a member's profile, edit their skills card (skills + expertise text + seniority + capacity h/week). You can also enable the 'upskilling' mode to encourage learning on adjacent tasks.",
   },
   {
     id: "smart-bulk", category: "smart",
-    title: "Auto-assign en lot",
-    body: "Sur le board, le bouton « Auto-assign (N) » recommande un assigné pour chaque issue non assignée. Vous cochez les suggestions à appliquer et assignez en une fois.",
+    title: "Bulk auto-assign",
+    body: "On the board, the 'Auto-assign (N)' button recommends an assignee for each unassigned issue. You check the suggestions to apply and assign them all at once.",
   },
   {
     id: "people-roles", category: "people",
-    title: "Membres et rôles",
-    body: "Trois rôles : Owner (contrôle total), Admin (gère membres et contenu), Member (contribue). Sur la page Members, un Owner peut promouvoir/rétrograder et retirer des membres. Les actions destructives sont toujours en rouge.",
+    title: "Members and roles",
+    body: "Three roles: Owner (full control), Admin (manages members and content), Member (contributes). On the Members page, an Owner can promote/demote and remove members. Destructive actions are always shown in red.",
   },
   {
     id: "people-teams", category: "people",
-    title: "Équipes et association aux opérations",
-    body: "Les équipes regroupent des membres par fonction. Vous pouvez associer une équipe à une opération depuis l'onglet Members de l'opération, pour gérer les accès et la composition par projet.",
+    title: "Teams and linking to operations",
+    body: "Teams group members by function. You can link a team to an operation from the operation's Members tab, to manage access and composition per project.",
   },
   {
     id: "analytics-read", category: "analytics",
-    title: "Lire les analytics",
-    body: "La page Intelligence affiche les KPIs (tâches résolues, cycle time, vélocité, cycles actifs), le throughput hebdomadaire, le burndown de sprint et la capacité d'équipe. Filtrez par opération avec le sélecteur en haut. Les analytics avancées sont incluses dans le plan Pro.",
+    title: "Reading the analytics",
+    body: "The Intelligence page shows KPIs (resolved tasks, cycle time, velocity, active cycles), weekly throughput, sprint burndown and team capacity. Filter by operation with the selector at the top. Advanced analytics are included in the Pro plan.",
   },
   {
     id: "analytics-assistant", category: "analytics",
-    title: "Utiliser l'assistant Ask AI",
-    body: "Cliquez sur « Ask AI » dans la barre du haut pour ouvrir l'assistant. Posez vos questions sur vos projets, tâches ou stratégie ; il répond en contexte. L'assistant IA est une fonctionnalité Pro.",
+    title: "Using the Ask AI assistant",
+    body: "Click 'Ask AI' in the top bar to open the assistant. Ask questions about your projects, tasks or strategy; it answers in context. The AI assistant is a Pro feature.",
   },
   {
     id: "billing-plans", category: "billing",
-    title: "Plans : Free, Pro, Enterprise",
-    body: "Free : 2 workspaces, jusqu'à 5 membres, board/list/cycles, Smart Assign de base. Pro : 10 workspaces, jusqu'à 50 membres, analytics avancées, assistant IA, intégrations. Enterprise : membres illimités, SSO, audit avancé, on-premise.",
+    title: "Plans: Free, Pro, Enterprise",
+    body: "Free: 2 workspaces, up to 5 members, board/list/cycles, basic Smart Assign. Pro: 10 workspaces, up to 50 members, advanced analytics, AI assistant, integrations. Enterprise: unlimited members, SSO, advanced audit, on-premise.",
   },
   {
     id: "billing-upgrade", category: "billing",
-    title: "Passer à Pro et gérer la facturation",
-    body: "Cliquez sur n'importe quel bouton « Passer à Pro » (profil, switcher, page Members) pour ouvrir la fenêtre d'upgrade et lancer le paiement sécurisé. Une fois abonné, gérez votre facturation depuis Settings → Billing & Plan (portail Stripe).",
+    title: "Upgrade to Pro and manage billing",
+    body: "Click any 'Upgrade to Pro' button (profile, switcher, Members page) to open the upgrade window and start the secure payment. Once subscribed, manage your billing from Settings → Billing & Plan (Stripe portal).",
   },
   {
     id: "security-gdpr", category: "security",
-    title: "Vos données (RGPD)",
-    body: "Depuis Settings → Privacy & Data, vous pouvez exporter l'ensemble de vos données personnelles (JSON) ou demander la suppression/anonymisation de votre compte. La politique de confidentialité détaille les données collectées, leurs bases légales et vos droits.",
+    title: "Your data (GDPR)",
+    body: "From Settings → Privacy & Data, you can export all of your personal data (JSON) or request deletion/anonymization of your account. The privacy policy details the data collected, its legal bases and your rights.",
   },
 ]
 
@@ -178,7 +178,7 @@ export default function HelpPage() {
         <Button asChild variant="outline" size="sm" className="shrink-0 gap-1.5">
           <Link href={`/${slug}/dashboard?tour=1`}>
             <Compass className="size-4" />
-            Revoir la visite guidée
+            Replay the guided tour
           </Link>
         </Button>
       </div>
@@ -199,11 +199,11 @@ export default function HelpPage() {
         /* ── Résultats de recherche (à plat) ─────────────────────────── */
         <div className="flex flex-col gap-4">
           <p className="text-xs text-muted-foreground">
-            {searchResults.length} résultat{searchResults.length !== 1 ? "s" : ""} pour « {query} »
+            {searchResults.length} result{searchResults.length !== 1 ? "s" : ""} for "{query}"
           </p>
           {searchResults.length === 0 ? (
             <p className="rounded-xl border border-border bg-card py-10 text-center text-sm text-muted-foreground">
-              Aucun article ne correspond à votre recherche.
+              No article matches your search.
             </p>
           ) : (
             <div className="flex flex-col gap-4">
@@ -228,7 +228,7 @@ export default function HelpPage() {
         <div className="flex gap-8">
           {/* Sommaire (sticky) */}
           <nav className="sticky top-0 hidden h-fit w-56 shrink-0 flex-col gap-0.5 lg:flex">
-            <p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Sommaire</p>
+            <p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Contents</p>
             {sections.map(({ category }) => (
               <button
                 key={category.id}

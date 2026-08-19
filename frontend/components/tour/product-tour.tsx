@@ -51,60 +51,60 @@ const STEPS: readonly TourStep[] = [
   {
     hero: true,
     icon: Compass,
-    title: "Bienvenue dans TaskForce 👋",
-    body: "TaskForce est le centre de commande de ton équipe : organise le travail en opérations, laisse Cortex répartir l'effort, et garde le pouls de tout au même endroit. Un tour éclair pour repérer l'essentiel.",
+    title: "Welcome to TaskForce 👋",
+    body: "TaskForce is your team's command center: organize work into operations, let Cortex distribute the effort, and keep a pulse on everything in one place. A quick tour to spot the essentials.",
     points: [
-      { icon: Layers, title: "Opérations", text: "Projets, issues et cycles dans un board clair." },
-      { icon: Sparkles, title: "Cortex (IA)", text: "Priorise, assigne et t'assiste partout." },
-      { icon: Activity, title: "Analytics", text: "Santé, débit et risques en temps réel." },
+      { icon: Layers, title: "Operations", text: "Projects, issues, and cycles in a clear board." },
+      { icon: Sparkles, title: "Cortex (AI)", text: "Prioritizes, assigns, and assists you everywhere." },
+      { icon: Activity, title: "Analytics", text: "Health, throughput, and risks in real time." },
     ],
   },
   {
-    title: "Ta navigation",
-    body: "Command, Work, People : tout se pilote depuis la barre latérale. Le workspace et ton compte s'y trouvent aussi.",
+    title: "Your navigation",
+    body: "Command, Work, People: everything is driven from the sidebar. Your workspace and account live there too.",
     target: '[data-tour="sidebar"]',
     placement: "right",
   },
   {
-    title: "Lance une opération",
-    body: "Une opération, c'est un projet. Crée la première ici — issues, cycles et assignation suivent.",
+    title: "Launch an operation",
+    body: "An operation is a project. Create your first one here — issues, cycles, and assignment follow.",
     target: '[data-tour="create-operation"]',
   },
   {
-    title: "Cortex, ton copilote",
-    body: "Génère des specs, priorise, assigne : l'IA t'assiste partout dans l'app. Ouvre-la d'un clic ici.",
+    title: "Cortex, your copilot",
+    body: "Generate specs, prioritize, assign: the AI assists you everywhere in the app. Open it in one click here.",
     target: '[data-tour="ask-ai"]',
   },
   {
-    title: "Tes analytics en direct",
-    body: "Santé des opérations, débit, risques : le pouls de ton équipe, sur données réelles et temps réel.",
+    title: "Your live analytics",
+    body: "Operation health, throughput, risks: your team's pulse, on real data and in real time.",
     target: '[data-tour="analytics"]',
   },
   {
     hero: true,
     bg: "/assets/tour/labs-wave.jpg",
-    title: "Repères visuels",
-    body: "Trois codes pour t'orienter d'un coup d'œil dans l'app.",
+    title: "Visual cues",
+    body: "Three cues to orient you at a glance in the app.",
     points: [
       {
         icon: FlaskConical,
         iconClassName: "text-violet-500",
         title: "Labs",
-        text: "Une fiole violette = fonctionnalité avancée, encore en finition (Intelligence, Brain OS).",
+        text: "A purple flask = advanced feature, still being polished (Intelligence, Brain OS).",
       },
-      { icon: Zap, title: "Action clé", text: "Le bleu marque l'action principale de chaque écran." },
-      { icon: Lock, title: "Bientôt", text: "Un cadenas signale une entrée à venir." },
+      { icon: Zap, title: "Key action", text: "Blue marks the primary action on every screen." },
+      { icon: Lock, title: "Coming soon", text: "A padlock marks an upcoming entry." },
     ],
   },
   {
     hero: true,
     icon: Rocket,
-    title: "Passe à la vitesse supérieure",
-    body: "Tu es en Free : 100 000 tokens Cortex par mois. Un forfait supérieur débloque tout le potentiel de l'app.",
+    title: "Kick it up a notch",
+    body: "You're on Free: 100,000 Cortex tokens per month. A higher plan unlocks the app's full potential.",
     points: [
-      { icon: Zap, title: "Plus de tokens Cortex", text: "De quoi faire tourner l'IA sans compter." },
-      { icon: Sparkles, title: "Assistant complet", text: "Ask AI en contexte, partout." },
-      { icon: Activity, title: "Analyses avancées", text: "Prévisions et tableaux de bord étendus." },
+      { icon: Zap, title: "More Cortex tokens", text: "Enough to run the AI without counting." },
+      { icon: Sparkles, title: "Full assistant", text: "Ask AI in context, everywhere." },
+      { icon: Activity, title: "Advanced analytics", text: "Forecasts and expanded dashboards." },
     ],
     cta: "upgrade",
   },
@@ -243,7 +243,7 @@ export function ProductTour() {
   const HeroIcon = step.icon ?? Sparkles;
 
   return createPortal(
-    <div className="fixed inset-0 z-[9990]" role="dialog" aria-modal="true" aria-label="Visite guidée">
+    <div className="fixed inset-0 z-[9990]" role="dialog" aria-modal="true" aria-label="Guided tour">
       {/* Voile + bloqueur de clics. Sans spotlight (hero / cible manquante) : dim uniforme. */}
       <div
         className="absolute inset-0"
@@ -266,12 +266,12 @@ export function ProductTour() {
               <span className="flex size-6 items-center justify-center rounded-md bg-primary/10 text-primary">
                 <Sparkles className="size-3.5" />
               </span>
-              Étape {stepIndex + 1} sur {STEPS.length}
+              Step {stepIndex + 1} of {STEPS.length}
             </span>
             <button
               type="button"
               onClick={() => close(dontShowAgain)}
-              aria-label="Fermer la visite"
+              aria-label="Close tour"
               className="text-muted-foreground transition-colors hover:text-foreground"
             >
               <X className="size-4" />
@@ -291,12 +291,12 @@ export function ProductTour() {
                 <div className="absolute inset-x-0 top-0 flex items-center justify-between px-4 pt-3.5">
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-background/80 px-2.5 py-1 text-xs font-medium text-foreground backdrop-blur">
                     <Sparkles className="size-3.5 text-primary" />
-                    Étape {stepIndex + 1} sur {STEPS.length}
+                    Step {stepIndex + 1} of {STEPS.length}
                   </span>
                   <button
                     type="button"
                     onClick={() => close(dontShowAgain)}
-                    aria-label="Fermer la visite"
+                    aria-label="Close tour"
                     className="flex size-7 items-center justify-center rounded-full bg-background/80 text-muted-foreground backdrop-blur transition-colors hover:text-foreground"
                   >
                     <X className="size-4" />
@@ -359,7 +359,7 @@ export function ProductTour() {
                 style={{ accentColor: "var(--primary)" }}
                 className="size-3.5 rounded border-border"
               />
-              Ne plus afficher cette visite
+              Don&apos;t show this tour again
             </label>
           )}
           <div className="flex items-center justify-between gap-2">
@@ -374,21 +374,21 @@ export function ProductTour() {
             <div className="flex items-center gap-1.5">
               {!isFirst && (
                 <Button variant="ghost" size="sm" onClick={goPrev}>
-                  <ArrowLeft /> Précédent
+                  <ArrowLeft /> Back
                 </Button>
               )}
               {step.cta === "upgrade" ? (
                 <>
                   <Button variant="ghost" size="sm" onClick={() => close(true)}>
-                    Terminer
+                    Finish
                   </Button>
                   <Button size="sm" onClick={handleUpgrade}>
-                    Voir les forfaits <Sparkles />
+                    View plans <Sparkles />
                   </Button>
                 </>
               ) : (
                 <Button size="sm" onClick={goNext}>
-                  {isFirst ? "C'est parti" : isLast ? "Terminer" : "Suivant"}
+                  {isFirst ? "Let's go" : isLast ? "Finish" : "Next"}
                   {!isLast && <ArrowRight />}
                 </Button>
               )}

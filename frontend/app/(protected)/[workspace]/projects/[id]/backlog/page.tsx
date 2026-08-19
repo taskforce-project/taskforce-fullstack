@@ -176,7 +176,7 @@ export default function ProjectBacklogPage() {
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); handleToggleDone(issue) }}
-              title="Marquer comme terminée"
+              title="Mark as done"
               className="shrink-0 text-muted-foreground transition-colors hover:text-emerald-500"
             >
               <CircleDot className="h-3.5 w-3.5" />
@@ -208,7 +208,7 @@ export default function ProjectBacklogPage() {
         {hasMore && (
           <div ref={sentinelRef} className="flex items-center justify-center gap-2 px-4 py-3 text-xs text-muted-foreground/60 border-b border-border/50">
             <span className="size-3 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-transparent" />
-            Chargement… ({visibleIssues.length}/{backlogIssues.length})
+            Loading… ({visibleIssues.length}/{backlogIssues.length})
           </div>
         )}
 

@@ -177,10 +177,10 @@ export function CreateIssueDialog({
       })
       setSuggestion(result)
       if (!result.recommended) {
-        toast.warning("Aucune suggestion — ajoute des membres au projet (ou des labels/compétences)")
+        toast.warning("No suggestion — add members to the project (or labels/skills)")
       }
     } catch {
-      toast.error("Impossible de générer la suggestion Smart Assign")
+      toast.error("Could not generate Smart Assign suggestion")
     } finally {
       setSuggesting(false)
     }
@@ -438,7 +438,7 @@ export function CreateIssueDialog({
 
                 {suggestion.alternatives.length > 0 && (
                   <div className="flex flex-col gap-1.5">
-                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Autres candidats</span>
+                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Other candidates</span>
                     <div className="flex flex-wrap gap-1.5">
                       {suggestion.alternatives.map((c) => (
                         <button

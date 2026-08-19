@@ -114,11 +114,11 @@ function renderInline(text: string, keyPrefix: string, opts: MarkdownProps): Rea
 const CALLOUTS: Record<string, { icon: typeof Info; cls: string; accent: string; label: string }> = {
   note:    { icon: Info, cls: "border-blue-500/30 bg-blue-500/5", accent: "text-blue-500", label: "Note" },
   info:    { icon: Info, cls: "border-blue-500/30 bg-blue-500/5", accent: "text-blue-500", label: "Info" },
-  tip:     { icon: Lightbulb, cls: "border-emerald-500/30 bg-emerald-500/5", accent: "text-emerald-500", label: "Astuce" },
-  success: { icon: CheckCircle2, cls: "border-emerald-500/30 bg-emerald-500/5", accent: "text-emerald-500", label: "Succès" },
-  warning: { icon: AlertTriangle, cls: "border-amber-500/30 bg-amber-500/5", accent: "text-amber-500", label: "Attention" },
+  tip:     { icon: Lightbulb, cls: "border-emerald-500/30 bg-emerald-500/5", accent: "text-emerald-500", label: "Tip" },
+  success: { icon: CheckCircle2, cls: "border-emerald-500/30 bg-emerald-500/5", accent: "text-emerald-500", label: "Success" },
+  warning: { icon: AlertTriangle, cls: "border-amber-500/30 bg-amber-500/5", accent: "text-amber-500", label: "Warning" },
   danger:  { icon: XCircle, cls: "border-red-500/30 bg-red-500/5", accent: "text-red-500", label: "Danger" },
-  error:   { icon: XCircle, cls: "border-red-500/30 bg-red-500/5", accent: "text-red-500", label: "Erreur" },
+  error:   { icon: XCircle, cls: "border-red-500/30 bg-red-500/5", accent: "text-red-500", label: "Error" },
   question:{ icon: AlertCircle, cls: "border-violet-500/30 bg-violet-500/5", accent: "text-violet-500", label: "Question" },
 }
 
@@ -157,7 +157,7 @@ function CodeBlock({ code, lang }: { code: string; lang?: string }) {
     <div className="group relative my-2 overflow-hidden rounded-lg border bg-muted/40">
       <div className="flex items-center justify-between border-b bg-muted/60 px-3 py-1">
         <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{lang || "code"}</span>
-        <button type="button" onClick={copy} className="text-muted-foreground hover:text-foreground" aria-label="Copier">
+        <button type="button" onClick={copy} className="text-muted-foreground hover:text-foreground" aria-label="Copy">
           {copied ? <Check className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5" />}
         </button>
       </div>
@@ -284,7 +284,7 @@ export function Markdown(props: MarkdownProps) {
                     <button
                       type="button"
                       onClick={() => props.onToggleTask!(it.index, !it.checked)}
-                      aria-label={it.checked ? "Décocher" : "Cocher"}
+                      aria-label={it.checked ? "Uncheck" : "Check"}
                       className={`${boxCls(it.checked)} cursor-pointer hover:brightness-110`}
                     >
                       {it.checked && <Check className="size-3" />}

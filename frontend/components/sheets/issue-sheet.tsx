@@ -230,11 +230,11 @@ function GitHubTab({ issueId, workspaceSlug }: Readonly<{ issueId: number; works
         commitUrl:   linkType === "COMMIT" ? commitUrl.trim()  : undefined,
         title: linkTitle.trim() || undefined,
       })
-      toast.success("Lien GitHub ajouté")
+      toast.success("GitHub link added")
       setShowForm(false)
       setRepoFullName(""); setPrNumber(""); setPrUrl(""); setCommitSha(""); setCommitUrl(""); setLinkTitle("")
     } catch {
-      toast.error("Impossible d'ajouter le lien")
+      toast.error("Could not add link")
     } finally {
       setSubmitting(false)
     }
@@ -294,8 +294,8 @@ function GitHubTab({ issueId, workspaceSlug }: Readonly<{ issueId: number; works
               type="button"
               className="text-muted-foreground hover:text-destructive transition-colors"
               onClick={async () => {
-                try { await removeGitHubLink(workspaceSlug, issueId, link.id); toast.success("Lien supprimé") }
-                catch { toast.error("Impossible de supprimer le lien") }
+                try { await removeGitHubLink(workspaceSlug, issueId, link.id); toast.success("Link deleted") }
+                catch { toast.error("Could not delete link") }
               }}
             >
               <Trash2 className="size-3.5" />
@@ -442,7 +442,7 @@ function ActivityFeed({ comments, activity, loading, comment, onChange, onSend, 
         <UserAvatar email={currentUser?.email} name={currentUser?.displayName ?? currentUser?.email} avatarUrl={currentUser?.avatarUrl} className="size-7 shrink-0 mt-0.5" fallbackClassName="text-[9px]" />
         <div className="flex flex-1 flex-col gap-2">
           <Textarea
-            placeholder="Ajouter un commentaire…  (Ctrl+Entrée pour envoyer)"
+            placeholder="Add a comment…  (Ctrl+Enter to send)"
             value={comment}
             onChange={(e) => onChange(e.target.value)}
             onKeyDown={onKeyDown}
@@ -451,16 +451,16 @@ function ActivityFeed({ comments, activity, loading, comment, onChange, onSend, 
           {comment.trim() && (
             <div className="flex justify-end">
               <Button size="sm" className="h-7 gap-1.5 text-xs" onClick={onSend}>
-                <Send className="size-3" /> Commenter
+                <Send className="size-3" /> Comment
               </Button>
             </div>
           )}
         </div>
       </div>
 
-      {loading && <p className="text-xs text-muted-foreground text-center py-4">Chargement…</p>}
+      {loading && <p className="text-xs text-muted-foreground text-center py-4">Loading…</p>}
       {!loading && entries.length === 0 && (
-        <p className="text-xs text-muted-foreground italic py-2">Aucune activité pour l&apos;instant.</p>
+        <p className="text-xs text-muted-foreground italic py-2">No activity yet.</p>
       )}
 
       {shown.length > 0 && (
@@ -476,9 +476,9 @@ function ActivityFeed({ comments, activity, loading, comment, onChange, onSend, 
                     <div className="mb-1 flex items-center gap-2">
                       <span className="text-xs font-semibold text-foreground">{c.author.displayName ?? c.author.email}</span>
                       <span className="text-xs text-muted-foreground">{formatCommentTime(c.createdAt)}</span>
-                      {c.isEdited && <span className="text-[10px] italic text-muted-foreground/60">(modifié)</span>}
+                      {c.isEdited && <span className="text-[10px] italic text-muted-foreground/60">(edited)</span>}
                       {isMe && (
-                        <button type="button" onClick={() => onDelete(c.id)} title="Supprimer le commentaire" className="ml-auto rounded p-0.5 text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-400">
+                        <button type="button" onClick={() => onDelete(c.id)} title="Delete comment" className="ml-auto rounded p-0.5 text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-400">
                           <Trash2 className="size-3" />
                         </button>
                       )}
@@ -489,7 +489,7 @@ function ActivityFeed({ comments, activity, loading, comment, onChange, onSend, 
               )
             }
             const a = entry.data
-            const actorName = a.actor ? (a.actor.displayName ?? a.actor.email) : "Système"
+            const actorName = a.actor ? (a.actor.displayName ?? a.actor.email) : "System"
             return (
               <div key={`e-${a.id}`} className="flex items-center gap-3">
                 <div className="flex size-7 shrink-0 items-center justify-center rounded-full border border-border bg-muted">
@@ -515,7 +515,7 @@ function ActivityFeed({ comments, activity, loading, comment, onChange, onSend, 
           onClick={() => setVisible((v) => v + ACTIVITY_STEP)}
           className="mx-auto flex items-center gap-1.5 rounded-md px-3 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
         >
-          <ChevronDown className="size-3.5" /> Charger plus ({remaining})
+          <ChevronDown className="size-3.5" /> Load more ({remaining})
         </button>
       )}
     </div>
@@ -711,7 +711,7 @@ export function SubtasksTab({
       if (created) {
         setTitle("")
         refresh()
-        toast.success("Sous-tâche créée")
+        toast.success("Subtask created")
       }
     } finally {
       setAdding(false)
@@ -720,9 +720,9 @@ export function SubtasksTab({
 
   return (
     <div className="flex flex-col gap-2">
-      {loading && <p className="text-xs text-muted-foreground text-center py-3">Chargement…</p>}
+      {loading && <p className="text-xs text-muted-foreground text-center py-3">Loading…</p>}
       {!loading && children.length === 0 && (
-        <p className="text-xs text-muted-foreground italic py-2">Aucune sous-tâche.</p>
+        <p className="text-xs text-muted-foreground italic py-2">No subtasks.</p>
       )}
       {children.map((c) => (
         <div key={c.id} className="flex items-center gap-2 rounded-md border border-border px-2.5 py-1.5">
@@ -745,11 +745,11 @@ export function SubtasksTab({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add() } }}
-          placeholder="Nouvelle sous-tâche…"
+          placeholder="New subtask…"
           className="h-8 flex-1 text-xs"
         />
         <Button size="sm" className="h-8 gap-1 text-xs" onClick={add} disabled={!title.trim() || adding}>
-          <Plus className="size-3.5" /> Ajouter
+          <Plus className="size-3.5" /> Add
         </Button>
       </div>
     </div>
@@ -821,16 +821,16 @@ function ChecklistTab({
           <span className="text-[10px] text-muted-foreground">{doneCount}/{items.length}</span>
         </div>
       )}
-      {loading && <p className="text-xs text-muted-foreground text-center py-3">Chargement…</p>}
+      {loading && <p className="text-xs text-muted-foreground text-center py-3">Loading…</p>}
       {!loading && items.length === 0 && (
-        <p className="text-xs text-muted-foreground italic py-2">Aucun item de checklist.</p>
+        <p className="text-xs text-muted-foreground italic py-2">No checklist items.</p>
       )}
       {items.map((item) => (
         <div key={item.id} className="group flex items-center gap-2">
           <button
             type="button"
             onClick={() => toggle(item)}
-            aria-label={item.done ? "Décocher" : "Cocher"}
+            aria-label={item.done ? "Uncheck" : "Check"}
             className={cn(
               "flex size-4 shrink-0 items-center justify-center rounded border transition-colors",
               item.done ? "border-emerald-500 bg-emerald-500 text-white" : "border-border hover:border-foreground/40"
@@ -842,7 +842,7 @@ function ChecklistTab({
           <button
             type="button"
             onClick={() => remove(item)}
-            aria-label="Supprimer l'item"
+            aria-label="Delete item"
             className="flex size-6 items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
           >
             <Trash2 className="size-3.5" />
@@ -854,11 +854,11 @@ function ChecklistTab({
           value={content}
           onChange={(e) => setContent(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add() } }}
-          placeholder="Ajouter un item…"
+          placeholder="Add an item…"
           className="h-8 flex-1 text-xs"
         />
         <Button size="sm" className="h-8 gap-1 text-xs" onClick={add} disabled={!content.trim() || adding}>
-          <Plus className="size-3.5" /> Ajouter
+          <Plus className="size-3.5" /> Add
         </Button>
       </div>
     </div>
@@ -927,13 +927,13 @@ function WorklogTab({
     <div className="flex flex-col gap-2">
       {entries.length > 0 && (
         <div className="flex items-center justify-between text-xs">
-          <span className="text-muted-foreground">Total enregistré</span>
+          <span className="text-muted-foreground">Total logged</span>
           <span className="font-semibold text-foreground">{formatMinutes(total)}</span>
         </div>
       )}
-      {loading && <p className="text-xs text-muted-foreground text-center py-3">Chargement…</p>}
+      {loading && <p className="text-xs text-muted-foreground text-center py-3">Loading…</p>}
       {!loading && entries.length === 0 && (
-        <p className="text-xs text-muted-foreground italic py-2">Aucun temps enregistré.</p>
+        <p className="text-xs text-muted-foreground italic py-2">No time logged yet.</p>
       )}
       {entries.map((e) => (
         <div key={e.id} className="group flex items-center gap-2 border-b border-border/50 py-1.5 last:border-0">
@@ -954,7 +954,7 @@ function WorklogTab({
           <button
             type="button"
             onClick={() => remove(e)}
-            aria-label="Supprimer l'entrée"
+            aria-label="Delete entry"
             className="flex size-6 items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
           >
             <Trash2 className="size-3.5" />
@@ -974,11 +974,11 @@ function WorklogTab({
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add() } }}
-          placeholder="Description (optionnel)"
+          placeholder="Description (optional)"
           className="h-8 min-w-0 flex-1 text-xs"
         />
         <Button size="sm" className="h-8 shrink-0 gap-1 text-xs" onClick={add} disabled={!minutes || adding}>
-          <Plus className="size-3.5" /> Logger
+          <Plus className="size-3.5" /> Log
         </Button>
       </div>
     </div>
@@ -1022,7 +1022,7 @@ function RelationsTab({
       await addRelation(workspaceSlug, projectId, issueId, { targetIssueId: targetId, relationType: type })
       setTargetId(undefined)
       refresh()
-      toast.success("Relation ajoutée")
+      toast.success("Relation added")
     } catch {
       // erreur déjà notifiée par le client HTTP
     } finally {
@@ -1041,9 +1041,9 @@ function RelationsTab({
 
   return (
     <div className="flex flex-col gap-2">
-      {loading && <p className="text-xs text-muted-foreground text-center py-3">Chargement…</p>}
+      {loading && <p className="text-xs text-muted-foreground text-center py-3">Loading…</p>}
       {!loading && relations.length === 0 && (
-        <p className="text-xs text-muted-foreground italic py-2">Aucune relation.</p>
+        <p className="text-xs text-muted-foreground italic py-2">No relations.</p>
       )}
       {relations.map((r) => (
         <div key={r.id} className="flex items-center gap-2 rounded-md border border-border px-2.5 py-1.5">
@@ -1053,7 +1053,7 @@ function RelationsTab({
           <button
             type="button"
             onClick={() => remove(r.id)}
-            aria-label="Supprimer la relation"
+            aria-label="Delete relation"
             className="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
           >
             <Trash2 className="size-3.5" />
@@ -1077,7 +1077,7 @@ function RelationsTab({
           onValueChange={(v) => setTargetId(v ? Number(v) : undefined)}
         >
           <SelectTrigger size="sm" className="min-w-0 flex-1 text-xs">
-            <SelectValue placeholder="Choisir une issue…" />
+            <SelectValue placeholder="Choose an issue…" />
           </SelectTrigger>
           <SelectContent>
             {candidates.map((i) => (
@@ -1088,7 +1088,7 @@ function RelationsTab({
           </SelectContent>
         </Select>
         <Button size="sm" className="h-8 shrink-0 gap-1 text-xs" onClick={add} disabled={!targetId || adding}>
-          <Plus className="size-3.5" /> Lier
+          <Plus className="size-3.5" /> Link
         </Button>
       </div>
     </div>
@@ -1240,7 +1240,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
     // updateIssue avale les erreurs et renvoie null (cf. WS-10) → on remonte le refus par un toast
     // au bon moment (à l'action) plutôt que via la bannière du board révélée à la fermeture du sheet.
     const ok = await updateIssue(workspaceSlug, projectId, issueId, payload)
-    if (!ok) toast.error("Modification non enregistrée — réessaie dans un instant.")
+    if (!ok) toast.error("Change not saved — try again in a moment.")
     return Boolean(ok)
   }
 
@@ -1249,10 +1249,10 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
     if (!workspaceSlug || !projectId) return
     try {
       await deleteIssue(workspaceSlug, projectId, issueId)
-      toast.success("Issue supprimée")
+      toast.success("Issue deleted")
       onOpenChange(false)
     } catch {
-      toast.error("Échec de la suppression")
+      toast.error("Delete failed")
     }
   }
 
@@ -1261,7 +1261,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
       await navigator.clipboard.writeText(text)
       toast.success(label)
     } catch {
-      toast.error("Copie impossible")
+      toast.error("Could not copy")
     }
   }
 
@@ -1270,7 +1270,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
     const next = !pinned
     setPinned(next)
     const res = await pinIssue(workspaceSlug, projectId, issueId, next)
-    if (res) toast.success(next ? "Issue épinglée" : "Issue dépinglée")
+    if (res) toast.success(next ? "Issue pinned" : "Issue unpinned")
     else setPinned(!next)
   }
 
@@ -1278,10 +1278,10 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
     if (!workspaceSlug || !projectId) return
     const res = await archiveIssue(workspaceSlug, projectId, issueId, !(issue!.archived ?? false))
     if (res) {
-      toast.success(res.archived ? "Issue archivée" : "Issue désarchivée")
+      toast.success(res.archived ? "Issue archived" : "Issue unarchived")
       if (res.archived) onOpenChange(false)
     } else {
-      toast.error("Échec de l'archivage")
+      toast.error("Archive failed")
     }
   }
 
@@ -1289,7 +1289,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
     const next = val || null
     setDueDate(next)
     await callUpdate({ dueDate: next })
-    toast.success(next ? "Échéance mise à jour" : "Échéance retirée")
+    toast.success(next ? "Due date updated" : "Due date removed")
   }
 
   function toggleLabel(l: IssueLabel) {
@@ -1354,7 +1354,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
   async function saveDescriptionValue(next: string) {
     setDescription(next)
     await callUpdate({ description: next })
-    toast.success("Description mise à jour")
+    toast.success("Description updated")
   }
 
   return (
@@ -1417,7 +1417,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
 
           {pinned && (
             <span className="flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-500">
-              <Pin className="size-3" /> Épinglée
+              <Pin className="size-3" /> Pinned
             </span>
           )}
 
@@ -1432,27 +1432,27 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-48">
               {/* Le lien partagé rouvre le board avec la sheet (`?issue=`), pas la page isolée. */}
-              <DropdownMenuItem className="gap-2 text-xs" onClick={() => copyToClipboard(`${window.location.origin}/${workspaceSlug}/projects/${projectId}?issue=${issue.id}`, "Lien copié")}>
-                <LinkIcon className="size-3.5" /> Copier le lien
+              <DropdownMenuItem className="gap-2 text-xs" onClick={() => copyToClipboard(`${window.location.origin}/${workspaceSlug}/projects/${projectId}?issue=${issue.id}`, "Link copied")}>
+                <LinkIcon className="size-3.5" /> Copy link
               </DropdownMenuItem>
-              <DropdownMenuItem className="gap-2 text-xs" onClick={() => copyToClipboard(issue.identifier, "Identifiant copié")}>
-                <Hash className="size-3.5" /> {`Copier l'ID (${issue.identifier})`}
+              <DropdownMenuItem className="gap-2 text-xs" onClick={() => copyToClipboard(issue.identifier, "ID copied")}>
+                <Hash className="size-3.5" /> {`Copy ID (${issue.identifier})`}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="gap-2 text-xs" onClick={handleTogglePin}>
                 {pinned ? <PinOff className="size-3.5" /> : <Pin className="size-3.5" />}
-                {pinned ? "Désépingler" : "Épingler"}
+                {pinned ? "Unpin" : "Pin"}
               </DropdownMenuItem>
               <DropdownMenuItem className="gap-2 text-xs" onClick={handleArchive}>
                 {issue.archived ? <ArchiveRestore className="size-3.5" /> : <Archive className="size-3.5" />}
-                {issue.archived ? "Désarchiver" : "Archiver"}
+                {issue.archived ? "Unarchive" : "Archive"}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="gap-2 text-xs text-destructive focus:text-destructive"
                 onSelect={(e) => { e.preventDefault(); setDeleteOpen(true) }}
               >
-                <Trash2 className="size-3.5" /> Supprimer
+                <Trash2 className="size-3.5" /> Delete
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -1460,14 +1460,14 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
           <DeleteConfirmDialog
             open={deleteOpen}
             onOpenChange={setDeleteOpen}
-            title="Supprimer l'issue ?"
-            description={`« ${issue.title} » sera définitivement supprimée. Cette action est irréversible.`}
-            confirmLabel="Supprimer"
+            title="Delete issue?"
+            description={`"${issue.title}" will be permanently deleted. This action cannot be undone.`}
+            confirmLabel="Delete"
             onConfirm={handleDelete}
           />
 
           <SheetClose asChild>
-            <Button variant="ghost" size="icon" aria-label="Fermer" className="h-7 w-7 text-muted-foreground hover:text-foreground">
+            <Button variant="ghost" size="icon" aria-label="Close" className="h-7 w-7 text-muted-foreground hover:text-foreground">
               <X className="size-4" />
             </Button>
           </SheetClose>
@@ -1509,7 +1509,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
 
             {/* Spec IA — repliable (feature phare : spec + prompt + découpage) */}
             {workspaceSlug && projectId && issue?.id && (
-              <CollapsibleSection icon={<Sparkles className="size-4" />} title="Spec IA">
+              <CollapsibleSection icon={<Sparkles className="size-4" />} title="AI Spec">
                 <IssueAiSpecPanel
                   workspaceSlug={workspaceSlug}
                   projectId={projectId}
@@ -1523,7 +1523,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
 
             {/* Sous-tâches — section dédiée, sous la description (façon Asana/Linear) */}
             {workspaceSlug && projectId && (
-              <Section icon={<Layers className="size-4" />} title="Sous-tâches">
+              <Section icon={<Layers className="size-4" />} title="Subtasks">
                 <SubtasksTab issueId={issueId} projectId={projectId} workspaceSlug={workspaceSlug} />
               </Section>
             )}
@@ -1537,7 +1537,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
 
             {/* Pièces jointes — repliable (secondaire) */}
             {workspaceSlug && projectId && (
-              <CollapsibleSection icon={<Paperclip className="size-4" />} title="Pièces jointes" count={sectionCounts.attachments}>
+              <CollapsibleSection icon={<Paperclip className="size-4" />} title="Attachments" count={sectionCounts.attachments}>
                 <AttachmentsTab issueId={issueId} projectId={projectId} workspaceSlug={workspaceSlug} />
               </CollapsibleSection>
             )}
@@ -1559,7 +1559,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
             <Separator />
 
             {/* Activité + commentaires — fil unifié tout en bas */}
-            <Section icon={<Activity className="size-4" />} title="Activité" count={storeComments.length}>
+            <Section icon={<Activity className="size-4" />} title="Activity" count={storeComments.length}>
               <ActivityFeed
                 comments={storeComments}
                 activity={storeActivity}
@@ -1657,8 +1657,8 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                       setSmartOpen(true)
                       setSmartRun((t) => t + 1)
                     }}
-                    title="Assigner avec l'IA"
-                    aria-label="Assigner avec l'IA"
+                    title="Assign with AI"
+                    aria-label="Assign with AI"
                     aria-pressed={smartOpen}
                     className={cn(
                       "flex size-8 shrink-0 items-center justify-center rounded-md border transition-colors",
@@ -1765,7 +1765,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                 <SelectContent>
                   {STORY_POINT_PRESETS.map((pt) => (
                     <SelectItem key={pt ?? "none"} value={pt === null ? "none" : String(pt)}>
-                      {pt === null ? "Aucune estimation" : `${pt} pts`}
+                      {pt === null ? "No estimate" : `${pt} pts`}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1788,18 +1788,18 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                     try {
                       if (prev !== null) await removeIssueFromCycle(workspaceSlug, projectId, prev, issueId)
                       if (next !== null) await addIssueToCycle(workspaceSlug, projectId, next, issueId)
-                      toast.success(next !== null ? "Cycle mis à jour" : "Retirée du cycle")
+                      toast.success(next !== null ? "Cycle updated" : "Removed from cycle")
                     } catch {
                       setCycleId(prev)
-                      toast.error("Impossible de mettre à jour le cycle")
+                      toast.error("Could not update cycle")
                     }
                   }}
                 >
                   <SelectTrigger size="sm" className="w-full">
-                    <span>{cycleId === null ? "Aucun cycle" : (projectCycles.find((c) => c.id === cycleId)?.name ?? "—")}</span>
+                    <span>{cycleId === null ? "No cycle" : (projectCycles.find((c) => c.id === cycleId)?.name ?? "—")}</span>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">Aucun cycle</SelectItem>
+                    <SelectItem value="none">No cycle</SelectItem>
                     {projectCycles.map((c) => (
                       <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
                     ))}
@@ -1818,7 +1818,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
               />
               {isOverdue && (
                 <span className="mt-1 flex items-center gap-1 text-[11px] font-medium text-red-400">
-                  <AlertTriangle className="size-3" /> En retard
+                  <AlertTriangle className="size-3" /> Overdue
                 </span>
               )}
             </MetaRow>
@@ -1835,7 +1835,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <Clock className="size-3.5 shrink-0" />
-                    <span>Suivi du temps</span>
+                    <span>Time tracking</span>
                   </div>
                   <WorklogTab issueId={issueId} projectId={projectId} workspaceSlug={workspaceSlug} />
                 </div>

@@ -60,10 +60,10 @@ export function WorkloadCard({ slug, card, globalRange, refreshToken }: Dashboar
   if (error) return <CardError onRetry={() => setRetry((n) => n + 1)} />
 
   const members = workload?.members ?? []
-  if (members.length === 0) return <CardEmpty message="Aucune donnée de charge disponible" />
+  if (members.length === 0) return <CardEmpty message="No workload data available" />
 
   const peak = Math.max(0, ...members.flatMap((m) => m.days.map((d) => d.count)))
-  if (peak === 0) return <CardEmpty message={`Aucune échéance planifiée sur ${days} j`} />
+  if (peak === 0) return <CardEmpty message={`No due dates scheduled in ${days}d`} />
 
   const visible = members.slice(0, MAX_MEMBERS)
 

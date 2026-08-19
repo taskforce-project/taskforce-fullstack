@@ -79,17 +79,17 @@ export function EnterpriseContactDialog({
     const newErrors: Record<string, string> = {};
 
     if (!fullName.trim()) {
-      newErrors.fullName = "Le nom complet est obligatoire";
+      newErrors.fullName = "Full name is required";
     }
 
     if (!email.trim()) {
-      newErrors.email = "L'email est obligatoire";
+      newErrors.email = "Email is required";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      newErrors.email = "Email invalide";
+      newErrors.email = "Invalid email";
     }
 
     if (!teamSize) {
-      newErrors.teamSize = "Veuillez sélectionner la taille de votre équipe";
+      newErrors.teamSize = "Please select your team size";
     }
 
     setErrors(newErrors);
@@ -161,10 +161,10 @@ export function EnterpriseContactDialog({
     <Dialog open={open} onOpenChange={handleCancel}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Intéressé par Enterprise ?</DialogTitle>
+          <DialogTitle>Interested in Enterprise?</DialogTitle>
           <DialogDescription>
-            Remplissez ce formulaire et notre équipe vous contactera sous 48h
-            pour discuter de vos besoins.
+            Fill out this form and our team will contact you within 48 hours to
+            discuss your needs.
           </DialogDescription>
         </DialogHeader>
 
@@ -172,7 +172,7 @@ export function EnterpriseContactDialog({
           {/* Nom complet */}
           <div className="space-y-2">
             <Label htmlFor="fullName">
-              Nom complet <span className="text-red-500">*</span>
+              Full name <span className="text-red-500">*</span>
             </Label>
             <Input
               id="fullName"
@@ -191,7 +191,7 @@ export function EnterpriseContactDialog({
           {/* Email */}
           <div className="space-y-2">
             <Label htmlFor="email">
-              Email professionnel <span className="text-red-500">*</span>
+              Work email <span className="text-red-500">*</span>
             </Label>
             <Input
               id="email"
@@ -210,7 +210,7 @@ export function EnterpriseContactDialog({
           {/* Taille de l'équipe */}
           <div className="space-y-2">
             <Label htmlFor="teamSize">
-              Taille de l&apos;équipe <span className="text-red-500">*</span>
+              Team size <span className="text-red-500">*</span>
             </Label>
             <Select
               value={teamSize}
@@ -221,13 +221,13 @@ export function EnterpriseContactDialog({
                 id="teamSize"
                 className={errors.teamSize ? "border-red-500" : ""}
               >
-                <SelectValue placeholder="Sélectionnez..." />
+                <SelectValue placeholder="Select..." />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="1-10">1-10 personnes</SelectItem>
-                <SelectItem value="11-50">11-50 personnes</SelectItem>
-                <SelectItem value="51-200">51-200 personnes</SelectItem>
-                <SelectItem value="200+">200+ personnes</SelectItem>
+                <SelectItem value="1-10">1-10 people</SelectItem>
+                <SelectItem value="11-50">11-50 people</SelectItem>
+                <SelectItem value="51-200">51-200 people</SelectItem>
+                <SelectItem value="200+">200+ people</SelectItem>
               </SelectContent>
             </Select>
             {errors.teamSize && (
@@ -237,10 +237,10 @@ export function EnterpriseContactDialog({
 
           {/* Message (optionnel) */}
           <div className="space-y-2">
-            <Label htmlFor="message">Décrivez votre projet (optionnel)</Label>
+            <Label htmlFor="message">Describe your project (optional)</Label>
             <Textarea
               id="message"
-              placeholder="Parlez-nous de vos besoins..."
+              placeholder="Tell us about your needs..."
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               disabled={isSubmitting}
@@ -248,7 +248,7 @@ export function EnterpriseContactDialog({
               maxLength={2000}
             />
             <p className="text-xs text-gray-500">
-              {message.length}/2000 caractères
+              {message.length}/2000 characters
             </p>
           </div>
 
@@ -260,16 +260,16 @@ export function EnterpriseContactDialog({
               onClick={handleCancel}
               disabled={isSubmitting}
             >
-              Annuler
+              Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Envoi...
+                  Sending...
                 </>
               ) : (
-                "Envoyer la demande"
+                "Send request"
               )}
             </Button>
           </div>

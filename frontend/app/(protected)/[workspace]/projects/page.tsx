@@ -67,11 +67,11 @@ type HealthLevel = "healthy" | "at-risk" | "critical" | "paused"
 type SortKey = "health" | "recent" | "name" | "progress" | "open"
 
 const SORT_LABEL: Record<SortKey, string> = {
-  health: "Santé",
-  recent: "Récent",
-  name: "Nom",
-  progress: "Progression",
-  open: "Tâches ouvertes",
+  health: "Health",
+  recent: "Recent",
+  name: "Name",
+  progress: "Progress",
+  open: "Open tasks",
 }
 
 // ─── Signal derivation (from real project data) ───────────────────────────────
@@ -184,7 +184,7 @@ function MemberStack({ project }: { readonly project: Project }) {
  */
 function VisibilityBadge({ isPublic }: { readonly isPublic: boolean }) {
   return (
-    <Badge variant="secondary" className="gap-1 font-normal text-muted-foreground" title={isPublic ? "Visible par tout le workspace" : "Réservé aux collaborateurs du projet"}>
+    <Badge variant="secondary" className="gap-1 font-normal text-muted-foreground" title={isPublic ? "Visible to the entire workspace" : "Restricted to project collaborators"}>
       {isPublic ? <Globe className="size-2.5" /> : <Lock className="size-2.5" />}
       {isPublic ? "Public" : "Private"}
     </Badge>
@@ -316,7 +316,7 @@ function OperationRow({
             variant="ghost"
             size="icon-sm"
             className={cn(project.isFavorite ? "text-amber-500" : "text-muted-foreground")}
-            title={project.isFavorite ? "Désépingler" : "Épingler"}
+            title={project.isFavorite ? "Unpin" : "Pin"}
             onClick={(e) => { e.stopPropagation(); toggleFavorite(slug, project.id, !project.isFavorite) }}
           >
             <Star className={cn("size-4", project.isFavorite && "fill-amber-400 text-amber-400")} />
@@ -327,7 +327,7 @@ function OperationRow({
               variant="ghost"
               size="icon-sm"
               className="text-muted-foreground"
-              title="Réactiver le projet"
+              title="Reactivate project"
               onClick={(e) => { e.stopPropagation(); updateProject(slug, project.id, { status: "ACTIVE" }) }}
             >
               <ArchiveRestore className="size-4" />
@@ -337,7 +337,7 @@ function OperationRow({
               variant="ghost"
               size="icon-sm"
               className="text-muted-foreground"
-              title="Archiver le projet"
+              title="Archive project"
               onClick={(e) => { e.stopPropagation(); archiveProject(slug, project.id) }}
             >
               <Archive className="size-4" />
@@ -410,7 +410,7 @@ function ProjectCard({
         </div>
         <button
           type="button"
-          title={project.isFavorite ? "Désépingler" : "Épingler"}
+          title={project.isFavorite ? "Unpin" : "Pin"}
           onClick={(e) => { e.stopPropagation(); toggleFavorite(slug, project.id, !project.isFavorite) }}
           className={cn(
             "shrink-0 rounded p-1 transition-colors hover:bg-muted",
@@ -436,8 +436,8 @@ function ProjectCard({
       <div className="flex items-center justify-between border-t border-border/60 pt-2.5">
         <MemberStack project={project} />
         <div className="flex items-center gap-3 text-xs tabular-nums text-muted-foreground">
-          <span title="Progression">{pct}%</span>
-          <span className="inline-flex items-center gap-1" title="Tâches ouvertes">
+          <span title="Progress">{pct}%</span>
+          <span className="inline-flex items-center gap-1" title="Open tasks">
             <CircleDot className="size-3.5" /> {project.openIssues}
           </span>
         </div>

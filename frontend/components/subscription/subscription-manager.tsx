@@ -46,8 +46,8 @@ export function SubscriptionManager() {
       setSubscription(data);
     } catch (error) {
       console.error("Error loading subscription:", error);
-      toast.error("Erreur", {
-        description: "Impossible de charger les informations d'abonnement",
+      toast.error("Error", {
+        description: "Unable to load subscription information",
       });
     } finally {
       setIsLoading(false);
@@ -59,8 +59,8 @@ export function SubscriptionManager() {
       const { checkoutUrl } = await stripeService.createCheckoutSession(plan);
       window.location.href = checkoutUrl;
     } catch (error) {
-      toast.error("Erreur", {
-        description: "Impossible de créer la session de paiement",
+      toast.error("Error", {
+        description: "Unable to create payment session",
       });
       console.error("Upgrade error:", error);
     }
@@ -71,18 +71,18 @@ export function SubscriptionManager() {
       setIsCancelling(true);
       await stripeService.cancelSubscription(immediately);
       
-      toast.success("Abonnement annulé", {
+      toast.success("Subscription cancelled", {
         description: immediately 
-          ? "Votre abonnement a été annulé immédiatement"
-          : "Votre abonnement sera annulé à la fin de la période en cours",
+          ? "Your subscription has been cancelled immediately"
+          : "Your subscription will be cancelled at the end of the current period",
       });
       
       // Rafraîchir les données
       await loadSubscription();
       refreshUser();
     } catch (error) {
-      toast.error("Erreur", {
-        description: "Impossible d'annuler l'abonnement",
+      toast.error("Error", {
+        description: "Unable to cancel subscription",
       });
       console.error("Cancel error:", error);
     } finally {
@@ -106,15 +106,15 @@ export function SubscriptionManager() {
         <CardHeader>
           <div className="flex items-center gap-2">
             <AlertCircle className="h-5 w-5 text-destructive" />
-            <CardTitle>Erreur</CardTitle>
+            <CardTitle>Error</CardTitle>
           </div>
           <CardDescription>
-            Impossible de charger les informations d&apos;abonnement
+            Unable to load subscription information
           </CardDescription>
         </CardHeader>
         <CardFooter>
           <Button onClick={loadSubscription} variant="outline">
-            Réessayer
+            Retry
           </Button>
         </CardFooter>
       </Card>
@@ -134,7 +134,7 @@ export function SubscriptionManager() {
               Plan {subscription.planType}
             </CardTitle>
             <CardDescription>
-              Gérez votre abonnement et vos options de facturation
+              Manage your subscription and billing options
             </CardDescription>
           </div>
           <Badge className={planColor} variant="secondary">
@@ -149,15 +149,15 @@ export function SubscriptionManager() {
             <span className="text-3xl font-bold">
               {subscription.amount} {subscription.currency?.toUpperCase()}
             </span>
-            <span className="text-muted-foreground">/mois</span>
+            <span className="text-muted-foreground">/month</span>
           </div>
         )}
 
         {subscription.currentPeriodEnd && (
           <div className="space-y-1">
-            <p className="text-sm font-medium">Prochaine facturation</p>
+            <p className="text-sm font-medium">Next billing</p>
             <p className="text-sm text-muted-foreground">
-              {new Date(subscription.currentPeriodEnd).toLocaleDateString("fr-FR", {
+              {new Date(subscription.currentPeriodEnd).toLocaleDateString("en-US", {
                 day: "numeric",
                 month: "long",
                 year: "numeric",
@@ -169,7 +169,7 @@ export function SubscriptionManager() {
         {subscription.cancelAtPeriodEnd && (
           <div className="p-3 bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800 rounded-md">
             <p className="text-sm text-orange-800 dark:text-orange-200">
-              Votre abonnement sera annulé à la fin de la période en cours
+              Your subscription will be cancelled at the end of the current period
             </p>
           </div>
         )}
@@ -179,10 +179,10 @@ export function SubscriptionManager() {
         {subscription.planType === "FREE" && (
           <>
             <Button onClick={() => handleUpgrade("BASIC")} variant="outline" className="flex-1">
-              Passer à Basic
+              Upgrade to Basic
             </Button>
             <Button onClick={() => handleUpgrade("BUSINESS")} className="flex-1">
-              Passer à Business
+              Upgrade to Business
             </Button>
           </>
         )}
@@ -191,26 +191,26 @@ export function SubscriptionManager() {
           <>
             {subscription.planType === "BASIC" && (
               <Button onClick={() => handleUpgrade("BUSINESS")} className="flex-1">
-                Passer à Business
+                Upgrade to Business
               </Button>
             )}
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="destructive" disabled={isCancelling} className="flex-1">
-                  {isCancelling ? <Loader2 className="h-4 w-4 animate-spin" /> : "Annuler l'abonnement"}
+                  {isCancelling ? <Loader2 className="h-4 w-4 animate-spin" /> : "Cancel subscription"}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Confirmer l&apos;annulation</AlertDialogTitle>
+                  <AlertDialogTitle>Confirm cancellation</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Êtes-vous sûr de vouloir annuler votre abonnement ? Vous perdrez l&apos;accès aux fonctionnalités premium à la fin de votre période de facturation.
+                    Are you sure you want to cancel your subscription? You will lose access to premium features at the end of your billing period.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Conserver l&apos;abonnement</AlertDialogCancel>
+                  <AlertDialogCancel>Keep subscription</AlertDialogCancel>
                   <AlertDialogAction onClick={() => handleCancel(false)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                    Annuler à la fin de la période
+                    Cancel at end of period
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
@@ -222,20 +222,20 @@ export function SubscriptionManager() {
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="destructive" disabled={isCancelling} className="w-full">
-                {isCancelling ? <Loader2 className="h-4 w-4 animate-spin" /> : "Annuler l'abonnement"}
+                {isCancelling ? <Loader2 className="h-4 w-4 animate-spin" /> : "Cancel subscription"}
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Confirmer l&apos;annulation</AlertDialogTitle>
+                <AlertDialogTitle>Confirm cancellation</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Êtes-vous sûr de vouloir annuler votre abonnement Enterprise ? Vous perdrez l&apos;accès à toutes les fonctionnalités avancées à la fin de votre période de facturation.
+                  Are you sure you want to cancel your Enterprise subscription? You will lose access to all advanced features at the end of your billing period.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>Conserver l&apos;abonnement</AlertDialogCancel>
+                <AlertDialogCancel>Keep subscription</AlertDialogCancel>
                 <AlertDialogAction onClick={() => handleCancel(false)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                  Annuler à la fin de la période
+                  Cancel at end of period
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>

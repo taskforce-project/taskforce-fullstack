@@ -73,7 +73,7 @@ export function AiUsageCard({ slug, refreshToken }: DashboardCardBodyProps) {
       <div className="flex items-center justify-between text-[11px] text-muted-foreground">
         <span className="tabular-nums">
           {unlimited
-            ? "Illimité"
+            ? "Unlimited"
             : `${pct} % de ${usage.limitTokens.toLocaleString("fr-FR")} tokens`}
         </span>
         <span className="tabular-nums">{usage.requestCount.toLocaleString("fr-FR")} requêtes</span>

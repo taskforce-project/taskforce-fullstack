@@ -54,7 +54,7 @@ export function ProjectTeamsSection({ workspace, projectId }: ProjectTeamsSectio
         setTeams(all)
         setLinkedIds(new Set(linked.map((t) => t.teamId)))
       })
-      .catch(() => { if (active) toast.error("Erreur lors du chargement des équipes") })
+      .catch(() => { if (active) toast.error("Failed to load teams") })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
   }, [workspace, projectId])
@@ -76,9 +76,9 @@ export function ProjectTeamsSection({ workspace, projectId }: ProjectTeamsSectio
       setTeams((prev) => [...prev, team])
       setNewName("")
       setExpanded(team.id)
-      toast.success(`Équipe « ${team.name} » créée`)
+      toast.success(`Team "${team.name}" created`)
     } catch {
-      toast.error("Impossible de créer l'équipe")
+      toast.error("Could not create the team")
     } finally {
       setCreating(false)
     }
@@ -89,9 +89,9 @@ export function ProjectTeamsSection({ workspace, projectId }: ProjectTeamsSectio
       await teamService.delete(workspace, team.id)
       setTeams((prev) => prev.filter((t) => t.id !== team.id))
       setLinkedIds((prev) => { const n = new Set(prev); n.delete(team.id); return n })
-      toast.success(`Équipe « ${team.name} » supprimée`)
+      toast.success(`Team "${team.name}" deleted`)
     } catch {
-      toast.error("Impossible de supprimer l'équipe")
+      toast.error("Could not delete the team")
     }
   }
 
@@ -109,11 +109,11 @@ export function ProjectTeamsSection({ workspace, projectId }: ProjectTeamsSectio
       // 409 = plafond Free du projet privé (collaborateurs via équipe compris) → message clair + upsell.
       const e = err as { response?: { status?: number; data?: { message?: string } } }
       if (e?.response?.status === 409) {
-        toast.error(e.response?.data?.message ?? "Limite de collaborateurs atteinte sur ce projet privé (forfait Free).", {
-          description: "Rendez le projet public, ou passez à un forfait payant pour associer sans limite.",
+        toast.error(e.response?.data?.message ?? "Collaborator limit reached on this private project (Free plan).", {
+          description: "Make the project public, or upgrade to a paid plan to link without limits.",
         })
       } else {
-        toast.error("Action impossible")
+        toast.error("Action failed")
       }
     }
   }
@@ -125,9 +125,9 @@ export function ProjectTeamsSection({ workspace, projectId }: ProjectTeamsSectio
       setTeams((prev) => prev.map((t) => (t.id === team.id ? fresh : t)))
       setQuery("")
       setResults([])
-      toast.success(`${user.displayName ?? user.email} ajouté à « ${team.name} »`)
+      toast.success(`${user.displayName ?? user.email} added to "${team.name}"`)
     } catch {
-      toast.error("Impossible d'ajouter ce membre")
+      toast.error("Could not add this member")
     }
   }
 
@@ -137,9 +137,9 @@ export function ProjectTeamsSection({ workspace, projectId }: ProjectTeamsSectio
       setTeams((prev) => prev.map((t) =>
         t.id === team.id ? { ...t, members: t.members.filter((m) => m.userId !== userId) } : t
       ))
-      toast.success("Membre retiré de l'équipe")
+      toast.success("Member removed from the team")
     } catch {
-      toast.error("Impossible de retirer ce membre")
+      toast.error("Could not remove this member")
     }
   }
 
@@ -162,8 +162,8 @@ export function ProjectTeamsSection({ workspace, projectId }: ProjectTeamsSectio
           email + rôle projet (Viewer inclus) + équipe optionnelle + ajout au workspace automatique. */}
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="text-sm font-semibold text-foreground">Membres &amp; équipes</h3>
-          <p className="text-xs text-muted-foreground">Invitez de nouvelles personnes ou regroupez-les en équipes, sans quitter l&apos;opération.</p>
+          <h3 className="text-sm font-semibold text-foreground">Members &amp; teams</h3>
+          <p className="text-xs text-muted-foreground">Invite new people or group them into teams, without leaving the operation.</p>
         </div>
         <ProjectInviteDialog workspace={workspace} projectId={projectId} onInvited={() => { void reloadTeams() }} />
       </div>
@@ -175,12 +175,12 @@ export function ProjectTeamsSection({ workspace, projectId }: ProjectTeamsSectio
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-          placeholder="Créer une nouvelle équipe…"
+          placeholder="Create a new team…"
           className="h-9 flex-1"
         />
         <Button size="sm" onClick={handleCreate} disabled={!newName.trim() || creating} className="gap-1.5">
           {creating ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
-          Créer
+          Create
         </Button>
       </div>
 
@@ -191,8 +191,8 @@ export function ProjectTeamsSection({ workspace, projectId }: ProjectTeamsSectio
             <Users className="size-5 text-muted-foreground" />
           </div>
           <div className="space-y-0.5">
-            <p className="text-sm font-medium text-foreground">Aucune équipe</p>
-            <p className="text-xs text-muted-foreground">Créez-en une ci-dessus pour regrouper des membres et l&apos;associer à l&apos;opération.</p>
+            <p className="text-sm font-medium text-foreground">No teams</p>
+            <p className="text-xs text-muted-foreground">Create one above to group members and link it to the operation.</p>
           </div>
         </div>
       ) : (
@@ -221,11 +221,11 @@ export function ProjectTeamsSection({ workspace, projectId }: ProjectTeamsSectio
                       <p className="truncate text-sm font-semibold text-foreground">{team.name}</p>
                       {isLinked && (
                         <Badge variant="secondary" className="shrink-0 gap-1 border-primary/20 bg-primary/10 text-[10px] text-primary">
-                          <span className="size-1.5 rounded-full bg-primary" /> Associée
+                          <span className="size-1.5 rounded-full bg-primary" /> Linked
                         </Badge>
                       )}
                     </div>
-                    <p className="mt-0.5 text-xs text-muted-foreground">{team.members.length} membre{team.members.length !== 1 ? "s" : ""}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{team.members.length} member{team.members.length !== 1 ? "s" : ""}</p>
                   </div>
                   {/* Avatars */}
                   <div className="hidden items-center sm:flex">
@@ -250,7 +250,7 @@ export function ProjectTeamsSection({ workspace, projectId }: ProjectTeamsSectio
                     className="h-7 gap-1.5 text-xs"
                     onClick={() => toggleProject(team)}
                   >
-                    {isLinked ? "Dissocier" : "Associer à l'opération"}
+                    {isLinked ? "Unlink" : "Link to operation"}
                   </Button>
                   <Button
                     size="sm"
@@ -258,14 +258,14 @@ export function ProjectTeamsSection({ workspace, projectId }: ProjectTeamsSectio
                     className="h-7 gap-1.5 text-xs text-muted-foreground"
                     onClick={() => setExpanded(isOpen ? null : team.id)}
                   >
-                    <Users className="size-3.5" /> Membres
+                    <Users className="size-3.5" /> Members
                     <ChevronDown className={cn("size-3.5 transition-transform", isOpen && "rotate-180")} />
                   </Button>
                   <div className="flex-1" />
                   <button
                     type="button"
                     onClick={() => handleDelete(team)}
-                    title="Supprimer l'équipe"
+                    title="Delete team"
                     className="shrink-0 rounded p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                   >
                     <Trash2 className="size-4" />
@@ -277,7 +277,7 @@ export function ProjectTeamsSection({ workspace, projectId }: ProjectTeamsSectio
                   <div className="border-t border-border/60 bg-muted/10 px-4 py-3 rounded-b-xl">
                     <div className="flex flex-col gap-1.5">
                       {team.members.length === 0 ? (
-                        <p className="py-1 text-xs text-muted-foreground">Aucun membre dans cette équipe.</p>
+                        <p className="py-1 text-xs text-muted-foreground">No members in this team.</p>
                       ) : team.members.map((m) => (
                         <div key={m.userId} className="flex items-center gap-2.5 rounded-md px-1 py-1">
                           <UserAvatar email={m.displayName} name={m.displayName} avatarUrl={m.avatarUrl} className="size-6" fallbackClassName="text-[9px]" />
@@ -286,7 +286,7 @@ export function ProjectTeamsSection({ workspace, projectId }: ProjectTeamsSectio
                           <button
                             type="button"
                             onClick={() => removeMember(team, m.userId)}
-                            title="Retirer de l'équipe"
+                            title="Remove from team"
                             className="rounded p-1 text-destructive transition-colors hover:bg-destructive/10"
                           >
                             <X className="size-3.5" />
@@ -301,7 +301,7 @@ export function ProjectTeamsSection({ workspace, projectId }: ProjectTeamsSectio
                       <Input
                         value={isOpen ? query : ""}
                         onChange={(e) => setQuery(e.target.value)}
-                        placeholder="Ajouter un membre (nom ou email)…"
+                        placeholder="Add a member (name or email)…"
                         className="h-8 pl-8 text-xs"
                       />
                       {query.trim() && results.length > 0 && (

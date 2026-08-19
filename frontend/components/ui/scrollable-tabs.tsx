@@ -60,7 +60,7 @@ export function ScrollableTabs({
       {canLeft && (
         <button
           type="button"
-          aria-label="Défiler à gauche"
+          aria-label="Scroll left"
           onClick={() => scrollBy(-1)}
           className="absolute left-0 z-10 flex h-full items-center bg-gradient-to-r from-background via-background to-transparent pr-4 text-muted-foreground hover:text-foreground"
         >
@@ -81,7 +81,7 @@ export function ScrollableTabs({
       {canRight && (
         <button
           type="button"
-          aria-label="Défiler à droite"
+          aria-label="Scroll right"
           onClick={() => scrollBy(1)}
           className="absolute right-0 z-10 flex h-full items-center bg-gradient-to-l from-background via-background to-transparent pl-4 text-muted-foreground hover:text-foreground"
         >

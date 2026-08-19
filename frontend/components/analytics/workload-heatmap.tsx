@@ -27,7 +27,7 @@ function cellClass(count: number, max: number): string {
 function dayLabel(iso: string): { dow: string; dom: string } {
   const d = new Date(`${iso}T00:00:00`)
   return {
-    dow: d.toLocaleDateString("fr-FR", { weekday: "short" }).replace(".", ""),
+    dow: d.toLocaleDateString("en-US", { weekday: "short" }).replace(".", ""),
     dom: String(d.getDate()),
   }
 }
@@ -35,7 +35,7 @@ function dayLabel(iso: string): { dow: string; dom: string } {
 /** Date lisible pour le tooltip : « samedi 18 juillet ». */
 function prettyDate(iso: string): string {
   const d = new Date(`${iso}T00:00:00`)
-  return d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })
+  return d.toLocaleDateString("en-US", { weekday: "long", day: "numeric", month: "long" })
 }
 
 /** Cellule survolée : contenu + position (relative au wrapper) pour le tooltip. */
@@ -56,7 +56,7 @@ export function WorkloadHeatmap({ data }: { readonly data: Workload | null }) {
   const wrapperRef = useRef<HTMLDivElement | null>(null)
 
   if (!data || data.members.length === 0) {
-    return <p className="px-3 py-6 text-center text-xs text-muted-foreground">Aucune donnée de charge disponible.</p>
+    return <p className="px-3 py-6 text-center text-xs text-muted-foreground">No workload data available.</p>
   }
 
   const days = data.members[0]?.days ?? []
@@ -68,10 +68,10 @@ export function WorkloadHeatmap({ data }: { readonly data: Workload | null }) {
     return (
       <div className="flex flex-col items-center gap-1.5 px-3 py-10 text-center">
         <CalendarX2 className="size-6 text-muted-foreground/40" />
-        <p className="text-sm font-medium text-foreground">Aucune échéance planifiée</p>
+        <p className="text-sm font-medium text-foreground">No due dates scheduled</p>
         <p className="max-w-sm text-xs text-muted-foreground">
-          Personne n&apos;a de tâche datée sur les {days.length || 14} prochains jours. La heatmap se
-          remplira dès que des issues auront une échéance assignée.
+          No one has a task due within the next {days.length || 14} days. The heatmap will
+          fill up as soon as issues have an assigned due date.
         </p>
       </div>
     )
@@ -92,15 +92,15 @@ export function WorkloadHeatmap({ data }: { readonly data: Workload | null }) {
         <div className="min-w-[640px]">
           {/* Légende d'intensité — en tête pour rester visible même avec beaucoup de membres. */}
           <div className="mb-2 flex items-center gap-1.5 text-[10px] text-muted-foreground">
-            <span className="mr-1 font-medium uppercase tracking-wide">Échéances / jour</span>
-            <span>moins</span>
+            <span className="mr-1 font-medium uppercase tracking-wide">Due dates / day</span>
+            <span>less</span>
             <span className={cn("size-3 rounded-sm", EMPTY_CELL)} />
             <span className="size-3 rounded-sm bg-amber-500/30" />
             <span className="size-3 rounded-sm bg-amber-500/55" />
             <span className="size-3 rounded-sm bg-orange-500/70" />
             <span className="size-3 rounded-sm bg-rose-500/85" />
-            <span>plus</span>
-            <span className="ml-auto tabular-nums">pic : {peak}</span>
+            <span>more</span>
+            <span className="ml-auto tabular-nums">peak: {peak}</span>
           </div>
 
           {/* En-tête des jours */}
@@ -124,7 +124,7 @@ export function WorkloadHeatmap({ data }: { readonly data: Workload | null }) {
                 <div className="flex w-44 shrink-0 items-center justify-between gap-2 pr-2">
                   <span className="truncate text-xs text-foreground">{m.displayName}</span>
                   <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
-                    {m.openIssues} ouv.{m.capacityHoursPerWeek != null ? ` · ${m.capacityHoursPerWeek}h` : ""}
+                    {m.openIssues} open{m.capacityHoursPerWeek != null ? ` · ${m.capacityHoursPerWeek}h` : ""}
                   </span>
                 </div>
                 {m.days.map((d) => (
@@ -152,7 +152,7 @@ export function WorkloadHeatmap({ data }: { readonly data: Workload | null }) {
           className="pointer-events-none absolute z-50 whitespace-nowrap rounded-md border border-border bg-popover px-2.5 py-1.5 text-xs shadow-md"
         >
           <div className="font-semibold text-foreground">
-            {hover.count === 0 ? "Aucune échéance" : `${hover.count} échéance${hover.count > 1 ? "s" : ""}`}
+            {hover.count === 0 ? "No due date" : `${hover.count} due date${hover.count > 1 ? "s" : ""}`}
           </div>
           <div className="text-muted-foreground">
             {hover.member} · {prettyDate(hover.date)}

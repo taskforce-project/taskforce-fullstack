@@ -140,7 +140,7 @@ export default function DashboardPage() {
               className="h-8 gap-1.5 text-xs"
               onClick={() => setRefreshToken((n) => n + 1)}
             >
-              <RefreshCw className="size-3.5" /> Actualiser
+              <RefreshCw className="size-3.5" /> Refresh
             </Button>
           </div>
         </div>
@@ -148,9 +148,9 @@ export default function DashboardPage() {
         {cardsError && cards.length === 0 ? (
           // Jamais de spinner infini : message court + réessai.
           <div className="flex flex-col items-center justify-center gap-2.5 rounded-xl border border-border py-12 text-center">
-            <p className="text-sm text-muted-foreground">Impossible de charger vos cartes.</p>
+            <p className="text-sm text-muted-foreground">Couldn't load your cards.</p>
             <Button variant="outline" size="sm" className="gap-1.5" onClick={() => void fetchCards(slug)}>
-              <RefreshCw className="size-3.5" /> Réessayer
+              <RefreshCw className="size-3.5" /> Retry
             </Button>
           </div>
         ) : cardsLoading && cards.length === 0 ? (

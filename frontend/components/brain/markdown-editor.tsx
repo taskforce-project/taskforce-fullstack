@@ -16,18 +16,18 @@ type ToolAction =
 
 // Config statique (hors composant) : aucune closure sur un ref pendant le rendu.
 const TOOLBAR: { icon: typeof Bold; label: string; action: ToolAction }[] = [
-  { icon: Heading1, label: "Titre 1", action: "h1" },
-  { icon: Heading2, label: "Titre 2", action: "h2" },
-  { icon: Bold, label: "Gras", action: "bold" },
-  { icon: Italic, label: "Italique", action: "italic" },
-  { icon: Highlighter, label: "Surligner", action: "highlight" },
-  { icon: List, label: "Liste", action: "ul" },
-  { icon: ListOrdered, label: "Liste numérotée", action: "ol" },
-  { icon: ListChecks, label: "Case à cocher", action: "task" },
+  { icon: Heading1, label: "Heading 1", action: "h1" },
+  { icon: Heading2, label: "Heading 2", action: "h2" },
+  { icon: Bold, label: "Bold", action: "bold" },
+  { icon: Italic, label: "Italic", action: "italic" },
+  { icon: Highlighter, label: "Highlight", action: "highlight" },
+  { icon: List, label: "List", action: "ul" },
+  { icon: ListOrdered, label: "Numbered list", action: "ol" },
+  { icon: ListChecks, label: "Checkbox", action: "task" },
   { icon: Quote, label: "Callout (tip/warning/danger…)", action: "callout" },
   { icon: Code, label: "Code", action: "code" },
-  { icon: Braces, label: "Bloc de code", action: "codeblock" },
-  { icon: Link2, label: "Lien", action: "link" },
+  { icon: Braces, label: "Code block", action: "codeblock" },
+  { icon: Link2, label: "Link", action: "link" },
   { icon: ImageIcon, label: "Image (URL)", action: "image" },
   { icon: Pencil, label: "Wikilink", action: "wiki" },
 ]
@@ -88,7 +88,7 @@ export function MarkdownEditor({ value, onChange, tags = [], onTagsChange, onUpl
     const { selectionStart: s, selectionEnd: e } = ta
 
     const surround = (before: string, after = before) => {
-      const sel = value.slice(s, e) || "texte"
+      const sel = value.slice(s, e) || "text"
       onChange(value.slice(0, s) + before + sel + after + value.slice(e))
       requestAnimationFrame(() => {
         ta.focus()
@@ -119,7 +119,7 @@ export function MarkdownEditor({ value, onChange, tags = [], onTagsChange, onUpl
       case "ul": return prefixLines("- ")
       case "ol": return prefixLines("1. ")
       case "task": return prefixLines("- [ ] ")
-      case "callout": return insertBlock("> [!tip] Titre\n> Votre message ici.\n")
+      case "callout": return insertBlock("> [!tip] Title\n> Your message here.\n")
       case "code": return surround("`")
       case "codeblock": return surround("```\n", "\n```")
       case "link": return surround("[", "](url)")
@@ -147,7 +147,7 @@ export function MarkdownEditor({ value, onChange, tags = [], onTagsChange, onUpl
           </button>
         ))}
         {onUploadFile && (
-          <button type="button" title="Joindre un document" onClick={() => fileInputRef.current?.click()}
+          <button type="button" title="Attach a document" onClick={() => fileInputRef.current?.click()}
             disabled={mode === "preview" || uploading}
             className="flex size-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30">
             {uploading ? <Loader2 className="size-3.5 animate-spin" /> : <Paperclip className="size-3.5" />}
@@ -158,11 +158,11 @@ export function MarkdownEditor({ value, onChange, tags = [], onTagsChange, onUpl
         <div className="ml-auto flex items-center rounded border p-0.5">
           <button type="button" onClick={() => setMode("write")}
             className={`flex items-center gap-1 rounded px-2 py-0.5 text-xs ${mode === "write" ? "bg-accent font-medium" : "text-muted-foreground"}`}>
-            <Pencil className="size-3" /> Écrire
+            <Pencil className="size-3" /> Write
           </button>
           <button type="button" onClick={() => setMode("preview")}
             className={`flex items-center gap-1 rounded px-2 py-0.5 text-xs ${mode === "preview" ? "bg-accent font-medium" : "text-muted-foreground"}`}>
-            <Eye className="size-3" /> Aperçu
+            <Eye className="size-3" /> Preview
           </button>
         </div>
       </div>
@@ -175,12 +175,12 @@ export function MarkdownEditor({ value, onChange, tags = [], onTagsChange, onUpl
           onChange={(e) => onChange(e.target.value)}
           rows={rows}
           spellCheck={false}
-          placeholder={placeholder ?? "# Titre&#10;&#10;Contenu markdown… Utilise [[Autre note]] pour lier et #tag pour classer."}
+          placeholder={placeholder ?? "# Title&#10;&#10;Markdown content… Use [[Other note]] to link and #tag to categorize."}
           className="w-full resize-y rounded-md border bg-background p-3 font-mono text-sm leading-relaxed outline-none focus:border-foreground/20"
         />
       ) : (
         <div className="min-h-[20rem] rounded-md border bg-background p-3">
-          {value.trim() ? <Markdown content={value} /> : <p className="text-sm italic text-muted-foreground">Rien à prévisualiser.</p>}
+          {value.trim() ? <Markdown content={value} /> : <p className="text-sm italic text-muted-foreground">Nothing to preview.</p>}
         </div>
       )}
 
@@ -203,7 +203,7 @@ export function MarkdownEditor({ value, onChange, tags = [], onTagsChange, onUpl
             if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addTag(tagInput) }
           }}
           onBlur={() => tagInput && addTag(tagInput)}
-          placeholder="ajouter…"
+          placeholder="add…"
           className="h-6 w-24 flex-1 border-0 bg-transparent px-1 text-xs shadow-none focus-visible:ring-0"
         />
       </div>

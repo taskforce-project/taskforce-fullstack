@@ -89,9 +89,9 @@ export function BulkAssignDialog({ slug, projectId, issues }: BulkAssignDialogPr
         })
       setRows(next2)
       setRan(true)
-      if (next2.length === 0) toast.warning("Aucune recommandation — ajoute des membres ou des compétences")
+      if (next2.length === 0) toast.warning("No recommendations — add members or skills")
     } catch {
-      toast.error("Impossible de générer les recommandations")
+      toast.error("Could not generate recommendations")
     } finally {
       setLoading(false)
     }
@@ -108,12 +108,12 @@ export function BulkAssignDialog({ slug, projectId, issues }: BulkAssignDialogPr
       await Promise.all(
         selected.map((r) => updateIssue(slug, projectId, r.issueId, { assigneeId: r.candidate.userId }))
       )
-      toast.success(`${selected.length} issue${selected.length > 1 ? "s" : ""} assignée${selected.length > 1 ? "s" : ""}`)
+      toast.success(`${selected.length} issue${selected.length > 1 ? "s" : ""} assigned${selected.length > 1 ? "" : ""}`)
       setOpen(false)
       setRows([])
       setRan(false)
     } catch {
-      toast.error("Échec de l'assignation")
+      toast.error("Assignment failed")
     } finally {
       setApplying(false)
     }
@@ -136,17 +136,17 @@ export function BulkAssignDialog({ slug, projectId, issues }: BulkAssignDialogPr
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="size-4 text-primary" /> Smart Assign — issues non assignées
+            <Sparkles className="size-4 text-primary" /> Smart Assign — unassigned issues
           </DialogTitle>
           <DialogDescription>
-            Recommandations basées sur compétences, charge et disponibilité. Décoche celles à exclure.
+            Recommendations based on skills, workload and availability. Uncheck the ones to exclude.
           </DialogDescription>
         </DialogHeader>
 
         {loading ? (
           <div className="flex flex-col items-center justify-center gap-2 py-10 text-muted-foreground">
             <Loader2 className="size-5 animate-spin" />
-            <span className="text-xs">Analyse de l&apos;équipe — compétences, charge, disponibilité…</span>
+            <span className="text-xs">Analyzing the team — skills, workload, availability…</span>
           </div>
         ) : ran && rows.length > 0 ? (
           <div className="flex flex-col gap-1.5">
@@ -165,10 +165,10 @@ export function BulkAssignDialog({ slug, projectId, issues }: BulkAssignDialogPr
                 )}>
                   {allSelected ? <Check className="size-3" /> : selectedCount > 0 ? <Minus className="size-3" /> : null}
                 </span>
-                {allSelected ? "Tout décocher" : "Tout cocher"}
+                {allSelected ? "Deselect all" : "Select all"}
               </button>
               <span className="text-[11px] text-muted-foreground">
-                {selectedCount}/{rows.length} · {distinctAssignees} {distinctAssignees > 1 ? "personnes" : "personne"}
+                {selectedCount}/{rows.length} · {distinctAssignees} {distinctAssignees > 1 ? "people" : "person"}
               </span>
             </div>
 
@@ -210,18 +210,18 @@ export function BulkAssignDialog({ slug, projectId, issues }: BulkAssignDialogPr
             </div>
           </div>
         ) : ran ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">Aucune recommandation disponible.</p>
+          <p className="py-8 text-center text-sm text-muted-foreground">No recommendations available.</p>
         ) : (
-          <p className="py-8 text-center text-sm text-muted-foreground">{unassigned.length} issue(s) non assignée(s) à traiter.</p>
+          <p className="py-8 text-center text-sm text-muted-foreground">{unassigned.length} unassigned issue(s) to process.</p>
         )}
 
         <DialogFooter>
           <Button variant="ghost" size="sm" onClick={() => handleOpenChange(false)} disabled={applying}>
-            Annuler
+            Cancel
           </Button>
           <Button size="sm" className="gap-1.5" onClick={applyAll} disabled={applying || selectedCount === 0}>
             {applying ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
-            Assigner{selectedCount > 0 ? ` ${selectedCount}` : ""}
+            Assign{selectedCount > 0 ? ` ${selectedCount}` : ""}
           </Button>
         </DialogFooter>
       </DialogContent>

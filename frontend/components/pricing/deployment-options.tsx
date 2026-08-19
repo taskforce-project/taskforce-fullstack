@@ -15,23 +15,23 @@ const deploymentOptions: DeploymentOption[] = [
   {
     id: "cloud",
     icon: Cloud,
-    title: "Déploiement Cloud",
+    title: "Cloud Deployment",
     description:
-      "Hébergement sécurisé en Europe (France/Allemagne). Déployez en quelques clics sans infrastructure à gérer.",
+      "Secure hosting in Europe (France/Germany). Deploy in a few clicks with no infrastructure to manage.",
   },
   {
     id: "self-hosted",
     icon: Server,
-    title: "Auto-hébergement (On-Premise)",
+    title: "Self-hosting (On-Premise)",
     description:
-      "Gardez le contrôle total de vos données. Déployez TaskForce sur vos propres serveurs avec Keycloak et PostgreSQL.",
+      "Keep full control of your data. Deploy TaskForce on your own servers with Keycloak and PostgreSQL.",
   },
   {
     id: "compliance",
     icon: ShieldCheck,
-    title: "Conformité & Sécurité",
+    title: "Compliance & Security",
     description:
-      "Conforme RGPD, chiffrement de bout en bout, sauvegardes automatiques et audits de sécurité réguliers.",
+      "GDPR-compliant, end-to-end encryption, automatic backups, and regular security audits.",
   },
 ];
 
@@ -45,10 +45,10 @@ export function DeploymentOptions({ className }: Readonly<DeploymentOptionsProps
       {/* Header */}
       <div className="text-center space-y-2">
         <h2 className="text-3xl font-bold tracking-tight">
-          Exécutez TaskForce à votre manière sur votre infrastructure
+          Run TaskForce your way on your own infrastructure
         </h2>
         <p className="text-muted-foreground">
-          Flexibilité maximale pour répondre à vos exigences d&apos;infrastructure et de conformité
+          Maximum flexibility to meet your infrastructure and compliance requirements
         </p>
       </div>
 

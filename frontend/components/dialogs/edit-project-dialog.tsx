@@ -61,10 +61,10 @@ export function EditProjectDialog({ project, slug, open, onOpenChange }: EditPro
         color,
         isPublic,
       })
-      toast.success("Opération mise à jour")
+      toast.success("Operation updated")
       onOpenChange(false)
     } catch {
-      toast.error("Échec de la mise à jour")
+      toast.error("Update failed")
     } finally {
       setSaving(false)
     }
@@ -74,9 +74,9 @@ export function EditProjectDialog({ project, slug, open, onOpenChange }: EditPro
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Modifier l&apos;opération</DialogTitle>
+          <DialogTitle>Edit operation</DialogTitle>
           <DialogDescription>
-            Infos globales du projet. Les réglages techniques sont dans l&apos;onglet Settings.
+            Project-wide info. Technical settings live in the Settings tab.
           </DialogDescription>
         </DialogHeader>
 
@@ -84,11 +84,11 @@ export function EditProjectDialog({ project, slug, open, onOpenChange }: EditPro
           <div className="flex items-end gap-3">
             <ProjectIconPicker value={iconUrl} onChange={setIconUrl} />
             <div className="flex flex-col gap-1.5 flex-1">
-              <label className="text-xs font-medium text-muted-foreground">Nom</label>
+              <label className="text-xs font-medium text-muted-foreground">Name</label>
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Nom de l'opération"
+                placeholder="Operation name"
                 autoFocus
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleSave() } }}
               />
@@ -99,25 +99,25 @@ export function EditProjectDialog({ project, slug, open, onOpenChange }: EditPro
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Description (optionnel)"
+              placeholder="Description (optional)"
               rows={3}
               className="w-full rounded-lg border border-border bg-muted/20 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground resize-none outline-none focus:border-primary/50"
             />
           </div>
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Couleur</label>
+            <label className="text-xs font-medium text-muted-foreground">Color</label>
             <ColorPalettePicker value={color} onChange={setColor} />
           </div>
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Visibilité</label>
+            <label className="text-xs font-medium text-muted-foreground">Visibility</label>
             <ProjectVisibilityPicker
               value={isPublic}
               onChange={setIsPublic}
               labels={{
-                privateTitle: "Privé",
-                privateHint: "Visible par les membres invités uniquement.",
+                privateTitle: "Private",
+                privateHint: "Visible only to invited members.",
                 publicTitle: "Public",
-                publicHint: "Visible par tout le workspace.",
+                publicHint: "Visible to the entire workspace.",
               }}
             />
           </div>
@@ -125,11 +125,11 @@ export function EditProjectDialog({ project, slug, open, onOpenChange }: EditPro
 
         <DialogFooter className="gap-2">
           <Button variant="outline" size="sm" onClick={() => onOpenChange(false)} disabled={saving}>
-            Annuler
+            Cancel
           </Button>
           <Button size="sm" onClick={handleSave} disabled={!name.trim() || saving} className="gap-1.5">
             {saving && <Loader2 className="size-3.5 animate-spin" />}
-            Enregistrer
+            Save
           </Button>
         </DialogFooter>
       </DialogContent>

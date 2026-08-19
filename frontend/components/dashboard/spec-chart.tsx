@@ -36,13 +36,13 @@ import { CardEmpty, CardError } from "./card-states"
 
 // Palette sémantique des séries (miroir de chart-explorer — le backend n'envoie que la clé).
 const SERIES_META: Record<string, { label: string; color: string }> = {
-  resolved: { label: "Résolues", color: "#10b981" },
+  resolved: { label: "Resolved", color: "#10b981" },
   opened: { label: "Ouvertes", color: "#3b82f6" },
   remaining: { label: "Restant", color: "#f43f5e" },
-  ideal: { label: "Idéal", color: "#94a3b8" },
+  ideal: { label: "Ideal", color: "#94a3b8" },
   openIssues: { label: "Issues ouvertes", color: "#6366f1" },
   completion: { label: "Avancement (%)", color: "#6366f1" },
-  done: { label: "Terminées", color: "#10b981" },
+  done: { label: "Done", color: "#10b981" },
   open: { label: "Ouvertes", color: "#f59e0b" },
 }
 
@@ -134,7 +134,7 @@ function BreakdownBody({
   if (error) return <CardError onRetry={() => setRetry((n) => n + 1)} />
 
   const data = rows ?? spec.data ?? []
-  if (data.length === 0) return <CardEmpty message="Aucune donnée pour cette répartition" />
+  if (data.length === 0) return <CardEmpty message="No data for this breakdown" />
 
   const color = "#6366f1"
   const yName = spec.yLabel ?? "Valeur"
@@ -218,7 +218,7 @@ function TimeseriesBody({ slug, spec, refreshToken }: Readonly<{ slug: string; s
     }
   }, [slug, dataset, bucket, refreshToken, retry])
 
-  if (!dataset) return <CardEmpty message="Spec de graphe incomplète" />
+  if (!dataset) return <CardEmpty message="Incomplete chart spec" />
   if (loading) return <Centered><Loader2 className="size-4 animate-spin text-muted-foreground" /></Centered>
   if (error) return <CardError onRetry={() => setRetry((n) => n + 1)} />
   if (rows.length === 0) return <CardEmpty />

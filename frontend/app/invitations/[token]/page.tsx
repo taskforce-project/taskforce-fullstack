@@ -56,7 +56,7 @@ export default function InvitationLandingPage() {
     setAccepting(true)
     try {
       await acceptInvitation(token)
-      toast.success(`Vous avez rejoint ${preview?.workspaceName ?? "le workspace"}`)
+      toast.success(`You have joined ${preview?.workspaceName ?? "the workspace"}`)
       router.replace("/")
     } catch (error) {
       // Remonter le motif réel du backend (email qui ne matche pas, invitation expirée…).
@@ -88,11 +88,11 @@ export default function InvitationLandingPage() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-3 px-6 text-center">
         <MailX className="size-10 text-muted-foreground" />
-        <h1 className="text-lg font-semibold">Invitation invalide</h1>
+        <h1 className="text-lg font-semibold">Invalid invitation</h1>
         <p className="max-w-sm text-sm text-muted-foreground">
-          Ce lien d&apos;invitation est invalide, a expiré ou a déjà été utilisé.
+          This invitation link is invalid, has expired, or has already been used.
         </p>
-        <Button variant="outline" size="sm" onClick={() => router.replace("/")}>Retour à l&apos;accueil</Button>
+        <Button variant="outline" size="sm" onClick={() => router.replace("/")}>Back to home</Button>
       </div>
     )
   }
@@ -104,15 +104,15 @@ export default function InvitationLandingPage() {
         <div className="flex size-12 items-center justify-center rounded-full bg-amber-500/10">
           <UserX className="size-6 text-amber-500" />
         </div>
-        <h1 className="text-lg font-semibold">Ce n&apos;est pas le bon compte</h1>
+        <h1 className="text-lg font-semibold">This isn&apos;t the right account</h1>
         <p className="max-w-sm text-sm text-muted-foreground">
-          Cette invitation à <strong>{preview.workspaceName}</strong> est destinée à{" "}
-          <strong>{preview.email}</strong>, mais vous êtes connecté en tant que{" "}
-          <strong>{user?.email}</strong>. Connectez-vous avec le compte invité pour l&apos;accepter.
+          This invitation to <strong>{preview.workspaceName}</strong> is intended for{" "}
+          <strong>{preview.email}</strong>, but you are signed in as{" "}
+          <strong>{user?.email}</strong>. Sign in with the invited account to accept it.
         </p>
         <div className="flex gap-2">
-          <Button onClick={switchAccount} className="gap-2">Changer de compte</Button>
-          <Button variant="outline" onClick={() => router.replace("/")}>Rester sur ce compte</Button>
+          <Button onClick={switchAccount} className="gap-2">Switch account</Button>
+          <Button variant="outline" onClick={() => router.replace("/")}>Stay on this account</Button>
         </div>
       </div>
     )
@@ -124,13 +124,13 @@ export default function InvitationLandingPage() {
       <div className="flex size-12 items-center justify-center rounded-full bg-primary/10">
         <Check className="size-6 text-primary" />
       </div>
-      <h1 className="text-lg font-semibold">Rejoindre {preview.workspaceName}</h1>
+      <h1 className="text-lg font-semibold">Join {preview.workspaceName}</h1>
       <p className="max-w-sm text-sm text-muted-foreground">
-        Vous avez été invité à rejoindre l&apos;espace de travail <strong>{preview.workspaceName}</strong>.
+        You have been invited to join the <strong>{preview.workspaceName}</strong> workspace.
       </p>
       <Button onClick={handleAccept} disabled={accepting} className="gap-2">
         {accepting && <Loader2 className="size-4 animate-spin" />}
-        Accepter l&apos;invitation
+        Accept invitation
       </Button>
     </div>
   )

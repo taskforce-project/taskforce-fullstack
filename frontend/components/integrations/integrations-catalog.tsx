@@ -22,20 +22,20 @@ import {
   type IntegrationCatalog, type ConnectorView, type PlaneProject, type PlaneStatus,
 } from "@/lib/api/integration-service"
 
-const CAP_LABEL: Record<string, string> = { observe: "Observe", act: "Agit", metrics: "Métriques", recommend: "Composants" }
+const CAP_LABEL: Record<string, string> = { observe: "Observe", act: "Act", metrics: "Metrics", recommend: "Components" }
 const CAP_DESC: Record<string, string> = {
-  observe: "Alimente le Brain OS avec les données du service (lecture).",
-  act: "Peut agir dans le service depuis TaskForce (écriture).",
-  metrics: "Remonte des métriques et indicateurs.",
-  recommend: "Recommandations de composants par Cortex (à venir).",
+  observe: "Feeds the Brain OS with the service's data (read).",
+  act: "Can act in the service from TaskForce (write).",
+  metrics: "Reports metrics and indicators.",
+  recommend: "Component recommendations by Cortex (coming soon).",
 }
-const AUTH_LABEL: Record<string, string> = { OAUTH2: "OAuth", API_KEY: "Clé API", TOKEN: "Token", CONFIG: "Config", NONE: "Sans auth" }
+const AUTH_LABEL: Record<string, string> = { OAUTH2: "OAuth", API_KEY: "API Key", TOKEN: "Token", CONFIG: "Config", NONE: "No auth" }
 const AUTH_HELP: Record<string, string> = {
-  OAUTH2: "Connexion via OAuth (redirection vers le service).",
-  API_KEY: "Connexion par clé API.",
-  TOKEN: "Connexion par token d'accès personnel.",
-  CONFIG: "Connexion par endpoint + identifiants.",
-  NONE: "Aucune authentification requise.",
+  OAUTH2: "Connect via OAuth (redirect to the service).",
+  API_KEY: "Connect with an API key.",
+  TOKEN: "Connect with a personal access token.",
+  CONFIG: "Connect with an endpoint + credentials.",
+  NONE: "No authentication required.",
 }
 
 /** Puce de filtre par catégorie (façon marketplace). */
@@ -95,7 +95,7 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
         if (tool.key === "github") await connectGitHub(slug)
         else await connectSlack(slug)
       } catch {
-        toast.error(`Impossible de démarrer la connexion ${tool.name}`)
+        toast.error(`Could not start the ${tool.name} connection`)
       }
       return
     }
@@ -127,9 +127,9 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
   if (error || !catalog) {
     return (
       <div className="flex flex-col items-center gap-3 py-12 text-center">
-        <p className="text-sm text-muted-foreground">Le catalogue d&apos;intégrations n&apos;a pas pu être chargé.</p>
+        <p className="text-sm text-muted-foreground">The integrations catalog could not be loaded.</p>
         <Button variant="outline" size="sm" onClick={refresh} className="gap-1.5">
-          <Loader2 className="size-3.5" /> Réessayer
+          <Loader2 className="size-3.5" /> Retry
         </Button>
       </div>
     )
@@ -149,19 +149,19 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
         <>
         <LabBanner
           feature="integrations"
-          message="Intégrations : la plupart des connecteurs sont branchables (identifiants stockés), mais la synchronisation des données par outil n'est pas encore active. Quelques intégrations (UI & composants) sont sur la roadmap, affichées « Bientôt »."
+          message="Integrations: most connectors can be plugged in (credentials stored), but per-tool data sync isn't active yet. A few integrations (UI & components) are on the roadmap, shown as 'Soon'."
         />
 
         {/* Filtre par statut de connexion — « ce que j'ai connecté ou pas » (en tête). */}
         <div className="flex gap-1.5">
           <CatPill active={statusFilter === "all"} onClick={() => setStatusFilter("all")}>
-            Toutes <span className="tabular-nums opacity-60">{catalog.total}</span>
+            All <span className="tabular-nums opacity-60">{catalog.total}</span>
           </CatPill>
           <CatPill active={statusFilter === "connected"} onClick={() => setStatusFilter("connected")}>
-            Connectées <span className="tabular-nums opacity-60">{catalog.connected}</span>
+            Connected <span className="tabular-nums opacity-60">{catalog.connected}</span>
           </CatPill>
           <CatPill active={statusFilter === "disconnected"} onClick={() => setStatusFilter("disconnected")}>
-            Non connectées <span className="tabular-nums opacity-60">{Math.max(0, catalog.total - catalog.connected)}</span>
+            Not connected <span className="tabular-nums opacity-60">{Math.max(0, catalog.total - catalog.connected)}</span>
           </CatPill>
         </div>
 
@@ -171,7 +171,7 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Rechercher un connecteur…"
+            placeholder="Search connectors…"
             className="h-10 pl-9"
           />
         </div>
@@ -179,7 +179,7 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
         {/* Filtres par catégorie */}
         <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 scrollbar-hide">
           <CatPill active={activeCat === "all"} onClick={() => setActiveCat("all")}>
-            Tous <span className="tabular-nums opacity-60">{catalog.total}</span>
+            All <span className="tabular-nums opacity-60">{catalog.total}</span>
           </CatPill>
           {catalog.categories.map((g) => (
             <CatPill key={g.category} active={activeCat === g.category} onClick={() => setActiveCat(g.category)}>
@@ -190,19 +190,19 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
 
         {/* Résumé */}
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-          <span className="inline-flex items-center gap-1"><span className="size-1.5 rounded-full bg-emerald-500" /><span className="font-medium text-foreground">{catalog.connected}</span> connecté(s)</span>
+          <span className="inline-flex items-center gap-1"><span className="size-1.5 rounded-full bg-emerald-500" /><span className="font-medium text-foreground">{catalog.connected}</span> connected</span>
           <span className="text-muted-foreground/40">·</span>
-          <span><span className="font-medium text-foreground">{catalog.available}</span> disponible(s)</span>
+          <span><span className="font-medium text-foreground">{catalog.available}</span> available</span>
           <span className="text-muted-foreground/40">·</span>
-          <span>{catalog.total} au total</span>
+          <span>{catalog.total} total</span>
         </div>
 
         {/* Grille */}
         {groups.length === 0 ? (
           <p className="py-12 text-center text-sm text-muted-foreground">
             {statusFilter === "connected"
-              ? "Aucune intégration connectée pour l'instant."
-              : "Aucun connecteur ne correspond à ta recherche."}
+              ? "No integrations connected yet."
+              : "No connector matches your search."}
           </p>
         ) : (
           groups.map((group) => (
@@ -254,10 +254,10 @@ function ConnectorCard({ tool, onOpenDetail }: Readonly<{ tool: ConnectorView; o
         </div>
         {tool.connected ? (
           <Badge variant="outline" className="gap-1 border-emerald-500/25 bg-emerald-500/10 text-[10px] text-emerald-500">
-            <Check className="size-3" /> Connecté
+            <Check className="size-3" /> Connected
           </Badge>
         ) : planned ? (
-          <Badge variant="outline" className="text-[10px] text-muted-foreground">Bientôt</Badge>
+          <Badge variant="outline" className="text-[10px] text-muted-foreground">Soon</Badge>
         ) : (
           <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70">{AUTH_LABEL[tool.authType] ?? tool.authType}</span>
         )}
@@ -293,7 +293,7 @@ function ConnectorDetailView({
     <div className="flex flex-col gap-6">
       {/* Retour */}
       <button type="button" onClick={onBack} className="flex w-fit items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground">
-        <ChevronLeft className="size-4" /> Retour
+        <ChevronLeft className="size-4" /> Back
       </button>
 
       {/* En-tête */}
@@ -307,10 +307,10 @@ function ConnectorDetailView({
               <h3 className="text-lg font-semibold text-foreground">{tool.name}</h3>
               {tool.connected && (
                 <Badge variant="outline" className="gap-1 border-emerald-500/25 bg-emerald-500/10 text-[10px] text-emerald-500">
-                  <Check className="size-3" /> Connecté
+                  <Check className="size-3" /> Connected
                 </Badge>
               )}
-              {planned && <Badge variant="outline" className="text-[10px] text-muted-foreground">Bientôt</Badge>}
+              {planned && <Badge variant="outline" className="text-[10px] text-muted-foreground">Soon</Badge>}
             </div>
             {tool.description && <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{tool.description}</p>}
           </div>
@@ -318,7 +318,7 @@ function ConnectorDetailView({
         {!planned && (
           <Button size="sm" className="shrink-0 gap-1.5" variant={tool.connected ? "outline" : "default"} onClick={onConnect}>
             <Plug className="size-3.5" />
-            {tool.connected ? (tool.authType === "OAUTH2" ? "Gérer" : "Configurer") : "Connecter"}
+            {tool.connected ? (tool.authType === "OAUTH2" ? "Manage" : "Configure") : "Connect"}
           </Button>
         )}
       </div>
@@ -326,7 +326,7 @@ function ConnectorDetailView({
       {/* Ce que ça permet */}
       {tool.capabilities.length > 0 && (
         <section className="flex flex-col gap-2">
-          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Ce que ce connecteur permet</h4>
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">What this connector can do</h4>
           <ul className="flex flex-col gap-1.5">
             {tool.capabilities.map((c) => (
               <li key={c} className="flex items-start gap-2 text-sm text-foreground">
@@ -340,7 +340,7 @@ function ConnectorDetailView({
 
       {/* Connexion */}
       <section className="flex flex-col gap-2">
-        <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Connexion</h4>
+        <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Connection</h4>
         <p className="text-sm text-muted-foreground">
           <span className="font-medium text-foreground">{AUTH_LABEL[tool.authType] ?? tool.authType}</span>
           {AUTH_HELP[tool.authType] ? ` — ${AUTH_HELP[tool.authType]}` : ""}
@@ -355,19 +355,19 @@ function ConnectorDetailView({
 
       {/* Catégorie */}
       <section className="flex flex-col gap-2">
-        <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Catégorie</h4>
+        <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Category</h4>
         <Badge variant="secondary" className="w-fit font-normal">{categoryLabel}</Badge>
       </section>
 
       {/* Liens réels */}
       {(tool.websiteUrl || tool.docsUrl) && (
         <section className="flex flex-col gap-2">
-          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Liens</h4>
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Links</h4>
           <div className="flex flex-wrap gap-2">
             {tool.websiteUrl && (
               <a href={tool.websiteUrl} target="_blank" rel="noopener noreferrer"
                  className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted">
-                <Globe className="size-3.5" /> Site officiel <ExternalLink className="size-3 text-muted-foreground" />
+                <Globe className="size-3.5" /> Official site <ExternalLink className="size-3 text-muted-foreground" />
               </a>
             )}
             {tool.docsUrl && (
@@ -422,11 +422,11 @@ function ConnectorDialog({
         // Connecteur générique : identifiants stockés chiffrés côté back.
         await connectConnector(slug, tool.key, form)
       }
-      toast.success(`${tool.name} connecté`)
+      toast.success(`${tool.name} connected`)
       onChanged()
       if (!isPlane) onClose()
     } catch {
-      toast.error("Connexion échouée — vérifie les informations saisies")
+      toast.error("Connection failed — check the details you entered")
     } finally {
       setConnecting(false)
     }
@@ -437,11 +437,11 @@ function ConnectorDialog({
     setSyncing(true)
     try {
       const r = await syncPlane(slug, projectId)
-      toast.success(`Synchronisé : ${r.created} créé(s), ${r.updated} mis à jour`)
+      toast.success(`Synced: ${r.created} created, ${r.updated} updated`)
       await loadConnected()
       onChanged()
     } catch {
-      toast.error("Synchronisation échouée")
+      toast.error("Sync failed")
     } finally {
       setSyncing(false)
     }
@@ -451,11 +451,11 @@ function ConnectorDialog({
     try {
       if (isPlane) await disconnectPlane(slug)
       else await disconnectConnector(slug, tool.key)
-      toast.success(`${tool.name} déconnecté`)
+      toast.success(`${tool.name} disconnected`)
       onChanged()
       onClose()
     } catch {
-      toast.error("Impossible de déconnecter")
+      toast.error("Could not disconnect")
     }
   }
 
@@ -503,7 +503,7 @@ function ConnectorDialog({
             <DialogFooter>
               <Button onClick={handleConnect} disabled={connecting} className="gap-1.5">
                 {connecting ? <Loader2 className="size-3.5 animate-spin" /> : <Plug className="size-3.5" />}
-                {connecting ? "Connexion…" : "Connecter"}
+                {connecting ? "Connecting…" : "Connect"}
               </Button>
             </DialogFooter>
           </div>
@@ -511,12 +511,12 @@ function ConnectorDialog({
           <div className="flex flex-col gap-3">
             <p className="text-xs text-muted-foreground">
               {status?.planeWorkspace && <>Workspace <span className="font-medium text-foreground">{status.planeWorkspace}</span> · </>}
-              {status?.ingestedNodes ?? 0} élément(s) ingéré(s) dans le Brain OS.
+              {status?.ingestedNodes ?? 0} item(s) ingested into the Brain OS.
             </p>
             <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-muted-foreground">Projet à synchroniser</span>
+              <span className="text-xs font-medium text-muted-foreground">Project to sync</span>
               <Select value={projectId} onValueChange={setProjectId}>
-                <SelectTrigger className="h-9"><SelectValue placeholder="Choisir un projet…" /></SelectTrigger>
+                <SelectTrigger className="h-9"><SelectValue placeholder="Choose a project…" /></SelectTrigger>
                 <SelectContent>
                   {projects.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                 </SelectContent>
@@ -526,11 +526,11 @@ function ConnectorDialog({
               <Button variant="outline" size="sm"
                       className="h-8 text-xs text-destructive border-destructive/30 hover:bg-destructive/10"
                       onClick={handleDisconnect}>
-                Déconnecter
+                Disconnect
               </Button>
               <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={handleSync} disabled={syncing || !projectId}>
                 {syncing ? <Loader2 className="size-3.5 animate-spin" /> : <Plug className="size-3.5" />}
-                {syncing ? "Synchronisation…" : "Synchroniser → Brain OS"}
+                {syncing ? "Syncing…" : "Sync → Brain OS"}
               </Button>
             </DialogFooter>
           </div>
@@ -539,13 +539,13 @@ function ConnectorDialog({
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2 rounded-md border border-emerald-500/25 bg-emerald-500/10 p-3 text-xs text-emerald-600 dark:text-emerald-400">
               <Check className="size-4 shrink-0" />
-              <span><span className="font-medium">{tool.name}</span> est connecté — identifiants enregistrés (chiffrés).</span>
+              <span><span className="font-medium">{tool.name}</span> is connected — credentials saved (encrypted).</span>
             </div>
             <DialogFooter>
               <Button variant="outline" size="sm"
                       className="h-8 text-xs text-destructive border-destructive/30 hover:bg-destructive/10"
                       onClick={handleDisconnect}>
-                Déconnecter
+                Disconnect
               </Button>
             </DialogFooter>
           </div>

@@ -21,11 +21,11 @@ export const WORKFLOW_PANEL_ID = "workflows"
 export const isActiveJob = (s: JobStatus) => s === "QUEUED" || s === "RUNNING" || s === "WAITING_FOR_INPUT"
 
 const STATUS: Record<JobStatus, { label: string; pill: string; Icon: typeof Loader2; spin?: boolean }> = {
-  QUEUED:            { label: "En file",         pill: "text-muted-foreground bg-muted",                     Icon: CircleDashed },
-  RUNNING:           { label: "En cours",        pill: "text-blue-500 bg-blue-500/12",                        Icon: Loader2, spin: true },
-  WAITING_FOR_INPUT: { label: "Attend une info", pill: "text-amber-600 dark:text-amber-400 bg-amber-500/14",  Icon: PauseCircle },
-  DONE:              { label: "Terminé",         pill: "text-emerald-500 bg-emerald-500/12",                  Icon: CheckCircle2 },
-  FAILED:            { label: "Échoué",          pill: "text-rose-500 bg-rose-500/12",                        Icon: XCircle },
+  QUEUED:            { label: "Queued",          pill: "text-muted-foreground bg-muted",                     Icon: CircleDashed },
+  RUNNING:           { label: "Running",         pill: "text-blue-500 bg-blue-500/12",                        Icon: Loader2, spin: true },
+  WAITING_FOR_INPUT: { label: "Waiting for input", pill: "text-amber-600 dark:text-amber-400 bg-amber-500/14",  Icon: PauseCircle },
+  DONE:              { label: "Done",            pill: "text-emerald-500 bg-emerald-500/12",                  Icon: CheckCircle2 },
+  FAILED:            { label: "Failed",          pill: "text-rose-500 bg-rose-500/12",                        Icon: XCircle },
 }
 
 function JobCard({ slug, job }: Readonly<{ slug: string; job: AnalysisJob }>) {
@@ -42,7 +42,7 @@ function JobCard({ slug, job }: Readonly<{ slug: string; job: AnalysisJob }>) {
     const ok = await answer(slug, job.id, reply.trim())
     setSending(false)
     if (ok) setReply("")
-    else toast.error("Impossible d'envoyer la réponse")
+    else toast.error("Could not send the reply")
   }
 
   return (
@@ -51,7 +51,7 @@ function JobCard({ slug, job }: Readonly<{ slug: string; job: AnalysisJob }>) {
         <ChevronRight className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform", expanded && "rotate-90")} />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-foreground">{job.projectName}</p>
-          <p className="text-[11px] text-muted-foreground">{job.depth === "DEEP" ? "Analyse approfondie" : "Analyse rapide"}</p>
+          <p className="text-[11px] text-muted-foreground">{job.depth === "DEEP" ? "Deep analysis" : "Quick analysis"}</p>
         </div>
         <span className={cn("flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold", meta.pill)}>
           <meta.Icon className={cn("size-3", meta.spin && "animate-spin")} /> {meta.label}
@@ -63,7 +63,7 @@ function JobCard({ slug, job }: Readonly<{ slug: string; job: AnalysisJob }>) {
           {job.plan.length > 0 ? (
             <AgentPlan tasks={job.plan} />
           ) : (
-            <p className="px-1 py-2 text-xs text-muted-foreground">Initialisation du workflow…</p>
+            <p className="px-1 py-2 text-xs text-muted-foreground">Initializing workflow…</p>
           )}
 
           {job.status === "WAITING_FOR_INPUT" && job.question && (
@@ -74,7 +74,7 @@ function JobCard({ slug, job }: Readonly<{ slug: string; job: AnalysisJob }>) {
                   value={reply}
                   onChange={(e) => setReply(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); sendAnswer() } }}
-                  placeholder="Ta réponse…"
+                  placeholder="Your reply…"
                   className="h-8 min-w-0 flex-1 rounded-md border border-border bg-background px-2.5 text-xs outline-none focus:border-amber-500/50"
                 />
                 <Button size="sm" className="h-8 gap-1 px-2.5 text-xs" onClick={sendAnswer} disabled={!reply.trim() || sending}>
@@ -91,15 +91,15 @@ function JobCard({ slug, job }: Readonly<{ slug: string; job: AnalysisJob }>) {
           <div className="mt-3 flex items-center gap-1.5">
             {job.status === "DONE" && (
               <Button size="sm" variant="outline" className="h-7 gap-1.5 text-xs" onClick={() => router.push(`/${slug}/analytics`)}>
-                Voir le résultat
+                View result
               </Button>
             )}
             {job.status === "FAILED" && (
               <Button
                 size="sm" variant="outline" className="h-7 gap-1.5 text-xs"
-                onClick={async () => { const j = await launch(slug, job.projectId, job.depth); if (!j) toast.error("Relance impossible") }}
+                onClick={async () => { const j = await launch(slug, job.projectId, job.depth); if (!j) toast.error("Relaunch failed") }}
               >
-                <RefreshCw className="size-3" /> Relancer
+                <RefreshCw className="size-3" /> Relaunch
               </Button>
             )}
             {!isActiveJob(job.status) && (
@@ -108,7 +108,7 @@ function JobCard({ slug, job }: Readonly<{ slug: string; job: AnalysisJob }>) {
                 onClick={() => dismissJob(slug, job.id)}
                 className="ml-auto flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
-                <Trash2 className="size-3" /> Archiver
+                <Trash2 className="size-3" /> Archive
               </button>
             )}
           </div>
@@ -132,8 +132,8 @@ export function WorkflowPanelContent() {
       {jobs.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
           <Layers className="size-7 text-muted-foreground/40" />
-          <p className="text-sm font-medium text-foreground">Aucun workflow</p>
-          <p className="text-xs text-muted-foreground">Lance une analyse depuis un projet (page Intelligence) — elle apparaîtra ici et continuera même si tu quittes la page.</p>
+          <p className="text-sm font-medium text-foreground">No workflows</p>
+          <p className="text-xs text-muted-foreground">Launch an analysis from a project (Intelligence page) — it will appear here and keep running even if you leave the page.</p>
         </div>
       ) : (
         jobs.map((job) => <JobCard key={job.id} slug={activeSlug} job={job} />)
@@ -147,7 +147,7 @@ export function toggleWorkflowPanel() {
   usePanelStore.getState().togglePanel({
     id: WORKFLOW_PANEL_ID,
     side: "right",
-    title: "Workflows IA",
+    title: "AI Workflows",
     icon: <Layers className="size-4 text-primary" />,
     width: 420,
     content: <WorkflowPanelContent />,
@@ -159,7 +159,7 @@ export function openWorkflowPanel() {
   usePanelStore.getState().openPanel({
     id: WORKFLOW_PANEL_ID,
     side: "right",
-    title: "Workflows IA",
+    title: "AI Workflows",
     icon: <Layers className="size-4 text-primary" />,
     width: 420,
     content: <WorkflowPanelContent />,

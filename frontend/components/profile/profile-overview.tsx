@@ -32,8 +32,8 @@ function ContributionGraph({ heatmap }: Readonly<{ heatmap: HeatWeek[] }>) {
   return (
     <div className="rounded-xl border border-border bg-card shadow-sm p-5">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-foreground">Activité</h3>
-        <span className="text-xs text-muted-foreground">{totalContribs} contributions sur 5 mois</span>
+        <h3 className="text-sm font-semibold text-foreground">Activity</h3>
+        <span className="text-xs text-muted-foreground">{totalContribs} contributions over 5 months</span>
       </div>
 
       <div className="flex gap-1 overflow-x-auto pb-1">
@@ -51,11 +51,11 @@ function ContributionGraph({ heatmap }: Readonly<{ heatmap: HeatWeek[] }>) {
       </div>
 
       <div className="flex items-center justify-end gap-1.5 mt-2">
-        <span className="text-[10px] text-muted-foreground">Moins</span>
+        <span className="text-[10px] text-muted-foreground">Less</span>
         {HEAT_COLORS.map((c) => (
           <div key={c} className={cn("h-3 w-3 rounded-sm", c)} />
         ))}
-        <span className="text-[10px] text-muted-foreground">Plus</span>
+        <span className="text-[10px] text-muted-foreground">More</span>
       </div>
     </div>
   )
@@ -74,10 +74,10 @@ export function ProfileOverview() {
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { label: "Issues créées",    value: stats?.issuesCreated   ?? "—", icon: <CircleDot className="h-4 w-4" /> },
-          { label: "Clôturées",        value: stats?.issuesClosed    ?? "—", icon: <CheckCircle2 className="h-4 w-4" /> },
-          { label: "Cycles terminés",  value: stats?.cyclesCompleted ?? "—", icon: <GitCommitHorizontal className="h-4 w-4" /> },
-          { label: "Jours actifs",     value: stats?.daysActive      ?? "—", icon: <Clock className="h-4 w-4" /> },
+          { label: "Issues created",   value: stats?.issuesCreated   ?? "—", icon: <CircleDot className="h-4 w-4" /> },
+          { label: "Closed",           value: stats?.issuesClosed    ?? "—", icon: <CheckCircle2 className="h-4 w-4" /> },
+          { label: "Cycles completed", value: stats?.cyclesCompleted ?? "—", icon: <GitCommitHorizontal className="h-4 w-4" /> },
+          { label: "Days active",      value: stats?.daysActive      ?? "—", icon: <Clock className="h-4 w-4" /> },
         ].map((stat) => (
           <div key={stat.label} className="rounded-xl border border-border bg-card p-4 shadow-sm flex flex-col gap-2">
             <div className="flex items-center justify-between">

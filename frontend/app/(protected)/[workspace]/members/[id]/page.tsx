@@ -62,7 +62,7 @@ function IssueList({ issues, loading, slug }: Readonly<{ issues: Issue[]; loadin
     )
   }
   if (issues.length === 0) {
-    return <p className="text-sm text-muted-foreground">Aucune issue assignée à ce membre.</p>
+    return <p className="text-sm text-muted-foreground">No issues assigned to this member.</p>
   }
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden">
@@ -140,7 +140,7 @@ export default function MemberProfilePage() {
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
     .slice(0, 5)
 
-  const joinedLabel = new Date(member.joinedAt).toLocaleDateString("fr-FR", {
+  const joinedLabel = new Date(member.joinedAt).toLocaleDateString("en-US", {
     day: "numeric", month: "short", year: "numeric",
   })
 
@@ -152,7 +152,7 @@ export default function MemberProfilePage() {
         <Button variant="ghost" size="sm" className="gap-2 -ml-2 text-muted-foreground hover:text-foreground" asChild>
           <Link href={`/${slug}/members`}>
             <ArrowLeft className="h-3.5 w-3.5" />
-            Membres
+            Members
           </Link>
         </Button>
       </div>
@@ -177,7 +177,7 @@ export default function MemberProfilePage() {
                 <h1 className="text-xl font-semibold text-foreground">
                   {member.displayName ?? member.email}
                 </h1>
-                {isYou && <Badge variant="secondary" className="text-xs">Vous</Badge>}
+                {isYou && <Badge variant="secondary" className="text-xs">You</Badge>}
               </div>
               <Badge variant="outline" className={cn("text-xs border mt-1 gap-1", role.badgeClass)}>
                 {role.icon}
@@ -193,7 +193,7 @@ export default function MemberProfilePage() {
             </span>
             <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
               <Calendar className="h-3.5 w-3.5" />
-              Rejoint le {joinedLabel}
+              Joined {joinedLabel}
             </span>
           </div>
         </div>
@@ -202,9 +202,9 @@ export default function MemberProfilePage() {
       {/* Stats row */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: "Issues assignées", value: assignedIssues.length, icon: CircleDot },
-          { label: "Issues terminées", value: doneCount,             icon: CheckCircle2 },
-          { label: "Issues en cours",  value: inProgress,            icon: Clock },
+          { label: "Issues assigned", value: assignedIssues.length, icon: CircleDot },
+          { label: "Issues completed", value: doneCount,             icon: CheckCircle2 },
+          { label: "Issues in progress",  value: inProgress,            icon: Clock },
         ].map(({ label, value, icon: Icon }) => (
           <div key={label} className="rounded-xl border border-border bg-card p-4 flex flex-col gap-1">
             <div className="flex items-center gap-2 text-muted-foreground">
@@ -228,7 +228,7 @@ export default function MemberProfilePage() {
 
       {/* Recent issues */}
       <section>
-        <h2 className="text-sm font-semibold text-foreground mb-3">Issues récentes</h2>
+        <h2 className="text-sm font-semibold text-foreground mb-3">Recent issues</h2>
         <IssueList issues={recentIssues} loading={issuesLoading} slug={slug} />
       </section>
     </div>

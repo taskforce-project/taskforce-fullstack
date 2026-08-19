@@ -108,8 +108,35 @@
 > quel (il affiche l'anglais par défaut). **`settings/page.tsx` (≈50 chaînes) + `settings-modal` FAITS en anglais**
 > (Profile/Account/Appearance/Notifications/Security/Workspace/Status/Integrations/Privacy/Usage/Nav + toasts +
 > `toLocaleString("fr-FR")`→`"en-US"`). Gardé « Français » (label de l'option de langue). `tsc`/ESLint **0**.
-> **Reste ~55 fichiers** : dashboard/*, projects/*, onboarding/*, dialogs/*, analytics/*, brain/*, agent/*,
-> members/*, sales/*, subscription/*, issues/*, sheets/*, tour, workflows, profile, smart-assign, a11y…
+> **Zone 2 — DASHBOARD FAITE (anglais)** : `card-registry` (labels/descriptions cartes), `dashboard-hero`
+> (greetings Bonjour/Bonsoir, nav palette, recherche), `dashboard/page` (Refresh/Retry), `add-card-dialog`,
+> `quick-columns`, `spec-chart`, `card-states`, `card-shell`, `dashboard-grid`, `dashboard-card`, + toutes les
+> cartes (`ops-health`, `throughput`, `needs-attention`, `ai-usage`, `ai-chart`, `kpi`, `burndown`, `workload`).
+> `toLocaleString("fr-FR")`→`"en-US"`. `tsc` **0**. ⚠️ **Leçon** : le grep sur accents SEUL manque du français
+> (accent-free « Aucun », fichiers hors 1er grep type `card-shell`) → il faut un **sweep large** (accents +
+> mots FR fréquents) par zone + `tsc`. **Reste ~40 fichiers** : projects/*, onboarding/*, dialogs/*, analytics/*,
+> brain/*, agent/*, members/*, sales/*, subscription/*, issues/*, sheets/*, tour, workflows, profile, smart-assign.
+> Vu le volume + le caractère 100 % indépendant (swap EN, aucun état partagé), un **workflow parallèle** finirait
+> le reste en une passe — proposé à l'utilisateur.
+>
+> **Zone 3+ — WORKFLOW PARALLÈLE (validé user).** ~13 agents `general-purpose`, chacun lit ~5 fichiers en entier
+> (pour attraper le FR accent-free) + swap FR→EN, syntax-safe. **Run 1** : 4 agents OK avant limite de session →
+> **20 fichiers, 184 chaînes** (subscription-manager, enterprise dialogs, roi-calculator, deployment-options,
+> command-palette, brain-graph, create-project/cycle dialogs, chat/tool, projects/[id]/cycles+members+backlog+pages…).
+> 9 agents échoués (limite). ⚠️ Un agent échoué avait **partiellement édité** `project-invite-dialog.tsx` en cassant
+> une balise `</SelectItem>` → corrigé à la main. `tsc` **0** après correction. **Run 2** (limite réinitialisée) :
+> 44 fichiers restants relancés (background). Après : `tsc` + **sweep large FR** (accents + accent-free) + **vitest**
+> (corriger les tests qui asseraient des chaînes FR devenues EN) + ESLint, puis commit + rebuild VM2.
+>
+> **Run 2** : 9/9 agents OK, **12 fichiers, 320 chaînes** (issue-sheet 51, billing 55, help 42, chart-explorer 42,
+> members 30, project-teams 27, member-availability 22, workflow-dock 18, issue-filters 13…). **Sweep final** :
+> le grep accents SEUL rate encore des fichiers jamais envoyés au workflow (leur FR était accent-free) → corrigés
+> à la main : `date-picker` (+ locale `fr`→`enUS`), `roadmap-gantt`, `notification-bell`, `error.tsx`,
+> `projects/[id]/layout` (favoris), `projects/[id]/pages` (Supprimer/Aucune page…), `workflows-button` (aria).
+> **Tests** : `subscription-manager.test` + `auth-flow.test` (intégration) asseraient du FR → assertions passées
+> en EN ; le test « language changes » repartait d'un défaut FR → réécrit EN→FR + **reset du singleton** (fuite
+> d'état inter-tests). **RÉSULTAT : `tsc` 0, `vitest` 821/821 verts, ESLint 0 nouvelle erreur.** ⚠️ Reste : commit
+> (dashboard + sweep complet) + rebuild VM2 + vérif live. Un seul « Français » (label d'option de langue) gardé.
 
 > **▶ SOUTENANCE — auto-audit contre les critères jury (12/07/2026).** Un camarade a reçu un retour du
 > **prof** sur son projet QualiTrack et l'a partagé ; ce retour révèle **ce que le jury attend**. On auto-audite

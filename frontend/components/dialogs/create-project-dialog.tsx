@@ -85,14 +85,14 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
         isPublic,
       })
       if (project) {
-        toast.success(`Projet « ${project.name} » créé`)
+        toast.success(`Project "${project.name}" created`)
         changeOpen(false)
         router.push(`/${slug}/projects/${project.id}`)
       } else {
-        toast.error("Impossible de créer le projet")
+        toast.error("Unable to create the project")
       }
     } catch {
-      toast.error("Une erreur est survenue lors de la création du projet")
+      toast.error("Something went wrong while creating the project")
     } finally {
       setIsLoading(false)
     }
