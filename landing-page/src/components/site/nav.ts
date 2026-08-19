@@ -290,7 +290,14 @@ export const PRIMARY_NAV = [
   { label: "Enterprise", href: "/enterprise" },
 ] as const;
 
-export const APP_URL = "https://app.taskforce.dev";
+// URL de l'application (sous-domaine `app` du domaine de base). « Préfixe (sous-domaine) dans le code,
+// suffixe (domaine) en variable d'env » : au déploiement on ne fixe que PUBLIC_BASE_DOMAIN (ex.
+// « taskforce-project.fr ») et on en dérive `app.<base>`. PUBLIC_APP_URL reste une échappatoire pour
+// pointer une URL arbitraire (preview, domaine custom). Défaut = domaine de production réel.
+const BASE_DOMAIN = (import.meta.env.PUBLIC_BASE_DOMAIN ?? "taskforce-project.fr")
+  .replace(/^https?:\/\//, "")
+  .replace(/\/+$/, "");
+export const APP_URL = import.meta.env.PUBLIC_APP_URL ?? `https://app.${BASE_DOMAIN}`;
 export const LABS_ICON = FlaskConical;
 
 /* ─────────────────────────  Pages réellement construites  ─────────────────────────

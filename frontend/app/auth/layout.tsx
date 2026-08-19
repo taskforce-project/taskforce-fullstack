@@ -14,6 +14,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AppFooter } from "@/components/layout/app-footer";
+import { SITE_URL } from "@/lib/config/urls";
 
 /**
  * Coquille des pages d'authentification.
@@ -63,7 +64,7 @@ export default function AuthLayout({
   // Conséquence directe : ce sont des `<a>` et non des `<Link>`. `Link` sert la navigation interne
   // de Next ; l'employer pour une autre origine déclenche une tentative de navigation côté client
   // sur une route qui n'existe pas ici.
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:4321";
+  const siteUrl = SITE_URL;
 
   return (
     <div className="auth-shell">

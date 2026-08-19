@@ -57,8 +57,25 @@
 > **`auth.ui`** ajouté et **mirroré EN/FR** (interpolation par jetons `{provider}`/`{email}`/`{seconds}` via
 > `String.replace`). Les **mocks de test** (`login`/`register-info`/`verification`/`forgot`/`auth-stepper`)
 > renvoient désormais les **vraies `CONSTANTS_FR`** (`vi.importActual`, anti-drift). Vérifié : `tsc --noEmit`
-> **0 erreur**, **83/83** tests auth verts, ESLint **0 erreur**. ⚠️ **Reste Batch 2** : français in-app
-> (`settings`, `integrations-catalog`, `onboarding`, `product-tour`, nav, dialogs entreprise…).
+> **0 erreur**, **83/83** tests auth verts, ESLint **0 erreur**. **Batch 1 vérifié EN LIVE** (VM2 rebuild,
+> `app.taskforce-project.fr` : « Sign in / Access your workspace / Email / Password / Forgot password? »).
+> ⚠️ **Reste Batch 2** : français in-app (`settings`, `integrations-catalog`, `onboarding`, `product-tour`,
+> nav, dialogs entreprise…).
+>
+> **MAJ (refactor URLs → domaine de base unique, 18/08)** : « préfixe (sous-domaine) dans le code, suffixe
+> (domaine) en variable d'env ». Nouveau module **`frontend/lib/config/urls.ts`** : dérive `API_URL`,
+> `API_URL_SSR`, `STORAGE_URL`, `SITE_URL` d'un seul **`NEXT_PUBLIC_BASE_DOMAIN`** (→ `api.<base>` /
+> `files.<base>` / `<base>`), repli **localhost** en dev, un `NEXT_PUBLIC_*` explicite l'emporte toujours.
+> Consommé par `lib/api/client.ts` (baseURL SSR/CSR) et `app/auth/layout.tsx` (lien « retour au site ») ;
+> `next.config.ts` ré-inline la même dérivation pour la CSP (`connect-src`/`img-src`). `Dockerfile` : `ARG`
+> + `ENV NEXT_PUBLIC_BASE_DOMAIN`. **Landing** : `nav.ts` `APP_URL` était **codé en dur sur l'ancien domaine
+> `app.taskforce.dev`** → dérivé de `import.meta.env.PUBLIC_BASE_DOMAIN` (défaut `taskforce-project.fr`),
+> échappatoire `PUBLIC_APP_URL`. Gabarits mis à jour : `.env.prod.example` (`BASE_DOMAIN`), `landing-page/.env.example`
+> (`PUBLIC_BASE_DOMAIN`/`PUBLIC_APP_URL`). Vérifié `tsc` + ESLint **0**. ⚠️ Côté **VM2** : `docker-compose.vm2.yml`
+> (build.args composés depuis `${BASE_DOMAIN}` + passage de `NEXT_PUBLIC_BASE_DOMAIN`) — fichier VM hors repo,
+> à ajuster au rebuild. ⚠️ La **landing déploie depuis `main` (Vercel)** : le fix `APP_URL` doit atteindre `main`
+> pour passer en prod. Backend (APP_URL/CORS/issuer) : même pattern possible en suivi (dérive dans
+> `docker-compose.prod.yml`), non fait ici (risque sur le boot prod, à valider via `docker compose config`).
 
 > **▶ SOUTENANCE — auto-audit contre les critères jury (12/07/2026).** Un camarade a reçu un retour du
 > **prof** sur son projet QualiTrack et l'a partagé ; ce retour révèle **ce que le jury attend**. On auto-audite

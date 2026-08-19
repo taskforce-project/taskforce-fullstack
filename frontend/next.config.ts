@@ -3,13 +3,18 @@ import type { NextConfig } from "next";
 // CSP adaptée App Router Next.js :
 // - unsafe-inline requis pour Tailwind (styles inline) et Next.js hydration
 // - unsafe-eval requis en dev (hot-reload) — à retirer si nonce mis en place en production
-const API_ORIGIN = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+// Domaine de base unique (miroir de `lib/config/urls.ts` — la config Next ne peut pas importer ce
+// module au chargement) : en prod on ne fixe que `NEXT_PUBLIC_BASE_DOMAIN` et on dérive api.<base> /
+// files.<base>. Une variable `NEXT_PUBLIC_*` explicite l'emporte toujours.
+const BASE_DOMAIN = (process.env.NEXT_PUBLIC_BASE_DOMAIN ?? "").replace(/^https?:\/\//, "").replace(/\/+$/, "");
+const fromBase = (subdomainPrefix: string) => (BASE_DOMAIN ? `https://${subdomainPrefix}${BASE_DOMAIN}` : "");
+const API_ORIGIN = process.env.NEXT_PUBLIC_API_URL || fromBase("api.") || "http://localhost:8080";
 // Origine du stockage objet (MinIO/S3) telle que le NAVIGATEUR la joint. Les pièces jointes sont
 // servies par URL présignée : l'hôte fait partie de la signature, le navigateur charge donc
 // directement depuis cette origine — sans elle dans img-src/connect-src, la CSP bloque la requête
 // (vignette cassée, `TypeError: Failed to fetch`) alors que le backend et MinIO sont sains.
 // `https:` dans img-src ne couvre pas un MinIO local en http:// → il faut l'origine explicite.
-const STORAGE_ORIGIN = process.env.NEXT_PUBLIC_STORAGE_URL ?? "http://localhost:9000";
+const STORAGE_ORIGIN = process.env.NEXT_PUBLIC_STORAGE_URL || fromBase("files.") || "http://localhost:9000";
 
 const IS_PROD = process.env.NODE_ENV === "production";
 
