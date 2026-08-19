@@ -119,7 +119,7 @@ function IssueRow({
     setRemoving(true)
     try {
       await removeIssueFromCycle(slug, projectId, cycleId, issue.id)
-      toast.success(`${issue.identifier} retirée du cycle`)
+      toast.success(`${issue.identifier} removed from cycle`)
       await onRemoved()
     } finally {
       setRemoving(false)
@@ -153,7 +153,7 @@ function IssueRow({
       <button
         onClick={handleRemove}
         disabled={removing}
-        aria-label={`Retirer ${issue.identifier} du cycle`}
+        aria-label={`Remove ${issue.identifier} from cycle`}
         className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive disabled:opacity-50 shrink-0"
       >
         {removing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
@@ -202,7 +202,7 @@ function AddIssuesDialog({
     setAddingId(issue.id)
     try {
       await addIssueToCycle(slug, projectId, cycleId, issue.id)
-      toast.success(`${issue.identifier} ajoutée au cycle`)
+      toast.success(`${issue.identifier} added to cycle`)
       await onAdded()
     } finally {
       setAddingId(null)
@@ -213,20 +213,20 @@ function AddIssuesDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button size="sm" variant="outline" className="gap-2">
-          <Plus className="h-3.5 w-3.5" /> Ajouter des issues
+          <Plus className="h-3.5 w-3.5" /> Add issues
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Ajouter des issues au cycle</DialogTitle>
+          <DialogTitle>Add issues to cycle</DialogTitle>
         </DialogHeader>
         {loading ? (
           <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
-            <Loader2 className="h-4 w-4 animate-spin" /><span className="text-sm">Chargement…</span>
+            <Loader2 className="h-4 w-4 animate-spin" /><span className="text-sm">Loading…</span>
           </div>
         ) : candidates.length === 0 ? (
           <p className="py-12 text-center text-sm text-muted-foreground">
-            Toutes les issues du projet sont déjà dans ce cycle.
+            All project issues are already in this cycle.
           </p>
         ) : (
           <ScrollArea className="max-h-80">
@@ -305,7 +305,7 @@ export default function CycleDetailPage() {
     setActing(true)
     try {
       await deleteCycle(workspace, projectId, cycleId)
-      toast.success("Cycle supprimé")
+      toast.success("Cycle deleted")
       router.push(`/${workspace}/projects/${projectId}/cycles`)
     } finally {
       setActing(false)
@@ -334,13 +334,13 @@ export default function CycleDetailPage() {
       <Empty>
         <EmptyHeader>
           <EmptyMedia variant="icon"><RefreshCw /></EmptyMedia>
-          <EmptyTitle>{error ? "Erreur" : "Cycle introuvable"}</EmptyTitle>
-          <EmptyDescription>{error ?? "Ce cycle n'existe pas ou a été supprimé."}</EmptyDescription>
+          <EmptyTitle>{error ? "Error" : "Cycle not found"}</EmptyTitle>
+          <EmptyDescription>{error ?? "This cycle doesn't exist or has been deleted."}</EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
           <Link href={`/${workspace}/projects/${projectId}/cycles`}>
             <Button variant="outline" size="sm" className="gap-2">
-              <ArrowLeft className="h-3.5 w-3.5" /> Retour aux cycles
+              <ArrowLeft className="h-3.5 w-3.5" /> Back to cycles
             </Button>
           </Link>
         </EmptyContent>
@@ -421,24 +421,24 @@ export default function CycleDetailPage() {
             {/* Actions du cycle — Démarrer / Terminer / Rouvrir / Supprimer (CYC-02/04/08). */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" disabled={acting} aria-label="Actions du cycle">
+                <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" disabled={acting} aria-label="Cycle actions">
                   {acting ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
                 {cycle.status === "DRAFT" && (
-                  <DropdownMenuItem onClick={() => handleTransition("ACTIVE", "Cycle démarré")}>
-                    <Play className="h-3.5 w-3.5" /> Démarrer le cycle
+                  <DropdownMenuItem onClick={() => handleTransition("ACTIVE", "Cycle started")}>
+                    <Play className="h-3.5 w-3.5" /> Start cycle
                   </DropdownMenuItem>
                 )}
                 {cycle.status === "ACTIVE" && (
-                  <DropdownMenuItem onClick={() => handleTransition("COMPLETED", "Cycle terminé")}>
-                    <CheckCircle2 className="h-3.5 w-3.5" /> Terminer le cycle
+                  <DropdownMenuItem onClick={() => handleTransition("COMPLETED", "Cycle completed")}>
+                    <CheckCircle2 className="h-3.5 w-3.5" /> Complete cycle
                   </DropdownMenuItem>
                 )}
                 {cycle.status === "COMPLETED" && (
-                  <DropdownMenuItem onClick={() => handleTransition("ACTIVE", "Cycle rouvert")}>
-                    <RotateCcw className="h-3.5 w-3.5" /> Rouvrir le cycle
+                  <DropdownMenuItem onClick={() => handleTransition("ACTIVE", "Cycle reopened")}>
+                    <RotateCcw className="h-3.5 w-3.5" /> Reopen cycle
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuSeparator />
@@ -446,7 +446,7 @@ export default function CycleDetailPage() {
                   className="text-destructive focus:text-destructive"
                   onSelect={() => setConfirmDelete(true)}
                 >
-                  <Trash2 className="h-3.5 w-3.5" /> Supprimer le cycle
+                  <Trash2 className="h-3.5 w-3.5" /> Delete cycle
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -454,9 +454,9 @@ export default function CycleDetailPage() {
             <DeleteConfirmDialog
               open={confirmDelete}
               onOpenChange={setConfirmDelete}
-              title="Supprimer le cycle ?"
-              description={`« ${cycle.name} » sera supprimé. Les issues rattachées ne sont pas supprimées. Action irréversible.`}
-              confirmLabel="Supprimer le cycle"
+              title="Delete cycle?"
+              description={`"${cycle.name}" will be deleted. Attached issues are not deleted. This action is irreversible.`}
+              confirmLabel="Delete cycle"
               variant="danger"
               onConfirm={handleDelete}
             />
@@ -472,7 +472,7 @@ export default function CycleDetailPage() {
 
       {/* Issues */}
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-foreground">Issues du cycle</h2>
+        <h2 className="text-sm font-semibold text-foreground">Cycle issues</h2>
         <AddIssuesDialog
           slug={workspace}
           projectId={projectId}
@@ -483,7 +483,7 @@ export default function CycleDetailPage() {
       </div>
       {issues.length === 0 ? (
         <div className="rounded-xl border border-border border-dashed bg-card p-12 text-center text-muted-foreground text-sm">
-          Aucune issue dans ce cycle. Cliquez sur « Ajouter des issues » pour en rattacher.
+          No issues in this cycle. Click "Add issues" to attach some.
         </div>
       ) : (
         <div className="flex flex-col gap-4">

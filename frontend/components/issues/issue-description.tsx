@@ -51,14 +51,14 @@ export function IssueDescription({ value, onSave, placeholder }: Readonly<IssueD
           value={draft}
           onChange={setDraft}
           rows={10}
-          placeholder="Décris l'issue en markdown… titres, listes, `- [ ]` cases à cocher, code."
+          placeholder="Describe the issue in markdown… headings, lists, `- [ ]` checkboxes, code."
         />
         <div className="flex gap-2">
           <Button size="sm" className="h-7 gap-1.5 text-xs" onClick={save}>
-            <CheckIcon className="size-3" /> Enregistrer
+            <CheckIcon className="size-3" /> Save
           </Button>
           <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={cancel}>
-            Annuler
+            Cancel
           </Button>
         </div>
       </div>
@@ -72,7 +72,7 @@ export function IssueDescription({ value, onSave, placeholder }: Readonly<IssueD
         onClick={startEditing}
         className="w-full -mx-3 rounded-md px-3 py-3 text-left text-sm italic text-muted-foreground transition-colors hover:bg-muted/40"
       >
-        {placeholder ?? "Aucune description. Cliquer pour en ajouter une."}
+        {placeholder ?? "No description. Click to add one."}
       </button>
     )
   }
@@ -87,7 +87,7 @@ export function IssueDescription({ value, onSave, placeholder }: Readonly<IssueD
       <button
         type="button"
         onClick={startEditing}
-        title="Éditer la description"
+        title="Edit the description"
         className="absolute top-1.5 right-1.5 rounded p-1 text-muted-foreground opacity-40 transition-opacity hover:bg-muted hover:opacity-100"
       >
         <Pencil className="size-3.5" />

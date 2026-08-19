@@ -36,60 +36,60 @@ const PLANS: PlanDef[] = [
   {
     key: "FREE",
     name: "Free",
-    tagline: "Pour découvrir TaskForce.",
+    tagline: "To explore TaskForce.",
     monthly: 0,
     features: [
-      "Membres illimités",
+      "Unlimited members",
       "2 workspaces",
       "250 issues",
       "Board, List & Cycles",
       "Smart Assign",
-      "100 000 tokens IA Cortex / mois",
+      "100,000 Cortex AI tokens / month",
     ],
   },
   {
     key: "BASIC",
     name: "Basic",
-    tagline: "Pour les petites équipes qui démarrent.",
+    tagline: "For small teams getting started.",
     monthly: 10,
     inherits: "Free",
     features: [
       "5 workspaces",
-      "Issues illimitées",
-      "Uploads de fichiers illimités",
-      "Rôles administrateur",
-      "500 000 tokens IA Cortex / mois",
+      "Unlimited issues",
+      "Unlimited file uploads",
+      "Admin roles",
+      "500,000 Cortex AI tokens / month",
     ],
   },
   {
     key: "BUSINESS",
     name: "Business",
-    tagline: "Pour les équipes qui livrent vite.",
+    tagline: "For teams that ship fast.",
     monthly: 16,
     inherits: "Basic",
     highlight: true,
     features: [
-      "Workspaces illimités",
-      "Invités & projets privés",
-      "Analytics avancées + burndown",
-      "Décisions & workflows IA",
-      "Intégration GitHub",
-      "2 000 000 tokens IA Cortex / mois",
+      "Unlimited workspaces",
+      "Guests & private projects",
+      "Advanced analytics + burndown",
+      "AI decisions & workflows",
+      "GitHub integration",
+      "2,000,000 Cortex AI tokens / month",
     ],
   },
   {
     key: "ENTERPRISE",
     name: "Enterprise",
-    tagline: "Sécurité, conformité et déploiement dédié.",
+    tagline: "Security, compliance and dedicated deployment.",
     monthly: null,
     inherits: "Business",
     features: [
       "SSO / SAML / SCIM",
-      "Contrôles admin granulaires",
-      "Audit & conformité RGPD",
-      "Déploiement on-premise",
-      "Support prioritaire & accompagnement",
-      "Tokens IA Cortex illimités",
+      "Granular admin controls",
+      "Audit & GDPR compliance",
+      "On-premise deployment",
+      "Priority support & guidance",
+      "Unlimited Cortex AI tokens",
     ],
   },
 ]
@@ -101,7 +101,7 @@ function YearlyToggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
       <span className={cn("relative h-4 w-7 rounded-full transition-colors", on ? "bg-blue-500" : "bg-muted-foreground/30")}>
         <span className={cn("absolute top-0.5 size-3 rounded-full bg-white transition-all", on ? "left-3.5" : "left-0.5")} />
       </span>
-      Facturé annuellement
+      Billed annually
     </button>
   )
 }
@@ -136,10 +136,10 @@ export default function BillingPage() {
   }, [slug])
 
   const renewLabel = (() => {
-    if (current === "FREE") return "Forfait gratuit"
-    if (!sub?.currentPeriodEnd) return "Abonnement actif"
-    const date = new Date(sub.currentPeriodEnd).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })
-    return sub.cancelAtPeriodEnd ? `Se termine le ${date}` : `Renouvellement le ${date}`
+    if (current === "FREE") return "Free plan"
+    if (!sub?.currentPeriodEnd) return "Active subscription"
+    const date = new Date(sub.currentPeriodEnd).toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" })
+    return sub.cancelAtPeriodEnd ? `Ends on ${date}` : `Renews on ${date}`
   })()
 
   const unlimited = usage ? usage.limitTokens < 0 : false
@@ -150,7 +150,7 @@ export default function BillingPage() {
     try {
       await stripeService.openBillingPortal()
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Portail de facturation indisponible pour le moment")
+      toast.error(e instanceof Error ? e.message : "Billing portal unavailable right now")
       setBusy(false)
     }
   }
@@ -161,36 +161,36 @@ export default function BillingPage() {
       const { checkoutUrl } = await stripeService.createCheckoutSession(plan)
       window.location.assign(checkoutUrl)
     } catch {
-      toast.error("Impossible de démarrer le paiement pour le moment. Réessayez plus tard.")
+      toast.error("Could not start payment right now. Please try again later.")
       setBusy(false)
     }
   }
 
   function priceFor(p: PlanDef): { big: string; per: string } {
-    if (p.monthly === null) return { big: "Sur devis", per: "" }
-    if (p.monthly === 0) return { big: "0 €", per: "" }
+    if (p.monthly === null) return { big: "Custom", per: "" }
+    if (p.monthly === 0) return { big: "€0", per: "" }
     const perMonth = annual ? Math.round(p.monthly * 0.83) : p.monthly
-    return { big: `${perMonth} €`, per: "par membre / mois" }
+    return { big: `€${perMonth}`, per: "per member / month" }
   }
 
   function renderCta(p: PlanDef) {
     const base = "h-10 w-full font-medium"
     if (p.key === current) {
       return current === "FREE"
-        ? <Button variant="secondary" className={base} disabled>Forfait actuel</Button>
-        : <Button variant="outline" className={base} onClick={openPortal} disabled={busy}>{busy ? "Ouverture…" : "Gérer"}</Button>
+        ? <Button variant="secondary" className={base} disabled>Current plan</Button>
+        : <Button variant="outline" className={base} onClick={openPortal} disabled={busy}>{busy ? "Opening…" : "Manage"}</Button>
     }
     if (p.key === "ENTERPRISE") {
       return (
         <Button asChild variant="outline" className={cn(base, "gap-1.5")}>
           <a href="mailto:sales@taskforce.dev?subject=Demande%20Enterprise%20TaskForce">
-            <Building2 className="size-4" /> Nous contacter
+            <Building2 className="size-4" /> Contact us
           </a>
         </Button>
       )
     }
     if (RANK[p.key] < RANK[current]) {
-      return <Button variant="ghost" className={cn(base, "text-muted-foreground hover:text-foreground")} onClick={openPortal} disabled={busy}>Rétrograder</Button>
+      return <Button variant="ghost" className={cn(base, "text-muted-foreground hover:text-foreground")} onClick={openPortal} disabled={busy}>Downgrade</Button>
     }
     return (
       <Button
@@ -199,14 +199,14 @@ export default function BillingPage() {
         onClick={() => checkout(p.key as SelfServe)}
         disabled={busy}
       >
-        {busy ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />} Passer à {p.name}
+        {busy ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />} Upgrade to {p.name}
       </Button>
     )
   }
 
   return (
     <PageContainer>
-      <PageHeader title="Facturation" description="Votre forfait, votre consommation IA et les options d'évolution." />
+      <PageHeader title="Billing" description="Your plan, your AI usage and upgrade options." />
 
       {/* Barre compacte : forfait courant + consommation IA (agrégée par compte) */}
       <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -216,26 +216,26 @@ export default function BillingPage() {
           </div>
           <div>
             <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              Forfait <span className="capitalize">{current.toLowerCase()}</span>
+              Plan <span className="capitalize">{current.toLowerCase()}</span>
               {current !== "FREE" && (
                 <Badge variant="outline" className="border-amber-500/20 bg-amber-500/15 text-amber-500">Active</Badge>
               )}
             </p>
             <p className="text-xs text-muted-foreground">
               {renewLabel}
-              {usage && ` · Cortex ce mois : ${usage.usedTokens.toLocaleString("fr-FR")}${unlimited ? " tokens" : ` / ${usage.limitTokens.toLocaleString("fr-FR")} (${usePct}%)`}`}
+              {usage && ` · Cortex this month: ${usage.usedTokens.toLocaleString("en-US")}${unlimited ? " tokens" : ` / ${usage.limitTokens.toLocaleString("en-US")} (${usePct}%)`}`}
             </p>
           </div>
         </div>
         {current !== "FREE" && (
-          <Button variant="outline" size="sm" onClick={openPortal} disabled={busy}>{busy ? "Ouverture…" : "Gérer la facturation"}</Button>
+          <Button variant="outline" size="sm" onClick={openPortal} disabled={busy}>{busy ? "Opening…" : "Manage billing"}</Button>
         )}
       </div>
 
       {/* Titre section */}
       <div className="mt-8 text-center">
-        <h2 className="text-xl font-semibold tracking-tight text-foreground">Des forfaits qui grandissent avec votre équipe</h2>
-        <p className="mt-1.5 text-sm text-muted-foreground">Tarification par membre. Changez à tout moment, sans engagement.</p>
+        <h2 className="text-xl font-semibold tracking-tight text-foreground">Plans that grow with your team</h2>
+        <p className="mt-1.5 text-sm text-muted-foreground">Per-member pricing. Change anytime, no commitment.</p>
       </div>
 
       {/* 4 colonnes séparées par un filet (style épuré) */}
@@ -243,7 +243,7 @@ export default function BillingPage() {
         {PLANS.map((p) => {
           const price = priceFor(p)
           const feats: { label: string; head: boolean }[] = [
-            ...(p.inherits ? [{ label: `Tout ce qui est dans ${p.inherits}`, head: true }] : []),
+            ...(p.inherits ? [{ label: `Everything in ${p.inherits}`, head: true }] : []),
             ...p.features.map((f) => ({ label: f, head: false })),
           ]
           const paid = p.monthly !== null && p.monthly > 0
@@ -252,7 +252,7 @@ export default function BillingPage() {
               <div className="flex items-center gap-2">
                 <h3 className="text-xl font-semibold tracking-tight text-foreground">{p.name}</h3>
                 {p.highlight && (
-                  <span className="rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">Populaire</span>
+                  <span className="rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">Popular</span>
                 )}
               </div>
 
@@ -265,7 +265,7 @@ export default function BillingPage() {
               <div className="mt-3 flex h-5 items-center">
                 {paid ? <YearlyToggle on={annual} onToggle={() => setAnnual((v) => !v)} /> : (
                   <span className="text-xs text-muted-foreground">
-                    {p.monthly === 0 ? "Gratuit pour toujours" : "Facturation annuelle"}
+                    {p.monthly === 0 ? "Free forever" : "Annual billing"}
                   </span>
                 )}
               </div>
@@ -288,8 +288,8 @@ export default function BillingPage() {
       </div>
 
       <p className="mx-auto mt-6 max-w-6xl text-center text-xs text-muted-foreground">
-        Les prix et forfaits sont indicatifs (placeholders) et seront ajustés avec la grille tarifaire finale de TaskForce.
-        Des limites d&apos;utilisation s&apos;appliquent.
+        Prices and plans are indicative (placeholders) and will be adjusted with the final TaskForce pricing grid.
+        Usage limits apply.
       </p>
     </PageContainer>
   )

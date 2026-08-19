@@ -192,25 +192,25 @@ function CycleCard({ cycle, slug, reload }: Readonly<{ cycle: Cycle; slug: strin
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem className="gap-2" onClick={handleViewIssues}><BarChart3 className="h-4 w-4" />Voir les issues</DropdownMenuItem>
+            <DropdownMenuItem className="gap-2" onClick={handleViewIssues}><BarChart3 className="h-4 w-4" />View issues</DropdownMenuItem>
             {/* Transitions contextuelles — remplacent le « Edit cycle » qui n'avait aucun onClick. */}
             {cycle.status === "upcoming" && (
               <DropdownMenuItem className="gap-2" disabled={busy} onClick={() => handleTransition("ACTIVE")}>
-                <Play className="h-4 w-4 text-emerald-400" />Démarrer le cycle
+                <Play className="h-4 w-4 text-emerald-400" />Start cycle
               </DropdownMenuItem>
             )}
             {cycle.status === "active" && (
               <DropdownMenuItem className="gap-2" disabled={busy} onClick={() => handleTransition("COMPLETED")}>
-                <CheckCircle2 className="h-4 w-4 text-emerald-400" />Terminer le cycle
+                <CheckCircle2 className="h-4 w-4 text-emerald-400" />Complete cycle
               </DropdownMenuItem>
             )}
             {cycle.status === "completed" && (
               <DropdownMenuItem className="gap-2" disabled={busy} onClick={() => handleTransition("ACTIVE")}>
-                <Play className="h-4 w-4 text-blue-400" />Rouvrir le cycle
+                <Play className="h-4 w-4 text-blue-400" />Reopen cycle
               </DropdownMenuItem>
             )}
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={handleDelete}>Supprimer</DropdownMenuItem>
+            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={handleDelete}>Delete</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -374,7 +374,7 @@ export default function CyclesPage() {
     <PageContainer>
       <PageHeader
         title="Cycles"
-        description={isLoading ? "Chargement…" : `${active.length} actifs · ${upcoming.length} à venir · ${completed.length} terminés`}
+        description={isLoading ? "Loading…" : `${active.length} active · ${upcoming.length} upcoming · ${completed.length} completed`}
         actions={
           <CreateCycleDialog>
             <Button size="sm" className="gap-2 shrink-0">
@@ -414,8 +414,8 @@ export default function CyclesPage() {
         <Empty>
           <EmptyHeader>
             <EmptyMedia variant="icon"><CalendarRange /></EmptyMedia>
-            <EmptyTitle>Aucun cycle</EmptyTitle>
-            <EmptyDescription>Créez un cycle pour suivre un sprint ou un jalon.</EmptyDescription>
+            <EmptyTitle>No cycles</EmptyTitle>
+            <EmptyDescription>Create a cycle to track a sprint or milestone.</EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
             <CreateCycleDialog>

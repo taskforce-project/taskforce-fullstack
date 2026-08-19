@@ -68,7 +68,7 @@ export function ThroughputCard({ slug, card, globalRange, refreshToken }: Dashbo
   if (data.length === 0) return <CardEmpty />
 
   const totalResolved = data.reduce((s, p) => s + p.resolved, 0)
-  const caption = weekly ? "Résolues · 8 semaines" : `Résolues · ${windowDays} j`
+  const caption = weekly ? "Resolved · 8 weeks" : `Resolved · ${windowDays}d`
 
   // Même traitement que les sparklines des opérations : le tracé s'arrête au-dessus du bas de
   // carte, l'aplat descend jusqu'à lui. Géométrie et dégradé viennent du module partagé pour que
@@ -105,7 +105,7 @@ export function ThroughputCard({ slug, card, globalRange, refreshToken }: Dashbo
             <Area
               type="monotone"
               dataKey="resolved"
-              name="Résolues"
+              name="Resolved"
               stroke="#3b82f6"
               strokeWidth={2}
               fill={`url(#${gradientId})`}

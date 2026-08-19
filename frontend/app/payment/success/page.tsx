@@ -28,8 +28,8 @@ function PaymentSuccessContent() {
       if (!sessionId) {
         setVerificationStatus("error");
         setIsVerifying(false);
-        toast.error("Erreur", {
-          description: "Aucune session de paiement trouvée",
+        toast.error("Error", {
+          description: "No payment session found",
         });
         return;
       }
@@ -44,13 +44,13 @@ function PaymentSuccessContent() {
         });
 
         if (!response.ok) {
-          throw new Error(`Erreur HTTP: ${response.status}`);
+          throw new Error(`HTTP error: ${response.status}`);
         }
 
         const data = await response.json();
         
         if (!data.success) {
-          throw new Error(data.message || "Erreur lors de la vérification du paiement");
+          throw new Error(data.message || "Error while verifying the payment");
         }
         
         setVerificationStatus("success");
@@ -58,13 +58,13 @@ function PaymentSuccessContent() {
         // Rafraîchir les données utilisateur pour obtenir le nouveau plan
         refreshUser();
         
-        toast.success("Paiement réussi !", {
-          description: data.data?.message || "Votre abonnement a été activé avec succès",
+        toast.success("Payment successful!", {
+          description: data.data?.message || "Your subscription has been activated successfully",
         });
       } catch (error) {
         setVerificationStatus("error");
-        toast.error("Erreur de vérification", {
-          description: "Impossible de vérifier le paiement. Contactez le support.",
+        toast.error("Verification error", {
+          description: "Unable to verify the payment. Contact support.",
         });
         console.error("Payment verification error:", error);
       } finally {
@@ -88,9 +88,9 @@ function PaymentSuccessContent() {
           <CardContent className="pt-6 pb-6">
             <div className="flex flex-col items-center gap-4 text-center">
               <Loader2 className="h-16 w-16 text-primary animate-spin" />
-              <h2 className="text-2xl font-bold">Vérification du paiement</h2>
+              <h2 className="text-2xl font-bold">Verifying payment</h2>
               <p className="text-muted-foreground">
-                Veuillez patienter pendant que nous confirmons votre paiement...
+                Please wait while we confirm your payment...
               </p>
             </div>
           </CardContent>
@@ -107,15 +107,15 @@ function PaymentSuccessContent() {
             <div className="flex justify-center mb-4">
               <AlertCircle className="h-16 w-16 text-destructive" />
             </div>
-            <CardTitle className="text-2xl">Erreur de vérification</CardTitle>
+            <CardTitle className="text-2xl">Verification error</CardTitle>
             <CardDescription>
-              Nous n&apos;avons pas pu vérifier votre paiement
+              We couldn&apos;t verify your payment
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground text-center">
-              Votre paiement a peut-être été traité, mais nous ne pouvons pas le confirmer actuellement.
-              Veuillez contacter notre support avec la référence de session suivante :
+              Your payment may have been processed, but we can&apos;t confirm it right now.
+              Please contact our support with the following session reference:
             </p>
             {sessionId && (
               <div className="p-3 bg-muted rounded-md">
@@ -124,14 +124,14 @@ function PaymentSuccessContent() {
             )}
             <div className="flex flex-col gap-2">
               <Button onClick={handleContinue} variant="outline" className="w-full">
-                Aller à la connexion
+                Go to login
               </Button>
               <Button
                 onClick={() => router.push("/")}
                 variant="ghost"
                 className="w-full"
               >
-                Retour à TaskForce
+                Back to TaskForce
               </Button>
             </div>
           </CardContent>
@@ -149,40 +149,40 @@ function PaymentSuccessContent() {
               <CheckCircle2 className="h-16 w-16 text-green-600 dark:text-green-400" />
             </div>
           </div>
-          <CardTitle className="text-3xl font-bold">Paiement réussi !</CardTitle>
+          <CardTitle className="text-3xl font-bold">Payment successful!</CardTitle>
           <CardDescription className="text-base">
-            Votre abonnement a été activé avec succès
+            Your subscription has been activated successfully
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-3">
             <div className="flex items-center gap-3">
               <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />
-              <p className="text-sm">Accès immédiat à toutes les fonctionnalités premium</p>
+              <p className="text-sm">Immediate access to all premium features</p>
             </div>
             <div className="flex items-center gap-3">
               <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />
-              <p className="text-sm">Email de confirmation envoyé à votre adresse</p>
+              <p className="text-sm">Confirmation email sent to your address</p>
             </div>
             <div className="flex items-center gap-3">
               <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />
-              <p className="text-sm">Facturation automatique à chaque période</p>
+              <p className="text-sm">Automatic billing each period</p>
             </div>
           </div>
 
           <div className="p-4 bg-muted rounded-lg">
             <p className="text-sm text-muted-foreground text-center">
-              Vous pouvez gérer votre abonnement à tout moment depuis les paramètres de votre compte.
+              You can manage your subscription at any time from your account settings.
             </p>
           </div>
 
           <Button onClick={handleContinue} className="w-full" size="lg">
-            Commencer à utiliser TaskForce
+            Start using TaskForce
           </Button>
 
           {sessionId && (
             <p className="text-xs text-muted-foreground text-center">
-              Référence de transaction : {sessionId.slice(-12)}
+              Transaction reference: {sessionId.slice(-12)}
             </p>
           )}
         </CardContent>

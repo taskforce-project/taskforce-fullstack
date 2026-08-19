@@ -6,7 +6,6 @@ import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -65,7 +64,6 @@ public class AgentService {
 
     private static final int MAX_TOOL_ITERS = 5;
 
-    @Transactional
     public AssistantAnswer run(String slug, Long userId, String message) {
         return run(slug, userId, message, List.of());
     }
@@ -74,8 +72,15 @@ public class AgentService {
      * Variante avec <b>mémoire multi-tours</b> : {@code history} = messages précédents de la
      * conversation (format LLM {@code {role, content}}, ordre chronologique), injectés dans le
      * prompt avant le message courant. Vide = premier tour (comportement identique à l'ancien).
+     *
+     * <p><b>PC-022 — aucune transaction n'englobe la boucle LLM.</b> Cette méthode était
+     * {@code @Transactional} : elle gardait une connexion Hikari ouverte pendant TOUS les appels au
+     * modèle (jusqu'à {@code MAX_TOOL_ITERS} × 300 s de read-timeout) → ~20 chats Cortex simultanés
+     * épuisaient le pool (20) et faisaient tomber toute l'API. On suit le patron d'{@link AnalysisJobRunner} :
+     * l'orchestrateur ne tient <b>aucune</b> tx ; chaque accès DB est confié à un collaborateur
+     * {@code @Transactional} (BrainAccessGuard, BrainSearchService, KnowledgeService via les outils,
+     * AiUsageService) → une tx courte par opération, jamais tenue pendant l'appel au LLM.</p>
      */
-    @Transactional
     public AssistantAnswer run(String slug, Long userId, String message, List<Map<String, Object>> history) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
         AgentContext ctx = new AgentContext(slug, ws.getId(), userId);

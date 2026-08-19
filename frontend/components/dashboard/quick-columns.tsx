@@ -55,12 +55,12 @@ function OperationsColumn() {
     .slice(0, MAX_ROWS)
 
   return (
-    <SectionCard title="Opérations" href="./projects" bodyClassName="p-0">
+    <SectionCard title="Operations" href="./projects" bodyClassName="p-0">
       {isLoading && projects.length === 0 ? (
         <ColumnSkeleton />
       ) : (
         <div className="flex h-full flex-col">
-          {rows.length === 0 && <ColumnEmpty message="Aucune opération pour l'instant" />}
+          {rows.length === 0 && <ColumnEmpty message="No operations yet" />}
           {rows.map((p) => (
             <Link key={p.id} href={`./projects/${p.id}`} className={ROW_CLASS}>
               <ProjectIcon iconUrl={p.iconUrl} name={p.name} color={p.color} size={22} />
@@ -79,7 +79,7 @@ function OperationsColumn() {
               data-tour="create-operation"
               className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border py-2 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-muted/30 hover:text-primary"
             >
-              <Plus className="size-3.5" /> Créer une opération
+              <Plus className="size-3.5" /> Create an operation
             </button>
           </div>
         </div>
@@ -127,7 +127,7 @@ function MyQueueColumn({ slug }: { readonly slug: string }) {
       {issues === null ? (
         <ColumnSkeleton />
       ) : open.length === 0 ? (
-        <ColumnEmpty message={failed ? "File indisponible pour le moment" : "Aucune tâche assignée"} />
+        <ColumnEmpty message={failed ? "Queue unavailable right now" : "No assigned tasks"} />
       ) : (
         open.map((i) => (
           // Board du projet + sheet ouverte (`?issue=`) — même cible que My Work.
@@ -173,7 +173,7 @@ function RecentColumn({ slug }: { readonly slug: string }) {
   const rows = (notifs ?? []).slice(0, MAX_ROWS)
 
   return (
-    <SectionCard title="Récents" href="./inbox" bodyClassName="p-0">
+    <SectionCard title="Recent" href="./inbox" bodyClassName="p-0">
       {notifs === null ? (
         <ColumnSkeleton />
       ) : rows.length === 0 ? (

@@ -87,17 +87,20 @@ export default function DashboardPage() {
   // re-déclenchement. Rejeu depuis l'aide via `?tour=1` (forcé même si déjà vu), puis on nettoie l'URL.
   const tourHasSeen = useTourStore((s) => s.hasSeen)
   const tourActive = useTourStore((s) => s.isActive)
+  const tourDismissed = useTourStore((s) => s.dismissed)
   const startTour = useTourStore((s) => s.start)
   useEffect(() => {
     if (tourActive || !slug) return
     const forceTour = new URLSearchParams(window.location.search).get("tour") === "1"
-    if (tourHasSeen && !forceTour) return
+    // `hasSeen` (persisté) = terminé/opt-out définitif ; `dismissed` (session) = fermé sans cocher →
+    // pas de re-déclenchement tant qu'on n'a pas rechargé l'app, mais la visite reviendra au prochain accès.
+    if ((tourHasSeen || tourDismissed) && !forceTour) return
     const t = setTimeout(() => {
       startTour()
       if (forceTour) window.history.replaceState(null, "", `/${slug}/dashboard`)
     }, forceTour ? 300 : 900)
     return () => clearTimeout(t)
-  }, [tourHasSeen, tourActive, startTour, slug])
+  }, [tourHasSeen, tourDismissed, tourActive, startTour, slug])
 
   const displayName = user?.displayName?.trim() || user?.firstName || ""
   const rangeLabel = GLOBAL_RANGES.find((r) => r.value === globalRange)?.label ?? globalRange
@@ -137,7 +140,7 @@ export default function DashboardPage() {
               className="h-8 gap-1.5 text-xs"
               onClick={() => setRefreshToken((n) => n + 1)}
             >
-              <RefreshCw className="size-3.5" /> Actualiser
+              <RefreshCw className="size-3.5" /> Refresh
             </Button>
           </div>
         </div>
@@ -145,9 +148,9 @@ export default function DashboardPage() {
         {cardsError && cards.length === 0 ? (
           // Jamais de spinner infini : message court + réessai.
           <div className="flex flex-col items-center justify-center gap-2.5 rounded-xl border border-border py-12 text-center">
-            <p className="text-sm text-muted-foreground">Impossible de charger vos cartes.</p>
+            <p className="text-sm text-muted-foreground">Couldn't load your cards.</p>
             <Button variant="outline" size="sm" className="gap-1.5" onClick={() => void fetchCards(slug)}>
-              <RefreshCw className="size-3.5" /> Réessayer
+              <RefreshCw className="size-3.5" /> Retry
             </Button>
           </div>
         ) : cardsLoading && cards.length === 0 ? (

@@ -27,25 +27,14 @@ vi.mock('sonner', () => ({
   },
 }));
 
-// Mock preferences store for translations
-vi.mock('@/lib/store/preferences-store', () => ({
-  usePreferencesStore: () => ({
-    t: {
-      common: {
-        error: 'Erreur',
-      },
-      auth: {
-        login: 'Se connecter',
-        errors: {
-          loginFailed: 'Échec de la connexion',
-        },
-        success: {
-          loginSuccess: 'Connexion réussie',
-        },
-      },
-    },
-  }),
-}));
+// Mock preferences store — return the REAL French constants so text queries stay valid and the
+// mock can never drift from the constants again (importActual avoids the vi.mock hoisting trap).
+vi.mock('@/lib/store/preferences-store', async () => {
+  const { CONSTANTS_FR } = await vi.importActual<typeof import('@/lib/constants_fr')>('@/lib/constants_fr');
+  return {
+    usePreferencesStore: () => ({ t: CONSTANTS_FR }),
+  };
+});
 
 // Mock validation utils - hoisted to fix initialization order
 const { mockIsAllowed, mockGetTimeUntilReset, mockReset } = vi.hoisted(() => ({
@@ -328,7 +317,7 @@ describe('LoginForm Component', () => {
         expect(toast.error).toHaveBeenCalledWith(
           'Erreur',
           expect.objectContaining({
-            description: 'Échec de la connexion',
+            description: 'Email ou mot de passe incorrect',
           })
         );
       });

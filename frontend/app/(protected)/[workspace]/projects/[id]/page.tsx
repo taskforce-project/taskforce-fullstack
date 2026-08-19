@@ -73,10 +73,10 @@ const AVATAR_COLORS = [
 
 const CATEGORY_OPTIONS: { value: IssueStatusCategory; label: string; color: string }[] = [
   { value: "BACKLOG",   label: "Backlog",    color: "#94a3b8" },
-  { value: "UNSTARTED", label: "Non démarré", color: "#6366f1" },
-  { value: "STARTED",   label: "En cours",   color: "#f59e0b" },
-  { value: "COMPLETED", label: "Terminé",    color: "#10b981" },
-  { value: "CANCELLED", label: "Annulé",     color: "#ef4444" },
+  { value: "UNSTARTED", label: "Not started", color: "#6366f1" },
+  { value: "STARTED",   label: "In progress",   color: "#f59e0b" },
+  { value: "COMPLETED", label: "Done",    color: "#10b981" },
+  { value: "CANCELLED", label: "Cancelled",     color: "#ef4444" },
 ]
 
 function getCategoryIcon(category: IssueStatusCategory, color: string, size = "size-3.5") {
@@ -172,7 +172,7 @@ function IssueCard({
       )}
 
       <p className="text-sm text-foreground leading-snug mb-3 line-clamp-2">
-        {issue.pinned && <Pin className="inline size-3 mr-1 -mt-0.5 text-amber-500 fill-amber-500" aria-label="Épinglée" />}
+        {issue.pinned && <Pin className="inline size-3 mr-1 -mt-0.5 text-amber-500 fill-amber-500" aria-label="Pinned" />}
         {issue.title}
       </p>
 
@@ -202,7 +202,7 @@ function IssueCard({
                 onClick={(e) => e.stopPropagation()}
                 onPointerDown={(e) => e.stopPropagation()}
                 className="opacity-0 group-hover/card:opacity-100 transition-opacity flex items-center gap-0.5 text-muted-foreground hover:text-foreground px-1 py-0.5 rounded hover:bg-muted/60"
-                title="Changer le statut"
+                title="Change status"
               >
                 {getCategoryIcon(issue.status.category, issue.status.color, "size-3")}
                 <ChevronDown className="size-3" />
@@ -341,7 +341,7 @@ function BoardColumn({
               className="text-xs font-semibold uppercase tracking-wide text-muted-foreground truncate cursor-pointer hover:text-foreground text-left bg-transparent border-0 p-0 min-w-0"
               onDoubleClick={startEdit}
               onKeyDown={(e) => e.key === "Enter" && startEdit()}
-              title="Double-cliquer pour renommer"
+              title="Double-click to rename"
             >
               {status.name}
             </button>
@@ -361,10 +361,10 @@ function BoardColumn({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52">
               <DropdownMenuItem className="gap-2 text-xs" onClick={startEdit}>
-                Renommer
+                Rename
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuLabel className="text-[10px] font-normal text-muted-foreground">Couleur</DropdownMenuLabel>
+              <DropdownMenuLabel className="text-[10px] font-normal text-muted-foreground">Color</DropdownMenuLabel>
               <div className="px-2 py-1.5" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
                 <ColorPicker value={status.color} onChange={(c) => onChangeColor(status.id, c)} />
               </div>
@@ -375,7 +375,7 @@ function BoardColumn({
                     className="gap-2 text-xs text-destructive focus:text-destructive"
                     onClick={() => onDeleteStatus(status.id)}
                   >
-                    Supprimer
+                    Delete
                   </DropdownMenuItem>
                 </>
               )}
@@ -453,14 +453,14 @@ function AddColumnPopover({
           className="flex flex-col items-center justify-center w-70 shrink-0 h-24 rounded-xl border-2 border-dashed border-border/50 text-muted-foreground hover:border-primary/40 hover:text-primary transition-all gap-2"
         >
           <Plus className="size-5" />
-          <span className="text-xs font-medium">Nouvelle colonne</span>
+          <span className="text-xs font-medium">New column</span>
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-72 p-4" align="start">
-        <p className="text-sm font-semibold mb-3">Créer une colonne</p>
+        <p className="text-sm font-semibold mb-3">Create a column</p>
         <div className="flex flex-col gap-3">
           <Input
-            placeholder="Nom de la colonne"
+            placeholder="Column name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleCreate()}
@@ -468,7 +468,7 @@ function AddColumnPopover({
             autoFocus
           />
           <div>
-            <p className="text-xs text-muted-foreground mb-1.5">Catégorie</p>
+            <p className="text-xs text-muted-foreground mb-1.5">Category</p>
             <div className="flex flex-wrap gap-1.5">
               {CATEGORY_OPTIONS.map((opt) => (
                 <button
@@ -489,11 +489,11 @@ function AddColumnPopover({
             </div>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground mb-1.5">Couleur</p>
+            <p className="text-xs text-muted-foreground mb-1.5">Color</p>
             <ColorPicker value={color} onChange={setColor} />
           </div>
           <Button size="sm" className="w-full" onClick={handleCreate} disabled={!name.trim() || loading}>
-            {loading ? "Création…" : "Créer"}
+            {loading ? "Creating…" : "Create"}
           </Button>
         </div>
       </PopoverContent>
@@ -655,7 +655,7 @@ export default function ProjectBoardPage() {
       {/* Error banner */}
       {error && !initializing && (
         <div className="mb-4 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-xs text-destructive flex items-center justify-between">
-          <span>Erreur ({workspace}/{projectId}) : {error}</span>
+          <span>Error ({workspace}/{projectId}): {error}</span>
           <button
             type="button"
             className="ml-4 underline hover:no-underline"
@@ -665,7 +665,7 @@ export default function ProjectBoardPage() {
               void fetchStatuses(workspace, projectId).then(() => fetchIssues(workspace, projectId)).finally(() => setInitializing(false))
             }}
           >
-            Réessayer
+            Retry
           </button>
         </div>
       )}

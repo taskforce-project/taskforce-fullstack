@@ -9,14 +9,8 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getRegisterData, setRegisterData } from "@/lib/auth/register-storage";
-import {
-  validateEmail,
-  validateName,
-  validatePassword,
-  sanitizeInput,
-  isDisposableEmail,
-  calculatePasswordStrength,
-} from "@/lib/utils/validation";
+import { sanitizeInput, calculatePasswordStrength } from "@/lib/utils/validation";
+import { registerSchema, firstZodError } from "@/lib/validation/auth-schemas";
 import { Loader2 } from "lucide-react";
 import { AuthStepper } from "@/components/auth/auth-stepper";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -102,7 +96,7 @@ export function SignupForm({
   );
 
   const strengthLabel =
-    strength >= 75 ? "Robuste" : strength >= STRENGTH_FLOOR ? "Correct" : "Trop faible";
+    strength >= 75 ? t.auth.ui.strengthStrong : strength >= STRENGTH_FLOOR ? t.auth.ui.strengthFair : t.auth.ui.strengthWeak;
 
   const strengthColor =
     strength >= 75
@@ -120,37 +114,11 @@ export function SignupForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.firstName || !formData.lastName || !formData.email || !formData.password || !formData.confirmPassword) {
-      toast.error(t.common.error, { description: "Veuillez remplir tous les champs" });
-      return;
-    }
-    if (!validateName(formData.firstName)) {
-      toast.error(t.common.error, { description: "Le prénom n'est pas valide (2-50 caractères, lettres uniquement)" });
-      return;
-    }
-    if (!validateName(formData.lastName)) {
-      toast.error(t.common.error, { description: "Le nom n'est pas valide (2-50 caractères, lettres uniquement)" });
-      return;
-    }
-    if (!validateEmail(formData.email)) {
-      toast.error(t.common.error, { description: "Format d'email invalide" });
-      return;
-    }
-    if (isDisposableEmail(formData.email)) {
-      toast.error(t.common.error, { description: "Les adresses email temporaires ne sont pas autorisées" });
-      return;
-    }
-    if (formData.password !== formData.confirmPassword) {
-      toast.error(t.common.error, { description: t.auth.errors.passwordsDoNotMatch });
-      return;
-    }
-    const passwordValidation = validatePassword(formData.password);
-    if (!passwordValidation.isValid) {
-      toast.error(t.common.error, { description: passwordValidation.errors[0] });
-      return;
-    }
-    if (calculatePasswordStrength(formData.password) < STRENGTH_FLOOR) {
-      toast.error(t.common.error, { description: "Le mot de passe est trop faible. Utilisez un mot de passe plus complexe." });
+    // Validation front via Zod (règle d'or #8) : identité, email (format + jetables), robustesse du mot
+    // de passe et concordance de la confirmation — schéma qui réutilise les mêmes helpers qu'avant.
+    const parsed = registerSchema.safeParse(formData);
+    if (!parsed.success) {
+      toast.error(t.common.error, { description: firstZodError(parsed.error) });
       return;
     }
     // La case « je ne suis pas un robot » n'est exigée que lorsqu'elle est RÉELLEMENT affichée —
@@ -159,11 +127,11 @@ export function SignupForm({
     // l'inscription malgré un Turnstile résolu. Dans ce cas, c'est le jeton Turnstile qui fait foi.
     // Le défi signé maison, lui, part toujours (`challengeToken`) et est vérifié côté serveur.
     if (afficheCaseACocher && !isHuman) {
-      toast.error(t.common.error, { description: "Veuillez confirmer que vous n'êtes pas un robot" });
+      toast.error(t.common.error, { description: t.auth.ui.confirmNotRobot });
       return;
     }
     if (challenge.turnstileRequired && !turnstileToken) {
-      toast.error(t.common.error, { description: "Veuillez compléter la vérification anti-robot" });
+      toast.error(t.common.error, { description: t.auth.ui.completeVerification });
       return;
     }
 
@@ -200,13 +168,13 @@ export function SignupForm({
           « Étape 1 sur 3 · Votre compte » juste au-dessus, et le titre dit le reste. Une ligne de
           plus ne dirait rien de neuf et coûterait la marge qui permet à l'écran de ne pas défiler
           sur un portable court. */}
-      <h1 className="auth-title">Créer votre compte</h1>
+      <h1 className="auth-title">{t.auth.ui.registerTitle}</h1>
 
       <form onSubmit={handleSubmit} className="mt-3 space-y-2.5">
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label htmlFor="firstName" className="auth-label">
-              Prénom
+              {t.auth.ui.firstName}
             </label>
             <Input
               id="firstName"
@@ -220,7 +188,7 @@ export function SignupForm({
           </div>
           <div>
             <label htmlFor="lastName" className="auth-label">
-              Nom
+              {t.auth.ui.lastName}
             </label>
             <Input
               id="lastName"
@@ -236,13 +204,13 @@ export function SignupForm({
 
         <div>
           <label htmlFor="email" className="auth-label">
-            Email
+            {t.auth.ui.email}
           </label>
           <Input
             id="email"
             type="email"
             autoComplete="email"
-            placeholder="vous@entreprise.com"
+            placeholder={t.auth.ui.emailPlaceholder}
             required
             value={formData.email}
             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
@@ -253,7 +221,7 @@ export function SignupForm({
 
         <div>
           <label htmlFor="password" className="auth-label">
-            Mot de passe
+            {t.auth.ui.password}
           </label>
           <Input
             id="password"
@@ -294,7 +262,7 @@ export function SignupForm({
 
         <div>
           <label htmlFor="confirmPassword" className="auth-label">
-            Confirmer
+            {t.auth.ui.confirm}
           </label>
           <Input
             id="confirmPassword"
@@ -341,7 +309,7 @@ export function SignupForm({
                   className="cursor-pointer text-xs font-medium select-none"
                   style={{ color: "var(--label-secondary)" }}
                 >
-                  Je confirme ne pas être un robot
+                  {t.auth.ui.notRobot}
                 </label>
               </div>
             )
@@ -360,27 +328,27 @@ export function SignupForm({
           >
             {/* Formulation resserrée pour tenir sur UNE ligne : sur deux, elle coûtait dix-huit
                 pixels au budget de hauteur de l'écran. Le sens est intact. */}
-            J&apos;accepte les{" "}
+            {t.auth.ui.acceptPrefix}{" "}
             <Link href="/legal-notices" className="underline underline-offset-2">
-              conditions
+              {t.auth.ui.termsLink}
             </Link>{" "}
-            et la{" "}
+            {t.auth.ui.acceptSeparator}{" "}
             <Link href="/privacy-policy" className="underline underline-offset-2">
-              politique de confidentialité
+              {t.auth.ui.privacyLink}
             </Link>
             .
           </p>
         </div>
 
         <Button type="submit" disabled={isLoading} className="auth-submit !mt-3">
-          {isLoading ? (<><Loader2 className="size-4 animate-spin" />Un instant…</>) : "Continuer"}
+          {isLoading ? (<><Loader2 className="size-4 animate-spin" />{t.auth.ui.oneMoment}</>) : t.auth.ui.continue}
         </Button>
       </form>
 
       <p className="mt-3 text-center text-xs" style={{ color: "var(--label-tertiary)" }}>
-        Vous avez déjà un compte ?{" "}
+        {t.auth.ui.alreadyHaveAccount}{" "}
         <Link href="/auth/login" className="auth-link">
-          Se connecter
+          {t.auth.ui.signIn}
         </Link>
       </p>
     </div>

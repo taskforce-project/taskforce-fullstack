@@ -39,6 +39,8 @@ services:
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
+      # pg18 : le layout refuse les données à la RACINE du mount → les placer dans un sous-répertoire.
+      PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
       - postgres_prod_data:/var/lib/postgresql/data
       # Crée la base `keycloak_prod` et l'extension `vector`. Joué UNE SEULE FOIS, au premier
@@ -60,7 +62,10 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:23.0
     container_name: taskforce-keycloak-prod
-    command: start --import-realm --optimized
+    # `--optimized` exige que la config DB soit bakée au BUILD (kc.sh build) ; l'image stock ne l'a pas
+    # → on laisse Keycloak s'auto-configurer au démarrage avec les KC_* runtime. `--import-realm` importe
+    # le realm monté sous /opt/keycloak/data/import.
+    command: start --import-realm
     environment:
       # Database — base dédiée, créée par db/init-prod/01
       KC_DB: postgres
@@ -82,6 +87,14 @@ services:
       # Cache local : `kubernetes` sonde le DNS d'un cluster k8s et n'a pas de sens sur un
       # déploiement mono-hôte Docker Compose.
       KC_CACHE: local
+
+      # Expose /health/* (sinon le healthcheck ne répond pas). Requis par KC 23.
+      KC_HEALTH_ENABLED: "true"
+      # Substitution des placeholders du realm importé : redirectUris/webOrigins (${FRONTEND_URL}/${API_URL})
+      # et le secret du client taskforce-api (${KEYCLOAK_CLIENT_SECRET}). Sans eux → "Invalid redirect URI".
+      FRONTEND_URL: ${FRONTEND_URL}
+      API_URL: ${API_URL}
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET}
     depends_on:
       postgres:
         condition: service_healthy
@@ -89,9 +102,12 @@ services:
       - taskforce-network
     volumes:
       # Import du realm production
-      - ./keycloak/realms:/opt/keycloak/data/import:ro
+      # Monter le SOUS-dossier prod : Keycloak n'importe QUE les .json directement dans le dossier
+      # (pas de récursion) — monter `./keycloak/realms` (qui contient prod/ et dev/) n'importe rien.
+      - ./keycloak/realms/prod:/opt/keycloak/data/import:ro
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready || exit 1"]
+      # L'image Keycloak (ubi-micro) n'embarque PAS curl → test TCP via bash /dev/tcp.
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -119,11 +135,21 @@ services:
 
       # Keycloak — service Docker en interne, issuer PUBLIC pour valider les jetons du navigateur
       KEYCLOAK_URL: http://keycloak:8080
+      # URL PUBLIQUE de Keycloak = issuer attendu des tokens (SecurityConfig.jwtDecoder) ; JWKS reste interne via KEYCLOAK_URL.
+      KEYCLOAK_PUBLIC_URL: ${KEYCLOAK_PUBLIC_URL:-http://keycloak:8080}
       KEYCLOAK_REALM: ${KEYCLOAK_REALM}
       KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID}
       KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET}
       KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI}
       KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/${KEYCLOAK_REALM}/protocol/openid-connect/certs
+      # Creds admin Keycloak (provisioning users via l'API admin) — requis par keycloak.admin.* au boot.
+      KEYCLOAK_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+
+      # URLs publiques applicatives — lues au boot (app.url / frontend-url / api-url). Sans elles → crash.
+      APP_URL: ${APP_URL}
+      FRONTEND_URL: ${FRONTEND_URL}
+      APP_API_URL: ${APP_API_URL}
 
       # CORS
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
@@ -183,7 +209,8 @@ services:
     networks:
       - taskforce-network
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/api/actuator/health || exit 1"]
+      # L'actuator n'a PAS de préfixe /api (aucun context-path) → chemin = /actuator/health (curl installé au build).
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health >/dev/null 2>&1 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -215,7 +242,14 @@ services:
       # contenu de travail ne quitte l'infrastructure — ce qui est vrai, mais devenait invérifiable
       # pour qui lit ce fichier. L'inférence se fait sur Ollama auto-hébergé, sans repli tiers.
       # LLM : hôte externe (machine dédiée / service managé), PAS ce conteneur. Cf. l'en-tête.
-      OLLAMA_BASE_URL: ${AI_OLLAMA_BASE_URL}
+      # LLM CHAT via Groq si GROQ_API_KEY présente (⚠️ le commentaire du 24/07 ci-dessus est PÉRIMÉ :
+      # ai-service/config.py lit GROQ_API_KEY depuis le 16/07). Groq = hébergé, aucun compute local requis.
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-120b}
+      GROQ_MODEL_FAST: ${GROQ_MODEL_FAST:-openai/gpt-oss-20b}
+      GROQ_BASE_URL: ${GROQ_BASE_URL:-https://api.groq.com/openai/v1}
+      # Embeddings : toujours Ollama. Sans Ollama, pointer un hôte qui refuse vite → repli lexical immédiat.
+      OLLAMA_BASE_URL: ${AI_OLLAMA_BASE_URL:-http://127.0.0.1:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:14b}
       OLLAMA_MODEL_FAST: ${OLLAMA_MODEL_FAST:-qwen3:8b}
       OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL:-bge-m3}

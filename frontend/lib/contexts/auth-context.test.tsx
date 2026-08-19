@@ -5,8 +5,12 @@ import * as authService from '../api/auth-service';
 import { useRouter } from 'next/navigation';
 
 // Mock dependencies
+// `usePathname` doit être fourni : le composant l'utilise (garde d'onboarding / sortie de /auth/login)
+// avec un repli `?? globalThis.location.pathname`. On le fait renvoyer le pathname stubbé par chaque
+// test (`vi.stubGlobal('location', …)`) → les cas de redirection restent pilotés comme avant.
 vi.mock('next/navigation', () => ({
   useRouter: vi.fn(),
+  usePathname: vi.fn(() => globalThis.location?.pathname ?? '/'),
 }));
 
 vi.mock('../api/auth-service', () => ({
@@ -349,6 +353,36 @@ describe('AuthContext', () => {
 
       // Should redirect after loading completes
       expect(mockRouter.push).toHaveBeenCalledWith('/auth/login');
+    });
+  });
+
+  describe('init & redirections', () => {
+    it("reste non authentifié quand aucun token n'est présent", async () => {
+      vi.mocked(authService.authService.isAuthenticated).mockReturnValue(false);
+
+      const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
+
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+      expect(result.current.user).toBeNull();
+      expect(result.current.isAuthenticated).toBe(false);
+    });
+
+    it("force /onboarding tant que l'onboarding n'est pas terminé", async () => {
+      vi.stubGlobal('location', { pathname: '/dashboard' });
+      vi.mocked(authService.authService.getCurrentUser).mockReturnValue({ ...mockUser, onboardingCompleted: false });
+
+      renderHook(() => useAuth(), { wrapper: AuthProvider });
+
+      await waitFor(() => expect(mockRouter.replace).toHaveBeenCalledWith('/onboarding'));
+    });
+
+    it("depuis /auth/login, route vers l'app quand l'onboarding est fait", async () => {
+      vi.stubGlobal('location', { pathname: '/auth/login' });
+      vi.mocked(authService.authService.getCurrentUser).mockReturnValue({ ...mockUser, onboardingCompleted: true });
+
+      renderHook(() => useAuth(), { wrapper: AuthProvider });
+
+      await waitFor(() => expect(mockRouter.replace).toHaveBeenCalledWith('/'));
     });
   });
 });

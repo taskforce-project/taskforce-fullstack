@@ -40,7 +40,7 @@ export function BurndownCard({ slug, refreshToken }: DashboardCardBodyProps) {
 
   if (loading) return <CardSkeleton />
   if (error) return <CardError onRetry={() => setRetry((n) => n + 1)} />
-  if (points.length === 0) return <CardEmpty message="Aucun sprint en cours" />
+  if (points.length === 0) return <CardEmpty message="No sprint in progress" />
 
   const remaining = points.at(-1)?.remaining ?? 0
 
@@ -57,7 +57,7 @@ export function BurndownCard({ slug, refreshToken }: DashboardCardBodyProps) {
     <div className="flex h-full flex-col p-4 pb-0">
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-2xl font-semibold tabular-nums tracking-tight">{remaining.toLocaleString("fr-FR")}</span>
-        <span className="text-[11px] text-muted-foreground">Restant vs idéal</span>
+        <span className="text-[11px] text-muted-foreground">Remaining vs ideal</span>
       </div>
       <div className="mt-2 h-28 w-full">
         <ResponsiveContainer width="100%" height="100%">
@@ -86,7 +86,7 @@ export function BurndownCard({ slug, refreshToken }: DashboardCardBodyProps) {
             <Line
               type="monotone"
               dataKey="ideal"
-              name="Idéal"
+              name="Ideal"
               stroke="#94a3b8"
               strokeWidth={2}
               strokeDasharray="4 4"

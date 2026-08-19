@@ -37,14 +37,35 @@ class OllamaGatewayError(RuntimeError):
 
 
 class OllamaGateway:
-    """Client `chat/completions` vers Ollama, avec timeout adapté à la génération locale."""
+    """Passerelle `chat/completions` : Ollama local par défaut, **Groq** (hébergé) si `GROQ_API_KEY`.
+
+    Ollama comme Groq exposent une API *OpenAI-compatible* → le même code sert les deux, seuls changent
+    l'URL, l'en-tête d'auth et les noms de modèles. Les EMBEDDINGS restent TOUJOURS sur Ollama (Groq n'en
+    fournit pas). La sélection est automatique au démarrage selon la présence de la clé Groq.
+    """
 
     def __init__(self, settings: Settings) -> None:
-        self._base_url = settings.ollama_base_url.rstrip("/")
-        self._default_model = settings.ollama_model
-        self._fast_model = settings.ollama_model_fast
+        self._use_groq = settings.use_groq
+        # --- CHAT : Groq (hébergé) si clé présente, sinon Ollama local ---
+        if self._use_groq:
+            self._chat_url = settings.groq_base_url.rstrip("/") + "/chat/completions"
+            self._default_model = settings.groq_model
+            self._fast_model = settings.groq_model_fast
+            self._api_key = settings.groq_api_key.strip()
+        else:
+            self._chat_url = settings.ollama_base_url.rstrip("/") + "/v1/chat/completions"
+            self._default_model = settings.ollama_model
+            self._fast_model = settings.ollama_model_fast
+            self._api_key = ""
+        # --- EMBEDDINGS : toujours Ollama (Groq n'expose pas d'endpoint d'embeddings) ---
+        self._embed_url = settings.ollama_base_url.rstrip("/") + "/api/embed"
         self._embed_model = settings.ollama_embed_model
         self._timeout_s = settings.ollama_timeout_s
+
+    @property
+    def provider(self) -> str:
+        """``"groq"`` (chat hébergé) ou ``"ollama"`` (chat local). Les embeddings sont toujours Ollama."""
+        return "groq" if self._use_groq else "ollama"
 
     @property
     def default_model(self) -> str:
@@ -74,7 +95,7 @@ class OllamaGateway:
         """
         body = {"model": model or self._embed_model, "input": texts}
         request = urllib.request.Request(
-            f"{self._base_url}/api/embed",
+            self._embed_url,
             data=json.dumps(body).encode("utf-8"),
             headers={"Content-Type": "application/json"},
             method="POST",
@@ -83,7 +104,7 @@ class OllamaGateway:
             with urllib.request.urlopen(request, timeout=self._timeout_s) as response:
                 payload = json.loads(response.read().decode("utf-8"))
         except (urllib.error.URLError, TimeoutError) as exc:
-            logger.error("Ollama embeddings injoignable (%s): %s", self._base_url, exc)
+            logger.error("Ollama embeddings injoignable (%s): %s", self._embed_url, exc)
             raise OllamaGatewayError(f"Embeddings locaux indisponibles: {exc}") from exc
 
         vectors = payload.get("embeddings")
@@ -115,9 +136,11 @@ class OllamaGateway:
             resolved_model, resolved_think = self.resolve_tier(tier)
         else:
             resolved_model, resolved_think = (model or self._default_model), think
+        # `/no_think` est une directive Qwen3 (Ollama) : inutile/parasite côté Groq (Llama) → on l'omet.
+        prepared_messages = messages if self._use_groq else _with_thinking(messages, resolved_think)
         body: dict = {
             "model": resolved_model,
-            "messages": _with_thinking(messages, resolved_think),
+            "messages": prepared_messages,
             "temperature": temperature,
             "stream": False,
         }
@@ -127,18 +150,23 @@ class OllamaGateway:
             body["tools"] = tools
             body["tool_choice"] = "auto"
 
+        # User-Agent applicatif OBLIGATOIRE : Groq est derrière Cloudflare, qui renvoie 403 aux
+        # requêtes dont l'UA est `Python-urllib/x.y` (défaut urllib). Sans lui, tout appel Groq échoue.
+        headers = {"Content-Type": "application/json", "User-Agent": "TaskForce-AI/1.0"}
+        if self._api_key:                                  # Groq exige le Bearer ; Ollama local n'en a pas
+            headers["Authorization"] = f"Bearer {self._api_key}"
         request = urllib.request.Request(
-            f"{self._base_url}/v1/chat/completions",
+            self._chat_url,
             data=json.dumps(body).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
+            headers=headers,
             method="POST",
         )
         try:
             with urllib.request.urlopen(request, timeout=self._timeout_s) as response:
                 payload = json.loads(response.read().decode("utf-8"))
         except (urllib.error.URLError, TimeoutError) as exc:
-            logger.error("Ollama injoignable (%s): %s", self._base_url, exc)
-            raise OllamaGatewayError(f"LLM local indisponible: {exc}") from exc
+            logger.error("LLM chat injoignable — provider=%s (%s): %s", self.provider, self._chat_url, exc)
+            raise OllamaGatewayError(f"LLM ({self.provider}) indisponible: {exc}") from exc
 
         choices = payload.get("choices") or []
         if not choices:

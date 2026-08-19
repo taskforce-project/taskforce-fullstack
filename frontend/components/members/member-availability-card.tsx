@@ -19,17 +19,17 @@ import { useAvailabilityStore } from "@/lib/store/availability-store"
 import type { LeaveType } from "@/lib/api/availability-service"
 
 const LEAVE_META: Record<LeaveType, { label: string; className: string }> = {
-  VACATION: { label: "Congés",     className: "bg-blue-500/15 text-blue-400 border-blue-500/20" },
-  SICK:     { label: "Maladie",    className: "bg-rose-500/15 text-rose-400 border-rose-500/20" },
-  REMOTE:   { label: "Télétravail", className: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20" },
-  OTHER:    { label: "Autre",      className: "bg-muted text-muted-foreground border-border" },
+  VACATION: { label: "Vacation",   className: "bg-blue-500/15 text-blue-400 border-blue-500/20" },
+  SICK:     { label: "Sick",       className: "bg-rose-500/15 text-rose-400 border-rose-500/20" },
+  REMOTE:   { label: "Remote",     className: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20" },
+  OTHER:    { label: "Other",      className: "bg-muted text-muted-foreground border-border" },
 }
 
 const LEAVE_OPTIONS: LeaveType[] = ["VACATION", "SICK", "REMOTE", "OTHER"]
 
 function formatRange(start: string, end: string): string {
   const fmt = (iso: string) =>
-    new Date(`${iso}T00:00:00`).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })
+    new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })
   return start === end ? fmt(start) : `${fmt(start)} → ${fmt(end)}`
 }
 
@@ -74,17 +74,17 @@ export function MemberAvailabilityCard({ slug, userId, canEdit }: MemberAvailabi
 
   async function handleAdd() {
     if (!startDate || !endDate) {
-      toast.error("Renseigne les dates de début et de fin")
+      toast.error("Enter the start and end dates")
       return
     }
     if (endDate < startDate) {
-      toast.error("La date de fin doit être après la date de début")
+      toast.error("The end date must be after the start date")
       return
     }
     setSaving(true)
     try {
       await addLeave(slug, userId, { type, startDate, endDate, note: note.trim() || undefined })
-      toast.success("Indisponibilité ajoutée")
+      toast.success("Unavailability added")
       resetForm()
     } catch {
       // erreur déjà notifiée
@@ -96,7 +96,7 @@ export function MemberAvailabilityCard({ slug, userId, canEdit }: MemberAvailabi
   async function handleRemove(leaveId: number) {
     try {
       await removeLeave(slug, userId, leaveId)
-      toast.success("Indisponibilité supprimée")
+      toast.success("Unavailability removed")
     } catch {
       // erreur déjà notifiée
     }
@@ -107,13 +107,13 @@ export function MemberAvailabilityCard({ slug, userId, canEdit }: MemberAvailabi
       <div className="flex items-center justify-between mb-3">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
           <CalendarOff className="h-4 w-4 text-amber-400" />
-          Disponibilité
-          <span className="text-xs font-normal text-muted-foreground">· congés &amp; indisponibilités</span>
+          Availability
+          <span className="text-xs font-normal text-muted-foreground">· leave &amp; unavailability</span>
         </h2>
         {canEdit && !adding && !loading && (
           <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground" onClick={() => setAdding(true)}>
             <Plus className="h-3.5 w-3.5" />
-            Ajouter
+            Add
           </Button>
         )}
       </div>
@@ -140,28 +140,28 @@ export function MemberAvailabilityCard({ slug, userId, canEdit }: MemberAvailabi
                   </Select>
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label htmlFor="leave-start" className="text-xs font-medium text-muted-foreground">Du</label>
-                  <DatePicker id="leave-start" value={startDate} onChange={setStartDate} placeholder="Début" />
+                  <label htmlFor="leave-start" className="text-xs font-medium text-muted-foreground">From</label>
+                  <DatePicker id="leave-start" value={startDate} onChange={setStartDate} placeholder="Start" />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label htmlFor="leave-end" className="text-xs font-medium text-muted-foreground">Au</label>
-                  <DatePicker id="leave-end" value={endDate} onChange={setEndDate} placeholder="Fin" />
+                  <label htmlFor="leave-end" className="text-xs font-medium text-muted-foreground">To</label>
+                  <DatePicker id="leave-end" value={endDate} onChange={setEndDate} placeholder="End" />
                 </div>
               </div>
               <Input
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-                placeholder="Note (optionnel)"
+                placeholder="Note (optional)"
                 maxLength={1000}
                 className="h-9"
               />
               <div className="flex items-center gap-2">
                 <Button size="sm" onClick={handleAdd} disabled={saving} className="gap-1.5">
                   {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
-                  Enregistrer
+                  Save
                 </Button>
                 <Button size="sm" variant="ghost" onClick={resetForm} disabled={saving}>
-                  <X className="h-3.5 w-3.5" /> Annuler
+                  <X className="h-3.5 w-3.5" /> Cancel
                 </Button>
               </div>
             </div>
@@ -182,7 +182,7 @@ export function MemberAvailabilityCard({ slug, userId, canEdit }: MemberAvailabi
                       type="button"
                       onClick={() => handleRemove(leave.id)}
                       className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-rose-500"
-                      aria-label="Supprimer l'indisponibilité"
+                      aria-label="Remove unavailability"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
@@ -193,10 +193,10 @@ export function MemberAvailabilityCard({ slug, userId, canEdit }: MemberAvailabi
           ) : (
             !adding && (
               <p className="text-sm text-muted-foreground">
-                Aucune indisponibilité déclarée.
+                No unavailability declared.
                 {canEdit && (
                   <button onClick={() => setAdding(true)} className="ml-1 inline-flex items-center gap-1 text-primary hover:underline">
-                    <Plus className="h-3 w-3" /> En ajouter
+                    <Plus className="h-3 w-3" /> Add one
                   </button>
                 )}
               </p>

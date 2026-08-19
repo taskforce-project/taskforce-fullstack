@@ -139,10 +139,10 @@ function packOffset(i: number): Pt {
 
 /** `PCA_PRA` → `PCA / PRA`, `SECURITE` → `Sécurité`. Les libellés viennent de l'enum de domaine. */
 const DOMAIN_LABEL: Record<string, string> = {
-  PROJET: "Projet", PRODUIT: "Produit", ARCHITECTURE: "Architecture", ENGINEERING: "Engineering",
-  API: "API", INFRA: "Infrastructure", SECURITE: "Sécurité", OPERATIONS: "Opérations",
-  AUDITS: "Audits", RUNBOOKS: "Runbooks", PCA_PRA: "PCA / PRA", DECISIONS: "Décisions",
-  ROADMAP: "Roadmap", DESIGN: "Design", UTILISATEUR: "Utilisateur", HISTORIQUE: "Historique",
+  PROJET: "Project", PRODUIT: "Product", ARCHITECTURE: "Architecture", ENGINEERING: "Engineering",
+  API: "API", INFRA: "Infrastructure", SECURITE: "Security", OPERATIONS: "Operations",
+  AUDITS: "Audits", RUNBOOKS: "Runbooks", PCA_PRA: "BCP / DRP", DECISIONS: "Decisions",
+  ROADMAP: "Roadmap", DESIGN: "Design", UTILISATEUR: "User", HISTORIQUE: "History",
   ARCHIVE: "Archive",
 }
 const domainLabel = (d: string) => DOMAIN_LABEL[d] ?? d
@@ -363,7 +363,7 @@ export function BrainGraph({
     const layOutCell = (key: string, at: Pt, ids: number[], radius: number, depth: number, color: string) => {
       const byDomain = new Map<string, number[]>()
       for (const id of ids) {
-        const d = byId.get(id)?.domain ?? "AUTRE"
+        const d = byId.get(id)?.domain ?? "OTHER"
         const arr = byDomain.get(d)
         if (arr) arr.push(id); else byDomain.set(d, [id])
       }
@@ -451,7 +451,7 @@ export function BrainGraph({
       const project = key === -1 ? null : known.get(key)
       return {
         id: key,
-        name: key === -1 ? "Base commune" : (project?.name ?? String(key)),
+        name: key === -1 ? "Common base" : (project?.name ?? String(key)),
         hue: key === -1 ? 0 : (hueOf.get(key) ?? 210),
         muted: key === -1,
         count: own.length,
@@ -732,7 +732,7 @@ export function BrainGraph({
       )}
 
       <div className="pointer-events-none absolute left-2 top-2 rounded-md bg-background/70 px-2 py-1 text-xs text-muted-foreground backdrop-blur">
-        Régions = projets · survol = révèle les liens · clic = ouvrir la note
+        Regions = projects · hover = reveal links · click = open note
       </div>
       {/* Code couleur : une pastille par cellule. Sans ça on lit des formes colorées sans savoir qui est qui. */}
       {data.regions.length > 0 && (
@@ -751,12 +751,12 @@ export function BrainGraph({
       )}
 
       <div className="pointer-events-none absolute bottom-2 left-2 flex flex-col gap-0.5 text-[10px] text-muted-foreground">
-        <span>Une cellule par projet, découpée par domaine · les frontières se <strong className="font-medium">repoussent</strong>, une note de 2 projets les fait <strong className="font-medium">se recouvrir</strong></span>
-        <span>● note · ◆ décision · <span style={{ color: FINDING_RED }}>▲ problème</span> · ⬡ runbook · ┄ wikilink</span>
+        <span>One cell per project, split by domain · borders <strong className="font-medium">push apart</strong>, a note in 2 projects makes them <strong className="font-medium">overlap</strong></span>
+        <span>● note · ◆ decision · <span style={{ color: FINDING_RED }}>▲ problem</span> · ⬡ runbook · ┄ wikilink</span>
       </div>
       <button onClick={resetView}
         className="absolute right-2 top-2 flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs text-muted-foreground hover:text-foreground">
-        <Maximize2 className="size-3.5" /> Vue globale
+        <Maximize2 className="size-3.5" /> Overview
       </button>
     </div>
   )

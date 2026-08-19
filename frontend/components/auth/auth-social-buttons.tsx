@@ -3,6 +3,7 @@
 import { Github } from "lucide-react";
 import { toast } from "sonner";
 import { authService } from "@/lib/api/auth-service";
+import { usePreferencesStore } from "@/lib/store/preferences-store";
 
 /**
  * Connexion via un fournisseur externe (GitHub, Google).
@@ -73,6 +74,7 @@ function parseList(raw: string | undefined): ProviderKey[] {
 }
 
 export function AuthSocialButtons() {
+  const { t } = usePreferencesStore();
   // Par défaut on affiche les deux : c'est une décision de produit assumée, la page annonce les
   // chemins prévus. Aucun n'est câblé par défaut, donc aucun ne prétend fonctionner.
   const shown = parseList(process.env.NEXT_PUBLIC_AUTH_SOCIAL_PROVIDERS ?? "github,google");
@@ -102,7 +104,7 @@ export function AuthSocialButtons() {
                       window.location.href = url;
                     })
                     .catch((e: unknown) => {
-                      toast.error(`Connexion ${label} indisponible`, {
+                      toast.error(t.auth.ui.socialUnavailableTitle.replace("{provider}", label), {
                         description: e instanceof Error ? e.message : undefined,
                       });
                     });
@@ -121,15 +123,15 @@ export function AuthSocialButtons() {
               className="auth-social-btn"
               aria-describedby={`${key}-indispo`}
               onClick={() =>
-                toast.info(`Connexion ${label} bientôt disponible`, {
-                  description: "En attendant, utilisez votre adresse et votre mot de passe.",
+                toast.info(t.auth.ui.socialComingSoonTitle.replace("{provider}", label), {
+                  description: t.auth.ui.socialComingSoonDescription,
                 })
               }
             >
               <Icon className="h-4 w-4" />
               {label}
               <span id={`${key}-indispo`} className="sr-only">
-                bientôt disponible
+                {t.auth.ui.socialComingSoonBadge}
               </span>
             </button>
           );
@@ -137,7 +139,7 @@ export function AuthSocialButtons() {
       </div>
 
       <div className="auth-separator">
-        <span>ou</span>
+        <span>{t.common.or}</span>
       </div>
     </div>
   );

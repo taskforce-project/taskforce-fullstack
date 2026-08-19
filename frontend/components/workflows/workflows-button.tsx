@@ -33,7 +33,7 @@ export function WorkflowsButton() {
       type="button"
       onClick={toggleWorkflowPanel}
       title="Workflows IA"
-      aria-label="Ouvrir les workflows IA"
+      aria-label="Open AI workflows"
       className="relative flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
     >
       <Layers className="size-4" />

@@ -65,7 +65,7 @@ export function AddCardDialog({ slug, open, onOpenChange }: AddCardDialogProps) 
     const created = await addCard(slug, { cardType: def.type, config: { size: def.defaultSize } })
     setPending(null)
     if (created) onOpenChange(false)
-    else toast.error("Impossible d'ajouter la carte")
+    else toast.error("Couldn't add the card")
   }
 
   async function handleGenerate() {
@@ -88,12 +88,12 @@ export function AddCardDialog({ slug, open, onOpenChange }: AddCardDialogProps) 
     setPending("ai-chart")
     const created = await addCard(slug, {
       cardType: "ai-chart",
-      title: spec.title || "Graphe IA",
+      title: spec.title || "AI chart",
       config: { size: "2", spec },
     })
     setPending(null)
     if (created) onOpenChange(false)
-    else toast.error("Impossible d'épingler le graphe")
+    else toast.error("Couldn't pin the chart")
   }
 
   async function handleAddSaved(chart: SavedChart) {
@@ -106,16 +106,16 @@ export function AddCardDialog({ slug, open, onOpenChange }: AddCardDialogProps) 
     })
     setPending(null)
     if (created) onOpenChange(false)
-    else toast.error("Impossible d'ajouter ce graphe")
+    else toast.error("Couldn't add this chart")
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Ajouter une carte</DialogTitle>
+          <DialogTitle>Add a card</DialogTitle>
           <DialogDescription>
-            Toutes les cartes s&apos;appuient sur les données réelles de votre workspace.
+            All cards rely on your workspace&apos;s real data.
           </DialogDescription>
         </DialogHeader>
 
@@ -148,13 +148,13 @@ export function AddCardDialog({ slug, open, onOpenChange }: AddCardDialogProps) 
         {/* Génération IA */}
         <div className="space-y-2 border-t border-border pt-4">
           <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            <Sparkles className="size-3 text-primary" /> Demander à l&apos;IA
+            <Sparkles className="size-3 text-primary" /> Ask AI
           </p>
           <div className="flex gap-2">
             <Textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              placeholder="ex. répartition des issues par priorité"
+              placeholder="e.g. issue breakdown by priority"
               rows={2}
               className="min-h-0 flex-1 resize-none text-sm"
             />
@@ -165,10 +165,10 @@ export function AddCardDialog({ slug, open, onOpenChange }: AddCardDialogProps) 
               disabled={!prompt.trim() || generating}
             >
               {generating ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
-              Générer
+              Generate
             </Button>
           </div>
-          {genError && <p className="text-[11px] text-rose-500">Génération impossible, réessayez.</p>}
+          {genError && <p className="text-[11px] text-rose-500">Generation failed, try again.</p>}
 
           {spec && (
             <div className="space-y-2 rounded-lg border border-border p-3">
@@ -183,7 +183,7 @@ export function AddCardDialog({ slug, open, onOpenChange }: AddCardDialogProps) 
                     disabled={pending !== null}
                   >
                     {pending === "ai-chart" ? <Loader2 className="size-3.5 animate-spin" /> : <Pin className="size-3.5" />}
-                    Épingler au dashboard
+                    Pin to dashboard
                   </Button>
                 )}
               </div>
@@ -199,7 +199,7 @@ export function AddCardDialog({ slug, open, onOpenChange }: AddCardDialogProps) 
         {saved.length > 0 && (
           <div className="space-y-2 border-t border-border pt-4">
             <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              <Pin className="size-3" /> Mes graphes épinglés
+              <Pin className="size-3" /> My pinned charts
             </p>
             <div className="max-h-40 space-y-0.5 overflow-y-auto">
               {saved.map((chart) => (
@@ -221,7 +221,7 @@ export function AddCardDialog({ slug, open, onOpenChange }: AddCardDialogProps) 
                     ) : (
                       <Plus className="size-3" />
                     )}
-                    Ajouter
+                    Add
                   </Button>
                 </div>
               ))}

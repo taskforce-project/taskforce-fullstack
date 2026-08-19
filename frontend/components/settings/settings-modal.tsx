@@ -2,6 +2,7 @@
 
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { useSettingsStore } from "@/lib/store/settings-store"
+import { usePreferencesStore } from "@/lib/store/preferences-store"
 import {
   SECTIONS,
   SettingsNav,
@@ -19,6 +20,7 @@ export function SettingsModal() {
   const section = useSettingsStore((s) => s.section)
   const closeSettings = useSettingsStore((s) => s.closeSettings)
   const setSection = useSettingsStore((s) => s.setSection)
+  const { t } = usePreferencesStore()
 
   // Section validée (repli sur "profile" si inconnue).
   const active = (SECTIONS.some((s) => s.key === section) ? section : "profile") as SettingsSection
@@ -29,7 +31,7 @@ export function SettingsModal() {
       <DialogContent
         className="max-w-5xl sm:max-w-5xl w-[94vw] h-[84vh] gap-0 overflow-hidden p-0 sm:rounded-2xl"
       >
-        <DialogTitle className="sr-only">Réglages</DialogTitle>
+        <DialogTitle className="sr-only">{t.settings.title}</DialogTitle>
         {/* min-w-0 : DialogContent est en display:grid ; sans lui, ce grid-item flex gonfle à la
             largeur min-content de son contenu (ex. catalogue d'intégrations) et déborde/coupe à droite. */}
         <div className="flex h-full min-h-0 min-w-0">

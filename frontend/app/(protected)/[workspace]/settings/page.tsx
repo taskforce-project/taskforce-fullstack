@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { useSearchParams, useRouter, useParams } from "next/navigation"
 import {
   User, Bell, Mail, Zap, Globe, Key, Palette, Webhook,
-  Upload, Camera, Link2, Trash2, Shield, Loader2,
+  Upload, Camera, Trash2, Shield, Loader2,
   Activity, CheckCircle2, AlertTriangle, Gauge, Search,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -29,6 +29,9 @@ import { useIntegrationStore } from "@/lib/store/integration-store"
 import { getGitHubRepos, getGitHubRepoIssues, type GitHubRepo, type GitHubRepoIssue } from "@/lib/api/integration-service"
 import { IntegrationsCatalog } from "@/components/integrations/integrations-catalog"
 import { BrandLogo } from "@/components/ui/brand-logo"
+import { ProfileOverview } from "@/components/profile/profile-overview"
+import { MemberSkillsCard } from "@/components/members/member-skills-card"
+import { MemberAvailabilityCard } from "@/components/members/member-availability-card"
 import { exportMyData, deleteMyAccount } from "@/lib/api/gdpr-service"
 import { getAiUsage, type AiUsage } from "@/lib/api/ai-usage-service"
 import { apiClient } from "@/lib/api/client"
@@ -140,6 +143,8 @@ function ProfilePanel() {
   const [saving, setSaving] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
 
+  // Reset SUR CHANGEMENT D'IDENTITÉ uniquement (pas à chaque refresh du user) : sinon un refreshUser()
+  // — par ex. après upload d'avatar — écraserait les champs nom en cours d'édition non sauvegardés.
   useEffect(() => {
     if (user) {
       setFirstName(user.firstName)
@@ -147,7 +152,8 @@ function ProfilePanel() {
       setDisplayName(user.displayName)
       setAvatarUrl(user.avatarUrl ?? "")
     }
-  }, [user])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id])
 
   const hasCustomAvatar = Boolean(avatarUrl)
 
@@ -155,7 +161,7 @@ function ProfilePanel() {
     const file = e.target.files?.[0]
     if (!file) return
     if (file.size > 3 * 1024 * 1024) {
-      toast.error("Image trop volumineuse — max 3 Mo")
+      toast.error("Image too large — max 3 MB")
       return
     }
     setUploadingAvatar(true)
@@ -170,9 +176,12 @@ function ProfilePanel() {
       })
       const newUrl = res.data.data.avatarUrl ?? ""
       setAvatarUrl(newUrl)
-      toast.success("Avatar mis à jour")
+      // L'upload PERSISTE déjà l'avatar côté backend, mais sans resynchroniser le user global la nouvelle
+      // photo ne se propageait NULLE PART (sidebar, nav-user, cartes membres) → « ça ne marche pas ».
+      await refreshUser()
+      toast.success("Avatar updated")
     } catch {
-      toast.error("Impossible d'uploader l'avatar")
+      toast.error("Couldn't upload the avatar")
     } finally {
       setUploadingAvatar(false)
       // reset input so the same file can be re-selected
@@ -272,7 +281,7 @@ function ProfilePanel() {
                   onChange={(e) => setAvatarUrl(e.target.value)}
                   placeholder="Or paste a URL…"
                 />
-                <p className="text-xs text-muted-foreground">JPG, PNG, GIF, WEBP — max 3 Mo</p>
+                <p className="text-xs text-muted-foreground">JPG, PNG, GIF, WEBP — max 3 MB</p>
               </div>
             </div>
           </FormField>
@@ -302,6 +311,15 @@ function ProfilePanel() {
           {saving ? "Saving…" : "Save profile"}
         </Button>
       </div>
+
+      {/* Compétences & disponibilité — attributs de profil (utilisés par le Smart Assign). Rapatriés de
+          l'ancienne section « Compétences » du menu : tout dans Profile (retour user « tout dans profil »). */}
+      <Separator className="mt-2" />
+      <CompetencesPanel />
+
+      {/* Aperçu « Mon profil » (ex-page /profile, supprimée) : stats + heatmap + activité — tout dans le modal. */}
+      <Separator className="mt-2" />
+      <ProfileOverview />
     </div>
   )
 }
@@ -309,26 +327,7 @@ function ProfilePanel() {
 function AccountPanel() {
   const { user } = useAuth()
   const { locale, setLocale } = useTranslation()
-  const [deleting, setDeleting] = useState(false)
-
-  async function handleDelete() {
-    setDeleting(true)
-    try {
-      await deleteMyAccount()
-      toast.success("Compte supprimé. Déconnexion…")
-      // Purge cliente + reload dur : le compte est anonymisé et la session Keycloak supprimée
-      // côté serveur — rester « connecté » dessus provoquait des 403 en cascade (flow brisé). RGPD-02.
-      if (globalThis.window !== undefined) {
-        localStorage.removeItem("accessToken")
-        localStorage.removeItem("refreshToken")
-        localStorage.removeItem("user")
-        window.location.href = "/auth/login"
-      }
-    } catch {
-      toast.error("Échec de la suppression. Réessayez ou contactez privacy@taskforce.dev.")
-      setDeleting(false)
-    }
-  }
+  const setSection = useSettingsStore((s) => s.setSection)
 
   return (
     <div className="flex flex-col gap-4">
@@ -349,28 +348,22 @@ function AccountPanel() {
               </SelectContent>
             </Select>
           </FormField>
+          <Separator />
+          {/* Suppression de compte + export des données → regroupés dans « Privacy & Data » (RGPD Art. 17/20).
+              Plus de doublon « Delete account » ici : Account = identité de connexion + langue. */}
+          <p className="text-xs text-muted-foreground">
+            Account deletion and data export:{" "}
+            <button
+              type="button"
+              onClick={() => setSection("privacy")}
+              className="underline underline-offset-2 transition-colors hover:text-foreground"
+            >
+              Privacy &amp; Data
+            </button>
+            .
+          </p>
         </div>
       </SectionCard>
-      <Zone variant="danger" title="Danger zone" description="Irreversible actions. Proceed with caution.">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-sm font-medium text-foreground">Delete your account</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Permanently delete your account and all associated data.</p>
-          </div>
-          <DeleteConfirmDialog
-            title="Supprimer votre compte ?"
-            description="Votre compte et toutes les données associées seront supprimés définitivement (RGPD — droit à l'effacement, art. 17). Cette action est irréversible."
-            confirmLabel="Supprimer mon compte"
-            variant="danger"
-            confirmText={user?.email ?? undefined}
-            onConfirm={handleDelete}
-          >
-            <Button variant="destructive" size="sm" className="h-8 text-xs shrink-0" disabled={deleting}>
-              {deleting ? "Suppression…" : "Delete account"}
-            </Button>
-          </DeleteConfirmDialog>
-        </div>
-      </Zone>
     </div>
   )
 }
@@ -396,19 +389,19 @@ function AppearancePanel() {
 
   const FONT_SIZES: { value: "normal" | "large" | "x-large"; label: string }[] = [
     { value: "normal", label: "Normal" },
-    { value: "large", label: "Grand" },
-    { value: "x-large", label: "Très grand" },
+    { value: "large", label: "Large" },
+    { value: "x-large", label: "Extra large" },
   ]
   const COLORBLIND_MODES: { value: "none" | "protanopia" | "deuteranopia" | "tritanopia"; label: string }[] = [
-    { value: "none", label: "Aucun" },
-    { value: "protanopia", label: "Protanopie (rouge)" },
-    { value: "deuteranopia", label: "Deutéranopie (vert)" },
-    { value: "tritanopia", label: "Tritanopie (bleu)" },
+    { value: "none", label: "None" },
+    { value: "protanopia", label: "Protanopia (red)" },
+    { value: "deuteranopia", label: "Deuteranopia (green)" },
+    { value: "tritanopia", label: "Tritanopia (blue)" },
   ]
 
   return (
     <div className="flex flex-col gap-4">
-      <SectionCard title="Theme" description="S'applique immédiatement et reste mémorisé.">
+      <SectionCard title="Theme" description="Applies immediately and is remembered.">
         <div className="flex gap-3">
           {(["system", "light", "dark"] as const).map((opt) => (
             <button
@@ -433,11 +426,11 @@ function AppearancePanel() {
         </div>
       </SectionCard>
 
-      <SectionCard title="Accessibilité" description="Confort de lecture et adaptations visuelles. Appliqué immédiatement et mémorisé.">
+      <SectionCard title="Accessibility" description="Reading comfort and visual adjustments. Applied immediately and remembered.">
         <div className="flex flex-col gap-6">
           {/* Taille du texte */}
           <div>
-            <p className="mb-1.5 text-sm font-medium text-foreground">Taille du texte</p>
+            <p className="mb-1.5 text-sm font-medium text-foreground">Text size</p>
             <div className="inline-flex rounded-lg border border-border p-0.5">
               {FONT_SIZES.map((f) => (
                 <button
@@ -460,12 +453,12 @@ function AppearancePanel() {
           {/* Confort de lecture (dyslexie) */}
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-sm font-medium text-foreground">Confort de lecture (dyslexie)</p>
+              <p className="text-sm font-medium text-foreground">Reading comfort (dyslexia)</p>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                Police plus lisible et espacements accrus (interlignes, lettres, mots).
+                More legible font and increased spacing (line height, letters, words).
               </p>
             </div>
-            <Switch checked={dyslexiaFont} onCheckedChange={setDyslexiaFont} aria-label="Confort de lecture" />
+            <Switch checked={dyslexiaFont} onCheckedChange={setDyslexiaFont} aria-label="Reading comfort" />
           </div>
 
           <Separator />
@@ -475,12 +468,12 @@ function AppearancePanel() {
               seule (couleur + icône + libellé dans les composants d'état). */}
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-sm font-medium text-foreground">Contraste élevé</p>
+              <p className="text-sm font-medium text-foreground">High contrast</p>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                Renforce les contrastes texte/fond/bordures (utile en cas de basse vision ou de forte luminosité).
+                Strengthens text/background/border contrast (useful for low vision or bright light).
               </p>
             </div>
-            <Switch checked={highContrast} onCheckedChange={setHighContrast} aria-label="Contraste élevé" />
+            <Switch checked={highContrast} onCheckedChange={setHighContrast} aria-label="High contrast" />
           </div>
 
           <Separator />
@@ -488,9 +481,9 @@ function AppearancePanel() {
           {/* Mode daltonien (option) — filtre de correction, EN PLUS du contraste et des repères non colorés. */}
           <div className="grid grid-cols-[1fr_auto] items-start gap-4">
             <div>
-              <p className="text-sm font-medium text-foreground">Mode daltonien</p>
+              <p className="text-sm font-medium text-foreground">Color-blind mode</p>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                Filtre de correction des couleurs selon le type de daltonisme (rouge-vert / bleu-jaune).
+                Color-correction filter based on the type of color blindness (red-green / blue-yellow).
               </p>
             </div>
             <Select value={colorblindMode} onValueChange={(v) => setColorblindMode(v as typeof colorblindMode)}>
@@ -525,24 +518,24 @@ function AppearancePanel() {
 function NotificationsPanel() {
   return (
     <div className="flex flex-col gap-4">
-      <SectionCard title="Notifications" description="Comment Taskforce vous tient informé.">
+      <SectionCard title="Notifications" description="How Taskforce keeps you informed.">
         <div className="flex flex-col gap-3">
           <div className="flex items-start gap-3">
             <Bell className="size-4 text-muted-foreground mt-0.5 shrink-0" />
             <div>
-              <p className="text-sm font-medium text-foreground">Notifications dans l&apos;application</p>
+              <p className="text-sm font-medium text-foreground">In-app notifications</p>
               <p className="text-xs text-muted-foreground">
-                Mentions, assignations, commentaires et changements de statut apparaissent en temps réel
-                dans la cloche de notifications. Toujours actives.
+                Mentions, assignments, comments and status changes appear in real time
+                in the notification bell. Always on.
               </p>
             </div>
           </div>
           <div className="flex items-start gap-3">
             <Mail className="size-4 text-muted-foreground mt-0.5 shrink-0" />
             <div>
-              <p className="text-sm font-medium text-foreground">Notifications par e-mail</p>
+              <p className="text-sm font-medium text-foreground">Email notifications</p>
               <p className="text-xs text-muted-foreground">
-                Le réglage fin des e-mails par type d&apos;événement n&apos;est pas encore disponible. À venir.
+                Fine-grained per-event email settings aren&apos;t available yet. Coming soon.
               </p>
             </div>
           </div>
@@ -555,15 +548,15 @@ function NotificationsPanel() {
 function SecurityPanel() {
   // Auth déléguée à Keycloak (OIDC) — pas de fabrication d'infos ici (QA Q-17).
   const items = [
-    { icon: <Key className="size-4 text-muted-foreground" />,    title: "Mot de passe",                 desc: "Modifiable depuis la console « Mon compte » de Keycloak." },
-    { icon: <Shield className="size-4 text-muted-foreground" />, title: "Double authentification (2FA)", desc: "Activez un authenticator (TOTP) depuis votre compte Keycloak." },
-    { icon: <Globe className="size-4 text-muted-foreground" />,  title: "Sessions actives",              desc: "Vos sessions sont gérées de façon centralisée par Keycloak." },
+    { icon: <Key className="size-4 text-muted-foreground" />,    title: "Password",                        desc: "Change it from Keycloak's 'My account' console." },
+    { icon: <Shield className="size-4 text-muted-foreground" />, title: "Two-factor authentication (2FA)", desc: "Enable an authenticator (TOTP) from your Keycloak account." },
+    { icon: <Globe className="size-4 text-muted-foreground" />,  title: "Active sessions",                 desc: "Your sessions are managed centrally by Keycloak." },
   ]
   return (
     <div className="flex flex-col gap-4">
       <SectionCard
-        title="Authentification & sécurité"
-        description="Votre identité est gérée par Keycloak (fournisseur OIDC). Le mot de passe, la 2FA et les sessions se gèrent dans votre compte Keycloak."
+        title="Authentication & security"
+        description="Your identity is managed by Keycloak (OIDC provider). Password, 2FA and sessions are managed in your Keycloak account."
       >
         <div className="flex flex-col divide-y divide-border/50">
           {items.map((it) => (
@@ -595,10 +588,10 @@ function WorkspacePanel() {
     if (!activeWorkspace) return
     try {
       const next = await deleteCurrentWorkspace(activeWorkspace.slug)
-      toast.success("Workspace supprimé")
+      toast.success("Workspace deleted")
       router.push(next ? `/${next}/dashboard` : "/")
     } catch {
-      toast.error("Impossible de supprimer le workspace (réservé au propriétaire)")
+      toast.error("Couldn't delete the workspace (owner only)")
     }
   }
 
@@ -657,22 +650,22 @@ function WorkspacePanel() {
       </SectionCard>
 
       {isOwner && (
-        <Zone variant="danger" title="Danger zone" description="Actions irréversibles. À utiliser avec précaution.">
+        <Zone variant="danger" title="Danger zone" description="Irreversible actions. Use with caution.">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm font-medium text-foreground">Supprimer ce workspace</p>
+              <p className="text-sm font-medium text-foreground">Delete this workspace</p>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                Supprime définitivement le workspace et toutes ses données (projets, issues, équipes…).
+                Permanently deletes the workspace and all its data (projects, issues, teams…).
               </p>
             </div>
             <DeleteConfirmDialog
-              title="Supprimer le workspace ?"
-              description={`« ${activeWorkspace?.name} » et toutes ses données seront définitivement supprimés. Cette action est irréversible.`}
-              confirmLabel="Supprimer le workspace"
+              title="Delete workspace?"
+              description={`“${activeWorkspace?.name}” and all its data will be permanently deleted. This cannot be undone.`}
+              confirmLabel="Delete workspace"
               onConfirm={handleDeleteWorkspace}
             >
               <Button variant="destructive" size="sm" className="h-8 shrink-0 text-xs">
-                Supprimer
+                Delete
               </Button>
             </DeleteConfirmDialog>
           </div>
@@ -730,18 +723,18 @@ function StatusPanel() {
   }
 
   const rows: { name: string; ok: boolean; detail: string }[] = [
-    { name: "Application (interface)", ok: true,            detail: "Chargée" },
-    { name: "API Taskforce",          ok: api !== "down",   detail: api === "checking" ? "Vérification…" : api === "ok" ? "Opérationnelle" : "Injoignable" },
-    { name: "Temps réel (STOMP)",     ok: api !== "down",   detail: api === "checking" ? "Vérification…" : api === "ok" ? "Disponible via l'API" : "Indisponible" },
-    { name: "Assistant IA (Groq)",    ok: true,             detail: "Configuré (côté serveur)" },
+    { name: "App (interface)",     ok: true,            detail: "Loaded" },
+    { name: "Taskforce API",       ok: api !== "down",   detail: api === "checking" ? "Checking…" : api === "ok" ? "Operational" : "Unreachable" },
+    { name: "Real-time (STOMP)",   ok: api !== "down",   detail: api === "checking" ? "Checking…" : api === "ok" ? "Available via the API" : "Unavailable" },
+    { name: "AI assistant (Groq)", ok: true,             detail: "Configured (server-side)" },
   ]
   const allOk = rows.every((r) => r.ok)
 
   return (
     <div className="flex flex-col gap-5 max-w-2xl">
       <div>
-        <h2 className="text-sm font-semibold text-foreground">Statut de l&apos;application</h2>
-        <p className="text-xs text-muted-foreground mt-0.5">État des services en temps réel.</p>
+        <h2 className="text-sm font-semibold text-foreground">Application status</h2>
+        <p className="text-xs text-muted-foreground mt-0.5">Real-time service status.</p>
       </div>
 
       <div className={cn(
@@ -749,7 +742,7 @@ function StatusPanel() {
         allOk ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-500" : "border-amber-500/30 bg-amber-500/10 text-amber-500"
       )}>
         {allOk ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
-        {allOk ? "Tous les systèmes sont opérationnels" : "Incident en cours sur un ou plusieurs services"}
+        {allOk ? "All systems operational" : "Incident affecting one or more services"}
       </div>
 
       <div className="rounded-xl border border-border bg-card overflow-hidden [box-shadow:var(--shadow-sm)]">
@@ -765,14 +758,14 @@ function StatusPanel() {
       {/* Journal d'audit (OWNER/ADMIN) + export CSV */}
       <div>
         <div className="mb-2 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-foreground">Journal d&apos;audit</h3>
+          <h3 className="text-sm font-semibold text-foreground">Audit log</h3>
           <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" onClick={exportAuditCsv} disabled={logs.length === 0}>
-            <Upload className="h-3.5 w-3.5" /> Exporter CSV
+            <Upload className="h-3.5 w-3.5" /> Export CSV
           </Button>
         </div>
         <div className="rounded-xl border border-border bg-card overflow-hidden [box-shadow:var(--shadow-sm)]">
           {logs.length === 0 ? (
-            <p className="px-4 py-6 text-center text-xs text-muted-foreground">Aucune entrée d&apos;audit (réservé aux administrateurs).</p>
+            <p className="px-4 py-6 text-center text-xs text-muted-foreground">No audit entries (admins only).</p>
           ) : (
             logs.slice(0, 30).map((l, i) => (
               <div key={l.id} className={cn("flex items-center gap-3 px-4 py-2.5", i < Math.min(logs.length, 30) - 1 && "border-b border-border/50")}>
@@ -781,7 +774,7 @@ function StatusPanel() {
                   {l.entityType ? `${l.entityType}${l.entityId ? ` #${l.entityId}` : ""}` : (l.details ?? "—")}
                 </span>
                 <span className="shrink-0 text-[10px] text-muted-foreground/70">
-                  {new Date(l.createdAt).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}
+                  {new Date(l.createdAt).toLocaleString("en-US", { dateStyle: "short", timeStyle: "short" })}
                 </span>
               </div>
             ))
@@ -806,7 +799,7 @@ function GitHubRepoBrowser({ slug }: { readonly slug: string }) {
     setLoadingRepos(true)
     getGitHubRepos(slug)
       .then((r) => { if (active) setRepos(r) })
-      .catch(() => { if (active) toast.error("Impossible de charger les dépôts GitHub") })
+      .catch(() => { if (active) toast.error("Couldn't load GitHub repositories") })
       .finally(() => { if (active) setLoadingRepos(false) })
     return () => { active = false }
   }, [slug])
@@ -818,18 +811,18 @@ function GitHubRepoBrowser({ slug }: { readonly slug: string }) {
     setLoadingIssues(true)
     getGitHubRepoIssues(slug, full)
       .then(setIssues)
-      .catch(() => toast.error("Impossible de charger les issues du dépôt"))
+      .catch(() => toast.error("Couldn't load the repository's issues"))
       .finally(() => setLoadingIssues(false))
   }
 
   return (
     <div className="mt-4 flex flex-col gap-3 border-t border-border/50 pt-4">
       <div className="flex items-center gap-2">
-        <p className="text-xs font-medium text-muted-foreground">Parcourir un dépôt</p>
+        <p className="text-xs font-medium text-muted-foreground">Browse a repository</p>
         {loadingRepos && <Loader2 className="size-3.5 animate-spin text-muted-foreground" />}
       </div>
       <Select value={repo} onValueChange={selectRepo}>
-        <SelectTrigger className="h-9"><SelectValue placeholder="Choisir un dépôt…" /></SelectTrigger>
+        <SelectTrigger className="h-9"><SelectValue placeholder="Choose a repository…" /></SelectTrigger>
         <SelectContent>
           {repos.map((r) => (
             <SelectItem key={r.fullName} value={r.fullName}>
@@ -839,9 +832,9 @@ function GitHubRepoBrowser({ slug }: { readonly slug: string }) {
         </SelectContent>
       </Select>
 
-      {loadingIssues && <p className="text-xs text-muted-foreground">Chargement des issues…</p>}
+      {loadingIssues && <p className="text-xs text-muted-foreground">Loading issues…</p>}
       {!loadingIssues && repo && issues.length === 0 && (
-        <p className="text-xs text-muted-foreground italic">Aucune issue / PR.</p>
+        <p className="text-xs text-muted-foreground italic">No issues / PRs.</p>
       )}
       {issues.length > 0 && (
         <div className="max-h-64 divide-y divide-border/50 overflow-y-auto rounded-lg border border-border">
@@ -871,36 +864,11 @@ function IntegrationsPanel() {
   const slug = activeWorkspace?.slug ?? ""
   const {
     githubStatus, slackStatus, slackChannels, webhooks,
-    fetchGitHubStatus, connectGitHub, disconnectGitHub,
-    fetchSlackStatus, connectSlack, disconnectSlack,
+    fetchGitHubStatus, disconnectGitHub,
+    fetchSlackStatus, disconnectSlack,
     fetchSlackChannels, addSlackChannel, removeSlackChannel,
     fetchWebhooks, addWebhook, removeWebhook,
   } = useIntegrationStore()
-
-  // Démarrage OAuth (XHR → URL → navigation vers GitHub/Slack). Sur succès la page quitte,
-  // donc on ne réinitialise l'état de chargement qu'en cas d'échec.
-  const [connectingGitHub, setConnectingGitHub] = useState(false)
-  const [connectingSlack,  setConnectingSlack]  = useState(false)
-
-  async function handleConnectGitHub() {
-    setConnectingGitHub(true)
-    try {
-      await connectGitHub(slug)
-    } catch {
-      toast.error("Impossible de démarrer la connexion GitHub")
-      setConnectingGitHub(false)
-    }
-  }
-
-  async function handleConnectSlack() {
-    setConnectingSlack(true)
-    try {
-      await connectSlack(slug)
-    } catch {
-      toast.error("Impossible de démarrer la connexion Slack")
-      setConnectingSlack(false)
-    }
-  }
 
   // Slack channel form
   const [channelId,   setChannelId]   = useState("")
@@ -930,18 +898,18 @@ function IntegrationsPanel() {
   async function handleDisconnectGitHub() {
     try {
       await disconnectGitHub(slug)
-      toast.success("GitHub déconnecté")
+      toast.success("GitHub disconnected")
     } catch {
-      toast.error("Impossible de déconnecter GitHub")
+      toast.error("Couldn't disconnect GitHub")
     }
   }
 
   async function handleDisconnectSlack() {
     try {
       await disconnectSlack(slug)
-      toast.success("Slack déconnecté")
+      toast.success("Slack disconnected")
     } catch {
-      toast.error("Impossible de déconnecter Slack")
+      toast.error("Couldn't disconnect Slack")
     }
   }
 
@@ -952,9 +920,9 @@ function IntegrationsPanel() {
       await addSlackChannel(slug, { channelId: channelId.trim(), channelName: channelName.trim(), eventTypes: ["issue.created"] })
       setChannelId("")
       setChannelName("")
-      toast.success("Canal Slack ajouté")
+      toast.success("Slack channel added")
     } catch {
-      toast.error("Impossible d'ajouter le canal")
+      toast.error("Couldn't add the channel")
     } finally {
       setAddingChannel(false)
     }
@@ -966,9 +934,9 @@ function IntegrationsPanel() {
     try {
       await addWebhook(slug, { url: webhookUrl.trim(), eventTypes: webhookEvents })
       setWebhookUrl("")
-      toast.success("Webhook ajouté")
+      toast.success("Webhook added")
     } catch {
-      toast.error("URL invalide ou inaccessible")
+      toast.error("Invalid or unreachable URL")
     } finally {
       setAddingWebhook(false)
     }
@@ -983,122 +951,106 @@ function IntegrationsPanel() {
   return (
     <div className="flex flex-col gap-4">
       {/* ---- Catalogue (le pool générique) ---- */}
-      <SectionCard title="Catalogue d'intégrations" description="Branchez vos outils sur le Brain OS. Un clic pour l'OAuth, sinon une clé API (aide ⓘ au survol).">
+      <SectionCard title="Integrations catalog" description="Connect your tools to the Brain OS. One click for OAuth, otherwise an API key (ⓘ help on hover).">
+
         {slug && <IntegrationsCatalog slug={slug} />}
       </SectionCard>
 
-      {/* ---- GitHub ---- */}
-      <SectionCard title="GitHub" description="Link issues to pull requests and commits.">
-        <div className="flex items-center gap-4">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted p-2">
-            <BrandLogo slug="github" name="GitHub" className="size-full" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-foreground">GitHub</p>
-            {githubStatus?.connected && githubStatus.meta?.login && (
-              <p className="text-xs text-muted-foreground">Connected as <span className="font-medium">@{githubStatus.meta.login}</span></p>
-            )}
-            {!githubStatus?.connected && (
-              <p className="text-xs text-muted-foreground">Not connected</p>
-            )}
-          </div>
-          {githubStatus?.connected ? (
+      {/* ---- GitHub — affiché UNIQUEMENT une fois connecté (gestion des dépôts). La connexion se fait
+             via le Catalogue ci-dessus ; plus de card « Connect » redondante ici. ---- */}
+      {githubStatus?.connected && (
+        <SectionCard title="GitHub" description="Repositories linked to issues (PRs and commits).">
+          <div className="flex items-center gap-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted p-2">
+              <BrandLogo slug="github" name="GitHub" className="size-full" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-foreground">GitHub</p>
+              {githubStatus.meta?.login && (
+                <p className="text-xs text-muted-foreground">Connected as <span className="font-medium">@{githubStatus.meta.login}</span></p>
+              )}
+            </div>
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="text-xs text-emerald-400 border-emerald-500/20 bg-emerald-500/10">Connected</Badge>
               <Button variant="outline" size="sm" className="h-7 text-xs text-destructive border-destructive/30 hover:bg-destructive/10" onClick={handleDisconnectGitHub}>
                 Disconnect
               </Button>
             </div>
-          ) : (
-            <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleConnectGitHub} disabled={connectingGitHub}>
-              <Link2 className="h-3 w-3 mr-1.5" />{connectingGitHub ? "Connexion…" : "Connect"}
-            </Button>
-          )}
-        </div>
-        {githubStatus?.connected && <GitHubRepoBrowser slug={slug} />}
-      </SectionCard>
+          </div>
+          <GitHubRepoBrowser slug={slug} />
+        </SectionCard>
+      )}
 
-      {/* ---- Slack ---- */}
-      <SectionCard title="Slack" description="Connectez votre espace Slack pour recevoir les notifications d'activité.">
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center gap-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted p-2">
-              <BrandLogo slug="slack" name="Slack" className="size-full" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground">Slack</p>
-              {slackStatus?.connected && slackStatus.meta?.teamName && (
-                <p className="text-xs text-muted-foreground">Connected to <span className="font-medium">{slackStatus.meta.teamName}</span></p>
-              )}
-              {!slackStatus?.connected && (
-                <p className="text-xs text-muted-foreground">Not connected</p>
-              )}
-            </div>
-            {slackStatus?.connected ? (
+      {/* ---- Slack — affiché UNIQUEMENT une fois connecté (canaux de notification). Connexion via le Catalogue. ---- */}
+      {slackStatus?.connected && (
+        <SectionCard title="Slack" description="Activity notifications in your Slack channels.">
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted p-2">
+                <BrandLogo slug="slack" name="Slack" className="size-full" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground">Slack</p>
+                {slackStatus.meta?.teamName && (
+                  <p className="text-xs text-muted-foreground">Connected to <span className="font-medium">{slackStatus.meta.teamName}</span></p>
+                )}
+              </div>
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="text-xs text-emerald-400 border-emerald-500/20 bg-emerald-500/10">Connected</Badge>
                 <Button variant="outline" size="sm" className="h-7 text-xs text-destructive border-destructive/30 hover:bg-destructive/10" onClick={handleDisconnectSlack}>
                   Disconnect
                 </Button>
               </div>
-            ) : (
-              <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleConnectSlack} disabled={connectingSlack}>
-                <Link2 className="h-3 w-3 mr-1.5" />{connectingSlack ? "Connexion…" : "Connect"}
-              </Button>
-            )}
-          </div>
+            </div>
 
-          {/* Slack channels — shown only when connected */}
-          {slackStatus?.connected && (
-            <>
-              <Separator />
-              <div className="flex flex-col gap-2">
-                <p className="text-xs font-medium text-foreground">Notification channels</p>
-                {slackChannels.length === 0 && (
-                  <p className="text-xs text-muted-foreground">No channels configured yet.</p>
-                )}
-                {slackChannels.map((ch) => (
-                  <div key={ch.id} className="flex items-center justify-between rounded-md border border-border px-3 py-2">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">#{ch.channelName}</p>
-                      <p className="text-xs text-muted-foreground">{ch.eventTypes.join(", ")}</p>
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-destructive hover:bg-destructive/10"
-                        onClick={async () => {
-                          try { await removeSlackChannel(slug, ch.id); toast.success("Canal supprimé") }
-                          catch { toast.error("Impossible de supprimer le canal") }
-                        }}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
+            {/* Canaux de notification */}
+            <Separator />
+            <div className="flex flex-col gap-2">
+              <p className="text-xs font-medium text-foreground">Notification channels</p>
+              {slackChannels.length === 0 && (
+                <p className="text-xs text-muted-foreground">No channels configured yet.</p>
+              )}
+              {slackChannels.map((ch) => (
+                <div key={ch.id} className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">#{ch.channelName}</p>
+                    <p className="text-xs text-muted-foreground">{ch.eventTypes.join(", ")}</p>
                   </div>
-                ))}
-                {/* Add channel form */}
-                <div className="flex gap-2 mt-1">
-                  <StyledInput
-                    placeholder="Channel ID (e.g. C0123456789)"
-                    value={channelId}
-                    onChange={(e) => setChannelId(e.target.value)}
-                  />
-                  <StyledInput
-                    placeholder="Channel name"
-                    value={channelName}
-                    onChange={(e) => setChannelName(e.target.value)}
-                  />
-                  <Button size="sm" className="h-9 text-xs shrink-0" onClick={handleAddChannel} disabled={addingChannel || !channelId || !channelName}>
-                    {addingChannel ? "Adding…" : "Add"}
-                  </Button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-destructive hover:bg-destructive/10"
+                      onClick={async () => {
+                        try { await removeSlackChannel(slug, ch.id); toast.success("Channel removed") }
+                        catch { toast.error("Couldn't remove the channel") }
+                      }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </div>
+              ))}
+              {/* Add channel form */}
+              <div className="flex gap-2 mt-1">
+                <StyledInput
+                  placeholder="Channel ID (e.g. C0123456789)"
+                  value={channelId}
+                  onChange={(e) => setChannelId(e.target.value)}
+                />
+                <StyledInput
+                  placeholder="Channel name"
+                  value={channelName}
+                  onChange={(e) => setChannelName(e.target.value)}
+                />
+                <Button size="sm" className="h-9 text-xs shrink-0" onClick={handleAddChannel} disabled={addingChannel || !channelId || !channelName}>
+                  {addingChannel ? "Adding…" : "Add"}
+                </Button>
               </div>
-            </>
-          )}
-        </div>
-      </SectionCard>
+            </div>
+          </div>
+        </SectionCard>
+      )}
 
       {/* ---- Webhooks ---- */}
       <SectionCard title="Webhooks" description="Receive HTTP POST events for workspace activity.">
@@ -1122,8 +1074,8 @@ function IntegrationsPanel() {
                       size="icon"
                       className="h-7 w-7 text-destructive hover:bg-destructive/10"
                       onClick={async () => {
-                        try { await removeWebhook(slug, wh.id); toast.success("Webhook supprimé") }
-                        catch { toast.error("Impossible de supprimer le webhook") }
+                        try { await removeWebhook(slug, wh.id); toast.success("Webhook removed") }
+                        catch { toast.error("Couldn't remove the webhook") }
                       }}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
@@ -1183,12 +1135,12 @@ function PrivacyPanel() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url
-      a.download = "taskforce-mes-donnees.json"
+      a.download = "taskforce-my-data.json"
       a.click()
       URL.revokeObjectURL(url)
-      toast.success("Vos données ont été exportées (téléchargement JSON).")
+      toast.success("Your data has been exported (JSON download).")
     } catch {
-      toast.error("Échec de l'export. Réessayez ou contactez privacy@taskforce.dev.")
+      toast.error("Export failed. Try again or contact privacy@taskforce.dev.")
     } finally {
       setLoading(null)
     }
@@ -1198,7 +1150,7 @@ function PrivacyPanel() {
     setLoading("DELETION")
     try {
       await deleteMyAccount()
-      toast.success("Compte anonymisé. Déconnexion…")
+      toast.success("Account anonymized. Signing out…")
       // Purge cliente + BONNE route (/auth/login ; /login n'existe pas → 404) : sinon l'utilisateur
       // restait « connecté » sur un compte anonymisé → 403 en cascade. RGPD-02.
       if (globalThis.window !== undefined) {
@@ -1208,7 +1160,7 @@ function PrivacyPanel() {
         setTimeout(() => { window.location.href = "/auth/login" }, 1000)
       }
     } catch {
-      toast.error("Échec de la suppression. Réessayez ou contactez privacy@taskforce.dev.")
+      toast.error("Deletion failed. Try again or contact privacy@taskforce.dev.")
       setLoading(null)
       setDeleteConfirm(false)
     }
@@ -1237,7 +1189,7 @@ function PrivacyPanel() {
           <div>
             <p className="text-sm font-medium text-foreground">Export my data</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Téléchargez immédiatement un export JSON de vos données personnelles (RGPD Art. 20 — portabilité).
+              Download a JSON export of your personal data right away (GDPR Art. 20 — portability).
             </p>
           </div>
           <Button
@@ -1247,7 +1199,7 @@ function PrivacyPanel() {
             disabled={loading === "ACCESS"}
             onClick={handleExport}
           >
-            {loading === "ACCESS" ? "Export…" : "Exporter mes données"}
+            {loading === "ACCESS" ? "Exporting…" : "Export my data"}
           </Button>
         </div>
       </SectionCard>
@@ -1257,7 +1209,7 @@ function PrivacyPanel() {
           <div>
             <p className="text-sm font-medium text-foreground">Delete my account</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Vos données personnelles seront anonymisées et votre accès coupé immédiatement (RGPD Art. 17 — droit à l&apos;effacement). Action irréversible.
+              Your personal data will be anonymized and your access cut off immediately (GDPR Art. 17 — right to erasure). Irreversible.
             </p>
           </div>
           {!deleteConfirm ? (
@@ -1286,7 +1238,7 @@ function PrivacyPanel() {
                 disabled={loading === "DELETION"}
                 onClick={handleDelete}
               >
-                {loading === "DELETION" ? "Traitement…" : "Confirmer la suppression"}
+                {loading === "DELETION" ? "Processing…" : "Confirm deletion"}
               </Button>
             </div>
           )}
@@ -1304,7 +1256,7 @@ function MiniStat({ label, value }: Readonly<{ label: string; value: number }>) 
   return (
     <div>
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="mt-0.5 text-lg font-semibold tabular-nums text-foreground">{value.toLocaleString("fr-FR")}</p>
+      <p className="mt-0.5 text-lg font-semibold tabular-nums text-foreground">{value.toLocaleString("en-US")}</p>
     </div>
   )
 }
@@ -1342,30 +1294,30 @@ function UsagePanel() {
 
   return (
     <div className="flex flex-col gap-4">
-      <SectionCard title="Consommation Cortex" description="Tokens consommés par l'agent Cortex ce mois-ci, et plafond de votre plan.">
+      <SectionCard title="Cortex usage" description="Tokens used by the Cortex agent this month, and your plan's cap.">
         {loading ? (
-          <p className="text-sm text-muted-foreground">Chargement…</p>
+          <p className="text-sm text-muted-foreground">Loading…</p>
         ) : !usage ? (
-          <p className="text-sm text-muted-foreground">Consommation indisponible pour le moment.</p>
+          <p className="text-sm text-muted-foreground">Usage unavailable right now.</p>
         ) : (
           <div className="flex flex-col gap-5">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-medium text-foreground">Plan <span className="uppercase">{usage.plan}</span></p>
-                <p className="text-xs text-muted-foreground mt-0.5">Période {usage.period} · réinitialisation le {usage.resetAt}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Period {usage.period} · resets on {usage.resetAt}</p>
               </div>
               {usage.plan !== "BUSINESS" && usage.plan !== "ENTERPRISE" && (
                 <Button size="sm" className="h-8 text-xs gap-1.5 shrink-0" onClick={goToPlans}>
-                  <Zap className="h-3.5 w-3.5" /> Voir les forfaits
+                  <Zap className="h-3.5 w-3.5" /> View plans
                 </Button>
               )}
             </div>
 
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Tokens ce mois</span>
+                <span className="text-muted-foreground">Tokens this month</span>
                 <span className="tabular-nums font-medium text-foreground">
-                  {usage.usedTokens.toLocaleString("fr-FR")} {unlimited ? "/ illimité" : `/ ${usage.limitTokens.toLocaleString("fr-FR")} (${pct}%)`}
+                  {usage.usedTokens.toLocaleString("en-US")} {unlimited ? "/ unlimited" : `/ ${usage.limitTokens.toLocaleString("en-US")} (${pct}%)`}
                 </span>
               </div>
               <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
@@ -1379,12 +1331,12 @@ function UsagePanel() {
             <div className="grid grid-cols-3 gap-3">
               <MiniStat label="Prompt" value={usage.promptTokens} />
               <MiniStat label="Completion" value={usage.completionTokens} />
-              <MiniStat label="Requêtes" value={usage.requestCount} />
+              <MiniStat label="Requests" value={usage.requestCount} />
             </div>
 
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Le coût IA est volontairement bas (modèle local ≈ coût serveur). Les plafonds sont indicatifs
-              et seront ajustés avec la grille tarifaire finale ; seul le compute IA sera rechargeable à la demande.
+              AI cost is deliberately low (local model ≈ server cost). Caps are indicative and will be adjusted
+              with the final pricing; only AI compute will be top-up-able on demand.
             </p>
           </div>
         )}
@@ -1432,8 +1384,8 @@ export function SettingsNav({
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Rechercher un réglage…"
-          aria-label="Rechercher un réglage"
+          placeholder="Search settings…"
+          aria-label="Search settings"
           className="h-8 w-full rounded-md border border-border bg-background pl-8 pr-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary/50"
         />
       </div>
@@ -1441,7 +1393,7 @@ export function SettingsNav({
       <nav className="flex flex-col gap-6">
         {query ? (
           results.length === 0 ? (
-            <p className="px-3 py-2 text-sm text-muted-foreground">Aucun réglage trouvé.</p>
+            <p className="px-3 py-2 text-sm text-muted-foreground">No settings found.</p>
           ) : (
             <div className="flex flex-col gap-0.5">{results.map(renderBtn)}</div>
           )
@@ -1454,6 +1406,20 @@ export function SettingsNav({
           ))
         )}
       </nav>
+    </div>
+  )
+}
+
+/** Compétences + disponibilité de SON propre profil (mêmes cartes que la fiche membre). Rendu à
+ *  l'intérieur de « Profile » (plus une section de menu séparée) — retour user « tout dans profil ». */
+function CompetencesPanel() {
+  const { user } = useAuth()
+  const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug ?? "")
+  if (!user || !slug || !Number.isFinite(Number(user.id))) return null
+  return (
+    <div className="flex flex-col gap-6">
+      <MemberSkillsCard slug={slug} userId={Number(user.id)} canEdit />
+      <MemberAvailabilityCard slug={slug} userId={Number(user.id)} canEdit />
     </div>
   )
 }
@@ -1495,8 +1461,8 @@ export default function SettingsPage() {
     const section = searchParams.get("section")
     const github = searchParams.get("github")
     const slack = searchParams.get("slack")
-    if (github === "connected") toast.success("GitHub connecté avec succès !")
-    if (slack === "connected") toast.success("Slack connecté avec succès !")
+    if (github === "connected") toast.success("GitHub connected successfully!")
+    if (slack === "connected") toast.success("Slack connected successfully!")
     const target = github || slack
       ? "integrations"
       : section && SECTIONS.some((s) => s.key === section)

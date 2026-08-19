@@ -23,12 +23,12 @@ const MAX_SKILLS = 50
 
 const SENIORITY_OPTIONS: { value: Seniority; label: string }[] = [
   { value: "JUNIOR", label: "Junior" },
-  { value: "MID", label: "Confirmé" },
+  { value: "MID", label: "Mid-level" },
   { value: "SENIOR", label: "Senior" },
   { value: "LEAD", label: "Lead" },
 ]
 const SENIORITY_LABEL: Record<Seniority, string> = {
-  JUNIOR: "Junior", MID: "Confirmé", SENIOR: "Senior", LEAD: "Lead",
+  JUNIOR: "Junior", MID: "Mid-level", SENIOR: "Senior", LEAD: "Lead",
 }
 const NO_SENIORITY = "__none__"
 
@@ -122,7 +122,7 @@ export function MemberSkillsCard({ slug, userId, canEdit }: MemberSkillsCardProp
         growthEnabled,
         growthTargetSkills: growthEnabled ? growthTargets : [],
       })
-      toast.success("Compétences mises à jour")
+      toast.success("Skills updated")
       setEditing(false)
     } catch {
       // erreur déjà notifiée par le client HTTP
@@ -136,13 +136,13 @@ export function MemberSkillsCard({ slug, userId, canEdit }: MemberSkillsCardProp
       <div className="flex items-center justify-between mb-3">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
           <Sparkles className="h-4 w-4 text-violet-400" />
-          Compétences
-          <span className="text-xs font-normal text-muted-foreground">· utilisées par le Smart Assign</span>
+          Skills
+          <span className="text-xs font-normal text-muted-foreground">· used by Smart Assign</span>
         </h2>
         {canEdit && !editing && !loading && (
           <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground" onClick={startEditing}>
             <Pencil className="h-3.5 w-3.5" />
-            Modifier
+            Edit
           </Button>
         )}
       </div>
@@ -162,7 +162,7 @@ export function MemberSkillsCard({ slug, userId, canEdit }: MemberSkillsCardProp
                   type="button"
                   onClick={() => removeSkill(skill)}
                   className="rounded-full p-0.5 hover:bg-muted-foreground/20"
-                  aria-label={`Retirer ${skill}`}
+                  aria-label={`Remove ${skill}`}
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -173,7 +173,7 @@ export function MemberSkillsCard({ slug, userId, canEdit }: MemberSkillsCardProp
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={handleDraftKeyDown}
               onBlur={addDraftSkill}
-              placeholder={skills.length === 0 ? "Ex : React, Spring Boot, UX… (Entrée pour ajouter)" : "Ajouter…"}
+              placeholder={skills.length === 0 ? "e.g. React, Spring Boot, UX… (Enter to add)" : "Add…"}
               className="h-7 flex-1 min-w-[8rem] border-0 bg-transparent px-1 shadow-none focus-visible:ring-0"
             />
           </div>
@@ -181,26 +181,26 @@ export function MemberSkillsCard({ slug, userId, canEdit }: MemberSkillsCardProp
           {/* Capacité + séniorité (PROD-1.8 Phase 2) */}
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Capacité (h/semaine)</label>
+              <label className="text-xs font-medium text-muted-foreground">Capacity (h/week)</label>
               <Input
                 type="number"
                 min={0}
                 max={168}
                 value={capacity}
                 onChange={(e) => setCapacity(e.target.value)}
-                placeholder="Ex : 35"
+                placeholder="e.g. 35"
                 className="h-9"
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Séniorité</label>
+              <label className="text-xs font-medium text-muted-foreground">Seniority</label>
               <Select
                 value={seniority === "" ? NO_SENIORITY : seniority}
                 onValueChange={(v) => setSeniority(v === NO_SENIORITY ? "" : (v as Seniority))}
               >
-                <SelectTrigger className="h-9"><SelectValue placeholder="Non renseignée" /></SelectTrigger>
+                <SelectTrigger className="h-9"><SelectValue placeholder="Not specified" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={NO_SENIORITY}>Non renseignée</SelectItem>
+                  <SelectItem value={NO_SENIORITY}>Not specified</SelectItem>
                   {SENIORITY_OPTIONS.map((o) => (
                     <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
                   ))}
@@ -213,9 +213,9 @@ export function MemberSkillsCard({ slug, userId, canEdit }: MemberSkillsCardProp
           <div className="rounded-lg border border-border p-3 flex flex-col gap-2.5">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-sm font-medium text-foreground">🌱 En développement</p>
+                <p className="text-sm font-medium text-foreground">🌱 Growing</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Le Smart Assign privilégiera des tâches stretch vers les compétences cibles.
+                  Smart Assign will prioritize stretch tasks toward the target skills.
                 </p>
               </div>
               <Switch checked={growthEnabled} onCheckedChange={setGrowthEnabled} />
@@ -229,7 +229,7 @@ export function MemberSkillsCard({ slug, userId, canEdit }: MemberSkillsCardProp
                       type="button"
                       onClick={() => setGrowthTargets(growthTargets.filter((s) => s !== skill))}
                       className="rounded-full p-0.5 hover:bg-muted-foreground/20"
-                      aria-label={`Retirer ${skill}`}
+                      aria-label={`Remove ${skill}`}
                     >
                       <X className="h-3 w-3" />
                     </button>
@@ -240,7 +240,7 @@ export function MemberSkillsCard({ slug, userId, canEdit }: MemberSkillsCardProp
                   onChange={(e) => setTargetDraft(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addTargetSkill() } }}
                   onBlur={addTargetSkill}
-                  placeholder={growthTargets.length === 0 ? "Compétences cibles… (Entrée)" : "Ajouter…"}
+                  placeholder={growthTargets.length === 0 ? "Target skills… (Enter)" : "Add…"}
                   className="h-7 flex-1 min-w-[8rem] border-0 bg-transparent px-1 shadow-none focus-visible:ring-0"
                 />
               </div>
@@ -250,7 +250,7 @@ export function MemberSkillsCard({ slug, userId, canEdit }: MemberSkillsCardProp
           <Textarea
             value={profileText}
             onChange={(e) => setProfileText(e.target.value)}
-            placeholder="Domaine d'expertise, contexte, préférences… (optionnel)"
+            placeholder="Area of expertise, context, preferences… (optional)"
             rows={3}
             maxLength={2000}
           />
@@ -258,10 +258,10 @@ export function MemberSkillsCard({ slug, userId, canEdit }: MemberSkillsCardProp
           <div className="flex items-center gap-2">
             <Button size="sm" onClick={handleSave} disabled={saving} className="gap-1.5">
               {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-              Enregistrer
+              Save
             </Button>
             <Button size="sm" variant="ghost" onClick={() => setEditing(false)} disabled={saving}>
-              Annuler
+              Cancel
             </Button>
           </div>
         </div>
@@ -275,10 +275,10 @@ export function MemberSkillsCard({ slug, userId, canEdit }: MemberSkillsCardProp
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">
-              Aucune compétence renseignée.
+              No skills added yet.
               {canEdit && (
                 <button onClick={startEditing} className="ml-1 inline-flex items-center gap-1 text-primary hover:underline">
-                  <Plus className="h-3 w-3" /> En ajouter
+                  <Plus className="h-3 w-3" /> Add some
                 </button>
               )}
             </p>
@@ -289,13 +289,13 @@ export function MemberSkillsCard({ slug, userId, canEdit }: MemberSkillsCardProp
                 <Badge variant="outline" className="font-medium">{SENIORITY_LABEL[profile.seniority]}</Badge>
               )}
               {profile?.capacityHoursPerWeek != null && (
-                <span className="text-muted-foreground">{profile.capacityHoursPerWeek} h/semaine</span>
+                <span className="text-muted-foreground">{profile.capacityHoursPerWeek} h/week</span>
               )}
             </div>
           )}
           {profile?.growthEnabled && (
             <div className="flex flex-wrap items-center gap-1.5 text-xs">
-              <Badge variant="outline" className="gap-1">🌱 En développement</Badge>
+              <Badge variant="outline" className="gap-1">🌱 Growing</Badge>
               {profile.growthTargetSkills.length > 0 && (
                 <span className="text-muted-foreground">
                   → {profile.growthTargetSkills.join(", ")}

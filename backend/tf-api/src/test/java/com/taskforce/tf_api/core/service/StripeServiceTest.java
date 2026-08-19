@@ -9,6 +9,8 @@ import org.mockito.InjectMocks;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import com.taskforce.tf_api.core.enums.PlanType;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -88,6 +90,38 @@ class StripeServiceTest {
 
             // Then
             assertThat(result).isEqualTo("price_enterprise_mock");
+        }
+    }
+
+    @Nested
+    @DisplayName("Get Plan For Price ID (reverse) Tests")
+    class GetPlanForPriceIdTests {
+
+        @Test
+        @DisplayName("mappe un price-id distinct vers le bon forfait")
+        void getPlanForPriceId_distinct_mapsCorrectly() {
+            assertThat(stripeService.getPlanForPriceId("price_basic_mock")).isEqualTo(PlanType.BASIC);
+            assertThat(stripeService.getPlanForPriceId("price_business_mock")).isEqualTo(PlanType.BUSINESS);
+            assertThat(stripeService.getPlanForPriceId("price_enterprise_mock")).isEqualTo(PlanType.ENTERPRISE);
+        }
+
+        @Test
+        @DisplayName("renvoie null pour un price-id inconnu, null ou vide")
+        void getPlanForPriceId_unknownOrBlank_returnsNull() {
+            assertThat(stripeService.getPlanForPriceId("price_unknown")).isNull();
+            assertThat(stripeService.getPlanForPriceId(null)).isNull();
+            assertThat(stripeService.getPlanForPriceId("   ")).isNull();
+        }
+
+        @Test
+        @DisplayName("price-id AMBIGU (BASIC == BUSINESS) → null : pas de rétrogradation Business→Basic")
+        void getPlanForPriceId_ambiguous_returnsNull() {
+            // Mauvaise config : un même price-id partagé par Basic ET Business (cf. .env.dev réel).
+            ReflectionTestUtils.setField(stripeService, "businessPriceId", "price_basic_mock");
+
+            // Le reverse-mapping est ambigu → null (le webhook ne resynchronisera donc pas le plan, il
+            // gardera celui posé par checkout.session.completed via metadata).
+            assertThat(stripeService.getPlanForPriceId("price_basic_mock")).isNull();
         }
     }
 

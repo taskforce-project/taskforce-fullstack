@@ -34,6 +34,11 @@ spring:
     clean-disabled: false
     validate-on-migrate: false
     baseline-on-migrate: true
+    # PC-026 : les seeds de dev (V17/V18/V31/V40 — mots de passe en clair, comptes QA) vivent dans
+    # `db/seed`, chargé UNIQUEMENT ici (dev). La base `application.yml` ne liste que `db/migration` →
+    # ni la prod ni le profil `it` (tests d'intégration) ne voient les seeds. Flyway ignore sans erreur
+    # les versions absentes sur une base neuve (V17/18/31/40 simplement non appliquées hors dev).
+    locations: classpath:db/migration,classpath:db/seed
 
   # Pas de bloc `security.oauth2` ici, volontairement.
   #  - Resource server : le décodeur JWT est fourni EXPLICITEMENT par SecurityConfig.jwtDecoder()

@@ -58,13 +58,13 @@ export default function ProjectPageDetailPage() {
       <Empty>
         <EmptyHeader>
           <EmptyMedia variant="icon"><FileText /></EmptyMedia>
-          <EmptyTitle>Page introuvable</EmptyTitle>
-          <EmptyDescription>Cette page n&apos;existe pas ou a été supprimée.</EmptyDescription>
+          <EmptyTitle>Page not found</EmptyTitle>
+          <EmptyDescription>This page doesn&apos;t exist or has been deleted.</EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
           <Link href={`/${slug}/projects/${projectId}/pages`}>
             <Button variant="outline" size="sm" className="gap-2">
-              <ArrowLeft className="h-3.5 w-3.5" /> Retour aux pages
+              <ArrowLeft className="h-3.5 w-3.5" /> Back to pages
             </Button>
           </Link>
         </EmptyContent>

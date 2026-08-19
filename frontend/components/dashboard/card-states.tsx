@@ -17,7 +17,7 @@ export function CardSkeleton() {
 }
 
 /** État vide honnête, centré et gris (façon « Not enough data » de Cloudflare). */
-export function CardEmpty({ message = "Pas assez de données" }: { readonly message?: string }) {
+export function CardEmpty({ message = "Not enough data" }: { readonly message?: string }) {
   return (
     <div className="flex h-full items-center justify-center p-4 text-center">
       <p className="text-xs text-muted-foreground/60">{message}</p>
@@ -28,7 +28,7 @@ export function CardEmpty({ message = "Pas assez de données" }: { readonly mess
 /** Erreur de chargement : message court + réessai (jamais de spinner infini). */
 export function CardError({
   onRetry,
-  message = "Données indisponibles",
+  message = "Data unavailable",
 }: {
   readonly onRetry: () => void
   readonly message?: string
@@ -37,7 +37,7 @@ export function CardError({
     <div className="flex h-full flex-col items-center justify-center gap-2 p-4 text-center">
       <p className="text-xs text-muted-foreground">{message}</p>
       <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" onClick={onRetry}>
-        <RefreshCw className="size-3" /> Réessayer
+        <RefreshCw className="size-3" /> Retry
       </Button>
     </div>
   )

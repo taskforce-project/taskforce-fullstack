@@ -64,7 +64,7 @@ export function DashboardCardItem({
 
   const handleRange = async (value: string) => {
     const updated = await patchCard(slug, card.id, { timeRange: value })
-    if (!updated) toast.error("Impossible de changer la période")
+    if (!updated) toast.error("Couldn't change the period")
   }
 
   const handleSize = async (next: DashboardCardSize) => {

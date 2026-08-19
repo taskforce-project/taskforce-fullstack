@@ -39,22 +39,22 @@ const NODE_TYPES = [
 ] as const
 
 const DOMAINS: { value: string; code: string; label: string }[] = [
-  { value: "PROJET", code: "01", label: "Projet" },
-  { value: "PRODUIT", code: "02", label: "Produit" },
+  { value: "PROJET", code: "01", label: "Project" },
+  { value: "PRODUIT", code: "02", label: "Product" },
   { value: "ARCHITECTURE", code: "03", label: "Architecture" },
   { value: "ENGINEERING", code: "04", label: "Engineering" },
   { value: "API", code: "05", label: "API" },
   { value: "INFRA", code: "06", label: "Infrastructure" },
-  { value: "SECURITE", code: "07", label: "Sécurité" },
-  { value: "OPERATIONS", code: "08", label: "Opérations" },
+  { value: "SECURITE", code: "07", label: "Security" },
+  { value: "OPERATIONS", code: "08", label: "Operations" },
   { value: "AUDITS", code: "09", label: "Audits" },
   { value: "RUNBOOKS", code: "10", label: "Runbooks" },
-  { value: "PCA_PRA", code: "11", label: "PCA / PRA" },
-  { value: "DECISIONS", code: "12", label: "Décisions" },
+  { value: "PCA_PRA", code: "11", label: "BCP / DRP" },
+  { value: "DECISIONS", code: "12", label: "Decisions" },
   { value: "ROADMAP", code: "13", label: "Roadmap" },
   { value: "DESIGN", code: "14", label: "Design" },
-  { value: "UTILISATEUR", code: "15", label: "Utilisateur" },
-  { value: "HISTORIQUE", code: "16", label: "Historique" },
+  { value: "UTILISATEUR", code: "15", label: "User" },
+  { value: "HISTORIQUE", code: "16", label: "History" },
   { value: "ARCHIVE", code: "20", label: "Archive" },
 ]
 
@@ -138,7 +138,7 @@ export default function BrainPage() {
       {/* Header */}
       <div className="flex items-center justify-between border-b px-6 py-4">
         <div className="flex items-center gap-3">
-          <button onClick={() => setExplorerOpen((v) => !v)} aria-label="Afficher/masquer l'explorateur"
+          <button onClick={() => setExplorerOpen((v) => !v)} aria-label="Show/hide explorer"
             className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
             {explorerOpen ? <PanelLeftClose className="size-4" /> : <PanelLeftOpen className="size-4" />}
           </button>
@@ -149,7 +149,7 @@ export default function BrainPage() {
             <h1 className="text-lg font-semibold leading-none">Brain OS</h1>
             <p className="mt-1 text-xs text-muted-foreground">
               {overview?.totalNodes ?? 0} nodes
-              {overview?.templateType ? ` · gabarit ${overview.templateType}` : ""}
+              {overview?.templateType ? ` · template ${overview.templateType}` : ""}
               {overview?.versionLabel ? ` · ${overview.versionLabel}` : ""}
             </p>
           </div>
@@ -162,7 +162,7 @@ export default function BrainPage() {
                 view === "editor" ? "bg-accent font-medium" : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              <FileText className="size-3.5" /> Éditeur
+              <FileText className="size-3.5" /> Editor
             </button>
             <button
               onClick={() => setView("graph")}
@@ -170,11 +170,11 @@ export default function BrainPage() {
                 view === "graph" ? "bg-accent font-medium" : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              <Network className="size-3.5" /> Graphe
+              <Network className="size-3.5" /> Graph
             </button>
           </div>
           <Button size="sm" onClick={() => setCreateOpen(true)}>
-            <Plus className="size-4" /> Nouveau node
+            <Plus className="size-4" /> New node
           </Button>
         </div>
       </div>
@@ -200,11 +200,11 @@ export default function BrainPage() {
                   if (e.key === "Enter") runSearch()
                   if (e.key === "Escape") onClearSearch()
                 }}
-                placeholder="Rechercher…"
+                placeholder="Search…"
                 className="pl-8 pr-8"
               />
               {(queryText || searchResults) && (
-                <button onClick={onClearSearch} aria-label="Effacer la recherche"
+                <button onClick={onClearSearch} aria-label="Clear search"
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                   <X className="size-4" />
                 </button>
@@ -219,7 +219,7 @@ export default function BrainPage() {
                 <div>
                   <div className="mb-1 flex items-center gap-1.5 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                     <Sparkles className="size-3" />
-                    {searching ? "Recherche…" : `${searchResults.length} résultat(s)`}
+                    {searching ? "Searching…" : `${searchResults.length} result(s)`}
                   </div>
                   {searchResults.map((hit) => (
                     <button key={hit.node.id} onClick={() => { selectNode(hit.node.id); setView("editor") }}
@@ -234,7 +234,7 @@ export default function BrainPage() {
                     </button>
                   ))}
                   {!searching && searchResults.length === 0 && (
-                    <p className="px-2 py-4 text-center text-xs text-muted-foreground">Aucun résultat.</p>
+                    <p className="px-2 py-4 text-center text-xs text-muted-foreground">No results.</p>
                   )}
                 </div>
               ) : loading && !overview ? (
@@ -246,7 +246,7 @@ export default function BrainPage() {
                   {activeTag && (
                     <button onClick={() => setActiveTag(null)}
                       className="mb-1 flex w-full items-center gap-1 px-2 py-1 text-xs text-primary hover:underline">
-                      <X className="size-3" /> Filtre #{activeTag}
+                      <X className="size-3" /> Filter #{activeTag}
                     </button>
                   )}
                   {/* Arborescence : tous les dossiers (domaines) visibles, même vides */}
@@ -308,7 +308,7 @@ export default function BrainPage() {
                     <button onClick={() => setShowSystem((v) => !v)}
                       className="flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground">
                       {showSystem ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
-                      {showSystem ? "Masquer le noyau" : "Afficher le noyau (règles agent)"}
+                      {showSystem ? "Hide the core" : "Show the core (agent rules)"}
                     </button>
                   </div>
                 </>
@@ -344,23 +344,23 @@ export default function BrainPage() {
               </div>
               {(overview?.totalNodes ?? 0) === 0 ? (
                 <div className="max-w-sm space-y-2">
-                  <p className="text-base font-semibold">Votre Brain est prêt</p>
+                  <p className="text-base font-semibold">Your Brain is ready</p>
                   <p className="text-sm text-muted-foreground">
-                    Les dossiers à gauche sont l&apos;architecture de base. Les notes se créent et se classent
-                    automatiquement au fil de vos projets — ou ajoutez-en une à la main.
+                    The folders on the left are the base architecture. Notes are created and organized
+                    automatically as your projects progress — or add one manually.
                   </p>
                 </div>
               ) : (
                 <p className="max-w-sm text-sm text-muted-foreground">
-                  Sélectionnez une note dans l&apos;explorateur pour la lire ou l&apos;éditer.
+                  Select a note in the explorer to read or edit it.
                 </p>
               )}
               <div className="flex gap-5 rounded-xl border bg-muted/20 px-5 py-3">
                 {[
                   { k: "Notes", v: overview?.totalNodes ?? 0 },
-                  { k: "Liens", v: overview?.edges?.length ?? 0 },
+                  { k: "Links", v: overview?.edges?.length ?? 0 },
                   { k: "Tags", v: tagCounts.length },
-                  { k: "Domaines", v: Object.keys(overview?.nodesByDomain ?? {}).length },
+                  { k: "Domains", v: Object.keys(overview?.nodesByDomain ?? {}).length },
                 ].map((s) => (
                   <div key={s.k} className="min-w-12 text-center">
                     <div className="text-lg font-semibold tabular-nums">{s.v}</div>
@@ -369,7 +369,7 @@ export default function BrainPage() {
                 ))}
               </div>
               <Button size="sm" variant="outline" onClick={() => setCreateOpen(true)}>
-                <Plus className="size-4" /> Nouvelle note
+                <Plus className="size-4" /> New note
               </Button>
             </div>
           )}
@@ -425,7 +425,7 @@ function PlanetHeader({ node }: { node: KnowledgeNode }) {
         })}
         {tags.length === 0 && (
           <text x={cx} y={cy + 56} textAnchor="middle" fontSize="9" fill="currentColor" fillOpacity="0.5">
-            aucune lune — ajoute des #tags pour relier cette planète
+            no moons — add #tags to link this planet
           </text>
         )}
       </svg>
@@ -481,21 +481,21 @@ function NodeDetail({
           {editing ? (
             <>
               <Button size="sm" variant="ghost" onClick={() => setEditing(false)} disabled={saving}>
-                <X className="size-4" /> Annuler
+                <X className="size-4" /> Cancel
               </Button>
               <Button size="sm" onClick={save} disabled={saving}>
-                <Save className="size-4" /> Enregistrer
+                <Save className="size-4" /> Save
               </Button>
             </>
           ) : (
             <>
               <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
-                Éditer
+                Edit
               </Button>
               <DeleteConfirmDialog
-                title="Supprimer cette note ?"
-                description={`« ${node.title} » sera définitivement supprimée, ainsi que ses liens. Cette action est irréversible.`}
-                confirmLabel="Supprimer"
+                title="Delete this note?"
+                description={`"${node.title}" will be permanently deleted, along with its links. This action cannot be undone.`}
+                confirmLabel="Delete"
                 onConfirm={() => { void onDelete() }}
               >
                 <Button size="sm" variant="ghost" className="text-destructive">
@@ -537,12 +537,12 @@ function NodeDetail({
               {node.content ? (
                 <Markdown content={node.content} onWikiLink={openWikiLink} className="space-y-3 text-sm leading-relaxed text-foreground/90" />
               ) : (
-                <p className="text-sm italic text-muted-foreground">Node vide.</p>
+                <p className="text-sm italic text-muted-foreground">Empty node.</p>
               )}
               <p className="mt-8 text-xs text-muted-foreground">
-                Mis à jour le {new Date(node.updatedAt).toLocaleString()} · astuce :{" "}
-                <code className="rounded bg-muted px-1">[[Titre d&apos;une note]]</code> pour lier,{" "}
-                <code className="rounded bg-muted px-1">#tag</code> pour classer.
+                Updated {new Date(node.updatedAt).toLocaleString()} · tip:{" "}
+                <code className="rounded bg-muted px-1">[[Note title]]</code> to link,{" "}
+                <code className="rounded bg-muted px-1">#tag</code> to categorize.
               </p>
               <RelationsPanel node={node} />
             </>
@@ -571,9 +571,9 @@ function RelationsPanel({ node }: { node: KnowledgeNode }) {
       </h3>
       {related.length === 0 ? (
         <p className="text-xs text-muted-foreground">
-          Aucun lien. Les relations se tissent automatiquement via les{" "}
-          <span className="font-medium text-primary">#tags</span> et les{" "}
-          <code className="rounded bg-muted px-1">[[wikilinks]]</code> du contenu.
+          No links. Relations form automatically through{" "}
+          <span className="font-medium text-primary">#tags</span> and{" "}
+          <code className="rounded bg-muted px-1">[[wikilinks]]</code> in the content.
         </p>
       ) : (
         <ul className="space-y-0.5">
@@ -639,7 +639,7 @@ function CreateNodeDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Nouveau node</DialogTitle>
+          <DialogTitle>New node</DialogTitle>
         </DialogHeader>
         <div className="mt-2 space-y-3">
           <div className="grid grid-cols-2 gap-3">
@@ -655,7 +655,7 @@ function CreateNodeDialog({
               </Select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-muted-foreground">Domaine</label>
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">Domain</label>
               <Select value={domain} onValueChange={setDomain}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -667,18 +667,18 @@ function CreateNodeDialog({
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-muted-foreground">Titre</label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex. ADR-002 — Choix du cache" />
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">Title</label>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. ADR-002 — Cache choice" />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-muted-foreground">Contenu (markdown)</label>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">Content (markdown)</label>
             <Textarea value={content} onChange={(e) => setContent(e.target.value)} rows={8} className="font-mono text-sm" />
           </div>
         </div>
         <div className="mt-4 flex justify-end gap-2">
-          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>Annuler</Button>
+          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>Cancel</Button>
           <Button onClick={submit} disabled={saving || !title.trim()}>
-            {saving ? "Création…" : "Créer"}
+            {saving ? "Creating…" : "Create"}
           </Button>
         </div>
       </DialogContent>

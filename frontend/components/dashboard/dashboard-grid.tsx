@@ -94,7 +94,7 @@ export function DashboardGrid({ slug, cards, globalRange, refreshToken, onAddCar
     next.splice(from, 1)
     next.splice(to, 0, Number(active.id))
     void reorderCards(slug, next).then((ok) => {
-      if (!ok) toast.error("Impossible de réordonner les cartes")
+      if (!ok) toast.error("Couldn't reorder the cards")
     })
   }
 
@@ -119,7 +119,7 @@ export function DashboardGrid({ slug, cards, globalRange, refreshToken, onAddCar
             key={`ghost-${i}`}
             type="button"
             onClick={onAddCard}
-            aria-label="Ajouter une carte"
+            aria-label="Add a card"
             className="flex min-h-[230px] items-center justify-center rounded-xl border border-dashed border-border text-muted-foreground/50 transition-colors hover:border-primary/40 hover:bg-muted/30 hover:text-primary"
           >
             <Plus className="size-5" />

@@ -5,6 +5,7 @@
 
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from "axios";
 import { toast } from "sonner";
+import { API_URL, API_URL_SSR } from "@/lib/config/urls";
 
 /**
  * Extension de la config Axios : `silentError` supprime le toast global (réseau/5xx).
@@ -18,19 +19,17 @@ declare module "axios" {
 }
 
 /**
- * API URL configuration
- * - SSR (serveur Next.js): utilise NEXT_PUBLIC_API_URL_SSR ou backend:8080 (réseau Docker)
- * - CSR (navigateur): utilise NEXT_PUBLIC_API_URL ou localhost:8080 (hôte)
+ * URL de base de l'API (origines dérivées d'un domaine unique dans `lib/config/urls.ts`) :
+ * - SSR (serveur Next) : `API_URL_SSR` — nom de service Docker en mono-hôte, URL publique en multi-VM.
+ * - CSR (navigateur) : `API_URL` — hôte public (prod) ou localhost (dev).
  */
-const API_URL = globalThis.window === undefined 
-  ? (process.env.NEXT_PUBLIC_API_URL_SSR || "http://backend:8080") // Server-side
-  : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080");  // Client-side
+const BASE_URL = globalThis.window === undefined ? API_URL_SSR : API_URL;
 
 /**
  * Instance Axios configurée pour les appels API
  */
 export const apiClient: AxiosInstance = axios.create({
-  baseURL: API_URL,
+  baseURL: BASE_URL,
   headers: {
     "Content-Type": "application/json",
   },

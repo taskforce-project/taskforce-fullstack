@@ -18,9 +18,9 @@ import type { AnalysisDepth, StoredBrief, StoredPriority } from "@/lib/api/analy
 import type { DecisionSnapshot } from "@/lib/api/analytics-service"
 
 const LEVEL: Record<StoredPriority["level"], { label: string; cls: string }> = {
-  HIGH:   { label: "Haute",   cls: "text-rose-500 border-rose-500/30 bg-rose-500/10" },
-  MEDIUM: { label: "Moyenne", cls: "text-amber-500 border-amber-500/30 bg-amber-500/10" },
-  LOW:    { label: "Basse",   cls: "text-blue-500 border-blue-500/30 bg-blue-500/10" },
+  HIGH:   { label: "High",   cls: "text-rose-500 border-rose-500/30 bg-rose-500/10" },
+  MEDIUM: { label: "Medium", cls: "text-amber-500 border-amber-500/30 bg-amber-500/10" },
+  LOW:    { label: "Low",    cls: "text-blue-500 border-blue-500/30 bg-blue-500/10" },
 }
 
 function Chip({ label, value, alert = false }: Readonly<{ label: string; value: number; alert?: boolean }>) {
@@ -39,11 +39,11 @@ function SnapshotRow({ s }: Readonly<{ s: DecisionSnapshot }>) {
   return (
     <div className="flex flex-wrap gap-1.5">
       <Chip label="issues" value={s.total} />
-      <Chip label="ouvertes" value={s.open} />
-      <Chip label="en cours" value={s.inProgress} />
-      <Chip label="terminées" value={s.completed} />
-      <Chip label="en retard" value={s.overdue} alert />
-      <Chip label="échéance ≤7j" value={s.dueSoon} alert />
+      <Chip label="open" value={s.open} />
+      <Chip label="in progress" value={s.inProgress} />
+      <Chip label="done" value={s.completed} />
+      <Chip label="overdue" value={s.overdue} alert />
+      <Chip label="due ≤7d" value={s.dueSoon} alert />
     </div>
   )
 }
@@ -78,10 +78,10 @@ function PriorityEditor({
       />
       <div className="mt-1.5 flex gap-1.5">
         <Button size="sm" className="h-7 gap-1 text-xs" onClick={save} disabled={!title.trim() || saving}>
-          {saving ? <Loader2 className="size-3 animate-spin" /> : <Check className="size-3" />} Enregistrer
+          {saving ? <Loader2 className="size-3 animate-spin" /> : <Check className="size-3" />} Save
         </Button>
         <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs" onClick={onCancel} disabled={saving}>
-          <X className="size-3" /> Annuler
+          <X className="size-3" /> Cancel
         </Button>
       </div>
     </div>
@@ -127,7 +127,7 @@ function PriorityCard({
           priority={priority}
           onCancel={() => setEditing(false)}
           onSave={async (title, rationale) => {
-            await run(() => editPriority(slug, projectId, priority.id, { title, rationale }), "Édition impossible")
+            await run(() => editPriority(slug, projectId, priority.id, { title, rationale }), "Edit failed")
             setEditing(false)
           }}
         />
@@ -141,7 +141,7 @@ function PriorityCard({
               href={`/${slug}/projects/${projectId}?issue=${priority.issueId}`}
               className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-emerald-500 hover:underline"
             >
-              <Check className="size-3" /> {priority.issueIdentifier ?? "Issue créée"}
+              <Check className="size-3" /> {priority.issueIdentifier ?? "Issue created"}
               <ExternalLink className="size-3" />
             </Link>
           )}
@@ -153,11 +153,11 @@ function PriorityCard({
           {dismissed ? (
             <button
               type="button" disabled={busy}
-              onClick={() => run(() => dismissPriority(slug, projectId, priority.id), "Action impossible")}
+              onClick={() => run(() => dismissPriority(slug, projectId, priority.id), "Action failed")}
               className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
-              title="Réactiver la priorité"
+              title="Reactivate priority"
             >
-              <Undo2 className="size-3" /> Restaurer
+              <Undo2 className="size-3" /> Restore
             </button>
           ) : (
             <>
@@ -166,29 +166,29 @@ function PriorityCard({
                 disabled={busy}
                 onClick={() => run(
                   () => accept(slug, projectId, priority.id).then((p) => { if (!p) throw new Error() }),
-                  "Création de l'issue échouée", "Issue créée dans le projet",
+                  "Failed to create issue", "Issue created in the project",
                 )}
               >
                 {busy ? <Loader2 className="size-3 animate-spin" /> : <Plus className="size-3" />}
-                Créer l&apos;issue
+                Create issue
               </Button>
               <button
-                type="button" disabled={busy} title={pinned ? "Détacher" : "Épingler"}
-                onClick={() => run(() => pin(slug, projectId, priority.id), "Action impossible")}
+                type="button" disabled={busy} title={pinned ? "Unpin" : "Pin"}
+                onClick={() => run(() => pin(slug, projectId, priority.id), "Action failed")}
                 className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
               >
                 {pinned ? <PinOff className="size-3.5" /> : <Pin className="size-3.5" />}
               </button>
               <button
-                type="button" disabled={busy} title="Éditer"
+                type="button" disabled={busy} title="Edit"
                 onClick={() => setEditing(true)}
                 className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
               >
                 <Pencil className="size-3.5" />
               </button>
               <button
-                type="button" disabled={busy} title="Écarter"
-                onClick={() => run(() => dismissPriority(slug, projectId, priority.id), "Action impossible")}
+                type="button" disabled={busy} title="Dismiss"
+                onClick={() => run(() => dismissPriority(slug, projectId, priority.id), "Action failed")}
                 className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-rose-500"
               >
                 <X className="size-3.5" />
@@ -236,7 +236,7 @@ export function DecisionBoard({
     const job = await launch(slug, projectId, depth)
     setLaunching(false)
     if (!job) {
-      toast.error("Impossible de lancer l'analyse")
+      toast.error("Could not start the analysis")
       return
     }
     openWorkflowPanel()
@@ -253,9 +253,9 @@ export function DecisionBoard({
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h3 className="text-sm font-semibold text-foreground">Décision du jour</h3>
+              <h3 className="text-sm font-semibold text-foreground">Today&apos;s decision</h3>
               {brief?.mode === "fallback" && (
-                <Badge variant="secondary" className="text-[10px]">métriques seules</Badge>
+                <Badge variant="secondary" className="text-[10px]">metrics only</Badge>
               )}
             </div>
             <p className="truncate text-xs text-muted-foreground">{projectName}</p>
@@ -266,8 +266,8 @@ export function DecisionBoard({
           {/* Rapide (8B) ou approfondi (14B + raisonnement, peut poser une question). */}
           <div className="flex rounded-lg border border-border bg-background p-0.5">
             {([
-              { value: "QUICK", label: "Rapide", Icon: Zap, hint: "8B — quelques secondes" },
-              { value: "DEEP", label: "Approfondi", Icon: BrainCircuit, hint: "14B + raisonnement — peut poser une question" },
+              { value: "QUICK", label: "Quick", Icon: Zap, hint: "8B — a few seconds" },
+              { value: "DEEP", label: "Deep", Icon: BrainCircuit, hint: "14B + reasoning — may ask a question" },
             ] as const).map((option) => (
               <button
                 key={option.value}
@@ -287,8 +287,8 @@ export function DecisionBoard({
           <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={analyse} disabled={busy}>
             {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
             {(() => {
-              if (runningJob) return "Analyse en cours…"
-              return brief ? "Ré-analyser" : "Analyser"
+              if (runningJob) return "Analyzing…"
+              return brief ? "Re-analyze" : "Analyze"
             })()}
           </Button>
         </div>
@@ -302,16 +302,16 @@ export function DecisionBoard({
         >
           <Loader2 className="size-3.5 shrink-0 animate-spin text-blue-500" />
           {runningJob.status === "WAITING_FOR_INPUT"
-            ? "L'IA attend une précision de ta part — ouvrir le workflow"
-            : "Analyse en cours — suivre les étapes dans le dock"}
+            ? "The AI needs a clarification from you — open the workflow"
+            : "Analysis running — follow the steps in the dock"}
         </button>
       )}
 
       {!brief && !runningJob && (
         <p className="mt-3 text-xs text-muted-foreground">
-          L&apos;IA lit les métriques réelles du projet + le Brain OS, puis propose la situation, les risques et
-          les <span className="font-medium text-foreground">3 priorités</span> de demain — que tu peux transformer en issues d&apos;un clic.
-          L&apos;analyse tourne en arrière-plan : tu peux quitter la page.
+          The AI reads the project&apos;s real metrics + the Brain OS, then lays out the situation, the risks, and
+          tomorrow&apos;s <span className="font-medium text-foreground">3 priorities</span> — which you can turn into issues in one click.
+          The analysis runs in the background: you can leave the page.
         </p>
       )}
 
@@ -328,7 +328,7 @@ export function DecisionBoard({
           {brief.risks.length > 0 && (
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                <AlertTriangle className="size-3.5 text-amber-500" /> Risques
+                <AlertTriangle className="size-3.5 text-amber-500" /> Risks
               </div>
               <ul className="flex flex-col gap-1">
                 {brief.risks.map((risk) => (
@@ -341,7 +341,7 @@ export function DecisionBoard({
           )}
 
           <div className="flex flex-col gap-2">
-            <span className="text-xs font-medium text-muted-foreground">Les 3 priorités de demain</span>
+            <span className="text-xs font-medium text-muted-foreground">Tomorrow&apos;s 3 priorities</span>
             {brief.priorities.map((priority) => (
               <PriorityCard key={priority.id} slug={slug} projectId={projectId} priority={priority} />
             ))}

@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { cn } from "@/lib/utils"
+import { usePreferencesStore } from "@/lib/store/preferences-store"
 
 interface AppFooterProps {
   /**
@@ -22,6 +23,7 @@ interface AppFooterProps {
  * il occupe la dernière bande de la grille.
  */
 export function AppFooter({ bleed = true }: AppFooterProps) {
+  const { t } = usePreferencesStore()
   const year = new Date().getFullYear()
   const version = process.env.NEXT_PUBLIC_APP_VERSION ?? "v1.0"
 
@@ -34,8 +36,8 @@ export function AppFooter({ bleed = true }: AppFooterProps) {
     >
       <span className="truncate">© {year} TaskForce · {version}</span>
       <nav className="flex shrink-0 items-center gap-4">
-        <Link href="/privacy-policy" className="transition-colors hover:text-foreground">Confidentialité</Link>
-        <Link href="/legal-notices" className="transition-colors hover:text-foreground">Mentions légales</Link>
+        <Link href="/privacy-policy" className="transition-colors hover:text-foreground">{t.shell.privacy}</Link>
+        <Link href="/legal-notices" className="transition-colors hover:text-foreground">{t.shell.legalNotices}</Link>
       </nav>
     </footer>
   )

@@ -54,10 +54,10 @@ import type { ProjectStatus } from "@/lib/api/project-service"
 // ---------------------------------------------------------------------------
 
 const SECTIONS = [
-  { key: "general",      label: "Général",      icon: Settings },
-  { key: "members",      label: "Membres",      icon: Users },
+  { key: "general",      label: "General",      icon: Settings },
+  { key: "members",      label: "Members",      icon: Users },
   { key: "labels",       label: "Labels",       icon: Tag },
-  { key: "integrations", label: "Intégrations", icon: GitBranch },
+  { key: "integrations", label: "Integrations", icon: GitBranch },
 ] as const
 
 // ---------------------------------------------------------------------------
@@ -141,25 +141,25 @@ export default function ProjectSettingsPage() {
     const result = await updateProject(workspace, projectId, { name, description, status, growthMode })
     setIsSaving(false)
     if (result) {
-      toast.success("Paramètres sauvegardés", { description: "Les modifications ont été appliquées." })
+      toast.success("Settings saved", { description: "Your changes have been applied." })
     } else {
-      toast.error("Erreur lors de la sauvegarde")
+      toast.error("Error while saving")
     }
   }
 
   async function handleArchive() {
     const result = await archiveProject(workspace, projectId)
     if (result) {
-      toast.warning("Projet archivé")
+      toast.warning("Project archived")
     } else {
-      toast.error("Erreur lors de l'archivage")
+      toast.error("Error while archiving")
     }
   }
 
   async function handleDelete() {
     if (deleteConfirm !== activeProject!.name) return
     await deleteProject(workspace, projectId)
-    toast.error("Projet supprimé", { description: `${activeProject!.name} a été supprimé.` })
+    toast.error("Project deleted", { description: `${activeProject!.name} has been deleted.` })
     setDeleteOpen(false)
     router.push(`/${workspace}/projects`)
   }
@@ -176,7 +176,7 @@ export default function ProjectSettingsPage() {
     setNewLabelColor("#6366f1")
     setNewLabelDesc("")
     setAddingLabel(false)
-    toast.success("Label créé")
+    toast.success("Label created")
   }
 
   function startEditLabel(l: typeof projectLabels[0]) {
@@ -189,12 +189,12 @@ export default function ProjectSettingsPage() {
   async function handleSaveEditLabel(labelId: number) {
     await editLabel(workspace, projectId, labelId, { name: editLabelName.trim() || undefined, color: editLabelColor || undefined, description: editLabelDesc.trim() || undefined })
     setEditingLabelId(null)
-    toast.success("Label modifié")
+    toast.success("Label updated")
   }
 
   async function handleDeleteLabel(labelId: number) {
     await removeLabel(workspace, projectId, labelId)
-    toast.success("Label supprimé")
+    toast.success("Label deleted")
   }
 
   return (
@@ -224,7 +224,7 @@ export default function ProjectSettingsPage() {
               section === "danger" ? "bg-red-500/10 font-medium text-red-400" : "text-muted-foreground hover:bg-red-500/5 hover:text-red-400",
             )}
           >
-            <AlertTriangle className="size-4 shrink-0" /> Zone de danger
+            <AlertTriangle className="size-4 shrink-0" /> Danger zone
           </button>
         </nav>
       </aside>
@@ -251,15 +251,15 @@ export default function ProjectSettingsPage() {
       {/* ── General ── */}
       {section === "general" && (
       <section>
-        <SectionTitle icon={Settings} title="Général" description="Informations générales du projet" />
+        <SectionTitle icon={Settings} title="General" description="General project information" />
         <form onSubmit={handleSaveGeneral} className="flex flex-col gap-4">
           <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-4">
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="project-name" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Nom du projet</label>
-              <Input id="project-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Mon projet" />
+              <label htmlFor="project-name" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Project name</label>
+              <Input id="project-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="My project" />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="project-identifier" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Identifiant</label>
+              <label htmlFor="project-identifier" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Identifier</label>
               <Input
                 id="project-identifier"
                 value={activeProject.identifier}
@@ -278,12 +278,12 @@ export default function ProjectSettingsPage() {
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
-              placeholder="Description du projet..."
+              placeholder="Project description..."
             />
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Statut</p>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Status</p>
             <Select value={status} onValueChange={(v) => setStatus(v as ProjectStatus)}>
               <SelectTrigger className="w-48">
                 <SelectValue />
@@ -291,17 +291,17 @@ export default function ProjectSettingsPage() {
               <SelectContent>
                 <SelectItem value="ACTIVE">
                   <span className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block" />Actif
+                    <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block" />Active
                   </span>
                 </SelectItem>
                 <SelectItem value="PAUSED">
                   <span className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-amber-500 inline-block" />En pause
+                    <span className="h-2 w-2 rounded-full bg-amber-500 inline-block" />Paused
                   </span>
                 </SelectItem>
                 <SelectItem value="ARCHIVED">
                   <span className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-muted-foreground inline-block" />Archivé
+                    <span className="h-2 w-2 rounded-full bg-muted-foreground inline-block" />Archived
                   </span>
                 </SelectItem>
               </SelectContent>
@@ -311,10 +311,10 @@ export default function ProjectSettingsPage() {
           {/* Mode montée en compétence (PROD-1.8 Phase 3) */}
           <div className="flex items-start justify-between gap-4 rounded-lg border border-border p-3">
             <div className="min-w-0">
-              <p className="text-sm font-medium text-foreground">🌱 Mode montée en compétence</p>
+              <p className="text-sm font-medium text-foreground">🌱 Skill growth mode</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Le Smart Assign peut proposer une tâche un cran au-dessus de l&apos;habitude d&apos;un membre
-                (jamais sur l&apos;urgent, seulement si capacité dispo). Bonus borné — n&apos;écrase pas le meilleur fit.
+                Smart Assign can suggest a task a notch above a member&apos;s usual level
+                (never on urgent work, only when capacity is available). Bounded bonus — it won&apos;t override the best fit.
               </p>
             </div>
             <Switch checked={growthMode} onCheckedChange={setGrowthMode} />
@@ -323,7 +323,7 @@ export default function ProjectSettingsPage() {
           <div className="flex justify-end">
             <Button type="submit" size="sm" className="gap-2" disabled={isSaving}>
               {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-              Sauvegarder
+              Save
             </Button>
           </div>
         </form>
@@ -334,14 +334,14 @@ export default function ProjectSettingsPage() {
       {section === "members" && (
       <section>
         <div className="flex items-start justify-between gap-4">
-          <SectionTitle icon={Users} title="Membres" description="Gérer les accès au projet" />
+          <SectionTitle icon={Users} title="Members" description="Manage project access" />
           <Button
             variant="outline"
             size="sm"
             className="shrink-0 gap-1.5"
             onClick={() => router.push(`/${workspace}/projects/${projectId}/members`)}
           >
-            <Users className="h-3.5 w-3.5" /> Gérer les membres
+            <Users className="h-3.5 w-3.5" /> Manage members
           </Button>
         </div>
         <div className="flex flex-col gap-2">
@@ -360,7 +360,7 @@ export default function ProjectSettingsPage() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium leading-none">
                     {m.displayName ?? m.email}
-                    {isMe && <span className="text-muted-foreground font-normal ml-1">(vous)</span>}
+                    {isMe && <span className="text-muted-foreground font-normal ml-1">(you)</span>}
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">{m.email}</p>
                 </div>
@@ -375,10 +375,10 @@ export default function ProjectSettingsPage() {
       {/* ── Labels ── */}
       {section === "labels" && (
       <section>
-        <SectionTitle icon={Tag} title="Labels" description="Labels personnalisés pour catégoriser les issues" />
+        <SectionTitle icon={Tag} title="Labels" description="Custom labels to categorize issues" />
         <div className="flex flex-col gap-2">
           {projectLabels.length === 0 && (
-            <p className="text-xs text-muted-foreground italic py-2">Aucun label — ajoutez-en ci-dessous.</p>
+            <p className="text-xs text-muted-foreground italic py-2">No labels — add one below.</p>
           )}
           {projectLabels.map((l) => editingLabelId === l.id ? (
             <div key={l.id} className="flex items-center gap-2 py-2 px-3 rounded-lg border border-border bg-card">
@@ -387,24 +387,24 @@ export default function ProjectSettingsPage() {
                 value={editLabelColor}
                 onChange={(e) => setEditLabelColor(e.target.value)}
                 className="h-7 w-7 rounded cursor-pointer border border-border bg-transparent p-0.5"
-                title="Couleur"
+                title="Color"
               />
               <Input
                 value={editLabelName}
                 onChange={(e) => setEditLabelName(e.target.value)}
                 className="h-7 text-xs flex-1"
-                placeholder="Nom"
+                placeholder="Name"
               />
               <Input
                 value={editLabelDesc}
                 onChange={(e) => setEditLabelDesc(e.target.value)}
                 className="h-7 text-xs flex-1"
-                placeholder="Description (optionnel)"
+                placeholder="Description (optional)"
               />
-              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleSaveEditLabel(l.id)} title="Sauvegarder">
+              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleSaveEditLabel(l.id)} title="Save">
                 <Check className="h-3.5 w-3.5 text-emerald-400" />
               </Button>
-              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setEditingLabelId(null)} title="Annuler">
+              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setEditingLabelId(null)} title="Cancel">
                 <X className="h-3.5 w-3.5 text-muted-foreground" />
               </Button>
             </div>
@@ -421,7 +421,7 @@ export default function ProjectSettingsPage() {
                 {l.name}
               </span>
               <span className="text-xs text-muted-foreground flex-1 truncate">{l.description}</span>
-              <Button size="sm" variant="ghost" className="h-7 w-7 p-0 shrink-0" onClick={() => startEditLabel(l)} title="Modifier">
+              <Button size="sm" variant="ghost" className="h-7 w-7 p-0 shrink-0" onClick={() => startEditLabel(l)} title="Edit">
                 <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
               </Button>
               <Button
@@ -429,7 +429,7 @@ export default function ProjectSettingsPage() {
                 variant="ghost"
                 className="h-7 w-7 p-0 shrink-0 hover:text-red-400"
                 onClick={() => handleDeleteLabel(l.id)}
-                title="Supprimer"
+                title="Delete"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </Button>
@@ -443,24 +443,24 @@ export default function ProjectSettingsPage() {
               value={newLabelColor}
               onChange={(e) => setNewLabelColor(e.target.value)}
               className="h-7 w-7 rounded cursor-pointer border border-border bg-transparent p-0.5 shrink-0"
-              title="Couleur"
+              title="Color"
             />
             <Input
               value={newLabelName}
               onChange={(e) => setNewLabelName(e.target.value)}
               className="h-7 text-xs flex-1"
-              placeholder="Nom du label"
+              placeholder="Label name"
               required
             />
             <Input
               value={newLabelDesc}
               onChange={(e) => setNewLabelDesc(e.target.value)}
               className="h-7 text-xs flex-1"
-              placeholder="Description (optionnel)"
+              placeholder="Description (optional)"
             />
             <Button type="submit" size="sm" className="h-7 text-xs shrink-0 gap-1.5" disabled={addingLabel || !newLabelName.trim()}>
               {addingLabel ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
-              Ajouter
+              Add
             </Button>
           </form>
         </div>
@@ -470,7 +470,7 @@ export default function ProjectSettingsPage() {
       {/* ── Integrations → gérées au niveau workspace ── */}
       {section === "integrations" && (
       <section>
-        <SectionTitle icon={GitBranch} title="Intégrations" description="Gérées une fois pour tout le workspace" />
+        <SectionTitle icon={GitBranch} title="Integrations" description="Managed once for the whole workspace" />
         <div className="flex flex-col items-start gap-4 rounded-xl border border-border bg-card p-5">
           <div className="flex items-center gap-2">
             {["github", "slack", "linear", "notion", "figma"].map((k) => (
@@ -478,13 +478,13 @@ export default function ProjectSettingsPage() {
                 <BrandLogo slug={k} name={k} className="size-full" />
               </div>
             ))}
-            <span className="ml-1 text-xs text-muted-foreground">+40 autres</span>
+            <span className="ml-1 text-xs text-muted-foreground">+40 others</span>
           </div>
           <p className="text-sm text-muted-foreground">
-            GitHub, Slack et tous les connecteurs se branchent au niveau du <span className="font-medium text-foreground">workspace</span>, puis s&apos;appliquent à ce projet — un seul endroit à gérer.
+            GitHub, Slack and all connectors plug in at the <span className="font-medium text-foreground">workspace</span> level, then apply to this project — a single place to manage.
           </p>
           <Button className="gap-2" onClick={() => openSettings("integrations")}>
-            <Plug className="size-4" /> Gérer les intégrations
+            <Plug className="size-4" /> Manage integrations
           </Button>
         </div>
       </section>
@@ -497,7 +497,7 @@ export default function ProjectSettingsPage() {
           <div className="px-4 py-3 border-b border-red-500/20">
             <div className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-red-400" />
-              <h2 className="text-sm font-semibold text-red-400">Zone de danger</h2>
+              <h2 className="text-sm font-semibold text-red-400">Danger zone</h2>
             </div>
           </div>
           <div className="p-4 flex flex-col gap-4">
@@ -505,8 +505,8 @@ export default function ProjectSettingsPage() {
             {/* Archive */}
             <div className="flex items-center justify-between gap-4">
               <div>
-                <p className="text-sm font-medium text-foreground">Archiver ce projet</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Le projet sera masqué mais les données conservées.</p>
+                <p className="text-sm font-medium text-foreground">Archive this project</p>
+                <p className="text-xs text-muted-foreground mt-0.5">The project will be hidden but its data kept.</p>
               </div>
               <Button
                 variant="outline"
@@ -515,7 +515,7 @@ export default function ProjectSettingsPage() {
                 onClick={handleArchive}
               >
                 <Archive className="h-3.5 w-3.5" />
-                Archiver
+                Archive
               </Button>
             </div>
 
@@ -524,24 +524,24 @@ export default function ProjectSettingsPage() {
             {/* Delete */}
             <div className="flex items-center justify-between gap-4">
               <div>
-                <p className="text-sm font-medium text-foreground">Supprimer ce projet</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Action irréversible. Toutes les données seront perdues.</p>
+                <p className="text-sm font-medium text-foreground">Delete this project</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Irreversible action. All data will be lost.</p>
               </div>
               <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
                 <DialogTrigger asChild>
                   <Button variant="destructive" size="sm" className="shrink-0 gap-2">
                     <Trash2 className="h-3.5 w-3.5" />
-                    Supprimer
+                    Delete
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle className="flex items-center gap-2 text-red-400">
                       <AlertTriangle className="h-5 w-5" />
-                      Supprimer le projet
+                      Delete project
                     </DialogTitle>
                     <DialogDescription>
-                      Cette action est irréversible. Tapez <strong>{activeProject.name}</strong> pour confirmer.
+                      This action is irreversible. Type <strong>{activeProject.name}</strong> to confirm.
                     </DialogDescription>
                   </DialogHeader>
                   <Input
@@ -551,13 +551,13 @@ export default function ProjectSettingsPage() {
                     className="mt-2"
                   />
                   <DialogFooter>
-                    <Button variant="outline" onClick={() => { setDeleteOpen(false); setDeleteConfirm("") }}>Annuler</Button>
+                    <Button variant="outline" onClick={() => { setDeleteOpen(false); setDeleteConfirm("") }}>Cancel</Button>
                     <Button
                       variant="destructive"
                       disabled={deleteConfirm !== activeProject.name}
                       onClick={handleDelete}
                     >
-                      Supprimer définitivement
+                      Delete permanently
                     </Button>
                   </DialogFooter>
                 </DialogContent>

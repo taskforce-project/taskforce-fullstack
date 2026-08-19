@@ -1,9 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import Link from "next/link"
 
 const STORAGE_KEY = "tf-cookie-consent"
 
@@ -42,6 +42,8 @@ export function CookieBanner() {
               tracking or advertising cookies, so there is nothing to opt out of.
             </p>
             <div className="flex justify-between items-center pt-2">
+              {/* Route Next interne `/privacy-policy` (app/privacy-policy/page.tsx existe, HTTP 200) —
+                  même convention que app-footer / register-info-form. */}
               <Link
                 href="/privacy-policy"
                 className="text-sm underline hover:text-primary transition-colors"

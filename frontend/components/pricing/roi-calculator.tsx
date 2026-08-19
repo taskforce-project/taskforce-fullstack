@@ -57,11 +57,11 @@ export function ROICalculator({ className }: Readonly<ROICalculatorProps>) {
         <div className="flex items-center justify-center gap-2 mb-2">
           <Calculator className="h-8 w-8 text-primary" />
           <h2 className="text-3xl font-bold tracking-tight">
-            Calculateur d&apos;économies
+            Savings calculator
           </h2>
         </div>
         <p className="text-muted-foreground">
-          Découvrez combien vous pourriez économiser en passant à TaskForce
+          See how much you could save by switching to TaskForce
         </p>
       </div>
 
@@ -71,14 +71,14 @@ export function ROICalculator({ className }: Readonly<ROICalculatorProps>) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />
-              Votre configuration actuelle
+              Your current setup
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Nombre d'utilisateurs */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <Label htmlFor="users-slider">Nombre d&apos;utilisateurs</Label>
+                <Label htmlFor="users-slider">Number of users</Label>
                 <Badge variant="secondary" className="text-lg font-bold">
                   {numberOfUsers}
                 </Badge>
@@ -93,14 +93,14 @@ export function ROICalculator({ className }: Readonly<ROICalculatorProps>) {
                 className="w-full"
               />
               <div className="flex justify-between text-xs text-muted-foreground">
-                <span>1 utilisateur</span>
-                <span>100+ utilisateurs</span>
+                <span>1 user</span>
+                <span>100+ users</span>
               </div>
             </div>
 
             {/* Outils actuels */}
             <div className="space-y-3">
-              <Label>Outils que vous utilisez actuellement</Label>
+              <Label>Tools you currently use</Label>
               <div className="grid grid-cols-2 gap-3">
                 {competitorTools.map((tool) => (
                   <div key={tool.name} className="flex items-center space-x-2">
@@ -123,7 +123,7 @@ export function ROICalculator({ className }: Readonly<ROICalculatorProps>) {
               </div>
               {selectedTools.length === 0 && (
                 <p className="text-sm text-muted-foreground italic">
-                  Sélectionnez au moins un outil pour voir les économies
+                  Select at least one tool to see the savings
                 </p>
               )}
             </div>
@@ -137,7 +137,7 @@ export function ROICalculator({ className }: Readonly<ROICalculatorProps>) {
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-green-600" />
-                <span>Avec le plan GRATUIT</span>
+                <span>With the FREE plan</span>
                 <Badge variant="secondary" className="ml-auto flex items-center gap-1">
                   0<Euro className="h-3.5 w-3.5" />
                 </Badge>
@@ -153,9 +153,9 @@ export function ROICalculator({ className }: Readonly<ROICalculatorProps>) {
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2">
                 <TrendingDown className="h-5 w-5 text-primary" />
-                <span>Avec le plan PRO</span>
+                <span>With the PRO plan</span>
                 <Badge className="ml-auto bg-primary flex items-center gap-1">
-                  {29 * numberOfUsers}<Euro className="h-3.5 w-3.5" />/mois
+                  {29 * numberOfUsers}<Euro className="h-3.5 w-3.5" />/month
                 </Badge>
               </CardTitle>
             </CardHeader>
@@ -169,15 +169,15 @@ export function ROICalculator({ className }: Readonly<ROICalculatorProps>) {
             <CardContent className="pt-6 text-center space-y-2">
               <Sparkles className="h-8 w-8 mx-auto mb-2" />
               <p className="font-semibold text-lg flex items-center justify-center gap-1">
-                Économisez jusqu&apos;à
+                Save up to
                 {Math.max(
                   freeSavings.yearlySavings,
                   proSavings.yearlySavings,
-                ).toLocaleString("fr-FR")}<Euro className="h-5 w-5" />
-                par an !
+                ).toLocaleString("en-US")}<Euro className="h-5 w-5" />
+                per year!
               </p>
               <p className="text-sm opacity-90">
-                Essayez TaskForce gratuitement dès aujourd&apos;hui
+                Try TaskForce for free today
               </p>
             </CardContent>
           </Card>
@@ -199,17 +199,17 @@ function SavingsDisplay({ savings, isPro }: Readonly<SavingsDisplayProps>) {
     <div className="space-y-3">
       {/* Coût actuel */}
       <div className="flex justify-between items-center">
-        <span className="text-sm text-muted-foreground">Coût actuel</span>
+        <span className="text-sm text-muted-foreground">Current cost</span>
         <span className="font-semibold flex items-center gap-1">
-          {savings.currentMonthlyCost.toLocaleString("fr-FR")}<Euro className="h-4 w-4" />/mois
+          {savings.currentMonthlyCost.toLocaleString("en-US")}<Euro className="h-4 w-4" />/month
         </span>
       </div>
 
       {/* Coût TaskForce */}
       <div className="flex justify-between items-center">
-        <span className="text-sm text-muted-foreground">Coût TaskForce</span>
+        <span className="text-sm text-muted-foreground">TaskForce cost</span>
         <span className={cn("font-semibold flex items-center gap-1", isPro && "text-primary")}>
-          {savings.taskforceCost.toLocaleString("fr-FR")}<Euro className="h-4 w-4" />/mois
+          {savings.taskforceCost.toLocaleString("en-US")}<Euro className="h-4 w-4" />/month
         </span>
       </div>
 
@@ -218,7 +218,7 @@ function SavingsDisplay({ savings, isPro }: Readonly<SavingsDisplayProps>) {
         <div className="flex justify-between items-center">
           <span className="text-sm font-medium flex items-center gap-1">
             <DollarSign className="h-4 w-4" />
-            Économie mensuelle
+            Monthly savings
           </span>
           <span
             className={cn(
@@ -227,7 +227,7 @@ function SavingsDisplay({ savings, isPro }: Readonly<SavingsDisplayProps>) {
             )}
           >
             {hasPositiveSavings ? "+" : ""}
-            {savings.monthlySavings.toLocaleString("fr-FR")}<Euro className="h-5 w-5" />
+            {savings.monthlySavings.toLocaleString("en-US")}<Euro className="h-5 w-5" />
           </span>
         </div>
 
@@ -235,7 +235,7 @@ function SavingsDisplay({ savings, isPro }: Readonly<SavingsDisplayProps>) {
         <div className="flex justify-between items-center">
           <span className="text-sm font-medium flex items-center gap-1">
             <TrendingDown className="h-4 w-4" />
-            Économie annuelle
+            Annual savings
           </span>
           <span
             className={cn(
@@ -244,7 +244,7 @@ function SavingsDisplay({ savings, isPro }: Readonly<SavingsDisplayProps>) {
             )}
           >
             {hasPositiveSavings ? "+" : ""}
-            {savings.yearlySavings.toLocaleString("fr-FR")}<Euro className="h-6 w-6" />
+            {savings.yearlySavings.toLocaleString("en-US")}<Euro className="h-6 w-6" />
           </span>
         </div>
 
@@ -255,7 +255,7 @@ function SavingsDisplay({ savings, isPro }: Readonly<SavingsDisplayProps>) {
               variant="secondary"
               className="w-full justify-center text-base py-1.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
             >
-              Vous économisez {savings.savingsPercentage.toFixed(0)}% !
+              You save {savings.savingsPercentage.toFixed(0)}%!
             </Badge>
           </div>
         )}

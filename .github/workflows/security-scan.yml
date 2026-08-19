@@ -1,0 +1,97 @@
+name: Security Scan
+
+# SAST (Semgrep) + SCA / secrets / misconfig (Trivy). Le DAST (OWASP ZAP) reste MANUEL/planifié via
+# `scripts/security-scan.ps1` : il exige toute la stack démarrée (backend + Keycloak + Postgres +
+# MinIO), trop lourde pour ce workflow.
+#
+# Stratégie de gate : on publie le rapport COMPLET (toutes sévérités) en artefact + résumé de job,
+# et on ne CASSE le build que sur le plus haut niveau — Trivy CRITICAL (corrigeable) et Semgrep
+# ERROR. L'audit du 16/08/2026 mesure 0 CRITICAL / 0 secret / 0 SAST ERROR : le gate est donc vert
+# aujourd'hui et sert de garde anti-régression (toute nouvelle faille critique casse la CI).
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+  schedule:
+    - cron: '0 3 * * 1'    # tous les lundis 03:00 UTC — veille CVE hebdomadaire (nouvelles CVE sur du code figé)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  trivy:
+    name: Trivy — dépendances / secrets / misconfig
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      # 1) Rapport COMPLET (CRITICAL→MEDIUM) → résumé + artefact, sans casser le build.
+      - name: 🔎 Trivy fs — rapport complet
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          severity: CRITICAL,HIGH,MEDIUM
+          format: table
+          output: trivy-report.txt
+          exit-code: '0'
+
+      # 2) Gate : casse le build uniquement sur une vuln CRITICAL corrigeable (0 aujourd'hui).
+      - name: 🚦 Trivy fs — gate CRITICAL
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: 📄 Résumé de job
+        if: always()
+        run: |
+          echo "## 🛡️ Trivy (filesystem)" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          head -c 60000 trivy-report.txt >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "(rapport indisponible)" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 💾 Archive Trivy report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-report
+          path: trivy-report.txt
+          retention-days: 30
+
+  semgrep:
+    name: Semgrep — SAST
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container:
+      image: semgrep/semgrep
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      # 1) Rapport complet (toutes sévérités) en artefact, non bloquant.
+      - name: 🔎 Semgrep — rapport complet
+        run: semgrep scan --config auto --json --output semgrep-report.json --metrics off .
+        continue-on-error: true
+
+      # 2) Gate : casse le build uniquement sur les findings de niveau ERROR (0 aujourd'hui).
+      - name: 🚦 Semgrep — gate ERROR
+        run: semgrep scan --config auto --severity ERROR --error --metrics off .
+
+      - name: 💾 Archive Semgrep report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: semgrep-report
+          path: semgrep-report.json
+          retention-days: 30

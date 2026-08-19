@@ -122,6 +122,9 @@ class SmartAssignServiceTest {
             .query(contains("assignment_events"), any(RowMapper.class), any(), any());
         lenient().doReturn(0.0).when(jdbcTemplate)
             .queryForObject(contains("story_points"), eq(Double.class), any(), any());
+        // Défaut : aucun membre en congé (member_leaves) → vivier de candidats complet.
+        lenient().doReturn(List.of()).when(jdbcTemplate)
+            .queryForList(contains("member_leaves"), eq(Long.class), any());
 
         // Charge cross-projets par défaut : aucune issue ouverte pour chaque candidat.
         lenient().when(issueRepository.findByWorkspaceSlugAndAssigneeId(anyString(), anyLong()))

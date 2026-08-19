@@ -62,10 +62,10 @@ export function RedistributionDialog({ slug, targetUserId, trigger, onApplied }:
       setRows(plan.moves.map((m) => ({ ...m, selected: true })))
       setRan(true)
       if (plan.moves.length === 0) {
-        toast.info("Aucune redistribution nécessaire — personne n'est en surcharge.")
+        toast.info("No redistribution needed — nobody is overloaded.")
       }
     } catch {
-      toast.error("Impossible de calculer la redistribution")
+      toast.error("Could not compute the redistribution")
     } finally {
       setLoading(false)
     }
@@ -85,15 +85,15 @@ export function RedistributionDialog({ slug, targetUserId, trigger, onApplied }:
         selected.map((r) => ({ issueId: r.issueId, toUserId: r.toUserId }))
       )
       toast.success(
-        `${result.applied} tâche${result.applied > 1 ? "s" : ""} redistribuée${result.applied > 1 ? "s" : ""}` +
-          (result.skipped > 0 ? ` · ${result.skipped} ignorée(s)` : "")
+        `${result.applied} task${result.applied > 1 ? "s" : ""} redistributed${result.applied > 1 ? "" : ""}` +
+          (result.skipped > 0 ? ` · ${result.skipped} skipped` : "")
       )
       setOpen(false)
       setRows([])
       setRan(false)
       onApplied?.()
     } catch {
-      toast.error("Échec de la redistribution")
+      toast.error("Redistribution failed")
     } finally {
       setApplying(false)
     }
@@ -105,7 +105,7 @@ export function RedistributionDialog({ slug, targetUserId, trigger, onApplied }:
         {trigger ?? (
           <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
             <Scale className="size-3.5" />
-            Rééquilibrer la charge
+            Rebalance the load
           </Button>
         )}
       </DialogTrigger>
@@ -113,12 +113,12 @@ export function RedistributionDialog({ slug, targetUserId, trigger, onApplied }:
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Scale className="size-4 text-primary" /> Redistribution suggérée
+            <Scale className="size-4 text-primary" /> Suggested redistribution
           </DialogTitle>
           <DialogDescription>
             {threshold != null
-              ? `Membres au-dessus de ${threshold} tâches ouvertes. Décoche ce que tu ne veux pas déplacer, puis valide.`
-              : "Propositions de déplacement pour rééquilibrer les charges. Tu valides ou refuses."}
+              ? `Members above ${threshold} open tasks. Uncheck what you don't want to move, then confirm.`
+              : "Suggested moves to rebalance workloads. You approve or reject."}
           </DialogDescription>
         </DialogHeader>
 
@@ -159,17 +159,17 @@ export function RedistributionDialog({ slug, targetUserId, trigger, onApplied }:
           </div>
         ) : ran ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
-            Rien à redistribuer — les charges sont équilibrées. 👍
+            Nothing to redistribute — workloads are balanced. 👍
           </p>
         ) : null}
 
         <DialogFooter>
           <Button variant="ghost" size="sm" onClick={() => handleOpenChange(false)} disabled={applying}>
-            Annuler
+            Cancel
           </Button>
           <Button size="sm" className="gap-1.5" onClick={apply} disabled={applying || selectedCount === 0}>
             {applying ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
-            Appliquer{selectedCount > 0 ? ` ${selectedCount}` : ""}
+            Apply{selectedCount > 0 ? ` ${selectedCount}` : ""}
           </Button>
         </DialogFooter>
       </DialogContent>

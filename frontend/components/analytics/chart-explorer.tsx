@@ -30,14 +30,14 @@ import { listProjects } from "@/lib/api/project-service"
 // Palette sémantique explicite (le thème garde ses --chart-* en niveaux de gris ; ici on veut
 // des séries distinctes et colorées, lisibles en clair comme en sombre).
 const SERIES_META: Record<string, { label: string; color: string }> = {
-  resolved:   { label: "Résolues",        color: "#10b981" },  // emerald — terminé
-  opened:     { label: "Ouvertes",        color: "#3b82f6" },  // blue — entrant
-  remaining:  { label: "Restant",         color: "#f43f5e" },  // rose — reste à faire
-  ideal:      { label: "Idéal",           color: "#94a3b8" },  // slate — repère (pointillé)
-  openIssues: { label: "Issues ouvertes", color: "#6366f1" },  // indigo — charge
-  completion: { label: "Avancement (%)",  color: "#6366f1" },  // indigo — % de complétion projet
-  done:       { label: "Terminées",       color: "#10b981" },  // emerald
-  open:       { label: "Ouvertes",        color: "#f59e0b" },  // amber
+  resolved:   { label: "Resolved",        color: "#10b981" },  // emerald — terminé
+  opened:     { label: "Opened",        color: "#3b82f6" },  // blue — entrant
+  remaining:  { label: "Remaining",         color: "#f43f5e" },  // rose — reste à faire
+  ideal:      { label: "Ideal",           color: "#94a3b8" },  // slate — repère (pointillé)
+  openIssues: { label: "Open issues", color: "#6366f1" },  // indigo — charge
+  completion: { label: "Completion (%)",  color: "#6366f1" },  // indigo — % de complétion projet
+  done:       { label: "Done",       color: "#10b981" },  // emerald
+  open:       { label: "Open",        color: "#f59e0b" },  // amber
 }
 
 /** Palette de repli pour une série hors catalogue (rotation stable). */
@@ -75,17 +75,17 @@ function preset(id: string, label: string, icon: React.ElementType, spec: Partia
 }
 
 const PRESETS: Preset[] = [
-  preset("throughput-week", "Débit hebdomadaire", Activity,
+  preset("throughput-week", "Weekly throughput", Activity,
     { dataset: "throughput", chartType: "area", bucket: "week", series: ["resolved", "opened"] }),
-  preset("throughput-day", "Débit quotidien (30 j)", Activity,
+  preset("throughput-day", "Daily throughput (30 days)", Activity,
     { dataset: "throughput", chartType: "area", bucket: "day", series: ["resolved", "opened"] }),
-  preset("burndown", "Burndown du sprint", TrendingDown,
+  preset("burndown", "Sprint burndown", TrendingDown,
     { dataset: "burndown", chartType: "line", series: ["remaining", "ideal"] }),
-  preset("capacity", "Charge par membre", Users,
+  preset("capacity", "Workload per member", Users,
     { dataset: "capacity", chartType: "bar", series: ["openIssues"] }),
-  preset("workload", "Charge de l'équipe (14 j)", CalendarRange,
+  preset("workload", "Team workload (14 days)", CalendarRange,
     { dataset: "workload", chartType: null, series: [] }),
-  preset("projects", "Avancement des projets", FolderKanban,
+  preset("projects", "Project progress", FolderKanban,
     { dataset: "projects", chartType: "bar", series: ["completion"] }),
 ]
 
@@ -173,7 +173,7 @@ function ChartTooltip({
             <span className="size-2 shrink-0 rounded-full" style={{ background: entry.color ?? entry.fill ?? entry.stroke ?? "var(--chart-1)" }} />
             <span className="text-muted-foreground">{entry.name}</span>
             <span className="ml-3 font-semibold tabular-nums text-popover-foreground">
-              {typeof entry.value === "number" ? entry.value.toLocaleString("fr-FR") : entry.value}
+              {typeof entry.value === "number" ? entry.value.toLocaleString("en-US") : entry.value}
             </span>
           </div>
         ))}
@@ -212,7 +212,7 @@ function SpecChart({
         <p className="max-w-md text-sm text-muted-foreground">{spec.unsupported}</p>
         {onSuggestion && spec.suggestions.length > 0 && (
           <div className="mt-2 flex flex-col items-center gap-2">
-            <p className="text-xs font-medium text-muted-foreground">Essaie plutôt :</p>
+            <p className="text-xs font-medium text-muted-foreground">Try instead:</p>
             <div className="flex flex-wrap justify-center gap-1.5">
               {spec.suggestions.map((s) => (
                 <button
@@ -237,7 +237,7 @@ function SpecChart({
   }
 
   if (loading) return <Centered><Loader2 className="size-5 animate-spin text-muted-foreground" /></Centered>
-  if (error) return <Centered><p className="text-xs text-muted-foreground">Données indisponibles</p></Centered>
+  if (error) return <Centered><p className="text-xs text-muted-foreground">Data unavailable</p></Centered>
 
   // Charge de l'équipe → heatmap (le type de graphe ne s'applique pas).
   if (spec.dataset === "workload") {
@@ -250,7 +250,7 @@ function SpecChart({
   // Marges pleines : de la place pour les axes (gauche/bas) et la légende — sinon ils sont rognés.
   const margin = preview ? { top: 4, right: 0, left: 0, bottom: 0 } : { top: 12, right: 20, left: 4, bottom: 4 }
 
-  if (rows.length === 0) return <Centered><p className="text-xs text-muted-foreground">Pas encore assez de données</p></Centered>
+  if (rows.length === 0) return <Centered><p className="text-xs text-muted-foreground">Not enough data yet</p></Centered>
 
   // Grille (les deux sens, subtile), axes, tooltip riche, légende cliquable.
   const legendClick = (data: { dataKey?: unknown }) => {
@@ -358,10 +358,10 @@ function BreakdownChart({
   if (loading) return <Centered><Loader2 className="size-5 animate-spin text-muted-foreground" /></Centered>
   const data = fetched ?? spec.data ?? []
   if (data.length === 0) {
-    return <Centered><p className="text-xs text-muted-foreground">Aucune donnée pour cette répartition</p></Centered>
+    return <Centered><p className="text-xs text-muted-foreground">No data for this breakdown</p></Centered>
   }
   const color = "#6366f1"
-  const yName = spec.yLabel ?? "Valeur"
+  const yName = spec.yLabel ?? "Value"
 
   // Vue 3D (barres) — Three.js, interactive (rotation + survol).
   if (threeD && !preview && spec.chartType !== "line") {
@@ -417,9 +417,9 @@ function MiniHeatmap({ workload }: { readonly workload: Workload | null }) {
 // ─── La carte 3-parties (style dashboard) ─────────────────────────────────────
 
 const TRIPTYCH: ReadonlyArray<{ preset: Preset; caption: string }> = [
-  { preset: PRESETS[0], caption: "résolues vs ouvertes" },
-  { preset: PRESETS[2], caption: "reste à faire" },
-  { preset: PRESETS[3], caption: "issues par membre" },
+  { preset: PRESETS[0], caption: "resolved vs opened" },
+  { preset: PRESETS[2], caption: "work remaining" },
+  { preset: PRESETS[3], caption: "issues per member" },
 ]
 
 /**
@@ -444,12 +444,12 @@ export function ChartExplorer({
       <div className="overflow-hidden rounded-xl border border-border bg-card">
         <div className="flex items-center justify-between gap-2 border-b border-border bg-muted/40 px-4 py-3">
           <span className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-            <Activity className="size-4" /> Aperçus analytiques
+            <Activity className="size-4" /> Analytics previews
           </span>
           <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs" onClick={() => openAt(PRESETS[0].id)}>
             {gated
               ? <><Lock className="size-3.5 text-amber-600 dark:text-amber-400" /> Pro</>
-              : <><Sparkles className="size-3.5 text-primary" /> Explorer</>}
+              : <><Sparkles className="size-3.5 text-primary" /> Explore</>}
           </Button>
         </div>
 
@@ -566,13 +566,13 @@ function ChartExplorerModal({
     if (!activeSpec || pinning) return
     setPinning(true)
     try {
-      const chart = await saveChart(slug, activeSpec.title || "Graphe", activeSpec)
-      toast.success("Graphe épinglé dans « Custom »")
+      const chart = await saveChart(slug, activeSpec.title || "Chart", activeSpec)
+      toast.success("Chart pinned to 'Custom'")
       setSaved((s) => [chart, ...s])
       setActivePresetId(null)
       setActiveSavedId(chart.id)
     } catch {
-      toast.error("Impossible d'épingler le graphe")
+      toast.error("Could not pin the chart")
     } finally {
       setPinning(false)
     }
@@ -584,7 +584,7 @@ function ChartExplorerModal({
       setSaved((s) => s.filter((c) => c.id !== id))
       if (activeSavedId === id) pickPreset(PRESETS[0])
     } catch {
-      toast.error("Suppression impossible")
+      toast.error("Could not delete the chart")
     }
   }
 
@@ -602,9 +602,9 @@ function ChartExplorerModal({
         <div className="flex items-center justify-between gap-2 border-b border-border px-4 pb-3 pt-1">
           <div className="flex items-center gap-2">
             <Activity className="size-4 text-primary" />
-            <DrawerTitle className="text-sm">Explorateur de graphes</DrawerTitle>
+            <DrawerTitle className="text-sm">Chart explorer</DrawerTitle>
             <DrawerDescription className="sr-only">
-              Catalogue de graphes et génération par l&apos;IA, rendus depuis les données réelles.
+              Chart catalog and AI generation, rendered from real data.
             </DrawerDescription>
           </div>
           <DrawerClose asChild>
@@ -619,7 +619,7 @@ function ChartExplorerModal({
           <aside className="flex w-full shrink-0 flex-col border-b border-border bg-muted/30 sm:w-64 sm:border-b-0 sm:border-r">
             <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
               {/* 1) Graphes permanents (base) — toujours là, non épinglables. */}
-              <p className="px-1 pb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Permanents</p>
+              <p className="px-1 pb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Permanent</p>
               <div className="flex flex-col gap-0.5">
                 {PRESETS.map((p) => (
                   <button
@@ -638,11 +638,11 @@ function ChartExplorerModal({
 
               {/* 2) Graphes épinglés — les graphes IA que tu as sauvegardés. Toujours visible. */}
               <p className="mt-4 flex items-center gap-1.5 px-1 pb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                <Pin className="size-3" /> Épinglés {saved.length > 0 && <span className="tabular-nums opacity-60">{saved.length}</span>}
+                <Pin className="size-3" /> Pinned {saved.length > 0 && <span className="tabular-nums opacity-60">{saved.length}</span>}
               </p>
               {saved.length === 0 ? (
                 <p className="px-2.5 py-2 text-xs leading-relaxed text-muted-foreground/70">
-                  Génère un graphe avec l&apos;IA, puis clique <span className="font-medium text-foreground">Épingler</span> pour le garder ici.
+                  Generate a chart with AI, then click <span className="font-medium text-foreground">Pin</span> to keep it here.
                 </p>
               ) : (
                 <div className="flex flex-col gap-0.5">
@@ -661,7 +661,7 @@ function ChartExplorerModal({
                         type="button"
                         onClick={() => removeSaved(chart.id)}
                         className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-rose-500 group-hover/item:opacity-100"
-                        title="Retirer"
+                        title="Remove"
                       >
                         <Trash2 className="size-3.5" />
                       </button>
@@ -674,22 +674,22 @@ function ChartExplorerModal({
             {/* Input IA — ancré en bas de la sidebar */}
             <div className="shrink-0 border-t border-border p-3">
               <p className="mb-1.5 flex items-center gap-1.5 px-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                <Sparkles className="size-3 text-primary" /> Générer avec l&apos;IA
+                <Sparkles className="size-3 text-primary" /> Generate with AI
               </p>
               <div className="flex gap-1.5">
                 <input
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); runGenerate() } }}
-                  placeholder="ex. charge par membre"
+                  placeholder="e.g. workload per member"
                   className="h-9 min-w-0 flex-1 rounded-md border border-border bg-background px-2.5 text-sm outline-none focus:border-primary/50"
                 />
                 <Button size="sm" className="h-9 shrink-0 px-2.5" onClick={() => runGenerate()} disabled={!prompt.trim() || generating}>
                   {generating ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
                 </Button>
               </div>
-              {genError && <p className="mt-1.5 px-1 text-[11px] text-rose-500">Génération impossible, réessaie.</p>}
-              <p className="mt-1.5 px-1 text-[11px] text-muted-foreground/70">Rendu depuis tes vraies données.</p>
+              {genError && <p className="mt-1.5 px-1 text-[11px] text-rose-500">Generation failed, try again.</p>}
+              <p className="mt-1.5 px-1 text-[11px] text-muted-foreground/70">Rendered from your real data.</p>
             </div>
           </aside>
 
@@ -701,7 +701,7 @@ function ChartExplorerModal({
                   <h2 className="text-base font-semibold text-foreground">{activeSpec.title}</h2>
                   {aiGenerated && !activeSpec.unsupported && (
                     <span className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
-                      <Sparkles className="size-2.5" /> IA
+                      <Sparkles className="size-2.5" /> AI
                     </span>
                   )}
                   <div className="ml-auto flex shrink-0 items-center gap-1.5">
@@ -728,10 +728,10 @@ function ChartExplorerModal({
                         className="h-7 gap-1.5 text-xs"
                         onClick={pinActive}
                         disabled={pinning}
-                        title="Épingler dans « Custom » pour le garder"
+                        title="Pin to 'Custom' to keep it"
                       >
                         {pinning ? <Loader2 className="size-3.5 animate-spin" /> : <Pin className="size-3.5" />}
-                        Épingler
+                        Pin
                       </Button>
                     )}
                   </div>

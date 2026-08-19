@@ -32,19 +32,19 @@ import { getAvatarUrl } from "@/lib/utils/avatar";
 
 const SENIORITIES: { value: Seniority; label: string }[] = [
   { value: "JUNIOR", label: "Junior" },
-  { value: "MID", label: "Confirmé" },
+  { value: "MID", label: "Mid-level" },
   { value: "SENIOR", label: "Senior" },
   { value: "LEAD", label: "Lead" },
 ];
 
-const STEPS = ["Vous", "Compétences", "Équipe", "Premier projet"];
+const STEPS = ["You", "Skills", "Team", "First project"];
 const TOTAL = STEPS.length;
 
 /** Phases défilées pendant la génération des suggestions (loader « vivant », sans label). */
 const SUGGESTION_PHASES = [
-  "Analyse de ton rôle…",
-  "Recherche des compétences clés…",
-  "Sélection des tags pertinents…",
+  "Analyzing your role…",
+  "Finding key skills…",
+  "Selecting relevant tags…",
 ];
 
 /** Dérive un identifiant projet court (3-4 lettres) depuis un nom, pour l'API createProject. */
@@ -143,7 +143,7 @@ export default function OnboardingPage() {
 
   async function fetchSuggestions() {
     if (!slug || !jobTitle.trim()) {
-      toast.info("Renseigne d'abord ton rôle à l'étape précédente.");
+      toast.info("First fill in your role in the previous step.");
       return;
     }
     setLoadingSuggestions(true);
@@ -151,7 +151,7 @@ export default function OnboardingPage() {
       const tags = await suggestSkills(slug, jobTitle.trim(), skills);
       setSuggestions(tags);
       setSuggestedFor(jobTitle.trim());
-      if (tags.length === 0) toast.info("Aucune suggestion pour le moment — ajoute tes compétences à la main.");
+      if (tags.length === 0) toast.info("No suggestions right now — add your skills manually.");
     } finally {
       setLoadingSuggestions(false);
     }
@@ -161,11 +161,11 @@ export default function OnboardingPage() {
     const email = inviteInput.trim().toLowerCase();
     if (!email) return;
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      toast.error("Adresse e-mail invalide.");
+      toast.error("Invalid email address.");
       return;
     }
     if (email === user?.email?.toLowerCase()) {
-      toast.info("Tu es déjà dans ce workspace.");
+      toast.info("You're already in this workspace.");
       return;
     }
     setInvites((prev) => (prev.includes(email) ? prev : [...prev, email]));
@@ -184,7 +184,7 @@ export default function OnboardingPage() {
           profileText: bio.trim() || undefined,
         });
       } catch {
-        toast.error("Compétences non enregistrées — tu pourras les compléter dans ton profil.");
+        toast.error("Skills not saved — you can complete them in your profile.");
       }
     }
     // Renommage du workspace (si changé). Best-effort.
@@ -201,7 +201,7 @@ export default function OnboardingPage() {
         try {
           await createInvitation(slug, { email });
         } catch {
-          toast.error(`Invitation non envoyée à ${email}.`);
+          toast.error(`Invitation not sent to ${email}.`);
         }
       }
     }
@@ -210,7 +210,7 @@ export default function OnboardingPage() {
       try {
         await createProject(slug, { name: projectName.trim(), identifier: deriveIdentifier(projectName) });
       } catch {
-        toast.error("Projet non créé — tu pourras le créer depuis le tableau de bord.");
+        toast.error("Project not created — you can create it from the dashboard.");
       }
     }
     // Drapeau d'onboarding — BLOQUANT : sans lui, la garde renverrait ici en boucle.
@@ -218,7 +218,7 @@ export default function OnboardingPage() {
       await finishOnboarding(jobTitle.trim() || undefined);
       window.location.href = "/";
     } catch {
-      toast.error("Impossible de finaliser. Réessaie.");
+      toast.error("Unable to finish. Try again.");
       setSubmitting(false);
     }
   }
@@ -243,7 +243,7 @@ export default function OnboardingPage() {
   };
 
   const account = {
-    name: user?.displayName || [user?.firstName, user?.lastName].filter(Boolean).join(" ") || "Vous",
+    name: user?.displayName || [user?.firstName, user?.lastName].filter(Boolean).join(" ") || "You",
     email: user?.email ?? "",
     avatarUrl: user ? getAvatarUrl(user) : "",
   };
@@ -262,17 +262,17 @@ export default function OnboardingPage() {
             onClick={() => setStep((s) => Math.max(1, s - 1))}
             disabled={step === 1 || submitting}
           >
-            <ArrowLeft /> Précédent
+            <ArrowLeft /> Back
           </Button>
 
           {step < TOTAL ? (
             <Button onClick={() => setStep((s) => Math.min(TOTAL, s + 1))} disabled={!canNext || submitting}>
-              Suivant <ArrowRight />
+              Next <ArrowRight />
             </Button>
           ) : (
             <Button onClick={persistAndLeave} disabled={submitting}>
               {submitting ? <Loader2 className="animate-spin" /> : <Check />}
-              Terminer
+              Finish
             </Button>
           )}
         </>
@@ -284,25 +284,25 @@ export default function OnboardingPage() {
           <div className="space-y-5">
             <div>
               <h1 className="text-xl font-semibold" style={{ color: "var(--label-primary)" }}>
-                Bienvenue{user?.firstName ? `, ${user.firstName}` : ""} 👋
+                Welcome{user?.firstName ? `, ${user.firstName}` : ""} 👋
               </h1>
               <p className="mt-1 text-sm" style={{ color: "var(--label-tertiary)" }}>
-                Deux minutes pour personnaliser TaskForce et aider l&apos;assignation intelligente.
+                Two minutes to personalize TaskForce and power smart assignment.
               </p>
             </div>
             <label className="block">
               <span className="mb-1.5 block text-sm font-medium" style={{ color: "var(--label-secondary)" }}>
-                Quel est ton rôle ?
+                What&apos;s your role?
               </span>
               <Input
                 value={jobTitle}
                 onChange={(e) => setJobTitle(e.target.value)}
-                placeholder="ex. Développeur back-end, Chef de projet, Designer…"
+                placeholder="e.g. Back-end developer, Project manager, Designer…"
               />
             </label>
             <div>
               <span className="mb-1.5 block text-sm font-medium" style={{ color: "var(--label-secondary)" }}>
-                Séniorité <span style={{ color: "var(--label-quaternary)" }}>(optionnel)</span>
+                Seniority <span style={{ color: "var(--label-quaternary)" }}>(optional)</span>
               </span>
               <div className="flex flex-wrap gap-2">
                 {SENIORITIES.map((s) => (
@@ -330,10 +330,10 @@ export default function OnboardingPage() {
           <div className="space-y-5">
             <div>
               <h1 className="text-xl font-semibold" style={{ color: "var(--label-primary)" }}>
-                Tes compétences
+                Your skills
               </h1>
               <p className="mt-1 text-sm" style={{ color: "var(--label-tertiary)" }}>
-                Elles aident TaskForce à te proposer les bonnes tâches. Ajoute-les, ou laisse Cortex te suggérer.
+                They help TaskForce suggest the right tasks for you. Add them, or let Cortex suggest some.
               </p>
             </div>
 
@@ -346,7 +346,7 @@ export default function OnboardingPage() {
                   <>
                     <Sparkles className="h-3.5 w-3.5" style={{ color: "var(--primary)" }} />
                     <span>
-                      Suggéré par Cortex{suggestedFor ? ` pour « ${suggestedFor} »` : ""} — clique pour ajouter
+                      Suggested by Cortex{suggestedFor ? ` for “${suggestedFor}”` : ""} — click to add
                     </span>
                     {suggestedFor && (
                       <button
@@ -354,7 +354,7 @@ export default function OnboardingPage() {
                         onClick={fetchSuggestions}
                         className="underline underline-offset-2 hover:opacity-80"
                       >
-                        Regénérer
+                        Regenerate
                       </button>
                     )}
                   </>
@@ -381,7 +381,7 @@ export default function OnboardingPage() {
 
             <div>
               <label className="mb-1.5 block text-sm font-medium" style={{ color: "var(--label-secondary)" }}>
-                Ajouter une compétence
+                Add a skill
               </label>
               <Input
                 value={skillInput}
@@ -392,7 +392,7 @@ export default function OnboardingPage() {
                     addSkill(skillInput);
                   }
                 }}
-                placeholder="Tape puis Entrée (ex. React, Java, Figma…)"
+                placeholder="Type then Enter (e.g. React, Java, Figma…)"
               />
               {skills.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-2">
@@ -403,7 +403,7 @@ export default function OnboardingPage() {
                       style={{ background: "var(--accent)", color: "var(--accent-foreground)" }}
                     >
                       {s}
-                      <button type="button" onClick={() => removeSkill(s)} aria-label={`Retirer ${s}`}>
+                      <button type="button" onClick={() => removeSkill(s)} aria-label={`Remove ${s}`}>
                         <X className="h-3 w-3 opacity-60 hover:opacity-100" />
                       </button>
                     </span>
@@ -415,7 +415,7 @@ export default function OnboardingPage() {
             <div className="grid grid-cols-2 gap-4">
               <label className="block">
                 <span className="mb-1.5 block text-sm font-medium" style={{ color: "var(--label-secondary)" }}>
-                  Capacité (h/sem) <span style={{ color: "var(--label-quaternary)" }}>opt.</span>
+                  Capacity (h/wk) <span style={{ color: "var(--label-quaternary)" }}>opt.</span>
                 </span>
                 <Input
                   value={capacity}
@@ -428,13 +428,13 @@ export default function OnboardingPage() {
 
             <label className="block">
               <span className="mb-1.5 block text-sm font-medium" style={{ color: "var(--label-secondary)" }}>
-                En une phrase <span style={{ color: "var(--label-quaternary)" }}>(optionnel)</span>
+                In one sentence <span style={{ color: "var(--label-quaternary)" }}>(optional)</span>
               </span>
               <Textarea
                 value={bio}
                 onChange={(e) => setBio(e.target.value.slice(0, 2000))}
                 rows={2}
-                placeholder="ex. J'aime les sujets perf et l'expérience développeur."
+                placeholder="e.g. I enjoy performance topics and developer experience."
                 className="resize-none"
               />
             </label>
@@ -446,25 +446,25 @@ export default function OnboardingPage() {
           <div className="space-y-5">
             <div>
               <h1 className="text-xl font-semibold" style={{ color: "var(--label-primary)" }}>
-                Ton espace de travail
+                Your workspace
               </h1>
               <p className="mt-1 text-sm" style={{ color: "var(--label-tertiary)" }}>
-                Nomme ton workspace et invite ton équipe (tu pourras le faire plus tard).
+                Name your workspace and invite your team (you can do this later).
               </p>
             </div>
             <label className="block">
               <span className="mb-1.5 block text-sm font-medium" style={{ color: "var(--label-secondary)" }}>
-                Nom du workspace
+                Workspace name
               </span>
               <Input
                 value={wsName}
                 onChange={(e) => setWsName(e.target.value)}
-                placeholder="Mon équipe"
+                placeholder="My team"
               />
             </label>
             <div>
               <span className="mb-1.5 block text-sm font-medium" style={{ color: "var(--label-secondary)" }}>
-                Inviter des coéquipiers <span style={{ color: "var(--label-quaternary)" }}>(optionnel)</span>
+                Invite teammates <span style={{ color: "var(--label-quaternary)" }}>(optional)</span>
               </span>
               <div className="flex gap-2">
                 <Input
@@ -476,11 +476,11 @@ export default function OnboardingPage() {
                       addInvite();
                     }
                   }}
-                  placeholder="collegue@entreprise.com"
+                  placeholder="colleague@company.com"
                   type="email"
                 />
                 <Button type="button" variant="outline" onClick={addInvite} className="shrink-0">
-                  Ajouter
+                  Add
                 </Button>
               </div>
               {invites.length > 0 && (
@@ -495,7 +495,7 @@ export default function OnboardingPage() {
                       <button
                         type="button"
                         onClick={() => setInvites((prev) => prev.filter((e) => e !== email))}
-                        aria-label={`Retirer ${email}`}
+                        aria-label={`Remove ${email}`}
                       >
                         <X className="h-3.5 w-3.5 opacity-60 hover:opacity-100" />
                       </button>
@@ -512,24 +512,24 @@ export default function OnboardingPage() {
           <div className="space-y-5">
             <div>
               <h1 className="text-xl font-semibold" style={{ color: "var(--label-primary)" }}>
-                Un premier projet ?
+                A first project?
               </h1>
               <p className="mt-1 text-sm" style={{ color: "var(--label-tertiary)" }}>
-                Facultatif — tu peux aussi le créer plus tard depuis le tableau de bord.
+                Optional — you can also create it later from the dashboard.
               </p>
             </div>
             <label className="block">
               <span className="mb-1.5 block text-sm font-medium" style={{ color: "var(--label-secondary)" }}>
-                Nom du projet
+                Project name
               </span>
               <Input
                 value={projectName}
                 onChange={(e) => setProjectName(e.target.value)}
-                placeholder="ex. Refonte du site, Sprint 1…"
+                placeholder="e.g. Website redesign, Sprint 1…"
               />
               {projectName.trim() && (
                 <span className="mt-1.5 block text-xs" style={{ color: "var(--label-tertiary)" }}>
-                  Identifiant : {deriveIdentifier(projectName)}
+                  Identifier: {deriveIdentifier(projectName)}
                 </span>
               )}
             </label>

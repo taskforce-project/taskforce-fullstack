@@ -66,7 +66,7 @@ function KpiCell({ metric }: { readonly metric: KpiMetric }) {
       </div>
       <div className={cn("flex items-center gap-1 text-xs font-medium tabular-nums", deltaClass)}>
         <DeltaIcon className="size-3.5" />
-        {metric.delta > 0 ? "+" : ""}{metric.delta} vs mois dernier
+        {metric.delta > 0 ? "+" : ""}{metric.delta} vs last month
       </div>
     </div>
   )
@@ -125,10 +125,10 @@ export default function AnalyticsPage() {
   // KPIs réels → cartes (zéros tant que non chargés ; aucun mock — PROD-1.7)
   const k = kpis ?? { tasksResolved: 0, tasksResolvedDelta: 0, avgResolutionDays: 0, avgResolutionDaysDelta: 0, velocity: 0, velocityDelta: 0, activeCycles: 0 }
   const kpiMetrics: KpiMetric[] = [
-    { label: "Tâches terminées", value: String(k.tasksResolved),   delta: k.tasksResolvedDelta,                 unit: "ce mois-ci", icon: TrendingUp },
-    { label: "Temps de cycle",   value: `${k.avgResolutionDays} j`, delta: Math.round(k.avgResolutionDaysDelta), unit: "en moyenne", icon: Activity, deltaInverse: true },
-    { label: "Vélocité",         value: String(k.velocity),        delta: k.velocityDelta,                      unit: "7 derniers jours", icon: Flame },
-    { label: "Cycles actifs",    value: String(k.activeCycles),    delta: 0,                                    unit: "en cours",   icon: Zap },
+    { label: "Tasks completed", value: String(k.tasksResolved),   delta: k.tasksResolvedDelta,                 unit: "this month", icon: TrendingUp },
+    { label: "Cycle time",   value: `${k.avgResolutionDays} d`, delta: Math.round(k.avgResolutionDaysDelta), unit: "on average", icon: Activity, deltaInverse: true },
+    { label: "Velocity",         value: String(k.velocity),        delta: k.velocityDelta,                      unit: "last 7 days", icon: Flame },
+    { label: "Active cycles",    value: String(k.activeCycles),    delta: 0,                                    unit: "in progress",   icon: Zap },
   ]
 
   const selectedProject = projects.find((p) => String(p.id) === projectFilter)
@@ -137,16 +137,16 @@ export default function AnalyticsPage() {
     <PageContainer>
       <PageHeader
         title="Intelligence"
-        description="Ce que l'IA observe de vos opérations — et ce qu'elle recommande de faire ensuite."
+        description="What the AI observes about your operations — and what it recommends doing next."
       />
 
       {/* Contexte : le sélecteur pilote toute la page, il doit se voir. */}
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
-        <span className="text-sm font-medium text-foreground">Projet analysé</span>
+        <span className="text-sm font-medium text-foreground">Analyzed project</span>
         <Select value={projectFilter} onValueChange={setProjectFilter}>
           <SelectTrigger className="h-9 w-64 text-sm"><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value={ALL_PROJECTS}>Tous les projets</SelectItem>
+            <SelectItem value={ALL_PROJECTS}>All projects</SelectItem>
             {projects.map((p) => (
               <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
             ))}
@@ -154,8 +154,8 @@ export default function AnalyticsPage() {
         </Select>
         <span className="ml-auto text-sm text-muted-foreground">
           {projectFilter === ALL_PROJECTS
-            ? `${projects.length} projet${projects.length > 1 ? "s" : ""} dans cet espace`
-            : "L'aide à la décision porte sur ce projet"}
+            ? `${projects.length} project${projects.length > 1 ? "s" : ""} in this workspace`
+            : "Decision support focuses on this project"}
         </span>
       </div>
 
@@ -163,34 +163,34 @@ export default function AnalyticsPage() {
       {projectFilter === ALL_PROJECTS ? (
         <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border px-6 py-10 text-center">
           <Brain className="size-7 text-muted-foreground/40" />
-          <p className="text-sm font-medium text-foreground">Choisis un projet pour l&apos;aide à la décision</p>
+          <p className="text-sm font-medium text-foreground">Choose a project for decision support</p>
           <p className="max-w-md text-sm text-muted-foreground">
-            L&apos;IA lit les métriques réelles du projet et le Brain OS, puis propose la situation, les risques
-            et les 3 priorités du jour — transformables en issues d&apos;un clic.
+            The AI reads the project&apos;s real metrics and the Brain OS, then suggests the situation, the risks
+            and the day&apos;s top 3 priorities — convertible into issues in one click.
           </p>
         </div>
       ) : (
         <DecisionBoard
           slug={slug}
           projectId={Number(projectFilter)}
-          projectName={selectedProject?.name ?? "Projet"}
+          projectName={selectedProject?.name ?? "Project"}
         />
       )}
 
       {/* 2 — Les signaux détectés par l'IA. */}
       <SectionCard
-        title="Signaux IA"
+        title="AI Signals"
         icon={<Brain className="size-4" />}
-        action={<span className="text-xs text-muted-foreground">{insights.length} {insights.length > 1 ? "signaux" : "signal"}</span>}
+        action={<span className="text-xs text-muted-foreground">{insights.length} {insights.length > 1 ? "signals" : "signal"}</span>}
         bodyClassName="p-4 space-y-2"
       >
         {insights.length === 0
-          ? <p className="py-6 text-center text-sm text-muted-foreground">Aucun signal pour le moment.</p>
+          ? <p className="py-6 text-center text-sm text-muted-foreground">No signals yet.</p>
           : insights.map((ins, i) => <InsightRow key={`${ins.agent}-${i}`} insight={ins} />)}
       </SectionCard>
 
       {/* 3 — Les chiffres (même chrome que les cartes du dashboard : en-tête + MetricSplit). */}
-      <SectionCard title="Indicateurs clés" icon={<Activity className="size-4" />} bodyClassName="p-0">
+      <SectionCard title="Key metrics" icon={<Activity className="size-4" />} bodyClassName="p-0">
         <MetricSplit className="max-sm:flex-col max-sm:divide-x-0 max-sm:divide-y">
           {kpiMetrics.map((m) => <KpiCell key={m.label} metric={m} />)}
         </MetricSplit>

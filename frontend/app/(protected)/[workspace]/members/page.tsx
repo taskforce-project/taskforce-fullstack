@@ -69,7 +69,7 @@ import { listSkillProfiles, type MemberSkillProfile } from "@/lib/api/skill-serv
 import { RedistributionDialog } from "@/components/dialogs/redistribution-dialog"
 
 const SENIORITY_LABEL: Record<string, string> = {
-  JUNIOR: "Junior", MID: "Confirmé", SENIOR: "Senior", LEAD: "Lead",
+  JUNIOR: "Junior", MID: "Mid", SENIOR: "Senior", LEAD: "Lead",
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -159,12 +159,12 @@ function InviteMemberDialog({ onInvited }: { readonly onInvited?: () => void }) 
     setEmailInviting(true)
     try {
       await createInvitation(slug, { email, role })
-      toast.success(`Invitation envoyée à ${email}`)
+      toast.success(`Invitation sent to ${email}`)
       setQuery("")
       setResults([])
       onInvited?.()
     } catch {
-      toast.error("Impossible d'envoyer l'invitation")
+      toast.error("Could not send the invitation")
     } finally {
       setEmailInviting(false)
     }
@@ -179,12 +179,12 @@ function InviteMemberDialog({ onInvited }: { readonly onInvited?: () => void }) 
     const added = results.filter(Boolean).length
     const failed = selectedUsers.length - added
     if (added > 0) {
-      toast.success(added === 1 ? "1 membre ajouté au workspace" : `${added} membres ajoutés au workspace`)
+      toast.success(added === 1 ? "1 member added to the workspace" : `${added} members added to the workspace`)
     }
     if (failed > 0) {
       toast.error(failed === 1
-        ? "1 invitation a échoué (compte Taskforce introuvable)."
-        : `${failed} invitations ont échoué (comptes Taskforce introuvables).`)
+        ? "1 invitation failed (Taskforce account not found)."
+        : `${failed} invitations failed (Taskforce accounts not found).`)
     }
     if (added > 0) {
       reset()
@@ -282,10 +282,10 @@ function InviteMemberDialog({ onInvited }: { readonly onInvited?: () => void }) 
                     className="mt-1.5 flex w-full items-center gap-2 rounded-md border border-dashed border-border px-2.5 py-2 text-left text-sm hover:bg-accent disabled:opacity-60"
                   >
                     {emailInviting ? <Loader2 className="size-4 animate-spin" /> : <Mail className="size-4 text-muted-foreground" />}
-                    <span>Aucun compte — inviter <strong>{query.trim()}</strong> par email</span>
+                    <span>No account — invite <strong>{query.trim()}</strong> by email</span>
                   </button>
                 ) : (
-                  <p className="mt-1.5 text-xs text-muted-foreground">Aucun compte ne correspond. Saisissez un email complet pour inviter une personne sans compte.</p>
+                  <p className="mt-1.5 text-xs text-muted-foreground">No account matches. Enter a full email to invite someone without an account.</p>
                 )
               )}
             </div>
@@ -297,7 +297,7 @@ function InviteMemberDialog({ onInvited }: { readonly onInvited?: () => void }) 
             <Select value={role} onValueChange={(v) => setRole(v as WorkspaceRole)}>
               {/* Le <label> voisin n'est pas associé au contrôle (pas de `htmlFor`) : sans
                   `aria-label`, ce sélecteur reste anonyme malgré son intitulé visible. */}
-              <SelectTrigger className="h-9" aria-label="Rôle du membre invité"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-9" aria-label="Invited member role"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="MEMBER">Member</SelectItem>
                 <SelectItem value="ADMIN">Admin</SelectItem>
@@ -341,16 +341,16 @@ function MemberRow({ member, isYou, canManage, isOwner, profile, projects = [] }
 
   async function handleChangeRole(newRole: WorkspaceRole) {
     const result = await changeRole(member.id, { role: newRole })
-    if (result) toast.success("Rôle mis à jour")
-    else toast.error("Impossible de changer le rôle")
+    if (result) toast.success("Role updated")
+    else toast.error("Could not change the role")
   }
 
   async function handleRemove() {
     try {
       await kick(member.id)
-      toast.success("Membre retiré du workspace")
+      toast.success("Member removed from the workspace")
     } catch {
-      toast.error("Impossible de retirer ce membre")
+      toast.error("Could not remove this member")
     }
   }
 
@@ -452,7 +452,7 @@ function MemberRow({ member, isYou, canManage, isOwner, profile, projects = [] }
             <Button
               variant="ghost"
               size="icon"
-              aria-label={`Actions pour ${member.displayName ?? member.email}`}
+              aria-label={`Actions for ${member.displayName ?? member.email}`}
               className="size-8 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
             >
               <MoreHorizontal className="size-4" />
@@ -511,9 +511,9 @@ function PendingInvitations({ slug, refreshKey }: { readonly slug: string; reado
     try {
       await revokeInvitation(slug, id)
       setInvitations((prev) => prev.filter((i) => i.id !== id))
-      toast.success("Invitation annulée")
+      toast.success("Invitation revoked")
     } catch {
-      toast.error("Impossible d'annuler l'invitation")
+      toast.error("Could not revoke the invitation")
     }
   }
 
@@ -522,7 +522,7 @@ function PendingInvitations({ slug, refreshKey }: { readonly slug: string; reado
   return (
     <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
       <div className="px-5 py-2.5 border-b border-border bg-muted/20 text-xs text-muted-foreground">
-        Invitations en attente ({invitations.length})
+        Pending invitations ({invitations.length})
       </div>
       {invitations.map((inv) => (
         <div key={inv.id} className="flex items-center gap-4 px-5 py-3 border-b border-border/50 last:border-0">
@@ -532,12 +532,12 @@ function PendingInvitations({ slug, refreshKey }: { readonly slug: string; reado
           <div className="flex-1 min-w-0">
             <p className="truncate text-sm font-medium text-foreground">{inv.email}</p>
             <p className="text-xs text-muted-foreground">
-              {inv.role} · invité {inv.invitedByName ? `par ${inv.invitedByName}` : ""}
+              {inv.role} · invited {inv.invitedByName ? `by ${inv.invitedByName}` : ""}
             </p>
           </div>
-          <Badge variant="outline" className="text-xs">En attente</Badge>
+          <Badge variant="outline" className="text-xs">Pending</Badge>
           <Button variant="ghost" size="sm" onClick={() => handleRevoke(inv.id)} className="text-destructive">
-            Annuler
+            Revoke
           </Button>
         </div>
       ))}
@@ -647,12 +647,12 @@ export default function MembersPage() {
             <div className="flex flex-col items-end gap-1.5">
               {!unlimited && (
                 <span className={cn("text-xs", atLimit ? "text-amber-500 font-medium" : "text-muted-foreground")}>
-                  {used}/{rawLimit} membres
+                  {used}/{rawLimit} members
                 </span>
               )}
               {atLimit ? (
                 <Button size="sm" variant="outline" className="gap-1.5" onClick={() => openUpgrade()}>
-                  <Crown className="size-3.5 text-amber-500" /> Passer à un plan supérieur
+                  <Crown className="size-3.5 text-amber-500" /> Upgrade plan
                 </Button>
               ) : (
                 <InviteMemberDialog onInvited={() => setInvitationRefresh((n) => n + 1)} />
@@ -705,9 +705,9 @@ export default function MembersPage() {
             {/* Le nom accessible ne doit pas dépendre de la valeur affichée : selon la sélection,
                 `SelectValue` peut ne rendre aucun texte et le bouton devient anonyme pour un
                 lecteur d'écran (axe : `button-name`, critique). */}
-            <SelectTrigger className="h-9 w-44 text-sm shrink-0" aria-label="Filtrer par projet"><SelectValue placeholder="Projet" /></SelectTrigger>
+            <SelectTrigger className="h-9 w-44 text-sm shrink-0" aria-label="Filter by project"><SelectValue placeholder="Project" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Tous les projets</SelectItem>
+              <SelectItem value="all">All projects</SelectItem>
               {projects.map((p) => (
                 <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
               ))}
@@ -804,8 +804,8 @@ export default function MembersPage() {
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {unlimited
-                  ? `Plan ${planLabel} — membres illimités.`
-                  : `Plan ${planLabel} — jusqu'à ${rawLimit} membres.${atLimit ? " Limite atteinte." : ""}`}
+                  ? `${planLabel} plan — unlimited members.`
+                  : `${planLabel} plan — up to ${rawLimit} members.${atLimit ? " Limit reached." : ""}`}
               </p>
             </div>
             {unlimited ? (
@@ -825,7 +825,7 @@ export default function MembersPage() {
                 </div>
                 {atLimit && (
                   <Button size="sm" variant="outline" className="gap-1.5" onClick={() => openUpgrade()}>
-                    <Crown className="size-3.5 text-amber-500" /> Améliorer
+                    <Crown className="size-3.5 text-amber-500" /> Upgrade
                   </Button>
                 )}
               </div>

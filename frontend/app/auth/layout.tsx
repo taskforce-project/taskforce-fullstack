@@ -14,6 +14,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AppFooter } from "@/components/layout/app-footer";
+import { SITE_URL } from "@/lib/config/urls";
 
 /**
  * Coquille des pages d'authentification.
@@ -53,8 +54,8 @@ export default function AuthLayout({
   // Sur la connexion on propose l'inscription, partout ailleurs on propose la connexion.
   const onLoginPage = pathname?.startsWith("/auth/login") ?? false;
   const opposite = onLoginPage
-    ? { href: "/auth/register", label: "Créer un compte" }
-    : { href: "/auth/login", label: "Se connecter" };
+    ? { href: "/auth/register", label: t.auth.ui.createAccount }
+    : { href: "/auth/login", label: t.auth.ui.signIn };
 
   // « Le site » n'est PAS la racine de cette application : le site vitrine est un projet Astro
   // distinct, servi sur une autre origine — `www.example.com` face à `app.example.com` en
@@ -63,7 +64,7 @@ export default function AuthLayout({
   // Conséquence directe : ce sont des `<a>` et non des `<Link>`. `Link` sert la navigation interne
   // de Next ; l'employer pour une autre origine déclenche une tentative de navigation côté client
   // sur une route qui n'existe pas ici.
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:4321";
+  const siteUrl = SITE_URL;
 
   return (
     <div className="auth-shell">
@@ -87,7 +88,7 @@ export default function AuthLayout({
 
           <a href={siteUrl} className="auth-back-link">
             <ArrowLeft className="h-3.5 w-3.5" />
-            Retour au site
+            {t.auth.ui.backToSite}
           </a>
         </div>
 

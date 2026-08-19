@@ -6,7 +6,10 @@ version: '3.8'
 
 services:
   postgres:
-    image: postgres:16-alpine
+    # pgvector OBLIGATOIRE : les migrations V32/V33/V52/V59 déclarent des colonnes `vector(384)` ; un
+    # `postgres:*-alpine` standard n'embarque pas l'extension → Flyway échoue au 1er démarrage (PC-025).
+    # Aligné sur dev/prod. Le user applicatif (superuser du conteneur) exécute `CREATE EXTENSION vector`.
+    image: ${POSTGRES_IMAGE:-pgvector/pgvector:pg18}
     container_name: taskforce-db
     restart: unless-stopped
     environment:
@@ -32,6 +35,10 @@ services:
     container_name: taskforce-backend
     restart: unless-stopped
     environment:
+      # Ce compose « par défaut » pointe vers dev (cf. en-tête). Depuis que le Dockerfile a un défaut
+      # `prod` fail-safe (PC-024), il faut déclarer le profil ici, sinon le backend démarrerait en prod
+      # sans les secrets prod et échouerait.
+      SPRING_PROFILES_ACTIVE: dev
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-taskforce_dev}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-taskforce_user}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-taskforce_pass}

@@ -93,7 +93,7 @@ export default function ErrorPage({ error, reset }: Readonly<ErrorPageProps>) {
           </Button>
           <Button size="sm" className="gap-2" onClick={reset}>
             <RefreshCw className="h-4 w-4" />
-            Réessayer
+            Try again
           </Button>
         </div>
       </div>

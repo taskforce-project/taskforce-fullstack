@@ -29,6 +29,7 @@ import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { planHasFeature } from "@/lib/config/plan-features"
 import { AgentChat } from "@/components/agent/agent-chat"
 import { toast } from "sonner"
+import { usePreferencesStore } from "@/lib/store/preferences-store"
 
 /**
  * Map a URL segment (slug) to a display label.
@@ -116,6 +117,7 @@ function useBreadcrumbs() {
 export function AppTopbar() {
   const breadcrumbs = useBreadcrumbs()
   const pathname = usePathname()
+  const { t } = usePreferencesStore()
   // Fonctionnalités « Lab » (en cours de finition) : Intelligence (/analytics) + Brain OS (/brain).
   // Le header se teinte en bleu discret (info) + un indicateur + un lien feedback — pendant des
   // fioles bleues de la sidebar. Remplace le bandeau `LabBanner` sur ces pages pleines.
@@ -127,7 +129,7 @@ export function AppTopbar() {
 
   const openAssistant = React.useCallback(() => {
     if (!aiEntitled) {
-      toast.info("L'assistant IA est une fonctionnalité Pro. Passez à Pro pour l'activer.")
+      toast.info(t.shell.aiProFeature)
       return
     }
     togglePanel({
@@ -137,7 +139,7 @@ export function AppTopbar() {
       icon: <Sparkles className="size-4 text-primary" />,
       content: <AgentChat />,
     })
-  }, [togglePanel, aiEntitled])
+  }, [togglePanel, aiEntitled, t])
 
   // Global Ctrl+K / Cmd+K shortcut
   React.useEffect(() => {
@@ -194,13 +196,13 @@ export function AppTopbar() {
           {/* Identité Labs alignée sur le site : flask + label en dégradé (pêche→rose→bleu), pilule neutre. */}
           <span className="flex items-center gap-1.5 rounded-full border border-border bg-background/80 px-2.5 py-0.5 text-[11px] font-semibold backdrop-blur">
             <FlaskConical className="tf-labs-icon size-3.5" strokeWidth={2} />
-            <span className="tf-labs-gtext">Expérimentation</span>
+            <span className="tf-labs-gtext">{t.shell.experimental}</span>
           </span>
           <a
             href="mailto:feedback@taskforce.dev?subject=Feedback"
             className="pointer-events-auto hidden text-[11px] font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline md:inline"
           >
-            Donner mon feedback
+            {t.shell.giveFeedback}
           </a>
         </div>
       )}
@@ -211,10 +213,10 @@ export function AppTopbar() {
         <button
           className="hidden h-8 cursor-pointer items-center gap-2 rounded-md border border-border bg-muted/40 px-2 text-xs text-muted-foreground transition-colors hover:bg-muted/60 sm:flex"
           onClick={() => setCmdOpen(true)}
-          aria-label="Open command palette"
+          aria-label={t.shell.openCommandPalette}
         >
           <Search className="size-3.5" />
-          <span className="hidden lg:inline">Search…</span>
+          <span className="hidden lg:inline">{t.shell.search}</span>
           <Kbd className="hidden lg:inline-flex gap-0.5">
             <span>⌘</span><span>K</span>
           </Kbd>
@@ -225,7 +227,7 @@ export function AppTopbar() {
           variant="ghost"
           size="icon"
           className="sm:hidden"
-          aria-label="Search"
+          aria-label={t.shell.searchAria}
           onClick={() => setCmdOpen(true)}
         >
           <Search className="size-4" />
@@ -237,11 +239,11 @@ export function AppTopbar() {
           size="sm"
           className="hidden gap-1.5 text-xs sm:inline-flex"
           onClick={openAssistant}
-          aria-label="Ouvrir l'assistant IA"
+          aria-label={t.shell.openAiAssistant}
           data-tour="ask-ai"
         >
           <Sparkles className="size-4 text-primary" />
-          <span className="hidden lg:inline">Ask AI</span>
+          <span className="hidden lg:inline">{t.shell.askAi}</span>
         </Button>
 
         {/* Workflows IA — dock des analyses en arrière-plan (badge = jobs actifs) */}

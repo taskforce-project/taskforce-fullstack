@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { format, parseISO, isValid } from "date-fns"
-import { fr } from "date-fns/locale"
+import { enUS } from "date-fns/locale"
 import { CalendarIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils"
 export function DatePicker({
   value,
   onChange,
-  placeholder = "Choisir une date",
+  placeholder = "Choose a date",
   id,
   className,
 }: {
@@ -49,7 +49,7 @@ export function DatePicker({
           )}
         >
           <CalendarIcon className="size-4 shrink-0" />
-          {selected ? format(selected, "d MMM yyyy", { locale: fr }) : placeholder}
+          {selected ? format(selected, "d MMM yyyy", { locale: enUS }) : placeholder}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">

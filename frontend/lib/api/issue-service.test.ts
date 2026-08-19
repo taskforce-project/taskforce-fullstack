@@ -35,7 +35,7 @@ import {
   addRelation,
   deleteRelation,
 } from './issue-service';
-import { apiClient } from './client';
+import { apiClient, AI_TIMEOUT_MS } from './client';
 import { ISSUE_ROUTES, ROADMAP_ROUTES } from '../config/api-routes';
 
 vi.mock('./client', () => ({
@@ -47,6 +47,7 @@ vi.mock('./client', () => ({
     delete: vi.fn(),
   },
   getErrorMessage: vi.fn((e: any) => e?.message || 'error'),
+  AI_TIMEOUT_MS: 200_000,
 }));
 
 const SLUG = 'acme';
@@ -326,7 +327,7 @@ describe('issue-service', () => {
 
       const result = await smartAssignIssue(SLUG, PID, IID);
 
-      expect(apiClient.post).toHaveBeenCalledWith(ISSUE_ROUTES.SMART_ASSIGN(SLUG, PID, IID));
+      expect(apiClient.post).toHaveBeenCalledWith(ISSUE_ROUTES.SMART_ASSIGN(SLUG, PID, IID), undefined, { timeout: AI_TIMEOUT_MS });
       expect(result).toEqual(res);
     });
   });
@@ -339,7 +340,7 @@ describe('issue-service', () => {
 
       const result = await smartAssignPreview(SLUG, PID, draft);
 
-      expect(apiClient.post).toHaveBeenCalledWith(ISSUE_ROUTES.SMART_ASSIGN_PREVIEW(SLUG, PID), draft);
+      expect(apiClient.post).toHaveBeenCalledWith(ISSUE_ROUTES.SMART_ASSIGN_PREVIEW(SLUG, PID), draft, { timeout: AI_TIMEOUT_MS });
       expect(result).toEqual(res);
     });
   });
@@ -351,7 +352,7 @@ describe('issue-service', () => {
 
       const result = await smartAssignBulk(SLUG, PID, [1, 2]);
 
-      expect(apiClient.post).toHaveBeenCalledWith(ISSUE_ROUTES.SMART_ASSIGN_BULK(SLUG, PID), { issueIds: [1, 2] });
+      expect(apiClient.post).toHaveBeenCalledWith(ISSUE_ROUTES.SMART_ASSIGN_BULK(SLUG, PID), { issueIds: [1, 2] }, { timeout: AI_TIMEOUT_MS });
       expect(result).toEqual(items);
     });
   });

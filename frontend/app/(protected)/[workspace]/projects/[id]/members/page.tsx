@@ -76,7 +76,7 @@ export default function ProjectMembersPage() {
     if (!workspace || !projectId) return
     listProjectMembers(workspace, projectId)
       .then(setMembers)
-      .catch(() => toast.error("Erreur lors du chargement des membres"))
+      .catch(() => toast.error("Failed to load members"))
   }, [workspace, projectId])
 
   useEffect(() => {
@@ -84,7 +84,7 @@ export default function ProjectMembersPage() {
     setIsLoading(true)
     listProjectMembers(workspace, projectId)
       .then(setMembers)
-      .catch(() => toast.error("Erreur lors du chargement des membres"))
+      .catch(() => toast.error("Failed to load members"))
       .finally(() => setIsLoading(false))
   }, [workspace, projectId])
 
@@ -92,9 +92,9 @@ export default function ProjectMembersPage() {
     try {
       await removeProjectMember(workspace, projectId, memberId)
       setMembers((prev) => prev.filter((m) => m.id !== memberId))
-      toast.success(`${memberEmail} retiré du projet`)
+      toast.success(`${memberEmail} removed from the project`)
     } catch {
-      toast.error("Erreur lors de la suppression")
+      toast.error("Failed to remove member")
     }
   }, [workspace, projectId])
 
@@ -122,7 +122,7 @@ export default function ProjectMembersPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          {members.length} membre{members.length === 1 ? "" : "s"}
+          {members.length} member{members.length === 1 ? "" : "s"}
         </p>
         <ProjectInviteDialog workspace={workspace} projectId={projectId} onInvited={refreshMembers} />
       </div>
@@ -149,7 +149,7 @@ export default function ProjectMembersPage() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-medium text-foreground">
                     {member.displayName ?? member.email}
-                    {isMe && <span className="ml-1 text-xs text-muted-foreground font-normal">(vous)</span>}
+                    {isMe && <span className="ml-1 text-xs text-muted-foreground font-normal">(you)</span>}
                   </span>
                   <Badge variant="outline" className={cn("text-xs border px-1.5 py-0 flex items-center gap-1", roleConf.badgeClass)}>
                     {roleConf.icon}
@@ -163,7 +163,7 @@ export default function ProjectMembersPage() {
               </div>
 
               <div className="hidden md:block text-xs text-muted-foreground shrink-0 text-right">
-                <div>Rejoint</div>
+                <div>Joined</div>
                 <div className="font-medium text-foreground">{formatDate(member.joinedAt)}</div>
               </div>
 
@@ -180,7 +180,7 @@ export default function ProjectMembersPage() {
                       onClick={() => handleRemove(member.id, member.email)}
                     >
                       <UserMinus className="size-4" />
-                      Retirer du projet
+                      Remove from project
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>

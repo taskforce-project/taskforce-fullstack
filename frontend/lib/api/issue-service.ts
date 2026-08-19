@@ -393,8 +393,13 @@ export async function smartAssignIssue(
   projectId: number,
   issueId: number
 ): Promise<SmartAssignResult> {
+  // Timeout génératif (AI_TIMEOUT_MS) et NON les 30s par défaut : le scoring passe par le LLM local
+  // (mesuré ~29s, au ras des 30s → timeout front intermittent = « Impossible de générer », surtout à
+  // froid / grosse équipe / pendant la démo). Aligné sur les autres appels génératifs (spec IA).
   const res = await apiClient.post<{ data: SmartAssignResult }>(
-    ISSUE_ROUTES.SMART_ASSIGN(slug, projectId, issueId)
+    ISSUE_ROUTES.SMART_ASSIGN(slug, projectId, issueId),
+    undefined,
+    { timeout: AI_TIMEOUT_MS }
   );
   return res.data.data;
 }
@@ -484,7 +489,8 @@ export async function smartAssignPreview(
 ): Promise<SmartAssignResult> {
   const res = await apiClient.post<{ data: SmartAssignResult }>(
     ISSUE_ROUTES.SMART_ASSIGN_PREVIEW(slug, projectId),
-    draft
+    draft,
+    { timeout: AI_TIMEOUT_MS } // scoring LLM (cf. smartAssignIssue) — pas les 30s par défaut
   );
   return res.data.data;
 }
@@ -502,7 +508,8 @@ export async function smartAssignBulk(
 ): Promise<BulkSmartAssignItem[]> {
   const res = await apiClient.post<{ data: BulkSmartAssignItem[] }>(
     ISSUE_ROUTES.SMART_ASSIGN_BULK(slug, projectId),
-    { issueIds }
+    { issueIds },
+    { timeout: AI_TIMEOUT_MS } // bulk = N × scoring LLM → dépasse largement 30s
   );
   return res.data.data;
 }

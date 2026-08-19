@@ -21,10 +21,10 @@ import {
 
 const PRIORITY_META: { value: IssuePriority; label: string; dot: string }[] = [
   { value: "URGENT", label: "Urgent",  dot: "bg-red-400" },
-  { value: "HIGH",   label: "Élevée",  dot: "bg-orange-400" },
-  { value: "MEDIUM", label: "Moyenne", dot: "bg-yellow-400" },
-  { value: "LOW",    label: "Basse",   dot: "bg-slate-400" },
-  { value: "NONE",   label: "Aucune",  dot: "bg-muted-foreground/30" },
+  { value: "HIGH",   label: "High",    dot: "bg-orange-400" },
+  { value: "MEDIUM", label: "Medium",  dot: "bg-yellow-400" },
+  { value: "LOW",    label: "Low",     dot: "bg-slate-400" },
+  { value: "NONE",   label: "None",    dot: "bg-muted-foreground/30" },
 ]
 
 function toggle<T>(arr: T[], value: T): T[] {
@@ -112,10 +112,10 @@ export function InlineIssueFilters({
   return (
     <div className="flex flex-wrap items-center gap-2">
       <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Filter className="size-3.5" /> Filtres
+        <Filter className="size-3.5" /> Filters
       </span>
 
-      <FilterDropdown label="Priorité" count={value.priorities.length}>
+      <FilterDropdown label="Priority" count={value.priorities.length}>
         {PRIORITY_META.map((p) => (
           <FilterRow
             key={p.value}
@@ -129,7 +129,7 @@ export function InlineIssueFilters({
       </FilterDropdown>
 
       {assignees.length > 0 && (
-        <FilterDropdown label="Assigné" count={value.assigneeIds.length}>
+        <FilterDropdown label="Assignee" count={value.assigneeIds.length}>
           {assignees.map((a) => (
             <FilterRow
               key={a.id ?? "unassigned"}
@@ -163,7 +163,7 @@ export function InlineIssueFilters({
           onClick={() => onChange(EMPTY_ISSUE_FILTERS)}
           className="flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
         >
-          <X className="size-3" /> Réinitialiser
+          <X className="size-3" /> Reset
         </button>
       )}
     </div>
@@ -196,7 +196,7 @@ export function IssueFilters({
           className={cn("h-7 text-xs gap-1.5", active > 0 && "border-primary/50 text-foreground")}
         >
           <Filter className="size-3.5" />
-          Filtres
+          Filters
           {active > 0 && (
             <span className="ml-0.5 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
               {active}
@@ -206,21 +206,21 @@ export function IssueFilters({
       </PopoverTrigger>
       <PopoverContent className="w-64 p-2" align="start">
         <div className="flex items-center justify-between px-2 py-1">
-          <span className="text-xs font-semibold">Filtrer</span>
+          <span className="text-xs font-semibold">Filter</span>
           {active > 0 && (
             <button
               type="button"
               onClick={() => onChange(EMPTY_ISSUE_FILTERS)}
               className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
             >
-              <X className="size-3" /> Réinitialiser
+              <X className="size-3" /> Reset
             </button>
           )}
         </div>
 
         {/* Priorité */}
         <div className="mt-1">
-          <p className="px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Priorité</p>
+          <p className="px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Priority</p>
           {PRIORITY_META.map((p) => (
             <FilterRow
               key={p.value}
@@ -236,7 +236,7 @@ export function IssueFilters({
         {/* Assigné */}
         {assignees.length > 0 && (
           <div className="mt-1 border-t border-border/60 pt-1">
-            <p className="px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Assigné</p>
+            <p className="px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Assignee</p>
             {assignees.map((a) => (
               <FilterRow
                 key={a.id ?? "unassigned"}

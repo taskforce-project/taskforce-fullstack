@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Loader2, AlertCircle } from "lucide-react";
 import { authService } from "@/lib/api/auth-service";
+import { usePreferencesStore } from "@/lib/store/preferences-store";
 
 /**
  * Page de rappel de la connexion externe.
@@ -18,8 +19,9 @@ import { authService } from "@/lib/api/auth-service";
  * échouerait et afficherait une erreur sur une connexion pourtant réussie. D'où le garde par `ref`,
  * qui survit au remontage là où un état serait réinitialisé.
  */
-export default function OAuthCallbackPage() {
+function OAuthCallbackInner() {
   const params = useSearchParams();
+  const { t } = usePreferencesStore();
   const [echecReseau, setEchecReseau] = useState<string | null>(null);
   const dejaEnvoye = useRef(false);
 
@@ -32,7 +34,7 @@ export default function OAuthCallbackPage() {
   const refusFournisseur =
     params.get("error_description") ??
     params.get("error") ??
-    (!code || !state ? "Réponse incomplète du fournisseur d'identité." : null);
+    (!code || !state ? t.auth.ui.callbackIncomplete : null);
 
   const erreur = refusFournisseur ?? echecReseau;
 
@@ -64,19 +66,19 @@ export default function OAuthCallbackPage() {
         window.location.replace(target);
       })
       .catch((e: unknown) => {
-        setEchecReseau(e instanceof Error ? e.message : "Connexion impossible.");
+        setEchecReseau(e instanceof Error ? e.message : t.auth.ui.callbackConnectFailed);
       });
-  }, [code, state, refusFournisseur]);
+  }, [code, state, refusFournisseur, t]);
 
   if (erreur) {
     return (
       <div className="auth-panel text-center">
         <AlertCircle className="mx-auto h-8 w-8" style={{ color: "var(--accent-red)" }} />
-        <h1 className="auth-title mt-3">Connexion impossible</h1>
+        <h1 className="auth-title mt-3">{t.auth.ui.callbackFailedTitle}</h1>
         <p className="auth-subtitle">{erreur}</p>
         <p className="mt-5 text-xs">
           <Link href="/auth/login" className="auth-link">
-            Revenir à la connexion
+            {t.auth.ui.callbackBackToLogin}
           </Link>
         </p>
       </div>
@@ -86,8 +88,30 @@ export default function OAuthCallbackPage() {
   return (
     <div className="auth-panel text-center">
       <Loader2 className="mx-auto h-7 w-7 animate-spin" style={{ color: "var(--label-tertiary)" }} />
-      <h1 className="auth-title mt-3">Connexion en cours</h1>
-      <p className="auth-subtitle">Un instant, nous finalisons votre session.</p>
+      <h1 className="auth-title mt-3">{t.auth.ui.callbackInProgressTitle}</h1>
+      <p className="auth-subtitle">{t.auth.ui.callbackInProgressSubtitle}</p>
     </div>
+  );
+}
+
+/**
+ * Enveloppe Suspense OBLIGATOIRE : `useSearchParams()` provoque un « CSR bailout » au prérendu
+ * statique — sans cette frontière, `next build` échoue (missing-suspense-with-csr-bailout, page
+ * exportée en erreur). Le fallback réutilise l'écran « Connexion en cours ».
+ */
+export default function OAuthCallbackPage() {
+  const { t } = usePreferencesStore();
+  return (
+    <Suspense
+      fallback={
+        <div className="auth-panel text-center">
+          <Loader2 className="mx-auto h-7 w-7 animate-spin" style={{ color: "var(--label-tertiary)" }} />
+          <h1 className="auth-title mt-3">{t.auth.ui.callbackInProgressTitle}</h1>
+          <p className="auth-subtitle">{t.auth.ui.callbackInProgressSubtitle}</p>
+        </div>
+      }
+    >
+      <OAuthCallbackInner />
+    </Suspense>
   );
 }

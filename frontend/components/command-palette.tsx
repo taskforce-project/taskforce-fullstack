@@ -61,7 +61,7 @@ function useAssistant(slug: string, query: string | null) {
     setText(""); setError(null); setIsRunning(true)
     sendAssistantMessage(slug, query)
       .then((answer) => { if (!cancelled) setText(answer) })
-      .catch(() => { if (!cancelled) setError("L'assistant est momentanément indisponible. Réessayez.") })
+      .catch(() => { if (!cancelled) setError("The assistant is temporarily unavailable. Please try again.") })
       .finally(() => { if (!cancelled) setIsRunning(false) })
     return () => { cancelled = true }
   }, [slug, query])
@@ -148,11 +148,11 @@ export function CommandPalette({ open, onOpenChange }: Readonly<CommandPalettePr
     { id: "ask-ai",        label: "Ask AI",              group: "Actions",    icon: <Sparkles className="h-4 w-4" />,        shortcut: "A",   action: enterAiMode },
     // La création d'issue est propre à un projet : on mène à la liste des projets, où chacun porte
     // son propre bouton « New issue » — plutôt qu'un dialogue de création sans projet.
-    { id: "new-issue",     label: "Créer une issue",     group: "Actions",    icon: <Plus className="h-4 w-4" />,            shortcut: "C",   action: () => go("/projects") },
-    { id: "new-project",   label: "Créer un projet",     group: "Actions",    icon: <Plus className="h-4 w-4" />,                             action: () => { openCreateProject(); onOpenChange(false) } },
-    { id: "notifications", label: "Ouvrir les notifications", group: "Actions", icon: <Bell className="h-4 w-4" />,                          action: () => go("/inbox") },
+    { id: "new-issue",     label: "Create issue",     group: "Actions",    icon: <Plus className="h-4 w-4" />,            shortcut: "C",   action: () => go("/projects") },
+    { id: "new-project",   label: "Create project",     group: "Actions",    icon: <Plus className="h-4 w-4" />,                             action: () => { openCreateProject(); onOpenChange(false) } },
+    { id: "notifications", label: "Open notifications", group: "Actions", icon: <Bell className="h-4 w-4" />,                          action: () => go("/inbox") },
     // « Voir les forfaits » → page des plans (facturation), pas les réglages génériques.
-    { id: "upgrade",       label: "Voir les forfaits",   group: "Actions",    icon: <Zap className="h-4 w-4" />,                              action: () => go("/billing") },
+    { id: "upgrade",       label: "View plans",   group: "Actions",    icon: <Zap className="h-4 w-4" />,                              action: () => go("/billing") },
     // Appearance
     { id: "theme-light",   label: "Switch to light mode", group: "Appearance", icon: <Sun className="h-4 w-4" />,    action: () => { setTheme("light"); onOpenChange(false) } },
     { id: "theme-dark",    label: "Switch to dark mode",  group: "Appearance", icon: <Moon className="h-4 w-4" />,   action: () => { setTheme("dark"); onOpenChange(false) } },
@@ -177,7 +177,7 @@ export function CommandPalette({ open, onOpenChange }: Readonly<CommandPalettePr
             </button>
             <Sparkles className="h-4 w-4 text-primary shrink-0" />
             <span className="text-sm font-medium text-foreground">Ask AI</span>
-            <span className="text-xs text-muted-foreground/50 ml-auto">ESC pour revenir</span>
+            <span className="text-xs text-muted-foreground/50 ml-auto">ESC to go back</span>
           </div>
 
           {/* Réponse streamée */}
@@ -193,7 +193,7 @@ export function CommandPalette({ open, onOpenChange }: Readonly<CommandPalettePr
                 <p className="text-sm leading-relaxed flex-1">
                   {aiError
                     ? <span className="text-destructive">{aiError}</span>
-                    : <span className="text-foreground">{aiText || (isRunning ? "Réflexion en cours…" : "")}</span>}
+                    : <span className="text-foreground">{aiText || (isRunning ? "Thinking…" : "")}</span>}
                 </p>
               </div>
               {!isRunning && (
@@ -201,7 +201,7 @@ export function CommandPalette({ open, onOpenChange }: Readonly<CommandPalettePr
                   onClick={() => { setAiQuery(null); setAiInput("") }}
                   className="mt-2 ml-7 text-[11px] text-muted-foreground/60 hover:text-foreground transition-colors"
                 >
-                  ← Nouvelle question
+                  ← New question
                 </button>
               )}
             </div>
@@ -215,13 +215,13 @@ export function CommandPalette({ open, onOpenChange }: Readonly<CommandPalettePr
                 value={aiInput}
                 onChange={(e) => setAiInput(e.target.value)}
                 onKeyDown={handleAiKeyDown}
-                placeholder="Posez votre question…"
+                placeholder="Ask your question…"
                 rows={3}
                 className="w-full resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 outline-none border-none"
               />
               <div className="flex items-center justify-end mt-1">
                 <span className="text-[10px] text-muted-foreground/40 flex items-center gap-1">
-                  <CornerDownLeft className="size-3" /> Entrée pour envoyer
+                  <CornerDownLeft className="size-3" /> Enter to send
                 </span>
               </div>
             </div>
@@ -270,15 +270,15 @@ export function CommandPalette({ open, onOpenChange }: Readonly<CommandPalettePr
             <span className="flex items-center gap-1.5">
               <kbd className="inline-flex size-4 items-center justify-center rounded border border-border bg-muted text-[10px]">↑</kbd>
               <kbd className="inline-flex size-4 items-center justify-center rounded border border-border bg-muted text-[10px]">↓</kbd>
-              pour naviguer
+              to navigate
             </span>
             <span className="flex items-center gap-1.5">
               <kbd className="inline-flex h-4 items-center justify-center rounded border border-border bg-muted px-1 text-[10px]">↵</kbd>
-              pour sélectionner
+              to select
             </span>
             <span className="ml-auto flex items-center gap-1.5">
               <kbd className="inline-flex h-4 items-center justify-center rounded border border-border bg-muted px-1 text-[10px]">esc</kbd>
-              pour fermer
+              to close
             </span>
           </div>
         </>

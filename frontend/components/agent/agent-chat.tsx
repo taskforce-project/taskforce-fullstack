@@ -24,9 +24,9 @@ interface Turn {
 }
 
 const SUGGESTIONS = [
-  "Analyse nos décisions sur les embeddings",
-  "Quels problèmes avons-nous rencontrés ?",
-  "Résume l'architecture de TaskForce",
+  "Analyze our decisions on embeddings",
+  "What problems have we encountered?",
+  "Summarize TaskForce's architecture",
 ]
 
 /** Reconstruit des tours à partir des messages persistés (rendu de l'historique). */
@@ -138,7 +138,7 @@ export function AgentChat() {
     } catch {
       setTurns((t) => [...t, {
         id: `a${Date.now()}`, role: "assistant",
-        answer: { answer: "Désolé, je n'ai pas pu répondre. Réessayez.", reasoning: null, mode: "fallback", sources: [], steps: [], toolCalls: [], usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 } },
+        answer: { answer: "Sorry, I couldn't answer. Please try again.", reasoning: null, mode: "fallback", sources: [], steps: [], toolCalls: [], usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 } },
       }])
     } finally {
       setLastMs(Date.now() - startRef.current)
@@ -148,7 +148,7 @@ export function AgentChat() {
 
   const currentTitle = currentId
     ? (conversations.find((c) => c.id === currentId)?.title ?? "Conversation")
-    : "Nouvelle conversation"
+    : "New conversation"
 
   return (
     <div className="flex h-full flex-col">
@@ -172,12 +172,12 @@ export function AgentChat() {
                 onClick={newConversation}
                 className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs font-medium transition-colors hover:bg-muted"
               >
-                <Plus className="size-3.5" /> Nouvelle conversation
+                <Plus className="size-3.5" /> New conversation
               </button>
               <div className="my-1 h-px bg-border" />
               <div className="max-h-64 overflow-y-auto">
                 {conversations.length === 0 ? (
-                  <p className="px-2 py-3 text-center text-xs text-muted-foreground">Aucune conversation.</p>
+                  <p className="px-2 py-3 text-center text-xs text-muted-foreground">No conversations.</p>
                 ) : (
                   conversations.map((c) => (
                     <div
@@ -195,7 +195,7 @@ export function AgentChat() {
                         type="button"
                         onClick={() => removeConversation(c.id)}
                         className="shrink-0 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
-                        title="Supprimer"
+                        title="Delete"
                       >
                         <Trash2 className="size-3.5" />
                       </button>
@@ -210,7 +210,7 @@ export function AgentChat() {
         <button
           type="button"
           onClick={newConversation}
-          title="Nouvelle conversation"
+          title="New conversation"
           className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
           <Plus className="size-4" />
@@ -227,7 +227,7 @@ export function AgentChat() {
             <div>
               <p className="text-sm font-medium">Cortex</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                L&apos;agent IA de Taskforce, fondé sur le Brain OS de votre workspace. Il cite ses sources.
+                Taskforce&apos;s AI agent, built on your workspace&apos;s Brain OS. It cites its sources.
               </p>
             </div>
             <div className="mt-2 flex w-full flex-col gap-1.5">
@@ -264,7 +264,7 @@ export function AgentChat() {
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input) }
             }}
-            placeholder="Posez votre question…"
+            placeholder="Ask your question…"
             rows={1}
             className="max-h-24 min-h-[1.5rem] flex-1 resize-none bg-transparent text-sm outline-none placeholder:text-muted-foreground/50"
           />
@@ -280,14 +280,14 @@ export function AgentChat() {
         <div className="mt-1 flex items-center justify-between gap-2 px-1 text-[10px] text-muted-foreground/50">
           <span className="flex min-w-0 items-center gap-1.5">
             {loading ? (
-              <span className="tabular-nums text-primary/70">Cortex réfléchit · {elapsed.toFixed(1)} s</span>
+              <span className="tabular-nums text-primary/70">Cortex is thinking · {elapsed.toFixed(1)} s</span>
             ) : convTokens > 0 ? (
               <>
                 <TokenMeter value={convTokens} className="text-muted-foreground/60" />
                 {lastMs != null && <span className="tabular-nums">· {(lastMs / 1000).toFixed(1)} s</span>}
               </>
             ) : (
-              <span>Entrée ↵ · Maj+Entrée</span>
+              <span>Enter ↵ · Shift+Enter</span>
             )}
           </span>
           <CortexUsage sessionTokens={convTokens} />
@@ -318,7 +318,7 @@ function AgentAnswerView({ answer }: { answer: AssistantAnswer }) {
         {answer.usage && answer.usage.totalTokens > 0 && (
           <span className="flex shrink-0 items-center gap-1.5 text-[10px] tabular-nums text-muted-foreground/60">
             <span className="rounded bg-muted px-1 py-px font-medium uppercase tracking-wide">{answer.mode}</span>
-            {answer.usage.totalTokens.toLocaleString("fr-FR")} tokens
+            {answer.usage.totalTokens.toLocaleString("en-US")} tokens
             {hasBreakdown && <span className="opacity-70">({answer.usage.promptTokens}↑ {answer.usage.completionTokens}↓)</span>}
           </span>
         )}

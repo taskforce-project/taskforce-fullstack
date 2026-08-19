@@ -10,6 +10,145 @@
 >
 > Sources : `.ai/qa.md` (QA produit détaillée), `.ai/known-issues.md` (bugs vérifiés), `.ai/module-map.md` (domaines↔code), `.ai/architecture-map.md` (archi réelle), `.ai/P0-fix-plan.md` (correctifs P0 paste-ready).
 
+> **▶ MAJ 18/08/2026 — Déploiement Phase 1 (backend sur VM1) + correctifs config prod.** `[DEPLOY-01]`
+> Premier déploiement prod réel sur la VM école `MNS-VMD-DFS5-033` (pilotée en SSH via Tailscale). Pile
+> backend **6/6 healthy** (postgres pgvector + keycloak + backend + ai-service + minio + redis), migrations
+> Flyway OK, realm `taskforce-prod` importé, **chat Groq opérationnel** (gpt-oss-120b/20b) + embeddings en
+> **repli lexical** (pas d'Ollama sur 4 Go). Le déploiement a révélé que **le profil `prod` n'avait jamais
+> bootté en entier** → correctifs appliqués au repo (branche `fix/pre-soutenance-qa`, à committer) :
+> - **`application-prod.yml`** : ajout des blocs **`mail`/`minio`/`stripe`/`otp`** (absents, requis par
+>   MailConfig/MinioConfig/StripeConfig/OtpService) + `keycloak.admin.client-id`/`keycloak.endpoints` +
+>   `management.health.mail.enabled=false`.
+> - **`docker-compose.prod.yml`** : mount realm `./keycloak/realms`→`./keycloak/realms/prod` (import récursif
+>   KO), healthcheck backend `/api/actuator/health`→`/actuator/health`, Keycloak (`--optimized` retiré,
+>   healthcheck `curl`→`/dev/tcp`, env placeholders realm), passthrough env backend (APP_URL/FRONTEND_URL/
+>   KEYCLOAK_ADMIN_*), `PGDATA` pg18, env Groq sur ai-service.
+> - **`ai-service`** : header `User-Agent` (Cloudflare devant Groq bloque `Python-urllib` → 403) + modèles
+>   Groq **actuels** (`llama-3.3` décommissionné). Cf. `.ai` mémoire agent [[groq-cloudflare-ua-block]].
+> - **`.env.prod.example`** : realm/client alignés sur le realm réel (`taskforce-prod`/`taskforce-api`).
+>
+> Les valeurs spécifiques au déploiement interne (placeholders localhost, `KC_HOSTNAME_STRICT=false`) restent
+> dans un **override VM `docker-compose.vm1.yml`** (hors repo), pas dans le compose committé. **Reste Phase 2** :
+> alignement issuer Keycloak + vrai **domaine** → **Cloudflare Tunnel + Access**, puis **VM2** (frontend +
+> observabilité PLG). Plan complet : `taskforce-docs/v1/08-operations/Plan_Deploiement_2VM.md`.
+>
+> **Correctifs repo appliqués le 18/08** (working tree `fix/pre-soutenance-qa`, NON commités — à review) :
+> `ai-service/app/services/ollama_gateway.py` (User-Agent), `ai-service/app/config.py` (modèles Groq),
+> `backend/tf-api/src/main/resources/application-prod.yml` (blocs mail/minio/stripe/otp + keycloak.endpoints
+> + health.mail off), `docker-compose.prod.yml` (mount realm prod, healthchecks, Keycloak, passthrough env,
+> PGDATA, Groq ai-service), `.env.prod.example` (realm/client alignés + URLs + Groq), `backend/tf-api/Dockerfile`
+> (chemin healthcheck). Non encore validés EN TANT QUE version committée (la VM tourne via l'override).
+>
+> **MAJ (consolidation Phase 2, 18/08)** : correctifs supplémentaires portés au repo — `docker-compose.prod.yml`
+> (`APP_API_URL` sans interpolation imbriquée `${...}` + passthrough `KEYCLOAK_PUBLIC_URL` avec défaut compose `:-`), `application-prod.yml`
+> (bloc `stripe` : `success-url`/`cancel-url` **à plat**, pas sous `checkout`), `backend/tf-api/Dockerfile`
+> (`mkdir /var/log/taskforce-api` + chown spring), `frontend/lib/store/preferences-store.ts` (défaut `language: "en"`
+> + `t: CONSTANTS_EN` — c'était `fr`/`CONSTANTS_FR`), `frontend/Dockerfile` (bake `NEXT_PUBLIC_SITE_URL`). Déploiement
+> VM1 (033) + VM2 (014) publiques via Cloudflare (`api.`/`auth.`/`app.taskforce-project.fr`).
+>
+> **MAJ (consolidation committée + déployée, 18/08)** : commit `db73b031` sur `fix/pre-soutenance-qa`
+> poussé ; **les 2 VM ont `git pull` + rebuild** (VM1 backend : healthy, boot 26 s, actuator UP ; VM2 frontend :
+> rebuild, sert 200). Fini les patchs sed sur la VM — les deux tournent du **code committé** (0 drift).
+>
+> **MAJ (lot i18n — Batch 1 : flux d'authentification, 18/08)** : le français codé en dur du **flux d'auth**
+> est sorti vers `constants_en/fr` + `t.auth.ui.*`. Composants routés : `login-form`, `register-info-form`,
+> `forgot-password-form`, `register/verification/verification-form`, `auth-social-buttons`, `auth-stepper`
+> (libellés via clés stables `account`/`verification`), `app/auth/layout`, `app/auth/callback/page`. Bloc
+> **`auth.ui`** ajouté et **mirroré EN/FR** (interpolation par jetons `{provider}`/`{email}`/`{seconds}` via
+> `String.replace`). Les **mocks de test** (`login`/`register-info`/`verification`/`forgot`/`auth-stepper`)
+> renvoient désormais les **vraies `CONSTANTS_FR`** (`vi.importActual`, anti-drift). Vérifié : `tsc --noEmit`
+> **0 erreur**, **83/83** tests auth verts, ESLint **0 erreur**. **Batch 1 vérifié EN LIVE** (VM2 rebuild,
+> `app.taskforce-project.fr` : « Sign in / Access your workspace / Email / Password / Forgot password? »).
+> ⚠️ **Reste Batch 2** : français in-app (`settings`, `integrations-catalog`, `onboarding`, `product-tour`,
+> nav, dialogs entreprise…).
+>
+> **MAJ (refactor URLs → domaine de base unique, 18/08)** : « préfixe (sous-domaine) dans le code, suffixe
+> (domaine) en variable d'env ». Nouveau module **`frontend/lib/config/urls.ts`** : dérive `API_URL`,
+> `API_URL_SSR`, `STORAGE_URL`, `SITE_URL` d'un seul **`NEXT_PUBLIC_BASE_DOMAIN`** (→ `api.<base>` /
+> `files.<base>` / `<base>`), repli **localhost** en dev, un `NEXT_PUBLIC_*` explicite l'emporte toujours.
+> Consommé par `lib/api/client.ts` (baseURL SSR/CSR) et `app/auth/layout.tsx` (lien « retour au site ») ;
+> `next.config.ts` ré-inline la même dérivation pour la CSP (`connect-src`/`img-src`). `Dockerfile` : `ARG`
+> + `ENV NEXT_PUBLIC_BASE_DOMAIN`. **Landing** : `nav.ts` `APP_URL` était **codé en dur sur l'ancien domaine
+> `app.taskforce.dev`** → dérivé de `import.meta.env.PUBLIC_BASE_DOMAIN` (défaut `taskforce-project.fr`),
+> échappatoire `PUBLIC_APP_URL`. Gabarits mis à jour : `.env.prod.example` (`BASE_DOMAIN`), `landing-page/.env.example`
+> (`PUBLIC_BASE_DOMAIN`/`PUBLIC_APP_URL`). Vérifié `tsc` + ESLint **0**. ⚠️ Côté **VM2** : `docker-compose.vm2.yml`
+> (build.args composés depuis `${BASE_DOMAIN}` + passage de `NEXT_PUBLIC_BASE_DOMAIN`) — fichier VM hors repo,
+> à ajuster au rebuild. ⚠️ La **landing déploie depuis `main` (Vercel)** : le fix `APP_URL` doit atteindre `main`
+> pour passer en prod. Backend (APP_URL/CORS/issuer) : même pattern possible en suivi (dérive dans
+> `docker-compose.prod.yml`), non fait ici (risque sur le boot prod, à valider via `docker compose config`).
+> Déployé + vérifié EN LIVE sur VM2 (build.args composés depuis `${BASE_DOMAIN}` dans `~/taskforce/.env`).
+>
+> **MAJ (Batch 2 i18n in-app — DÉMARRÉ, 18/08)** : constat clé — contrairement au flux d'auth (100 % FR),
+> **l'in-app est majoritairement en anglais codé en dur** (breadcrumbs, `Account`/`Billing`/`Search…`/`Ask AI`)
+> avec des **îlots de français**. L'approche proportionnée pour « tout en anglais » = **remplacer ces îlots FR
+> par de l'anglais en place** (pas de re-routage bilingue complet de milliers de chaînes déjà anglaises).
+> **Décision d'approche tranchée par l'utilisateur : BILINGUE COMPLET** (routage `t.xxx` EN/FR, toggle FR/EN
+> fonctionnel in-app comme l'auth) — pas de simple swap. Donc on route TOUT vers `constants_en/fr`.
+>
+> **Zone 1/N — App shell FAITE (bilingue)** : nouveau namespace **`shell`** (mirroré EN/FR) + réemploi de
+> `common.*`/`settings.*`. Routés vers `t` : `app-footer` (privacy/legalNotices), `nav-user`
+> (settings.upgrade/account/billing, common.notifications/logout), `team-switcher` (workspaces, active,
+> workspacesCount interpolé, templates, create/cancel…), `app-topbar` (search/askAi/experimental/giveFeedback,
+> arias, toast Pro). `tsc --noEmit` **0**, ESLint **0**. ⚠️ Breadcrumbs `segmentLabel` (déjà EN, module-level)
+> non encore routés — suivi. **Reste ~55-60 fichiers** (settings-modal, dashboard, projects, onboarding, dialogs,
+> analytics, brain, agent, members, integrations…). `settings-modal` (titre) routé.
+>
+> **⚠️ DÉCOUVERTE BLOQUANTE (18/08)** : l'app a **DEUX systèmes i18n déconnectés** — (1) `lib/i18n/index.tsx`
+> (`useTranslation`, clé localStorage **`tf-locale`**), utilisé par le sélecteur **Réglages→Langue** ;
+> (2) `lib/store/preferences-store.ts` (`usePreferencesStore`, clé **`taskforce-preferences`**), utilisé par
+> l'auth + le shell + tout ce que je route. **Ils ne partagent AUCUN état** → le toggle de langue est en réalité
+> **cassé** (changer dans Réglages ne bouge pas l'auth/shell, et inversement). Un vrai bilingue exige d'abord
+> d'**UNIFIER** les deux (cible = `preferences-store` ; faire pointer le sélecteur Réglages + adapter `useTranslation`),
+> PUIS de router ~1000 chaînes. C'est un chantier à part entière (plusieurs sessions). En plus, `settings/page.tsx`
+> à lui seul ≈ 1475 lignes / ~100 chaînes. Décision de cap redemandée à l'utilisateur.
+>
+> **CAP TRANCHÉ (18/08) : ANGLAIS SEULEMENT, on ignore le toggle.** L'utilisateur choisit de rendre l'app 100 %
+> anglaise au plus vite par **remplacement des littéraux FR → EN en place** (pas de routage `t`, pas d'unification
+> des 2 systèmes i18n — le toggle reste non fonctionnel, comme aujourd'hui). Le shell déjà routé en `t` reste tel
+> quel (il affiche l'anglais par défaut). **`settings/page.tsx` (≈50 chaînes) + `settings-modal` FAITS en anglais**
+> (Profile/Account/Appearance/Notifications/Security/Workspace/Status/Integrations/Privacy/Usage/Nav + toasts +
+> `toLocaleString("fr-FR")`→`"en-US"`). Gardé « Français » (label de l'option de langue). `tsc`/ESLint **0**.
+> **Zone 2 — DASHBOARD FAITE (anglais)** : `card-registry` (labels/descriptions cartes), `dashboard-hero`
+> (greetings Bonjour/Bonsoir, nav palette, recherche), `dashboard/page` (Refresh/Retry), `add-card-dialog`,
+> `quick-columns`, `spec-chart`, `card-states`, `card-shell`, `dashboard-grid`, `dashboard-card`, + toutes les
+> cartes (`ops-health`, `throughput`, `needs-attention`, `ai-usage`, `ai-chart`, `kpi`, `burndown`, `workload`).
+> `toLocaleString("fr-FR")`→`"en-US"`. `tsc` **0**. ⚠️ **Leçon** : le grep sur accents SEUL manque du français
+> (accent-free « Aucun », fichiers hors 1er grep type `card-shell`) → il faut un **sweep large** (accents +
+> mots FR fréquents) par zone + `tsc`. **Reste ~40 fichiers** : projects/*, onboarding/*, dialogs/*, analytics/*,
+> brain/*, agent/*, members/*, sales/*, subscription/*, issues/*, sheets/*, tour, workflows, profile, smart-assign.
+> Vu le volume + le caractère 100 % indépendant (swap EN, aucun état partagé), un **workflow parallèle** finirait
+> le reste en une passe — proposé à l'utilisateur.
+>
+> **Zone 3+ — WORKFLOW PARALLÈLE (validé user).** ~13 agents `general-purpose`, chacun lit ~5 fichiers en entier
+> (pour attraper le FR accent-free) + swap FR→EN, syntax-safe. **Run 1** : 4 agents OK avant limite de session →
+> **20 fichiers, 184 chaînes** (subscription-manager, enterprise dialogs, roi-calculator, deployment-options,
+> command-palette, brain-graph, create-project/cycle dialogs, chat/tool, projects/[id]/cycles+members+backlog+pages…).
+> 9 agents échoués (limite). ⚠️ Un agent échoué avait **partiellement édité** `project-invite-dialog.tsx` en cassant
+> une balise `</SelectItem>` → corrigé à la main. `tsc` **0** après correction. **Run 2** (limite réinitialisée) :
+> 44 fichiers restants relancés (background). Après : `tsc` + **sweep large FR** (accents + accent-free) + **vitest**
+> (corriger les tests qui asseraient des chaînes FR devenues EN) + ESLint, puis commit + rebuild VM2.
+>
+> **Run 2** : 9/9 agents OK, **12 fichiers, 320 chaînes** (issue-sheet 51, billing 55, help 42, chart-explorer 42,
+> members 30, project-teams 27, member-availability 22, workflow-dock 18, issue-filters 13…). **Sweep final** :
+> le grep accents SEUL rate encore des fichiers jamais envoyés au workflow (leur FR était accent-free) → corrigés
+> à la main : `date-picker` (+ locale `fr`→`enUS`), `roadmap-gantt`, `notification-bell`, `error.tsx`,
+> `projects/[id]/layout` (favoris), `projects/[id]/pages` (Supprimer/Aucune page…), `workflows-button` (aria).
+> **Tests** : `subscription-manager.test` + `auth-flow.test` (intégration) asseraient du FR → assertions passées
+> en EN ; le test « language changes » repartait d'un défaut FR → réécrit EN→FR + **reset du singleton** (fuite
+> d'état inter-tests). **RÉSULTAT : `tsc` 0, `vitest` 821/821 verts, ESLint 0 nouvelle erreur.** ⚠️ Reste : commit
+> (dashboard + sweep complet) + rebuild VM2 + vérif live. Un seul « Français » (label d'option de langue) gardé.
+>
+> **▶ MAJ 19/08 — Flow release + auto-déploiement VM (choix user : « tout sur main + auto-deploy VM sur main »).**
+> Vérifié : (1) **aucun CI/CD ne déploie vers les VM** (pas de ssh/deploy dans `.github/workflows`, pas de
+> cron/timer/webhook sur les VM) → MAJ VM toujours **manuelles**. (2) `release.yml` se déclenche sur push **dev ET main**,
+> détecte les services changés **par file-diff** (`backend/`/`frontend/`/`landing/`), **build+push images vers ghcr.io** +
+> releases/tags (labels `release:{major|minor|patch}` requis) — ces images vont sur **ghcr, pas la VM** (la VM build depuis
+> les sources). (3) Tests en CI. **Fait (VM, hors repo)** : `scripts/auto-deploy.sh` (poll `origin/main` ; rebuild ciblé du
+> rôle ; **garde-fous** : déploie SEULEMENT si HEAD==main ET fast-forward) + `.deploy-role` (backend=VM1 / frontend=VM2) +
+> units `tf-autodeploy.{service,timer}` (poll 3 min) — **DÉSACTIVÉS + INACTIFS**. **Activation** : (a) user commit le lot
+> i18n (86 fichiers) sur `fix/pre-soutenance-qa` ; (b) merge → `dev` (CI) → `main` (PR+label) ; (c) MOI : `git checkout main`
+> + rebuild 1× par VM + `systemctl enable --now tf-autodeploy.timer`. Ensuite « push main = déploie ». Rollback = `disable`.
+
 > **▶ SOUTENANCE — auto-audit contre les critères jury (12/07/2026).** Un camarade a reçu un retour du
 > **prof** sur son projet QualiTrack et l'a partagé ; ce retour révèle **ce que le jury attend**. On auto-audite
 > TaskForce contre ces critères (ce ne sont pas des critiques de TaskForce). Detail dans le Brain OS :
@@ -31,6 +170,88 @@
 >   **assemblage du bundle PDF** unique (Phase 11 doc) `[SOUT-07]` **[P1]**.
 > - **A anticiper (Q&A jury)** : questions du type "montre les tests de ton Model X", "cheminement d'une
 >   requete HTTP dans tes 5 couches" - preparer 1 exemple concret de chacune.
+
+> **▶ MAJ 17/08/2026 — durcissement tests/couverture + portes CI bloquantes (chantiers A+B).** Déclenché
+> par un regard critique sur la couverture réelle (vues package-level sous le gate). Détail : rapports
+> `taskforce-docs/v1/08-operations/Rapport_Tests.md` et `…/07-securite/Rapport_Securite.md`.
+> - **Couverture front HONNÊTE (C18) ✅** : exclusion du **généré / déco / barrels** (`*.generated.ts`,
+>   `floating-paths.tsx` fond SVG animé, `index.ts`) — même logique que i18n/constants/mocks — au lieu de les
+>   compter à 0 % (chiffre gonflé). Tests ajoutés sur la **vraie logique** : `client-logger.ts` **0 → 100 %**
+>   (throttle/dédup/token-gate, E25) et `turnstile-widget.tsx` (cycle render/remove anti-bot, frontière
+>   d'intégration). Gate Vitest **vert : All files 85,19 → 90,03 %**, `components/auth` 79,9 → 86,3 %.
+>   **+14 tests** (front = **821**). `[FE-COV-01]`
+> - **Slices contrôleurs backend (C25) ✅** : **+13 `@WebMvcTest`** sur 7 contrôleurs démo-critiques qui étaient
+>   à ~0 % (`Analytics`, `Knowledge/Brain`, `Analysis`, `Cortex`, `User`, `OAuth`, `webhook Stripe`) — routage,
+>   résolution JWT→userId, 200/401, gardes de bordure (liste blanche OAuth, état anti-CSRF, signature Stripe
+>   invalide → 400). `it.ps1 -Verify` = **865 tests / 0 échec** ; gate JaCoCo (périmètre) **72,99 → 73,64 %**,
+>   « All coverage checks have been met ». `[BE-COV-01]`
+> - **Portes CI BLOQUANTES (C25/C26, PC-028) ✅** : `backend-tests.yml` passe de `mvn test jacoco:report` à
+>   **`mvn verify`** → l'exécution `jacoco-check` (BUNDLE LINE ≥ 70 %), **inerte** jusqu'ici en CI, **bloque** enfin.
+>   Nouveau workflow **`security-scan.yml`** : **Trivy** (deps/secrets/misconfig) + **Semgrep** (SAST), rapport
+>   complet en artefact + **gate sur le plus haut niveau** (CRITICAL / ERROR, 0 aujourd'hui) + run **hebdo** planifié.
+>   ZAP DAST reste manuel (stack requise). `[CI-GATE-01]`
+> - **2e lot de slices contrôleurs (C25) ✅** : **+9 `@WebMvcTest`** sur 8 contrôleurs CRUD workspace restés à
+>   ~0 % (Cycle/Page/DashboardCard/MemberLeave/MemberSkill/AiUsage/SkillSuggestion/Webhook). Back = **874 tests**,
+>   gate JaCoCo **73,64 → 74,11 %**. `[BE-COV-02]`
+> - **DAST en CI (C26) ✅** : nouveau `zap-dast.yml` — OWASP ZAP baseline **planifié hebdo + manuel**, lève la
+>   stack (comme les E2E), gate sur alerte HIGH. Complète Trivy/Semgrep de `security-scan.yml`. `[CI-DAST-01]`
+> - **Durcissement prod P0 (C24/C26) ✅** : PC-024 (Dockerfile défaut `prod` fail-safe), PC-026 (seeds
+>   V17/18/31/40 déplacés en `db/seed`, chargés en **dev seulement** → prod/`it` ne les voient plus),
+>   PC-027 (`CorsConfig` lit `cors.allowed-origins`), **PC-025** (compose « par défaut » aligné sur
+>   `pgvector/pgvector:pg18`, prod/dev l'étaient déjà). Vérifié `it.ps1 -Verify` : chaîne de migration **sans
+>   seeds** (= chemin prod), V73, 0 erreur Flyway. `[PROD-P0-01]`
+> - **Montée des CVE HIGH (C24) ✅** : `spring-framework` 7.0.8, `netty` 4.2.16, `micrometer` 1.16.6,
+>   `spring-data-commons` 4.0.6, `next` 16.2.11 + `apk upgrade` (paquets OS). Vérifié back (874) + `next build`
+>   (au passage, **fix pré-existant** : `/auth/callback` manquait sa frontière `<Suspense>`) ; **`keycloak`
+>   25→26 fait** (bump majeur, testé — 874 verts, API admin stable, 0 conflit transitif). `[SEC-DEPS-01]`
+> - **Reste (action user)** : roter les secrets `.env.dev` (Groq / OAuth GitHub / Stripe test) avant rendu ;
+>   `stripe listen` + démo paiement Business sur un compte frais.
+> - **Vérif** : `it.ps1 -Verify` (**874 tests, gate 74,11 %** ✅) + Vitest `--coverage` (821 tests, 90,03 %, gate ✅)
+>   + `next build` ✅ + `tsc`/`eslint` verts.
+
+> **▶ MAJ 17/08/2026 (suite) — P0 IA + faux positifs du registre.**
+> - **PC-022 (P0) — `AgentService.run` ne tient plus de transaction pendant le LLM** : `@Transactional` retiré.
+>   Les collaborateurs (BrainAccessGuard, BrainSearchService, KnowledgeService via les outils, AiUsageService)
+>   sont **déjà** `@Transactional` → tx courte par opération, jamais tenue pendant l'appel au modèle (patron
+>   `AnalysisJobRunner`). Fin du risque « ~20 chats Cortex simultanés = pool Hikari (20) épuisé = API down ».
+>   Vérifié `it.ps1 -Verify` : **874 tests, 0 échec, gate vert**. **Reste, même famille** : `SmartAssignService.bulkRecommend` +
+>   `PlaneIntegrationService.sync` (N LLM en 1 tx) — refonte read→LLM→write plus lourde, sur des actions
+>   **mono-utilisateur** (bouton bulk / sync) → à cadrer à part, pas à bâcler. `[PC-022]`
+> - **PC-029 / PC-030 — déjà corrigés (registre périmé, vérifié 17/08)** : le Cmd+K appelle le vrai
+>   `sendAssistantMessage` (Cortex, plus de mock) ; la page `/agents` (faux chiffres) n'existe plus (aucune
+>   route ni référence). Statuts corrigés dans `Problemes_Connus`.
+
+> **▶ MAJ 16/08/2026 — audit de livrabilité pré-soutenance + 3 correctifs + bascule IA VM.** Topo complet :
+> `.ai/audit-livrable-pfr.md` (couverture des 32 compétences, paiement, sécurité, tests). Verdict : **livrable
+> pour la soutenance Blocs 2-3**, gaps résiduels = C11/E9 (cas RGPD externe non reçu) et Bloc 4 non déployé
+> (mise en situation séparée). ⚠️ **Brain OS réel = `C:\Taskforce\taskforce-docs\`** (chemin `CLAUDE.md` périmé).
+> - **Smart Assign — démo qui claque ✅** : `dev_seed.sql` **curé** (charge par domaine + `member_leaves`) →
+>   best-match net (WEB-5 react+ts → Aïcha 66 %). Congés = **vraie contrainte** : `SmartAssignService`
+>   exclut du vivier les membres en VACATION/SICK du jour (`resolveCandidates`, REMOTE = présent). **Rééquilibrage
+>   du scoring** (labelScore 0.08→0.22) → le bulk auto-assign **distribue par métier** au lieu de concentrer sur
+>   le moins chargé. `it.ps1 -Test SmartAssignServiceTest` = **35/35**. `[PROD-1.8]`
+> - **Bascule IA Groq (déployabilité VM, C29-C30) ✅** : détection auto — si `GROQ_API_KEY` présente, le **chat**
+>   (smart-assign, Cortex, orchestration) passe sur **Groq** (hébergé, zéro compute local → VM 4 Go) ; sinon
+>   Ollama local. Embeddings toujours Ollama. `ai-service/app/{config.py,services/ollama_gateway.py,routers/health.py}`
+>   + `docker-compose.dev.yml` + `.env*`. Vérifié no-op en dev (`chat_provider: ollama`). ⚠️ clé `.env.dev` **morte
+>   (403)** → vidée ; mettre une clé valide (console.groq.com) pour la VM. `[IA-DEPLOY-01]`
+> - **Paiement Stripe — anti-rétrogradation (C23) ✅** : bug `STRIPE_PRICE_ID_BASIC == BUSINESS` → le webhook
+>   `subscription.updated` rétrogradait Business→Basic. Fix : `getPlanForPriceId` renvoie **null si le price-id est
+>   ambigu** (matche plusieurs forfaits) → le plan reste celui posé par `checkout.session.completed` (metadata).
+>   `StripeServiceTest` **10/10** (nouveau cas ambigu). Reste **action user** : créer un price Business distinct +
+>   lancer `stripe listen` pour la démo. `[PROD-PAY-02]`
+> - **CI backend réparée (C25/C26, PC-028) ✅** : `backend-tests.yml` faisait `mvn test` **sans Postgres** → intégration
+>   en erreur, JaCoCo disque ~4 %, « Backend Tests » rouge. Ajout d'un **service `pgvector/pgvector:pg16`** +
+>   `SPRING_DATASOURCE_*` (réplique `it.ps1`) → les tests d'intégration tournent en CI. Couverture réelle (via
+>   `it.ps1 -Full`) = **back ~75-78 %** / **front ~92 %** (781 tests). `[SOUT-02 / PC-028]`
+> - **Validation front Zod (C16/C22, règle d'or #8) ✅** : Zod était déclaré mais **inutilisé**. Nouveau
+>   `lib/validation/auth-schemas.ts` (réutilise les helpers existants) câblé sur **login + register** (`safeParse`).
+>   tsc/eslint verts. `[FE-SEC-ZOD-01]`
+> - **Visite guidée — logique corrigée ✅** : terminée→bloquée ; fermée sans cocher→revient au prochain accès ;
+>   case « Ne plus afficher » créée→bloquée. Flag `dismissed` éphémère (anti-boucle). `[FE-TOUR-01]`
+> - **⚠️ Reste P0 prod (dossier)** : CORS en dur (PC-027), prod en profil `dev` (PC-024), seeds à mots de passe
+>   en clair en prod (PC-026), **roter** clé Groq + secrets OAuth GitHub des `.env.dev` (absents de l'historique git,
+>   vérifié). Détail : `Problemes_Connus.md` + `.ai/audit-livrable-pfr.md`.
 
 > **▶ MAJ 05/07/2026 — round « V1-hardening » (branche `test/v1-hardening`).** Correctifs livrés + vérifiés (658 tests back + 54 front verts) :
 > - **Sécurité** — migration de l'émission des tokens vers **Keycloak OIDC RS256** (`JwtService` HS512 custom supprimé ; refresh/logout natifs IdP) → ferme **PC-019 / TF-SEC-009**. Détail : Brain OS `taskforce-docs` [ADR-011].

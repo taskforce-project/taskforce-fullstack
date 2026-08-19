@@ -114,7 +114,7 @@ export function CreateCycleDialog({ children, onCreated, projectId }: CreateCycl
       })
       // On ne ferme QUE si la création a abouti : sinon le formulaire reste, avec sa saisie.
       if (cycle) {
-        toast.success(`Cycle « ${cycle.name} » créé`)
+        toast.success(`Cycle "${cycle.name}" created`)
         onCreated?.(cycle)
         resetForm()
         setOpen(false)

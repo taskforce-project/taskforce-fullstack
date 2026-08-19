@@ -31,6 +31,7 @@ import { useAuth } from "@/lib/contexts/auth-context"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { useUpgradeStore } from "@/lib/store/upgrade-store"
 import { useSettingsStore } from "@/lib/store/settings-store"
+import { usePreferencesStore } from "@/lib/store/preferences-store"
 
 export function NavUser({
   user,
@@ -47,6 +48,7 @@ export function NavUser({
   const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug)
   const openUpgrade = useUpgradeStore((s) => s.openUpgrade)
   const openSettings = useSettingsStore((s) => s.openSettings)
+  const { t } = usePreferencesStore()
 
   const isPro = authUser?.planType === "BUSINESS" || authUser?.planType === "ENTERPRISE"
 
@@ -127,33 +129,33 @@ export function NavUser({
                     className="gap-2 text-amber-600 focus:text-amber-600 dark:text-amber-500 dark:focus:text-amber-500"
                   >
                     <Sparkles className="size-4" />
-                    <span className="font-medium">Améliorer mon forfait</span>
+                    <span className="font-medium">{t.settings.upgrade}</span>
                   </DropdownMenuItem>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
               </>
             )}
             <DropdownMenuGroup>
-              <DropdownMenuItem onClick={() => router.push(`/${slug}/profile`)}>
+              <DropdownMenuItem onClick={() => openSettings("profile")}>
                 <BadgeCheck />
-                Account
+                {t.settings.account}
                 {isPro && (
                   <Badge className="ml-auto h-5 bg-primary px-1.5 text-[10px] text-primary-foreground">Pro</Badge>
                 )}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => router.push(`/${slug}/billing`)}>
                 <CreditCard />
-                Billing
+                {t.settings.billing}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => openSettings("notifications")}>
                 <Bell />
-                Notifications
+                {t.common.notifications}
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout}>
               <LogOut />
-              Log out
+              {t.common.logout}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

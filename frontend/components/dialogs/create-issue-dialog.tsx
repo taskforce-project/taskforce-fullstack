@@ -177,10 +177,10 @@ export function CreateIssueDialog({
       })
       setSuggestion(result)
       if (!result.recommended) {
-        toast.warning("Aucune suggestion — ajoute des membres au projet (ou des labels/compétences)")
+        toast.warning("No suggestion — add members to the project (or labels/skills)")
       }
     } catch {
-      toast.error("Impossible de générer la suggestion Smart Assign")
+      toast.error("Could not generate Smart Assign suggestion")
     } finally {
       setSuggesting(false)
     }
@@ -385,41 +385,44 @@ export function CreateIssueDialog({
             </Button>
 
             {suggestion?.recommended && (
-              <div className="rounded-lg border border-primary/30 bg-primary/5 p-2.5 flex flex-col gap-2">
+              <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 flex flex-col gap-2.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-primary">
-                    Best match · {suggestion.recommended.score}%
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-primary">
+                    Best match
                   </span>
-                  {suggestion.fallbackUsed && (
-                    <span className="text-[10px] text-amber-400">AI fallback</span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {suggestion.fallbackUsed && (
+                      <span className="text-[10px] text-amber-500">AI fallback</span>
+                    )}
+                    <span className="text-sm font-bold text-primary tabular-nums">{suggestion.recommended.score}%</span>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2.5">
                   <UserAvatar
                     email={suggestion.recommended.email}
                     name={suggestion.recommended.displayName ?? suggestion.recommended.email}
                     avatarUrl={suggestion.recommended.avatarUrl}
-                    className="size-6 shrink-0"
-                    fallbackClassName="text-[9px]"
+                    className="size-7 shrink-0"
+                    fallbackClassName="text-[10px]"
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-foreground truncate">
+                    <p className="text-sm font-medium text-foreground truncate">
                       {suggestion.recommended.displayName ?? suggestion.recommended.email}
                     </p>
-                    <p className="text-[10px] text-muted-foreground">
+                    <p className="text-[11px] text-muted-foreground">
                       {suggestion.recommended.openIssues} open · {suggestion.recommended.availability}% avail.
                     </p>
                   </div>
                   {assigneeId === suggestion.recommended.userId ? (
-                    <Badge variant="secondary" className="text-[10px] gap-1">
+                    <Badge variant="secondary" className="text-[11px] gap-1">
                       <Check className="size-3" /> Selected
                     </Badge>
                   ) : (
                     <Button
                       type="button"
                       size="sm"
-                      className="h-6 text-[10px] gap-1"
+                      className="h-7 text-xs gap-1"
                       onClick={() => setAssigneeId(suggestion.recommended!.userId)}
                     >
                       <Check className="size-3" /> Assign
@@ -434,17 +437,28 @@ export function CreateIssueDialog({
                 />
 
                 {suggestion.alternatives.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    {suggestion.alternatives.map((c) => (
-                      <button
-                        key={c.userId}
-                        type="button"
-                        onClick={() => setAssigneeId(c.userId)}
-                        className="flex items-center gap-1 rounded-md border border-border bg-muted/30 px-1.5 py-0.5 text-[10px] text-muted-foreground hover:border-border/80 hover:text-foreground transition-colors"
-                      >
-                        {(c.displayName ?? c.email).split(" ")[0]} · {c.score}%
-                      </button>
-                    ))}
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Other candidates</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {suggestion.alternatives.map((c) => (
+                        <button
+                          key={c.userId}
+                          type="button"
+                          onClick={() => setAssigneeId(c.userId)}
+                          className="flex items-center gap-1.5 rounded-full border border-border bg-background/60 py-0.5 pl-0.5 pr-2 text-[11px] transition-colors hover:border-primary/40"
+                        >
+                          <UserAvatar
+                            email={c.email}
+                            name={c.displayName ?? c.email}
+                            avatarUrl={c.avatarUrl}
+                            className="size-4 shrink-0"
+                            fallbackClassName="text-[7px]"
+                          />
+                          <span className="font-medium text-foreground/80">{(c.displayName ?? c.email).split(" ")[0]}</span>
+                          <span className="tabular-nums text-muted-foreground">{c.score}%</span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -474,7 +488,8 @@ export function CreateIssueDialog({
                       )}
                       style={isSelected ? { backgroundColor: label.color, borderColor: label.color } : undefined}
                     >
-                      <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: label.color }} />
+                      {/* Pastille blanche une fois sélectionné (sinon invisible sur le fond de même couleur) */}
+                      <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: isSelected ? "#ffffff" : label.color }} />
                       {label.name}
                     </button>
                   )

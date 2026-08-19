@@ -33,21 +33,21 @@ export default function PaymentCancelPage() {
               <XCircle className="h-16 w-16 text-orange-600 dark:text-orange-400" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold">Paiement annulé</CardTitle>
+          <CardTitle className="text-2xl font-bold">Payment cancelled</CardTitle>
           <CardDescription className="text-base">
-            Vous avez annulé le processus de paiement
+            You cancelled the payment process
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground text-center">
-              Ne vous inquiétez pas ! Vous pouvez toujours :
+              Don&apos;t worry! You can still:
             </p>
 
             <div className="space-y-2">
               <Button onClick={handleRetry} className="w-full" size="lg">
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                Réessayer le paiement
+                Retry payment
               </Button>
 
               <Button 
@@ -56,7 +56,7 @@ export default function PaymentCancelPage() {
                 className="w-full"
                 size="lg"
               >
-                Continuer avec le plan gratuit
+                Continue with the free plan
               </Button>
             </div>
           </div>
@@ -65,39 +65,39 @@ export default function PaymentCancelPage() {
             <div className="flex items-start gap-3">
               <HelpCircle className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
               <div className="space-y-1">
-                <p className="text-sm font-medium">Besoin d&apos;aide ?</p>
+                <p className="text-sm font-medium">Need help?</p>
                 <p className="text-xs text-muted-foreground">
-                  Si vous rencontrez des difficultés avec le paiement, notre équipe support est disponible pour vous aider.
+                  If you run into trouble with the payment, our support team is available to help you.
                 </p>
               </div>
             </div>
           </div>
 
           <div className="space-y-3 pt-4 border-t">
-            <p className="text-xs font-medium text-center">Pourquoi choisir un plan premium ?</p>
+            <p className="text-xs font-medium text-center">Why choose a premium plan?</p>
             <ul className="space-y-2 text-xs text-muted-foreground">
               <li className="flex items-start gap-2">
                 <span className="text-primary mt-0.5">✓</span>
-                <span>Projets illimités et fonctionnalités avancées</span>
+                <span>Unlimited projects and advanced features</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-primary mt-0.5">✓</span>
-                <span>Support prioritaire et assistance dédiée</span>
+                <span>Priority support and dedicated assistance</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-primary mt-0.5">✓</span>
-                <span>Intégrations tierces et rapports personnalisés</span>
+                <span>Third-party integrations and custom reports</span>
               </li>
             </ul>
           </div>
 
           <div className="flex justify-center gap-4 text-xs text-muted-foreground pt-4 border-t">
             <Link href="/legal-notices" className="hover:underline">
-              Conditions d&apos;utilisation
+              Terms of use
             </Link>
             <span>•</span>
             <Link href="/privacy-policy" className="hover:underline">
-              Politique de confidentialité
+              Privacy policy
             </Link>
           </div>
         </CardContent>

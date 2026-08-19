@@ -1,5 +1,7 @@
 "use client";
 
+import { usePreferencesStore } from "@/lib/store/preferences-store";
+
 /**
  * Fil d'étapes de l'inscription.
  *
@@ -11,7 +13,9 @@
  * structure, la feuille de style décide de l'apparence.
  */
 
-export const REGISTER_STEPS = ["Compte", "Vérification"] as const;
+// Clés d'étapes stables (indépendantes de la langue) : les libellés affichés sont dérivés de `t`
+// dans le composant. Utilisées pour le compte de segments, les clés React et l'aria.
+export const REGISTER_STEPS = ["account", "verification"] as const;
 
 export type RegisterStep = 1 | 2;
 
@@ -21,7 +25,10 @@ interface AuthStepperProps {
 }
 
 export function AuthStepper({ current }: AuthStepperProps) {
+  const { t } = usePreferencesStore();
   const total = REGISTER_STEPS.length;
+  const stepLabels = [t.auth.ui.stepAccount, t.auth.ui.stepVerification];
+  const currentLabel = stepLabels[current - 1] ?? "";
 
   return (
     <div
@@ -30,7 +37,10 @@ export function AuthStepper({ current }: AuthStepperProps) {
       aria-valuemin={1}
       aria-valuemax={total}
       aria-valuenow={current}
-      aria-valuetext={`Étape ${current} sur ${total} : ${REGISTER_STEPS[current - 1]}`}
+      aria-valuetext={t.auth.ui.stepAria
+        .replace("{current}", String(current))
+        .replace("{total}", String(total))
+        .replace("{label}", currentLabel)}
     >
       <div className="auth-steps">
         {REGISTER_STEPS.map((label, index) => {
@@ -58,7 +68,7 @@ export function AuthStepper({ current }: AuthStepperProps) {
                       : "var(--label-quaternary)",
               }}
             >
-              {label}
+              {stepLabels[index]}
             </span>
           );
         })}

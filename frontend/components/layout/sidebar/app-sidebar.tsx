@@ -297,7 +297,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                    plus de violet plat. Cf. `.tf-labs-icon` + <LabsGradientDefs/>. */
                 className="tf-labs-icon ml-auto size-3.5 shrink-0 group-data-[collapsible=icon]:hidden"
                 strokeWidth={2}
-                aria-label="Fonctionnalité en cours de finition"
+                aria-label="Feature being finalized"
               />
             )}
           </Link>

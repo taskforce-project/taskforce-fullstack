@@ -30,8 +30,9 @@ FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
 
-# Installer curl pour healthcheck
-RUN apk add --no-cache curl
+# Mettre à jour les paquets OS de base (CVE HIGH curl/libcurl/libexpat/p11-kit — audit Trivy 17/08/2026),
+# puis installer curl pour le healthcheck.
+RUN apk upgrade --no-cache && apk add --no-cache curl
 
 # Télécharger le Java agent OpenTelemetry (instrumentation automatique pour SigNoz/OTLP)
 # Désactivé par défaut via OTEL_SDK_DISABLED=true - activer dans .env.dev quand le profil observability est utilisé
@@ -50,6 +51,9 @@ COPY --from=build /app/target/*.jar app.jar
 # Changer le propriétaire
 RUN chown spring:spring app.jar && chown -R spring:spring /otel
 
+# Dossier de logs (logback y écrit application.log) — créé + possédé par spring, sinon FileNotFoundException au boot.
+RUN mkdir -p /var/log/taskforce-api && chown spring:spring /var/log/taskforce-api
+
 # Utiliser l'utilisateur non-root
 USER spring:spring
 
@@ -57,14 +61,19 @@ USER spring:spring
 EXPOSE 8080
 
 # Variables d'environnement par défaut
-# OTEL_JAVA_AGENT : vide par défaut, surchargé dans docker-compose quand le profil observability est actif
-ENV SPRING_PROFILES_ACTIVE=dev \
+# SPRING_PROFILES_ACTIVE=prod : défaut SÛR (fail-safe). Le profil `prod` exige des secrets/env
+# (DB, Keycloak, TF_ENCRYPTION_KEY…) → un `docker run` nu ÉCHOUE au démarrage au lieu de tourner
+# avec les réglages permissifs de `dev` (`flyway clean` armé, tokens HS512 maison, mot de passe DB
+# par défaut). Le dev surcharge explicitement en `dev` (docker-compose.dev.yml), la prod en `prod`
+# (docker-compose.prod.yml). Cf. PC-024.
+# OTEL_JAVA_AGENT : vide par défaut, surchargé dans docker-compose quand le profil observability est actif.
+ENV SPRING_PROFILES_ACTIVE=prod \
     JAVA_OPTS="-Xms256m -Xmx512m" \
     OTEL_JAVA_AGENT=""
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
-  CMD curl -f http://localhost:8080/api/actuator/health || exit 1
+  CMD curl -f http://localhost:8080/actuator/health || exit 1
 
 # Commande de démarrage avec support des profils
 # $OTEL_JAVA_AGENT est vide par défaut ou "-javaagent:/otel/opentelemetry-javaagent.jar" si observability activé

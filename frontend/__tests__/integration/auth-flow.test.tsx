@@ -69,11 +69,11 @@ describe('Integration Tests - Authentication Flow', () => {
       await user.type(emailInput, 'test@example.com');
       
       // Fill in password
-      const passwordInput = screen.getByLabelText(/mot de passe/i);
+      const passwordInput = screen.getByLabelText(/password/i);
       await user.type(passwordInput, 'Test@2024!');
 
       // Submit form
-      const submitButton = screen.getByRole('button', { name: /se connecter/i });
+      const submitButton = screen.getByRole('button', { name: /sign in/i });
       await user.click(submitButton);
 
       // Wait for login to be called
@@ -99,8 +99,8 @@ describe('Integration Tests - Authentication Flow', () => {
       render(<LoginForm />);
 
       const emailInput = screen.getByLabelText(/email/i);
-      const passwordInput = screen.getByLabelText(/mot de passe/i);
-      const submitButton = screen.getByRole('button', { name: /se connecter/i });
+      const passwordInput = screen.getByLabelText(/password/i);
+      const submitButton = screen.getByRole('button', { name: /sign in/i });
 
       await user.type(emailInput, 'wrong@example.com');
       await user.type(passwordInput, 'WrongPassword');
@@ -196,17 +196,24 @@ describe('Integration Tests - Authentication Flow', () => {
       
       const { result } = renderHook(() => usePreferencesStore());
       
-      const frTranslations = result.current.t;
-      
       act(() => {
         result.current.setLanguage('en');
       });
-      
       const enTranslations = result.current.t;
-      
+
+      act(() => {
+        result.current.setLanguage('fr');
+      });
+      const frTranslations = result.current.t;
+
       // Translations should be different
-      expect(enTranslations).not.toBe(frTranslations);
-      expect(result.current.language).toBe('en');
+      expect(frTranslations).not.toBe(enTranslations);
+      expect(result.current.language).toBe('fr');
+
+      // Restore default — the preferences store is a module singleton and leaks across tests.
+      act(() => {
+        result.current.setLanguage('en');
+      });
     });
   });
 
@@ -371,7 +378,7 @@ describe('Integration Tests - Authentication Flow', () => {
       
       // All inputs should be labeled
       expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/mot de passe/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
     });
 
     it('should apply accessibility preferences from store', async () => {

@@ -101,9 +101,9 @@ export default function ProjectPagesPage() {
         <Empty>
           <EmptyHeader>
             <EmptyMedia variant="icon"><FileText /></EmptyMedia>
-            <EmptyTitle>{search ? "Aucun résultat" : "Aucune page"}</EmptyTitle>
+            <EmptyTitle>{search ? "No results" : "No pages"}</EmptyTitle>
             <EmptyDescription>
-              {search ? "Aucune page ne correspond à votre recherche." : "Créez une page pour documenter cette opération."}
+              {search ? "No page matches your search." : "Create a page to document this operation."}
             </EmptyDescription>
           </EmptyHeader>
           {!search && (
@@ -142,7 +142,7 @@ export default function ProjectPagesPage() {
                         type="button"
                         onClick={(e) => { e.preventDefault(); e.stopPropagation() }}
                         className="rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
-                        aria-label="Actions de la page"
+                        aria-label="Page actions"
                       >
                         <MoreHorizontal className="h-3.5 w-3.5" />
                       </button>
@@ -153,7 +153,7 @@ export default function ProjectPagesPage() {
                         onSelect={() => setPageToDelete(page)}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
-                        Supprimer
+                        Delete
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -182,13 +182,13 @@ export default function ProjectPagesPage() {
       <AlertDialog open={pageToDelete !== null} onOpenChange={(open) => { if (!open) setPageToDelete(null) }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer la page ?</AlertDialogTitle>
+            <AlertDialogTitle>Delete page?</AlertDialogTitle>
             <AlertDialogDescription>
-              « {pageToDelete?.title} » sera définitivement supprimée. Cette action est irréversible.
+              “{pageToDelete?.title}” will be permanently deleted. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={async () => {
@@ -201,7 +201,7 @@ export default function ProjectPagesPage() {
                 setPageToDelete(null)
               }}
             >
-              Supprimer
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
