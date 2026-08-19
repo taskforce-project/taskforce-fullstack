@@ -51,6 +51,9 @@ COPY --from=build /app/target/*.jar app.jar
 # Changer le propriétaire
 RUN chown spring:spring app.jar && chown -R spring:spring /otel
 
+# Dossier de logs (logback y écrit application.log) — créé + possédé par spring, sinon FileNotFoundException au boot.
+RUN mkdir -p /var/log/taskforce-api && chown spring:spring /var/log/taskforce-api
+
 # Utiliser l'utilisateur non-root
 USER spring:spring
 

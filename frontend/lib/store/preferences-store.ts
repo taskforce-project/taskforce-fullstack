@@ -62,14 +62,14 @@ export const usePreferencesStore = create<PreferencesState>()(
       },
 
       // Language
-      language: "fr",
+      language: "en",
       setLanguage: (language) => {
         set({ 
           language,
           t: getTranslations(language),
         });
       },
-      t: CONSTANTS_FR, // Default to French
+      t: CONSTANTS_EN, // Default to English
 
       // Accessibility
       reducedMotion: false,

@@ -135,6 +135,8 @@ services:
 
       # Keycloak — service Docker en interne, issuer PUBLIC pour valider les jetons du navigateur
       KEYCLOAK_URL: http://keycloak:8080
+      # URL PUBLIQUE de Keycloak = issuer attendu des tokens (SecurityConfig.jwtDecoder) ; JWKS reste interne via KEYCLOAK_URL.
+      KEYCLOAK_PUBLIC_URL: ${KEYCLOAK_PUBLIC_URL:-http://keycloak:8080}
       KEYCLOAK_REALM: ${KEYCLOAK_REALM}
       KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID}
       KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET}
@@ -147,7 +149,7 @@ services:
       # URLs publiques applicatives — lues au boot (app.url / frontend-url / api-url). Sans elles → crash.
       APP_URL: ${APP_URL}
       FRONTEND_URL: ${FRONTEND_URL}
-      APP_API_URL: ${APP_API_URL:${APP_URL}}
+      APP_API_URL: ${APP_API_URL}
 
       # CORS
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}

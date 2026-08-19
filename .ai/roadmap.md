@@ -38,6 +38,15 @@
 > + health.mail off), `docker-compose.prod.yml` (mount realm prod, healthchecks, Keycloak, passthrough env,
 > PGDATA, Groq ai-service), `.env.prod.example` (realm/client alignés + URLs + Groq), `backend/tf-api/Dockerfile`
 > (chemin healthcheck). Non encore validés EN TANT QUE version committée (la VM tourne via l'override).
+>
+> **MAJ (consolidation Phase 2, 18/08)** : correctifs supplémentaires portés au repo — `docker-compose.prod.yml`
+> (`APP_API_URL` sans interpolation imbriquée `${...}` + passthrough `KEYCLOAK_PUBLIC_URL` avec défaut compose `:-`), `application-prod.yml`
+> (bloc `stripe` : `success-url`/`cancel-url` **à plat**, pas sous `checkout`), `backend/tf-api/Dockerfile`
+> (`mkdir /var/log/taskforce-api` + chown spring), `frontend/lib/store/preferences-store.ts` (défaut `language: "en"`
+> + `t: CONSTANTS_EN` — c'était `fr`/`CONSTANTS_FR`), `frontend/Dockerfile` (bake `NEXT_PUBLIC_SITE_URL`). Déploiement
+> VM1 (033) + VM2 (014) publiques via Cloudflare (`api.`/`auth.`/`app.taskforce-project.fr`). ⚠️ **Reste un vrai lot
+> i18n (Étape 2)** : du **français codé en dur** dans les composants (ex. `register-info-form.tsx`
+> `<h1>Créer votre compte</h1>`, toasts) → à sortir vers `constants_en/fr` + `t.xxx`.
 
 > **▶ SOUTENANCE — auto-audit contre les critères jury (12/07/2026).** Un camarade a reçu un retour du
 > **prof** sur son projet QualiTrack et l'a partagé ; ce retour révèle **ce que le jury attend**. On auto-audite
