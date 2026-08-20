@@ -35,11 +35,18 @@ const WS_ORIGIN = API_ORIGIN.replace(/^http/, "ws");
 // utilisée par ce seul widget — pas un joker.
 const TURNSTILE_ORIGIN = "https://challenges.cloudflare.com";
 
+// Cloudflare Web Analytics : le proxy Cloudflare injecte automatiquement `beacon.min.js` (servi par
+// static.cloudflareinsights.com) sur les pages passant par le tunnel, et le beacon POSTe les mesures
+// RUM vers cloudflareinsights.com. Sans ces deux origines dans la CSP, le script est bloqué et une
+// erreur apparaît en console de production — alors qu'aucun code applicatif ne charge ce script.
+const CF_BEACON_SCRIPT = "https://static.cloudflareinsights.com";
+const CF_BEACON_CONNECT = "https://cloudflareinsights.com";
+
 const cspHeader = [
   "default-src 'self'",
   // `unsafe-eval` n'est requis QUE par le rechargement à chaud du serveur de développement.
   // L'embarquer en production élargissait la surface XSS sans aucune contrepartie.
-  `script-src 'self' 'unsafe-inline' ${TURNSTILE_ORIGIN}${IS_PROD ? "" : " 'unsafe-eval'"}`,
+  `script-src 'self' 'unsafe-inline' ${TURNSTILE_ORIGIN} ${CF_BEACON_SCRIPT}${IS_PROD ? "" : " 'unsafe-eval'"}`,
   // Sans `frame-src`, `default-src 'self'` s'applique aux iframes et le défi Turnstile ne s'affiche
   // pas. La directive n'existait pas : elle est ajoutée ici, restreinte à cette seule origine.
   `frame-src 'self' ${TURNSTILE_ORIGIN}`,
@@ -47,7 +54,7 @@ const cspHeader = [
   // injectent des styles en ligne. Le lever suppose de passer aux nonces.
   "style-src 'self' 'unsafe-inline'",
   // Turnstile émet aussi des requêtes vers son origine depuis l'iframe (défi, télémétrie).
-  `connect-src 'self' ${API_ORIGIN} ${STORAGE_ORIGIN} ${WS_ORIGIN} ${TURNSTILE_ORIGIN}`,
+  `connect-src 'self' ${API_ORIGIN} ${STORAGE_ORIGIN} ${WS_ORIGIN} ${TURNSTILE_ORIGIN} ${CF_BEACON_CONNECT}`,
   // `https:` était un joker autorisant les images de N'IMPORTE quelle origine HTTPS. Il n'a de
   // raison d'être qu'en développement, où MinIO est en http:// ; en production les deux origines
   // utiles sont explicites.
