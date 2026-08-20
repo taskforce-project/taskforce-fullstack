@@ -14,7 +14,6 @@ import type { TranslationKeys } from "@/lib/constants_en"
 export type Locale = "en" | "fr"
 
 const LOCALE_STORAGE_KEY = "tf-locale"
-const SUPPORTED_LOCALES = new Set<Locale>(["en", "fr"])
 
 const translations: Record<Locale, TranslationKeys> = {
   en: CONSTANTS_EN,
@@ -40,13 +39,11 @@ interface I18nContextType {
 const I18nContext = createContext<I18nContextType | undefined>(undefined)
 
 export function I18nProvider({ children }: { readonly children: React.ReactNode }) {
-  // Lazy initializer reads from localStorage on the client without needing an effect
-  const [locale, setLocale] = useState<Locale>(() => {
-    if (globalThis.window === undefined) return "en"
-    const saved = localStorage.getItem(LOCALE_STORAGE_KEY)
-    if (saved && SUPPORTED_LOCALES.has(saved as Locale)) return saved as Locale
-    return "en"
-  })
+  // App verrouillée en anglais pour la v1 (produit monolingue). On ne lit délibérément PAS le
+  // `tf-locale` sauvegardé : un navigateur ayant stocké "fr" via l'ancien sélecteur (retiré)
+  // afficherait l'UI applicative en français alors que le reste est en anglais. `setLocale` existe
+  // encore pour une future passe i18n ; les constantes FR restent dans l'arbre.
+  const [locale, setLocale] = useState<Locale>("en")
 
   const updateLocale = useCallback((newLocale: Locale) => {
     setLocale(newLocale)

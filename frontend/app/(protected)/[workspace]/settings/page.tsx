@@ -10,7 +10,6 @@ import {
 import { toast } from "sonner"
 import { useTheme } from "next-themes"
 
-import { useTranslation } from "@/lib/i18n"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Zone } from "@/components/ui/zone"
@@ -326,27 +325,14 @@ function ProfilePanel() {
 
 function AccountPanel() {
   const { user } = useAuth()
-  const { locale, setLocale } = useTranslation()
   const setSection = useSettingsStore((s) => s.setSection)
 
   return (
     <div className="flex flex-col gap-4">
-      <SectionCard title="Account info" description="Manage your login and localization preferences.">
+      <SectionCard title="Account info" description="Manage your login and account preferences.">
         <div className="flex flex-col gap-5">
           <FormField label="Email" hint="Managed via your identity provider.">
             <StyledInput type="email" value={user?.email ?? ""} readOnly />
-          </FormField>
-          <Separator />
-          <FormField label="Language" hint="Applied immediately across the app.">
-            <Select value={locale} onValueChange={(v) => setLocale(v as "en" | "fr")}>
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="en">English</SelectItem>
-                <SelectItem value="fr">Français</SelectItem>
-              </SelectContent>
-            </Select>
           </FormField>
           <Separator />
           {/* Suppression de compte + export des données → regroupés dans « Privacy & Data » (RGPD Art. 17/20).

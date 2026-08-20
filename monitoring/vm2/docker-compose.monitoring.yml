@@ -1,0 +1,87 @@
+# Pile de supervision TaskForce — déployée sur la VM2 (frontend), qui a de la marge RAM (~2,7 Gio
+# disponibles) contrairement à la VM1 (backend + IA + Keycloak + Postgres + MinIO, ~175 Mio libres).
+#
+#   Prometheus collecte, Grafana affiche (UN seul port, un menu de dashboards). Les exportateurs de la
+#   VM1 sont grattés À TRAVERS Tailscale (100.122.50.25) — les deux VM sont sur le même tailnet.
+#
+# Accès : http://100.120.222.10:3001  (Grafana, via Tailscale). Rien n'est exposé publiquement : le
+# tunnel Cloudflare ne route que app./api./auth./www. — le port 3001 n'est joignable que sur le tailnet.
+name: taskforce-monitoring
+
+networks:
+  monitoring:
+    driver: bridge
+
+volumes:
+  prometheus-data:
+  grafana-data:
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: tf-prometheus
+    restart: unless-stopped
+    user: root
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --web.enable-lifecycle
+    ports:
+      - "127.0.0.1:9090:9090"   # local (debug) — Grafana joint Prometheus par le réseau interne
+    networks: [monitoring]
+
+  grafana:
+    image: grafana/grafana:11.3.1
+    container_name: tf-grafana
+    restart: unless-stopped
+    depends_on: [prometheus]
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?definir GRAFANA_ADMIN_PASSWORD dans .env}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3001:3000"   # 0.0.0.0:3001 → joignable via Tailscale (100.120.222.10:3001)
+    networks: [monitoring]
+
+  # Métriques HÔTE de la VM2 (CPU, RAM, disque, réseau). Sans network_mode host : les montages
+  # /proc /sys / suffisent, et Prometheus le joint par son nom de service dans le réseau interne.
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: tf-node-exporter
+    restart: unless-stopped
+    command:
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --path.rootfs=/rootfs
+      - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    networks: [monitoring]
+
+  # Métriques par CONTENEUR de la VM2 (CPU, RAM, réseau, redémarrages).
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: tf-cadvisor
+    restart: unless-stopped
+    privileged: true
+    devices:
+      - /dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    networks: [monitoring]

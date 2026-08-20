@@ -159,8 +159,12 @@ export const usePreferencesStore = create<PreferencesState>()(
               document.documentElement.classList.add(`cb-${state.colorblindMode}`);
             }
           }
-          // Set translations based on saved language
-          state.t = getTranslations(state.language);
+          // App verrouillée en anglais (v1 = produit monolingue). On IGNORE délibérément la langue
+          // persistée : un navigateur ayant stocké "fr" via l'ancien sélecteur (retiré) afficherait
+          // sinon une UI à moitié traduite — auth + footer en français, le reste en anglais. Les
+          // constantes FR restent dans l'arbre pour une future passe i18n.
+          state.language = "en";
+          state.t = CONSTANTS_EN;
         }
       },
     }

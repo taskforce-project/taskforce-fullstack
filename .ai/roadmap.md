@@ -10,6 +10,36 @@
 >
 > Sources : `.ai/qa.md` (QA produit détaillée), `.ai/known-issues.md` (bugs vérifiés), `.ai/module-map.md` (domaines↔code), `.ai/architecture-map.md` (archi réelle), `.ai/P0-fix-plan.md` (correctifs P0 paste-ready).
 
+> **▶ MAJ 20/08/2026 — Hotfix pré-soutenance : app 100 % EN + beacon CSP + supervision VM2 + prépa OAuth GitHub.** `[HOTFIX-QA]`
+> Branche `hotfix/auth-oauth-monitoring` (working tree, NON commité — l'utilisateur committe/PR→main).
+> - **i18n verrouillé en anglais.** Deux systèmes de langue coexistaient, DÉCONNECTÉS : le store
+>   `preferences-store` (auth/footer/topbar, localStorage `taskforce-preferences`) et le provider `lib/i18n`
+>   (reste de l'app, localStorage `tf-locale`). Un `fr` persisté affichait l'auth en français alors que le
+>   reste (littéraux anglais) restait anglais → écran mi-français vu en prod. Correctif : les DEUX systèmes
+>   épinglés à `en` à l'init (`onRehydrateStorage` force `en`+CONSTANTS_EN ; `I18nProvider` init `"en"` sans
+>   lire `tf-locale`), et les DEUX sélecteurs de langue retirés (dropdown `app/auth/layout.tsx` + champ
+>   « Language » de `settings`). CONSTANTS_FR conservées pour une future passe i18n. `tsc` 0, **821/821** verts.
+> - **CSP** : `next.config.ts` autorise le beacon Cloudflare Web Analytics (`static.cloudflareinsights.com`
+>   en `script-src`, `cloudflareinsights.com` en `connect-src`) — injecté par le proxy CF, bloqué jusqu'ici.
+> - **Supervision déployée sur la VM2** (RAM libre ; VM1 saturée à ~175 Mio). `monitoring/` : Prometheus +
+>   Grafana + node-exporter + cAdvisor sur VM2 ; node-exporter + cAdvisor + relais `socat`(→backend:8080/
+>   actuator) sur VM1, grattés via **Tailscale** (100.122.50.25). **6 cibles UP**, Grafana
+>   `http://100.120.222.10:3001` (Tailscale only, rien de public), 3 dashboards (Overview maison + Node
+>   Exporter Full + cAdvisor). Déployé HORS arbre git (`~/monitoring/`) pour ne pas gêner l'auto-deploy ;
+>   fichiers versionnés dans `monitoring/`. Le backend expose déjà `/actuator/prometheus` (Micrometer).
+> - **OAuth GitHub** : backend (`OAuthLoginController`/`OAuthLoginService`, flux autorisation + `kc_idp_hint`)
+>   et frontend (`AuthSocialButtons`, gated par `NEXT_PUBLIC_AUTH_SOCIAL_READY`) **déjà prêts**. Manque côté
+>   CONFIG : (1) **IdP `github` dans le realm `taskforce-prod`** (absent — aucun `identityProviders`), (2)
+>   **GitHub OAuth App dédiée** dont le callback = `https://auth.taskforce-project.fr/realms/taskforce-prod/broker/github/endpoint`,
+>   (3) flag front `NEXT_PUBLIC_AUTH_SOCIAL_READY=github` (ARG/ENV ajoutés à `frontend/Dockerfile`, défaut
+>   vide = « bientôt »). À finaliser avec les identifiants de l'OAuth App GitHub de l'utilisateur.
+> - **Login prod débloqué (ops, 20/08).** L'unique compte (`pierre.michel.work@gmail.com`) portait une
+>   action requise `VERIFY_EMAIL` RÉSIDUELLE malgré `emailVerified=true` → ROPC refusé
+>   (`resolve_required_actions`, 401 sur `/api/auth/login`). Action retirée via kcadm. NON systémique : le
+>   realm ne met pas `VERIFY_EMAIL` en `defaultAction`, et `KeycloakService.createUser/verifyEmail` ne pose
+>   aucune action requise. Le « 502 » vu sur `auth.` = visite DIRECTE de l'endpoint broker GitHub (sans
+>   `state`) — pas une panne (Keycloak répond 200 interne ET public). Cf. mémoire [[kc-login-required-actions]].
+
 > **▶ MAJ 18/08/2026 — Déploiement Phase 1 (backend sur VM1) + correctifs config prod.** `[DEPLOY-01]`
 > Premier déploiement prod réel sur la VM école `MNS-VMD-DFS5-033` (pilotée en SSH via Tailscale). Pile
 > backend **6/6 healthy** (postgres pgvector + keycloak + backend + ai-service + minio + redis), migrations
@@ -148,6 +178,17 @@
 > units `tf-autodeploy.{service,timer}` (poll 3 min) — **DÉSACTIVÉS + INACTIFS**. **Activation** : (a) user commit le lot
 > i18n (86 fichiers) sur `fix/pre-soutenance-qa` ; (b) merge → `dev` (CI) → `main` (PR+label) ; (c) MOI : `git checkout main`
 > + rebuild 1× par VM + `systemctl enable --now tf-autodeploy.timer`. Ensuite « push main = déploie ». Rollback = `disable`.
+>
+> **▶ FAIT 19/08 — Consolidation `main` = prod + auto-déploiement ACTIF.** PR #91 (`fix/pre-soutenance-qa` → `dev`)
+> mergée (branche source supprimée par GitHub). Choix user : `main` = prod (app+landing). Découverte : `main` était
+> **landing-only, 2903 commits derrière `dev`** → merge direct = 42 conflits (artefacts rename `landing-page/src`→`frontend/`).
+> Mais la **landing de `dev` était PLUS récente** (fix `APP_URL` env-derived + copie modèles Anthropic/OpenAI) → `main = dev`
+> = **amélioration**, zéro régression. Consolidation via merge commit dont l'**arbre = `dev` à l'octet près** (`merge -s ours`
+> + `read-tree --reset origin/dev`) → **fast-forward, pas de force**. Poussé (par l'user). `release.yml` a tourné → tags
+> `backend/frontend-v0.2.0-rc1`, `landing-v2.0.0/2.0.1`. **Activation VM** : les 2 VM étaient en **clone single-branch**
+> (`fix/pre-soutenance-qa` seule, supprimée) → refspec élargi (`+refs/heads/*:...`), `checkout -B main origin/main`, VM2
+> **rebuild frontend** (full anglais), VM1 backend inchangé (diff `backend/` vide). **Timers actifs + vérifiés** (`à jour
+> (47673bb3)` sur les 2). **App EN confirmée live** sur `app.taskforce-project.fr`. → **push `main` = déploiement auto.**
 
 > **▶ SOUTENANCE — auto-audit contre les critères jury (12/07/2026).** Un camarade a reçu un retour du
 > **prof** sur son projet QualiTrack et l'a partagé ; ce retour révèle **ce que le jury attend**. On auto-audite

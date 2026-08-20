@@ -46,11 +46,18 @@ ARG NEXT_PUBLIC_SITE_URL=http://localhost:4321
 # Domaine de base unique dont `lib/config/urls.ts` dérive api.<base> / files.<base> / <base> quand les
 # URLs explicites ci-dessus ne sont pas fournies. Vide par défaut → repli localhost en dev.
 ARG NEXT_PUBLIC_BASE_DOMAIN=
+# Connexion sociale : PROVIDERS = boutons AFFICHÉS ; READY = fournisseurs réellement CÂBLÉS côté
+# serveur (IdP Keycloak). READY vide → boutons « bientôt disponible » (honnête, aucune erreur).
+# Passer READY=github une fois l'IdP GitHub configuré dans le realm — cf. components/auth/auth-social-buttons.tsx.
+ARG NEXT_PUBLIC_AUTH_SOCIAL_PROVIDERS=github,google
+ARG NEXT_PUBLIC_AUTH_SOCIAL_READY=
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL_SSR=$NEXT_PUBLIC_API_URL_SSR
 ENV NEXT_PUBLIC_STORAGE_URL=$NEXT_PUBLIC_STORAGE_URL
 ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
 ENV NEXT_PUBLIC_BASE_DOMAIN=$NEXT_PUBLIC_BASE_DOMAIN
+ENV NEXT_PUBLIC_AUTH_SOCIAL_PROVIDERS=$NEXT_PUBLIC_AUTH_SOCIAL_PROVIDERS
+ENV NEXT_PUBLIC_AUTH_SOCIAL_READY=$NEXT_PUBLIC_AUTH_SOCIAL_READY
 
 # Build de l'application Next.js
 RUN npm run build

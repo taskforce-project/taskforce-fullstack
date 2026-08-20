@@ -1,0 +1,110 @@
+{
+  "uid": "taskforce-overview",
+  "title": "TaskForce — Overview",
+  "tags": ["taskforce"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "id": 1, "type": "stat", "title": "Backend (tf-api)",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [ { "refId": "A", "expr": "up{job=\"taskforce-backend\"}" } ],
+      "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "mappings": [
+        { "type": "value", "options": { "0": { "text": "DOWN", "color": "red" }, "1": { "text": "UP", "color": "green" } } }
+      ], "color": { "mode": "thresholds" }, "thresholds": { "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] } }, "overrides": [] }
+    },
+    {
+      "id": 2, "type": "stat", "title": "VM1 backend — RAM disponible",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [ { "refId": "A", "expr": "100 * node_memory_MemAvailable_bytes{vm=\"vm1-backend\"} / node_memory_MemTotal_bytes{vm=\"vm1-backend\"}" } ],
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "unit": "percent", "color": { "mode": "thresholds" }, "thresholds": { "steps": [ { "color": "red", "value": null }, { "color": "orange", "value": 15 }, { "color": "green", "value": 30 } ] } }, "overrides": [] }
+    },
+    {
+      "id": 3, "type": "stat", "title": "VM2 frontend — RAM disponible",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [ { "refId": "A", "expr": "100 * node_memory_MemAvailable_bytes{vm=\"vm2-frontend\"} / node_memory_MemTotal_bytes{vm=\"vm2-frontend\"}" } ],
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "unit": "percent", "color": { "mode": "thresholds" }, "thresholds": { "steps": [ { "color": "red", "value": null }, { "color": "orange", "value": 15 }, { "color": "green", "value": 30 } ] } }, "overrides": [] }
+    },
+    {
+      "id": 4, "type": "stat", "title": "Conteneurs vus",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [ { "refId": "A", "expr": "count(count by (name) (container_last_seen{name!=\"\"}))" } ],
+      "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "fixed", "fixedColor": "blue" } }, "overrides": [] }
+    },
+    {
+      "id": 5, "type": "timeseries", "title": "CPU occupé (%) par VM",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [ { "refId": "A", "expr": "100 - (avg by (vm) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)", "legendFormat": "{{vm}}" } ],
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "custom": { "fillOpacity": 10, "showPoints": "never" } }, "overrides": [] }
+    },
+    {
+      "id": 6, "type": "timeseries", "title": "RAM utilisée par VM",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [ { "refId": "A", "expr": "node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes", "legendFormat": "{{vm}}" } ],
+      "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "fillOpacity": 10, "showPoints": "never" } }, "overrides": [] }
+    },
+    {
+      "id": 7, "type": "timeseries", "title": "Top conteneurs — RAM",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [ { "refId": "A", "expr": "topk(10, sum by (vm, name) (container_memory_usage_bytes{name!=\"\"}))", "legendFormat": "{{vm}}/{{name}}" } ],
+      "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "fillOpacity": 8, "showPoints": "never" } }, "overrides": [] }
+    },
+    {
+      "id": 8, "type": "timeseries", "title": "Top conteneurs — CPU",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [ { "refId": "A", "expr": "topk(10, sum by (vm, name) (rate(container_cpu_usage_seconds_total{name!=\"\"}[5m])))", "legendFormat": "{{vm}}/{{name}}" } ],
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 8, "showPoints": "never" } }, "overrides": [] }
+    },
+    {
+      "id": 9, "type": "timeseries", "title": "Backend — débit HTTP par statut",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [ { "refId": "A", "expr": "sum by (status) (rate(http_server_requests_seconds_count[5m]))", "legendFormat": "{{status}}" } ],
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "fillOpacity": 10, "showPoints": "never" } }, "overrides": [] }
+    },
+    {
+      "id": 10, "type": "timeseries", "title": "Backend — mémoire JVM (heap)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "sum(jvm_memory_used_bytes{area=\"heap\"})", "legendFormat": "used" },
+        { "refId": "B", "expr": "sum(jvm_memory_committed_bytes{area=\"heap\"})", "legendFormat": "committed" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "fillOpacity": 10, "showPoints": "never" } }, "overrides": [] }
+    },
+    {
+      "id": 11, "type": "timeseries", "title": "Disque utilisé (%) par VM (/)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [ { "refId": "A", "expr": "100 - (node_filesystem_avail_bytes{mountpoint=\"/\",fstype!~\"tmpfs|overlay|squashfs\"} * 100 / node_filesystem_size_bytes{mountpoint=\"/\"})", "legendFormat": "{{vm}}" } ],
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "custom": { "fillOpacity": 10, "showPoints": "never" } }, "overrides": [] }
+    },
+    {
+      "id": 12, "type": "timeseries", "title": "Réseau par VM (RX / TX)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "sum by (vm) (rate(node_network_receive_bytes_total{device!~\"lo|veth.*|docker.*|br.*|cali.*\"}[5m]))", "legendFormat": "{{vm}} rx" },
+        { "refId": "B", "expr": "sum by (vm) (rate(node_network_transmit_bytes_total{device!~\"lo|veth.*|docker.*|br.*|cali.*\"}[5m]))", "legendFormat": "{{vm}} tx" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "Bps", "custom": { "fillOpacity": 8, "showPoints": "never" } }, "overrides": [] }
+    }
+  ]
+}

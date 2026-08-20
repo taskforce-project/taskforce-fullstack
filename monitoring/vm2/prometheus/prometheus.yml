@@ -1,0 +1,38 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: taskforce
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # ---- VM2 (frontend) : hôte + conteneurs (réseau interne, par nom de service) ----
+  - job_name: node-vm2
+    static_configs:
+      - targets: ["node-exporter:9100"]
+        labels: { vm: vm2-frontend }
+  - job_name: cadvisor-vm2
+    static_configs:
+      - targets: ["cadvisor:8080"]
+        labels: { vm: vm2-frontend }
+
+  # ---- VM1 (backend) : grattée via Tailscale (100.122.50.25) ----
+  - job_name: node-vm1
+    static_configs:
+      - targets: ["100.122.50.25:9100"]
+        labels: { vm: vm1-backend }
+  - job_name: cadvisor-vm1
+    static_configs:
+      - targets: ["100.122.50.25:8081"]
+        labels: { vm: vm1-backend }
+
+  # ---- Backend Spring Boot (Micrometer / Actuator) via relais socat sur la VM1 ----
+  # Le backend n'expose pas 8080 sur l'hôte ; un socat sur la VM1 relaie 9101 → backend:8080.
+  - job_name: taskforce-backend
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["100.122.50.25:9101"]
+        labels: { vm: vm1-backend, app: tf-api }

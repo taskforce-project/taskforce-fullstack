@@ -1,0 +1,57 @@
+# Exportateurs de la VM1 (backend), grattés par le Prometheus de la VM2 via Tailscale.
+# Volontairement MINIMAL (RAM serrée sur la VM1) : node-exporter + cadvisor + un relais socat qui
+# expose /actuator/prometheus du backend au Prometheus distant, SANS toucher au conteneur backend.
+#
+# Les ports sont liés à l'IP Tailscale (100.122.50.25) uniquement — jamais 0.0.0.0 : rien de nouveau
+# n'est exposé hors du tailnet.
+name: taskforce-monitoring-exporters
+
+networks:
+  # Réseau du backend (pour que le relais socat joigne taskforce-backend-prod par son nom).
+  taskforce-prod-network:
+    external: true
+
+services:
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: tf-node-exporter
+    restart: unless-stopped
+    command:
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --path.rootfs=/rootfs
+      - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    ports:
+      - "100.122.50.25:9100:9100"   # Tailscale uniquement
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: tf-cadvisor
+    restart: unless-stopped
+    privileged: true
+    devices:
+      - /dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    ports:
+      - "100.122.50.25:8081:8080"   # Tailscale uniquement
+
+  # Relais TCP : 9101 (tailnet) → taskforce-backend-prod:8080 (réseau interne). L'actuator est public
+  # (SecurityConfig : /actuator/**), donc pas de jeton nécessaire pour /actuator/prometheus.
+  actuator-proxy:
+    image: alpine/socat:1.8.0.1
+    container_name: tf-actuator-proxy
+    restart: unless-stopped
+    command: TCP-LISTEN:9101,fork,reuseaddr TCP:taskforce-backend-prod:8080
+    ports:
+      - "100.122.50.25:9101:9101"   # Tailscale uniquement
+    networks:
+      - taskforce-prod-network

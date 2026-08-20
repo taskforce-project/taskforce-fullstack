@@ -1,13 +1,7 @@
 "use client";
 
 import { usePreferencesStore } from "@/lib/store/preferences-store";
-import { Moon, Sun, Languages, ArrowLeft } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Moon, Sun, ArrowLeft } from "lucide-react";
 import { Toaster } from "@/components/ui/sonner";
 import { useSyncExternalStore } from "react";
 import Image from "next/image";
@@ -36,7 +30,7 @@ export default function AuthLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const { theme, toggleTheme, language, setLanguage, t } = usePreferencesStore();
+  const { theme, toggleTheme, t } = usePreferencesStore();
   const pathname = usePathname();
 
   // Les préférences viennent du stockage local : rendues côté serveur, elles produiraient un écart
@@ -95,32 +89,6 @@ export default function AuthLayout({
         <div className="auth-actions">
           {mounted && (
             <>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    className="auth-icon-btn"
-                    aria-label={t.accessibility.changeLanguage}
-                  >
-                    <Languages className="h-4 w-4" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    onClick={() => setLanguage("fr")}
-                    className={language === "fr" ? "bg-accent" : ""}
-                  >
-                    Français
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => setLanguage("en")}
-                    className={language === "en" ? "bg-accent" : ""}
-                  >
-                    English
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
               <button
                 type="button"
                 className="auth-icon-btn"
