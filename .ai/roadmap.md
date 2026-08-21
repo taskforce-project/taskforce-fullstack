@@ -32,13 +32,32 @@
 >   CONFIG : (1) **IdP `github` dans le realm `taskforce-prod`** (absent — aucun `identityProviders`), (2)
 >   **GitHub OAuth App dédiée** dont le callback = `https://auth.taskforce-project.fr/realms/taskforce-prod/broker/github/endpoint`,
 >   (3) flag front `NEXT_PUBLIC_AUTH_SOCIAL_READY=github` (ARG/ENV ajoutés à `frontend/Dockerfile`, défaut
->   vide = « bientôt »). À finaliser avec les identifiants de l'OAuth App GitHub de l'utilisateur.
+>   vide = « bientôt »). **FAIT 20/08** : IdP `github` ACTIVÉ (app `taskforce-oauth`, client
+>   `Ov23lis390g7hXCbah6S`, realm `defaultLocale=en`) + flag front `AUTH_SOCIAL_READY=github` (VM2 `.env`)
+>   + rebuild VM2 → **bouton GitHub LIVE**. Chaîne vérifiée front→back→KC→GitHub (arrive sur « Sign in to
+>   GitHub — to continue to taskforce-oauth »). Restent confirmables uniquement par un VRAI login GitHub :
+>   l'URL de callback enregistrée sur l'app GitHub + la validité du secret (le `+4` collé était suspect).
 > - **Login prod débloqué (ops, 20/08).** L'unique compte (`pierre.michel.work@gmail.com`) portait une
 >   action requise `VERIFY_EMAIL` RÉSIDUELLE malgré `emailVerified=true` → ROPC refusé
 >   (`resolve_required_actions`, 401 sur `/api/auth/login`). Action retirée via kcadm. NON systémique : le
 >   realm ne met pas `VERIFY_EMAIL` en `defaultAction`, et `KeycloakService.createUser/verifyEmail` ne pose
 >   aucune action requise. Le « 502 » vu sur `auth.` = visite DIRECTE de l'endpoint broker GitHub (sans
 >   `state`) — pas une panne (Keycloak répond 200 interne ET public). Cf. mémoire [[kc-login-required-actions]].
+> - **GitHub login opérationnel (20/08).** L'échec au retour de GitHub était `incorrect_client_credentials`
+>   (secret mal saisi) → corrigé en `…93925aa8` (l'utilisateur avait encodé le dernier caractère « 8 »
+>   comme « 4+4 »). Le callback URL est bien enregistré sur l'app `taskforce-oauth` (l'utilisateur passe
+>   l'écran d'autorisation GitHub). **Flux rendu SEAMLESS** (aucune page Keycloak) : IdP
+>   `updateProfileFirstLoginMode=off` + flow custom **`first broker login autolink`** (COPIE éditable du
+>   built-in : Review Profile / Confirm link / Account verification DISABLED + authenticator **`idp-auto-link`**
+>   REQUIRED dans « Handle Existing Account »), lié au github IdP via `firstBrokerLoginFlowAlias`. Auto-link
+>   par email de confiance (`trustEmail=true`). Le built-in `first broker login` a été REMIS par défaut (le
+>   désactiver dessus cassait la connexion : `invalid_user_credentials`). ⚠️ **NON dans le realm.json** → à
+>   refaire via kcadm si réimport. Cf. mémoire [[kc-login-required-actions]].
+> - **Sauvegardes prod (`ops/backup/`).** `pg_dumpall` (CLUSTER COMPLET : `taskforce` + `keycloak_prod`
+>   [users + IdP + secret + flows] + `umami` + rôles) SQL+gzip QUOTIDIEN (systemd `tf-backup.timer` 03:00,
+>   `Persistent`, rotation `KEEP=14`) sur VM1 `~/backups/`, + `pg_restore.sh` (arrête backend+keycloak+
+>   ai-service, restaure, redémarre). Cluster ~90 Mio → ~90 Kio gz. ⚠️ **Keycloak = base SÉPARÉE
+>   `keycloak_prod`** → un dump mono-base l'aurait manqué. Vérifié. Filet pour **reseed sans risque**. Cf. [[prod-backup-system]].
 
 > **▶ MAJ 18/08/2026 — Déploiement Phase 1 (backend sur VM1) + correctifs config prod.** `[DEPLOY-01]`
 > Premier déploiement prod réel sur la VM école `MNS-VMD-DFS5-033` (pilotée en SSH via Tailscale). Pile
