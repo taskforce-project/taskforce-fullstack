@@ -74,12 +74,12 @@ export function AiUsageCard({ slug, refreshToken }: DashboardCardBodyProps) {
         <span className="tabular-nums">
           {unlimited
             ? "Unlimited"
-            : `${pct} % de ${usage.limitTokens.toLocaleString("fr-FR")} tokens`}
+            : `${pct}% of ${usage.limitTokens.toLocaleString("en-US")} tokens`}
         </span>
-        <span className="tabular-nums">{usage.requestCount.toLocaleString("fr-FR")} requêtes</span>
+        <span className="tabular-nums">{usage.requestCount.toLocaleString("en-US")} requests</span>
       </div>
       <p className="text-[11px] text-muted-foreground/70">
-        Réinitialisation le {new Date(usage.resetAt).toLocaleDateString("fr-FR")}
+        Reset on {new Date(usage.resetAt).toLocaleDateString("en-US")}
       </p>
     </div>
   )

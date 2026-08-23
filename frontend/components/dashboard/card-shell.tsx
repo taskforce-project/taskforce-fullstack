@@ -119,7 +119,7 @@ export function CardShell({
             {timeRanges && timeRanges.length > 0 && (
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger className="gap-2 text-xs">
-                  <Clock className="size-3.5 text-muted-foreground" /> Période
+                  <Clock className="size-3.5 text-muted-foreground" /> Range
                 </DropdownMenuSubTrigger>
                 <DropdownMenuSubContent>
                   <DropdownMenuRadioGroup value={activeRange ?? ""} onValueChange={onChangeRange}>
@@ -135,11 +135,11 @@ export function CardShell({
 
             <DropdownMenuSub>
               <DropdownMenuSubTrigger className="gap-2 text-xs">
-                <Scaling className="size-3.5 text-muted-foreground" /> Taille
+                <Scaling className="size-3.5 text-muted-foreground" /> Size
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
                 <DropdownMenuRadioGroup value={size} onValueChange={(v) => onChangeSize(v === "2" ? "2" : "1")}>
-                  <DropdownMenuRadioItem value="1" className="text-xs">1× (simple)</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="1" className="text-xs">1× (single)</DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="2" className="text-xs">2× (double)</DropdownMenuRadioItem>
                 </DropdownMenuRadioGroup>
               </DropdownMenuSubContent>
@@ -147,7 +147,7 @@ export function CardShell({
 
             <DropdownMenuSeparator />
             <DropdownMenuItem className="gap-2 text-xs text-rose-500 focus:text-rose-500" onClick={onRemove}>
-              <Trash2 className="size-3.5" /> Retirer
+              <Trash2 className="size-3.5" /> Remove
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

@@ -10,6 +10,19 @@
 >
 > Sources : `.ai/qa.md` (QA produit détaillée), `.ai/known-issues.md` (bugs vérifiés), `.ai/module-map.md` (domaines↔code), `.ai/architecture-map.md` (archi réelle), `.ai/P0-fix-plan.md` (correctifs P0 paste-ready).
 
+> **▶ MAJ 23/08/2026 — QA batch 1 (branche `hotfix/qa-batch-1`, PR cascade dev→main).** `[QA-1]`
+> Corrections QA (post mise-en-prod OAuth/version) :
+> - **i18n** : dernières chaînes FR du dashboard → EN (carte AI/Cortex usage `% of`/`requests`/`Reset on`,
+>   « Ma file »→My queue, « Rien de nouveau »→Nothing new, « Débit détaillé… »→Detailed throughput, menu carte
+>   Size/Range/Remove/1× single).
+> - **Icône Google** : logo officiel 4 couleurs (au lieu du monochrome) — `auth-social-buttons.tsx`.
+> - **Favicon** : `frontend/app/icon.svg` = SVG du logo de la landing (l'onglet affichait un logo minuscule via `favicon.ico`).
+> - **Terms/Privacy** : vérifiés — `/legal-notices` + `/privacy-policy` ont déjà du VRAI contenu ; liens register + footer OK. RAS.
+> - **Écran auth premium** : `AuthTransition` (Framer Motion, aucune dépendance/asset externe → CSP OK) + temps
+>   d'affichage minimum (1,6 s) + phase « succès » (coche) avant redirection, sur `/auth/callback`.
+> RESTE (features, une par une) : emails d'invitation + approbation · workspaces perso/org + recalcul limites ·
+> photo de profil (avatar GitHub/Google/DiceBear).
+
 > **▶ MAJ 20/08/2026 — Hotfix pré-soutenance : app 100 % EN + beacon CSP + supervision VM2 + prépa OAuth GitHub.** `[HOTFIX-QA]`
 > Branche `hotfix/auth-oauth-monitoring` (working tree, NON commité — l'utilisateur committe/PR→main).
 > - **i18n verrouillé en anglais.** Deux systèmes de langue coexistaient, DÉCONNECTÉS : le store
