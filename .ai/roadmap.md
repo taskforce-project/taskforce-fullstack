@@ -53,6 +53,15 @@
 >   par email de confiance (`trustEmail=true`). Le built-in `first broker login` a été REMIS par défaut (le
 >   désactiver dessus cassait la connexion : `invalid_user_credentials`). ⚠️ **NON dans le realm.json** → à
 >   refaire via kcadm si réimport. Cf. mémoire [[kc-login-required-actions]].
+> - **Google login (23/08)** : IdP `google` ACTIVÉ (client `312298514743-…apps.googleusercontent.com`, MÊME
+>   flow `first broker login autolink` → seamless), bouton front actif (`AUTH_SOCIAL_READY=github,google` sur
+>   VM2 `.env` + rebuild), chaîne vérifiée jusqu'à `accounts.google.com` (« to continue to taskforce-project.fr »).
+>   ⚠️ Écran de consentement Google en mode **TEST** → ajouter les *test users* (sinon `access_denied`), ou publier.
+> - **Reproductibilité OAuth + doc Brain OS (23/08)** : script idempotent **`ops/kc-setup.sh`** (rejoue IdPs
+>   GitHub+Google + flow autolink + `defaultLocale=en` ; secrets par variable d'env) — la config KC vit hors
+>   `realm.json`. Runbooks documentés dans **`taskforce-docs/v1/08-operations/DevOps.md`** (supervision +
+>   sauvegardes + connexion sociale) + item [[Backend]] `BE-SEC-OAUTH`. Users prod : pierre / alizée / yseult /
+>   dev@techguys (à déclarer en *test users* Google).
 > - **Sauvegardes prod (`ops/backup/`).** `pg_dumpall` (CLUSTER COMPLET : `taskforce` + `keycloak_prod`
 >   [users + IdP + secret + flows] + `umami` + rôles) SQL+gzip QUOTIDIEN (systemd `tf-backup.timer` 03:00,
 >   `Persistent`, rotation `KEEP=14`) sur VM1 `~/backups/`, + `pg_restore.sh` (arrête backend+keycloak+
