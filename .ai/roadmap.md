@@ -62,6 +62,10 @@
 >   `realm.json`. Runbooks documentés dans **`taskforce-docs/v1/08-operations/DevOps.md`** (supervision +
 >   sauvegardes + connexion sociale) + item [[Backend]] `BE-SEC-OAUTH`. Users prod : pierre / alizée / yseult /
 >   dev@techguys (à déclarer en *test users* Google).
+> - **Version déployée visible dans l'app (23/08)** : le footer affiche le **SHA court du commit déployé**
+>   (`NEXT_PUBLIC_APP_VERSION`, ARG/ENV ajoutés au `frontend/Dockerfile`). Injecté par l'auto-deploy VM2
+>   (`export APP_VERSION=$(git rev-parse --short HEAD)` avant le build + build-arg dans `docker-compose.vm2.yml`).
+>   → on LIT dans le navigateur quelle version tourne, sans SSH. Effectif après le prochain merge sur `main`.
 > - **Sauvegardes prod (`ops/backup/`).** `pg_dumpall` (CLUSTER COMPLET : `taskforce` + `keycloak_prod`
 >   [users + IdP + secret + flows] + `umami` + rôles) SQL+gzip QUOTIDIEN (systemd `tf-backup.timer` 03:00,
 >   `Persistent`, rotation `KEEP=14`) sur VM1 `~/backups/`, + `pg_restore.sh` (arrête backend+keycloak+
