@@ -646,6 +646,10 @@ public class AuthService {
         String firstName = str(profil.get("given_name"));
         String lastName  = str(profil.get("family_name"));
         String keycloakId = str(profil.get("sub"));
+        // Photo de profil du fournisseur. Keycloak ne l'expose dans le `userinfo` que si un mapper
+        // d'attribut recopie l'avatar en claim `picture` (config IdP, cf. ops/kc-setup.sh). Absente,
+        // l'avatar généré côté front (identicon déterministe) prend le relais : personne sans photo.
+        String picture = str(profil.get("picture"));
 
         if (email == null || email.isBlank()) {
             // Un compte GitHub peut n'exposer aucune adresse publique. Sans adresse nous ne pouvons
@@ -666,11 +670,21 @@ public class AuthService {
                 .planStatus(PlanStatus.ACTIVE)
                 .isActive(true)
                 .displayName(buildDisplayName(firstName, lastName))
+                .avatarUrl(picture)
                 .build());
         });
 
         if (!user.getIsActive()) {
             throw new RuntimeException("Ce compte est désactivé");
+        }
+
+        // Rattrapage : un compte créé par mot de passe (donc sans photo) qui se connecte ensuite par
+        // GitHub/Google récupère sa photo de profil. On n'écrase jamais un avatar déjà défini — une
+        // photo importée par la personne l'emporte sur celle du fournisseur.
+        if ((user.getAvatarUrl() == null || user.getAvatarUrl().isBlank())
+                && picture != null && !picture.isBlank()) {
+            user.setAvatarUrl(picture);
+            userRepository.save(user);
         }
 
         if (creation) {
