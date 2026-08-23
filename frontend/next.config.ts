@@ -42,6 +42,13 @@ const TURNSTILE_ORIGIN = "https://challenges.cloudflare.com";
 const CF_BEACON_SCRIPT = "https://static.cloudflareinsights.com";
 const CF_BEACON_CONNECT = "https://cloudflareinsights.com";
 
+// Avatars des fournisseurs de connexion externe (photo de profil GitHub / Google). Quand une
+// personne se connecte par GitHub ou Google, `completeOAuthLogin` (backend) enregistre l'URL de sa
+// photo, hébergée sur ces CDN. Sans ces origines explicites dans img-src, la CSP de production (sans
+// le joker `https:`) la bloquerait → repli silencieux sur l'identicon généré. Le sous-domaine Google
+// varie (lh3, lh4…) d'où le joker de sous-domaine ; GitHub sert ses avatars depuis un hôte unique.
+const OAUTH_AVATAR_ORIGINS = "https://avatars.githubusercontent.com https://*.googleusercontent.com";
+
 const cspHeader = [
   "default-src 'self'",
   // `unsafe-eval` n'est requis QUE par le rechargement à chaud du serveur de développement.
@@ -58,7 +65,7 @@ const cspHeader = [
   // `https:` était un joker autorisant les images de N'IMPORTE quelle origine HTTPS. Il n'a de
   // raison d'être qu'en développement, où MinIO est en http:// ; en production les deux origines
   // utiles sont explicites.
-  `img-src 'self' data: blob: ${API_ORIGIN} ${STORAGE_ORIGIN}${IS_PROD ? "" : " https:"}`,
+  `img-src 'self' data: blob: ${API_ORIGIN} ${STORAGE_ORIGIN} ${OAUTH_AVATAR_ORIGINS}${IS_PROD ? "" : " https:"}`,
   "font-src 'self' data:",
   "media-src 'self'",
   "object-src 'none'",

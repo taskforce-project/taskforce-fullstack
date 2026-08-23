@@ -10,6 +10,30 @@
 >
 > Sources : `.ai/qa.md` (QA produit détaillée), `.ai/known-issues.md` (bugs vérifiés), `.ai/module-map.md` (domaines↔code), `.ai/architecture-map.md` (archi réelle), `.ai/P0-fix-plan.md` (correctifs P0 paste-ready).
 
+> **▶ MAJ 23/08/2026 — QA batch 2 : photo de profil (branche `hotfix/qa-avatars`, PR → dev).** `[QA-2]`
+> Objectif : personne ne reste « sans photo de profil ». Deux causes, traitées :
+> - **Fallback bloqué en prod.** `lib/utils/avatar.ts` renvoyait `https://api.dicebear.com/…` ; la CSP prod
+>   `img-src` n'a PAS de joker `https:` → image bloquée → initiales seules (perçu « aucune photo »). Désormais
+>   l'identicon est **généré dans le navigateur** (`@dicebear/core` + `identicon`, déjà en dépendance) en
+>   **data-URI** (déjà autorisé par la CSP), déterministe (seed = email) + cache mémoire. Zéro appel réseau.
+> - **Avatar OAuth jamais capturé.** `AuthService.completeOAuthLogin` lisait `email/given_name/family_name/sub`
+>   mais jamais `picture` → `avatar_url` restait null. Ajout : capture de `picture` à la création + **backfill**
+>   au login (sans jamais écraser un avatar déjà défini — une photo importée l'emporte). `avatar_url` existe
+>   déjà (migration `V12`) → **aucune migration**. CSP `img-src` : ajout des CDN `avatars.githubusercontent.com`
+>   + `*.googleusercontent.com`.
+> ⚠️ RESTE (config, VM) : Keycloak ne met `picture` dans le `userinfo` que via un **mapper d'attribut IdP**
+>   (GitHub `avatar_url`→`picture` ; Google idem) — à ajouter dans `ops/kc-setup.sh` puis rejouer sur la VM.
+>   Tant que non fait, tout le monde a l'identicon généré (le fix principal) ; la vraie photo OAuth s'allume après.
+> Vérifs : `tsc` 0 · `next build` 0 · `avatar.test` 11/11. Backend validé par la CI (pas de JDK sur l'hôte).
+
+> **▶ NOTE 23/08/2026 — Dette technique différée : versioning des tags de release.** `[TD-TAGS]`
+> Dans `release.yml`, les lignes `rc` (dev) et `stable` (main) sont calculées SÉPARÉMENT : à la promotion
+> dev→main, main repart de la dernière stable et IGNORE le numéro de la rc validée (constat : stable
+> `frontend-v0.0.5` face à rc `frontend-v0.2.2-rc1`). En prime, `version-management.yml` fait ÉCHOUER toute PR
+> sans label `service:release:*`. **Sans impact prod** : la version affichée dans l'app = SHA git, pas ces tags.
+> **Différé volontairement** avant soutenance (chirurgie CI = risque). Correctif prévu : à la promotion, dériver
+> le stable en retirant `-rc` de la rc promue (`0.2.2-rc1`→`0.2.2`) au lieu de repartir de la ligne stable.
+
 > **▶ MAJ 23/08/2026 — QA batch 1 (branche `hotfix/qa-batch-1`, PR cascade dev→main).** `[QA-1]`
 > Corrections QA (post mise-en-prod OAuth/version) :
 > - **i18n** : dernières chaînes FR du dashboard → EN (carte AI/Cortex usage `% of`/`requests`/`Reset on`,
