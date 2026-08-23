@@ -1,0 +1,11 @@
+[Unit]
+Description=TaskForce Postgres backup (pg_dump + rotation)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=pmichel
+# BACKUP_DIR / KEEP surchargeables ici si besoin.
+Environment=KEEP=14
+ExecStart=/home/pmichel/ops/backup/pg_backup.sh
