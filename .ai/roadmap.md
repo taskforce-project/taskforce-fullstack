@@ -10,6 +10,11 @@
 >
 > Sources : `.ai/qa.md` (QA produit détaillée), `.ai/known-issues.md` (bugs vérifiés), `.ai/module-map.md` (domaines↔code), `.ai/architecture-map.md` (archi réelle), `.ai/P0-fix-plan.md` (correctifs P0 paste-ready).
 
+> **▶ MAJ 24/08/2026 — QA-18 : 3 bugs prod trouvés en QA live (branche `fix/qa-avatars-invitations`, PR → dev).** `[QA-18]`
+> - **`GET /api/invitations/mine` → 500 (jwt null).** L'endpoint (un seul segment) matchait le motif **public** `/api/invitations/*` (preview par token) → chaîne publique sans décodage JWT → `@AuthenticationPrincipal Jwt` null → NPE. **Il n'avait donc jamais fonctionné** (bannière d'invitations in-app). Fix : chaîne de sécurité `@Order(0)` `myInvitationsFilterChain` qui exige l'auth sur `/api/invitations/mine[/**]` **avant** la chaîne publique.
+> - **Avatars cassés (CSP).** `UserService` stockait `avatar_url = https://api.dicebear.com/...` quand l'avatar était absent ; la CSP `img-src` prod bloque ce domaine → « sans photo ». Fix : ne plus stocker d'URL externe (`avatar_url` NULL → identicon **local** côté front, `avatar.ts`) + **migration V74** qui purge les URLs `api.dicebear.com` déjà en base. `FileController` : fallback avatar **404** au lieu d'un redirect 302 dicebear. Tests MAJ (UserService, FileController).
+> - **Analytics 409 « ADVANCED_ANALYTICS » → décision produit : base gratuite.** `getThroughput` + `getBurndown` sont désormais **disponibles en Free** (gate retiré) ; seules `getCapacity` + `getWorkload` (vues avancées) restent gatées. Test de gating repointé sur `getCapacity`. Reste optionnel : soigner l'UX front des vues encore gatées (409→402/403 + encart « upgrade » au lieu d'un log d'erreur).
+
 > **▶ MAJ 24/08/2026 — QA-17 : spec API réelle + publication CI de la doc Fern (branche `feat/docs-fern`, PR #116 → dev).** `[QA-17]`
 > - **Spec OpenAPI réelle.** `fern/openapi/openapi.json` était un placeholder. springdoc sert la vraie spec
 >   sur **`/api-docs`** (pas `/v3/api-docs` : `springdoc.api-docs.path` est customisé), actif partout **sauf

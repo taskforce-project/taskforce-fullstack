@@ -120,12 +120,14 @@ class AnalyticsServiceIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("getThroughput applique le gating PRO (PlanFeatureService refuse → propagé)")
-    void throughput_enforces_plan_gating() {
+    @DisplayName("getCapacity applique le gating PRO (PlanFeatureService refuse → propagé)")
+    void capacity_enforces_plan_gating() {
+        // Le débit/burndown sont désormais gratuits (Free) ; le gating ADVANCED_ANALYTICS ne
+        // s'applique plus qu'aux vues avancées (capacité, charge). On y vérifie donc la propagation.
         doThrow(new BusinessException("Fonctionnalité réservée au plan Pro"))
             .when(planFeatureService).requireFeature(any(), any());
 
-        assertThatThrownBy(() -> analyticsService.getThroughput(SLUG, owner.getId(), null, "WEEK"))
+        assertThatThrownBy(() -> analyticsService.getCapacity(SLUG, owner.getId(), null))
             .isInstanceOf(BusinessException.class);
     }
 
