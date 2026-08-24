@@ -22,6 +22,11 @@
 >   workflow est **gated par le secret `FERN_TOKEN`** (skip propre si absent) et n'est **jamais un required
 >   check** → il ne peut pas casser la CI verte. Domaine `docs.taskforce-project.fr` = CNAME **Cloudflare
 >   DNS-only** vers la cible fournie par Fern (procédure dans `fern/README.md`).
+> - **Publié en live le 24/08** sur `taskforce.docs.buildwithfern.com` (custom-domain `docs.taskforce-project.fr`
+>   en cours de vérif DNS). Deux gotchas Fern rencontrés : (1) Fern **refuse les noms de tags OpenAPI
+>   non-ASCII** → tag `Système` renommé `System`, sinon l'onglet API est **zappé silencieusement** ;
+>   (2) la publication prod nécessite `CI=true fern generate --docs --force` — `--force` **seul ne contourne
+>   pas** le prompt « production » (terminal non-interactif → « No » par défaut → annulation).
 
 > **▶ MAJ 24/08/2026 — QA batch 4 : workspaces perso vs partagés + quota corrigé (branche `hotfix/qa-workspaces`, PR → dev).** `[QA-4]`
 > - **Distinction façon orgs GitHub.** Le switcher listait tout à plat. Désormais deux groupes :

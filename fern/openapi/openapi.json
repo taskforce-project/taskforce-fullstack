@@ -6,12 +6,12 @@
     "description": "Référence de l'API REST TaskForce. ⚠️ PLACEHOLDER versionné : en CI/prod, remplacé par la spec RÉELLE générée depuis le backend (springdoc, `/v3/api-docs`) avant `fern generate`. Voir fern/README.md."
   },
   "servers": [{ "url": "https://api.taskforce-project.fr", "description": "Production" }],
-  "tags": [{ "name": "Système", "description": "Santé et métadonnées du service." }],
+  "tags": [{ "name": "System", "description": "Santé et métadonnées du service." }],
   "paths": {
     "/actuator/health": {
       "get": {
         "operationId": "healthCheck",
-        "tags": ["Système"],
+        "tags": ["System"],
         "summary": "État de santé du service",
         "description": "Endpoint d'exemple (placeholder). La vraie spec liste l'ensemble des endpoints métier (auth, workspaces, projets, issues…).",
         "responses": {
