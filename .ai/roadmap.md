@@ -42,6 +42,18 @@
 > Nouveau DTO `IncomingInvitationResponse`. Tests d'intégration ajoutés (list + accept-by-id + garde-fou
 > email). `tsc` 0 · `next build` 0 · 149 tests front verts. Backend validé par la CI (pas de JDK hôte).
 
+> **▶ MAJ 24/08/2026 — QA batch 5 : harmonisation DA des emails (branche `hotfix/qa-email-templates`, PR → dev).** `[QA-5]`
+> L'email d'**invitation** (et la confirmation **RGPD**) partaient en **HTML inline basique** — sans logo
+> ni DA de l'app — alors qu'OTP / bienvenue / reset utilisent des **templates Thymeleaf** (header noir +
+> logo PNG base64 embarqué, carte blanche, footer). Harmonisé : deux nouveaux templates
+> `email/workspace-invitation-email.html` + `email/data-request-email.html`, **copiés depuis
+> `otp-email.html`** (header/logo/styles/footer à l'identique, zéro recopie du base64) puis contenu
+> remplacé. `EmailService.sendWorkspaceInvitationEmail` + `sendDataRequestEmail` passent par
+> `templateEngine.process(…)` (Context) au lieu du HTML en dur ; `EmailServiceTest` adapté (stub du
+> moteur + retrait des `verifyNoInteractions`). `sendInternalNotification` (alerte sales **interne**, HTML
+> fourni par l'appelant) laissé tel quel. Rendu vérifié (logo base64 intact, PNG 612×408 chargé).
+> Backend validé par la CI (pas de JDK hôte).
+
 > **▶ MAJ 23/08/2026 — QA batch 2 : photo de profil (branche `hotfix/qa-avatars`, PR → dev).** `[QA-2]`
 > Objectif : personne ne reste « sans photo de profil ». Deux causes, traitées :
 > - **Fallback bloqué en prod.** `lib/utils/avatar.ts` renvoyait `https://api.dicebear.com/…` ; la CSP prod

@@ -238,6 +238,8 @@ class EmailServiceTest {
         @DisplayName("devrait envoyer email de suppression de compte (DELETION)")
         void sendDataRequestEmail_deletion_shouldSendEmail() {
             // Given
+            when(templateEngine.process(eq("email/data-request-email"), any(Context.class)))
+                    .thenReturn("<html><body>RGPD</body></html>");
             doNothing().when(mailSender).send(any(MimeMessage.class));
 
             // When
@@ -245,13 +247,14 @@ class EmailServiceTest {
 
             // Then
             verify(mailSender).send(any(MimeMessage.class));
-            verifyNoInteractions(templateEngine);
         }
 
         @Test
         @DisplayName("devrait envoyer email d'accès aux données (ACCESS)")
         void sendDataRequestEmail_access_shouldSendEmail() {
             // Given
+            when(templateEngine.process(eq("email/data-request-email"), any(Context.class)))
+                    .thenReturn("<html><body>RGPD</body></html>");
             doNothing().when(mailSender).send(any(MimeMessage.class));
 
             // When
@@ -265,6 +268,8 @@ class EmailServiceTest {
         @DisplayName("devrait avaler l'exception d'envoi sans la propager (best-effort)")
         void sendDataRequestEmail_withMailError_shouldNotThrow() {
             // Given
+            when(templateEngine.process(eq("email/data-request-email"), any(Context.class)))
+                    .thenReturn("<html><body>RGPD</body></html>");
             doThrow(new RuntimeException("SMTP down"))
                     .when(mailSender).send(any(MimeMessage.class));
 
@@ -283,6 +288,8 @@ class EmailServiceTest {
         @DisplayName("devrait envoyer email d'invitation workspace avec succès")
         void sendWorkspaceInvitationEmail_withValidData_shouldSendEmail() {
             // Given
+            when(templateEngine.process(eq("email/workspace-invitation-email"), any(Context.class)))
+                    .thenReturn("<html><body>Invitation</body></html>");
             doNothing().when(mailSender).send(any(MimeMessage.class));
 
             // When
@@ -291,13 +298,14 @@ class EmailServiceTest {
 
             // Then
             verify(mailSender).send(any(MimeMessage.class));
-            verifyNoInteractions(templateEngine);
         }
 
         @Test
         @DisplayName("devrait avaler l'exception d'envoi sans la propager (best-effort)")
         void sendWorkspaceInvitationEmail_withMailError_shouldNotThrow() {
             // Given
+            when(templateEngine.process(eq("email/workspace-invitation-email"), any(Context.class)))
+                    .thenReturn("<html><body>Invitation</body></html>");
             doThrow(new RuntimeException("SMTP down"))
                     .when(mailSender).send(any(MimeMessage.class));
 
