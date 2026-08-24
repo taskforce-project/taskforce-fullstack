@@ -70,6 +70,18 @@
 >   Tant que non fait, tout le monde a l'identicon généré (le fix principal) ; la vraie photo OAuth s'allume après.
 > Vérifs : `tsc` 0 · `next build` 0 · `avatar.test` 11/11. Backend validé par la CI (pas de JDK sur l'hôte).
 
+> **▶ MAJ 24/08/2026 — Fix onboarding : 500 → 409 sur violation de contrainte (branche `fix/onboarding-500`, PR → dev).** `[QA-11]`
+> Bug remonté : onboarding « démo déjà utilisé » **puis erreur 500**. Diagnostic : le « déjà utilisé » est un
+> `BusinessException` déjà mappé en **400 propre** (identifiant projet pré-vérifié) ; le 500 venait d'une
+> **`DataIntegrityViolationException` non mappée** — course « check-puis-insert » sur double soumission (le
+> pré-check `existsBy...` passe pour 2 requêtes concurrentes, la 2e insertion viole `uq_project_identifier`),
+> ou un profil de compétences ré-inséré au re-run. Elle tombait dans le handler générique → 500. → **nouveau
+> `@ExceptionHandler(DataIntegrityViolationException)` → 409** (message générique côté client, détails SQL
+> journalisés en interne seulement). Les appels best-effort de l'onboarding traitent alors le conflit
+> proprement. `completeOnboarding` et `updateWorkspace` (slug intact) vérifiés sûrs. Piste hors-scope :
+> rendre `updateMemberSkills` idempotent (upsert).
+
+> **▶ MAJ 24/08/2026 — Correctifs du correctif CI sécu (même branche `fix/ci-green-2`).** `[QA-9]`
 > **▶ MAJ 24/08/2026 — Durcissement sécu : Swagger off en prod + conteneurs non-root (PR #109).** `[QA-10]`
 > Corrections issues du rapport de sécurité du 24/08 (revue config+code + sondes non destructives sur la prod) :
 > - **F1 (Swagger exposé, MOYEN)** — sonde live : `/swagger-ui` et `/api-docs` répondaient **200** en prod
