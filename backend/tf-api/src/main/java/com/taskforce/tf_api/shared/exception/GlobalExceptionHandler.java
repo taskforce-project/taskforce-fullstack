@@ -11,6 +11,8 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -204,6 +206,27 @@ public class GlobalExceptionHandler {
         );
 
         return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+    }
+
+    /**
+     * Ressource / route inexistante → 404 propre. Sans ce handler, {@code NoResourceFoundException}
+     * (chemin statique introuvable — ex. {@code /swagger-ui/**} depuis que springdoc est désactivé en
+     * prod, F1 de l'audit) et {@code NoHandlerFoundException} étaient interceptées par le fourre-tout
+     * {@code Exception} ci-dessous et remontaient en <b>500</b> au lieu d'un <b>404</b>.
+     */
+    @ExceptionHandler({NoResourceFoundException.class, NoHandlerFoundException.class})
+    public ResponseEntity<ErrorResponse> handleNotFound(
+            Exception ex,
+            HttpServletRequest request) {
+
+        ErrorResponse error = ErrorResponse.of(
+                HttpStatus.NOT_FOUND.value(),
+                "Not Found",
+                "Ressource introuvable.",
+                request.getRequestURI()
+        );
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
     }
 
     /**
