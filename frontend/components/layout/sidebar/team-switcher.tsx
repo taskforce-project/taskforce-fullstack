@@ -87,6 +87,34 @@ export function WorkspaceSwitcher() {
 
   const displayName = activeWorkspace?.name ?? "Workspace"
 
+  // Distinction façon orgs GitHub : « Vos espaces » (flag `personal` renseigné par le backend =
+  // je suis propriétaire) vs « Partagés avec vous » (ceux d'autrui, où j'ai été invité). Seuls les
+  // espaces possédés comptent pour le quota de création — être invité ailleurs ne le bloque pas.
+  const owned = workspaces.filter((ws) => ws.personal)
+  const shared = workspaces.filter((ws) => !ws.personal)
+  const ownedCount = owned.length
+
+  const renderWorkspaceItem = (ws: (typeof workspaces)[number]) => (
+    <DropdownMenuItem
+      key={ws.uuid}
+      onClick={() => handleSwitch(ws.slug)}
+      className="gap-2 p-2"
+      data-active={ws.slug === activeWorkspace?.slug}
+    >
+      <WorkspaceAvatar
+        name={ws.name}
+        seed={ws.slug ?? ws.uuid}
+        logoUrl={ws.logoUrl}
+        className="size-6"
+        textClassName="text-[10px]"
+      />
+      <span className="flex-1 truncate">{ws.name}</span>
+      {ws.slug === activeWorkspace?.slug && (
+        <span className="ml-auto text-xs text-muted-foreground">{t.shell.active}</span>
+      )}
+    </DropdownMenuItem>
+  )
+
   return (
     <>
       <SidebarMenu>
@@ -116,38 +144,31 @@ export function WorkspaceSwitcher() {
               side={isMobile ? "bottom" : "right"}
               sideOffset={4}
             >
-              <DropdownMenuLabel className="text-xs text-muted-foreground">
-                {t.shell.workspaces}
-              </DropdownMenuLabel>
-              {workspaces.map((ws) => (
-                <DropdownMenuItem
-                  key={ws.uuid}
-                  onClick={() => handleSwitch(ws.slug)}
-                  className="gap-2 p-2"
-                  data-active={ws.slug === activeWorkspace?.slug}
-                >
-                  <WorkspaceAvatar
-                    name={ws.name}
-                    seed={ws.slug ?? ws.uuid}
-                    logoUrl={ws.logoUrl}
-                    className="size-6"
-                    textClassName="text-[10px]"
-                  />
-                  <span className="flex-1 truncate">{ws.name}</span>
-                  {ws.slug === activeWorkspace?.slug && (
-                    <span className="ml-auto text-xs text-muted-foreground">{t.shell.active}</span>
-                  )}
-                </DropdownMenuItem>
-              ))}
+              {owned.length > 0 && (
+                <>
+                  <DropdownMenuLabel className="text-xs text-muted-foreground">
+                    {t.shell.yourWorkspaces}
+                  </DropdownMenuLabel>
+                  {owned.map(renderWorkspaceItem)}
+                </>
+              )}
+              {shared.length > 0 && (
+                <>
+                  <DropdownMenuLabel className="text-xs text-muted-foreground">
+                    {t.shell.sharedWorkspaces}
+                  </DropdownMenuLabel>
+                  {shared.map(renderWorkspaceItem)}
+                </>
+              )}
               <DropdownMenuSeparator />
               {(() => {
                 const limit = planLimit(planType, "workspaces")
-                const atLimit = workspaces.length >= limit
+                const atLimit = ownedCount >= limit
                 return (
                   <>
                     {Number.isFinite(limit) && (
                       <div className="px-2 py-1 text-[11px] text-muted-foreground">
-                        {t.shell.workspacesCount.replace("{count}", String(workspaces.length)).replace("{limit}", String(limit))}
+                        {t.shell.workspacesCount.replace("{count}", String(ownedCount)).replace("{limit}", String(limit))}
                       </div>
                     )}
                     {atLimit ? (

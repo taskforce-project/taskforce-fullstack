@@ -35,4 +35,11 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
     /** Nombre de workspaces dont l'utilisateur est membre */
     @Query("SELECT COUNT(wm) FROM WorkspaceMember wm WHERE wm.user.id = :userId")
     long countByMemberId(@Param("userId") Long userId);
+
+    /**
+     * Nombre de workspaces POSSÉDÉS (créés) par l'utilisateur. Base du quota de création par plan :
+     * distinct de {@link #countByMemberId} (qui compte aussi les workspaces où l'on est simplement
+     * invité) — être invité chez d'autres ne doit PAS consommer son propre quota.
+     */
+    long countByOwnerId(Long ownerId);
 }

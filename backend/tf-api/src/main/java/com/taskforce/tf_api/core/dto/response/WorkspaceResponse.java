@@ -28,6 +28,13 @@ public class WorkspaceResponse {
     private Long ownerId;
     private String ownerName;
 
+    /**
+     * Vrai si l'utilisateur qui demande la liste est le propriétaire (espace « perso »), faux s'il y
+     * est seulement membre (espace « partagé », façon orgs GitHub). Renseigné par
+     * {@code listWorkspacesByUser} ; défaut false pour les réponses hors contexte utilisateur.
+     */
+    private boolean personal;
+
     /** Nombre de membres */
     private int memberCount;
 

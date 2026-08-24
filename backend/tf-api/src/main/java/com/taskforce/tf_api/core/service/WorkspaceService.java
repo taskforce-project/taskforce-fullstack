@@ -125,7 +125,12 @@ public class WorkspaceService {
     @Transactional(readOnly = true)
     public List<WorkspaceResponse> listWorkspacesByUser(Long userId) {
         return workspaceRepository.findAllByMemberId(userId).stream()
-            .map(this::toResponse)
+            .map(ws -> {
+                WorkspaceResponse r = toResponse(ws);
+                // Perso = je suis le propriétaire ; partagé = j'y suis seulement membre (invité).
+                r.setPersonal(ws.getOwner().getId().equals(userId));
+                return r;
+            })
             .collect(Collectors.toList());
     }
 
@@ -138,7 +143,9 @@ public class WorkspaceService {
         User owner = userRepository.findById(userId)
             .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
 
-        long count = workspaceRepository.countByMemberId(userId);
+        // Quota fondé sur les workspaces POSSÉDÉS, pas sur les adhésions : être invité chez d'autres
+        // ne doit pas empêcher de créer les siens (cf. distinction perso / partagés, façon orgs GitHub).
+        long count = workspaceRepository.countByOwnerId(userId);
         checkWorkspaceLimit(owner.getPlanType(), count);
 
         String slug = generateUniqueSlug(request.getName());
@@ -224,7 +231,8 @@ public class WorkspaceService {
 
         PlanType ownerPlan = workspace.getOwner().getPlanType();
         long membersUsed     = workspaceMemberRepository.findByWorkspaceId(workspace.getId()).size();
-        long workspacesUsed  = workspaceRepository.countByMemberId(requestingUserId);
+        // Usage = workspaces possédés (cohérent avec le quota de création ci-dessus).
+        long workspacesUsed  = workspaceRepository.countByOwnerId(requestingUserId);
 
         return WorkspaceUsageResponse.builder()
             .plan(ownerPlan != null ? ownerPlan.name() : PlanType.FREE.name())
