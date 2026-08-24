@@ -1,0 +1,31 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "TaskForce API",
+    "version": "1.0.0",
+    "description": "Référence de l'API REST TaskForce. ⚠️ Ce fichier est un PLACEHOLDER versionné : en CI/prod, il est remplacé par la spec RÉELLE générée depuis le backend (springdoc, `/v3/api-docs`) avant le build. Voir README.md."
+  },
+  "servers": [{ "url": "https://api.taskforce-project.fr", "description": "Production" }],
+  "paths": {
+    "/actuator/health": {
+      "get": {
+        "tags": ["Système"],
+        "summary": "État de santé du service",
+        "description": "Endpoint d'exemple (placeholder). La vraie spec liste l'ensemble des endpoints métier.",
+        "responses": {
+          "200": {
+            "description": "Service opérationnel",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "status": { "type": "string", "example": "UP" } }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

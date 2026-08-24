@@ -1,0 +1,37 @@
+---
+title: Documentation TaskForce
+description: Guides produit et référence API de TaskForce, l'AI Delivery OS.
+template: splash
+hero:
+  tagline: Orchestrez vos projets, vos équipes et votre connaissance au même endroit — augmentés par l'IA.
+  actions:
+    - text: Premiers pas
+      link: /guides/premiers-pas/
+      icon: right-arrow
+      variant: primary
+    - text: Référence API
+      link: /api/
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Deux docs, un seul endroit
+
+<CardGrid stagger>
+  <Card title="Guides produit" icon="open-book">
+    Prendre en main TaskForce pas à pas : compte, onboarding, espaces de travail, projets et invitations.
+    Écrit pour les **utilisateurs**.
+  </Card>
+  <Card title="Référence API" icon="setting">
+    Tous les endpoints REST, générés depuis la **spec OpenAPI** du backend. Écrit pour les **intégrateurs**.
+    Voir la [référence API](/api/).
+  </Card>
+  <Card title="Toujours à jour" icon="approve-check">
+    La référence est régénérée à chaque release depuis le code — pas de doc qui dérive du réel.
+  </Card>
+  <Card title="Open source friendly" icon="github">
+    Le code vit sur [GitHub](https://github.com/taskforce-project). Cette doc aussi.
+  </Card>
+</CardGrid>
