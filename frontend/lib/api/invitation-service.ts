@@ -75,7 +75,11 @@ export async function acceptInvitation(token: string): Promise<void> {
 /** Invitations reçues par l'utilisateur courant (bannière d'approbation in-app). */
 export async function listMyInvitations(): Promise<IncomingInvitation[]> {
   const res = await apiClient.get<{ data: IncomingInvitation[] }>(INVITATION_ROUTES.MINE())
-  return res.data.data
+  // Défensif : cet endpoint DOIT renvoyer un tableau, mais un contrat cassé (ex. route
+  // /invitations/mine masquée par /invitations/{token}) peut renvoyer un objet. La bannière est
+  // optionnelle — elle ne doit JAMAIS faire planter le rendu de l'app (`.map` sur non-tableau).
+  const data = res.data?.data
+  return Array.isArray(data) ? data : []
 }
 
 /** Accepte explicitement une de ses invitations, par identifiant (sans token). */
