@@ -10,6 +10,19 @@
 >
 > Sources : `.ai/qa.md` (QA produit détaillée), `.ai/known-issues.md` (bugs vérifiés), `.ai/module-map.md` (domaines↔code), `.ai/architecture-map.md` (archi réelle), `.ai/P0-fix-plan.md` (correctifs P0 paste-ready).
 
+> **▶ MAJ 24/08/2026 — QA-17 : spec API réelle + publication CI de la doc Fern (branche `feat/docs-fern`, PR #116 → dev).** `[QA-17]`
+> - **Spec OpenAPI réelle.** `fern/openapi/openapi.json` était un placeholder. springdoc sert la vraie spec
+>   sur **`/api-docs`** (pas `/v3/api-docs` : `springdoc.api-docs.path` est customisé), actif partout **sauf
+>   en prod** (désactivé, audit F1). Les tests étant des slices `@DataJpaTest` (profil `it`, sans couche web
+>   ni springdoc, sans clients externes), la spec ne peut PAS s'extraire d'un test → on la génère **contre le
+>   backend en marche** : `fern/scripts/generate-openapi.{ps1,sh}` (curl `${TF_API_URL:-http://localhost:8080}/api-docs`,
+>   UTF-8 sans BOM, reformatage indenté), à committer.
+> - **Publication CI.** `.github/workflows/docs.yml` (push `main` sur `fern/**` + `workflow_dispatch`) fait
+>   `fern check` + `fern generate --docs`. Fern est un **SaaS** (héberge la doc, **aucune VM** sollicitée) ; le
+>   workflow est **gated par le secret `FERN_TOKEN`** (skip propre si absent) et n'est **jamais un required
+>   check** → il ne peut pas casser la CI verte. Domaine `docs.taskforce-project.fr` = CNAME **Cloudflare
+>   DNS-only** vers la cible fournie par Fern (procédure dans `fern/README.md`).
+
 > **▶ MAJ 24/08/2026 — QA batch 4 : workspaces perso vs partagés + quota corrigé (branche `hotfix/qa-workspaces`, PR → dev).** `[QA-4]`
 > - **Distinction façon orgs GitHub.** Le switcher listait tout à plat. Désormais deux groupes :
 >   **« Vos espaces »** (dont on est propriétaire) et **« Partagés avec vous »** (ceux d'autrui, où l'on
