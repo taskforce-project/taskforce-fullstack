@@ -16,8 +16,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 /**
@@ -88,12 +86,11 @@ public class UserService {
             }
         }
 
-        // Auto-génération de l'avatar DiceBear si absent en DB
-        if (user.getAvatarUrl() == null || user.getAvatarUrl().isBlank()) {
-            String seed = URLEncoder.encode(user.getEmail(), StandardCharsets.UTF_8);
-            user.setAvatarUrl("https://api.dicebear.com/9.x/identicon/svg?seed=" + seed);
-            log.info("avatarUrl généré et sauvegardé pour {}", email);
-        }
+        // Avatar : on ne stocke PLUS d'URL externe. Si l'utilisateur n'a pas d'avatar (photo OAuth ou
+        // fichier importé), `avatarUrl` reste NULL et le front génère un identicon DiceBear LOCALEMENT
+        // (data-URI déterministe par email, cf. avatar.ts::getAvatarUrl). L'ancienne auto-génération
+        // vers https://api.dicebear.com/... était bloquée par la CSP `img-src` en prod → avatar cassé.
+        // Les URLs externes déjà stockées sont purgées par la migration V74.
 
         userRepository.save(user);
         return buildUserResponse(user, keycloakUser);

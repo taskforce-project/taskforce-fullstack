@@ -129,6 +129,32 @@ public class SecurityConfig {
     }
 
     /**
+     * Filter chain PRIORITAIRE pour « mes invitations » (user-centric → JWT obligatoire).
+     *
+     * <p>{@code GET /api/invitations/mine} n'a qu'<b>un seul segment</b> après {@code /api/invitations/},
+     * il matchait donc le motif public {@code /api/invitations/*} (prévu pour la seule preview par token
+     * {@code GET /api/invitations/&#123;token&#125;}) → la requête tombait dans la chaîne publique, sans
+     * traitement du JWT → {@code @AuthenticationPrincipal Jwt} <b>null</b> → {@code NullPointerException}
+     * (500). Cette chaîne {@code @Order(0)} capte {@code /mine} <b>avant</b> la chaîne publique et exige
+     * l'authentification, si bien que le JWT du membre connecté est bien décodé.</p>
+     */
+    @Bean
+    @Order(0)
+    @ConditionalOnProperty(name = "keycloak.enabled", havingValue = "true", matchIfMissing = true)
+    public SecurityFilterChain myInvitationsFilterChain(HttpSecurity http) throws Exception {
+        applySecurityHeaders(http);
+        http
+            .securityMatcher("/api/invitations/mine", "/api/invitations/mine/**")
+            .cors(Customizer.withDefaults())
+            .authorizeHttpRequests(authz -> authz.anyRequest().authenticated())
+            .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(jwtDecoder())))
+            .csrf(csrf -> csrf.disable())
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+
+        return http.build();
+    }
+
+    /**
      * Filter chain prioritaire pour les endpoints publics.
      */
     @Bean

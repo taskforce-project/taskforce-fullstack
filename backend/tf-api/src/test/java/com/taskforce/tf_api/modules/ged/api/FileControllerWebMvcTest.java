@@ -75,16 +75,14 @@ class FileControllerWebMvcTest {
     }
 
     @Test
-    @DisplayName("GET avatars/{id} (auth) → 302 dicebear quand MinIO échoue (fallback)")
-    void getAvatar_fallback_302() throws Exception {
+    @DisplayName("GET avatars/{id} (auth) → 404 quand MinIO échoue (le front génère l'identicon localement)")
+    void getAvatar_fallback_404() throws Exception {
         stubUserFound();
         when(minioService.getObjectStream(anyString()))
             .thenThrow(new RuntimeException("Minio object not found"));
 
         mockMvc.perform(get("/api/files/avatars/7").with(auth()))
-            .andExpect(status().isFound())
-            .andExpect(header().string("Location",
-                org.hamcrest.Matchers.containsString("dicebear")));
+            .andExpect(status().isNotFound());
     }
 
     @Test
