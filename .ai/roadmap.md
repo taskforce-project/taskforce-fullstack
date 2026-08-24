@@ -70,6 +70,17 @@
 >   Tant que non fait, tout le monde a l'identicon généré (le fix principal) ; la vraie photo OAuth s'allume après.
 > Vérifs : `tsc` 0 · `next build` 0 · `avatar.test` 11/11. Backend validé par la CI (pas de JDK sur l'hôte).
 
+> **▶ MAJ 24/08/2026 — CI sécu réellement verte : findings Semgrep écartés + Trivy en install direct (branche `fix/ci-green-2`, PR → dev).** `[QA-8]`
+> Suite de QA-7 : une fois Semgrep/Trivy DÉBLOQUÉS (ils tournaient enfin), les vraies causes sont sorties :
+> - **Semgrep** : 11 findings ERROR, TOUS hors code applicatif — injections `${{ }}` dans `.github/workflows`
+>   (valeurs contrôlées par GitHub / labels de collaborateurs), `missing-user` sur des Dockerfiles (couvert
+>   par le scanner misconfig de Trivy), `ws://` dans **2 fichiers de test** + **1 config observabilité**
+>   (trafic INTERNE au réseau Docker). → nouveau **`.semgrepignore`** qui **scope le gate au code applicatif**
+>   (le rapport, lui, continue de tout voir). Rationale documentée dans le fichier.
+> - **Trivy** : `trivy-action@v0.28.0` épingle en interne `setup-trivy@v0.2.1` (**supprimé**) → job cassé
+>   AVANT le scan. → **install direct** du binaire (script officiel), plus aucune dépendance d'action versionnée.
+> Attendu : 0 CRITICAL / 0 secret (aucun secret en dur ; Trivy ne lit que le dépôt, pas le serveur).
+
 > **▶ MAJ 24/08/2026 — CI verte pour la promo prod (branche `fix/ci-green`, PR → dev).** `[QA-7]`
 > Trois checks cassaient la PR `dev→main` #105, tous par **dérive d'outillage** (pas de vraie faille) :
 > - **Semgrep** : `semgrep scan --config auto … --metrics off` — la version `semgrep/semgrep:latest`

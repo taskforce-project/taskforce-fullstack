@@ -1,0 +1,18 @@
+# --- Périmètre du SAST (Semgrep) ---
+# Le gate ERROR ne bloque que sur le CODE APPLICATIF (frontend/, backend/, ai-service/).
+# Les chemins ci-dessous sont exclus volontairement : non applicables au produit, ou couverts par un
+# autre outil. Le rapport reste consultable en artefact ; seule la décision de casser le build est
+# restreinte. Findings écartés (audit du 24/08, ruleset `auto` drifté) :
+#  - .github/       : durcissement des workflows CI (injections `${{ }}` à valeurs contrôlées par
+#                     GitHub / labels de collaborateurs) — faible risque en dépôt privé, revue dédiée.
+#  - observability/ : configs d'infra (ex. `ws://signoz:4320` = trafic INTERNE au réseau Docker, non
+#                     exposé publiquement).
+#  - *.test.*       : fichiers de test (mocks `ws://` sans impact sécurité).
+#  - Dockerfile*    : durcissement d'image (missing-user) — déjà couvert par Trivy (scanner misconfig).
+
+.github/
+observability/
+*.test.ts
+*.test.tsx
+Dockerfile
+Dockerfile.dev
