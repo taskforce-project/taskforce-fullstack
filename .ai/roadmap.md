@@ -70,7 +70,19 @@
 >   Tant que non fait, tout le monde a l'identicon généré (le fix principal) ; la vraie photo OAuth s'allume après.
 > Vérifs : `tsc` 0 · `next build` 0 · `avatar.test` 11/11. Backend validé par la CI (pas de JDK sur l'hôte).
 
-> **▶ MAJ 24/08/2026 — Correctifs du correctif CI sécu (même branche `fix/ci-green-2`).** `[QA-9]`
+> **▶ MAJ 24/08/2026 — Durcissement sécu : Swagger off en prod + conteneurs non-root (PR #109).** `[QA-10]`
+> Corrections issues du rapport de sécurité du 24/08 (revue config+code + sondes non destructives sur la prod) :
+> - **F1 (Swagger exposé, MOYEN)** — sonde live : `/swagger-ui` et `/api-docs` répondaient **200** en prod
+>   (divulgation de la surface d'API). → `springdoc.api-docs.enabled=false` + `swagger-ui.enabled=false`
+>   dans `application-prod.yml` (reste dispo en dev). Supprime aussi le 500 de `/v3/api-docs`.
+> - **F3 (conteneurs root, FAIBLE/MOYEN)** — `ai-service` (Debian → `useradd appuser`) et `landing`
+>   (Alpine → user `node` existant) passent en **non-root**. landing est validé par la CI `build-landing` ;
+>   ai-service est rebuild au déploiement (échec visible, pas silencieux).
+> Non inclus ici : **F2** (Cloudflare « Always Use HTTPS », réglage tableau de bord, côté user) et **F4**
+> (interpolations `${{ }}` dans les workflows — reporté pour ne pas déstabiliser le pipeline qu'on vient de
+> réparer ; faible risque en dépôt privé). Vrai angle restant d'un pentest sérieux : **tests authentifiés IDOR**.
+
+> **▶ MAJ 24/08/2026 — Correctifs du correctif CI sécu (PR #109).** `[QA-9]`
 > Le run de #108 a révélé 2 effets de bord :
 > - **Semgrep** trouvait 3 findings « WebSocket non chiffré »… dans ma **propre doc** : `.ai/roadmap.md`
 >   et les **commentaires du `.semgrepignore`** contenaient le motif d'URL décrit. → j'exclus `*.md` et
