@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 168 32" fill="none">
+  <rect width="32" height="32" rx="7" fill="#2563eb"/>
+  <path d="M8 9h16v3.5h-6.25V24h-3.5V12.5H8V9z" fill="#ffffff"/>
+  <text x="42" y="22" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="17" font-weight="700" letter-spacing="-0.3" fill="currentColor">TaskForce</text>
+</svg>

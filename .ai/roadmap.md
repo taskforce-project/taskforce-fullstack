@@ -70,6 +70,15 @@
 >   Tant que non fait, tout le monde a l'identicon généré (le fix principal) ; la vraie photo OAuth s'allume après.
 > Vérifs : `tsc` 0 · `next build` 0 · `avatar.test` 11/11. Backend validé par la CI (pas de JDK sur l'hôte).
 
+> **▶ MAJ 24/08/2026 — Doc en Fern (remplace Starlight) : guides + API, style « produit » (branche `feat/docs-fern`, PR → dev).** `[QA-16]`
+> L'utilisateur préfère le rendu **Fern** ([buildwithfern.com](https://buildwithfern.com)) à Starlight (QA-15)
+> pour la doc produit + la référence API. → nouveau dossier `fern/` (config `docs.yml` brandée bleu `#2563eb`,
+> guides produit en Markdown, spec OpenAPI, onglets **Guides** + **Référence API**) **ET suppression de
+> `docs-site/`** (Starlight, QA-15) pour n'avoir qu'un seul système. `fern check` : **0 erreur** (config valide,
+> API détectée via `generators.yml`). Publication = **SaaS Fern** : `fern login` + `fern generate --docs`
+> (compte gratuit) → héberge sur **docs.taskforce-project.fr** (`custom-domain` déclaré). Spec = placeholder ;
+> la vraie vient du backend springdoc en CI (cf. `fern/README.md`).
+
 > **▶ MAJ 24/08/2026 — Nettoyage 404 Swagger + script de charge k6 (branche `fix/swagger-404-k6`, PR → dev).** `[QA-14]`
 > - **404 propre** : `/swagger-ui` renvoyait **500** en prod (springdoc désactivé F1 → `NoResourceFoundException`
 >   captée par le fourre-tout `Exception`). Ajout d'un `@ExceptionHandler({NoResourceFoundException,
