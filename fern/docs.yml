@@ -57,17 +57,59 @@ navigation:
   - tab: guides
     layout:
       - section: Découvrir
+        skip-slug: true
         contents:
           - page: Bienvenue
             path: ./pages/index.md
+            slug: bienvenue
+          - page: Concepts clés
+            path: ./pages/concepts-cles.md
+            slug: concepts-cles
           - page: Premiers pas
             path: ./pages/premiers-pas.md
-      - section: Guides produit
+            slug: premiers-pas
+      - section: Organiser le travail
+        skip-slug: true
         contents:
           - page: Espaces & projets
             path: ./pages/espaces-et-projets.md
+            slug: espaces-et-projets
+          - page: Issues & tableaux
+            path: ./pages/issues-et-tableaux.md
+            slug: issues-et-tableaux
+          - page: Cycles
+            path: ./pages/cycles.md
+            slug: cycles
+      - section: Collaborer
+        skip-slug: true
+        contents:
+          - page: Membres & rôles
+            path: ./pages/membres-et-roles.md
+            slug: membres-et-roles
           - page: Inviter son équipe
             path: ./pages/inviter-son-equipe.md
+            slug: inviter-son-equipe
+          - page: Smart Assign
+            path: ./pages/smart-assign.md
+            slug: smart-assign
+      - section: Aller plus loin
+        skip-slug: true
+        contents:
+          - page: Mémoire (Brain OS)
+            path: ./pages/memoire.md
+            slug: memoire
+          - page: Analytics
+            path: ./pages/analytics.md
+            slug: analytics
+          - page: Intégrations
+            path: ./pages/integrations.md
+            slug: integrations
+      - section: Compte
+        skip-slug: true
+        contents:
+          - page: Offres & IA
+            path: ./pages/offres-et-ia.md
+            slug: offres-et-ia
   - tab: api
     layout:
       - api: Référence API
