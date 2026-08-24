@@ -14,6 +14,7 @@ import { SettingsModal } from "@/components/settings/settings-modal"
 import { CreateProjectModal } from "@/components/dialogs/create-project-modal"
 import { ProductTour } from "@/components/tour/product-tour"
 import { LabsGradientDefs } from "@/components/ui/labs-gradient-defs"
+import { PendingInvitationsBanner } from "@/components/invitations/pending-invitations-banner"
 
 interface AppShellProps {
   readonly children: React.ReactNode
@@ -27,6 +28,9 @@ export function AppShell({ children }: AppShellProps) {
       <AppSidebar />
       <SidebarInset className="overflow-hidden">
         <AppTopbar />
+        {/* Invitations reçues en attente d'approbation — bannière montée hors du <main> keyé par
+            la route : un seul fetch par session, persistante à la navigation. Nulle si rien. */}
+        <PendingInvitationsBanner />
         <div className="flex min-h-0 flex-1">
           <PanelDock side="left" />
           <AnimatePresence mode="wait" initial={false}>
