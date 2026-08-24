@@ -220,3 +220,12 @@ management:
       export:
         enabled: true
 
+# Documentation d'API (Springdoc) DÉSACTIVÉE en production. La surface d'API n'a pas à être exposée
+# publiquement : c'est une aide à la reconnaissance pour un attaquant (audit 24/08 : /swagger-ui et
+# /api-docs répondaient 200 en prod). Reste disponible en développement (application-dev.yml).
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
