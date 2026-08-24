@@ -47,10 +47,18 @@ export function WorkspaceAvatar({
   className,
   textClassName,
 }: WorkspaceAvatarProps) {
+  // Dégradé déterministe (même workspace → même rendu) mais à forte variété : on tire la teinte,
+  // l'écart de teinte, la saturation, la luminosité et l'angle de bits INDÉPENDANTS du hash. Avant,
+  // seule la teinte variait (sat/lum figées, écart de teinte étroit) → tous les workspaces se
+  // ressemblaient. Là, deux workspaces se ressemblent rarement.
   const h = hashString(String(seed ?? name ?? ""))
   const hue1 = h % 360
-  const hue2 = (hue1 + 35 + (h % 55)) % 360
-  const gradient = `linear-gradient(135deg, hsl(${hue1} 68% 54%), hsl(${hue2} 70% 44%))`
+  const hue2 = (hue1 + 60 + ((h >>> 3) % 180)) % 360 // écart 60–240° : analogique → complémentaire
+  const sat = 58 + ((h >>> 7) % 30) // 58–88 %
+  const light1 = 46 + ((h >>> 11) % 14) // 46–60 %
+  const light2 = Math.max(30, light1 - 12 - ((h >>> 15) % 8))
+  const angle = (h >>> 5) % 360
+  const gradient = `linear-gradient(${angle}deg, hsl(${hue1} ${sat}% ${light1}%), hsl(${hue2} ${sat}% ${light2}%))`
 
   return (
     <div
