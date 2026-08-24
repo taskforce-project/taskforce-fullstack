@@ -53,6 +53,12 @@ RUN npm install -g serve
 # Copier les fichiers buildés
 COPY --from=builder /app/dist ./dist
 
+# Exécution en utilisateur NON-ROOT (durcissement, Semgrep dockerfile.missing-user). Les images
+# `node` fournissent déjà un utilisateur `node` (uid 1000) ; on lui donne la propriété de /app pour
+# lire dist/. Le port 4321 (> 1024) est bindable sans privilège.
+RUN chown -R node:node /app
+USER node
+
 # Exposer le port
 EXPOSE 4321
 
