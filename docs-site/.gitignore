@@ -1,8 +1,0 @@
-# build & cache
-dist/
-.astro/
-node_modules/
-
-# environnement
-.env
-.env.production
