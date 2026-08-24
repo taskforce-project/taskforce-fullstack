@@ -5,6 +5,8 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { AlertCircle } from "lucide-react";
 import { authService } from "@/lib/api/auth-service";
+import { acceptInvitation } from "@/lib/api/invitation-service";
+import { takeInvitationToken } from "@/lib/utils/pending-invitation";
 import { usePreferencesStore } from "@/lib/store/preferences-store";
 import { AuthTransition } from "@/components/auth/auth-transition";
 
@@ -55,7 +57,19 @@ function OAuthCallbackInner() {
 
     authService
       .oauthCallback({ code, state, redirectUri })
-      .then((auth) => {
+      .then(async (auth) => {
+        // Approbation explicite : la personne peut venir d'un lien d'invitation puis s'être connectée
+        // via GitHub/Google. Le token a été mis de côté avant la redirection OAuth ; on l'applique
+        // maintenant (best-effort — n'empêche jamais d'entrer).
+        const invitationToken = takeInvitationToken();
+        if (invitationToken) {
+          try {
+            await acceptInvitation(invitationToken);
+          } catch {
+            /* invitation invalide/expirée/déjà utilisée — la connexion reste valable */
+          }
+        }
+
         // Modèle Linear : tout le monde démarre en Free. Un NOUVEAU venu (onboarding non fait) va au
         // wizard ; un habitué va droit à l'app.
         const target = auth?.user?.onboardingCompleted === false ? "/onboarding" : "/";

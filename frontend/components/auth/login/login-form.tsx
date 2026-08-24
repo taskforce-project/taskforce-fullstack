@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import Link from "next/link"
@@ -13,6 +13,8 @@ import { sanitizeInput, globalRateLimiter } from "@/lib/utils/validation"
 import { loginSchema, firstZodError } from "@/lib/validation/auth-schemas"
 import { Loader2 } from "lucide-react"
 import { AuthSocialButtons } from "@/components/auth/auth-social-buttons"
+import { acceptInvitation } from "@/lib/api/invitation-service"
+import { stashInvitationToken, takeInvitationToken } from "@/lib/utils/pending-invitation"
 
 /**
  * Connexion.
@@ -30,6 +32,12 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
   const { t } = usePreferencesStore()
   const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({ email: "", password: "" })
+
+  // Un lien d'invitation mène ici avec `?invitation=<token>` : on le met de côté pour l'appliquer
+  // après connexion (couvre aussi le détour OAuth, qui perd les paramètres d'URL au retour).
+  useEffect(() => {
+    stashInvitationToken(new URLSearchParams(window.location.search).get("invitation"))
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -53,7 +61,20 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
     try {
       const loggedIn = await login({ email: sanitizedEmail, password: sanitizedPassword })
       globalRateLimiter.reset("login")
-      toast.success(t.auth.success.loginSuccess)
+
+      // Approbation explicite : si l'utilisateur arrive d'un lien d'invitation, on l'applique
+      // maintenant (best-effort — un échec n'empêche jamais la connexion réussie).
+      const invitationToken = takeInvitationToken()
+      if (invitationToken) {
+        try {
+          await acceptInvitation(invitationToken)
+          toast.success("Invitation accepted")
+        } catch {
+          toast.success(t.auth.success.loginSuccess)
+        }
+      } else {
+        toast.success(t.auth.success.loginSuccess)
+      }
       // Direct vers l'onboarding si non fait — évite que l'app « flashe » avant le wizard.
       router.replace(loggedIn?.onboardingCompleted === false ? "/onboarding" : "/")
     } catch (error) {
