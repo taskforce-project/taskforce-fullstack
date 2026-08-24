@@ -35,12 +35,11 @@ public class FileController {
      */
     @GetMapping("/avatars/{userId}")
     public ResponseEntity<InputStreamResource> getAvatar(@PathVariable Long userId) {
-        String user_avatarUrl = userRepository.findById(userId)
-            .map(u -> u.getAvatarUrl())
+        // Existence de l'utilisateur (404 sinon) ; la valeur de l'avatarUrl n'est pas utilisée ici.
+        userRepository.findById(userId)
             .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable : " + userId));
 
-        // L'avatarUrl stocké est soit un chemin Minio proxy, soit une URL externe
-        // On extrait la clé Minio à partir du path /api/files/avatars/{userId}
+        // Clé Minio dérivée du path /api/files/avatars/{userId}
         String objectKey = "avatars/" + userId + "/avatar";
 
         try {
@@ -50,11 +49,9 @@ public class FileController {
                 .contentType(MediaType.IMAGE_JPEG)
                 .body(new InputStreamResource(stream));
         } catch (Exception e) {
-            // Fallback : redirect vers dicebear si pas d'avatar Minio
-            String name = user_avatarUrl != null ? user_avatarUrl : "user" + userId;
-            return ResponseEntity.status(302)
-                .header(HttpHeaders.LOCATION, "https://api.dicebear.com/9.x/identicon/svg?seed=" + userId)
-                .build();
+            // Pas d'objet Minio pour cet avatar → 404. Le front bascule alors sur l'identicon généré
+            // LOCALEMENT (avatar.ts) ; on ne redirige plus vers api.dicebear.com (bloqué par la CSP).
+            return ResponseEntity.notFound().build();
         }
     }
 
