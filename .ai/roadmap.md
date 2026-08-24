@@ -70,6 +70,15 @@
 >   Tant que non fait, tout le monde a l'identicon généré (le fix principal) ; la vraie photo OAuth s'allume après.
 > Vérifs : `tsc` 0 · `next build` 0 · `avatar.test` 11/11. Backend validé par la CI (pas de JDK sur l'hôte).
 
+> **▶ MAJ 24/08/2026 — Nettoyage 404 Swagger + script de charge k6 (branche `fix/swagger-404-k6`, PR → dev).** `[QA-14]`
+> - **404 propre** : `/swagger-ui` renvoyait **500** en prod (springdoc désactivé F1 → `NoResourceFoundException`
+>   captée par le fourre-tout `Exception`). Ajout d'un `@ExceptionHandler({NoResourceFoundException,
+>   NoHandlerFoundException}) → 404`. Toute route inconnue renvoie désormais un 404 propre. (Spring Boot 4.0.6.)
+> - **Tests de charge** : `load-testing/` (script k6 paramétrable + runbook). Diagnostic du 1er run à 83 %
+>   d'échec = **épuisement des ports éphémères Windows** côté client (`interrupted iterations`), pas le
+>   serveur (le `p(95)=1,68 s < 3 s` passait). Runbook : Debian + `ulimit`/`sysctl`, rampe progressive
+>   (pas 50 000 VUs d'un coup), et **edge CF (429 attendu) vs origine via Tailscale** (capacité réelle).
+
 > **▶ MAJ 24/08/2026 — Test aligné sur l'auto-suffixe (branche `fix/project-test`, PR → dev).** `[QA-13]`
 > `ProjectServiceIntegrationTest.should_reject_duplicate_identifier` cassait les Backend Tests de #105 :
 > il attendait l'ancien rejet `BusinessException` sur préfixe dupliqué, or #112 auto-suffixe désormais
