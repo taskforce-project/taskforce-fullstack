@@ -10,6 +10,7 @@
   "paths": {
     "/actuator/health": {
       "get": {
+        "operationId": "healthCheck",
         "tags": ["Système"],
         "summary": "État de santé du service",
         "description": "Endpoint d'exemple (placeholder). La vraie spec liste l'ensemble des endpoints métier (auth, workspaces, projets, issues…).",
