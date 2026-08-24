@@ -70,6 +70,16 @@
 >   Tant que non fait, tout le monde a l'identicon généré (le fix principal) ; la vraie photo OAuth s'allume après.
 > Vérifs : `tsc` 0 · `next build` 0 · `avatar.test` 11/11. Backend validé par la CI (pas de JDK sur l'hôte).
 
+> **▶ MAJ 24/08/2026 — Correctifs du correctif CI sécu (même branche `fix/ci-green-2`).** `[QA-9]`
+> Le run de #108 a révélé 2 effets de bord :
+> - **Semgrep** trouvait 3 findings « WebSocket non chiffré »… dans ma **propre doc** : `.ai/roadmap.md`
+>   et les **commentaires du `.semgrepignore`** contenaient le motif d'URL décrit. → j'exclus `*.md` et
+>   le fichier `.semgrepignore` lui-même, et je retire le littéral des commentaires (la prose de doc
+>   n'est pas du code à scanner).
+> - **Trivy** échouait en `FATAL` : le scanner Java résout les POM transitifs via Maven Central, dont
+>   l'IP partagée du runner est **rate-limitée (429)**. → ajout de **`--offline-scan`** (analyse des
+>   manifestes avec la base locale, sans requête réseau de résolution).
+
 > **▶ MAJ 24/08/2026 — CI sécu réellement verte : findings Semgrep écartés + Trivy en install direct (branche `fix/ci-green-2`, PR → dev).** `[QA-8]`
 > Suite de QA-7 : une fois Semgrep/Trivy DÉBLOQUÉS (ils tournaient enfin), les vraies causes sont sorties :
 > - **Semgrep** : 11 findings ERROR, TOUS hors code applicatif — injections `${{ }}` dans `.github/workflows`
