@@ -70,6 +70,12 @@
 >   Tant que non fait, tout le monde a l'identicon généré (le fix principal) ; la vraie photo OAuth s'allume après.
 > Vérifs : `tsc` 0 · `next build` 0 · `avatar.test` 11/11. Backend validé par la CI (pas de JDK sur l'hôte).
 
+> **▶ MAJ 24/08/2026 — Test aligné sur l'auto-suffixe (branche `fix/project-test`, PR → dev).** `[QA-13]`
+> `ProjectServiceIntegrationTest.should_reject_duplicate_identifier` cassait les Backend Tests de #105 :
+> il attendait l'ancien rejet `BusinessException` sur préfixe dupliqué, or #112 auto-suffixe désormais
+> (`WEB → WEB2`). Test réécrit → `should_autosuffix_duplicate_identifier` : le 2e projet est créé avec
+> `WEB2` (le nom reste libre). C'est le comportement VOULU (l'id/préfixe prime, pas le nom).
+
 > **▶ MAJ 24/08/2026 — Ré-ajout auto-suffixe projet (perdu au merge #111) + fix tsc landing (branche `fix/pre-prod-2`, PR → dev).** `[QA-12]`
 > Deux points bloquant la promo #105 :
 > - **Auto-suffixe projet perdu** : le merge de #111 a pris le 409 handler mais PAS le commit d'auto-suffixe

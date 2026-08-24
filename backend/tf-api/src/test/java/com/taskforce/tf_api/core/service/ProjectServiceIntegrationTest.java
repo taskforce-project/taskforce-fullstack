@@ -101,12 +101,15 @@ class ProjectServiceIntegrationTest extends AbstractIntegrationTest {
         }
 
         @Test
-        @DisplayName("refuse un identifiant déjà pris dans le workspace (insensible à la casse)")
-        void should_reject_duplicate_identifier() {
+        @DisplayName("un identifiant déjà pris est AUTO-SUFFIXÉ (le nom de projet reste libre) : WEB → WEB2")
+        void should_autosuffix_duplicate_identifier() {
             projectService.createProject(SLUG, owner.getId(), req("Web", "web"));
 
-            assertThatThrownBy(() -> projectService.createProject(SLUG, owner.getId(), req("Web 2", "WEB")))
-                .isInstanceOf(BusinessException.class);
+            // Le NOM d'un projet n'est jamais unique : un 2e projet dont le préfixe dérivé entre en
+            // collision ne doit PAS échouer — l'identifiant (préfixe d'issue) est auto-suffixé, comme
+            // le slug unique d'un workspace. C'est l'id/préfixe qui prime, pas le nom.
+            ProjectResponse second = projectService.createProject(SLUG, owner.getId(), req("Web 2", "WEB"));
+            assertThat(second.getIdentifier()).isEqualTo("WEB2");
         }
     }
 
