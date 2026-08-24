@@ -326,7 +326,28 @@ function ProfilePanel() {
 
 function AccountPanel() {
   const { user } = useAuth()
-  const setSection = useSettingsStore((s) => s.setSection)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState(false)
+
+  // Suppression de compte = droit à l'effacement RGPD (Art. 17) : vit ici, dans « Account »
+  // (l'export des données, lui, est dans « Privacy & Data »).
+  const handleDelete = async () => {
+    setDeleting(true)
+    try {
+      await deleteMyAccount()
+      toast.success("Account anonymized. Signing out…")
+      if (globalThis.window !== undefined) {
+        localStorage.removeItem("accessToken")
+        localStorage.removeItem("refreshToken")
+        localStorage.removeItem("user")
+        setTimeout(() => { window.location.href = "/auth/login" }, 1000)
+      }
+    } catch {
+      toast.error("Deletion failed. Try again or contact privacy@taskforce.dev.")
+      setDeleting(false)
+      setDeleteConfirm(false)
+    }
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -335,22 +356,33 @@ function AccountPanel() {
           <FormField label="Email" hint="Managed via your identity provider.">
             <StyledInput type="email" value={user?.email ?? ""} readOnly />
           </FormField>
-          <Separator />
-          {/* Suppression de compte + export des données → regroupés dans « Privacy & Data » (RGPD Art. 17/20).
-              Plus de doublon « Delete account » ici : Account = identité de connexion + langue. */}
-          <p className="text-xs text-muted-foreground">
-            Account deletion and data export:{" "}
-            <button
-              type="button"
-              onClick={() => setSection("privacy")}
-              className="underline underline-offset-2 transition-colors hover:text-foreground"
-            >
-              Privacy &amp; Data
-            </button>
-            .
-          </p>
         </div>
       </SectionCard>
+
+      <Zone variant="danger" title="Delete account" description="Permanently remove your account and all associated data.">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-foreground">Delete my account</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Your personal data will be anonymized and your access cut off immediately (GDPR Art. 17 — right to erasure). Irreversible.
+            </p>
+          </div>
+          {!deleteConfirm ? (
+            <Button variant="destructive" size="sm" className="shrink-0 h-8 text-xs" onClick={() => setDeleteConfirm(true)}>
+              Delete account
+            </Button>
+          ) : (
+            <div className="flex items-center gap-2 shrink-0">
+              <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setDeleteConfirm(false)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" size="sm" className="h-8 text-xs" disabled={deleting} onClick={handleDelete}>
+                {deleting ? "Processing…" : "Confirm deletion"}
+              </Button>
+            </div>
+          )}
+        </div>
+      </Zone>
     </div>
   )
 }
@@ -1182,11 +1214,11 @@ function IntegrationsPanel() {
 // ---------------------------------------------------------------------------
 
 function PrivacyPanel() {
-  const [loading, setLoading] = useState<"ACCESS" | "DELETION" | null>(null)
-  const [deleteConfirm, setDeleteConfirm] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const setSection = useSettingsStore((s) => s.setSection)
 
   const handleExport = async () => {
-    setLoading("ACCESS")
+    setLoading(true)
     try {
       const data = await exportMyData()
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" })
@@ -1200,27 +1232,7 @@ function PrivacyPanel() {
     } catch {
       toast.error("Export failed. Try again or contact privacy@taskforce.dev.")
     } finally {
-      setLoading(null)
-    }
-  }
-
-  const handleDelete = async () => {
-    setLoading("DELETION")
-    try {
-      await deleteMyAccount()
-      toast.success("Account anonymized. Signing out…")
-      // Purge cliente + BONNE route (/auth/login ; /login n'existe pas → 404) : sinon l'utilisateur
-      // restait « connecté » sur un compte anonymisé → 403 en cascade. RGPD-02.
-      if (globalThis.window !== undefined) {
-        localStorage.removeItem("accessToken")
-        localStorage.removeItem("refreshToken")
-        localStorage.removeItem("user")
-        setTimeout(() => { window.location.href = "/auth/login" }, 1000)
-      }
-    } catch {
-      toast.error("Deletion failed. Try again or contact privacy@taskforce.dev.")
-      setLoading(null)
-      setDeleteConfirm(false)
+      setLoading(false)
     }
   }
 
@@ -1254,54 +1266,27 @@ function PrivacyPanel() {
             variant="outline"
             size="sm"
             className="shrink-0 h-8 text-xs"
-            disabled={loading === "ACCESS"}
+            disabled={loading}
             onClick={handleExport}
           >
-            {loading === "ACCESS" ? "Exporting…" : "Export my data"}
+            {loading ? "Exporting…" : "Export my data"}
           </Button>
         </div>
       </SectionCard>
 
-      <Zone variant="danger" title="Delete account" description="Permanently remove your account and all associated data.">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-sm font-medium text-foreground">Delete my account</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Your personal data will be anonymized and your access cut off immediately (GDPR Art. 17 — right to erasure). Irreversible.
-            </p>
-          </div>
-          {!deleteConfirm ? (
-            <Button
-              variant="destructive"
-              size="sm"
-              className="shrink-0 h-8 text-xs"
-              onClick={() => setDeleteConfirm(true)}
-            >
-              Delete account
-            </Button>
-          ) : (
-            <div className="flex items-center gap-2 shrink-0">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 text-xs"
-                onClick={() => setDeleteConfirm(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                size="sm"
-                className="h-8 text-xs"
-                disabled={loading === "DELETION"}
-                onClick={handleDelete}
-              >
-                {loading === "DELETION" ? "Processing…" : "Confirm deletion"}
-              </Button>
-            </div>
-          )}
-        </div>
-      </Zone>
+      <SectionCard title="Delete your data" description="Erasing your personal data is done by deleting your account.">
+        <p className="text-xs text-muted-foreground">
+          Your personal data is anonymized when you delete your account (GDPR Art. 17 — right to erasure). Manage this from{" "}
+          <button
+            type="button"
+            onClick={() => setSection("account")}
+            className="underline underline-offset-2 transition-colors hover:text-foreground"
+          >
+            Account
+          </button>
+          .
+        </p>
+      </SectionCard>
     </div>
   )
 }
