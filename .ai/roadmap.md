@@ -78,6 +78,14 @@
 >   d'échec = **épuisement des ports éphémères Windows** côté client (`interrupted iterations`), pas le
 >   serveur (le `p(95)=1,68 s < 3 s` passait). Runbook : Debian + `ulimit`/`sysctl`, rampe progressive
 >   (pas 50 000 VUs d'un coup), et **edge CF (429 attendu) vs origine via Tailscale** (capacité réelle).
+> **▶ MAJ 24/08/2026 — Docs site brandé (Astro Starlight) : guides produit + référence API (branche `feat/docs-site`, PR → dev).** `[QA-15]`
+> Nouveau `docs-site/` : **un seul endroit** pour la doc PRODUIT (guides utilisateur MDX) ET la RÉFÉRENCE
+> API (rendue depuis la spec OpenAPI via `starlight-openapi`), thémé bleu TaskForce (`#2563eb`), destiné à
+> **docs.taskforce-project.fr** (Cloudflare Pages). Alternative « perso » à Swagger, découplée de l'API
+> (aucune réexposition). **Build validé en local** (`npm run build` → 7 pages, EXIT 0) après alignement des
+> versions (Starlight 0.34 / starlight-openapi 0.18 / Astro 5.6). La spec est un placeholder en repo ; le
+> vrai `openapi.json` est écrit depuis le backend (springdoc) en CI avant le build (cf. README). Runbook k6
+> livré séparément (voir #114 + [QA-14]).
 
 > **▶ MAJ 24/08/2026 — Test aligné sur l'auto-suffixe (branche `fix/project-test`, PR → dev).** `[QA-13]`
 > `ProjectServiceIntegrationTest.should_reject_duplicate_identifier` cassait les Backend Tests de #105 :

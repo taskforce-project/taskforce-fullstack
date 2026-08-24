@@ -1,0 +1,31 @@
+/* --- Thème TaskForce pour Starlight ---
+ * Starlight gère nativement le clair/sombre + toute la mise en page ; on ne redéfinit QUE l'accent de
+ * marque (bleu #2563eb, miroir de `--primary` de la landing) et deux détails typographiques. C'est ce
+ * qui rend le site « perso » sans réécrire un thème complet. */
+
+:root {
+  /* Accent en thème SOMBRE (défaut Starlight) */
+  --sl-color-accent-low: #172554;   /* blue-950 */
+  --sl-color-accent: #3b82f6;        /* blue-500 (plus lisible sur fond sombre) */
+  --sl-color-accent-high: #bfdbfe;   /* blue-200 */
+}
+
+:root[data-theme="light"] {
+  --sl-color-accent-low: #dbeafe;    /* blue-100 */
+  --sl-color-accent: #2563eb;        /* blue-600 — primaire TaskForce */
+  --sl-color-accent-high: #1e3a8a;   /* blue-900 */
+}
+
+/* Titre de marque un peu plus dense */
+.site-title {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* Hero de la page d'accueil : léger dégradé de marque derrière le titre */
+.hero h1 {
+  background: linear-gradient(120deg, var(--sl-color-white), #93c5fd);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
