@@ -10,6 +10,19 @@
 >
 > Sources : `.ai/qa.md` (QA produit détaillée), `.ai/known-issues.md` (bugs vérifiés), `.ai/module-map.md` (domaines↔code), `.ai/architecture-map.md` (archi réelle), `.ai/P0-fix-plan.md` (correctifs P0 paste-ready).
 
+> **▶ MAJ 24/08/2026 — QA batch 4 : workspaces perso vs partagés + quota corrigé (branche `hotfix/qa-workspaces`, PR → dev).** `[QA-4]`
+> - **Distinction façon orgs GitHub.** Le switcher listait tout à plat. Désormais deux groupes :
+>   **« Vos espaces »** (dont on est propriétaire) et **« Partagés avec vous »** (ceux d'autrui, où l'on
+>   est invité). Flag `personal` calculé côté back dans `listWorkspacesByUser` (`owner.id == userId`) et
+>   porté par `WorkspaceResponse` — pas de comparaison d'id fragile côté front (`user.id` est un String,
+>   `ownerId` un number). Nouvelles clés i18n `shell.yourWorkspaces`/`sharedWorkspaces` (EN+FR).
+> - **Quota de création corrigé (bug réel).** `createNewWorkspace` **et** `getUsage` comptaient
+>   `countByMemberId` (possédés **+** invités) → être invité chez d'autres **consommait le quota de
+>   création** (FREE 2 / BASIC 5) et pouvait bloquer la création des siens. Corrigé en `countByOwnerId`
+>   (nouvelle méthode repo) : seuls les workspaces **possédés** comptent. Même correction côté switcher
+>   (`ownedCount` au lieu de `workspaces.length` pour l'affichage ET le gating « limite atteinte »).
+> `tsc` 0 · `next build` 0 · **822 tests front verts**. Backend validé par la CI.
+
 > **▶ MAJ 23/08/2026 — QA batch 2 : photo de profil (branche `hotfix/qa-avatars`, PR → dev).** `[QA-2]`
 > Objectif : personne ne reste « sans photo de profil ». Deux causes, traitées :
 > - **Fallback bloqué en prod.** `lib/utils/avatar.ts` renvoyait `https://api.dicebear.com/…` ; la CSP prod
