@@ -20,7 +20,7 @@
 > - ~~Texte FR résiduel : titre de graphe généré par l'IA~~ ✅ **fait** : `ChartSpecService` (prompt force titre+description **en anglais**) + `AnalyticsQueryService` (labels d'axes/dimensions/mesures/scope/prédiction en EN) + repli heuristique (titres EN + mots-clés EN pour router les requêtes anglaises).
 > - ~~**Account** vide · **Privacy & Data** (delete account→Account, delete data→Data)~~ ✅ **fait** : `AccountPanel` porte désormais **Delete account** (RGPD Art. 17) ; `PrivacyPanel` garde **Export my data** (Art. 20) + une note « Delete your data → Account ». Reste : **Notifications** sans réglage actionnable. *(Security ✅. **Usage Cortex/factures** : laissé — décision. **Sessions actives** : abandonné.)*
 > - **Integrations** : audit (lesquelles marchent + ce qu'elles apportent). · **Status** : refonte + gestion. · **Signals** : refaire comme « My Queue » (tableau + chiffres).
-> - **Private/Public** : vérifier la visibilité projet (invité workspace voit public, pas privé, sauf invité au projet).
+> - ~~**Private/Public** : vérifier la visibilité projet~~ ✅ **vérifié** : `ProjectVisibilityGuard` correct (public=tous, privé=membres projet + OWNER/ADMIN ws) ET câblé — `listProjects` filtre (ligne 97-99), accès direct → 404 (`assertCanView`), écriture RBAC (VIEWER lecture seule, non-membre écrit public only). Membre ws non-membre projet voit public, pas privé. Gap résiduel documenté (code l.688 : My Queue/recherche « à durcir ») mais My Queue = issues assignées (déjà scopées).
 > - **Responsive** : topbar (bandeau type Stripe) + page Pricing. · **Doc** : gros passage (compléter les guides).
 
 > **▶ MAJ 24/08/2026 — QA-18 : 3 bugs prod trouvés en QA live (branche `fix/qa-avatars-invitations`, PR → dev).** `[QA-18]`
