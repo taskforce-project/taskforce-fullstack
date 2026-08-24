@@ -70,6 +70,19 @@
 >   Tant que non fait, tout le monde a l'identicon généré (le fix principal) ; la vraie photo OAuth s'allume après.
 > Vérifs : `tsc` 0 · `next build` 0 · `avatar.test` 11/11. Backend validé par la CI (pas de JDK sur l'hôte).
 
+> **▶ MAJ 24/08/2026 — CI verte pour la promo prod (branche `fix/ci-green`, PR → dev).** `[QA-7]`
+> Trois checks cassaient la PR `dev→main` #105, tous par **dérive d'outillage** (pas de vraie faille) :
+> - **Semgrep** : `semgrep scan --config auto … --metrics off` — la version `semgrep/semgrep:latest`
+>   exige désormais les métriques pour `--config auto` (« Cannot create auto config when metrics are
+>   off »). → `--metrics off` retiré (on garde `auto`, validé à 0 ERROR le 16/08).
+> - **Trivy** : `aquasecurity/trivy-action@0.24.0` **n'existe plus** (les tags sont passés en `v*`). →
+>   repin `@v0.28.0` (existence confirmée via l'API GitHub ; `0.28.0` sans `v` = 404).
+> - **Tests front** : PAS un test cassé — **seuil de couverture** `lib/utils/**` branches
+>   **82.14 % < 85 %**, tiré par `pending-invitation.ts` (28.57 %, ajouté en QA-3 sans test). → ajout de
+>   `pending-invitation.test.ts` (5 cas) + 1 cas `avatar.test.ts` → **lib/utils = 85.22 %+** (vérifié en
+>   local, 67 fichiers de tests verts). Semgrep/Trivy non exécutables en local (outils CI) : les
+>   correctifs lèvent les **erreurs de commande** ; d'éventuelles vraies findings apparaîtront au re-run.
+
 > **▶ MAJ 24/08/2026 — TD-TAGS RÉSOLU : le stable suit la rc de dev.** `[QA-6]`
 > Correctif `fix/release-versioning` (PR → dev). À la promotion dev→main, `release.yml` (et l'aperçu
 > `version-management.yml`) dérivent la version PROD de la **dernière rc** en retirant le suffixe `-rc`
