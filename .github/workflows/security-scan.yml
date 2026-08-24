@@ -32,7 +32,7 @@ jobs:
 
       # 1) Rapport COMPLET (CRITICAL→MEDIUM) → résumé + artefact, sans casser le build.
       - name: 🔎 Trivy fs — rapport complet
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           scan-type: fs
           scan-ref: .
@@ -44,7 +44,7 @@ jobs:
 
       # 2) Gate : casse le build uniquement sur une vuln CRITICAL corrigeable (0 aujourd'hui).
       - name: 🚦 Trivy fs — gate CRITICAL
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           scan-type: fs
           scan-ref: .
@@ -81,12 +81,12 @@ jobs:
 
       # 1) Rapport complet (toutes sévérités) en artefact, non bloquant.
       - name: 🔎 Semgrep — rapport complet
-        run: semgrep scan --config auto --json --output semgrep-report.json --metrics off .
+        run: semgrep scan --config auto --json --output semgrep-report.json .
         continue-on-error: true
 
       # 2) Gate : casse le build uniquement sur les findings de niveau ERROR (0 aujourd'hui).
       - name: 🚦 Semgrep — gate ERROR
-        run: semgrep scan --config auto --severity ERROR --error --metrics off .
+        run: semgrep scan --config auto --severity ERROR --error .
 
       - name: 💾 Archive Semgrep report
         if: always()

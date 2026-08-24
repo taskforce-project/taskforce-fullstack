@@ -46,6 +46,13 @@ describe('avatar helper', () => {
 
     expect(a).toBe(b);
   });
+
+  it('prefixes a relative path without leading slash and falls back to the default API origin', () => {
+    delete process.env.NEXT_PUBLIC_API_URL;
+
+    expect(getAvatarUrl({ email: 'x@example.com', avatarUrl: 'uploads/a.png' }))
+      .toBe('http://localhost:8080/uploads/a.png');
+  });
 });
 
 describe('getInitials', () => {
