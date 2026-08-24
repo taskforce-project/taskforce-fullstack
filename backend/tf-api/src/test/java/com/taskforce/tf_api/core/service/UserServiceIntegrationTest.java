@@ -50,14 +50,16 @@ class UserServiceIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("getByEmail renvoie le profil et génère un avatar si absent")
+    @DisplayName("getByEmail renvoie le profil et NE stocke PLUS d'URL d'avatar externe (identicon local côté front)")
     void should_get_by_email() {
         when(keycloakService.getUserById(anyString())).thenReturn(kcRep());
 
         var res = userService.getByEmail("owner@it.dev");
 
         assertThat(res.getEmail()).isEqualTo("owner@it.dev");
-        assertThat(userRepository.findById(user.getId()).orElseThrow().getAvatarUrl()).contains("dicebear");
+        // Plus d'auto-génération vers api.dicebear.com (bloquée par la CSP en prod) : avatarUrl reste
+        // NULL et le front génère l'identicon localement (avatar.ts). Cf. UserService + migration V74.
+        assertThat(userRepository.findById(user.getId()).orElseThrow().getAvatarUrl()).isNull();
     }
 
     @Test
