@@ -32,6 +32,7 @@ import { ProfileOverview } from "@/components/profile/profile-overview"
 import { MemberSkillsCard } from "@/components/members/member-skills-card"
 import { MemberAvailabilityCard } from "@/components/members/member-availability-card"
 import { exportMyData, deleteMyAccount } from "@/lib/api/gdpr-service"
+import { requestPasswordReset, getTwoFactorStatus, enableTwoFactor, disableTwoFactor } from "@/lib/api/user-service"
 import { getAiUsage, type AiUsage } from "@/lib/api/ai-usage-service"
 import { apiClient } from "@/lib/api/client"
 import { USER_ROUTES } from "@/lib/config/api-routes"
@@ -532,28 +533,99 @@ function NotificationsPanel() {
 }
 
 function SecurityPanel() {
-  // Auth déléguée à Keycloak (OIDC) — pas de fabrication d'infos ici (QA Q-17).
-  const items = [
-    { icon: <Key className="size-4 text-muted-foreground" />,    title: "Password",                        desc: "Change it from Keycloak's 'My account' console." },
-    { icon: <Shield className="size-4 text-muted-foreground" />, title: "Two-factor authentication (2FA)", desc: "Enable an authenticator (TOTP) from your Keycloak account." },
-    { icon: <Globe className="size-4 text-muted-foreground" />,  title: "Active sessions",                 desc: "Your sessions are managed centrally by Keycloak." },
-  ]
+  // UI TaskForce, mais le métier reste géré par Keycloak (le secret TOTP et le mot de passe ne
+  // transitent jamais par l'app) : reset par email + activation 2FA par email (scan du QR côté KC).
+  const [twoFa, setTwoFa] = useState<boolean | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    getTwoFactorStatus().then(setTwoFa).catch(() => setTwoFa(null))
+  }, [])
+
+  const onResetPassword = async () => {
+    setBusy(true)
+    try {
+      await requestPasswordReset()
+      toast.success("Password reset email sent — check your inbox.")
+    } catch {
+      toast.error("Couldn't send the reset email.")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const onToggle2fa = async () => {
+    setBusy(true)
+    try {
+      if (twoFa) {
+        await disableTwoFactor()
+        setTwoFa(false)
+        toast.success("Two-factor authentication disabled.")
+      } else {
+        await enableTwoFactor()
+        toast.success("2FA setup email sent — scan the QR code to finish enabling it.")
+      }
+    } catch {
+      toast.error("Couldn't update two-factor authentication.")
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <SectionCard
         title="Authentication & security"
-        description="Your identity is managed by Keycloak (OIDC provider). Password, 2FA and sessions are managed in your Keycloak account."
+        description="Your sign-in is secured by Keycloak. Manage your password and two-factor authentication here."
       >
         <div className="flex flex-col divide-y divide-border/50">
-          {items.map((it) => (
-            <div key={it.title} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
-              <span className="mt-0.5 shrink-0">{it.icon}</span>
+          {/* Mot de passe */}
+          <div className="flex items-center justify-between gap-3 py-3 first:pt-0">
+            <div className="flex items-start gap-3">
+              <Key className="size-4 text-muted-foreground mt-0.5 shrink-0" />
               <div>
-                <p className="text-sm font-medium text-foreground">{it.title}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{it.desc}</p>
+                <p className="text-sm font-medium text-foreground">Password</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  We&apos;ll email you a secure link to set a new password.
+                </p>
               </div>
             </div>
-          ))}
+            <Button size="sm" variant="outline" onClick={onResetPassword} disabled={busy}>
+              Reset password
+            </Button>
+          </div>
+
+          {/* 2FA */}
+          <div className="flex items-center justify-between gap-3 py-3 last:pb-0">
+            <div className="flex items-start gap-3">
+              <Shield className="size-4 text-muted-foreground mt-0.5 shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-foreground">
+                  Two-factor authentication (2FA)
+                  {twoFa === true && (
+                    <Badge variant="secondary" className="ml-2 align-middle">Enabled</Badge>
+                  )}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {twoFa
+                    ? "An authenticator app is required at sign-in."
+                    : "Add an authenticator app (TOTP) for an extra layer of security."}
+                </p>
+              </div>
+            </div>
+            {twoFa === null ? (
+              <Loader2 className="size-4 animate-spin text-muted-foreground" />
+            ) : (
+              <Button
+                size="sm"
+                variant={twoFa ? "outline" : "default"}
+                onClick={onToggle2fa}
+                disabled={busy}
+              >
+                {twoFa ? "Disable" : "Enable 2FA"}
+              </Button>
+            )}
+          </div>
         </div>
       </SectionCard>
     </div>
