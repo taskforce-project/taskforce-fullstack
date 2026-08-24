@@ -32,9 +32,26 @@ describe('avatar helper', () => {
     expect(getAvatarUrl({ email: 'alice@example.com', avatarUrl })).toBe(avatarUrl);
   });
 
-  it('falls back to DiceBear when no avatar exists', () => {
-    expect(getAvatarUrl({ email: 'alice@example.com', avatarUrl: null }))
-      .toContain('https://api.dicebear.com/9.x/identicon/svg?seed=alice%40example.com');
+  it('generates a local DiceBear data-URI when no avatar exists (no external request)', () => {
+    const result = getAvatarUrl({ email: 'alice@example.com', avatarUrl: null });
+
+    // Généré dans le navigateur → jamais d'appel réseau (la CSP prod bloque api.dicebear.com).
+    expect(result).toMatch(/^data:image\/svg\+xml/);
+    expect(result).not.toContain('api.dicebear.com');
+  });
+
+  it('generates a deterministic avatar for the same email', () => {
+    const a = getAvatarUrl({ email: 'same@example.com', avatarUrl: null });
+    const b = getAvatarUrl({ email: 'same@example.com', avatarUrl: null });
+
+    expect(a).toBe(b);
+  });
+
+  it('prefixes a relative path without leading slash and falls back to the default API origin', () => {
+    delete process.env.NEXT_PUBLIC_API_URL;
+
+    expect(getAvatarUrl({ email: 'x@example.com', avatarUrl: 'uploads/a.png' }))
+      .toBe('http://localhost:8080/uploads/a.png');
   });
 });
 

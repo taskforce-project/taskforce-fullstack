@@ -567,6 +567,8 @@ export const CONSTANTS_EN = {
     giveFeedback: "Give feedback",
     // Workspace switcher
     workspaces: "Workspaces",
+    yourWorkspaces: "Your workspaces",
+    sharedWorkspaces: "Shared with you",
     active: "active",
     workspacesCount: "{count}/{limit} workspaces",
     limitReachedUpgrade: "Limit reached — Upgrade",

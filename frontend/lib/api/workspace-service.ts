@@ -20,6 +20,8 @@ export interface Workspace {
   logoUrl: string | null;
   ownerId: number;
   ownerName: string;
+  /** Vrai si l'utilisateur courant est le propriétaire (espace perso) ; faux si simple membre (partagé). */
+  personal?: boolean;
   memberCount: number;
   createdAt: string;
   updatedAt: string;

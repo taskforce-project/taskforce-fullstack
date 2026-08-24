@@ -126,14 +126,21 @@ jobs:
             fi
             NEW_VERSION="backend-v${MAJOR}.${MINOR}.${PATCH}-rc${RC}"
           else
-            if [[ "$LABELS" == *"backend:release:major"* ]]; then
-              MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0
-            elif [[ "$LABELS" == *"backend:release:minor"* ]]; then
-              MINOR=$((MINOR + 1)); PATCH=0
+            # Promotion PROD : le stable SUIT la dernière rc de dev (on retire juste le suffixe -rc),
+            # au lieu de repartir d'une ligne stable indépendante qui divergeait (dette TD-TAGS).
+            LATEST_RC=$(git tag -l "backend-v*-rc*" --sort=-v:refname | head -n1)
+            if [ -n "$LATEST_RC" ]; then
+              NEW_VERSION=$(echo "$LATEST_RC" | sed -E 's/-rc[0-9]+$//')
             else
-              PATCH=$((PATCH + 1))
+              if [[ "$LABELS" == *"backend:release:major"* ]]; then
+                MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0
+              elif [[ "$LABELS" == *"backend:release:minor"* ]]; then
+                MINOR=$((MINOR + 1)); PATCH=0
+              else
+                PATCH=$((PATCH + 1))
+              fi
+              NEW_VERSION="backend-v${MAJOR}.${MINOR}.${PATCH}"
             fi
-            NEW_VERSION="backend-v${MAJOR}.${MINOR}.${PATCH}"
           fi
           
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
@@ -181,14 +188,21 @@ jobs:
             fi
             NEW_VERSION="frontend-v${MAJOR}.${MINOR}.${PATCH}-rc${RC}"
           else
-            if [[ "$LABELS" == *"frontend:release:major"* ]]; then
-              MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0
-            elif [[ "$LABELS" == *"frontend:release:minor"* ]]; then
-              MINOR=$((MINOR + 1)); PATCH=0
+            # Promotion PROD : le stable SUIT la dernière rc de dev (on retire juste le suffixe -rc),
+            # au lieu de repartir d'une ligne stable indépendante qui divergeait (dette TD-TAGS).
+            LATEST_RC=$(git tag -l "frontend-v*-rc*" --sort=-v:refname | head -n1)
+            if [ -n "$LATEST_RC" ]; then
+              NEW_VERSION=$(echo "$LATEST_RC" | sed -E 's/-rc[0-9]+$//')
             else
-              PATCH=$((PATCH + 1))
+              if [[ "$LABELS" == *"frontend:release:major"* ]]; then
+                MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0
+              elif [[ "$LABELS" == *"frontend:release:minor"* ]]; then
+                MINOR=$((MINOR + 1)); PATCH=0
+              else
+                PATCH=$((PATCH + 1))
+              fi
+              NEW_VERSION="frontend-v${MAJOR}.${MINOR}.${PATCH}"
             fi
-            NEW_VERSION="frontend-v${MAJOR}.${MINOR}.${PATCH}"
           fi
           
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
@@ -236,14 +250,21 @@ jobs:
             fi
             NEW_VERSION="landing-v${MAJOR}.${MINOR}.${PATCH}-rc${RC}"
           else
-            if [[ "$LABELS" == *"landing:release:major"* ]]; then
-              MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0
-            elif [[ "$LABELS" == *"landing:release:minor"* ]]; then
-              MINOR=$((MINOR + 1)); PATCH=0
+            # Promotion PROD : le stable SUIT la dernière rc de dev (on retire juste le suffixe -rc),
+            # au lieu de repartir d'une ligne stable indépendante qui divergeait (dette TD-TAGS).
+            LATEST_RC=$(git tag -l "landing-v*-rc*" --sort=-v:refname | head -n1)
+            if [ -n "$LATEST_RC" ]; then
+              NEW_VERSION=$(echo "$LATEST_RC" | sed -E 's/-rc[0-9]+$//')
             else
-              PATCH=$((PATCH + 1))
+              if [[ "$LABELS" == *"landing:release:major"* ]]; then
+                MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0
+              elif [[ "$LABELS" == *"landing:release:minor"* ]]; then
+                MINOR=$((MINOR + 1)); PATCH=0
+              else
+                PATCH=$((PATCH + 1))
+              fi
+              NEW_VERSION="landing-v${MAJOR}.${MINOR}.${PATCH}"
             fi
-            NEW_VERSION="landing-v${MAJOR}.${MINOR}.${PATCH}"
           fi
           
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
@@ -254,22 +275,29 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
+          # Création idempotente : si le tag existe déjà (ex. promotion rejouée), on saute au lieu
+          # d'échouer — la promotion PROD peut retomber sur une version déjà taguée sans casser le job.
+          create_tag() {
+            local v="$1" label="$2"
+            if git rev-parse "$v" >/dev/null 2>&1; then
+              echo "⏭️  Tag $v existe déjà — on saute (idempotent)"
+            else
+              git tag -a "$v" -m "$label $v"
+              git push origin "$v"
+              echo "✅ Created tag: $v"
+            fi
+          }
+
           if [[ "${{ steps.changes.outputs.backend }}" == "true" ]]; then
-            git tag -a "${{ steps.backend.outputs.version }}" -m "Backend Release ${{ steps.backend.outputs.version }}"
-            git push origin "${{ steps.backend.outputs.version }}"
-            echo "✅ Created tag: ${{ steps.backend.outputs.version }}"
+            create_tag "${{ steps.backend.outputs.version }}" "Backend Release"
           fi
-          
+
           if [[ "${{ steps.changes.outputs.frontend }}" == "true" ]]; then
-            git tag -a "${{ steps.frontend.outputs.version }}" -m "Frontend Release ${{ steps.frontend.outputs.version }}"
-            git push origin "${{ steps.frontend.outputs.version }}"
-            echo "✅ Created tag: ${{ steps.frontend.outputs.version }}"
+            create_tag "${{ steps.frontend.outputs.version }}" "Frontend Release"
           fi
-          
+
           if [[ "${{ steps.changes.outputs.landing }}" == "true" ]]; then
-            git tag -a "${{ steps.landing.outputs.version }}" -m "Landing Release ${{ steps.landing.outputs.version }}"
-            git push origin "${{ steps.landing.outputs.version }}"
-            echo "✅ Created tag: ${{ steps.landing.outputs.version }}"
+            create_tag "${{ steps.landing.outputs.version }}" "Landing Release"
           fi
 
   build-backend:

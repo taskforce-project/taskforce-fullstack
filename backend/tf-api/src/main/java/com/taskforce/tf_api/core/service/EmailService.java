@@ -124,19 +124,16 @@ public class EmailService {
             String actionLine = isDeletion
                 ? "Votre compte a été désactivé et vos données seront supprimées dans 30 jours conformément au RGPD."
                 : "Nous avons bien reçu votre demande. Vous recevrez une copie de vos données dans un délai de 30 jours.";
+            String requestTypeLabel = isDeletion ? "Suppression de compte" : "Accès aux données";
 
-            String html = """
-                <!DOCTYPE html><html><body style="font-family:sans-serif;color:#333;max-width:600px;margin:0 auto;padding:24px">
-                <h2 style="color:#111">Bonjour %s,</h2>
-                <p>%s</p>
-                <p>Type de demande : <strong>%s</strong></p>
-                <p>Si vous n'êtes pas à l'origine de cette demande, contactez-nous immédiatement à <a href="mailto:privacy@taskforce.dev">privacy@taskforce.dev</a>.</p>
-                <hr style="margin:24px 0;border:none;border-top:1px solid #eee"/>
-                <p style="font-size:12px;color:#999">%s — %s</p>
-                </body></html>
-                """.formatted(firstName, actionLine, isDeletion ? "Suppression de compte" : "Accès aux données", fromName, appUrl);
+            Context context = new Context();
+            context.setVariable("firstName", firstName);
+            context.setVariable("actionLine", actionLine);
+            context.setVariable("requestTypeLabel", requestTypeLabel);
 
-            sendHtmlEmail(toEmail, subject, html);
+            String htmlContent = templateEngine.process("email/data-request-email", context);
+
+            sendHtmlEmail(toEmail, subject, htmlContent);
             log.info("Email de demande RGPD ({}) envoyé à : {}", requestType, toEmail);
         } catch (Exception e) {
             log.error("Erreur lors de l'envoi de l'email RGPD à {}: {}", toEmail, e.getMessage());
@@ -150,25 +147,18 @@ public class EmailService {
     public void sendWorkspaceInvitationEmail(String toEmail, String inviterName,
                                              String workspaceName, String acceptUrl) {
         try {
-            String subject = String.format("[%s] Vous êtes invité à rejoindre %s", fromName, workspaceName);
-            String html = """
-                <!DOCTYPE html><html><body style="font-family:sans-serif;color:#333;max-width:600px;margin:0 auto;padding:24px">
-                <h2 style="color:#111">Invitation à rejoindre %s</h2>
-                <p><strong>%s</strong> vous invite à rejoindre l'espace de travail <strong>%s</strong> sur %s.</p>
-                <p style="margin:28px 0">
-                  <a href="%s" style="background:#6366f1;color:#fff;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:600">
-                    Rejoindre %s
-                  </a>
-                </p>
-                <p style="font-size:13px;color:#666">Si vous n'avez pas encore de compte, vous pourrez en créer un — votre invitation sera appliquée automatiquement.</p>
-                <p style="font-size:13px;color:#666">Ce lien expire dans 7 jours.</p>
-                <hr style="margin:24px 0;border:none;border-top:1px solid #eee"/>
-                <p style="font-size:12px;color:#999">%s — <a href="%s">%s</a></p>
-                </body></html>
-                """.formatted(workspaceName, inviterName, workspaceName, fromName,
-                              acceptUrl, workspaceName, fromName, appUrl, appUrl);
+            Context context = new Context();
+            context.setVariable("inviterName", inviterName);
+            context.setVariable("workspaceName", workspaceName);
+            context.setVariable("acceptUrl", acceptUrl);
 
-            sendHtmlEmail(toEmail, subject, html);
+            String htmlContent = templateEngine.process("email/workspace-invitation-email", context);
+
+            sendHtmlEmail(
+                toEmail,
+                String.format("[%s] Vous êtes invité à rejoindre %s", fromName, workspaceName),
+                htmlContent
+            );
             log.info("Email d'invitation workspace envoyé à : {}", toEmail);
         } catch (Exception e) {
             log.error("Échec de l'envoi de l'email d'invitation à {} : {}", toEmail, e.getMessage());

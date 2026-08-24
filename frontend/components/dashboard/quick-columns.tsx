@@ -123,7 +123,7 @@ function MyQueueColumn({ slug }: { readonly slug: string }) {
     .slice(0, MAX_ROWS)
 
   return (
-    <SectionCard title="Ma file" href="./my-work" bodyClassName="p-0">
+    <SectionCard title="My queue" href="./my-work" bodyClassName="p-0">
       {issues === null ? (
         <ColumnSkeleton />
       ) : open.length === 0 ? (
@@ -177,7 +177,7 @@ function RecentColumn({ slug }: { readonly slug: string }) {
       {notifs === null ? (
         <ColumnSkeleton />
       ) : rows.length === 0 ? (
-        <ColumnEmpty message={failed ? "Notifications indisponibles pour le moment" : "Rien de nouveau"} />
+        <ColumnEmpty message={failed ? "Notifications unavailable right now" : "Nothing new"} />
       ) : (
         rows.map((n) => {
           const inner = (

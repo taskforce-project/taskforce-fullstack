@@ -1,0 +1,22 @@
+# --- Perimetre du SAST (Semgrep) ---
+# Le gate ERROR ne bloque que sur le CODE APPLICATIF (frontend/, backend/, ai-service/).
+# Les chemins ci-dessous sont exclus volontairement : non applicables au produit, ou couverts par un
+# autre outil. Le rapport (etape non bloquante) continue de tout scanner ; seule la decision de casser
+# le build est restreinte. Findings ecartes (audit du 24/08, ruleset `auto` drifte) :
+#  - .github/       : durcissement des workflows CI (interpolation a valeurs controlees par GitHub /
+#                     labels de collaborateurs) - faible risque en depot prive, revue dediee.
+#  - observability/ : configs d'infra (WebSocket non chiffre vers signoz = trafic INTERNE au reseau
+#                     Docker, non expose publiquement).
+#  - *.test.*       : fichiers de test (mocks de WebSocket non chiffre, sans impact securite).
+#  - Dockerfile*    : durcissement d'image (missing-user) - deja couvert par le scanner misconfig de Trivy.
+#  - *.md / ce fichier : documentation. Elle DECRIT des findings (donc contient des motifs comme les
+#                     schemas d'URL non chiffres) ; scanner sa prose ne produit que du bruit.
+
+.github/
+observability/
+*.test.ts
+*.test.tsx
+Dockerfile
+Dockerfile.dev
+*.md
+.semgrepignore

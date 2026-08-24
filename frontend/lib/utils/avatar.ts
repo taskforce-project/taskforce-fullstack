@@ -1,7 +1,10 @@
+import { createAvatar } from "@dicebear/core"
+import { identicon } from "@dicebear/collection"
+
 /**
  * Retourne l'URL de l'avatar pour un utilisateur.
- * - Si `avatarUrl` est défini en DB → l'utilise directement (cached par le navigateur).
- * - Sinon → génère l'URL DiceBear identicon basée sur l'email (déterministe, sans requête backend).
+ * - Si `avatarUrl` est défini en DB (photo OAuth GitHub/Google, ou fichier importé) → l'utilise.
+ * - Sinon → génère un identicon DiceBear **déterministe** (seed = email), rendu localement.
  *
  * À utiliser partout dans l'app pour garantir la cohérence des PDPs.
  */
@@ -15,6 +18,31 @@ function resolveApiAvatarUrl(avatarUrl: string): string {
   return `${apiBaseUrl}${normalizedPath}`
 }
 
+/**
+ * Cache déterministe (même seed → même SVG). Évite de régénérer l'identicon à chaque rendu — listes
+ * de membres, sidebar, sélecteurs — alors que le résultat est stable pour un email donné.
+ */
+const generatedCache = new Map<string, string>()
+
+/**
+ * Avatar de repli généré **dans le navigateur** (DiceBear identicon), renvoyé en data-URI.
+ *
+ * Historiquement ce repli pointait vers `https://api.dicebear.com/9.x/identicon/svg?seed=…`. En
+ * production, la CSP `img-src` n'autorise que des origines explicites (le joker `https:` n'existe
+ * qu'en développement) : cet appel externe était donc **bloqué**, l'image cassait, et la personne se
+ * retrouvait « sans photo de profil ». On génère désormais le même identicon localement (paquet
+ * `@dicebear/core`, déjà en dépendance) : aucune requête réseau, `data:` est déjà autorisé par la
+ * CSP, et le rendu reste déterministe (identique partout pour un même email).
+ */
+function generatedAvatar(seed: string): string {
+  const cached = generatedCache.get(seed)
+  if (cached) return cached
+
+  const dataUri = createAvatar(identicon, { seed }).toDataUri()
+  generatedCache.set(seed, dataUri)
+  return dataUri
+}
+
 export function getAvatarUrl({
   email,
   avatarUrl,
@@ -25,7 +53,7 @@ export function getAvatarUrl({
   lastName?: string
 }): string {
   if (avatarUrl) return resolveApiAvatarUrl(avatarUrl)
-  return `https://api.dicebear.com/9.x/identicon/svg?seed=${encodeURIComponent(email)}`
+  return generatedAvatar(email)
 }
 
 /**

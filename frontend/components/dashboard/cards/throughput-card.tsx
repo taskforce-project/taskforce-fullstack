@@ -57,7 +57,7 @@ export function ThroughputCard({ slug, card, globalRange, refreshToken }: Dashbo
     return (
       <div className="flex h-full items-center justify-center p-4">
         <Link href="./analytics" className="text-xs text-primary hover:underline">
-          Débit détaillé disponible avec un forfait supérieur
+          Detailed throughput available on a higher plan
         </Link>
       </div>
     )

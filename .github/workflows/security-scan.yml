@@ -30,28 +30,25 @@ jobs:
       - name: 📥 Checkout
         uses: actions/checkout@v4
 
+      # Installation directe du binaire Trivy (script officiel). On n'utilise plus
+      # `aquasecurity/trivy-action` : certaines de ses versions épinglent en interne un `setup-trivy`
+      # supprimé (`v0.2.1` introuvable) — un bug de pin transitif qui cassait le job AVANT le scan,
+      # sans rapport avec une faille du code.
+      - name: ⬇️ Install Trivy
+        run: |
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+          trivy --version
+
       # 1) Rapport COMPLET (CRITICAL→MEDIUM) → résumé + artefact, sans casser le build.
+      #    `--offline-scan` : Trivy ne résout PAS l'arbre de dépendances transitives via le réseau
+      #    (Maven Central renvoyait 429 Too Many Requests depuis l'IP partagée du runner). Il analyse
+      #    les manifestes/lockfiles présents avec sa base de vulns locale — suffisant pour le gate.
       - name: 🔎 Trivy fs — rapport complet
-        uses: aquasecurity/trivy-action@0.24.0
-        with:
-          scan-type: fs
-          scan-ref: .
-          scanners: vuln,secret,misconfig
-          severity: CRITICAL,HIGH,MEDIUM
-          format: table
-          output: trivy-report.txt
-          exit-code: '0'
+        run: trivy fs --scanners vuln,secret,misconfig --severity CRITICAL,HIGH,MEDIUM --format table --output trivy-report.txt --exit-code 0 --offline-scan .
 
       # 2) Gate : casse le build uniquement sur une vuln CRITICAL corrigeable (0 aujourd'hui).
       - name: 🚦 Trivy fs — gate CRITICAL
-        uses: aquasecurity/trivy-action@0.24.0
-        with:
-          scan-type: fs
-          scan-ref: .
-          scanners: vuln,secret,misconfig
-          severity: CRITICAL
-          ignore-unfixed: true
-          exit-code: '1'
+        run: trivy fs --scanners vuln,secret,misconfig --severity CRITICAL --ignore-unfixed --exit-code 1 --offline-scan .
 
       - name: 📄 Résumé de job
         if: always()
@@ -81,12 +78,12 @@ jobs:
 
       # 1) Rapport complet (toutes sévérités) en artefact, non bloquant.
       - name: 🔎 Semgrep — rapport complet
-        run: semgrep scan --config auto --json --output semgrep-report.json --metrics off .
+        run: semgrep scan --config auto --json --output semgrep-report.json .
         continue-on-error: true
 
       # 2) Gate : casse le build uniquement sur les findings de niveau ERROR (0 aujourd'hui).
       - name: 🚦 Semgrep — gate ERROR
-        run: semgrep scan --config auto --severity ERROR --error --metrics off .
+        run: semgrep scan --config auto --severity ERROR --error .
 
       - name: 💾 Archive Semgrep report
         if: always()

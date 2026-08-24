@@ -3,6 +3,7 @@ package com.taskforce.tf_api.shared.exception;
 import com.taskforce.tf_api.shared.dto.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -175,6 +176,34 @@ public class GlobalExceptionHandler {
         );
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    /**
+     * Violation de contrainte d'intégrité (unicité, clé étrangère). Se produit notamment sur une
+     * course « vérifier puis insérer » — typiquement une double soumission de l'onboarding : le
+     * pré-check {@code existsBy...} passe pour deux requêtes concurrentes, et c'est la seconde
+     * insertion qui viole la contrainte au commit (ex. {@code uq_project_identifier}, ou un profil
+     * de compétences ré-inséré au re-run). Sans ce handler, cela remontait en <b>500 opaque</b> ;
+     * on renvoie un <b>409</b> clair, que les appels best-effort du front savent traiter.
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(
+            DataIntegrityViolationException ex,
+            HttpServletRequest request) {
+
+        // Le message JPA/SQL peut exposer des détails de schéma : on le journalise en INTERNE
+        // seulement, et on ne renvoie qu'un message générique et sûr au client.
+        log.warn("Violation de contrainte d'intégrité sur {} : {}", request.getRequestURI(),
+                ex.getMostSpecificCause().getMessage());
+
+        ErrorResponse error = ErrorResponse.of(
+                HttpStatus.CONFLICT.value(),
+                "Conflict",
+                "Cette ressource existe déjà ou entre en conflit avec une autre.",
+                request.getRequestURI()
+        );
+
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
     }
 
     /**

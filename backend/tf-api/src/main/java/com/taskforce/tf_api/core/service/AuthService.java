@@ -54,7 +54,6 @@ public class AuthService {
     private final UserRepository userRepository;
     private final WorkspaceService workspaceService;
     private final AuditService auditService;
-    private final WorkspaceInvitationService workspaceInvitationService;
     private final HumanChallengeService humanChallengeService;
 
     @Value("${stripe.success-url}")
@@ -284,9 +283,6 @@ public class AuthService {
         // Créer automatiquement un workspace pour le nouvel utilisateur
         workspaceService.createWorkspace(user, keycloakUser.getFirstName());
 
-        // Appliquer les invitations en attente pour cet email (PROD-3.5, best-effort)
-        workspaceInvitationService.acceptPendingInvitations(user);
-
         // Envoyer l'email de bienvenue
         emailService.sendWelcomeEmail(request.getEmail(), keycloakUser.getFirstName());
 
@@ -354,9 +350,6 @@ public class AuthService {
         if (!user.getIsActive()) {
             throw new RuntimeException("Ce compte est désactivé");
         }
-
-        // Appliquer d'éventuelles invitations workspace en attente (PROD-3.5, best-effort)
-        workspaceInvitationService.acceptPendingInvitations(user);
 
         // Réponse = tokens Keycloak + profil DB
         AuthResponse authResponse = buildAuthResponse(
@@ -646,6 +639,10 @@ public class AuthService {
         String firstName = str(profil.get("given_name"));
         String lastName  = str(profil.get("family_name"));
         String keycloakId = str(profil.get("sub"));
+        // Photo de profil du fournisseur. Keycloak ne l'expose dans le `userinfo` que si un mapper
+        // d'attribut recopie l'avatar en claim `picture` (config IdP, cf. ops/kc-setup.sh). Absente,
+        // l'avatar généré côté front (identicon déterministe) prend le relais : personne sans photo.
+        String picture = str(profil.get("picture"));
 
         if (email == null || email.isBlank()) {
             // Un compte GitHub peut n'exposer aucune adresse publique. Sans adresse nous ne pouvons
@@ -666,6 +663,7 @@ public class AuthService {
                 .planStatus(PlanStatus.ACTIVE)
                 .isActive(true)
                 .displayName(buildDisplayName(firstName, lastName))
+                .avatarUrl(picture)
                 .build());
         });
 
@@ -673,10 +671,18 @@ public class AuthService {
             throw new RuntimeException("Ce compte est désactivé");
         }
 
+        // Rattrapage : un compte créé par mot de passe (donc sans photo) qui se connecte ensuite par
+        // GitHub/Google récupère sa photo de profil. On n'écrase jamais un avatar déjà défini — une
+        // photo importée par la personne l'emporte sur celle du fournisseur.
+        if ((user.getAvatarUrl() == null || user.getAvatarUrl().isBlank())
+                && picture != null && !picture.isBlank()) {
+            user.setAvatarUrl(picture);
+            userRepository.save(user);
+        }
+
         if (creation) {
             workspaceService.createWorkspace(user, firstName);
         }
-        workspaceInvitationService.acceptPendingInvitations(user);
 
         KeycloakTokenResponse kcToken = KeycloakTokenResponse.builder()
             .accessToken(str(jetons.get("access_token")))

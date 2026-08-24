@@ -568,6 +568,8 @@ export const CONSTANTS_FR: TranslationKeys = {
     giveFeedback: "Donner mon feedback",
     // Sélecteur d'espace de travail
     workspaces: "Espaces de travail",
+    yourWorkspaces: "Vos espaces",
+    sharedWorkspaces: "Partagés avec vous",
     active: "actif",
     workspacesCount: "{count}/{limit} espaces",
     limitReachedUpgrade: "Limite atteinte — Améliorer",
