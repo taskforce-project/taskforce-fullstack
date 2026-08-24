@@ -240,11 +240,11 @@ public class ProjectService {
         Workspace workspace = resolveWorkspaceAndAssertMember(workspaceSlug, requestingUserId);
         User creator = resolveUser(requestingUserId);
 
-        String identifier = request.getIdentifier().toUpperCase();
-        if (projectRepository.existsByWorkspaceIdAndIdentifier(workspace.getId(), identifier)) {
-            throw new BusinessException(
-                "L'identifiant '" + identifier + "' est déjà utilisé dans ce workspace");
-        }
+        // Unicité de l'IDENTIFIANT (préfixe d'issue, façon Linear/Jira : DEMO-1, DEMO-2…) PAR workspace
+        // — c'est LUI, pas le nom, qui doit être unique. Le NOM reste libre : deux projets « demo » dans
+        // un même workspace sont permis, avec des préfixes distincts. Plutôt que d'échouer sur collision,
+        // on suffixe automatiquement (comme le slug de workspace) : DEMO → DEMO2 → DEMO3.
+        String identifier = uniqueIdentifier(workspace.getId(), request.getIdentifier().toUpperCase());
 
         Project project = Project.builder()
             .workspace(workspace)
@@ -278,6 +278,28 @@ public class ProjectService {
         seedDefaultLabels(project);
 
         return toResponse(project, false);
+    }
+
+    /**
+     * Rend un identifiant de projet unique DANS le workspace en suffixant un compteur si besoin
+     * (DEMO → DEMO2 → DEMO3…), sans dépasser la longueur maximale (10). Le NOM du projet reste libre :
+     * seul l'identifiant (préfixe d'issue) doit être unique par workspace. Miroir de la logique de slug
+     * unique des workspaces — on ne bloque plus l'utilisateur sur une collision de préfixe.
+     */
+    private String uniqueIdentifier(Long workspaceId, String base) {
+        if (!projectRepository.existsByWorkspaceIdAndIdentifier(workspaceId, base)) {
+            return base;
+        }
+        for (int suffix = 2; suffix < 1000; suffix++) {
+            String num = String.valueOf(suffix);
+            int maxBase = 10 - num.length();
+            String candidate = (base.length() > maxBase ? base.substring(0, maxBase) : base) + num;
+            if (!projectRepository.existsByWorkspaceIdAndIdentifier(workspaceId, candidate)) {
+                return candidate;
+            }
+        }
+        // Cas improbable (1000 préfixes identiques) : on laisse la contrainte DB trancher (→ 409).
+        return base;
     }
 
     private void seedDefaultLabels(Project project) {

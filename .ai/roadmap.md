@@ -70,6 +70,16 @@
 >   Tant que non fait, tout le monde a l'identicon généré (le fix principal) ; la vraie photo OAuth s'allume après.
 > Vérifs : `tsc` 0 · `next build` 0 · `avatar.test` 11/11. Backend validé par la CI (pas de JDK sur l'hôte).
 
+> **▶ MAJ 24/08/2026 — Ré-ajout auto-suffixe projet (perdu au merge #111) + fix tsc landing (branche `fix/pre-prod-2`, PR → dev).** `[QA-12]`
+> Deux points bloquant la promo #105 :
+> - **Auto-suffixe projet perdu** : le merge de #111 a pris le 409 handler mais PAS le commit d'auto-suffixe
+>   (`uniqueIdentifier`) — dev avait encore l'ancien « déjà utilisé ». Ré-appliqué : le préfixe d'issue
+>   s'auto-suffixe (`DEMO → DEMO2`), le nom de projet reste libre.
+> - **Landing `tsc` rouge sur #105** (révélé parce que le changement de Dockerfile landing de #110 a
+>   déclenché `landing-tests`) : `import.meta.env` n'était pas typé — le fichier `src/env.d.ts`
+>   (`/// <reference types="astro/client" />`) **manquait** (`.astro/types.d.ts` est gitignoré, non
+>   régénéré en CI). Créé. `astro build` marchait déjà (Vercel vert) ; seul le `tsc --noEmit` échouait.
+
 > **▶ MAJ 24/08/2026 — Fix onboarding : 500 → 409 sur violation de contrainte (branche `fix/onboarding-500`, PR → dev).** `[QA-11]`
 > Bug remonté : onboarding « démo déjà utilisé » **puis erreur 500**. Diagnostic : le « déjà utilisé » est un
 > `BusinessException` déjà mappé en **400 propre** (identifiant projet pré-vérifié) ; le 500 venait d'une
