@@ -14,11 +14,29 @@ logo:
   height: 28
   href: https://taskforce-project.fr
 
-# Bleu de marque TaskForce (miroir de --primary de la landing).
+# Palette de marque TaskForce, reprise 1:1 des design tokens de l'app (frontend/app/globals.css,
+# palette « Cloudflare-flat »). On ne peut pas injecter le globals.css tel quel (Fern n'est pas
+# Tailwind/shadcn) : on mappe donc les primitives de marque sur les couleurs natives de Fern.
+# Police : l'app utilise Inter, qui est aussi la police par defaut de Fern -> deja aligne.
 colors:
   accent-primary:
-    light: "#2563eb"
-    dark: "#3b82f6"
+    light: "#2563eb"   # --primary (blue-600)
+    dark: "#3b82f6"    # --primary dark (blue-500)
+  background:
+    light: "#fbfbfc"   # --background
+    dark: "#0b0b0c"
+  sidebar-background:
+    light: "#fbfbfc"   # --sidebar (= background, pas de rupture, facon Cloudflare)
+    dark: "#0b0b0c"
+  header-background:
+    light: "#fbfbfc"
+    dark: "#0b0b0c"
+  card-background:
+    light: "#ffffff"   # --card
+    dark: "#161617"
+  border:
+    light: "#e6e6e9"   # --border
+    dark: "#2a2a2c"
 
 navbar-links:
   - type: minimal

@@ -27,6 +27,13 @@
 >   non-ASCII** → tag `Système` renommé `System`, sinon l'onglet API est **zappé silencieusement** ;
 >   (2) la publication prod nécessite `CI=true fern generate --docs --force` — `--force` **seul ne contourne
 >   pas** le prompt « production » (terminal non-interactif → « No » par défaut → annulation).
+> - **Thème + entrée produit.** Palette Fern (`docs.yml colors`) mappée 1:1 sur les tokens de l'app
+>   (`frontend/app/globals.css`, « Cloudflare-flat ») : accent `#2563eb`/`#3b82f6`, fond, cartes, bordures,
+>   sidebar (Inter = police par défaut Fern, déjà alignée — pas d'injection du globals.css brut, Fern ≠ Tailwind).
+>   Vérifié live : `--accent-primary` = `rgb(37,99,235)`. Côté landing, `/docs` (page « Start here » périmée qui
+>   annonçait l'API « coming ») **redirige** vers `docs.taskforce-project.fr` (meta-refresh + JS, build statique) ;
+>   l'entrée menu « Documentation » est conservée. ⚠️ La redirection atteint la PROD landing via le flux
+>   release landing habituel (PR landing-only → main), pas ce PR dev.
 
 > **▶ MAJ 24/08/2026 — QA batch 4 : workspaces perso vs partagés + quota corrigé (branche `hotfix/qa-workspaces`, PR → dev).** `[QA-4]`
 > - **Distinction façon orgs GitHub.** Le switcher listait tout à plat. Désormais deux groupes :
