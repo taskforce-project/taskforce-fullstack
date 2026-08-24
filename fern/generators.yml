@@ -1,0 +1,6 @@
+# Déclare la spec OpenAPI utilisée par la RÉFÉRENCE API de la doc (onglet « api » de docs.yml).
+# Pas de génération de SDK ici : on ne veut que la doc. La vraie spec est écrite depuis le backend
+# (springdoc) en CI avant `fern generate --docs` (voir README.md).
+api:
+  specs:
+    - openapi: ./openapi/openapi.json

@@ -1,0 +1,73 @@
+# Documentation TaskForce (Fern) — doc PRODUIT (guides) + RÉFÉRENCE API au même endroit.
+# Publier : `fern login` puis `fern generate --docs` (voir fern/README.md).
+
+instances:
+  - url: taskforce.docs.buildwithfern.com
+    custom-domain: docs.taskforce-project.fr
+
+title: TaskForce Docs
+favicon: ./assets/favicon.svg
+
+logo:
+  light: ./assets/logo.svg
+  dark: ./assets/logo.svg
+  height: 28
+  href: https://taskforce-project.fr
+
+# Palette de marque TaskForce, reprise 1:1 des design tokens de l'app (frontend/app/globals.css,
+# palette « Cloudflare-flat »). On ne peut pas injecter le globals.css tel quel (Fern n'est pas
+# Tailwind/shadcn) : on mappe donc les primitives de marque sur les couleurs natives de Fern.
+# Police : l'app utilise Inter, qui est aussi la police par defaut de Fern -> deja aligne.
+colors:
+  accent-primary:
+    light: "#2563eb"   # --primary (blue-600)
+    dark: "#3b82f6"    # --primary dark (blue-500)
+  background:
+    light: "#fbfbfc"   # --background
+    dark: "#0b0b0c"
+  sidebar-background:
+    light: "#fbfbfc"   # --sidebar (= background, pas de rupture, facon Cloudflare)
+    dark: "#0b0b0c"
+  header-background:
+    light: "#fbfbfc"
+    dark: "#0b0b0c"
+  card-background:
+    light: "#ffffff"   # --card
+    dark: "#161617"
+  border:
+    light: "#e6e6e9"   # --border
+    dark: "#2a2a2c"
+
+navbar-links:
+  - type: minimal
+    text: Ouvrir l'app
+    url: https://app.taskforce-project.fr
+  - type: github
+    value: https://github.com/taskforce-project
+
+tabs:
+  guides:
+    display-name: Guides
+    icon: "fa-solid fa-book-open"
+  api:
+    display-name: Référence API
+    icon: "fa-solid fa-code"
+
+navigation:
+  - tab: guides
+    layout:
+      - section: Découvrir
+        contents:
+          - page: Bienvenue
+            path: ./pages/index.md
+          - page: Premiers pas
+            path: ./pages/premiers-pas.md
+      - section: Guides produit
+        contents:
+          - page: Espaces & projets
+            path: ./pages/espaces-et-projets.md
+          - page: Inviter son équipe
+            path: ./pages/inviter-son-equipe.md
+  - tab: api
+    layout:
+      - api: Référence API

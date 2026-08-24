@@ -1,89 +1,41 @@
 ---
-import BaseLayout from "@/layouts/BaseLayout.astro";
-import PageHero from "@/components/site/PageHero.astro";
-import PageCta from "@/components/site/PageCta.astro";
-import FaqSection from "@/components/site/sections/FaqSection.astro";
-import { Rocket, BookOpen, Server, Code2, ArrowRight, Info } from "lucide-react";
-
-const FAQ = [
-  { q: "Where do I actually start?", a: "Create a workspace, invite your team and give TaskForce one outcome. Most of it explains itself the first time you approve a checkpoint — no manual required." },
-  { q: "Is there an API reference?", a: "A programmatic API is on the roadmap, not shipped yet. We mark it “Coming” rather than publish a reference we can't stand behind." },
-  { q: "Can I self-host?", a: "Yes — self-hosting with Docker is a first-class deployment, and local models run through Ollama. The deployment and security details live in the Trust Center." },
-  { q: "Why are the docs this thin?", a: "We're early and would rather ship accurate docs than pad the page. Guides grow as the product stabilises — missing something? Write to hello@taskforce.dev." },
-];
-
-const CARDS = [
-  { icon: Rocket, title: "Getting started", text: "Create a workspace, invite your team, and run your first workflow.", href: "/waitlist", cta: "Start free", ready: true },
-  { icon: BookOpen, title: "Core concepts", text: "Runs, checkpoints, approvals and memory — what an AI delivery OS actually is.", href: "/learn", cta: "Learn", ready: true },
-  { icon: Server, title: "Self-hosting & security", text: "Deployment models, data handling and the security posture, in the Trust Center.", href: "/trust", cta: "Trust Center", ready: true },
-  { icon: Code2, title: "API reference", text: "Programmatic access to workspaces, issues and runs.", href: null, cta: "Coming", ready: false },
-];
+// /docs redirige vers la documentation TaskForce (Fern, hebergee sur le cloud Fern).
+// L'ancienne page « Start here » est remplacee : la vraie doc (guides + reference API) vit
+// desormais sur docs.taskforce-project.fr. On garde la route /docs (menu « Documentation »)
+// comme point d'entree stable qui redirige. Build statique -> redirection meta-refresh + JS.
+const DEST = "https://docs.taskforce-project.fr";
 ---
 
-<BaseLayout
-  title="Documentation — TaskForce"
-  description="Where to start with TaskForce: getting started, core concepts, self-hosting and security. Full API and guides are on the way."
->
-  <PageHero
-    kicker="Documentation"
-    title="Start here"
-    lead="TaskForce is early, and so are its docs. Here's where to begin today — with the full guides and API reference on the way."
-    primary={{ label: "Start free", href: "/waitlist" }}
-    secondary={{ label: "Book a demo", href: "/book-a-demo" }}
-  />
-
-  <section class="bg-card border-b">
-    <div class="container-rail py-20 lg:py-28">
-      <div class="grid gap-6 sm:grid-cols-2">
-        {
-          CARDS.map((c) => {
-            const body = (
-              <>
-                <div class="flex items-center justify-between gap-2">
-                  <span class="bg-card text-foreground flex size-11 items-center justify-center rounded-xl border">
-                    <c.icon className="size-5" strokeWidth={1.75} />
-                  </span>
-                  {!c.ready && (
-                    <span class="text-muted-foreground inline-flex items-center rounded-md border border-dashed px-1.5 py-0.5 text-[10px] font-medium tracking-wide uppercase">
-                      Coming
-                    </span>
-                  )}
-                </div>
-                <h3 class="mt-4 text-[16px] font-semibold text-foreground">{c.title}</h3>
-                <p class="text-muted-foreground mt-2 flex-1 text-[13.5px] leading-6">{c.text}</p>
-                {c.ready && (
-                  <span class="link-underline text-foreground mt-4 inline-flex items-center gap-1.5 text-[13.5px] font-medium">
-                    {c.cta}
-                    <ArrowRight className="size-3.5" />
-                  </span>
-                )}
-              </>
-            );
-            return c.ready ? (
-              <a href={c.href} class="bg-card hover:border-primary/30 flex flex-col border p-6 transition-colors">
-                {body}
-              </a>
-            ) : (
-              <div class="bg-card flex flex-col border p-6 opacity-70">{body}</div>
-            );
-          })
-        }
-      </div>
-
-      <p class="text-muted-foreground mt-8 flex items-start gap-2 text-[13px] leading-6">
-        <Info className="mt-0.5 size-4 shrink-0" strokeWidth={1.75} />
-        We'd rather ship docs that are accurate than pad this page. Missing something you need? Write to
-        <a href="mailto:hello@taskforce.dev" class="link-underline text-foreground font-medium">&nbsp;hello@taskforce.dev</a>.
-      </p>
-    </div>
-  </section>
-
-  <FaqSection title="Questions about the docs" items={FAQ} />
-
-  <PageCta
-    title="The best doc is a first run"
-    lead="Create a workspace and give TaskForce one outcome — it explains itself faster than a guide."
-    primary={{ label: "Start free", href: "/waitlist" }}
-    secondary={{ label: "Learn the concepts", href: "/learn" }}
-  />
-</BaseLayout>
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="refresh" content={`0; url=${DEST}`} />
+    <link rel="canonical" href={DEST} />
+    <meta name="robots" content="noindex, follow" />
+    <title>Documentation TaskForce</title>
+    <script is:inline define:vars={{ DEST }}>
+      window.location.replace(DEST);
+    </script>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        font-family: Inter, "SF Pro Text", -apple-system, system-ui, sans-serif;
+        background: #fbfbfc;
+        color: #1d1d1f;
+      }
+      a { color: #2563eb; }
+      @media (prefers-color-scheme: dark) {
+        body { background: #0b0b0c; color: #f5f5f7; }
+        a { color: #3b82f6; }
+      }
+    </style>
+  </head>
+  <body>
+    <p>Redirection vers la documentation TaskForce&nbsp;: <a href={DEST}>{DEST}</a></p>
+  </body>
+</html>

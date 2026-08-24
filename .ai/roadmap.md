@@ -10,6 +10,31 @@
 >
 > Sources : `.ai/qa.md` (QA produit détaillée), `.ai/known-issues.md` (bugs vérifiés), `.ai/module-map.md` (domaines↔code), `.ai/architecture-map.md` (archi réelle), `.ai/P0-fix-plan.md` (correctifs P0 paste-ready).
 
+> **▶ MAJ 24/08/2026 — QA-17 : spec API réelle + publication CI de la doc Fern (branche `feat/docs-fern`, PR #116 → dev).** `[QA-17]`
+> - **Spec OpenAPI réelle.** `fern/openapi/openapi.json` était un placeholder. springdoc sert la vraie spec
+>   sur **`/api-docs`** (pas `/v3/api-docs` : `springdoc.api-docs.path` est customisé), actif partout **sauf
+>   en prod** (désactivé, audit F1). Les tests étant des slices `@DataJpaTest` (profil `it`, sans couche web
+>   ni springdoc, sans clients externes), la spec ne peut PAS s'extraire d'un test → on la génère **contre le
+>   backend en marche** : `fern/scripts/generate-openapi.{ps1,sh}` (curl `${TF_API_URL:-http://localhost:8080}/api-docs`,
+>   UTF-8 sans BOM, reformatage indenté), à committer.
+> - **Publication CI.** `.github/workflows/docs.yml` (push `main` sur `fern/**` + `workflow_dispatch`) fait
+>   `fern check` + `fern generate --docs`. Fern est un **SaaS** (héberge la doc, **aucune VM** sollicitée) ; le
+>   workflow est **gated par le secret `FERN_TOKEN`** (skip propre si absent) et n'est **jamais un required
+>   check** → il ne peut pas casser la CI verte. Domaine `docs.taskforce-project.fr` = CNAME **Cloudflare
+>   DNS-only** vers la cible fournie par Fern (procédure dans `fern/README.md`).
+> - **Publié en live le 24/08** sur `taskforce.docs.buildwithfern.com` (custom-domain `docs.taskforce-project.fr`
+>   en cours de vérif DNS). Deux gotchas Fern rencontrés : (1) Fern **refuse les noms de tags OpenAPI
+>   non-ASCII** → tag `Système` renommé `System`, sinon l'onglet API est **zappé silencieusement** ;
+>   (2) la publication prod nécessite `CI=true fern generate --docs --force` — `--force` **seul ne contourne
+>   pas** le prompt « production » (terminal non-interactif → « No » par défaut → annulation).
+> - **Thème + entrée produit.** Palette Fern (`docs.yml colors`) mappée 1:1 sur les tokens de l'app
+>   (`frontend/app/globals.css`, « Cloudflare-flat ») : accent `#2563eb`/`#3b82f6`, fond, cartes, bordures,
+>   sidebar (Inter = police par défaut Fern, déjà alignée — pas d'injection du globals.css brut, Fern ≠ Tailwind).
+>   Vérifié live : `--accent-primary` = `rgb(37,99,235)`. Côté landing, `/docs` (page « Start here » périmée qui
+>   annonçait l'API « coming ») **redirige** vers `docs.taskforce-project.fr` (meta-refresh + JS, build statique) ;
+>   l'entrée menu « Documentation » est conservée. ⚠️ La redirection atteint la PROD landing via le flux
+>   release landing habituel (PR landing-only → main), pas ce PR dev.
+
 > **▶ MAJ 24/08/2026 — QA batch 4 : workspaces perso vs partagés + quota corrigé (branche `hotfix/qa-workspaces`, PR → dev).** `[QA-4]`
 > - **Distinction façon orgs GitHub.** Le switcher listait tout à plat. Désormais deux groupes :
 >   **« Vos espaces »** (dont on est propriétaire) et **« Partagés avec vous »** (ceux d'autrui, où l'on
@@ -69,6 +94,32 @@
 >   (GitHub `avatar_url`→`picture` ; Google idem) — à ajouter dans `ops/kc-setup.sh` puis rejouer sur la VM.
 >   Tant que non fait, tout le monde a l'identicon généré (le fix principal) ; la vraie photo OAuth s'allume après.
 > Vérifs : `tsc` 0 · `next build` 0 · `avatar.test` 11/11. Backend validé par la CI (pas de JDK sur l'hôte).
+
+> **▶ MAJ 24/08/2026 — Doc en Fern (remplace Starlight) : guides + API, style « produit » (branche `feat/docs-fern`, PR → dev).** `[QA-16]`
+> L'utilisateur préfère le rendu **Fern** ([buildwithfern.com](https://buildwithfern.com)) à Starlight (QA-15)
+> pour la doc produit + la référence API. → nouveau dossier `fern/` (config `docs.yml` brandée bleu `#2563eb`,
+> guides produit en Markdown, spec OpenAPI, onglets **Guides** + **Référence API**) **ET suppression de
+> `docs-site/`** (Starlight, QA-15) pour n'avoir qu'un seul système. `fern check` : **0 erreur** (config valide,
+> API détectée via `generators.yml`). Publication = **SaaS Fern** : `fern login` + `fern generate --docs`
+> (compte gratuit) → héberge sur **docs.taskforce-project.fr** (`custom-domain` déclaré). Spec = placeholder ;
+> la vraie vient du backend springdoc en CI (cf. `fern/README.md`).
+
+> **▶ MAJ 24/08/2026 — Nettoyage 404 Swagger + script de charge k6 (branche `fix/swagger-404-k6`, PR → dev).** `[QA-14]`
+> - **404 propre** : `/swagger-ui` renvoyait **500** en prod (springdoc désactivé F1 → `NoResourceFoundException`
+>   captée par le fourre-tout `Exception`). Ajout d'un `@ExceptionHandler({NoResourceFoundException,
+>   NoHandlerFoundException}) → 404`. Toute route inconnue renvoie désormais un 404 propre. (Spring Boot 4.0.6.)
+> - **Tests de charge** : `load-testing/` (script k6 paramétrable + runbook). Diagnostic du 1er run à 83 %
+>   d'échec = **épuisement des ports éphémères Windows** côté client (`interrupted iterations`), pas le
+>   serveur (le `p(95)=1,68 s < 3 s` passait). Runbook : Debian + `ulimit`/`sysctl`, rampe progressive
+>   (pas 50 000 VUs d'un coup), et **edge CF (429 attendu) vs origine via Tailscale** (capacité réelle).
+> **▶ MAJ 24/08/2026 — Docs site brandé (Astro Starlight) : guides produit + référence API (branche `feat/docs-site`, PR → dev).** `[QA-15]`
+> Nouveau `docs-site/` : **un seul endroit** pour la doc PRODUIT (guides utilisateur MDX) ET la RÉFÉRENCE
+> API (rendue depuis la spec OpenAPI via `starlight-openapi`), thémé bleu TaskForce (`#2563eb`), destiné à
+> **docs.taskforce-project.fr** (Cloudflare Pages). Alternative « perso » à Swagger, découplée de l'API
+> (aucune réexposition). **Build validé en local** (`npm run build` → 7 pages, EXIT 0) après alignement des
+> versions (Starlight 0.34 / starlight-openapi 0.18 / Astro 5.6). La spec est un placeholder en repo ; le
+> vrai `openapi.json` est écrit depuis le backend (springdoc) en CI avant le build (cf. README). Runbook k6
+> livré séparément (voir #114 + [QA-14]).
 
 > **▶ MAJ 24/08/2026 — Test aligné sur l'auto-suffixe (branche `fix/project-test`, PR → dev).** `[QA-13]`
 > `ProjectServiceIntegrationTest.should_reject_duplicate_identifier` cassait les Backend Tests de #105 :

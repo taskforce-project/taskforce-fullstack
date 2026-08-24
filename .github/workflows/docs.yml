@@ -1,0 +1,57 @@
+name: Docs (Fern)
+
+# Publie la documentation Fern (guides produit + reference API) sur docs.taskforce-project.fr.
+#
+# Fern est un SaaS : ce job ne fait que BUILDER + POUSSER la config vers le cloud Fern, qui HEBERGE
+# le site. Aucune VM/aucun conteneur cote TaskForce n'est sollicite (seul un CNAME DNS pointe le
+# sous-domaine vers Fern).
+#
+# La spec API (`fern/openapi/openapi.json`) est generee EN AMONT depuis le backend en marche
+# (`fern/scripts/generate-openapi.*`, endpoint springdoc /api-docs) puis commitee : la CI n'a pas
+# besoin de demarrer le backend, ce qui garde ce workflow simple et fiable.
+#
+# Ce workflow n'est JAMAIS un required check -> il ne peut pas bloquer une PR.
+# Sans le secret FERN_TOKEN, il se termine en succes sans rien publier.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - 'fern/**'
+      - '.github/workflows/docs.yml'
+
+jobs:
+  publish:
+    name: Publish Fern docs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Le secret est mappe en env au niveau job : le contexte `env` est utilisable dans les `if`
+    # de step (le contexte `secrets`, lui, ne l'est pas de facon fiable).
+    env:
+      FERN_TOKEN: ${{ secrets.FERN_TOKEN }}
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: ⏭️ FERN_TOKEN absent -> publication ignoree
+        if: ${{ env.FERN_TOKEN == '' }}
+        run: echo "::notice::FERN_TOKEN non configure (Settings -> Secrets -> Actions). Publication Fern ignoree."
+
+      - name: 🟢 Setup Node
+        if: ${{ env.FERN_TOKEN != '' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 📦 Install Fern CLI
+        if: ${{ env.FERN_TOKEN != '' }}
+        run: npm install -g fern-api
+
+      - name: ✅ fern check
+        if: ${{ env.FERN_TOKEN != '' }}
+        run: fern check
+
+      - name: 🚀 fern generate --docs
+        if: ${{ env.FERN_TOKEN != '' }}
+        run: fern generate --docs
