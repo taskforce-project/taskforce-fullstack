@@ -30,28 +30,22 @@ jobs:
       - name: 📥 Checkout
         uses: actions/checkout@v4
 
+      # Installation directe du binaire Trivy (script officiel). On n'utilise plus
+      # `aquasecurity/trivy-action` : certaines de ses versions épinglent en interne un `setup-trivy`
+      # supprimé (`v0.2.1` introuvable) — un bug de pin transitif qui cassait le job AVANT le scan,
+      # sans rapport avec une faille du code.
+      - name: ⬇️ Install Trivy
+        run: |
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+          trivy --version
+
       # 1) Rapport COMPLET (CRITICAL→MEDIUM) → résumé + artefact, sans casser le build.
       - name: 🔎 Trivy fs — rapport complet
-        uses: aquasecurity/trivy-action@v0.28.0
-        with:
-          scan-type: fs
-          scan-ref: .
-          scanners: vuln,secret,misconfig
-          severity: CRITICAL,HIGH,MEDIUM
-          format: table
-          output: trivy-report.txt
-          exit-code: '0'
+        run: trivy fs --scanners vuln,secret,misconfig --severity CRITICAL,HIGH,MEDIUM --format table --output trivy-report.txt --exit-code 0 .
 
       # 2) Gate : casse le build uniquement sur une vuln CRITICAL corrigeable (0 aujourd'hui).
       - name: 🚦 Trivy fs — gate CRITICAL
-        uses: aquasecurity/trivy-action@v0.28.0
-        with:
-          scan-type: fs
-          scan-ref: .
-          scanners: vuln,secret,misconfig
-          severity: CRITICAL
-          ignore-unfixed: true
-          exit-code: '1'
+        run: trivy fs --scanners vuln,secret,misconfig --severity CRITICAL --ignore-unfixed --exit-code 1 .
 
       - name: 📄 Résumé de job
         if: always()
