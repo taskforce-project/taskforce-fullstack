@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.taskforce.tf_api.core.dto.request.CreateInvitationRequest;
+import com.taskforce.tf_api.core.dto.response.IncomingInvitationResponse;
 import com.taskforce.tf_api.core.dto.response.InvitationPreviewResponse;
 import com.taskforce.tf_api.core.dto.response.InvitationResponse;
 import com.taskforce.tf_api.core.model.User;
@@ -93,6 +94,29 @@ public class InvitationController {
     ) {
         Long userId = resolveUserId(jwt);
         invitationService.acceptInvitation(token, userId);
+        return ResponseEntity.ok(ApiResponse.success("Invitation acceptée", null));
+    }
+
+    // ---- Mes invitations reçues (in-app, sans token) ------------------------
+
+    /** Invitations PENDING adressées à l'utilisateur courant (bannière d'approbation in-app). */
+    @GetMapping("/invitations/mine")
+    public ResponseEntity<ApiResponse<List<IncomingInvitationResponse>>> listMine(
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long userId = resolveUserId(jwt);
+        return ResponseEntity.ok(ApiResponse.success(
+            "Invitations reçues", invitationService.listMyPendingInvitations(userId)));
+    }
+
+    /** L'utilisateur courant accepte explicitement une de ses invitations (par identifiant). */
+    @PostMapping("/invitations/mine/{invitationId}/accept")
+    public ResponseEntity<ApiResponse<Void>> acceptMine(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long invitationId
+    ) {
+        Long userId = resolveUserId(jwt);
+        invitationService.acceptMyInvitation(userId, invitationId);
         return ResponseEntity.ok(ApiResponse.success("Invitation acceptée", null));
     }
 

@@ -31,6 +31,15 @@ export interface CreateInvitationPayload {
   role?: WorkspaceRole
 }
 
+/** Invitation reçue par l'utilisateur courant (vue invité, sans token). */
+export interface IncomingInvitation {
+  id: number
+  workspaceName: string
+  role: WorkspaceRole
+  invitedByName: string | null
+  expiresAt: string
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Service
 // ─────────────────────────────────────────────────────────────────────────────
@@ -61,4 +70,15 @@ export async function previewInvitation(token: string): Promise<InvitationPrevie
 /** Accepte une invitation pour l'utilisateur authentifié (email doit matcher). */
 export async function acceptInvitation(token: string): Promise<void> {
   await apiClient.post(INVITATION_ROUTES.ACCEPT(token), {})
+}
+
+/** Invitations reçues par l'utilisateur courant (bannière d'approbation in-app). */
+export async function listMyInvitations(): Promise<IncomingInvitation[]> {
+  const res = await apiClient.get<{ data: IncomingInvitation[] }>(INVITATION_ROUTES.MINE())
+  return res.data.data
+}
+
+/** Accepte explicitement une de ses invitations, par identifiant (sans token). */
+export async function acceptMyInvitation(invitationId: number): Promise<void> {
+  await apiClient.post(INVITATION_ROUTES.MINE_ACCEPT(invitationId), {})
 }

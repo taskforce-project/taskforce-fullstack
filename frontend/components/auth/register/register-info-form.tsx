@@ -10,6 +10,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getRegisterData, setRegisterData } from "@/lib/auth/register-storage";
 import { sanitizeInput, calculatePasswordStrength } from "@/lib/utils/validation";
+import { stashInvitationToken } from "@/lib/utils/pending-invitation";
 import { registerSchema, firstZodError } from "@/lib/validation/auth-schemas";
 import { Loader2 } from "lucide-react";
 import { AuthStepper } from "@/components/auth/auth-stepper";
@@ -70,12 +71,16 @@ export function SignupForm({
     }
   }, []);
 
-  // Pré-remplissage de l'email depuis une invitation (?email=…, PROD-3.5)
+  // Pré-remplissage de l'email depuis une invitation (?email=…, PROD-3.5), et report du token
+  // d'invitation : il doit survivre au parcours inscription → OTP → login, où l'acceptation
+  // explicite sera appliquée (plus d'auto-rattachement silencieux à la connexion).
   useEffect(() => {
-    const invitedEmail = new URLSearchParams(window.location.search).get("email");
+    const params = new URLSearchParams(window.location.search);
+    const invitedEmail = params.get("email");
     if (invitedEmail) {
       setFormData((prev) => ({ ...prev, email: invitedEmail }));
     }
+    stashInvitationToken(params.get("invitation"));
   }, []);
 
   // Le défi est demandé au chargement, et non à la soumission : c'est l'écart entre son émission et

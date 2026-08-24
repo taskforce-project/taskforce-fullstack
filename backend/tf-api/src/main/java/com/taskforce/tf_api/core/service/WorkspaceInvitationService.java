@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.taskforce.tf_api.core.dto.request.CreateInvitationRequest;
+import com.taskforce.tf_api.core.dto.response.IncomingInvitationResponse;
 import com.taskforce.tf_api.core.dto.response.InvitationPreviewResponse;
 import com.taskforce.tf_api.core.dto.response.InvitationResponse;
 import com.taskforce.tf_api.core.enums.InvitationStatus;
@@ -181,25 +182,49 @@ public class WorkspaceInvitationService {
     }
 
     /**
-     * Accepte toutes les invitations PENDING correspondant à l'email de l'utilisateur.
-     * Appelé après l'inscription/le premier login. Best-effort (ne casse jamais l'inscription).
+     * Liste les invitations PENDING (non expirées) adressées à l'email de l'utilisateur courant.
+     *
+     * <p>Alimente la bannière « vous avez été invité » in-app. Depuis le passage à une acceptation
+     * <b>explicite</b> (plus d'auto-rattachement silencieux à la connexion), c'est ce qui permet
+     * d'accepter <b>sans dépendre de l'email</b> — indispensable pour un compte déjà existant.</p>
+     */
+    @Transactional(readOnly = true)
+    public List<IncomingInvitationResponse> listMyPendingInvitations(Long userId) {
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+        return invitationRepository
+            .findByEmailIgnoreCaseAndStatus(user.getEmail(), InvitationStatus.PENDING)
+            .stream()
+            .filter(inv -> !inv.isExpired())
+            .map(IncomingInvitationResponse::from)
+            .collect(Collectors.toList());
+    }
+
+    /**
+     * Acceptation explicite d'une de SES invitations, par identifiant (l'invité clique « Accepter »
+     * dans l'app). L'invitation doit viser l'email du demandeur — même garde-fou que
+     * {@link #acceptInvitation(String, Long)}, mais sans exiger la connaissance du token.
      */
     @Transactional
-    public void acceptPendingInvitations(User user) {
-        try {
-            List<WorkspaceInvitation> pending = invitationRepository
-                .findByEmailIgnoreCaseAndStatus(user.getEmail(), InvitationStatus.PENDING);
-            for (WorkspaceInvitation invitation : pending) {
-                if (invitation.isExpired()) {
-                    invitation.setStatus(InvitationStatus.EXPIRED);
-                    invitationRepository.save(invitation);
-                    continue;
-                }
-                joinWorkspace(invitation, user);
-            }
-        } catch (Exception e) {
-            log.error("Échec de l'acceptation auto des invitations pour {} : {}", user.getEmail(), e.getMessage());
+    public void acceptMyInvitation(Long userId, Long invitationId) {
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+        WorkspaceInvitation invitation = invitationRepository.findById(invitationId)
+            .orElseThrow(() -> new ResourceNotFoundException("Invitation introuvable"));
+
+        if (!user.getEmail().equalsIgnoreCase(invitation.getEmail())) {
+            throw new BusinessException("Cette invitation ne vous est pas adressée");
         }
+        if (invitation.getStatus() != InvitationStatus.PENDING) {
+            throw new BusinessException("Cette invitation n'est plus valide");
+        }
+        if (invitation.isExpired()) {
+            invitation.setStatus(InvitationStatus.EXPIRED);
+            invitationRepository.save(invitation);
+            throw new BusinessException("Cette invitation a expiré");
+        }
+
+        joinWorkspace(invitation, user);
     }
 
     // -------------------------------------------------------------------------

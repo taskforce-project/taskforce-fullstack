@@ -76,9 +76,6 @@ class AuthServiceTest {
     private WorkspaceService workspaceService;
 
     @Mock
-    private WorkspaceInvitationService workspaceInvitationService;
-
-    @Mock
     private AuditService auditService;
 
     @Mock

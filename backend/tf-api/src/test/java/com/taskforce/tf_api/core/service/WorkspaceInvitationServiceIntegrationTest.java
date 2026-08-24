@@ -153,4 +153,39 @@ class WorkspaceInvitationServiceIntegrationTest extends AbstractIntegrationTest 
             assertThat(workspaceMemberRepository.existsByWorkspaceIdAndUserId(workspace.getId(), erin.getId())).isTrue();
         }
     }
+
+    // =========================================================================
+    @Nested
+    @DisplayName("invitations reçues (in-app, approbation explicite)")
+    class Incoming {
+
+        @Test
+        @DisplayName("listMyPendingInvitations renvoie les invitations PENDING adressées à mon email")
+        void should_list_my_pending() {
+            service.createInvitation(SLUG, owner.getId(), req("frank@it.dev", WorkspaceRole.MEMBER));
+            User frank = persistUser("frank");
+
+            var mine = service.listMyPendingInvitations(frank.getId());
+            assertThat(mine).hasSize(1);
+            assertThat(mine.get(0).getWorkspaceName()).isEqualTo("Inv WS");
+            assertThat(mine.get(0).getRole()).isEqualTo(WorkspaceRole.MEMBER);
+        }
+
+        @Test
+        @DisplayName("acceptMyInvitation fait rejoindre par identifiant ; invitation d'autrui → refus")
+        void should_accept_mine_and_guard_email() {
+            service.createInvitation(SLUG, owner.getId(), req("grace@it.dev", WorkspaceRole.MEMBER));
+            WorkspaceInvitation inv = invitationRepository
+                .findByWorkspaceIdAndStatus(workspace.getId(), InvitationStatus.PENDING).get(0);
+            User grace = persistUser("grace");
+            User heidi = persistUser("heidi");
+
+            // invitation adressée à grace → un autre compte ne peut pas l'accepter
+            assertThatThrownBy(() -> service.acceptMyInvitation(heidi.getId(), inv.getId()))
+                .isInstanceOf(BusinessException.class);
+
+            service.acceptMyInvitation(grace.getId(), inv.getId());
+            assertThat(workspaceMemberRepository.existsByWorkspaceIdAndUserId(workspace.getId(), grace.getId())).isTrue();
+        }
+    }
 }

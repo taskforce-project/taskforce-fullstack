@@ -22,6 +22,25 @@
 >   (nouvelle méthode repo) : seuls les workspaces **possédés** comptent. Même correction côté switcher
 >   (`ownedCount` au lieu de `workspaces.length` pour l'affichage ET le gating « limite atteinte »).
 > `tsc` 0 · `next build` 0 · **822 tests front verts**. Backend validé par la CI.
+> **▶ MAJ 24/08/2026 — QA batch 3 : approbation EXPLICITE des invitations + email prod (branche `hotfix/qa-invitations`, PR → dev).** `[QA-3]`
+> Constat : le système d'invitation (email + token + page d'acceptation + révocation, PROD-3.5) était
+> **déjà entièrement codé**. Les vrais trous :
+> 1. **Email éteint en prod** — `application-prod.yml` a `MAIL_HOST:` défaut **VIDE** → aucun email
+>    transactionnel (invitations, OTP, reset) si `.env.prod` ne le définit pas. Décision : **Brevo**
+>    (relais SMTP). **Aucun code à changer** (la config lit déjà `MAIL_*`) ; variables à poser sur la VM :
+>    `MAIL_HOST=smtp-relay.brevo.com` · `MAIL_PORT=587` · `MAIL_USERNAME=<login SMTP Brevo>` ·
+>    `MAIL_PASSWORD=<clé SMTP Brevo>` · `MAIL_FROM=noreply@taskforce-project.fr` · `MAIL_FROM_NAME=TaskForce`.
+> 2. **Auto-rattachement silencieux** — `acceptPendingInvitations` ajoutait l'invité dès sa connexion
+>    (email invité concordant) → ressenti « forcé », sans clic. **Retiré** des 3 flux (register/login/
+>    oauth) + le champ associé d'`AuthService`. L'acceptation est désormais **explicite** :
+>    - via le **lien d'invitation** : le token est reporté (`sessionStorage`, util `pending-invitation`)
+>      à travers register→OTP→login **et** le détour OAuth (qui perd l'URL), puis `acceptInvitation` est
+>      appelé au succès (login-form + register-info-form + callback) ;
+>    - via une **bannière in-app** (`PendingInvitationsBanner`, montée dans `AppShell` hors du `<main>`
+>      keyé), alimentée par `GET /api/invitations/mine` + acceptation par id
+>      `POST /api/invitations/mine/{id}/accept` (sans exposer le token) — **marche même sans email**.
+> Nouveau DTO `IncomingInvitationResponse`. Tests d'intégration ajoutés (list + accept-by-id + garde-fou
+> email). `tsc` 0 · `next build` 0 · 149 tests front verts. Backend validé par la CI (pas de JDK hôte).
 
 > **▶ MAJ 23/08/2026 — QA batch 2 : photo de profil (branche `hotfix/qa-avatars`, PR → dev).** `[QA-2]`
 > Objectif : personne ne reste « sans photo de profil ». Deux causes, traitées :

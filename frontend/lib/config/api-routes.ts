@@ -95,6 +95,9 @@ export const WORKSPACE_ROUTES = {
 export const INVITATION_ROUTES = {
   PREVIEW: (token: string) => `/api/invitations/${token}`,
   ACCEPT: (token: string) => `/api/invitations/${token}/accept`,
+  // Invitations reçues par l'utilisateur courant (bannière d'approbation in-app, sans token)
+  MINE: () => `/api/invitations/mine`,
+  MINE_ACCEPT: (invitationId: number) => `/api/invitations/mine/${invitationId}/accept`,
 } as const;
 
 /**
