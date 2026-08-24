@@ -151,8 +151,9 @@ public class AnalyticsService {
     private static final DateTimeFormatter DAY_LABEL = DateTimeFormatter.ofPattern("dd/MM");
 
     public List<ThroughputPointResponse> getThroughput(String slug, Long userId, Long projectId, String bucket) {
+        // Analytics de BASE (débit) : disponible dès le plan Free (décision produit 24/08).
+        // Seules les vues avancées (capacité, charge) restent derrière ADVANCED_ANALYTICS.
         Workspace ws = requireWorkspaceMember(slug, userId);
-        requireFeature(slug, PlanFeature.ADVANCED_ANALYTICS);
         List<Long> projectIds = resolveProjectIds(ws.getId(), userId, projectId);
 
         boolean daily = "DAY".equalsIgnoreCase(bucket);
@@ -185,8 +186,8 @@ public class AnalyticsService {
     // -------------------------------------------------------------------------
 
     public List<BurndownPointResponse> getBurndown(String slug, Long userId, Long projectId) {
+        // Analytics de BASE (burndown de cycle) : disponible dès le plan Free (décision produit 24/08).
         Workspace ws = requireWorkspaceMember(slug, userId);
-        requireFeature(slug, PlanFeature.ADVANCED_ANALYTICS);
         // Cycles actifs restreints aux projets visibles par l'utilisateur (TF-RBAC-INTEL)
         List<Cycle> activeCycles = activeViewableCycles(slug, ws.getId(), userId);
         if (projectId != null) {
