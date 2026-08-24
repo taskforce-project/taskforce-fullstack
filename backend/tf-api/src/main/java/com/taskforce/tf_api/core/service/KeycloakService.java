@@ -187,7 +187,10 @@ public class KeycloakService {
     /** Désactive le 2FA en supprimant le(s) credential(s) TOTP de l'utilisateur. */
     public void disableTotp(String keycloakId) {
         log.info("Désactivation du 2FA (TOTP) pour {}", keycloakId);
-        realmResource.users().get(keycloakId).removeTotp();
+        UserResource userResource = realmResource.users().get(keycloakId);
+        userResource.credentials().stream()
+            .filter(c -> "otp".equalsIgnoreCase(c.getType()))
+            .forEach(c -> userResource.removeCredential(c.getId()));
     }
 
     /**
