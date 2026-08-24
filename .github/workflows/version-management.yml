@@ -128,14 +128,23 @@ jobs:
                 }
                 versions[service] = `${service}-v${major}.${minor}.${patch}-rc${rc}`;
               } else {
-                if (increment === 'major') {
-                  major++; minor = 0; patch = 0;
-                } else if (increment === 'minor') {
-                  minor++; patch = 0;
+                // Promotion PROD : le stable = la dernière rc de dev sans le suffixe -rc (il SUIT
+                // donc dev), au lieu de repartir d'une ligne stable indépendante (dette TD-TAGS).
+                const rcTags = tags
+                  .filter(t => t.name.startsWith(prefix) && t.name.includes('-rc'))
+                  .sort((a, b) => b.name.localeCompare(a.name, undefined, { numeric: true }));
+                if (rcTags.length > 0) {
+                  versions[service] = rcTags[0].name.replace(/-rc\d+$/, '');
                 } else {
-                  patch++;
+                  if (increment === 'major') {
+                    major++; minor = 0; patch = 0;
+                  } else if (increment === 'minor') {
+                    minor++; patch = 0;
+                  } else {
+                    patch++;
+                  }
+                  versions[service] = `${service}-v${major}.${minor}.${patch}`;
                 }
-                versions[service] = `${service}-v${major}.${minor}.${patch}`;
               }
               
               core.info(`📦 ${service}: ${latestTag?.name || 'none'} → ${versions[service]}`);

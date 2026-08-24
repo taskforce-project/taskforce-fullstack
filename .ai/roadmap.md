@@ -70,6 +70,15 @@
 >   Tant que non fait, tout le monde a l'identicon généré (le fix principal) ; la vraie photo OAuth s'allume après.
 > Vérifs : `tsc` 0 · `next build` 0 · `avatar.test` 11/11. Backend validé par la CI (pas de JDK sur l'hôte).
 
+> **▶ MAJ 24/08/2026 — TD-TAGS RÉSOLU : le stable suit la rc de dev.** `[QA-6]`
+> Correctif `fix/release-versioning` (PR → dev). À la promotion dev→main, `release.yml` (et l'aperçu
+> `version-management.yml`) dérivent la version PROD de la **dernière rc** en retirant le suffixe `-rc`
+> (au lieu d'une ligne stable indépendante qui divergeait : stable `frontend-v0.0.5` face à la rc
+> `frontend-v0.2.6-rc1`). Création de tags **idempotente** (skip si le tag existe). Résultat : les
+> versions **suivent dev** et restent incrémentales (prochaine promo → `frontend-v0.2.x`). Purement
+> cosmétique — la prod **build depuis les sources** (compose prod en `build:`), ces tags/images ghcr ne
+> sont pas tirés par la VM. La note de dette d'origine ci-dessous.
+
 > **▶ NOTE 23/08/2026 — Dette technique différée : versioning des tags de release.** `[TD-TAGS]`
 > Dans `release.yml`, les lignes `rc` (dev) et `stable` (main) sont calculées SÉPARÉMENT : à la promotion
 > dev→main, main repart de la dernière stable et IGNORE le numéro de la rc validée (constat : stable
