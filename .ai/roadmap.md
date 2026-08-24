@@ -10,6 +10,18 @@
 >
 > Sources : `.ai/qa.md` (QA produit détaillée), `.ai/known-issues.md` (bugs vérifiés), `.ai/module-map.md` (domaines↔code), `.ai/architecture-map.md` (archi réelle), `.ai/P0-fix-plan.md` (correctifs P0 paste-ready).
 
+> **▶ MAJ 24/08/2026 — QA-19 : QA live batch 2 (branche `hot-fix` → grosse PR dev puis main).** `[QA-19]`
+> **Corrigés :**
+> - **Upload avatar → 500.** `spring.servlet.multipart.max-file-size` au défaut Spring (1 Mo) alors que l'UI annonce 3 Mo → toute image > 1 Mo levait `MaxUploadSizeExceededException` **avant** le contrôleur. Relevé à 10 Mo (`application.yml`) + handler → **413** propre.
+> - **PDP workspace peu variées.** Le dégradé ne faisait varier que la teinte (sat/lum figées) → « même style » partout. `workspace-avatar.tsx` : teinte + écart + saturation + luminosité + angle tirés de bits **indépendants** du hash (déterministe mais varié).
+> - **Help → doc.** L'entrée Help pointe vers `docs.taskforce-project.fr` (nouvel onglet ; `renderItem` gère les liens externes).
+> **Backlog QA (à traiter sur `hot-fix`) :**
+> - Texte FR résiduel : titre de graphe généré par l'IA (« Répartition des issues par priorité ») → prompt LLM en anglais.
+> - Réglages : **Account** vide · **Notifications** sans réglage actionnable · **Security** (2FA / mot de passe / sessions — via Keycloak ?) · **Privacy & Data** (bouton export/anonymisation ; *delete account* → Account, *delete data* → Data) · **Usage Cortex** (factures/téléchargement type Claude — Stripe portal ?).
+> - **Integrations** : audit (lesquelles marchent + ce qu'elles apportent). · **Status** : refonte + gestion. · **Signals** : refaire comme « My Queue » (tableau + chiffres).
+> - **Private/Public** : vérifier la visibilité projet (invité workspace voit public, pas privé, sauf invité au projet).
+> - **Responsive** : topbar (bandeau type Stripe) + page Pricing. · **Doc** : gros passage (compléter les guides).
+
 > **▶ MAJ 24/08/2026 — QA-18 : 3 bugs prod trouvés en QA live (branche `fix/qa-avatars-invitations`, PR → dev).** `[QA-18]`
 > - **`GET /api/invitations/mine` → 500 (jwt null).** L'endpoint (un seul segment) matchait le motif **public** `/api/invitations/*` (preview par token) → chaîne publique sans décodage JWT → `@AuthenticationPrincipal Jwt` null → NPE. **Il n'avait donc jamais fonctionné** (bannière d'invitations in-app). Fix : chaîne de sécurité `@Order(0)` `myInvitationsFilterChain` qui exige l'auth sur `/api/invitations/mine[/**]` **avant** la chaîne publique.
 > - **Avatars cassés (CSP).** `UserService` stockait `avatar_url = https://api.dicebear.com/...` quand l'avatar était absent ; la CSP `img-src` prod bloque ce domaine → « sans photo ». Fix : ne plus stocker d'URL externe (`avatar_url` NULL → identicon **local** côté front, `avatar.ts`) + **migration V74** qui purge les URLs `api.dicebear.com` déjà en base. `FileController` : fallback avatar **404** au lieu d'un redirect 302 dicebear. Tests MAJ (UserService, FileController).
