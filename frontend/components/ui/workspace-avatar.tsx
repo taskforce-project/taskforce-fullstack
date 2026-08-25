@@ -51,17 +51,23 @@ export function WorkspaceAvatar({
   className,
   textClassName,
 }: WorkspaceAvatarProps) {
-  // Déterministe et varié : teinte, 2e teinte, position du glow et angle tirés de bits INDÉPENDANTS
-  // du hash → deux workspaces se ressemblent rarement. Base SOMBRE + glow coloré.
+  // Déterministe (même workspace → même rendu, SSR-safe, pas de flicker) mais **couleurs vives et
+  // très variées** : teinte, 2e teinte (écart large), saturation, luminosités, position du glow et
+  // angle tirés de bits INDÉPENDANTS du hash → chaque org tombe sur une couleur « random » distincte.
+  // Sombre mais assez lumineux pour que la teinte se VOIE (l'ancien 9 % rendait tout quasi noir).
   const h = hashString(String(seed ?? name ?? ""))
   const hue1 = h % 360
-  const hue2 = (hue1 + 40 + ((h >>> 3) % 130)) % 360
-  const glowX = 58 + ((h >>> 7) % 32) // 58–90 %
-  const glowY = 55 + ((h >>> 11) % 35) // 55–90 %
+  const hue2 = (hue1 + 60 + ((h >>> 9) % 240)) % 360 // écart 60–300° : forte variété
+  const sat = 64 + ((h >>> 7) % 24) // 64–88 %
+  const light1 = 30 + ((h >>> 11) % 14) // 30–44 %
+  const light2 = 18 + ((h >>> 15) % 10) // 18–28 %
+  const glowLight = 50 + ((h >>> 3) % 12) // 50–62 %
+  const glowX = 55 + ((h >>> 13) % 35) // 55–90 %
+  const glowY = 52 + ((h >>> 17) % 36) // 52–88 %
   const angle = (h >>> 5) % 360
   const gradient = [
-    `radial-gradient(circle at ${glowX}% ${glowY}%, hsl(${hue2} 70% 48% / 0.5), transparent 62%)`,
-    `linear-gradient(${angle}deg, hsl(${hue1} 45% 9%), hsl(${hue2} 42% 17%))`,
+    `radial-gradient(circle at ${glowX}% ${glowY}%, hsl(${hue2} ${sat}% ${glowLight}% / 0.55), transparent 60%)`,
+    `linear-gradient(${angle}deg, hsl(${hue1} ${sat}% ${light1}%), hsl(${hue2} ${sat}% ${light2}%))`,
   ].join(", ")
 
   return (
