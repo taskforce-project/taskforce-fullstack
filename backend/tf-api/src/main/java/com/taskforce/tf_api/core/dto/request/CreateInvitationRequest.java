@@ -1,5 +1,6 @@
 package com.taskforce.tf_api.core.dto.request;
 
+import com.taskforce.tf_api.core.enums.ProjectRole;
 import com.taskforce.tf_api.core.enums.WorkspaceRole;
 
 import jakarta.validation.constraints.Email;
@@ -19,4 +20,10 @@ public class CreateInvitationRequest {
 
     /** Rôle cible dans le workspace (défaut MEMBER). */
     private WorkspaceRole role;
+
+    /** Optionnel : projet ciblé — l'acceptation ajoutera aussi l'invité à ce projet. */
+    private Long projectId;
+
+    /** Rôle dans le projet ciblé (défaut MEMBER si {@link #projectId} présent). */
+    private ProjectRole projectRole;
 }

@@ -1,22 +1,45 @@
 ---
 title: Intégrations
-subtitle: Connecter TaskForce à votre chaîne d'outils.
+subtitle: Connecter vos outils à votre espace.
 ---
 
-TaskForce se connecte à vos outils et peut notifier des systèmes externes.
+TaskForce se connecte aux outils que votre équipe utilise déjà. Les connexions se gèrent depuis la
+carte **« Connecter vos outils »** du Dashboard, ou dans les **Paramètres**.
 
-## Connecteurs
+## Outils connectables
 
-- **GitHub** — relier l'activité de développement à vos projets.
-- **Slack** — porter les notifications de TaskForce dans vos canaux.
+Aujourd'hui, vous pouvez connecter :
 
-## Webhooks
+<CardGroup cols={2}>
+  <Card title="GitHub" icon="github">
+    Reliez votre code à vos opérations.
+  </Card>
+  <Card title="Slack" icon="slack">
+    Portez l'activité de TaskForce dans vos canaux.
+  </Card>
+</CardGroup>
 
-Émettez des **webhooks** vers vos propres services pour réagir aux événements de TaskForce (création
-d'issue, changement de statut…).
+D'autres outils figurent dans le **catalogue** et s'ajouteront progressivement. Le catalogue indique,
+pour chacun, s'il est **connecté** ou non, et combien sont disponibles.
+
+## Connecter un outil
+
+<Steps>
+  <Step title="Ouvrir le catalogue">
+    Depuis la carte du Dashboard ou les Paramètres, ouvrez les **Intégrations**.
+  </Step>
+  <Step title="Connecter">
+    Cliquez sur **Connecter**. Selon l'outil, l'autorisation passe par **OAuth** (redirection vers le
+    service) ou par une **configuration** (jeton / paramètres).
+  </Step>
+  <Step title="Gérer ensuite">
+    Une fois connecté, l'outil se **gère** ou se **déconnecte** depuis la même page.
+  </Step>
+</Steps>
+
+{/* SCREENSHOT: integrations-catalog — le catalogue d'intégrations (connectés / disponibles) */}
 
 <Info>
-La configuration des **intégrations** et des **webhooks** est réservée aux rôles **Propriétaire** et
-**Admin**. Pour piloter TaskForce dans l'autre sens (créer des issues, lire des données…), voir la
-[référence API](/api).
+  Les **identifiants** de connexion sont **chiffrés** au repos. La gestion des intégrations est
+  réservée aux **Propriétaires et Admins** de l'espace. → [Membres & rôles](/guides/membres-et-roles)
 </Info>

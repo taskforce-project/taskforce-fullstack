@@ -11,11 +11,16 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import com.taskforce.tf_api.core.dto.request.CreateInvitationRequest;
 import com.taskforce.tf_api.core.dto.response.InvitationResponse;
 import com.taskforce.tf_api.core.enums.InvitationStatus;
+import com.taskforce.tf_api.core.enums.ProjectRole;
 import com.taskforce.tf_api.core.enums.WorkspaceRole;
+import com.taskforce.tf_api.core.model.Project;
+import com.taskforce.tf_api.core.model.ProjectMember;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.model.WorkspaceInvitation;
 import com.taskforce.tf_api.core.model.WorkspaceMember;
+import com.taskforce.tf_api.core.repository.ProjectMemberRepository;
+import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceInvitationRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
@@ -40,9 +45,12 @@ class WorkspaceInvitationServiceIntegrationTest extends AbstractIntegrationTest 
     @Autowired private WorkspaceRepository workspaceRepository;
     @Autowired private WorkspaceMemberRepository workspaceMemberRepository;
     @Autowired private WorkspaceInvitationRepository invitationRepository;
+    @Autowired private ProjectRepository projectRepository;
+    @Autowired private ProjectMemberRepository projectMemberRepository;
 
     @MockitoBean private AuthorizationService authorizationService; // requireManager → no-op
     @MockitoBean private EmailService emailService;
+    @MockitoBean private ProjectService projectService; // assertProjectSeatAvailable → no-op en test
 
     private static final String SLUG = "ws-inv-it";
     private User owner;
@@ -66,6 +74,19 @@ class WorkspaceInvitationServiceIntegrationTest extends AbstractIntegrationTest 
     private User persistUser(String name) {
         return userRepository.save(User.builder()
             .keycloakId("kc-" + name).email(name + "@it.dev").displayName(name).isActive(true).build());
+    }
+
+    private Project persistProject(String identifier) {
+        return projectRepository.save(Project.builder()
+            .workspace(workspace).name("Proj " + identifier).identifier(identifier).createdBy(owner).build());
+    }
+
+    private CreateInvitationRequest projectReq(String email, Long projectId, ProjectRole projectRole) {
+        CreateInvitationRequest r = new CreateInvitationRequest();
+        r.setEmail(email);
+        r.setProjectId(projectId);
+        r.setProjectRole(projectRole);
+        return r;
     }
 
     // =========================================================================
@@ -186,6 +207,57 @@ class WorkspaceInvitationServiceIntegrationTest extends AbstractIntegrationTest 
 
             service.acceptMyInvitation(grace.getId(), inv.getId());
             assertThat(workspaceMemberRepository.existsByWorkspaceIdAndUserId(workspace.getId(), grace.getId())).isTrue();
+        }
+    }
+
+    // =========================================================================
+    @Nested
+    @DisplayName("Invitation projet (acceptation requise)")
+    class ProjectInvitation {
+
+        @Test
+        @DisplayName("createInvitation avec projectId → PENDING ciblant le projet")
+        void should_create_project_invitation() {
+            Project project = persistProject("WEB");
+            service.createInvitation(SLUG, owner.getId(), projectReq("dev@it.dev", project.getId(), ProjectRole.MEMBER));
+
+            WorkspaceInvitation inv = invitationRepository
+                .findByWorkspaceIdAndStatus(workspace.getId(), InvitationStatus.PENDING).stream()
+                .filter(i -> i.getEmail().equals("dev@it.dev")).findFirst().orElseThrow();
+            assertThat(inv.getProject()).isNotNull();
+            assertThat(inv.getProject().getId()).isEqualTo(project.getId());
+            assertThat(inv.getProjectRole()).isEqualTo(ProjectRole.MEMBER);
+        }
+
+        @Test
+        @DisplayName("accepter une invitation projet → membre du workspace ET du projet")
+        void should_accept_and_join_project() {
+            Project project = persistProject("API");
+            User dev = persistUser("devapi");
+            service.createInvitation(SLUG, owner.getId(), projectReq(dev.getEmail(), project.getId(), ProjectRole.LEAD));
+            WorkspaceInvitation inv = invitationRepository
+                .findByWorkspaceIdAndStatus(workspace.getId(), InvitationStatus.PENDING).stream()
+                .filter(i -> i.getEmail().equalsIgnoreCase(dev.getEmail())).findFirst().orElseThrow();
+
+            service.acceptMyInvitation(dev.getId(), inv.getId());
+
+            assertThat(workspaceMemberRepository.existsByWorkspaceIdAndUserId(workspace.getId(), dev.getId())).isTrue();
+            ProjectMember pm = projectMemberRepository.findByProjectIdAndUserId(project.getId(), dev.getId()).orElseThrow();
+            assertThat(pm.getRole()).isEqualTo(ProjectRole.LEAD);
+        }
+
+        @Test
+        @DisplayName("inviter quelqu'un déjà membre du projet → refus")
+        void should_reject_existing_project_member() {
+            Project project = persistProject("OPS");
+            User dev = persistUser("devops");
+            projectMemberRepository.save(ProjectMember.builder()
+                .project(project).user(dev).role(ProjectRole.MEMBER).addedBy(owner).build());
+
+            assertThatThrownBy(() -> service.createInvitation(SLUG, owner.getId(),
+                    projectReq(dev.getEmail(), project.getId(), ProjectRole.MEMBER)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("déjà membre du projet");
         }
     }
 }

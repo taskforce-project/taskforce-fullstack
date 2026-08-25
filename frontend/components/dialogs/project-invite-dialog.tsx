@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/select"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { searchUsers, type UserSearchResult } from "@/lib/api/user-service"
-import { addProjectMember, type ProjectRole } from "@/lib/api/project-service"
+import { type ProjectRole } from "@/lib/api/project-service"
 import { inviteMember } from "@/lib/api/workspace-service"
 import { teamService, type Team } from "@/lib/api/team-service"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
@@ -103,13 +103,10 @@ export function ProjectInviteDialog({ workspace, projectId, onInvited }: Project
     }
     setSubmitting(true)
     try {
-      // 1. Prérequis : appartenance au workspace
-      if (!alreadyInWorkspace) {
-        await inviteMember(workspace, { email: selected.email, role: "MEMBER" })
-      }
-      // 2. Ajout au projet
-      await addProjectMember(workspace, projectId, { email: selected.email, role })
-      // 3. Équipe optionnelle
+      // Invitation PENDING ciblant le projet : la personne devra ACCEPTER (email + bannière in-app).
+      // À l'acceptation, elle rejoint le workspace (si besoin) ET le projet, avec le rôle choisi.
+      await inviteMember(workspace, { email: selected.email, role: "MEMBER", projectId, projectRole: role })
+      // Équipe optionnelle (indépendante de l'acceptation du projet).
       if (teamChoice === NEW_TEAM) {
         const team = await teamService.create(workspace, { name: newTeamName.trim() })
         await teamService.addMember(workspace, team.id, { userId: selected.id })
@@ -117,7 +114,7 @@ export function ProjectInviteDialog({ workspace, projectId, onInvited }: Project
         await teamService.addMember(workspace, Number(teamChoice), { userId: selected.id })
       }
 
-      toast.success(`${selected.displayName ?? selected.email} added to the project`)
+      toast.success(`Invitation sent to ${selected.displayName ?? selected.email}`)
       onInvited()
       reset()
       setOpen(false)
@@ -150,7 +147,7 @@ export function ProjectInviteDialog({ workspace, projectId, onInvited }: Project
         <DialogHeader>
           <DialogTitle>Invite a member</DialogTitle>
           <DialogDescription>
-            Search for a Taskforce user by name or email, then choose their role.
+            Search for a Taskforce user, choose their role — they&apos;ll receive an invitation to accept.
           </DialogDescription>
         </DialogHeader>
 
@@ -218,11 +215,11 @@ export function ProjectInviteDialog({ workspace, projectId, onInvited }: Project
             )}
           </div>
 
-          {/* Notice : ajout workspace automatique */}
-          {selected && !alreadyInWorkspace && (
-            <div className="flex items-start gap-2 rounded-md border border-amber-500/20 bg-amber-500/10 px-2.5 py-2 text-xs text-amber-500">
+          {/* Notice : la personne doit ACCEPTER l'invitation avant de rejoindre. */}
+          {selected && (
+            <div className="flex items-start gap-2 rounded-md border border-blue-500/20 bg-blue-500/10 px-2.5 py-2 text-xs text-blue-500">
               <Info className="mt-0.5 size-3.5 shrink-0" />
-              <span>This user isn&apos;t in the workspace yet — they&apos;ll be added automatically.</span>
+              <span>They&apos;ll receive an invitation to this project{alreadyInWorkspace ? "" : " and the workspace"} and must accept it before joining.</span>
             </div>
           )}
 

@@ -727,6 +727,14 @@ public class ProjectService {
      * Lève une {@link IllegalStateException} (→ 409) pour déclencher l'upsell côté front,
      * en miroir du plafond de workspaces de {@code WorkspaceService}.
      */
+    /**
+     * Réutilisable (invitations projet) : rejette si ajouter un collaborateur dépasserait le plafond
+     * Free du projet privé. Même règle que l'ajout direct — l'invitation ne doit pas la contourner.
+     */
+    public void assertProjectSeatAvailable(Project project) {
+        enforcePrivateProjectSeatLimit(project);
+    }
+
     private void enforcePrivateProjectSeatLimit(Project project) {
         if (skipSeatLimit(project)) {
             return;

@@ -4,6 +4,7 @@
 
 import { apiClient } from "./client";
 import { WORKSPACE_ROUTES } from "../config/api-routes";
+import type { ProjectRole } from "./project-service";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -53,6 +54,9 @@ export interface CreateWorkspacePayload {
 export interface InviteMemberPayload {
   email: string;
   role?: WorkspaceRole;
+  /** Optionnel : cible un projet — l'acceptation ajoutera aussi l'invité au projet avec ce rôle. */
+  projectId?: number;
+  projectRole?: ProjectRole;
 }
 
 export interface UpdateMemberRolePayload {

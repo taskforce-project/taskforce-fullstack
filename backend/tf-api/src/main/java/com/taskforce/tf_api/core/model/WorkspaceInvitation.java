@@ -3,6 +3,7 @@ package com.taskforce.tf_api.core.model;
 import java.time.LocalDateTime;
 
 import com.taskforce.tf_api.core.enums.InvitationStatus;
+import com.taskforce.tf_api.core.enums.ProjectRole;
 import com.taskforce.tf_api.core.enums.WorkspaceRole;
 import com.taskforce.tf_api.shared.audit.AuditableEntity;
 
@@ -77,6 +78,16 @@ public class WorkspaceInvitation extends AuditableEntity {
 
     @Column(name = "accepted_at")
     private LocalDateTime acceptedAt;
+
+    /** Projet ciblé (optionnel) : à l'acceptation, l'invité rejoint aussi ce projet. NULL = invitation workspace simple. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "project_id")
+    private Project project;
+
+    /** Rôle dans le projet ciblé (si {@link #project} non nul). */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "project_role", length = 20)
+    private ProjectRole projectRole;
 
     public boolean isExpired() {
         return expiresAt != null && expiresAt.isBefore(LocalDateTime.now());

@@ -14,11 +14,16 @@ import com.taskforce.tf_api.core.dto.response.IncomingInvitationResponse;
 import com.taskforce.tf_api.core.dto.response.InvitationPreviewResponse;
 import com.taskforce.tf_api.core.dto.response.InvitationResponse;
 import com.taskforce.tf_api.core.enums.InvitationStatus;
+import com.taskforce.tf_api.core.enums.ProjectRole;
 import com.taskforce.tf_api.core.enums.WorkspaceRole;
+import com.taskforce.tf_api.core.model.Project;
+import com.taskforce.tf_api.core.model.ProjectMember;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.model.WorkspaceInvitation;
 import com.taskforce.tf_api.core.model.WorkspaceMember;
+import com.taskforce.tf_api.core.repository.ProjectMemberRepository;
+import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceInvitationRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
@@ -45,6 +50,9 @@ public class WorkspaceInvitationService {
     private final WorkspaceMemberRepository workspaceMemberRepository;
     private final WorkspaceInvitationRepository invitationRepository;
     private final UserRepository userRepository;
+    private final ProjectRepository projectRepository;
+    private final ProjectMemberRepository projectMemberRepository;
+    private final ProjectService projectService;
     private final AuthorizationService authorizationService;
     private final EmailService emailService;
 
@@ -66,18 +74,38 @@ public class WorkspaceInvitationService {
             throw new BusinessException("Impossible d'inviter quelqu'un en tant que OWNER");
         }
 
-        // Déjà membre ?
+        // Contexte projet optionnel : à l'acceptation, l'invité rejoint aussi ce projet.
+        final Project project = request.getProjectId() == null ? null
+            : projectRepository.findByIdAndWorkspaceId(request.getProjectId(), workspace.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Projet introuvable dans ce workspace"));
+        final ProjectRole projectRole = project == null ? null
+            : (request.getProjectRole() != null ? request.getProjectRole() : ProjectRole.MEMBER);
+
+        // Plafond « façon GitHub » : projet privé + Free = collaborateurs limités. L'invitation ne
+        // doit pas contourner la règle qui vivait dans l'ajout direct — on la vérifie dès l'invitation.
+        if (project != null) {
+            projectService.assertProjectSeatAvailable(project);
+        }
+
+        // Déjà membre ? — la cible détermine la garde (projet vs workspace).
         userRepository.findByEmail(email).ifPresent(u -> {
-            if (workspaceMemberRepository.existsByWorkspaceIdAndUserId(workspace.getId(), u.getId())) {
+            if (project != null) {
+                if (projectMemberRepository.existsByProjectIdAndUserId(project.getId(), u.getId())) {
+                    throw new BusinessException("Cet utilisateur est déjà membre du projet");
+                }
+                // Un membre du workspace PEUT être invité à un projet — il devra accepter.
+            } else if (workspaceMemberRepository.existsByWorkspaceIdAndUserId(workspace.getId(), u.getId())) {
                 throw new BusinessException("Cet utilisateur est déjà membre du workspace");
             }
         });
 
-        // Invitation PENDING existante → on la renvoie (idempotent).
+        // Invitation PENDING existante (workspace+email) → réutilisée (idempotent), re-ciblée au besoin.
         WorkspaceInvitation invitation = invitationRepository
             .findByWorkspaceIdAndEmailIgnoreCaseAndStatus(workspace.getId(), email, InvitationStatus.PENDING)
             .map(existing -> {
                 existing.setRole(role);
+                existing.setProject(project);
+                existing.setProjectRole(projectRole);
                 existing.setExpiresAt(LocalDateTime.now().plusDays(EXPIRY_DAYS));
                 return existing;
             })
@@ -86,6 +114,8 @@ public class WorkspaceInvitationService {
                 .invitedBy(userRepository.findById(requesterId).orElse(null))
                 .email(email)
                 .role(role)
+                .project(project)
+                .projectRole(projectRole)
                 .token(UUID.randomUUID().toString().replace("-", ""))
                 .status(InvitationStatus.PENDING)
                 .expiresAt(LocalDateTime.now().plusDays(EXPIRY_DAYS))
@@ -242,10 +272,24 @@ public class WorkspaceInvitationService {
                 .build();
             workspaceMemberRepository.save(member);
         }
+        // Invitation ciblant un projet : ajout au projet à l'acceptation (fini l'ajout direct).
+        Project project = invitation.getProject();
+        if (project != null
+            && !projectMemberRepository.existsByProjectIdAndUserId(project.getId(), user.getId())) {
+            // Le siège est réellement consommé ici : on re-vérifie le plafond au moment d'accepter.
+            projectService.assertProjectSeatAvailable(project);
+            projectMemberRepository.save(ProjectMember.builder()
+                .project(project)
+                .user(user)
+                .role(invitation.getProjectRole() != null ? invitation.getProjectRole() : ProjectRole.MEMBER)
+                .addedBy(invitation.getInvitedBy())
+                .build());
+        }
         invitation.setStatus(InvitationStatus.ACCEPTED);
         invitation.setAcceptedAt(LocalDateTime.now());
         invitationRepository.save(invitation);
-        log.info("{} a rejoint le workspace {} via invitation", user.getEmail(), workspaceId);
+        log.info("{} a rejoint le workspace {} via invitation{}", user.getEmail(), workspaceId,
+            project != null ? " (+ projet " + project.getId() + ")" : "");
     }
 
     private Workspace resolveWorkspace(String slug) {
