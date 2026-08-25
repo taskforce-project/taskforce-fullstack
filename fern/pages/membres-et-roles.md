@@ -1,31 +1,53 @@
 ---
 title: Membres & rôles
-subtitle: Qui peut voir, écrire et administrer.
+subtitle: Qui peut voir, contribuer et administrer — à chaque niveau.
 ---
 
-Les droits dans TaskForce dépendent de deux choses : votre **rôle** dans l'espace et la **visibilité** du
-projet.
+Les droits dans TaskForce se lisent à **trois niveaux** : l'**espace de travail**, l'**opération**, et
+l'**équipe**. Chacun a ses propres rôles, du plus large au plus fin.
 
-## Les rôles
+## Rôles d'espace de travail
 
-| Rôle | Droits |
-| ---- | ------ |
-| **Propriétaire** (Owner) | Tous les droits, dont la facturation. Ne s'attribue **pas** par invitation. |
-| **Admin** | Gère les membres, les projets, les **intégrations** et les **webhooks**. |
-| **Membre** | Crée et modifie le travail (issues, cycles…) selon la visibilité des projets. |
-| **Lecteur** (Viewer) | **Lecture seule** : consulte sans rien modifier. |
+Ils déterminent ce qu'une personne peut faire **dans tout l'espace**.
 
-## Visibilité des projets
-
-- **Projet public** — visible **et contribuable** par les membres de l'espace (façon dépôt public).
-- **Projet privé** — réservé à des **collaborateurs explicites** ; invisible aux autres membres.
+| Rôle | Ce qu'il permet |
+| --- | --- |
+| **Propriétaire** *(Owner)* | Contrôle total de l'espace, dont la **facturation** et les réglages sensibles. |
+| **Admin** | Administre l'espace : membres, opérations, intégrations, réglages. |
+| **Membre** | Participe au travail de l'espace (selon la visibilité des opérations). |
 
 <Info>
-Les actions sensibles — configuration des **intégrations** et des **webhooks** — sont réservées aux rôles
-**Propriétaire** et **Admin**.
+  Les **intégrations** et **webhooks** sont réservés aux **Propriétaires et Admins** de l'espace.
+  → [Intégrations](/guides/integrations)
 </Info>
 
-## Gérer les membres
+## Rôles d'opération
 
-Sur la page **Membres** d'un espace, un Propriétaire ou un Admin peut **inviter**, **changer le rôle** ou
-**retirer** un membre. → [Inviter son équipe](/guides/inviter-son-equipe)
+À l'intérieur d'une opération, un rôle plus fin s'applique — utile pour ouvrir un projet en lecture
+sans donner les droits d'écriture.
+
+| Rôle | Ce qu'il permet |
+| --- | --- |
+| **Lead** | Pilote l'opération : ses réglages, ses membres, ses statuts. |
+| **Membre** | Contribue : crée et modifie des tâches, commente, range dans les sprints. |
+| **Lecteur** *(Viewer)* | **Lecture seule** : consulte sans pouvoir modifier. |
+
+La **visibilité** de l'opération se combine à ces rôles :
+
+- Une opération **publique** est visible — et contribuable — par les membres de l'espace, selon leur rôle.
+- Une opération **privée** n'est accessible qu'à ses **collaborateurs explicites**.
+
+→ [Espaces & projets](/guides/espaces-et-projets)
+
+## Rôles d'équipe
+
+Une **équipe** regroupe des personnes de façon réutilisable (voir [Équipes](/guides/equipes)). En son
+sein, on est **Lead** ou **Membre**.
+
+## Le profil de chaque membre
+
+La page **Membres** liste les personnes de l'espace, leur rôle et leurs **compétences**. Chaque membre
+a un **profil de compétences** — issu de l'[onboarding](/guides/onboarding-et-profil) et modifiable —
+qui alimente l'[assignation intelligente](/guides/smart-assign).
+
+{/* SCREENSHOT: membres-liste — la page Membres (tableau : personne, rôle, compétences) */}

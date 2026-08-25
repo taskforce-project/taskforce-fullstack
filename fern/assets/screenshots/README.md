@@ -44,5 +44,13 @@ Chaque capture illustre une page de la doc Fern. **Convention** : place le fichi
 | `ma-file` | Mon travail | la vue « Ma file » avec la colonne Assignment (Accept / Decline) |
 | `assignation-actions` | Assignations | la ligne « À valider » avec les boutons Accepter / Refuser |
 
-> Les lots suivants (Collaborer, IA, Piloter, Compte) ajouteront leurs propres lignes ici au fur et à
-> mesure.
+## Lot 4 — Collaborer
+
+| id | Page | Où / quoi capturer |
+| --- | --- | --- |
+| `membres-liste` | Membres & rôles | la page Membres (personne, rôle, compétences) |
+| `invitation-modal` | Inviter son équipe | la fenêtre d'invitation (email + choix du rôle) |
+| `equipe-detail` | Équipes | une équipe (identité + liste de ses membres) |
+| `notifications-preferences` | Notifications & préférences | la matrice Paramètres → Notifications (événements × canaux) |
+
+> Les lots suivants (IA, Piloter, Compte) ajouteront leurs propres lignes ici au fur et à mesure.

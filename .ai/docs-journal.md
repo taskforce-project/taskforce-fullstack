@@ -37,6 +37,10 @@ Puis **tab Référence API** (chantier 2 : OpenAPI + guides bonnes pratiques/aut
 - ✅ **Lot 3 — Mon quotidien** (4 pages, nouvelles) : tableau-de-bord (cartes du card-registry),
   inbox/Signaux (4 filtres + types + temps réel), mon-travail/Ma file, assignations (flux
   accept/refus QA-30). Types de notif tirés de `notification-service.ts` (6 événements réglables).
-- 🔲 Lots 4 à 7 (14 pages).
+- ✅ **Lot 4 — Collaborer** (4 pages) : membres-et-roles (modèle 3 niveaux : espace OWNER/ADMIN/MEMBER,
+  opération LEAD/MEMBER/VIEWER, équipe LEAD/MEMBER), inviter-son-equipe (statuts + acceptation
+  explicite) — réécrits ; equipes (groupes workspace), notifications (6 événements × 2 canaux) —
+  nouveaux. Rôles/portées vérifiés dans workspace/project/team-service.
+- 🔲 Lots 5 à 7 (10 pages).
 - 🔲 Câblage des screenshots.
 - 🔲 Référence API (chantier 2).
