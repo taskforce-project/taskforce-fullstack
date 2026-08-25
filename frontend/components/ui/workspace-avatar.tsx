@@ -4,12 +4,16 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 
 /**
- * Avatar de workspace — fond dégradé **déterministe** dérivé d'un seed (QA2-7).
+ * Avatar de workspace — fond **dégradé sombre + glow coloré + grain léger**, déterministe (QA2-7).
  *
- * Tant que la persistance DB (`backgroundSeed`/`primaryColor`/`secondaryColor`, → QA2-16)
- * n'est pas en place, le dégradé est calculé côté client à partir du seed (uuid/slug/nom) :
- * même seed → même rendu, partout. Rounded-full, initiales en blanc (lisibles), ou logo si fourni.
+ * Même seed (uuid/slug/nom) → même rendu, partout. Base sombre façon « noise + gradient » : un
+ * dégradé sombre teinté, un glow coloré décalé, et un grain (feTurbulence) posé en overlay très
+ * discret pour ajouter de la « matière ». Rounded-full, initiales blanches, ou logo si fourni.
  */
+
+// Bruit fractal (feTurbulence) en data-URI — posé en overlay `mix-blend-overlay` très léger.
+const NOISE_URL =
+  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")"
 
 function hashString(input: string): number {
   let h = 0
@@ -47,23 +51,23 @@ export function WorkspaceAvatar({
   className,
   textClassName,
 }: WorkspaceAvatarProps) {
-  // Dégradé déterministe (même workspace → même rendu) mais à forte variété : on tire la teinte,
-  // l'écart de teinte, la saturation, la luminosité et l'angle de bits INDÉPENDANTS du hash. Avant,
-  // seule la teinte variait (sat/lum figées, écart de teinte étroit) → tous les workspaces se
-  // ressemblaient. Là, deux workspaces se ressemblent rarement.
+  // Déterministe et varié : teinte, 2e teinte, position du glow et angle tirés de bits INDÉPENDANTS
+  // du hash → deux workspaces se ressemblent rarement. Base SOMBRE + glow coloré.
   const h = hashString(String(seed ?? name ?? ""))
   const hue1 = h % 360
-  const hue2 = (hue1 + 60 + ((h >>> 3) % 180)) % 360 // écart 60–240° : analogique → complémentaire
-  const sat = 58 + ((h >>> 7) % 30) // 58–88 %
-  const light1 = 46 + ((h >>> 11) % 14) // 46–60 %
-  const light2 = Math.max(30, light1 - 12 - ((h >>> 15) % 8))
+  const hue2 = (hue1 + 40 + ((h >>> 3) % 130)) % 360
+  const glowX = 58 + ((h >>> 7) % 32) // 58–90 %
+  const glowY = 55 + ((h >>> 11) % 35) // 55–90 %
   const angle = (h >>> 5) % 360
-  const gradient = `linear-gradient(${angle}deg, hsl(${hue1} ${sat}% ${light1}%), hsl(${hue2} ${sat}% ${light2}%))`
+  const gradient = [
+    `radial-gradient(circle at ${glowX}% ${glowY}%, hsl(${hue2} 70% 48% / 0.5), transparent 62%)`,
+    `linear-gradient(${angle}deg, hsl(${hue1} 45% 9%), hsl(${hue2} 42% 17%))`,
+  ].join(", ")
 
   return (
     <div
       className={cn(
-        "flex aspect-square shrink-0 items-center justify-center overflow-hidden rounded-full text-white",
+        "relative isolate flex aspect-square shrink-0 items-center justify-center overflow-hidden rounded-full text-white",
         className
       )}
       style={logoUrl ? undefined : { backgroundImage: gradient }}
@@ -72,9 +76,17 @@ export function WorkspaceAvatar({
         // eslint-disable-next-line @next/next/no-img-element
         <img src={logoUrl} alt={name} className="size-full rounded-full object-cover" />
       ) : (
-        <span className={cn("text-xs font-bold leading-none", textClassName)}>
-          {initialsOf(name)}
-        </span>
+        <>
+          {/* Grain très léger — ajoute de la matière au dégradé sans le dénaturer. */}
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-0 opacity-20 mix-blend-overlay"
+            style={{ backgroundImage: NOISE_URL, backgroundSize: "110px 110px" }}
+          />
+          <span className={cn("relative z-10 text-xs font-bold leading-none", textClassName)}>
+            {initialsOf(name)}
+          </span>
+        </>
       )}
     </div>
   )
