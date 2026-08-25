@@ -119,7 +119,6 @@ function InviteMemberDialog({ onInvited }: { readonly onInvited?: () => void }) 
   const [role, setRole] = useState<WorkspaceRole>("MEMBER")
   const [loading, setLoading] = useState(false)
   const [emailInviting, setEmailInviting] = useState(false)
-  const invite = useWorkspaceStore((s) => s.invite)
   const existingMembers = useWorkspaceStore((s) => s.members)
   const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug)
 
@@ -172,24 +171,28 @@ function InviteMemberDialog({ onInvited }: { readonly onInvited?: () => void }) 
   }
 
   async function handleInvite() {
-    if (selectedUsers.length === 0) return
+    if (selectedUsers.length === 0 || !slug) return
     setLoading(true)
-    const results = await Promise.all(selectedUsers.map((u) => invite({ email: u.email, role })))
+    // Invitation PENDING (email + bannière in-app à accepter) — plus d'ajout direct.
+    const results = await Promise.all(
+      selectedUsers.map((u) =>
+        createInvitation(slug, { email: u.email, role }).then(() => true).catch(() => false)
+      )
+    )
     setLoading(false)
 
-    const added = results.filter(Boolean).length
-    const failed = selectedUsers.length - added
-    if (added > 0) {
-      toast.success(added === 1 ? "1 member added to the workspace" : `${added} members added to the workspace`)
+    const sent = results.filter(Boolean).length
+    const failed = selectedUsers.length - sent
+    if (sent > 0) {
+      toast.success(sent === 1 ? "Invitation sent" : `${sent} invitations sent`)
     }
     if (failed > 0) {
-      toast.error(failed === 1
-        ? "1 invitation failed (Taskforce account not found)."
-        : `${failed} invitations failed (Taskforce accounts not found).`)
+      toast.error(failed === 1 ? "1 invitation failed." : `${failed} invitations failed.`)
     }
-    if (added > 0) {
+    if (sent > 0) {
       reset()
       setOpen(false)
+      onInvited?.()
     }
   }
 
@@ -206,7 +209,7 @@ function InviteMemberDialog({ onInvited }: { readonly onInvited?: () => void }) 
         <DialogHeader>
           <DialogTitle>Invite member</DialogTitle>
           <DialogDescription>
-            Search an existing Taskforce user by name or email and pick their role.
+            Search a Taskforce user or enter an email — they&apos;ll receive an invitation to accept.
           </DialogDescription>
         </DialogHeader>
 
@@ -311,7 +314,7 @@ function InviteMemberDialog({ onInvited }: { readonly onInvited?: () => void }) 
           <Button variant="outline" size="sm" onClick={() => setOpen(false)}>Cancel</Button>
           <Button size="sm" onClick={handleInvite} disabled={selectedUsers.length === 0 || loading} className="gap-2">
             {loading ? <Loader2 className="size-4 animate-spin" /> : <UserPlus className="size-4" />}
-            {selectedUsers.length > 1 ? `Add ${selectedUsers.length} members` : "Add member"}
+            {selectedUsers.length > 1 ? `Invite ${selectedUsers.length}` : "Invite"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -26,7 +26,7 @@ import {
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { searchUsers, type UserSearchResult } from "@/lib/api/user-service"
 import { type ProjectRole } from "@/lib/api/project-service"
-import { inviteMember } from "@/lib/api/workspace-service"
+import { createInvitation } from "@/lib/api/invitation-service"
 import { teamService, type Team } from "@/lib/api/team-service"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 
@@ -105,7 +105,7 @@ export function ProjectInviteDialog({ workspace, projectId, onInvited }: Project
     try {
       // Invitation PENDING ciblant le projet : la personne devra ACCEPTER (email + bannière in-app).
       // À l'acceptation, elle rejoint le workspace (si besoin) ET le projet, avec le rôle choisi.
-      await inviteMember(workspace, { email: selected.email, role: "MEMBER", projectId, projectRole: role })
+      await createInvitation(workspace, { email: selected.email, role: "MEMBER", projectId, projectRole: role })
       // Équipe optionnelle (indépendante de l'acceptation du projet).
       if (teamChoice === NEW_TEAM) {
         const team = await teamService.create(workspace, { name: newTeamName.trim() })
