@@ -8,7 +8,8 @@ import { usePanelStore, type PanelDescriptor, type PanelSide } from "@/lib/store
 
 /**
  * Rend le panneau d'un côté (gauche/droite) du shell — une carte flottante « façon Claude »
- * (arrondie, ombrée, avec un léger gap), redimensionnable, qui pousse le contenu (flex). PROD-8.9.
+ * (arrondie, ombrée, avec un léger gap), redimensionnable, en <b>overlay par-dessus le contenu</b>
+ * (absolute) : elle ne comprime plus le `<main>`, elle passe au-dessus (retour user). PROD-8.9.
  * Un seul panneau par côté à la fois (cf. panel-store).
  */
 export function PanelDock({ side }: { readonly side: PanelSide }) {
@@ -53,10 +54,12 @@ function PanelColumn({ panel, side }: { readonly panel: PanelDescriptor; readonl
 
   return (
     <aside
-      style={{ width: panel.width }}
+      style={{ width: panel.width, maxWidth: "92vw" }}
       className={cn(
-        "relative flex h-full shrink-0 flex-col py-2",
-        side === "right" ? "pl-1 pr-2" : "pl-2 pr-1"
+        // Overlay : posé sur toute la hauteur du contenu, par-dessus le `<main>` (z au-dessus du
+        // contenu, sous la topbar sticky z-40 et les modals z-50). `max-w-92vw` = garde-fou mobile.
+        "absolute inset-y-0 z-30 flex h-full flex-col py-2",
+        side === "right" ? "right-0 pl-1 pr-2" : "left-0 pl-2 pr-1"
       )}
     >
       {/* Poignée de redimensionnement — pilule discrète qui s'éclaire au survol (façon Claude). */}

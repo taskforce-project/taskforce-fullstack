@@ -31,7 +31,9 @@ export function AppShell({ children }: AppShellProps) {
         {/* Invitations reçues en attente d'approbation — bannière montée hors du <main> keyé par
             la route : un seul fetch par session, persistante à la navigation. Nulle si rien. */}
         <PendingInvitationsBanner />
-        <div className="flex min-h-0 flex-1">
+        {/* `relative` : les panneaux (workflows / chat IA) se positionnent en OVERLAY par-dessus
+            le contenu (absolute) au lieu de le comprimer — cf. PanelDock. */}
+        <div className="relative flex min-h-0 flex-1">
           <PanelDock side="left" />
           <AnimatePresence mode="wait" initial={false}>
             <motion.main
