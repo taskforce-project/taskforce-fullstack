@@ -65,6 +65,14 @@ export const USER_ROUTES = {
 } as const;
 
 /**
+ * Statut opérationnel (santé services, lue de l'actuator).
+ * Backend: @RequestMapping("/api/status")
+ */
+export const STATUS_ROUTES = {
+  SYSTEM: "/api/status",
+} as const;
+
+/**
  * Routes workspace
  * Backend: @RequestMapping("/api/workspaces")
  */

@@ -34,6 +34,7 @@ import { MemberAvailabilityCard } from "@/components/members/member-availability
 import { exportMyData, deleteMyAccount } from "@/lib/api/gdpr-service"
 import { requestPasswordReset, getTwoFactorStatus, enableTwoFactor, disableTwoFactor } from "@/lib/api/user-service"
 import { getAiUsage, type AiUsage } from "@/lib/api/ai-usage-service"
+import { getSystemStatus, type SystemStatus } from "@/lib/api/status-service"
 import { apiClient } from "@/lib/api/client"
 import { USER_ROUTES } from "@/lib/config/api-routes"
 import { cn } from "@/lib/utils"
@@ -768,27 +769,30 @@ function WorkspacePanel() {
 
 // ── Status (santé de l'app, façon status page) ──────────────────────────────
 function StatusPanel() {
-  const [api, setApi] = useState<"checking" | "ok" | "down">("checking")
   const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug)
+  const [health, setHealth] = useState<SystemStatus | null>(null)
+  const [apiState, setApiState] = useState<"checking" | "ok" | "down">("checking")
   const [logs, setLogs] = useState<AuditLogEntry[]>([])
 
+  // Santé RÉELLE lue du serveur (actuator via /api/status). Robuste : on réessaie avant de crier
+  // à l'incident (évite un faux positif sur un hiccup réseau / redémarrage).
   useEffect(() => {
     let alive = true
-    // Probe robuste : on réessaie avant de déclarer l'API « injoignable »
-    // (évite un faux « Incident » lors d'un hiccup réseau / redémarrage). QA Q-20
-    async function probe() {
+    async function load() {
       for (let attempt = 1; attempt <= 3 && alive; attempt++) {
         try {
-          await apiClient.get("/api/workspaces") // sonde légère (la liste existe toujours ; /current 500 si owner multi-workspace)
-          if (alive) setApi("ok")
+          const s = await getSystemStatus()
+          if (!alive) return
+          setHealth(s)
+          setApiState("ok")
           return
         } catch {
-          if (attempt === 3) { if (alive) setApi("down"); return }
+          if (attempt === 3) { if (alive) setApiState("down"); return }
           await new Promise((r) => setTimeout(r, 1500))
         }
       }
     }
-    void probe()
+    void load()
     return () => { alive = false }
   }, [])
 
@@ -812,33 +816,58 @@ function StatusPanel() {
     URL.revokeObjectURL(url)
   }
 
-  const rows: { name: string; ok: boolean; detail: string }[] = [
-    { name: "App (interface)",     ok: true,            detail: "Loaded" },
-    { name: "Taskforce API",       ok: api !== "down",   detail: api === "checking" ? "Checking…" : api === "ok" ? "Operational" : "Unreachable" },
-    { name: "Real-time (STOMP)",   ok: api !== "down",   detail: api === "checking" ? "Checking…" : api === "ok" ? "Available via the API" : "Unavailable" },
-    { name: "AI assistant (Groq)", ok: true,             detail: "Configured (server-side)" },
+  // Libellés lisibles pour les indicateurs actuator + normalisation de l'état.
+  const COMPONENT_LABELS: Record<string, string> = {
+    db: "Database", dataSource: "Database", ping: "API ping", diskSpace: "Disk space",
+    redis: "Cache (Redis)", mail: "Email (SMTP)", ssl: "SSL",
+    livenessState: "Liveness", readinessState: "Readiness",
+  }
+  const labelFor = (k: string) => COMPONENT_LABELS[k] ?? k.charAt(0).toUpperCase() + k.slice(1)
+  const kind = (s: string): "UP" | "DOWN" | "DEGRADED" =>
+    s === "UP" ? "UP" : (s === "DOWN" || s === "OUT_OF_SERVICE") ? "DOWN" : "DEGRADED"
+
+  type Row = { name: string; state: "UP" | "DOWN" | "DEGRADED" | "CHECKING"; detail: string }
+  const rows: Row[] = [
+    { name: "App (interface)", state: "UP", detail: "Loaded" },
+    {
+      name: "TaskForce API",
+      state: apiState === "checking" ? "CHECKING" : apiState === "ok" ? "UP" : "DOWN",
+      detail: apiState === "checking" ? "Checking…" : apiState === "ok" ? "Operational" : "Unreachable",
+    },
+    ...(health?.components ?? []).map<Row>((c) => ({ name: labelFor(c.key), state: kind(c.status), detail: c.status })),
   ]
-  const allOk = rows.every((r) => r.ok)
+  const overall: Row["state"] =
+    apiState === "checking" ? "CHECKING"
+      : apiState === "down" ? "DOWN"
+      : health ? kind(health.status)
+      : "DEGRADED"
+  const dotClass = (s: Row["state"]) =>
+    s === "UP" ? "bg-emerald-500" : s === "DOWN" ? "bg-red-500" : s === "DEGRADED" ? "bg-amber-500" : "bg-muted-foreground/40"
 
   return (
     <div className="flex flex-col gap-5 max-w-2xl">
       <div>
         <h2 className="text-sm font-semibold text-foreground">Application status</h2>
-        <p className="text-xs text-muted-foreground mt-0.5">Real-time service status.</p>
+        <p className="text-xs text-muted-foreground mt-0.5">Live service health, read from the server.</p>
       </div>
 
       <div className={cn(
         "flex items-center gap-2 rounded-lg border px-4 py-3 text-sm font-medium",
-        allOk ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-500" : "border-amber-500/30 bg-amber-500/10 text-amber-500"
+        overall === "UP" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-500"
+          : overall === "DOWN" ? "border-red-500/30 bg-red-500/10 text-red-500"
+          : "border-amber-500/30 bg-amber-500/10 text-amber-500"
       )}>
-        {allOk ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
-        {allOk ? "All systems operational" : "Incident affecting one or more services"}
+        {overall === "UP" ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+        {overall === "CHECKING" ? "Checking service health…"
+          : overall === "UP" ? "All systems operational"
+          : overall === "DOWN" ? "Major outage affecting one or more services"
+          : "Degraded — some services report issues"}
       </div>
 
       <div className="rounded-xl border border-border bg-card overflow-hidden [box-shadow:var(--shadow-sm)]">
         {rows.map((r, i) => (
           <div key={r.name} className={cn("flex items-center gap-3 px-4 py-3", i < rows.length - 1 && "border-b border-border/50")}>
-            <span className={cn("size-2 rounded-full shrink-0", r.ok ? "bg-emerald-500" : "bg-amber-500")} />
+            <span className={cn("size-2 rounded-full shrink-0", dotClass(r.state))} />
             <span className="flex-1 text-sm text-foreground">{r.name}</span>
             <span className="text-xs text-muted-foreground">{r.detail}</span>
           </div>
