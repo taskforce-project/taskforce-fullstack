@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
-import { TextShimmerWave } from "@/components/ui/text-shimmer-wave"
+import { ShimmerLoader } from "@/components/ui/shimmer-loader"
 import { cn } from "@/lib/utils"
 import {
   generateIssueSpec,
@@ -30,6 +30,14 @@ interface IssueAiSpecPanelProps {
  * avec les notes proches du Brain OS (« déjà vu ? »). L'humain édite, copie le prompt, puis
  * approuve → la spec est écrite dans le Brain OS (write-back), liée à l'issue.
  */
+/** Messages du loader de génération de spec (bouclés : Brain OS → contexte → structure → rédaction). */
+const SPEC_PHASES = [
+  "Retrieving from Brain OS…",
+  "Reading the context…",
+  "Structuring the tasks…",
+  "Drafting the spec…",
+]
+
 export function IssueAiSpecPanel({ workspaceSlug, projectId, issueId, onApplied }: Readonly<IssueAiSpecPanelProps>) {
   const [draft, setDraft] = useState<IssueSpecDraft | null>(null)
   const [generating, setGenerating] = useState(false)
@@ -139,7 +147,7 @@ export function IssueAiSpecPanel({ workspaceSlug, projectId, issueId, onApplied 
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
         <Loader2 className="size-6 animate-spin text-primary" />
-        <TextShimmerWave className="text-sm font-medium">Drafting the spec…</TextShimmerWave>
+        <ShimmerLoader phrases={SPEC_PHASES} className="text-sm font-medium" />
         <p className="text-xs text-muted-foreground">
           Brain OS retrieval + local generation — this may take a few seconds.
         </p>

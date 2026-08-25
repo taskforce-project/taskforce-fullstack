@@ -7,7 +7,7 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { Badge } from "@/components/ui/badge"
-import { TextShimmerWave } from "@/components/ui/text-shimmer-wave"
+import { ShimmerLoader } from "@/components/ui/shimmer-loader"
 import {
   Dialog,
   DialogContent,
@@ -22,6 +22,14 @@ import { useIssueStore } from "@/lib/store/issue-store"
 import { smartAssignBulk, type Issue, type SmartAssignCandidate } from "@/lib/api/issue-service"
 
 /** Teinte du badge de score selon la confiance (aligné sur la jauge du panneau Smart Assign). */
+/** Messages du loader Smart Assign en lot (bouclés : compétences / charge / dispo de toute l'équipe). */
+const BULK_ASSIGN_PHASES = [
+  "Analyzing the team…",
+  "Weighing skills…",
+  "Calculating availability…",
+  "Finding the best matches…",
+]
+
 function scoreTone(score: number): string {
   if (score >= 70) return "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
   if (score >= 50) return "bg-amber-500/15 text-amber-600 dark:text-amber-400"
@@ -147,7 +155,7 @@ export function BulkAssignDialog({ slug, projectId, issues }: BulkAssignDialogPr
         {loading ? (
           <div className="flex flex-col items-center justify-center gap-2 py-10 text-muted-foreground">
             <Loader2 className="size-5 animate-spin" />
-            <TextShimmerWave as="span" className="text-xs">Finding the best fit…</TextShimmerWave>
+            <ShimmerLoader phrases={BULK_ASSIGN_PHASES} className="text-xs" />
           </div>
         ) : ran && rows.length > 0 ? (
           <div className="flex flex-col gap-1.5">
