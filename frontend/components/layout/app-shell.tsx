@@ -12,6 +12,7 @@ import { AppFooter } from "@/components/layout/app-footer"
 import { UpgradeDialog } from "@/components/subscription/upgrade-dialog"
 import { SettingsModal } from "@/components/settings/settings-modal"
 import { CreateProjectModal } from "@/components/dialogs/create-project-modal"
+import { FeedbackDialog } from "@/components/feedback/feedback-dialog"
 import { ProductTour } from "@/components/tour/product-tour"
 import { LabsGradientDefs } from "@/components/ui/labs-gradient-defs"
 import { PendingInvitationsBanner } from "@/components/invitations/pending-invitations-banner"
@@ -59,6 +60,7 @@ export function AppShell({ children }: AppShellProps) {
       <UpgradeDialog />
       <SettingsModal />
       <CreateProjectModal />
+      <FeedbackDialog />
 
       {/* Tour produit (coach-marks) — rendu conditionnel via son store ; cible les data-tour du dashboard */}
       <ProductTour />

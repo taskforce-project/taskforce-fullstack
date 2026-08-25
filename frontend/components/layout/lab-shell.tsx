@@ -3,6 +3,8 @@
 import { usePathname } from "next/navigation"
 import { FlaskConical } from "lucide-react"
 
+import { useFeedbackStore } from "@/lib/store/feedback-store"
+
 /** Zones expérimentales : Intelligence (`/analytics`) + Brain OS (`/brain`). */
 const LAB_ROUTE = /\/(analytics|brain)(\/|$)/
 
@@ -17,10 +19,13 @@ const LAB_ROUTE = /\/(analytics|brain)(\/|$)/
 export function LabShell({ children }: { readonly children: React.ReactNode }) {
   const pathname = usePathname()
   const isLab = LAB_ROUTE.test(pathname)
+  const openFeedback = useFeedbackStore((s) => s.openFeedback)
 
   if (!isLab) {
     return <div className="h-svh">{children}</div>
   }
+
+  const labArea = pathname.includes("/brain") ? "Brain OS" : "Intelligence"
 
   return (
     <div className="tf-lab-shell flex h-svh flex-col bg-blue-600 dark:bg-blue-700">
@@ -31,12 +36,13 @@ export function LabShell({ children }: { readonly children: React.ReactNode }) {
         <span className="hidden text-[11px] text-white/70 sm:inline">
           — Intelligence and Brain OS are still evolving
         </span>
-        <a
-          href="mailto:feedback@taskforce.dev?subject=Feedback%20Labs"
+        <button
+          type="button"
+          onClick={() => openFeedback(`Labs · ${labArea}`)}
           className="ml-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-white/90 underline-offset-2 transition-colors hover:bg-white/15 hover:underline"
         >
           Give feedback
-        </a>
+        </button>
       </div>
 
       {/* L'app, poussée en bas, coins supérieurs arrondis (le bleu affleure dans les coins). */}

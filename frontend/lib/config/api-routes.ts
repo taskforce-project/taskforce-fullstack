@@ -73,6 +73,14 @@ export const STATUS_ROUTES = {
 } as const;
 
 /**
+ * Retours utilisateur (« Give feedback »).
+ * Backend: @RequestMapping("/api/feedback")
+ */
+export const FEEDBACK_ROUTES = {
+  SUBMIT: "/api/feedback",
+} as const;
+
+/**
  * Routes workspace
  * Backend: @RequestMapping("/api/workspaces")
  */
