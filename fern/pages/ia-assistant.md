@@ -4,25 +4,43 @@ subtitle: Le chat Cortex — poser une question sans quitter son écran.
 ---
 
 L'**assistant** est le visage conversationnel de Cortex. On l'ouvre depuis le bouton **Ask AI** de la
-barre du haut : il **glisse en panneau** sur la droite, par-dessus votre écran, pour que vous gardiez
-votre travail sous les yeux.
+barre du haut : il **glisse en panneau** sur la droite, **par-dessus** votre écran, sans le déplacer.
+Vous gardez votre travail sous les yeux pendant que vous dialoguez — c'est fait pour être consulté au
+fil de la tâche, pas dans une page à part.
 
 {/* SCREENSHOT: ia-assistant-panel — le panneau de l'assistant Cortex ouvert (conversation) */}
 
-## Comment ça marche
+## Le déroulé d'un échange
 
-- **Vous demandez** — tapez votre question ou votre demande dans le panneau.
-- **Cortex réfléchit** — un indicateur montre la progression (« réflexion », étapes) pendant la
-  génération de la réponse.
-- **La conversation se poursuit** — l'assistant garde le **fil** de l'échange ; vous pouvez enchaîner
-  les messages dans le contexte de la discussion.
+<Steps>
+  <Step title="Vous demandez">
+    Tapez votre question ou votre demande. Si vous ne savez pas par où commencer, des **suggestions de
+    départ** vous proposent des amorces.
+  </Step>
+  <Step title="Cortex réfléchit">
+    Un indicateur montre la **progression** pendant la génération — étapes de réflexion, puis la
+    réponse qui s'écrit. Rien ne se fige en silence.
+  </Step>
+  <Step title="La conversation continue">
+    L'assistant garde le **fil** de l'échange : vous enchaînez les messages dans le contexte de la
+    discussion, sans tout re-expliquer à chaque fois.
+  </Step>
+</Steps>
 
-Des **suggestions de départ** vous aident à formuler une première demande quand vous ne savez pas par
-où commencer.
+## Suivre et affiner
 
-## Bon à savoir
+- **Consommation visible** — comme toute fonction Cortex, l'assistant **consomme des tokens** ; un
+  indicateur reste à l'œil. → [Vue d'ensemble de l'IA](/guides/ia-vue-ensemble)
+- **Retour sur les réponses** — vous pouvez signaler qu'une réponse est utile ou non, pour situer sa
+  qualité.
 
-- L'assistant **consomme des tokens** (comme toutes les fonctions Cortex). L'indicateur de
-  consommation reste visible. → [Vue d'ensemble de l'IA](/guides/ia-vue-ensemble)
-- Pour un **traitement plus lourd** qui s'exécute en arrière-plan et peut vous consulter en cours de
-  route, ce sont les **workflows** qu'il vous faut, pas le chat. → [Workflows](/guides/ia-workflows)
+## Assistant ou workflow ?
+
+Les deux mobilisent Cortex, mais pas pour la même chose :
+
+- L'**assistant** répond **dans l'instant**, en conversation — idéal pour une question, une
+  reformulation, un coup de main ponctuel.
+- Un **[workflow](/guides/ia-workflows)** exécute un **traitement plus profond** en arrière-plan,
+  planifie des étapes et peut vous **consulter en cours de route**.
+
+Un doute, une question rapide → l'assistant. Une tâche qui demande plusieurs étapes → un workflow.
