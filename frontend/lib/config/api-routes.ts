@@ -81,6 +81,15 @@ export const FEEDBACK_ROUTES = {
 } as const;
 
 /**
+ * Acceptation / refus d'une assignation de tâche (assigné courant).
+ * Backend: @RequestMapping("/api/me/assignments")
+ */
+export const ASSIGNMENT_ROUTES = {
+  ACCEPT:  (issueId: number) => `/api/me/assignments/${issueId}/accept`,
+  DECLINE: (issueId: number) => `/api/me/assignments/${issueId}/decline`,
+} as const;
+
+/**
  * Routes workspace
  * Backend: @RequestMapping("/api/workspaces")
  */
