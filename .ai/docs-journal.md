@@ -34,6 +34,9 @@ Puis **tab Référence API** (chantier 2 : OpenAPI + guides bonnes pratiques/aut
   (réécrits) ; roadmap, pages (nouveaux). Roadmap/Pages/Sprints **vérifiés fonctionnels** dans le
   code (RoadmapGantt, page-store CRUD, cycle-store DRAFT/ACTIVE/COMPLETED). Propriétés de tâche
   tirées de `issue-service.ts` (statuts custom, types, relations, sous-tâches, story points).
-- 🔲 Lots 3 à 7 (18 pages).
+- ✅ **Lot 3 — Mon quotidien** (4 pages, nouvelles) : tableau-de-bord (cartes du card-registry),
+  inbox/Signaux (4 filtres + types + temps réel), mon-travail/Ma file, assignations (flux
+  accept/refus QA-30). Types de notif tirés de `notification-service.ts` (6 événements réglables).
+- 🔲 Lots 4 à 7 (14 pages).
 - 🔲 Câblage des screenshots.
 - 🔲 Référence API (chantier 2).

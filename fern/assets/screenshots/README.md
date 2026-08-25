@@ -35,5 +35,14 @@ Chaque capture illustre une page de la doc Fern. **Convention** : place le fichi
 | `roadmap-gantt` | Roadmap | la feuille de route (Gantt) d'un espace, barres de progression |
 | `pages-liste` | Pages | l'onglet Pages d'une opération (liste des documents, recherche) |
 
-> Les lots suivants (Mon quotidien, Collaborer, IA, Piloter, Compte) ajouteront leurs
-> propres lignes ici au fur et à mesure.
+## Lot 3 — Mon quotidien
+
+| id | Page | Où / quoi capturer |
+| --- | --- | --- |
+| `dashboard-full` | Tableau de bord | le Dashboard d'un espace **avec du contenu** (cartes, recherche) |
+| `signaux-liste` | Boîte de réception | la vue Signaux + ses filtres (Tous / Mentions / Alertes / Assigné à moi) |
+| `ma-file` | Mon travail | la vue « Ma file » avec la colonne Assignment (Accept / Decline) |
+| `assignation-actions` | Assignations | la ligne « À valider » avec les boutons Accepter / Refuser |
+
+> Les lots suivants (Collaborer, IA, Piloter, Compte) ajouteront leurs propres lignes ici au fur et à
+> mesure.
