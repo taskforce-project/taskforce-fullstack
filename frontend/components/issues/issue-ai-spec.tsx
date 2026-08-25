@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
+import { TextShimmerWave } from "@/components/ui/text-shimmer-wave"
 import { cn } from "@/lib/utils"
 import {
   generateIssueSpec,
@@ -138,7 +139,7 @@ export function IssueAiSpecPanel({ workspaceSlug, projectId, issueId, onApplied 
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
         <Loader2 className="size-6 animate-spin text-primary" />
-        <p className="text-sm font-medium">The AI is writing the spec…</p>
+        <TextShimmerWave className="text-sm font-medium">Drafting the spec…</TextShimmerWave>
         <p className="text-xs text-muted-foreground">
           Brain OS retrieval + local generation — this may take a few seconds.
         </p>

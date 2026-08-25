@@ -7,6 +7,7 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { Badge } from "@/components/ui/badge"
+import { TextShimmerWave } from "@/components/ui/text-shimmer-wave"
 import { cn } from "@/lib/utils"
 import type { IssuePriority } from "@/components/sheets/issue-sheet"
 import {
@@ -185,9 +186,9 @@ export function SmartAssignPanel({
 
         {/* Analyse en cours — retour immédiat au clic, pas de bouton à re-cliquer. */}
         {loading && (
-          <div className="flex items-center justify-center gap-1.5 rounded-md bg-muted/40 px-2 py-2 text-xs text-muted-foreground">
-            <Loader2 className="size-3 animate-spin" />
-            Analyzing team…
+          <div className="flex items-center justify-center gap-1.5 rounded-md bg-muted/40 px-2 py-2 text-xs">
+            <Loader2 className="size-3 animate-spin text-muted-foreground" />
+            <TextShimmerWave as="span">Finding the best fit…</TextShimmerWave>
           </div>
         )}
 

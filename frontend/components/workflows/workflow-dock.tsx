@@ -10,6 +10,7 @@ import { toast } from "sonner"
 
 import { cn } from "@/lib/utils"
 import { AgentPlan } from "@/components/ui/agent-plan"
+import { TextShimmerWave } from "@/components/ui/text-shimmer-wave"
 import { Button } from "@/components/ui/button"
 import { usePanelStore } from "@/lib/store/panel-store"
 import { useWorkflowStore } from "@/lib/store/workflow-store"
@@ -63,7 +64,7 @@ function JobCard({ slug, job }: Readonly<{ slug: string; job: AnalysisJob }>) {
           {job.plan.length > 0 ? (
             <AgentPlan tasks={job.plan} />
           ) : (
-            <p className="px-1 py-2 text-xs text-muted-foreground">Initializing workflow…</p>
+            <TextShimmerWave className="px-1 py-2 text-xs">Initializing workflow…</TextShimmerWave>
           )}
 
           {job.status === "WAITING_FOR_INPUT" && job.question && (

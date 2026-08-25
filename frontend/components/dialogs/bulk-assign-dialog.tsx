@@ -7,6 +7,7 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { Badge } from "@/components/ui/badge"
+import { TextShimmerWave } from "@/components/ui/text-shimmer-wave"
 import {
   Dialog,
   DialogContent,
@@ -146,7 +147,7 @@ export function BulkAssignDialog({ slug, projectId, issues }: BulkAssignDialogPr
         {loading ? (
           <div className="flex flex-col items-center justify-center gap-2 py-10 text-muted-foreground">
             <Loader2 className="size-5 animate-spin" />
-            <span className="text-xs">Analyzing the team — skills, workload, availability…</span>
+            <TextShimmerWave as="span" className="text-xs">Finding the best fit…</TextShimmerWave>
           </div>
         ) : ran && rows.length > 0 ? (
           <div className="flex flex-col gap-1.5">
