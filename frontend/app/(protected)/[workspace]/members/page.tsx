@@ -11,7 +11,6 @@ import {
   MoreHorizontal,
   Mail,
   X,
-  Filter,
   Layers,
   Loader2,
   Sparkles,
@@ -25,8 +24,7 @@ import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { Input } from "@/components/ui/input"
-import { DataTablePagination } from "@/components/ui/data-table-pagination"
-import { usePagination } from "@/hooks/use-pagination"
+import { DataTable, type DataTableColumn } from "@/components/ui/data-table"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -104,6 +102,9 @@ const ROLE_FILTER_TABS: { key: RoleFilter; label: string }[] = [
   { key: "ADMIN", label: "Admins" },
   { key: "MEMBER", label: "Members" },
 ]
+
+/** Ordre de tri des rôles (OWNER en tête). */
+const ROLE_RANK: Record<WorkspaceRole, number> = { OWNER: 0, ADMIN: 1, MEMBER: 2 }
 
 // ---------------------------------------------------------------------------
 // InviteMemberDialog
@@ -319,25 +320,20 @@ function InviteMemberDialog({ onInvited }: { readonly onInvited?: () => void }) 
 }
 
 // ---------------------------------------------------------------------------
-// MemberRow
+// MemberActions — menu d'une ligne membre (promote / demote / remove)
 // ---------------------------------------------------------------------------
 
-interface MemberRowProps {
+interface MemberActionsProps {
   readonly member: WorkspaceMember
   readonly isYou: boolean
   readonly canManage: boolean
   readonly isOwner: boolean
-  readonly profile?: MemberSkillProfile
-  readonly projects?: { id: number; name: string }[]
 }
 
-function MemberRow({ member, isYou, canManage, isOwner, profile, projects = [] }: MemberRowProps) {
-  const role = ROLE_CONFIG[member.role]
+/** Rien si la ligne n'est pas gérable (soi-même, non-manager, ou cible OWNER). */
+function MemberActions({ member, isYou, canManage, isOwner }: MemberActionsProps) {
   const changeRole = useWorkspaceStore((s) => s.changeRole)
   const kick = useWorkspaceStore((s) => s.kick)
-  const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug)
-
-  const displayLabel = member.displayName ?? member.email
 
   async function handleChangeRole(newRole: WorkspaceRole) {
     const result = await changeRole(member.id, { role: newRole })
@@ -354,135 +350,41 @@ function MemberRow({ member, isYou, canManage, isOwner, profile, projects = [] }
     }
   }
 
-  const joinedDate = new Date(member.joinedAt).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  })
+  if (isYou || !canManage || member.role === "OWNER") return null
 
   return (
-    <div className="group flex items-center gap-4 px-5 py-3 border-b border-border/50 last:border-0 hover:bg-muted/20 transition-colors">
-      {/* Avatar — le point vert « en ligne » était CODÉ EN DUR sur chaque membre : aucune prop, aucune
-          condition. Il n'existe aucun système de présence (ni table, ni topic STOMP, ni heartbeat) →
-          retiré plutôt que de simuler une fonctionnalité inexistante. Voir TF-PRESENCE-FAKE : la vraie
-          présence est un chantier à part. */}
-      <div className="shrink-0">
-        <UserAvatar
-          email={member.email}
-          name={displayLabel}
-          avatarUrl={member.avatarUrl}
-          className="size-9"
-          fallbackClassName="text-xs font-semibold"
-        />
-      </div>
-
-      {/* Member (nom) */}
-      <div className="w-48 min-w-0 shrink-0">
-        <div className="flex items-center gap-1.5">
-          {slug ? (
-            <Link href={`/${slug}/members/${member.id}`} className="truncate text-sm font-medium text-foreground hover:underline">
-              {displayLabel}
-            </Link>
-          ) : (
-            <span className="truncate text-sm font-medium text-foreground">{displayLabel}</span>
-          )}
-          {isYou && <span className="shrink-0 text-xs text-muted-foreground font-normal">(you)</span>}
-        </div>
-        {profile?.seniority && (
-          <span className="text-xs text-muted-foreground">{SENIORITY_LABEL[profile.seniority] ?? profile.seniority}</span>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={`Actions for ${member.displayName ?? member.email}`}
+          className="size-8 shrink-0 text-muted-foreground"
+        >
+          <MoreHorizontal className="size-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {isOwner && member.role !== "ADMIN" && (
+          <DropdownMenuItem onClick={() => handleChangeRole("ADMIN")}>
+            Promote to Admin
+          </DropdownMenuItem>
         )}
-      </div>
-
-      {/* Rôle */}
-      <div className="w-28 shrink-0">
-        <Badge variant="outline" className={cn("text-xs border px-1.5 py-0 h-5 inline-flex items-center gap-1", role.badgeClass)}>
-          {role.icon}
-          {role.label}
-        </Badge>
-      </div>
-
-      {/* Email */}
-      <div className="hidden md:flex flex-1 min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-        <Mail className="size-3 shrink-0" />
-        <span className="truncate">{member.email}</span>
-      </div>
-
-      {/* Compétences (aperçu) — alimentent le Smart Assign */}
-      <div className="hidden xl:flex w-52 shrink-0 flex-wrap items-center gap-1">
-        {profile && profile.skills.length > 0 ? (
-          <>
-            {profile.skills.slice(0, 3).map((skill) => (
-              <span key={skill} className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{skill}</span>
-            ))}
-            {profile.skills.length > 3 && (
-              <span className="text-[10px] text-muted-foreground">+{profile.skills.length - 3}</span>
-            )}
-          </>
-        ) : (
-          <span className="text-[10px] text-muted-foreground/40">—</span>
+        {isOwner && member.role === "ADMIN" && (
+          <DropdownMenuItem onClick={() => handleChangeRole("MEMBER")}>
+            Demote to Member
+          </DropdownMenuItem>
         )}
-      </div>
-
-      {/* Projets du membre (QA2-20) */}
-      <div className="hidden xl:flex w-44 shrink-0 flex-wrap items-center gap-1">
-        {projects.length > 0 ? (
-          <>
-            <Layers className="size-3 shrink-0 text-muted-foreground/60" />
-            {projects.slice(0, 2).map((p) => (
-              <span key={p.id} className="max-w-[80px] truncate rounded-full border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">{p.name}</span>
-            ))}
-            {projects.length > 2 && (
-              <span className="text-[10px] text-muted-foreground">+{projects.length - 2}</span>
-            )}
-          </>
-        ) : (
-          <span className="text-[10px] text-muted-foreground/40">—</span>
-        )}
-      </div>
-
-      {/* Joined */}
-      <div className="hidden lg:block w-28 shrink-0 text-right text-xs text-muted-foreground">
-        {joinedDate}
-      </div>
-
-      {/* Actions — only shown if current user can manage and target is not OWNER */}
-      {!isYou && canManage && member.role !== "OWNER" && (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={`Actions for ${member.displayName ?? member.email}`}
-              className="size-8 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-            >
-              <MoreHorizontal className="size-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {/* Only OWNER can change roles */}
-            {isOwner && member.role !== "ADMIN" && (
-              <DropdownMenuItem onClick={() => handleChangeRole("ADMIN")}>
-                Promote to Admin
-              </DropdownMenuItem>
-            )}
-            {isOwner && member.role === "ADMIN" && (
-              <DropdownMenuItem onClick={() => handleChangeRole("MEMBER")}>
-                Demote to Member
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="text-destructive focus:text-destructive [&_svg]:text-destructive"
-              onClick={handleRemove}
-            >
-              <UserMinus className="size-4" />
-              Remove from workspace
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )}
-      {!(!isYou && canManage && member.role !== "OWNER") && <div className="size-8 shrink-0" />}
-    </div>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          className="text-destructive focus:text-destructive [&_svg]:text-destructive"
+          onClick={handleRemove}
+        >
+          <UserMinus className="size-4" />
+          Remove from workspace
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 
@@ -621,7 +523,128 @@ export default function MembersPage() {
     return list
   }, [members, search, roleFilter, projectFilter, projects])
 
-  const { page, setPage, pageSize, setPageSize, pageCount, pageItems, total } = usePagination(filtered)
+  const slug = workspace?.slug
+
+  // Colonnes du DataTable partagé (même DA que Signals / My Queue) : tri + pagination gérés dedans.
+  const columns: DataTableColumn<WorkspaceMember>[] = [
+    {
+      key: "member",
+      header: "Member",
+      icon: <User className="size-3.5" />,
+      className: "min-w-[200px]",
+      sortValue: (m) => (m.displayName ?? m.email).toLowerCase(),
+      render: (m) => {
+        const profile = profilesByUser[m.userId]
+        const isYou = String(m.userId) === String(currentUser?.id)
+        const label = m.displayName ?? m.email
+        return (
+          <div className="flex items-center gap-3">
+            <UserAvatar email={m.email} name={label} avatarUrl={m.avatarUrl} className="size-8" fallbackClassName="text-xs font-semibold" />
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                {slug ? (
+                  <Link href={`/${slug}/members/${m.id}`} className="truncate text-sm font-medium text-foreground hover:underline">{label}</Link>
+                ) : (
+                  <span className="truncate text-sm font-medium text-foreground">{label}</span>
+                )}
+                {isYou && <span className="shrink-0 text-xs text-muted-foreground">(you)</span>}
+              </div>
+              {profile?.seniority && (
+                <span className="text-xs text-muted-foreground">{SENIORITY_LABEL[profile.seniority] ?? profile.seniority}</span>
+              )}
+            </div>
+          </div>
+        )
+      },
+    },
+    {
+      key: "role",
+      header: "Role",
+      icon: <Shield className="size-3.5" />,
+      className: "w-32",
+      sortValue: (m) => ROLE_RANK[m.role],
+      render: (m) => {
+        const role = ROLE_CONFIG[m.role]
+        return (
+          <Badge variant="outline" className={cn("inline-flex h-5 items-center gap-1 border px-1.5 py-0 text-xs", role.badgeClass)}>
+            {role.icon}
+            {role.label}
+          </Badge>
+        )
+      },
+    },
+    {
+      key: "email",
+      header: "Email",
+      icon: <Mail className="size-3.5" />,
+      className: "hidden md:table-cell",
+      sortValue: (m) => m.email.toLowerCase(),
+      render: (m) => <span className="text-xs text-muted-foreground">{m.email}</span>,
+    },
+    {
+      key: "skills",
+      header: "Skills",
+      icon: <Sparkles className="size-3.5" />,
+      className: "hidden xl:table-cell",
+      render: (m) => {
+        const profile = profilesByUser[m.userId]
+        if (!profile || profile.skills.length === 0) return <span className="text-[10px] text-muted-foreground/40">—</span>
+        return (
+          <div className="flex flex-wrap items-center gap-1">
+            {profile.skills.slice(0, 3).map((s) => (
+              <span key={s} className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{s}</span>
+            ))}
+            {profile.skills.length > 3 && <span className="text-[10px] text-muted-foreground">+{profile.skills.length - 3}</span>}
+          </div>
+        )
+      },
+    },
+    {
+      key: "projects",
+      header: "Projects",
+      icon: <Layers className="size-3.5" />,
+      className: "hidden xl:table-cell",
+      render: (m) => {
+        const list = projectsByUser.get(m.userId) ?? []
+        if (list.length === 0) return <span className="text-[10px] text-muted-foreground/40">—</span>
+        return (
+          <div className="flex flex-wrap items-center gap-1">
+            {list.slice(0, 2).map((p) => (
+              <span key={p.id} className="max-w-[90px] truncate rounded-full border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">{p.name}</span>
+            ))}
+            {list.length > 2 && <span className="text-[10px] text-muted-foreground">+{list.length - 2}</span>}
+          </div>
+        )
+      },
+    },
+    {
+      key: "joined",
+      header: "Joined",
+      icon: <CalendarDays className="size-3.5" />,
+      align: "right",
+      className: "hidden lg:table-cell w-32",
+      sortValue: (m) => new Date(m.joinedAt).getTime(),
+      render: (m) => (
+        <span className="text-xs text-muted-foreground">
+          {new Date(m.joinedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+        </span>
+      ),
+    },
+    {
+      key: "actions",
+      header: "",
+      align: "right",
+      className: "w-12",
+      render: (m) => (
+        <MemberActions
+          member={m}
+          isYou={String(m.userId) === String(currentUser?.id)}
+          canManage={canManage}
+          isOwner={isOwner}
+        />
+      ),
+    },
+  ]
 
   const memberCount = members.length
   const memberSuffix = memberCount === 1 ? "" : "s"
@@ -723,63 +746,30 @@ export default function MembersPage() {
         )}
       </div>
 
-      {/* Members list */}
-      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-        {/* Table header */}
-        <div className="flex items-center gap-4 px-5 py-2.5 border-b border-border bg-muted/20 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          <div className="size-9 shrink-0" />
-          <div className="w-48 shrink-0 flex items-center gap-1.5"><User className="size-3.5" /> Member</div>
-          <div className="w-28 shrink-0 flex items-center gap-1.5"><Shield className="size-3.5" /> Role</div>
-          <div className="hidden md:flex flex-1 items-center gap-1.5"><Mail className="size-3.5" /> Email</div>
-          <div className="hidden xl:flex w-52 shrink-0 items-center gap-1.5"><Sparkles className="size-3.5" /> Skills</div>
-          <div className="hidden xl:flex w-44 shrink-0 items-center gap-1.5"><Layers className="size-3.5" /> Projects</div>
-          <div className="hidden lg:flex w-28 shrink-0 items-center justify-end gap-1.5"><CalendarDays className="size-3.5" /> Joined</div>
-          <div className="size-8 shrink-0" />
-        </div>
-
-        {membersLoading && (
-          Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-4 px-5 py-4 border-b border-border/50 last:border-0">
-              <Skeleton className="size-9 rounded-full" />
+      {/* Members list — DataTable partagé (tri par colonne, pagination, styles homogènes avec Signals). */}
+      {membersLoading && members.length === 0 ? (
+        <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-4 border-b border-border/50 px-5 py-4 last:border-0">
+              <Skeleton className="size-8 rounded-full" />
               <div className="flex-1 space-y-1.5">
                 <Skeleton className="h-4 w-40" />
                 <Skeleton className="h-3 w-56" />
               </div>
-              <Skeleton className="hidden lg:block h-4 w-24" />
+              <Skeleton className="hidden h-4 w-24 lg:block" />
               <Skeleton className="size-8 rounded-md" />
             </div>
-          ))
-        )}
-        {!membersLoading && filtered.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <Filter className="size-8 text-muted-foreground/30 mb-3" />
-            <p className="text-sm font-medium text-foreground">No members found</p>
-            <p className="text-xs text-muted-foreground mt-1">Try adjusting your search or filter</p>
-          </div>
-        )}
-        {!membersLoading && filtered.length > 0 && pageItems.map((member) => (
-          <MemberRow
-            key={member.id}
-            member={member}
-              isYou={String(member.userId) === String(currentUser?.id)}
-            canManage={canManage}
-            isOwner={isOwner}
-            profile={profilesByUser[member.userId]}
-            projects={projectsByUser.get(member.userId) ?? []}
-          />
-        ))}
-
-        {!membersLoading && total > 0 && (
-          <DataTablePagination
-            page={page}
-            pageCount={pageCount}
-            pageSize={pageSize}
-            total={total}
-            onPageChange={setPage}
-            onPageSizeChange={setPageSize}
-          />
-        )}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <DataTable
+          columns={columns}
+          data={filtered}
+          rowKey={(m) => m.id}
+          pageSize={25}
+          emptyMessage="No members found. Try adjusting your search or filter."
+        />
+      )}
 
       {/* Invitations en attente (PROD-3.5) */}
       {canManage && workspace?.slug && (

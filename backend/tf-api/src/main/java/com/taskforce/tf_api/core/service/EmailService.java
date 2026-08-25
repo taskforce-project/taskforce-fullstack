@@ -23,6 +23,9 @@ public class EmailService {
     private final JavaMailSender mailSender;
     private final TemplateEngine templateEngine;
 
+    @Value("${mail.host:}")
+    private String mailHost;
+
     @Value("${mail.from:noreply@taskforce.com}")
     private String fromEmail;
 
@@ -166,8 +169,40 @@ public class EmailService {
     }
 
     /**
-     * Méthode privée pour envoyer un email HTML
+     * SMTP réellement configuré ? En prod, {@code MAIL_HOST} peut être vide (« SMTP inactif ») :
+     * dans ce cas les envois best-effort deviennent des no-op silencieux plutôt que des erreurs.
      */
+    public boolean isEnabled() {
+        return mailHost != null && !mailHost.isBlank();
+    }
+
+    /**
+     * Email d'une notification produit (assignation, mention, commentaire, statut, échéance…).
+     * Envoyé <b>uniquement si l'utilisateur a activé le canal email</b> pour cet événement
+     * (gate côté {@link NotificationService}). Best-effort : jamais propagé (ne casse pas l'action
+     * métier) et no-op si SMTP inactif. Le contenu (title/body) est en anglais, comme l'inbox in-app.
+     */
+    public void sendNotificationEmail(String toEmail, String recipientName, String eventLabel,
+                                      String title, String body, String issueIdentifier, String relativeUrl) {
+        if (!isEnabled()) return;
+        try {
+            Context context = new Context();
+            context.setVariable("recipientName",
+                (recipientName != null && !recipientName.isBlank()) ? recipientName : "there");
+            context.setVariable("eventLabel", eventLabel);
+            context.setVariable("title", title);
+            context.setVariable("body", body);
+            context.setVariable("issueIdentifier", issueIdentifier);
+            context.setVariable("actionUrl", appUrl + (relativeUrl != null ? relativeUrl : ""));
+
+            String htmlContent = templateEngine.process("email/notification-email", context);
+            sendHtmlEmail(toEmail, String.format("[%s] %s", fromName, title), htmlContent);
+            log.info("Notification email envoyé à : {}", toEmail);
+        } catch (Exception e) {
+            log.error("Échec de l'envoi de la notification email à {} : {}", toEmail, e.getMessage());
+        }
+    }
+
     /**
      * Envoi générique d'une notification interne (ex : équipe sales). Best-effort :
      * en cas d'échec on logue sans propager (ne casse jamais l'action métier appelante).

@@ -10,6 +10,7 @@ import { toast } from "sonner"
 
 import { cn } from "@/lib/utils"
 import { AgentPlan } from "@/components/ui/agent-plan"
+import { ShimmerLoader } from "@/components/ui/shimmer-loader"
 import { Button } from "@/components/ui/button"
 import { usePanelStore } from "@/lib/store/panel-store"
 import { useWorkflowStore } from "@/lib/store/workflow-store"
@@ -17,6 +18,14 @@ import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import type { AnalysisJob, JobStatus } from "@/lib/api/analysis-service"
 
 export const WORKFLOW_PANEL_ID = "workflows"
+
+/** Messages du loader pendant que le plan du workflow se génère (bouclés). */
+const WORKFLOW_PHASES = [
+  "Spinning up the agent…",
+  "Planning the steps…",
+  "Gathering context…",
+  "Almost ready…",
+]
 
 export const isActiveJob = (s: JobStatus) => s === "QUEUED" || s === "RUNNING" || s === "WAITING_FOR_INPUT"
 
@@ -63,7 +72,7 @@ function JobCard({ slug, job }: Readonly<{ slug: string; job: AnalysisJob }>) {
           {job.plan.length > 0 ? (
             <AgentPlan tasks={job.plan} />
           ) : (
-            <p className="px-1 py-2 text-xs text-muted-foreground">Initializing workflow…</p>
+            <ShimmerLoader phrases={WORKFLOW_PHASES} className="px-1 py-2 text-xs" />
           )}
 
           {job.status === "WAITING_FOR_INPUT" && job.question && (

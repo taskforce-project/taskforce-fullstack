@@ -3,9 +3,8 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Search, Sparkles, FlaskConical } from "lucide-react"
+import { Search, Sparkles } from "lucide-react"
 
-import { cn } from "@/lib/utils"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import {
@@ -116,12 +115,7 @@ function useBreadcrumbs() {
 
 export function AppTopbar() {
   const breadcrumbs = useBreadcrumbs()
-  const pathname = usePathname()
   const { t } = usePreferencesStore()
-  // Fonctionnalités « Lab » (en cours de finition) : Intelligence (/analytics) + Brain OS (/brain).
-  // Le header se teinte en bleu discret (info) + un indicateur + un lien feedback — pendant des
-  // fioles bleues de la sidebar. Remplace le bandeau `LabBanner` sur ces pages pleines.
-  const isLab = /\/(analytics|brain)(\/|$)/.test(pathname)
   const [cmdOpen, setCmdOpen] = React.useState(false)
   const togglePanel = usePanelStore((s) => s.togglePanel)
   const planType = useUserStore((s) => s.user?.planType)
@@ -154,13 +148,7 @@ export function AppTopbar() {
   }, [])
 
   return (
-    <header
-      className={cn(
-        "sticky top-0 z-40 flex h-14 shrink-0 items-center gap-2 border-b px-4 transition-colors",
-        // Pages Labs : le bandeau prend l'image du site (hero-wave) sous un voile lisible, plus la teinte bleue.
-        isLab ? "lab-banner-bg border-border" : "border-border bg-background",
-      )}
-    >
+    <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background px-4">
       {/* Left: sidebar trigger + breadcrumb */}
       <div className="flex flex-1 items-center gap-2">
         <SidebarTrigger className="-ml-1" />
@@ -174,7 +162,10 @@ export function AppTopbar() {
                 // pointent tous deux vers `/{slug}/dashboard` — l'href seul provoquait une clé dupliquée.
                 <React.Fragment key={`${i}-${crumb.href}`}>
                   {i > 0 && <BreadcrumbSeparator className="hidden md:block" />}
-                  <BreadcrumbItem className={i > 0 ? "hidden md:block" : ""}>
+                  {/* Responsive : on garde TOUJOURS la page courante (dernier crumb) ; les niveaux
+                      parents + séparateurs se replient sous `md` (sinon petit écran = plus de fil
+                      d'Ariane du tout). Le workspace reste accessible via le switcher de la sidebar. */}
+                  <BreadcrumbItem className={crumb.isLast ? "max-w-[60vw] truncate sm:max-w-none" : "hidden md:block"}>
                     {crumb.isLast ? (
                       <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
                     ) : (
@@ -189,23 +180,6 @@ export function AppTopbar() {
           </Breadcrumb>
         )}
       </div>
-
-      {/* Indicateur « Lab » centré dans le header (feature en expérimentation). */}
-      {isLab && (
-        <div className="pointer-events-none absolute left-1/2 flex -translate-x-1/2 items-center gap-2">
-          {/* Identité Labs alignée sur le site : flask + label en dégradé (pêche→rose→bleu), pilule neutre. */}
-          <span className="flex items-center gap-1.5 rounded-full border border-border bg-background/80 px-2.5 py-0.5 text-[11px] font-semibold backdrop-blur">
-            <FlaskConical className="tf-labs-icon size-3.5" strokeWidth={2} />
-            <span className="tf-labs-gtext">{t.shell.experimental}</span>
-          </span>
-          <a
-            href="mailto:feedback@taskforce.dev?subject=Feedback"
-            className="pointer-events-auto hidden text-[11px] font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline md:inline"
-          >
-            {t.shell.giveFeedback}
-          </a>
-        </div>
-      )}
 
       {/* Right: search, notifications, theme, user */}
       <div className="flex items-center gap-1">
@@ -231,6 +205,17 @@ export function AppTopbar() {
           onClick={() => setCmdOpen(true)}
         >
           <Search className="size-4" />
+        </Button>
+
+        {/* Ask AI — icône seule sur mobile (le bouton texte ci-dessous est masqué < sm). */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="sm:hidden"
+          onClick={openAssistant}
+          aria-label={t.shell.openAiAssistant}
+        >
+          <Sparkles className="size-4 text-primary" />
         </Button>
 
         {/* Ask AI — ouvre l'assistant en panneau latéral (PROD-8.9) */}

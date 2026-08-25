@@ -3,11 +3,13 @@
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import {
-  CircleDot, CheckCircle2, Clock, RefreshCw, FileText, Layers, Hash, CalendarDays,
+  CircleDot, CheckCircle2, Clock, RefreshCw, FileText, Layers, Hash, CalendarDays, Check, X,
 } from "lucide-react"
+import { toast } from "sonner"
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { PageContainer, PageHeader } from "@/components/layout/page-shell"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -18,6 +20,7 @@ import { cn } from "@/lib/utils"
 import { useUserStore } from "@/lib/store/user-store"
 import { pageService, type WorkspacePage } from "@/lib/api/page-service"
 import { listMyIssues } from "@/lib/api/issue-service"
+import { acceptAssignment, declineAssignment } from "@/lib/api/assignment-service"
 import { listWorkspaceCycles, type WorkspaceCycle } from "@/lib/api/cycle-service"
 import type { IssueStatusCategory, IssuePriority as ApiPriority, Issue as ApiIssue } from "@/lib/api/issue-service"
 import type { CycleStatus as ApiCycleStatus } from "@/lib/api/cycle-service"
@@ -32,6 +35,8 @@ type CycleStatus   = "active" | "upcoming" | "completed"
 
 interface Issue {
   id: string
+  /** Id numérique (pour les appels API accept/decline). */
+  issueId: number
   identifier: string
   title: string
   priority: IssuePriority
@@ -42,6 +47,8 @@ interface Issue {
   /** Timestamp brut pour le tri chronologique (l'affichage reste `dueDate`). */
   dueTs: number | null
   url: string
+  /** Acceptation de l'assignation : "PENDING" (à valider) | "ACCEPTED" | null. */
+  assignmentStatus: "PENDING" | "ACCEPTED" | null
 }
 
 interface Cycle {
@@ -250,6 +257,7 @@ function QueueSection({ label, count, children }: Readonly<{ label: string; coun
 function mapMyIssue(i: ApiIssue, baseUrl: string): Issue {
   return {
     id:         String(i.id),
+    issueId:    i.id,
     identifier: i.identifier,
     title:      i.title,
     priority:   PRIORITY_MAP[i.priority],
@@ -260,6 +268,7 @@ function mapMyIssue(i: ApiIssue, baseUrl: string): Issue {
     dueTs:      i.dueDate ? new Date(i.dueDate).getTime() : null,
     // Board + sheet ouverte (`?issue=`), plutôt que la page détail isolée.
     url:        `${baseUrl}/projects/${i.projectId}?issue=${i.id}`,
+    assignmentStatus: i.assignmentStatus,
   }
 }
 
@@ -360,6 +369,52 @@ export function MyWorkView({ defaultTab }: MyWorkViewProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug, user?.id, refreshToken])
 
+  // Acceptation / refus d'une assignation en attente (mise à jour optimiste).
+  async function handleAccept(issue: Issue) {
+    try {
+      await acceptAssignment(issue.issueId)
+      setMyIssues((prev) => prev.map((it) => (it.id === issue.id ? { ...it, assignmentStatus: "ACCEPTED" } : it)))
+      toast.success("Assignment accepted")
+    } catch {
+      toast.error("Couldn't accept the assignment.")
+    }
+  }
+  async function handleDecline(issue: Issue) {
+    try {
+      await declineAssignment(issue.issueId)
+      // Désassignée → elle sort de ma file.
+      setMyIssues((prev) => prev.filter((it) => it.id !== issue.id))
+      toast.success("Assignment declined")
+    } catch {
+      toast.error("Couldn't decline the assignment.")
+    }
+  }
+
+  // Colonnes de base + une colonne Accept/Decline quand l'assignation est en attente (PENDING).
+  const issueColumns: DataTableColumn<Issue>[] = [
+    ...ISSUE_COLUMNS,
+    {
+      key: "assignment",
+      header: "Assignment",
+      className: "w-[150px]",
+      render: (issue) =>
+        issue.assignmentStatus === "PENDING" ? (
+          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+            <Button size="sm" variant="outline" className="h-7 gap-1 px-2 text-xs" onClick={() => handleAccept(issue)}>
+              <Check className="size-3.5" /> Accept
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-destructive"
+              onClick={() => handleDecline(issue)}
+            >
+              <X className="size-3.5" /> Decline
+            </Button>
+          </div>
+        ) : null,
+    },
+  ]
 
   return (
     <PageContainer>
@@ -392,7 +447,7 @@ export function MyWorkView({ defaultTab }: MyWorkViewProps) {
         {(tab === "all" || tab === "issues") && (
           <QueueSection label="Issues" count={myIssues.length}>
             <DataTable
-              columns={ISSUE_COLUMNS}
+              columns={issueColumns}
               data={myIssues}
               rowKey={(i) => i.id}
               // Une issue est une entité qu'on consulte/édite : sheet en place, la file reste derrière.

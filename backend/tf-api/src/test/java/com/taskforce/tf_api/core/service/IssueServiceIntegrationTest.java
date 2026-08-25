@@ -20,7 +20,9 @@ import com.taskforce.tf_api.core.enums.IssuePriority;
 import com.taskforce.tf_api.core.enums.IssueStatusCategory;
 import com.taskforce.tf_api.core.enums.ProjectRole;
 import com.taskforce.tf_api.core.enums.WorkspaceRole;
+import com.taskforce.tf_api.core.model.AssignmentStatus;
 import com.taskforce.tf_api.core.model.Issue;
+import com.taskforce.tf_api.shared.exception.ForbiddenException;
 import com.taskforce.tf_api.core.model.IssueStatus;
 import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.model.ProjectLabel;
@@ -128,7 +130,7 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
     class Create {
 
         @Test
-        @DisplayName("persiste l'issue (séquence 1, statut défaut, position 0), notifie l'assigné et publie l'événement")
+        @DisplayName("persiste l'issue (séquence 1, statut défaut, position 0), self-assign accepté d'office (sans notif), publie l'événement")
         void should_create_first_issue_with_defaults() {
             IssueResponse res = issueService.createIssue(SLUG, project.getId(), createRequest("Login bug", owner.getId()), owner.getId());
 
@@ -138,14 +140,17 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
             assertThat(res.getPosition()).isZero();
             assertThat(res.getStatus().getName()).isEqualTo("Todo"); // statut par défaut
             assertThat(res.getAssignee().getId()).isEqualTo(owner.getId());
+            // Self-assign (assigné == demandeur) → accepté d'office, pas de validation à demander.
+            assertThat(res.getAssignmentStatus()).isEqualTo("ACCEPTED");
 
             // réellement en base
             Optional<Issue> persisted = issueRepository.findById(res.getId());
             assertThat(persisted).isPresent();
             assertThat(persisted.get().getPriority()).isEqualTo(IssuePriority.HIGH);
+            assertThat(persisted.get().getAssignmentStatus()).isEqualTo(AssignmentStatus.ACCEPTED);
 
-            // effets de bord (mocks)
-            verify(notificationService).notifyAssigned(any(Issue.class), any(User.class));
+            // effets de bord (mocks) — pas de notif d'assignation sur un self-assign
+            verify(notificationService, never()).notifyAssigned(any(Issue.class), any(User.class));
             verify(messagingTemplate).convertAndSend(contains("/topic/projects."), any(Object.class));
             // push Slack déclenché sur issue.created
             verify(slackService).notifyEvent(
@@ -198,6 +203,70 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
             assertThatThrownBy(() -> issueService.createIssue(SLUG, project.getId(), createRequest("x", null), stranger.getId()))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Accès refusé");
+        }
+    }
+
+    // =========================================================================
+    @Nested
+    @DisplayName("acceptAssignment / declineAssignment")
+    class Acceptance {
+
+        /** Membre « dev » à qui l'owner peut assigner une issue (→ PENDING). */
+        private User seedDev() {
+            User dev = userRepository.save(User.builder()
+                .keycloakId("kc-dev").email("dev@it.dev").displayName("Dev").isActive(true).build());
+            workspaceMemberRepository.save(WorkspaceMember.builder()
+                .workspace(workspace).user(dev).role(WorkspaceRole.MEMBER).build());
+            return dev;
+        }
+
+        private Long assignedTo(User dev) {
+            return issueService.createIssue(SLUG, project.getId(),
+                createRequest("Assigned to dev", dev.getId()), owner.getId()).getId();
+        }
+
+        @Test
+        @DisplayName("assignation par un tiers -> PENDING")
+        void assign_by_other_is_pending() {
+            Long id = assignedTo(seedDev());
+            assertThat(issueRepository.findById(id).orElseThrow().getAssignmentStatus())
+                .isEqualTo(AssignmentStatus.PENDING);
+        }
+
+        @Test
+        @DisplayName("accept : PENDING -> ACCEPTED")
+        void accept_confirms() {
+            User dev = seedDev();
+            Long id = assignedTo(dev);
+
+            IssueResponse res = issueService.acceptAssignment(id, dev.getId());
+
+            assertThat(res.getAssignmentStatus()).isEqualTo("ACCEPTED");
+            assertThat(issueRepository.findById(id).orElseThrow().getAssignmentStatus())
+                .isEqualTo(AssignmentStatus.ACCEPTED);
+        }
+
+        @Test
+        @DisplayName("decline : désassigne + prévient l'assigneur")
+        void decline_unassigns_and_notifies() {
+            User dev = seedDev();
+            Long id = assignedTo(dev);
+
+            issueService.declineAssignment(id, dev.getId());
+
+            Issue reloaded = issueRepository.findById(id).orElseThrow();
+            assertThat(reloaded.getAssignee()).isNull();
+            assertThat(reloaded.getAssignmentStatus()).isNull();
+            verify(notificationService).notifyAssignmentDeclined(any(Issue.class), any(User.class), any(User.class));
+        }
+
+        @Test
+        @DisplayName("accept par un non-assigné -> 403 (ForbiddenException)")
+        void rejects_non_assignee() {
+            Long id = assignedTo(seedDev());
+
+            assertThatThrownBy(() -> issueService.acceptAssignment(id, owner.getId()))
+                .isInstanceOf(ForbiddenException.class);
         }
     }
 

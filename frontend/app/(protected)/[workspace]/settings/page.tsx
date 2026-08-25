@@ -32,7 +32,15 @@ import { ProfileOverview } from "@/components/profile/profile-overview"
 import { MemberSkillsCard } from "@/components/members/member-skills-card"
 import { MemberAvailabilityCard } from "@/components/members/member-availability-card"
 import { exportMyData, deleteMyAccount } from "@/lib/api/gdpr-service"
+import { requestPasswordReset, getTwoFactorStatus, enableTwoFactor, disableTwoFactor } from "@/lib/api/user-service"
 import { getAiUsage, type AiUsage } from "@/lib/api/ai-usage-service"
+import {
+  getNotificationPreferences,
+  updateNotificationPreferences,
+  type NotificationPreference,
+  type NotificationEventKey,
+} from "@/lib/api/notification-service"
+import { getSystemStatus, type SystemStatus } from "@/lib/api/status-service"
 import { apiClient } from "@/lib/api/client"
 import { USER_ROUTES } from "@/lib/config/api-routes"
 import { cn } from "@/lib/utils"
@@ -325,7 +333,28 @@ function ProfilePanel() {
 
 function AccountPanel() {
   const { user } = useAuth()
-  const setSection = useSettingsStore((s) => s.setSection)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState(false)
+
+  // Suppression de compte = droit à l'effacement RGPD (Art. 17) : vit ici, dans « Account »
+  // (l'export des données, lui, est dans « Privacy & Data »).
+  const handleDelete = async () => {
+    setDeleting(true)
+    try {
+      await deleteMyAccount()
+      toast.success("Account anonymized. Signing out…")
+      if (globalThis.window !== undefined) {
+        localStorage.removeItem("accessToken")
+        localStorage.removeItem("refreshToken")
+        localStorage.removeItem("user")
+        setTimeout(() => { window.location.href = "/auth/login" }, 1000)
+      }
+    } catch {
+      toast.error("Deletion failed. Try again or contact privacy@taskforce.dev.")
+      setDeleting(false)
+      setDeleteConfirm(false)
+    }
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -334,22 +363,33 @@ function AccountPanel() {
           <FormField label="Email" hint="Managed via your identity provider.">
             <StyledInput type="email" value={user?.email ?? ""} readOnly />
           </FormField>
-          <Separator />
-          {/* Suppression de compte + export des données → regroupés dans « Privacy & Data » (RGPD Art. 17/20).
-              Plus de doublon « Delete account » ici : Account = identité de connexion + langue. */}
-          <p className="text-xs text-muted-foreground">
-            Account deletion and data export:{" "}
-            <button
-              type="button"
-              onClick={() => setSection("privacy")}
-              className="underline underline-offset-2 transition-colors hover:text-foreground"
-            >
-              Privacy &amp; Data
-            </button>
-            .
-          </p>
         </div>
       </SectionCard>
+
+      <Zone variant="danger" title="Delete account" description="Permanently remove your account and all associated data.">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-foreground">Delete my account</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Your personal data will be anonymized and your access cut off immediately (GDPR Art. 17 — right to erasure). Irreversible.
+            </p>
+          </div>
+          {!deleteConfirm ? (
+            <Button variant="destructive" size="sm" className="shrink-0 h-8 text-xs" onClick={() => setDeleteConfirm(true)}>
+              Delete account
+            </Button>
+          ) : (
+            <div className="flex items-center gap-2 shrink-0">
+              <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setDeleteConfirm(false)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" size="sm" className="h-8 text-xs" disabled={deleting} onClick={handleDelete}>
+                {deleting ? "Processing…" : "Confirm deletion"}
+              </Button>
+            </div>
+          )}
+        </div>
+      </Zone>
     </div>
   )
 }
@@ -489,71 +529,227 @@ function AppearancePanel() {
   )
 }
 
+/** Événements réglables (regroupent les 8 `type` de notifications back). */
+const NOTIF_EVENTS: { key: NotificationEventKey; label: string; description: string }[] = [
+  { key: "assigned",      label: "Assigned to you", description: "When an issue is assigned to you" },
+  { key: "mention",       label: "Mentions",        description: "When someone @mentions you in a comment" },
+  { key: "commented",     label: "Comments",        description: "New comments on issues you report or are assigned to" },
+  { key: "statusChanged", label: "Status changes",  description: "When an issue you're involved in changes status or is completed" },
+  { key: "dueDate",       label: "Due dates",       description: "Reminders when your issues are due soon or overdue" },
+  { key: "overload",      label: "Team overload",   description: "When a teammate's workload gets too high (managers)" },
+]
+
 /**
- * Panneau Notifications — réécrit HONNÊTE (TF-SETTINGS-FAKE).
+ * Panneau Notifications — de VRAIS réglages, par événement et par canal.
  *
- * <p>L'ancienne version affichait 6 toggles « Email notifications » persistés dans `localStorage`, sans
- * aucun effet : le back ne lisait AUCUNE préférence, et surtout <b>ces emails n'existent pas</b>
- * (`EmailService` ne fait qu'OTP/welcome/reset/invitation ; « Weekly digest » = zéro ligne de code).
- * Six interrupteurs qui ne pilotaient rien, plus un toast « enregistrées » qui confirmait le mensonge.</p>
+ * <p>In-app (cloche + temps réel) et email (opt-in) sont réglables pour chacun des 6 événements.
+ * Persisté côté back (`/api/me/notification-preferences`, portée compte) : `NotificationService`
+ * lit ces réglages avant de persister/pousser (in-app) et avant d'envoyer un email. « Absence =
+ * défaut » (in-app ON, email OFF), donc rien à seeder.</p>
  *
- * <p>Ce qui est <b>vrai</b> : les notifications <b>in-app</b> (cloche + temps réel) existent et sont
- * toujours actives — `NotificationService` les persiste et les pousse. On le dit, sans promettre des
- * réglages qui n'existent pas.</p>
+ * <p>Mise à jour <b>optimiste</b> : l'état local fait foi, PUT en arrière-plan, revert + toast si
+ * échec. On n'écrase pas l'état avec la réponse (évite les races entre bascules rapides).</p>
  */
 function NotificationsPanel() {
+  const [prefs, setPrefs] = useState<NotificationPreference[] | null>(null)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    getNotificationPreferences()
+      .then((p) => { setPrefs(p); setFailed(false) })
+      .catch(() => setFailed(true))
+  }, [])
+
+  const setChannel = async (
+    eventKey: NotificationEventKey,
+    channel: "inApp" | "email",
+    value: boolean,
+  ) => {
+    if (!prefs) return
+    const previous = prefs
+    const next = prefs.map((p) => (p.eventKey === eventKey ? { ...p, [channel]: value } : p))
+    setPrefs(next) // optimiste — l'état local fait foi
+    try {
+      await updateNotificationPreferences(next)
+    } catch {
+      setPrefs(previous) // revert
+      toast.error("Couldn't save your notification settings.")
+    }
+  }
+
+  const find = (eventKey: NotificationEventKey) => prefs?.find((p) => p.eventKey === eventKey)
+
   return (
     <div className="flex flex-col gap-4">
-      <SectionCard title="Notifications" description="How Taskforce keeps you informed.">
-        <div className="flex flex-col gap-3">
-          <div className="flex items-start gap-3">
-            <Bell className="size-4 text-muted-foreground mt-0.5 shrink-0" />
-            <div>
-              <p className="text-sm font-medium text-foreground">In-app notifications</p>
-              <p className="text-xs text-muted-foreground">
-                Mentions, assignments, comments and status changes appear in real time
-                in the notification bell. Always on.
-              </p>
+      <SectionCard
+        title="Notifications"
+        description="Choose how Taskforce reaches you for each type of event."
+      >
+        {prefs === null ? (
+          failed ? (
+            <div className="flex items-center justify-between gap-3 py-4">
+              <p className="text-sm text-muted-foreground">Couldn&apos;t load your preferences.</p>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setFailed(false)
+                  getNotificationPreferences()
+                    .then((p) => { setPrefs(p); setFailed(false) })
+                    .catch(() => setFailed(true))
+                }}
+              >
+                Retry
+              </Button>
             </div>
-          </div>
-          <div className="flex items-start gap-3">
-            <Mail className="size-4 text-muted-foreground mt-0.5 shrink-0" />
-            <div>
-              <p className="text-sm font-medium text-foreground">Email notifications</p>
-              <p className="text-xs text-muted-foreground">
-                Fine-grained per-event email settings aren&apos;t available yet. Coming soon.
-              </p>
+          ) : (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+              <Loader2 className="size-4 animate-spin" /> Loading your preferences…
             </div>
+          )
+        ) : (
+          <div className="flex flex-col">
+            {/* En-têtes de colonnes */}
+            <div className="flex items-center gap-3 pb-2 mb-1 border-b border-border/60 text-xs font-medium text-muted-foreground">
+              <div className="flex-1" />
+              <div className="w-16 flex items-center justify-center gap-1"><Bell className="size-3.5" /> In-app</div>
+              <div className="w-16 flex items-center justify-center gap-1"><Mail className="size-3.5" /> Email</div>
+            </div>
+
+            {NOTIF_EVENTS.map((ev) => {
+              const p = find(ev.key)
+              return (
+                <div
+                  key={ev.key}
+                  className="flex items-center gap-3 py-3 border-b border-border/40 last:border-0"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground">{ev.label}</p>
+                    <p className="text-xs text-muted-foreground">{ev.description}</p>
+                  </div>
+                  <div className="w-16 flex justify-center">
+                    <Switch
+                      aria-label={`In-app for ${ev.label}`}
+                      checked={p?.inApp ?? true}
+                      onCheckedChange={(v) => setChannel(ev.key, "inApp", v)}
+                    />
+                  </div>
+                  <div className="w-16 flex justify-center">
+                    <Switch
+                      aria-label={`Email for ${ev.label}`}
+                      checked={p?.email ?? false}
+                      onCheckedChange={(v) => setChannel(ev.key, "email", v)}
+                    />
+                  </div>
+                </div>
+              )
+            })}
+
+            <p className="text-xs text-muted-foreground mt-3 leading-relaxed">
+              In-app notifications appear in the bell in real time. Email is opt-in and delivered only
+              when email is configured for your instance.
+            </p>
           </div>
-        </div>
+        )}
       </SectionCard>
     </div>
   )
 }
 
 function SecurityPanel() {
-  // Auth déléguée à Keycloak (OIDC) — pas de fabrication d'infos ici (QA Q-17).
-  const items = [
-    { icon: <Key className="size-4 text-muted-foreground" />,    title: "Password",                        desc: "Change it from Keycloak's 'My account' console." },
-    { icon: <Shield className="size-4 text-muted-foreground" />, title: "Two-factor authentication (2FA)", desc: "Enable an authenticator (TOTP) from your Keycloak account." },
-    { icon: <Globe className="size-4 text-muted-foreground" />,  title: "Active sessions",                 desc: "Your sessions are managed centrally by Keycloak." },
-  ]
+  // UI TaskForce, mais le métier reste géré par Keycloak (le secret TOTP et le mot de passe ne
+  // transitent jamais par l'app) : reset par email + activation 2FA par email (scan du QR côté KC).
+  const [twoFa, setTwoFa] = useState<boolean | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    getTwoFactorStatus().then(setTwoFa).catch(() => setTwoFa(null))
+  }, [])
+
+  const onResetPassword = async () => {
+    setBusy(true)
+    try {
+      await requestPasswordReset()
+      toast.success("Password reset email sent — check your inbox.")
+    } catch {
+      toast.error("Couldn't send the reset email.")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const onToggle2fa = async () => {
+    setBusy(true)
+    try {
+      if (twoFa) {
+        await disableTwoFactor()
+        setTwoFa(false)
+        toast.success("Two-factor authentication disabled.")
+      } else {
+        await enableTwoFactor()
+        toast.success("2FA setup email sent — scan the QR code to finish enabling it.")
+      }
+    } catch {
+      toast.error("Couldn't update two-factor authentication.")
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <SectionCard
         title="Authentication & security"
-        description="Your identity is managed by Keycloak (OIDC provider). Password, 2FA and sessions are managed in your Keycloak account."
+        description="Your sign-in is secured by Keycloak. Manage your password and two-factor authentication here."
       >
         <div className="flex flex-col divide-y divide-border/50">
-          {items.map((it) => (
-            <div key={it.title} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
-              <span className="mt-0.5 shrink-0">{it.icon}</span>
+          {/* Mot de passe */}
+          <div className="flex items-center justify-between gap-3 py-3 first:pt-0">
+            <div className="flex items-start gap-3">
+              <Key className="size-4 text-muted-foreground mt-0.5 shrink-0" />
               <div>
-                <p className="text-sm font-medium text-foreground">{it.title}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{it.desc}</p>
+                <p className="text-sm font-medium text-foreground">Password</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  We&apos;ll email you a secure link to set a new password.
+                </p>
               </div>
             </div>
-          ))}
+            <Button size="sm" variant="outline" onClick={onResetPassword} disabled={busy}>
+              Reset password
+            </Button>
+          </div>
+
+          {/* 2FA */}
+          <div className="flex items-center justify-between gap-3 py-3 last:pb-0">
+            <div className="flex items-start gap-3">
+              <Shield className="size-4 text-muted-foreground mt-0.5 shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-foreground">
+                  Two-factor authentication (2FA)
+                  {twoFa === true && (
+                    <Badge variant="secondary" className="ml-2 align-middle">Enabled</Badge>
+                  )}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {twoFa
+                    ? "An authenticator app is required at sign-in."
+                    : "Add an authenticator app (TOTP) for an extra layer of security."}
+                </p>
+              </div>
+            </div>
+            {twoFa === null ? (
+              <Loader2 className="size-4 animate-spin text-muted-foreground" />
+            ) : (
+              <Button
+                size="sm"
+                variant={twoFa ? "outline" : "default"}
+                onClick={onToggle2fa}
+                disabled={busy}
+              >
+                {twoFa ? "Disable" : "Enable 2FA"}
+              </Button>
+            )}
+          </div>
         </div>
       </SectionCard>
     </div>
@@ -664,27 +860,30 @@ function WorkspacePanel() {
 
 // ── Status (santé de l'app, façon status page) ──────────────────────────────
 function StatusPanel() {
-  const [api, setApi] = useState<"checking" | "ok" | "down">("checking")
   const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug)
+  const [health, setHealth] = useState<SystemStatus | null>(null)
+  const [apiState, setApiState] = useState<"checking" | "ok" | "down">("checking")
   const [logs, setLogs] = useState<AuditLogEntry[]>([])
 
+  // Santé RÉELLE lue du serveur (actuator via /api/status). Robuste : on réessaie avant de crier
+  // à l'incident (évite un faux positif sur un hiccup réseau / redémarrage).
   useEffect(() => {
     let alive = true
-    // Probe robuste : on réessaie avant de déclarer l'API « injoignable »
-    // (évite un faux « Incident » lors d'un hiccup réseau / redémarrage). QA Q-20
-    async function probe() {
+    async function load() {
       for (let attempt = 1; attempt <= 3 && alive; attempt++) {
         try {
-          await apiClient.get("/api/workspaces") // sonde légère (la liste existe toujours ; /current 500 si owner multi-workspace)
-          if (alive) setApi("ok")
+          const s = await getSystemStatus()
+          if (!alive) return
+          setHealth(s)
+          setApiState("ok")
           return
         } catch {
-          if (attempt === 3) { if (alive) setApi("down"); return }
+          if (attempt === 3) { if (alive) setApiState("down"); return }
           await new Promise((r) => setTimeout(r, 1500))
         }
       }
     }
-    void probe()
+    void load()
     return () => { alive = false }
   }, [])
 
@@ -708,33 +907,58 @@ function StatusPanel() {
     URL.revokeObjectURL(url)
   }
 
-  const rows: { name: string; ok: boolean; detail: string }[] = [
-    { name: "App (interface)",     ok: true,            detail: "Loaded" },
-    { name: "Taskforce API",       ok: api !== "down",   detail: api === "checking" ? "Checking…" : api === "ok" ? "Operational" : "Unreachable" },
-    { name: "Real-time (STOMP)",   ok: api !== "down",   detail: api === "checking" ? "Checking…" : api === "ok" ? "Available via the API" : "Unavailable" },
-    { name: "AI assistant (Groq)", ok: true,             detail: "Configured (server-side)" },
+  // Libellés lisibles pour les indicateurs actuator + normalisation de l'état.
+  const COMPONENT_LABELS: Record<string, string> = {
+    db: "Database", dataSource: "Database", ping: "API ping", diskSpace: "Disk space",
+    redis: "Cache (Redis)", mail: "Email (SMTP)", ssl: "SSL",
+    livenessState: "Liveness", readinessState: "Readiness",
+  }
+  const labelFor = (k: string) => COMPONENT_LABELS[k] ?? k.charAt(0).toUpperCase() + k.slice(1)
+  const kind = (s: string): "UP" | "DOWN" | "DEGRADED" =>
+    s === "UP" ? "UP" : (s === "DOWN" || s === "OUT_OF_SERVICE") ? "DOWN" : "DEGRADED"
+
+  type Row = { name: string; state: "UP" | "DOWN" | "DEGRADED" | "CHECKING"; detail: string }
+  const rows: Row[] = [
+    { name: "App (interface)", state: "UP", detail: "Loaded" },
+    {
+      name: "TaskForce API",
+      state: apiState === "checking" ? "CHECKING" : apiState === "ok" ? "UP" : "DOWN",
+      detail: apiState === "checking" ? "Checking…" : apiState === "ok" ? "Operational" : "Unreachable",
+    },
+    ...(health?.components ?? []).map<Row>((c) => ({ name: labelFor(c.key), state: kind(c.status), detail: c.status })),
   ]
-  const allOk = rows.every((r) => r.ok)
+  const overall: Row["state"] =
+    apiState === "checking" ? "CHECKING"
+      : apiState === "down" ? "DOWN"
+      : health ? kind(health.status)
+      : "DEGRADED"
+  const dotClass = (s: Row["state"]) =>
+    s === "UP" ? "bg-emerald-500" : s === "DOWN" ? "bg-red-500" : s === "DEGRADED" ? "bg-amber-500" : "bg-muted-foreground/40"
 
   return (
     <div className="flex flex-col gap-5 max-w-2xl">
       <div>
         <h2 className="text-sm font-semibold text-foreground">Application status</h2>
-        <p className="text-xs text-muted-foreground mt-0.5">Real-time service status.</p>
+        <p className="text-xs text-muted-foreground mt-0.5">Live service health, read from the server.</p>
       </div>
 
       <div className={cn(
         "flex items-center gap-2 rounded-lg border px-4 py-3 text-sm font-medium",
-        allOk ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-500" : "border-amber-500/30 bg-amber-500/10 text-amber-500"
+        overall === "UP" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-500"
+          : overall === "DOWN" ? "border-red-500/30 bg-red-500/10 text-red-500"
+          : "border-amber-500/30 bg-amber-500/10 text-amber-500"
       )}>
-        {allOk ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
-        {allOk ? "All systems operational" : "Incident affecting one or more services"}
+        {overall === "UP" ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+        {overall === "CHECKING" ? "Checking service health…"
+          : overall === "UP" ? "All systems operational"
+          : overall === "DOWN" ? "Major outage affecting one or more services"
+          : "Degraded — some services report issues"}
       </div>
 
       <div className="rounded-xl border border-border bg-card overflow-hidden [box-shadow:var(--shadow-sm)]">
         {rows.map((r, i) => (
           <div key={r.name} className={cn("flex items-center gap-3 px-4 py-3", i < rows.length - 1 && "border-b border-border/50")}>
-            <span className={cn("size-2 rounded-full shrink-0", r.ok ? "bg-emerald-500" : "bg-amber-500")} />
+            <span className={cn("size-2 rounded-full shrink-0", dotClass(r.state))} />
             <span className="flex-1 text-sm text-foreground">{r.name}</span>
             <span className="text-xs text-muted-foreground">{r.detail}</span>
           </div>
@@ -1110,11 +1334,11 @@ function IntegrationsPanel() {
 // ---------------------------------------------------------------------------
 
 function PrivacyPanel() {
-  const [loading, setLoading] = useState<"ACCESS" | "DELETION" | null>(null)
-  const [deleteConfirm, setDeleteConfirm] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const setSection = useSettingsStore((s) => s.setSection)
 
   const handleExport = async () => {
-    setLoading("ACCESS")
+    setLoading(true)
     try {
       const data = await exportMyData()
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" })
@@ -1128,27 +1352,7 @@ function PrivacyPanel() {
     } catch {
       toast.error("Export failed. Try again or contact privacy@taskforce.dev.")
     } finally {
-      setLoading(null)
-    }
-  }
-
-  const handleDelete = async () => {
-    setLoading("DELETION")
-    try {
-      await deleteMyAccount()
-      toast.success("Account anonymized. Signing out…")
-      // Purge cliente + BONNE route (/auth/login ; /login n'existe pas → 404) : sinon l'utilisateur
-      // restait « connecté » sur un compte anonymisé → 403 en cascade. RGPD-02.
-      if (globalThis.window !== undefined) {
-        localStorage.removeItem("accessToken")
-        localStorage.removeItem("refreshToken")
-        localStorage.removeItem("user")
-        setTimeout(() => { window.location.href = "/auth/login" }, 1000)
-      }
-    } catch {
-      toast.error("Deletion failed. Try again or contact privacy@taskforce.dev.")
-      setLoading(null)
-      setDeleteConfirm(false)
+      setLoading(false)
     }
   }
 
@@ -1182,54 +1386,27 @@ function PrivacyPanel() {
             variant="outline"
             size="sm"
             className="shrink-0 h-8 text-xs"
-            disabled={loading === "ACCESS"}
+            disabled={loading}
             onClick={handleExport}
           >
-            {loading === "ACCESS" ? "Exporting…" : "Export my data"}
+            {loading ? "Exporting…" : "Export my data"}
           </Button>
         </div>
       </SectionCard>
 
-      <Zone variant="danger" title="Delete account" description="Permanently remove your account and all associated data.">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-sm font-medium text-foreground">Delete my account</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Your personal data will be anonymized and your access cut off immediately (GDPR Art. 17 — right to erasure). Irreversible.
-            </p>
-          </div>
-          {!deleteConfirm ? (
-            <Button
-              variant="destructive"
-              size="sm"
-              className="shrink-0 h-8 text-xs"
-              onClick={() => setDeleteConfirm(true)}
-            >
-              Delete account
-            </Button>
-          ) : (
-            <div className="flex items-center gap-2 shrink-0">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 text-xs"
-                onClick={() => setDeleteConfirm(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                size="sm"
-                className="h-8 text-xs"
-                disabled={loading === "DELETION"}
-                onClick={handleDelete}
-              >
-                {loading === "DELETION" ? "Processing…" : "Confirm deletion"}
-              </Button>
-            </div>
-          )}
-        </div>
-      </Zone>
+      <SectionCard title="Delete your data" description="Erasing your personal data is done by deleting your account.">
+        <p className="text-xs text-muted-foreground">
+          Your personal data is anonymized when you delete your account (GDPR Art. 17 — right to erasure). Manage this from{" "}
+          <button
+            type="button"
+            onClick={() => setSection("account")}
+            className="underline underline-offset-2 transition-colors hover:text-foreground"
+          >
+            Account
+          </button>
+          .
+        </p>
+      </SectionCard>
     </div>
   )
 }

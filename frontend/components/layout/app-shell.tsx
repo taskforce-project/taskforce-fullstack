@@ -12,6 +12,7 @@ import { AppFooter } from "@/components/layout/app-footer"
 import { UpgradeDialog } from "@/components/subscription/upgrade-dialog"
 import { SettingsModal } from "@/components/settings/settings-modal"
 import { CreateProjectModal } from "@/components/dialogs/create-project-modal"
+import { FeedbackDialog } from "@/components/feedback/feedback-dialog"
 import { ProductTour } from "@/components/tour/product-tour"
 import { LabsGradientDefs } from "@/components/ui/labs-gradient-defs"
 import { PendingInvitationsBanner } from "@/components/invitations/pending-invitations-banner"
@@ -24,14 +25,18 @@ export function AppShell({ children }: AppShellProps) {
   const pathname = usePathname()
 
   return (
-    <SidebarProvider className="h-svh">
+    <SidebarProvider className="h-full">
       <AppSidebar />
       <SidebarInset className="overflow-hidden">
         <AppTopbar />
         {/* Invitations reçues en attente d'approbation — bannière montée hors du <main> keyé par
             la route : un seul fetch par session, persistante à la navigation. Nulle si rien. */}
         <PendingInvitationsBanner />
-        <div className="flex min-h-0 flex-1">
+        {/* `relative` : les panneaux (workflows / chat IA) se positionnent en OVERLAY par-dessus le
+            contenu (absolute). `overflow-hidden` : pendant le slide d'ouverture le panneau part hors
+            écran à droite — sans clip ici, ça crée une barre de scroll horizontale transitoire qui
+            « repousse » le contenu vers la gauche puis revient. On clippe donc à la source. */}
+        <div className="relative flex min-h-0 flex-1 overflow-hidden">
           <PanelDock side="left" />
           <AnimatePresence mode="wait" initial={false}>
             <motion.main
@@ -55,6 +60,7 @@ export function AppShell({ children }: AppShellProps) {
       <UpgradeDialog />
       <SettingsModal />
       <CreateProjectModal />
+      <FeedbackDialog />
 
       {/* Tour produit (coach-marks) — rendu conditionnel via son store ; cible les data-tour du dashboard */}
       <ProductTour />

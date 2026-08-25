@@ -146,7 +146,7 @@ const NAV_BOTTOM: readonly NavItem[] = [
   },
   {
     key: "nav.help",
-    url: "/help",
+    url: "https://docs.taskforce-project.fr",
     icon: HelpCircle,
   },
 ]
@@ -285,22 +285,34 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       )
     }
 
+    // Lien externe (ex. Help → doc) : ouvre un nouvel onglet, pas de préfixe workspace (withSlug).
+    const isExternal = /^https?:\/\//.test(item.url)
+    const linkInner = (
+      <>
+        <item.icon />
+        <span>{t(item.key)}</span>
+        {item.lab && (
+          <FlaskConical
+            /* Identité Labs alignée sur le site : le TRAIT prend le dégradé (pêche→rose→bleu),
+               plus de violet plat. Cf. `.tf-labs-icon` + <LabsGradientDefs/>. */
+            className="tf-labs-icon ml-auto size-3.5 shrink-0 group-data-[collapsible=icon]:hidden"
+            strokeWidth={2}
+            aria-label="Feature being finalized"
+          />
+        )}
+      </>
+    )
+
     return (
       <SidebarMenuItem key={item.key}>
-        <SidebarMenuButton asChild tooltip={t(item.key)} isActive={isActive(item.url)}>
-          <Link href={withSlug(item.url)}>
-            <item.icon />
-            <span>{t(item.key)}</span>
-            {item.lab && (
-              <FlaskConical
-                /* Identité Labs alignée sur le site : le TRAIT prend le dégradé (pêche→rose→bleu),
-                   plus de violet plat. Cf. `.tf-labs-icon` + <LabsGradientDefs/>. */
-                className="tf-labs-icon ml-auto size-3.5 shrink-0 group-data-[collapsible=icon]:hidden"
-                strokeWidth={2}
-                aria-label="Feature being finalized"
-              />
-            )}
-          </Link>
+        <SidebarMenuButton asChild tooltip={t(item.key)} isActive={!isExternal && isActive(item.url)}>
+          {isExternal ? (
+            <a href={item.url} target="_blank" rel="noreferrer">
+              {linkInner}
+            </a>
+          ) : (
+            <Link href={withSlug(item.url)}>{linkInner}</Link>
+          )}
         </SidebarMenuButton>
       </SidebarMenuItem>
     )

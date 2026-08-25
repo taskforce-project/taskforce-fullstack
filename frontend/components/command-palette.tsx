@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, type KeyboardEvent } from "react"
 import { useRouter, useParams } from "next/navigation"
+import { TextShimmerWave } from "@/components/ui/text-shimmer-wave"
 import {
   LayoutDashboard,
   Inbox,
@@ -193,7 +194,7 @@ export function CommandPalette({ open, onOpenChange }: Readonly<CommandPalettePr
                 <p className="text-sm leading-relaxed flex-1">
                   {aiError
                     ? <span className="text-destructive">{aiError}</span>
-                    : <span className="text-foreground">{aiText || (isRunning ? "Thinking…" : "")}</span>}
+                    : <span className="text-foreground">{aiText || (isRunning ? <TextShimmerWave as="span">Cortex is thinking…</TextShimmerWave> : "")}</span>}
                 </p>
               </div>
               {!isRunning && (

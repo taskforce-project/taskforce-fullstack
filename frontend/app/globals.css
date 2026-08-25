@@ -295,19 +295,24 @@
   color: transparent;
 }
 
-/* Fond « Labs » = l'image du site (hero-wave), UNIQUEMENT sur le bandeau (topbar) des pages Labs.
-   Un « blob » dégradé côté GAUCHE (couleur `--background`, thème-aware) masque l'image là où se trouve
-   le texte (fil d'Ariane) ; l'image reste DISCRÈTE à droite (jamais totalement dévoilée). */
-.lab-banner-bg {
-  background-image:
-    radial-gradient(160% 190% at 4% 50%,
-      var(--background) 0%,
-      var(--background) 24%,
-      color-mix(in srgb, var(--background) 28%, transparent) 100%),
-    url("/assets/tour/labs-wave.jpg");
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
+/* Bandeau « Labs » façon sandbox Stripe : géré par `LabShell` (bandeau bleu en haut + app aux coins
+   arrondis). La sidebar shadcn est `fixed` (relative au viewport) → elle ignore le décalage : on la
+   fait descendre SOUS le bandeau + on arrondit son coin haut-gauche, cohérent avec l'app à droite.
+   2.25rem = hauteur du bandeau (`h-9` dans LabShell) ; 1rem = `rounded-2xl` de l'app. */
+/* Le SidebarProvider impose `min-h-svh` (100svh). Sur une page Labs le conteneur ne fait que
+   `100svh - bandeau` → l'app déborde de 36px sous le conteneur (bas rogné) et le moindre reflow
+   (ex. ouverture d'un panneau) « fait remonter » le contenu. On lève ce plancher. */
+.tf-lab-shell [data-slot="sidebar-wrapper"] {
+  min-height: 0;
+}
+
+.tf-lab-shell [data-slot="sidebar-container"] {
+  top: 2.25rem;
+  height: calc(100svh - 2.25rem);
+}
+.tf-lab-shell [data-slot="sidebar-inner"] {
+  overflow: hidden;
+  border-top-left-radius: 1rem;
 }
 
 /* Lignes « Labs » du Ctrl+K : la même vague, en accent à droite (voile à gauche pour garder icône +

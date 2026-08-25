@@ -171,6 +171,37 @@ public class UserService {
         return buildUserResponse(user, keycloakUser);
     }
 
+    // ---- Sécurité (mot de passe + 2FA) — UI TaskForce adossée au métier Keycloak ----------------
+
+    /** Déclenche l'email de réinitialisation du mot de passe (flux Keycloak). */
+    public void requestPasswordReset(String email) {
+        User user = userRepository.findByEmail(email)
+            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+        keycloakService.sendPasswordResetEmail(user.getKeycloakId());
+    }
+
+    /** Le 2FA (TOTP) est-il actif pour l'utilisateur courant ? */
+    @Transactional(readOnly = true)
+    public boolean isTwoFactorEnabled(String email) {
+        User user = userRepository.findByEmail(email)
+            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+        return keycloakService.isTotpEnabled(user.getKeycloakId());
+    }
+
+    /** Déclenche l'email de configuration du 2FA (l'utilisateur scanne le QR côté Keycloak). */
+    public void enableTwoFactor(String email) {
+        User user = userRepository.findByEmail(email)
+            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+        keycloakService.sendConfigureTotpEmail(user.getKeycloakId());
+    }
+
+    /** Désactive le 2FA (supprime le credential TOTP). */
+    public void disableTwoFactor(String email) {
+        User user = userRepository.findByEmail(email)
+            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+        keycloakService.disableTotp(user.getKeycloakId());
+    }
+
     /**
      * Construit un UserResponse depuis l'entité User + UserRepresentation Keycloak.
      * displayName : valeur personnalisée si définie, sinon "Prénom NOM" depuis Keycloak.

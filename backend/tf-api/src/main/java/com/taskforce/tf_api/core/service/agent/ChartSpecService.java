@@ -165,7 +165,7 @@ public class ChartSpecService {
           .append("   \"predict\": \"SUCCESS\" → score de succès (0-100) par projet, calculé sur le taux de complétion et les retards.\n")
           .append("   Choisis-le pour « prédiction / chances de succès / réussite / santé / risque des projets ». ")
           .append("Ce n'est pas de la voyance : c'est un score explicable sur données réelles.\n\n")
-          .append("Ajoute toujours \"title\" (court, français) et \"description\" (une phrase). Réponds STRICTEMENT en JSON.\n")
+          .append("Ajoute toujours \"title\" (court) et \"description\" (une phrase), tous deux **EN ANGLAIS** (l'UI est en anglais). Réponds STRICTEMENT en JSON.\n")
           .append("Choisis A (répartition) pour « par projet/statut/assigné/priorité/type » ou « combien/nombre ». ")
           .append("Choisis B pour une évolution dans le temps ou l'avancement des projets.\n\n")
           // Anti-refus : la plupart des demandes ont une vue proche. Ne PAS refuser par excès de prudence.
@@ -176,7 +176,7 @@ public class ChartSpecService {
           .append("- une fenêtre temporelle (« sur 14 jours », « ce mois ») n'est PAS un obstacle : choisis workload ou throughput.\n\n")
           .append("Ne réponds \"unsupported\" QUE si la donnée est vraiment absente de Taskforce (revenus, ventes, ")
           .append("sources externes, satisfaction client…). Dans ce cas réponds : {\"unsupported\": string (ce qui manque, ")
-          .append("en français), \"suggestions\": [{\"label\": string (bouton court), \"prompt\": string (une demande PROCHE ")
+          .append("EN ANGLAIS), \"suggestions\": [{\"label\": string (bouton court, EN ANGLAIS), \"prompt\": string (une demande PROCHE ")
           .append("et répondable)}]} — propose 2 à 3 reformulations que TU sais faire avec les données ci-dessus.");
         return sb.toString();
     }
@@ -194,7 +194,7 @@ public class ChartSpecService {
         String scp = scope == null || scope.isBlank() ? "ALL" : scope.toUpperCase(Locale.ROOT);
         String xLabel = queryService.dimensionLabel(dimension);
         String yLabel = queryService.measureLabel(measure);
-        String finalTitle = title == null || title.isBlank() ? yLabel + " par " + xLabel.toLowerCase(Locale.ROOT) : title.trim();
+        String finalTitle = title == null || title.isBlank() ? yLabel + " by " + xLabel.toLowerCase(Locale.ROOT) : title.trim();
         return new ChartSpecResponse(finalTitle, safe(description), "breakdown",
             null, ct, null, null, data, dim, mes, scp, xLabel, yLabel, null, List.of());
     }
@@ -233,11 +233,11 @@ public class ChartSpecService {
     /** Reformulations proposées par défaut — toutes répondables (couvrent le catalogue). */
     private List<ChartSuggestion> defaultSuggestions() {
         return List.of(
-            new ChartSuggestion("Charge par membre", "issues ouvertes par assigné"),
-            new ChartSuggestion("Charge de l'équipe sur 14 jours", "charge de l'équipe jour par jour"),
-            new ChartSuggestion("Issues par projet", "nombre d'issues par projet"),
-            new ChartSuggestion("Avancement des projets", "avancement des projets"),
-            new ChartSuggestion("Débit hebdomadaire", "tâches résolues et ouvertes par semaine"));
+            new ChartSuggestion("Workload per member", "open issues by assignee"),
+            new ChartSuggestion("Team workload (14 days)", "team workload day by day"),
+            new ChartSuggestion("Issues by project", "issues by project"),
+            new ChartSuggestion("Project progress", "project progress"),
+            new ChartSuggestion("Weekly throughput", "resolved and opened tasks per week"));
     }
 
     // =========================================================================
@@ -249,7 +249,7 @@ public class ChartSpecService {
 
         // 0) Prédiction — avant la répartition (« succès des projets » contient « projet »).
         if (containsAny(p, "prédiction", "prediction", "prédire", "predire", "succès", "succes",
-                "réussite", "reussite", "chance", "risque", "santé", "sante")) {
+                "réussite", "reussite", "chance", "risque", "santé", "sante", "success", "risk", "health")) {
             return prediction(projectIds, null, "", "SUCCESS");
         }
 
@@ -263,30 +263,30 @@ public class ChartSpecService {
         }
 
         // 2) Séries temporelles.
-        if (containsAny(p, "burndown", "reste", "sprint", "restant", "idéal", "ideal")) {
-            return timeseries(DATASETS.get("burndown"), "Burndown du sprint", "", "line", null, List.of("remaining", "ideal"));
+        if (containsAny(p, "burndown", "reste", "sprint", "restant", "idéal", "ideal", "remaining")) {
+            return timeseries(DATASETS.get("burndown"), "Sprint burndown", "", "line", null, List.of("remaining", "ideal"));
         }
         if (containsAny(p, "avancement", "complétion", "completion", "progress", "progression")) {
-            return timeseries(DATASETS.get("projects"), "Avancement des projets", "", "bar", null, List.of("completion"));
+            return timeseries(DATASETS.get("projects"), "Project progress", "", "bar", null, List.of("completion"));
         }
-        if (containsAny(p, "charge") && containsAny(p, "jour", "heatmap", "quotidien", "semaine", "période", "periode")) {
-            return timeseries(DATASETS.get("workload"), "Charge de l'équipe", "", "heatmap", null, List.of());
+        if (containsAny(p, "charge", "workload", "load") && containsAny(p, "jour", "heatmap", "quotidien", "semaine", "période", "periode", "day", "week")) {
+            return timeseries(DATASETS.get("workload"), "Team workload", "", "heatmap", null, List.of());
         }
-        if (containsAny(p, "membre", "charg", "capacit", "équipe", "equipe")) {
-            return timeseries(DATASETS.get("capacity"), "Charge par membre", "", "bar", null, List.of("openIssues"));
+        if (containsAny(p, "membre", "charg", "capacit", "équipe", "equipe", "member", "workload", "capacity", "team")) {
+            return timeseries(DATASETS.get("capacity"), "Workload per member", "", "bar", null, List.of("openIssues"));
         }
         boolean daily = containsAny(p, "jour", "quotidien", "30", "daily");
-        return timeseries(DATASETS.get("throughput"), daily ? "Débit quotidien" : "Débit hebdomadaire",
+        return timeseries(DATASETS.get("throughput"), daily ? "Daily throughput" : "Weekly throughput",
             "", "area", daily ? "day" : "week", List.of("resolved", "opened"));
     }
 
     /** Détecte une dimension de répartition dans la demande (null si aucune). */
     private String detectDimension(String p) {
-        if (containsAny(p, "par projet", "par projets", "chaque projet", "issues par projet")) return "PROJECT";
-        if (containsAny(p, "par statut", "par status", "par état", "par etat", "par colonne")) return "STATUS";
-        if (containsAny(p, "par assign", "par membre", "par responsable", "par personne", "par développeur", "par developpeur")) return "ASSIGNEE";
-        if (containsAny(p, "par priorit")) return "PRIORITY";
-        if (containsAny(p, "par type")) return "TYPE";
+        if (containsAny(p, "par projet", "par projets", "chaque projet", "issues par projet", "by project", "per project")) return "PROJECT";
+        if (containsAny(p, "par statut", "par status", "par état", "par etat", "par colonne", "by status", "by state")) return "STATUS";
+        if (containsAny(p, "par assign", "par membre", "par responsable", "par personne", "par développeur", "par developpeur", "by assignee", "per assignee", "by member", "per member")) return "ASSIGNEE";
+        if (containsAny(p, "par priorit", "by priorit")) return "PRIORITY";
+        if (containsAny(p, "par type", "by type")) return "TYPE";
         return null;
     }
 
@@ -296,12 +296,12 @@ public class ChartSpecService {
 
     private String defaultTitle(Dataset d) {
         return switch (d.key()) {
-            case "throughput" -> "Débit";
-            case "burndown"   -> "Burndown du sprint";
-            case "capacity"   -> "Charge par membre";
-            case "workload"   -> "Charge de l'équipe";
-            case "projects"   -> "Avancement des projets";
-            default           -> "Graphe";
+            case "throughput" -> "Throughput";
+            case "burndown"   -> "Sprint burndown";
+            case "capacity"   -> "Workload per member";
+            case "workload"   -> "Team workload";
+            case "projects"   -> "Project progress";
+            default           -> "Chart";
         };
     }
 
