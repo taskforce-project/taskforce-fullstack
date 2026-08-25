@@ -178,4 +178,7 @@ navigation:
           - page: Bonnes pratiques
             path: ./pages/api-bonnes-pratiques.md
             slug: api-bonnes-pratiques
+          - page: Piloter depuis un agent (MCP)
+            path: ./pages/api-mcp.md
+            slug: api-mcp
       - api: Référence API
