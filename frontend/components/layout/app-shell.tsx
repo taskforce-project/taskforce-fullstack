@@ -24,7 +24,7 @@ export function AppShell({ children }: AppShellProps) {
   const pathname = usePathname()
 
   return (
-    <SidebarProvider className="h-svh">
+    <SidebarProvider className="h-full">
       <AppSidebar />
       <SidebarInset className="overflow-hidden">
         <AppTopbar />

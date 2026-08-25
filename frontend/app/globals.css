@@ -295,29 +295,8 @@
   color: transparent;
 }
 
-/* Fond « Labs » = l'image du site (hero-wave), UNIQUEMENT sur le bandeau (topbar) des pages Labs.
-   Un « blob » dégradé côté GAUCHE (couleur `--background`, thème-aware) masque l'image là où se trouve
-   le texte (fil d'Ariane) ; l'image reste DISCRÈTE à droite (jamais totalement dévoilée). */
-.lab-banner-bg {
-  background-image:
-    radial-gradient(160% 190% at 4% 50%,
-      var(--background) 0%,
-      var(--background) 24%,
-      color-mix(in srgb, var(--background) 28%, transparent) 100%),
-    url("/assets/tour/labs-wave.jpg");
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-}
-
-/* Cadre « sandbox » (façon mode test Stripe) autour du viewport sur les zones Labs — dessiné par
-   `LabFrame` (overlay fixe non-interactif). Liseré bleu + halo intérieur discret, lisible dans les
-   deux thèmes. Donne l'impression d'« être ailleurs » sans toucher au layout ni au scroll. */
-.tf-lab-frame {
-  box-shadow:
-    inset 0 0 0 3px rgba(59, 130, 246, 0.75),
-    inset 0 0 44px -12px rgba(59, 130, 246, 0.5);
-}
+/* (Bandeau « Labs » déplacé dans `LabShell` : bandeau bleu en haut + coins arrondis, façon sandbox
+   Stripe. Ancien fond topbar `.lab-banner-bg` et cadre viewport `.tf-lab-frame` retirés.) */
 
 /* Lignes « Labs » du Ctrl+K : la même vague, en accent à droite (voile à gauche pour garder icône +
    libellé lisibles). Sur `--popover` (fond du modal de recherche). */

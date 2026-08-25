@@ -5,7 +5,6 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Search, Sparkles } from "lucide-react"
 
-import { cn } from "@/lib/utils"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import {
@@ -116,13 +115,7 @@ function useBreadcrumbs() {
 
 export function AppTopbar() {
   const breadcrumbs = useBreadcrumbs()
-  const pathname = usePathname()
   const { t } = usePreferencesStore()
-  // Zones « Lab » : Intelligence (/analytics) + Brain OS (/brain). Le header garde l'image du site
-  // (`lab-banner-bg`) ; l'indicateur « Experimental » + le lien feedback vivent désormais dans le
-  // cadre sandbox plein écran (`LabFrame`, monté dans le layout) — fini la pastille en `absolute`
-  // centrée qui chevauchait le fil d'Ariane / les actions sur petit écran.
-  const isLab = /\/(analytics|brain)(\/|$)/.test(pathname)
   const [cmdOpen, setCmdOpen] = React.useState(false)
   const togglePanel = usePanelStore((s) => s.togglePanel)
   const planType = useUserStore((s) => s.user?.planType)
@@ -155,13 +148,7 @@ export function AppTopbar() {
   }, [])
 
   return (
-    <header
-      className={cn(
-        "sticky top-0 z-40 flex h-14 shrink-0 items-center gap-2 border-b px-4 transition-colors",
-        // Pages Labs : le bandeau prend l'image du site (hero-wave) sous un voile lisible, plus la teinte bleue.
-        isLab ? "lab-banner-bg border-border" : "border-border bg-background",
-      )}
-    >
+    <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background px-4">
       {/* Left: sidebar trigger + breadcrumb */}
       <div className="flex flex-1 items-center gap-2">
         <SidebarTrigger className="-ml-1" />
