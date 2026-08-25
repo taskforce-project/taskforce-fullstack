@@ -10,6 +10,11 @@
 >
 > Sources : `.ai/qa.md` (QA produit détaillée), `.ai/known-issues.md` (bugs vérifiés), `.ai/module-map.md` (domaines↔code), `.ai/architecture-map.md` (archi réelle), `.ai/P0-fix-plan.md` (correctifs P0 paste-ready).
 
+> **▶ MAJ 25/08/2026 — QA-29 : vrai formulaire de feedback (« Give feedback ») (branche `hot-fix`).** `[QA-29]`
+> - Les « Give feedback » étaient de simples `mailto:` → **vrai formulaire** : `FeedbackDialog` global (catégorie **Idea / Bug / Other** + message) monté dans l'AppShell, ouvert via `useFeedbackStore.openFeedback(context)`. Branché sur le bandeau `LabShell` (contexte « Labs · Intelligence/Brain OS ») et le `LabBanner` in-app (intégrations).
+> - **Back** : `POST /api/feedback` (`FeedbackController` + `FeedbackService`) → **persiste** (table `feedback`, migration **V76**, entité write-once) + **notif email best-effort à l'équipe** (`EmailService.sendInternalNotification`, no-op si SMTP inactif, message **HTML-échappé**). DTO `SubmitFeedbackRequest` (catégorie `BUG|IDEA|OTHER`, message ≤5000, contexte). Tests `FeedbackServiceTest` (persist+notify / défaut OTHER + skip email / user introuvable).
+> - **Front** : `feedback-service.ts` + `FEEDBACK_ROUTES` + `feedback-store.ts` + `components/feedback/feedback-dialog.tsx`.
+
 > **▶ MAJ 25/08/2026 — QA-28 : bandeau Labs façon Stripe (haut + coins arrondis, plus de cadre) (branche `hot-fix`).** `[QA-28]`
 > - **Refonte du cadre Labs** (retour user : « pas tout le tour, juste en haut, façon Stripe ») : l'ancien `LabFrame` (liseré bleu **autour** du viewport) → **`LabShell`** = un **bandeau bleu pleine largeur EN HAUT** + l'app **poussée en dessous** avec **coins supérieurs arrondis** (le bleu affleure dans les coins), sur `/analytics` + `/brain`. Aucun cadre latéral/bas.
 > - Mécanique : `LabShell` = flex-column `h-svh` (bandeau `h-9` + app `flex-1 rounded-t-2xl`). `AppShell` passe de `SidebarProvider h-svh` → **`h-full`** (c'est `LabShell` qui porte la hauteur). Topbar nettoyée (retrait `lab-banner-bg`/`isLab`/`cn` inutile) ; CSS mort supprimé (`.lab-banner-bg`, `.tf-lab-frame`) ; `lab-frame.tsx` supprimé (remplace QA-21/QA-25).
