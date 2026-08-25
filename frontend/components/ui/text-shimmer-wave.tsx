@@ -1,5 +1,5 @@
 'use client';
-import { type JSX } from 'react';
+import { useMemo, type JSX } from 'react';
 import { motion, Transition } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
@@ -30,8 +30,12 @@ export function TextShimmerWave({
   rotateYDistance = 10,
   transition,
 }: TextShimmerWave) {
-  const MotionComponent = motion.create(
-    Component as keyof JSX.IntrinsicElements
+  // `motion.create` DOIT être mémoïsé : appelé pendant le render, il recrée un composant à chaque
+  // rendu → React remonte l'élément à chaque fois et l'animation « gèle » dans les contextes qui
+  // re-render souvent (ex. le chat avec son timer). Mémoïsé par `Component`, il n'est créé qu'une fois.
+  const MotionComponent = useMemo(
+    () => motion.create(Component as keyof JSX.IntrinsicElements),
+    [Component]
   );
 
   return (
