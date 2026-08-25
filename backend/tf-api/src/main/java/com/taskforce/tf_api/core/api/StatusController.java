@@ -2,12 +2,9 @@ package com.taskforce.tf_api.core.api;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
-import org.springframework.boot.actuate.health.CompositeHealth;
-import org.springframework.boot.actuate.health.HealthComponent;
-import org.springframework.boot.actuate.health.HealthEndpoint;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -15,37 +12,42 @@ import org.springframework.web.bind.annotation.RestController;
 import com.taskforce.tf_api.shared.dto.ApiResponse;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 /**
- * Statut opérationnel (page « Status » des réglages).
- *
- * <p>Lit la santé <b>réelle</b> déjà agrégée par l'actuator Spring ({@link HealthEndpoint}) — DB,
- * cache, disque, etc. — plutôt que de pinger chaque service à la demande : ces indicateurs sont
- * calculés/mis en cache par Spring, donc <b>aucun overload</b> ni appel réseau supplémentaire.
- * L'endpoint est authentifié (préfixe {@code /api/**}) et ne renvoie que le code d'état par
- * composant (UP / DOWN / OUT_OF_SERVICE…), aucune donnée sensible.</p>
+ * Statut opérationnel (page « Status » des réglages) — vérifications <b>légères et sûres, sans
+ * overload</b> : l'API est « up » dès lors que cette requête répond, et la base est sondée par un
+ * simple {@code SELECT 1} (local, instantané). On ne fait <b>aucun ping réseau</b> vers des services
+ * externes (IA / Keycloak) à chaque chargement : ce serait de la latence et de la charge inutiles.
+ * Enrichissement possible plus tard (cache, IA, Keycloak) via de vrais indicateurs, ou l'agrégat
+ * Prometheus/Grafana pour un état « dégradé » sur seuil.
  */
 @RestController
 @RequestMapping("/api/status")
 @RequiredArgsConstructor
+@Slf4j
 public class StatusController {
 
-    private final HealthEndpoint healthEndpoint;
+    private final JdbcTemplate jdbcTemplate;
 
     public record ComponentStatus(String key, String status) {}
     public record StatusResponse(String status, List<ComponentStatus> components) {}
 
     @GetMapping
     public ResponseEntity<ApiResponse<StatusResponse>> status() {
-        HealthComponent health = healthEndpoint.health();
-        String overall = health.getStatus().getCode();
-
         List<ComponentStatus> components = new ArrayList<>();
-        if (health instanceof CompositeHealth composite && composite.getComponents() != null) {
-            for (Map.Entry<String, HealthComponent> e : composite.getComponents().entrySet()) {
-                components.add(new ComponentStatus(e.getKey(), e.getValue().getStatus().getCode()));
-            }
+
+        // Base de données : sonde légère (local, ~instantané).
+        String db = "UP";
+        try {
+            jdbcTemplate.queryForObject("SELECT 1", Integer.class);
+        } catch (Exception e) {
+            db = "DOWN";
+            log.warn("Sonde DB (SELECT 1) en échec : {}", e.getMessage());
         }
-        return ResponseEntity.ok(ApiResponse.success("Statut", new StatusResponse(overall, components)));
+        components.add(new ComponentStatus("db", db));
+
+        boolean allUp = components.stream().allMatch(c -> "UP".equals(c.status()));
+        return ResponseEntity.ok(ApiResponse.success("Statut", new StatusResponse(allUp ? "UP" : "DOWN", components)));
     }
 }
