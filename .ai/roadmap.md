@@ -10,6 +10,11 @@
 >
 > Sources : `.ai/qa.md` (QA produit détaillée), `.ai/known-issues.md` (bugs vérifiés), `.ai/module-map.md` (domaines↔code), `.ai/architecture-map.md` (archi réelle), `.ai/P0-fix-plan.md` (correctifs P0 paste-ready).
 
+> **▶ MAJ 25/08/2026 — QA-23 : Panneaux en overlay + cartes dashboard flex-wrap (branche `hot-fix`).** `[QA-23]`
+> - **Panneaux (Workflows / chat IA Cortex) en OVERLAY.** `PanelDock` était un frère **flex** du `<main>` (largeur fixe `shrink-0`) → il **comprimait** le contenu (cartes tassées, texte tronqué — retour user). Passé en **`absolute inset-y-0 z-30`** (au-dessus du contenu, sous la topbar sticky z-40 / modals z-50), conteneur parent `relative`, `max-w-[92vw]` garde-fou mobile. **Vérifié en live** : `main` reste à **1024px panneau ouvert** (au lieu de rétrécir) + panneau `position: absolute` qui chevauche le contenu.
+> - **QuickColumns (3 colonnes de reprise).** `grid md:grid-cols-3` (tassé dès que la place manque) → **`flex flex-wrap` + `[&>*]:min-w-[15rem] [&>*]:flex-1`** : reflow 3 → 2 → 1, jamais sous une largeur lisible. La `DashboardGrid` Analytics (drag-drop réordonnable) est laissée telle quelle (positions stables nécessaires).
+> - **Pricing.** Gardé en **grille `1/2/4`** (pas flex-wrap) : avec 4 cartes, `flex-wrap` crée une carte orpheline étirée sur certaines largeurs ; la grille donne des colonnes propres. À basculer si le wrap est vraiment voulu.
+
 > **▶ MAJ 25/08/2026 — QA-22 : Pricing (Billing) responsive (branche `hot-fix`).** `[QA-22]`
 > - **Grille des forfaits** (`app/(protected)/[workspace]/billing/page.tsx`) : passait de **1 colonne → 4 dès `md`** (768px) via `divide-*` (basé sur l'ordre DOM → incapable d'un 2-colonnes propre) ⇒ 4 cartes tassées + CTA qui débordent sur tablette/petit portable. Remplacé par une **grille `gap` responsive** `grid-cols-1 sm:grid-cols-2 xl:grid-cols-4` avec cartes bordées (highlight « Popular » = bordure + ring primaire). **Vérifié en live** (Docker, `admin-taskforce-workspace/billing`) : 4 cols @1280 · 2 cols @768 · 1 col @375, **zéro débordement horizontal**. `upgrade-dialog` renvoie vers ces plans (pas de grille propre) → couvert.
 
