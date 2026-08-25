@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { X } from "lucide-react"
+import { motion, AnimatePresence } from "framer-motion"
 
 import { cn } from "@/lib/utils"
 import { usePanelStore, type PanelDescriptor, type PanelSide } from "@/lib/store/panel-store"
@@ -15,14 +16,14 @@ import { usePanelStore, type PanelDescriptor, type PanelSide } from "@/lib/store
 export function PanelDock({ side }: { readonly side: PanelSide }) {
   const panels = usePanelStore((s) => s.panels)
   const docked = panels.filter((p) => p.side === side)
-  if (docked.length === 0) return null
 
+  // AnimatePresence : anime l'ouverture ET la fermeture (slide + fade) du panneau.
   return (
-    <>
+    <AnimatePresence>
       {docked.map((panel) => (
         <PanelColumn key={panel.id} panel={panel} side={side} />
       ))}
-    </>
+    </AnimatePresence>
   )
 }
 
@@ -53,7 +54,13 @@ function PanelColumn({ panel, side }: { readonly panel: PanelDescriptor; readonl
   )
 
   return (
-    <aside
+    <motion.aside
+      // Slide + fade fluide à l'ouverture/fermeture (transform `x`, n'interfère pas avec le resize
+      // qui joue sur `width`). Même courbe que la transition du contenu principal (app-shell).
+      initial={{ x: side === "right" ? "100%" : "-100%", opacity: 0 }}
+      animate={{ x: 0, opacity: 1 }}
+      exit={{ x: side === "right" ? "100%" : "-100%", opacity: 0 }}
+      transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
       style={{ width: panel.width, maxWidth: "92vw" }}
       className={cn(
         // Overlay : posé sur toute la hauteur du contenu, par-dessus le `<main>` (z au-dessus du
@@ -94,6 +101,6 @@ function PanelColumn({ panel, side }: { readonly panel: PanelDescriptor; readonl
         {/* Corps */}
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{panel.content}</div>
       </div>
-    </aside>
+    </motion.aside>
   )
 }
