@@ -1,0 +1,35 @@
+# Journal — Doc Fern (manuel utilisateur + référence API)
+
+Chantier « Documentation » (roadmap §4 item 8). Doc **produit** (guides) + **référence API** dans Fern
+(`fern/`), publiée sur `docs.taskforce-project.fr`. Objectif : manuel utilisateur complet, calqué sur
+la structure d'un Linear, **collé à la réalité du code** (rien d'inventé ; Lab assumé).
+
+## Sommaire validé (28 pages / 7 sections, `fern/docs.yml`)
+
+1. **Découvrir** — Bienvenue · Concepts clés · Premiers pas · Onboarding & profil · Tour de l'interface
+2. **Organiser le travail** — Espaces & projets · Issues & tableaux · Cycles · Roadmap · Pages
+3. **Mon quotidien** — Tableau de bord · Boîte de réception (Signaux) · Mon travail (Ma file) · Accepter/refuser une assignation
+4. **Collaborer** — Membres & rôles · Inviter son équipe · Équipes · Notifications & préférences
+5. **L'IA — Cortex** — Vue d'ensemble · Assistant · Workflows · Génération de spec · Smart Assign · Mémoire (Brain OS · Lab)
+6. **Piloter & intégrer** — Analytics (Intelligence · Lab) · Intégrations
+7. **Compte & offres** — Profil & sécurité · Offres, facturation & IA
+
+Puis **tab Référence API** (chantier 2 : OpenAPI + guides bonnes pratiques/auth/conventions).
+
+## Décisions
+
+- **Vocabulaire = labels FR réels de l'app** (Opérations/Tâches/Sprints/Signaux/Ma file/Feuille de
+  route/Intelligence), glosés une fois. Table de correspondance dans `concepts-cles.md`.
+- **Lab assumé** : Intelligence + Brain OS présentés « en finition », pas comme finis.
+- **Screenshots** : repères `{/* SCREENSHOT: id … */}` dans les pages + manifeste
+  `fern/assets/screenshots/README.md`. Capture par le user (FR, données réelles ; onboarding = compte
+  de test). Câblage `<Frame>` une fois les PNG fournis.
+
+## Avancement
+
+- ✅ `docs.yml` restructuré (28 pages / 7 sections).
+- ✅ **Lot 1 — Découvrir** (5 pages) : index, concepts-cles, premiers-pas (réécrits) ;
+  onboarding-et-profil, tour-interface (nouveaux). Repères screenshots posés.
+- 🔲 Lots 2 à 7 (23 pages).
+- 🔲 Câblage des screenshots.
+- 🔲 Référence API (chantier 2).

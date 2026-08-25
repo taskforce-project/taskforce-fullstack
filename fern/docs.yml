@@ -68,6 +68,12 @@ navigation:
           - page: Premiers pas
             path: ./pages/premiers-pas.md
             slug: premiers-pas
+          - page: Onboarding & profil
+            path: ./pages/onboarding-et-profil.md
+            slug: onboarding-et-profil
+          - page: Tour de l'interface
+            path: ./pages/tour-interface.md
+            slug: tour-interface
       - section: Organiser le travail
         skip-slug: true
         contents:
@@ -80,6 +86,27 @@ navigation:
           - page: Cycles
             path: ./pages/cycles.md
             slug: cycles
+          - page: Roadmap
+            path: ./pages/roadmap.md
+            slug: roadmap
+          - page: Pages
+            path: ./pages/pages.md
+            slug: pages
+      - section: Mon quotidien
+        skip-slug: true
+        contents:
+          - page: Tableau de bord
+            path: ./pages/tableau-de-bord.md
+            slug: tableau-de-bord
+          - page: Boîte de réception
+            path: ./pages/inbox.md
+            slug: inbox
+          - page: Mon travail
+            path: ./pages/mon-travail.md
+            slug: mon-travail
+          - page: Accepter ou refuser une assignation
+            path: ./pages/assignations.md
+            slug: assignations
       - section: Collaborer
         skip-slug: true
         contents:
@@ -89,25 +116,49 @@ navigation:
           - page: Inviter son équipe
             path: ./pages/inviter-son-equipe.md
             slug: inviter-son-equipe
+          - page: Équipes
+            path: ./pages/equipes.md
+            slug: equipes
+          - page: Notifications & préférences
+            path: ./pages/notifications.md
+            slug: notifications
+      - section: L'IA — Cortex
+        skip-slug: true
+        contents:
+          - page: Vue d'ensemble de l'IA
+            path: ./pages/ia-vue-ensemble.md
+            slug: ia-vue-ensemble
+          - page: Assistant
+            path: ./pages/ia-assistant.md
+            slug: ia-assistant
+          - page: Workflows
+            path: ./pages/ia-workflows.md
+            slug: ia-workflows
+          - page: Génération de spec
+            path: ./pages/ia-generation-spec.md
+            slug: ia-generation-spec
           - page: Smart Assign
             path: ./pages/smart-assign.md
             slug: smart-assign
-      - section: Aller plus loin
-        skip-slug: true
-        contents:
           - page: Mémoire (Brain OS)
             path: ./pages/memoire.md
             slug: memoire
+      - section: Piloter & intégrer
+        skip-slug: true
+        contents:
           - page: Analytics
             path: ./pages/analytics.md
             slug: analytics
           - page: Intégrations
             path: ./pages/integrations.md
             slug: integrations
-      - section: Compte
+      - section: Compte & offres
         skip-slug: true
         contents:
-          - page: Offres & IA
+          - page: Profil & sécurité
+            path: ./pages/profil-et-securite.md
+            slug: profil-et-securite
+          - page: Offres, facturation & IA
             path: ./pages/offres-et-ia.md
             slug: offres-et-ia
   - tab: api
