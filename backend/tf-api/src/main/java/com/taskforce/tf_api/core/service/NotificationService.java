@@ -2,6 +2,7 @@ package com.taskforce.tf_api.core.service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -13,6 +14,7 @@ import com.taskforce.tf_api.core.dto.response.NotificationResponse;
 import com.taskforce.tf_api.core.model.Issue;
 import com.taskforce.tf_api.core.model.IssueComment;
 import com.taskforce.tf_api.core.model.Notification;
+import com.taskforce.tf_api.core.model.NotificationEvent;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.NotificationRepository;
@@ -40,6 +42,8 @@ public class NotificationService {
     private final WorkspaceRepository    workspaceRepository;
     private final UserRepository         userRepository;
     private final SimpMessagingTemplate  messagingTemplate;
+    private final NotificationPreferenceService preferenceService;
+    private final EmailService           emailService;
 
     // =========================================================================
     // Lecture
@@ -136,7 +140,7 @@ public class NotificationService {
 
         Notification notif = buildNotification(issue, actor, issue.getAssignee(), "assigned", "info",
             issue.getTitle(), null);
-        persistAndPush(notif);
+        dispatch(notif);
     }
 
     /**
@@ -150,7 +154,7 @@ public class NotificationService {
         for (User recipient : recipients) {
             Notification notif = buildNotification(issue, actor, recipient, "commented", "low",
                 issue.getTitle(), body);
-            persistAndPush(notif);
+            dispatch(notif);
         }
     }
 
@@ -171,7 +175,7 @@ public class NotificationService {
             }
             Notification notif = buildNotification(issue, actor, recipient, type, urgency,
                 title + " — moved to " + newStatusName, null);
-            persistAndPush(notif);
+            dispatch(notif);
         }
     }
 
@@ -185,7 +189,7 @@ public class NotificationService {
             if (mentioned.getId().equals(actor.getId())) continue;
             Notification notif = buildNotification(issue, actor, mentioned, "mention", "warning",
                 issue.getTitle(), truncate(commentBody, 200));
-            persistAndPush(notif);
+            dispatch(notif);
         }
     }
 
@@ -213,7 +217,7 @@ public class NotificationService {
         String title   = issue.getTitle() + (overdue ? " — deadline breached" : " — due soon");
         // Alerte système : pas d'acteur (actor null)
         Notification notif = buildNotification(issue, null, assignee, type, urgency, title, null);
-        persistAndPush(notif);
+        dispatch(notif);
     }
 
     /**
@@ -252,7 +256,7 @@ public class NotificationService {
                 .projectName(workspace.getName())
                 .projectUrl(membersUrl)
                 .build();
-            persistAndPush(notif);
+            dispatch(notif);
         }
     }
 
@@ -261,12 +265,47 @@ public class NotificationService {
     // =========================================================================
 
     /**
-     * Persiste la notification puis la pousse en temps réel au destinataire (best-effort).
-     * Centralise TOUS les chemins de création : le push ne doit jamais casser la transaction métier.
+     * Point de sortie unique de TOUS les chemins de création. Applique les réglages du destinataire
+     * (voir {@link NotificationPreferenceService}) :
+     * <ul>
+     *   <li><b>in-app</b> actif → persiste la ligne (l'inbox) + push temps réel ;</li>
+     *   <li><b>email</b> actif → envoi best-effort (no-op si SMTP inactif).</li>
+     * </ul>
+     * Ni le push ni l'email ne doivent casser la transaction métier appelante.
+     *
+     * <p>Note : si in-app est OFF et email ON, aucune ligne n'est persistée — donc pas de déduplication
+     * pour les alertes récurrentes (dueDate/overload), l'email peut alors se répéter au rythme du
+     * scheduler. Le défaut (in-app ON) évite ce cas ; c'est un choix assumé plutôt que persister une
+     * ligne « fantôme » invisible dans la cloche.</p>
+     */
+    private void dispatch(Notification notif) {
+        User recipient = notif.getRecipient();
+        Optional<NotificationEvent> event = NotificationEvent.fromType(notif.getType());
+        NotificationPreferenceService.Channels channels = preferenceService.resolve(recipient.getId(), event);
+
+        if (channels.inApp()) {
+            Notification saved = notificationRepository.save(notif);
+            pushRealtime(saved);
+        }
+
+        if (channels.email()) {
+            emailService.sendNotificationEmail(
+                recipient.getEmail(),
+                recipient.getDisplayName(),
+                emailLabel(notif.getType()),
+                notif.getTitle(),
+                notif.getBody(),
+                notif.getIssueIdentifier(),
+                notif.getIssueUrl()
+            );
+        }
+    }
+
+    /**
+     * Pousse la notification en temps réel au destinataire (best-effort).
      * Destination : {@code /topic/notifications.{recipientId}} (même payload que le REST).
      */
-    private void persistAndPush(Notification notif) {
-        Notification saved = notificationRepository.save(notif);
+    private void pushRealtime(Notification saved) {
         try {
             messagingTemplate.convertAndSend(
                 "/topic/notifications." + saved.getRecipient().getId(),
@@ -276,6 +315,22 @@ public class NotificationService {
             log.warn("Publication temps réel notification échouée (destinataire {}): {}",
                 saved.getRecipient().getId(), ex.getMessage());
         }
+    }
+
+    /** Libellé court de l'événement pour l'email (badge + objet). */
+    private String emailLabel(String type) {
+        if (type == null) return "Notification";
+        return switch (type) {
+            case "assigned"      -> "Assigned to you";
+            case "mention"       -> "You were mentioned";
+            case "commented"     -> "New comment";
+            case "statusChanged" -> "Status update";
+            case "completed"     -> "Completed";
+            case "dueSoon"       -> "Due soon";
+            case "overdue"       -> "Overdue";
+            case "overload"      -> "Workload alert";
+            default              -> "Notification";
+        };
     }
 
     private Notification buildNotification(Issue issue, User actor, User recipient,
