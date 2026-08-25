@@ -70,4 +70,14 @@ Chaque capture illustre une page de la doc Fern. **Convention** : place le fichi
 | `intelligence-vue` | Analytics | la vue Intelligence (KPIs + graphes throughput/workload) — Lab |
 | `integrations-catalog` | Intégrations | le catalogue d'intégrations (connectés / disponibles) |
 
-> Le dernier lot (Compte) ajoutera ses propres lignes ici.
+## Lot 7 — Compte & offres
+
+| id | Page | Où / quoi capturer |
+| --- | --- | --- |
+| `parametres-profil` | Profil & sécurité | le panneau Paramètres (navigation latérale + section Profil) |
+| `facturation` | Offres, facturation & IA | Paramètres → Facturation (forfait courant + mise à niveau) |
+
+---
+
+**Total : 25 screenshots** à fournir (dont 2 nécessitent un compte de test : `onboarding-1-you`,
+`onboarding-2-skills`). Dépose les PNG ici avec le nom exact de la colonne `id`.

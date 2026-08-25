@@ -50,6 +50,11 @@ Puis **tab Référence API** (chantier 2 : OpenAPI + guides bonnes pratiques/aut
   burndown, charge/capacité, graphes IA — marqué Lab), integrations (GitHub + Slack connectables,
   credentials chiffrés, OWNER/ADMIN). Vérifié : analytics-service, integrations-catalog (gate connect
   github/slack).
-- 🔲 Lot 7 (2 pages).
-- 🔲 Câblage des screenshots.
-- 🔲 Référence API (chantier 2).
+- ✅ **Lot 7 — Compte & offres** (2 pages) : profil-et-securite (Paramètres : profil, apparence +
+  accessibilité, sécurité Keycloak reset/2FA, confidentialité RGPD) — nouveau ; offres-et-ia
+  (Free/Basic/Business/Enterprise, self-service Basic/Business via Stripe, IA incluse métrée tokens,
+  murs = scale, per-seat) — réécrit. Prix/quotas NON hardcodés (renvoi à l'app).
+- ✅ **Manuel utilisateur COMPLET — 28/28 pages.**
+- 🔲 Câblage des 25 screenshots (fournis par le user, cf. manifeste).
+- 🔲 **Référence API (chantier 2)** : régénérer `fern/openapi/openapi.json` depuis le backend
+  (`fern/scripts/generate-openapi.ps1`) + guides bonnes pratiques / auth / conventions.
