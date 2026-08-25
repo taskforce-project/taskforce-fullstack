@@ -10,6 +10,10 @@
 >
 > Sources : `.ai/qa.md` (QA produit détaillée), `.ai/known-issues.md` (bugs vérifiés), `.ai/module-map.md` (domaines↔code), `.ai/architecture-map.md` (archi réelle), `.ai/P0-fix-plan.md` (correctifs P0 paste-ready).
 
+> **▶ MAJ 25/08/2026 — QA-28 : bandeau Labs façon Stripe (haut + coins arrondis, plus de cadre) (branche `hot-fix`).** `[QA-28]`
+> - **Refonte du cadre Labs** (retour user : « pas tout le tour, juste en haut, façon Stripe ») : l'ancien `LabFrame` (liseré bleu **autour** du viewport) → **`LabShell`** = un **bandeau bleu pleine largeur EN HAUT** + l'app **poussée en dessous** avec **coins supérieurs arrondis** (le bleu affleure dans les coins), sur `/analytics` + `/brain`. Aucun cadre latéral/bas.
+> - Mécanique : `LabShell` = flex-column `h-svh` (bandeau `h-9` + app `flex-1 rounded-t-2xl`). `AppShell` passe de `SidebarProvider h-svh` → **`h-full`** (c'est `LabShell` qui porte la hauteur). Topbar nettoyée (retrait `lab-banner-bg`/`isLab`/`cn` inutile) ; CSS mort supprimé (`.lab-banner-bg`, `.tf-lab-frame`) ; `lab-frame.tsx` supprimé (remplace QA-21/QA-25).
+
 > **▶ MAJ 25/08/2026 — QA-27 : chat sans bordure + shimmer loader continu (branche `hot-fix`).** `[QA-27]`
 > - **Réponse du chat sans bordure/fond/ombre** (retour user) : la bulle assistant (`chat/message.tsx`) portait `border bg-card` → retiré, juste le texte façon chat (la bulle **user** garde son fond sombre).
 > - **Shimmer du loader « pas toujours là »** : deux causes — (1) `key={text}` remontait le shimmer à chaque changement de message (reset visible), (2) le `repeatDelay` par défaut est **proportionnel à la longueur** du texte → longue pause statique entre deux vagues (« le texte défile sans animation »). Fix : plus de `key` (la vague continue, le texte change en place) + `repeatDelay: 0.2` → animation quasi-continue. Appliqué à `ShimmerLoader` (Smart Assign / spec / workflow / redistribution) et `ThinkingBar` (chat / onboarding).
