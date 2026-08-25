@@ -1,6 +1,7 @@
 import { apiClient } from "@/lib/api/client"
 import { WORKSPACE_ROUTES, INVITATION_ROUTES } from "@/lib/config/api-routes"
 import type { WorkspaceRole } from "@/lib/api/workspace-service"
+import type { ProjectRole } from "@/lib/api/project-service"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -29,6 +30,9 @@ export interface InvitationPreview {
 export interface CreateInvitationPayload {
   email: string
   role?: WorkspaceRole
+  /** Optionnel : cible un projet — l'acceptation ajoutera aussi l'invité au projet avec ce rôle. */
+  projectId?: number
+  projectRole?: ProjectRole
 }
 
 /** Invitation reçue par l'utilisateur courant (vue invité, sans token). */
