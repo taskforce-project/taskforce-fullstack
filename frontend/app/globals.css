@@ -299,6 +299,13 @@
    arrondis). La sidebar shadcn est `fixed` (relative au viewport) → elle ignore le décalage : on la
    fait descendre SOUS le bandeau + on arrondit son coin haut-gauche, cohérent avec l'app à droite.
    2.25rem = hauteur du bandeau (`h-9` dans LabShell) ; 1rem = `rounded-2xl` de l'app. */
+/* Le SidebarProvider impose `min-h-svh` (100svh). Sur une page Labs le conteneur ne fait que
+   `100svh - bandeau` → l'app déborde de 36px sous le conteneur (bas rogné) et le moindre reflow
+   (ex. ouverture d'un panneau) « fait remonter » le contenu. On lève ce plancher. */
+.tf-lab-shell [data-slot="sidebar-wrapper"] {
+  min-height: 0;
+}
+
 .tf-lab-shell [data-slot="sidebar-container"] {
   top: 2.25rem;
   height: calc(100svh - 2.25rem);
