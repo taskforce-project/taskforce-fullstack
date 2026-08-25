@@ -1,18 +1,35 @@
 ---
 title: Analytics
-subtitle: Mesurer le débit, les délais et la charge.
+subtitle: Intelligence — lire le rythme de vos équipes.
 ---
 
-TaskForce fournit des **tableaux de bord** pour piloter la livraison — sans tableur à côté.
+<Warning>
+  **Intelligence** est signalé **Lab** : les métriques reposent sur des **données réelles**, mais
+  certaines briques (prédictions, visualisations avancées) sont **en cours de finition**.
+</Warning>
 
-## Indicateurs
+La vue **Intelligence** transforme l'activité de vos opérations en indicateurs lisibles : à quel
+rythme l'équipe livre, où le travail s'accumule, ce qui ralentit.
 
-- **Débit (throughput)** — le volume d'issues terminées sur une période.
-- **Temps de résolution** — la durée entre l'ouverture et la clôture d'une issue.
-- **Charge / capacité** — la répartition du travail dans l'équipe.
-- **Burndown de cycle** — le restant à faire au fil d'un [cycle](/guides/cycles).
+## Ce que vous y lisez
 
-## AI insights
+| Indicateur | Ce qu'il montre |
+| --- | --- |
+| **Vélocité** | Le volume livré, et son évolution (delta) d'une période à l'autre. |
+| **Débit** *(throughput)* | Les tâches terminées dans le temps — par jour (30 j) ou par semaine (8 sem.). |
+| **Burndown** | La trajectoire d'un sprint vers son terme. |
+| **Charge & capacité** | La répartition du travail **par membre**, au regard de leur capacité. |
 
-Au-delà des chiffres bruts, TaskForce met en avant des **observations générées par l'IA** pour signaler
-tendances et points d'attention, afin de transformer les métriques en décisions.
+{/* SCREENSHOT: intelligence-vue — la vue Intelligence (KPIs + graphes throughput/workload) — Lab */}
+
+## Les graphes assistés par l'IA
+
+Au-delà des indicateurs prêts à l'emploi, Cortex peut **générer un graphe à la demande** et faire
+émerger des **observations** (*insights*) sur vos données. Vous pouvez **sauvegarder** les graphes qui
+vous servent pour les retrouver. Ces fonctions, comme toute sollicitation de Cortex, **consomment des
+tokens**. → [Vue d'ensemble de l'IA](/guides/ia-vue-ensemble)
+
+<Tip>
+  Pour un aperçu synthétique au quotidien, plusieurs de ces indicateurs existent aussi en **cartes**
+  sur le [Tableau de bord](/guides/tableau-de-bord). Intelligence, lui, sert l'analyse approfondie.
+</Tip>

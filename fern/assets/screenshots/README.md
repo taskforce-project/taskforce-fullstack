@@ -63,4 +63,11 @@ Chaque capture illustre une page de la doc Fern. **Convention** : place le fichi
 | `smart-assign` | Smart Assign | la suggestion (recommandé·e + alternatives, scores) |
 | `brain-graph` | Mémoire (Brain OS) | la vue graphe du Brain OS (nœuds reliés) — Lab |
 
-> Les lots suivants (Piloter, Compte) ajouteront leurs propres lignes ici au fur et à mesure.
+## Lot 6 — Piloter & intégrer
+
+| id | Page | Où / quoi capturer |
+| --- | --- | --- |
+| `intelligence-vue` | Analytics | la vue Intelligence (KPIs + graphes throughput/workload) — Lab |
+| `integrations-catalog` | Intégrations | le catalogue d'intégrations (connectés / disponibles) |
+
+> Le dernier lot (Compte) ajoutera ses propres lignes ici.

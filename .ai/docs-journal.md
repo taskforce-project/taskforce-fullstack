@@ -46,6 +46,10 @@ Puis **tab Référence API** (chantier 2 : OpenAPI + guides bonnes pratiques/aut
   AiMeter (métrage tokens, complimentary), workflow-dock (jobs QUEUED→…→DONE, human-in-the-loop),
   ai/spec + approve, SmartAssignCandidate (semantic/historical/workload/availability), Brain OS =
   knowledge graph fonctionnel mais **Lab**.
-- 🔲 Lots 6 à 7 (4 pages).
+- ✅ **Lot 6 — Piloter & intégrer** (2 pages, réécrits) : analytics/Intelligence (vélocité, débit,
+  burndown, charge/capacité, graphes IA — marqué Lab), integrations (GitHub + Slack connectables,
+  credentials chiffrés, OWNER/ADMIN). Vérifié : analytics-service, integrations-catalog (gate connect
+  github/slack).
+- 🔲 Lot 7 (2 pages).
 - 🔲 Câblage des screenshots.
 - 🔲 Référence API (chantier 2).
