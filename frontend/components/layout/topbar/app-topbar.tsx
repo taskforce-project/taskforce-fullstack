@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Search, Sparkles, FlaskConical } from "lucide-react"
+import { Search, Sparkles } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { SidebarTrigger } from "@/components/ui/sidebar"
@@ -118,9 +118,10 @@ export function AppTopbar() {
   const breadcrumbs = useBreadcrumbs()
   const pathname = usePathname()
   const { t } = usePreferencesStore()
-  // Fonctionnalités « Lab » (en cours de finition) : Intelligence (/analytics) + Brain OS (/brain).
-  // Le header se teinte en bleu discret (info) + un indicateur + un lien feedback — pendant des
-  // fioles bleues de la sidebar. Remplace le bandeau `LabBanner` sur ces pages pleines.
+  // Zones « Lab » : Intelligence (/analytics) + Brain OS (/brain). Le header garde l'image du site
+  // (`lab-banner-bg`) ; l'indicateur « Experimental » + le lien feedback vivent désormais dans le
+  // cadre sandbox plein écran (`LabFrame`, monté dans le layout) — fini la pastille en `absolute`
+  // centrée qui chevauchait le fil d'Ariane / les actions sur petit écran.
   const isLab = /\/(analytics|brain)(\/|$)/.test(pathname)
   const [cmdOpen, setCmdOpen] = React.useState(false)
   const togglePanel = usePanelStore((s) => s.togglePanel)
@@ -189,23 +190,6 @@ export function AppTopbar() {
           </Breadcrumb>
         )}
       </div>
-
-      {/* Indicateur « Lab » centré dans le header (feature en expérimentation). */}
-      {isLab && (
-        <div className="pointer-events-none absolute left-1/2 flex -translate-x-1/2 items-center gap-2">
-          {/* Identité Labs alignée sur le site : flask + label en dégradé (pêche→rose→bleu), pilule neutre. */}
-          <span className="flex items-center gap-1.5 rounded-full border border-border bg-background/80 px-2.5 py-0.5 text-[11px] font-semibold backdrop-blur">
-            <FlaskConical className="tf-labs-icon size-3.5" strokeWidth={2} />
-            <span className="tf-labs-gtext">{t.shell.experimental}</span>
-          </span>
-          <a
-            href="mailto:feedback@taskforce.dev?subject=Feedback"
-            className="pointer-events-auto hidden text-[11px] font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline md:inline"
-          >
-            {t.shell.giveFeedback}
-          </a>
-        </div>
-      )}
 
       {/* Right: search, notifications, theme, user */}
       <div className="flex items-center gap-1">

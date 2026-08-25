@@ -310,6 +310,15 @@
   background-repeat: no-repeat;
 }
 
+/* Cadre « sandbox » (façon mode test Stripe) autour du viewport sur les zones Labs — dessiné par
+   `LabFrame` (overlay fixe non-interactif). Liseré bleu + halo intérieur discret, lisible dans les
+   deux thèmes. Donne l'impression d'« être ailleurs » sans toucher au layout ni au scroll. */
+.tf-lab-frame {
+  box-shadow:
+    inset 0 0 0 3px rgba(59, 130, 246, 0.75),
+    inset 0 0 44px -12px rgba(59, 130, 246, 0.5);
+}
+
 /* Lignes « Labs » du Ctrl+K : la même vague, en accent à droite (voile à gauche pour garder icône +
    libellé lisibles). Sur `--popover` (fond du modal de recherche). */
 .lab-cmd-row {
