@@ -4,9 +4,7 @@ import { useEffect, useState } from "react"
 import { FlaskConical, X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-
-/** Adresse de retour (dev) — à remplacer par un vrai canal de feedback le moment venu. */
-const FEEDBACK_EMAIL = "feedback@taskforce.dev"
+import { useFeedbackStore } from "@/lib/store/feedback-store"
 
 interface LabBannerProps {
   /** Clé stable (mémorise le « fermé » par fonctionnalité dans localStorage). */
@@ -26,6 +24,7 @@ export function LabBanner({ feature, message, className }: LabBannerProps) {
   const storageKey = `tf.lab-banner.dismissed.${feature}`
   // Masqué par défaut avant hydratation → évite un flash puis une disparition si déjà fermé.
   const [visible, setVisible] = useState(false)
+  const openFeedback = useFeedbackStore((s) => s.openFeedback)
 
   useEffect(() => {
     setVisible(localStorage.getItem(storageKey) !== "1")
@@ -38,8 +37,6 @@ export function LabBanner({ feature, message, className }: LabBannerProps) {
     setVisible(false)
   }
 
-  const subject = encodeURIComponent(`Feedback — ${feature}`)
-
   return (
     /* Violet et non bleu : le bleu porte désormais les actions primaires (boutons, cases,
        interrupteurs). Un bandeau « lab » en bleu se lirait comme quelque chose d'actionnable,
@@ -50,12 +47,13 @@ export function LabBanner({ feature, message, className }: LabBannerProps) {
       <span className="min-w-0 flex-1">
         {message ?? "Fonctionnalité en cours de finition — les données sont réelles, l'expérience évolue encore."}
       </span>
-      <a
-        href={`mailto:${FEEDBACK_EMAIL}?subject=${subject}`}
+      <button
+        type="button"
+        onClick={() => openFeedback(feature)}
         className="shrink-0 rounded-md border border-violet-300 bg-white/70 px-2.5 py-1 text-xs font-medium text-violet-700 transition-colors hover:bg-white dark:border-violet-800 dark:bg-violet-900/40 dark:text-violet-100 dark:hover:bg-violet-900/70"
       >
         Donner mon feedback
-      </a>
+      </button>
       <button
         type="button"
         onClick={dismiss}

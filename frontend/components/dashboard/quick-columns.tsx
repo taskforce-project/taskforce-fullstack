@@ -207,10 +207,14 @@ function RecentColumn({ slug }: { readonly slug: string }) {
 // Grille des trois colonnes
 // ---------------------------------------------------------------------------
 
-/** Trois listes compactes (en-têtes cliquables vers la page complète), données réelles. */
+/**
+ * Trois listes compactes (en-têtes cliquables vers la page complète), données réelles.
+ * `flex-wrap` + `min-w` : les colonnes reflowent (3 → 2 → 1) au lieu d'être tassées quand la place
+ * manque (fenêtre étroite ou panneau ouvert) — jamais en dessous d'une largeur lisible.
+ */
 export function QuickColumns({ slug }: { readonly slug: string }) {
   return (
-    <div className="grid gap-4 md:grid-cols-3">
+    <div className="flex flex-wrap gap-4 [&>*]:min-w-[15rem] [&>*]:flex-1">
       <OperationsColumn />
       <MyQueueColumn slug={slug} />
       <RecentColumn slug={slug} />

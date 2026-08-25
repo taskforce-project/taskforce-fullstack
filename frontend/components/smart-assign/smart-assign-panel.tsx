@@ -7,6 +7,7 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { Badge } from "@/components/ui/badge"
+import { ShimmerLoader } from "@/components/ui/shimmer-loader"
 import { cn } from "@/lib/utils"
 import type { IssuePriority } from "@/components/sheets/issue-sheet"
 import {
@@ -37,6 +38,14 @@ interface SmartAssignProps {
 // ─────────────────────────────────────────────────────────────────────────────
 // WorkloadBar
 // ─────────────────────────────────────────────────────────────────────────────
+
+/** Messages du loader Smart Assign (bouclés pendant le calcul : compétences / charge / dispo). */
+const SMART_ASSIGN_PHASES = [
+  "Analyzing the team…",
+  "Weighing skills…",
+  "Calculating availability…",
+  "Finding the best match…",
+]
 
 function getBarColor(value: number): string {
   // Bleu de référence pour un bon score ; seuils d'alerte amber/rose alignés sur la jauge d'usage IA (échelle inversée)
@@ -185,9 +194,9 @@ export function SmartAssignPanel({
 
         {/* Analyse en cours — retour immédiat au clic, pas de bouton à re-cliquer. */}
         {loading && (
-          <div className="flex items-center justify-center gap-1.5 rounded-md bg-muted/40 px-2 py-2 text-xs text-muted-foreground">
-            <Loader2 className="size-3 animate-spin" />
-            Analyzing team…
+          <div className="flex items-center justify-center gap-1.5 rounded-md bg-muted/40 px-2 py-2 text-xs">
+            <Loader2 className="size-3 animate-spin text-muted-foreground" />
+            <ShimmerLoader phrases={SMART_ASSIGN_PHASES} />
           </div>
         )}
 

@@ -36,11 +36,11 @@ public class AnalyticsQueryService {
 
     /** Axe de regroupement autorisé → expression SQL + jointure nécessaire. */
     public enum Dimension {
-        PROJECT ("p.name",                                  "JOIN projects p ON p.id = i.project_id",       "Projet"),
-        STATUS  ("s.name",                                  "",                                             "Statut"),
-        ASSIGNEE("COALESCE(u.display_name, 'Non assigné')", "LEFT JOIN users u ON u.id = i.assignee_id",    "Assigné"),
-        PRIORITY("i.priority",                              "",                                             "Priorité"),
-        TYPE    ("COALESCE(t.name, 'Sans type')",           "LEFT JOIN issue_types t ON t.id = i.type_id",  "Type");
+        PROJECT ("p.name",                                   "JOIN projects p ON p.id = i.project_id",      "Project"),
+        STATUS  ("s.name",                                   "",                                            "Status"),
+        ASSIGNEE("COALESCE(u.display_name, 'Unassigned')",   "LEFT JOIN users u ON u.id = i.assignee_id",   "Assignee"),
+        PRIORITY("i.priority",                               "",                                            "Priority"),
+        TYPE    ("COALESCE(t.name, 'No type')",              "LEFT JOIN issue_types t ON t.id = i.type_id", "Type");
 
         final String expr;
         final String join;
@@ -50,7 +50,7 @@ public class AnalyticsQueryService {
 
     /** Mesure autorisée → expression d'agrégation SQL. */
     public enum Measure {
-        COUNT ("COUNT(*)",                         "Nombre d'issues"),
+        COUNT ("COUNT(*)",                         "Issues"),
         POINTS("COALESCE(SUM(i.story_points), 0)", "Story points");
 
         final String expr;
@@ -60,9 +60,9 @@ public class AnalyticsQueryService {
 
     /** Périmètre (filtre sur la catégorie de statut). */
     public enum Scope {
-        ALL ("",                                                  "toutes"),
-        OPEN("AND s.category NOT IN ('COMPLETED', 'CANCELLED')",  "ouvertes"),
-        DONE("AND s.category = 'COMPLETED'",                      "terminées");
+        ALL ("",                                                  "all"),
+        OPEN("AND s.category NOT IN ('COMPLETED', 'CANCELLED')",  "open"),
+        DONE("AND s.category = 'COMPLETED'",                      "done");
 
         final String clause;
         final String label;
@@ -123,7 +123,7 @@ public class AnalyticsQueryService {
 
     /** Type de prédiction autorisé. L'enum garde la porte ouverte à d'autres projections. */
     public enum Prediction {
-        SUCCESS("Score de succès (%)", "Prédiction de succès par projet");
+        SUCCESS("Success score (%)", "Success prediction by project");
 
         final String yLabel;
         final String title;
@@ -135,7 +135,7 @@ public class AnalyticsQueryService {
     public static List<String> predictionKeys() { return List.copyOf(PREDICTIONS.keySet()); }
     public boolean isValidPrediction(String key) { return PREDICTIONS.containsKey(up(key)); }
     public String predictionYLabel(String key) { Prediction p = PREDICTIONS.get(up(key)); return p != null ? p.yLabel : "Score"; }
-    public String predictionTitle(String key)  { Prediction p = PREDICTIONS.get(up(key)); return p != null ? p.title : "Prédiction"; }
+    public String predictionTitle(String key)  { Prediction p = PREDICTIONS.get(up(key)); return p != null ? p.title : "Prediction"; }
 
     /**
      * Prédiction par projet à partir de signaux réels — <b>aucune donnée inventée</b>.

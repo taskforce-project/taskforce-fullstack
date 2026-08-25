@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react"
 import { Client, type IMessage } from "@stomp/stompjs"
 import SockJS from "sockjs-client"
+import { toast } from "sonner"
 
 import { buildRealtimeUrls } from "@/lib/hooks/use-stomp"
 import { useNotificationStore } from "@/lib/store/notification-store"
@@ -37,6 +38,13 @@ export function useNotificationsRealtime(slug: string | undefined) {
       try {
         const notification = JSON.parse(msg.body) as NotificationResponse
         pushSignal(notification)
+        // Toast « live » : la notif in-app se voit à l'instant (pas seulement le badge de la cloche).
+        // On ne reçoit ici QUE les événements dont le canal in-app est activé (gating côté back) —
+        // donc pas besoin de re-vérifier la préférence, et pas de spam.
+        const opts = { description: notification.body ?? undefined }
+        if (notification.urgency === "critical") toast.error(notification.title, opts)
+        else if (notification.urgency === "warning") toast.warning(notification.title, opts)
+        else toast(notification.title, opts)
       } catch {
         // message non-JSON ignoré
       }

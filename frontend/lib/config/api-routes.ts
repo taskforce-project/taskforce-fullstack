@@ -55,9 +55,38 @@ export const USER_ROUTES = {
   ME: "/api/users/me",
   AVATAR: "/api/users/me/avatar",
   DATA_REQUEST: "/api/users/me/data-request",
+  /** Sécurité (métier Keycloak) : reset mot de passe + 2FA. */
+  PASSWORD_RESET: "/api/users/me/password/reset",
+  TWO_FACTOR: "/api/users/me/2fa",
+  TWO_FACTOR_ENABLE: "/api/users/me/2fa/enable",
   SEARCH: (q: string) => `/api/users/search?q=${encodeURIComponent(q)}`,
   /** Clôture du parcours d'onboarding (rôle + drapeau). */
   ONBOARDING: "/api/users/me/onboarding",
+} as const;
+
+/**
+ * Statut opérationnel (santé services, lue de l'actuator).
+ * Backend: @RequestMapping("/api/status")
+ */
+export const STATUS_ROUTES = {
+  SYSTEM: "/api/status",
+} as const;
+
+/**
+ * Retours utilisateur (« Give feedback »).
+ * Backend: @RequestMapping("/api/feedback")
+ */
+export const FEEDBACK_ROUTES = {
+  SUBMIT: "/api/feedback",
+} as const;
+
+/**
+ * Acceptation / refus d'une assignation de tâche (assigné courant).
+ * Backend: @RequestMapping("/api/me/assignments")
+ */
+export const ASSIGNMENT_ROUTES = {
+  ACCEPT:  (issueId: number) => `/api/me/assignments/${issueId}/accept`,
+  DECLINE: (issueId: number) => `/api/me/assignments/${issueId}/decline`,
 } as const;
 
 /**
@@ -294,6 +323,8 @@ export const NOTIFICATION_ROUTES = {
   MARK_ALL_READ:   (slug: string) => `/api/workspaces/${slug}/notifications/read-all`,
   ACKNOWLEDGE:     (slug: string, id: number) => `/api/workspaces/${slug}/notifications/${id}/acknowledge`,
   ACKNOWLEDGE_ALL: (slug: string) => `/api/workspaces/${slug}/notifications/acknowledge-all`,
+  /** Réglages par événement (portée compte, pas workspace). GET + PUT. */
+  PREFERENCES:     "/api/me/notification-preferences",
 } as const;
 
 /**

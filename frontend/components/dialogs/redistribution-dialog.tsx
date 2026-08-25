@@ -6,6 +6,7 @@ import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { ShimmerLoader } from "@/components/ui/shimmer-loader"
 import {
   Dialog,
   DialogContent,
@@ -25,6 +26,14 @@ import {
 interface Row extends RedistributionMove {
   selected: boolean
 }
+
+/** Messages du loader (même moteur que Smart Assign : compétences / charge / dispo). */
+const REDISTRIBUTION_PHASES = [
+  "Reading current assignments…",
+  "Weighing each workload…",
+  "Calculating availability…",
+  "Finding the best balance…",
+]
 
 interface RedistributionDialogProps {
   readonly slug: string
@@ -123,8 +132,9 @@ export function RedistributionDialog({ slug, targetUserId, trigger, onApplied }:
         </DialogHeader>
 
         {loading ? (
-          <div className="flex items-center justify-center py-10">
-            <Loader2 className="size-5 animate-spin text-muted-foreground" />
+          <div className="flex items-center justify-center gap-2 py-10 text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" />
+            <ShimmerLoader phrases={REDISTRIBUTION_PHASES} className="text-xs" />
           </div>
         ) : ran && rows.length > 0 ? (
           <div className="flex flex-col gap-1 max-h-[55vh] overflow-y-auto">

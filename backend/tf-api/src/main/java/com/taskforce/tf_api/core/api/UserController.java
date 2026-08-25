@@ -16,6 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -97,6 +98,36 @@ public class UserController {
         log.debug("POST /api/users/me/avatar — email={}", email);
         UserResponse response = userService.uploadAvatar(email, file);
         return ResponseEntity.ok(ApiResponse.success("Avatar mis à jour", response));
+    }
+
+    // ---- Sécurité : mot de passe + 2FA (UI TaskForce, métier Keycloak) --------------------------
+
+    /** Déclenche l'email « réinitialiser le mot de passe » (flux Keycloak). POST /api/users/me/password/reset */
+    @PostMapping("/me/password/reset")
+    public ResponseEntity<ApiResponse<Void>> requestPasswordReset(@AuthenticationPrincipal Jwt jwt) {
+        userService.requestPasswordReset(identityResolver.resolveEmail(jwt));
+        return ResponseEntity.ok(ApiResponse.success("Email de réinitialisation envoyé", null));
+    }
+
+    /** Statut du 2FA (TOTP). GET /api/users/me/2fa → { data: true|false } */
+    @GetMapping("/me/2fa")
+    public ResponseEntity<ApiResponse<Boolean>> getTwoFactor(@AuthenticationPrincipal Jwt jwt) {
+        boolean enabled = userService.isTwoFactorEnabled(identityResolver.resolveEmail(jwt));
+        return ResponseEntity.ok(ApiResponse.success("Statut 2FA", enabled));
+    }
+
+    /** Déclenche l'email de configuration du 2FA (TOTP). POST /api/users/me/2fa/enable */
+    @PostMapping("/me/2fa/enable")
+    public ResponseEntity<ApiResponse<Void>> enableTwoFactor(@AuthenticationPrincipal Jwt jwt) {
+        userService.enableTwoFactor(identityResolver.resolveEmail(jwt));
+        return ResponseEntity.ok(ApiResponse.success("Email de configuration 2FA envoyé", null));
+    }
+
+    /** Désactive le 2FA. DELETE /api/users/me/2fa */
+    @DeleteMapping("/me/2fa")
+    public ResponseEntity<ApiResponse<Void>> disableTwoFactor(@AuthenticationPrincipal Jwt jwt) {
+        userService.disableTwoFactor(identityResolver.resolveEmail(jwt));
+        return ResponseEntity.ok(ApiResponse.success("2FA désactivé", null));
     }
 
     /**

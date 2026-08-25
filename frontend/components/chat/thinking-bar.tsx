@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
 import { Loader } from "@/components/ui/loader"
-import { ShimmeringText } from "@/components/ui/shimmering-text"
+import { TextShimmerWave } from "@/components/ui/text-shimmer-wave"
 
 /** Phases de réflexion de Cortex, défilées pendant la génération (donne un déroulé « vivant »). */
 const PHASES = [
@@ -42,8 +42,9 @@ export function ThinkingBar({
   return (
     <span className={cn("inline-flex items-center gap-2", className)}>
       <Loader variant="spin" size="sm" className="text-primary" />
-      {/* key={text} → le shimmer redémarre à chaque phase (petite transition). */}
-      <ShimmeringText key={text}>{text}</ShimmeringText>
+      {/* Pas de `key` : la vague CONTINUE quand la phase change (sinon reset visible). `repeatDelay`
+          court → animation quasi-continue (le défaut fait une longue pause selon la longueur). */}
+      <TextShimmerWave as="span" transition={{ repeatDelay: 0.2 }}>{text}</TextShimmerWave>
     </span>
   )
 }

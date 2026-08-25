@@ -59,6 +59,7 @@ import com.taskforce.tf_api.core.model.IssueStatus;
 import com.taskforce.tf_api.core.model.IssueType;
 import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.model.ProjectLabel;
+import com.taskforce.tf_api.core.model.AssignmentStatus;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.WorkspaceMember;
 import com.taskforce.tf_api.core.repository.IssueActivityRepository;
@@ -75,6 +76,7 @@ import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.shared.dto.PageResponse;
 import com.taskforce.tf_api.shared.exception.BusinessException;
+import com.taskforce.tf_api.shared.exception.ForbiddenException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import lombok.extern.slf4j.Slf4j;
@@ -369,9 +371,15 @@ public class IssueService {
 
         logActivity(issue, reporter, IssueActivityType.CREATED, null, issue.getTitle());
 
-        // Notification d'assignation à la création
+        // Assignation à la création : statut + notif. Self-assign = accepté d'office (pas de validation).
         if (assignee != null) {
-            notificationService.notifyAssigned(issue, reporter);
+            issue.setAssignedBy(reporter);
+            if (assignee.getId().equals(reporter.getId())) {
+                issue.setAssignmentStatus(AssignmentStatus.ACCEPTED);
+            } else {
+                issue.setAssignmentStatus(AssignmentStatus.PENDING);
+                notificationService.notifyAssigned(issue, reporter);
+            }
         }
 
         IssueResponse created = toResponse(issue);
@@ -385,6 +393,52 @@ public class IssueService {
         );
 
         return created;
+    }
+
+    /**
+     * L'assigné ACCEPTE l'assignation en attente → statut ACCEPTED. Réservé à l'assigné courant.
+     */
+    @Transactional
+    public IssueResponse acceptAssignment(Long issueId, Long userId) {
+        Issue issue = resolveAssignmentTarget(issueId, userId);
+        issue.setAssignmentStatus(AssignmentStatus.ACCEPTED);
+        IssueResponse resp = toResponse(issue);
+        publishIssueEvent("updated", issue.getProject().getId(), issue.getId(), resp);
+        return resp;
+    }
+
+    /**
+     * L'assigné REFUSE l'assignation : l'issue est <b>désassignée</b> et l'auteur de l'assignation
+     * est <b>prévenu</b> (il pourra réassigner, via Smart Assign s'il veut). Réservé à l'assigné courant.
+     */
+    @Transactional
+    public IssueResponse declineAssignment(Long issueId, Long userId) {
+        Issue issue = resolveAssignmentTarget(issueId, userId);
+        User decliner = issue.getAssignee();
+        User assignedBy = issue.getAssignedBy();
+
+        issue.setAssignee(null);
+        issue.setAssignmentStatus(null);
+        issue.setAssignedBy(null);
+        logActivity(issue, decliner, IssueActivityType.ASSIGNEE_CHANGED, decliner.getEmail(), null);
+
+        if (assignedBy != null && !assignedBy.getId().equals(userId)) {
+            notificationService.notifyAssignmentDeclined(issue, assignedBy, decliner);
+        }
+
+        IssueResponse resp = toResponse(issue);
+        publishIssueEvent("updated", issue.getProject().getId(), issue.getId(), resp);
+        return resp;
+    }
+
+    /** Charge l'issue et vérifie que {@code userId} en est bien l'assigné (sinon 403). */
+    private Issue resolveAssignmentTarget(Long issueId, Long userId) {
+        Issue issue = issueRepository.findById(issueId)
+            .orElseThrow(() -> new ResourceNotFoundException("Issue introuvable"));
+        if (issue.getAssignee() == null || !issue.getAssignee().getId().equals(userId)) {
+            throw new ForbiddenException("Cette assignation ne vous concerne pas");
+        }
+        return issue;
     }
 
     /**
@@ -449,8 +503,15 @@ public class IssueService {
             User newAssignee = resolveUser(request.getAssigneeId());
             String old = issue.getAssignee() != null ? issue.getAssignee().getEmail() : null;
             issue.setAssignee(newAssignee);
+            issue.setAssignedBy(actor);
             logActivity(issue, actor, IssueActivityType.ASSIGNEE_CHANGED, old, newAssignee.getEmail());
-            notificationService.notifyAssigned(issue, actor);
+            // (Ré)assignation : à valider par l'assigné, sauf self-assign (accepté d'office).
+            if (newAssignee.getId().equals(actor.getId())) {
+                issue.setAssignmentStatus(AssignmentStatus.ACCEPTED);
+            } else {
+                issue.setAssignmentStatus(AssignmentStatus.PENDING);
+                notificationService.notifyAssigned(issue, actor);
+            }
         }
         if (request.getParentId() != null) {
             Issue newParent = resolveIssue(request.getParentId(), project.getId());
@@ -1064,6 +1125,7 @@ public class IssueService {
             .type(issue.getType() != null ? toTypeResponse(issue.getType()) : null)
             .assignee(issue.getAssignee() != null ? toUserSummary(issue.getAssignee()) : null)
             .reporter(toUserSummary(issue.getReporter()))
+            .assignmentStatus(issue.getAssignmentStatus() != null ? issue.getAssignmentStatus().name() : null)
             .parent(issue.getParent() != null ? toIssueSummary(issue.getParent()) : null)
             .childCount(issue.getChildren().size())
             .startDate(issue.getStartDate())

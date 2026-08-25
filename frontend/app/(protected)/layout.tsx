@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react"
 
 import { useAuth } from "@/lib/contexts/auth-context"
 import { AppShell } from "@/components/layout/app-shell"
+import { LabShell } from "@/components/layout/lab-shell"
 import { Toaster } from "@/components/ui/sonner"
 
 export default function ProtectedLayout({
@@ -48,7 +49,10 @@ export default function ProtectedLayout({
 
   return (
     <>
-      <AppShell>{children}</AppShell>
+      {/* LabShell : bandeau « sandbox » en haut + coins arrondis sur les zones Labs (sinon transparent). */}
+      <LabShell>
+        <AppShell>{children}</AppShell>
+      </LabShell>
       <Toaster position="bottom-right" richColors closeButton />
     </>
   )

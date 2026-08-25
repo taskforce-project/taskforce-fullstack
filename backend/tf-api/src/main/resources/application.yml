@@ -51,6 +51,14 @@ spring:
       include-stacktrace: on_param
       include-exception: false
 
+  # Upload multipart : le défaut Spring (1 Mo) faisait échouer l'upload d'avatar en 500
+  # (l'UI annonce « max 3 Mo »). Relevé à 10 Mo (avatars + pièces jointes). Un dépassement
+  # renvoie désormais un 413 propre (GlobalExceptionHandler.handleMaxUploadSize).
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 12MB
+
 # Server Configuration
 server:
   port: ${SERVER_PORT:8080}

@@ -37,6 +37,9 @@ public class IssueResponse {
     private UserSummaryResponse assignee;
     private UserSummaryResponse reporter;
 
+    /** Acceptation de l'assignation courante : "PENDING" | "ACCEPTED" | null (pas d'assigné / historique). */
+    private String assignmentStatus;
+
     /** null si issue de premier niveau */
     private IssueSummaryResponse parent;
     private int childCount;

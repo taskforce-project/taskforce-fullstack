@@ -70,6 +70,8 @@ export interface Issue {
   type: IssueType | null;
   assignee: UserSummary | null;
   reporter: UserSummary;
+  /** Acceptation de l'assignation courante : "PENDING" (à valider) | "ACCEPTED" | null. */
+  assignmentStatus: "PENDING" | "ACCEPTED" | null;
   parent: IssueSummary | null;
   childCount: number;
   startDate: string | null;

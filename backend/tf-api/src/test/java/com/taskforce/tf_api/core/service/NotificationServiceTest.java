@@ -29,6 +29,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -47,6 +48,8 @@ class NotificationServiceTest {
     @Mock private WorkspaceRepository workspaceRepository;
     @Mock private UserRepository userRepository;
     @Mock private SimpMessagingTemplate messagingTemplate;
+    @Mock private NotificationPreferenceService preferenceService;
+    @Mock private EmailService emailService;
 
     @InjectMocks private NotificationService service;
 
@@ -59,6 +62,10 @@ class NotificationServiceTest {
     void setUp() {
         workspace = Workspace.builder().id(1L).slug(SLUG).name("Acme").build();
         project = Project.builder().id(5L).workspace(workspace).identifier("APP").name("App").build();
+        // Défaut : in-app actif, email inactif -> comportement historique (persist + push, pas d'email).
+        // lenient() car les tests de lecture/garde-fous ne déclenchent jamais dispatch().
+        lenient().when(preferenceService.resolve(anyLong(), any()))
+            .thenReturn(new NotificationPreferenceService.Channels(true, false));
     }
 
     private User user(long id, String name) {
@@ -104,6 +111,26 @@ class NotificationServiceTest {
 
             verify(notificationRepository).save(any(Notification.class));
             verify(messagingTemplate).convertAndSend(eq("/topic/notifications.20"), any(Object.class));
+        }
+
+        @Test
+        @DisplayName("notifyAssignmentDeclined prévient l'assigneur (refus)")
+        void should_notify_assignment_declined() {
+            User assigner = user(50L, "manager");
+            User decliner = user(20L, "dev");
+            when(notificationRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            service.notifyAssignmentDeclined(issue(decliner, user(21L, "reporter")), assigner, decliner);
+
+            verify(notificationRepository).save(any(Notification.class));
+            verify(messagingTemplate).convertAndSend(eq("/topic/notifications.50"), any(Object.class));
+        }
+
+        @Test
+        @DisplayName("notifyAssignmentDeclined ne fait rien sans assigneur connu")
+        void should_skip_declined_without_assigner() {
+            service.notifyAssignmentDeclined(issue(user(20L, "a"), user(21L, "r")), null, user(20L, "a"));
+            verify(notificationRepository, never()).save(any());
         }
     }
 
@@ -291,6 +318,53 @@ class NotificationServiceTest {
                 java.util.List.of(user(1L, "owner"), user(2L, "admin")));
 
             verify(notificationRepository, times(2)).save(any());
+        }
+    }
+
+    // =========================================================================
+    @Nested
+    @DisplayName("Préférences (gating in-app / email)")
+    class Preferences {
+
+        @Test
+        @DisplayName("in-app désactivé -> ni persistance ni push ni email")
+        void should_skip_all_when_inapp_and_email_off() {
+            when(preferenceService.resolve(anyLong(), any()))
+                .thenReturn(new NotificationPreferenceService.Channels(false, false));
+
+            service.notifyAssigned(issue(user(20L, "assignee"), user(30L, "actor")), user(30L, "actor"));
+
+            verify(notificationRepository, never()).save(any());
+            verify(messagingTemplate, never()).convertAndSend(anyString(), any(Object.class));
+            verify(emailService, never()).sendNotificationEmail(
+                anyString(), anyString(), anyString(), anyString(), any(), anyString(), anyString());
+        }
+
+        @Test
+        @DisplayName("email activé -> persiste (in-app) ET envoie l'email au destinataire")
+        void should_send_email_when_enabled() {
+            when(preferenceService.resolve(anyLong(), any()))
+                .thenReturn(new NotificationPreferenceService.Channels(true, true));
+            when(notificationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+            service.notifyAssigned(issue(user(20L, "assignee"), user(30L, "actor")), user(30L, "actor"));
+
+            verify(notificationRepository).save(any(Notification.class));
+            verify(emailService).sendNotificationEmail(
+                eq("assignee@ex.dev"), anyString(), anyString(), anyString(), any(), anyString(), anyString());
+        }
+
+        @Test
+        @DisplayName("email activé mais in-app désactivé -> email seul, aucune ligne inbox")
+        void should_email_only_when_inapp_off() {
+            when(preferenceService.resolve(anyLong(), any()))
+                .thenReturn(new NotificationPreferenceService.Channels(false, true));
+
+            service.notifyAssigned(issue(user(20L, "assignee"), user(30L, "actor")), user(30L, "actor"));
+
+            verify(notificationRepository, never()).save(any());
+            verify(emailService).sendNotificationEmail(
+                anyString(), anyString(), anyString(), anyString(), any(), anyString(), anyString());
         }
     }
 }

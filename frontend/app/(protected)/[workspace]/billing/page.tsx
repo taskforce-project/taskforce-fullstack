@@ -238,8 +238,9 @@ export default function BillingPage() {
         <p className="mt-1.5 text-sm text-muted-foreground">Per-member pricing. Change anytime, no commitment.</p>
       </div>
 
-      {/* 4 colonnes séparées par un filet (style épuré) */}
-      <div className="mx-auto mt-6 grid w-full max-w-6xl divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card/40 md:grid-cols-4 md:divide-x md:divide-y-0">
+      {/* Grille responsive : 1 colonne (mobile) → 2 (tablette) → 4 (desktop). Cartes bordées avec
+          gap : le layout `divide-*` (basé sur l'ordre DOM) ne sait pas faire un 2 colonnes propre. */}
+      <div className="mx-auto mt-6 grid w-full max-w-6xl grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {PLANS.map((p) => {
           const price = priceFor(p)
           const feats: { label: string; head: boolean }[] = [
@@ -248,7 +249,13 @@ export default function BillingPage() {
           ]
           const paid = p.monthly !== null && p.monthly > 0
           return (
-            <div key={p.key} className={cn("flex flex-col p-6", p.highlight && "bg-gradient-to-b from-primary/[0.06] to-transparent")}>
+            <div
+              key={p.key}
+              className={cn(
+                "flex flex-col rounded-2xl border border-border bg-card p-6",
+                p.highlight && "border-primary/30 bg-gradient-to-b from-primary/[0.06] to-transparent ring-1 ring-primary/20",
+              )}
+            >
               <div className="flex items-center gap-2">
                 <h3 className="text-xl font-semibold tracking-tight text-foreground">{p.name}</h3>
                 {p.highlight && (
