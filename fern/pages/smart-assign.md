@@ -1,24 +1,42 @@
 ---
 title: Smart Assign
-subtitle: L'IA suggère la bonne personne pour chaque tâche.
+subtitle: La bonne personne pour chaque tâche — suggérée, jamais imposée.
 ---
 
-**Smart Assign** propose automatiquement le meilleur **responsable** pour une issue, en s'appuyant sur les
-**compétences** et la **charge** de chaque membre — plutôt que d'assigner au hasard ou toujours à la même
-personne.
+**Smart Assign** répond à une question simple : *« qui devrait prendre cette tâche ? »*. Cortex évalue
+les membres de l'opération et vous propose **la personne la plus adaptée**, avec des alternatives. Vous
+restez décideur — c'est une **suggestion**.
+
+## Ce que Cortex évalue
+
+La recommandation croise plusieurs signaux, pour chaque personne :
+
+| Critère | Ce qu'il regarde |
+| --- | --- |
+| **Compétences** | La correspondance entre les tags de compétences de la personne et la tâche. |
+| **Expérience** | Son historique sur des tâches semblables. |
+| **Charge de travail** | Ce qu'elle a déjà en cours. |
+| **Disponibilité** | Sa capacité déclarée (heures/semaine). |
+
+Ces signaux se combinent en un **score**, et Cortex renvoie **un·e recommandé·e** en tête, suivi·e
+d'**alternatives** classées — libre à vous de choisir.
+
+{/* SCREENSHOT: smart-assign — la suggestion Smart Assign (recommandé + alternatives, scores) */}
+
+## Où l'utiliser
+
+- **À la création d'une tâche** — une suggestion vous est proposée avant même de l'enregistrer.
+- **En lot** — demandez des recommandations pour **plusieurs tâches à la fois** (multi-assign).
+- **Après un refus** — quand une assignation est refusée, Smart Assign aide à trouver le prochain bon
+  choix. → [Accepter ou refuser une assignation](/guides/assignations)
 
 ## D'où viennent les données
 
-À la première connexion, un court **onboarding** demande à chaque membre son **rôle** et ses
-**compétences**. Ces réponses alimentent un **profil de compétences**, la matière première de Smart Assign.
+Smart Assign s'appuie sur les **profils de compétences** des membres — renseignés à
+l'[onboarding](/guides/onboarding-et-profil) et modifiables dans le profil. Plus les profils sont à
+jour, meilleures sont les suggestions.
 
-<Steps>
-  <Step title="Onboarding">Chaque membre renseigne son rôle et ses compétences.</Step>
-  <Step title="Suggestion">À l'assignation d'une issue, l'IA propose le meilleur responsable.</Step>
-  <Step title="Décision">Vous gardez la main : la suggestion reste une proposition.</Step>
-</Steps>
-
-<Tip>
-La suggestion d'affectation est **offerte** : elle n'est pas décomptée de votre consommation d'IA
-(voir [Offres & IA](/guides/offres-et-ia)).
-</Tip>
+<Note>
+  Si l'IA n'est pas disponible, Smart Assign bascule sur un **classement déterministe** (repli) plutôt
+  que de ne rien proposer. La suggestion **consomme des tokens** lorsqu'elle passe par le modèle.
+</Note>

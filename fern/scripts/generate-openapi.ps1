@@ -34,3 +34,9 @@ try {
 # UTF-8 SANS BOM (certains parseurs OpenAPI sont stricts sur le BOM).
 [System.IO.File]::WriteAllText($out, $pretty, (New-Object System.Text.UTF8Encoding($false)))
 Write-Host "OK -> $out"
+
+# Post-traitement : reference API lisible (retire l'actuator, renomme les tags par contexte, ordonne
+# les sections). Idempotent. Cf. clean-openapi.mjs.
+Write-Host "-> Nettoyage de la spec (clean-openapi.mjs)"
+& node (Join-Path $PSScriptRoot 'clean-openapi.mjs')
+if ($LASTEXITCODE -ne 0) { Write-Error 'clean-openapi a echoue'; exit 1 }
