@@ -41,6 +41,11 @@ Puis **tab Référence API** (chantier 2 : OpenAPI + guides bonnes pratiques/aut
   opération LEAD/MEMBER/VIEWER, équipe LEAD/MEMBER), inviter-son-equipe (statuts + acceptation
   explicite) — réécrits ; equipes (groupes workspace), notifications (6 événements × 2 canaux) —
   nouveaux. Rôles/portées vérifiés dans workspace/project/team-service.
-- 🔲 Lots 5 à 7 (10 pages).
+- ✅ **Lot 5 — L'IA (Cortex)** (6 pages) : ia-vue-ensemble, ia-assistant, ia-workflows,
+  ia-generation-spec (nouveaux) ; smart-assign, memoire/Brain OS (réécrits). Vérifié dans le code :
+  AiMeter (métrage tokens, complimentary), workflow-dock (jobs QUEUED→…→DONE, human-in-the-loop),
+  ai/spec + approve, SmartAssignCandidate (semantic/historical/workload/availability), Brain OS =
+  knowledge graph fonctionnel mais **Lab**.
+- 🔲 Lots 6 à 7 (4 pages).
 - 🔲 Câblage des screenshots.
 - 🔲 Référence API (chantier 2).

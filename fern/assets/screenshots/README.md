@@ -53,4 +53,14 @@ Chaque capture illustre une page de la doc Fern. **Convention** : place le fichi
 | `equipe-detail` | Équipes | une équipe (identité + liste de ses membres) |
 | `notifications-preferences` | Notifications & préférences | la matrice Paramètres → Notifications (événements × canaux) |
 
-> Les lots suivants (IA, Piloter, Compte) ajouteront leurs propres lignes ici au fur et à mesure.
+## Lot 5 — L'IA (Cortex)
+
+| id | Page | Où / quoi capturer |
+| --- | --- | --- |
+| `ia-assistant-panel` | Assistant | le panneau de l'assistant Cortex ouvert (conversation) |
+| `ia-workflows-dock` | Workflows | le dock des workflows (un job avec son plan et son statut) |
+| `ia-spec` | Génération de spec | la proposition de spec générée sur une tâche + action d'approbation |
+| `smart-assign` | Smart Assign | la suggestion (recommandé·e + alternatives, scores) |
+| `brain-graph` | Mémoire (Brain OS) | la vue graphe du Brain OS (nœuds reliés) — Lab |
+
+> Les lots suivants (Piloter, Compte) ajouteront leurs propres lignes ici au fur et à mesure.
