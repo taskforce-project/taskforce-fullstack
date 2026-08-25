@@ -10,6 +10,10 @@
 >
 > Sources : `.ai/qa.md` (QA produit détaillée), `.ai/known-issues.md` (bugs vérifiés), `.ai/module-map.md` (domaines↔code), `.ai/architecture-map.md` (archi réelle), `.ai/P0-fix-plan.md` (correctifs P0 paste-ready).
 
+> **▶ MAJ 25/08/2026 — QA-27 : chat sans bordure + shimmer loader continu (branche `hot-fix`).** `[QA-27]`
+> - **Réponse du chat sans bordure/fond/ombre** (retour user) : la bulle assistant (`chat/message.tsx`) portait `border bg-card` → retiré, juste le texte façon chat (la bulle **user** garde son fond sombre).
+> - **Shimmer du loader « pas toujours là »** : deux causes — (1) `key={text}` remontait le shimmer à chaque changement de message (reset visible), (2) le `repeatDelay` par défaut est **proportionnel à la longueur** du texte → longue pause statique entre deux vagues (« le texte défile sans animation »). Fix : plus de `key` (la vague continue, le texte change en place) + `repeatDelay: 0.2` → animation quasi-continue. Appliqué à `ShimmerLoader` (Smart Assign / spec / workflow / redistribution) et `ThinkingBar` (chat / onboarding).
+
 > **▶ MAJ 25/08/2026 — QA-26 : shimmer IA — fix animation + loaders bouclés + redistribution (branche `hot-fix`).** `[QA-26]`
 > - **Fix `TextShimmerWave` qui ne s'animait plus (retour user « plus d'animation après reload »)** : `motion.create()` était appelé **pendant le render** → composant recréé à chaque rendu → élément remonté en boucle → animation gelée dans les contextes qui re-render souvent (le chat avec son timer). Mémoïsé (`useMemo` par `Component`).
 > - **Loaders IA bouclés** : nouveau `ShimmerLoader` (`components/ui/shimmer-loader.tsx`) qui **fait défiler 4 messages** par cas (~1.8 s chacun, `key` → transition douce). Branché sur Smart Assign panel + bulk, génération de spec, workflows, **redistribution**. (Chat + onboarding bouclaient déjà via `ThinkingBar`.)
