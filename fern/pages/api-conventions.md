@@ -1,6 +1,6 @@
 ---
 title: Conventions
-subtitle: Enveloppe, erreurs, pagination, codes HTTP.
+subtitle: Enveloppe, méthodes, erreurs, pagination, codes HTTP.
 ---
 
 Ces règles s'appliquent à **tous** les endpoints. Les connaître dispense de les relire sur chaque
@@ -8,8 +8,19 @@ route.
 
 ## Le préfixe `/api`
 
-Toute route porte le préfixe **`/api`**. Il n'y a pas de version dans le chemin — la référence
-OpenAPI fait foi pour le contrat courant.
+Toute route porte le préfixe **`/api`**. Il n'y a pas de version dans le chemin — la référence OpenAPI
+fait foi pour le contrat courant.
+
+## Méthodes HTTP
+
+L'API suit les conventions REST habituelles :
+
+| Méthode | Usage |
+| --- | --- |
+| **GET** | Lire une ressource ou une liste. Sans effet de bord. |
+| **POST** | Créer une ressource, ou déclencher une action. |
+| **PUT / PATCH** | Mettre à jour (remplacement / modification partielle). |
+| **DELETE** | Supprimer. |
 
 ## L'enveloppe `ApiResponse<T>`
 
@@ -37,11 +48,23 @@ Succès comme erreur, le corps suit la même forme :
 | **400 Bad Request** | Corps invalide — échec de validation. |
 | **401 / 403** | Non authentifié / droits insuffisants. → [Authentification](/api/api-authentification) |
 | **404 Not Found** | Ressource introuvable ou hors de votre périmètre. |
+| **409 Conflict** | Conflit d'état (ex. doublon, contrainte). |
 | **429 Too Many Requests** | Limite de débit atteinte (voir ci-dessous). |
 | **5xx** | Erreur serveur. |
 
 En cas d'erreur applicative, l'enveloppe passe `success: false` et **`message`** décrit le problème
-(`data` vaut alors `null`).
+(`data` vaut alors `null`) :
+
+```json
+{
+  "success": false,
+  "message": "La priorité doit être l'une de : NONE, LOW, MEDIUM, HIGH, URGENT",
+  "data": null,
+  "timestamp": "2026-08-25T14:12:00"
+}
+```
+
+Traitez donc **tout non-2xx** comme une erreur, et affichez / journalisez `message`.
 
 ## Pagination
 
