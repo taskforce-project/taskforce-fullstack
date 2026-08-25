@@ -163,4 +163,19 @@ navigation:
             slug: offres-et-ia
   - tab: api
     layout:
+      - section: Guide développeur
+        skip-slug: true
+        contents:
+          - page: Introduction
+            path: ./pages/api-introduction.md
+            slug: api-introduction
+          - page: Authentification
+            path: ./pages/api-authentification.md
+            slug: api-authentification
+          - page: Conventions
+            path: ./pages/api-conventions.md
+            slug: api-conventions
+          - page: Bonnes pratiques
+            path: ./pages/api-bonnes-pratiques.md
+            slug: api-bonnes-pratiques
       - api: Référence API

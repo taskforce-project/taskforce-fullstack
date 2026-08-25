@@ -56,5 +56,17 @@ Puis **tab Référence API** (chantier 2 : OpenAPI + guides bonnes pratiques/aut
   murs = scale, per-seat) — réécrit. Prix/quotas NON hardcodés (renvoi à l'app).
 - ✅ **Manuel utilisateur COMPLET — 28/28 pages.**
 - 🔲 Câblage des 25 screenshots (fournis par le user, cf. manifeste).
-- 🔲 **Référence API (chantier 2)** : régénérer `fern/openapi/openapi.json` depuis le backend
-  (`fern/scripts/generate-openapi.ps1`) + guides bonnes pratiques / auth / conventions.
+- ✅ **Chantier 2 — Référence API** :
+  - `openapi.json` **RÉEL** régénéré depuis le backend (springdoc `/api-docs`) : 235 opérations,
+    179 chemins, 314 schémas, auth `bearer-jwt`.
+  - Post-processeur `fern/scripts/clean-openapi.mjs` (branché dans `generate-openapi.ps1`) : retire
+    l'actuator, renomme les 42 tags `xxx-controller` en sections lisibles, ordonne + décrit → 40
+    sections propres. Idempotent, survit aux régénérations.
+  - 4 guides dev (onglet API) : Introduction, Authentification, Conventions (enveloppe/erreurs/
+    pagination/rate-limit), Bonnes pratiques. Câblés dans `docs.yml`.
+
+## Reste
+
+- 🔲 Screenshots (user) → câblage `<Frame>` (galeries pour flux séquentiels : onboarding 4 étapes,
+  spec, accept/refus).
+- 🔲 Publication : `fern login` + `fern generate --docs` (login navigateur, côté user).
