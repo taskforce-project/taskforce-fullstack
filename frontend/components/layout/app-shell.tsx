@@ -31,9 +31,11 @@ export function AppShell({ children }: AppShellProps) {
         {/* Invitations reçues en attente d'approbation — bannière montée hors du <main> keyé par
             la route : un seul fetch par session, persistante à la navigation. Nulle si rien. */}
         <PendingInvitationsBanner />
-        {/* `relative` : les panneaux (workflows / chat IA) se positionnent en OVERLAY par-dessus
-            le contenu (absolute) au lieu de le comprimer — cf. PanelDock. */}
-        <div className="relative flex min-h-0 flex-1">
+        {/* `relative` : les panneaux (workflows / chat IA) se positionnent en OVERLAY par-dessus le
+            contenu (absolute). `overflow-hidden` : pendant le slide d'ouverture le panneau part hors
+            écran à droite — sans clip ici, ça crée une barre de scroll horizontale transitoire qui
+            « repousse » le contenu vers la gauche puis revient. On clippe donc à la source. */}
+        <div className="relative flex min-h-0 flex-1 overflow-hidden">
           <PanelDock side="left" />
           <AnimatePresence mode="wait" initial={false}>
             <motion.main
