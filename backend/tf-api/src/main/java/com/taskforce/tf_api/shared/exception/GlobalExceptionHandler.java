@@ -2,6 +2,7 @@ package com.taskforce.tf_api.shared.exception;
 
 import com.taskforce.tf_api.shared.dto.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.ws.rs.WebApplicationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -248,6 +249,31 @@ public class GlobalExceptionHandler {
         );
 
         return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(error);
+    }
+
+    /**
+     * Échec d'un appel au fournisseur d'identité (Keycloak) via son client JAX-RS — le seul client
+     * {@code jakarta.ws.rs} de l'app. Typiquement l'envoi d'un email d'action (reset mot de passe,
+     * configuration 2FA) via {@code executeActionsEmail} quand <b>le SMTP du realm Keycloak n'est pas
+     * configuré</b> (Keycloak renvoie alors un 500). Sans ce handler, cela remontait en <b>500 « erreur
+     * inattendue »</b> effrayant ; on renvoie un <b>502</b> clair et actionnable.
+     */
+    @ExceptionHandler(WebApplicationException.class)
+    public ResponseEntity<ErrorResponse> handleIdentityProviderError(
+            WebApplicationException ex,
+            HttpServletRequest request) {
+
+        log.error("Échec d'un appel au fournisseur d'identité (Keycloak) sur {} : {}",
+                request.getRequestURI(), ex.getMessage());
+
+        ErrorResponse error = ErrorResponse.of(
+                HttpStatus.BAD_GATEWAY.value(),
+                "Bad Gateway",
+                "Le service d'authentification n'a pas pu envoyer l'email (SMTP indisponible). Réessaie plus tard.",
+                request.getRequestURI()
+        );
+
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(error);
     }
 
     /**

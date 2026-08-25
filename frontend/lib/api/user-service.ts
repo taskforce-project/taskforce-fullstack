@@ -59,21 +59,23 @@ export async function searchUsers(q: string): Promise<UserSearchResult[]> {
 
 /** Déclenche l'email « réinitialiser le mot de passe » (flux Keycloak). */
 export async function requestPasswordReset(): Promise<void> {
-  await apiClient.post(USER_ROUTES.PASSWORD_RESET);
+  // silentError : le panneau Security affiche son propre message clair — pas de double toast
+  // (le back peut renvoyer 502 si le SMTP du realm Keycloak n'est pas configuré).
+  await apiClient.post(USER_ROUTES.PASSWORD_RESET, undefined, { silentError: true });
 }
 
 /** Indique si le 2FA (TOTP) est actif pour l'utilisateur courant. */
 export async function getTwoFactorStatus(): Promise<boolean> {
-  const response = await apiClient.get<{ data: boolean }>(USER_ROUTES.TWO_FACTOR);
+  const response = await apiClient.get<{ data: boolean }>(USER_ROUTES.TWO_FACTOR, { silentError: true });
   return response.data.data;
 }
 
 /** Déclenche l'email de configuration du 2FA (l'utilisateur scanne le QR côté Keycloak). */
 export async function enableTwoFactor(): Promise<void> {
-  await apiClient.post(USER_ROUTES.TWO_FACTOR_ENABLE);
+  await apiClient.post(USER_ROUTES.TWO_FACTOR_ENABLE, undefined, { silentError: true });
 }
 
 /** Désactive le 2FA (supprime le credential TOTP). */
 export async function disableTwoFactor(): Promise<void> {
-  await apiClient.delete(USER_ROUTES.TWO_FACTOR);
+  await apiClient.delete(USER_ROUTES.TWO_FACTOR, { silentError: true });
 }
