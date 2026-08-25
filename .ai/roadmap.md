@@ -12,7 +12,7 @@
 
 > **▶ MAJ 25/08/2026 — QA-29 : vrai formulaire de feedback (« Give feedback ») (branche `hot-fix`).** `[QA-29]`
 > - Les « Give feedback » étaient de simples `mailto:` → **vrai formulaire** : `FeedbackDialog` global (catégorie **Idea / Bug / Other** + message) monté dans l'AppShell, ouvert via `useFeedbackStore.openFeedback(context)`. Branché sur le bandeau `LabShell` (contexte « Labs · Intelligence/Brain OS ») et le `LabBanner` in-app (intégrations).
-> - **Back** : `POST /api/feedback` (`FeedbackController` + `FeedbackService`) → **persiste** (table `feedback`, migration **V76**, entité write-once) + **notif email best-effort à l'équipe** (`EmailService.sendInternalNotification`, no-op si SMTP inactif, message **HTML-échappé**). DTO `SubmitFeedbackRequest` (catégorie `BUG|IDEA|OTHER`, message ≤5000, contexte). Tests `FeedbackServiceTest` (persist+notify / défaut OTHER + skip email / user introuvable).
+> - **Back** : `POST /api/feedback` (`FeedbackController` + `FeedbackService`) → **persiste** (table `feedback`, migration **V76**, entité write-once) + **notif email best-effort à l'équipe** (`EmailService.sendInternalNotification`, no-op si SMTP inactif, message **HTML-échappé**). DTO `SubmitFeedbackRequest` (catégorie `BUG|IDEA|OTHER`, message ≤5000, contexte). Tests `FeedbackServiceTest` (persist+notify / défaut OTHER + skip email / user introuvable ; ⚠️ `@Value notify-email` posé via `ReflectionTestUtils` car non injecté par `@InjectMocks`).
 > - **Front** : `feedback-service.ts` + `FEEDBACK_ROUTES` + `feedback-store.ts` + `components/feedback/feedback-dialog.tsx`.
 
 > **▶ MAJ 25/08/2026 — QA-28 : bandeau Labs façon Stripe (haut + coins arrondis, plus de cadre) (branche `hot-fix`).** `[QA-28]`

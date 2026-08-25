@@ -2,6 +2,7 @@ package com.taskforce.tf_api.core.service;
 
 import java.util.Optional;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -9,6 +10,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import com.taskforce.tf_api.core.dto.request.SubmitFeedbackRequest;
 import com.taskforce.tf_api.core.model.Feedback;
@@ -35,6 +37,13 @@ class FeedbackServiceTest {
     @InjectMocks private FeedbackService service;
 
     private static final long USER_ID = 7L;
+
+    @BeforeEach
+    void setUp() {
+        // `@Value` n'est PAS injecté par `@InjectMocks` (Mockito) → sans ça `notifyEmail` reste null
+        // et le 1er argument de sendInternalNotification ne matche pas `anyString()`.
+        ReflectionTestUtils.setField(service, "notifyEmail", "feedback@taskforce.dev");
+    }
 
     @Test
     @DisplayName("submit : persiste le retour + notifie l'équipe quand le SMTP est actif")
