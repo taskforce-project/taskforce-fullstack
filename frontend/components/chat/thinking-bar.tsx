@@ -42,8 +42,9 @@ export function ThinkingBar({
   return (
     <span className={cn("inline-flex items-center gap-2", className)}>
       <Loader variant="spin" size="sm" className="text-primary" />
-      {/* key={text} → le shimmer (vague par caractère) redémarre à chaque phase. */}
-      <TextShimmerWave as="span" key={text}>{text}</TextShimmerWave>
+      {/* Pas de `key` : la vague CONTINUE quand la phase change (sinon reset visible). `repeatDelay`
+          court → animation quasi-continue (le défaut fait une longue pause selon la longueur). */}
+      <TextShimmerWave as="span" transition={{ repeatDelay: 0.2 }}>{text}</TextShimmerWave>
     </span>
   )
 }
