@@ -295,8 +295,18 @@
   color: transparent;
 }
 
-/* (Bandeau « Labs » déplacé dans `LabShell` : bandeau bleu en haut + coins arrondis, façon sandbox
-   Stripe. Ancien fond topbar `.lab-banner-bg` et cadre viewport `.tf-lab-frame` retirés.) */
+/* Bandeau « Labs » façon sandbox Stripe : géré par `LabShell` (bandeau bleu en haut + app aux coins
+   arrondis). La sidebar shadcn est `fixed` (relative au viewport) → elle ignore le décalage : on la
+   fait descendre SOUS le bandeau + on arrondit son coin haut-gauche, cohérent avec l'app à droite.
+   2.25rem = hauteur du bandeau (`h-9` dans LabShell) ; 1rem = `rounded-2xl` de l'app. */
+.tf-lab-shell [data-slot="sidebar-container"] {
+  top: 2.25rem;
+  height: calc(100svh - 2.25rem);
+}
+.tf-lab-shell [data-slot="sidebar-inner"] {
+  overflow: hidden;
+  border-top-left-radius: 1rem;
+}
 
 /* Lignes « Labs » du Ctrl+K : la même vague, en accent à droite (voile à gauche pour garder icône +
    libellé lisibles). Sur `--popover` (fond du modal de recherche). */

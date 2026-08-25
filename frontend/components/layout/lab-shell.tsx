@@ -23,7 +23,7 @@ export function LabShell({ children }: { readonly children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex h-svh flex-col bg-blue-600 dark:bg-blue-700">
+    <div className="tf-lab-shell flex h-svh flex-col bg-blue-600 dark:bg-blue-700">
       {/* Bandeau sandbox — pleine largeur, en haut. */}
       <div className="flex h-9 shrink-0 items-center justify-center gap-2.5 px-4 text-white">
         <FlaskConical className="size-3.5 shrink-0" strokeWidth={2.5} aria-hidden />
