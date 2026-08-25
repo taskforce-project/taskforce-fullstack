@@ -24,6 +24,8 @@ public class IncomingInvitationResponse {
     private WorkspaceRole role;
     private String invitedByName;
     private LocalDateTime expiresAt;
+    /** Nom du projet ciblé, si l'invitation porte sur un projet (sinon null = invitation workspace simple). */
+    private String projectName;
 
     public static IncomingInvitationResponse from(WorkspaceInvitation inv) {
         String inviter = inv.getInvitedBy() != null
@@ -38,6 +40,7 @@ public class IncomingInvitationResponse {
             .role(inv.getRole())
             .invitedByName(inviter)
             .expiresAt(inv.getExpiresAt())
+            .projectName(inv.getProject() != null ? inv.getProject().getName() : null)
             .build();
     }
 }
