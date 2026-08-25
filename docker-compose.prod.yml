@@ -172,6 +172,8 @@ services:
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       MAIL_FROM: ${MAIL_FROM}
       MAIL_FROM_NAME: ${MAIL_FROM_NAME:-TaskForce}
+      # Adresse de réception des retours « Give feedback » (mappe feedback.notify-email).
+      FEEDBACK_NOTIFY_EMAIL: ${FEEDBACK_NOTIFY_EMAIL:-feedback@taskforce.dev}
 
       # Redis — rate limiting distribué (TF-SEC-011)
       RATELIMIT_DISTRIBUTED_ENABLED: "true"
