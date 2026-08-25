@@ -144,6 +144,19 @@ public class NotificationService {
     }
 
     /**
+     * Notifie l'auteur de l'assignation qu'un membre a <b>refusé</b> l'assignation (il faut réassigner).
+     * L'issue est déjà désassignée côté IssueService ; ici on prévient simplement l'assigneur.
+     */
+    @Transactional
+    public void notifyAssignmentDeclined(Issue issue, User assignedBy, User decliner) {
+        if (assignedBy == null) return;
+        String declinerName = decliner.getDisplayName() != null ? decliner.getDisplayName() : decliner.getEmail();
+        Notification notif = buildNotification(issue, decliner, assignedBy, "assignmentDeclined", "warning",
+            declinerName + " declined \"" + issue.getTitle() + "\" — reassign needed", null);
+        dispatch(notif);
+    }
+
+    /**
      * Notifie reporter + assignee quand un commentaire est posté.
      */
     @Transactional

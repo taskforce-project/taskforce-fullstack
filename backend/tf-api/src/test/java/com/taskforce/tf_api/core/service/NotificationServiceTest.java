@@ -112,6 +112,26 @@ class NotificationServiceTest {
             verify(notificationRepository).save(any(Notification.class));
             verify(messagingTemplate).convertAndSend(eq("/topic/notifications.20"), any(Object.class));
         }
+
+        @Test
+        @DisplayName("notifyAssignmentDeclined prévient l'assigneur (refus)")
+        void should_notify_assignment_declined() {
+            User assigner = user(50L, "manager");
+            User decliner = user(20L, "dev");
+            when(notificationRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            service.notifyAssignmentDeclined(issue(decliner, user(21L, "reporter")), assigner, decliner);
+
+            verify(notificationRepository).save(any(Notification.class));
+            verify(messagingTemplate).convertAndSend(eq("/topic/notifications.50"), any(Object.class));
+        }
+
+        @Test
+        @DisplayName("notifyAssignmentDeclined ne fait rien sans assigneur connu")
+        void should_skip_declined_without_assigner() {
+            service.notifyAssignmentDeclined(issue(user(20L, "a"), user(21L, "r")), null, user(20L, "a"));
+            verify(notificationRepository, never()).save(any());
+        }
     }
 
     // =========================================================================

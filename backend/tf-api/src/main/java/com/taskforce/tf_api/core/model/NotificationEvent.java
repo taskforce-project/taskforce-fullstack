@@ -41,7 +41,7 @@ public enum NotificationEvent {
     public static Optional<NotificationEvent> fromType(String type) {
         if (type == null) return Optional.empty();
         return switch (type) {
-            case "assigned" -> Optional.of(ASSIGNED);
+            case "assigned", "assignmentDeclined" -> Optional.of(ASSIGNED);
             case "mention" -> Optional.of(MENTION);
             case "commented" -> Optional.of(COMMENTED);
             case "statusChanged", "completed" -> Optional.of(STATUS_CHANGED);

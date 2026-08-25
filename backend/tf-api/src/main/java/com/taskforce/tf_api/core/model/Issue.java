@@ -101,6 +101,17 @@ public class Issue {
     @JoinColumn(name = "assignee_id")
     private User assignee;
 
+    /** Acceptation de l'assignation courante : PENDING (à valider) | ACCEPTED. Null = pas d'assigné
+     *  ou assignation historique (avant la feature) → pas de prompt d'acceptation. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "assignment_status", length = 20)
+    private AssignmentStatus assignmentStatus;
+
+    /** Auteur de l'assignation courante (pour le prévenir en cas de refus). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assignment_assigned_by_id")
+    private User assignedBy;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "reporter_id", nullable = false)
     private User reporter;
