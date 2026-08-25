@@ -175,7 +175,10 @@ export function AppTopbar() {
                 // pointent tous deux vers `/{slug}/dashboard` — l'href seul provoquait une clé dupliquée.
                 <React.Fragment key={`${i}-${crumb.href}`}>
                   {i > 0 && <BreadcrumbSeparator className="hidden md:block" />}
-                  <BreadcrumbItem className={i > 0 ? "hidden md:block" : ""}>
+                  {/* Responsive : on garde TOUJOURS la page courante (dernier crumb) ; les niveaux
+                      parents + séparateurs se replient sous `md` (sinon petit écran = plus de fil
+                      d'Ariane du tout). Le workspace reste accessible via le switcher de la sidebar. */}
+                  <BreadcrumbItem className={crumb.isLast ? "max-w-[60vw] truncate sm:max-w-none" : "hidden md:block"}>
                     {crumb.isLast ? (
                       <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
                     ) : (
@@ -215,6 +218,17 @@ export function AppTopbar() {
           onClick={() => setCmdOpen(true)}
         >
           <Search className="size-4" />
+        </Button>
+
+        {/* Ask AI — icône seule sur mobile (le bouton texte ci-dessous est masqué < sm). */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="sm:hidden"
+          onClick={openAssistant}
+          aria-label={t.shell.openAiAssistant}
+        >
+          <Sparkles className="size-4 text-primary" />
         </Button>
 
         {/* Ask AI — ouvre l'assistant en panneau latéral (PROD-8.9) */}
