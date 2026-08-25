@@ -65,8 +65,25 @@ Puis **tab Référence API** (chantier 2 : OpenAPI + guides bonnes pratiques/aut
   - 4 guides dev (onglet API) : Introduction, Authentification, Conventions (enveloppe/erreurs/
     pagination/rate-limit), Bonnes pratiques. Câblés dans `docs.yml`.
 
+## Enrichissement (« détaille plus » — 25/08)
+
+Preview Fern OK (32 pages, 0 erreur). Retour user : pages trop courtes. **Passe d'étoffement** :
+issues, espaces-et-projets, cycles, roadmap (commit `006aa3c4`) ; pages, ia-assistant, ia-workflows,
+ia-generation-spec, equipes, mon-travail (commit `f3108a7a`). Plancher passé de ~17 à ~35 lignes,
+pages cœur 50-118. Basé sur le vrai modèle (priorités, catégories de statut, journal d'activité
+complet, relations, scoring Smart Assign, statuts de workflow…). Reste optionnel : polish des 4 encore
+courtes (analytics, tableau-de-bord, inbox, notifications) si besoin.
+
+## ⚠️ Housekeeping — la doc n'est PAS encore dans le repo distant
+
+Tout le travail doc (30 pages + guides API + enrichissement) est sur **`hot-fix` LOCAL uniquement**
+(commits `643a104f`…`f3108a7a`), **non poussé**. `origin/hot-fix` est resté à `e27571a9` (mergé sur
+dev via #124, sans les docs). → **à faire** : pousser une branche docs + PR vers `dev` pour les
+**landing** dans le repo et permettre la publication CI. En attendant, preview locale via `fern
+generate --docs --preview`.
+
 ## Reste
 
-- 🔲 Screenshots (user) → câblage `<Frame>` (galeries pour flux séquentiels : onboarding 4 étapes,
-  spec, accept/refus).
+- 🔲 **Lander les docs** : push branche `docs/*` + PR → dev (le diff = uniquement les commits docs).
+- 🔲 Screenshots (user) → câblage `<Frame>` (galeries : onboarding 4 étapes, spec, accept/refus).
 - 🔲 Publication : `fern login` + `fern generate --docs` (login navigateur, côté user).
