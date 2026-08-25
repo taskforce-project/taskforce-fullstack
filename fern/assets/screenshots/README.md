@@ -24,5 +24,16 @@ Chaque capture illustre une page de la doc Fern. **Convention** : place le fichi
 | `tour-full` | Tour de l'interface | vue complète de l'app (Dashboard), barre latérale + barre du haut |
 | `tour-ai-panel` | Tour de l'interface | le panneau assistant Cortex ouvert par-dessus le canevas |
 
-> Les lots suivants (Organiser, Mon quotidien, Collaborer, IA, Piloter, Compte) ajouteront leurs
+## Lot 2 — Organiser le travail
+
+| id | Page | Où / quoi capturer |
+| --- | --- | --- |
+| `projet-creation` | Espaces & projets | la fenêtre « Créer un projet » (nom, préfixe, couleur, visibilité) |
+| `tache-detail` | Issues & tableaux | le panneau de détail d'une tâche (propriétés à droite, activité) |
+| `tache-kanban` | Issues & tableaux | la vue Kanban d'une opération (colonnes par statut) |
+| `sprint-liste` | Cycles | l'onglet Sprints d'une opération (actif / brouillon / terminé) |
+| `roadmap-gantt` | Roadmap | la feuille de route (Gantt) d'un espace, barres de progression |
+| `pages-liste` | Pages | l'onglet Pages d'une opération (liste des documents, recherche) |
+
+> Les lots suivants (Mon quotidien, Collaborer, IA, Piloter, Compte) ajouteront leurs
 > propres lignes ici au fur et à mesure.

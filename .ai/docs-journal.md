@@ -29,7 +29,11 @@ Puis **tab Référence API** (chantier 2 : OpenAPI + guides bonnes pratiques/aut
 
 - ✅ `docs.yml` restructuré (28 pages / 7 sections).
 - ✅ **Lot 1 — Découvrir** (5 pages) : index, concepts-cles, premiers-pas (réécrits) ;
-  onboarding-et-profil, tour-interface (nouveaux). Repères screenshots posés.
-- 🔲 Lots 2 à 7 (23 pages).
+  onboarding-et-profil, tour-interface (nouveaux). Repères screenshots posés. Commit `643a104f`.
+- ✅ **Lot 2 — Organiser le travail** (5 pages) : espaces-et-projets, issues-et-tableaux, cycles
+  (réécrits) ; roadmap, pages (nouveaux). Roadmap/Pages/Sprints **vérifiés fonctionnels** dans le
+  code (RoadmapGantt, page-store CRUD, cycle-store DRAFT/ACTIVE/COMPLETED). Propriétés de tâche
+  tirées de `issue-service.ts` (statuts custom, types, relations, sous-tâches, story points).
+- 🔲 Lots 3 à 7 (18 pages).
 - 🔲 Câblage des screenshots.
 - 🔲 Référence API (chantier 2).
