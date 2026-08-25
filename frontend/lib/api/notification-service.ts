@@ -72,3 +72,41 @@ export async function acknowledge(slug: string, id: number): Promise<Notificatio
 export async function acknowledgeAll(slug: string): Promise<void> {
   await apiClient.patch(NOTIFICATION_ROUTES.ACKNOWLEDGE_ALL(slug));
 }
+
+// ---------------------------------------------------------------------------
+// Réglages (portée compte : par événement, par canal)
+// ---------------------------------------------------------------------------
+
+/** Événements réglables (regroupent les 8 `type` de notifications). */
+export type NotificationEventKey =
+  | "assigned"
+  | "mention"
+  | "commented"
+  | "statusChanged"
+  | "dueDate"
+  | "overload";
+
+export interface NotificationPreference {
+  eventKey: NotificationEventKey;
+  /** Canal in-app (cloche + temps réel). */
+  inApp: boolean;
+  /** Canal email (opt-in). */
+  email: boolean;
+}
+
+/** Matrice complète des réglages de l'utilisateur courant (défauts fusionnés côté back). */
+export async function getNotificationPreferences(): Promise<NotificationPreference[]> {
+  const response = await apiClient.get<{ data: NotificationPreference[] }>(NOTIFICATION_ROUTES.PREFERENCES);
+  return response.data.data;
+}
+
+/** Enregistre les réglages ; renvoie la matrice recalculée. */
+export async function updateNotificationPreferences(
+  preferences: NotificationPreference[],
+): Promise<NotificationPreference[]> {
+  const response = await apiClient.put<{ data: NotificationPreference[] }>(
+    NOTIFICATION_ROUTES.PREFERENCES,
+    { preferences },
+  );
+  return response.data.data;
+}

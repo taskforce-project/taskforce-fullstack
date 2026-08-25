@@ -306,6 +306,8 @@ export const NOTIFICATION_ROUTES = {
   MARK_ALL_READ:   (slug: string) => `/api/workspaces/${slug}/notifications/read-all`,
   ACKNOWLEDGE:     (slug: string, id: number) => `/api/workspaces/${slug}/notifications/${id}/acknowledge`,
   ACKNOWLEDGE_ALL: (slug: string) => `/api/workspaces/${slug}/notifications/acknowledge-all`,
+  /** Réglages par événement (portée compte, pas workspace). GET + PUT. */
+  PREFERENCES:     "/api/me/notification-preferences",
 } as const;
 
 /**
