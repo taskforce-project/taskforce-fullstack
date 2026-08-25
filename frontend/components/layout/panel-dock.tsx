@@ -55,13 +55,19 @@ function PanelColumn({ panel, side }: { readonly panel: PanelDescriptor; readonl
 
   return (
     <motion.aside
-      // Slide + fade fluide à l'ouverture/fermeture (transform `x`, n'interfère pas avec le resize
-      // qui joue sur `width`). Même courbe que la transition du contenu principal (app-shell).
-      initial={{ x: side === "right" ? "100%" : "-100%", opacity: 0 }}
-      animate={{ x: 0, opacity: 1 }}
-      exit={{ x: side === "right" ? "100%" : "-100%", opacity: 0 }}
-      transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
-      style={{ width: panel.width, maxWidth: "92vw" }}
+      // Ouverture/fermeture fluide SANS jamais dépasser les bornes finales du panneau : `opacity` +
+      // `scale` ancré sur le bord (`transformOrigin`). Un slide en `x` (depuis hors écran droite)
+      // débordait et créait une barre de scroll horizontale transitoire → contenu « repoussé » vers
+      // la gauche (retour user). Le scale part de 0.97 → 1 : le panneau ne sort JAMAIS de sa zone.
+      initial={{ opacity: 0, scale: 0.97 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.97 }}
+      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+      style={{
+        width: panel.width,
+        maxWidth: "92vw",
+        transformOrigin: side === "right" ? "right center" : "left center",
+      }}
       className={cn(
         // Overlay : posé sur toute la hauteur du contenu, par-dessus le `<main>` (z au-dessus du
         // contenu, sous la topbar sticky z-40 et les modals z-50). `max-w-92vw` = garde-fou mobile.
