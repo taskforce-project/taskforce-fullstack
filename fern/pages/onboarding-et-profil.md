@@ -49,6 +49,8 @@ Donnez un **nom à votre espace de travail** et, si vous le souhaitez, **invitez
 saisissant leur email. Les invitations partent à la fin de l'assistant ; vous pourrez en envoyer
 d'autres plus tard. Voir [Inviter son équipe](/guides/inviter-son-equipe).
 
+{/* SCREENSHOT: onboarding-3-team — étape « Team » du wizard (nom d'espace + invitations) */}
+
 ## Étape 4 — Premier projet
 
 Optionnel : donnez un **nom** à une première **opération**. TaskForce en **dérive automatiquement le
@@ -56,6 +58,8 @@ préfixe** (les 3-4 premières lettres, ex. `WEBS` pour « Website redesign »).
 bien la créer plus tard depuis le Dashboard.
 
 Cliquez sur **Terminer** : vos réponses sont enregistrées et vous entrez dans l'application.
+
+{/* SCREENSHOT: onboarding-4-project — étape « First project » du wizard (nom + préfixe dérivé) */}
 
 ## Modifier votre profil plus tard
 

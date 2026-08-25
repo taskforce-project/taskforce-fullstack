@@ -21,6 +21,8 @@ Chaque capture illustre une page de la doc Fern. **Convention** : place le fichi
 | `premiers-pas-dashboard` | Premiers pas | le Dashboard d'un espace neuf |
 | `onboarding-1-you` | Onboarding & profil | étape « You » du wizard *(compte de test)* |
 | `onboarding-2-skills` | Onboarding & profil | étape « Skills », badges suggérés par Cortex *(compte de test)* |
+| `onboarding-3-team` | Onboarding & profil | étape « Team » (nom d'espace + invitations) *(compte de test)* |
+| `onboarding-4-project` | Onboarding & profil | étape « First project » (nom + préfixe dérivé) *(compte de test)* |
 | `tour-full` | Tour de l'interface | vue complète de l'app (Dashboard), barre latérale + barre du haut |
 | `tour-ai-panel` | Tour de l'interface | le panneau assistant Cortex ouvert par-dessus le canevas |
 
@@ -79,5 +81,6 @@ Chaque capture illustre une page de la doc Fern. **Convention** : place le fichi
 
 ---
 
-**Total : 25 screenshots** à fournir (dont 2 nécessitent un compte de test : `onboarding-1-you`,
-`onboarding-2-skills`). Dépose les PNG ici avec le nom exact de la colonne `id`.
+**Total : 27 screenshots** à fournir (dont **4** nécessitent un compte de test : les `onboarding-*`,
+qui forment une **galerie séquentielle** des 4 étapes). Dépose les PNG ici avec le nom exact de la
+colonne `id`.
