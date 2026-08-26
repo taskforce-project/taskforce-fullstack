@@ -16,6 +16,7 @@ import { FeedbackDialog } from "@/components/feedback/feedback-dialog"
 import { ProductTour } from "@/components/tour/product-tour"
 import { LabsGradientDefs } from "@/components/ui/labs-gradient-defs"
 import { PendingInvitationsBanner } from "@/components/invitations/pending-invitations-banner"
+import { LoginIntro } from "@/components/layout/login-intro"
 
 interface AppShellProps {
   readonly children: React.ReactNode
@@ -23,6 +24,20 @@ interface AppShellProps {
 
 export function AppShell({ children }: AppShellProps) {
   const pathname = usePathname()
+
+  // Intro de connexion : jouée UNE fois, juste après un login (drapeau `tf.intro` posé par le
+  // callback OAuth). L'overlay couvre l'app pendant son hydratation, puis se dissout dessus.
+  const [showIntro, setShowIntro] = React.useState(false)
+  React.useEffect(() => {
+    try {
+      if (sessionStorage.getItem("tf.intro")) {
+        sessionStorage.removeItem("tf.intro")
+        setShowIntro(true)
+      }
+    } catch {
+      /* sessionStorage indisponible (mode privé) — pas d'intro, l'app s'affiche normalement */
+    }
+  }, [])
 
   return (
     <SidebarProvider className="h-full">
@@ -67,6 +82,10 @@ export function AppShell({ children }: AppShellProps) {
 
       {/* Dégradé SVG de l'identité Labs — référencé par les icônes `tf-labs-icon` (sidebar, topbar, Ctrl+K) */}
       <LabsGradientDefs />
+
+      {/* Intro de connexion (overlay plein écran) — le logo TaskForce s'illumine, une vague ouvre
+          l'app, puis dissolution dans l'app déjà montée dessous. Une seule fois, post-login. */}
+      {showIntro && <LoginIntro phase="reveal" onDone={() => setShowIntro(false)} />}
     </SidebarProvider>
   )
 }
