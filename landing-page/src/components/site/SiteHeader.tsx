@@ -89,7 +89,7 @@ function MenuCard({ item }: { item: NavLink }) {
       <a
         href={item.href}
         className={cn(
-          "!flex-row group relative items-start gap-3 overflow-hidden rounded-xl p-3 transition-shadow",
+          "nav-card !flex-row group relative items-start gap-3 overflow-hidden rounded-xl p-3 transition-shadow",
           isLabs ? "border hover:shadow-md" : "transition-colors hover:bg-accent focus:bg-accent",
         )}
       >
@@ -108,7 +108,7 @@ function MenuCard({ item }: { item: NavLink }) {
             )}
           >
             <Icon
-              className={cn("size-[18px]", isLabs && "labs-ic-head")}
+              className={cn("nav-ic size-[18px]", isLabs && "labs-ic-head")}
               strokeWidth={1.75}
               style={isLabs ? undefined : { color: hueFor(Icon) }}
             />
