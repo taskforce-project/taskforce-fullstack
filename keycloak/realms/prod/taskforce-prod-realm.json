@@ -187,7 +187,17 @@
     "fr"
   ],
   "defaultLocale": "fr",
-  "smtpServer": {},
+  "smtpServer": {
+    "host": "smtp-relay.brevo.com",
+    "port": "587",
+    "starttls": "true",
+    "ssl": "false",
+    "auth": "true",
+    "from": "noreply@taskforce-project.fr",
+    "fromDisplayName": "TaskForce",
+    "user": "${MAIL_USERNAME}",
+    "password": "${MAIL_PASSWORD}"
+  },
   "eventsEnabled": true,
   "eventsListeners": [
     "jboss-logging"

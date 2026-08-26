@@ -33,6 +33,7 @@ function OAuthCallbackInner() {
   const { t } = usePreferencesStore();
   const [echecReseau, setEchecReseau] = useState<string | null>(null);
   const [phase, setPhase] = useState<"authenticating" | "success">("authenticating");
+  const [userName, setUserName] = useState<string | null>(null);
   const dejaEnvoye = useRef(false);
   const debut = useRef(0);
 
@@ -72,6 +73,8 @@ function OAuthCallbackInner() {
 
         // Modèle Linear : tout le monde démarre en Free. Un NOUVEAU venu (onboarding non fait) va au
         // wizard ; un habitué va droit à l'app.
+        setUserName(auth?.user?.displayName ?? auth?.user?.firstName ?? null);
+
         const target = auth?.user?.onboardingCompleted === false ? "/onboarding" : "/";
 
         // Temps minimum d'affichage, puis coche, puis navigation DURE (le service a écrit jetons +
@@ -110,6 +113,7 @@ function OAuthCallbackInner() {
       subtitle={
         phase === "success" ? "Taking you to your workspace…" : "Securely connecting your account…"
       }
+      userName={userName}
     />
   );
 }

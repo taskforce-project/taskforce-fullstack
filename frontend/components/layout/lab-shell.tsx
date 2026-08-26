@@ -28,18 +28,21 @@ export function LabShell({ children }: { readonly children: React.ReactNode }) {
   const labArea = pathname.includes("/brain") ? "Brain OS" : "Intelligence"
 
   return (
-    <div className="tf-lab-shell flex h-svh flex-col bg-blue-600 dark:bg-blue-700">
-      {/* Bandeau sandbox — pleine largeur, en haut. */}
-      <div className="flex h-9 shrink-0 items-center justify-center gap-2.5 px-4 text-white">
-        <FlaskConical className="size-3.5 shrink-0" strokeWidth={2.5} aria-hidden />
+    <div
+      className="tf-lab-shell flex h-svh flex-col bg-cover bg-center"
+      style={{ backgroundImage: "url('/assets/tour/labs-wave.jpg')" }}
+    >
+      {/* Bandeau sandbox — pleine largeur, en haut (fond image « labs-wave », dégradé clair). */}
+      <div className="flex h-9 shrink-0 items-center justify-center gap-2.5 px-4 text-slate-800">
+        <FlaskConical className="size-3.5 shrink-0 text-slate-700" strokeWidth={2.5} aria-hidden />
         <span className="text-xs font-semibold tracking-tight">Experimental space</span>
-        <span className="hidden text-[11px] text-white/70 sm:inline">
+        <span className="hidden text-[11px] text-slate-600 sm:inline">
           — Intelligence and Brain OS are still evolving
         </span>
         <button
           type="button"
           onClick={() => openFeedback(`Labs · ${labArea}`)}
-          className="ml-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-white/90 underline-offset-2 transition-colors hover:bg-white/15 hover:underline"
+          className="ml-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-slate-700 underline-offset-2 transition-colors hover:bg-black/5 hover:underline"
         >
           Give feedback
         </button>
