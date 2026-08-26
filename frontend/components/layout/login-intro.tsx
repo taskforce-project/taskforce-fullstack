@@ -69,13 +69,15 @@ export function LoginIntro({
 
           {/* La vague : le dégradé Labs, ondulé par le filtre, qui jaillit du logo et ouvre l'app. */}
           <motion.div
-            className="pointer-events-none absolute h-[72vmin] w-[72vmin] rounded-full"
+            /* Fusion : `multiply` fonce le dégradé sur le fond CLAIR ; mais sur fond SOMBRE multiply
+               vire au noir (la vague disparaît) → `screen` en dark pour qu'elle rayonne au lieu de
+               s'éteindre. Thème piloté par la classe `dark` de next-themes sur <html>. */
+            className="pointer-events-none absolute h-[72vmin] w-[72vmin] rounded-full mix-blend-multiply dark:mix-blend-screen"
             style={{
               backgroundImage: "url('/assets/tour/labs-wave.jpg')",
               backgroundSize: "cover",
               backgroundPosition: "center",
               filter: "url(#tf-liquid)",
-              mixBlendMode: "multiply",
             }}
             initial={{ scale: 0.34, opacity: 0 }}
             animate={{ scale: [0.34, 1.5, 3.9], opacity: [0, 0.95, 0] }}
