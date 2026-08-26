@@ -10,7 +10,12 @@
 >
 > Sources : `.ai/qa.md` (QA produit détaillée), `.ai/known-issues.md` (bugs vérifiés), `.ai/module-map.md` (domaines↔code), `.ai/architecture-map.md` (archi réelle), `.ai/P0-fix-plan.md` (correctifs P0 paste-ready).
 
-> **▶ MAJ 26/08/2026 — QA-39 : avatar redimensionné à l'upload (−~1,4 Mo sur le poids page) (branche `perf/avatar-resize`, en cours).** `[QA-39]`
+> **▶ MAJ 26/08/2026 — QA-40 : LCP dashboard — imports dynamiques des cartes Recharts (branche `perf/lcp-dynamic-imports`, en cours ; branche sœur QA-39 avatar en //).** `[QA-40]`
+> - **Problème (Lighthouse /dashboard)** : **LCP 6,5 s** (poids 25, score 0.09) = le pire levier Perf. L'élément LCP = le H1 « Pick up… », rendu **après hydratation** (dashboard client-rendered, ~33 chunks JS). Recharts (lourd) était en import **STATIQUE** dans le dispatcher `dashboard-card.tsx` (`CARD_BODIES`) → embarqué dans le bundle critique même sans carte chart affichée.
+> - **Fix** : `ThroughputCard` / `BurndownCard` / `AiChartCard` (Recharts) passés en **`next/dynamic`** (`ssr:false`, fallback squelette) → Recharts sort du bundle critique du dashboard → moins de JS d'hydratation → H1 (LCP) plus tôt. `tsc` / ESLint verts.
+> - **Reste (facile, autres routes)** : `brain-graph` (three + react-force-graph, la plus grosse lib) sur `/brain` ; `chart-explorer` / `bars-3d` sur `/analytics` → même `next/dynamic` (n'affecte pas le LCP /dashboard mesuré mais allège ces routes).
+
+> **▶ MAJ 26/08/2026 — QA-39 : avatar redimensionné à l'upload (−~1,4 Mo sur le poids page) (branche `perf/avatar-resize`, PR #151→dev).** `[QA-39]`
 > - **Problème (Lighthouse)** : `GET /api/files/avatars/{id}` servait l'image **plein format** (jusqu'à 3 Mo ; ici 1,4 Mo) alors qu'elle s'affiche en ~36px → ~60 % du poids de la page, + `cache-insight`/`total-byte-weight`.
 > - **Fix (backend, ZÉRO dépendance)** : `shared/util/ImageUtils.resizeAvatar(byte[])` (`javax.imageio` + AWT headless) → vignette **256px JPEG** (ratio préservé, **jamais agrandie**, alpha aplati sur blanc). Branché dans `UserService.uploadAvatar` AVANT `minioService.upload` (`image/jpeg`) ; **fallback sur l'original** si l'image n'est pas décodable (format exotique) → l'upload ne casse jamais. Variable `extension` morte supprimée. 3 tests `ImageUtilsTest` (downscale 800→256/192, pas d'upscale 64→64, non-image→null).
 > - **Portée** : n'affecte que les **nouveaux** uploads (les avatars déjà stockés restent jusqu'au prochain upload). Déploie via **VM1** (rôle backend).
