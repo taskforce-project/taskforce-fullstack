@@ -1,22 +1,38 @@
 "use client"
 
 import { useState, type ComponentType } from "react"
+import dynamic from "next/dynamic"
 import { toast } from "sonner"
 import type { DraggableAttributes, DraggableSyntheticListeners } from "@dnd-kit/core"
 
 import type { DashboardCard, DashboardCardSize } from "@/lib/api/dashboard-card-service"
 import { useDashboardCardsStore } from "@/lib/store/dashboard-cards-store"
+import { Skeleton } from "@/components/ui/skeleton"
 import { CARD_REGISTRY, cardTitle, type DashboardCardBodyProps, type GlobalRange } from "./card-registry"
 import { CardShell } from "./card-shell"
 import { CardEmpty } from "./card-states"
-import { AiChartCard } from "./cards/ai-chart-card"
 import { AiUsageCard } from "./cards/ai-usage-card"
-import { BurndownCard } from "./cards/burndown-card"
 import { KpiCard, KpiOpenCard } from "./cards/kpi-card"
 import { NeedsAttentionCard } from "./cards/needs-attention-card"
 import { OpsHealthCard } from "./cards/ops-health-card"
-import { ThroughputCard } from "./cards/throughput-card"
 import { WorkloadCard } from "./cards/workload-card"
+
+// Cartes à base de Recharts chargées À LA DEMANDE : Recharts (lourd) sort du bundle critique du
+// dashboard → moins de JS d'hydratation → le H1 « Pick up… » (élément LCP mesuré) s'affiche plus tôt.
+// Fallback = squelette ; les corps gèrent ensuite leur propre chargement de données par-dessus.
+const ChartFallback = () => <Skeleton className="h-[180px] w-full rounded-md" />
+const ThroughputCard = dynamic(() => import("./cards/throughput-card").then((m) => m.ThroughputCard), {
+  loading: ChartFallback,
+  ssr: false,
+})
+const BurndownCard = dynamic(() => import("./cards/burndown-card").then((m) => m.BurndownCard), {
+  loading: ChartFallback,
+  ssr: false,
+})
+const AiChartCard = dynamic(() => import("./cards/ai-chart-card").then((m) => m.AiChartCard), {
+  loading: ChartFallback,
+  ssr: false,
+})
 
 /** Corps de carte par type — tous branchés sur des endpoints réels. */
 const CARD_BODIES: Readonly<Record<string, ComponentType<DashboardCardBodyProps>>> = {
