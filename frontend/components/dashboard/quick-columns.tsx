@@ -33,7 +33,7 @@ function ColumnSkeleton() {
 
 /** État vide honnête d'une colonne — jamais de donnée fabriquée. */
 function ColumnEmpty({ message }: { readonly message: string }) {
-  return <p className="px-4 py-8 text-center text-xs text-muted-foreground/60">{message}</p>
+  return <p className="px-4 py-8 text-center text-xs text-muted-foreground">{message}</p>
 }
 
 const ROW_CLASS =
