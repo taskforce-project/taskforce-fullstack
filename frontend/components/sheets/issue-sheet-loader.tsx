@@ -57,9 +57,10 @@ export function toSheetIssue(issue: Issue): SheetIssue {
       ? {
           initials: issue.assignee.email.slice(0, 2).toUpperCase(),
           color:    AVATAR_COLORS[issue.assignee.id % AVATAR_COLORS.length],
-          name:     issue.assignee.email,
+          name:     issue.assignee.displayName ?? issue.assignee.email,
           email:    issue.assignee.email,
           userId:   issue.assignee.id,
+          avatarUrl: issue.assignee.avatarUrl,
         }
       : null,
     assigneeId:  issue.assignee?.id ?? null,

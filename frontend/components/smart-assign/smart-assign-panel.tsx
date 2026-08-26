@@ -61,7 +61,7 @@ function WorkloadBar({ value }: Readonly<{ value: number }>) {
       <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
         <div className={cn("h-full rounded-full transition-all", color)} style={{ width: `${value}%` }} />
       </div>
-      <span className="text-[10px] text-muted-foreground w-7 text-right">{value}%</span>
+      <span className="text-[0.625rem] text-muted-foreground w-7 text-right">{value}%</span>
     </div>
   )
 }
@@ -70,7 +70,7 @@ function WorkloadBar({ value }: Readonly<{ value: number }>) {
 function LabeledBar({ label, value }: Readonly<{ label: string; value: number }>) {
   return (
     <div className="flex items-center gap-2">
-      <span className="text-[10px] text-muted-foreground w-16 shrink-0">{label}</span>
+      <span className="text-[0.625rem] text-muted-foreground w-16 shrink-0">{label}</span>
       <WorkloadBar value={value} />
     </div>
   )
@@ -87,14 +87,14 @@ export function MatchReasoning({
     <div className="flex flex-col gap-1.5 rounded-md bg-background/60 p-2">
       {skills.length > 0 && (
         <div className="flex flex-wrap items-center gap-1">
-          <span className="text-[9px] uppercase tracking-wide text-muted-foreground">Matches</span>
+          <span className="text-[0.5625rem] uppercase tracking-wide text-muted-foreground">Matches</span>
           {skills.map((s) => (
-            <Badge key={s} className="h-4 px-1.5 text-[9px] bg-emerald-500/15 text-emerald-400 border-0">{s}</Badge>
+            <Badge key={s} className="h-4 px-1.5 text-[0.5625rem] bg-emerald-500/15 text-emerald-400 border-0">{s}</Badge>
           ))}
         </div>
       )}
       {reason && (
-        <p className="text-[10px] leading-snug text-muted-foreground italic">“{reason}”</p>
+        <p className="text-[0.625rem] leading-snug text-muted-foreground italic">“{reason}”</p>
       )}
     </div>
   )
@@ -165,7 +165,7 @@ export function SmartAssignPanel({
       <div className="flex items-center justify-between px-3 py-2 bg-muted/30 border-b border-border">
         <div className="flex items-center gap-1.5">
           <Sparkles className="size-3 text-primary" />
-          <span className="text-[11px] font-semibold text-foreground">Smart Assign</span>
+          <span className="text-[0.6875rem] font-semibold text-foreground">Smart Assign</span>
         </div>
         <button
           type="button"
@@ -179,16 +179,16 @@ export function SmartAssignPanel({
       <div className="px-3 py-3 flex flex-col gap-3">
         {/* Context chips */}
         <div className="flex flex-wrap gap-1">
-          <Badge variant="secondary" className="text-[9px] h-4 px-1.5 bg-muted/60 border-0 text-muted-foreground">
+          <Badge variant="secondary" className="text-[0.5625rem] h-4 px-1.5 bg-muted/60 border-0 text-muted-foreground">
             priority:{issuePriority.toLowerCase()}
           </Badge>
           {issueLabels.length > 0
             ? issueLabels.map((l) => (
-                <Badge key={l} variant="secondary" className="text-[9px] h-4 px-1.5 bg-muted/60 border-0 text-muted-foreground">
+                <Badge key={l} variant="secondary" className="text-[0.5625rem] h-4 px-1.5 bg-muted/60 border-0 text-muted-foreground">
                   {l}
                 </Badge>
               ))
-            : <span className="text-[10px] text-muted-foreground italic">No labels — analysis based on workload & availability</span>
+            : <span className="text-[0.625rem] text-muted-foreground italic">No labels — analysis based on workload & availability</span>
           }
         </div>
 
@@ -214,8 +214,8 @@ export function SmartAssignPanel({
             {/* Top recommendation */}
             <div className="rounded-md border border-primary/30 bg-primary/5 p-2.5 flex flex-col gap-2">
               <div className="flex items-center gap-2 justify-between">
-                <span className="text-[10px] font-semibold text-primary uppercase tracking-wide">Best match</span>
-                <span className="text-[10px] font-bold text-primary">{top.score}%</span>
+                <span className="text-[0.625rem] font-semibold text-primary uppercase tracking-wide">Best match</span>
+                <span className="text-[0.625rem] font-bold text-primary">{top.score}%</span>
               </div>
 
               <div className="flex items-center gap-2">
@@ -224,11 +224,11 @@ export function SmartAssignPanel({
                   name={top.displayName ?? top.email}
                   avatarUrl={top.avatarUrl}
                   className="size-6 shrink-0"
-                  fallbackClassName="text-[9px]"
+                  fallbackClassName="text-[0.5625rem]"
                 />
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium text-foreground truncate">{top.displayName ?? top.email}</p>
-                  <p className="text-[10px] text-muted-foreground">
+                  <p className="text-[0.625rem] text-muted-foreground">
                     {top.openIssues} open · {top.matchedSkills?.length ?? 0} skill match{(top.matchedSkills?.length ?? 0) === 1 ? "" : "es"}
                   </p>
                 </div>
@@ -248,18 +248,18 @@ export function SmartAssignPanel({
               {top.factors.length > 0 && (
                 <div className="flex flex-wrap items-center gap-1">
                   {top.factors.map((f) => (
-                    <Badge key={f} variant="outline" className="text-[9px] h-3.5 px-1 border-primary/20 text-primary/70">{f}</Badge>
+                    <Badge key={f} variant="outline" className="text-[0.5625rem] h-3.5 px-1 border-primary/20 text-primary/70">{f}</Badge>
                   ))}
                 </div>
               )}
 
               {currentAssignee?.userId === top.userId ? (
-                <div className="flex items-center gap-1 text-[10px] text-emerald-400">
+                <div className="flex items-center gap-1 text-[0.625rem] text-emerald-400">
                   <Check className="size-3" />
                   Already assigned
                 </div>
               ) : (
-                <Button size="sm" className="h-6 text-[10px] gap-1 mt-0.5" onClick={() => handleConfirm(top)}>
+                <Button size="sm" className="h-6 text-[0.625rem] gap-1 mt-0.5" onClick={() => handleConfirm(top)}>
                   <Check className="size-3" />
                   Assign {(top.displayName ?? top.email).split(" ")[0]}
                 </Button>
@@ -272,7 +272,7 @@ export function SmartAssignPanel({
                 <button
                   type="button"
                   onClick={() => setShowAll((v) => !v)}
-                  className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground w-full py-0.5 transition-colors"
+                  className="flex items-center gap-1 text-[0.625rem] text-muted-foreground hover:text-foreground w-full py-0.5 transition-colors"
                 >
                   <ChevronDown className={cn("size-3 transition-transform", showAll && "rotate-180")} />
                   {showAll ? "Hide" : "Show"} other candidates
@@ -292,17 +292,17 @@ export function SmartAssignPanel({
                           name={candidate.displayName ?? candidate.email}
                           avatarUrl={candidate.avatarUrl}
                           className="size-5 shrink-0"
-                          fallbackClassName="text-[8px]"
+                          fallbackClassName="text-[0.5rem]"
                         />
                         <div className="flex-1 min-w-0">
-                          <p className="text-[10px] font-medium text-foreground truncate">{candidate.displayName ?? candidate.email}</p>
+                          <p className="text-[0.625rem] font-medium text-foreground truncate">{candidate.displayName ?? candidate.email}</p>
                           <div className="flex items-center gap-1 mt-0.5">
                             {candidate.factors.slice(0, 2).map((f) => (
-                              <span key={f} className="text-[9px] text-muted-foreground">{f}</span>
+                              <span key={f} className="text-[0.5625rem] text-muted-foreground">{f}</span>
                             ))}
                           </div>
                         </div>
-                        <span className="text-[10px] font-semibold text-muted-foreground shrink-0 group-hover:text-foreground">{candidate.score}%</span>
+                        <span className="text-[0.625rem] font-semibold text-muted-foreground shrink-0 group-hover:text-foreground">{candidate.score}%</span>
                       </button>
                     ))}
                   </div>
@@ -311,7 +311,7 @@ export function SmartAssignPanel({
             )}
 
             {result?.fallbackUsed && (
-              <div className="flex items-start gap-1.5 text-[10px] text-amber-400 bg-amber-500/10 rounded-md px-2 py-1.5">
+              <div className="flex items-start gap-1.5 text-[0.625rem] text-amber-400 bg-amber-500/10 rounded-md px-2 py-1.5">
                 <AlertCircle className="size-3 shrink-0 mt-0.5" />
                 AI fallback active — recommendation generated from Java rules.
               </div>
@@ -319,7 +319,7 @@ export function SmartAssignPanel({
 
             {/* No skills warning */}
             {issueLabels.length === 0 && (
-              <div className="flex items-start gap-1.5 text-[10px] text-amber-400 bg-amber-500/10 rounded-md px-2 py-1.5">
+              <div className="flex items-start gap-1.5 text-[0.625rem] text-amber-400 bg-amber-500/10 rounded-md px-2 py-1.5">
                 <AlertCircle className="size-3 shrink-0 mt-0.5" />
                 Add labels to this issue for a more accurate skill-based recommendation.
               </div>
@@ -330,7 +330,7 @@ export function SmartAssignPanel({
             <button
               type="button"
               onClick={() => { setShowAll(false); void handleAnalyze() }}
-              className="text-[10px] text-muted-foreground hover:text-foreground transition-colors self-start"
+              className="text-[0.625rem] text-muted-foreground hover:text-foreground transition-colors self-start"
             >
               Re-analyze
             </button>
