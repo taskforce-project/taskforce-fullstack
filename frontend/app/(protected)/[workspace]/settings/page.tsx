@@ -32,7 +32,7 @@ import { ProfileOverview } from "@/components/profile/profile-overview"
 import { MemberSkillsCard } from "@/components/members/member-skills-card"
 import { MemberAvailabilityCard } from "@/components/members/member-availability-card"
 import { exportMyData, deleteMyAccount } from "@/lib/api/gdpr-service"
-import { requestPasswordReset, getTwoFactorStatus, enableTwoFactor, disableTwoFactor } from "@/lib/api/user-service"
+import { getTwoFactorStatus, enableTwoFactor, disableTwoFactor } from "@/lib/api/user-service"
 import { getAiUsage, type AiUsage } from "@/lib/api/ai-usage-service"
 import {
   getNotificationPreferences,
@@ -657,8 +657,10 @@ function NotificationsPanel() {
 }
 
 function SecurityPanel() {
-  // UI TaskForce, mais le métier reste géré par Keycloak (le secret TOTP et le mot de passe ne
-  // transitent jamais par l'app) : reset par email + activation 2FA par email (scan du QR côté KC).
+  // Le métier auth est piloté par Keycloak via son API admin — l'utilisateur ne voit jamais Keycloak.
+  // Reset mot de passe → parcours brandé de l'app (`/auth/forgot-password` : code par email templaté,
+  // puis nouveau mot de passe). 2FA (TOTP) → encore la page Keycloak (à internaliser : secret + QR côté app).
+  const router = useRouter()
   const [twoFa, setTwoFa] = useState<boolean | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -666,16 +668,10 @@ function SecurityPanel() {
     getTwoFactorStatus().then(setTwoFa).catch(() => setTwoFa(null))
   }, [])
 
-  const onResetPassword = async () => {
-    setBusy(true)
-    try {
-      await requestPasswordReset()
-      toast.success("Password reset email sent — check your inbox.")
-    } catch {
-      toast.error("Couldn't send the reset email.")
-    } finally {
-      setBusy(false)
-    }
+  const onResetPassword = () => {
+    // Réutilise le VRAI parcours brandé (`/auth/forgot-password`) : code OTP par email (template
+    // `reset-password-email`) → nouveau mot de passe → API admin Keycloak. Jamais de page Keycloak.
+    router.push("/auth/forgot-password")
   }
 
   const onToggle2fa = async () => {
@@ -710,7 +706,7 @@ function SecurityPanel() {
               <div>
                 <p className="text-sm font-medium text-foreground">Password</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  We&apos;ll email you a secure link to set a new password.
+                  We&apos;ll email you a code to set a new password — all inside TaskForce.
                 </p>
               </div>
             </div>
