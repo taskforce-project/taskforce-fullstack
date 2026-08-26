@@ -71,7 +71,7 @@ export interface SheetIssue {
   statusId: number
   statusName: string
   statusCategory: IssueStatusCategory
-  assignee: { initials: string; color: string; name: string; userId: number; email?: string | null } | null
+  assignee: { initials: string; color: string; name: string; userId: number; email?: string | null; avatarUrl?: string | null } | null
   assigneeId: number | null
   labels: IssueLabel[]
   dueDate: string | null
@@ -1618,7 +1618,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                     const m = projectMembers.find((x) => String(x.userId) === val)
                     if (!m) return
                     const name = m.displayName ?? m.email
-                    setAssignee({ initials: memberInitials(m), color: memberColor(m.userId), name, userId: m.userId, email: m.email })
+                    setAssignee({ initials: memberInitials(m), color: memberColor(m.userId), name, userId: m.userId, email: m.email, avatarUrl: m.avatarUrl })
                     await callUpdate({ assigneeId: m.userId })
                     toast.success(`Assigned to ${name}`)
                   }}
@@ -1626,7 +1626,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                   <SelectTrigger size="sm" className="w-full min-w-0 flex-1">
                     {assignee ? (
                       <span className="flex items-center gap-1.5 min-w-0">
-                        <UserAvatar email={assignee.email} name={assignee.name} className="size-4 shrink-0" fallbackClassName="text-[8px]" />
+                        <UserAvatar email={assignee.email} name={assignee.name} avatarUrl={assignee.avatarUrl} className="size-4 shrink-0" fallbackClassName="text-[8px]" />
                         <span className="truncate">{assignee.name}</span>
                       </span>
                     ) : (
@@ -1691,7 +1691,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                   const initials = (m.displayName ?? m.email).slice(0, 2).toUpperCase()
                   const color = memberColor(m.userId)
                   const name = m.displayName ?? m.email
-                  setAssignee({ initials, color, name, userId: m.userId, email: m.email })
+                  setAssignee({ initials, color, name, userId: m.userId, email: m.email, avatarUrl: m.avatarUrl })
                   await callUpdate({ assigneeId: m.userId })
                   toast.success(`Assigned to ${name}`)
                 }}
