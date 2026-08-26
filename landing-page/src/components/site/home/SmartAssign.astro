@@ -1,0 +1,68 @@
+---
+/**
+ * SmartAssign (.astro) — section « produit concret » : une CAPTURE RÉELLE du dialogue Smart Assign,
+ * châssis + détail zoom révélé au survol. Placée tôt dans le récit (après Before/After) pour montrer
+ * le produit qui fait vraiment le travail. Smart Assign est une capacité **live**.
+ */
+import SectionShell from "@/components/site/sections/SectionShell.astro";
+import ScreenFrame from "@/components/site/sections/ScreenFrame.astro";
+import { ArrowRight, Check } from "lucide-react";
+
+const POINTS: [string, string][] = [
+  ["Skills-aware", "Matches the work to who's actually good at it — not who's free first."],
+  ["Workload-balanced", "Reads current load and availability so nobody gets buried."],
+  ["One click, whole batch", "Assign every unassigned issue at once — uncheck the ones to keep."],
+];
+---
+
+<SectionShell
+  eyebrow="Smart Assign · live"
+  title="The right task to the right person — with the reason."
+  lead="TaskForce reads each unassigned issue and every teammate's skills, workload and availability, then proposes who should own what. You review the recommendations, then assign the whole batch in one click."
+>
+  <div class="mt-12 grid items-center gap-10 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)] lg:gap-14">
+    <div>
+      <ul class="space-y-4">
+        {
+          POINTS.map(([t, d]) => (
+            <li class="flex gap-3">
+              <span class="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200">
+                <Check className="size-3" strokeWidth={3} />
+              </span>
+              <span class="text-[14px] leading-6">
+                <span class="font-semibold text-foreground">{t}</span>
+                <span class="text-muted-foreground"> — {d}</span>
+              </span>
+            </li>
+          ))
+        }
+      </ul>
+      <a
+        href="/product/smart-assign"
+        class="link-underline text-primary mt-7 inline-flex items-center gap-1 text-[14px] font-medium"
+      >
+        See how Smart Assign works
+        <ArrowRight className="size-4" />
+      </a>
+    </div>
+
+    <ScreenFrame
+      src="/screens/smart-assign.webp"
+      alt="TaskForce Smart Assign — recommendations by skills, workload and availability"
+      width={1600}
+      height={863}
+    >
+      {/* Détail « zoom » révélé au survol : la recommandation de l'IA en gros plan. */}
+      <img
+        src="/screens/smart-assign-zoom.webp"
+        alt=""
+        width={704}
+        height={740}
+        loading="lazy"
+        decoding="async"
+        class="pointer-events-none absolute right-3 bottom-3 z-20 w-[38%] max-w-[210px] translate-y-3 scale-95 rounded-lg border bg-card opacity-0 shadow-2xl ring-1 ring-black/5 transition-all duration-300 ease-out group-hover:translate-y-0 group-hover:scale-100 group-hover:opacity-100 motion-reduce:translate-y-0 motion-reduce:opacity-100 motion-reduce:transition-none"
+        draggable="false"
+      />
+    </ScreenFrame>
+  </div>
+</SectionShell>
