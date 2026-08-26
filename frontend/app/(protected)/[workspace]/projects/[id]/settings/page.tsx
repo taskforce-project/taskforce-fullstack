@@ -21,9 +21,8 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
-import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
+import { ProjectMembersManager } from "@/components/projects/project-members-manager"
 import { useSettingsStore } from "@/lib/store/settings-store"
 import {
   Select,
@@ -45,7 +44,6 @@ import { BrandLogo } from "@/components/ui/brand-logo"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { useProjectStore } from "@/lib/store/project-store"
-import { useUserStore } from "@/lib/store/user-store"
 import { useLabelStore } from "@/lib/store/label-store"
 import type { ProjectStatus } from "@/lib/api/project-service"
 
@@ -90,7 +88,6 @@ export default function ProjectSettingsPage() {
   const projectId  = typeof params.id        === "string" ? Number(params.id)  : 0
 
   const { activeProject, updateProject, archiveProject, deleteProject } = useProjectStore()
-  const { user } = useUserStore()
   const { labelsByProject, fetchLabels, addLabel, editLabel, removeLabel } = useLabelStore()
 
   const [name,          setName]          = useState("")
@@ -164,7 +161,6 @@ export default function ProjectSettingsPage() {
     router.push(`/${workspace}/projects`)
   }
 
-  const members = activeProject.members ?? []
   const projectLabels = labelsByProject[projectId] ?? []
 
   async function handleAddLabel(e: React.FormEvent) {
@@ -333,42 +329,8 @@ export default function ProjectSettingsPage() {
       {/* ── Members ── */}
       {section === "members" && (
       <section>
-        <div className="flex items-start justify-between gap-4">
-          <SectionTitle icon={Users} title="Members" description="Manage project access" />
-          <Button
-            variant="outline"
-            size="sm"
-            className="shrink-0 gap-1.5"
-            onClick={() => router.push(`/${workspace}/projects/${projectId}/members`)}
-          >
-            <Users className="h-3.5 w-3.5" /> Manage members
-          </Button>
-        </div>
-        <div className="flex flex-col gap-2">
-          {members.map((m) => {
-            const isMe      = user?.email === m.email
-            const initials  = m.displayName
-              ? m.displayName.trim().split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase()
-              : m.email.slice(0, 2).toUpperCase()
-            const colors    = ["bg-violet-500","bg-blue-500","bg-emerald-500","bg-orange-500","bg-pink-500","bg-cyan-500"]
-            const color     = colors[m.userId % colors.length]
-            return (
-              <div key={m.id} className="flex items-center gap-3 py-2.5 px-3 rounded-lg border border-border bg-card">
-                <Avatar className="h-8 w-8">
-                  <AvatarFallback className={cn("text-xs text-white", color)}>{initials}</AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium leading-none">
-                    {m.displayName ?? m.email}
-                    {isMe && <span className="text-muted-foreground font-normal ml-1">(you)</span>}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{m.email}</p>
-                </div>
-                <Badge variant="outline" className="text-xs capitalize">{m.role.toLowerCase()}</Badge>
-              </div>
-            )
-          })}
-        </div>
+        <SectionTitle icon={Users} title="Members" description="Invite, manage roles and access for this project" />
+        <ProjectMembersManager workspace={workspace} projectId={projectId} />
       </section>
       )}
 
