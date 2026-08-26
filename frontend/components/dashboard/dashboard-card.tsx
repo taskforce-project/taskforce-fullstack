@@ -86,13 +86,13 @@ export function DashboardCardItem({
   const handleSize = async (next: DashboardCardSize) => {
     if (next === size) return
     const updated = await patchCard(slug, card.id, { config: { ...card.config, size: next } })
-    if (!updated) toast.error("Impossible de redimensionner la carte")
+    if (!updated) toast.error("Couldn't resize the card")
   }
 
   const handleRemove = async () => {
     const ok = await removeCard(slug, card.id)
     // Le store a déjà rétabli la carte (revert visuel) — on prévient seulement.
-    if (!ok) toast.error("Impossible de retirer la carte")
+    if (!ok) toast.error("Couldn't remove the card")
   }
 
   return (

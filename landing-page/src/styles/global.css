@@ -1022,6 +1022,27 @@ body {
 /* Fiole Labs dans le header (site-wide) — dégradé déclaré par le <svg> caché de SiteHeader. */
 .labs-ic-head { stroke: url(#lgLabsHead); }
 
+/* Icônes des méga-menus (Product / Resources) : pop élastique au survol/focus de la carte.
+   100 % CSS — aucun JS, aucune dépendance → scores Lighthouse du site préservés (cf. QA-37 : même
+   intention que les icônes animées de la webapp, ici sans framer-motion). Respecte reduced-motion. */
+.nav-ic { transition: transform .2s ease; transform-origin: center; }
+.nav-card:hover .nav-ic,
+.nav-card:focus-visible .nav-ic {
+  animation: nav-ic-pop .42s cubic-bezier(.34, 1.56, .64, 1);
+  transform: scale(1.12);
+}
+@keyframes nav-ic-pop {
+  0%   { transform: scale(1)    rotate(0deg); }
+  35%  { transform: scale(1.2)  rotate(-8deg); }
+  70%  { transform: scale(1.05) rotate(5deg); }
+  100% { transform: scale(1.12) rotate(0deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nav-ic { transition: none; }
+  .nav-card:hover .nav-ic,
+  .nav-card:focus-visible .nav-ic { animation: none; transform: scale(1.08); }
+}
+
 /* PixelBlast FIGÉ (statique) : petits carrés warm (palette hero-wave), concentrés sur les BORDS via un
    masque → « pixels autour » d'une section, façon transition. Labs uniquement (le warm reste réservé à
    Labs). Poser avec `.decor` (relève le contenu) + `overflow-hidden`. Zéro JS, zéro three.js. */
