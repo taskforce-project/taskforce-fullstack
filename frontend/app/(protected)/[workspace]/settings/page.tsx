@@ -32,7 +32,8 @@ import { ProfileOverview } from "@/components/profile/profile-overview"
 import { MemberSkillsCard } from "@/components/members/member-skills-card"
 import { MemberAvailabilityCard } from "@/components/members/member-availability-card"
 import { exportMyData, deleteMyAccount } from "@/lib/api/gdpr-service"
-import { getTwoFactorStatus, enableTwoFactor, disableTwoFactor } from "@/lib/api/user-service"
+import { getTwoFactorStatus, disableTwoFactor } from "@/lib/api/user-service"
+import { TwoFactorSetupDialog } from "@/components/dialogs/two-factor-setup-dialog"
 import { getAiUsage, type AiUsage } from "@/lib/api/ai-usage-service"
 import {
   getNotificationPreferences,
@@ -674,19 +675,14 @@ function SecurityPanel() {
     router.push("/auth/forgot-password")
   }
 
-  const onToggle2fa = async () => {
+  const onDisable2fa = async () => {
     setBusy(true)
     try {
-      if (twoFa) {
-        await disableTwoFactor()
-        setTwoFa(false)
-        toast.success("Two-factor authentication disabled.")
-      } else {
-        await enableTwoFactor()
-        toast.success("2FA setup email sent — scan the QR code to finish enabling it.")
-      }
+      await disableTwoFactor()
+      setTwoFa(false)
+      toast.success("Two-factor authentication disabled.")
     } catch {
-      toast.error("Couldn't update two-factor authentication.")
+      toast.error("Couldn't disable two-factor authentication.")
     } finally {
       setBusy(false)
     }
@@ -735,15 +731,14 @@ function SecurityPanel() {
             </div>
             {twoFa === null ? (
               <Loader2 className="size-4 animate-spin text-muted-foreground" />
-            ) : (
-              <Button
-                size="sm"
-                variant={twoFa ? "outline" : "default"}
-                onClick={onToggle2fa}
-                disabled={busy}
-              >
-                {twoFa ? "Disable" : "Enable 2FA"}
+            ) : twoFa ? (
+              <Button size="sm" variant="outline" onClick={onDisable2fa} disabled={busy}>
+                Disable
               </Button>
+            ) : (
+              <TwoFactorSetupDialog onEnabled={() => setTwoFa(true)}>
+                <Button size="sm">Enable 2FA</Button>
+              </TwoFactorSetupDialog>
             )}
           </div>
         </div>

@@ -58,7 +58,8 @@ export const USER_ROUTES = {
   /** Sécurité (métier Keycloak) : reset mot de passe + 2FA. */
   PASSWORD_RESET: "/api/users/me/password/reset",
   TWO_FACTOR: "/api/users/me/2fa",
-  TWO_FACTOR_ENABLE: "/api/users/me/2fa/enable",
+  TWO_FACTOR_SETUP: "/api/users/me/2fa/setup",
+  TWO_FACTOR_CONFIRM: "/api/users/me/2fa/confirm",
   SEARCH: (q: string) => `/api/users/search?q=${encodeURIComponent(q)}`,
   /** Clôture du parcours d'onboarding (rôle + drapeau). */
   ONBOARDING: "/api/users/me/onboarding",
