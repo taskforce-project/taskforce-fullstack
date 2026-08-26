@@ -64,18 +64,30 @@ export async function requestPasswordReset(): Promise<void> {
   await apiClient.post(USER_ROUTES.PASSWORD_RESET, undefined, { silentError: true });
 }
 
+/** Ce que renvoie le démarrage de l'activation 2FA : de quoi afficher un QR (ou saisir à la main). */
+export interface TwoFactorSetup {
+  secret: string;
+  otpauthUri: string;
+}
+
 /** Indique si le 2FA (TOTP) est actif pour l'utilisateur courant. */
 export async function getTwoFactorStatus(): Promise<boolean> {
   const response = await apiClient.get<{ data: boolean }>(USER_ROUTES.TWO_FACTOR, { silentError: true });
   return response.data.data;
 }
 
-/** Déclenche l'email de configuration du 2FA (l'utilisateur scanne le QR côté Keycloak). */
-export async function enableTwoFactor(): Promise<void> {
-  await apiClient.post(USER_ROUTES.TWO_FACTOR_ENABLE, undefined, { silentError: true });
+/** Démarre l'activation 2FA : renvoie le secret + l'URI otpauth (à encoder en QR). N'active pas encore. */
+export async function setupTwoFactor(): Promise<TwoFactorSetup> {
+  const response = await apiClient.post<{ data: TwoFactorSetup }>(USER_ROUTES.TWO_FACTOR_SETUP, undefined, { silentError: true });
+  return response.data.data;
 }
 
-/** Désactive le 2FA (supprime le credential TOTP). */
+/** Confirme l'activation avec un premier code à 6 chiffres. */
+export async function confirmTwoFactor(code: string): Promise<void> {
+  await apiClient.post(USER_ROUTES.TWO_FACTOR_CONFIRM, { code }, { silentError: true });
+}
+
+/** Désactive le 2FA (supprime le secret). */
 export async function disableTwoFactor(): Promise<void> {
   await apiClient.delete(USER_ROUTES.TWO_FACTOR, { silentError: true });
 }

@@ -34,6 +34,8 @@ export interface AuthResponse {
   refreshToken: string;
   expiresIn: number;
   message?: string;
+  /** Vrai quand le mot de passe est bon mais qu'un code 2FA est requis : aucun token n'est fourni. */
+  twoFactorRequired?: boolean;
 }
 
 /**
@@ -86,17 +88,23 @@ export const authService = {
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     try {
       const response = await apiClient.post<{ success: boolean; message: string; data: AuthResponse }>(AUTH_ROUTES.LOGIN, credentials);
-      
+
       // Le backend renvoie { success, message, data: AuthResponse }
       const authData = response.data.data;
-      
+
+      // 2FA requis : le mot de passe est bon mais aucun token n'est émis à ce stade. On ne persiste
+      // rien — le formulaire de connexion affiche l'étape « code » et rejoue le login avec `totp`.
+      if (authData.twoFactorRequired) {
+        return authData;
+      }
+
       // Sauvegarder les tokens et l'utilisateur dans localStorage
       if (typeof window !== "undefined") {
         localStorage.setItem("accessToken", authData.accessToken);
         localStorage.setItem("refreshToken", authData.refreshToken);
         localStorage.setItem("user", JSON.stringify(authData.user));
       }
-      
+
       return authData;
     } catch (error) {
       throw new Error(getErrorMessage(error));

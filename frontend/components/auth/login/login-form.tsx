@@ -19,9 +19,9 @@ import { stashInvitationToken, takeInvitationToken } from "@/lib/utils/pending-i
 /**
  * Connexion.
  *
- * Une colonne, quatre éléments : titre, deux champs, une action. Le panneau de marque et le décor
- * animé ont été retirés — ils occupaient la moitié de l'écran pour ne rien dire, et forçaient un
- * défilement sur les hauteurs d'écran courantes. La marque vit désormais dans la barre supérieure.
+ * Une colonne, quatre éléments : titre, deux champs, une action. Quand le compte a le 2FA activé, une
+ * <b>seconde étape</b> demande le code TOTP (le serveur répond `twoFactorRequired` sans émettre de
+ * token — cf. {@link login}), puis on rejoue la connexion avec le code.
  *
  * La logique de validation est inchangée : limitation du nombre de tentatives, format d'adresse,
  * assainissement des entrées.
@@ -32,6 +32,9 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
   const { t } = usePreferencesStore()
   const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({ email: "", password: "" })
+  // Étape 2FA : le serveur a répondu `twoFactorRequired` → on garde email+password et on demande le code.
+  const [totpStep, setTotpStep] = useState(false)
+  const [code, setCode] = useState("")
 
   // Un lien d'invitation mène ici avec `?invitation=<token>` : on le met de côté pour l'appliquer
   // après connexion (couvre aussi le détour OAuth, qui perd les paramètres d'URL au retour).
@@ -42,24 +45,41 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Validation front via Zod (règle d'or #8) — remplace les vérifications ad-hoc champ + email.
-    const parsed = loginSchema.safeParse(formData)
-    if (!parsed.success) {
-      toast.error(t.common.error, { description: firstZodError(parsed.error) })
-      return
-    }
-    if (!globalRateLimiter.isAllowed("login", 5, 15 * 60 * 1000)) {
-      const timeLeft = globalRateLimiter.getTimeUntilReset("login", 15 * 60 * 1000)
-      toast.error(t.common.error, { description: t.auth.ui.tooManyAttempts.replace("{seconds}", String(timeLeft)) })
+    if (!totpStep) {
+      // Étape 1 — email + mot de passe. Validation Zod (règle d'or #8) + limitation de tentatives.
+      const parsed = loginSchema.safeParse(formData)
+      if (!parsed.success) {
+        toast.error(t.common.error, { description: firstZodError(parsed.error) })
+        return
+      }
+      if (!globalRateLimiter.isAllowed("login", 5, 15 * 60 * 1000)) {
+        const timeLeft = globalRateLimiter.getTimeUntilReset("login", 15 * 60 * 1000)
+        toast.error(t.common.error, { description: t.auth.ui.tooManyAttempts.replace("{seconds}", String(timeLeft)) })
+        return
+      }
+    } else if (code.length !== 6) {
+      // Étape 2 — code TOTP à 6 chiffres.
+      toast.error(t.common.error, { description: "Entrez le code à 6 chiffres." })
       return
     }
 
-    const sanitizedEmail    = sanitizeInput(formData.email)
+    const sanitizedEmail = sanitizeInput(formData.email)
     const sanitizedPassword = sanitizeInput(formData.password)
 
     setIsLoading(true)
     try {
-      const loggedIn = await login({ email: sanitizedEmail, password: sanitizedPassword })
+      const result = await login({
+        email: sanitizedEmail,
+        password: sanitizedPassword,
+        totp: totpStep ? code : undefined,
+      })
+
+      // Mot de passe correct mais 2FA requis → on bascule sur l'étape « code » sans se connecter.
+      if (result.twoFactorRequired) {
+        setTotpStep(true)
+        return
+      }
+
       globalRateLimiter.reset("login")
 
       // Approbation explicite : si l'utilisateur arrive d'un lien d'invitation, on l'applique
@@ -76,7 +96,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
         toast.success(t.auth.success.loginSuccess)
       }
       // Direct vers l'onboarding si non fait — évite que l'app « flashe » avant le wizard.
-      router.replace(loggedIn?.onboardingCompleted === false ? "/onboarding" : "/")
+      router.replace(result.user?.onboardingCompleted === false ? "/onboarding" : "/")
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
       toast.error(t.common.error, { description: errorMessage || t.auth.errors.loginFailed })
@@ -87,63 +107,96 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
 
   return (
     <div className={cn("auth-panel", className)} {...props}>
-      <h1 className="auth-title">{t.auth.ui.loginTitle}</h1>
-      <p className="auth-subtitle">{t.auth.ui.loginSubtitle}</p>
-
-      {/* Fournisseurs externes, au-dessus du formulaire comme partout : quand ils existent, ils sont
-          le chemin le plus rapide. Absents tant que le flux d'autorisation n'est pas implémenté. */}
-      <AuthSocialButtons />
-
-      <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-        <div>
-          <label htmlFor="email" className="auth-label">
-            {t.auth.ui.email}
-          </label>
-          <Input
-            id="email"
-            type="email"
-            autoComplete="email"
-            placeholder={t.auth.ui.emailPlaceholder}
-            required
-            value={formData.email}
-            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            disabled={isLoading}
-            className="auth-input"
-          />
-        </div>
-
-        <div>
-          <div className="flex items-baseline justify-between">
-            <label htmlFor="password" className="auth-label">
-              {t.auth.ui.password}
-            </label>
-            <Link href="/auth/forgot-password" className="auth-link-muted mb-1.5 text-[11px]">
-              {t.auth.ui.forgotPassword}
-            </Link>
-          </div>
-          <Input
-            id="password"
-            type="password"
-            autoComplete="current-password"
-            required
-            value={formData.password}
-            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-            disabled={isLoading}
-            className="auth-input"
-          />
-        </div>
-
-        <Button type="submit" disabled={isLoading} className="auth-submit">
-          {isLoading ? (<><Loader2 className="size-4 animate-spin" />{t.auth.ui.signingIn}</>) : t.auth.ui.signIn}
-        </Button>
-      </form>
-
-      <p className="mt-5 text-center text-xs" style={{ color: "var(--label-tertiary)" }}>
-        {t.auth.ui.noAccount}{" "}
-        <Link href="/auth/register" className="auth-link">
-          {t.auth.ui.createAccount}
-        </Link>
+      <h1 className="auth-title">{totpStep ? "Vérification en deux étapes" : t.auth.ui.loginTitle}</h1>
+      <p className="auth-subtitle">
+        {totpStep
+          ? "Entrez le code à 6 chiffres de votre application d'authentification."
+          : t.auth.ui.loginSubtitle}
       </p>
+
+      {totpStep ? (
+        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+          <Input
+            id="totp"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={6}
+            placeholder="000000"
+            required
+            autoFocus
+            value={code}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+            disabled={isLoading}
+            className="auth-input text-center font-mono tracking-[0.4em]"
+          />
+          <Button type="submit" disabled={isLoading || code.length !== 6} className="auth-submit">
+            {isLoading ? (<><Loader2 className="size-4 animate-spin" />{t.auth.ui.signingIn}</>) : "Vérifier"}
+          </Button>
+          <button
+            type="button"
+            onClick={() => { setTotpStep(false); setCode("") }}
+            className="auth-link-muted mx-auto block text-[11px]"
+          >
+            ← Utiliser une autre adresse
+          </button>
+        </form>
+      ) : (
+        <>
+          {/* Fournisseurs externes, au-dessus du formulaire : quand ils existent, ils sont le chemin le plus rapide. */}
+          <AuthSocialButtons />
+
+          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+            <div>
+              <label htmlFor="email" className="auth-label">
+                {t.auth.ui.email}
+              </label>
+              <Input
+                id="email"
+                type="email"
+                autoComplete="email"
+                placeholder={t.auth.ui.emailPlaceholder}
+                required
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                disabled={isLoading}
+                className="auth-input"
+              />
+            </div>
+
+            <div>
+              <div className="flex items-baseline justify-between">
+                <label htmlFor="password" className="auth-label">
+                  {t.auth.ui.password}
+                </label>
+                <Link href="/auth/forgot-password" className="auth-link-muted mb-1.5 text-[11px]">
+                  {t.auth.ui.forgotPassword}
+                </Link>
+              </div>
+              <Input
+                id="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                disabled={isLoading}
+                className="auth-input"
+              />
+            </div>
+
+            <Button type="submit" disabled={isLoading} className="auth-submit">
+              {isLoading ? (<><Loader2 className="size-4 animate-spin" />{t.auth.ui.signingIn}</>) : t.auth.ui.signIn}
+            </Button>
+          </form>
+
+          <p className="mt-5 text-center text-xs" style={{ color: "var(--label-tertiary)" }}>
+            {t.auth.ui.noAccount}{" "}
+            <Link href="/auth/register" className="auth-link">
+              {t.auth.ui.createAccount}
+            </Link>
+          </p>
+        </>
+      )}
     </div>
   )
 }

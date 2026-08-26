@@ -323,4 +323,62 @@ describe('LoginForm Component', () => {
       });
     });
   });
+
+  describe('Two-Factor (2FA)', () => {
+    it('should show the 2FA code step when the server requires it', async () => {
+      mockLogin.mockResolvedValue({ twoFactorRequired: true });
+      const user = userEvent.setup();
+      render(<LoginForm />);
+
+      await user.type(screen.getByLabelText(/email/i), 'test@example.com');
+      await user.type(screen.getByLabelText(/mot de passe/i), 'Password123!');
+      await user.click(screen.getByRole('button', { name: /se connecter/i }));
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('000000')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /vérifier/i })).toBeInTheDocument();
+      });
+    });
+
+    it('should submit the TOTP code to complete login', async () => {
+      mockLogin
+        .mockResolvedValueOnce({ twoFactorRequired: true })
+        .mockResolvedValueOnce({ user: { onboardingCompleted: true } });
+      const user = userEvent.setup();
+      render(<LoginForm />);
+
+      await user.type(screen.getByLabelText(/email/i), 'test@example.com');
+      await user.type(screen.getByLabelText(/mot de passe/i), 'Password123!');
+      await user.click(screen.getByRole('button', { name: /se connecter/i }));
+
+      const codeInput = await screen.findByPlaceholderText('000000');
+      await user.type(codeInput, '123456');
+      await user.click(screen.getByRole('button', { name: /vérifier/i }));
+
+      await waitFor(() => {
+        expect(mockLogin).toHaveBeenLastCalledWith({
+          email: 'test@example.com',
+          password: 'Password123!',
+          totp: '123456',
+        });
+      });
+    });
+
+    it('should require a 6-digit code before submitting', async () => {
+      mockLogin.mockResolvedValueOnce({ twoFactorRequired: true });
+      const user = userEvent.setup();
+      render(<LoginForm />);
+
+      await user.type(screen.getByLabelText(/email/i), 'test@example.com');
+      await user.type(screen.getByLabelText(/mot de passe/i), 'Password123!');
+      await user.click(screen.getByRole('button', { name: /se connecter/i }));
+
+      const codeInput = await screen.findByPlaceholderText('000000');
+      await user.type(codeInput, '123{Enter}'); // trop court → pas de 2ᵉ appel login
+
+      await waitFor(() => {
+        expect(mockLogin).toHaveBeenCalledTimes(1);
+      });
+    });
+  });
 });

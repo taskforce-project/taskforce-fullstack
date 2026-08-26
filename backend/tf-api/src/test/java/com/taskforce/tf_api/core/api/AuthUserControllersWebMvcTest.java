@@ -18,6 +18,7 @@ import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.AuthService;
 import com.taskforce.tf_api.core.service.StripeWebhookService;
+import com.taskforce.tf_api.core.service.TwoFactorService;
 import com.taskforce.tf_api.core.service.UserService;
 import com.taskforce.tf_api.shared.security.JwtIdentityResolver;
 import com.taskforce.tf_api.shared.security.OAuthLoginService;
@@ -51,6 +52,7 @@ class AuthUserControllersWebMvcTest {
     @MockitoBean private OAuthLoginService oauthLoginService;
     @MockitoBean private AuthService authService;
     @MockitoBean private UserService userService;
+    @MockitoBean private TwoFactorService twoFactorService;
     @MockitoBean private JwtIdentityResolver identityResolver;
     @MockitoBean private StripeWebhookService stripeWebhookService;
     // Requis pour instancier WorkspaceAccessInterceptor (WebMvcConfig chargé dans la slice), même si
