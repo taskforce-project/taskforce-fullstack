@@ -32,7 +32,7 @@ export function LoginIntro({
       style={{ transformOrigin: "center" }}
       initial={{ opacity: 1, scale: 1 }}
       animate={reveal ? { opacity: [1, 1, 1, 0], scale: [1, 1.01, 1.03, 1.1] } : { opacity: 1 }}
-      transition={reveal ? { duration: 2.9, times: [0, 0.3, 0.65, 1], ease: [0.4, 0, 0.2, 1] } : { duration: 0 }}
+      transition={reveal ? { duration: 4.4, times: [0, 0.3, 0.65, 1], ease: [0.4, 0, 0.2, 1] } : { duration: 0 }}
       onAnimationComplete={() => { if (reveal) onDone?.() }}
       aria-hidden="true"
     >
@@ -42,7 +42,7 @@ export function LoginIntro({
         style={{ background: "radial-gradient(circle, rgba(99,102,241,0.16), rgba(99,102,241,0) 68%)" }}
         initial={{ opacity: reveal ? 0.7 : 0, scale: reveal ? 1 : 0.6 }}
         animate={reveal ? { opacity: [0.7, 0.9, 0], scale: [1, 1.6, 3.4] } : { opacity: [0, 0.8, 0.6], scale: [0.6, 1, 0.94] }}
-        transition={reveal ? { duration: 2, times: [0, 0.4, 1], ease: "easeOut" } : { duration: 2.6, repeat: Infinity, repeatType: "mirror", ease: "easeInOut" }}
+        transition={reveal ? { duration: 3, times: [0, 0.4, 1], ease: "easeOut" } : { duration: 2.6, repeat: Infinity, repeatType: "mirror", ease: "easeInOut" }}
       />
 
       {reveal && (
@@ -79,7 +79,7 @@ export function LoginIntro({
             }}
             initial={{ scale: 0.34, opacity: 0 }}
             animate={{ scale: [0.34, 1.5, 3.9], opacity: [0, 0.95, 0] }}
-            transition={{ duration: 2.5, times: [0, 0.42, 1], ease: [0.22, 1, 0.36, 1] }}
+            transition={{ duration: 3.7, times: [0, 0.42, 1], ease: [0.22, 1, 0.36, 1] }}
           />
         </>
       )}
@@ -90,7 +90,7 @@ export function LoginIntro({
         initial={reveal ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.9 }}
         animate={reveal ? { opacity: [1, 1, 0], scale: [1, 1.06, 1.16] } : { opacity: 1, scale: [0.9, 1.0, 0.985] }}
         transition={reveal
-          ? { duration: 2, times: [0, 0.5, 1], ease: "easeInOut" }
+          ? { duration: 3, times: [0, 0.5, 1], ease: "easeInOut" }
           : { opacity: { duration: 1.2, ease: "easeOut" }, scale: { duration: 3.2, repeat: Infinity, repeatType: "mirror", ease: "easeInOut" } }}
       >
         <Image
