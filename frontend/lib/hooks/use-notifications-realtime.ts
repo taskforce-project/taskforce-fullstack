@@ -2,7 +2,6 @@
 
 import { useEffect, useRef } from "react"
 import { Client, type IMessage } from "@stomp/stompjs"
-import SockJS from "sockjs-client"
 import { toast } from "sonner"
 
 import { buildRealtimeUrls } from "@/lib/hooks/use-stomp"
@@ -50,11 +49,16 @@ export function useNotificationsRealtime(slug: string | undefined) {
       }
     }
 
-    function activate(useSockJs: boolean) {
+    async function activate(useSockJs: boolean) {
+      if (disposed) return
+      // Fallback chargé À LA DEMANDE : sur le chemin nominal (WS natif), SockJS n'est jamais importé,
+      // donc son écouteur `unload` — déprécié (audit Lighthouse best-practices) — n'est pas enregistré
+      // et il ne pèse pas sur le bundle initial. Le repli reste identique si le WS natif échoue.
+      const SockJS = useSockJs ? (await import("sockjs-client")).default : null
       if (disposed) return
       const client = new Client({
         brokerURL: useSockJs ? undefined : wsUrl,
-        webSocketFactory: useSockJs ? () => new SockJS(sockJsUrl) : undefined,
+        webSocketFactory: SockJS ? () => new SockJS(sockJsUrl) : undefined,
         connectHeaders,
         reconnectDelay: 5000,
         onConnect: () => {
@@ -64,7 +68,7 @@ export function useNotificationsRealtime(slug: string | undefined) {
         onWebSocketClose: () => {
           if (!connectedOnce && !useSockJs && !fallbackTriggered && !disposed) {
             fallbackTriggered = true
-            void client.deactivate().finally(() => activate(true))
+            void client.deactivate().finally(() => void activate(true))
           }
         },
       })
@@ -72,7 +76,7 @@ export function useNotificationsRealtime(slug: string | undefined) {
       clientRef.current = client
     }
 
-    activate(false)
+    void activate(false)
 
     return () => {
       disposed = true
