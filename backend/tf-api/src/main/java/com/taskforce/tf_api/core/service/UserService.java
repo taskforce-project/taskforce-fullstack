@@ -7,6 +7,7 @@ import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.modules.ged.service.MinioService;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
+import com.taskforce.tf_api.shared.util.ImageUtils;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayInputStream;
 import java.util.List;
 
 /**
@@ -148,15 +150,20 @@ public class UserService {
         User user = userRepository.findByEmail(email)
             .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
 
-        String extension = "jpg";
-        String originalFilename = file.getOriginalFilename();
-        if (originalFilename != null && originalFilename.contains(".")) {
-            extension = originalFilename.substring(originalFilename.lastIndexOf('.') + 1).toLowerCase();
-        }
         String objectKey = "avatars/" + user.getId() + "/avatar";
 
         try {
-            minioService.upload(objectKey, file.getInputStream(), file.getSize(), file.getContentType());
+            // Redimensionnement AVANT stockage : l'avatar est affiché en ~36px, inutile de servir le
+            // plein format (jusqu'à 3 Mo → ~60 % du poids de la page, cf. audit Lighthouse). ImageUtils
+            // le ramène à 256px JPEG ; si l'image n'est pas décodable (format exotique), on retombe sur
+            // l'original pour ne jamais casser l'upload.
+            byte[] original = file.getBytes();
+            byte[] resized = ImageUtils.resizeAvatar(original);
+            if (resized != null) {
+                minioService.upload(objectKey, new ByteArrayInputStream(resized), resized.length, "image/jpeg");
+            } else {
+                minioService.upload(objectKey, new ByteArrayInputStream(original), original.length, file.getContentType());
+            }
         } catch (Exception e) {
             throw new RuntimeException("Échec de l'upload avatar : " + e.getMessage(), e);
         }
