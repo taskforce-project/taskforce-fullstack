@@ -10,7 +10,11 @@
 >
 > Sources : `.ai/qa.md` (QA produit détaillée), `.ai/known-issues.md` (bugs vérifiés), `.ai/module-map.md` (domaines↔code), `.ai/architecture-map.md` (archi réelle), `.ai/P0-fix-plan.md` (correctifs P0 paste-ready).
 
-> **▶ MAJ 26/08/2026 — QA-43 : contraste a11y de l'app — états vides `text-muted-foreground/60` sous le seuil AA (retour revue soutenance, point 5).** `[QA-43]`
+> **▶ MAJ 26/08/2026 — QA-44 : avatar de l'assigné (issue sheet) — DiceBear au lieu de la vraie pdp (retour user).** `[QA-44]`
+> - **Problème** : dans le sélecteur d'assigné de l'issue sheet, la valeur **sélectionnée** (et l'état initial) affichait l'identicon **DiceBear** au lieu de la vraie photo. Le front **droppait `avatarUrl`** partout où il construit l'objet assigné `{ initials, color, name, userId, email }` : type (`issue-sheet.tsx:74`), loader (`issue-sheet-loader.tsx`), et les **2 setters** (dropdown manuel + panneau Smart Assign) → `UserAvatar` sans `avatarUrl` → fallback DiceBear. Les DTOs backend l'exposent pourtant (`UserSummaryResponse.avatarUrl`, `ProjectMemberResponse.avatarUrl`, `SmartAssignCandidate.avatarUrl`).
+> - **Fix** : `avatarUrl` propagé de bout en bout — type + loader + les 2 `setAssignee` + le **rendu de la valeur sélectionnée** (`avatarUrl={assignee.avatarUrl}`, ligne 1629). **Bonus** : le loader utilisait `email` comme `name` → `displayName ?? email` (cohérent avec le board). `tsc` vert. Déployé **VM2** (patch).
+
+> **▶ MAJ 26/08/2026 — QA-43 : contraste a11y de l'app — états vides `text-muted-foreground/60` sous le seuil AA (retour revue soutenance, point 5) (PR #158→dev + #159→main, déployé prod VM2 `067f2c9a`).** `[QA-43]`
 > - **Problème** : Lighthouse (app dark, /dashboard) remontait **1 violation SÉRIEUSE** de contraste — « No assigned tasks » (`ColumnEmpty`, `quick-columns.tsx`) en `text-muted-foreground/60` : l'opacité 60 % mêle le token au fond → **#646467 sur #161617 = 3.06:1** (< 4.5 à 12 px). Même motif dans `CardEmpty` (`card-states.tsx`).
 > - **Fix** : `/60` retiré → `text-muted-foreground` plein (comme `CardError` qui passait déjà). Vérifié sur les vraies valeurs `globals.css` : dark `#98989d`/`#161617` = **~6.3:1**, light `#6e6e73`/`#fff` = **~5.1:1** → **AA OK** dans les deux thèmes. Rend vraie l'affirmation soutenance « aucune violation sérieuse sur l'app ». À déployer **VM2**.
 > - **Reste** : le motif `/60` sert ailleurs pour du secondaire (horodatages, compteurs) — limite AA mais hors scope (dé-emphase voulue) ; balayage possible si AA strict partout souhaité.
