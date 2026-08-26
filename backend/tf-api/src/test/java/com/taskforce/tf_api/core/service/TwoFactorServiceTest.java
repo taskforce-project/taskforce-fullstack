@@ -138,6 +138,22 @@ class TwoFactorServiceTest {
     }
 
     @Test
+    void verifyOrThrow_blocksAfterTooManyWrongCodes() {
+        UserTwoFactor row = UserTwoFactor.builder().userId(UID).secret("S").enabled(true).build();
+        when(repository.findByUserId(UID)).thenReturn(Optional.of(row));
+        when(totp.verify("S", "000000")).thenReturn(false);
+
+        // 6 tentatives ratées → chacune lève « invalide »
+        for (int i = 0; i < 6; i++) {
+            assertThatThrownBy(() -> service.verifyOrThrow(UID, "000000")).isInstanceOf(BusinessException.class);
+        }
+        // 7ᵉ : bloquée AVANT vérification (message différent)
+        assertThatThrownBy(() -> service.verifyOrThrow(UID, "000000"))
+            .isInstanceOf(BusinessException.class)
+            .hasMessageContaining("Patientez");
+    }
+
+    @Test
     void disable_deletesRow() {
         when(userRepository.findByEmail(EMAIL)).thenReturn(Optional.of(user));
         service.disable(EMAIL);

@@ -17,6 +17,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { setupTwoFactor, confirmTwoFactor } from "@/lib/api/user-service"
+import { usePreferencesStore } from "@/lib/store/preferences-store"
 
 /**
  * Activation du 2FA (TOTP) — 100 % dans l'app, jamais de page Keycloak.
@@ -31,6 +32,7 @@ export function TwoFactorSetupDialog({
   readonly children: React.ReactNode
   readonly onEnabled: () => void
 }) {
+  const { t } = usePreferencesStore()
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [qr, setQr] = useState<string | null>(null)
@@ -45,7 +47,7 @@ export function TwoFactorSetupDialog({
       setSecret(s.secret)
       setQr(await QRCode.toDataURL(s.otpauthUri, { margin: 1, width: 220 }))
     } catch {
-      toast.error("Impossible de démarrer l'activation 2FA.")
+      toast.error(t.auth.ui.twoFactorSetupError)
       setOpen(false)
     } finally {
       setLoading(false)
@@ -67,11 +69,11 @@ export function TwoFactorSetupDialog({
     setLoading(true)
     try {
       await confirmTwoFactor(code)
-      toast.success("Double authentification activée.")
+      toast.success(t.auth.ui.twoFactorEnabled)
       onEnabled()
       setOpen(false)
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Code invalide — réessayez.")
+      toast.error(e instanceof Error ? e.message : t.auth.ui.twoFactorCodeInvalid)
     } finally {
       setLoading(false)
     }
@@ -89,18 +91,15 @@ export function TwoFactorSetupDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <ShieldCheck className="size-4 text-blue-500" /> Activer la double authentification
+            <ShieldCheck className="size-4 text-blue-500" /> {t.auth.ui.twoFactorSetupTitle}
           </DialogTitle>
-          <DialogDescription>
-            Scannez le QR code avec votre app d&apos;authentification (Google Authenticator, Authy,
-            1Password…), puis entrez le code à 6 chiffres pour confirmer.
-          </DialogDescription>
+          <DialogDescription>{t.auth.ui.twoFactorSetupDesc}</DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col items-center gap-4 py-2">
           {qr ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={qr} alt="QR code 2FA" className="size-48 rounded-lg border border-border bg-white p-2" />
+            <img src={qr} alt="QR" className="size-48 rounded-lg border border-border bg-white p-2" />
           ) : (
             <div className="flex size-48 items-center justify-center rounded-lg border border-border">
               <Loader2 className="size-5 animate-spin text-muted-foreground" />
@@ -111,7 +110,7 @@ export function TwoFactorSetupDialog({
             <button
               type="button"
               onClick={copySecret}
-              title="Copier le secret (saisie manuelle)"
+              title={t.auth.ui.twoFactorCopySecret}
               className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-2.5 py-1 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
             >
               {secret.replace(/(.{4})/g, "$1 ").trim()}
@@ -132,9 +131,9 @@ export function TwoFactorSetupDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>Annuler</Button>
+          <Button variant="outline" onClick={() => setOpen(false)}>{t.auth.ui.twoFactorCancel}</Button>
           <Button onClick={confirm} disabled={loading || code.length !== 6} className="gap-2">
-            {loading && <Loader2 className="size-3.5 animate-spin" />} Activer
+            {loading && <Loader2 className="size-3.5 animate-spin" />} {t.auth.ui.twoFactorActivate}
           </Button>
         </DialogFooter>
       </DialogContent>

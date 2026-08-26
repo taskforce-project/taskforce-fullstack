@@ -23,8 +23,8 @@ import { stashInvitationToken, takeInvitationToken } from "@/lib/utils/pending-i
  * <b>seconde étape</b> demande le code TOTP (le serveur répond `twoFactorRequired` sans émettre de
  * token — cf. {@link login}), puis on rejoue la connexion avec le code.
  *
- * La logique de validation est inchangée : limitation du nombre de tentatives, format d'adresse,
- * assainissement des entrées.
+ * Validation Zod + limitation de tentatives (mot de passe ET codes 2FA). Après connexion, on pose le
+ * drapeau `tf.intro` → l'intro de marque joue aussi sur un login par mot de passe (comme en OAuth).
  */
 export function LoginForm({ className, ...props }: React.ComponentProps<"div">) {
   const { login } = useAuth()
@@ -57,10 +57,16 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
         toast.error(t.common.error, { description: t.auth.ui.tooManyAttempts.replace("{seconds}", String(timeLeft)) })
         return
       }
-    } else if (code.length !== 6) {
-      // Étape 2 — code TOTP à 6 chiffres.
-      toast.error(t.common.error, { description: "Entrez le code à 6 chiffres." })
-      return
+    } else {
+      // Étape 2 — code TOTP à 6 chiffres, avec limite dédiée (anti-brute-force ; le backend a la sienne).
+      if (code.length !== 6) {
+        toast.error(t.common.error, { description: t.auth.ui.twoFactorEnterCode })
+        return
+      }
+      if (!globalRateLimiter.isAllowed("login-2fa", 6, 2 * 60 * 1000)) {
+        toast.error(t.common.error, { description: t.auth.ui.twoFactorTooManyCodes })
+        return
+      }
     }
 
     const sanitizedEmail = sanitizeInput(formData.email)
@@ -81,6 +87,15 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
       }
 
       globalRateLimiter.reset("login")
+      globalRateLimiter.reset("login-2fa")
+
+      // L'intro de marque joue aussi après un login par mot de passe (pas seulement OAuth) :
+      // l'AppShell/ProtectedLayout consomme ce drapeau au montage.
+      try {
+        sessionStorage.setItem("tf.intro", "1")
+      } catch {
+        /* mode privé / stockage indisponible — pas d'intro, on entre quand même */
+      }
 
       // Approbation explicite : si l'utilisateur arrive d'un lien d'invitation, on l'applique
       // maintenant (best-effort — un échec n'empêche jamais la connexion réussie).
@@ -107,12 +122,8 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
 
   return (
     <div className={cn("auth-panel", className)} {...props}>
-      <h1 className="auth-title">{totpStep ? "Vérification en deux étapes" : t.auth.ui.loginTitle}</h1>
-      <p className="auth-subtitle">
-        {totpStep
-          ? "Entrez le code à 6 chiffres de votre application d'authentification."
-          : t.auth.ui.loginSubtitle}
-      </p>
+      <h1 className="auth-title">{totpStep ? t.auth.ui.twoFactorTitle : t.auth.ui.loginTitle}</h1>
+      <p className="auth-subtitle">{totpStep ? t.auth.ui.twoFactorSubtitle : t.auth.ui.loginSubtitle}</p>
 
       {totpStep ? (
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
@@ -130,14 +141,14 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
             className="auth-input text-center font-mono tracking-[0.4em]"
           />
           <Button type="submit" disabled={isLoading || code.length !== 6} className="auth-submit">
-            {isLoading ? (<><Loader2 className="size-4 animate-spin" />{t.auth.ui.signingIn}</>) : "Vérifier"}
+            {isLoading ? (<><Loader2 className="size-4 animate-spin" />{t.auth.ui.signingIn}</>) : t.auth.ui.twoFactorVerify}
           </Button>
           <button
             type="button"
             onClick={() => { setTotpStep(false); setCode("") }}
             className="auth-link-muted mx-auto block text-[11px]"
           >
-            ← Utiliser une autre adresse
+            {t.auth.ui.twoFactorUseAnother}
           </button>
         </form>
       ) : (
