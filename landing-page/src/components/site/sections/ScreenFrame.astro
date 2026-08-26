@@ -1,0 +1,41 @@
+---
+/**
+ * ScreenFrame — châssis épuré pour une CAPTURE RÉELLE de l'app (webp pré-optimisé dans /screens,
+ * chrome navigateur retiré). Coins arrondis + bord + ombre en couches ; léger lift au survol
+ * (CSS pur via `group`, aucun JS), `prefers-reduced-motion` respecté. Le <slot/> permet de poser
+ * un détail « zoom » révélé au survol, ou une annotation, par-dessus la capture.
+ */
+interface Props {
+  src: string;
+  alt: string;
+  width: number;
+  height: number;
+  priority?: boolean;
+  class?: string;
+}
+const { src, alt, width, height, priority = false, class: className = "" } = Astro.props;
+---
+
+<figure
+  class:list={[
+    "screen-frame group relative isolate overflow-hidden rounded-2xl border bg-card shadow-xl ring-1 ring-black/[0.04] transition-[transform,box-shadow] duration-300 ease-out will-change-transform hover:-translate-y-1.5 hover:shadow-2xl motion-reduce:transition-none motion-reduce:hover:translate-y-0",
+    className,
+  ]}
+>
+  <img
+    src={src}
+    alt={alt}
+    width={width}
+    height={height}
+    loading={priority ? "eager" : "lazy"}
+    decoding="async"
+    class="block h-auto w-full select-none"
+    draggable="false"
+  />
+  {/* Fine brillance haute (effet verre) */}
+  <span
+    aria-hidden
+    class="pointer-events-none absolute inset-x-0 top-0 z-10 h-px bg-gradient-to-r from-transparent via-white/70 to-transparent"
+  ></span>
+  <slot />
+</figure>
