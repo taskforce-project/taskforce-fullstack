@@ -2,7 +2,6 @@ import { Check, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BrandLogo } from "../BrandLogo";
 import { Toast } from "../AppShot";
-import { SpecPanel } from "../scene/SpecPanel";
 
 /**
  * Preuve sociale HONNÊTE (review 6) : « Built with », pas « customers » — on n'a pas de
@@ -87,27 +86,40 @@ export function Hero() {
             aria-hidden
             className="pointer-events-none absolute inset-x-0 -top-6 bottom-0 [background:radial-gradient(120%_90%_at_50%_0%,color-mix(in_oklab,var(--primary)_9%,transparent),transparent_65%)]"
           />
-          <div className="relative mx-auto w-full max-w-5xl">
-            <SpecPanel />
+          <div className="group relative mx-auto w-full max-w-4xl">
+            {/* Capture RÉELLE du dashboard (chrome navigateur retiré, webp), châssis épuré + léger
+                lift au survol (CSS pur, reduced-motion OK). SSR → protège le LCP (H1 au-dessus). */}
+            <div className="overflow-hidden rounded-2xl border bg-card shadow-xl ring-1 ring-black/[0.04] transition-[transform,box-shadow] duration-300 ease-out will-change-transform group-hover:-translate-y-1.5 group-hover:shadow-2xl motion-reduce:transition-none motion-reduce:group-hover:translate-y-0">
+              <img
+                src="/screens/dashboard.webp"
+                alt="TaskForce dashboard — operations, delivery queue and analytics"
+                width={1600}
+                height={862}
+                loading="eager"
+                decoding="async"
+                className="block h-auto w-full select-none"
+                draggable={false}
+              />
+            </div>
 
-            {/* Toast 1 — la décision approuvée part en mémoire : gouvernance + mémoire, en un coup d'œil. */}
+            {/* Toast 1 — le différenciateur : ça tourne sur TES modèles, coût modèle nul. */}
             <Toast
               className="-top-3 right-3 sm:-right-4"
+              icon={<Sparkles className="text-primary size-3.5 shrink-0" />}
+            >
+              <span className="font-medium">Runs on your models</span> · zero cost
+            </Toast>
+
+            {/* Toast 2 — la gouvernance : un humain valide chaque étape. */}
+            <Toast
+              className="bottom-12 left-3 sm:-left-4"
               icon={
                 <span className="flex size-5 items-center justify-center rounded-full bg-emerald-500 text-white">
                   <Check className="size-3" strokeWidth={3} />
                 </span>
               }
             >
-              <span className="font-medium">Approved</span> · saved to Memory
-            </Toast>
-
-            {/* Toast 2 — le prompt d'exécution, prêt pour le coding agent. */}
-            <Toast
-              className="bottom-12 left-3 sm:-left-4"
-              icon={<Sparkles className="text-primary size-3.5 shrink-0" />}
-            >
-              <span className="font-medium">Claude Code prompt</span> · ready
+              <span className="font-medium">You approve</span> · every step
             </Toast>
           </div>
         </div>
