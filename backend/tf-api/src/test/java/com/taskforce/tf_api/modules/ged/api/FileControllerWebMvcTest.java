@@ -31,10 +31,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * Tests de tranche web du {@link FileController} (proxy MinIO) via {@code @WebMvcTest}.
  *
- * <p>Rappel sécurité (cf. SecurityConfig PUBLIC_MATCHERS) :
- * {@code /api/files/brain/**} est PUBLIC, tandis que {@code /api/files/avatars/**} n'est PAS
- * listé et tombe donc dans la chaîne authentifiée (401 sans JWT). Les endpoints renvoient un
- * {@code InputStreamResource} (pas d'enveloppe ApiResponse). MinioService et repositories mockés.
+ * <p>Rappel sécurité (cf. SecurityConfig PUBLIC_MATCHERS) : {@code /api/files/brain/**} ET
+ * {@code /api/files/avatars/*} sont PUBLICS — servis en {@code <img>}, impossible d'y joindre un
+ * Bearer. Les endpoints renvoient un {@code InputStreamResource} (pas d'enveloppe ApiResponse).
+ * MinioService et repositories mockés.
  */
 @WebMvcTest(FileController.class)
 @Import(SecurityConfig.class)
@@ -60,7 +60,7 @@ class FileControllerWebMvcTest {
             .thenReturn(Optional.of(User.builder().id(7L).email(EMAIL).avatarUrl("seed").build()));
     }
 
-    // ---- Avatars (endpoint sécurisé) ---------------------------------------
+    // ---- Avatars (endpoint PUBLIC) -----------------------------------------
 
     @Test
     @DisplayName("GET avatars/{id} (auth) → 200 + image/jpeg quand MinIO renvoie le flux")
@@ -86,10 +86,15 @@ class FileControllerWebMvcTest {
     }
 
     @Test
-    @DisplayName("GET avatars/{id} sans JWT → 401 (endpoint non public)")
-    void getAvatar_unauthenticated_401() throws Exception {
+    @DisplayName("GET avatars/{id} SANS JWT → 200 (endpoint public : servi en <img> sans Bearer)")
+    void getAvatar_unauthenticated_isPublic() throws Exception {
+        stubUserFound();
+        when(minioService.getObjectStream(anyString()))
+            .thenReturn(new ByteArrayInputStream("img".getBytes()));
+
         mockMvc.perform(get("/api/files/avatars/7"))
-            .andExpect(status().isUnauthorized());
+            .andExpect(status().isOk())
+            .andExpect(header().string("Content-Type", MediaType.IMAGE_JPEG_VALUE));
     }
 
     // ---- Brain files (endpoint PUBLIC) -------------------------------------
