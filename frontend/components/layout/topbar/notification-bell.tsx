@@ -2,8 +2,10 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { Bell, CheckCheck } from "lucide-react"
+import { CheckCheck } from "lucide-react"
 
+import { BellIcon } from "@/components/ui/icons"
+import { AnimatedNavIcon } from "@/components/layout/sidebar/animated-nav-icon"
 import { Button } from "@/components/ui/button"
 import {
   Popover,
@@ -55,7 +57,7 @@ export function NotificationBell() {
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon" aria-label="Notifications" className="relative">
-          <Bell className="size-4" />
+          <AnimatedNavIcon icon={BellIcon} />
           {unreadCount > 0 && (
             <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold leading-none text-white tabular-nums">
               {unreadCount > 9 ? "9+" : unreadCount}
