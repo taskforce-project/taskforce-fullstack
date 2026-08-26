@@ -100,6 +100,10 @@ const nextConfig: NextConfig = {
   // Next 16 : Turbopack est le bundler par défaut (build + dev).
   // Config vide lève le conflit « webpack config sans turbopack config »
   turbopack: {},
+  experimental: {
+    // Tree-shaking ciblé des gros barrels (icônes / anim / charts) → moins de JS d'hydratation.
+    optimizePackageImports: ["lucide-react", "recharts", "framer-motion", "date-fns"],
+  },
   transpilePackages: [
     "@tiptap/react",
     "@tiptap/pm",
