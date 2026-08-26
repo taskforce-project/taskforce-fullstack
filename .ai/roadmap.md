@@ -10,6 +10,11 @@
 >
 > Sources : `.ai/qa.md` (QA produit détaillée), `.ai/known-issues.md` (bugs vérifiés), `.ai/module-map.md` (domaines↔code), `.ai/architecture-map.md` (archi réelle), `.ai/P0-fix-plan.md` (correctifs P0 paste-ready).
 
+> **▶ MAJ 26/08/2026 — QA-40 : LCP dashboard — imports dynamiques des cartes Recharts (branche `perf/lcp-dynamic-imports`, en cours ; branche sœur QA-39 avatar en //).** `[QA-40]`
+> - **Problème (Lighthouse /dashboard)** : **LCP 6,5 s** (poids 25, score 0.09) = le pire levier Perf. L'élément LCP = le H1 « Pick up… », rendu **après hydratation** (dashboard client-rendered, ~33 chunks JS). Recharts (lourd) était en import **STATIQUE** dans le dispatcher `dashboard-card.tsx` (`CARD_BODIES`) → embarqué dans le bundle critique même sans carte chart affichée.
+> - **Fix** : `ThroughputCard` / `BurndownCard` / `AiChartCard` (Recharts) passés en **`next/dynamic`** (`ssr:false`, fallback squelette) → Recharts sort du bundle critique du dashboard → moins de JS d'hydratation → H1 (LCP) plus tôt. `tsc` / ESLint verts.
+> - **Reste (facile, autres routes)** : `brain-graph` (three + react-force-graph, la plus grosse lib) sur `/brain` ; `chart-explorer` / `bars-3d` sur `/analytics` → même `next/dynamic` (n'affecte pas le LCP /dashboard mesuré mais allège ces routes).
+
 > **▶ MAJ 26/08/2026 — QA-38 : intro visible en dark + lot Lighthouse #1 (Best Practices 77→~96, SEO 92→100) (branche `perf/lighthouse-bp-seo`, en cours).** `[QA-38]`
 > - **Intro de connexion invisible en dark (bug)** : la vague utilisait `mix-blend-multiply` — sur fond SOMBRE multiply vire au noir → la vague s'éteignait. Passée en `mix-blend-multiply dark:mix-blend-screen` (`login-intro.tsx`) : screen fait RAYONNER le dégradé sur le noir (classe `dark` next-themes).
 > - **Lighthouse mesuré AVANT (mobile, /dashboard connecté, user)** : Perf **68**, Best Practices **77**, SEO **92**, A11y 96. ⚠️ **Correction d'hypothèse (moi + user)** : l'audit `csp-xss` (nonce vs `unsafe-inline`) est **weight 0** (informatif) → le migrer NE bouge PAS le score et risquait de casser Turnstile/login → **abandonné**. Vrais leviers Best Practices : `deprecations` (5) + `errors-in-console` (1).
