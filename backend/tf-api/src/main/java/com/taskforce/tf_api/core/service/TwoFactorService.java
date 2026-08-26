@@ -85,15 +85,32 @@ public class TwoFactorService {
         return repository.existsByUserIdAndEnabledTrue(userId);
     }
 
+    /**
+     * Anti-brute-force sur la vérification TOTP : au-delà de {@link #MAX_TOTP_FAILS} codes erronés
+     * dans {@link #TOTP_WINDOW_MS}, on bloque l'utilisateur le temps de la fenêtre. En mémoire — la
+     * prod tourne sur une seule instance backend (à porter sur Redis si on scale horizontalement).
+     */
+    private static final int MAX_TOTP_FAILS = 6;
+    private static final long TOTP_WINDOW_MS = 2 * 60 * 1000L;
+    private final java.util.Map<Long, long[]> totpFails = new java.util.concurrent.ConcurrentHashMap<>();
+
     /** Au login : exige un code valide contre le secret actif. Lève {@link BusinessException} sinon. */
     @Transactional(readOnly = true)
     public void verifyOrThrow(Long userId, String code) {
+        long now = System.currentTimeMillis();
+        long[] f = totpFails.get(userId);
+        if (f != null && f[0] >= MAX_TOTP_FAILS && (now - f[1]) < TOTP_WINDOW_MS) {
+            throw new BusinessException("Trop de codes erronés. Patientez une minute et réessayez");
+        }
         UserTwoFactor row = repository.findByUserId(userId)
             .filter(UserTwoFactor::isEnabled)
             .orElseThrow(() -> new BusinessException("2FA non configuré"));
         if (!totp.verify(row.getSecret(), code)) {
+            totpFails.compute(userId, (k, v) ->
+                (v == null || (now - v[1]) >= TOTP_WINDOW_MS) ? new long[]{1, now} : new long[]{v[0] + 1, v[1]});
             throw new BusinessException("Code d'authentification invalide");
         }
+        totpFails.remove(userId); // succès → on oublie les échecs
     }
 
     /** Désactive le 2FA (supprime le secret). */
