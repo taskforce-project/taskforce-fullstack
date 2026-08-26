@@ -17,9 +17,9 @@ interface ErrorPageProps {
 export default function ErrorPage({ error, reset }: Readonly<ErrorPageProps>) {
   useEffect(() => {
     // Journalisation serveur (E25) — best-effort.
-    reportClientError("error", error.message || "Erreur de route", `error.tsx${error.digest ? " digest=" + error.digest : ""}`, error.stack);
-    toast.error("Une erreur inattendue s'est produite", {
-      description: error.message || "Essayez de recharger la page.",
+    reportClientError("error", error.message || "Route error", `error.tsx${error.digest ? " digest=" + error.digest : ""}`, error.stack);
+    toast.error("An unexpected error occurred", {
+      description: error.message || "Try reloading the page.",
       duration: 6000,
     });
   }, [error]);
@@ -70,11 +70,11 @@ export default function ErrorPage({ error, reset }: Readonly<ErrorPageProps>) {
         {/* Message */}
         <div className="flex flex-col gap-2 max-w-sm">
           <h1 className="text-xl font-semibold tracking-tight">
-            Erreur inattendue
+            Unexpected error
           </h1>
           <p className="text-sm text-muted-foreground leading-relaxed">
-            Quelque chose s&apos;est mal passé côté serveur. Vous pouvez
-            réessayer ou revenir au tableau de bord.
+            Something went wrong on our end. You can try again or head
+            back to your dashboard.
           </p>
           {digest && (
             <p className="text-xs text-muted-foreground/50 font-mono mt-1">
@@ -88,7 +88,7 @@ export default function ErrorPage({ error, reset }: Readonly<ErrorPageProps>) {
           <Button asChild size="sm" variant="outline" className="gap-2">
             <Link href="/dashboard">
               <ArrowLeft className="h-4 w-4" />
-              Tableau de bord
+              Dashboard
             </Link>
           </Button>
           <Button size="sm" className="gap-2" onClick={reset}>

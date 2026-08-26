@@ -225,7 +225,7 @@ describe('API Client', () => {
       await expect(onResponseError(axiosError())).rejects.toBeDefined();
 
       expect(toast.error).toHaveBeenCalledWith(
-        'Impossible de contacter le serveur',
+        "Couldn't reach the server",
         expect.objectContaining({ id: 'api-network-error' }),
       );
     });
@@ -244,7 +244,7 @@ describe('API Client', () => {
       ).rejects.toBeDefined();
 
       expect(toast.error).toHaveBeenCalledWith(
-        'Erreur serveur',
+        'Server error',
         expect.objectContaining({ id: 'api-server-error' }),
       );
     });
@@ -270,10 +270,10 @@ describe('API Client', () => {
       await expect(onResponseError(error)).rejects.toBeDefined();
 
       expect(toast.warning).toHaveBeenCalledWith(
-        'Trop de requêtes',
+        'Too many requests',
         expect.objectContaining({
           id: 'api-rate-limit',
-          description: expect.stringContaining('42 s'),
+          description: expect.stringContaining('42s'),
         }),
       );
     });
@@ -284,8 +284,8 @@ describe('API Client', () => {
       await expect(onResponseError(error)).rejects.toBeDefined();
 
       expect(toast.warning).toHaveBeenCalledWith(
-        'Trop de requêtes',
-        expect.objectContaining({ description: expect.stringContaining('quelques secondes') }),
+        'Too many requests',
+        expect.objectContaining({ description: expect.stringContaining('a few seconds') }),
       );
     });
   });
