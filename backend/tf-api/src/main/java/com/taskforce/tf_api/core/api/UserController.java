@@ -2,9 +2,12 @@ package com.taskforce.tf_api.core.api;
 
 import com.taskforce.tf_api.core.dto.request.CompleteOnboardingRequest;
 import com.taskforce.tf_api.core.dto.request.DataRequestRequest;
+import com.taskforce.tf_api.core.dto.request.TwoFactorConfirmRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateUserRequest;
+import com.taskforce.tf_api.core.dto.response.TwoFactorSetupResponse;
 import com.taskforce.tf_api.core.dto.response.UserResponse;
 import com.taskforce.tf_api.core.dto.response.UserSearchResult;
+import com.taskforce.tf_api.core.service.TwoFactorService;
 import com.taskforce.tf_api.core.service.UserService;
 import com.taskforce.tf_api.shared.dto.ApiResponse;
 import com.taskforce.tf_api.shared.security.JwtIdentityResolver;
@@ -39,6 +42,7 @@ import java.util.List;
 public class UserController {
 
     private final UserService userService;
+    private final TwoFactorService twoFactorService;
     private final JwtIdentityResolver identityResolver;
 
     /**
@@ -109,24 +113,34 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.success("Email de réinitialisation envoyé", null));
     }
 
-    /** Statut du 2FA (TOTP). GET /api/users/me/2fa → { data: true|false } */
+    /** Statut du 2FA (TOTP, géré par l'app). GET /api/users/me/2fa → { data: true|false } */
     @GetMapping("/me/2fa")
     public ResponseEntity<ApiResponse<Boolean>> getTwoFactor(@AuthenticationPrincipal Jwt jwt) {
-        boolean enabled = userService.isTwoFactorEnabled(identityResolver.resolveEmail(jwt));
+        boolean enabled = twoFactorService.isEnabled(identityResolver.resolveEmail(jwt));
         return ResponseEntity.ok(ApiResponse.success("Statut 2FA", enabled));
     }
 
-    /** Déclenche l'email de configuration du 2FA (TOTP). POST /api/users/me/2fa/enable */
-    @PostMapping("/me/2fa/enable")
-    public ResponseEntity<ApiResponse<Void>> enableTwoFactor(@AuthenticationPrincipal Jwt jwt) {
-        userService.enableTwoFactor(identityResolver.resolveEmail(jwt));
-        return ResponseEntity.ok(ApiResponse.success("Email de configuration 2FA envoyé", null));
+    /** Démarre l'activation : renvoie le secret + l'URI otpauth (à encoder en QR). POST /api/users/me/2fa/setup */
+    @PostMapping("/me/2fa/setup")
+    public ResponseEntity<ApiResponse<TwoFactorSetupResponse>> setupTwoFactor(@AuthenticationPrincipal Jwt jwt) {
+        TwoFactorSetupResponse res = twoFactorService.setup(identityResolver.resolveEmail(jwt));
+        return ResponseEntity.ok(ApiResponse.success("Configuration 2FA générée", res));
     }
 
-    /** Désactive le 2FA. DELETE /api/users/me/2fa */
+    /** Confirme l'activation avec un premier code TOTP. POST /api/users/me/2fa/confirm */
+    @PostMapping("/me/2fa/confirm")
+    public ResponseEntity<ApiResponse<Void>> confirmTwoFactor(
+        @AuthenticationPrincipal Jwt jwt,
+        @Valid @RequestBody TwoFactorConfirmRequest request
+    ) {
+        twoFactorService.confirm(identityResolver.resolveEmail(jwt), request.getCode());
+        return ResponseEntity.ok(ApiResponse.success("2FA activé", null));
+    }
+
+    /** Désactive le 2FA (supprime le secret). DELETE /api/users/me/2fa */
     @DeleteMapping("/me/2fa")
     public ResponseEntity<ApiResponse<Void>> disableTwoFactor(@AuthenticationPrincipal Jwt jwt) {
-        userService.disableTwoFactor(identityResolver.resolveEmail(jwt));
+        twoFactorService.disable(identityResolver.resolveEmail(jwt));
         return ResponseEntity.ok(ApiResponse.success("2FA désactivé", null));
     }
 

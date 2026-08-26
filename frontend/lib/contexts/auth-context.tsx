@@ -7,7 +7,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { authService } from "../api/auth-service";
+import { authService, type AuthResponse } from "../api/auth-service";
 import { useUserStore } from "../store/user-store";
 import type { AuthUser, LoginCredentials } from "../auth";
 
@@ -18,8 +18,8 @@ interface AuthContextType {
   user: AuthUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  /** Renvoie l'utilisateur connecté — l'appelant peut ainsi router selon `onboardingCompleted`. */
-  login: (credentials: LoginCredentials) => Promise<AuthUser>;
+  /** Renvoie la réponse d'auth : `twoFactorRequired` si un code 2FA manque, sinon `user` (l'appelant route selon `onboardingCompleted`). */
+  login: (credentials: LoginCredentials) => Promise<AuthResponse>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -102,9 +102,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
   /**
    * Connexion
    */
-  const login = async (credentials: LoginCredentials): Promise<AuthUser> => {
+  const login = async (credentials: LoginCredentials): Promise<AuthResponse> => {
     try {
       const response = await authService.login(credentials);
+      // 2FA requis : mot de passe OK mais aucun token émis → on n'établit PAS de session. Le
+      // formulaire affiche l'étape « code » et rejoue le login avec le TOTP.
+      if (response.twoFactorRequired) {
+        return response;
+      }
       // Setter immédiat depuis la réponse login → redirection rapide, pas de blocage réseau
       setUser(response.user);
       setStoreUser(response.user);
@@ -116,7 +121,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
       });
       // La redirection est gérée par le composant appelant, qui décide d'après `onboardingCompleted`.
-      return response.user;
+      return response;
     } catch (error) {
       setUser(null);
       throw error;

@@ -17,6 +17,7 @@ import com.taskforce.tf_api.core.enums.PlanType;
 import com.taskforce.tf_api.core.model.OtpVerification;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
+import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.security.HumanChallengeService;
 import com.taskforce.tf_api.util.TestDataBuilder;
 import org.junit.jupiter.api.BeforeEach;
@@ -80,6 +81,11 @@ class AuthServiceTest {
 
     @Mock
     private HumanChallengeService humanChallengeService;
+
+    // 2FA (TOTP géré par l'app) : dépendance ajoutée au constructeur d'AuthService → DOIT être mockée
+    // ici (sinon `@InjectMocks` la laisse null → NPE dans `login`). Cf. l'avertissement ci-dessus.
+    @Mock
+    private TwoFactorService twoFactorService;
 
     @InjectMocks
     private AuthService authService;
@@ -661,6 +667,52 @@ class AuthServiceTest {
                 .hasMessageContaining("Email ou mot de passe incorrect");
 
             verify(userRepository, never()).findByKeycloakId(anyString());
+        }
+
+        @Test
+        @DisplayName("2FA activé + sans code → twoFactorRequired, aucun token")
+        void login_shouldRequireTwoFactor_whenEnabledAndNoCode() {
+            when(keycloakAuthService.authenticate(TEST_EMAIL, "Password123!")).thenReturn(keycloakToken);
+            when(keycloakService.getUserByEmail(TEST_EMAIL)).thenReturn(keycloakUser);
+            when(userRepository.findByKeycloakId(TEST_KEYCLOAK_ID)).thenReturn(Optional.of(user));
+            when(twoFactorService.isEnabled(user.getId())).thenReturn(true);
+
+            AuthResponse response = authService.login(loginRequest);
+
+            assertThat(response.getTwoFactorRequired()).isTrue();
+            assertThat(response.getAccessToken()).isNull();
+            verify(twoFactorService, never()).verifyOrThrow(anyLong(), anyString());
+        }
+
+        @Test
+        @DisplayName("2FA activé + code valide → tokens")
+        void login_shouldReturnTokens_whenEnabledAndValidCode() {
+            loginRequest.setTotp("123456");
+            when(keycloakAuthService.authenticate(TEST_EMAIL, "Password123!")).thenReturn(keycloakToken);
+            when(keycloakService.getUserByEmail(TEST_EMAIL)).thenReturn(keycloakUser);
+            when(userRepository.findByKeycloakId(TEST_KEYCLOAK_ID)).thenReturn(Optional.of(user));
+            when(twoFactorService.isEnabled(user.getId())).thenReturn(true);
+
+            AuthResponse response = authService.login(loginRequest);
+
+            assertThat(response.getAccessToken()).isEqualTo("keycloak_access_token");
+            verify(twoFactorService).verifyOrThrow(user.getId(), "123456");
+        }
+
+        @Test
+        @DisplayName("2FA activé + code invalide → exception")
+        void login_shouldThrow_whenEnabledAndInvalidCode() {
+            loginRequest.setTotp("000000");
+            when(keycloakAuthService.authenticate(TEST_EMAIL, "Password123!")).thenReturn(keycloakToken);
+            when(keycloakService.getUserByEmail(TEST_EMAIL)).thenReturn(keycloakUser);
+            when(userRepository.findByKeycloakId(TEST_KEYCLOAK_ID)).thenReturn(Optional.of(user));
+            when(twoFactorService.isEnabled(user.getId())).thenReturn(true);
+            doThrow(new BusinessException("Code d'authentification invalide"))
+                .when(twoFactorService).verifyOrThrow(user.getId(), "000000");
+
+            assertThatThrownBy(() -> authService.login(loginRequest))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("invalide");
         }
     }
 

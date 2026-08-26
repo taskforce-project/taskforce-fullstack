@@ -55,6 +55,7 @@ public class AuthService {
     private final WorkspaceService workspaceService;
     private final AuditService auditService;
     private final HumanChallengeService humanChallengeService;
+    private final TwoFactorService twoFactorService;
 
     @Value("${stripe.success-url}")
     private String stripeSuccessUrl;
@@ -349,6 +350,18 @@ public class AuthService {
 
         if (!user.getIsActive()) {
             throw new RuntimeException("Ce compte est désactivé");
+        }
+
+        // 2FA géré par l'app : le mot de passe est bon. Si le 2FA est actif, on exige un code TOTP
+        // AVANT d'émettre le moindre token. Le backend (client confidentiel) étant le seul chemin
+        // d'authentification, l'imposer ici suffit.
+        if (twoFactorService.isEnabled(user.getId())) {
+            String totp = request.getTotp();
+            if (totp == null || totp.isBlank()) {
+                log.info("2FA requis pour : {}", request.getEmail());
+                return AuthResponse.builder().twoFactorRequired(true).build();
+            }
+            twoFactorService.verifyOrThrow(user.getId(), totp);
         }
 
         // Réponse = tokens Keycloak + profil DB

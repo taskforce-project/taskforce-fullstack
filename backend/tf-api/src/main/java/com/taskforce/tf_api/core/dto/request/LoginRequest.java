@@ -23,4 +23,7 @@ public class LoginRequest {
 
     @NotBlank(message = "Le mot de passe est obligatoire")
     private String password;
+
+    /** Code TOTP (2FA) — optionnel : n'est requis que si l'utilisateur a activé le 2FA. */
+    private String totp;
 }
