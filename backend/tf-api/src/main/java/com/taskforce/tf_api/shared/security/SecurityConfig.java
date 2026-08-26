@@ -74,6 +74,9 @@ public class SecurityConfig {
         // est public ; POST /api/invitations/{token}/accept (2 segments) reste authentifié (JWT requis). WS-03/04.
         "/api/invitations/*",
         "/api/files/brain/**",
+        // Avatars servis en <img> (impossible d'y joindre un Bearer) → publics, comme les fichiers Brain.
+        // La clé Minio dérive de l'userId ; l'endpoint renvoie 404 si absent (cf. FileController#getAvatar).
+        "/api/files/avatars/*",
         "/api/sales/**",
         "/api/stripe/**",
         // Webhook Stripe : requête serveur-à-serveur signée (pas de JWT). La signature est
