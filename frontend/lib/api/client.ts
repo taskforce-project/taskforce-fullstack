@@ -158,7 +158,7 @@ apiClient.interceptors.response.use(
     if (globalThis.window !== undefined && !isAuthEndpoint) {
       const status = error.response?.status
       const data = error.response?.data as { message?: string } | undefined
-      const message = data?.message || error.message || "Une erreur est survenue"
+      const message = data?.message || error.message || "Something went wrong"
       // Appels de fond (polling, préchargement) : on ne toast jamais, on trace seulement.
       const silent = Boolean(error.config?.silentError)
 
@@ -167,16 +167,16 @@ apiClient.interceptors.response.use(
         if (silent) {
           console.warn(`[api] réseau/timeout (silencieux) ${error.config?.url ?? ""} — ${message}`)
         } else {
-          toast.error("Impossible de contacter le serveur", {
+          toast.error("Couldn't reach the server", {
             id: "api-network-error",
-            description: "Vérifiez votre connexion réseau.",
+            description: "Check your network connection.",
           })
         }
       } else if (status && status >= 500) {
         if (silent) {
           console.warn(`[api] ${status} (silencieux) ${error.config?.url ?? ""} — ${message}`)
         } else {
-          toast.error("Erreur serveur", { id: "api-server-error", description: `${status} — ${message}` })
+          toast.error("Server error", { id: "api-server-error", description: `${status} — ${message}` })
         }
       } else if (status === 429) {
         // Exception au principe « 4xx = contextuel » : le 429 n'est pas lié à l'action en cours,
@@ -184,12 +184,12 @@ apiClient.interceptors.response.use(
         // paraissait simplement figée (les stores avalent l'erreur en silence). `id` stable →
         // un seul toast même quand une rafale d'appels est rejetée d'un coup.
         const retryAfter = Number(error.response?.headers?.["retry-after"])
-        const wait = Number.isFinite(retryAfter) && retryAfter > 0 ? `${retryAfter} s` : "quelques secondes"
+        const wait = Number.isFinite(retryAfter) && retryAfter > 0 ? `${retryAfter}s` : "a few seconds"
         console.warn(`[api] 429 ${error.config?.url ?? ""} — retry after ${wait}`)
         if (!silent) {
-          toast.warning("Trop de requêtes", {
+          toast.warning("Too many requests", {
             id: "api-rate-limit",
-            description: `Vous avez atteint la limite. Réessayez dans ${wait}.`,
+            description: `You've hit the rate limit. Try again in ${wait}.`,
           })
         }
       } else if (status && status >= 400) {
