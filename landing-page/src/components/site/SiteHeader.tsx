@@ -24,6 +24,7 @@ import {
   type NavLink,
 } from "./nav";
 import { cn } from "@/lib/utils";
+import { AnimatedNavIcon } from "./AnimatedNavIcon";
 
 /**
  * SiteHeader — barre de navigation du site marketing.
@@ -89,7 +90,7 @@ function MenuCard({ item }: { item: NavLink }) {
       <a
         href={item.href}
         className={cn(
-          "nav-card !flex-row group relative items-start gap-3 overflow-hidden rounded-xl p-3 transition-shadow",
+          "!flex-row group relative items-start gap-3 overflow-hidden rounded-xl p-3 transition-shadow",
           isLabs ? "border hover:shadow-md" : "transition-colors hover:bg-accent focus:bg-accent",
         )}
       >
@@ -107,9 +108,11 @@ function MenuCard({ item }: { item: NavLink }) {
               isLabs && "border bg-card/90",
             )}
           >
-            <Icon
-              className={cn("nav-ic size-[18px]", isLabs && "labs-ic-head")}
+            <AnimatedNavIcon
+              icon={Icon}
+              size={18}
               strokeWidth={1.75}
+              className={cn("size-[18px]", isLabs && "labs-ic-head")}
               style={isLabs ? undefined : { color: hueFor(Icon) }}
             />
           </span>
