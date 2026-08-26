@@ -3,21 +3,22 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { ChevronRight, Lock, FlaskConical } from "lucide-react"
+
 import {
-  LayoutDashboard,
-  Radio,
-  ListTodo,
-  Layers,
-  Activity,
-  Brain,
-  User,
-  Settings2,
-  HelpCircle,
-  Plus,
-  ChevronRight,
-  Lock,
-  FlaskConical,
-} from "lucide-react"
+  LayoutDashboardIcon,
+  RadioIcon,
+  ListChecksIcon,
+  LayersIcon,
+  ActivityIcon,
+  BrainIcon,
+  UserIcon,
+  PlusIcon,
+  Settings2Icon,
+  HelpCircleIcon,
+  type AnimatedIconComponent,
+} from "@/components/ui/icons"
+import { AnimatedNavIcon } from "@/components/layout/sidebar/animated-nav-icon"
 
 import { NavUser } from "@/components/layout/sidebar/nav-user"
 import { WorkspaceSwitcher } from "@/components/layout/sidebar/team-switcher"
@@ -63,7 +64,7 @@ import {
 type NavItem = {
   readonly key: string
   readonly url: string
-  readonly icon: React.ElementType
+  readonly aicon: AnimatedIconComponent
   readonly badge?: string
   readonly comingSoon?: boolean
   /** Feature en cours de finition → petite fiole bleue (info) dans la sidebar + bandeau « Lab » sur la page. */
@@ -82,12 +83,12 @@ const NAV_COMMAND: readonly NavItem[] = [
   {
     key: "nav.dashboard",
     url: "/dashboard",
-    icon: LayoutDashboard,
+    aicon: LayoutDashboardIcon,
   },
   {
     key: "nav.inbox",
     url: "/inbox",
-    icon: Radio,
+    aicon: RadioIcon,
     items: [
       { key: "nav.sub.allNotifications", url: "/inbox" },
       { key: "nav.sub.mentions",         url: "/inbox/mentions" },
@@ -98,7 +99,7 @@ const NAV_COMMAND: readonly NavItem[] = [
   {
     key: "nav.myWork",
     url: "/my-work",
-    icon: ListTodo,
+    aicon: ListChecksIcon,
     items: [
       { key: "nav.sub.myAll",    url: "/my-work" },
       { key: "nav.sub.myIssues", url: "/my-work/issues" },
@@ -112,18 +113,18 @@ const NAV_WORK: readonly NavItem[] = [
   {
     key: "nav.projects",
     url: "/projects",
-    icon: Layers,
+    aicon: LayersIcon,
   },
   {
     key: "nav.analytics",
     url: "/analytics",
-    icon: Activity,
+    aicon: ActivityIcon,
     lab: true, // Intelligence : données réelles mais en cours de finition (prédictions, dock, 3D).
   },
   {
     key: "nav.brain",
     url: "/brain",
-    icon: Brain,
+    aicon: BrainIcon,
     lab: true, // Brain OS : Phase 0, en construction.
   },
   // Agents retiré (11/07/2026) : non construit, aucune utilité pour l'instant.
@@ -133,7 +134,7 @@ const NAV_PEOPLE: readonly NavItem[] = [
   {
     key: "nav.members",
     url: "/members",
-    icon: User,
+    aicon: UserIcon,
   },
   // Teams retiré du menu (QA2-21) — désormais géré par opération (onglet Members du projet).
 ]
@@ -142,12 +143,12 @@ const NAV_BOTTOM: readonly NavItem[] = [
   {
     key: "nav.settings",
     url: "/settings",
-    icon: Settings2,
+    aicon: Settings2Icon,
   },
   {
     key: "nav.help",
     url: "https://docs.taskforce-project.fr",
-    icon: HelpCircle,
+    aicon: HelpCircleIcon,
   },
 ]
 
@@ -198,7 +199,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             aria-disabled
             className="cursor-not-allowed opacity-60 hover:bg-transparent"
           >
-            <item.icon />
+            <AnimatedNavIcon icon={item.aicon} />
             <span>{t(item.key)}</span>
             <span className="ml-auto flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground group-data-[collapsible=icon]:hidden">
               <Lock className="size-3" />
@@ -224,7 +225,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   isActive={isActive(item.url)}
                   className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                 >
-                  <item.icon />
+                  <AnimatedNavIcon icon={item.aicon} />
                   <span>{t(item.key)}</span>
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
@@ -252,7 +253,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenuItem>
             <CollapsibleTrigger asChild>
               <SidebarMenuButton tooltip={t(item.key)} isActive={isActive(item.url)}>
-                <item.icon />
+                <AnimatedNavIcon icon={item.aicon} />
                 <span>{t(item.key)}</span>
                 <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
               </SidebarMenuButton>
@@ -278,7 +279,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       return (
         <SidebarMenuItem key={item.key}>
           <SidebarMenuButton tooltip={t(item.key)} onClick={() => openSettings()}>
-            <item.icon />
+            <AnimatedNavIcon icon={item.aicon} />
             <span>{t(item.key)}</span>
           </SidebarMenuButton>
         </SidebarMenuItem>
@@ -289,7 +290,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const isExternal = /^https?:\/\//.test(item.url)
     const linkInner = (
       <>
-        <item.icon />
+        <AnimatedNavIcon icon={item.aicon} />
         <span>{t(item.key)}</span>
         {item.lab && (
           <FlaskConical
@@ -359,7 +360,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <SidebarMenuItem>
               {/* Ouvre le modal GLOBAL en place (plus de navigation `?new=1` qui faisait clignoter le modal). */}
               <SidebarMenuButton onClick={openCreateProject} className="text-muted-foreground">
-                <Plus className="size-4" />
+                <AnimatedNavIcon icon={PlusIcon} />
                 <span>{t("nav.createProject")}</span>
               </SidebarMenuButton>
             </SidebarMenuItem>

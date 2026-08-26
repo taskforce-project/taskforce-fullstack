@@ -9,9 +9,10 @@ import { useFeedbackStore } from "@/lib/store/feedback-store"
 const LAB_ROUTE = /\/(analytics|brain)(\/|$)/
 
 /**
- * Coquille « sandbox » façon mode test Stripe pour les zones Labs : un <b>bandeau bleu en haut</b>
- * (pleine largeur), et l'app <b>poussée en dessous</b> avec les <b>coins supérieurs arrondis</b>
- * (le bleu affleure dans les coins). Pas de cadre sur les côtés/bas — juste le haut.
+ * Coquille « sandbox » façon mode test Stripe pour les zones Labs : un <b>bandeau en haut</b>
+ * (pleine largeur, fond = le bas du dégradé Labs), et l'app <b>encadrée</b> en dessous par un fin
+ * liseré de ce même dégradé sur les <b>côtés et le bas</b> — coins arrondis. Le « cadre » enveloppe
+ * donc l'app (plus seulement le haut) ; le fond du conteneur affleure dans le liseré et les coins.
  *
  * <p>Hors zone Labs : simple conteneur pleine hauteur. Dans les deux cas c'est LUI qui donne la
  * hauteur à l'app (l'`AppShell` passe donc de `h-svh` à `h-full`).</p>
@@ -56,9 +57,12 @@ export function LabShell({ children }: { readonly children: React.ReactNode }) {
         </button>
       </div>
 
-      {/* L'app, poussée en bas, coins supérieurs arrondis (le bleu affleure dans les coins). */}
-      <div className="min-h-0 flex-1 overflow-hidden rounded-t-2xl bg-background">
-        {children}
+      {/* L'app : encadrée par un liseré du dégradé Labs (côtés + bas), coins arrondis — le « cadre »
+          sandbox enveloppe l'app, plus seulement le haut. Le fond du conteneur affleure dans le liseré. */}
+      <div className="min-h-0 flex-1 px-1.5 pb-1.5">
+        <div className="h-full overflow-hidden rounded-2xl bg-background">
+          {children}
+        </div>
       </div>
     </div>
   )
