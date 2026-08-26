@@ -23,4 +23,10 @@ public class AuthResponse {
 
     private Long expiresIn; // Durée de validité du token en secondes
     private UserResponse user;
+
+    /**
+     * Vrai quand le mot de passe est correct mais qu'un code 2FA est requis pour finir la connexion :
+     * dans ce cas AUCUN token n'est émis, le front affiche l'étape « code » et rejoue le login avec `totp`.
+     */
+    private Boolean twoFactorRequired;
 }
