@@ -20,7 +20,7 @@ export function CardSkeleton() {
 export function CardEmpty({ message = "Not enough data" }: { readonly message?: string }) {
   return (
     <div className="flex h-full items-center justify-center p-4 text-center">
-      <p className="text-xs text-muted-foreground/60">{message}</p>
+      <p className="text-xs text-muted-foreground">{message}</p>
     </div>
   )
 }
