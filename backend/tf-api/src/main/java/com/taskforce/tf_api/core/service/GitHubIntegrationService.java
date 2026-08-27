@@ -78,6 +78,7 @@ public class GitHubIntegrationService {
     private final IssueRepository          issueRepository;
     private final OAuthStateRepository     oauthStateRepository;
     private final RestTemplate             restTemplate;
+    private final ProjectVisibilityGuard   visibilityGuard;
 
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final int STATE_TTL_MINUTES = 10;
@@ -187,10 +188,25 @@ public class GitHubIntegrationService {
     // Issue links
     // ----------------------------------------------------------------
 
-    @Transactional
-    public GitHubLinkResponse addLink(Long issueId, GitHubLinkRequest req, User linkedBy) {
+    /**
+     * Résout une issue en la <b>scopant au workspace {@code {slug}}</b> du chemin (fix <b>H1</b>,
+     * TF-SEC-IDOR). Sans ce contrôle, un {@code issueId} séquentiel laissait lire/écrire/supprimer les
+     * liens GitHub de n'importe quelle issue de n'importe quel compte. On renvoie 404 (pas 403) pour ne
+     * pas révéler l'existence d'une issue d'un autre tenant.
+     */
+    private Issue scopedIssue(String workspaceSlug, Long issueId) {
         Issue issue = issueRepository.findById(issueId)
             .orElseThrow(() -> new ResourceNotFoundException("Issue not found: " + issueId));
+        if (!issue.getProject().getWorkspace().getSlug().equals(workspaceSlug)) {
+            throw new ResourceNotFoundException("Issue not found: " + issueId);
+        }
+        return issue;
+    }
+
+    @Transactional
+    public GitHubLinkResponse addLink(String workspaceSlug, Long issueId, GitHubLinkRequest req, User linkedBy) {
+        Issue issue = scopedIssue(workspaceSlug, issueId);
+        visibilityGuard.assertCanWrite(issue.getProject(), linkedBy.getId()); // ajouter un lien = écriture
 
         IssueGitHubLink link = IssueGitHubLink.builder()
             .issue(issue)
@@ -209,16 +225,26 @@ public class GitHubIntegrationService {
         return toResponse(link);
     }
 
-    public List<GitHubLinkResponse> getLinks(Long issueId) {
-        return issueGitHubLinkRepository.findByIssueIdOrderByLinkedAtDesc(issueId)
+    @Transactional(readOnly = true)
+    public List<GitHubLinkResponse> getLinks(String workspaceSlug, Long issueId, User requester) {
+        Issue issue = scopedIssue(workspaceSlug, issueId);
+        visibilityGuard.assertCanView(issue.getProject(), requester.getId());
+        return issueGitHubLinkRepository.findByIssueIdOrderByLinkedAtDesc(issue.getId())
             .stream()
             .map(this::toResponse)
             .toList();
     }
 
     @Transactional
-    public void deleteLink(Long linkId) {
-        issueGitHubLinkRepository.deleteById(linkId);
+    public void deleteLink(String workspaceSlug, Long linkId, User requester) {
+        IssueGitHubLink link = issueGitHubLinkRepository.findById(linkId)
+            .orElseThrow(() -> new ResourceNotFoundException("Lien GitHub introuvable"));
+        Issue issue = link.getIssue();
+        if (!issue.getProject().getWorkspace().getSlug().equals(workspaceSlug)) {
+            throw new ResourceNotFoundException("Lien GitHub introuvable"); // cross-tenant → 404
+        }
+        visibilityGuard.assertCanWrite(issue.getProject(), requester.getId());
+        issueGitHubLinkRepository.delete(link);
     }
 
     // ----------------------------------------------------------------

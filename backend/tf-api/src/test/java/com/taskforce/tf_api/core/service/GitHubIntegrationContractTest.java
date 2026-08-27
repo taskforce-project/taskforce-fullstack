@@ -57,6 +57,7 @@ class GitHubIntegrationContractTest {
     private WorkspaceRepository workspaceRepository;
     private IssueRepository issueRepository;
     private OAuthStateRepository oauthStateRepository;
+    private ProjectVisibilityGuard visibilityGuard;
 
     private Workspace workspace;
 
@@ -67,17 +68,19 @@ class GitHubIntegrationContractTest {
         workspaceRepository       = Mockito.mock(WorkspaceRepository.class);
         issueRepository           = Mockito.mock(IssueRepository.class);
         oauthStateRepository      = Mockito.mock(OAuthStateRepository.class);
+        visibilityGuard           = Mockito.mock(ProjectVisibilityGuard.class);
         RestTemplate rt = new RestTemplate();
 
         // Ordre du constructeur généré par @RequiredArgsConstructor = ordre de déclaration des champs final :
-        // integrationRepository, issueGitHubLinkRepository, workspaceRepository, issueRepository, oauthStateRepository, restTemplate
+        // integrationRepository, issueGitHubLinkRepository, workspaceRepository, issueRepository, oauthStateRepository, restTemplate, visibilityGuard
         service = new GitHubIntegrationService(
             integrationRepository,
             issueGitHubLinkRepository,
             workspaceRepository,
             issueRepository,
             oauthStateRepository,
-            rt
+            rt,
+            visibilityGuard
         );
 
         ReflectionTestUtils.setField(service, "clientId", "cid");
