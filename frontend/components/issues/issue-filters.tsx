@@ -4,6 +4,7 @@ import { Filter, X, ChevronDown } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
+import { UserAvatar } from "@/components/ui/user-avatar"
 import {
   Popover,
   PopoverContent,
@@ -136,6 +137,11 @@ export function InlineIssueFilters({
               checked={value.assigneeIds.includes(a.id)}
               onToggle={() => onChange({ ...value, assigneeIds: toggle(value.assigneeIds, a.id) })}
             >
+              {a.id === null ? (
+                <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-muted text-[9px] text-muted-foreground">?</span>
+              ) : (
+                <UserAvatar email={a.email ?? ""} name={a.name} avatarUrl={a.avatarUrl} className="size-4 shrink-0" fallbackClassName="text-[8px]" />
+              )}
               <span className="truncate">{a.name}</span>
             </FilterRow>
           ))}
@@ -243,7 +249,12 @@ export function IssueFilters({
                 checked={value.assigneeIds.includes(a.id)}
                 onToggle={() => onChange({ ...value, assigneeIds: toggle(value.assigneeIds, a.id) })}
               >
-                <span className="truncate">{a.name}</span>
+                {a.id === null ? (
+                <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-muted text-[9px] text-muted-foreground">?</span>
+              ) : (
+                <UserAvatar email={a.email ?? ""} name={a.name} avatarUrl={a.avatarUrl} className="size-4 shrink-0" fallbackClassName="text-[8px]" />
+              )}
+              <span className="truncate">{a.name}</span>
               </FilterRow>
             ))}
           </div>
