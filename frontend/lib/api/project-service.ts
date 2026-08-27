@@ -6,6 +6,31 @@
 import { apiClient } from "./client";
 import { PROJECT_ROUTES } from "../config/api-routes";
 
+/**
+ * Télécharge l'export COMPLET d'un projet (issues + descriptions + commentaires + activité) au format
+ * JSON ou CSV, généré côté serveur (P1b bêta) — pour reprendre le projet dans un autre outil. Récupère le
+ * blob via XHR authentifié (Bearer) puis déclenche le téléchargement navigateur.
+ */
+export async function downloadProjectExport(
+  slug: string,
+  projectId: number,
+  format: "json" | "csv",
+): Promise<void> {
+  const res = await apiClient.get(PROJECT_ROUTES.EXPORT(slug, projectId), {
+    params: { format },
+    responseType: "blob",
+  });
+  const url = URL.createObjectURL(res.data as Blob);
+  const link = document.createElement("a");
+  const stamp = new Date().toISOString().slice(0, 10);
+  link.href = url;
+  link.download = `project-${projectId}-export-${stamp}.${format}`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
