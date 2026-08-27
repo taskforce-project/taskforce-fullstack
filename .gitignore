@@ -227,3 +227,9 @@ Temporary Items
 # Rapports Lighthouse CI (générés localement par `lhci autorun`)
 .lighthouseci/
 .lh-out/
+
+# Rapports DAST complets (OWASP ZAP) — NE PAS publier (repo public) : endpoints + paires requête/réponse.
+# On garde seulement la config `zap.yaml`. Rapports/images à conserver hors repo (local ou repo privé).
+security-reports/**/*.html
+security-reports/**/*.json
+security-reports/**/*.png
