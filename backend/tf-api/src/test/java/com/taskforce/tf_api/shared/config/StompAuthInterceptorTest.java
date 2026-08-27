@@ -56,6 +56,7 @@ class StompAuthInterceptorTest {
     @Mock private JwtDecoder jwtDecoder;
     @Mock private UserRepository userRepository;
     @Mock private JwtIdentityResolver identityResolver;
+    @Mock private com.taskforce.tf_api.core.service.RealtimeAuthorizationService realtimeAuth;
     @Mock private MessageChannel channel;
 
     @InjectMocks private StompAuthInterceptor interceptor;
@@ -193,16 +194,28 @@ class StompAuthInterceptorTest {
                 .isInstanceOf(MessageDeliveryException.class);
         }
 
-        /**
-         * Périmètre assumé (cf. {@code TF-RT-AUTH-CHANNELS}) : ces topics ne sont pas encore autorisés
-         * finement — il faudrait lire la base depuis {@code shared.config}, ce qui creuserait la
-         * dépendance {@code shared → core}. Ils exigent au moins une session authentifiée.
-         */
         @Test
-        @DisplayName("projects/analysis → passent (autorisation fine encore à faire : TF-RT-AUTH-CHANNELS)")
-        void other_topics_pass_for_now() {
+        @DisplayName("projects.{id} : abonné qui PEUT voir le projet → autorisé")
+        void project_subscribe_allowed_when_can_view() {
+            when(realtimeAuth.canSubscribeProject(7L, 3L)).thenReturn(true);
             Message<byte[]> msg = subscribe("/topic/projects.3", "7");
             assertThat(interceptor.preSend(msg, channel)).isSameAs(msg);
+        }
+
+        @Test
+        @DisplayName("🔒 projects.{id} : abonné sans accès au projet → REFUSÉ (fix H2)")
+        void project_subscribe_rejected_when_cannot_view() {
+            when(realtimeAuth.canSubscribeProject(7L, 3L)).thenReturn(false);
+            assertThatThrownBy(() -> interceptor.preSend(subscribe("/topic/projects.3", "7"), channel))
+                .isInstanceOf(MessageDeliveryException.class);
+        }
+
+        @Test
+        @DisplayName("🔒 analysis.{ws} : non-membre du workspace → REFUSÉ (fix H2)")
+        void analysis_subscribe_rejected_when_not_member() {
+            when(realtimeAuth.canSubscribeWorkspace(7L, 9L)).thenReturn(false);
+            assertThatThrownBy(() -> interceptor.preSend(subscribe("/topic/analysis.9", "7"), channel))
+                .isInstanceOf(MessageDeliveryException.class);
         }
     }
 }

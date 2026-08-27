@@ -585,6 +585,7 @@ public class IssueService {
     public List<IssueResponse> listChildren(String workspaceSlug, Long projectId, Long issueId, Long userId) {
         Project project = resolveProject(workspaceSlug, projectId);
         assertWorkspaceMember(project.getWorkspace().getId(), userId);
+        visibilityGuard.assertCanView(project, userId); // projet privé : membres invités + OWNER/ADMIN
         resolveIssue(issueId, project.getId()); // valide l'appartenance au projet
         return issueRepository.findByParentIdOrderBySequenceNumberAsc(issueId).stream()
             .map(this::toResponse)
@@ -646,6 +647,7 @@ public class IssueService {
     private void resolveChecklistScope(String slug, Long projectId, Long issueId, Long userId) {
         Project project = resolveProject(slug, projectId);
         assertWorkspaceMember(project.getWorkspace().getId(), userId);
+        visibilityGuard.assertCanView(project, userId); // projet privé : membres invités + OWNER/ADMIN
         resolveIssue(issueId, project.getId());
     }
 
@@ -848,6 +850,7 @@ public class IssueService {
     public List<IssueTypeResponse> listTypes(String workspaceSlug, Long projectId, Long userId) {
         Project project = resolveProject(workspaceSlug, projectId);
         assertWorkspaceMember(project.getWorkspace().getId(), userId);
+        visibilityGuard.assertCanView(project, userId); // projet privé : membres invités + OWNER/ADMIN
         return issueTypeRepository.findByProjectIdOrderByName(project.getId()).stream()
             .map(this::toTypeResponse)
             .toList();
@@ -861,6 +864,7 @@ public class IssueService {
     public List<IssueCommentResponse> listComments(String workspaceSlug, Long projectId, Long issueId, Long userId) {
         Project project = resolveProject(workspaceSlug, projectId);
         assertWorkspaceMember(project.getWorkspace().getId(), userId);
+        visibilityGuard.assertCanView(project, userId); // projet privé : membres invités + OWNER/ADMIN
         resolveIssue(issueId, project.getId());
         return commentRepository.findByIssueIdOrderByCreatedAtAsc(issueId).stream()
             .map(this::toCommentResponse)
@@ -959,6 +963,7 @@ public class IssueService {
     public List<IssueActivityResponse> listActivity(String workspaceSlug, Long projectId, Long issueId, Long userId) {
         Project project = resolveProject(workspaceSlug, projectId);
         assertWorkspaceMember(project.getWorkspace().getId(), userId);
+        visibilityGuard.assertCanView(project, userId); // projet privé : membres invités + OWNER/ADMIN
         resolveIssue(issueId, project.getId());
         List<IssueActivity> activities = activityRepository.findByIssueIdOrderByCreatedAtAsc(issueId);
         // Rétention d'historique par plan : UNLIMITED_HISTORY (BUSINESS+) = tout ; sinon on ne renvoie que
@@ -978,6 +983,7 @@ public class IssueService {
     public List<IssueRelationResponse> listRelations(String workspaceSlug, Long projectId, Long issueId, Long userId) {
         Project project = resolveProject(workspaceSlug, projectId);
         assertWorkspaceMember(project.getWorkspace().getId(), userId);
+        visibilityGuard.assertCanView(project, userId); // projet privé : membres invités + OWNER/ADMIN
         Issue issue = resolveIssue(issueId, project.getId());
         return relationRepository.findByIssueId(issue.getId()).stream()
             .map(r -> toRelationResponse(r, issue.getId()))

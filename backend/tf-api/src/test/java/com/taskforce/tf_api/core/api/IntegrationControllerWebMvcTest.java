@@ -153,7 +153,7 @@ class IntegrationControllerWebMvcTest {
     void github_add_link_201() throws Exception {
         when(userRepository.findByEmail(anyString()))
             .thenReturn(Optional.of(User.builder().id(3L).email("dev@it.dev").build()));
-        when(gitHubService.addLink(anyLong(), any(), any())).thenReturn(
+        when(gitHubService.addLink(anyString(), anyLong(), any(), any())).thenReturn(
             new GitHubLinkResponse(1L, "PR", "octo/hello", 42, "https://pr", null, null, "T", "OPEN", null));
 
         mockMvc.perform(post("/api/workspaces/acme/integrations/github/issues/5/links").with(auth())
@@ -175,7 +175,9 @@ class IntegrationControllerWebMvcTest {
     @Test
     @DisplayName("GET github issue links → 200")
     void github_get_links_200() throws Exception {
-        when(gitHubService.getLinks(anyLong())).thenReturn(java.util.List.<GitHubLinkResponse>of());
+        when(userRepository.findByEmail(anyString()))
+            .thenReturn(Optional.of(User.builder().id(3L).email("dev@it.dev").build()));
+        when(gitHubService.getLinks(anyString(), anyLong(), any())).thenReturn(java.util.List.<GitHubLinkResponse>of());
 
         mockMvc.perform(get("/api/workspaces/acme/integrations/github/issues/5/links").with(auth()))
             .andExpect(status().isOk());
@@ -184,6 +186,9 @@ class IntegrationControllerWebMvcTest {
     @Test
     @DisplayName("DELETE github link → 200")
     void github_delete_link_200() throws Exception {
+        when(userRepository.findByEmail(anyString()))
+            .thenReturn(Optional.of(User.builder().id(3L).email("dev@it.dev").build()));
+
         mockMvc.perform(delete("/api/workspaces/acme/integrations/github/links/9").with(auth()))
             .andExpect(status().isOk());
     }

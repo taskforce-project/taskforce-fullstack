@@ -143,14 +143,24 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     private String resolveClientIp(HttpServletRequest request) {
-        // Respect du header X-Forwarded-For (proxy/load-balancer)
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.split(",")[0].trim();
+        // Fix M5 (TF-SEC-RATELIMIT-IP) : ne PAS faire confiance à la valeur de GAUCHE de X-Forwarded-For.
+        // nginx APPEND (`$proxy_add_x_forwarded_for`), donc le premier hop est fourni par le client →
+        // spoofable : un attaquant obtenait un bucket neuf par requête et défaisait le throttle login/OTP.
+        // Derrière Cloudflare (tunnel → nginx → backend), `CF-Connecting-IP` porte l'IP RÉELLE du client,
+        // posée par Cloudflare (le client ne peut pas la falsifier — CF l'écrase) : seule valeur fiable.
+        String cf = request.getHeader("CF-Connecting-IP");
+        if (cf != null && !cf.isBlank()) {
+            return cf.trim();
         }
         String realIp = request.getHeader("X-Real-IP");
         if (realIp != null && !realIp.isBlank()) {
             return realIp.trim();
+        }
+        // Repli : dernier hop du X-Forwarded-For (ajouté par le proxy de confiance le plus proche), jamais le premier.
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            String[] hops = forwarded.split(",");
+            return hops[hops.length - 1].trim();
         }
         return request.getRemoteAddr();
     }

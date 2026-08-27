@@ -86,16 +86,34 @@ class RateLimitFilterTest {
     }
 
     @Test
-    @DisplayName("résolution d'IP : X-Forwarded-For prioritaire (1re valeur de la liste)")
+    @DisplayName("résolution d'IP : X-Forwarded-For — DERNIER hop de confiance, pas le 1er (spoofable) (fix M5)")
     void resolves_ip_from_forwarded_for() throws Exception {
         FilterChain chain = mock(FilterChain.class);
+        // Le vrai client = le dernier hop (ajouté par nginx). 10 requêtes saturent le quota register.
         for (int i = 0; i < 10; i++) {
-            filter.doFilter(req("/api/auth/register", "203.0.113.7, 10.0.0.1", null, "127.0.0.1"),
+            filter.doFilter(req("/api/auth/register", "10.0.0.1, 203.0.113.7", null, "127.0.0.1"),
                 new MockHttpServletResponse(), chain);
         }
-        // AUTH_STRICT (register) quota = 5 → déjà bloqué avant 10 ; on vérifie juste qu'un 429 survient
+        // Un attaquant qui change la 1re valeur mais garde le dernier hop → MÊME bucket → toujours bloqué.
         var blocked = new MockHttpServletResponse();
-        filter.doFilter(req("/api/auth/register", "203.0.113.7", null, "127.0.0.1"), blocked, mock(FilterChain.class));
+        filter.doFilter(req("/api/auth/register", "9.9.9.9, 203.0.113.7", null, "127.0.0.1"), blocked, mock(FilterChain.class));
+        assertThat(blocked.getStatus()).isEqualTo(429);
+    }
+
+    @Test
+    @DisplayName("résolution d'IP : CF-Connecting-IP prioritaire, non spoofable via X-Forwarded-For (fix M5)")
+    void resolves_ip_from_cf_connecting_ip() throws Exception {
+        FilterChain chain = mock(FilterChain.class);
+        for (int i = 0; i < 10; i++) {
+            var r = req("/api/auth/register", "1.1.1.1", null, "127.0.0.1");
+            r.addHeader("CF-Connecting-IP", "203.0.113.20");
+            filter.doFilter(r, new MockHttpServletResponse(), chain);
+        }
+        // X-Forwarded-For différent mais MÊME CF-Connecting-IP (posé par Cloudflare) → même bucket → bloqué.
+        var r2 = req("/api/auth/register", "2.2.2.2", null, "127.0.0.1");
+        r2.addHeader("CF-Connecting-IP", "203.0.113.20");
+        var blocked = new MockHttpServletResponse();
+        filter.doFilter(r2, blocked, mock(FilterChain.class));
         assertThat(blocked.getStatus()).isEqualTo(429);
     }
 

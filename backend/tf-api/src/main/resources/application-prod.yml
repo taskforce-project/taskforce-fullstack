@@ -50,7 +50,9 @@ spring:
   web:
     error:
       include-stacktrace: never
-      include-message: always
+      # never : ne pas exposer les messages d'exception non gérés au client (fuite d'info L12). Les erreurs
+      # métier renvoient leur message via ApiResponse.error(...) dans le corps (indépendant de ce réglage).
+      include-message: never
 
 # Rate limiting distribué (buckets partagés via Redis entre instances) — TF-SEC-011
 ratelimit:
