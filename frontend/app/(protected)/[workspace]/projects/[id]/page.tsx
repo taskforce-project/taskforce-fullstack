@@ -51,7 +51,8 @@ import {
 import { cn } from "@/lib/utils"
 import { useIssueStore } from "@/lib/store/issue-store"
 import { useProjectRealtime } from "@/lib/hooks/use-project-realtime"
-import { exportIssuesToCsv } from "@/lib/utils/export-issues-csv"
+import { downloadProjectExport } from "@/lib/api/project-service"
+import { toast } from "sonner"
 import type { Issue, IssueStatus, IssueStatusCategory, IssuePriority } from "@/lib/api/issue-service"
 
 // ---------------------------------------------------------------------------
@@ -632,22 +633,36 @@ export default function ProjectBoardPage() {
     await updateIssue(workspace, projectId, activeData.issueId, { statusId: overData.statusId })
   }
 
+  // Export COMPLET du projet (serveur) — issues + descriptions + commentaires + activité (P1b bêta).
+  async function exportProject(format: "csv" | "json") {
+    if (!workspace) return
+    try {
+      await downloadProjectExport(workspace, projectId, format)
+    } catch {
+      toast.error("Export failed. Please try again.")
+    }
+  }
+
   return (
     <div className="flex h-full min-h-0 flex-col gap-0">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2 mb-4 shrink-0">
         <InlineIssueFilters issues={issues} value={filters} onChange={setFilters} />
         <div className="ml-auto flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 gap-1.5 text-xs"
-            disabled={issues.length === 0}
-            onClick={() => exportIssuesToCsv(applyIssueFilters(issues, filters), `issues-p${projectId}`)}
-          >
-            <Download className="size-3.5" />
-            Export CSV
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" disabled={issues.length === 0}>
+                <Download className="size-3.5" />
+                Export
+                <ChevronDown className="size-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Export complet du projet</DropdownMenuLabel>
+              <DropdownMenuItem onSelect={() => void exportProject("csv")}>CSV (issues + détails)</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => void exportProject("json")}>JSON (complet)</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <BulkAssignDialog slug={workspace} projectId={projectId} issues={issues} />
         </div>
       </div>
