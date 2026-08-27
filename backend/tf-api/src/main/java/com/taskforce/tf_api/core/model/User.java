@@ -193,6 +193,20 @@ public class User {
     private Boolean onboardingCompleted = false;
 
     /**
+     * Vague de bêta fermée à laquelle appartient l'utilisateur (ex. {@code beta_2026_09}). Nullable ;
+     * peuplé manuellement par testeur (formulaire d'intake). Sert au filtrage des métriques par cohorte.
+     */
+    @Column(name = "beta_cohort", length = 50)
+    private String betaCohort;
+
+    /**
+     * Contexte de test déclaré — {@code PROFESSIONAL} / {@code PERSONAL} / {@code FREE} (contrainte CHECK
+     * en base). Nullable. Permet des métriques spécifiques au contexte (cf. protocole bêta).
+     */
+    @Column(name = "beta_context", length = 20)
+    private String betaContext;
+
+    /**
      * Vrai si l'utilisateur bénéficie effectivement d'un plan payant : un palier ≠ FREE <b>et</b> un
      * abonnement qui n'est pas en défaut de paiement.
      *
