@@ -138,12 +138,20 @@ public class StripeService {
      * Récupère le Price ID selon le type de plan
      */
     public String getPriceIdForPlan(String planType) {
-        return switch (planType.toUpperCase()) {
+        String id = switch (planType.toUpperCase()) {
             case "BASIC" -> basicPriceId;
             case "BUSINESS" -> businessPriceId;
             case "ENTERPRISE" -> enterprisePriceId;
             default -> throw new IllegalArgumentException("Type de plan invalide : " + planType);
         };
+        // Price-id non configuré (STRIPE_PRICE_ID_* absent — cas prod actuel) : message clair (→ 409)
+        // au lieu d'un appel Stripe avec un prix vide qui remonte en 502 opaque (« you must provide a price »).
+        if (id == null || id.isBlank()) {
+            throw new IllegalStateException(
+                "Online checkout for the " + planType.toUpperCase() + " plan isn't configured yet. "
+                + "Please try again later or contact support.");
+        }
+        return id;
     }
 
     /**
