@@ -82,12 +82,30 @@ public class AiUsageService {
             ? repository.findByAccountIdAndPeriod(owner.getId(), period)
             : Optional.empty();
         String resetAt = LocalDate.now().plusMonths(1).withDayOfMonth(1).toString();
+
+        long limit = limitFor(plan);
+        long realTotal = row.map(AiTokenUsage::getTotalTokens).orElse(0L);
+        long realPrompt = row.map(AiTokenUsage::getPromptTokens).orElse(0L);
+        long realCompletion = row.map(AiTokenUsage::getCompletionTokens).orElse(0L);
+
+        // Affichage PLAFONNÉ à 100 % (façon Claude) : le gate laisse terminer la requête qui franchit le
+        // seuil, donc le réel peut dépasser le plafond — mais on ne l'AFFICHE jamais. Le RÉEL reste en base
+        // (ai_token_usage) pour le calcul de coût / dépassement ; ici on borne uniquement ce qui est exposé.
+        long shownTotal = limit >= 0 ? Math.min(realTotal, limit) : realTotal;
+        long shownPrompt = realPrompt;
+        long shownCompletion = realCompletion;
+        if (limit >= 0 && realTotal > limit && realTotal > 0) {
+            // Prorata pour que prompt↑ + completion↓ ne dépasse pas le total affiché plafonné.
+            shownPrompt = Math.round(realPrompt * (double) limit / realTotal);
+            shownCompletion = shownTotal - shownPrompt;
+        }
+
         return new AiUsageResponse(
             plan.name(),
-            row.map(AiTokenUsage::getTotalTokens).orElse(0L),
-            limitFor(plan),
-            row.map(AiTokenUsage::getPromptTokens).orElse(0L),
-            row.map(AiTokenUsage::getCompletionTokens).orElse(0L),
+            shownTotal,
+            limit,
+            shownPrompt,
+            shownCompletion,
             row.map(AiTokenUsage::getRequestCount).orElse(0),
             period,
             resetAt
@@ -98,8 +116,17 @@ public class AiUsageService {
      * Bloque (→ 409) si le <b>compte</b> a atteint son plafond mensuel de tokens IA. No-op si le plan est
      * illimité (Enterprise) ou si le compte/plafond est introuvable. Appelé <b>avant</b> chaque génération
      * LLM (cf. {@code AgentService.run}) : c'est le gate de l'IA (façon Claude, l'IA est métrée par tokens).
+     *
+     * <p><b>{@code noRollbackFor = IllegalStateException}</b> : ce gate est appelé DANS la transaction de
+     * l'appelant (ex. {@code SmartAssignService.recommend}, {@code @Transactional}). Sans cette règle, la
+     * levée au plafond marque la transaction partagée <b>rollback-only</b> : même si l'appelant <i>attrape</i>
+     * l'exception pour retomber sur son repli déterministe (Java), le commit final échoue en
+     * {@code UnexpectedRollbackException} (→ <b>500</b>). C'était le bug du smart-assign au plafond — le repli
+     * Java s'exécutait bien mais la requête finissait en 500. Le gate est un pur signal de contrôle (aucune
+     * écriture) : il ne doit jamais forcer de rollback. Le chat ({@code AgentService.run}, hors tx) reçoit
+     * toujours son 409 — {@code noRollbackFor} n'affecte pas la propagation, seulement le marquage rollback.</p>
      */
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, noRollbackFor = IllegalStateException.class)
     public void assertWithinQuota(Long workspaceId) {
         if (workspaceId == null) {
             return;
@@ -123,15 +150,19 @@ public class AiUsageService {
     }
 
     /**
-     * Plafond mensuel de tokens IA par plan ({@code -1} = illimité).
-     * Valeurs <b>placeholder</b> volontairement généreuses (modèle local ≈ coût serveur) — le calibrage
-     * final dépend de la décision pricing (cf. TF-PLAN-STORAGE / TF-AI-BUDGET).
+     * Plafond mensuel de tokens IA par plan ({@code -1} = illimité). Métrage <b>par tokens</b> (façon
+     * Claude) : une action lourde (analyse « deep » = gros modèle + raisonnement + boucle d'outils) coûte
+     * déjà plus de quota qu'un smart-assign « fast » car elle <b>génère plus de tokens</b> — le routing
+     * modèle par fonctionnalité (tier {@code fast}/{@code standard}/{@code deep} côté gateway) n'appelle
+     * donc <b>aucune pondération</b> ici. Échelle 1× / 5× / 20× / ∞ ; mesuré ≈ 1,2k tokens/action →
+     * FREE ≈ 80 actions/mois, BASIC ≈ 400, BUSINESS ≈ 1 600. Valeurs <b>arrêtées le 27/08/2026</b>
+     * (décision pricing, cf. QA-46).
      */
     private long limitFor(PlanType plan) {
         return switch (plan) {
-            case FREE -> 100_000L;        // 100k tokens/mois
-            case BASIC -> 500_000L;       // 500k tokens/mois
-            case BUSINESS -> 2_000_000L;  // 2M tokens/mois
+            case FREE -> 100_000L;        // 100k tokens/mois (~80 actions IA)
+            case BASIC -> 500_000L;       // 500k tokens/mois (~400 actions IA)
+            case BUSINESS -> 2_000_000L;  // 2M tokens/mois (~1 600 actions IA)
             case ENTERPRISE -> -1L;       // illimité
         };
     }
