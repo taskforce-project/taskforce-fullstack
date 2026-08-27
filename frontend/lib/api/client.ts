@@ -224,6 +224,15 @@ export function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
   }
-  
+
   return "Une erreur inconnue est survenue";
+}
+
+/**
+ * Code HTTP d'une erreur Axios (`undefined` si erreur réseau/timeout ou non-Axios).
+ * Permet à un appelant de distinguer un cas métier précis (ex. 409 quota IA atteint)
+ * du repli générique, sans dépendre directement d'Axios dans le composant.
+ */
+export function getErrorStatus(error: unknown): number | undefined {
+  return axios.isAxiosError(error) ? error.response?.status : undefined;
 }

@@ -211,6 +211,11 @@ public class AgentService {
             return new AssistantAnswer(smallTalkFallback(), null, "fallback", List.of(), steps, List.of(), AssistantUsage.NONE);
         }
 
+        // Même gate de quota que le chemin principal (run) : le small-talk consomme aussi des tokens.
+        // Sans ce gate, un compte au plafond contournait le quota en enchaînant « salut »/« merci ».
+        // Au-dessus du plafond → 409 (repli côté front), avant tout appel LLM.
+        aiUsageService.assertWithinQuota(workspaceId);
+
         llm.beginUsageCapture();
         try {
             steps.add(new AssistantStep("Rédaction de la réponse", "active", "Génération via Cortex (rapide)"));

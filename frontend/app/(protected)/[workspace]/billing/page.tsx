@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { useAuth } from "@/lib/contexts/auth-context"
+import { getErrorStatus, getErrorMessage } from "@/lib/api/client"
 import { stripeService, type SubscriptionInfo } from "@/lib/api/stripe-service"
 import { getAiUsage, type AiUsage } from "@/lib/api/ai-usage-service"
 
@@ -160,8 +161,10 @@ export default function BillingPage() {
     try {
       const { checkoutUrl } = await stripeService.createCheckoutSession(plan)
       window.location.assign(checkoutUrl)
-    } catch {
-      toast.error("Could not start payment right now. Please try again later.")
+    } catch (e) {
+      // 409 = règle métier claire (ex. forfait pas encore configuré côté Stripe) → on montre le message
+      // serveur ; tout autre cas (réseau, 502 Stripe) reste un message générique.
+      toast.error(getErrorStatus(e) === 409 ? getErrorMessage(e) : "Could not start payment right now. Please try again later.")
       setBusy(false)
     }
   }
