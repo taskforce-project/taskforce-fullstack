@@ -81,12 +81,12 @@ describe("issue-filters", () => {
       ]
       const opts = deriveAssigneeOptions(issues)
       expect(opts.filter((o) => o.id === 10)).toHaveLength(1)
-      expect(opts).toContainEqual({ id: null, name: "Non assigné" })
+      expect(opts).toContainEqual({ id: null, name: "Unassigned" })
     })
 
-    it("utilise l'email en repli quand le displayName est null", () => {
-      const opts = deriveAssigneeOptions([issue({ assignee: { id: 11, displayName: null, email: "b@x.dev" } as Issue["assignee"] })])
-      expect(opts).toContainEqual({ id: 11, name: "b@x.dev" })
+    it("porte email + avatarUrl et retombe sur l'email quand le displayName est null", () => {
+      const opts = deriveAssigneeOptions([issue({ assignee: { id: 11, displayName: null, email: "b@x.dev", avatarUrl: "http://x/a.png" } as Issue["assignee"] })])
+      expect(opts).toContainEqual({ id: 11, name: "b@x.dev", email: "b@x.dev", avatarUrl: "http://x/a.png" })
     })
 
     it("n'ajoute pas 'Non assigné' quand toutes les issues sont assignées", () => {

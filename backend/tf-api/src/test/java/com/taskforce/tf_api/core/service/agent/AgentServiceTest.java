@@ -15,6 +15,7 @@ import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.service.LlmClient;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -169,6 +170,24 @@ class AgentServiceTest {
         // Et aucune recherche n'a été déclenchée
         org.mockito.Mockito.verify(search, org.mockito.Mockito.never())
             .retrieveRelevant(anyLong(), anyString(), anyInt());
+    }
+
+    @Test
+    @DisplayName("run (conversationnel) : compte au plafond → 409 (IllegalStateException), AUCUN appel LLM")
+    void run_conversational_blocked_when_quota_reached() {
+        stubWorkspace();
+        when(groq.isConfigured()).thenReturn(true);
+        // Le small-talk est métré → il doit être gated comme le chemin principal : au plafond, le gate
+        // lève AVANT tout appel LLM (sinon contournement du quota en enchaînant « salut »/« merci »).
+        org.mockito.Mockito.doThrow(new IllegalStateException("Quota IA mensuel atteint"))
+            .when(aiUsageService).assertWithinQuota(anyLong());
+
+        assertThatThrownBy(() -> service.run("acme", 7L, "Hey comment va tu ?"))
+            .isInstanceOf(IllegalStateException.class);
+
+        // Gate AVANT beginUsageCapture/chat : aucun token n'est consommé au-dessus du plafond.
+        org.mockito.Mockito.verify(groq, org.mockito.Mockito.never())
+            .chat(anyString(), org.mockito.ArgumentMatchers.any(), anyString());
     }
 
     @Test

@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useParams } from "next/navigation"
-import { Send, Sparkles, MessageSquare, ChevronDown, Plus, Trash2 } from "lucide-react"
+import Link from "next/link"
+import { Send, Sparkles, MessageSquare, ChevronDown, Plus, Trash2, ArrowUpRight } from "lucide-react"
 import {
   Message, Steps, Reasoning, Tool, Sources, ThinkingBar, FeedbackBar, PromptSuggestion, TokenMeter,
   type ToolStatus,
@@ -10,6 +11,7 @@ import {
 import { Markdown } from "@/components/ui/lightweight-markdown"
 import { cn } from "@/lib/utils"
 import { sendAgentMessage, type AssistantAnswer } from "@/lib/api/assistant-service"
+import { getErrorStatus } from "@/lib/api/client"
 import {
   listConversations, getConversation, deleteConversation,
   type ConversationSummary, type ConversationMessage,
@@ -21,6 +23,8 @@ interface Turn {
   role: "user" | "assistant"
   text?: string
   answer?: AssistantAnswer
+  /** Tour spécial : plafond de tokens IA atteint → carte d'info + CTA (au lieu d'une réponse). */
+  kind?: "quota"
 }
 
 const SUGGESTIONS = [
@@ -43,6 +47,36 @@ function messagesToTurns(messages: ConversationMessage[]): Turn[] {
             usage: { promptTokens: 0, completionTokens: 0, totalTokens: m.totalTokens },
           },
         },
+  )
+}
+
+/**
+ * Plafond de tokens IA atteint (HTTP 409) — carte d'**information** (pas d'erreur) avec un **CTA**
+ * clair vers la page d'abonnement. Rendue en tour assistant pour rester dans le fil.
+ */
+function QuotaNotice({ slug }: Readonly<{ slug: string }>) {
+  return (
+    <div className="flex flex-col gap-2 rounded-xl border border-primary/25 bg-primary/5 p-3">
+      <div className="flex items-center gap-2">
+        <div className="flex size-6 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
+          <Sparkles className="size-3.5" />
+        </div>
+        <p className="text-sm font-medium text-foreground">Monthly AI limit reached</p>
+      </div>
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        You&apos;ve used all of Cortex&apos;s tokens for this month on your current plan.
+        Upgrade to keep chatting and unlock a larger monthly allowance.
+      </p>
+      {slug && (
+        <Link
+          href={`/${slug}/billing`}
+          className="inline-flex w-fit items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90"
+        >
+          Upgrade plan
+          <ArrowUpRight className="size-3.5" />
+        </Link>
+      )}
+    </div>
   )
 }
 
@@ -135,11 +169,17 @@ export function AgentChat() {
       setConvTokens((n) => n + (res.answer.usage?.totalTokens ?? 0))
       setTurns((t) => [...t, { id: `a${Date.now()}`, role: "assistant", answer: res.answer }])
       void loadConversations()
-    } catch {
-      setTurns((t) => [...t, {
-        id: `a${Date.now()}`, role: "assistant",
-        answer: { answer: "Sorry, I couldn't answer. Please try again.", reasoning: null, mode: "fallback", sources: [], steps: [], toolCalls: [], usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 } },
-      }])
+    } catch (e) {
+      // 409 = plafond de tokens IA atteint → carte d'info + CTA (pas un repli « réessayez » trompeur
+      // qui laisse croire à un bug). Tout autre cas reste un repli générique.
+      if (getErrorStatus(e) === 409) {
+        setTurns((t) => [...t, { id: `a${Date.now()}`, role: "assistant", kind: "quota" }])
+      } else {
+        setTurns((t) => [...t, {
+          id: `a${Date.now()}`, role: "assistant",
+          answer: { answer: "Sorry, I couldn't answer. Please try again.", reasoning: null, mode: "fallback", sources: [], steps: [], toolCalls: [], usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 } },
+        }])
+      }
     } finally {
       setLastMs(Date.now() - startRef.current)
       setLoading(false)
@@ -240,6 +280,10 @@ export function AgentChat() {
           turns.map((t) =>
             t.role === "user" ? (
               <Message key={t.id} role="user" content={t.text} />
+            ) : t.kind === "quota" ? (
+              <Message key={t.id} role="assistant">
+                <QuotaNotice slug={slug} />
+              </Message>
             ) : (
               <Message key={t.id} role="assistant">
                 {t.answer && <AgentAnswerView answer={t.answer} />}

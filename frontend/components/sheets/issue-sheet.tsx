@@ -1720,7 +1720,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                     <ChevronDown className="size-4 shrink-0 opacity-50" />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="min-w-40">
+                <DropdownMenuContent align="start" className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-40">
                   {(labelsByProject[projectId ?? 0] ?? []).length === 0 && (
                     <div className="px-2 py-1.5 text-xs text-muted-foreground italic">
                       No labels — create some in project settings

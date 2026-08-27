@@ -36,18 +36,19 @@ export function applyIssueFilters(issues: Issue[], f: IssueFilterState): Issue[]
 
 // --- Options dérivées des issues chargées (évite des fetchs supplémentaires) ---
 
-export interface AssigneeOption { id: number | null; name: string }
+export interface AssigneeOption { id: number | null; name: string; email?: string | null; avatarUrl?: string | null }
 export interface LabelOption { id: number; name: string; color: string }
 
 export function deriveAssigneeOptions(issues: Issue[]): AssigneeOption[] {
-  const map = new Map<number, string>()
+  const map = new Map<number, AssigneeOption>()
   let hasUnassigned = false
   for (const issue of issues) {
-    if (issue.assignee) map.set(issue.assignee.id, issue.assignee.displayName ?? issue.assignee.email)
+    const a = issue.assignee
+    if (a) map.set(a.id, { id: a.id, name: a.displayName ?? a.email, email: a.email, avatarUrl: a.avatarUrl })
     else hasUnassigned = true
   }
-  const out: AssigneeOption[] = [...map.entries()].map(([id, name]) => ({ id, name }))
-  if (hasUnassigned) out.push({ id: null, name: "Non assigné" })
+  const out: AssigneeOption[] = [...map.values()]
+  if (hasUnassigned) out.push({ id: null, name: "Unassigned" })
   return out
 }
 
