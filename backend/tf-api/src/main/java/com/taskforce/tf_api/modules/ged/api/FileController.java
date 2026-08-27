@@ -13,7 +13,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.modules.ged.service.MinioService;
-import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import lombok.RequiredArgsConstructor;
 
@@ -35,13 +34,13 @@ public class FileController {
      */
     @GetMapping("/avatars/{userId}")
     public ResponseEntity<InputStreamResource> getAvatar(@PathVariable Long userId) {
-        // Existence de l'utilisateur (404 sinon) ; la valeur de l'avatarUrl n'est pas utilisée ici.
-        userRepository.findById(userId)
-            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable : " + userId));
-
-        // Clé Minio dérivée du path /api/files/avatars/{userId}
+        // Fix L8 : ne PAS distinguer « utilisateur inconnu » de « pas d'avatar » — un 404 JSON (throw) d'un
+        // côté et un 404 vide de l'autre formait un oracle d'énumération d'utilisateurs. Les deux renvoient
+        // désormais le MÊME 404 vide ; le front bascule sur l'identicon généré localement (avatar.ts).
+        if (userRepository.findById(userId).isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
         String objectKey = "avatars/" + userId + "/avatar";
-
         try {
             InputStream stream = minioService.getObjectStream(objectKey);
             return ResponseEntity.ok()
