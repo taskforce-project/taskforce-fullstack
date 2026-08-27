@@ -193,7 +193,7 @@ public class IntegrationController {
         @AuthenticationPrincipal Jwt jwt
     ) {
         User user = resolveUser(jwt);
-        GitHubLinkResponse link = gitHubService.addLink(issueId, req, user);
+        GitHubLinkResponse link = gitHubService.addLink(slug, issueId, req, user);
         return ResponseEntity.status(HttpStatus.CREATED)
             .body(ApiResponse.success("Lien GitHub ajouté", link));
     }
@@ -201,17 +201,19 @@ public class IntegrationController {
     @GetMapping("/api/workspaces/{slug}/integrations/github/issues/{issueId}/links")
     public ResponseEntity<ApiResponse<List<GitHubLinkResponse>>> getGitHubLinks(
         @PathVariable String slug,
-        @PathVariable Long issueId
+        @PathVariable Long issueId,
+        @AuthenticationPrincipal Jwt jwt
     ) {
-        return ResponseEntity.ok(ApiResponse.success(gitHubService.getLinks(issueId)));
+        return ResponseEntity.ok(ApiResponse.success(gitHubService.getLinks(slug, issueId, resolveUser(jwt))));
     }
 
     @DeleteMapping("/api/workspaces/{slug}/integrations/github/links/{linkId}")
     public ResponseEntity<ApiResponse<Void>> deleteGitHubLink(
         @PathVariable String slug,
-        @PathVariable Long linkId
+        @PathVariable Long linkId,
+        @AuthenticationPrincipal Jwt jwt
     ) {
-        gitHubService.deleteLink(linkId);
+        gitHubService.deleteLink(slug, linkId, resolveUser(jwt));
         return ResponseEntity.ok(ApiResponse.success("Lien GitHub supprimé", null));
     }
 

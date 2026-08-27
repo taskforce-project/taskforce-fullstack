@@ -665,6 +665,21 @@ public class AuthService {
                 + "Rendez-la visible chez le fournisseur, ou utilisez l'inscription classique.");
         }
 
+        // Fix M7 (TF-SEC-OAUTH-VERIFY) : refuser une connexion externe dont le fournisseur déclare l'e-mail
+        // NON vérifié — sinon un compte IdP portant l'e-mail d'une victime pourrait se greffer sur son compte
+        // local (prise de contrôle par identité e-mail). Google et GitHub ne renvoient que des e-mails
+        // vérifiés, donc les connexions légitimes ne sont pas touchées ; ce garde-fou couvre un IdP mal
+        // configuré. (Le contrôle complet — exiger `email_verified` + maîtriser le linking — se pose aussi
+        // côté realm Keycloak.)
+        Object verifiedClaim = profil.get("email_verified");
+        boolean explicitlyUnverified =
+            Boolean.FALSE.equals(verifiedClaim) || "false".equalsIgnoreCase(str(verifiedClaim));
+        if (explicitlyUnverified) {
+            throw new RuntimeException(
+                "L'adresse e-mail de votre compte externe n'est pas vérifiée. "
+                + "Vérifiez-la chez le fournisseur, puis réessayez.");
+        }
+
         boolean creation = userRepository.findByEmail(email).isEmpty();
 
         User user = userRepository.findByEmail(email).orElseGet(() -> {

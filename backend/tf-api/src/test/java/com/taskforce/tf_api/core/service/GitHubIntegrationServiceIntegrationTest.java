@@ -29,7 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * URL OAuth, statut (déconnecté), disconnect, liens issue↔GitHub (CRUD).
  */
 @DisplayName("GitHubIntegrationService (intégration Postgres)")
-@Import(GitHubIntegrationService.class)
+@Import({GitHubIntegrationService.class, ProjectVisibilityGuard.class})
 class GitHubIntegrationServiceIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired private GitHubIntegrationService service;
@@ -38,6 +38,7 @@ class GitHubIntegrationServiceIntegrationTest extends AbstractIntegrationTest {
     @Autowired private ProjectRepository projectRepository;
     @Autowired private IssueStatusRepository issueStatusRepository;
     @Autowired private IssueRepository issueRepository;
+    @Autowired private com.taskforce.tf_api.core.repository.WorkspaceMemberRepository workspaceMemberRepository;
 
     @Autowired private com.taskforce.tf_api.core.repository.IntegrationRepository integrationRepository;
     @Autowired private com.taskforce.tf_api.core.repository.OAuthStateRepository oauthStateRepository;
@@ -52,6 +53,8 @@ class GitHubIntegrationServiceIntegrationTest extends AbstractIntegrationTest {
         owner = userRepository.save(User.builder()
             .keycloakId("kc-gh").email("gh@it.dev").displayName("Owner").isActive(true).build());
         Workspace ws = workspaceRepository.save(Workspace.builder().name("GH WS").slug(SLUG).owner(owner).build());
+        workspaceMemberRepository.save(com.taskforce.tf_api.core.model.WorkspaceMember.builder()
+            .workspace(ws).user(owner).role(com.taskforce.tf_api.core.enums.WorkspaceRole.OWNER).build());
         Project project = projectRepository.save(Project.builder().workspace(ws).name("App").identifier("APP").createdBy(owner).build());
         IssueStatus status = issueStatusRepository.save(IssueStatus.builder()
             .project(project).name("Backlog").category(IssueStatusCategory.BACKLOG).build());
@@ -80,14 +83,22 @@ class GitHubIntegrationServiceIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("addLink / getLinks / deleteLink sur une issue")
+    @DisplayName("addLink / getLinks / deleteLink sur une issue (scopés au workspace)")
     void should_manage_links() {
-        var link = service.addLink(issueId,
+        var link = service.addLink(SLUG, issueId,
             new GitHubLinkRequest("PR", "o/r", 1, "https://github.com/o/r/pull/1", null, null, "Fix"), owner);
-        assertThat(service.getLinks(issueId)).hasSize(1);
+        assertThat(service.getLinks(SLUG, issueId, owner)).hasSize(1);
 
-        service.deleteLink(link.id());
-        assertThat(service.getLinks(issueId)).isEmpty();
+        service.deleteLink(SLUG, link.id(), owner);
+        assertThat(service.getLinks(SLUG, issueId, owner)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("🔒 H1 : accéder aux liens d'une issue via un AUTRE workspace → 404 (pas de fuite cross-tenant)")
+    void links_cross_tenant_rejected() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                () -> service.getLinks("un-autre-workspace", issueId, owner))
+            .isInstanceOf(com.taskforce.tf_api.shared.exception.ResourceNotFoundException.class);
     }
 
     private void connectGitHub() {
