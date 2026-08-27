@@ -10,6 +10,13 @@
 >
 > Sources : `.ai/qa.md` (QA produit détaillée), `.ai/known-issues.md` (bugs vérifiés), `.ai/module-map.md` (domaines↔code), `.ai/architecture-map.md` (archi réelle), `.ai/P0-fix-plan.md` (correctifs P0 paste-ready).
 
+> **▶ MAJ 27/08/2026 — QA-50 : durcissement sécu pré-bêta (lot 2) — M4 (proxy Brain) + L8 ; vérif config M6/L10.** `[QA-50]`
+> - **M4 (proxy fichiers Brain public)** : `/api/files/brain/{wsId}/{name}` est public (servi en `<img>` → pas d'en-tête d'auth) ; la clé était `UUID.substring(0,8)` = **32 bits** sur un `workspaceId` séquentiel → brute-forçable. **Fix** : `BrainAttachmentController` génère un token **UUID complet** (122 bits) → URL-capacité réellement inguessable. Zéro changement front (le nom uploadé est juste plus long ; anciens fichiers = clé faible mais toujours servis). Défense complète (auth+scope via blob, ou URL signée à expiration) = amélioration ultérieure.
+> - **L8 (énumération via l'avatar)** : `getAvatar` renvoyait un 404 JSON (throw) distinct du 404 vide (pas d'avatar) → oracle. **Fix** : même 404 vide des deux côtés + test (import `ResourceNotFoundException` retiré).
+> - **M6 / L10 — VÉRIFIÉ EN PROD (OK, aucun code)** : `TF_TURNSTILE_SECRET_KEY` (35) + `TF_HUMAN_CHALLENGE_SECRET` (64) **posés** → anti-bot signup actif ; `CORS_ALLOWED_ORIGINS = https://app.taskforce-project.fr` (allowlist stricte). Reste : realm Keycloak (`email_verified` + first-broker-login linking) = tâche admin user (le code M7 ajoute déjà une couche).
+> - **L9 (actuator)** : mitigé en externe par nginx (404 hors health) + scrape Prometheus interne nécessaire → accepté. **L11 (interceptor fail-open)** : observation de conception, risque faible → accepté.
+> - **Reste = P1** : cohorte (`V80`), export projet serveur (JSON+CSV), métriques bêta via Grafana.
+
 > **▶ MAJ 27/08/2026 — QA-49 : durcissement sécurité pré-bêta (H1/H2 bloquants cross-tenant + M3/M5/M7 + L12).** `[QA-49]`
 > - **Contexte** : bêta fermée sur la **prod partagée** → audit sécu (5 sous-agents), feu vert user « corrige tout, critique + moyen ». ⚠️ **Repo GitHub PUBLIC** (le user va le passer privé — c'est aussi comme ça que le « gars sur Vercel » a trouvé le projet) → failles publiquement auditables, d'où l'urgence. Aucun secret réel dans l'historique git (placeholders seulement — vérifié).
 > - **H1 (critique — IDOR cross-tenant)** : `GitHubIntegrationService.addLink/getLinks/deleteLink` résolvaient l'issue/lien par ID brut, sans scope workspace. **Fix** : `scopedIssue(slug, issueId)` (404 si hors `{slug}`) + `visibilityGuard.assertCanWrite/assertCanView` ; contrôleur passe `slug` + user (get/delete ne prenaient même pas le user).

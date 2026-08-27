@@ -50,7 +50,12 @@ public class BrainAttachmentController {
 
         String original = file.getOriginalFilename() != null ? file.getOriginalFilename() : "fichier";
         String safe = original.replaceAll("[^a-zA-Z0-9._-]", "_");
-        String name = UUID.randomUUID().toString().substring(0, 8) + "-" + safe;
+        // Clé-capacité RÉELLEMENT inguessable (fix M4). L'URL /api/files/brain/... est publique (servie en
+        // <img>, donc pas d'en-tête d'auth possible) : la seule protection est l'imprévisibilité du nom.
+        // 8 hex (32 bits) sur un workspaceId séquentiel était brute-forçable → UUID complet = 122 bits aléatoires.
+        // (Défense complète — auth + scope via blob, ou URL signée à expiration — = amélioration ultérieure.)
+        String token = UUID.randomUUID().toString().replace("-", "");
+        String name = token + "-" + safe;
         String key  = "brain/" + ws.getId() + "/" + name;
 
         String contentType = file.getContentType() != null ? file.getContentType() : "application/octet-stream";
