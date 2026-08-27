@@ -97,6 +97,15 @@ class FileControllerWebMvcTest {
             .andExpect(header().string("Content-Type", MediaType.IMAGE_JPEG_VALUE));
     }
 
+    @Test
+    @DisplayName("GET avatars/{id} utilisateur inconnu → 404 vide (fix L8 : pas d'oracle d'énumération)")
+    void getAvatar_unknownUser_404() throws Exception {
+        when(userRepository.findById(999L)).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/api/files/avatars/999").with(auth()))
+            .andExpect(status().isNotFound());
+    }
+
     // ---- Brain files (endpoint PUBLIC) -------------------------------------
 
     @Test
