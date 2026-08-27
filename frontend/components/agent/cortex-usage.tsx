@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 import { useParams } from "next/navigation"
 import { Sparkles, ExternalLink, Zap, ChevronDown, ChevronRight, RefreshCw } from "lucide-react"
 
@@ -62,7 +63,19 @@ export function CortexUsage({ sessionTokens, className }: { sessionTokens: numbe
   const [open, setOpen] = useState(false)
   const [usage, setUsage] = useState<AiUsage | null>(null)
   const [refreshing, setRefreshing] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
+  const ref = useRef<HTMLDivElement>(null)      // conteneur du trigger
+  const popRef = useRef<HTMLDivElement>(null)   // popover (rendu en portail sur <body>)
+  const [coords, setCoords] = useState<{ left: number; bottom: number } | null>(null)
+
+  // Position FIXE du popover, ancrée AU-DESSUS du trigger (bord droit aligné). Porté sur <body> (portail) :
+  // sinon l'`overflow` du panneau flottant Cortex le ROGNE (il s'ouvre vers le haut) et il passe SOUS le
+  // sheet. Fixed + portail = il flotte par-dessus tout, jamais clippé (retour user QA-47).
+  const place = useCallback(() => {
+    const el = ref.current
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    setCoords({ left: r.right, bottom: window.innerHeight - r.top + 8 })
+  }, [])
 
   // `minSpin` : durée minimale de l'animation, uniquement au clic manuel (pas à l'ouverture) — sinon un
   // refresh instantané ne laisse pas voir le spin et on ne « sent » pas que ça a rechargé.
@@ -87,12 +100,21 @@ export function CortexUsage({ sessionTokens, className }: { sessionTokens: numbe
 
   useEffect(() => {
     if (!open) return
+    place()
     const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+      const t = e.target as Node
+      // Clic hors du trigger ET hors du popover porté → ferme.
+      if (!ref.current?.contains(t) && !popRef.current?.contains(t)) setOpen(false)
     }
     document.addEventListener("mousedown", onDown)
-    return () => document.removeEventListener("mousedown", onDown)
-  }, [open])
+    window.addEventListener("resize", place)
+    window.addEventListener("scroll", place, true)
+    return () => {
+      document.removeEventListener("mousedown", onDown)
+      window.removeEventListener("resize", place)
+      window.removeEventListener("scroll", place, true)
+    }
+  }, [open, place])
 
   const ctxPct = pctOf(sessionTokens, CONTEXT_WINDOW)
   const unlimited = usage ? usage.limitTokens < 0 : false
@@ -113,8 +135,12 @@ export function CortexUsage({ sessionTokens, className }: { sessionTokens: numbe
         <ChevronDown className={cn("size-3 transition-transform", open && "rotate-180")} />
       </button>
 
-      {open && (
-        <div className="absolute bottom-full right-0 z-50 mb-2 w-80 overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-lg">
+      {open && coords && typeof document !== "undefined" && createPortal(
+        <div
+          ref={popRef}
+          style={{ position: "fixed", left: coords.left, bottom: coords.bottom, transform: "translateX(-100%)" }}
+          className="z-[120] w-80 overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-lg"
+        >
           {/* Fenêtre de contexte */}
           <div className="p-3">
             <button
@@ -199,7 +225,8 @@ export function CortexUsage({ sessionTokens, className }: { sessionTokens: numbe
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )
