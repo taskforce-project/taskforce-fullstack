@@ -15,6 +15,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.stereotype.Component;
 
 import com.taskforce.tf_api.core.repository.UserRepository;
+import com.taskforce.tf_api.core.service.RealtimeAuthorizationService;
 import com.taskforce.tf_api.shared.security.JwtIdentityResolver;
 
 import lombok.RequiredArgsConstructor;
@@ -43,12 +44,17 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class StompAuthInterceptor implements ChannelInterceptor {
 
-    /** Seul topic dont la clé EST l'identité de l'abonné : {@code /topic/notifications.{userId}}. */
-    private static final String USER_TOPIC_PREFIX = "/topic/notifications.";
+    /** Topic dont la clé EST l'identité de l'abonné : {@code /topic/notifications.{userId}}. */
+    private static final String USER_TOPIC_PREFIX     = "/topic/notifications.";
+    /** Flux temps réel d'un projet (board) : {@code /topic/projects.{projectId}} — autorisé par visibilité projet. */
+    private static final String PROJECT_TOPIC_PREFIX  = "/topic/projects.";
+    /** Flux d'analyse IA d'un workspace : {@code /topic/analysis.{workspaceId}} — autorisé par appartenance. */
+    private static final String ANALYSIS_TOPIC_PREFIX = "/topic/analysis.";
 
-    private final JwtDecoder          jwtDecoder;
-    private final UserRepository      userRepository;
-    private final JwtIdentityResolver identityResolver;
+    private final JwtDecoder                   jwtDecoder;
+    private final UserRepository               userRepository;
+    private final JwtIdentityResolver          identityResolver;
+    private final RealtimeAuthorizationService realtimeAuth;
 
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
@@ -102,22 +108,21 @@ public class StompAuthInterceptor implements ChannelInterceptor {
     }
 
     /**
-     * Autorise l'abonnement à {@code /topic/notifications.{userId}} : l'abonné doit être ce {@code userId}.
-     * C'est le seul topic dont la <b>clé est l'identité</b>, donc le seul où une comparaison de chaîne
-     * suffit — et c'était la fuite concrète (lire les notifications d'un autre).
-     *
-     * <p><b>Volontairement hors périmètre ici</b> : {@code /topic/projects.{projectId}} et
-     * {@code /topic/analysis.{workspaceId}}. Les autoriser demande de <b>lire la base</b> (visibilité
-     * projet, appartenance workspace) depuis {@code shared.config} — ce qui creuserait la dépendance
-     * {@code shared → core} déjà introduite ici par {@code UserRepository} et contreviendrait à la règle
-     * d'or n°5 ({@code shared ← core ← modules}). Le geste juste est un service d'autorisation temps réel
-     * côté {@code core}, appelé par un intercepteur qui reste mince : tracé en {@code TF-RT-AUTH-CHANNELS}.
-     * En attendant, ces deux topics exigent désormais au moins une session <b>authentifiée</b>, ce qui
-     * n'était pas le cas avant.</p>
+     * Autorise chaque {@code SUBSCRIBE} <b>par canal</b> (fix <b>H2</b>, TF-RT-AUTH-CHANNELS). Toute
+     * souscription exige une session authentifiée ; en plus, les canaux porteurs de données sont vérifiés :
+     * <ul>
+     *   <li>{@code /topic/notifications.{userId}} — l'abonné doit être ce {@code userId} ;</li>
+     *   <li>{@code /topic/projects.{projectId}} — l'abonné doit <b>voir</b> le projet (public / membre / OWNER-ADMIN) ;</li>
+     *   <li>{@code /topic/analysis.{workspaceId}} — l'abonné doit être <b>membre</b> du workspace.</li>
+     * </ul>
+     * Avant, seul le topic notifications était contrôlé : {@code projects.*} / {@code analysis.*} n'exigeaient
+     * qu'une session authentifiée → n'importe qui pouvait streamer l'activité d'un autre compte par simple
+     * énumération d'id. La lecture de la base vit dans {@link RealtimeAuthorizationService} (côté {@code core}) ;
+     * l'intercepteur reste mince.
      */
     private void authorizeSubscribe(StompHeaderAccessor accessor) {
         String destination = accessor.getDestination();
-        if (destination == null || !destination.startsWith(USER_TOPIC_PREFIX)) {
+        if (destination == null) {
             return;
         }
         String principal = accessor.getUser() != null ? accessor.getUser().getName() : null;
@@ -125,11 +130,38 @@ public class StompAuthInterceptor implements ChannelInterceptor {
             log.warn("STOMP SUBSCRIBE refusé sur {} : session non authentifiée", destination);
             throw new MessageDeliveryException("Authentification requise");
         }
-        String targetUserId = destination.substring(USER_TOPIC_PREFIX.length());
-        if (!principal.equals(targetUserId)) {
-            log.warn("STOMP SUBSCRIBE refusé : user {} a tenté de lire les notifications de {}",
-                principal, targetUserId);
-            throw new MessageDeliveryException("Accès refusé à ce canal");
+        long userId;
+        try {
+            userId = Long.parseLong(principal);
+        } catch (NumberFormatException ex) {
+            throw new MessageDeliveryException("Identité illisible");
+        }
+
+        if (destination.startsWith(USER_TOPIC_PREFIX)) {
+            if (!principal.equals(destination.substring(USER_TOPIC_PREFIX.length()))) {
+                log.warn("STOMP SUBSCRIBE refusé : user {} a tenté de lire les notifications d'un autre", principal);
+                throw new MessageDeliveryException("Accès refusé à ce canal");
+            }
+        } else if (destination.startsWith(PROJECT_TOPIC_PREFIX)) {
+            if (!realtimeAuth.canSubscribeProject(userId, parseId(destination, PROJECT_TOPIC_PREFIX))) {
+                log.warn("STOMP SUBSCRIBE refusé : user {} sans accès au canal {}", userId, destination);
+                throw new MessageDeliveryException("Accès refusé à ce canal");
+            }
+        } else if (destination.startsWith(ANALYSIS_TOPIC_PREFIX)) {
+            if (!realtimeAuth.canSubscribeWorkspace(userId, parseId(destination, ANALYSIS_TOPIC_PREFIX))) {
+                log.warn("STOMP SUBSCRIBE refusé : user {} sans accès au canal {}", userId, destination);
+                throw new MessageDeliveryException("Accès refusé à ce canal");
+            }
+        }
+        // Autres canaux : la session authentifiée suffit (aucun flux cross-tenant connu au-delà de ces 3).
+    }
+
+    /** Id numérique en fin de destination ({@code prefix + id}) ; refuse une destination malformée. */
+    private static long parseId(String destination, String prefix) {
+        try {
+            return Long.parseLong(destination.substring(prefix.length()));
+        } catch (NumberFormatException ex) {
+            throw new MessageDeliveryException("Canal invalide");
         }
     }
 }
