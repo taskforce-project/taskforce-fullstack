@@ -4,8 +4,10 @@ import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Value;
 
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -27,6 +29,7 @@ import com.taskforce.tf_api.core.dto.response.SelectPlanResponse;
 import com.taskforce.tf_api.core.dto.response.VerifyOtpResponse;
 import com.taskforce.tf_api.core.service.AuthService;
 import com.taskforce.tf_api.shared.security.HumanChallengeService;
+import com.taskforce.tf_api.shared.security.RefreshTokenCookie;
 import com.taskforce.tf_api.shared.security.TurnstileService;
 import com.taskforce.tf_api.shared.dto.ApiResponse;
 
@@ -48,6 +51,7 @@ public class AuthController {
     private final AuthService authService;
     private final HumanChallengeService humanChallengeService;
     private final TurnstileService turnstileService;
+    private final RefreshTokenCookie refreshCookie;
 
     @Value("${security.turnstile.site-key:}")
     private String turnstileSiteKey;
@@ -197,16 +201,29 @@ public class AuthController {
 
         try {
             AuthResponse response = authService.login(request);
-
-            return ResponseEntity.ok(
-                ApiResponse.success("Connexion réussie", response)
-            );
+            return withRefreshCookie(response, "Connexion réussie");
 
         } catch (Exception e) {
             log.error("Erreur lors de la connexion : {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(ApiResponse.error(e.getMessage()));
         }
+    }
+
+    /**
+     * Détache le refresh token du CORPS de la réponse et le pose en cookie {@code HttpOnly}
+     * (jamais lisible par JS). Si aucun token n'est présent — cas 2FA en attente —, renvoie la
+     * réponse inchangée. Mutualisé par login et refresh.
+     */
+    private ResponseEntity<ApiResponse<AuthResponse>> withRefreshCookie(AuthResponse response, String message) {
+        String refresh = response.getRefreshToken();
+        if (refresh == null || refresh.isBlank()) {
+            return ResponseEntity.ok(ApiResponse.success(message, response));
+        }
+        response.setRefreshToken(null);
+        return ResponseEntity.ok()
+            .header(HttpHeaders.SET_COOKIE, refreshCookie.set(refresh).toString())
+            .body(ApiResponse.success(message, response));
     }
 
     /**
@@ -263,20 +280,31 @@ public class AuthController {
      */
     @PostMapping("/refresh-token")
     public ResponseEntity<ApiResponse<AuthResponse>> refreshToken(
-        @Valid @RequestBody RefreshTokenRequest request
+        @CookieValue(name = "${auth.refresh-cookie.name:tf_refresh}", required = false) String cookieRefresh,
+        @RequestBody(required = false) RefreshTokenRequest request
     ) {
         log.info("Requête de rafraîchissement de token");
 
-        try {
-            AuthResponse response = authService.refreshToken(request.getRefreshToken());
+        // Le refresh token vient du cookie HttpOnly ; repli sur le corps pour les sessions
+        // créées AVANT la migration (transition sans déconnexion forcée).
+        String refresh = (cookieRefresh != null && !cookieRefresh.isBlank())
+            ? cookieRefresh
+            : (request != null ? request.getRefreshToken() : null);
 
-            return ResponseEntity.ok(
-                ApiResponse.success("Token rafraîchi avec succès", response)
-            );
+        if (refresh == null || refresh.isBlank()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.error("Refresh token manquant"));
+        }
+
+        try {
+            AuthResponse response = authService.refreshToken(refresh);
+            return withRefreshCookie(response, "Token rafraîchi avec succès");
 
         } catch (Exception e) {
             log.error("Erreur lors du rafraîchissement du token : {}", e.getMessage());
+            // Refresh rejeté/expiré → purger le cookie (session morte) + 401.
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .header(HttpHeaders.SET_COOKIE, refreshCookie.clear().toString())
                 .body(ApiResponse.error(e.getMessage()));
         }
     }
@@ -295,13 +323,15 @@ public class AuthController {
             String token = authorization.startsWith("Bearer ") ? authorization.substring(7) : authorization;
             authService.logout(token);
 
-            return ResponseEntity.ok(
-                ApiResponse.<Void>success("Déconnexion réussie", null)
-            );
+            return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, refreshCookie.clear().toString())
+                .body(ApiResponse.<Void>success("Déconnexion réussie", null));
 
         } catch (Exception e) {
             log.error("Erreur lors de la déconnexion : {}", e.getMessage());
+            // Même en cas d'erreur serveur, on efface le cookie de refresh côté client.
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .header(HttpHeaders.SET_COOKIE, refreshCookie.clear().toString())
                 .body(ApiResponse.error(e.getMessage()));
         }
     }

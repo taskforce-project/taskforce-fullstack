@@ -3,6 +3,7 @@ package com.taskforce.tf_api.core.api;
 import java.util.Map;
 import java.util.Set;
 
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,6 +18,7 @@ import com.taskforce.tf_api.core.dto.response.AuthResponse;
 import com.taskforce.tf_api.core.service.AuthService;
 import com.taskforce.tf_api.shared.dto.ApiResponse;
 import com.taskforce.tf_api.shared.security.OAuthLoginService;
+import com.taskforce.tf_api.shared.security.RefreshTokenCookie;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -55,6 +57,7 @@ public class OAuthLoginController {
 
     private final OAuthLoginService oauthLoginService;
     private final AuthService authService;
+    private final RefreshTokenCookie refreshCookie;
 
     /** URL de démarrage de la connexion externe. */
     @GetMapping("/{provider}/authorize")
@@ -98,7 +101,15 @@ public class OAuthLoginController {
 
         try {
             AuthResponse reponse = authService.completeOAuthLogin(profil, jetons);
-            return ResponseEntity.ok(ApiResponse.success("Connexion réussie", reponse));
+            // Le refresh token part en cookie HttpOnly (jamais dans le corps), comme le login classique.
+            String refresh = reponse.getRefreshToken();
+            if (refresh == null || refresh.isBlank()) {
+                return ResponseEntity.ok(ApiResponse.success("Connexion réussie", reponse));
+            }
+            reponse.setRefreshToken(null);
+            return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, refreshCookie.set(refresh).toString())
+                .body(ApiResponse.success("Connexion réussie", reponse));
         } catch (Exception e) {
             log.error("Finalisation de la connexion externe impossible : {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)

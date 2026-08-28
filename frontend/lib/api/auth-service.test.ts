@@ -110,7 +110,8 @@ describe('authService - API Service', () => {
       await authService.login(credentials);
 
       expect(localStorageMock.setItem).toHaveBeenCalledWith('accessToken', 'mock-access-token');
-      expect(localStorageMock.setItem).toHaveBeenCalledWith('refreshToken', 'mock-refresh-token');
+      // Le refresh token n'est plus stocké côté JS : il vit dans un cookie HttpOnly posé par le backend.
+      expect(localStorageMock.setItem).not.toHaveBeenCalledWith('refreshToken', expect.anything());
       expect(localStorageMock.setItem).toHaveBeenCalledWith('user', JSON.stringify(mockResponse.data.data.user));
     });
 
@@ -296,7 +297,7 @@ describe('authService - API Service', () => {
       await authService.verifyOtp('test@example.com', '123456');
 
       expect(localStorageMock.setItem).toHaveBeenCalledWith('accessToken', 'access-token');
-      expect(localStorageMock.setItem).toHaveBeenCalledWith('refreshToken', 'refresh-token');
+      expect(localStorageMock.setItem).not.toHaveBeenCalledWith('refreshToken', expect.anything());
     });
 
     it('should fail with incorrect OTP code', async () => {
@@ -562,7 +563,7 @@ describe('authService — couverture OAuth / challenge / fallbacks / garde-fous'
     vi.mocked(client.apiClient.post).mockResolvedValue({ data: { data } } as any);
     await expect(authService.oauthCallback({ code: 'c', state: 's', redirectUri: 'r' })).resolves.toEqual(data);
     expect(localStorageMock.setItem).toHaveBeenCalledWith('accessToken', 'at');
-    expect(localStorageMock.setItem).toHaveBeenCalledWith('refreshToken', 'rt');
+    expect(localStorageMock.setItem).not.toHaveBeenCalledWith('refreshToken', expect.anything());
   });
 
   it('oauthCallback propage une erreur', async () => {
