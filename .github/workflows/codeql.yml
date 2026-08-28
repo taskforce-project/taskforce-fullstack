@@ -1,0 +1,64 @@
+name: CodeQL
+
+# Analyse de sécurité statique native GitHub (code scanning). Gratuite sur les dépôts PUBLICS.
+# Complète Semgrep (SAST) et Trivy (dépendances/secrets/misconfig) : CodeQL suit les flux de
+# données (taint tracking) et remonte les résultats dans l'onglet Security du dépôt.
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+  schedule:
+    - cron: '0 4 * * 1'   # lundi 04:00 UTC — veille CVE / nouvelles requêtes sur du code figé
+
+# Un seul run par ref : annule l'analyse précédente si un nouveau push arrive.
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyse (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write   # publier les alertes de code scanning
+      contents: read
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: java-kotlin            # backend Spring Boot
+            build-mode: manual
+          - language: javascript-typescript  # frontend Next.js + landing
+            build-mode: none
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        if: matrix.language == 'java-kotlin'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          queries: security-extended   # jeu de requêtes de sécurité élargi
+
+      # build-mode: manual → on compile nous-mêmes le backend pour que CodeQL trace le build.
+      - name: Compile backend (tf-api)
+        if: matrix.language == 'java-kotlin'
+        working-directory: backend/tf-api
+        run: ./mvnw -B -ntp -DskipTests clean compile
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
