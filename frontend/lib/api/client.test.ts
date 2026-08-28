@@ -147,10 +147,11 @@ describe('API Client', () => {
       expect(axios.post).toHaveBeenCalledWith(
         expect.stringContaining('/api/auth/refresh-token'),
         { refreshToken: 'refresh-1' },
+        { withCredentials: true },
       );
-      // Rotation des deux jetons.
       expect(localStorage.getItem('accessToken')).toBe('neuf');
-      expect(localStorage.getItem('refreshToken')).toBe('refresh-2');
+      // Le refresh token n'est plus stocké côté JS (cookie HttpOnly) : le legacy est purgé.
+      expect(localStorage.getItem('refreshToken')).toBeNull();
       // La requête d'origine repart avec le nouveau jeton.
       expect(error.config.headers.Authorization).toBe('Bearer neuf');
       expect(result).toEqual({ data: 'rejoué' });
@@ -163,8 +164,8 @@ describe('API Client', () => {
       await onResponseError(axiosError({ response: { status: 401 } }));
 
       expect(localStorage.getItem('accessToken')).toBe('nu');
-      // Sans nouveau refresh token, l'ancien est conservé.
-      expect(localStorage.getItem('refreshToken')).toBe('refresh-1');
+      // Le refresh token n'est plus stocké côté JS (cookie HttpOnly) : le legacy est purgé.
+      expect(localStorage.getItem('refreshToken')).toBeNull();
     });
 
     it('purge la session et redirige si le refresh échoue', async () => {
@@ -183,12 +184,18 @@ describe('API Client', () => {
       expect(window.location.href).toBe('/auth/login');
     });
 
-    it('redirige sans bruit quand il n’y a aucun refresh token', async () => {
+    it('tente le refresh via cookie et redirige si aucune session', async () => {
       localStorage.setItem('accessToken', 'vieux');
+      // Le cookie HttpOnly est invisible au JS : on tente TOUJOURS le refresh ; ici il échoue (pas de session).
+      vi.mocked(axios.post).mockRejectedValue(new Error('pas de session'));
 
       await expect(onResponseError(axiosError({ response: { status: 401 } }))).rejects.toBeDefined();
 
-      expect(axios.post).not.toHaveBeenCalled();
+      expect(axios.post).toHaveBeenCalledWith(
+        expect.stringContaining('/api/auth/refresh-token'),
+        {},
+        { withCredentials: true },
+      );
       expect(window.location.href).toBe('/auth/login');
       // Session expirée : aucun toast, la redirection se suffit.
       expect(toast.error).not.toHaveBeenCalled();

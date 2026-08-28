@@ -22,6 +22,7 @@ import com.taskforce.tf_api.core.service.TwoFactorService;
 import com.taskforce.tf_api.core.service.UserService;
 import com.taskforce.tf_api.shared.security.JwtIdentityResolver;
 import com.taskforce.tf_api.shared.security.OAuthLoginService;
+import com.taskforce.tf_api.shared.security.RefreshTokenCookie;
 import com.taskforce.tf_api.shared.security.SecurityConfig;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -41,7 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * PUBLIC_MATCHERS (chaîne @Order(1)) → aucun JWT attendu ; /users/** reste authentifié.
  */
 @WebMvcTest({OAuthLoginController.class, UserController.class, StripeWebhookController.class})
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, RefreshTokenCookie.class})
 @ActiveProfiles("test")
 @TestPropertySource(properties = "stripe.webhook-secret=whsec_test_dummy")
 @DisplayName("Controllers publics + utilisateur (@WebMvcTest)")

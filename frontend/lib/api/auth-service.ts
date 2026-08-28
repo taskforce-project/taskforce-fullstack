@@ -31,7 +31,8 @@ export interface AuthChallenge {
 export interface AuthResponse {
   user: AuthUser;
   accessToken: string;
-  refreshToken: string;
+  /** Absent du corps depuis la migration en cookie HttpOnly (posé par le backend). */
+  refreshToken?: string | null;
   expiresIn: number;
   message?: string;
   /** Vrai quand le mot de passe est bon mais qu'un code 2FA est requis : aucun token n'est fourni. */
@@ -100,8 +101,8 @@ export const authService = {
 
       // Sauvegarder les tokens et l'utilisateur dans localStorage
       if (typeof window !== "undefined") {
+        // Le refresh token n'est plus stocké côté JS : il vit dans un cookie HttpOnly posé par le backend.
         localStorage.setItem("accessToken", authData.accessToken);
-        localStorage.setItem("refreshToken", authData.refreshToken);
         localStorage.setItem("user", JSON.stringify(authData.user));
       }
 
@@ -172,8 +173,8 @@ export const authService = {
 
       const authData = response.data.data;
       if (typeof window !== "undefined") {
+        // Le refresh token n'est plus stocké côté JS : il vit dans un cookie HttpOnly posé par le backend.
         localStorage.setItem("accessToken", authData.accessToken);
-        localStorage.setItem("refreshToken", authData.refreshToken);
         localStorage.setItem("user", JSON.stringify(authData.user));
       }
       return authData;
@@ -229,8 +230,8 @@ export const authService = {
       // Si vérification réussie et tokens fournis, les sauvegarder
       if (otpData.authData) {
         if (typeof window !== "undefined") {
+          // Refresh token en cookie HttpOnly (posé par le backend), plus en localStorage.
           localStorage.setItem("accessToken", otpData.authData.accessToken);
-          localStorage.setItem("refreshToken", otpData.authData.refreshToken);
           localStorage.setItem("user", JSON.stringify(otpData.authData.user));
         }
       }

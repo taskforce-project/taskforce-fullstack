@@ -67,6 +67,15 @@ cors:
   allow-credentials: true
   max-age: 3600
 
+# Cookie porteur du refresh token (HttpOnly). En prod : Secure (HTTPS) + SameSite=Lax — app.* et
+# api.* partagent le même site (eTLD+1), le cookie passe sur l'XHR de refresh. Le refresh token
+# n'est ainsi jamais exposé au JavaScript (durcissement OWASP A07).
+auth:
+  refresh-cookie:
+    secure: ${AUTH_REFRESH_COOKIE_SECURE:true}
+    same-site: ${AUTH_REFRESH_COOKIE_SAMESITE:Lax}
+    max-age-seconds: ${AUTH_REFRESH_COOKIE_MAX_AGE:10800}
+
 # Keycloak Configuration
 keycloak:
   url: ${KEYCLOAK_URL}

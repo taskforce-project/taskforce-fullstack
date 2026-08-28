@@ -56,6 +56,24 @@ export function toggleTaskInMarkdown(md: string, taskIndex: number): string {
 const INLINE_RE =
   /(`[^`]+`)|(!\[[^\]]*\]\([^)]+\))|(\[\[[^\]]+\]\])|(==[^=]+==)|(\*\*[^*]+\*\*)|(\*[^*\n]+\*)|(_[^_\n]+_)|(\[[^\]]+\]\([^)]+\))|(#[\p{L}_][\p{L}0-9_/-]{0,39})/gu
 
+// Neutralise les schémas d'URL dangereux (`javascript:`, `data:text/html`, `vbscript:`…) dans
+// le contenu écrit par l'utilisateur (notes Brain, messages du chat). React n'échappe PAS un
+// `href="javascript:…"` → sans ce filtre, un lien markdown malveillant exécuterait du JS au clic.
+function safeLinkUrl(url: string): string | null {
+  const u = url.trim()
+  if (/^(https?:|mailto:|tel:)/i.test(u)) return u   // schémas explicites autorisés
+  if (/^[a-z][a-z0-9+.-]*:/i.test(u)) return null    // tout autre schéma explicite → rejeté
+  return u                                            // relatif, ancre (#…), //host : sûr
+}
+function safeImageUrl(url: string): string | null {
+  const u = url.trim()
+  if (/^https?:/i.test(u)) return u
+  if (/^data:image\//i.test(u)) return u             // data: uniquement pour les images
+  if (/^blob:/i.test(u)) return u
+  if (/^[a-z][a-z0-9+.-]*:/i.test(u)) return null    // tout autre schéma → rejeté
+  return u                                            // relatif : sûr
+}
+
 function renderInline(text: string, keyPrefix: string, opts: MarkdownProps): ReactNode[] {
   const out: ReactNode[] = []
   let last = 0
@@ -70,10 +88,11 @@ function renderInline(text: string, keyPrefix: string, opts: MarkdownProps): Rea
       out.push(<code key={key} className="rounded bg-muted px-1 py-0.5 font-mono text-[0.85em]">{token.slice(1, -1)}</code>)
     } else if (token.startsWith("![")) {
       const mm = /!\[([^\]]*)\]\(([^)]+)\)/.exec(token)
-      out.push(mm
+      const src = mm ? safeImageUrl(mm[2]) : null
+      out.push(mm && src
         // eslint-disable-next-line @next/next/no-img-element
-        ? <img key={key} src={mm[2]} alt={mm[1]} className="my-2 max-h-96 rounded-lg border object-contain" />
-        : token)
+        ? <img key={key} src={src} alt={mm[1]} className="my-2 max-h-96 rounded-lg border object-contain" />
+        : (mm ? mm[1] : token))
     } else if (token.startsWith("[[")) {
       const title = token.slice(2, -2).trim()
       out.push(
@@ -98,10 +117,11 @@ function renderInline(text: string, keyPrefix: string, opts: MarkdownProps): Rea
       )
     } else {
       const mm = /\[([^\]]+)\]\(([^)]+)\)/.exec(token)
-      out.push(mm
-        ? <a key={key} href={mm[2]} target="_blank" rel="noopener noreferrer"
+      const href = mm ? safeLinkUrl(mm[2]) : null
+      out.push(mm && href
+        ? <a key={key} href={href} target="_blank" rel="noopener noreferrer"
              className="text-primary underline underline-offset-2 hover:opacity-80">{mm[1]}</a>
-        : token)
+        : (mm ? mm[1] : token))
     }
     last = m.index + token.length
   }

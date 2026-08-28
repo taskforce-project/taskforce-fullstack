@@ -22,6 +22,7 @@ import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.WebhookRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
+import com.taskforce.tf_api.shared.security.SsrfGuard;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,6 +48,8 @@ public class WebhookService {
             .orElseThrow(() -> new ResourceNotFoundException("Workspace not found: " + workspaceSlug));
         // Webhook sortant = risque d'exfiltration → réservé aux gestionnaires (OWNER/ADMIN).
         authorizationService.requireManager(workspace.getId(), createdBy.getId());
+        // Anti-SSRF : refuser une URL qui viserait le réseau interne (Docker/Tailscale/localhost/métadonnées).
+        SsrfGuard.assertPublicHttpUrl(req.url());
 
         Webhook webhook = Webhook.builder()
             .workspace(workspace)
@@ -80,6 +83,8 @@ public class WebhookService {
             .filter(w -> w.getWorkspace().getId().equals(workspace.getId()))
             .orElseThrow(() -> new ResourceNotFoundException("Webhook not found: " + webhookId));
 
+        // Anti-SSRF : même garde qu'à la création (une màj ne doit pas pouvoir viser l'interne).
+        SsrfGuard.assertPublicHttpUrl(req.url());
         webhook.setUrl(req.url());
         if (req.secret() != null) webhook.setSecret(req.secret());
         if (req.eventTypes() != null) webhook.setEventTypes(req.eventTypes().toArray(new String[0]));
@@ -110,6 +115,15 @@ public class WebhookService {
     }
 
     private void fireOne(Webhook webhook, String eventType, Object payload) {
+        // Défense en profondeur : re-valider l'URL au moment de l'envoi (une entrée corrompue
+        // en base ou un rebinding DNS ne doit pas atteindre le réseau interne).
+        if (!SsrfGuard.isPublicHttpUrl(webhook.getUrl())) {
+            log.warn("Webhook {} ignoré : URL non publique (anti-SSRF) : {}", webhook.getId(), webhook.getUrl());
+            webhook.setLastFiredAt(LocalDateTime.now());
+            webhook.setLastStatus(0);
+            webhookRepository.save(webhook);
+            return;
+        }
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
