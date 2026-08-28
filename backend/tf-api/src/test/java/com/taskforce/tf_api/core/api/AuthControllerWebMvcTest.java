@@ -16,14 +16,17 @@ import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.AuthService;
 import com.taskforce.tf_api.shared.security.HumanChallengeService;
+import com.taskforce.tf_api.shared.security.RefreshTokenCookie;
 import com.taskforce.tf_api.shared.security.SecurityConfig;
 import com.taskforce.tf_api.shared.security.TurnstileService;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -33,7 +36,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * {@code AuthService} mocké ; on vérifie le contrat HTTP (enveloppe {@code ApiResponse}, 200/2xx/400).
  */
 @WebMvcTest(AuthController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, RefreshTokenCookie.class})
 @ActiveProfiles("test")
 @DisplayName("AuthController (@WebMvcTest)")
 class AuthControllerWebMvcTest {
@@ -135,7 +138,9 @@ class AuthControllerWebMvcTest {
         mockMvc.perform(post("/api/auth/refresh-token").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"refreshToken\":\"rt\"}"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.refreshToken").value("r"));
+            .andExpect(jsonPath("$.data.accessToken").value("a"))
+            // Le refresh token part désormais en cookie HttpOnly, plus dans le corps JSON.
+            .andExpect(header().string("Set-Cookie", containsString("tf_refresh=")));
     }
 
     @Test
@@ -289,11 +294,13 @@ class AuthControllerWebMvcTest {
     }
 
     @Test
-    @DisplayName("POST /api/auth/refresh-token corps vide (@NotBlank) → 400")
-    void refresh_token_invalid_400() throws Exception {
+    @DisplayName("POST /api/auth/refresh-token sans cookie ni corps → 401 (refresh manquant)")
+    void refresh_token_missing_401() throws Exception {
+        // Le refresh token vient désormais du cookie HttpOnly (repli sur le corps) ; absent des
+        // deux → 401 « non autorisé » (et non plus 400 : le champ de corps n'est plus obligatoire).
         mockMvc.perform(post("/api/auth/refresh-token").contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
-            .andExpect(status().isBadRequest());
+            .andExpect(status().isUnauthorized());
     }
 
     @Test

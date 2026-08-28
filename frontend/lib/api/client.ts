@@ -84,6 +84,35 @@ apiClient.interceptors.request.use(
 );
 
 /**
+ * Single-flight du refresh : une seule requête `/api/auth/refresh-token` en vol à la fois,
+ * partagée par TOUS les appels qui prennent un 401 en même temps. Sans ce partage, N requêtes
+ * expirées lançaient N refresh ; or Keycloak fait tourner le refresh token
+ * (revokeRefreshToken=true, maxReuse=0) → les refresh en trop réutilisent un token déjà tourné
+ * → réutilisation détectée → session révoquée → déconnexion parasite. Renvoie le nouvel access
+ * token, ou `null` si aucun refresh token n'est disponible.
+ */
+let refreshInFlight: Promise<string | null> | null = null;
+
+async function refreshAccessToken(): Promise<string | null> {
+  // Le refresh token vit dans un cookie HttpOnly, envoyé automatiquement (`withCredentials`).
+  // Repli de transition : une session créée AVANT la migration a encore le token en localStorage
+  // → on l'envoie une dernière fois dans le corps (le backend l'accepte), puis on le purge une
+  // fois que le cookie a pris le relais.
+  const legacy = globalThis.window !== undefined ? localStorage.getItem("refreshToken") : null;
+  const body = legacy ? { refreshToken: legacy } : {};
+  // `axios` brut (pas `apiClient`) → la requête de refresh ne re-traverse pas cet intercepteur ;
+  // `withCredentials` pour que le cookie HttpOnly parte avec la requête.
+  const response = await axios.post(`${API_URL}/api/auth/refresh-token`, body, { withCredentials: true });
+  const authData = response.data?.data ?? response.data;
+  const accessToken: string | undefined = authData?.accessToken;
+  if (globalThis.window !== undefined && accessToken) {
+    localStorage.setItem("accessToken", accessToken);
+    localStorage.removeItem("refreshToken"); // le cookie prend le relais
+  }
+  return accessToken ?? null;
+}
+
+/**
  * Intercepteur pour gérer les erreurs et le refresh des tokens
  */
 apiClient.interceptors.response.use(
@@ -108,44 +137,28 @@ apiClient.interceptors.response.use(
     // (les 401 des endpoints auth — ex. mauvais mot de passe — sont laissés au formulaire)
     if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       originalRequest._retry = true;
+      try {
+        // Single-flight : tous les 401 concurrents partagent le MÊME appel de refresh
+        // (voir refreshAccessToken ci-dessus) ; `finally` libère le verrou pour la salve suivante.
+        refreshInFlight = refreshInFlight ?? refreshAccessToken().finally(() => { refreshInFlight = null; });
+        const newAccessToken = await refreshInFlight;
 
-      const refreshToken = globalThis.window !== undefined ? localStorage.getItem("refreshToken") : null;
-
-      if (refreshToken) {
-        try {
-          // Tentative de refresh du token
-          const response = await axios.post(`${API_URL}/api/auth/refresh-token`, {
-            refreshToken,
-          });
-
-          // Le backend retourne ApiResponse<AuthResponse> : les tokens sont dans response.data.data
-          const authData = response.data?.data ?? response.data;
-          const { accessToken, refreshToken: newRefreshToken } = authData;
-
-          // Sauvegarder les nouveaux tokens (rotation)
-          if (globalThis.window !== undefined) {
-            localStorage.setItem("accessToken", accessToken);
-            if (newRefreshToken) {
-              localStorage.setItem("refreshToken", newRefreshToken);
-            }
-          }
-
-          // Retry la requête originale avec le nouveau token
-          if (originalRequest.headers) {
-            originalRequest.headers.Authorization = `Bearer ${accessToken}`;
-          }
-
-          return apiClient(originalRequest);
-        } catch (refreshError) {
-          // Refresh échoué → déconnexion silencieuse (pas de toast "Requête invalide")
+        if (!newAccessToken) {
+          // Pas de refresh token → session simplement expirée : redirection silencieuse.
           clearSessionAndRedirect();
-          return Promise.reject(refreshError);
+          return Promise.reject(error);
         }
-      }
 
-      // Pas de refresh token → session simplement expirée : redirection silencieuse.
-      clearSessionAndRedirect();
-      return Promise.reject(error);
+        // Retry la requête originale avec le nouveau token.
+        if (originalRequest.headers) {
+          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+        }
+        return apiClient(originalRequest);
+      } catch (refreshError) {
+        // Refresh échoué (token rejeté/expiré) → déconnexion silencieuse (pas de toast).
+        clearSessionAndRedirect();
+        return Promise.reject(refreshError);
+      }
     }
 
     // Toast global réservé aux erreurs SYSTÉMIQUES (inattendues, non contextuelles) :

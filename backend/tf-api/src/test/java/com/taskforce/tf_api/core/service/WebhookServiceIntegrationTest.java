@@ -76,13 +76,24 @@ class WebhookServiceIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("create + list + update + delete")
     void crud() {
-        WebhookResponse w = create("https://ex.com/hook");
+        // IP publique littérale (TEST-NET-3, RFC 5737) : passe la garde anti-SSRF sans résolution DNS.
+        WebhookResponse w = create("https://203.0.113.10/hook");
         assertThat(webhookService.list(SLUG)).hasSize(1);
 
-        webhookService.update(SLUG, w.id(), new WebhookRequest("https://ex.com/v2", null, null), owner.getId());
-        assertThat(webhookRepository.findById(w.id()).orElseThrow().getUrl()).isEqualTo("https://ex.com/v2");
+        webhookService.update(SLUG, w.id(), new WebhookRequest("https://203.0.113.10/v2", null, null), owner.getId());
+        assertThat(webhookRepository.findById(w.id()).orElseThrow().getUrl()).isEqualTo("https://203.0.113.10/v2");
 
         webhookService.delete(SLUG, w.id(), owner.getId());
+        assertThat(webhookService.list(SLUG)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("un OWNER ne peut PAS créer un webhook vers une adresse interne (anti-SSRF → 400)")
+    void create_rejette_url_interne_ssrf() {
+        // Métadonnées cloud / réseau interne : doit être refusé même pour un gestionnaire.
+        assertThatThrownBy(() -> webhookService.create(
+                SLUG, new WebhookRequest("http://169.254.169.254/latest/meta-data/", null, List.of()), owner))
+            .isInstanceOf(IllegalArgumentException.class);
         assertThat(webhookService.list(SLUG)).isEmpty();
     }
 
