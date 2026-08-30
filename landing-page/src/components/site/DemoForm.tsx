@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
  * you like us to run? » — on veut que le prospect arrive avec un vrai outcome à passer.
  */
 
-const CONTACT = "hello@taskforce.dev";
+const CONTACT = "contact@taskforce-project.fr";
 const TEAM_SIZES = ["1–10", "11–50", "51–200", "200+"] as const;
 const TOPICS = [
   "Run TaskForce on a real workflow",
