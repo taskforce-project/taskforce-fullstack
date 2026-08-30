@@ -7,7 +7,7 @@ import { Activity, ArrowRight } from "lucide-react";
 
 const FAQ = [
   { q: "Why isn't there an uptime number?", a: "We're pre-launch and won't post availability figures we can't yet stand behind. A public monitoring page is on the way." },
-  { q: "How do I report an incident?", a: "Email hello@taskforce.dev — it reaches us directly while public monitoring is being set up." },
+  { q: "How do I report an incident?", a: "Email contact@taskforce-project.fr — it reaches us directly while public monitoring is being set up." },
   { q: "Where's your approach to reliability?", a: "Availability, resilience and incident handling are documented in the Trust Center." },
   { q: "Will there be incident history?", a: "Yes. When public monitoring launches, real-time component status and past incidents will show here." },
 ];
@@ -15,13 +15,13 @@ const FAQ = [
 
 <BaseLayout
   title="Status — TaskForce"
-  description="TaskForce service status. Public availability monitoring is on the way; in the meantime, report any incident to hello@taskforce.dev."
+  description="TaskForce service status. Public availability monitoring is on the way; in the meantime, report any incident to contact@taskforce-project.fr."
 >
   <PageHero
     kicker="Status"
     title="Service status"
     lead="We're pre-launch, so we won't post an uptime number we can't yet stand behind. A public availability page is on the way — until then, here's how to reach us if something's wrong."
-    primary={{ label: "Report an incident", href: "mailto:hello@taskforce.dev" }}
+    primary={{ label: "Report an incident", href: "mailto:contact@taskforce-project.fr" }}
     secondary={{ label: "Trust Center", href: "/trust" }}
   />
 
@@ -38,7 +38,7 @@ const FAQ = [
             here. We'd rather leave it honest than display a fabricated “all systems operational”.
           </p>
           <a
-            href="mailto:hello@taskforce.dev"
+            href="mailto:contact@taskforce-project.fr"
             class="link-underline text-foreground mt-6 inline-flex items-center gap-1.5 text-[14px] font-medium"
           >
             Report an incident

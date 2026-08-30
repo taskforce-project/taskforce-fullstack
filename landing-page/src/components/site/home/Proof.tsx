@@ -61,7 +61,7 @@ export function Trust() {
       {/* PREUVE « dure » (phase design) : la vraie UI de l'audit trail. Cadre d'app VIDE, à
           remplir avec une capture ; toast custom par-dessus (pattern « vrai screen + toasts »). */}
       <div className="mt-12">
-        <AppShot chrome="app.taskforce.dev/runs/checkout-redesign · audit">
+        <AppShot chrome="app.taskforce-project.fr/runs/checkout-redesign · audit">
           <Toast
             className="right-4 top-4"
             icon={
