@@ -1,21 +1,42 @@
 "use client"
 
-import { motion } from "framer-motion"
+import {
+  LazyMotion,
+  animate,
+  domAnimation,
+  m,
+  useMotionTemplate,
+  useMotionValue,
+  useReducedMotion,
+} from "framer-motion"
 import Image from "next/image"
+import { useEffect } from "react"
 
 /**
- * Intro de connexion « façon ElevenLabs » : le logo TaskForce s'illumine, puis une **vague liquide**
- * (ondulation) jaillit et **ouvre l'app** — pendant que le dashboard charge <b>dessous</b> (overlay,
- * pas d'écran isolé). Pas de loader, pas de coupure : la dissolution révèle l'app déjà montée.
+ * Intro de connexion — langage « produit premium » (ElevenLabs / Linear), pas un loader.
  *
- * La vague = le dégradé **Labs** (`labs-wave.jpg`) déformé par un filtre SVG `feTurbulence` +
- * `feDisplacementMap` (baseFrequency animée en SMIL) → une surface qui ondule vraiment, pas des
- * anneaux géométriques. Fond = `--background` (thème-aware → dissolution sans flash).
+ * Principe : la **matière** (le dégradé Labs) est déjà là au repos autour du logo, puis **s'étale**
+ * jusqu'à recouvrir l'écran, et l'app — montée <b>dessous</b> — est révélée par un cut propre. Pas
+ * d'écran isolé, pas de coupure blanche : `matière → expansion → recouvrement → app`.
  *
- * Deux temps de part et d'autre du rechargement post-OAuth (frame de jointure = logo illuminé,
- * identique des deux côtés → rechargement invisible) :
- * - `hold`   : sur `/auth/callback` pendant l'échange — le logo apparaît et s'illumine, en boucle douce.
- * - `reveal` : monté par le `ProtectedLayout` juste après login — vague + dissolution, puis {@link onDone}.
+ * Discipline du mouvement (le point clé) :
+ * - Le contour **ne scale pas** : on anime le **rayon d'un masque radial** (`mask-image`), donc le
+ *   volume *s'étale* au lieu qu'une image soit agrandie.
+ * - Le **bord** est rendu organique par un filtre SVG `feTurbulence` + `feDisplacementMap` posé sur le
+ *   wrapper : il déforme le bord du masque ET la texture de quelques pixels.
+ * - La **texture a son propre mouvement** : la turbulence est animée en boucle lente (SMIL),
+ *   indépendamment de l'expansion — les vagues glissent, elles ne sont pas « étirées ».
+ * - **Expansion continue** : une seule course, courbe douce qui démarre lentement puis **accélère**
+ *   jusqu'à la sortie (pas de « hold » staggé) ; le volume dépasse les quatre bords du viewport.
+ * - Le **logo est absorbé** : baisse d'opacité + léger flou (pas de fade brutal, pas de scale).
+ * - **Zéro gadget** : ni halo/glow, ni rotation, ni bounce/overshoot, ni particules, ni spinner.
+ *
+ * Deux temps de part et d'autre du rechargement post-OAuth (frame de jointure = matière au repos +
+ * logo net, identique des deux côtés → rechargement invisible) :
+ * - `hold`   : sur `/auth/callback` pendant l'échange — le logo apparaît, la matière respire à peine.
+ * - `reveal` : monté par le `ProtectedLayout` juste après login — expansion + absorption, puis {@link onDone}.
+ *
+ * `prefers-reduced-motion` respecté : simple fondu propre vers l'app, sans expansion.
  */
 export function LoginIntro({
   phase,
@@ -25,85 +46,135 @@ export function LoginIntro({
   readonly onDone?: () => void
 }) {
   const reveal = phase === "reveal"
+  const reduced = useReducedMotion()
+
+  // Rayon du masque (px) — piloté impérativement pour composer le `mask-image` via un template.
+  // Init non nul (~matière au repos) pour éviter un blob invisible à la première frame ; corrigé au vmin réel dans l'effet.
+  const radius = useMotionValue(120)
+  const logoOpacity = useMotionValue(reveal ? 1 : 0)
+  const logoBlur = useMotionValue(0)
+  const overlayOpacity = useMotionValue(1)
+
+  // Le volume s'étale en agrandissant CE masque (le contour bouge, rien n'est scalé).
+  const maskImage = useMotionTemplate`radial-gradient(circle ${radius}px at 50% 50%, #000 82%, rgba(0,0,0,0.5) 93%, transparent 100%)`
+  const logoFilter = useMotionTemplate`blur(${logoBlur}px)`
+
+  useEffect(() => {
+    const vmin = Math.min(window.innerWidth, window.innerHeight)
+    const r0 = vmin * 0.14 // matière au repos : un peu plus large que le logo
+    const R = Math.hypot(window.innerWidth, window.innerHeight) * 0.85 // dépasse les 4 coins
+    radius.set(r0)
+
+    // ── hold : la matière est là, au repos ; le logo apparaît en douceur ──────────────────
+    if (!reveal) {
+      const a = animate(logoOpacity, 1, { duration: 1.1, ease: "easeOut" })
+      return () => a.stop()
+    }
+
+    // ── reduced-motion : pas d'expansion, un fondu propre suffit ───────────────────────────
+    if (reduced) {
+      logoOpacity.set(1)
+      const a = animate(overlayOpacity, 0, {
+        duration: 0.55,
+        ease: "easeInOut",
+        onComplete: () => onDone?.(),
+      })
+      return () => a.stop()
+    }
+
+    // ── reveal : expansion continue (ease-in-out qui accélère) → recouvrement → cut ─────────
+    const D = 3.6
+    const controls = [
+      // Rayon : une SEULE course r0 → R, en continu. Courbe douce qui démarre lentement et
+      // ACCÉLÈRE jusqu'à la sortie (pas de « hold » staggé). Bezier réglable si besoin.
+      animate(radius, [r0, R], {
+        duration: D,
+        ease: [0.42, 0, 0.68, 0.35],
+      }),
+      // Logo absorbé : opacité qui descend puis flou qui monte, tôt dans l'expansion.
+      animate(logoOpacity, [1, 1, 0], { duration: D, times: [0, 0.12, 0.4], ease: "easeInOut" }),
+      animate(logoBlur, [0, 0, 14], { duration: D, times: [0, 0.12, 0.5], ease: "easeIn" }),
+      // La matière a recouvert l'écran vers 90 % → cut propre vers l'app (montée dessous).
+      animate(overlayOpacity, [1, 1, 0], {
+        duration: D,
+        times: [0, 0.9, 1],
+        ease: "easeInOut",
+        onComplete: () => onDone?.(),
+      }),
+    ]
+    return () => controls.forEach((c) => c.stop())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reveal, reduced])
 
   return (
-    <motion.div
-      className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden bg-background"
-      style={{ transformOrigin: "center" }}
-      initial={{ opacity: 1, scale: 1 }}
-      animate={reveal ? { opacity: [1, 1, 1, 0], scale: [1, 1.01, 1.03, 1.1] } : { opacity: 1 }}
-      transition={reveal ? { duration: 4.4, times: [0, 0.3, 0.65, 1], ease: [0.4, 0, 0.2, 1] } : { duration: 0 }}
-      onAnimationComplete={() => { if (reveal) onDone?.() }}
-      aria-hidden="true"
-    >
-      {/* Halo — la lumière qui « allume » le logo, puis bloom au reveal */}
-      <motion.div
-        className="pointer-events-none absolute h-[46vmin] w-[46vmin] rounded-full"
-        style={{ background: "radial-gradient(circle, rgba(99,102,241,0.16), rgba(99,102,241,0) 68%)" }}
-        initial={{ opacity: reveal ? 0.7 : 0, scale: reveal ? 1 : 0.6 }}
-        animate={reveal ? { opacity: [0.7, 0.9, 0], scale: [1, 1.6, 3.4] } : { opacity: [0, 0.8, 0.6], scale: [0.6, 1, 0.94] }}
-        transition={reveal ? { duration: 3, times: [0, 0.4, 1], ease: "easeOut" } : { duration: 2.6, repeat: Infinity, repeatType: "mirror", ease: "easeInOut" }}
-      />
+    <LazyMotion features={domAnimation} strict>
+      <m.div
+        className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden bg-background"
+        style={{ opacity: overlayOpacity }}
+        aria-hidden="true"
+      >
+        {/* Filtre : la turbulence (animée, en boucle lente) déforme le bord du masque ET la texture
+            de quelques pixels — c'est ce qui rend le contour organique et donne à la matière son
+            mouvement propre, indépendant de l'expansion. */}
+        <svg aria-hidden className="absolute h-0 w-0">
+          <defs>
+            <filter id="tf-liquid" x="-20%" y="-20%" width="140%" height="140%">
+              <feTurbulence
+                type="fractalNoise"
+                baseFrequency="0.006 0.010"
+                numOctaves={2}
+                seed={7}
+                result="noise"
+              >
+                <animate
+                  attributeName="baseFrequency"
+                  dur="8s"
+                  values="0.006 0.010;0.010 0.015;0.006 0.010"
+                  repeatCount="indefinite"
+                  calcMode="spline"
+                  keyTimes="0;0.5;1"
+                  keySplines="0.42 0 0.58 1;0.42 0 0.58 1"
+                />
+              </feTurbulence>
+              <feDisplacementMap
+                in="SourceGraphic"
+                in2="noise"
+                scale={26}
+                xChannelSelector="R"
+                yChannelSelector="G"
+              />
+            </filter>
+          </defs>
+        </svg>
 
-      {reveal && (
-        <>
-          {/* Filtre SVG : la turbulence anime la surface (ondulation), le displacement la déforme. */}
-          <svg aria-hidden className="absolute h-0 w-0">
-            <defs>
-              <filter id="tf-liquid" x="-35%" y="-35%" width="170%" height="170%">
-                <feTurbulence type="fractalNoise" baseFrequency="0.008 0.013" numOctaves={2} seed={4} result="noise">
-                  <animate
-                    attributeName="baseFrequency"
-                    dur="5s"
-                    values="0.008 0.013;0.013 0.019;0.008 0.013"
-                    repeatCount="indefinite"
-                    calcMode="spline"
-                    keyTimes="0;0.5;1"
-                    keySplines="0.42 0 0.58 1;0.42 0 0.58 1"
-                  />
-                </feTurbulence>
-                <feDisplacementMap in="SourceGraphic" in2="noise" scale={38} xChannelSelector="R" yChannelSelector="G" />
-              </filter>
-            </defs>
-          </svg>
-
-          {/* La vague : le dégradé Labs, ondulé par le filtre, qui jaillit du logo et ouvre l'app. */}
-          <motion.div
-            /* Fusion : `multiply` fonce le dégradé sur le fond CLAIR ; mais sur fond SOMBRE multiply
-               vire au noir (la vague disparaît) → `screen` en dark pour qu'elle rayonne au lieu de
-               s'éteindre. Thème piloté par la classe `dark` de next-themes sur <html>. */
-            className="pointer-events-none absolute h-[72vmin] w-[72vmin] rounded-full mix-blend-multiply dark:mix-blend-screen"
+        {/* Le volume : le dégradé Labs, dont le displacement rend le bord organique, révélé par le
+            masque radial qui grandit. `multiply` sur fond clair pour la profondeur d'encre ; `screen`
+            en dark pour qu'il rayonne au lieu de s'éteindre. */}
+        <div className="pointer-events-none absolute inset-0" style={{ filter: "url(#tf-liquid)" }}>
+          <m.div
+            className="absolute inset-0 mix-blend-multiply dark:mix-blend-screen"
             style={{
               backgroundImage: "url('/assets/tour/labs-wave.jpg')",
               backgroundSize: "cover",
               backgroundPosition: "center",
-              filter: "url(#tf-liquid)",
+              WebkitMaskImage: maskImage,
+              maskImage,
             }}
-            initial={{ scale: 0.34, opacity: 0 }}
-            animate={{ scale: [0.34, 1.5, 3.9], opacity: [0, 0.95, 0] }}
-            transition={{ duration: 3.7, times: [0, 0.42, 1], ease: [0.22, 1, 0.36, 1] }}
           />
-        </>
-      )}
+        </div>
 
-      {/* Logo TaskForce — apparaît, s'illumine (halo + légère respiration) */}
-      <motion.div
-        className="relative"
-        initial={reveal ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.9 }}
-        animate={reveal ? { opacity: [1, 1, 0], scale: [1, 1.06, 1.16] } : { opacity: 1, scale: [0.9, 1.0, 0.985] }}
-        transition={reveal
-          ? { duration: 3, times: [0, 0.5, 1], ease: "easeInOut" }
-          : { opacity: { duration: 1.2, ease: "easeOut" }, scale: { duration: 3.2, repeat: Infinity, repeatType: "mirror", ease: "easeInOut" } }}
-      >
-        <Image
-          src="/assets/logo/logo_taskforce_tp.png"
-          alt="TaskForce"
-          width={240}
-          height={160}
-          priority
-          className="h-[14vmin] max-h-[130px] w-auto drop-shadow-[0_10px_36px_rgba(79,70,229,0.28)] dark:invert"
-        />
-      </motion.div>
-    </motion.div>
+        {/* Logo TaskForce — net au repos, puis absorbé (opacité + léger flou) par la matière. */}
+        <m.div className="relative" style={{ opacity: logoOpacity, filter: logoFilter }}>
+          <Image
+            src="/assets/logo/logo_taskforce_tp.png"
+            alt="TaskForce"
+            width={240}
+            height={160}
+            priority
+            className="h-[14vmin] max-h-[130px] w-auto dark:invert"
+          />
+        </m.div>
+      </m.div>
+    </LazyMotion>
   )
 }
