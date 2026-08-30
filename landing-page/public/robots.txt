@@ -3,4 +3,4 @@ User-agent: *
 Allow: /
 
 # Sitemap
-Sitemap: https://taskforce.dev/sitemap.xml
+Sitemap: https://taskforce-project.fr/sitemap.xml
