@@ -82,6 +82,12 @@ const ICON_HUE: Record<string, string> = {
   BookOpen: HUE.sky, //  Docs
   History: HUE.orange, //Changelog
   RefreshCw: HUE.teal, //Learning from reviews
+
+  // Remplaçants animés (cf. nav.ts + AnimatedNavIcon) : on garde la teinte du glyphe d'origine.
+  Waypoints: HUE.blue, //     Orchestration (ex-Workflow)
+  UserRoundCog: HUE.violet, // Agents (ex-Bot)
+  Lightbulb: HUE.emerald, //  Learn (ex-GraduationCap)
+  Atom: HUE.violet, //        Labs (ex-FlaskConical)
 };
 
 /** Teinte d'une icône Lucide (par `displayName`). `fallback` = bleu de marque si l'icône n'est pas mappée. */

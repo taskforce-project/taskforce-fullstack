@@ -1,6 +1,6 @@
 import {
-  Workflow,
-  Bot,
+  Waypoints,
+  UserRoundCog,
   ShieldCheck,
   Brain,
   Sparkles,
@@ -9,13 +9,13 @@ import {
   Plug,
   BookOpen,
   Newspaper,
-  GraduationCap,
+  Lightbulb,
   History,
   Map,
   Activity,
   Cpu,
   RefreshCw,
-  FlaskConical,
+  Atom,
   type LucideIcon,
 } from "lucide-react";
 
@@ -61,14 +61,14 @@ export const PRODUCT_PLATFORM: NavLink[] = [
     label: "Orchestration",
     href: "/product/orchestration",
     desc: "Vision to deploy, as validated checkpoints",
-    icon: Workflow,
+    icon: Waypoints,
     badge: "labs",
   },
   {
     label: "Agents",
     href: "/product/agents",
     desc: "CPO, CTO and COO working your delivery",
-    icon: Bot,
+    icon: UserRoundCog,
     badge: "labs",
   },
   {
@@ -180,7 +180,7 @@ export const LABS_LINKS: NavLink[] = [
     label: "Agent roles",
     href: "/labs/agent-roles",
     desc: "Scoped agents rather than one generalist",
-    icon: Bot,
+    icon: UserRoundCog,
   },
   {
     label: "Run memory",
@@ -207,10 +207,10 @@ export const LABS_LINKS: NavLink[] = [
 export const RESOURCES_LINKS: NavLink[] = [
   { label: "Documentation", href: "/docs", desc: "Guides, API and self-host", icon: BookOpen },
   { label: "Blog", href: "/blog", desc: "Engineering and product notes", icon: Newspaper },
-  { label: "Learn", href: "/learn", desc: "What an AI delivery OS actually is", icon: GraduationCap },
+  { label: "Learn", href: "/learn", desc: "What an AI delivery OS actually is", icon: Lightbulb },
   { label: "Changelog", href: "/changelog", desc: "Everything we shipped", icon: History },
   { label: "Roadmap", href: "/roadmap", desc: "What comes next, in the open", icon: Map },
-  { label: "Labs", href: "/labs", desc: "What we're exploring next", icon: FlaskConical },
+  { label: "Labs", href: "/labs", desc: "What we're exploring next", icon: Atom },
   { label: "Status", href: "/status", desc: "Live availability", icon: Activity },
 ];
 
@@ -298,7 +298,7 @@ const BASE_DOMAIN = (import.meta.env.PUBLIC_BASE_DOMAIN ?? "taskforce-project.fr
   .replace(/^https?:\/\//, "")
   .replace(/\/+$/, "");
 export const APP_URL = import.meta.env.PUBLIC_APP_URL ?? `https://app.${BASE_DOMAIN}`;
-export const LABS_ICON = FlaskConical;
+export const LABS_ICON = Atom;
 
 /* ─────────────────────────  Pages réellement construites  ─────────────────────────
  * Source unique de vérité : header, footer, menu mobile et le hub /product lisent cet
