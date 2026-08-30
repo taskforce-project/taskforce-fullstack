@@ -1,0 +1,3 @@
+# Secrets et config portant un secret — jamais versionnés.
+.env
+alertmanager/alertmanager.yml

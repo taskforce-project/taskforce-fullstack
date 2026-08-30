@@ -15,6 +15,7 @@ networks:
 volumes:
   prometheus-data:
   grafana-data:
+  alertmanager-data:
 
 services:
   prometheus:
@@ -24,6 +25,7 @@ services:
     user: root
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/rules:/etc/prometheus/rules:ro
       - prometheus-data:/prometheus
     command:
       - --config.file=/etc/prometheus/prometheus.yml
@@ -32,6 +34,21 @@ services:
       - --web.enable-lifecycle
     ports:
       - "127.0.0.1:9090:9090"   # local (debug) — Grafana joint Prometheus par le réseau interne
+    networks: [monitoring]
+
+  # Routage des alertes (règles Prometheus) vers Discord. Config + secret : ./alertmanager/alertmanager.yml
+  # (créé depuis alertmanager.example.yml, gitignoré). Non exposé : joint en interne par Prometheus (9093).
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: tf-alertmanager
+    restart: unless-stopped
+    user: root   # lit alertmanager.yml (chmod 600, porte le secret webhook) — même choix que prometheus
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
     networks: [monitoring]
 
   grafana:

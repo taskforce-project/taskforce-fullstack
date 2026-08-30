@@ -29,10 +29,22 @@ cd ~/monitoring/vm1 && docker compose -f docker-compose.exporters.yml up -d
 mkdir -p ~/monitoring && cp -r monitoring/vm2 ~/monitoring/
 cd ~/monitoring/vm2
 cp .env.example .env && sed -i "s/GRAFANA_ADMIN_PASSWORD=/GRAFANA_ADMIN_PASSWORD=$(openssl rand -hex 16)/" .env
+# alertes -> Discord : créer la config depuis l'exemple, puis y coller l'URL du webhook Discord
+cp alertmanager/alertmanager.example.yml alertmanager/alertmanager.yml
+# ... éditer alertmanager/alertmanager.yml : remplacer webhook_url par l'URL réelle (fichier gitignoré)
 # dashboards communautaires (best-effort, nécessite l'accès sortant)
 bash fetch-dashboards.sh
 docker compose -f docker-compose.monitoring.yml up -d
 ```
+
+## Alertes
+
+- **9 règles** (`prometheus/rules/taskforce-alerts.yml`, chargées via `rule_files:`) en 4 familles :
+  disponibilité, erreurs/latence, saturation, sécurité (pics de 401 login et de 429 rate-limit).
+- **Alertmanager** les route vers **Discord** (`alertmanager/alertmanager.yml`, gitignoré car il porte
+  l'URL du webhook). Rien n'est exposé : Prometheus le joint en interne (`alertmanager:9093`).
+- Test : `docker exec tf-prometheus promtool check rules /etc/prometheus/rules/*.yml`, puis vérifier
+  `http://100.120.222.10:3001` (Grafana) et l'onglet Alerts d'Alertmanager (interne).
 
 ## Notes
 
