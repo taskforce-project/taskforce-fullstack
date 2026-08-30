@@ -1131,3 +1131,15 @@ body {
     0 20px 48px -16px rgba(0, 0, 0, 0.6),
     0 2px 8px -2px rgba(0, 0, 0, 0.4);
 }
+
+/* Icônes animées des méga-menus (@animateicons) : la lib applique la teinte `hueFor` à son <div>
+   interne, mais le <svg> ne l'hérite pas (une règle de thème grise le stroke). On force l'héritage
+   pour retrouver « une couleur par icône ». Cf. AnimatedNavIcon (classe `tf-navic` sur le wrapper). */
+.tf-navic svg {
+  color: inherit !important;
+}
+/* Lien « Labs » : la fiole porte le dégradé `lgLabsHead` (défini dans SiteHeader). Le class `labs-ic-head`
+   est sur le wrapper (@animateicons ne le passe pas au svg) → on cible le svg descendant. */
+.labs-ic-head svg {
+  stroke: url(#lgLabsHead) !important;
+}

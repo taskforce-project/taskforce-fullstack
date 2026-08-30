@@ -17,17 +17,21 @@ import {
 } from "framer-motion";
 import {
   ActivityIcon,
+  AtomIcon,
   BookOpenIcon,
   BrainIcon,
   ChartColumnIcon,
   CpuIcon,
   HistoryIcon,
+  LightbulbIcon,
   MapIcon,
   PlugIcon,
   RefreshCwIcon,
   ShieldCheckIcon,
   SparklesIcon,
+  UserRoundCogIcon,
   UsersIcon,
+  WaypointsIcon,
 } from "@animateicons/react/lucide";
 
 /**
@@ -37,9 +41,10 @@ import {
  * entière (plus proche `a`/`button` ancêtre) — exactement comme la sidebar. `prefers-reduced-motion`
  * respecté. La couleur (`style.color` = teinte `hueFor`) est transmise au glyphe.
  *
- * Les glyphes absents du registry (Workflow, Bot, Newspaper, GraduationCap, FlaskConical) retombent
- * sur l'ancien « wobble » lucide générique — rendu cohérent, couleur et dégradé Labs (`labs-ic-head`)
- * préservés (le seul cas Labs, FlaskConical, passe par ce repli).
+ * Les glyphes historiquement absents du registry ont été remplacés dans `nav.ts` par des équivalents
+ * animés proches (Orchestration→Waypoints, Agents→UserRoundCog, Learn→Lightbulb, Labs→Atom). Reste
+ * seulement `Newspaper` (Blog) sur l'ancien « wobble » lucide générique — rendu cohérent, couleur et
+ * dégradé Labs (`labs-ic-head`) préservés.
  */
 
 /** Contrat impératif commun aux icônes animées (identique à la webapp). */
@@ -70,6 +75,11 @@ const ANIMATED: Record<string, AnimatedIconComponent> = {
   History: HistoryIcon as unknown as AnimatedIconComponent,
   Map: MapIcon as unknown as AnimatedIconComponent,
   Activity: ActivityIcon as unknown as AnimatedIconComponent,
+  // Remplaçants animés des glyphes absents du registry (mêmes concepts, cf. nav.ts).
+  Waypoints: WaypointsIcon as unknown as AnimatedIconComponent, // Orchestration
+  UserRoundCog: UserRoundCogIcon as unknown as AnimatedIconComponent, // Agents / Agent roles
+  Lightbulb: LightbulbIcon as unknown as AnimatedIconComponent, // Learn
+  Atom: AtomIcon as unknown as AnimatedIconComponent, // Labs
 };
 
 type Props = {
@@ -129,15 +139,14 @@ function PathNavIcon({
     [reduced],
   );
 
+  // Les composants @animateicons n'exposent NI le prop `color` NI le `className` jusqu'au <svg> (ils
+  // colorent seulement leur <div> interne). On pose donc teinte (`style.color`) ET classes sur le
+  // wrapper `tf-navic`, et deux règles global.css les redescendent au svg :
+  //   .tf-navic svg { color: inherit }          → teinte `hueFor` (via currentColor)
+  //   .labs-ic-head svg { stroke: url(#lgLabsHead) } → dégradé de la fiole Labs
   return (
-    <span ref={host} className="contents">
-      <Comp
-        ref={handle}
-        size={size}
-        isAnimated={false}
-        color={typeof style?.color === "string" ? style.color : undefined}
-        className={className}
-      />
+    <span ref={host} className={`tf-navic contents ${className ?? ""}`} style={style}>
+      <Comp ref={handle} size={size} isAnimated={false} />
     </span>
   );
 }
