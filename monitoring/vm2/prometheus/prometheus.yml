@@ -4,6 +4,15 @@ global:
   external_labels:
     monitor: taskforce
 
+# Règles d'alerte : chargées puis évaluées par Prometheus, alertes actives poussées vers Alertmanager.
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
 scrape_configs:
   - job_name: prometheus
     static_configs:

@@ -1,0 +1,94 @@
+# ============================================================
+#  Règles d'alerte — supervision TaskForce (RNCP E26)
+#  COPIE DÉPLOYÉE, chargée par Prometheus (rule_files: /etc/prometheus/rules/*.yml).
+#  Source/documentation : observability/alerts/prometheus-rules.yml — garder les deux en phase.
+#  Cible les métriques Micrometer du backend Spring Boot (/actuator/prometheus, job "taskforce-backend").
+# ============================================================
+groups:
+  - name: taskforce-backend-availability
+    rules:
+      - alert: BackendDown
+        expr: up{job="taskforce-backend"} == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "Backend TaskForce injoignable"
+          description: "Le endpoint /actuator/prometheus ne répond plus depuis 2 min."
+
+      - alert: HealthDown
+        expr: (sum(rate(http_server_requests_seconds_count{uri="/actuator/health",status!="200"}[5m])) or vector(0)) > 0
+        for: 3m
+        labels: { severity: critical }
+        annotations:
+          summary: "Health-check backend en échec"
+          description: "Le health-check renvoie un statut != 200 (DB/MinIO/Keycloak ?)."
+
+  - name: taskforce-backend-errors-latency
+    rules:
+      - alert: HighServerErrorRate
+        expr: |
+          sum(rate(http_server_requests_seconds_count{status=~"5..", uri!~"/actuator.*"}[5m]))
+          /
+          clamp_min(sum(rate(http_server_requests_seconds_count{uri!~"/actuator.*"}[5m])), 1)
+          > 0.05
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Taux d'erreurs 5xx élevé (>5%)"
+          description: "Plus de 5% des requêtes renvoient une erreur serveur depuis 5 min."
+
+      - alert: HighLatencyP95
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_server_requests_seconds_bucket{uri!~"/actuator.*"}[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Latence p95 élevée (>1s)"
+          description: "Le 95e percentile du temps de réponse dépasse 1s depuis 5 min."
+
+  - name: taskforce-backend-saturation
+    rules:
+      - alert: HighJvmHeap
+        expr: |
+          sum(jvm_memory_used_bytes{area="heap"}) / sum(jvm_memory_max_bytes{area="heap"}) > 0.9
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Heap JVM > 90%"
+          description: "Risque de GC pressure / OutOfMemory."
+
+      - alert: DbConnectionPoolSaturated
+        expr: hikaricp_connections_pending > 0
+        for: 3m
+        labels: { severity: warning }
+        annotations:
+          summary: "Pool de connexions DB saturé"
+          description: "Des requêtes attendent une connexion Hikari depuis 3 min."
+
+      - alert: HighCpuUsage
+        expr: system_cpu_usage > 0.9
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "CPU système > 90%"
+          description: "Charge CPU soutenue depuis 5 min."
+
+  - name: taskforce-security
+    rules:
+      - alert: RateLimitSpike
+        expr: sum(rate(http_server_requests_seconds_count{status="429"}[5m])) > 1
+        for: 2m
+        labels: { severity: warning }
+        annotations:
+          summary: "Pic de rejets rate-limit (429)"
+          description: "Nombreux 429 : possible brute-force / abus d'API (cf. RateLimitFilter)."
+
+      - alert: AuthFailureSpike
+        expr: sum(rate(http_server_requests_seconds_count{uri="/api/auth/login", status="401"}[5m])) > 1
+        for: 3m
+        labels: { severity: warning }
+        annotations:
+          summary: "Pic d'échecs de connexion (401 /login)"
+          description: "Nombreux échecs d'authentification : credential stuffing possible."
