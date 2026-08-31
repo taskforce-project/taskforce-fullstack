@@ -37,6 +37,15 @@ spring:
       host: ${REDIS_HOST:redis}
       port: ${REDIS_PORT:6379}
 
+  # Cache des agrégats de dashboard sur Redis (TTL 5 min, partagé entre instances) — PERF-CACHE-01
+  cache:
+    type: redis
+    redis:
+      time-to-live: 300000
+      key-prefix: "tf:cache:"
+      use-key-prefix: true
+      cache-null-values: false
+
   # Security Configuration
   security:
     oauth2:

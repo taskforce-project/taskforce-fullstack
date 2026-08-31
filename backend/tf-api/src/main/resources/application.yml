@@ -27,6 +27,10 @@ spring:
     locations: classpath:db/migration
     validate-on-migrate: true
 
+  # Cache applicatif : dev = mémoire simple (aucun Redis requis) ; prod = Redis (application-prod.yml). PERF-CACHE-01
+  cache:
+    type: simple
+
   # Email Configuration
   mail:
     host: ${MAIL_HOST:sandbox.smtp.mailtrap.io}
@@ -77,6 +81,10 @@ management:
       enabled: true
     readinessstate:
       enabled: true
+    # Redis = service support (rate-limit + cache), pas critique à la liveness : on ne couple pas
+    # la santé du backend à Redis (un incident Redis ne doit pas marquer le backend DOWN). PERF-CACHE-01
+    redis:
+      enabled: false
   # Métriques (supervision / alertes E26) : histogramme pour le p95 de latence + tag applicatif.
   metrics:
     tags:
