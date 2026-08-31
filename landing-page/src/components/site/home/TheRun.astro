@@ -1,6 +1,6 @@
 ---
 /**
- * TheRun (.astro) — « The run » : le run en **React Flow** (`HeroFlow`, sur canvas à points) au lieu de
+ * TheRun (.astro) - « The run » : le run en **React Flow** (`HeroFlow`, sur canvas à points) au lieu de
  * l'ancienne timeline animée maison (`RunTimeline.tsx`). Copie conservée : 3 garanties, note honnête,
  * puces entreprise, et le détail des 7 checkpoints (table). Converti en `.astro` pour héberger l'îlot RF.
  */
@@ -12,7 +12,7 @@ import { ArrowRight, ScrollText, Server, GitBranch, Cpu } from "lucide-react";
 
 const RUN_SUB = [
   { title: "Every step is attributable", text: "Each checkpoint names what produced it and the model it ran on." },
-  { title: "Nothing advances without you", text: "Each checkpoint waits for a human — which is exactly what lets you hand agents more, not less." },
+  { title: "Nothing advances without you", text: "Each checkpoint waits for a human - which is exactly what lets you hand agents more, not less." },
   { title: "Rejections carry your comment", text: "Send a step back with a note and it comes into the next attempt." },
 ];
 
@@ -35,9 +35,9 @@ const RUN_BULLETS = [
 const ANATOMY = [
   { step: "Vision", by: "CPO agent", artifact: "One page: the problem, who has it, what « done » looks like.", decision: "Approve the framing, or reframe it before anything is built on top.", level: "labs" as const },
   { step: "Product spec", by: "CPO agent", artifact: "Stories with acceptance criteria, and the edge cases nobody asked about.", decision: "Approve, or send it back with what is missing.", level: "labs" as const },
-  { step: "Architecture", by: "CTO agent", artifact: "The proposed approach — and the option that was rejected, with the reason.", decision: "Approve the trade-off. This is the decision that is expensive to reverse later.", level: "labs" as const },
+  { step: "Architecture", by: "CTO agent", artifact: "The proposed approach - and the option that was rejected, with the reason.", decision: "Approve the trade-off. This is the decision that is expensive to reverse later.", level: "labs" as const },
   { step: "API contract", by: "CTO agent", artifact: "Endpoints, payloads and error cases, written against your existing conventions.", decision: "Approve or amend. Downstream steps are generated from what you sign here.", level: "labs" as const },
-  { step: "Breakdown", by: "COO agent", artifact: "Issues, sized and ordered, each linked back to the line of spec it came from.", decision: "Approve — then Smart Assign routes each issue to a person.", level: "live" as const },
+  { step: "Breakdown", by: "COO agent", artifact: "Issues, sized and ordered, each linked back to the line of spec it came from.", decision: "Approve - then Smart Assign routes each issue to a person.", level: "live" as const },
   { step: "Implementation", by: "Your coding agent", artifact: "A branch. TaskForce hands over the context and stays out of the way.", decision: "Your normal code review. We do not replace it.", level: "live" as const },
   { step: "QA & deploy", by: "COO agent", artifact: "A checklist derived from the acceptance criteria you approved in step two.", decision: "Sign off. The whole chain is in the audit trail.", level: "beta" as const },
 ];
@@ -58,7 +58,7 @@ const ANATOMY = [
     <StepChainFlow steps={RUN_STEPS} dir="h" id="run-timeline" highlight={2} w={176} client:only="react" />
   </div>
   <p class="text-muted-foreground mt-3 text-[12.5px]">
-    Illustrative — each step is an agent draft a human approves; the seven real checkpoints are detailed below.
+    Illustrative - each step is an agent draft a human approves; the seven real checkpoints are detailed below.
   </p>
 
   {/* Les 3 garanties, en 3 colonnes sous la timeline. */}
@@ -106,11 +106,11 @@ const ANATOMY = [
     }
   </div>
 
-  {/* Le détail des 7 checkpoints — table sur filets edge-to-edge. */}
+  {/* Le détail des 7 checkpoints - table sur filets edge-to-edge. */}
   <div class="mt-16">
     <h3 class="t-h3">Seven checkpoints. Seven artifacts. One accountable chain.</h3>
     <p class="text-muted-foreground mt-2 max-w-2xl text-[14px] leading-7">
-      Not a black box that returns a pull request — a sequence of artifacts, each one attributable,
+      Not a black box that returns a pull request - a sequence of artifacts, each one attributable,
       each one refusable.
     </p>
     <div class="-mx-6 mt-7 overflow-x-auto border-y border-border lg:-mx-10">
@@ -149,7 +149,7 @@ const ANATOMY = [
       <p class="text-[14px] font-semibold text-foreground">Adaptive by design</p>
       <p class="text-muted-foreground mt-1 text-[13.5px] leading-6">
         A bug fix doesn't need a strategy phase; a migration doesn't take the same path as a feature
-        launch. The run adapts to the decision being made — it just never skips the approval.
+        launch. The run adapts to the decision being made - it just never skips the approval.
       </p>
     </div>
   </div>

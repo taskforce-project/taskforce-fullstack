@@ -304,7 +304,7 @@ export function vu(columns: number, levels: number[]): Frame {
       if (rowFromBottom < height) {
         let brightness = 1
         if (row < rows * 0.3) {
-          // brightness stays 1 — top rows at full brightness
+          // brightness stays 1 - top rows at full brightness
         } else if (row < rows * 0.6) {
           brightness = 0.8
         } else {

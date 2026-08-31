@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils"
 import { usePanelStore, type PanelDescriptor, type PanelSide } from "@/lib/store/panel-store"
 
 /**
- * Rend le panneau d'un côté (gauche/droite) du shell — une carte flottante « façon Claude »
+ * Rend le panneau d'un côté (gauche/droite) du shell - une carte flottante « façon Claude »
  * (arrondie, ombrée, avec un léger gap), redimensionnable, en <b>overlay par-dessus le contenu</b>
  * (absolute) : elle ne comprime plus le `<main>`, elle passe au-dessus (retour user). PROD-8.9.
  * Un seul panneau par côté à la fois (cf. panel-store).
@@ -75,7 +75,7 @@ function PanelColumn({ panel, side }: { readonly panel: PanelDescriptor; readonl
         side === "right" ? "right-0 pl-1 pr-2" : "left-0 pl-2 pr-1"
       )}
     >
-      {/* Poignée de redimensionnement — pilule discrète qui s'éclaire au survol (façon Claude). */}
+      {/* Poignée de redimensionnement - pilule discrète qui s'éclaire au survol (façon Claude). */}
       <button
         type="button"
         aria-label="Redimensionner le panneau"

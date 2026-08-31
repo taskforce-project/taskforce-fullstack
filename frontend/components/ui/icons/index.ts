@@ -1,6 +1,6 @@
 // Icônes animées « clés » (animateicons.in, réécrites sur framer-motion déjà présent dans le bundle).
 // Portée volontairement resserrée aux spots à fort survol (nav sidebar, cloche, création) pour ne
-// pas alourdir le JS d'hydratation — cf. objectif Lighthouse perf.
+// pas alourdir le JS d'hydratation - cf. objectif Lighthouse perf.
 export { LayoutDashboardIcon } from "./layout-dashboard-icon"
 export { RadioIcon } from "./radio-icon"
 export { ListChecksIcon } from "./list-checks-icon"

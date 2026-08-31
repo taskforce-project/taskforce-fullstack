@@ -38,7 +38,7 @@ function CardsSkeleton() {
 /**
  * Dashboard façon Cloudflare : hero centré (pilule connecteurs + recherche Cmd+K),
  * trois colonnes de reprise (Opérations / Ma file / Récents), puis la section
- * Analytics — grille de cartes épinglées PERSISTÉES par utilisateur et par
+ * Analytics - grille de cartes épinglées PERSISTÉES par utilisateur et par
  * workspace (API dashboard-cards), réordonnables et configurables.
  */
 export default function DashboardPage() {
@@ -53,10 +53,10 @@ export default function DashboardPage() {
   const cardsError = useDashboardCardsStore((s) => s.error)
   const fetchCards = useDashboardCardsStore((s) => s.fetchCards)
 
-  // Période globale de la section Analytics — préférence UI par workspace (localStorage),
+  // Période globale de la section Analytics - préférence UI par workspace (localStorage),
   // pas une donnée métier. Les cartes qui savent l'honorer l'utilisent comme fenêtre par défaut.
   const [globalRange, setGlobalRange] = useState<GlobalRange>("30d")
-  // Incrémenté par le refresh global — propagé à toutes les cartes de la grille.
+  // Incrémenté par le refresh global - propagé à toutes les cartes de la grille.
   const [refreshToken, setRefreshToken] = useState(0)
   const [addOpen, setAddOpen] = useState(false)
 
@@ -82,7 +82,7 @@ export default function DashboardPage() {
     if (slug) localStorage.setItem(rangeStorageKey(slug), value)
   }
 
-  // Tour produit : au 1ᵉʳ dashboard (jamais vu), on le lance après un court délai — le temps que la
+  // Tour produit : au 1ᵉʳ dashboard (jamais vu), on le lance après un court délai - le temps que la
   // grille se peigne pour que les cibles `data-tour` existent. `hasSeen` (persisté) évite tout
   // re-déclenchement. Rejeu depuis l'aide via `?tour=1` (forcé même si déjà vu), puis on nettoie l'URL.
   const tourHasSeen = useTourStore((s) => s.hasSeen)
@@ -111,7 +111,7 @@ export default function DashboardPage() {
 
       <QuickColumns slug={slug} />
 
-      {/* Analytics — période globale + refresh global + grille de cartes persistées. */}
+      {/* Analytics - période globale + refresh global + grille de cartes persistées. */}
       <section className="space-y-3" data-tour="analytics">
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-lg font-semibold tracking-tight">Analytics</h2>

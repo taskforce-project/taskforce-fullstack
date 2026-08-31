@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils"
 
 export type { AiMode } from "./matrix-frames"
 
-// CSS keyframes injected once — GPU-accelerated hue rotation
+// CSS keyframes injected once - GPU-accelerated hue rotation
 const HUE_KEYFRAMES = `@keyframes ai-hue{from{filter:hue-rotate(0deg)}to{filter:hue-rotate(360deg)}}`
 
 // Color groups
@@ -31,8 +31,8 @@ const COLOR_GROUP: Record<AiMode, ColorGroup> = {
 }
 
 const HUE_BASE: Record<"hue-idle" | "hue-doing", string> = {
-  "hue-idle":  "#a855f7", // purple — shadow-xs base
-  "hue-doing": "#ff7a00", // orange — shadow-2xs base
+  "hue-idle":  "#a855f7", // purple - shadow-xs base
+  "hue-doing": "#ff7a00", // orange - shadow-2xs base
 }
 
 const HUE_DURATION: Record<"hue-idle" | "hue-doing", string> = {
@@ -49,7 +49,7 @@ interface AiMatrixIconProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 /**
- * AiMatrixIcon — semantic LED-grid AI brand mark.
+ * AiMatrixIcon - semantic LED-grid AI brand mark.
  *
  * idle            → orbital dots, smooth hue rotation (8s)
  * thinking/writing → blob wave, fast hue rotation (3s)

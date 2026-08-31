@@ -3,14 +3,14 @@ import { TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
- * DeliveryInsights — illustration du bloc « Analytics ».
+ * DeliveryInsights - illustration du bloc « Analytics ».
  *
  * L'ancien visuel était un tableau de bord générique : trois chiffres et des barres qui
  * montent. N'importe quel SaaS montre ça, ça ne prouve rien.
  *
  * Ici on montre la **seule métrique qu'un système à checkpoints peut produire** :
  * le taux de renvoi *par étape*. C'est ce qui désigne l'endroit où le processus fait
- * réellement mal — et aucun tracker classique ne peut le calculer, faute de checkpoints.
+ * réellement mal - et aucun tracker classique ne peut le calculer, faute de checkpoints.
  */
 
 const KPIS = [
@@ -138,7 +138,7 @@ export function DeliveryInsights() {
         </ul>
       </div>
 
-      {/* La lecture — place réservée en permanence */}
+      {/* La lecture - place réservée en permanence */}
       <div className="min-h-[104px] border-t bg-amber-50/40 px-4 py-3">
         <p
           className={cn(
@@ -148,7 +148,7 @@ export function DeliveryInsights() {
         >
           <TriangleAlert className="mt-[2px] size-3.5 shrink-0 text-amber-600" strokeWidth={2} />
           <span className="text-foreground">
-            <span className="font-medium">{WORST.step}</span> is where your process actually hurts —
+            <span className="font-medium">{WORST.step}</span> is where your process actually hurts -
             nearly a third of runs go back there.
           </span>
         </p>

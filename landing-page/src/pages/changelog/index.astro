@@ -17,7 +17,7 @@ const GROUPS: Group[] = [
     dot: "bg-emerald-500",
     entries: [
       { area: "Delivery", title: "Delivery workspace", desc: "Boards, issues and cycles for the whole team, updating in real time." },
-      { area: "Delivery", title: "Smart Assign", desc: "The right task to the right owner — a coding agent counts as an assignee." },
+      { area: "Delivery", title: "Smart Assign", desc: "The right task to the right owner - a coding agent counts as an assignee." },
       { area: "Insights", title: "Delivery analytics", desc: "Lead time, throughput, velocity and workload, computed straight from your board." },
     ],
   },
@@ -28,7 +28,7 @@ const GROUPS: Group[] = [
     entries: [
       { area: "Memory", title: "TaskForce Memory", desc: "Decisions, constraints and trade-offs kept as a graph the next run can read." },
       { area: "Governance", title: "Human approvals", desc: "A required sign-off at each checkpoint of a run, recorded with the decision." },
-      { area: "Integrations", title: "Connector catalogue", desc: "129 connectors across 16 categories — connect today, deep sync rolling out." },
+      { area: "Integrations", title: "Connector catalogue", desc: "129 connectors across 16 categories - connect today, deep sync rolling out." },
     ],
   },
   {
@@ -45,20 +45,20 @@ const GROUPS: Group[] = [
 
 const FAQ = [
   { q: "Why no dated release notes?", a: "We're pre-launch. Rather than invent a version history, we show the real current state grouped by maturity. Dated entries begin at general availability." },
-  { q: "What do Live, Beta and Planned mean?", a: "Live is in production, Beta is usable with rough edges, and Planned is direction we're building toward — sequence, not a dated promise." },
+  { q: "What do Live, Beta and Planned mean?", a: "Live is in production, Beta is usable with rough edges, and Planned is direction we're building toward - sequence, not a dated promise." },
   { q: "Where do I see what's coming?", a: "The public roadmap is the source of truth for what's next; this page records what has actually landed." },
   { q: "How often will this update?", a: "From general availability onward, shipped changes land here as dated notes. Until then, it reflects the honest state of the product." },
 ];
 ---
 
 <BaseLayout
-  title="Changelog — TaskForce"
-  description="What's shipped in TaskForce right now, by maturity — Live, Beta and Planned. Dated release notes will land here as we ship."
+  title="Changelog - TaskForce"
+  description="What's shipped in TaskForce right now, by maturity - Live, Beta and Planned. Dated release notes will land here as we ship."
 >
   <PageHero
     kicker="Changelog"
     title="What we've shipped, honestly"
-    lead="We're pre-launch, so instead of inventing dated release notes, here's the real current state — what's Live, what's Beta, and what's Planned. Dated entries begin at general availability."
+    lead="We're pre-launch, so instead of inventing dated release notes, here's the real current state - what's Live, what's Beta, and what's Planned. Dated entries begin at general availability."
     primary={{ label: "See the roadmap", href: "/roadmap" }}
     secondary={{ label: "What ships today", href: "/product" }}
   />
@@ -95,7 +95,7 @@ const FAQ = [
         <p class="text-muted-foreground mt-14 flex items-start gap-2 border-t pt-6 text-[13px] leading-6">
           <Info className="mt-0.5 size-4 shrink-0" strokeWidth={1.75} />
           <span>
-            We don't publish dated release notes before launch — the{" "}
+            We don't publish dated release notes before launch - the{" "}
             <a href="/roadmap" class="link-underline text-foreground font-medium">public roadmap</a>{" "}
             is the source of truth for what's next.
           </span>

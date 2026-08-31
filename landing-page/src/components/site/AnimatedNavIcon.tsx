@@ -35,15 +35,15 @@ import {
 } from "@animateicons/react/lucide";
 
 /**
- * AnimatedNavIcon — icône des méga-menus animée **au path**, avec la MÊME lib que la sidebar de la
+ * AnimatedNavIcon - icône des méga-menus animée **au path**, avec la MÊME lib que la sidebar de la
  * webapp : `@animateicons/react` (dont dérivent les icônes bespoke de `frontend/components/ui/icons/*`).
  * Chaque glyphe a SA propre chorégraphie de paths (draw / pulse), déclenchée au survol de la LIGNE
- * entière (plus proche `a`/`button` ancêtre) — exactement comme la sidebar. `prefers-reduced-motion`
+ * entière (plus proche `a`/`button` ancêtre) - exactement comme la sidebar. `prefers-reduced-motion`
  * respecté. La couleur (`style.color` = teinte `hueFor`) est transmise au glyphe.
  *
  * Les glyphes historiquement absents du registry ont été remplacés dans `nav.ts` par des équivalents
  * animés proches (Orchestration→Waypoints, Agents→UserRoundCog, Learn→Lightbulb, Labs→Atom). Reste
- * seulement `Newspaper` (Blog) sur l'ancien « wobble » lucide générique — rendu cohérent, couleur et
+ * seulement `Newspaper` (Blog) sur l'ancien « wobble » lucide générique - rendu cohérent, couleur et
  * dégradé Labs (`labs-ic-head`) préservés.
  */
 

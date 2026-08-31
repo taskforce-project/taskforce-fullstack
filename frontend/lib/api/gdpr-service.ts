@@ -1,5 +1,5 @@
 /**
- * Service RGPD — droits des personnes (CERT-C11.3/C11.4).
+ * Service RGPD - droits des personnes (CERT-C11.3/C11.4).
  * Routes: /api/gdpr/export · /api/gdpr/account
  */
 

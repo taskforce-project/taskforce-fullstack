@@ -7,7 +7,7 @@ import { useUpgradeStore } from "@/lib/store/upgrade-store"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 
 /**
- * Pont « upgrade » — monté une fois globalement (AppShell), piloté par `useUpgradeStore`.
+ * Pont « upgrade » - monté une fois globalement (AppShell), piloté par `useUpgradeStore`.
  *
  * <p>Historiquement un petit modal intermédiaire ; désormais une <b>redirection directe</b> vers la page
  * <b>Facturation</b> (grille complète des 4 forfaits). Motif (retour user) : cliquer « abonnement / améliorer »

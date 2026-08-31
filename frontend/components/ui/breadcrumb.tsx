@@ -44,7 +44,7 @@ function BreadcrumbLink({
     <Comp
       data-slot="breadcrumb-link"
       className={cn(
-        // QA2-3 : hover plus visible — soulignement animé qui grandit depuis la gauche
+        // QA2-3 : hover plus visible - soulignement animé qui grandit depuis la gauche
         "relative transition-colors hover:text-foreground after:absolute after:-bottom-0.5 after:left-0 after:h-px after:w-0 after:bg-foreground after:transition-[width] after:duration-200 after:ease-out hover:after:w-full",
         className
       )}

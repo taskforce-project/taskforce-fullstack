@@ -1,12 +1,12 @@
 /**
- * Santé d'une opération — logique reprise du dashboard historique (TF-DASH-HARDCODE) :
+ * Santé d'une opération - logique reprise du dashboard historique (TF-DASH-HARDCODE) :
  * calculée depuis les vraies données projet (statut + ratio d'issues ouvertes).
  */
 import type { Project } from "@/lib/api/project-service";
 
 export type OperationHealth = "healthy" | "atRisk" | "critical" | "paused";
 
-/** Libellé + pastille par état de santé — source unique (rose aligné sur la SegmentBar). */
+/** Libellé + pastille par état de santé - source unique (rose aligné sur la SegmentBar). */
 export const HEALTH_META: Record<OperationHealth, { label: string; dot: string }> = {
   healthy: { label: "Sur les rails", dot: "bg-emerald-500" },
   atRisk: { label: "À risque", dot: "bg-amber-500" },

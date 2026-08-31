@@ -4,7 +4,7 @@
 @custom-variant dark (&:is(.dark, .dark *));
 
 /* ============================================================================
-   DESIGN TOKENS — Cloudflare-flat palette (light + dark)
+   DESIGN TOKENS - Cloudflare-flat palette (light + dark)
    ============================================================================ */
 
 /* ── LIGHT MODE (default) ── Cloudflare dashboard palette (flat, opaque) ─────── */
@@ -12,14 +12,14 @@
   --background:         #fbfbfc;   /* near-white unifié (sidebar = contenu, façon Cloudflare) */
   --card:               #ffffff;
   --popover:            #ffffff;
-  --sidebar:            #fbfbfc;   /* identique au background — pas de rupture sidebar/contenu */
+  --sidebar:            #fbfbfc;   /* identique au background - pas de rupture sidebar/contenu */
 
   --foreground:         #1d1d1f;
   --card-foreground:    #1d1d1f;
   --popover-foreground: #1d1d1f;
   --sidebar-foreground: #3a3a3c;
 
-  /* Bleu de marque — même famille que les barres de progression (blue-600 → blue-400) et que les
+  /* Bleu de marque - même famille que les barres de progression (blue-600 → blue-400) et que les
      courbes d'activité. Porte TOUTES les actions primaires : bouton principal, case cochée,
      interrupteur actif, curseur. Auparavant noir : rien ne distinguait alors une action engageante
      d'un simple élément de texte. */
@@ -49,13 +49,13 @@
   --chart-2: #6e6e73;
   --chart-3: #a1a1a6;
   --chart-4: #c7c7cc;
-  --chart-5: #f48120;   /* orange Cloudflare — réservé aux graphiques */
+  --chart-5: #f48120;   /* orange Cloudflare - réservé aux graphiques */
 
   --font-sans: var(--font-inter), "SF Pro Text", -apple-system, system-ui, sans-serif;
   --font-serif: Georgia, serif;
   --font-mono: var(--font-jetbrains-mono), "SF Mono", ui-monospace, monospace;
 
-  --radius:          0.625rem;   /* 10px — radius de référence unique : cartes du dashboard + popover Cortex.
+  --radius:          0.625rem;   /* 10px - radius de référence unique : cartes du dashboard + popover Cortex.
                                     Tout le reste (panneaux, dialogs, inputs, boutons) s'aligne dessus via l'échelle. */
   --spacing:         0.25rem;
   --tracking-normal: -0.011em;
@@ -72,8 +72,8 @@
 
   --label-primary:    #1d1d1f;
   --label-secondary:  #4b4b4f;
-  /* Assombris le 22/07 (audit axe-core). Les valeurs précédentes — #8e8e93 et #b5b5ba, reprises de
-     la palette iOS — donnaient respectivement ~3,1:1 et ~2,0:1 sur le fond clair, là où WCAG 2.1 AA
+  /* Assombris le 22/07 (audit axe-core). Les valeurs précédentes - #8e8e93 et #b5b5ba, reprises de
+     la palette iOS - donnaient respectivement ~3,1:1 et ~2,0:1 sur le fond clair, là où WCAG 2.1 AA
      (critère 1.4.3) exige 4,5:1 pour du texte normal. Elles portaient du vrai contenu, pas de la
      décoration : sous-titre de connexion, « Pas encore de compte ? », liens légaux.
      La hiérarchie entre les quatre niveaux est conservée, simplement resserrée. */
@@ -113,7 +113,7 @@
   --sidebar-foreground: #c7c7cc;
 
   /* Bleu remonté d'un cran (blue-500) : sur fond sombre, le blue-600 du thème clair manque de
-     luminance et l'action primaire passe inaperçue. Texte blanc conservé — contraste suffisant. */
+     luminance et l'action primaire passe inaperçue. Texte blanc conservé - contraste suffisant. */
   --primary:            #3b82f6;   /* blue-500 */
   --primary-foreground: #ffffff;
   --secondary:          #202022;
@@ -213,12 +213,12 @@
   --font-mono:  var(--font-mono);
   --font-serif: var(--font-serif);
 
-  --radius-sm: calc(var(--radius) - 4px);  /*  6px — badges, petits contrôles */
-  --radius-md: calc(var(--radius) - 2px);  /*  8px — boutons, inputs */
-  --radius-lg: var(--radius);              /* 10px — panneaux, dialogs, popovers */
+  --radius-sm: calc(var(--radius) - 4px);  /*  6px - badges, petits contrôles */
+  --radius-md: calc(var(--radius) - 2px);  /*  8px - boutons, inputs */
+  --radius-lg: var(--radius);              /* 10px - panneaux, dialogs, popovers */
   /* Aligné sur --radius (et non +4px) : les cartes/popovers en `rounded-xl` gardent le radius
      de référence au lieu de sur-arrondir, ce qui unifie tout l'app sur une seule valeur. */
-  --radius-xl: var(--radius);              /* 10px — cartes (Card shadcn, cartes dashboard) */
+  --radius-xl: var(--radius);              /* 10px - cartes (Card shadcn, cartes dashboard) */
 
   --shadow-2xs: var(--shadow-2xs);
   --shadow-xs:  var(--shadow-xs);
@@ -255,7 +255,7 @@
     min-height: 100svh;
   }
 
-  /* Flat design — pas d'orbes de gradient ambiants (style Cloudflare) */
+  /* Flat design - pas d'orbes de gradient ambiants (style Cloudflare) */
 
   ::selection       { background: rgba(29, 29, 31, 0.12); color: inherit; }
   .dark ::selection { background: rgba(255, 255, 255, 0.20); color: inherit; }
@@ -271,20 +271,20 @@
 }
 
 /* ============================================================================
-   FLAT SURFACE SYSTEM  (style Cloudflare — opaque, sans blur)
+   FLAT SURFACE SYSTEM  (style Cloudflare - opaque, sans blur)
    ============================================================================ */
 
 /* Le shell de contenu montre le --background (gris très clair) */
 [data-slot="sidebar-inset"] { background: var(--background) !important; }
 [data-slot="sidebar-wrapper"] { background: var(--background); }
 
-/* Sidebar — panneau opaque. La bordure droite est portée par le composant shadcn
+/* Sidebar - panneau opaque. La bordure droite est portée par le composant shadcn
    (`group-data-[side=left]:border-r` sur le conteneur) : la doubler ici créait un double trait. */
 [data-sidebar="sidebar"] {
   background: var(--sidebar);
 }
 
-/* Identité « Labs » — alignée sur le site : l'ICÔNE prend un dégradé sur le TRAIT (pêche→rose→bleu, sans
+/* Identité « Labs » - alignée sur le site : l'ICÔNE prend un dégradé sur le TRAIT (pêche→rose→bleu, sans
    violet), et les labels Labs sont en texte dégradé. Le dégradé SVG est déclaré par <LabsGradientDefs/>
    (monté dans AppShell) ; ces classes le référencent. */
 .tf-labs-icon { stroke: url(#tf-labs-grad); }
@@ -343,7 +343,7 @@ html.a11y-dyslexia body {
 }
 
 /* Contraste élevé : on ne « transforme » PAS les couleurs (un filtre CSS global déforme le design et
-   n'aide pas vraiment) — on surcharge les tokens sémantiques pour maximiser le contraste (texte noir,
+   n'aide pas vraiment) - on surcharge les tokens sémantiques pour maximiser le contraste (texte noir,
    fonds blancs, bordures franches, muted lisible, primaire/danger renforcés). Spécificité `html.classe`
    (0,1,1) > `.dark` (0,1,0) → l'emporte même en thème sombre. L'accessibilité daltonienne se joue
    surtout côté design (couleur + icône + libellé, jamais la couleur seule) ; le filtre daltonien
@@ -443,7 +443,7 @@ textarea:not([disabled]) { cursor: text; }
 .animate-fade-up  { animation: fade-up  0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 .animate-scale-in { animation: scale-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
-/* Dépliage fluide des onglets repliables (Radix Collapsible — sidebar, etc.) */
+/* Dépliage fluide des onglets repliables (Radix Collapsible - sidebar, etc.) */
 @keyframes collapsible-down { from { height: 0; } to { height: var(--radix-collapsible-content-height); } }
 @keyframes collapsible-up   { from { height: var(--radix-collapsible-content-height); } to { height: 0; } }
 .animate-collapsible-down { animation: collapsible-down 0.22s cubic-bezier(0.16, 1, 0.3, 1); }
@@ -496,17 +496,17 @@ textarea:not([disabled]) { cursor: text; }
 .ProseMirror table th         { font-weight:600; background:var(--fill-tertiary); }
 
 /* ============================================================================
-   AUTH / DÉCORATIF  (seules classes "maison" conservées — pages d'auth)
+   AUTH / DÉCORATIF  (seules classes "maison" conservées - pages d'auth)
    ============================================================================ */
 
 @layer components {
 
   /* ══════════════════════════════════════════════════════════════════════════
-     AUTH — coquille plein écran, sans défilement
+     AUTH - coquille plein écran, sans défilement
      ─────────────────────────────────────────────────────────────────────────
      Parti pris : une seule colonne centrée sur fond calme. Pas de panneau
      latéral, pas de décor animé. Les pages d'authentification sont un passage,
-     pas une destination — tout ce que l'œil n'a pas besoin de voir est retiré.
+     pas une destination - tout ce que l'œil n'a pas besoin de voir est retiré.
      La hauteur est verrouillée à 100svh (`svh` et non `vh` : sur mobile, la
      barre d'URL rétractable fausse `vh` et réintroduit un défilement).
      ══════════════════════════════════════════════════════════════════════════ */
@@ -521,7 +521,7 @@ textarea:not([disabled]) { cursor: text; }
 
   /* ── Barre supérieure : marque à gauche, rien au centre, actions à droite ── */
   /* La hauteur suit le logo, pas l'inverse : 80 px de signe plus 6 px d'air de part et d'autre.
-     Passer de 56 à 92 px prend 36 px sur le budget vertical du contenu — assumé, c'est le prix
+     Passer de 56 à 92 px prend 36 px sur le budget vertical du contenu - assumé, c'est le prix
      demandé pour un logo deux fois plus grand. */
   .auth-topbar {
     display: flex;
@@ -631,10 +631,10 @@ textarea:not([disabled]) { cursor: text; }
 
   .auth-panel {
     width: 100%;
-    max-width: 22.5rem;   /* 360px — largeur de lecture confortable pour un formulaire court */
+    max-width: 22.5rem;   /* 360px - largeur de lecture confortable pour un formulaire court */
   }
   .auth-panel-wide {
-    max-width: 26.5rem;   /* 424px — inscription : deux colonnes prénom / nom */
+    max-width: 26.5rem;   /* 424px - inscription : deux colonnes prénom / nom */
   }
 
   /* ── Titres ── */
@@ -825,7 +825,7 @@ textarea:not([disabled]) { cursor: text; }
     background: linear-gradient(100.41deg, rgba(255, 91, 55, 0.15) 0.52%, rgba(171, 0, 82, 0.15) 100%);
   }
 
-  /* ── Card décorative (hover lift) — utilisée hors dashboard ── */
+  /* ── Card décorative (hover lift) - utilisée hors dashboard ── */
   .card {
     background: var(--card);
     border: 1px solid var(--separator);

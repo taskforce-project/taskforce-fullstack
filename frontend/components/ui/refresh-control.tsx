@@ -6,7 +6,7 @@ import { RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
-/** Écart relatif entre deux instants — pure, donc sûre à appeler pendant le rendu. */
+/** Écart relatif entre deux instants - pure, donc sûre à appeler pendant le rendu. */
 function formatSince(from: number, now: number): string {
   const seconds = Math.floor((now - from) / 1000)
   if (seconds < 15)   return "just now"
@@ -19,7 +19,7 @@ function formatSince(from: number, now: number): string {
  * Libellé relatif de la dernière synchro, réévalué toutes les 30 s.
  *
  * Seul `now` est en état, alimenté par le minuteur (callback asynchrone) ; le libellé est DÉRIVÉ.
- * Le rendu reste donc pur — pas de `Date.now()` pendant le rendu — et aucun état n'est
+ * Le rendu reste donc pur - pas de `Date.now()` pendant le rendu - et aucun état n'est
  * réinitialisé depuis un effet.
  */
 function useSyncedLabel(lastSyncAt: number | null): string | null {
@@ -37,7 +37,7 @@ function useSyncedLabel(lastSyncAt: number | null): string | null {
 }
 
 /**
- * État de synchro + rafraîchissement manuel — <b>même contrôle sur toutes les vues de flux</b>
+ * État de synchro + rafraîchissement manuel - <b>même contrôle sur toutes les vues de flux</b>
  * (Signal Center, Ma file…).
  *
  * Le libellé seul ne suffit pas : afficher « à jour il y a 2 min » sans offrir le moyen

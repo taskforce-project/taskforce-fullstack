@@ -1,5 +1,5 @@
 /**
- * Store d'ouverture du modal Settings (façon Claude) — ouvrable depuis n'importe quel CTA
+ * Store d'ouverture du modal Settings (façon Claude) - ouvrable depuis n'importe quel CTA
  * (sidebar, popover Cortex, menu utilisateur) sans navigation de page. La section active est
  * conservée pour les deep-links / réouvertures sur la bonne section.
  */

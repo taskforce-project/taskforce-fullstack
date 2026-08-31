@@ -40,7 +40,7 @@ interface MemberSkillsCardProps {
 }
 
 /**
- * Carte de compétences d'un membre — alimente le Smart Assign (PROD-1.2).
+ * Carte de compétences d'un membre - alimente le Smart Assign (PROD-1.2).
  * Les compétences saisies sont relues par SmartAssignService pour matcher les labels d'issue.
  */
 export function MemberSkillsCard({ slug, userId, canEdit }: MemberSkillsCardProps) {

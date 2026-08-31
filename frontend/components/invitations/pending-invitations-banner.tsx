@@ -16,7 +16,7 @@ import {
  *
  * Depuis le passage à une acceptation EXPLICITE (plus d'auto-rattachement silencieux à la connexion),
  * un compte déjà existant qui a été invité voit ici ses invitations en attente et clique « Accepter »
- * — sans dépendre de l'email. Rendue nulle s'il n'y a rien : aucun espace occupé dans le cas courant.
+ * - sans dépendre de l'email. Rendue nulle s'il n'y a rien : aucun espace occupé dans le cas courant.
  */
 export function PendingInvitationsBanner() {
   const [invitations, setInvitations] = useState<IncomingInvitation[]>([])

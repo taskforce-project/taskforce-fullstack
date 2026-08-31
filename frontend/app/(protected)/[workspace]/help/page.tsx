@@ -21,7 +21,7 @@ import { useTranslation } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
 // ---------------------------------------------------------------------------
-// Contenu réel de la doc (QA2-25) — concis, factuel, aligné sur l'app.
+// Contenu réel de la doc (QA2-25) - concis, factuel, aligné sur l'app.
 // ---------------------------------------------------------------------------
 
 interface DocCategory {

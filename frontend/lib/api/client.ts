@@ -10,7 +10,7 @@ import { API_URL, API_URL_SSR } from "@/lib/config/urls";
 /**
  * Extension de la config Axios : `silentError` supprime le toast global (réseau/5xx).
  * À poser sur les appels de FOND (polling, préchargement, badges) qui ne doivent jamais
- * alarmer l'utilisateur s'ils échouent — seule une action explicite mérite un toast.
+ * alarmer l'utilisateur s'ils échouent - seule une action explicite mérite un toast.
  */
 declare module "axios" {
   interface AxiosRequestConfig {
@@ -20,8 +20,8 @@ declare module "axios" {
 
 /**
  * URL de base de l'API (origines dérivées d'un domaine unique dans `lib/config/urls.ts`) :
- * - SSR (serveur Next) : `API_URL_SSR` — nom de service Docker en mono-hôte, URL publique en multi-VM.
- * - CSR (navigateur) : `API_URL` — hôte public (prod) ou localhost (dev).
+ * - SSR (serveur Next) : `API_URL_SSR` - nom de service Docker en mono-hôte, URL publique en multi-VM.
+ * - CSR (navigateur) : `API_URL` - hôte public (prod) ou localhost (dev).
  */
 const BASE_URL = globalThis.window === undefined ? API_URL_SSR : API_URL;
 
@@ -33,12 +33,12 @@ export const apiClient: AxiosInstance = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
-  timeout: 30000, // 30s — backend dev (JVM froide + debug JDWP) dépasse souvent 10s au login
+  timeout: 30000, // 30s - backend dev (JVM froide + debug JDWP) dépasse souvent 10s au login
   withCredentials: true, // Activé pour accepter les cookies HttpOnly JWT
 });
 
 /**
- * Timeout dédié aux appels **génératifs** (LLM local Ollama) — spec, décision, agent.
+ * Timeout dédié aux appels **génératifs** (LLM local Ollama) - spec, décision, agent.
  * La génération locale (surtout 14B / démarrage à froid / « Approfondir ») dépasse largement les 30s
  * par défaut. Aligné au-dessus du readTimeout du gateway backend (180s). À passer par requête :
  * `apiClient.post(url, body, { timeout: AI_TIMEOUT_MS })`.
@@ -134,7 +134,7 @@ apiClient.interceptors.response.use(
     };
 
     // Erreur 401 sur un endpoint protégé, pas déjà retryé.
-    // (les 401 des endpoints auth — ex. mauvais mot de passe — sont laissés au formulaire)
+    // (les 401 des endpoints auth - ex. mauvais mot de passe - sont laissés au formulaire)
     if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       originalRequest._retry = true;
       try {
@@ -178,7 +178,7 @@ apiClient.interceptors.response.use(
       if (!error.response) {
         // Réseau / timeout : `id` stable → un seul toast à la fois (pas d'empilement de doublons).
         if (silent) {
-          console.warn(`[api] réseau/timeout (silencieux) ${error.config?.url ?? ""} — ${message}`)
+          console.warn(`[api] réseau/timeout (silencieux) ${error.config?.url ?? ""} - ${message}`)
         } else {
           toast.error("Couldn't reach the server", {
             id: "api-network-error",
@@ -187,9 +187,9 @@ apiClient.interceptors.response.use(
         }
       } else if (status && status >= 500) {
         if (silent) {
-          console.warn(`[api] ${status} (silencieux) ${error.config?.url ?? ""} — ${message}`)
+          console.warn(`[api] ${status} (silencieux) ${error.config?.url ?? ""} - ${message}`)
         } else {
-          toast.error("Server error", { id: "api-server-error", description: `${status} — ${message}` })
+          toast.error("Server error", { id: "api-server-error", description: `${status} - ${message}` })
         }
       } else if (status === 429) {
         // Exception au principe « 4xx = contextuel » : le 429 n'est pas lié à l'action en cours,
@@ -198,7 +198,7 @@ apiClient.interceptors.response.use(
         // un seul toast même quand une rafale d'appels est rejetée d'un coup.
         const retryAfter = Number(error.response?.headers?.["retry-after"])
         const wait = Number.isFinite(retryAfter) && retryAfter > 0 ? `${retryAfter}s` : "a few seconds"
-        console.warn(`[api] 429 ${error.config?.url ?? ""} — retry after ${wait}`)
+        console.warn(`[api] 429 ${error.config?.url ?? ""} - retry after ${wait}`)
         if (!silent) {
           toast.warning("Too many requests", {
             id: "api-rate-limit",
@@ -206,8 +206,8 @@ apiClient.interceptors.response.use(
           })
         }
       } else if (status && status >= 400) {
-        // 4xx contextuel : pas de toast global — l'appelant décide. Trace console pour le dev.
-        console.warn(`[api] ${status} ${error.config?.url ?? ""} — ${message}`)
+        // 4xx contextuel : pas de toast global - l'appelant décide. Trace console pour le dev.
+        console.warn(`[api] ${status} ${error.config?.url ?? ""} - ${message}`)
       }
     }
 

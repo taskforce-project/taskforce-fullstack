@@ -17,7 +17,7 @@ function windowDays(timeRange: string | null, globalDays: number): number {
   return globalDays
 }
 
-/** Échelle d'intensité des cellules — même palette que la heatmap d'Intelligence. */
+/** Échelle d'intensité des cellules - même palette que la heatmap d'Intelligence. */
 function cellClass(count: number, max: number): string {
   if (count <= 0 || max <= 0) return "bg-muted/40"
   const ratio = count / max

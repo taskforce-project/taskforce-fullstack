@@ -10,7 +10,7 @@ import { useUpgradeStore } from "@/lib/store/upgrade-store"
 import { useSettingsStore } from "@/lib/store/settings-store"
 import { getAiUsage, type AiUsage } from "@/lib/api/ai-usage-service"
 
-/** Fenêtre de contexte du modèle local (approx.) — sert la jauge « fenêtre de contexte ». */
+/** Fenêtre de contexte du modèle local (approx.) - sert la jauge « fenêtre de contexte ». */
 const CONTEXT_WINDOW = 32_768
 
 const fmt = (n: number) =>
@@ -77,7 +77,7 @@ export function CortexUsage({ sessionTokens, className }: { sessionTokens: numbe
     setCoords({ left: r.right, bottom: window.innerHeight - r.top + 8 })
   }, [])
 
-  // `minSpin` : durée minimale de l'animation, uniquement au clic manuel (pas à l'ouverture) — sinon un
+  // `minSpin` : durée minimale de l'animation, uniquement au clic manuel (pas à l'ouverture) - sinon un
   // refresh instantané ne laisse pas voir le spin et on ne « sent » pas que ça a rechargé.
   const load = useCallback(async (minSpin = false) => {
     if (!slug) return

@@ -179,7 +179,7 @@ async function fetchJson(url, tries = 3) {
     const res = await fetch(url, { headers: { "User-Agent": "taskforce-logos-script" } })
     if (res.ok) return res.json()
     if (i < tries - 1) { await sleep(1000 * (i + 1)); continue }
-    throw new Error(`HTTP ${res.status} — ${url}`)
+    throw new Error(`HTTP ${res.status} - ${url}`)
   }
 }
 
@@ -188,12 +188,12 @@ async function downloadSvg(url, dest, tries = 3) {
     const res = await fetch(url)
     if (res.ok) {
       const svg = await res.text()
-      if (!svg.trim().startsWith("<svg")) throw new Error(`Réponse non-SVG — ${url}`)
+      if (!svg.trim().startsWith("<svg")) throw new Error(`Réponse non-SVG - ${url}`)
       await writeFile(dest, svg, "utf8")
       return svg
     }
     if (i < tries - 1) { await sleep(800 * (i + 1)); continue }
-    throw new Error(`HTTP ${res.status} — ${url}`)
+    throw new Error(`HTTP ${res.status} - ${url}`)
   }
 }
 
@@ -215,7 +215,7 @@ function classifyMono(svg) {
 }
 
 /**
- * Choisit le meilleur SVG parmi les résultats — STRICT pour éviter les faux positifs
+ * Choisit le meilleur SVG parmi les résultats - STRICT pour éviter les faux positifs
  * (« Plane » → « PlanetScale »). Ordre : titre exact → résultat unique → mot entier → null.
  * Pas de `list[0]` aveugle : mieux vaut un fallback initiales qu'un mauvais logo.
  */
@@ -248,35 +248,35 @@ async function main() {
     try {
       const needle = b.search.toLowerCase()
       const list = catalog.filter((s) => (s.title ?? "").toLowerCase().includes(needle))
-      if (list.length === 0) { missing.push(b.key); console.log(`✗ ${b.key} — absent du catalogue SVGL`); continue }
+      if (list.length === 0) { missing.push(b.key); console.log(`✗ ${b.key} - absent du catalogue SVGL`); continue }
       const svg = pickBest(list, b.match ?? b.search)
-      if (!svg) { missing.push(b.key); console.log(`✗ ${b.key} — pas de correspondance fiable`); continue }
+      if (!svg) { missing.push(b.key); console.log(`✗ ${b.key} - pas de correspondance fiable`); continue }
       const route = svg.route
 
       if (route && typeof route === "object" && route.light && route.dark) {
         await downloadSvg(route.light, join(LOGOS_DIR, `${b.key}-light.svg`))
         await downloadSvg(route.dark, join(LOGOS_DIR, `${b.key}-dark.svg`))
         manifest[b.key] = "themed"
-        console.log(`✓ ${b.key} — themed (${svg.title})`)
+        console.log(`✓ ${b.key} - themed (${svg.title})`)
       } else if (typeof route === "string") {
         const raw = await downloadSvg(route, join(LOGOS_DIR, `${b.key}.svg`))
         const kind = classifyMono(raw)
         manifest[b.key] = kind
-        console.log(`✓ ${b.key} — ${kind} (${svg.title})`)
+        console.log(`✓ ${b.key} - ${kind} (${svg.title})`)
       } else {
-        missing.push(b.key); console.log(`✗ ${b.key} — route inattendue`)
+        missing.push(b.key); console.log(`✗ ${b.key} - route inattendue`)
       }
     } catch (e) {
       missing.push(b.key)
-      console.log(`✗ ${b.key} — ${e.message}`)
+      console.log(`✗ ${b.key} - ${e.message}`)
     }
     await sleep(300) // politesse rate-limit (SVGL 404 sous cadence trop rapide)
   }
 
   // Manifeste trié (clés alpha) → diff stable
   const ordered = Object.fromEntries(Object.keys(manifest).sort().map((k) => [k, manifest[k]]))
-  const ts = `// AUTOGÉNÉRÉ par scripts/fetch-logos.mjs — ne pas éditer à la main.
-// Logos de marque (SVGL — https://svgl.app) vendorisés dans public/logos/.
+  const ts = `// AUTOGÉNÉRÉ par scripts/fetch-logos.mjs - ne pas éditer à la main.
+// Logos de marque (SVGL - https://svgl.app) vendorisés dans public/logos/.
 // Régénérer : npm run logos
 
 export type BrandLogoKind = "single" | "themed" | "mono"

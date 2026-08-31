@@ -28,7 +28,7 @@ export function ShimmerLoader({
 
   const text = phrases[i % phrases.length] ?? ""
 
-  // Pas de `key={text}` : on ne remonte pas le shimmer à chaque message (ça le remettait à zéro) —
+  // Pas de `key={text}` : on ne remonte pas le shimmer à chaque message (ça le remettait à zéro) -
   // le texte change en place et la vague CONTINUE. `repeatDelay` court : sinon la vague fait une
   // longue pause (proportionnelle à la longueur) et on voyait « le texte défiler sans animation ».
   return (

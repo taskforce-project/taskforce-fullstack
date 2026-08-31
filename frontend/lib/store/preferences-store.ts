@@ -15,7 +15,7 @@ interface PreferencesState {
   // Language
   language: Language;
   setLanguage: (language: Language) => void;
-  t: typeof CONSTANTS_EN | typeof CONSTANTS_FR; // Translations object (FR/EN — formes structurellement identiques)
+  t: typeof CONSTANTS_EN | typeof CONSTANTS_FR; // Translations object (FR/EN - formes structurellement identiques)
 
   // Accessibility
   reducedMotion: boolean;
@@ -27,11 +27,11 @@ interface PreferencesState {
   highContrast: boolean;
   setHighContrast: (value: boolean) => void;
 
-  // Confort de lecture (dyslexie) — police lisible + espacements accrus.
+  // Confort de lecture (dyslexie) - police lisible + espacements accrus.
   dyslexiaFont: boolean;
   setDyslexiaFont: (value: boolean) => void;
 
-  // Mode daltonien (option, en plus du contraste élevé) — filtre de correction appliqué au contenu.
+  // Mode daltonien (option, en plus du contraste élevé) - filtre de correction appliqué au contenu.
   colorblindMode: "none" | "protanopia" | "deuteranopia" | "tritanopia";
   setColorblindMode: (mode: "none" | "protanopia" | "deuteranopia" | "tritanopia") => void;
 
@@ -161,7 +161,7 @@ export const usePreferencesStore = create<PreferencesState>()(
           }
           // App verrouillée en anglais (v1 = produit monolingue). On IGNORE délibérément la langue
           // persistée : un navigateur ayant stocké "fr" via l'ancien sélecteur (retiré) afficherait
-          // sinon une UI à moitié traduite — auth + footer en français, le reste en anglais. Les
+          // sinon une UI à moitié traduite - auth + footer en français, le reste en anglais. Les
           // constantes FR restent dans l'arbre pour une future passe i18n.
           state.language = "en";
           state.t = CONSTANTS_EN;

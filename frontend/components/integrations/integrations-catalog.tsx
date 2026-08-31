@@ -102,7 +102,7 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
     setDialogTool(tool)
   }
 
-  // Filtrage recherche + catégorie (marketplace) — catégories vides masquées.
+  // Filtrage recherche + catégorie (marketplace) - catégories vides masquées.
   const groups = useMemo(() => {
     if (!catalog) return []
     const q = query.trim().toLowerCase()
@@ -152,7 +152,7 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
           message="Integrations: most connectors can be plugged in (credentials stored), but per-tool data sync isn't active yet. A few integrations (UI & components) are on the roadmap, shown as 'Soon'."
         />
 
-        {/* Filtre par statut de connexion — « ce que j'ai connecté ou pas » (en tête). */}
+        {/* Filtre par statut de connexion - « ce que j'ai connecté ou pas » (en tête). */}
         <div className="flex gap-1.5">
           <CatPill active={statusFilter === "all"} onClick={() => setStatusFilter("all")}>
             All <span className="tabular-nums opacity-60">{catalog.total}</span>
@@ -232,7 +232,7 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
   )
 }
 
-/** Tuile d'un connecteur — clic → fiche détaillée (façon Claude). Logo, état, description, capacités. */
+/** Tuile d'un connecteur - clic → fiche détaillée (façon Claude). Logo, état, description, capacités. */
 function ConnectorCard({ tool, onOpenDetail }: Readonly<{ tool: ConnectorView; onOpenDetail: () => void }>) {
   const planned = tool.status === "PLANNED"
 
@@ -280,7 +280,7 @@ function ConnectorCard({ tool, onOpenDetail }: Readonly<{ tool: ConnectorView; o
 }
 
 /**
- * Fiche détaillée d'un connecteur (façon Claude) — infos honnêtes UNIQUEMENT : description, ce que
+ * Fiche détaillée d'un connecteur (façon Claude) - infos honnêtes UNIQUEMENT : description, ce que
  * permet le connecteur (capacités), mode de connexion, catégorie et liens RÉELS (site officiel + docs).
  * Pas de listes d'outils/auteurs inventées pour les services qu'on n'intègre pas réellement.
  */
@@ -331,7 +331,7 @@ function ConnectorDetailView({
             {tool.capabilities.map((c) => (
               <li key={c} className="flex items-start gap-2 text-sm text-foreground">
                 <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary/60" />
-                <span><span className="font-medium">{CAP_LABEL[c] ?? c}</span>{CAP_DESC[c] ? ` — ${CAP_DESC[c]}` : ""}</span>
+                <span><span className="font-medium">{CAP_LABEL[c] ?? c}</span>{CAP_DESC[c] ? ` - ${CAP_DESC[c]}` : ""}</span>
               </li>
             ))}
           </ul>
@@ -343,7 +343,7 @@ function ConnectorDetailView({
         <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Connection</h4>
         <p className="text-sm text-muted-foreground">
           <span className="font-medium text-foreground">{AUTH_LABEL[tool.authType] ?? tool.authType}</span>
-          {AUTH_HELP[tool.authType] ? ` — ${AUTH_HELP[tool.authType]}` : ""}
+          {AUTH_HELP[tool.authType] ? ` - ${AUTH_HELP[tool.authType]}` : ""}
         </p>
         {tool.setupHint && (
           <div className="flex gap-2 rounded-md border border-border bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground">
@@ -426,7 +426,7 @@ function ConnectorDialog({
       onChanged()
       if (!isPlane) onClose()
     } catch {
-      toast.error("Connection failed — check the details you entered")
+      toast.error("Connection failed - check the details you entered")
     } finally {
       setConnecting(false)
     }
@@ -539,7 +539,7 @@ function ConnectorDialog({
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2 rounded-md border border-emerald-500/25 bg-emerald-500/10 p-3 text-xs text-emerald-600 dark:text-emerald-400">
               <Check className="size-4 shrink-0" />
-              <span><span className="font-medium">{tool.name}</span> is connected — credentials saved (encrypted).</span>
+              <span><span className="font-medium">{tool.name}</span> is connected - credentials saved (encrypted).</span>
             </div>
             <DialogFooter>
               <Button variant="outline" size="sm"

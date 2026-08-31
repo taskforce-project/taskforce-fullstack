@@ -1,5 +1,5 @@
 /**
- * Service des cartes de dashboard épinglées — par utilisateur et par workspace.
+ * Service des cartes de dashboard épinglées - par utilisateur et par workspace.
  * Backend: @RequestMapping("/api/workspaces/{slug}/dashboard-cards")
  *
  * Le premier GET pour un couple (user, workspace) bootstrape les 4 cartes par
@@ -15,7 +15,7 @@ import type { Project } from "./project-service";
 /** Largeur d'une carte dans la grille (col-span). */
 export type DashboardCardSize = "1" | "2";
 
-/** Config JSON libre d'une carte — champs connus typés, le reste ouvert. */
+/** Config JSON libre d'une carte - champs connus typés, le reste ouvert. */
 export interface DashboardCardConfig {
   size?: DashboardCardSize;
   /** Spec de graphe générée par l'IA (cartes `ai-chart`). */
@@ -77,7 +77,7 @@ export async function deleteDashboardCard(slug: string, id: number): Promise<voi
 // ---------------------------------------------------------------------------
 // Les colonnes et corps de carte sont des chargements de FOND : jamais de toast
 // global, chaque composant affiche son propre état vide/erreur. Les services
-// d'origine n'exposent pas `silentError` pour ces appels — variantes locales.
+// d'origine n'exposent pas `silentError` pour ces appels - variantes locales.
 
 /** Colonne « Ma file » : issues assignées à l'utilisateur (variante silencieuse de listMyIssues). */
 export async function listMyIssuesQuiet(slug: string): Promise<Issue[]> {

@@ -7,7 +7,7 @@ import { MemorySearchDemo, TakeNotesDemo, ConnectedToolsDemo } from "@/component
 import { Compass, Building2, CalendarClock, BrainCircuit, Boxes, ShieldCheck, SlidersHorizontal, Search, PenLine, Plug } from "lucide-react";
 import { hueFor } from "@/lib/site-icons";
 
-/* Les 3 rôles — mêmes que la page Orchestration (road_to_v2/Agents_C_Level.md). Direction Planned. */
+/* Les 3 rôles - mêmes que la page Orchestration (road_to_v2/Agents_C_Level.md). Direction Planned. */
 const TEAM = [
   {
     code: "CPO",
@@ -36,29 +36,29 @@ const TEAM = [
 const TOOLS = [
   { icon: Search, title: "Search your Memory", text: "Retrieves the decisions, constraints and conventions behind your system before it answers." },
   { icon: PenLine, title: "Take notes", text: "Writes findings back as knowledge nodes, so what it learns stays in the graph." },
-  { icon: Plug, title: "Use connected tools", text: "Calls tools exposed over MCP by the systems you've connected — and any external write waits for a human." },
+  { icon: Plug, title: "Use connected tools", text: "Calls tools exposed over MCP by the systems you've connected - and any external write waits for a human." },
 ];
 
-/* Les garde-fous — cohérents avec Orchestration. « Governable » (pas « safe to trust » : l'IA
+/* Les garde-fous - cohérents avec Orchestration. « Governable » (pas « safe to trust » : l'IA
    peut se tromper avec assurance, cf. AI Transparency). Model-agnostic → Configurable (propriété
    d'architecture, pas de comportement). */
 const RULES = [
-  { icon: BrainCircuit, title: "Grounded", desc: "Uses your architecture, decisions and conventions — not generic guesses." },
+  { icon: BrainCircuit, title: "Grounded", desc: "Uses your architecture, decisions and conventions - not generic guesses." },
   { icon: Boxes, title: "Specialized", desc: "Works within a defined responsibility instead of pretending to know everything." },
   { icon: ShieldCheck, title: "Governed", desc: "Proposes; a human approves. Nothing consequential runs on its own." },
-  { icon: SlidersHorizontal, title: "Your models", desc: "Local through Ollama at zero model cost, or hosted — your call, fast or deep per run." },
+  { icon: SlidersHorizontal, title: "Your models", desc: "Local through Ollama at zero model cost, or hosted - your call, fast or deep per run." },
 ];
 
 ---
 
 <BaseLayout
-  title="Agents — TaskForce"
+  title="Agents - TaskForce"
   description="A delivery team, not a single generalist: specialized agents for product, architecture and delivery, grounded in your Memory and approved by a human. Today, one assistant agent grounded in your Brain OS; the specialized team is the direction."
 >
   <PageHero
     kicker="Agents"
     title="A delivery team, not a single generalist"
-    lead="Most AI workflows start with a generalist agent. TaskForce is building a small team of specialized agents — product, architecture and delivery — each grounded in your Memory, each producing proposals a human approves."
+    lead="Most AI workflows start with a generalist agent. TaskForce is building a small team of specialized agents - product, architecture and delivery - each grounded in your Memory, each producing proposals a human approves."
     level="labs"
     primary={{ label: "Run your first workflow", href: "/waitlist" }}
     secondary={{ label: "See the run", href: "/product/orchestration" }}
@@ -71,7 +71,7 @@ const RULES = [
         <p class="t-eyebrow mb-3">The team</p>
         <h2 class="t-h2">Three roles, the way a strong org splits them</h2>
         <p class="t-lead mt-4">
-          Responsibility is split the way a software organization does it — so no single agent has to
+          Responsibility is split the way a software organization does it - so no single agent has to
           be an expert at everything, and no single agent gets the final say.
         </p>
       </div>
@@ -105,12 +105,12 @@ const RULES = [
           <p class="t-eyebrow mb-3">Orchestration</p>
           <h2 class="t-h2">One run, three perspectives</h2>
           <p class="t-lead mt-4 max-w-xl">
-            Each role produces an artifact — a spec, an approach, a breakdown — and hands it to the next
+            Each role produces an artifact - a spec, an approach, a breakdown - and hands it to the next
             only after a human approves it. Three perspectives, one accountable chain.
           </p>
           <p class="text-muted-foreground mt-6 flex items-center gap-2 text-[13px]">
             <ShieldCheck className="size-4 shrink-0" strokeWidth={2} style={{ color: hueFor(ShieldCheck) }} />
-            A human approves at every checkpoint — no role hands off on its own.
+            A human approves at every checkpoint - no role hands off on its own.
           </p>
         </div>
         <div class="lg:pl-4">
@@ -130,7 +130,7 @@ const RULES = [
         <h2 class="t-h2">One assistant, grounded in your Memory</h2>
         <p class="t-lead mt-4">
           The specialized team is the direction. Today, TaskForce ships an assistant grounded in your
-          Brain OS: it retrieves the reasoning behind your system, uses connected tools — and
+          Brain OS: it retrieves the reasoning behind your system, uses connected tools - and
           hands consequential actions to a human.
         </p>
       </div>
@@ -168,8 +168,8 @@ const RULES = [
         <p class="t-eyebrow mb-3">The rules</p>
         <h2 class="t-h2">What makes an agent governable</h2>
         <p class="t-lead mt-4">
-          An agent is only as useful as it is accountable. Every agent — the assistant today, the
-          specialized team as it lands — works to the same rules.
+          An agent is only as useful as it is accountable. Every agent - the assistant today, the
+          specialized team as it lands - works to the same rules.
         </p>
       </div>
       <div class="-mx-6 mt-12 grid grid-cols-1 gap-px border-y border-border bg-border sm:grid-cols-2 lg:grid-cols-4 lg:-mx-10">
@@ -188,7 +188,7 @@ const RULES = [
       <p class="text-muted-foreground mt-8 text-[13px] leading-6">
         Every proposal an agent makes waits for a human at a
         <a href="/product/orchestration" class="link-underline text-foreground font-medium"> checkpoint</a>
-        — see how sign-off works in
+        - see how sign-off works in
         <a href="/product/approvals" class="link-underline text-foreground font-medium"> Approvals</a>.
       </p>
     </div>

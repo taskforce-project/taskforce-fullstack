@@ -36,7 +36,7 @@ interface DeleteConfirmDialogProps {
   readonly confirmText?: string
   /** Libellé au-dessus du champ de saisie (défaut générique). */
   readonly confirmTextLabel?: string
-  /** Mode contrôlé (ex. déclenché depuis un menu) — si fourni, le trigger interne est optionnel. */
+  /** Mode contrôlé (ex. déclenché depuis un menu) - si fourni, le trigger interne est optionnel. */
   readonly open?: boolean
   readonly onOpenChange?: (open: boolean) => void
 }

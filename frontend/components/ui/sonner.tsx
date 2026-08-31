@@ -18,7 +18,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
       theme={theme as ToasterProps["theme"]}
       className="toaster group"
       // Bouton (×) sur CHAQUE toast : sans lui, impossible de fermer à la main (surtout les toasts
-      // persistants / empilés) — on attendait l'auto-dismiss ou on restait coincé.
+      // persistants / empilés) - on attendait l'auto-dismiss ou on restait coincé.
       closeButton
       icons={{
         success: <CircleCheckIcon className="size-4" />,

@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils"
 
 /**
  * Texte avec un reflet animé qui balaie (façon « shimmering-text » d'ElevenLabs UI).
- * Implémenté maison (registry ElevenLabs inaccessible — Vercel checkpoint).
+ * Implémenté maison (registry ElevenLabs inaccessible - Vercel checkpoint).
  * Idéal pour un état « réfléchit… » / chargement.
  */
 export function ShimmeringText({

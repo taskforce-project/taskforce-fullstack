@@ -115,7 +115,7 @@ function CycleCard({ cycle, slug, reload }: Readonly<{ cycle: Cycle; slug: strin
   }
 
   /**
-   * Transition de statut — le chaînon UI qui manquait (C2). `updateCycle` existait dans le store et
+   * Transition de statut - le chaînon UI qui manquait (C2). `updateCycle` existait dans le store et
    * n'avait AUCUN appelant : un cycle naissait `DRAFT` et y restait, donc `ACTIVE`/`COMPLETED` étaient
    * inatteignables depuis le produit (burndown vide, KPI à 0, sections Active/Completed désertes). Le
    * backend, lui, gère déjà tout : validation, push Slack ET l'event Brain OS à la clôture (garde « une
@@ -193,7 +193,7 @@ function CycleCard({ cycle, slug, reload }: Readonly<{ cycle: Cycle; slug: strin
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem className="gap-2" onClick={handleViewIssues}><BarChart3 className="h-4 w-4" />View issues</DropdownMenuItem>
-            {/* Transitions contextuelles — remplacent le « Edit cycle » qui n'avait aucun onClick. */}
+            {/* Transitions contextuelles - remplacent le « Edit cycle » qui n'avait aucun onClick. */}
             {cycle.status === "upcoming" && (
               <DropdownMenuItem className="gap-2" disabled={busy} onClick={() => handleTransition("ACTIVE")}>
                 <Play className="h-4 w-4 text-emerald-400" />Start cycle
@@ -354,7 +354,7 @@ export default function CyclesPage() {
   const [cycles, setCycles] = useState<Cycle[]>([])
 
   // Extrait en callback pour être rejoué après une transition/suppression : la page tient son PROPRE
-  // état local (mappé depuis l'API), distinct du store — muter le store ne la rafraîchit donc pas.
+  // état local (mappé depuis l'API), distinct du store - muter le store ne la rafraîchit donc pas.
   const reload = useCallback(async () => {
     if (!slug) return
     const projs = await fetchProjects(slug)
@@ -400,7 +400,7 @@ export default function CyclesPage() {
         <CycleSection title="Completed" cycles={completed} defaultOpen={false} slug={slug} reload={reload} />
       )}
 
-      {/* Chargement — skeleton calqué sur la grille de cartes */}
+      {/* Chargement - skeleton calqué sur la grille de cartes */}
       {isLoading && cycles.length === 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -409,7 +409,7 @@ export default function CyclesPage() {
         </div>
       )}
 
-      {/* État vide — primitive partagée (Empty) */}
+      {/* État vide - primitive partagée (Empty) */}
       {!isLoading && cycles.length === 0 && (
         <Empty>
           <EmptyHeader>

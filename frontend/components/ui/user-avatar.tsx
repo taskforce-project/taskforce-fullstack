@@ -7,7 +7,7 @@ import { getAvatarUrl, getInitials } from "@/lib/utils/avatar"
 import { cn } from "@/lib/utils"
 
 export interface UserAvatarProps {
-  /** Identité utilisée comme seed déterministe (DiceBear) — garantit la même PDP partout. */
+  /** Identité utilisée comme seed déterministe (DiceBear) - garantit la même PDP partout. */
   email?: string | null
   /** URL d'avatar persistée en DB ; sinon fallback DiceBear sur l'email. */
   avatarUrl?: string | null

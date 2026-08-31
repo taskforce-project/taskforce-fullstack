@@ -16,13 +16,13 @@ import { LoginIntro } from "@/components/layout/login-intro";
  * Keycloak renvoie ici le navigateur avec `?code=…&state=…`. Cette page relaie le code à notre API,
  * qui seule détient le secret du client et peut l'échanger contre des jetons. Rien n'est décidé ici.
  *
- * <b>L'échange ne part qu'une fois</b> (garde par `ref` — le mode strict remonte l'effet en dev, et un
+ * <b>L'échange ne part qu'une fois</b> (garde par `ref` - le mode strict remonte l'effet en dev, et un
  * code d'autorisation est à usage unique).
  *
  * <b>Intro « ElevenLabs ».</b> Pendant l'échange on montre la 1ʳᵉ moitié de l'intro (le logo TaskForce
  * qui s'illumine, {@link LoginIntro} `phase="hold"`). Au succès on pose le drapeau `tf.intro` et on
  * navigue en dur (les stores Zustand se reconstruisent proprement) ; l'`AppShell` joue alors la 2ᵉ
- * moitié (vague + révélation) <b>en overlay pendant que l'app charge</b> — pas de loader, pas de
+ * moitié (vague + révélation) <b>en overlay pendant que l'app charge</b> - pas de loader, pas de
  * coupure. La frame de jointure (logo illuminé sur le fond de l'app) étant identique, le rechargement
  * est invisible.
  */
@@ -59,13 +59,13 @@ function OAuthCallbackInner() {
       .then(async (auth) => {
         // Approbation explicite : la personne peut venir d'un lien d'invitation puis s'être connectée
         // via GitHub/Google. Le token mis de côté avant la redirection est appliqué maintenant
-        // (best-effort — n'empêche jamais d'entrer).
+        // (best-effort - n'empêche jamais d'entrer).
         const invitationToken = takeInvitationToken();
         if (invitationToken) {
           try {
             await acceptInvitation(invitationToken);
           } catch {
-            /* invitation invalide/expirée/déjà utilisée — la connexion reste valable */
+            /* invitation invalide/expirée/déjà utilisée - la connexion reste valable */
           }
         }
 
@@ -77,7 +77,7 @@ function OAuthCallbackInner() {
         try {
           sessionStorage.setItem("tf.intro", "1");
         } catch {
-          /* mode privé / stockage indisponible — on navigue quand même, sans révélation */
+          /* mode privé / stockage indisponible - on navigue quand même, sans révélation */
         }
 
         // Petit temps de présence du logo avant le rechargement, pour masquer la jointure.
@@ -109,7 +109,7 @@ function OAuthCallbackInner() {
 
 /**
  * Enveloppe Suspense OBLIGATOIRE : `useSearchParams()` provoque un « CSR bailout » au prérendu
- * statique — sans cette frontière, `next build` échoue. Le fallback est le fond de l'app (l'intro
+ * statique - sans cette frontière, `next build` échoue. Le fallback est le fond de l'app (l'intro
  * démarre dès les paramètres d'URL lus).
  */
 export default function OAuthCallbackPage() {

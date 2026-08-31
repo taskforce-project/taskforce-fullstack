@@ -26,14 +26,14 @@ interface CardShellProps {
   readonly title: string
   readonly icon?: ReactNode
   readonly size: DashboardCardSize
-  /** Options de période de la carte — sous-menu absent si non fourni. */
+  /** Options de période de la carte - sous-menu absent si non fourni. */
   readonly timeRanges?: readonly CardTimeRangeOption[]
   readonly activeRange?: string
   readonly onRefresh: () => void
   readonly onChangeRange: (value: string) => void
   readonly onChangeSize: (size: DashboardCardSize) => void
   readonly onRemove: () => void
-  /** Poignée de drag (dnd-kit) — l'en-tête entier devient saisissable. */
+  /** Poignée de drag (dnd-kit) - l'en-tête entier devient saisissable. */
   readonly dragAttributes?: DraggableAttributes
   readonly dragListeners?: DraggableSyntheticListeners
   readonly isDragging?: boolean
@@ -66,12 +66,12 @@ export function CardShell({
 
         Avant, `dragAttributes` et `dragListeners` étaient posés ensemble sur cette barre. Or
         `dragAttributes` de dnd-kit contient `role="button"` et `tabindex="0"` : la barre devenait un
-        contrôle interactif contenant lui-même le bouton de menu — c'est la violation
+        contrôle interactif contenant lui-même le bouton de menu - c'est la violation
         `nested-interactive` d'axe-core (5 occurrences, une par carte), un cas où un lecteur d'écran
         ne sait plus quoi annoncer.
 
-        Désormais : les `listeners` (pointeur) restent sur la barre — on peut toujours saisir la
-        carte n'importe où sur son en-tête, l'usage à la souris est inchangé — tandis que les
+        Désormais : les `listeners` (pointeur) restent sur la barre - on peut toujours saisir la
+        carte n'importe où sur son en-tête, l'usage à la souris est inchangé - tandis que les
         `attributes` (rôle, tabulation, description ARIA) vont sur une poignée dédiée. Les
         événements clavier de la poignée remontent jusqu'aux listeners par propagation, donc le
         glisser-déposer au clavier continue de fonctionner.

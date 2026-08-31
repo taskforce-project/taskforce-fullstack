@@ -1,7 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
- * Configuration Playwright — tests E2E des parcours critiques (F-T4).
+ * Configuration Playwright - tests E2E des parcours critiques (F-T4).
  *
  * Cible l'app **déjà lancée** (docker-compose dev) : front sur http://localhost:3000, API sur
  * http://localhost:8080 (ports mappés sur l'hôte). Les navigateurs Playwright tournent sur l'hôte

@@ -9,7 +9,7 @@ import type {
 
 /**
  * Rend une icône animée (bespoke animateicons ou repli lucide) et déclenche son animation au survol
- * de la LIGNE de menu entière — pas seulement du petit glyphe. Plutôt que de câbler des handlers dans
+ * de la LIGNE de menu entière - pas seulement du petit glyphe. Plutôt que de câbler des handlers dans
  * chaque branche de rendu de la sidebar, on lie l'écouteur au plus proche `a`/`button` ancêtre (la
  * ligne shadcn `SidebarMenuButton`, rendue tantôt en lien tantôt en bouton).
  *

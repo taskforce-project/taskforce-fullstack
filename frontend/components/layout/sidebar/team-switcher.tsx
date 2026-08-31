@@ -89,7 +89,7 @@ export function WorkspaceSwitcher() {
 
   // Distinction façon orgs GitHub : « Vos espaces » (flag `personal` renseigné par le backend =
   // je suis propriétaire) vs « Partagés avec vous » (ceux d'autrui, où j'ai été invité). Seuls les
-  // espaces possédés comptent pour le quota de création — être invité ailleurs ne le bloque pas.
+  // espaces possédés comptent pour le quota de création - être invité ailleurs ne le bloque pas.
   const owned = workspaces.filter((ws) => ws.personal)
   const shared = workspaces.filter((ws) => !ws.personal)
   const ownedCount = owned.length

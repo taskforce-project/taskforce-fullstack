@@ -195,7 +195,7 @@ describe('AuthContext', () => {
       expect(result.current.user).toBeNull();
       expect(result.current.isAuthenticated).toBe(false);
       // QA2 : rechargement dur (`window.location`) et non `router.push`. Une navigation cliente
-      // laisserait vivants les stores Zustand, qui sont des singletons au niveau module — deux
+      // laisserait vivants les stores Zustand, qui sont des singletons au niveau module - deux
       // comptes successifs sur le même navigateur mélangeraient leurs caches (403, intégrations
       // fantômes). Seul un rechargement complet les détruit.
       expect(window.location.href).toBe('/auth/login');

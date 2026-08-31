@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils"
 import { BRAND_LOGOS } from "@/lib/brand-logos.generated"
 
 interface BrandLogoProps {
-  /** Clé de la marque / connecteur (ex. "github", "slack") — cf. ConnectorCatalog.java. */
+  /** Clé de la marque / connecteur (ex. "github", "slack") - cf. ConnectorCatalog.java. */
   slug: string
   /** Nom lisible (alt + repli initiales). */
   name: string
@@ -16,7 +16,7 @@ function initials(name: string): string {
 }
 
 /**
- * Logo de marque servi **localement** depuis `public/logos/` (vendorisé via SVGL —
+ * Logo de marque servi **localement** depuis `public/logos/` (vendorisé via SVGL -
  * cf. `scripts/fetch-logos.mjs`, `npm run logos`). Aucun appel réseau au runtime.
  *  - `themed`  → variante claire/sombre commutée par le thème (pas de flash JS).
  *  - `single`  → un seul fichier (logo couleur).

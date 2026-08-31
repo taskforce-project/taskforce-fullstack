@@ -173,7 +173,7 @@ function InviteMemberDialog({ onInvited }: { readonly onInvited?: () => void }) 
   async function handleInvite() {
     if (selectedUsers.length === 0 || !slug) return
     setLoading(true)
-    // Invitation PENDING (email + bannière in-app à accepter) — plus d'ajout direct.
+    // Invitation PENDING (email + bannière in-app à accepter) - plus d'ajout direct.
     const results = await Promise.all(
       selectedUsers.map((u) =>
         createInvitation(slug, { email: u.email, role }).then(() => true).catch(() => false)
@@ -209,7 +209,7 @@ function InviteMemberDialog({ onInvited }: { readonly onInvited?: () => void }) 
         <DialogHeader>
           <DialogTitle>Invite member</DialogTitle>
           <DialogDescription>
-            Search a Taskforce user or enter an email — they&apos;ll receive an invitation to accept.
+            Search a Taskforce user or enter an email - they&apos;ll receive an invitation to accept.
           </DialogDescription>
         </DialogHeader>
 
@@ -286,7 +286,7 @@ function InviteMemberDialog({ onInvited }: { readonly onInvited?: () => void }) 
                     className="mt-1.5 flex w-full items-center gap-2 rounded-md border border-dashed border-border px-2.5 py-2 text-left text-sm hover:bg-accent disabled:opacity-60"
                   >
                     {emailInviting ? <Loader2 className="size-4 animate-spin" /> : <Mail className="size-4 text-muted-foreground" />}
-                    <span>No account — invite <strong>{query.trim()}</strong> by email</span>
+                    <span>No account - invite <strong>{query.trim()}</strong> by email</span>
                   </button>
                 ) : (
                   <p className="mt-1.5 text-xs text-muted-foreground">No account matches. Enter a full email to invite someone without an account.</p>
@@ -323,7 +323,7 @@ function InviteMemberDialog({ onInvited }: { readonly onInvited?: () => void }) 
 }
 
 // ---------------------------------------------------------------------------
-// MemberActions — menu d'une ligne membre (promote / demote / remove)
+// MemberActions - menu d'une ligne membre (promote / demote / remove)
 // ---------------------------------------------------------------------------
 
 interface MemberActionsProps {
@@ -484,7 +484,7 @@ export default function MembersPage() {
     return map
   }, [projects])
 
-  // Profils de compétences (aperçu sur la liste — PROD-1.2/1.8)
+  // Profils de compétences (aperçu sur la liste - PROD-1.2/1.8)
   useEffect(() => {
     const slug = workspace?.slug
     if (!slug) return
@@ -497,7 +497,7 @@ export default function MembersPage() {
       .catch(() => { /* non bloquant */ })
     getWorkspaceUsage(slug)
       .then((u) => { if (active) setUsage(u) })
-      .catch(() => { /* non bloquant — fallback plan-limits.ts */ })
+      .catch(() => { /* non bloquant - fallback plan-limits.ts */ })
     return () => { active = false }
   }, [workspace?.slug])
 
@@ -591,7 +591,7 @@ export default function MembersPage() {
       className: "hidden xl:table-cell",
       render: (m) => {
         const profile = profilesByUser[m.userId]
-        if (!profile || profile.skills.length === 0) return <span className="text-[10px] text-muted-foreground/40">—</span>
+        if (!profile || profile.skills.length === 0) return <span className="text-[10px] text-muted-foreground/40">-</span>
         return (
           <div className="flex flex-wrap items-center gap-1">
             {profile.skills.slice(0, 3).map((s) => (
@@ -609,7 +609,7 @@ export default function MembersPage() {
       className: "hidden xl:table-cell",
       render: (m) => {
         const list = projectsByUser.get(m.userId) ?? []
-        if (list.length === 0) return <span className="text-[10px] text-muted-foreground/40">—</span>
+        if (list.length === 0) return <span className="text-[10px] text-muted-foreground/40">-</span>
         return (
           <div className="flex flex-wrap items-center gap-1">
             {list.slice(0, 2).map((p) => (
@@ -741,7 +741,7 @@ export default function MembersPage() {
           </Select>
         )}
 
-        {/* Redistribution de charge (PROD-1.12) — manager only */}
+        {/* Redistribution de charge (PROD-1.12) - manager only */}
         {canManage && workspace?.slug && (
           <div className="ml-auto shrink-0">
             <RedistributionDialog slug={workspace.slug} onApplied={() => fetchMembers()} />
@@ -749,7 +749,7 @@ export default function MembersPage() {
         )}
       </div>
 
-      {/* Members list — DataTable partagé (tri par colonne, pagination, styles homogènes avec Signals). */}
+      {/* Members list - DataTable partagé (tri par colonne, pagination, styles homogènes avec Signals). */}
       {membersLoading && members.length === 0 ? (
         <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
           {Array.from({ length: 5 }).map((_, i) => (
@@ -779,7 +779,7 @@ export default function MembersPage() {
         <PendingInvitations slug={workspace.slug} refreshKey={invitationRefresh} />
       )}
 
-      {/* Plan info — limite réelle selon le plan (QA2-20 : plus de « /5 » codé en dur) */}
+      {/* Plan info - limite réelle selon le plan (QA2-20 : plus de « /5 » codé en dur) */}
       {workspace && (() => {
         const rawLimit = usage ? usage.membersLimit : planLimit(currentUser?.planType, "members")
         const unlimited = rawLimit === -1 || !Number.isFinite(rawLimit)
@@ -797,8 +797,8 @@ export default function MembersPage() {
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {unlimited
-                  ? `${planLabel} plan — unlimited members.`
-                  : `${planLabel} plan — up to ${rawLimit} members.${atLimit ? " Limit reached." : ""}`}
+                  ? `${planLabel} plan - unlimited members.`
+                  : `${planLabel} plan - up to ${rawLimit} members.${atLimit ? " Limit reached." : ""}`}
               </p>
             </div>
             {unlimited ? (

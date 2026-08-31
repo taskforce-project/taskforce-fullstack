@@ -202,7 +202,7 @@ function PriorityCard({
 }
 
 /**
- * Decision board (boucle OODA) — aide à la décision par projet sur la page Analytics.
+ * Decision board (boucle OODA) - aide à la décision par projet sur la page Analytics.
  *
  * L'analyse est un **workflow asynchrone** : « Analyser » le lance et ouvre le dock, où l'on suit
  * les étapes en direct ; le brief produit est persisté, et chaque priorité reste actionnable
@@ -266,8 +266,8 @@ export function DecisionBoard({
           {/* Rapide (8B) ou approfondi (14B + raisonnement, peut poser une question). */}
           <div className="flex rounded-lg border border-border bg-background p-0.5">
             {([
-              { value: "QUICK", label: "Quick", Icon: Zap, hint: "8B — a few seconds" },
-              { value: "DEEP", label: "Deep", Icon: BrainCircuit, hint: "14B + reasoning — may ask a question" },
+              { value: "QUICK", label: "Quick", Icon: Zap, hint: "8B - a few seconds" },
+              { value: "DEEP", label: "Deep", Icon: BrainCircuit, hint: "14B + reasoning - may ask a question" },
             ] as const).map((option) => (
               <button
                 key={option.value}
@@ -302,15 +302,15 @@ export function DecisionBoard({
         >
           <Loader2 className="size-3.5 shrink-0 animate-spin text-blue-500" />
           {runningJob.status === "WAITING_FOR_INPUT"
-            ? "The AI needs a clarification from you — open the workflow"
-            : "Analysis running — follow the steps in the dock"}
+            ? "The AI needs a clarification from you - open the workflow"
+            : "Analysis running - follow the steps in the dock"}
         </button>
       )}
 
       {!brief && !runningJob && (
         <p className="mt-3 text-xs text-muted-foreground">
           The AI reads the project&apos;s real metrics + the Brain OS, then lays out the situation, the risks, and
-          tomorrow&apos;s <span className="font-medium text-foreground">3 priorities</span> — which you can turn into issues in one click.
+          tomorrow&apos;s <span className="font-medium text-foreground">3 priorities</span> - which you can turn into issues in one click.
           The analysis runs in the background: you can leave the page.
         </p>
       )}

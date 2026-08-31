@@ -3,7 +3,7 @@ import { WORKSPACE_ROUTES } from "@/lib/config/api-routes";
 
 /**
  * Redistribution de charge (PROD-1.12, trou CDC #4 « ajustements dynamiques »).
- * Le backend propose un plan (preview) qu'un manager valide (apply) — jamais de réassignation silencieuse.
+ * Le backend propose un plan (preview) qu'un manager valide (apply) - jamais de réassignation silencieuse.
  */
 
 export interface RedistributionMove {

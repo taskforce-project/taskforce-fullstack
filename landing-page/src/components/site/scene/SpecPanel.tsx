@@ -3,9 +3,9 @@ import { AppWindow } from "./AppWindow";
 import { WORKSPACE, PROJECT, RUN, SPEC_CRITERIA } from "@/lib/story";
 
 /**
- * SpecPanel — le visuel produit du hero (statique, SSR, aucun îlot : on protège le LCP).
+ * SpecPanel - le visuel produit du hero (statique, SSR, aucun îlot : on protège le LCP).
  *
- * Décision (audit v2 + plan d'exécution) : le hero ne montre PLUS un board kanban — c'était le
+ * Décision (audit v2 + plan d'exécution) : le hero ne montre PLUS un board kanban - c'était le
  * signal « outil de gestion de projet » n°1. Il montre l'ACTE réellement livré (Phase B ✅ du
  * road_to_v2) : une issue → l'IA rédige la spec + le prompt d'exécution (à coller dans Claude Code)
  * + le découpage, ancré dans la mémoire (« déjà vu ? »), et un humain approuve → la décision part
@@ -64,7 +64,7 @@ export function SpecPanel() {
               <span className="ml-auto rounded bg-white/10 px-1.5 py-px text-[8.5px] text-white/70">ready</span>
             </div>
             <p className="mt-1.5 font-mono text-[9.5px] leading-[1.5] text-white/55">
-              Implement invoice export for a chosen period — PDF or CSV at export time; over 500 rows run in the background…
+              Implement invoice export for a chosen period - PDF or CSV at export time; over 500 rows run in the background…
             </p>
             <p className="mt-1.5 text-[9px] text-white/40">Paste into Claude Code, Cursor or your agent</p>
           </div>

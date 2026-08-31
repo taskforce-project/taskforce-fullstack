@@ -51,7 +51,7 @@ function messagesToTurns(messages: ConversationMessage[]): Turn[] {
 }
 
 /**
- * Plafond de tokens IA atteint (HTTP 409) — carte d'**information** (pas d'erreur) avec un **CTA**
+ * Plafond de tokens IA atteint (HTTP 409) - carte d'**information** (pas d'erreur) avec un **CTA**
  * clair vers la page d'abonnement. Rendue en tour assistant pour rester dans le fil.
  */
 function QuotaNotice({ slug }: Readonly<{ slug: string }>) {

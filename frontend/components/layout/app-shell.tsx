@@ -29,12 +29,12 @@ export function AppShell({ children }: AppShellProps) {
       <AppSidebar />
       <SidebarInset className="overflow-hidden">
         <AppTopbar />
-        {/* Invitations reçues en attente d'approbation — bannière montée hors du <main> keyé par
+        {/* Invitations reçues en attente d'approbation - bannière montée hors du <main> keyé par
             la route : un seul fetch par session, persistante à la navigation. Nulle si rien. */}
         <PendingInvitationsBanner />
         {/* `relative` : les panneaux (workflows / chat IA) se positionnent en OVERLAY par-dessus le
             contenu (absolute). `overflow-hidden` : pendant le slide d'ouverture le panneau part hors
-            écran à droite — sans clip ici, ça crée une barre de scroll horizontale transitoire qui
+            écran à droite - sans clip ici, ça crée une barre de scroll horizontale transitoire qui
             « repousse » le contenu vers la gauche puis revient. On clippe donc à la source. */}
         <div className="relative flex min-h-0 flex-1 overflow-hidden">
           <PanelDock side="left" />
@@ -56,16 +56,16 @@ export function AppShell({ children }: AppShellProps) {
         </div>
       </SidebarInset>
 
-      {/* Modals globaux — ouvrables depuis n'importe quel CTA */}
+      {/* Modals globaux - ouvrables depuis n'importe quel CTA */}
       <UpgradeDialog />
       <SettingsModal />
       <CreateProjectModal />
       <FeedbackDialog />
 
-      {/* Tour produit (coach-marks) — rendu conditionnel via son store ; cible les data-tour du dashboard */}
+      {/* Tour produit (coach-marks) - rendu conditionnel via son store ; cible les data-tour du dashboard */}
       <ProductTour />
 
-      {/* Dégradé SVG de l'identité Labs — référencé par les icônes `tf-labs-icon` (sidebar, topbar, Ctrl+K) */}
+      {/* Dégradé SVG de l'identité Labs - référencé par les icônes `tf-labs-icon` (sidebar, topbar, Ctrl+K) */}
       <LabsGradientDefs />
     </SidebarProvider>
   )

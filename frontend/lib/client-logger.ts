@@ -1,7 +1,7 @@
 import { WORKSPACE_ROUTES } from "@/lib/config/api-routes";
 
 /**
- * Journalisation « classique » des erreurs client (E25) — best-effort, non bloquant.
+ * Journalisation « classique » des erreurs client (E25) - best-effort, non bloquant.
  *
  * Remonte les erreurs (window.onerror, rejets non gérés, ErrorBoundary) vers l'endpoint serveur
  * `POST /api/logs/client` qui les écrit dans les logs applicatifs (Slf4j → OTEL/SigNoz).

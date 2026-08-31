@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { useTourStore } from "@/lib/store/tour-store";
 
 /**
- * Tour produit maison (coach-marks), stylé avec nos jetons shadcn — pas de dépendance externe.
+ * Tour produit maison (coach-marks), stylé avec nos jetons shadcn - pas de dépendance externe.
  *
  * <p>Deux variantes d'étape : les <b>coach-marks</b> (petit popover + spotlight sur un vrai élément,
  * repéré par {@code data-tour="…"}) et les <b>hero</b> (grand modal centré : accueil qui explique l'app,
@@ -35,7 +35,7 @@ interface TourStep {
   readonly hero?: boolean;
   /** Icône du hero (si pas de bannière). */
   readonly icon?: React.ElementType;
-  /** Image de bannière de couverture (hero) — ex. le fond « Labs » du site. */
+  /** Image de bannière de couverture (hero) - ex. le fond « Labs » du site. */
   readonly bg?: string;
   /** Points clés listés dans un hero. */
   readonly points?: readonly TourPoint[];
@@ -67,7 +67,7 @@ const STEPS: readonly TourStep[] = [
   },
   {
     title: "Launch an operation",
-    body: "An operation is a project. Create your first one here — issues, cycles, and assignment follow.",
+    body: "An operation is a project. Create your first one here - issues, cycles, and assignment follow.",
     target: '[data-tour="create-operation"]',
   },
   {
@@ -158,7 +158,7 @@ export function ProductTour() {
     if (isActive) setDontShowAgain(false);
   }, [isActive]);
 
-  // Position de la cible — recalculée à chaque étape + au scroll/resize. Les hero sont centrés (pas de
+  // Position de la cible - recalculée à chaque étape + au scroll/resize. Les hero sont centrés (pas de
   // cible). Intervalle léger : suit le défilement fluide de scrollIntoView sans dépendre d'un événement.
   React.useLayoutEffect(() => {
     if (!isActive) return;
@@ -259,7 +259,7 @@ export function ProductTour() {
         style={cardStyle}
         className="max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-2xl outline-none"
       >
-        {/* En-tête : compteur + fermer — sauf hero à bannière (l'en-tête y est superposé sur l'image) */}
+        {/* En-tête : compteur + fermer - sauf hero à bannière (l'en-tête y est superposé sur l'image) */}
         {!(isHero && step.bg) && (
           <div className={cn("flex items-center justify-between gap-3 px-4 pt-3.5", isHero && "px-6 pt-5")}>
             <span className="inline-flex items-center gap-2 text-xs font-medium text-muted-foreground">
@@ -348,7 +348,7 @@ export function ProductTour() {
             isHero && "mt-6 px-4 py-3",
           )}
         >
-          {/* « Ne plus afficher » — masquée sur la dernière étape (là, « Terminer » = visite complétée,
+          {/* « Ne plus afficher » - masquée sur la dernière étape (là, « Terminer » = visite complétée,
               qui bloque de toute façon). Cochée + fermeture (croix/Échap) → blocage définitif. */}
           {!isLast && (
             <label className="mb-2.5 flex w-fit cursor-pointer select-none items-center gap-2 text-xs text-muted-foreground transition-colors hover:text-foreground">

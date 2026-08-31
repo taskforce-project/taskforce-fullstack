@@ -4,12 +4,12 @@ import { Section, SectionHeader, LevelBadge } from "../Section";
 import { cn } from "@/lib/utils";
 
 /**
- * RunTimeline — LA démonstration de la page (décision review 26/07).
+ * RunTimeline - LA démonstration de la page (décision review 26/07).
  *
  * Le reste du site est statique et met des placeholders ; ici, une seule fois, on
  * MONTRE le mécanisme au lieu de le décrire : un outcome qui avance checkpoint par
  * checkpoint, chaque étape passant « en attente d'approbation » puis « approuvée »,
- * jusqu'au déploiement — puis ça reboucle.
+ * jusqu'au déploiement - puis ça reboucle.
  *
  * Ce n'est PAS un faux écran ni de fausses données : c'est un schéma du run (des
  * noms d'étapes et des états), animé. Aucun chiffre inventé (pas de « 4/4 tests »),
@@ -43,13 +43,13 @@ const STEP_BEATS: [number, number][] = [
   [850, 1150], // QA & deploy
 ];
 const BEATS = STEP_BEATS.flat(); // 14 battements
-/** Battement de repos (reduced-motion) : étape 4, en attente d'approbation — pas « Shipped ». */
+/** Battement de repos (reduced-motion) : étape 4, en attente d'approbation - pas « Shipped ». */
 const RESTING = 7;
 
-/** Les trois garanties du mécanisme — compagnes de lecture de la timeline. */
+/** Les trois garanties du mécanisme - compagnes de lecture de la timeline. */
 const RUN_SUB = [
   { title: "Every step is attributable", text: "Each checkpoint names what produced it and the model it ran on." },
-  { title: "Nothing advances without you", text: "Each checkpoint waits for a human — which is exactly what lets you hand agents more, not less." },
+  { title: "Nothing advances without you", text: "Each checkpoint waits for a human - which is exactly what lets you hand agents more, not less." },
   { title: "Rejections carry your comment", text: "Send a step back with a note and it comes into the next attempt." },
 ];
 
@@ -62,15 +62,15 @@ const RUN_BULLETS = [
 ];
 
 /**
- * Le détail de chaque checkpoint — fusionné dans « The run » (review 27/07 : la section
+ * Le détail de chaque checkpoint - fusionné dans « The run » (review 27/07 : la section
  * « Anatomy » séparée faisait doublon). Ordre = vrai ordre d'exécution.
  */
 const ANATOMY: { step: string; by: string; artifact: string; decision: string; level?: "live" | "beta" | "labs" }[] = [
   { step: "Vision", by: "CPO agent", artifact: "One page: the problem, who has it, what « done » looks like.", decision: "Approve the framing, or reframe it before anything is built on top.", level: "labs" },
   { step: "Product spec", by: "CPO agent", artifact: "Stories with acceptance criteria, and the edge cases nobody asked about.", decision: "Approve, or send it back with what is missing.", level: "labs" },
-  { step: "Architecture", by: "CTO agent", artifact: "The proposed approach — and the option that was rejected, with the reason.", decision: "Approve the trade-off. This is the decision that is expensive to reverse later.", level: "labs" },
+  { step: "Architecture", by: "CTO agent", artifact: "The proposed approach - and the option that was rejected, with the reason.", decision: "Approve the trade-off. This is the decision that is expensive to reverse later.", level: "labs" },
   { step: "API contract", by: "CTO agent", artifact: "Endpoints, payloads and error cases, written against your existing conventions.", decision: "Approve or amend. Downstream steps are generated from what you sign here.", level: "labs" },
-  { step: "Breakdown", by: "COO agent", artifact: "Issues, sized and ordered, each linked back to the line of spec it came from.", decision: "Approve — then Smart Assign routes each issue to a person.", level: "live" },
+  { step: "Breakdown", by: "COO agent", artifact: "Issues, sized and ordered, each linked back to the line of spec it came from.", decision: "Approve - then Smart Assign routes each issue to a person.", level: "live" },
   { step: "Implementation", by: "Your coding agent", artifact: "A branch. TaskForce hands over the context and stays out of the way.", decision: "Your normal code review. We do not replace it.", level: "live" },
   { step: "QA & deploy", by: "COO agent", artifact: "A checklist derived from the acceptance criteria you approved in step two.", decision: "Sign off. The whole chain is in the audit trail.", level: "beta" },
 ];
@@ -100,7 +100,7 @@ function StateChip({
 
   const impl = step === "Implementation";
 
-  // Phase « draft » : l'AGENT travaille — discret, gris, une puce qui pulse.
+  // Phase « draft » : l'AGENT travaille - discret, gris, une puce qui pulse.
   if (phase === "draft") {
     return (
       <span className="text-muted-foreground flex shrink-0 items-center gap-1.5 text-[11.5px]">
@@ -110,7 +110,7 @@ function StateChip({
     );
   }
 
-  // Phase « review » : le run ATTEND l'humain — moment focal, en primaire.
+  // Phase « review » : le run ATTEND l'humain - moment focal, en primaire.
   return (
     <span className="border-primary/30 bg-primary/5 text-primary flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11.5px] font-medium">
       <span className="bg-primary size-1.5 animate-pulse rounded-full" />
@@ -121,7 +121,7 @@ function StateChip({
 
 export function RunTimeline() {
   const scene = useScene(BEATS, { loopAfter: 2400, threshold: 0.4 });
-  // État de repos (reduced-motion) : mi-parcours, en attente d'approbation — pas « Shipped ».
+  // État de repos (reduced-motion) : mi-parcours, en attente d'approbation - pas « Shipped ».
   const beat = scene.reduced ? RESTING : scene.beat; // 0..14
   const stepIndex = Math.min(Math.floor(beat / 2), STEPS.length); // étape courante 0..7
   const phase: Phase = beat % 2 === 0 ? "draft" : "review";
@@ -159,12 +159,12 @@ export function RunTimeline() {
 
           <p className="text-muted-foreground mt-6 text-[12.5px] leading-5">
             Drafting a spec and the breakdown ship <span className="text-foreground font-medium">today</span>;
-            the full seven-checkpoint run is <span className="text-foreground font-medium">Planned</span> — each
+            the full seven-checkpoint run is <span className="text-foreground font-medium">Planned</span> - each
             step below is labelled.
           </p>
         </div>
 
-        {/* Colonne timeline — l'îlot animé (client:idle dans index.astro). */}
+        {/* Colonne timeline - l'îlot animé (client:idle dans index.astro). */}
         <div ref={scene.ref} className="bg-card overflow-hidden rounded-2xl border">
           {/* En-tête du run */}
           <div className="flex items-center justify-between border-b px-5 py-3.5">
@@ -232,7 +232,7 @@ export function RunTimeline() {
             {allDone ? (
               <p className="flex items-center gap-2 text-[13px] font-medium text-emerald-600">
                 <Check className="size-4" strokeWidth={2.5} />
-                Shipped — every decision in the audit trail
+                Shipped - every decision in the audit trail
               </p>
             ) : (
               <p className="text-muted-foreground text-[13px]">
@@ -258,11 +258,11 @@ export function RunTimeline() {
       </div>
 
       {/* Le détail, sous la démonstration : ce que chaque checkpoint produit et ce que la
-          personne décide. (Ancienne section « Anatomy », fusionnée ici — review 27/07.) */}
+          personne décide. (Ancienne section « Anatomy », fusionnée ici - review 27/07.) */}
       <div className="mt-16">
         <h3 className="t-h3">Seven checkpoints. Seven artifacts. One accountable chain.</h3>
         <p className="text-muted-foreground mt-2 max-w-2xl text-[14px] leading-7">
-          Not a black box that returns a pull request — a sequence of artifacts, each one
+          Not a black box that returns a pull request - a sequence of artifacts, each one
           attributable, each one refusable.
         </p>
 
@@ -310,7 +310,7 @@ export function RunTimeline() {
           <p className="text-[14px] font-semibold text-foreground">Adaptive by design</p>
           <p className="text-muted-foreground mt-1 text-[13.5px] leading-6">
             A bug fix doesn’t need a strategy phase; a migration doesn’t take the same path as a
-            feature launch. The run adapts to the decision being made — it just never skips the
+            feature launch. The run adapts to the decision being made - it just never skips the
             approval.
           </p>
         </div>

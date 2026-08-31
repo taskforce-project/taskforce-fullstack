@@ -1,6 +1,6 @@
 ---
 /**
- * WhatShipsToday (.astro) — les 2 « actes IA » réellement livrés, en flux React Flow, sur la DA
+ * WhatShipsToday (.astro) - les 2 « actes IA » réellement livrés, en flux React Flow, sur la DA
  * « traits intégrés » via `SectionShell` + `TraitGrid`. Chaque acte = un flux vertical avec l'étape
  * humaine mise en avant ; le socle Live = cellule pleine largeur.
  */
@@ -13,8 +13,8 @@ import { Check, FileCode2, Compass, Cpu } from "lucide-react";
 const ACTS = [
   {
     icon: FileCode2,
-    title: "Turn an issue into a spec — and a prompt",
-    text: "Point TaskForce at an issue. It drafts the product spec, a ready-to-run prompt for your coding agent and the breakdown — checked against your past decisions. You approve; the decision is saved to Memory.",
+    title: "Turn an issue into a spec - and a prompt",
+    text: "Point TaskForce at an issue. It drafts the product spec, a ready-to-run prompt for your coding agent and the breakdown - checked against your past decisions. You approve; the decision is saved to Memory.",
     demo: {
       kind: "draft" as const,
       title: "Spec · issue #142",
@@ -29,7 +29,7 @@ const ACTS = [
   {
     icon: Compass,
     title: "Ask your project what to do next",
-    text: "The decision board reads your real project — what's open, what's late, what's due this week — and proposes your next three priorities, with the reasoning. One click turns a priority into an issue.",
+    text: "The decision board reads your real project - what's open, what's late, what's due this week - and proposes your next three priorities, with the reasoning. One click turns a priority into an issue.",
     demo: {
       kind: "board" as const,
       title: "Reads your board → your 3 priorities",
@@ -56,7 +56,7 @@ const ALSO_LIVE = [
 <SectionShell
   eyebrow="What ships today"
   title="Not a someday demo. This part is already live."
-  lead="The full governed run is the direction. But the core act works today — grounded in your memory, on the models you choose."
+  lead="The full governed run is the direction. But the core act works today - grounded in your memory, on the models you choose."
 >
   <TraitGrid cols={2} class="mt-12">
     {
@@ -80,11 +80,11 @@ const ALSO_LIVE = [
       ))
     }
 
-    {/* Socle Live — cellule pleine largeur. */}
+    {/* Socle Live - cellule pleine largeur. */}
     <div class="bg-card flex flex-col gap-4 p-6 sm:col-span-2 sm:flex-row sm:items-center sm:justify-between">
       <p class="flex items-center gap-3 text-[14px] font-medium text-foreground">
         <Cpu className="size-10 shrink-0" style={{ color: hueFor(Cpu, HUE.violet) }} strokeWidth={1.4} />
-        Hosted in the cloud, or self-hosted on local models — zero model cost.
+        Hosted in the cloud, or self-hosted on local models - zero model cost.
       </p>
       <div class="flex flex-wrap gap-1.5">
         {

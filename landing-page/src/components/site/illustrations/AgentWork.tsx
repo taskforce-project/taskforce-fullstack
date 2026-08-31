@@ -16,13 +16,13 @@ import { AGENTS, AGENT_STEPS, BREAKDOWN, PEOPLE, PROJECT, WORKSPACE, type AgentS
 import { cn } from "@/lib/utils";
 
 /**
- * AgentWork — SCÈNE 3 : « et voilà ce que l'agent a fait, ligne par ligne ».
+ * AgentWork - SCÈNE 3 : « et voilà ce que l'agent a fait, ligne par ligne ».
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * CE QU'ELLE VEND
  * ─────────────────────────────────────────────────────────────────────────────
  * Déléguer à un agent n'a d'intérêt que si on peut **relire** ce qu'il a fait.
- * La vue ne montre donc pas « une IA travaille » — elle montre des faits
+ * La vue ne montre donc pas « une IA travaille » - elle montre des faits
  * vérifiables : un fichier, un diff chiffré, un résultat de tests, un numéro de
  * PR. Rien qui ne puisse être ouvert et contredit.
  *
@@ -35,7 +35,7 @@ import { cn } from "@/lib/utils";
  * L'agent est un contributeur de plus, pas une dérogation au processus.
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * LA PARTITION (une étape ~1,1 s, puis 3 s de pause — la scène BOUCLE)
+ * LA PARTITION (une étape ~1,1 s, puis 3 s de pause - la scène BOUCLE)
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -54,7 +54,7 @@ const ICON: Record<AgentStep["verb"], typeof FileCode2> = {
   Open: GitPullRequest,
 };
 
-const task = BREAKDOWN[1]; // CP-41 — l'issue née du commentaire humain.
+const task = BREAKDOWN[1]; // CP-41 - l'issue née du commentaire humain.
 
 export function AgentWork() {
   const scene = useScene(BEATS, { loopAfter: 3000 });
@@ -132,7 +132,7 @@ export function AgentWork() {
                     criterion {s.criterion}
                   </span>
                 )}
-                {/* Les gates (tests, sécu) passent en vert une fois franchies — c'est ce
+                {/* Les gates (tests, sécu) passent en vert une fois franchies - c'est ce
                     que tout le monde veut voir avant de laisser un agent livrer. */}
                 <span
                   className={cn(

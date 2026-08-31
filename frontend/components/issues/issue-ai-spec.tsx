@@ -25,7 +25,7 @@ interface IssueAiSpecPanelProps {
 }
 
 /**
- * Onglet « Spec IA » d'une issue — le cœur du flux « le projet avance tout seul » :
+ * Onglet « Spec IA » d'une issue - le cœur du flux « le projet avance tout seul » :
  * l'IA propose une spec + un prompt d'exécution (prêt à coller dans Claude Code) + un découpage,
  * avec les notes proches du Brain OS (« déjà vu ? »). L'humain édite, copie le prompt, puis
  * approuve → la spec est écrite dans le Brain OS (write-back), liée à l'issue.
@@ -78,7 +78,7 @@ export function IssueAiSpecPanel({ workspaceSlug, projectId, issueId, onApplied 
       await navigator.clipboard.writeText(prompt)
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
-      toast.success("Prompt copied — paste it into Claude Code")
+      toast.success("Prompt copied - paste it into Claude Code")
     } catch {
       toast.error("Could not copy")
     }
@@ -124,7 +124,7 @@ export function IssueAiSpecPanel({ workspaceSlug, projectId, issueId, onApplied 
         <div className="max-w-xs">
           <p className="text-sm font-medium">AI-assisted specification</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Generates a spec, an execution prompt ready to paste into Claude Code, and a breakdown —
+            Generates a spec, an execution prompt ready to paste into Claude Code, and a breakdown -
             grounded in the real context of your Brain OS.
           </p>
         </div>
@@ -133,7 +133,7 @@ export function IssueAiSpecPanel({ workspaceSlug, projectId, issueId, onApplied 
             <Sparkles className="size-3.5" />
             Generate AI spec
           </Button>
-          <Button size="sm" variant="outline" onClick={() => handleGenerate(true)} className="gap-1.5" title="14B + reasoning — slower (~1-3 min)">
+          <Button size="sm" variant="outline" onClick={() => handleGenerate(true)} className="gap-1.5" title="14B + reasoning - slower (~1-3 min)">
             <BrainCircuit className="size-3.5" />
             Go deeper
           </Button>
@@ -149,7 +149,7 @@ export function IssueAiSpecPanel({ workspaceSlug, projectId, issueId, onApplied 
         <Loader2 className="size-6 animate-spin text-primary" />
         <ShimmerLoader phrases={SPEC_PHASES} className="text-sm font-medium" />
         <p className="text-xs text-muted-foreground">
-          Brain OS retrieval + local generation — this may take a few seconds.
+          Brain OS retrieval + local generation - this may take a few seconds.
         </p>
       </div>
     )
@@ -169,14 +169,14 @@ export function IssueAiSpecPanel({ workspaceSlug, projectId, issueId, onApplied 
             <RefreshCw className="size-3.5" />
             Regenerate
           </Button>
-          <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs" onClick={() => handleGenerate(true)} disabled={generating} title="14B + reasoning — slower (~1-3 min)">
+          <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs" onClick={() => handleGenerate(true)} disabled={generating} title="14B + reasoning - slower (~1-3 min)">
             <BrainCircuit className="size-3.5" />
             Go deeper
           </Button>
         </div>
       </div>
 
-      {/* « Déjà vu ? » — notes proches du Brain OS */}
+      {/* « Déjà vu ? » - notes proches du Brain OS */}
       {draft && draft.similar.length > 0 && (
         <div className="rounded-md border border-border bg-muted/30 p-3">
           <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">

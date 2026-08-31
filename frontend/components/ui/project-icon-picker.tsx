@@ -229,7 +229,7 @@ export function ProjectIconPicker({ value, onChange }: Readonly<ProjectIconPicke
             >
               <Upload className="size-5" />
               <span>Click to upload image</span>
-              <span className="text-xs">PNG, JPG, SVG — max {MAX_FILE_SIZE_MB}MB</span>
+              <span className="text-xs">PNG, JPG, SVG - max {MAX_FILE_SIZE_MB}MB</span>
             </button>
             {uploadError && <p className="text-xs text-destructive">{uploadError}</p>}
             <input

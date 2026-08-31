@@ -56,7 +56,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     try {
       set({ jobs: await listAnalysisJobs(slug) })
     } catch {
-      /* non bloquant — le dock affiche l'état vide */
+      /* non bloquant - le dock affiche l'état vide */
     } finally {
       set({ loadingJobs: false })
     }

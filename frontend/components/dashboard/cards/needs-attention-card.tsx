@@ -13,7 +13,7 @@ import { CardError, CardSkeleton } from "../card-states"
 
 const MAX_ROWS = 5
 
-/** Opérations à risque ou critiques — données réelles du store projets. */
+/** Opérations à risque ou critiques - données réelles du store projets. */
 export function NeedsAttentionCard({ slug, refreshToken }: DashboardCardBodyProps) {
   const projects = useProjectStore((s) => s.projects)
   const isLoading = useProjectStore((s) => s.isLoading)
@@ -21,7 +21,7 @@ export function NeedsAttentionCard({ slug, refreshToken }: DashboardCardBodyProp
   const fetchProjects = useProjectStore((s) => s.fetchProjects)
 
   useEffect(() => {
-    // Garde anti-doublon : le store est partagé entre cartes — un seul GET par refresh global.
+    // Garde anti-doublon : le store est partagé entre cartes - un seul GET par refresh global.
     if (slug && refreshToken > 0 && !useProjectStore.getState().isLoading) void fetchProjects(slug)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug, refreshToken])
@@ -29,7 +29,7 @@ export function NeedsAttentionCard({ slug, refreshToken }: DashboardCardBodyProp
   if (isLoading && projects.length === 0) return <CardSkeleton />
   if (error && projects.length === 0) return <CardError onRetry={() => void fetchProjects(slug)} />
 
-  // Critiques d'abord, puis à risque — les plus urgentes en tête.
+  // Critiques d'abord, puis à risque - les plus urgentes en tête.
   const flagged = projects
     .filter((p) => {
       const h = healthOf(p)

@@ -6,10 +6,10 @@ import { useRouter, useParams } from "next/navigation"
 import { useSettingsStore } from "@/lib/store/settings-store"
 
 /**
- * Route `/profile` — la page standalone a été RETIRÉE. Tout le profil vit désormais dans le modal
+ * Route `/profile` - la page standalone a été RETIRÉE. Tout le profil vit désormais dans le modal
  * Réglages : section « Profil » (édition identité + aperçu stats/heatmap/activité) et section
  * « Compétences » (skills + disponibilité). Cette route ouvre donc le modal sur la section Profil,
- * par-dessus le dashboard — dynamique façon Claude, plus de page dédiée par écran.
+ * par-dessus le dashboard - dynamique façon Claude, plus de page dédiée par écran.
  */
 export default function ProfilePage() {
   const router = useRouter()

@@ -1,6 +1,6 @@
 ---
 /**
- * BaseLayout — coquille partagée de toutes les pages marketing (light-only).
+ * BaseLayout - coquille partagée de toutes les pages marketing (light-only).
  * <head>/SEO + Inter Variable + SiteHeader (îlot) + <slot/> + SiteFooter (statique, SSR/SEO).
  * Chaque page passe `title` / `description` (+ `image` OG optionnelle).
  */
@@ -13,7 +13,7 @@ interface Props {
   title: string;
   description: string;
   image?: string;
-  /** Classe(s) de <body> — permet à une zone (ex. /labs) de commiter son propre fond. Défaut light inchangé. */
+  /** Classe(s) de <body> - permet à une zone (ex. /labs) de commiter son propre fond. Défaut light inchangé. */
   bodyClass?: string;
   /** Couleur de la barre navigateur mobile. Défaut blanc. */
   themeColor?: string;

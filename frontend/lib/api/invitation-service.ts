@@ -30,7 +30,7 @@ export interface InvitationPreview {
 export interface CreateInvitationPayload {
   email: string
   role?: WorkspaceRole
-  /** Optionnel : cible un projet — l'acceptation ajoutera aussi l'invité au projet avec ce rôle. */
+  /** Optionnel : cible un projet - l'acceptation ajoutera aussi l'invité au projet avec ce rôle. */
   projectId?: number
   projectRole?: ProjectRole
 }
@@ -81,7 +81,7 @@ export async function listMyInvitations(): Promise<IncomingInvitation[]> {
   const res = await apiClient.get<{ data: IncomingInvitation[] }>(INVITATION_ROUTES.MINE())
   // Défensif : cet endpoint DOIT renvoyer un tableau, mais un contrat cassé (ex. route
   // /invitations/mine masquée par /invitations/{token}) peut renvoyer un objet. La bannière est
-  // optionnelle — elle ne doit JAMAIS faire planter le rendu de l'app (`.map` sur non-tableau).
+  // optionnelle - elle ne doit JAMAIS faire planter le rendu de l'app (`.map` sur non-tableau).
   const data = res.data?.data
   return Array.isArray(data) ? data : []
 }

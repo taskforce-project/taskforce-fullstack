@@ -51,7 +51,7 @@ export function AddCardDialog({ slug, open, onOpenChange }: AddCardDialogProps) 
     setSpec(null)
     setGenError(false)
     setPending(null)
-    // Graphes épinglés dans Intelligence — non bloquant si indisponible.
+    // Graphes épinglés dans Intelligence - non bloquant si indisponible.
     listSavedCharts(slug)
       .then(setSaved)
       .catch(() => setSaved([]))

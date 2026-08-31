@@ -84,7 +84,7 @@ function useBreadcrumbs() {
       const isLast = i === segments.length - 1
 
       // 1er segment = slug du workspace. Le title-case kebab générique affichait « Pierre 6db5ea »
-      // (le slug porte un suffixe hex d'unicité) et liait vers `/{slug}` — une route SANS page → 404.
+      // (le slug porte un suffixe hex d'unicité) et liait vers `/{slug}` - une route SANS page → 404.
       // On rend le vrai nom du workspace et on pointe vers son accueil réel (`/{slug}/dashboard`).
       if (i === 0) {
         const ws = workspaces.find((w) => w.slug === seg)
@@ -159,7 +159,7 @@ export function AppTopbar() {
             <BreadcrumbList>
               {breadcrumbs.map((crumb, i) => (
                 // Clé = index + href : sur le dashboard, le crumb workspace ET le crumb « Dashboard »
-                // pointent tous deux vers `/{slug}/dashboard` — l'href seul provoquait une clé dupliquée.
+                // pointent tous deux vers `/{slug}/dashboard` - l'href seul provoquait une clé dupliquée.
                 <React.Fragment key={`${i}-${crumb.href}`}>
                   {i > 0 && <BreadcrumbSeparator className="hidden md:block" />}
                   {/* Responsive : on garde TOUJOURS la page courante (dernier crumb) ; les niveaux
@@ -183,7 +183,7 @@ export function AppTopbar() {
 
       {/* Right: search, notifications, theme, user */}
       <div className="flex items-center gap-1">
-        {/* Global search button — desktop */}
+        {/* Global search button - desktop */}
         <button
           className="hidden h-8 cursor-pointer items-center gap-2 rounded-md border border-border bg-muted/40 px-2 text-xs text-muted-foreground transition-colors hover:bg-muted/60 sm:flex"
           onClick={() => setCmdOpen(true)}
@@ -207,7 +207,7 @@ export function AppTopbar() {
           <Search className="size-4" />
         </Button>
 
-        {/* Ask AI — icône seule sur mobile (le bouton texte ci-dessous est masqué < sm). */}
+        {/* Ask AI - icône seule sur mobile (le bouton texte ci-dessous est masqué < sm). */}
         <Button
           variant="ghost"
           size="icon"
@@ -218,7 +218,7 @@ export function AppTopbar() {
           <Sparkles className="size-4 text-primary" />
         </Button>
 
-        {/* Ask AI — ouvre l'assistant en panneau latéral (PROD-8.9) */}
+        {/* Ask AI - ouvre l'assistant en panneau latéral (PROD-8.9) */}
         <Button
           variant="ghost"
           size="sm"
@@ -231,10 +231,10 @@ export function AppTopbar() {
           <span className="hidden lg:inline">{t.shell.askAi}</span>
         </Button>
 
-        {/* Workflows IA — dock des analyses en arrière-plan (badge = jobs actifs) */}
+        {/* Workflows IA - dock des analyses en arrière-plan (badge = jobs actifs) */}
         <WorkflowsButton />
 
-        {/* Notifications — badge non-lus + popover preview (QA2-11) */}
+        {/* Notifications - badge non-lus + popover preview (QA2-11) */}
         <NotificationBell />
 
         {/* Theme toggle */}

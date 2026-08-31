@@ -102,7 +102,7 @@ export const useDashboardCardsStore = create<DashboardCardsState>((set, get) => 
 
   removeCard: async (slug, id) => {
     const previous = get().cards;
-    // Retrait optimiste — revert visuel si le serveur refuse.
+    // Retrait optimiste - revert visuel si le serveur refuse.
     set((state) => ({ cards: state.cards.filter((c) => c.id !== id) }));
     try {
       await deleteDashboardCard(slug, id);

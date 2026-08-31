@@ -16,7 +16,7 @@ const vv = ((Math.max(0, Object.keys(VERTICALS).indexOf(c.key)) % 2) + 2) % 2;
 ---
 
 <BaseLayout
-  title={`TaskForce for ${c.name} — Solutions`}
+  title={`TaskForce for ${c.name} - Solutions`}
   description={c.lead}
 >
   <PageHero
@@ -31,7 +31,7 @@ const vv = ((Math.max(0, Object.keys(VERTICALS).indexOf(c.key)) % 2) + 2) % 2;
     </span>
   </PageHero>
 
-  {/* ── The idea — 2 agencements selon la verticale (côté demo, fond, couldApply liste/cartes) ── */}
+  {/* ── The idea - 2 agencements selon la verticale (côté demo, fond, couldApply liste/cartes) ── */}
   <section class:list={["bg-card border-b", vv === 1 ? "bg-striped" : "bg-dots"]}>
     <div class:list={["container-rail", vv === 1 ? "pt-28 pb-20 lg:pt-40 lg:pb-28" : "py-20 lg:py-28"]}>
       <div class="grid gap-12 lg:grid-cols-2 lg:items-center lg:gap-16">
@@ -64,7 +64,7 @@ const vv = ((Math.max(0, Object.keys(VERTICALS).indexOf(c.key)) % 2) + 2) % 2;
         <div class:list={[vv === 1 && "lg:order-1"]}>
           {demo && <UseCaseDemo demo={demo} client:visible />}
           <p class="text-muted-foreground mt-3 text-center text-[11px]">
-            Illustrative — the shape of a governed run, not a shipped {c.name} workflow.
+            Illustrative - the shape of a governed run, not a shipped {c.name} workflow.
           </p>
         </div>
       </div>
@@ -96,7 +96,7 @@ const vv = ((Math.max(0, Object.keys(VERTICALS).indexOf(c.key)) % 2) + 2) % 2;
 
   <PageCta
     title={`Think TaskForce fits ${c.name}?`}
-    lead="We'd rather prove it with a real team than claim it. Tell us how your team ships — or see the workflow we've already proven."
+    lead="We'd rather prove it with a real team than claim it. Tell us how your team ships - or see the workflow we've already proven."
     primary={{ label: "See what's proven", href: "/solutions/engineering" }}
     secondary={{ label: "Talk to us", href: "/company/contact" }}
   />

@@ -30,12 +30,12 @@ import { listProjects } from "@/lib/api/project-service"
 // Palette sémantique explicite (le thème garde ses --chart-* en niveaux de gris ; ici on veut
 // des séries distinctes et colorées, lisibles en clair comme en sombre).
 const SERIES_META: Record<string, { label: string; color: string }> = {
-  resolved:   { label: "Resolved",        color: "#10b981" },  // emerald — terminé
-  opened:     { label: "Opened",        color: "#3b82f6" },  // blue — entrant
-  remaining:  { label: "Remaining",         color: "#f43f5e" },  // rose — reste à faire
-  ideal:      { label: "Ideal",           color: "#94a3b8" },  // slate — repère (pointillé)
-  openIssues: { label: "Open issues", color: "#6366f1" },  // indigo — charge
-  completion: { label: "Completion (%)",  color: "#6366f1" },  // indigo — % de complétion projet
+  resolved:   { label: "Resolved",        color: "#10b981" },  // emerald - terminé
+  opened:     { label: "Opened",        color: "#3b82f6" },  // blue - entrant
+  remaining:  { label: "Remaining",         color: "#f43f5e" },  // rose - reste à faire
+  ideal:      { label: "Ideal",           color: "#94a3b8" },  // slate - repère (pointillé)
+  openIssues: { label: "Open issues", color: "#6366f1" },  // indigo - charge
+  completion: { label: "Completion (%)",  color: "#6366f1" },  // indigo - % de complétion projet
   done:       { label: "Done",       color: "#10b981" },  // emerald
   open:       { label: "Open",        color: "#f59e0b" },  // amber
 }
@@ -54,7 +54,7 @@ const seriesLabel = (key: string) => SERIES_META[key]?.label ?? key
 const seriesColor = (key: string, index = 0) => SERIES_META[key]?.color ?? FALLBACK_COLORS[index % FALLBACK_COLORS.length]
 
 // ─── Catalogue (sidebar du modal) ────────────────────────────────────────────
-// Presets sur données réelles — aucun n'appelle l'IA, ils cadrent des séries connues.
+// Presets sur données réelles - aucun n'appelle l'IA, ils cadrent des séries connues.
 
 interface Preset {
   id: string
@@ -247,7 +247,7 @@ function SpecChart({
 
   const xKey = DATASET_XKEY[spec.dataset ?? ""] ?? "name"
   const series = spec.series.length > 0 ? spec.series : Object.keys(SERIES_META)
-  // Marges pleines : de la place pour les axes (gauche/bas) et la légende — sinon ils sont rognés.
+  // Marges pleines : de la place pour les axes (gauche/bas) et la légende - sinon ils sont rognés.
   const margin = preview ? { top: 4, right: 0, left: 0, bottom: 0 } : { top: 12, right: 20, left: 4, bottom: 4 }
 
   if (rows.length === 0) return <Centered><p className="text-xs text-muted-foreground">Not enough data yet</p></Centered>
@@ -258,7 +258,7 @@ function SpecChart({
     if (typeof key === "string" || typeof key === "number") toggleSeries(String(key))
   }
   // ⚠️ Recharts n'inspecte QUE ses enfants directs (et les tableaux, qu'il aplatit) pour repérer
-  // grille/axes/légende/tooltip — il n'entre PAS dans un <Fragment>. On renvoie donc un *tableau*
+  // grille/axes/légende/tooltip - il n'entre PAS dans un <Fragment>. On renvoie donc un *tableau*
   // d'éléments (surtout pas un <>…</>) : sinon Grid/XAxis/YAxis/Tooltip/Legend sont ignorés et le
   // graphe sort « nu » (courbes seules, ni grille ni survol). C'était la cause du « pas de tooltip ».
   const axes = preview ? null : [
@@ -298,7 +298,7 @@ function SpecChart({
     )
   }
 
-  // area (défaut) — dégradé style dashboard sur la première série.
+  // area (défaut) - dégradé style dashboard sur la première série.
   return (
     <ResponsiveContainer width="100%" height={height}>
       <AreaChart data={rows} margin={margin}>
@@ -326,7 +326,7 @@ function Centered({ children }: { readonly children: React.ReactNode }) {
 }
 
 /**
- * Rend une répartition « X par Y » (mode breakdown) — une série `value` par catégorie `label`.
+ * Rend une répartition « X par Y » (mode breakdown) - une série `value` par catégorie `label`.
  * Les points arrivent avec le spec (génération IA) ; pour un graphe **épinglé** (spec sans data,
  * mais avec dimension/measure/scope), on ré-exécute la requête pour des données à jour.
  */
@@ -363,12 +363,12 @@ function BreakdownChart({
   const color = "#6366f1"
   const yName = spec.yLabel ?? "Value"
 
-  // Vue 3D (barres) — Three.js, interactive (rotation + survol).
+  // Vue 3D (barres) - Three.js, interactive (rotation + survol).
   if (threeD && !preview && spec.chartType !== "line") {
     return <Bars3D data={data} color={color} yLabel={yName} />
   }
   const margin = preview ? { top: 4, right: 0, left: 0, bottom: 0 } : { top: 12, right: 20, left: 4, bottom: 4 }
-  // Tableau (pas de <Fragment>) : recharts n'unwrappe pas les fragments — cf. SpecChart.
+  // Tableau (pas de <Fragment>) : recharts n'unwrappe pas les fragments - cf. SpecChart.
   const axes = preview ? null : [
     <CartesianGrid key="grid" strokeDasharray="3 3" stroke="var(--border)" strokeOpacity={0.7} vertical={false} />,
     <XAxis key="x" dataKey="label" tick={{ fontSize: 12, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false}
@@ -403,7 +403,7 @@ function BreakdownChart({
 /** Aperçu compact de la heatmap : quelques barres d'intensité, sans axes. */
 function MiniHeatmap({ workload }: { readonly workload: Workload | null }) {
   const totals = (workload?.members ?? []).map((m) => m.openIssues)
-  if (totals.length === 0) return <Centered><p className="text-xs text-muted-foreground/60">—</p></Centered>
+  if (totals.length === 0) return <Centered><p className="text-xs text-muted-foreground/60">-</p></Centered>
   const max = Math.max(...totals, 1)
   return (
     <div className="flex h-full items-end gap-1">
@@ -423,7 +423,7 @@ const TRIPTYCH: ReadonlyArray<{ preset: Preset; caption: string }> = [
 ]
 
 /**
- * Carte unique en 3 volets — le point d'entrée de l'exploration analytique.
+ * Carte unique en 3 volets - le point d'entrée de l'exploration analytique.
  * Chaque volet est un aperçu de graphe (style dashboard, dégradé) ; cliquer ouvre le
  * modal d'exploration, pré-positionné sur le graphe cliqué.
  */
@@ -618,7 +618,7 @@ function ChartExplorerModal({
           {/* Sidebar : catalogue + input IA */}
           <aside className="flex w-full shrink-0 flex-col border-b border-border bg-muted/30 sm:w-64 sm:border-b-0 sm:border-r">
             <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
-              {/* 1) Graphes permanents (base) — toujours là, non épinglables. */}
+              {/* 1) Graphes permanents (base) - toujours là, non épinglables. */}
               <p className="px-1 pb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Permanent</p>
               <div className="flex flex-col gap-0.5">
                 {PRESETS.map((p) => (
@@ -636,7 +636,7 @@ function ChartExplorerModal({
                 ))}
               </div>
 
-              {/* 2) Graphes épinglés — les graphes IA que tu as sauvegardés. Toujours visible. */}
+              {/* 2) Graphes épinglés - les graphes IA que tu as sauvegardés. Toujours visible. */}
               <p className="mt-4 flex items-center gap-1.5 px-1 pb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 <Pin className="size-3" /> Pinned {saved.length > 0 && <span className="tabular-nums opacity-60">{saved.length}</span>}
               </p>
@@ -671,7 +671,7 @@ function ChartExplorerModal({
               )}
             </div>
 
-            {/* Input IA — ancré en bas de la sidebar */}
+            {/* Input IA - ancré en bas de la sidebar */}
             <div className="shrink-0 border-t border-border p-3">
               <p className="mb-1.5 flex items-center gap-1.5 px-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 <Sparkles className="size-3 text-primary" /> Generate with AI

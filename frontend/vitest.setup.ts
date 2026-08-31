@@ -59,7 +59,7 @@ globalThis.confirm = vi.fn(() => true);
 globalThis.prompt = vi.fn(() => null);
 
 // --------------------------------------------------------------------------
-// Réseau désactivé en test (happy-dom) — filet de sécurité.
+// Réseau désactivé en test (happy-dom) - filet de sécurité.
 // Des composants déclenchent au montage des appels vers le backend (localhost:8080)
 // qui n'existe pas en test → sans stub, happy-dom tente une vraie connexion et rejette
 // en ECONNREFUSED *après* la fin du test → rejet non géré → `vitest run` sort en erreur

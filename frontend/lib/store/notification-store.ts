@@ -94,7 +94,7 @@ interface NotificationState {
   signals: Signal[];
   unreadCount: number;
   isLoading: boolean;
-  /** Horodatage de la dernière synchro réelle (fetch ou push STOMP) — alimente l'indicateur « Live ». */
+  /** Horodatage de la dernière synchro réelle (fetch ou push STOMP) - alimente l'indicateur « Live ». */
   lastSyncAt: number | null;
 
   /** Charge les notifications depuis le backend */
@@ -149,7 +149,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       const count = await countUnreadApi(slug);
       set({ unreadCount: count });
     } catch {
-      // Silencieux — le badge n'est pas bloquant
+      // Silencieux - le badge n'est pas bloquant
     }
   },
 
@@ -162,7 +162,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     try {
       await markAsReadApi(slug, Number(id));
     } catch {
-      // Rollback silencieux — prochaine fetch corrigera l'état
+      // Rollback silencieux - prochaine fetch corrigera l'état
     }
   },
 
@@ -182,7 +182,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   acknowledgeAll: async (slug) => {
     try {
       await acknowledgeAllApi(slug);
-      // Refetch — les notifications acquittées sont filtrées par le backend
+      // Refetch - les notifications acquittées sont filtrées par le backend
       await get().fetchNotifications(slug);
     } catch {
       // Silencieux
