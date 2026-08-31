@@ -251,6 +251,17 @@
 			<artifactId>lettuce-core</artifactId>
 		</dependency>
 
+		<!-- Cache Redis des agrégats de dashboard (@Cacheable + RedisCacheManager). PERF-CACHE-01.
+		     Dev : cache mémoire simple (spring.cache.type=simple, aucun Redis requis). Prod : Redis. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-cache</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-redis</artifactId>
+		</dependency>
+
 		<!-- Test Dependencies -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
