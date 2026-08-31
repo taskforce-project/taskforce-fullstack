@@ -4,7 +4,7 @@ import { LABS } from "@/lib/labs";
 import { cn } from "@/lib/utils";
 
 /**
- * ResearchLog — signature #3 : le « carnet de recherche » à rail collant + scroll-spy.
+ * ResearchLog - signature #3 : le « carnet de recherche » à rail collant + scroll-spy.
  *
  * Colonne gauche = un index 2026 qui reste collé (CSS sticky) pendant que les entrées défilent ;
  * un IntersectionObserver surligne l'expérience au centre du viewport. Pas de fausses notes datées :

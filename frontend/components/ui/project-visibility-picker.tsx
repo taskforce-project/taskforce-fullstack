@@ -15,7 +15,7 @@ interface ProjectVisibilityPickerProps {
   /** `true` = public (tout le workspace), `false` = privé (membres invités uniquement). */
   readonly value: boolean
   readonly onChange: (isPublic: boolean) => void
-  /** Libellés (défaut anglais) — passer des libellés FR sur les surfaces francophones. */
+  /** Libellés (défaut anglais) - passer des libellés FR sur les surfaces francophones. */
   readonly labels?: VisibilityLabels
 }
 

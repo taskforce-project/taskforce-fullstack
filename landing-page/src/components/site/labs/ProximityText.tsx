@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import VariableProximity from "@/components/VariableProximity";
 
 /**
- * ProximityText — enveloppe pour VariableProximity (React Bits).
+ * ProximityText - enveloppe pour VariableProximity (React Bits).
  * VP exige un `containerRef` (impossible à passer depuis Astro) et code en dur la police
  * « Roboto Flex » (non chargée ici) : on crée le ref, et on force notre police variable (Sora).
  * Sous prefers-reduced-motion, `to === from` → aucun changement de graisse (pas de branche de rendu

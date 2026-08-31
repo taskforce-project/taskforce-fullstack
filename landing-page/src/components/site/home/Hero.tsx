@@ -4,7 +4,7 @@ import { BrandLogo } from "../BrandLogo";
 import { Toast } from "../AppShot";
 
 /**
- * Preuve sociale HONNÊTE (review 6) : « Built with », pas « customers » — on n'a pas de
+ * Preuve sociale HONNÊTE (review 6) : « Built with », pas « customers » - on n'a pas de
  * clients à montrer, mais on peut montrer l'écosystème sur lequel on construit. Vrais logos.
  */
 const BUILT_WITH = [
@@ -17,10 +17,10 @@ const BUILT_WITH = [
 ];
 
 /**
- * Hero — titre, promesse, CTA, et l'ACTE produit réellement livré comme visuel.
+ * Hero - titre, promesse, CTA, et l'ACTE produit réellement livré comme visuel.
  *
  * Décision (audit v2 + plan) : le hero ne montre plus un board kanban (le signal « PM tool »),
- * mais l'acte shippé — une issue → l'IA rédige spec + prompt Claude Code + découpage, ancré dans
+ * mais l'acte shippé - une issue → l'IA rédige spec + prompt Claude Code + découpage, ancré dans
  * la mémoire, et un humain approuve. Le vrai châssis d'app (`SpecPanel` → `AppWindow`), deux toasts
  * par-dessus. Statique (SSR, aucun îlot) : c'est au-dessus de la ligne de flottaison, on protège le LCP.
  */
@@ -37,7 +37,7 @@ export function Hero() {
       />
 
       <div className="container-rail relative pt-20 pb-0 lg:pt-28">
-        {/* Copie du hero — CENTRÉE et épurée (façon Linear/Relevance) : titre en haut, une promesse,
+        {/* Copie du hero - CENTRÉE et épurée (façon Linear/Relevance) : titre en haut, une promesse,
             deux actions. Une seule colonne → fini le désalignement titre/texte du layout 2-col. */}
         <div className="mx-auto max-w-3xl text-center">
           <p className="text-primary mb-4 text-[14px] font-medium tracking-[-0.01em]">
@@ -48,7 +48,7 @@ export function Hero() {
             <br className="hidden sm:block" /> TaskForce runs the delivery.
           </h1>
           <p className="t-lead mx-auto mt-6 max-w-2xl text-balance">
-            TaskForce turns an outcome into the spec, the plan and the prompt your coding agent runs —
+            TaskForce turns an outcome into the spec, the plan and the prompt your coding agent runs -
             a human approves every step, and the reasons are remembered.
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
@@ -61,7 +61,7 @@ export function Hero() {
           </div>
         </div>
 
-        {/* Preuve sociale honnête : « Works with » (pas « customers ») — l'écosystème qu'on utilise. Centré. */}
+        {/* Preuve sociale honnête : « Works with » (pas « customers ») - l'écosystème qu'on utilise. Centré. */}
         <div className="mt-14 flex flex-col items-center gap-5">
           <span className="text-muted-foreground text-[12.5px]">
             Works with the tools your engineers already trust
@@ -80,7 +80,7 @@ export function Hero() {
         </div>
 
         {/* Visuel produit : l'acte IA réel, qui descend dans le filet de section.
-            Toasts custom par-dessus — pattern « vrai screen + toasts » (phase design). */}
+            Toasts custom par-dessus - pattern « vrai screen + toasts » (phase design). */}
         <div className="relative mt-14">
           <div
             aria-hidden
@@ -92,7 +92,7 @@ export function Hero() {
             <div className="overflow-hidden rounded-2xl border bg-card shadow-xl ring-1 ring-black/[0.04] transition-[transform,box-shadow] duration-300 ease-out will-change-transform group-hover:-translate-y-1.5 group-hover:shadow-2xl motion-reduce:transition-none motion-reduce:group-hover:translate-y-0">
               <img
                 src="/screens/dashboard.webp"
-                alt="TaskForce dashboard — operations, delivery queue and analytics"
+                alt="TaskForce dashboard - operations, delivery queue and analytics"
                 width={1600}
                 height={862}
                 loading="eager"
@@ -102,7 +102,7 @@ export function Hero() {
               />
             </div>
 
-            {/* Toast 1 — le différenciateur : ça tourne sur TES modèles, coût modèle nul. */}
+            {/* Toast 1 - le différenciateur : ça tourne sur TES modèles, coût modèle nul. */}
             <Toast
               className="-top-3 right-3 sm:-right-4"
               icon={<Sparkles className="text-primary size-3.5 shrink-0" />}
@@ -110,7 +110,7 @@ export function Hero() {
               <span className="font-medium">Runs on your models</span> · zero cost
             </Toast>
 
-            {/* Toast 2 — la gouvernance : un humain valide chaque étape. */}
+            {/* Toast 2 - la gouvernance : un humain valide chaque étape. */}
             <Toast
               className="bottom-12 left-3 sm:-left-4"
               icon={

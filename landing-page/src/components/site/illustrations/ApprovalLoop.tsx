@@ -3,7 +3,7 @@ import { Check, CornerDownLeft, Plus, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
- * ApprovalLoop — illustration du bloc « Human in the loop ».
+ * ApprovalLoop - illustration du bloc « Human in the loop ».
  *
  * Trois affirmations du produit, démontrées par une seule boucle plutôt qu'écrites :
  *  1. rien n'avance sans un humain,
@@ -32,7 +32,7 @@ type AuditLine = { who: string; what: string; at: string; agent?: boolean; from:
 const AUDIT: AuditLine[] = [
   { who: "CTO agent", what: "proposed 4 endpoints", at: "14:02", agent: true, from: "proposed" },
   { who: "Marie D.", what: "requested changes", at: "14:09", from: "changes" },
-  { who: "CTO agent", what: "revised — 1 endpoint added", at: "14:10", agent: true, from: "revised" },
+  { who: "CTO agent", what: "revised - 1 endpoint added", at: "14:10", agent: true, from: "revised" },
   { who: "Marie D.", what: "approved", at: "14:12", from: "approved" },
 ];
 
@@ -107,7 +107,7 @@ export function ApprovalLoop() {
             : phase === "changes"
               ? "Changes requested"
               : phase === "revised"
-                ? "Revised — waiting for you"
+                ? "Revised - waiting for you"
                 : "Approved"}
         </span>
       </div>
@@ -142,7 +142,7 @@ export function ApprovalLoop() {
           </li>
         </ul>
 
-        {/* Le commentaire humain — place réservée en permanence, même raison. */}
+        {/* Le commentaire humain - place réservée en permanence, même raison. */}
         <div
           className={cn(
             "mt-4 transition-[opacity,transform] duration-500 ease-out",

@@ -230,7 +230,7 @@ function IssueCard({
 }
 
 // ---------------------------------------------------------------------------
-// IssueCardPreview — clone rendu dans le <DragOverlay> (suit le curseur, fluide)
+// IssueCardPreview - clone rendu dans le <DragOverlay> (suit le curseur, fluide)
 // ---------------------------------------------------------------------------
 
 function IssueCardPreview({ issue }: { readonly issue: Issue }) {
@@ -388,7 +388,7 @@ function BoardColumn({
       {/* Divider with status color */}
       <div className="h-0.5 w-full rounded-full mb-3 opacity-60 shrink-0" style={{ backgroundColor: status.color }} />
 
-      {/* Cards (droppable) — scroll interne par colonne */}
+      {/* Cards (droppable) - scroll interne par colonne */}
       <div
         ref={setNodeRef}
         className={cn(
@@ -633,7 +633,7 @@ export default function ProjectBoardPage() {
     await updateIssue(workspace, projectId, activeData.issueId, { statusId: overData.statusId })
   }
 
-  // Export COMPLET du projet (serveur) — issues + descriptions + commentaires + activité (P1b bêta).
+  // Export COMPLET du projet (serveur) - issues + descriptions + commentaires + activité (P1b bêta).
   async function exportProject(format: "csv" | "json") {
     if (!workspace) return
     try {
@@ -724,7 +724,7 @@ export default function ProjectBoardPage() {
             <AddColumnPopover workspaceSlug={workspace} projectId={projectId} />
           </div>
 
-          {/* Clone qui suit le curseur — DnD fluide (QA2-14) */}
+          {/* Clone qui suit le curseur - DnD fluide (QA2-14) */}
           <DragOverlay dropAnimation={null}>
             {activeIssue ? <IssueCardPreview issue={activeIssue} /> : null}
           </DragOverlay>

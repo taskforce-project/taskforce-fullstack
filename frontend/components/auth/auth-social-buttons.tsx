@@ -14,7 +14,7 @@ import { usePreferencesStore } from "@/lib/store/preferences-store";
  *
  * Un bouton affiché mais non câblé ne mène pas à une erreur : il annonce clairement que le chemin
  * n'est pas encore ouvert. C'est le seul moyen honnête de montrer une intention de produit sans
- * mentir sur l'état du système — et cela devient fonctionnel en déplaçant un nom d'une liste à
+ * mentir sur l'état du système - et cela devient fonctionnel en déplaçant un nom d'une liste à
  * l'autre, sans toucher au composant.
  *
  * <h3>Ce qu'il reste à faire pour câbler un fournisseur</h3>
@@ -27,12 +27,12 @@ import { usePreferencesStore } from "@/lib/store/preferences-store";
  *       et celle-ci vise déjà {@code /api/integrations/github/callback} ;</li>
  *   <li>le fournisseur d'identité déclaré dans le realm Keycloak ;</li>
  *   <li>une route de rappel dans cette application, qui échange le code contre des jetons ;</li>
- *   <li>la création du compte local au premier passage — l'utilisateur existe alors chez Keycloak
+ *   <li>la création du compte local au premier passage - l'utilisateur existe alors chez Keycloak
  *       mais pas encore dans notre table {@code users}.</li>
  * </ol>
  */
 
-/** Le « G » officiel de Google en 4 couleurs — c'est la forme imposée par les consignes de marque
+/** Le « G » officiel de Google en 4 couleurs - c'est la forme imposée par les consignes de marque
  *  « Sign in with Google » (le monochrome n'est autorisé que sur fond de couleur pleine). */
 function GoogleMark({ className }: { className?: string }) {
   return (

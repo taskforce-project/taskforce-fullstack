@@ -9,7 +9,7 @@ import { BrainLoopFlow, DecisionGraphFlow } from "@/components/site/flows/Orches
 import { ArrowRight, Boxes, Network, RefreshCw, Building2 } from "lucide-react";
 
 /**
- * TaskForce Memory (Brain OS) — refonte au kit de sections (modèle : orchestration.astro).
+ * TaskForce Memory (Brain OS) - refonte au kit de sections (modèle : orchestration.astro).
  * DA « petits traits » : le graphe causal (DecisionGraph, visuel RÉEL) porté par un FeatureSplit,
  * les 4 points en BorderedGrid, la continuité Orchestration en FeatureSplit inversé. On alterne
  * bg (secondary/card) + reverse pour rythmer la page. Aucune copie modifiée : on RE-LAYOUTE l'existant.
@@ -18,12 +18,12 @@ const POINTS = [
   {
     icon: Boxes,
     title: "Decisions become objects, not documents",
-    desc: "Each decision links to the constraints it answered, the alternatives it rejected, and the files it shaped — structured so it can be reused, traced and challenged later.",
+    desc: "Each decision links to the constraints it answered, the alternatives it rejected, and the files it shaped - structured so it can be reused, traced and challenged later.",
   },
   {
     icon: Network,
     title: "A map of why, not a search box",
-    desc: "Retrieval follows the relationships between decisions, so a run gets the reasoning behind the code — not the ten pages that happen to share a keyword.",
+    desc: "Retrieval follows the relationships between decisions, so a run gets the reasoning behind the code - not the ten pages that happen to share a keyword.",
   },
   {
     icon: RefreshCw,
@@ -32,20 +32,20 @@ const POINTS = [
   },
   {
     icon: Building2,
-    title: "Your organization's memory — not the model's",
+    title: "Your organization's memory - not the model's",
     desc: "It lives in your workspace, can run on your infrastructure, and stays under your organization's control. The memory is an asset you own, not a vendor's.",
   },
 ];
 ---
 
 <BaseLayout
-  title="TaskForce Memory — powered by Brain OS"
-  description="The memory layer behind every decision. Architectural decisions, constraints and conventions become reusable intelligence — a map of why, not a search box over your docs."
+  title="TaskForce Memory - powered by Brain OS"
+  description="The memory layer behind every decision. Architectural decisions, constraints and conventions become reusable intelligence - a map of why, not a search box over your docs."
 >
   <PageHero
     kicker="TaskForce Memory"
     title="The memory layer behind every decision"
-    lead="Powered by Brain OS. Every architectural decision, constraint and convention your team makes becomes reusable intelligence — so the next run, and the next hire, never start from a blank page."
+    lead="Powered by Brain OS. Every architectural decision, constraint and convention your team makes becomes reusable intelligence - so the next run, and the next hire, never start from a blank page."
     level="beta"
     align="center"
     primary={{ label: "Run your first workflow", href: "/waitlist" }}
@@ -61,24 +61,24 @@ const POINTS = [
     bg="card"
     eyebrow="Not a RAG over your wiki"
     title="Git remembers what changed. TaskForce remembers why."
-    lead="TaskForce Memory links each decision to the constraints it answered, the alternatives it rejected, and the code it shaped — so the reasoning is retrievable long after the thread, the meeting and the person who made it are gone."
+    lead="TaskForce Memory links each decision to the constraints it answered, the alternatives it rejected, and the code it shaped - so the reasoning is retrievable long after the thread, the meeting and the person who made it are gone."
   >
     <div class="flow-canvas relative h-[360px] overflow-hidden border">
       <DecisionGraphFlow client:only="react" />
     </div>
   </FeatureSplit>
 
-  {/* ───── Ce que la mémoire fait — 4 points en grille « petits traits » ───── */}
+  {/* ───── Ce que la mémoire fait - 4 points en grille « petits traits » ───── */}
   <BorderedGrid bg="card" items={POINTS} cols={2} />
 
-  {/* ───── How it fits together — la boucle en React Flow (même DA que l'orchestration) ───── */}
+  {/* ───── How it fits together - la boucle en React Flow (même DA que l'orchestration) ───── */}
   <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-28">
       <div class="max-w-2xl">
         <p class="t-eyebrow mb-3">How it fits together</p>
         <h2 class="t-h2 text-balance">Memory is the decision graph of your organization</h2>
         <p class="t-lead mt-4">
-          Documents describe the system. Decisions explain why it is the way it is — every run reads
+          Documents describe the system. Decisions explain why it is the way it is - every run reads
           that reasoning before it starts, then writes its validated decisions back when it finishes.
         </p>
       </div>
@@ -100,7 +100,7 @@ const POINTS = [
 
   <PageCta
     title="Build institutional memory, one decision at a time."
-    lead="It starts filling on your first run — every decision, constraint and trade-off kept where the next run can use it."
+    lead="It starts filling on your first run - every decision, constraint and trade-off kept where the next run can use it."
     primary={{ label: "Run your first workflow", href: "/waitlist" }}
     secondary={{ label: "Book a demo", href: "/book-a-demo" }}
     note="Your organization shouldn't have to remember everything. TaskForce should remember why."

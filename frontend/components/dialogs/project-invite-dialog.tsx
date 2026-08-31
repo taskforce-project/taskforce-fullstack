@@ -46,7 +46,7 @@ const PROJECT_ROLES: { value: ProjectRole; label: string }[] = [
 ]
 
 /**
- * Invitation d'un membre dans un projet façon GitHub (PROD-3.4 — Slice 2).
+ * Invitation d'un membre dans un projet façon GitHub (PROD-3.4 - Slice 2).
  * Recherche dynamique → sélection → rôle projet. Si l'utilisateur n'est pas
  * encore dans le workspace, il y est **ajouté automatiquement** (prérequis back).
  * Option : ajouter l'invité à une équipe existante ou en créer une.
@@ -147,7 +147,7 @@ export function ProjectInviteDialog({ workspace, projectId, onInvited }: Project
         <DialogHeader>
           <DialogTitle>Invite a member</DialogTitle>
           <DialogDescription>
-            Search for a Taskforce user, choose their role — they&apos;ll receive an invitation to accept.
+            Search for a Taskforce user, choose their role - they&apos;ll receive an invitation to accept.
           </DialogDescription>
         </DialogHeader>
 

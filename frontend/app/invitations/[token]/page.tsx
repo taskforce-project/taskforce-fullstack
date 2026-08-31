@@ -72,7 +72,7 @@ export default function InvitationLandingPage() {
     try {
       await logout()
     } catch {
-      /* logout best-effort — la redirection se fait quand même */
+      /* logout best-effort - la redirection se fait quand même */
     }
   }
 

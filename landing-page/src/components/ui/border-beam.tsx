@@ -16,9 +16,9 @@ interface BorderBeamProps {
 }
 
 /**
- * BorderBeam — Magic UI, réécrit SANS `motion` : le faisceau parcourt le bord via `offset-path`
+ * BorderBeam - Magic UI, réécrit SANS `motion` : le faisceau parcourt le bord via `offset-path`
  * + une animation CSS (@keyframes border-beam-move, dans global.css). Motif : `motion/react`
- * cassait l'hydratation des îlots (double instance React) dans notre setup Astro/Vite — même
+ * cassait l'hydratation des îlots (double instance React) dans notre setup Astro/Vite - même
  * parti pris que pour l'Aurora (on retire la dépendance plutôt que de la combattre).
  */
 export const BorderBeam = ({

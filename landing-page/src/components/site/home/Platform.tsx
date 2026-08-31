@@ -3,7 +3,7 @@ import { Section, SectionHeader, FeatureBand } from "../Section";
 import type { Maturity } from "../nav";
 
 /**
- * Platform — le diagnostic, la conséquence, et l'état réel du produit.
+ * Platform - le diagnostic, la conséquence, et l'état réel du produit.
  * Trois blocs qui s'enchaînent : où le contexte se perd aujourd'hui → pourquoi il faut
  * un seul système → ce qui est réellement livré aujourd'hui.
  */
@@ -12,7 +12,7 @@ import type { Maturity } from "../nav";
  * Décision review (26/07) : les meilleurs sites font RESSENTIR le problème avant
  * de présenter la solution. Ici, la « taxe de coordination » : une intention qui
  * passe de main en main. La cascade de « Someone… » se lit comme une litanie, puis
- * bascule sur la promesse. Éditorial, sans carte ni icône — c'est du texte qui doit
+ * bascule sur la promesse. Éditorial, sans carte ni icône - c'est du texte qui doit
  * faire mouche, pas une illustration. Arrive juste après le hero. */
 
 const HANDOFFS = [
@@ -32,7 +32,7 @@ export function Problem() {
         <SectionHeader
           eyebrow="The problem"
           title="Teams don’t lose time building. They lose it transferring context."
-          lead="Most software delivery moves the same way: an intention is passed from hand to hand until something ships. At each handoff the reason behind a decision gets thinner — and the reason is the part nobody writes down."
+          lead="Most software delivery moves the same way: an intention is passed from hand to hand until something ships. At each handoff the reason behind a decision gets thinner - and the reason is the part nobody writes down."
         />
 
         <div className="border-l pl-6">
@@ -47,7 +47,7 @@ export function Problem() {
             The work isn’t the problem. The transfer is.
           </p>
           <p className="text-primary mt-2 text-[15px] leading-7 font-medium">
-            TaskForce keeps the context in one governed run — written down once, carried from outcome
+            TaskForce keeps the context in one governed run - written down once, carried from outcome
             to ship.
           </p>
         </div>
@@ -65,7 +65,7 @@ export function Leaks() {
         <SectionHeader
           eyebrow="The problem"
           title="A decision loses something at every handoff"
-          lead="None of these are bad tools. But a decision, the reason behind it and the work it produced end up in three different places — and by the time someone needs the reason, it is the only part that was never written down."
+          lead="None of these are bad tools. But a decision, the reason behind it and the work it produced end up in three different places - and by the time someone needs the reason, it is the only part that was never written down."
         />
         <p className="mt-6 text-[14px] leading-7 text-foreground">
           The same sentence travels across a normal stack and nothing is deleted on purpose. It just
@@ -100,7 +100,7 @@ export function WhyOneSystem() {
 /* ─────────────────────────  L'état réel du produit  ───────────────────────── */
 
 /**
- * Carte de maturité — volontairement **sans carte blanche et sans animation**.
+ * Carte de maturité - volontairement **sans carte blanche et sans animation**.
  * Après neuf illustrations animées, une bande dense et statique est une respiration :
  * la variété de formes fait autant pour la lecture que la variété de contenu.
  * Trois zones, de gauche à droite, dans le sens où les choses se déplacent.

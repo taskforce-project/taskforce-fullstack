@@ -6,7 +6,7 @@ import {
 } from "lucide-react"
 
 /**
- * Rendu Markdown riche et SANS dépendance (pas de react-markdown/shiki/tiptap — réseau du poste).
+ * Rendu Markdown riche et SANS dépendance (pas de react-markdown/shiki/tiptap - réseau du poste).
  * Couvre : titres H1–H4, listes, gras/italique, ==surlignage==, code inline, **blocs de code**
  * (coloration légère + copier), liens, **images** ![](url), **[[wikilinks]]**, **#tags**, et
  * **callouts** façon Obsidian `> [!tip] Titre`. Réutilisé par le chat IA et les notes Brain OS.

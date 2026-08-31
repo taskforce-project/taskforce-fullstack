@@ -23,18 +23,18 @@ import { cn } from "@/lib/utils";
 import { WORKSPACE, type Person } from "@/lib/story";
 
 /**
- * AppWindow — le châssis TaskForce, calé sur des **captures réelles** de l'app
+ * AppWindow - le châssis TaskForce, calé sur des **captures réelles** de l'app
  * (fournies le 24/07). Plus aucune approximation :
  *
  *   · sidebar : avatar rond du workspace + slug dessous, groupes Command / Work /
- *     People, libellés exacts — « Signals » (pas « Signal Center »), « Brain OS »
- *     (pas « Brain »), « New Project » — fioles violettes sur Intelligence et
+ *     People, libellés exacts - « Signals » (pas « Signal Center »), « Brain OS »
+ *     (pas « Brain »), « New Project » - fioles violettes sur Intelligence et
  *     Brain OS, compte en pied ;
  *   · fil d'Ariane à **chevrons** `›`, trois niveaux ;
  *   · barre du haut : recherche en pilule avec `⌘K`, `Ask AI`, l'icône des
  *     workflows, la cloche **à badge rouge**, le sélecteur de thème ;
  *   · le contenu est un **panneau blanc à coin arrondi**, encastré dans le fond
- *     clair — c'est ce décrochement qui donne sa profondeur à l'app.
+ *     clair - c'est ce décrochement qui donne sa profondeur à l'app.
  *
  * Réf. `frontend/components/layout/{sidebar/app-sidebar,topbar/app-topbar}.tsx`
  * pour la structure, captures pour le rendu.
@@ -69,7 +69,7 @@ export function AppWindow({
   children,
 }: {
   breadcrumb: string[];
-  /** Item de nav mis en surbrillance — change selon l'acte du film. */
+  /** Item de nav mis en surbrillance - change selon l'acte du film. */
   active?: string;
   footer?: ReactNode;
   bleed?: boolean;
@@ -260,7 +260,7 @@ function Topbar({ breadcrumb }: { breadcrumb: string[] }) {
 
 /* ─────────────────────────  Avatars  ───────────────────────── */
 
-/** Pastille de personne — l'app utilise des identicônes, on reste sur des initiales. */
+/** Pastille de personne - l'app utilise des identicônes, on reste sur des initiales. */
 export function PersonChip({
   person,
   withName = true,
@@ -312,7 +312,7 @@ export function AvatarStack({ people, extra }: { people: readonly Person[]; extr
 
 /**
  * Le pointeur qui exécute l'action. Sans lui, la scène dit « quelque chose change
- * tout seul ». Avec lui, « **quelqu'un fait quelque chose** » — c'est la différence
+ * tout seul ». Avec lui, « **quelqu'un fait quelque chose** » - c'est la différence
  * entre un écran qui bouge et une démonstration.
  * Positionné depuis le coin bas-droit du contenu : stable quelle que soit la largeur.
  */

@@ -1,7 +1,7 @@
 import { FeatureSplit, FeatureBand } from "../Section";
 
 /**
- * Features — Brain OS, Smart Assign, modèles & coût, analytics.
+ * Features - Brain OS, Smart Assign, modèles & coût, analytics.
  * Sections en TEXTE SEUL (décision user : pas de visuel là où il n'est pas nécessaire).
  */
 
@@ -18,7 +18,7 @@ export function BrainOS() {
       lead="Your architecture, your decisions, your conventions. Agents read from the same place instead of being told again in every request."
       bullets={[
         "Documents and decisions are indexed as you work, not maintained on the side.",
-        "Retrieval runs on pgvector with BGE-M3 embeddings — no separate vector database.",
+        "Retrieval runs on pgvector with BGE-M3 embeddings - no separate vector database.",
         "Every generated step cites the context it drew from, so you can check it.",
       ]}
       cta={{ label: "Inside Brain OS", href: "/product/brain-os" }}
@@ -37,7 +37,7 @@ export function SmartAssign() {
       lead="Triage is the meeting nobody defends. TaskForce scores five signals, explains the ranking, and lets you override it in one click."
       bullets={[
         "Five signals: skills, current load, history on the area, timezone overlap, recent reviews.",
-        "You see the whole ranking, not just the winner — including who came close and why.",
+        "You see the whole ranking, not just the winner - including who came close and why.",
         "Overriding takes one click, and the override becomes a signal of its own.",
       ]}
       cta={{ label: "How Smart Assign scores", href: "/product/smart-assign" }}
@@ -60,12 +60,12 @@ export function Models() {
       eyebrow="Models"
       level="labs"
       title="Your models, your network, your call"
-      lead="A run is a sequence of steps, and they do not all need the same brains. The routine ones can run on a model you host; the two that carry the real decisions can call something stronger — or never leave your network either."
+      lead="A run is a sequence of steps, and they do not all need the same brains. The routine ones can run on a model you host; the two that carry the real decisions can call something stronger - or never leave your network either."
       aside={
         <>
           The choice is per step, not per workspace, and it is a setting rather than a migration.
           <span className="text-muted-foreground block pt-3">
-            Self-hosted by default, and whatever you send is never used to train anything —
+            Self-hosted by default, and whatever you send is never used to train anything -
             wherever it runs.
           </span>
         </>
@@ -84,7 +84,7 @@ export function Analytics() {
       eyebrow="Analytics"
       level="live"
       title="The one number a tracker cannot give you"
-      lead="Lead time and throughput, every tool has them. What only a checkpointed run can tell you is which step keeps getting sent back — because that is where your process is actually failing, not where people are slow."
+      lead="Lead time and throughput, every tool has them. What only a checkpointed run can tell you is which step keeps getting sent back - because that is where your process is actually failing, not where people are slow."
       bullets={[
         "Every run and every decision is a data point. The chart is a by-product of working, not a report someone fills in.",
         "The send-back rate per step names the weak link, and the reasons say why.",

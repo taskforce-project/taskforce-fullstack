@@ -12,7 +12,7 @@ import { AUTH_ROUTES } from "../config/api-routes";
  *
  * Le client n'infère rien : c'est le serveur qui dit ce qui est actif et fournit la clé de site.
  * Dupliquer cette configuration côté client la ferait diverger tôt ou tard, et la panne serait
- * silencieuse — widget affiché, vérification systématiquement en échec.
+ * silencieuse - widget affiché, vérification systématiquement en échec.
  */
 export interface AuthChallenge {
   /** Jeton du défi signé maison, à renvoyer à l'inscription. Vide si le mécanisme est inactif. */
@@ -94,7 +94,7 @@ export const authService = {
       const authData = response.data.data;
 
       // 2FA requis : le mot de passe est bon mais aucun token n'est émis à ce stade. On ne persiste
-      // rien — le formulaire de connexion affiche l'étape « code » et rejoue le login avec `totp`.
+      // rien - le formulaire de connexion affiche l'étape « code » et rejoue le login avec `totp`.
       if (authData.twoFactorRequired) {
         return authData;
       }
@@ -117,7 +117,7 @@ export const authService = {
    *
    * En cas d'échec réseau on renvoie `{ token: "", required: false }` plutôt que de propager :
    * un serveur de défi injoignable ne doit pas empêcher quiconque de s'inscrire. Si le mécanisme est
-   * réellement actif côté serveur, l'inscription sera refusée à la soumission avec un motif clair —
+   * réellement actif côté serveur, l'inscription sera refusée à la soumission avec un motif clair -
    * ce qui est le bon endroit pour le dire.
    */
   async getChallenge(): Promise<AuthChallenge> {

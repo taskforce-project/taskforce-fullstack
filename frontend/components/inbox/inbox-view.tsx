@@ -52,7 +52,7 @@ const FALLBACK_TYPE: TypeCfg = { icon: Radio, label: "Notification", color: "tex
  *
  * Les liens sont dénormalisés à l'écriture de la notification : une ligne peut arriver sans
  * destination (données historiques). Elle ne doit alors ni afficher le bouton « ouvrir », ni se
- * présenter comme cliquable — un clic sans effet est pire que pas de clic du tout.
+ * présenter comme cliquable - un clic sans effet est pire que pas de clic du tout.
  */
 function hasDestination(s: Signal): boolean {
   return Boolean(s.issueUrl || s.operationUrl)
@@ -125,7 +125,7 @@ export function InboxView({ defaultTab = "all" }: InboxViewProps) {
     else if (s.operationUrl) router.push(s.operationUrl) // repli : au moins le contexte projet
   }
 
-  // Bouton « ↗ » : sortie explicite vers le board avec le sheet ouvert (`?issue=`) — la page pleine
+  // Bouton « ↗ » : sortie explicite vers le board avec le sheet ouvert (`?issue=`) - la page pleine
   // a été retirée (redondante avec le sheet). Reste le seul chemin qui QUITTE la liste de triage.
   function openSignalFullPage(s: Signal) {
     if (slug) markAsRead(slug, s.id)
@@ -229,7 +229,7 @@ export function InboxView({ defaultTab = "all" }: InboxViewProps) {
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">Signal Center</h1>
           <p className="text-sm text-muted-foreground">
-            Operational alerts, mentions, and assignments — sorted by urgency
+            Operational alerts, mentions, and assignments - sorted by urgency
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">

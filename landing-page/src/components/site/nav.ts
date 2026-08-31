@@ -20,13 +20,13 @@ import {
 } from "lucide-react";
 
 /**
- * nav.ts — architecture de navigation du site, en données.
+ * nav.ts - architecture de navigation du site, en données.
  * Source unique consommée par le header (méga-menus), le footer et le sitemap.
  * Réf. taskforce-docs/v1/14-design/landing-refonte/Plan_Refonte_Site.md §3
  */
 
 /**
- * Badge de maturité — garde-fou d'honnêteté (Spec_Master §1.1).
+ * Badge de maturité - garde-fou d'honnêteté (Spec_Master §1.1).
  *
  * ⚠️ La clé reste `labs` (historique, évite un renommage en cascade) mais le libellé public
  * est **« Planned »** depuis la décision D11 : on annonce ce qui arrive, on n'invite pas
@@ -122,7 +122,7 @@ export const PRODUCT_DELIVERY: NavLink[] = [
 
 /**
  * Décision D10 : on ouvre au-delà de la tech. Le produit orchestre du travail qui passe par
- * des étapes relues et validées — l'ingénierie logicielle est le premier métier prouvé,
+ * des étapes relues et validées - l'ingénierie logicielle est le premier métier prouvé,
  * pas le seul possible. Les métiers non prouvés portent un badge de maturité sur leur page.
  */
 export const SOLUTIONS_GROUPS: NavGroup[] = [
@@ -281,7 +281,7 @@ export const FOOTER_GROUPS: NavGroup[] = [
   },
 ];
 
-/** Labels des entrées de la barre — réutilisés par le menu mobile. */
+/** Labels des entrées de la barre - réutilisés par le menu mobile. */
 export const PRIMARY_NAV = [
   { label: "Product", href: "/product" },
   { label: "Solutions", href: "/solutions" },
@@ -303,7 +303,7 @@ export const LABS_ICON = Atom;
 /* ─────────────────────────  Pages réellement construites  ─────────────────────────
  * Source unique de vérité : header, footer, menu mobile et le hub /product lisent cet
  * ensemble pour décider si un lien est cliquable ou GRISÉ (« Soon »). On ne construit pas
- * 50 pages d'un coup — le reste est désactivé plutôt que renvoyé sur du 404. Décision user
+ * 50 pages d'un coup - le reste est désactivé plutôt que renvoyé sur du 404. Décision user
  * (30/07) : « celles qu'on peut faire, sinon griser et rendre non cliquable ».
  * Pour activer une page : la créer dans src/pages/ PUIS ajouter sa route ici. */
 export const BUILT_ROUTES: ReadonlySet<string> = new Set([

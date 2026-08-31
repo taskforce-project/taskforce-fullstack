@@ -18,7 +18,7 @@ const eslintConfig = defineConfig([
     "test-results/**",
     // Bibliothèque tierce vendorisée (axe-core 4.11.1, Deque Systems) : 560 Ko minifiés,
     // chargés tels quels par Playwright pour l'audit d'accessibilité. Ce n'est pas notre
-    // code, on ne le corrige pas — on l'exclut de l'analyse.
+    // code, on ne le corrige pas - on l'exclut de l'analyse.
     "e2e/axe.min.js",
   ]),
   {
@@ -50,7 +50,7 @@ const eslintConfig = defineConfig([
     //
     // La règle d'or « TypeScript strict, pas de `any` » vise le code applicatif : elle y reste
     // intégralement appliquée. Dans les tests, `as any` sert exclusivement à construire des
-    // *fixtures partielles* — un objet minimal (`{ id: 1, title: 'A' }`) qui tient lieu d'entité
+    // *fixtures partielles* - un objet minimal (`{ id: 1, title: 'A' }`) qui tient lieu d'entité
     // complète, parce que le test ne porte que sur les champs cités. Les alternatives sont pires :
     // écrire des fixtures exhaustives les rend fragiles à chaque évolution du domaine, et
     // `as unknown as Issue` est la même échappatoire en plus verbeux.

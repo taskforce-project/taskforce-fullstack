@@ -1,6 +1,6 @@
 ---
 /**
- * SmartAssign (.astro) — section « produit concret » : une CAPTURE RÉELLE du dialogue Smart Assign,
+ * SmartAssign (.astro) - section « produit concret » : une CAPTURE RÉELLE du dialogue Smart Assign,
  * châssis + détail zoom révélé au survol. Placée tôt dans le récit (après Before/After) pour montrer
  * le produit qui fait vraiment le travail. Smart Assign est une capacité **live**.
  */
@@ -9,15 +9,15 @@ import ScreenFrame from "@/components/site/sections/ScreenFrame.astro";
 import { ArrowRight, Check } from "lucide-react";
 
 const POINTS: [string, string][] = [
-  ["Skills-aware", "Matches the work to who's actually good at it — not who's free first."],
+  ["Skills-aware", "Matches the work to who's actually good at it - not who's free first."],
   ["Workload-balanced", "Reads current load and availability so nobody gets buried."],
-  ["One click, whole batch", "Assign every unassigned issue at once — uncheck the ones to keep."],
+  ["One click, whole batch", "Assign every unassigned issue at once - uncheck the ones to keep."],
 ];
 ---
 
 <SectionShell
   eyebrow="Smart Assign · live"
-  title="The right task to the right person — with the reason."
+  title="The right task to the right person - with the reason."
   lead="TaskForce reads each unassigned issue and every teammate's skills, workload and availability, then proposes who should own what. You review the recommendations, then assign the whole batch in one click."
 >
   <div class="mt-12 grid items-center gap-10 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)] lg:gap-14">
@@ -31,7 +31,7 @@ const POINTS: [string, string][] = [
               </span>
               <span class="text-[14px] leading-6">
                 <span class="font-semibold text-foreground">{t}</span>
-                <span class="text-muted-foreground"> — {d}</span>
+                <span class="text-muted-foreground"> - {d}</span>
               </span>
             </li>
           ))
@@ -48,7 +48,7 @@ const POINTS: [string, string][] = [
 
     <ScreenFrame
       src="/screens/smart-assign.webp"
-      alt="TaskForce Smart Assign — recommendations by skills, workload and availability"
+      alt="TaskForce Smart Assign - recommendations by skills, workload and availability"
       width={1600}
       height={863}
     >

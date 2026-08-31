@@ -2,7 +2,7 @@ import { Github, Linkedin, Twitter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FOOTER_GROUPS, isLive } from "./nav";
 
-/** Marqueur « page pas encore construite » — grisé, non cliquable (décision user 30/07). */
+/** Marqueur « page pas encore construite » - grisé, non cliquable (décision user 30/07). */
 function SoonTag() {
   return (
     <span className="text-muted-foreground/60 inline-flex items-center rounded border border-dashed px-1 py-px text-[8.5px] font-semibold tracking-wide uppercase">
@@ -12,7 +12,7 @@ function SoonTag() {
 }
 
 /**
- * SiteFooter — pied de page 6 colonnes, statique (SSR, pas d'hydratation : c'est du SEO).
+ * SiteFooter - pied de page 6 colonnes, statique (SSR, pas d'hydratation : c'est du SEO).
  * Les colonnes viennent de `nav.ts` : une seule source pour le header, le footer et le sitemap.
  * Liens : soulignage animé `.link-underline`, repris du breadcrumb de la webapp.
  */
@@ -108,7 +108,7 @@ export function SiteFooter() {
               </span>
             </li>
             {/* « Hosted in the EU » : à rétablir une fois l'hébergeur tranché (Hetzner DE),
-                pas avant — on n'affirme rien de non démontrable. */}
+                pas avant - on n'affirme rien de non démontrable. */}
             <li>English</li>
           </ul>
         </div>

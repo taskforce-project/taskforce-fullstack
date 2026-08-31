@@ -45,7 +45,7 @@ export function BurndownCard({ slug, refreshToken }: DashboardCardBodyProps) {
   const remaining = points.at(-1)?.remaining ?? 0
 
   // Même bande basse que les autres courbes de l'app : les tracés s'arrêtent au-dessus du bas de
-  // carte au lieu de s'y coller. Pertinent ici en particulier — un burndown réussi finit à zéro,
+  // carte au lieu de s'y coller. Pertinent ici en particulier - un burndown réussi finit à zéro,
   // et c'est précisément là que la ligne se confondrait avec le bord.
   // Pas de dégradé (deux lignes, aucun remplissage) : seule la géométrie est partagée.
   const CHART_HEIGHT = 112 // h-28

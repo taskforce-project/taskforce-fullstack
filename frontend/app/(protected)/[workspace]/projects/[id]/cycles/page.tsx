@@ -32,7 +32,7 @@ const CYCLE_STATUS_CONFIG: Record<CycleStatus, { badgeClass: string; label: stri
 }
 
 function formatDate(iso: string | null | undefined): string {
-  if (!iso) return "—"
+  if (!iso) return "-"
   try {
     return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" })
   } catch {
@@ -81,7 +81,7 @@ function CycleCard({ cycle, href }: { readonly cycle: Cycle; readonly href: stri
           {cycle.issueCount} issue{cycle.issueCount !== 1 ? "s" : ""}
         </span>
       ) : (
-        <span className="text-xs text-amber-400/80 hidden md:block shrink-0">No issues — add some</span>
+        <span className="text-xs text-amber-400/80 hidden md:block shrink-0">No issues - add some</span>
       )}
 
       <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />

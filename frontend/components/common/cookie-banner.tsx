@@ -42,7 +42,7 @@ export function CookieBanner() {
               tracking or advertising cookies, so there is nothing to opt out of.
             </p>
             <div className="flex justify-between items-center pt-2">
-              {/* Route Next interne `/privacy-policy` (app/privacy-policy/page.tsx existe, HTTP 200) —
+              {/* Route Next interne `/privacy-policy` (app/privacy-policy/page.tsx existe, HTTP 200) -
                   même convention que app-footer / register-info-form. */}
               <Link
                 href="/privacy-policy"

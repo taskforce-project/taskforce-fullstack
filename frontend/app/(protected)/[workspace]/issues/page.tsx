@@ -194,7 +194,7 @@ function IssueRow({ issue, slug }: Readonly<{ issue: Issue; slug: string }>) {
             {new Date(issue.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
           </span>
         ) : (
-          <span className="text-xs text-muted-foreground/40">—</span>
+          <span className="text-xs text-muted-foreground/40">-</span>
         )}
       </div>
 

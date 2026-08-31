@@ -1,5 +1,5 @@
 /**
- * Registre des types de cartes du dashboard — libellé, description, icône,
+ * Registre des types de cartes du dashboard - libellé, description, icône,
  * taille par défaut et périodes supportées. Toutes les cartes s'appuient sur
  * des endpoints réels (aucune donnée fabriquée).
  */
@@ -21,7 +21,7 @@ import type { DashboardCard, DashboardCardSize } from "@/lib/api/dashboard-card-
 // Période globale de la section Analytics
 // ---------------------------------------------------------------------------
 
-/** Période GLOBALE — préférence UI (localStorage par workspace), pas une donnée métier. */
+/** Période GLOBALE - préférence UI (localStorage par workspace), pas une donnée métier. */
 export type GlobalRange = "24h" | "7d" | "30d";
 
 export const GLOBAL_RANGES: readonly { value: GlobalRange; label: string }[] = [
@@ -50,7 +50,7 @@ export interface CardDefinition {
   description: string;
   icon: LucideIcon;
   defaultSize: DashboardCardSize;
-  /** Périodes propres à la carte (sous-menu « Période ») — absent si la carte n'a pas de fenêtre. */
+  /** Périodes propres à la carte (sous-menu « Période ») - absent si la carte n'a pas de fenêtre. */
   timeRanges?: readonly CardTimeRangeOption[];
   /** true = absente de la grille « Ajouter » (ex. ai-chart, créée via la génération IA). */
   hiddenInPicker?: boolean;
@@ -155,7 +155,7 @@ export function cardTitle(card: DashboardCard): string {
 export interface DashboardCardBodyProps {
   slug: string;
   card: DashboardCard;
-  /** Période globale de la section — fenêtre par défaut, le réglage par carte prime. */
+  /** Période globale de la section - fenêtre par défaut, le réglage par carte prime. */
   globalRange: GlobalRange;
   /** Incrémenté par le refresh global et le « Actualiser » de la carte. */
   refreshToken: number;

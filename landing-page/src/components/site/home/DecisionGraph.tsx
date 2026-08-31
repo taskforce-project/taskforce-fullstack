@@ -1,9 +1,9 @@
 /**
- * DecisionGraph — première animation « haut de gamme » custom (phase design, review 14).
+ * DecisionGraph - première animation « haut de gamme » custom (phase design, review 14).
  *
  * Remplace le seul placeholder vivant de la page (« Decision graph », section Memory/Synergy).
- * C'est le VISUEL du moat : un graphe CAUSAL — une décision, la contrainte qui l'a produite,
- * l'alternative rejetée, et ce qui en dépend — avec des faisceaux qui parcourent les arêtes.
+ * C'est le VISUEL du moat : un graphe CAUSAL - une décision, la contrainte qui l'a produite,
+ * l'alternative rejetée, et ce qui en dépend - avec des faisceaux qui parcourent les arêtes.
  *
  * 100 % SVG + SMIL (`animateMotion`) : zéro dépendance, s'anime SANS hydratation (donc statique
  * côté Astro, aucun îlot), couleurs = tokens du site. À itérer visuellement en direct.
@@ -46,7 +46,7 @@ export function DecisionGraph() {
         <text x="76" y="250" fontSize={9} fontWeight={600} letterSpacing={0.6} className="fill-muted-foreground">IMPACTS</text>
         <text x="76" y="266" fontSize={11} className="fill-foreground">Billing · Search · Users</text>
 
-        {/* ── Nœud : rejeté (MongoDB) — porte son propre en-tête REJECTED ── */}
+        {/* ── Nœud : rejeté (MongoDB) - porte son propre en-tête REJECTED ── */}
         <rect x="348" y="118" width="120" height="58" rx="10" className="fill-secondary stroke-border" strokeDasharray="4 4" />
         <text x="362" y="134" fontSize={8} fontWeight={600} letterSpacing={0.6} className="fill-muted-foreground">REJECTED</text>
         <text x="362" y="150" fontSize={11} className="fill-foreground">MongoDB</text>

@@ -2,7 +2,7 @@ import { create } from "zustand";
 import type { ReactNode } from "react";
 
 /**
- * Socle de panneaux (PROD-8.9) — surfaces ouvrables à gauche/droite, empilables,
+ * Socle de panneaux (PROD-8.9) - surfaces ouvrables à gauche/droite, empilables,
  * redimensionnables, qui s'intègrent dans le shell sans changer de page.
  * N'importe quel composant peut ouvrir un panneau via `openPanel`/`togglePanel`.
  */
@@ -10,7 +10,7 @@ import type { ReactNode } from "react";
 export type PanelSide = "left" | "right";
 
 export interface PanelDescriptor {
-  /** Identifiant stable — réouvrir le même id remplace/focus au lieu de dupliquer. */
+  /** Identifiant stable - réouvrir le même id remplace/focus au lieu de dupliquer. */
   id: string;
   side: PanelSide;
   title: string;
@@ -70,7 +70,7 @@ export const usePanelStore = create<PanelState>((set, get) => ({
     const panel = normalize(input);
     set((s) => {
       // Un seul panneau par côté à la fois : ouvrir sur un côté ferme celui déjà ouvert de ce
-      // côté (sinon deux panneaux se retrouvaient côte à côte et écrasaient tout — retour user).
+      // côté (sinon deux panneaux se retrouvaient côte à côte et écrasaient tout - retour user).
       // Les panneaux d'un AUTRE côté restent (le socle gauche/droite garde son sens).
       const existing = s.panels.find((p) => p.id === panel.id);
       const kept = s.panels.filter((p) => p.id !== panel.id && p.side !== panel.side);

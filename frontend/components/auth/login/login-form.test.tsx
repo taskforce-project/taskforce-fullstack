@@ -27,7 +27,7 @@ vi.mock('sonner', () => ({
   },
 }));
 
-// Mock preferences store — return the REAL French constants so text queries stay valid and the
+// Mock preferences store - return the REAL French constants so text queries stay valid and the
 // mock can never drift from the constants again (importActual avoids the vi.mock hoisting trap).
 vi.mock('@/lib/store/preferences-store', async () => {
   const { CONSTANTS_FR } = await vi.importActual<typeof import('@/lib/constants_fr')>('@/lib/constants_fr');

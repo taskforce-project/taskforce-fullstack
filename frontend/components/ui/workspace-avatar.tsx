@@ -4,14 +4,14 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 
 /**
- * Avatar de workspace — fond **dégradé sombre + glow coloré + grain léger**, déterministe (QA2-7).
+ * Avatar de workspace - fond **dégradé sombre + glow coloré + grain léger**, déterministe (QA2-7).
  *
  * Même seed (uuid/slug/nom) → même rendu, partout. Base sombre façon « noise + gradient » : un
  * dégradé sombre teinté, un glow coloré décalé, et un grain (feTurbulence) posé en overlay très
  * discret pour ajouter de la « matière ». Rounded-full, initiales blanches, ou logo si fourni.
  */
 
-// Bruit fractal (feTurbulence) en data-URI — posé en overlay `mix-blend-overlay` très léger.
+// Bruit fractal (feTurbulence) en data-URI - posé en overlay `mix-blend-overlay` très léger.
 const NOISE_URL =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")"
 
@@ -83,7 +83,7 @@ export function WorkspaceAvatar({
         <img src={logoUrl} alt={name} className="size-full rounded-full object-cover" />
       ) : (
         <>
-          {/* Grain très léger — ajoute de la matière au dégradé sans le dénaturer. */}
+          {/* Grain très léger - ajoute de la matière au dégradé sans le dénaturer. */}
           <span
             aria-hidden
             className="pointer-events-none absolute inset-0 opacity-20 mix-blend-overlay"

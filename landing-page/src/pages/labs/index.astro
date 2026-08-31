@@ -13,8 +13,8 @@ import { hueFor } from "@/lib/site-icons";
 import { FlaskConical, ArrowRight, Bot, Brain, Cpu, ShieldCheck, Sparkles } from "lucide-react";
 
 /**
- * Labs — CLAIR, STATIQUE, SOBRE. Retours user 03/08 : image de fond plein cadre, pas de rails sur le hero,
- * icônes en dégradé (le TRAIT prend le dégradé, aucun fond), accents en BLEU (primaire)/neutre — plus de
+ * Labs - CLAIR, STATIQUE, SOBRE. Retours user 03/08 : image de fond plein cadre, pas de rails sur le hero,
+ * icônes en dégradé (le TRAIT prend le dégradé, aucun fond), accents en BLEU (primaire)/neutre - plus de
  * violet ; dégradés tirés de l'image (sans violet). Système de sections/rails plutôt que des cartes flottantes.
  * D11 : on publie la DIRECTION, pas le mécanisme ; aucune expérience n'est « Live ».
  */
@@ -37,7 +37,7 @@ const SURFACES: Record<string, { at: string; href: string; mat: Mat }> = {
   "learning-from-reviews": { at: "Prediction & calibration", href: "/product/orchestration", mat: "planned" },
 };
 
-/* Données pour l'îlot LabsSubjects — 1 sujet = 1 section empilée (barre d'onglets sticky + ancre). */
+/* Données pour l'îlot LabsSubjects - 1 sujet = 1 section empilée (barre d'onglets sticky + ancre). */
 const SHOWCASE = ITEMS.map((lab, i) => ({
   key: lab.key,
   name: lab.name,
@@ -56,14 +56,14 @@ type Grad = { name: string; blurb: string; href: string; icon: typeof Bot; mat: 
 const GRADUATED: Grad[] = [
   {
     name: "TaskForce Memory",
-    blurb: "Runs start from what your team already decided — decisions, constraints and rejected paths, carried forward.",
+    blurb: "Runs start from what your team already decided - decisions, constraints and rejected paths, carried forward.",
     href: "/product/brain-os",
     icon: Brain,
     mat: "beta",
   },
   {
-    name: "Your models — local or hosted",
-    blurb: "Run on Ollama locally or a hosted model. Your models, your call — per deployment.",
+    name: "Your models - local or hosted",
+    blurb: "Run on Ollama locally or a hosted model. Your models, your call - per deployment.",
     href: "/enterprise",
     icon: Cpu,
     mat: "live",
@@ -89,8 +89,8 @@ const FeatIcon = GRAD_FEATURED.icon;
 ---
 
 <BaseLayout
-  title="Labs — TaskForce"
-  description="TaskForce Labs — research in public. The delivery loop we're building, the experiments behind it, and what has already graduated to the product. We publish the direction; the mechanism stays in the lab until it ships."
+  title="Labs - TaskForce"
+  description="TaskForce Labs - research in public. The delivery loop we're building, the experiments behind it, and what has already graduated to the product. We publish the direction; the mechanism stays in the lab until it ships."
 >
   <LabsGradientDefs />
 
@@ -133,7 +133,7 @@ const FeatIcon = GRAD_FEATURED.icon;
         <p class="labs-gtext font-mono text-[12px] font-semibold tracking-[0.14em] uppercase">The experiments</p>
         <h2 class="t-h2 mt-3">Four directions we're chasing</h2>
         <p class="t-lead mt-4">
-          Each one as its own section — why it matters, what we're exploring, and where it stands. Jump with the
+          Each one as its own section - why it matters, what we're exploring, and where it stands. Jump with the
           bar, or scroll the whole story. We publish the direction; the mechanism stays in the lab until it ships.
         </p>
       </div>
@@ -151,7 +151,7 @@ const FeatIcon = GRAD_FEATURED.icon;
         <p class="labs-gtext font-mono text-[12px] font-semibold tracking-[0.14em] uppercase">The system</p>
         <h2 class="t-h2 mt-3">The pieces are one loop</h2>
         <p class="t-lead mt-4">
-          The experiments aren't separate features — they're steps of one loop TaskForce reasons over. Intent
+          The experiments aren't separate features - they're steps of one loop TaskForce reasons over. Intent
           enters, runs against what your organisation already decided, and every decision feeds back into memory.
         </p>
       </div>
@@ -162,7 +162,7 @@ const FeatIcon = GRAD_FEATURED.icon;
       </div>
       <p class="text-muted-foreground mt-8 inline-flex w-full items-center justify-center gap-2 font-mono text-[11.5px]">
         <span aria-hidden class="text-[15px] leading-none">↺</span>
-        the decision feeds back into memory — the loop closes
+        the decision feeds back into memory - the loop closes
       </p>
     </div>
   </section>
@@ -178,7 +178,7 @@ const FeatIcon = GRAD_FEATURED.icon;
         <h2 class="t-h2 mt-3">What has already graduated</h2>
         <p class="t-lead mt-4">
           When something works, it leaves Labs and ships with a maturity label. These started as questions
-          here — they're in the product today.
+          here - they're in the product today.
         </p>
       </div>
 
@@ -238,10 +238,10 @@ const FeatIcon = GRAD_FEATURED.icon;
     </div>
   </section>
 
-  {/* ── CTA : le bandeau standard (PageCta), à plat — plus de card flottante à ombre ── */}
+  {/* ── CTA : le bandeau standard (PageCta), à plat - plus de card flottante à ombre ── */}
   <PageCta
     title="Follow where this goes"
-    lead="The roadmap is public — hold us to it. And start with what already ships today."
+    lead="The roadmap is public - hold us to it. And start with what already ships today."
     primary={{ label: "See the roadmap", href: "/roadmap" }}
     secondary={{ label: "What ships today", href: "/product" }}
   />

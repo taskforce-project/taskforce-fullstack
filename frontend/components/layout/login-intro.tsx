@@ -13,10 +13,10 @@ import Image from "next/image"
 import { useEffect } from "react"
 
 /**
- * Intro de connexion — langage « produit premium » (ElevenLabs / Linear), pas un loader.
+ * Intro de connexion - langage « produit premium » (ElevenLabs / Linear), pas un loader.
  *
  * Principe : la **matière** (le dégradé Labs) est déjà là au repos autour du logo, puis **s'étale**
- * jusqu'à recouvrir l'écran, et l'app — montée <b>dessous</b> — est révélée par un cut propre. Pas
+ * jusqu'à recouvrir l'écran, et l'app - montée <b>dessous</b> - est révélée par un cut propre. Pas
  * d'écran isolé, pas de coupure blanche : `matière → expansion → recouvrement → app`.
  *
  * Discipline du mouvement (le point clé) :
@@ -25,16 +25,16 @@ import { useEffect } from "react"
  * - Le **bord** est rendu organique par un filtre SVG `feTurbulence` + `feDisplacementMap` posé sur le
  *   wrapper : il déforme le bord du masque ET la texture de quelques pixels.
  * - La **texture a son propre mouvement** : la turbulence est animée en boucle lente (SMIL),
- *   indépendamment de l'expansion — les vagues glissent, elles ne sont pas « étirées ».
- * - **Expansion continue** : une seule course en **courbe S** (ease-in-out ~10/80/10) — démarrage
+ *   indépendamment de l'expansion - les vagues glissent, elles ne sont pas « étirées ».
+ * - **Expansion continue** : une seule course en **courbe S** (ease-in-out ~10/80/10) - démarrage
  *   doux, rush au milieu, décélération en fin (« plongée dans l'eau ») ; le volume dépasse les 4 bords.
  * - Le **logo est absorbé** : baisse d'opacité + léger flou (pas de fade brutal, pas de scale).
  * - **Zéro gadget** : ni halo/glow, ni rotation, ni bounce/overshoot, ni particules, ni spinner.
  *
  * Deux temps de part et d'autre du rechargement post-OAuth (frame de jointure = matière au repos +
  * logo net, identique des deux côtés → rechargement invisible) :
- * - `hold`   : sur `/auth/callback` pendant l'échange — le logo apparaît, la matière respire à peine.
- * - `reveal` : monté par le `ProtectedLayout` juste après login — expansion + absorption, puis {@link onDone}.
+ * - `hold`   : sur `/auth/callback` pendant l'échange - le logo apparaît, la matière respire à peine.
+ * - `reveal` : monté par le `ProtectedLayout` juste après login - expansion + absorption, puis {@link onDone}.
  *
  * `prefers-reduced-motion` respecté : simple fondu propre vers l'app, sans expansion.
  */
@@ -48,7 +48,7 @@ export function LoginIntro({
   const reveal = phase === "reveal"
   const reduced = useReducedMotion()
 
-  // Rayon du masque (px) — piloté impérativement pour composer le `mask-image` via un template.
+  // Rayon du masque (px) - piloté impérativement pour composer le `mask-image` via un template.
   // Init non nul (~matière au repos) pour éviter un blob invisible à la première frame ; corrigé au vmin réel dans l'effet.
   const radius = useMotionValue(120)
   const logoOpacity = useMotionValue(reveal ? 1 : 0)
@@ -86,7 +86,7 @@ export function LoginIntro({
     const D = 1.6
     const controls = [
       // Rayon : une SEULE course r0 → R. Courbe en S : démarrage doux, RUSH au milieu, puis
-      // DÉCÉLÉRATION sur les derniers ~20 % — mais `y2=0.9` (pas 1) évite la queue qui « rampe »
+      // DÉCÉLÉRATION sur les derniers ~20 % - mais `y2=0.9` (pas 1) évite la queue qui « rampe »
       // à la fin : ça décélère en FINISSANT le mouvement. Effet « zoom in / plongée dans l'eau ».
       animate(radius, [r0, R], {
         duration: D,
@@ -116,7 +116,7 @@ export function LoginIntro({
         aria-hidden="true"
       >
         {/* Filtre : la turbulence (animée, en boucle lente) déforme le bord du masque ET la texture
-            de quelques pixels — c'est ce qui rend le contour organique et donne à la matière son
+            de quelques pixels - c'est ce qui rend le contour organique et donne à la matière son
             mouvement propre, indépendant de l'expansion. */}
         <svg aria-hidden className="absolute h-0 w-0">
           <defs>
@@ -165,7 +165,7 @@ export function LoginIntro({
           />
         </div>
 
-        {/* Logo TaskForce — net au repos, puis absorbé (opacité + léger flou) par la matière. */}
+        {/* Logo TaskForce - net au repos, puis absorbé (opacité + léger flou) par la matière. */}
         <m.div className="relative" style={{ opacity: logoOpacity, filter: logoFilter }}>
           <Image
             src="/assets/logo/logo_taskforce_tp.png"

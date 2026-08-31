@@ -103,7 +103,7 @@ function FormField({ label, hint, children }: Readonly<{ label: string; hint?: s
 }
 
 /**
- * Section de réglages « façon Claude » : plus de carte encadrée — juste un titre, une description et le
+ * Section de réglages « façon Claude » : plus de carte encadrée - juste un titre, une description et le
  * contenu directement, séparés par un filet discret entre sections (retour user : « pas de cards à
  * l'intérieur, juste le contenu direct à droite »). Le variant danger garde un titre rouge pour l'alerte.
  */
@@ -152,7 +152,7 @@ function ProfilePanel() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
 
   // Reset SUR CHANGEMENT D'IDENTITÉ uniquement (pas à chaque refresh du user) : sinon un refreshUser()
-  // — par ex. après upload d'avatar — écraserait les champs nom en cours d'édition non sauvegardés.
+  // - par ex. après upload d'avatar - écraserait les champs nom en cours d'édition non sauvegardés.
   useEffect(() => {
     if (user) {
       setFirstName(user.firstName)
@@ -169,7 +169,7 @@ function ProfilePanel() {
     const file = e.target.files?.[0]
     if (!file) return
     if (file.size > 3 * 1024 * 1024) {
-      toast.error("Image too large — max 3 MB")
+      toast.error("Image too large - max 3 MB")
       return
     }
     setUploadingAvatar(true)
@@ -289,7 +289,7 @@ function ProfilePanel() {
                   onChange={(e) => setAvatarUrl(e.target.value)}
                   placeholder="Or paste a URL…"
                 />
-                <p className="text-xs text-muted-foreground">JPG, PNG, GIF, WEBP — max 3 MB</p>
+                <p className="text-xs text-muted-foreground">JPG, PNG, GIF, WEBP - max 3 MB</p>
               </div>
             </div>
           </FormField>
@@ -310,7 +310,7 @@ function ProfilePanel() {
           </FormField>
           {/* Les champs « Role / Title » et « Skills » ont été RETIRÉS : ils n'étaient jamais chargés ni
               enregistrés (le payload de sauvegarde = firstName/lastName/displayName/avatarUrl), et le hint
-              « Used for smart issue assignment » MENTAIT — le vrai éditeur de compétences (le seul lu par
+              « Used for smart issue assignment » MENTAIT - le vrai éditeur de compétences (le seul lu par
               le smart-assign) vit sur la fiche d'un membre (/members/{id}). Cf. TF-SETTINGS-FAKE. */}
         </div>
       </SectionCard>
@@ -320,12 +320,12 @@ function ProfilePanel() {
         </Button>
       </div>
 
-      {/* Compétences & disponibilité — attributs de profil (utilisés par le Smart Assign). Rapatriés de
+      {/* Compétences & disponibilité - attributs de profil (utilisés par le Smart Assign). Rapatriés de
           l'ancienne section « Compétences » du menu : tout dans Profile (retour user « tout dans profil »). */}
       <Separator className="mt-2" />
       <CompetencesPanel />
 
-      {/* Aperçu « Mon profil » (ex-page /profile, supprimée) : stats + heatmap + activité — tout dans le modal. */}
+      {/* Aperçu « Mon profil » (ex-page /profile, supprimée) : stats + heatmap + activité - tout dans le modal. */}
       <Separator className="mt-2" />
       <ProfileOverview />
     </div>
@@ -372,7 +372,7 @@ function AccountPanel() {
           <div>
             <p className="text-sm font-medium text-foreground">Delete my account</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Your personal data will be anonymized and your access cut off immediately (GDPR Art. 17 — right to erasure). Irreversible.
+              Your personal data will be anonymized and your access cut off immediately (GDPR Art. 17 - right to erasure). Irreversible.
             </p>
           </div>
           {!deleteConfirm ? (
@@ -404,7 +404,7 @@ function AppearancePanel() {
   useEffect(() => setMounted(true), [])
   const current = mounted ? (theme ?? "system") : "system"
 
-  // Accessibilité — persistée dans le store de préférences (appliquée en direct via des classes racine).
+  // Accessibilité - persistée dans le store de préférences (appliquée en direct via des classes racine).
   const fontSize = usePreferencesStore((s) => s.fontSize)
   const setFontSize = usePreferencesStore((s) => s.setFontSize)
   const dyslexiaFont = usePreferencesStore((s) => s.dyslexiaFont)
@@ -490,7 +490,7 @@ function AppearancePanel() {
 
           <Separator />
 
-          {/* Contraste élevé — alternative saine au « filtre daltonien » : on renforce les contrastes
+          {/* Contraste élevé - alternative saine au « filtre daltonien » : on renforce les contrastes
               (WCAG) plutôt que de transformer les couleurs. L'info n'est jamais portée par la couleur
               seule (couleur + icône + libellé dans les composants d'état). */}
           <div className="flex items-start justify-between gap-4">
@@ -505,7 +505,7 @@ function AppearancePanel() {
 
           <Separator />
 
-          {/* Mode daltonien (option) — filtre de correction, EN PLUS du contraste et des repères non colorés. */}
+          {/* Mode daltonien (option) - filtre de correction, EN PLUS du contraste et des repères non colorés. */}
           <div className="grid grid-cols-[1fr_auto] items-start gap-4">
             <div>
               <p className="text-sm font-medium text-foreground">Color-blind mode</p>
@@ -541,7 +541,7 @@ const NOTIF_EVENTS: { key: NotificationEventKey; label: string; description: str
 ]
 
 /**
- * Panneau Notifications — de VRAIS réglages, par événement et par canal.
+ * Panneau Notifications - de VRAIS réglages, par événement et par canal.
  *
  * <p>In-app (cloche + temps réel) et email (opt-in) sont réglables pour chacun des 6 événements.
  * Persisté côté back (`/api/me/notification-preferences`, portée compte) : `NotificationService`
@@ -569,7 +569,7 @@ function NotificationsPanel() {
     if (!prefs) return
     const previous = prefs
     const next = prefs.map((p) => (p.eventKey === eventKey ? { ...p, [channel]: value } : p))
-    setPrefs(next) // optimiste — l'état local fait foi
+    setPrefs(next) // optimiste - l'état local fait foi
     try {
       await updateNotificationPreferences(next)
     } catch {
@@ -658,7 +658,7 @@ function NotificationsPanel() {
 }
 
 function SecurityPanel() {
-  // Le métier auth est piloté par Keycloak via son API admin — l'utilisateur ne voit jamais Keycloak.
+  // Le métier auth est piloté par Keycloak via son API admin - l'utilisateur ne voit jamais Keycloak.
   // Reset mot de passe → parcours brandé de l'app (`/auth/forgot-password` : code par email templaté,
   // puis nouveau mot de passe). 2FA (TOTP) → encore la page Keycloak (à internaliser : secret + QR côté app).
   const router = useRouter()
@@ -702,7 +702,7 @@ function SecurityPanel() {
               <div>
                 <p className="text-sm font-medium text-foreground">Password</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  We&apos;ll email you a code to set a new password — all inside TaskForce.
+                  We&apos;ll email you a code to set a new password - all inside TaskForce.
                 </p>
               </div>
             </div>
@@ -802,7 +802,7 @@ function WorkspacePanel() {
               placeholder="My Workspace"
             />
           </FormField>
-          <FormField label="Description" hint="Optional — shown to workspace members.">
+          <FormField label="Description" hint="Optional - shown to workspace members.">
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -943,7 +943,7 @@ function StatusPanel() {
         {overall === "CHECKING" ? "Checking service health…"
           : overall === "UP" ? "All systems operational"
           : overall === "DOWN" ? "Major outage affecting one or more services"
-          : "Degraded — some services report issues"}
+          : "Degraded - some services report issues"}
       </div>
 
       <div className="rounded-xl border border-border bg-card overflow-hidden [box-shadow:var(--shadow-sm)]">
@@ -972,7 +972,7 @@ function StatusPanel() {
               <div key={l.id} className={cn("flex items-center gap-3 px-4 py-2.5", i < Math.min(logs.length, 30) - 1 && "border-b border-border/50")}>
                 <Badge variant="secondary" className="shrink-0 font-mono text-[10px]">{l.action}</Badge>
                 <span className="flex-1 truncate text-xs text-muted-foreground">
-                  {l.entityType ? `${l.entityType}${l.entityId ? ` #${l.entityId}` : ""}` : (l.details ?? "—")}
+                  {l.entityType ? `${l.entityType}${l.entityId ? ` #${l.entityId}` : ""}` : (l.details ?? "-")}
                 </span>
                 <span className="shrink-0 text-[10px] text-muted-foreground/70">
                   {new Date(l.createdAt).toLocaleString("en-US", { dateStyle: "short", timeStyle: "short" })}
@@ -1157,7 +1157,7 @@ function IntegrationsPanel() {
         {slug && <IntegrationsCatalog slug={slug} />}
       </SectionCard>
 
-      {/* ---- GitHub — affiché UNIQUEMENT une fois connecté (gestion des dépôts). La connexion se fait
+      {/* ---- GitHub - affiché UNIQUEMENT une fois connecté (gestion des dépôts). La connexion se fait
              via le Catalogue ci-dessus ; plus de card « Connect » redondante ici. ---- */}
       {githubStatus?.connected && (
         <SectionCard title="GitHub" description="Repositories linked to issues (PRs and commits).">
@@ -1182,7 +1182,7 @@ function IntegrationsPanel() {
         </SectionCard>
       )}
 
-      {/* ---- Slack — affiché UNIQUEMENT une fois connecté (canaux de notification). Connexion via le Catalogue. ---- */}
+      {/* ---- Slack - affiché UNIQUEMENT une fois connecté (canaux de notification). Connexion via le Catalogue. ---- */}
       {slackStatus?.connected && (
         <SectionCard title="Slack" description="Activity notifications in your Slack channels.">
           <div className="flex flex-col gap-4">
@@ -1370,7 +1370,7 @@ function PrivacyPanel() {
           <div>
             <p className="text-sm font-medium text-foreground">Export my data</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Download a JSON export of your personal data right away (GDPR Art. 20 — portability).
+              Download a JSON export of your personal data right away (GDPR Art. 20 - portability).
             </p>
           </div>
           <Button
@@ -1387,7 +1387,7 @@ function PrivacyPanel() {
 
       <SectionCard title="Delete your data" description="Erasing your personal data is done by deleting your account.">
         <p className="text-xs text-muted-foreground">
-          Your personal data is anonymized when you delete your account (GDPR Art. 17 — right to erasure). Manage this from{" "}
+          Your personal data is anonymized when you delete your account (GDPR Art. 17 - right to erasure). Manage this from{" "}
           <button
             type="button"
             onClick={() => setSection("account")}
@@ -1503,7 +1503,7 @@ function UsagePanel() {
 // Page
 // ---------------------------------------------------------------------------
 
-/** Navigation latérale des sections — réutilisée par la page ET le modal Settings. */
+/** Navigation latérale des sections - réutilisée par la page ET le modal Settings. */
 export function SettingsNav({
   active,
   onSelect,
@@ -1565,7 +1565,7 @@ export function SettingsNav({
 }
 
 /** Compétences + disponibilité de SON propre profil (mêmes cartes que la fiche membre). Rendu à
- *  l'intérieur de « Profile » (plus une section de menu séparée) — retour user « tout dans profil ». */
+ *  l'intérieur de « Profile » (plus une section de menu séparée) - retour user « tout dans profil ». */
 function CompetencesPanel() {
   const { user } = useAuth()
   const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug ?? "")
@@ -1578,7 +1578,7 @@ function CompetencesPanel() {
   )
 }
 
-/** Rendu du panneau de la section active — réutilisé par la page ET le modal Settings. */
+/** Rendu du panneau de la section active - réutilisé par la page ET le modal Settings. */
 export function SettingsPanels({ active }: Readonly<{ active: SettingsSection }>) {
   return (
     <>
@@ -1597,7 +1597,7 @@ export function SettingsPanels({ active }: Readonly<{ active: SettingsSection }>
 }
 
 /**
- * Route `/settings` — la page standalone a été RETIRÉE (redondante avec le modal Settings, monté
+ * Route `/settings` - la page standalone a été RETIRÉE (redondante avec le modal Settings, monté
  * globalement dans `app-shell` et ouvrable depuis n'importe quel CTA via `useSettingsStore`). Cette
  * route se contente désormais d'OUVRIR le modal par-dessus le dashboard, en préservant le deep-link
  * `?section=` et le retour OAuth GitHub/Slack (toast + ouverture directe sur « Integrations »).

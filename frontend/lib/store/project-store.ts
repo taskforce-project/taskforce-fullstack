@@ -160,7 +160,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
 }));
 
 // ---------------------------------------------------------------------------
-// Selectors (performance — évite les re-renders inutiles)
+// Selectors (performance - évite les re-renders inutiles)
 // ---------------------------------------------------------------------------
 
 export const selectActiveProjects = (state: ProjectState) =>

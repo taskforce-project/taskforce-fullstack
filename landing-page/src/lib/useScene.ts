@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 /**
  * Horloge qui se met **réellement en pause** quand l'onglet passe en arrière-plan.
  *
- * `requestAnimationFrame` est suspendu dans un onglet caché — c'est voulu, ça
+ * `requestAnimationFrame` est suspendu dans un onglet caché - c'est voulu, ça
  * économise le CPU. Mais `performance.now()`, lui, continue d'avancer : au retour
  * de la personne, une scène pilotée par l'horloge brute aurait sauté d'un coup à
  * son état final, sans jamais se jouer.
@@ -35,7 +35,7 @@ function useVisibilityClock() {
         start.current = performance.now();
         hiddenAt.current = null;
       },
-      /** Repositionner la scène à un temps donné — utilisé quand la personne agit. */
+      /** Repositionner la scène à un temps donné - utilisé quand la personne agit. */
       seek: (ms: number) => {
         start.current = performance.now() - ms;
         hiddenAt.current = null;
@@ -48,7 +48,7 @@ function useVisibilityClock() {
 }
 
 /**
- * useScene — le métronome partagé par toutes les scènes de la home.
+ * useScene - le métronome partagé par toutes les scènes de la home.
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * CE QU'IL CORRIGE
@@ -57,7 +57,7 @@ function useVisibilityClock() {
  * défauts en découlaient :
  *
  *  1. Une boucle n'atterrit jamais. On l'attrape au milieu, on ne sait pas où
- *     l'histoire commence, et l'état final — celui qui porte le message — passe
+ *     l'histoire commence, et l'état final - celui qui porte le message - passe
  *     comme les autres.
  *  2. Un tempo uniforme n'a pas de moment fort. Un « Aha » se fabrique avec un
  *     silence avant, pas avec une étape de plus.
@@ -67,7 +67,7 @@ function useVisibilityClock() {
  * elle entre à l'écran, se joue **une fois**, et **se fige sur son état final**.
  * Un temps long dans la partition est un silence : c'est là qu'on regarde.
  *
- * ACCESSIBILITÉ : `prefers-reduced-motion` saute directement à l'état final —
+ * ACCESSIBILITÉ : `prefers-reduced-motion` saute directement à l'état final -
  * la personne voit le message, pas le mouvement (WCAG 2.3.3).
  *
  * ⚠️ L'IntersectionObserver observe un élément que le composant rend lui-même,
@@ -105,13 +105,13 @@ export type Scene = {
   /** Rejouer depuis le début (bouton « Replay » des scènes longues). */
   replay: () => void;
   /**
-   * Sauter à un battement — c'est ce qui rend une scène **jouable**.
+   * Sauter à un battement - c'est ce qui rend une scène **jouable**.
    * Quand la personne clique `Approve` au lieu d'attendre, la scène ne redémarre
    * pas : elle reprend exactement là où ce clic la mène. Une démo qu'on peut
    * prendre en main se retient bien plus longtemps qu'une démo qu'on regarde.
    */
   goTo: (beat: number) => void;
-  /** `true` si le battement `i` est déjà passé — sucre pour la lecture des vues. */
+  /** `true` si le battement `i` est déjà passé - sucre pour la lecture des vues. */
   at: (i: number) => boolean;
 };
 
@@ -135,7 +135,7 @@ export function useScene(beats: readonly number[], options: SceneOptions = {}): 
   const count = beats.length;
 
   // Armement : la scène attend d'être vue. Une animation qui se joue hors écran
-  // n'est pas une animation, c'est du CPU — et la personne arrive après la fin.
+  // n'est pas une animation, c'est du CPU - et la personne arrive après la fin.
   useEffect(() => {
     // Battement figé (inspection) : on pose l'état et on n'anime rien.
     if (fixed != null) {
@@ -169,7 +169,7 @@ export function useScene(beats: readonly number[], options: SceneOptions = {}): 
    * Déroulé, piloté par le TEMPS ÉCOULÉ et non par des `setTimeout` enchaînés.
    *
    * Constaté le 24/07 : un onglet d'arrière-plan voit ses `setTimeout` clampés à
-   * 1 s par Chrome. Une chaîne d'incréments fixes se met alors à ramper — la
+   * 1 s par Chrome. Une chaîne d'incréments fixes se met alors à ramper - la
    * frappe à 18 ms/caractère tombait à 1 caractère/seconde et la scène affichait
    * « Exports ov » longtemps après son atterrissage.
    *
@@ -233,7 +233,7 @@ export function useScene(beats: readonly number[], options: SceneOptions = {}): 
 }
 
 /**
- * useTypewriter — du texte qui s'écrit, caractère par caractère.
+ * useTypewriter - du texte qui s'écrit, caractère par caractère.
  *
  * Pourquoi taper plutôt qu'apparaître en fondu : le fondu dit « voici du
  * contenu », la frappe dit « quelque chose est en train de l'écrire ». C'est la

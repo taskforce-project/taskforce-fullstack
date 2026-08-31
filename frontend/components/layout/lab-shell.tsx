@@ -43,12 +43,12 @@ export function LabShell({ children }: { readonly children: React.ReactNode }) {
         }}
       />
 
-      {/* Bandeau sandbox — transparent (laisse voir le dégradé au-dessus) ; texte blanc + ombre. */}
+      {/* Bandeau sandbox - transparent (laisse voir le dégradé au-dessus) ; texte blanc + ombre. */}
       <div className="relative z-10 flex h-9 shrink-0 items-center justify-center gap-2.5 px-4 text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.35)]">
         <FlaskConical className="size-3.5 shrink-0" strokeWidth={2.5} aria-hidden />
         <span className="text-xs font-semibold tracking-tight">Experimental space</span>
         <span className="hidden text-[11px] text-white/85 sm:inline">
-          — Intelligence and Brain OS are still evolving
+          - Intelligence and Brain OS are still evolving
         </span>
         <button
           type="button"

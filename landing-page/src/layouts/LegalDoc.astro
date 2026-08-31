@@ -4,7 +4,7 @@ import Prose from "@/components/site/Prose.astro";
 import { Info } from "lucide-react";
 
 /**
- * LegalDoc — gabarit partagé des pages légales : en-tête (fil d'Ariane léger + titre + date),
+ * LegalDoc - gabarit partagé des pages légales : en-tête (fil d'Ariane léger + titre + date),
  * bandeau de brouillon optionnel (HONNÊTETÉ : ne jamais présenter un texte non relu comme des
  * conditions définitives), corps en `Prose`, pied « une question ? ». Le contenu passe en `<slot />`.
  */
@@ -20,7 +20,7 @@ const { title, description, updated, eyebrow = "Legal", draft = false } = Astro.
 const CONTACT = "contact@taskforce-project.fr";
 ---
 
-<BaseLayout title={`${title} — TaskForce`} description={description}>
+<BaseLayout title={`${title} - TaskForce`} description={description}>
   <section class="bg-card border-b">
     <div class="container-rail py-16 lg:py-20">
       <div class="mx-auto max-w-2xl">
@@ -34,7 +34,7 @@ const CONTACT = "contact@taskforce-project.fr";
               <Info className="text-primary mt-0.5 size-4 shrink-0" strokeWidth={2} />
               <p class="text-[13px] leading-6 text-foreground">
                 <span class="font-medium">Working draft.</span> TaskForce is pre-launch. This document
-                is provided for transparency and is pending final legal review — it is not yet a binding
+                is provided for transparency and is pending final legal review - it is not yet a binding
                 agreement. Questions?{" "}
                 <a href={`mailto:${CONTACT}`} class="link-underline text-foreground font-medium">
                   {CONTACT}

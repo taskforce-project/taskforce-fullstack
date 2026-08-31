@@ -51,7 +51,7 @@ interface CreateCycleDialogProps {
   readonly children?: React.ReactNode
   /** Notifié APRÈS persistance réussie, avec le cycle créé. Optionnel : la création n'en dépend pas. */
   readonly onCreated?: (cycle: Cycle) => void
-  /** Verrouille le cycle sur un projet précis (masque le sélecteur) — page cycles d'un projet. */
+  /** Verrouille le cycle sur un projet précis (masque le sélecteur) - page cycles d'un projet. */
   readonly projectId?: number
 }
 
@@ -92,7 +92,7 @@ export function CreateCycleDialog({ children, onCreated, projectId }: CreateCycl
   const canCreate = name.trim().length > 0 && startDate !== undefined && endDate !== undefined
 
   /**
-   * ⚠️ Ce dialog ne persistait RIEN. Il se contentait de `onCreated?.(payload)` — et ses deux usages
+   * ⚠️ Ce dialog ne persistait RIEN. Il se contentait de `onCreated?.(payload)` - et ses deux usages
    * (`cycles/page.tsx`) l'instancient **sans aucune prop**, donc `onCreated` était `undefined` et
    * l'appel un no-op. Formulaire rempli, dialog fermé, aucune erreur, **aucun cycle créé**.
    * Il appelle désormais le store lui-même, comme `create-project-dialog`. `onCreated` reste optionnel
@@ -186,7 +186,7 @@ export function CreateCycleDialog({ children, onCreated, projectId }: CreateCycl
             />
           </div>
 
-          {/* Project — masqué quand le dialogue est verrouillé sur un projet (page cycles d'un projet). */}
+          {/* Project - masqué quand le dialogue est verrouillé sur un projet (page cycles d'un projet). */}
           {projectId == null && (
             <div className="flex flex-col gap-1.5">
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Project</span>

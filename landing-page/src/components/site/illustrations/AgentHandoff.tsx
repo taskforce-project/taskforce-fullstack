@@ -3,7 +3,7 @@ import { Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
- * AgentHandoff — illustration du bloc « Agents ».
+ * AgentHandoff - illustration du bloc « Agents ».
  *
  * Remplace trois cartes descriptives par ce qu'elles décrivaient : les trois rôles
  * travaillent sur **le même run**, chacun émet ses livrables, et le relais passe de l'un
@@ -131,7 +131,7 @@ export function AgentHandoff() {
                 {lane.scope}
               </p>
 
-              {/* Livrables — la place des trois est réservée dès le départ */}
+              {/* Livrables - la place des trois est réservée dès le départ */}
               <ul className="mt-3 flex flex-col gap-1.5">
                 {lane.outputs.map((o, idx) => {
                   const isDone = doneAt(lane.key, idx);

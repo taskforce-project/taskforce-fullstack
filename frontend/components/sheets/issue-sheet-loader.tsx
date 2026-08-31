@@ -16,7 +16,7 @@ const ISSUE_URL_PATTERN = /\/projects\/(\d+)\/issues\/(\d+)\/?$/
 
 /**
  * Extrait la cible d'une URL d'issue. Renvoie `null` si l'URL ne pointe pas sur une issue
- * (ex. un signal de surcharge pointe vers la fiche d'un membre) — l'appelant retombe alors
+ * (ex. un signal de surcharge pointe vers la fiche d'un membre) - l'appelant retombe alors
  * sur une navigation classique.
  */
 export function parseIssueTarget(url: string | null | undefined): IssueSheetTarget | null {

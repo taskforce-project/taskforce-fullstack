@@ -127,14 +127,14 @@ describe('API Client', () => {
     });
   });
 
-  describe('Intercepteur de réponse — succès', () => {
+  describe('Intercepteur de réponse - succès', () => {
     it('laisse passer la réponse telle quelle', () => {
       const response = { data: { ok: true } };
       expect(onResponse(response)).toBe(response);
     });
   });
 
-  describe('Intercepteur de réponse — 401', () => {
+  describe('Intercepteur de réponse - 401', () => {
     it('rafraîchit le token puis rejoue la requête', async () => {
       localStorage.setItem('refreshToken', 'refresh-1');
       vi.mocked(axios.post).mockResolvedValue({
@@ -227,7 +227,7 @@ describe('API Client', () => {
     });
   });
 
-  describe('Intercepteur de réponse — erreurs systémiques', () => {
+  describe('Intercepteur de réponse - erreurs systémiques', () => {
     it('signale une panne réseau', async () => {
       await expect(onResponseError(axiosError())).rejects.toBeDefined();
 
@@ -268,7 +268,7 @@ describe('API Client', () => {
     });
   });
 
-  describe('Intercepteur de réponse — 429', () => {
+  describe('Intercepteur de réponse - 429', () => {
     it('annonce le délai d’attente lu dans Retry-After', async () => {
       const error = axiosError({
         response: { status: 429, headers: { 'retry-after': '42' } },
@@ -297,7 +297,7 @@ describe('API Client', () => {
     });
   });
 
-  describe('Intercepteur de réponse — 4xx contextuels', () => {
+  describe('Intercepteur de réponse - 4xx contextuels', () => {
     it('ne produit aucun toast global : l’appelant affiche le message adapté', async () => {
       await expect(
         onResponseError(axiosError({ response: { status: 403, data: { message: 'interdit' } } })),

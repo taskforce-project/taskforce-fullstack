@@ -53,7 +53,7 @@ import { BrandLogo } from "../BrandLogo";
 import "@xyflow/react/dist/base.css";
 
 /**
- * OrchestrationFlows — tous les schémas de la page Orchestration en React Flow, STATIQUES (aucune
+ * OrchestrationFlows - tous les schémas de la page Orchestration en React Flow, STATIQUES (aucune
  * animation, cf. retour user), structurés façon Attio. Un seul socle `StaticFlow` (interactions
  * coupées, badge masqué, canvas transparent) + 3 types de nœuds partagés. Le hero est ré-aligné à
  * partir des hauteurs DOM réelles (cartes de hauteurs variables) ; les autres nœuds ont une hauteur
@@ -230,7 +230,7 @@ function RunStepNode({ data }: NodeProps<Node<RunStepData>>) {
 }
 
 // Nœud « hub » : soit le cœur (TaskForce/Memory, mis en avant), soit un outil connecté (vrai logo).
-// Sert aux graphes RADIAUX (ex. Integrations) — une FORME différente des chaînes, pour varier.
+// Sert aux graphes RADIAUX (ex. Integrations) - une FORME différente des chaînes, pour varier.
 type HubData = {
   label: string;
   sub?: string;
@@ -397,7 +397,7 @@ function StaticFlow(props: {
   );
 }
 
-/* ─────────────────────────── 1) Hero — pipeline ─────────────────────────── */
+/* ─────────────────────────── 1) Hero - pipeline ─────────────────────────── */
 
 const HW = 264;
 const HX = 168; // tronc centré (300 - 264/2)
@@ -439,13 +439,13 @@ export function HeroFlow() {
   );
 }
 
-/* ─────────────────────────── 2) Grounding — contexte → proposition ─────────────────────────── */
+/* ─────────────────────────── 2) Grounding - contexte → proposition ─────────────────────────── */
 
 const CTX = [
-  { label: "Decision", value: "Postgres over Mongo — tenant isolation" },
+  { label: "Decision", value: "Postgres over Mongo - tenant isolation" },
   { label: "Constraint", value: "EU data residency (GDPR)" },
   { label: "Convention", value: "Trunk-based, squash-merge" },
-  { label: "Rejected", value: "Third-party billing — lock-in" },
+  { label: "Rejected", value: "Third-party billing - lock-in" },
 ];
 const GND_NODES: Node[] = [
   ...CTX.map(
@@ -539,7 +539,7 @@ export function ApprovalFlow() {
   return <StaticFlow flowClass="tf-approval" nodes={APP_NODES} edges={APP_EDGES} padding={0.06} />;
 }
 
-/* ─────────────────────────── 4) Handoff — plan → agent → PR (vertical) ─────────────────────────── */
+/* ─────────────────────────── 4) Handoff - plan → agent → PR (vertical) ─────────────────────────── */
 
 const HO_H = 60;
 const hoNode = (id: string, y: number, data: MiniData): Node<MiniData> => ({
@@ -653,7 +653,7 @@ export function CalibrationFlow() {
   return <StaticFlow flowClass="tf-calibration" nodes={CAL_NODES} edges={CAL_EDGES} padding={0.06} />;
 }
 
-/* ─────────────────────────── 6) Agents — chaîne de rôles (vertical) ─────────────────────────── */
+/* ─────────────────────────── 6) Agents - chaîne de rôles (vertical) ─────────────────────────── */
 // `vChain` est une déclaration de fonction (hoistée) → utilisable ici même si définie plus bas.
 const AGENTS = vChain(
   [
@@ -692,7 +692,7 @@ function vChain(items: MiniData[], step: number, w: number): { nodes: Node<MiniD
   return { nodes, edges };
 }
 
-/* ─── 7) Analytics — boucle Delivery → … → Next run (vertical) ─── */
+/* ─── 7) Analytics - boucle Delivery → … → Next run (vertical) ─── */
 const ANALYTICS = vChain(
   [
     { dot: "#64748b", icon: GitPullRequest, title: "Delivery", handles: [] },
@@ -708,7 +708,7 @@ export function AnalyticsLoopFlow() {
   return <StaticFlow flowClass="tf-analytics" nodes={ANALYTICS.nodes} edges={ANALYTICS.edges} padding={0.04} />;
 }
 
-/* ─── 8) Approvals — la primitive du checkpoint (vertical) ─── */
+/* ─── 8) Approvals - la primitive du checkpoint (vertical) ─── */
 const APPROVALS = vChain(
   [
     { dot: "#64748b", icon: Bot, title: "Agent", sub: "proposes", handles: [] },
@@ -725,7 +725,7 @@ export function ApprovalsFlow() {
   return <StaticFlow flowClass="tf-approvals" nodes={APPROVALS.nodes} edges={APPROVALS.edges} padding={0.05} />;
 }
 
-/* ─── 9) Integrations — connect → remember → act (vertical) ─── */
+/* ─── 9) Integrations - connect → remember → act (vertical) ─── */
 const INTEGRATIONS = vChain(
   [
     { dot: "#64748b", icon: Boxes, title: "Your systems", sub: "GitHub · Linear · Postgres · …", handles: [] },
@@ -741,12 +741,12 @@ export function IntegrationsFlow() {
   return <StaticFlow flowClass="tf-integrations" nodes={INTEGRATIONS.nodes} edges={INTEGRATIONS.edges} padding={0.05} />;
 }
 
-/* ─── 9b) Integrations — HUB RADIAL (custom) : ton stack se connecte à une mémoire commune.
+/* ─── 9b) Integrations - HUB RADIAL (custom) : ton stack se connecte à une mémoire commune.
    Forme volontairement DIFFÉRENTE des chaînes verticales → illustre « connecter », pas un pipeline. ─── */
 const IH_CW = 150, IH_CH = 74; // cœur
 const IH_TW = 118, IH_TH = 46; // outil
 const IH_TOOLS: { id: string; x: number; y: number; brand: string; label: string; src: Position; core: string }[] = [
-  // Mix VOLONTAIREMENT business (review user : « des tools type business, pas full tech ») —
+  // Mix VOLONTAIREMENT business (review user : « des tools type business, pas full tech ») -
   // CRM · paiement · e-commerce · docs · comms, avec un seul ancrage dev (GitHub, connecteur prouvé).
   { id: "t0", x: 406, y: 197, brand: "github", label: "GitHub", src: Position.Left, core: "cr" },
   { id: "t1", x: 318, y: 84, brand: "salesforce", label: "Salesforce", src: Position.Bottom, core: "ct" },
@@ -802,7 +802,7 @@ export function IntegrationsHubFlow() {
   return <StaticFlow flowClass="tf-inthub" nodes={IH_NODES} edges={IH_EDGES} padding={0.14} />;
 }
 
-/* ─── 10) Brain OS — la boucle Memory → … → Memory (horizontale, façon Calibration) ─── */
+/* ─── 10) Brain OS - la boucle Memory → … → Memory (horizontale, façon Calibration) ─── */
 const BR_W = 190;
 const BR_STEP = 230;
 const brNode = (id: string, i: number, data: MiniData): Node<MiniData> => ({
@@ -885,7 +885,7 @@ export function BrainLoopFlow() {
   return <StaticFlow flowClass="tf-brain" nodes={BRAIN_NODES} edges={BRAIN_EDGES} padding={0.1} />;
 }
 
-/* ─── 11) Smart Assign — routage d'une tâche vers le bon responsable (vertical) ─── */
+/* ─── 11) Smart Assign - routage d'une tâche vers le bon responsable (vertical) ─── */
 const ROUTING = vChain(
   [
     { dot: "#64748b", icon: Inbox, title: "New task", sub: "needs an owner", handles: [] },
@@ -901,7 +901,7 @@ export function RoutingFlow() {
   return <StaticFlow flowClass="tf-routing" nodes={ROUTING.nodes} edges={ROUTING.edges} padding={0.05} />;
 }
 
-/* ─── 11b) Smart Assign — CONVERGENCE + fan-out (custom) : 3 signaux → pondération → le bon owner
+/* ─── 11b) Smart Assign - CONVERGENCE + fan-out (custom) : 3 signaux → pondération → le bon owner
    parmi plusieurs candidats (le choisi en vert). Forme DISTINCTE de la chaîne verticale. ─── */
 const SA_H = 56;
 const saNode = (id: string, x: number, y: number, w: number, data: MiniData): Node<MiniData> => ({
@@ -928,7 +928,7 @@ export function SmartAssignFlow() {
   return <StaticFlow flowClass="tf-smartassign" nodes={SA_NODES} edges={SA_EDGES} padding={0.1} />;
 }
 
-/* ─── 12) Labs — la boucle Signal → Memory → … → Decision → ↩ Memory (horizontale) ─── */
+/* ─── 12) Labs - la boucle Signal → Memory → … → Decision → ↩ Memory (horizontale) ─── */
 const LB_W = 186;
 const LB_STEP = 214;
 const lbNode = (id: string, i: number, data: MiniData): Node<MiniData> => ({
@@ -982,7 +982,7 @@ export function LabsLoopFlow() {
   return <StaticFlow flowClass="tf-labs" nodes={LABS_NODES} edges={LABS_EDGES} padding={0.1} />;
 }
 
-/* ─── 13) AI transparency — le chemin d'une proposition (chaîne + fourche de décision) ─── */
+/* ─── 13) AI transparency - le chemin d'une proposition (chaîne + fourche de décision) ─── */
 const PP_NODES: Node<MiniData>[] = [
   { id: "ctx", type: "mini", position: { x: 0, y: 0 }, style: { width: 200, height: 60 }, initialWidth: 200, initialHeight: 60, data: { dot: "#64748b", icon: BrainCircuit, title: "Context + Memory", sub: "workspace + decisions", handles: [{ type: "source", position: Position.Right, id: "r", ring: true }] } },
   { id: "agent", type: "mini", position: { x: 240, y: 0 }, style: { width: 168, height: 60 }, initialWidth: 168, initialHeight: 60, data: { dot: "#2563eb", icon: Sparkles, title: "Agent", sub: "drafts a proposal", handles: [LR(), RR()] } },
@@ -1006,7 +1006,7 @@ export function ProposalPathFlow() {
   return <StaticFlow flowClass="tf-proposal" nodes={PP_NODES} edges={PP_EDGES} padding={0.08} />;
 }
 
-/* ─── 14) Enterprise — comment TaskForce s'insère (IdP → TaskForce → systèmes/données/modèles) ─── */
+/* ─── 14) Enterprise - comment TaskForce s'insère (IdP → TaskForce → systèmes/données/modèles) ─── */
 const ES_NODES: Node<MiniData>[] = [
   { id: "idp", type: "mini", position: { x: 190, y: 0 }, style: { width: 240, height: 60 }, initialWidth: 240, initialHeight: 60, data: { dot: "#64748b", icon: KeyRound, title: "Your identity provider", sub: "OIDC / SAML", handles: [{ type: "source", position: Position.Bottom, id: "b", ring: true }] } },
   { id: "tf", type: "mini", position: { x: 150, y: 116 }, style: { width: 320, height: 64 }, initialWidth: 320, initialHeight: 64, data: { icon: ShieldCheck, title: "TaskForce", sub: "Governance · Memory · Orchestration", highlight: true, handles: [{ type: "target", position: Position.Top, id: "t" }, { type: "source", position: Position.Bottom, id: "b", ring: true }] } },
@@ -1024,7 +1024,7 @@ export function EnterpriseStackFlow() {
   return <StaticFlow flowClass="tf-enterprise" nodes={ES_NODES} edges={ES_EDGES} padding={0.1} />;
 }
 
-/* ─── 15) Solutions/Engineering — le run, de l'outcome à la livraison relue (vertical) ─── */
+/* ─── 15) Solutions/Engineering - le run, de l'outcome à la livraison relue (vertical) ─── */
 const ENG_RUN = vChain(
   [
     { dot: "#7c3aed", icon: Compass, title: "Frame & spec", sub: "problem · DoD · acceptance", handles: [] },
@@ -1051,30 +1051,30 @@ const ICON_MAP: Record<string, LucideIcon> = {
   users: Users, ticket: Ticket, eye: Eye, rocket: Rocket, board: LayoutGrid,
 };
 
-/* Palette sémantique des icônes — teinte par FAMILLE, pas par icône, pour que la couleur PORTE un
+/* Palette sémantique des icônes - teinte par FAMILLE, pas par icône, pour que la couleur PORTE un
    sens et reste cohérente d'un flux à l'autre (bleu = build/spec · violet = IA/pensée · émeraude =
    livré · ambre = gouvernance · cyan = data · rose = rejet · ardoise = neutre/entrée). Alignée sur
    les `dot` déjà posés à la main sur les flux Orchestration. `StepChainFlow` la lit par défaut. */
 const ICON_COLOR: Record<string, string> = {
-  // neutre / entrée / structurel — ardoise
+  // neutre / entrée / structurel - ardoise
   inbox: "#64748b", boxes: "#64748b", database: "#64748b", key: "#64748b", users: "#64748b", eye: "#64748b",
-  // cadrage / pensée / IA / modèle — violet
+  // cadrage / pensée / IA / modèle - violet
   compass: "#7c3aed", sparkles: "#7c3aed", brain: "#7c3aed", bot: "#7c3aed", lightbulb: "#7c3aed",
   repeat: "#7c3aed", cpu: "#7c3aed",
-  // build / spec / plan / exécution — bleu de marque
+  // build / spec / plan / exécution - bleu de marque
   file: "#2563eb", building: "#2563eb", calendar: "#2563eb", list: "#2563eb", terminal: "#2563eb",
   plug: "#2563eb", branch: "#2563eb", flag: "#2563eb",
-  // data / mesure — cyan
+  // data / mesure - cyan
   chart: "#0891b2", gauge: "#0891b2", scale: "#0891b2", board: "#0891b2",
-  // gouvernance / revue / attention — ambre
+  // gouvernance / revue / attention - ambre
   shield: "#d97706", pencil: "#d97706", zap: "#d97706",
-  // livré / validé / succès — émeraude
+  // livré / validé / succès - émeraude
   check: "#059669", rocket: "#059669", pr: "#059669", userCheck: "#059669",
-  // rejet / incident — rose
+  // rejet / incident - rose
   x: "#e11d48", ticket: "#e11d48",
 };
 
-/* ─── 17) Chaîne d'étapes générique (props) — pour les sections home (What ships today, Before/After) ─── */
+/* ─── 17) Chaîne d'étapes générique (props) - pour les sections home (What ships today, Before/After) ─── */
 export function StepChainFlow({
   steps,
   id,
@@ -1129,7 +1129,7 @@ export function StepChainFlow({
   return <StaticFlow flowClass={`tf-chain-${id}`} nodes={nodes} edges={edges} padding={0.05} />;
 }
 
-/* ─── 16) Use cases — les étapes « In a run » (verticales, texte qui wrap, hauteur mesurée) ─── */
+/* ─── 16) Use cases - les étapes « In a run » (verticales, texte qui wrap, hauteur mesurée) ─── */
 export function UseCaseRunFlow({ steps }: { steps: string[] }) {
   const W = 440;
   const accentOf = (t: string) => /human|approv|sign off|review/i.test(t);
@@ -1168,7 +1168,7 @@ export function UseCaseRunFlow({ steps }: { steps: string[] }) {
   );
 }
 
-/* ─── 18) Decision graph — Requirement → Decision → Impacts (+ Rejected en pointillés) ─── */
+/* ─── 18) Decision graph - Requirement → Decision → Impacts (+ Rejected en pointillés) ─── */
 const DG_NODES: Node<MiniData>[] = [
   { id: "req", type: "mini", position: { x: 130, y: 0 }, style: { width: 250, height: 60 }, initialWidth: 250, initialHeight: 60, data: { dot: "#64748b", icon: FileText, title: "Vector search + billing", sub: "Requirement", handles: [{ type: "source", position: Position.Bottom, id: "b", ring: true }] } },
   { id: "decision", type: "mini", position: { x: 100, y: 122 }, style: { width: 310, height: 66 }, initialWidth: 310, initialHeight: 66, data: { icon: BrainCircuit, title: "Postgres + pgvector", sub: "Decision", highlight: true, handles: [{ type: "target", position: Position.Top, id: "t" }, { type: "source", position: Position.Bottom, id: "b", ring: true }, { type: "source", position: Position.Right, id: "r", ring: true }] } },

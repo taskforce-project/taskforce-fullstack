@@ -215,7 +215,7 @@ export async function listMyIssues(slug: string): Promise<Issue[]> {
 }
 
 /**
- * Retourne les issues planifiées (startDate ou dueDate renseigné) du workspace — roadmap.
+ * Retourne les issues planifiées (startDate ou dueDate renseigné) du workspace - roadmap.
  */
 export async function getScheduledIssues(slug: string): Promise<Issue[]> {
   const res = await apiClient.get<{ data: Issue[] }>(ROADMAP_ROUTES.SCHEDULED(slug));
@@ -492,7 +492,7 @@ export async function smartAssignPreview(
   const res = await apiClient.post<{ data: SmartAssignResult }>(
     ISSUE_ROUTES.SMART_ASSIGN_PREVIEW(slug, projectId),
     draft,
-    { timeout: AI_TIMEOUT_MS } // scoring LLM (cf. smartAssignIssue) — pas les 30s par défaut
+    { timeout: AI_TIMEOUT_MS } // scoring LLM (cf. smartAssignIssue) - pas les 30s par défaut
   );
   return res.data.data;
 }
@@ -570,7 +570,7 @@ export async function deleteRelation(
 }
 
 // ---------------------------------------------------------------------------
-// IA — spec + prompt d'exécution (human-in-the-loop)
+// IA - spec + prompt d'exécution (human-in-the-loop)
 // ---------------------------------------------------------------------------
 
 /** Une note Brain OS proche de l'issue (« déjà vu ? »). */
@@ -581,7 +581,7 @@ export interface SimilarNode {
   score: number | null;
 }
 
-/** Brouillon généré par l'IA — non persisté tant que l'humain n'a pas approuvé. */
+/** Brouillon généré par l'IA - non persisté tant que l'humain n'a pas approuvé. */
 export interface IssueSpecDraft {
   spec: string;
   executionPrompt: string;

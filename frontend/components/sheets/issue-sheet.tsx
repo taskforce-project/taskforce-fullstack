@@ -151,7 +151,7 @@ function MetaRow({ icon, label, children }: Readonly<{ icon: React.ReactNode; la
 }
 
 // ---------------------------------------------------------------------------
-// Sections empilées (remplacent la bande d'onglets scrollable — façon Linear/GitHub)
+// Sections empilées (remplacent la bande d'onglets scrollable - façon Linear/GitHub)
 // ---------------------------------------------------------------------------
 
 function SectionHeading({ icon, title, count }: Readonly<{ icon: React.ReactNode; title: string; count?: number }>) {
@@ -176,7 +176,7 @@ function Section({ icon, title, count, children }: Readonly<{ icon: React.ReactN
   )
 }
 
-/** Section repliable (Spec IA, relations, GitHub) — le contenu n'est monté qu'à l'ouverture. */
+/** Section repliable (Spec IA, relations, GitHub) - le contenu n'est monté qu'à l'ouverture. */
 function CollapsibleSection({
   icon, title, count, defaultOpen = false, children,
 }: Readonly<{ icon: React.ReactNode; title: string; count?: number; defaultOpen?: boolean; children: React.ReactNode }>) {
@@ -422,7 +422,7 @@ const ACTIVITY_STEP = 10
  */
 function ActivityFeed({ comments, activity, loading, comment, onChange, onSend, onDelete }: Readonly<ActivityFeedProps>) {
   const currentUser = useUserStore((s) => s.user)
-  // Combien d'entrées afficher (pagination « charger plus ») — départ court pour garder l'issue lisible.
+  // Combien d'entrées afficher (pagination « charger plus ») - départ court pour garder l'issue lisible.
   const [visible, setVisible] = useState(ACTIVITY_INITIAL)
   const entries: FeedEntry[] = [
     ...comments.map((c) => ({ kind: "comment" as const, at: c.createdAt, data: c })),
@@ -437,7 +437,7 @@ function ActivityFeed({ comments, activity, loading, comment, onChange, onSend, 
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Zone de saisie — en tête : le commentaire posté apparaît juste en dessous (plus récent d'abord). */}
+      {/* Zone de saisie - en tête : le commentaire posté apparaît juste en dessous (plus récent d'abord). */}
       <div className="flex gap-3">
         <UserAvatar email={currentUser?.email} name={currentUser?.displayName ?? currentUser?.email} avatarUrl={currentUser?.avatarUrl} className="size-7 shrink-0 mt-0.5" fallbackClassName="text-[9px]" />
         <div className="flex flex-1 flex-col gap-2">
@@ -1082,7 +1082,7 @@ function RelationsTab({
           <SelectContent>
             {candidates.map((i) => (
               <SelectItem key={i.id} value={String(i.id)} className="text-xs">
-                <span className="font-mono text-muted-foreground">{i.identifier}</span> — {i.title}
+                <span className="font-mono text-muted-foreground">{i.identifier}</span> - {i.title}
               </SelectItem>
             ))}
           </SelectContent>
@@ -1099,9 +1099,9 @@ interface IssueSheetProps {
   issue: SheetIssue | null
   open: boolean
   onOpenChange: (open: boolean) => void
-  /** Slug du workspace — requis pour les pièces jointes */
+  /** Slug du workspace - requis pour les pièces jointes */
   workspaceSlug?: string
-  /** ID numérique du projet — requis pour les pièces jointes */
+  /** ID numérique du projet - requis pour les pièces jointes */
   projectId?: number
 }
 
@@ -1147,10 +1147,10 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
   // `smartRun` = jeton incrémenté au clic pour relancer l'analyse ; l'ouverture par défaut n'analyse pas.
   const [smartOpen, setSmartOpen] = useState(false)
   const [smartRun, setSmartRun] = useState(0)
-  // Cycle courant de l'issue + cycles du projet (options du sélecteur) — CYC-03b.
+  // Cycle courant de l'issue + cycles du projet (options du sélecteur) - CYC-03b.
   const [cycleId, setCycleId] = useState<number | null>(null)
   const [projectCycles, setProjectCycles] = useState<Cycle[]>([])
-  // Compteurs des sections repliées (badges façon Linear) — chargés à l'ouverture, visibles repliés.
+  // Compteurs des sections repliées (badges façon Linear) - chargés à l'ouverture, visibles repliés.
   const [sectionCounts, setSectionCounts] = useState({ checklist: 0, attachments: 0, relations: 0 })
 
   useEffect(() => { if (editingTitle) titleRef.current?.focus() }, [editingTitle])
@@ -1185,7 +1185,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
       .catch(() => { /* silent */ })
   }, [open, workspaceSlug, projectId, fetchStatuses, fetchLabels])
 
-  // Cycles du projet (options du sélecteur) + cycle courant de l'issue — CYC-03b.
+  // Cycles du projet (options du sélecteur) + cycle courant de l'issue - CYC-03b.
   useEffect(() => {
     if (!open || !workspaceSlug || !projectId || !issue) return
     listCycles(workspaceSlug, projectId).then(setProjectCycles).catch(() => { /* silent */ })
@@ -1208,7 +1208,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
       .finally(() => setLoadingActivity(false))
   }, [open, issue, workspaceSlug, projectId, fetchComments, fetchActivity])
 
-  // Compteurs des sections repliées — on charge juste les longueurs à l'ouverture pour afficher un
+  // Compteurs des sections repliées - on charge juste les longueurs à l'ouverture pour afficher un
   // badge « n » (façon Linear) sans avoir à déplier. Les onglets rechargent leur détail à l'ouverture.
   useEffect(() => {
     if (!open || !workspaceSlug || !projectId || !issue) return
@@ -1240,7 +1240,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
     // updateIssue avale les erreurs et renvoie null (cf. WS-10) → on remonte le refus par un toast
     // au bon moment (à l'action) plutôt que via la bannière du board révélée à la fermeture du sheet.
     const ok = await updateIssue(workspaceSlug, projectId, issueId, payload)
-    if (!ok) toast.error("Change not saved — try again in a moment.")
+    if (!ok) toast.error("Change not saved - try again in a moment.")
     return Boolean(ok)
   }
 
@@ -1297,7 +1297,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
     const next = exists ? labels.filter((x) => x.id !== l.id) : [...labels, l]
     const previous = labels
     setLabels(next)
-    // Si l'enregistrement échoue, on RÉTABLIT l'état précédent — pas de label « fantôme » affiché
+    // Si l'enregistrement échoue, on RÉTABLIT l'état précédent - pas de label « fantôme » affiché
     // comme ajouté alors qu'il n'a pas été persisté (ISS-06).
     void callUpdate({ labelIds: next.map((x) => x.id) }).then((ok) => { if (!ok) setLabels(previous) })
   }
@@ -1478,7 +1478,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
 
           {/* Left: title + description + comments (scrollable) */}
           <div className="flex-1 min-w-0 px-6 py-5 flex flex-col gap-5 sm:overflow-y-auto">
-            {/* Title — inline editable */}
+            {/* Title - inline editable */}
             {editingTitle ? (
               <input
                 ref={titleRef}
@@ -1501,13 +1501,13 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
               </button>
             )}
 
-            {/* Description — rendu markdown interactif (cases à cocher) + petit éditeur */}
+            {/* Description - rendu markdown interactif (cases à cocher) + petit éditeur */}
             <div>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Description</p>
               <IssueDescription value={description} onSave={saveDescriptionValue} />
             </div>
 
-            {/* Spec IA — repliable (feature phare : spec + prompt + découpage) */}
+            {/* Spec IA - repliable (feature phare : spec + prompt + découpage) */}
             {workspaceSlug && projectId && issue?.id && (
               <CollapsibleSection icon={<Sparkles className="size-4" />} title="AI Spec">
                 <IssueAiSpecPanel
@@ -1521,35 +1521,35 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
 
             <Separator />
 
-            {/* Sous-tâches — section dédiée, sous la description (façon Asana/Linear) */}
+            {/* Sous-tâches - section dédiée, sous la description (façon Asana/Linear) */}
             {workspaceSlug && projectId && (
               <Section icon={<Layers className="size-4" />} title="Subtasks">
                 <SubtasksTab issueId={issueId} projectId={projectId} workspaceSlug={workspaceSlug} />
               </Section>
             )}
 
-            {/* Checklist — repliable (secondaire ; le contenu ne se charge qu'à l'ouverture) */}
+            {/* Checklist - repliable (secondaire ; le contenu ne se charge qu'à l'ouverture) */}
             {workspaceSlug && projectId && (
               <CollapsibleSection icon={<CheckCircle2 className="size-4" />} title="Checklist" count={sectionCounts.checklist}>
                 <ChecklistTab issueId={issueId} projectId={projectId} workspaceSlug={workspaceSlug} />
               </CollapsibleSection>
             )}
 
-            {/* Pièces jointes — repliable (secondaire) */}
+            {/* Pièces jointes - repliable (secondaire) */}
             {workspaceSlug && projectId && (
               <CollapsibleSection icon={<Paperclip className="size-4" />} title="Attachments" count={sectionCounts.attachments}>
                 <AttachmentsTab issueId={issueId} projectId={projectId} workspaceSlug={workspaceSlug} />
               </CollapsibleSection>
             )}
 
-            {/* Relations — repliable */}
+            {/* Relations - repliable */}
             {workspaceSlug && projectId && (
               <CollapsibleSection icon={<Link2 className="size-4" />} title="Relations" count={sectionCounts.relations}>
                 <RelationsTab issueId={issueId} projectId={projectId} workspaceSlug={workspaceSlug} />
               </CollapsibleSection>
             )}
 
-            {/* GitHub — repliable (le contenu ne se charge qu'à l'ouverture) */}
+            {/* GitHub - repliable (le contenu ne se charge qu'à l'ouverture) */}
             {workspaceSlug && (
               <CollapsibleSection icon={<BrandLogo slug="github" name="GitHub" className="size-4" />} title="GitHub" count={githubLinks[issueId]?.length ?? 0}>
                 <GitHubTab issueId={issueId} workspaceSlug={workspaceSlug} />
@@ -1558,7 +1558,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
 
             <Separator />
 
-            {/* Activité + commentaires — fil unifié tout en bas */}
+            {/* Activité + commentaires - fil unifié tout en bas */}
             <Section icon={<Activity className="size-4" />} title="Activity" count={storeComments.length}>
               <ActivityFeed
                 comments={storeComments}
@@ -1572,7 +1572,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
             </Section>
           </div>
 
-          {/* Right: metadata sidebar (fully editable) — empilée sous le contenu en mobile */}
+          {/* Right: metadata sidebar (fully editable) - empilée sous le contenu en mobile */}
           <div className="w-full shrink-0 border-t border-border px-5 py-5 sm:w-96 sm:border-t-0 sm:border-l sm:overflow-y-auto">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Details</p>
 
@@ -1603,7 +1603,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
               </Select>
             </MetaRow>
 
-            {/* Assignee — Select + étoile Smart Assign IA inline (taille input, pas un bloc pleine largeur) */}
+            {/* Assignee - Select + étoile Smart Assign IA inline (taille input, pas un bloc pleine largeur) */}
             <MetaRow icon={<Avatar className="size-3.5"><AvatarFallback className="text-[7px]">?</AvatarFallback></Avatar>} label="Assignee">
               <div className="flex w-full items-center gap-1.5">
                 <Select
@@ -1675,7 +1675,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
               </div>
             </MetaRow>
 
-            {/* Smart Auto-Assign — panneau contrôlé, ouvert par l'étoile IA ci-dessus */}
+            {/* Smart Auto-Assign - panneau contrôlé, ouvert par l'étoile IA ci-dessus */}
             {workspaceSlug && projectId && (
               <SmartAssignPanel
                 open={smartOpen}
@@ -1698,7 +1698,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
               />
             )}
 
-            {/* Labels — multi-select */}
+            {/* Labels - multi-select */}
             <MetaRow icon={<Tag className="size-3.5" />} label="Labels">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -1723,7 +1723,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                 <DropdownMenuContent align="start" className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-40">
                   {(labelsByProject[projectId ?? 0] ?? []).length === 0 && (
                     <div className="px-2 py-1.5 text-xs text-muted-foreground italic">
-                      No labels — create some in project settings
+                      No labels - create some in project settings
                     </div>
                   )}
                   {(labelsByProject[projectId ?? 0] ?? []).map((l) => {
@@ -1747,7 +1747,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
               </DropdownMenu>
             </MetaRow>
 
-            {/* Points — select de presets (estimation d'effort), persiste en base */}
+            {/* Points - select de presets (estimation d'effort), persiste en base */}
             <MetaRow icon={<Layers className="size-3.5" />} label="Points">
               <Select
                 value={points === null ? "none" : String(points)}
@@ -1760,7 +1760,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                 }}
               >
                 <SelectTrigger size="sm" className="w-full">
-                  <span>{points === null ? "—" : `${points} pts`}</span>
+                  <span>{points === null ? "-" : `${points} pts`}</span>
                 </SelectTrigger>
                 <SelectContent>
                   {STORY_POINT_PRESETS.map((pt) => (
@@ -1772,7 +1772,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
               </Select>
             </MetaRow>
 
-            {/* Cycle — sélecteur réel (CYC-03b). Le back expose désormais le cycle courant de l'issue
+            {/* Cycle - sélecteur réel (CYC-03b). Le back expose désormais le cycle courant de l'issue
                 (GET .../issues/{id}/cycles). « Changer » = retirer du cycle précédent puis ajouter au
                 nouveau (pas d'endpoint « move »). On appelle les fns service en direct (le store avale
                 les erreurs) pour un vrai feedback. */}
@@ -1796,7 +1796,7 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                   }}
                 >
                   <SelectTrigger size="sm" className="w-full">
-                    <span>{cycleId === null ? "No cycle" : (projectCycles.find((c) => c.id === cycleId)?.name ?? "—")}</span>
+                    <span>{cycleId === null ? "No cycle" : (projectCycles.find((c) => c.id === cycleId)?.name ?? "-")}</span>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">No cycle</SelectItem>
@@ -1808,12 +1808,12 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
               </MetaRow>
             )}
 
-            {/* Due date — sélecteur de date shadcn (Calendar + Popover) */}
+            {/* Due date - sélecteur de date shadcn (Calendar + Popover) */}
             <MetaRow icon={<Calendar className="size-3.5" />} label="Due date">
               <DatePicker
                 value={dueIso}
                 onChange={saveDueDate}
-                placeholder="—"
+                placeholder="-"
                 className={cn(isOverdue && "border-red-500/40 text-red-400 hover:text-red-400")}
               />
               {isOverdue && (
@@ -1823,12 +1823,12 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
               )}
             </MetaRow>
 
-            {/* Created — read-only (reste dans la liste de propriétés) */}
+            {/* Created - read-only (reste dans la liste de propriétés) */}
             <MetaRow icon={<Activity className="size-3.5" />} label="Created">
               <span className="text-xs text-muted-foreground">{issue.createdAt}</span>
             </MetaRow>
 
-            {/* Suivi du temps — bloc dédié en bas (plus lourd que les propriétés → isolé sous un séparateur) */}
+            {/* Suivi du temps - bloc dédié en bas (plus lourd que les propriétés → isolé sous un séparateur) */}
             {workspaceSlug && projectId && (
               <>
                 <Separator className="my-3" />

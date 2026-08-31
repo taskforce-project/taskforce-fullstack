@@ -17,7 +17,7 @@ import { isLive } from "@/components/site/nav";
 import { hueFor } from "@/lib/site-icons";
 
 /**
- * Trust Center — profond et HONNÊTE (review user 30/07). Plus un « security overview »
+ * Trust Center - profond et HONNÊTE (review user 30/07). Plus un « security overview »
  * mais un vrai portail d'évaluation pour un RSSI / architecte sécu / procurement.
  * Règle absolue : statuts conservateurs, rien de non démontrable. Faits ancrés sur le
  * Brain OS (AES-256-GCM secrets, Keycloak OIDC, RBAC testé, GdprService réel, Semgrep/ZAP/Trivy).
@@ -25,7 +25,7 @@ import { hueFor } from "@/lib/site-icons";
 
 const CONTACT = "contact@taskforce-project.fr";
 
-/* Ton des pastilles de statut — la couleur ne porte jamais seule l'info (le libellé aussi). */
+/* Ton des pastilles de statut - la couleur ne porte jamais seule l'info (le libellé aussi). */
 const TONE: Record<string, string> = {
   available: "bg-emerald-50 text-emerald-700 border-emerald-200",
   beta: "bg-amber-50 text-amber-700 border-amber-200",
@@ -38,7 +38,7 @@ const GLANCE: { area: string; label: string; tone: keyof typeof TONE }[] = [
   { area: "Self-hosting", label: "Available", tone: "available" },
   { area: "Encryption in transit", label: "TLS", tone: "available" },
   { area: "Secrets encrypted at rest", label: "AES-256-GCM", tone: "available" },
-  { area: "SSO — OIDC", label: "Available", tone: "available" },
+  { area: "SSO - OIDC", label: "Available", tone: "available" },
   { area: "Enterprise IdP federation", label: "SAML / OIDC", tone: "available" },
   { area: "RBAC & per-project access", label: "Available", tone: "available" },
   { area: "GDPR export & erasure", label: "Available", tone: "available" },
@@ -52,28 +52,28 @@ const GLANCE: { area: string; label: string; tone: keyof typeof TONE }[] = [
 ];
 
 const AI_GOV = [
-  { t: "Model & provider selection", d: "Local models through Ollama by default, or an optional hosted provider (Groq) — your choice." },
+  { t: "Model & provider selection", d: "Local models through Ollama by default, or an optional hosted provider (Groq) - your choice." },
   { t: "Hosted vs local", d: "Run local models to keep every prompt and output inside your own network." },
   { t: "No training on your data", d: "TaskForce uses provider APIs configured for business use, and never uses your data to train its own models. Training policy for a hosted model depends on the provider and service; local models remove the question entirely." },
   { t: "Human approval", d: "The AI proposes; a named human approves it. An agent can never approve its own work." },
-  { t: "Model-call auditability", d: "Every call is recorded — which model, which step, on whose infrastructure." },
+  { t: "Model-call auditability", d: "Every call is recorded - which model, which step, on whose infrastructure." },
   { t: "Agent & connector scopes", d: "Agents act only within the connectors and permissions you explicitly grant." },
 ];
 
 const IDENTITY = [
-  "SSO — TaskForce authenticates through Keycloak over OIDC.",
-  "Enterprise IdP federation — Keycloak can federate with your identity provider over SAML or OIDC.",
+  "SSO - TaskForce authenticates through Keycloak over OIDC.",
+  "Enterprise IdP federation - Keycloak can federate with your identity provider over SAML or OIDC.",
   "RBAC with workspace and project roles: Owner, Admin, Member, Viewer.",
-  "Per-project access — membership is scoped, not workspace-wide by default.",
+  "Per-project access - membership is scoped, not workspace-wide by default.",
   "Session management: short-lived access tokens, refresh, revoke and provider-side logout.",
   "MFA is managed by your identity provider, not reinvented by us.",
   "Least privilege: sensitive actions are role-gated; audit logs are owner-only.",
-  "Self-hosted, TaskForce personnel have no access to your instance or its data — you run it.",
+  "Self-hosted, TaskForce personnel have no access to your instance or its data - you run it.",
 ];
 
 const LIFECYCLE = [
   { t: "Collection", d: "Only what you connect or type into a run: repos, issues, docs and the outcomes you describe." },
-  { t: "Processing", d: "During a run, the relevant context is sent to the model you selected — hosted or local." },
+  { t: "Processing", d: "During a run, the relevant context is sent to the model you selected - hosted or local." },
   { t: "Storage", d: "Workspace content and memory live in PostgreSQL; files in object storage (MinIO/S3); secrets in an encrypted store." },
   { t: "Retention", d: "Today, data is kept until you delete it. Granular retention controls are Planned." },
   { t: "Deletion", d: "Account and workspace erasure removes your data and the associated Keycloak identity." },
@@ -85,7 +85,7 @@ const SECRETS = [
   "OAuth for GitHub and Slack; encrypted API keys for other connectors.",
   "Connector credentials are encrypted at rest with AES-256-GCM and are never stored as plaintext database values.",
   "They are not included in the prompts sent to models.",
-  "Scopes you grant define what a connector — and therefore an agent — can reach.",
+  "Scopes you grant define what a connector - and therefore an agent - can reach.",
   "Disconnect a connector at any time to revoke access.",
 ];
 
@@ -100,7 +100,7 @@ const SDLC = [
 ];
 
 const AVAILABILITY = [
-  { t: "Backups", items: ["Self-hosted — your backup policy", "Managed cloud — Planned"] },
+  { t: "Backups", items: ["Self-hosted - your backup policy", "Managed cloud - Planned"] },
   { t: "Recovery", items: ["Backup restoration", "Database recovery", "Object-storage recovery"] },
   { t: "Monitoring", items: ["Application health", "Infrastructure health", "Model-provider availability"] },
   { t: "Incident response", items: ["Detection", "Triage", "Containment", "Recovery"] },
@@ -162,19 +162,19 @@ const RESOURCES = [
 const FLOW = [
   { title: "Your workspace", items: ["Repos, issues, docs", "and the outcomes you describe"], tone: "plain" },
   { title: "TaskForce", items: ["Memory", "Workflow engine", "Audit trail"], tone: "primary" },
-  { title: "Model provider", items: ["Ollama — local (default)", "Groq — optional"], tone: "plain" },
+  { title: "Model provider", items: ["Ollama - local (default)", "Groq - optional"], tone: "plain" },
 ];
 
 ---
 
 <BaseLayout
-  title="Trust center — TaskForce"
-  description="Security you can verify, not just claim. How TaskForce handles data, who can do what, what every run leaves behind, and exactly where each control stands — Available, Beta, Planned or not started."
+  title="Trust center - TaskForce"
+  description="Security you can verify, not just claim. How TaskForce handles data, who can do what, what every run leaves behind, and exactly where each control stands - Available, Beta, Planned or not started."
 >
   <PageHero
     eyebrow="Trust center"
     title="Security you can verify, not just claim"
-    lead="TaskForce puts AI in your delivery path, so it should answer for it. Here is how data is handled, who can do what, and what every run leaves behind — with a public roadmap you can hold us to."
+    lead="TaskForce puts AI in your delivery path, so it should answer for it. Here is how data is handled, who can do what, and what every run leaves behind - with a public roadmap you can hold us to."
     primary={{ label: "Read the AI transparency note", href: "/legal/ai-transparency" }}
     secondary={{ label: "Book a security review", href: "/book-a-demo" }}
   />
@@ -213,7 +213,7 @@ const FLOW = [
         <p class="t-eyebrow mb-3">At a glance</p>
         <h2 class="t-h2">Where security stands today</h2>
         <p class="t-lead mt-4">
-          No badges we haven't earned. Here is the honest status of each control — and the ones that
+          No badges we haven't earned. Here is the honest status of each control - and the ones that
           aren't there yet are labelled just as plainly.
         </p>
       </div>
@@ -246,7 +246,7 @@ const FLOW = [
         <p class="t-eyebrow mb-3">Security architecture</p>
         <h2 class="t-h2">The trust boundaries, at a glance</h2>
         <p class="t-lead mt-4">
-          Where authentication, your connected systems and the models sit relative to TaskForce — so
+          Where authentication, your connected systems and the models sit relative to TaskForce - so
           an architect can read the model before the details.
         </p>
       </div>
@@ -271,7 +271,7 @@ const FLOW = [
         {/* Trust boundary matérialisée : en self-host, TaskForce + le modèle local vivent DANS ton réseau */}
         <div class="border-primary/40 relative rounded-2xl border-2 border-dashed p-5 pt-7">
           <span class="bg-card text-primary absolute -top-2.5 left-4 rounded-full border px-2.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase">
-            Your network — when self-hosted
+            Your network - when self-hosted
           </span>
           <div class="border-primary/30 bg-primary/[0.04] rounded-xl border p-5 text-center">
             <p class="text-[14px] font-semibold text-foreground">TaskForce</p>
@@ -285,7 +285,7 @@ const FLOW = [
             <ArrowRight className="text-muted-foreground/50 size-4 rotate-90" />
           </div>
           <div class="bg-card mx-auto max-w-xs rounded-xl border p-4 text-center">
-            <p class="text-[13px] font-semibold text-foreground">Local model — Ollama</p>
+            <p class="text-[13px] font-semibold text-foreground">Local model - Ollama</p>
             <p class="mt-1 text-[11px] font-medium text-emerald-700">stays in your network</p>
           </div>
         </div>
@@ -299,8 +299,8 @@ const FLOW = [
           <span class="bg-border h-px flex-1" />
         </div>
         <div class="bg-card mt-4 rounded-xl border border-dashed p-4 text-center">
-          <p class="text-[13px] font-semibold text-foreground">Hosted model — Groq (optional)</p>
-          <p class="mt-1 text-[11px] font-medium text-amber-700">external — leaves your network</p>
+          <p class="text-[13px] font-semibold text-foreground">Hosted model - Groq (optional)</p>
+          <p class="mt-1 text-[11px] font-medium text-amber-700">external - leaves your network</p>
         </div>
       </div>
     </div>
@@ -311,7 +311,7 @@ const FLOW = [
     <div class="container-rail py-20 lg:py-24">
       <div class="max-w-2xl">
         <p class="t-eyebrow mb-3">Data flow</p>
-        <h2 class="t-h2">Where your data goes — and where it doesn't</h2>
+        <h2 class="t-h2">Where your data goes - and where it doesn't</h2>
         <p class="t-lead mt-4">
           For an AI product this matters more than any single control. This is the path your data
           takes through a run, and what self-hosting changes about it.
@@ -415,7 +415,7 @@ const FLOW = [
         <p class="t-eyebrow mb-3">Data lifecycle</p>
         <h2 class="t-h2">From collection to deletion</h2>
         <p class="t-lead mt-4">
-          The questions a security questionnaire asks — answered up front, including the parts that
+          The questions a security questionnaire asks - answered up front, including the parts that
           are still on the roadmap.
         </p>
       </div>
@@ -449,7 +449,7 @@ const FLOW = [
             <ScrollText className="size-4" strokeWidth={2} style={{ color: hueFor(ScrollText) }} /> What is recorded
           </p>
           <ul class="mt-4 flex flex-col gap-2.5">
-            {["Who approved what, and when", "Which model ran which step, on whose infrastructure", "Workspace, project, timestamp, token usage and status", "Run artifacts — the drafts an agent produced, kept for your review"].map((x) => (
+            {["Who approved what, and when", "Which model ran which step, on whose infrastructure", "Workspace, project, timestamp, token usage and status", "Run artifacts - the drafts an agent produced, kept for your review"].map((x) => (
               <li class="text-muted-foreground flex items-start gap-2 text-[13.5px] leading-6">
                 <Check className="text-primary mt-[3px] size-3.5 shrink-0" strokeWidth={2.5} />
                 {x}
@@ -462,7 +462,7 @@ const FLOW = [
             <ShieldCheck className="size-4" strokeWidth={2} style={{ color: hueFor(ShieldCheck) }} /> What stays in your hands
           </p>
           <ul class="mt-4 flex flex-col gap-2.5">
-            {["With local models, prompts and outputs never leave your network", "You choose the provider per deployment — or none but local", "Audit access is owner-only, not open to every member", "Run artifacts live in your workspace, deletable with it"].map((x) => (
+            {["With local models, prompts and outputs never leave your network", "You choose the provider per deployment - or none but local", "Audit access is owner-only, not open to every member", "Run artifacts live in your workspace, deletable with it"].map((x) => (
               <li class="text-muted-foreground flex items-start gap-2 text-[13.5px] leading-6">
                 <Check className="text-primary mt-[3px] size-3.5 shrink-0" strokeWidth={2.5} />
                 {x}
@@ -481,7 +481,7 @@ const FLOW = [
         <p class="t-eyebrow mb-3">Integrations & secrets</p>
         <h2 class="t-h2">What can an agent do with the keys you give it?</h2>
         <p class="t-lead mt-4">
-          The real question isn't only “can TaskForce be breached?” — it's what an agent can reach
+          The real question isn't only “can TaskForce be breached?” - it's what an agent can reach
           with your connected credentials. Here is how they're contained.
         </p>
       </div>
@@ -500,7 +500,7 @@ const FLOW = [
           <Plug className="size-5" strokeWidth={1.75} style={{ color: hueFor(Plug) }} />
           <p class="mt-3 text-[14px] leading-6 text-foreground">
             An agent inherits the <span class="font-medium">scopes of the connector</span>, nothing
-            more — and never the raw secret behind it.
+            more - and never the raw secret behind it.
           </p>
         </div>
       </div>
@@ -548,7 +548,7 @@ const FLOW = [
         <p class="t-eyebrow mb-3">Threat model</p>
         <h2 class="t-h2">What we defend, and what's yours to defend</h2>
         <p class="t-lead mt-4">
-          Security is shared — especially when you self-host. Here is the honest split of
+          Security is shared - especially when you self-host. Here is the honest split of
           responsibility.
         </p>
       </div>
@@ -582,7 +582,7 @@ const FLOW = [
         </div>
       </div>
 
-      {/* Security boundaries — qui contrôle quoi */}
+      {/* Security boundaries - qui contrôle quoi */}
       <div class="mt-8 border bg-card p-6">
         <p class="text-[14px] font-semibold text-foreground">Security boundaries</p>
         <ul class="mt-4 grid gap-x-8 gap-y-2.5 sm:grid-cols-2">
@@ -606,7 +606,7 @@ const FLOW = [
         <p class="t-eyebrow mb-3">Compliance</p>
         <h2 class="t-h2">Compliance & certifications</h2>
         <p class="t-lead mt-4">
-          Stated conservatively on purpose. We won't imply a certification we don't hold — if a row
+          Stated conservatively on purpose. We won't imply a certification we don't hold - if a row
           says “Not started,” that's the truth.
         </p>
       </div>
@@ -627,7 +627,7 @@ const FLOW = [
         }
       </ul>
       <p class="text-muted-foreground mt-4 text-[12.5px]">
-        Technical controls are not the same as full legal compliance — organizational and contractual
+        Technical controls are not the same as full legal compliance - organizational and contractual
         obligations depend on your deployment and configuration.
       </p>
     </div>
@@ -781,9 +781,9 @@ const FLOW = [
 
   <PageCta
     title="Bring it to your security team"
-    lead="Send us your security questionnaire, or book a review and we'll walk your team through the architecture, the controls and the roadmap — including the parts that aren't done yet."
+    lead="Send us your security questionnaire, or book a review and we'll walk your team through the architecture, the controls and the roadmap - including the parts that aren't done yet."
     primary={{ label: "Book a security review", href: "/book-a-demo" }}
     secondary={{ label: "Read the AI transparency note", href: "/legal/ai-transparency" }}
-    note={`Security contact — ${CONTACT}`}
+    note={`Security contact - ${CONTACT}`}
   />
 </BaseLayout>

@@ -77,7 +77,7 @@ type NavItem = {
   }[]
 }
 
-// ─── Nav groups — operations-centric information architecture ─────────────────
+// ─── Nav groups - operations-centric information architecture ─────────────────
 
 const NAV_COMMAND: readonly NavItem[] = [
   {
@@ -136,7 +136,7 @@ const NAV_PEOPLE: readonly NavItem[] = [
     url: "/members",
     aicon: UserIcon,
   },
-  // Teams retiré du menu (QA2-21) — désormais géré par opération (onglet Members du projet).
+  // Teams retiré du menu (QA2-21) - désormais géré par opération (onglet Members du projet).
 ]
 
 const NAV_BOTTOM: readonly NavItem[] = [
@@ -195,7 +195,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       return (
         <SidebarMenuItem key={item.key}>
           <SidebarMenuButton
-            tooltip={`${t(item.key)} — ${t("nav.comingSoon")}`}
+            tooltip={`${t(item.key)} - ${t("nav.comingSoon")}`}
             aria-disabled
             className="cursor-not-allowed opacity-60 hover:bg-transparent"
           >
@@ -330,7 +330,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
       <SidebarContent className="overflow-x-hidden">
 
-        {/* Command — daily driver surfaces */}
+        {/* Command - daily driver surfaces */}
         <SidebarGroup>
           <SidebarGroupLabel>Command</SidebarGroupLabel>
           <SidebarMenu>
@@ -338,7 +338,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </SidebarMenu>
         </SidebarGroup>
 
-        {/* Work — ops, intelligence, agents */}
+        {/* Work - ops, intelligence, agents */}
         <SidebarGroup>
           <SidebarGroupLabel>Work</SidebarGroupLabel>
           <SidebarMenu>

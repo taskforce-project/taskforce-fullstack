@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 
 /**
- * BrandLogo — logos de marque vendorisés depuis SVGL.
+ * BrandLogo - logos de marque vendorisés depuis SVGL.
  * Les fichiers viennent de `frontend/public/logos/` (générés par `npm run logos` côté webapp),
  * recopiés dans `landing-page/public/logos/`. Même source que le catalogue de connecteurs :
  * un logo présent dans l'app est présent ici.
@@ -47,7 +47,7 @@ export function BrandLogo({
 }: {
   /** Clé du catalogue de connecteurs (ex. `github`, `linear`). */
   brand: string;
-  /** Nom lisible — sert d'alternative textuelle quand le logo porte l'information. */
+  /** Nom lisible - sert d'alternative textuelle quand le logo porte l'information. */
   label: string;
   className?: string;
 }) {

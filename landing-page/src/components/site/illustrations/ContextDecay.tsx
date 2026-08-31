@@ -3,13 +3,13 @@ import { FileText, MessageSquare, KanbanSquare, User, GitBranch } from "lucide-r
 import { cn } from "@/lib/utils";
 
 /**
- * ContextDecay — illustration du bloc « The problem ».
+ * ContextDecay - illustration du bloc « The problem ».
  *
  * L'idée : ne pas *dire* que le contexte se perd, le **montrer**. Une même décision
  * est réécrite à chaque outil qu'elle traverse, et on voit ce qui disparaît à chaque saut.
  * La dernière ligne montre la même décision dans un run : rien ne tombe.
  *
- * Chaque mot porte `keep: false` quand il ne survit pas à l'étape — c'est la donnée qui
+ * Chaque mot porte `keep: false` quand il ne survit pas à l'étape - c'est la donnée qui
  * produit l'animation, pas une opacité décorative.
  */
 
@@ -174,7 +174,7 @@ export function ContextDecay() {
                         : "text-emerald-600",
                   )}
                 >
-                  {reached ? `${hop.retained}%` : "—"}
+                  {reached ? `${hop.retained}%` : "-"}
                 </span>
               </div>
 

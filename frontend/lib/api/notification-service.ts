@@ -40,7 +40,7 @@ export interface NotificationResponse {
 
 /** Liste les notifications non acquittées du workspace */
 export async function listNotifications(slug: string): Promise<NotificationResponse[]> {
-  // Appel de fond (cloche du topbar, poll 60s) : échec silencieux — jamais de toast.
+  // Appel de fond (cloche du topbar, poll 60s) : échec silencieux - jamais de toast.
   const response = await apiClient.get<{ data: NotificationResponse[] }>(NOTIFICATION_ROUTES.LIST(slug), { silentError: true });
   return response.data.data;
 }

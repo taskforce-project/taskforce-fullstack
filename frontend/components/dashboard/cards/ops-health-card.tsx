@@ -18,7 +18,7 @@ export function OpsHealthCard({ slug, refreshToken }: DashboardCardBodyProps) {
 
   useEffect(() => {
     // 0 = chargement initial déjà déclenché par la page ; on ne refetch que sur demande.
-    // Garde anti-doublon : plusieurs cartes partagent ce store — un seul GET par refresh global.
+    // Garde anti-doublon : plusieurs cartes partagent ce store - un seul GET par refresh global.
     if (slug && refreshToken > 0 && !useProjectStore.getState().isLoading) void fetchProjects(slug)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug, refreshToken])

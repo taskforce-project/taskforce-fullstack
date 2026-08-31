@@ -51,7 +51,7 @@ function SheetContent({
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: "top" | "right" | "bottom" | "left"
   /** Bouton de fermeture intégré. Le passer à `false` quand le contenu fournit
-   *  le sien — le bouton par défaut fait 16px et échoue WCAG 2.2 (2.5.8, cible ≥ 24px). */
+   *  le sien - le bouton par défaut fait 16px et échoue WCAG 2.2 (2.5.8, cible ≥ 24px). */
   showClose?: boolean
 }) {
   return (

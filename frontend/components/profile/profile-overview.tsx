@@ -11,10 +11,10 @@ import { useWorkspaceStore } from "@/lib/store/workspace-store"
 
 /**
  * Aperçu « Mon profil » (stats + heatmap de contributions), extrait de l'ancienne page `/profile`
- * (supprimée) pour être monté dans la section **Profil** du modal Réglages — tout dans le modal, façon
+ * (supprimée) pour être monté dans la section **Profil** du modal Réglages - tout dans le modal, façon
  * Claude, plutôt qu'une page standalone. Autonome : lit le workspace courant du store.
  *
- * NB : le flux « Activité récente » a été retiré (jugé peu utile ici — retour user).
+ * NB : le flux « Activité récente » a été retiré (jugé peu utile ici - retour user).
  */
 
 const HEAT_COLORS = [
@@ -74,10 +74,10 @@ export function ProfileOverview() {
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { label: "Issues created",   value: stats?.issuesCreated   ?? "—", icon: <CircleDot className="h-4 w-4" /> },
-          { label: "Closed",           value: stats?.issuesClosed    ?? "—", icon: <CheckCircle2 className="h-4 w-4" /> },
-          { label: "Cycles completed", value: stats?.cyclesCompleted ?? "—", icon: <GitCommitHorizontal className="h-4 w-4" /> },
-          { label: "Days active",      value: stats?.daysActive      ?? "—", icon: <Clock className="h-4 w-4" /> },
+          { label: "Issues created",   value: stats?.issuesCreated   ?? "-", icon: <CircleDot className="h-4 w-4" /> },
+          { label: "Closed",           value: stats?.issuesClosed    ?? "-", icon: <CheckCircle2 className="h-4 w-4" /> },
+          { label: "Cycles completed", value: stats?.cyclesCompleted ?? "-", icon: <GitCommitHorizontal className="h-4 w-4" /> },
+          { label: "Days active",      value: stats?.daysActive      ?? "-", icon: <Clock className="h-4 w-4" /> },
         ].map((stat) => (
           <div key={stat.label} className="rounded-xl border border-border bg-card p-4 shadow-sm flex flex-col gap-2">
             <div className="flex items-center justify-between">

@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { LabsConcept } from "./LabsConcepts";
 
 /**
- * LabsSubjects — les directions de recherche en UNE page : barre d'onglets STICKY sous le header,
+ * LabsSubjects - les directions de recherche en UNE page : barre d'onglets STICKY sous le header,
  * qui ancre-scrolle vers des sections EMPILÉES (scroll-spy). Les sections VARIENT de composition
  * (illustration-hero pleine largeur / split miroir gauche-droite, hypothèses en liste ou en grille)
  * pour ne pas se répéter. Illustration « concept » honnête (D11). Îlot React autonome.
@@ -92,7 +92,7 @@ export function LabsSubjects({ subjects }: { subjects: Subject[] }) {
         </div>
       </div>
 
-      {/* ── Sections empilées, ancrées — compositions variées ── */}
+      {/* ── Sections empilées, ancrées - compositions variées ── */}
       {subjects.map((s, i) => {
         const layout = i === 0 || i === 3 ? "hero" : "split";
         const illRight = i === 1; // split : Run memory à droite, Model choice à gauche

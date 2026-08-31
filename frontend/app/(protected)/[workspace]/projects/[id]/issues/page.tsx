@@ -191,7 +191,7 @@ function IssueRow({ issue, onOpen }: { readonly issue: Issue; readonly onOpen: (
       {/* Due date */}
       <span className={cn("hidden md:flex items-center gap-1 text-xs w-20 text-right shrink-0", overdue ? "text-red-400 font-medium" : "text-muted-foreground")}>
         {overdue && <AlertTriangle className="size-3" />}
-        {formatDate(issue.dueDate) ?? "—"}
+        {formatDate(issue.dueDate) ?? "-"}
       </span>
 
       {/* Assignee */}

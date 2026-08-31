@@ -1,5 +1,5 @@
 /**
- * Filtres SVG du mode daltonien — appliqués à `body` (toute l'app, portails inclus ; cf. `globals.css`),
+ * Filtres SVG du mode daltonien - appliqués à `body` (toute l'app, portails inclus ; cf. `globals.css`),
  * pilotés par `preferences-store.colorblindMode`.
  *
  * <p>Chaque filtre est la <b>daltonisation</b> (correction) précalculée en <b>une seule matrice</b>
@@ -9,7 +9,7 @@
  * pixel) ; une matrice unique produit la même correction ET fonctionne. Effet vérifié : rouge et vert
  * deviennent distinguables ; les couleurs non confondues (ambre/bleu) bougent à peine.</p>
  *
- * <p>Complément — pas un remplacement — du mode « contraste élevé » (tokens sémantiques) et du principe
+ * <p>Complément - pas un remplacement - du mode « contraste élevé » (tokens sémantiques) et du principe
  * « jamais la couleur seule » (couleur + icône + libellé). Rendu caché (0×0), monté une fois au layout.</p>
  */
 export function A11yFilters() {

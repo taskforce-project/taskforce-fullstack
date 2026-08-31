@@ -163,7 +163,7 @@ const ISSUE_COLUMNS: DataTableColumn<Issue>[] = [
   },
   {
     key: "due", header: "Due", icon: <CalendarDays className="size-3" />, align: "right", className: "hidden w-24 md:table-cell",
-    render: (i) => <span className="text-xs text-muted-foreground">{i.dueDate ?? "—"}</span>,
+    render: (i) => <span className="text-xs text-muted-foreground">{i.dueDate ?? "-"}</span>,
     sortValue: (i) => i.dueTs ?? Number.POSITIVE_INFINITY,
   },
 ]
@@ -198,7 +198,7 @@ const CYCLE_COLUMNS: DataTableColumn<Cycle>[] = [
   {
     key: "progress", header: "Progress", className: "hidden w-32 lg:table-cell",
     render: (c) => c.status === "upcoming"
-      ? <span className="text-xs text-muted-foreground">—</span>
+      ? <span className="text-xs text-muted-foreground">-</span>
       : (
         <span className="flex items-center gap-2">
           <Progress value={c.progress} className="h-1.5 flex-1" />
@@ -283,8 +283,8 @@ function mapWorkspaceCycle({ cycle: c, projectId, projectName }: WorkspaceCycle,
     progress:        c.issueCount > 0 ? Math.round((c.completedCount / c.issueCount) * 100) : 0,
     totalIssues:     c.issueCount,
     completedIssues: c.completedCount,
-    startDate:       c.startDate ? new Date(c.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—",
-    endDate:         c.endDate   ? new Date(c.endDate).toLocaleDateString("en-US",   { month: "short", day: "numeric" }) : "—",
+    startDate:       c.startDate ? new Date(c.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "-",
+    endDate:         c.endDate   ? new Date(c.endDate).toLocaleDateString("en-US",   { month: "short", day: "numeric" }) : "-",
     daysLeft:        daysLeftMs !== null && daysLeftMs > 0 ? daysLeftMs : null,
     url:             `${baseUrl}/projects/${projectId}/cycles/${c.id}`,
   }
@@ -345,7 +345,7 @@ export function MyWorkView({ defaultTab }: MyWorkViewProps) {
       // en quelques navigations et donnait une application figée.
       //
       // Mode tolérant conservé : une section en échec (droits, indispo ponctuelle) ne doit pas
-      // faire tomber toute la vue — `allSettled`, on ne garde que les succès.
+      // faire tomber toute la vue - `allSettled`, on ne garde que les succès.
       const [issuesRes, cyclesRes, pagesRes] = await Promise.allSettled([
         listMyIssues(slug),
         listWorkspaceCycles(slug),
@@ -429,7 +429,7 @@ export function MyWorkView({ defaultTab }: MyWorkViewProps) {
         }
       />
 
-      {/* Onglets de tri (All / Issues / Sprints / Pages) — QA2-23 */}
+      {/* Onglets de tri (All / Issues / Sprints / Pages) - QA2-23 */}
       <Tabs value={tab} onValueChange={(v) => setTab(v as QueueTab)}>
         <TabsList>
           <TabsTrigger value="all">All</TabsTrigger>

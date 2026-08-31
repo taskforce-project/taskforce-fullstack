@@ -16,7 +16,7 @@ interface ErrorPageProps {
 
 export default function ErrorPage({ error, reset }: Readonly<ErrorPageProps>) {
   useEffect(() => {
-    // Journalisation serveur (E25) — best-effort.
+    // Journalisation serveur (E25) - best-effort.
     reportClientError("error", error.message || "Route error", `error.tsx${error.digest ? " digest=" + error.digest : ""}`, error.stack);
     toast.error("An unexpected error occurred", {
       description: error.message || "Try reloading the page.",

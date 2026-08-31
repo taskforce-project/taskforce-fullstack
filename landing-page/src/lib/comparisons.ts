@@ -1,9 +1,9 @@
 /**
- * comparisons.ts — données des fiches `/vs/{key}`.
+ * comparisons.ts - données des fiches `/vs/{key}`.
  *
  * RÈGLE (honnêteté + fair-play) : on mène par ce que le concurrent fait DE BIEN (crédibilité), on ne
  * dit jamais « il est mauvais ». Les différences sont formulées « not its focus », pas « ✗ ». Les
- * agents de code sont COMPLÉMENTAIRES — TaskForce les utilise comme assignés. `kind` change le cadrage.
+ * agents de code sont COMPLÉMENTAIRES - TaskForce les utilise comme assignés. `kind` change le cadrage.
  */
 
 export type Comparison = {
@@ -30,19 +30,19 @@ export const COMPARISONS: Record<string, Comparison> = {
       "Issue tracking, sprints and reporting teams already know",
     ],
     adds: [
-      "AI drafts the spec, approach and breakdown — as reviewed artifacts, not tickets typed by hand",
+      "AI drafts the spec, approach and breakdown - as reviewed artifacts, not tickets typed by hand",
       "A human approves each checkpoint, and the approval is recorded",
       "The reasoning behind each decision is kept in memory for the next run",
       "Coding agents are orchestrated as assignees, within the same governed flow",
     ],
     rows: [
       { dim: "Issue tracking", them: "Deep and mature", us: "Real-time board, issues and cycles" },
-      { dim: "AI-drafted delivery artifacts", them: "Not its focus", us: "Spec, approach, breakdown — governed" },
+      { dim: "AI-drafted delivery artifacts", them: "Not its focus", us: "Spec, approach, breakdown - governed" },
       { dim: "Decision memory", them: "Not its focus", us: "Reasoning kept as a graph" },
       { dim: "Human approval as a primitive", them: "Workflow states", us: "A checkpoint sign-off, recorded" },
       { dim: "Coding-agent orchestration", them: "Not its focus", us: "Agents as assignees" },
     ],
-    together: "Keep Jira as your tracker if it's your system of record. TaskForce adds the governed AI delivery layer above it — and a Jira connector is in the catalogue.",
+    together: "Keep Jira as your tracker if it's your system of record. TaskForce adds the governed AI delivery layer above it - and a Jira connector is in the catalogue.",
     bottomLine: "Choose Jira for configurable enterprise tracking. Add TaskForce for governed, memory-backed AI delivery on top.",
   },
   linear: {
@@ -58,7 +58,7 @@ export const COMPARISONS: Record<string, Comparison> = {
     adds: [
       "The same board feel, plus validated checkpoints before work moves forward",
       "AI that drafts the spec and approach for a human to approve",
-      "A memory of why decisions were made — not just what changed",
+      "A memory of why decisions were made - not just what changed",
       "Orchestration of the coding agents your team already uses",
     ],
     rows: [
@@ -75,14 +75,14 @@ export const COMPARISONS: Record<string, Comparison> = {
     key: "notion",
     name: "Notion",
     kind: "tracker",
-    lead: "Notion is where flexible docs and wikis live. TaskForce makes the spec, the decision and the sign-off outputs of the run itself — not pages you maintain by hand.",
+    lead: "Notion is where flexible docs and wikis live. TaskForce makes the spec, the decision and the sign-off outputs of the run itself - not pages you maintain by hand.",
     goodAt: [
       "Flexible documents, wikis and databases",
       "A great home for freeform knowledge and notes",
       "Highly customizable to how a team likes to work",
     ],
     adds: [
-      "Delivery artifacts — spec, decision, QA — produced by the run, not written from scratch",
+      "Delivery artifacts - spec, decision, QA - produced by the run, not written from scratch",
       "A human approval attached to each artifact, and kept",
       "A memory graph of decisions, not documents you have to keep current",
       "The governed run that ties artifacts to the work that produced them",
@@ -94,7 +94,7 @@ export const COMPARISONS: Record<string, Comparison> = {
       { dim: "Human approval as a primitive", them: "Not its focus", us: "A checkpoint sign-off, recorded" },
       { dim: "Coding-agent orchestration", them: "Not its focus", us: "Agents as assignees" },
     ],
-    together: "Keep Notion for freeform knowledge. Let TaskForce produce the delivery artifacts as a byproduct of governed runs — a Notion connector is in the catalogue.",
+    together: "Keep Notion for freeform knowledge. Let TaskForce produce the delivery artifacts as a byproduct of governed runs - a Notion connector is in the catalogue.",
     bottomLine: "Choose Notion for flexible docs. Use TaskForce when you want spec, decision and sign-off to be outputs of the work itself.",
   },
   shortcut: {
@@ -127,7 +127,7 @@ export const COMPARISONS: Record<string, Comparison> = {
     key: "claude-code-alone",
     name: "Claude Code alone",
     kind: "agent",
-    lead: "A coding agent writes and ships code fast. TaskForce frames the work first, keeps a human on each decision, remembers why — then hands the build to that same agent.",
+    lead: "A coding agent writes and ships code fast. TaskForce frames the work first, keeps a human on each decision, remembers why - then hands the build to that same agent.",
     goodAt: [
       "Writing, editing and shipping code directly in your repo",
       "Fast, capable execution on well-scoped tasks",
@@ -137,7 +137,7 @@ export const COMPARISONS: Record<string, Comparison> = {
       "Framing the work into a reviewed spec and approach before any code is written",
       "A human approval on each consequential decision, recorded",
       "Memory of the decisions and constraints, so the next task starts with context",
-      "Routing the work to Claude Code as an assignee — same board, same review",
+      "Routing the work to Claude Code as an assignee - same board, same review",
     ],
     rows: [
       { dim: "Writing & shipping code", them: "Its whole job", us: "Delegated to the agent you choose" },
@@ -146,7 +146,7 @@ export const COMPARISONS: Record<string, Comparison> = {
       { dim: "Decision memory", them: "Per-session context", us: "Kept across runs" },
       { dim: "Multi-agent orchestration", them: "One agent", us: "Specialized roles, one accountable chain" },
     ],
-    together: "This isn't either/or. TaskForce uses Claude Code (or Cursor, or Copilot) as the executor — it governs the decisions around it and keeps the trail.",
+    together: "This isn't either/or. TaskForce uses Claude Code (or Cursor, or Copilot) as the executor - it governs the decisions around it and keeps the trail.",
     bottomLine: "Keep using your coding agent. Add TaskForce when you want the decisions around it framed, approved and remembered.",
   },
   devin: {
@@ -160,7 +160,7 @@ export const COMPARISONS: Record<string, Comparison> = {
       "A bet on how far autonomy can go",
     ],
     adds: [
-      "A human decision at each checkpoint — governance is the point, not an option",
+      "A human decision at each checkpoint - governance is the point, not an option",
       "Model- and agent-agnostic orchestration, rather than a single closed loop",
       "The reasoning kept, so decisions are attributable long after the fact",
       "Freedom to use the coding agent you already trust as the executor",
@@ -179,7 +179,7 @@ export const COMPARISONS: Record<string, Comparison> = {
     key: "cursor",
     name: "Cursor",
     kind: "agent",
-    lead: "Cursor is an AI-native editor that helps you write code. TaskForce governs the delivery around it — and can route work to it as an assignee.",
+    lead: "Cursor is an AI-native editor that helps you write code. TaskForce governs the delivery around it - and can route work to it as an assignee.",
     goodAt: [
       "An excellent AI-native coding editor",
       "Fast, in-context help while you write code",

@@ -51,7 +51,7 @@ export function AuthStepper({ current }: AuthStepperProps) {
         })}
       </div>
 
-      {/* Un libellé par segment (gap identique : 0.375rem) — le parcours est lisible d'entrée. */}
+      {/* Un libellé par segment (gap identique : 0.375rem) - le parcours est lisible d'entrée. */}
       <div className="mt-2 flex gap-1.5">
         {REGISTER_STEPS.map((label, index) => {
           const position = index + 1;

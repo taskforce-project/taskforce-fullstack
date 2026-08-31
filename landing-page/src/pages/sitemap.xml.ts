@@ -1,7 +1,7 @@
 import { BUILT_ROUTES } from "@/components/site/nav";
 
 /**
- * sitemap.xml — généré à partir de `BUILT_ROUTES` (source unique des pages construites).
+ * sitemap.xml - généré à partir de `BUILT_ROUTES` (source unique des pages construites).
  * Ajouter une page = l'ajouter à BUILT_ROUTES, elle entre ici automatiquement. Aucune liste à tenir.
  */
 // Même dérivation que nav.ts : suffixe (domaine) en variable d'env, défaut = domaine de prod réel.

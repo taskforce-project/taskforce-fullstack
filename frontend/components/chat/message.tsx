@@ -35,7 +35,7 @@ export function Message({ role, content, children, className }: MessageProps) {
       )}
       <div className={cn(
         "max-w-[85%] text-sm leading-relaxed",
-        // Réponse assistant : ni bordure ni fond ni ombre (retour user) — juste le texte, façon chat.
+        // Réponse assistant : ni bordure ni fond ni ombre (retour user) - juste le texte, façon chat.
         isUser
           ? "rounded-2xl rounded-br-sm bg-foreground px-3.5 py-2.5 text-background"
           : "pt-0.5 text-foreground",

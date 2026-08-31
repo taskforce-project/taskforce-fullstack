@@ -3,7 +3,7 @@ import { SlidersHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
- * LabField — signature #1 : le « champ expérimental » du hero Labs.
+ * LabField - signature #1 : le « champ expérimental » du hero Labs.
  *
  * Canvas 2D (aucune dépendance, aucun WebGL) : une trame de points sur grille qu'une
  * « sonde » éclaire par proximité. La sonde suit le curseur ; sans curseur (idle / tactile)
@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
  *  - pause hors-écran (IntersectionObserver) et onglet caché (visibilitychange) ;
  *  - `prefers-reduced-motion` → une seule image statique, pas de rAF ;
  *  - pointeur grossier (tactile) → pas de suivi curseur, dérive ambiante seule ;
- *  - canvas `aria-hidden`, `pointer-events:none` — purement décoratif, le texte reste sélectionnable.
+ *  - canvas `aria-hidden`, `pointer-events:none` - purement décoratif, le texte reste sélectionnable.
  *
  * Le petit panneau « Customize the field » (brief §8) ne touche QUE le visuel (motion/densité/grille),
  * jamais le contenu métier. Boutons réels, focus clavier, `aria-pressed`.
@@ -127,7 +127,7 @@ export default function LabField({ controls = false, intensity = "full", classNa
       probe.x += (probe.tx - probe.x) * 0.08;
       probe.y += (probe.ty - probe.y) * 0.08;
 
-      // Halo de la sonde (additif, discret — violet Labs)
+      // Halo de la sonde (additif, discret - violet Labs)
       ctx.save();
       ctx.globalCompositeOperation = "lighter";
       const glow = ctx.createRadialGradient(probe.x, probe.y, 0, probe.x, probe.y, R * 1.4);
@@ -159,7 +159,7 @@ export default function LabField({ controls = false, intensity = "full", classNa
         ctx.fill();
       }
 
-      // Liens de la sonde vers les points les plus proches — « l'instrument touche le champ »
+      // Liens de la sonde vers les points les plus proches - « l'instrument touche le champ »
       near.sort((n1, n2) => n1.d - n2.d);
       ctx.lineWidth = 1;
       for (const n of near.slice(0, 6)) {
@@ -196,7 +196,7 @@ export default function LabField({ controls = false, intensity = "full", classNa
     };
 
     build();
-    draw(false); // 1re image SYNCHRONE — le rAF peut être throttlé au 1er paint (ou preview non-composité)
+    draw(false); // 1re image SYNCHRONE - le rAF peut être throttlé au 1er paint (ou preview non-composité)
     start();
 
     // ── Suivi curseur (jamais sur pointeur tactile) ──

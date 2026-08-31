@@ -120,7 +120,7 @@ export function NavUser({
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {/* CTA upgrade — uniquement si le plan n'est pas Pro (évite le séparateur orphelin) */}
+            {/* CTA upgrade - uniquement si le plan n'est pas Pro (évite le séparateur orphelin) */}
             {!isPro && (
               <>
                 <DropdownMenuGroup>

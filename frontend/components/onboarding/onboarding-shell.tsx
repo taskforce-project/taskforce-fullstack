@@ -19,11 +19,11 @@ import {
 } from "@/components/ui/sidebar";
 
 /**
- * Coquille de l'onboarding — donne au wizard l'allure exacte de l'application.
+ * Coquille de l'onboarding - donne au wizard l'allure exacte de l'application.
  *
  * <p>Le reproche initial (« j'ai l'impression d'avoir quitté TaskForce ») venait d'une carte flottante
  * sur page vide. On reprend le <b>vrai composant `Sidebar` de l'app</b> (mêmes jetons, même largeur) et,
- * après un essai « sidebar vide » jugé trop creux, on la <b>remplit avec les étapes</b> — via les vraies
+ * après un essai « sidebar vide » jugé trop creux, on la <b>remplit avec les étapes</b> - via les vraies
  * primitives `SidebarMenu`/`SidebarMenuButton`, donc rendu 100 % natif (fond actif `sidebar-accent`,
  * survol, etc.), pas un stepper custom. Marque en haut, compte en bas, comme le châssis Linear demandé.</p>
  *
@@ -37,7 +37,7 @@ export interface OnboardingShellProps {
   readonly steps: readonly string[];
   /** Étape courante (1-based). */
   readonly current: number;
-  /** Étape la plus avancée atteinte (1-based) — on ne peut sauter que jusqu'à elle. */
+  /** Étape la plus avancée atteinte (1-based) - on ne peut sauter que jusqu'à elle. */
   readonly maxReached: number;
   readonly onSelectStep: (step: number) => void;
   readonly account: { readonly name: string; readonly email: string; readonly avatarUrl: string };
@@ -155,7 +155,7 @@ export function OnboardingShell({
           </div>
         </div>
 
-        {/* Footer ancré — même hauteur que la barre profil pour que les bordures s'alignent. */}
+        {/* Footer ancré - même hauteur que la barre profil pour que les bordures s'alignent. */}
         <div className="flex h-16 shrink-0 items-center border-t border-border px-6 md:px-10">
           <div className="mx-auto flex w-full max-w-2xl items-center justify-between">{footer}</div>
         </div>

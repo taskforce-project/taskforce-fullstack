@@ -7,14 +7,14 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
 /**
- * DemoForm — îlot du formulaire de démo.
+ * DemoForm - îlot du formulaire de démo.
  *
  * Pas de backend côté landing (le CRM viendra plus tard, cf. [besoin-backend]). Pour rester
  * HONNÊTE et fonctionnel dès maintenant, l'envoi compose un `mailto:` pré-rempli : le client
  * mail du visiteur s'ouvre avec ses infos. Le jour où l'API existe, on remplace `onSubmit` par un POST.
  *
  * Qualifié (review user) : email pro, société, taille d'équipe, **sujet d'intérêt**, et « what would
- * you like us to run? » — on veut que le prospect arrive avec un vrai outcome à passer.
+ * you like us to run? » - on veut que le prospect arrive avec un vrai outcome à passer.
  */
 
 const CONTACT = "contact@taskforce-project.fr";
@@ -56,7 +56,7 @@ export function DemoForm() {
       setForm((f) => ({ ...f, [key]: e.target.value }));
 
   const mailtoHref = (() => {
-    const subject = `Demo request — ${form.company || form.name || "TaskForce"}`;
+    const subject = `Demo request - ${form.company || form.name || "TaskForce"}`;
     const body = [
       `Name: ${form.name}`,
       `Work email: ${form.email}`,
@@ -148,7 +148,7 @@ export function DemoForm() {
           rows={4}
           value={form.message}
           onChange={set("message")}
-          placeholder="A feature, migration, technical initiative — or simply the workflow you'd like to improve."
+          placeholder="A feature, migration, technical initiative - or simply the workflow you'd like to improve."
         />
         <p className="text-muted-foreground text-[12px]">
           A short description is enough. You don't need to prepare anything.

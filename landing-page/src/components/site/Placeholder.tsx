@@ -2,13 +2,13 @@ import { ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
- * Placeholder — remplace les faux écrans produit et les images, le temps d'avoir
+ * Placeholder - remplace les faux écrans produit et les images, le temps d'avoir
  * les vrais assets (décision user : « à la place des screens, des placeholders ;
  * les images aussi »).
  *
  * Volontairement neutre et STATIQUE : pas d'animation, pas de fausse UI. Un cadre
  * en pointillés, une étiquette, une proportion. C'est un trou à remplir, pas une
- * illustration — et ça se voit, ce qui est le but.
+ * illustration - et ça se voit, ce qui est le but.
  */
 export function Placeholder({
   label = "Placeholder",
