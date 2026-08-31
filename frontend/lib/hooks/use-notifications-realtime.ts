@@ -14,7 +14,7 @@ import type { NotificationResponse } from "@/lib/api/notification-service"
  * Le backend publie sur `/topic/notifications.{recipientId}` (NotificationService) ;
  * on prepend la notification au store (dédup par id, incrément du compteur non-lu).
  *
- * @param slug — slug du workspace actif (réutilisé pour cohérence avec le board) ; sert
+ * @param slug - slug du workspace actif (réutilisé pour cohérence avec le board) ; sert
  *               surtout de garde : on ne s'abonne que dans un workspace.
  */
 export function useNotificationsRealtime(slug: string | undefined) {
@@ -38,7 +38,7 @@ export function useNotificationsRealtime(slug: string | undefined) {
         const notification = JSON.parse(msg.body) as NotificationResponse
         pushSignal(notification)
         // Toast « live » : la notif in-app se voit à l'instant (pas seulement le badge de la cloche).
-        // On ne reçoit ici QUE les événements dont le canal in-app est activé (gating côté back) —
+        // On ne reçoit ici QUE les événements dont le canal in-app est activé (gating côté back) -
         // donc pas besoin de re-vérifier la préférence, et pas de spam.
         const opts = { description: notification.body ?? undefined }
         if (notification.urgency === "critical") toast.error(notification.title, opts)
@@ -52,7 +52,7 @@ export function useNotificationsRealtime(slug: string | undefined) {
     async function activate(useSockJs: boolean) {
       if (disposed) return
       // Fallback chargé À LA DEMANDE : sur le chemin nominal (WS natif), SockJS n'est jamais importé,
-      // donc son écouteur `unload` — déprécié (audit Lighthouse best-practices) — n'est pas enregistré
+      // donc son écouteur `unload` - déprécié (audit Lighthouse best-practices) - n'est pas enregistré
       // et il ne pèse pas sur le bundle initial. Le repli reste identique si le WS natif échoue.
       const SockJS = useSockJs ? (await import("sockjs-client")).default : null
       if (disposed) return

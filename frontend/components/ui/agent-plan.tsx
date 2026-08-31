@@ -11,7 +11,7 @@ import {
 import { motion, AnimatePresence, LayoutGroup, type Variants } from "framer-motion"
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Types (exportés) — pilotés par le backend (workflow IA) : statut mis à jour en
+// Types (exportés) - pilotés par le backend (workflow IA) : statut mis à jour en
 // direct via STOMP. Composant purement **présentation** (pas de mutation locale).
 // ─────────────────────────────────────────────────────────────────────────────
 

@@ -139,7 +139,7 @@ function VelocityCell({ delta }: { readonly delta: number | null }) {
   if (delta === null || delta === 0) {
     return (
       <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-        <Minus className="size-3" /> {delta === null ? "N/A" : "—"}
+        <Minus className="size-3" /> {delta === null ? "N/A" : "-"}
       </span>
     )
   }
@@ -158,7 +158,7 @@ function MemberStack({ project }: { readonly project: Project }) {
   return (
     <div className="flex items-center -space-x-1.5">
       {visible.map((m) => (
-        // `UserAvatar` (et non Avatar brut) : composant partagé de l'app — même PDP pour un même
+        // `UserAvatar` (et non Avatar brut) : composant partagé de l'app - même PDP pour un même
         // utilisateur partout, et fond opaque hérité (les identicons par défaut sont transparents).
         <UserAvatar
           key={m.id}
@@ -179,7 +179,7 @@ function MemberStack({ project }: { readonly project: Project }) {
 }
 
 /**
- * Visibilité du projet — information de gouvernance : « privé » veut dire que seuls ses
+ * Visibilité du projet - information de gouvernance : « privé » veut dire que seuls ses
  * collaborateurs y accèdent. Affichée en clair plutôt que devinée depuis les réglages.
  */
 function VisibilityBadge({ isPublic }: { readonly isPublic: boolean }) {
@@ -193,7 +193,7 @@ function VisibilityBadge({ isPublic }: { readonly isPublic: boolean }) {
 
 // ─── Stats strip ──────────────────────────────────────────────────────────────
 
-/** Fenêtre de l'historique de santé — 30 jours : assez pour voir une tendance, assez court pour rester lisible dans une cellule de KPI. */
+/** Fenêtre de l'historique de santé - 30 jours : assez pour voir une tendance, assez court pour rester lisible dans une cellule de KPI. */
 const HEALTH_WINDOW_DAYS = 30
 
 function StatsStrip({
@@ -210,7 +210,7 @@ function StatsStrip({
   const avgProgress = total > 0 ? Math.round(projects.reduce((acc, p) => acc + progressPct(p), 0) / total) : 0
 
   // `renderZero` : ici zéro est l'OBJECTIF. Une ligne plate au plancher signifie « aucune opération
-  // en difficulté sur 30 jours » — c'est le résultat qu'on veut voir, pas une absence de données.
+  // en difficulté sur 30 jours » - c'est le résultat qu'on veut voir, pas une absence de données.
   const riskTrend = (tone: "red", key: "atRisk" | "critical") => (
     <Sparkline
       values={history.map((p) => p[key])}
@@ -283,7 +283,7 @@ function OperationRow({
       <TableCell><HealthBadge level={health} /></TableCell>
       <TableCell className="hidden lg:table-cell">
         {/* Même lecture qu'en vue cartes : la forme de l'activité, sans quitter la liste. */}
-        <Sparkline values={activity} tone="blue" height={28} className="w-24" emptyLabel="—" />
+        <Sparkline values={activity} tone="blue" height={28} className="w-24" emptyLabel="-" />
       </TableCell>
       <TableCell className="hidden md:table-cell">
         {riskSignal ? (
@@ -311,7 +311,7 @@ function OperationRow({
       </TableCell>
       <TableCell className="text-right">
         <div className="flex items-center justify-end gap-0.5">
-          {/* Pin (favori) — épinglé en tête de liste (QA2-22) */}
+          {/* Pin (favori) - épinglé en tête de liste (QA2-22) */}
           <Button
             variant="ghost"
             size="icon-sm"
@@ -321,7 +321,7 @@ function OperationRow({
           >
             <Star className={cn("size-4", project.isFavorite && "fill-amber-400 text-amber-400")} />
           </Button>
-          {/* Archive / Réactiver — action directe (QA2-22 : plus cachée dans le « … ») */}
+          {/* Archive / Réactiver - action directe (QA2-22 : plus cachée dans le « … ») */}
           {project.status === "ARCHIVED" ? (
             <Button
               variant="ghost"
@@ -380,7 +380,7 @@ function ProjectCard({
 }: {
   readonly project: Project
   readonly slug: string
-  /** Fournie par la page (un seul appel groupé) — plus de requête par carte. */
+  /** Fournie par la page (un seul appel groupé) - plus de requête par carte. */
   readonly activity: readonly number[]
 }) {
   const router = useRouter()
@@ -425,7 +425,7 @@ function ProjectCard({
         <p className="line-clamp-2 text-xs text-muted-foreground">{project.description}</p>
       )}
 
-      {/* Activité (sparkline bleu, façon GitHub) — remplace la barre de progression.
+      {/* Activité (sparkline bleu, façon GitHub) - remplace la barre de progression.
           `-mb-3` annule le `gap-3` de la carte : le dégradé rejoint le filet séparateur du bas
           au lieu de flotter au-dessus. */}
       <div className="mt-auto -mb-3">
@@ -513,14 +513,14 @@ function EmptyState({ isSearch }: { readonly isSearch: boolean }) {
 export default function ProjectsPage() {
   const params = useParams<{ workspace: string }>()
   const slug = params.workspace
-  // « New project » ouvre le modal GLOBAL en place (cf. useCreateProjectStore) — plus de `?new=1`,
+  // « New project » ouvre le modal GLOBAL en place (cf. useCreateProjectStore) - plus de `?new=1`,
   // donc plus de changement de page qui faisait clignoter le modal.
   const openCreateProject = useCreateProjectStore((s) => s.openCreateProject)
 
   const { projects, isLoading, fetchProjects } = useProjectStore()
   const [filter, setFilter] = useState<FilterTab>("active")
   const [search, setSearch] = useState("")
-  // Liste par défaut (façon Linear : dense, typographique) — les cartes restent dispo via le sélecteur.
+  // Liste par défaut (façon Linear : dense, typographique) - les cartes restent dispo via le sélecteur.
   const [view, setView] = useState<"list" | "cards">("list")
   const [sortBy, setSortBy] = useState<SortKey>("health")
 
@@ -636,7 +636,7 @@ export default function ProjectsPage() {
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-          {/* Vue liste / cartes — LISTE en premier (vue par défaut, façon Linear). */}
+          {/* Vue liste / cartes - LISTE en premier (vue par défaut, façon Linear). */}
           <div className="flex items-center rounded-md border border-border p-0.5">
             <button
               type="button"

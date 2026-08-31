@@ -7,7 +7,7 @@ import { DecisionGraph } from "./DecisionGraph";
 import { cn } from "@/lib/utils";
 
 /**
- * Showcase — des archétypes de section VARIÉS (inspirés de la structure de
+ * Showcase - des archétypes de section VARIÉS (inspirés de la structure de
  * relevanceai.com), pour casser la monotonie des `FeatureSplit` répétés.
  * Aucun faux écran animé : les visuels sont des placeholders, le reste est du
  * contenu. Ce qui change d'une section à l'autre, c'est le GABARIT.
@@ -25,7 +25,7 @@ const TEAMS: { key: string; label: string; cards: { title: string; text: string 
     label: "Engineering",
     cards: [
       { title: "Ship a feature", text: "Spec, break down, hand code to an agent, review the PR." },
-      { title: "Triage the backlog", text: "Issues sized and routed to the right dev — or an agent." },
+      { title: "Triage the backlog", text: "Issues sized and routed to the right dev - or an agent." },
       { title: "Reproduce a bug", text: "A clean repro and a failing test before anyone opens the file." },
     ],
   },
@@ -50,14 +50,14 @@ const TEAMS: { key: string; label: string; cards: { title: string; text: string 
 ];
 
 export function TeamGrid() {
-  const eng = TEAMS[0]; // Engineering — le wedge assumé (review 5, Option A). Statique, plus d'onglet.
+  const eng = TEAMS[0]; // Engineering - le wedge assumé (review 5, Option A). Statique, plus d'onglet.
 
   return (
     <Section>
       <SectionHeader
         eyebrow="Who it’s for"
         title="Built for engineering teams first"
-        lead="TaskForce is engineering-first, and we don’t hide it. But a governed run with a sign-off at each step isn’t specific to code — it expands to every team that ships reviewed work."
+        lead="TaskForce is engineering-first, and we don’t hide it. But a governed run with a sign-off at each step isn’t specific to code - it expands to every team that ships reviewed work."
       />
 
       {/* Le wedge assumé : les cas engineering en clair, l'élargissement annoncé (pas simulé). */}
@@ -80,7 +80,7 @@ export function TeamGrid() {
       <div className="mt-10 flex flex-wrap items-center justify-between gap-4 border-t pt-8">
         <p className="text-muted-foreground max-w-xl text-[14px]">
           <span className="text-foreground font-medium">Start with one workflow, not a migration.</span>{" "}
-          TaskForce is the missing layer between your tracker and your coding agent — it sits on top
+          TaskForce is the missing layer between your tracker and your coding agent - it sits on top
           of the board, repo and review you already use.
         </p>
         <Button asChild size="pill">
@@ -106,7 +106,7 @@ export function Phases() {
       <SectionHeader
         eyebrow="Getting started"
         title="Start with one workflow, not a migration"
-        lead="No rip-and-replace. TaskForce is the missing layer between your tracker and your coding agent — it sits on top of the board, repo and review you already use, and hands the work back."
+        lead="No rip-and-replace. TaskForce is the missing layer between your tracker and your coding agent - it sits on top of the board, repo and review you already use, and hands the work back."
       />
 
       <div className="mt-12 grid gap-5 lg:grid-cols-[1fr_1fr_1.4fr]">
@@ -155,7 +155,7 @@ export function StackReplaces() {
       <SectionHeader
         eyebrow="One system"
         title="One platform instead of four you wire together"
-        lead="Most teams bolt a router, a queue, a tracker and an audit log together just to run agents through review. Here it is one system — and the pieces already know about each other."
+        lead="Most teams bolt a router, a queue, a tracker and an audit log together just to run agents through review. Here it is one system - and the pieces already know about each other."
       />
 
       <div className="mt-12 grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
@@ -184,14 +184,14 @@ export function StackReplaces() {
 }
 
 /* ─────────────────────────  E. Grille de features (bento)  ─────────────────────────
- * Remplace 4 `FeatureSplit` texte identiques par UNE grille de cartes — même
+ * Remplace 4 `FeatureSplit` texte identiques par UNE grille de cartes - même
  * contenu, gabarit différent. Chaque carte : placeholder + badge de maturité + texte. */
 
 const FEATURES: { title: string; level: "live" | "beta" | "labs"; text: string; wide?: boolean }[] = [
   {
     title: "Brain OS",
     level: "beta",
-    text: "Define the context once — your architecture, decisions, conventions. Agents read from the same place instead of being told again in every prompt.",
+    text: "Define the context once - your architecture, decisions, conventions. Agents read from the same place instead of being told again in every prompt.",
     wide: true,
   },
   {
@@ -202,7 +202,7 @@ const FEATURES: { title: string; level: "live" | "beta" | "labs"; text: string; 
   {
     title: "Models, your call",
     level: "labs",
-    text: "Routine steps on a model you host; the hard ones can call something stronger — or never leave your network.",
+    text: "Routine steps on a model you host; the hard ones can call something stronger - or never leave your network.",
   },
   {
     title: "Delivery analytics",
@@ -224,7 +224,7 @@ export function FeatureCards() {
       <SectionHeader
         eyebrow="What makes a run work"
         title="Four things that only pay off in the same system"
-        lead="Each is useful alone. Together, in one platform, they feed each other — which is exactly what you cannot bolt on afterwards."
+        lead="Each is useful alone. Together, in one platform, they feed each other - which is exactly what you cannot bolt on afterwards."
       />
       <ul className="mt-12 grid gap-5 sm:grid-cols-2">
         {FEATURES.map((f) => (
@@ -277,7 +277,7 @@ export function BigShot() {
         align="center"
         eyebrow="The workspace"
         title="Everything lands in one place you can read"
-        lead="Runs, checkpoints, approvals and the audit trail — in the same workspace your team already lives in."
+        lead="Runs, checkpoints, approvals and the audit trail - in the same workspace your team already lives in."
       />
       <div className="mt-12 rounded-3xl border p-4 sm:p-8 [background:radial-gradient(120%_100%_at_50%_0%,color-mix(in_oklab,var(--primary)_8%,transparent),transparent_70%)]">
         <Placeholder label="TaskForce workspace" ratio="16 / 9" className="bg-card/70 shadow-lg" />
@@ -303,7 +303,7 @@ export function Testimonials() {
             <div className="bg-secondary/70 h-4 w-[70%] rounded" />
           </div>
           <p className="text-muted-foreground mt-6 text-[13px]">
-            Customer stories go here once early teams are live — a real quote, name and role.
+            Customer stories go here once early teams are live - a real quote, name and role.
           </p>
         </div>
 
@@ -334,8 +334,8 @@ export function Testimonials() {
  * (contexte partagé). Porte l'argument « un seul système » de façon concrète. */
 
 const SYSTEMS = [
-  { verb: "Plan", part: "Agent runtime", text: "Agents draft each checkpoint — the vision, the spec, the architecture." },
-  { verb: "Remember", part: "TaskForce Memory", text: "Links every decision, constraint and trade-off — with the reason attached." },
+  { verb: "Plan", part: "Agent runtime", text: "Agents draft each checkpoint - the vision, the spec, the architecture." },
+  { verb: "Remember", part: "TaskForce Memory", text: "Links every decision, constraint and trade-off - with the reason attached." },
   { verb: "Execute", part: "Workflow engine", text: "The governed run: checkpoints, approvals and assignment." },
   { verb: "Verify", part: "Audit system", text: "Every decision, approval and model call, recorded." },
 ];
@@ -348,7 +348,7 @@ export function Synergy() {
         indexHref="/product"
         eyebrow="Why it’s different"
         title="A delivery system, not an assistant"
-        lead="Most AI tools optimize execution. TaskForce optimizes the system that decides what gets executed — one platform where planning, memory, the governed run and the audit trail already know about each other, instead of four tools you wire together."
+        lead="Most AI tools optimize execution. TaskForce optimizes the system that decides what gets executed - one platform where planning, memory, the governed run and the audit trail already know about each other, instead of four tools you wire together."
       />
 
       {/* Le « pourquoi les outils actuels ne suffisent pas », en trois lignes (review 4). */}
@@ -373,13 +373,13 @@ export function Synergy() {
         ))}
       </ul>
 
-      {/* Bento : la couche de savoir — c'est elle qui retient le contexte (lien avec « The problem »).
+      {/* Bento : la couche de savoir - c'est elle qui retient le contexte (lien avec « The problem »).
           De-cardé : bande edge-to-edge à filet (pas de card flottante). */}
       <div className="bg-card -mx-6 mt-6 grid items-center gap-8 border-y border-border px-6 py-8 sm:px-8 lg:-mx-10 lg:grid-cols-2 lg:gap-14 lg:px-10">
         <div>
           <h3 className="t-h3">Git remembers what changed. TaskForce remembers why.</h3>
           <p className="text-muted-foreground mt-3 text-[14px] leading-7">
-            Not a search box over your docs — a map of why. TaskForce Memory links the decisions,
+            Not a search box over your docs - a map of why. TaskForce Memory links the decisions,
             constraints and trade-offs behind the system, and how they connect. Every run reads why
             the system is the way it is, and writes its own decisions back. Retrieval hands you
             passages; this hands you the reasoning.
@@ -395,9 +395,9 @@ export function Synergy() {
         <DecisionGraph />
       </div>
 
-      {/* Gain quotidien (fondu depuis l'ancien Pillars) — équilibre le discours de contrôle. */}
+      {/* Gain quotidien (fondu depuis l'ancien Pillars) - équilibre le discours de contrôle. */}
       <p className="text-muted-foreground mt-10 max-w-2xl text-[14px] leading-7">
-        The payoff is daily: fewer meetings, fewer half-written tickets, less context re-explained —
+        The payoff is daily: fewer meetings, fewer half-written tickets, less context re-explained -
         and agents that already understand your system.
       </p>
     </Section>
@@ -464,7 +464,7 @@ export function FeatureShowcase() {
  * Gabarit repris tel quel de la home de Linear : les 3 cartes juste après le hero
  * (« Purpose-built / Powered by agents / Designed for speed »). Étiquette monospace
  * « FIG 0x », titre court, une ligne. Ici : les 3 piliers du différenciateur, posés
- * juste après le problème — la réponse en trois affirmations avant la démonstration. */
+ * juste après le problème - la réponse en trois affirmations avant la démonstration. */
 
 const PILLARS = [
   { n: "01", title: "Governed by design", text: "An agent drafts each step; a human approves it. Nothing ships on its own." },
@@ -479,7 +479,7 @@ export function Pillars() {
         align="center"
         eyebrow="Why it’s different"
         title="A delivery system, not an assistant"
-        lead="Most AI tools optimize execution. TaskForce optimizes the system that decides what gets executed — a governed run you can watch, approve and audit."
+        lead="Most AI tools optimize execution. TaskForce optimizes the system that decides what gets executed - a governed run you can watch, approve and audit."
       />
       <ul className="bg-border mt-14 grid gap-px overflow-hidden rounded-2xl border sm:grid-cols-3">
         {PILLARS.map((p) => (
@@ -495,7 +495,7 @@ export function Pillars() {
       {/* Équilibrer le contrôle par le GAIN QUOTIDIEN (review 8 : trop de gouvernance, pas assez
           de bénéfice dev au jour le jour). */}
       <p className="text-muted-foreground mx-auto mt-10 max-w-2xl text-center text-[15px] leading-7">
-        The payoff is daily: fewer meetings, fewer half-written tickets, less context re-explained —
+        The payoff is daily: fewer meetings, fewer half-written tickets, less context re-explained -
         and agents that already understand your system.
       </p>
     </Section>
@@ -509,11 +509,11 @@ export function Pillars() {
  * toujours visibles : pas de repli animé, donc aucun décalage de mise en page (CLS). */
 
 const FOUNDATIONS = [
-  { n: "01", title: "Self-hosting", text: "Run TaskForce and your models on your own infrastructure — a first-class Enterprise deployment.", visual: "Self-hosted deployment" },
+  { n: "01", title: "Self-hosting", text: "Run TaskForce and your models on your own infrastructure - a first-class Enterprise deployment.", visual: "Self-hosted deployment" },
   { n: "02", title: "Audit trail", text: "Every decision, approval and model call is recorded: who, what, when, and on whose hardware.", visual: "Audit trail" },
   { n: "03", title: "A model per step", text: "Routine steps on a model you host; the hard ones can call something stronger, or never leave your network.", visual: "Model routing" },
   { n: "04", title: "Access control", text: "SSO and SAML through Keycloak, roles and permissions, and per-project access.", visual: "SSO & roles" },
-  { n: "05", title: "Production-grade core", text: "The same engine the product runs on: real-time boards, migrations, backups and monitoring — built to run in production, not just to demo.", visual: "Production core" },
+  { n: "05", title: "Production-grade core", text: "The same engine the product runs on: real-time boards, migrations, backups and monitoring - built to run in production, not just to demo.", visual: "Production core" },
 ];
 
 export function Foundations() {
@@ -527,7 +527,7 @@ export function Foundations() {
         indexHref="/trust"
         eyebrow="Foundations"
         title="Built on strong foundations"
-        lead="The run is the visible part. Underneath it is the boring, load-bearing work an enterprise actually asks about — and the part that is hard to bolt on later."
+        lead="The run is the visible part. Underneath it is the boring, load-bearing work an enterprise actually asks about - and the part that is hard to bolt on later."
       />
 
       <div className="mt-12 grid gap-10 lg:grid-cols-2 lg:items-center lg:gap-16">
@@ -583,7 +583,7 @@ export function Foundations() {
 }
 
 /* ─────────────────────────  K. Avant / Après (résumé de la proposition)  ─────────────────────────
- * Décision review (27/07) : une démonstration VISUELLE qui résume toute la proposition —
+ * Décision review (27/07) : une démonstration VISUELLE qui résume toute la proposition -
  * la chaîne longue et fuyante d'aujourd'hui vs le run court et gouverné. Statique, aucune
  * fausse donnée : juste deux flux, l'un long (6 mains), l'autre court (4 étapes). La longueur
  * qui diffère PORTE le message (moins de mains = moins d'endroits où le contexte se perd). */

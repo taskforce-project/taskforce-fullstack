@@ -71,7 +71,7 @@ export function RedistributionDialog({ slug, targetUserId, trigger, onApplied }:
       setRows(plan.moves.map((m) => ({ ...m, selected: true })))
       setRan(true)
       if (plan.moves.length === 0) {
-        toast.info("No redistribution needed — nobody is overloaded.")
+        toast.info("No redistribution needed - nobody is overloaded.")
       }
     } catch {
       toast.error("Could not compute the redistribution")
@@ -169,7 +169,7 @@ export function RedistributionDialog({ slug, targetUserId, trigger, onApplied }:
           </div>
         ) : ran ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
-            Nothing to redistribute — workloads are balanced. 👍
+            Nothing to redistribute - workloads are balanced. 👍
           </p>
         ) : null}
 

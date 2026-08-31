@@ -6,13 +6,13 @@ import { BREAKDOWN, PROJECT, WORKSPACE, type Task } from "@/lib/story";
 import { cn } from "@/lib/utils";
 
 /**
- * AutoAssign — SCÈNE 2 : « le découpage part vers les bonnes personnes, dont un agent ».
+ * AutoAssign - SCÈNE 2 : « le découpage part vers les bonnes personnes, dont un agent ».
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * CE QU'ELLE VEND
  * ─────────────────────────────────────────────────────────────────────────────
  * C'est ici que bascule tout l'argument. Jusqu'à ce plan, TaskForce écrit des
- * documents. À partir de ce plan, il **distribue du travail** — et un agent de
+ * documents. À partir de ce plan, il **distribue du travail** - et un agent de
  * code y est un assigné comme un autre : même carte, même colonne, même
  * checkpoint de revue. Ce n'est pas « une IA en plus », c'est un membre d'équipe
  * de plus dans un système qui savait déjà répartir le travail.
@@ -30,7 +30,7 @@ import { cn } from "@/lib/utils";
  * (« Recommandations basées sur compétences, charge et disponibilité »).
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * LA PARTITION (10,3 s, puis 2,5 s de pause — la scène BOUCLE)
+ * LA PARTITION (10,3 s, puis 2,5 s de pause - la scène BOUCLE)
  * ─────────────────────────────────────────────────────────────────────────────
  *  1,0 s  les 4 issues du découpage tombent une à une, non assignées
  *  3,0 s  le curseur va sur `Auto-assign (4)` et clique
@@ -123,7 +123,7 @@ function TaskRow({ task, visible, assigned }: { task: Task; visible: boolean; as
       </span>
       <span className="min-w-0 flex-1 truncate text-[12px] text-foreground">{task.title}</span>
 
-      {/* Le lien vers la spec — c'est ce qui rend la chaîne vérifiable. */}
+      {/* Le lien vers la spec - c'est ce qui rend la chaîne vérifiable. */}
       <span
         className={cn(
           "hidden shrink-0 rounded border px-1.5 py-px font-mono text-[9px] md:inline",
@@ -153,7 +153,7 @@ function TaskRow({ task, visible, assigned }: { task: Task; visible: boolean; as
             ) : (
               <PersonChip person={task.assignee} />
             )}
-            {/* Le reviewer — toujours un humain, même quand l'exécutant est un agent. */}
+            {/* Le reviewer - toujours un humain, même quand l'exécutant est un agent. */}
             <span className="hidden items-center gap-1 md:flex" title={`Reviewed by ${task.reviewer.name}`}>
               <span className="text-muted-foreground/50 text-[9.5px]">review</span>
               <PersonChip person={task.reviewer} withName={false} />
@@ -191,7 +191,7 @@ function SmartAssignModal({ open, showReco }: { open: boolean; showReco: boolean
         <div className="flex items-start gap-2 px-4 pt-3.5">
           <Sparkles className="text-primary mt-[3px] size-3.5 shrink-0" />
           <div className="min-w-0 flex-1">
-            <p className="text-[13px] font-semibold text-foreground">Smart Assign — 4 issues</p>
+            <p className="text-[13px] font-semibold text-foreground">Smart Assign - 4 issues</p>
             <p className="text-muted-foreground mt-0.5 text-[11px] leading-[16px]">
               Recommendations based on skills, load and availability. Uncheck any you want to keep
               for a human.

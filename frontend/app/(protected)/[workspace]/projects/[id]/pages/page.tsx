@@ -65,7 +65,7 @@ export default function ProjectPagesPage() {
       })
       router.push(`/${slug}/projects/${projectId}/pages/${created.id}`)
     } catch {
-      // erreur silencieuse — le store gère le state
+      // erreur silencieuse - le store gère le state
     }
   }
 

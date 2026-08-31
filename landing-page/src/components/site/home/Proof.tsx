@@ -6,7 +6,7 @@ import { AppShot, Toast } from "../AppShot";
 import { BrandLogo } from "../BrandLogo";
 
 /**
- * Proof — conformité, intégrations, direction, CTA final.
+ * Proof - conformité, intégrations, direction, CTA final.
  * Pas de logo client ni de témoignage : la preuve est technique (décision D9).
  */
 
@@ -74,7 +74,7 @@ export function Trust() {
           </Toast>
         </AppShot>
         <p className="text-muted-foreground mt-3 text-[12.5px]">
-          Your real audit view drops in here — every approval, rejection and model call, attributable.
+          Your real audit view drops in here - every approval, rejection and model call, attributable.
         </p>
       </div>
 
@@ -131,7 +131,7 @@ export function Trust() {
 
 /* ─────────────────────────  Intégrations (vraie grille de logos)  ───────────────────────── */
 
-/** Vrais logos vendorisés — grille façon Relevance « Connect to N apps ». */
+/** Vrais logos vendorisés - grille façon Relevance « Connect to N apps ». */
 const INTEGRATIONS = [
   "github", "gitlab", "linear", "slack", "notion", "figma", "sentry", "vscode",
   "docker", "vercel", "netlify", "cloudflare", "aws", "azure", "gcp", "postgresql",
@@ -149,7 +149,7 @@ export function Integrations() {
           title="TaskForce doesn’t replace your stack. It connects to it."
           lead={
             <>
-              The same connector catalogue as the app — <span className="text-primary">129</span>{" "}
+              The same connector catalogue as the app - <span className="text-primary">129</span>{" "}
               tools across your tracker, repo, chat and cloud. Adding one is a line of configuration,
               not a release.
             </>
@@ -186,7 +186,7 @@ export function Integrations() {
 
 /**
  * Décision D11 : on vend la direction, **pas le mécanisme**.
- * Rien ici ne décrit comment c'est construit — ni la boucle de raisonnement, ni le routage
+ * Rien ici ne décrit comment c'est construit - ni la boucle de raisonnement, ni le routage
  * de modèles, ni la méthode de benchmark. Une vision se vend ; une recette se copie.
  */
 const AHEAD = [
@@ -194,19 +194,19 @@ const AHEAD = [
     icon: PenLine,
     ic: "#2563eb",
     title: "Less drafting, more deciding",
-    text: "Every checkpoint that gets reliable is one you stop writing yourself. The direction is not fewer humans — it is humans spending their time on the decisions instead of the paperwork around them.",
+    text: "Every checkpoint that gets reliable is one you stop writing yourself. The direction is not fewer humans - it is humans spending their time on the decisions instead of the paperwork around them.",
   },
   {
     icon: Network,
     ic: "#7c3aed",
     title: "An intelligence layer for the organization",
-    text: "The decisions, constraints and trade-offs one run records don’t belong to engineering alone. The same graph that tells an agent why the system is the way it is can tell any team why the organization is — a live model to decide on top of, not a wiki to search.",
+    text: "The decisions, constraints and trade-offs one run records don’t belong to engineering alone. The same graph that tells an agent why the system is the way it is can tell any team why the organization is - a live model to decide on top of, not a wiki to search.",
   },
   {
     icon: Server,
     ic: "#64748b",
     title: "Still your infrastructure",
-    text: "Self-hosting is a first-class deployment — it comes with Enterprise, and where your models run stays your decision.",
+    text: "Self-hosting is a first-class deployment - it comes with Enterprise, and where your models run stays your decision.",
   },
 ];
 
@@ -218,7 +218,7 @@ export function WhereThisGoes() {
           <SectionHeader
             eyebrow="The direction"
             title="Software teams won’t hand-write specs forever"
-            lead="TaskForce runs software delivery today — that’s the wedge, not the ceiling. The memory that keeps one run’s context is the same intelligence an organization loses everywhere else: in meetings, in chat, in people’s heads. The destination is to make it the active layer every team decides on top of. The roadmap is public — hold us to it rather than trust a pitch."
+            lead="TaskForce runs software delivery today - that’s the wedge, not the ceiling. The memory that keeps one run’s context is the same intelligence an organization loses everywhere else: in meetings, in chat, in people’s heads. The destination is to make it the active layer every team decides on top of. The roadmap is public - hold us to it rather than trust a pitch."
           />
           <Button asChild variant="outline" size="pill" className="mt-8">
             <a href="/roadmap">

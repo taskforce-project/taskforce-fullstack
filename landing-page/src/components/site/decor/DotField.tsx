@@ -1,7 +1,7 @@
 import { useEffect, useRef, memo } from "react";
 
 /**
- * DotField — nappe de points qui réagit au curseur (bulge + halo doux). Portage React Bits
+ * DotField - nappe de points qui réagit au curseur (bulge + halo doux). Portage React Bits
  * (github.com/…/react-bits) adapté à TaskForce : couleurs de MARQUE (bleu, pas le violet par défaut),
  * fond transparent, `pointer-events-none` (à poser en absolute inset-0 derrière le contenu), et
  * respect de `prefers-reduced-motion` → une seule image figée, zéro RAF. Zéro dépendance (canvas natif).

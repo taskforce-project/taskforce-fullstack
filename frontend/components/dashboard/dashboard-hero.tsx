@@ -14,7 +14,7 @@ import { useSettingsStore } from "@/lib/store/settings-store"
 import { useCreateProjectStore } from "@/lib/store/create-project-store"
 import { useProjectStore } from "@/lib/store/project-store"
 
-/** Connecteurs mis en avant dans la pilule (clés du catalogue — cf. ConnectorCatalog.java). */
+/** Connecteurs mis en avant dans la pilule (clés du catalogue - cf. ConnectorCatalog.java). */
 const PILL_TOOLS = [
   { slug: "github", name: "GitHub" },
   { slug: "slack", name: "Slack" },
@@ -22,7 +22,7 @@ const PILL_TOOLS = [
   { slug: "linear", name: "Linear" },
 ] as const
 
-/** Même contenu que la palette Ctrl+K — navigation + Labs (les actions spéciales sont ajoutées à part). */
+/** Même contenu que la palette Ctrl+K - navigation + Labs (les actions spéciales sont ajoutées à part). */
 const NAV_ITEMS = [
   { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
   { label: "Inbox", path: "/inbox", icon: Inbox },
@@ -55,7 +55,7 @@ interface Row {
 }
 
 interface DashboardHeroProps {
-  /** Nom réel de l'utilisateur (displayName) — vide si inconnu. */
+  /** Nom réel de l'utilisateur (displayName) - vide si inconnu. */
   readonly displayName: string
 }
 
@@ -91,7 +91,7 @@ export function DashboardHero({ displayName }: DashboardHeroProps) {
     reset()
   }
 
-  // Actions spéciales (pas de simple navigation) — mêmes que dans la palette Ctrl+K.
+  // Actions spéciales (pas de simple navigation) - mêmes que dans la palette Ctrl+K.
   const ACTIONS = useMemo(() => [
     { label: "Create an operation", icon: Plus, run: () => { openCreateProject(); reset() } },
     { label: "Settings", icon: Settings, run: () => { openSettings(); reset() } },
@@ -151,7 +151,7 @@ export function DashboardHero({ displayName }: DashboardHeroProps) {
 
   return (
     <div className="flex flex-col items-center gap-5 pt-2 text-center">
-      {/* Pilule d'onboarding des connecteurs — discrète : bordure, fond card, hover. */}
+      {/* Pilule d'onboarding des connecteurs - discrète : bordure, fond card, hover. */}
       <button
         type="button"
         onClick={() => openSettings("integrations")}
@@ -243,7 +243,7 @@ export function DashboardHero({ displayName }: DashboardHeroProps) {
             )}
             </div>
 
-            {/* Barre en bas — la même que le modal Ctrl+K (rappels clavier). */}
+            {/* Barre en bas - la même que le modal Ctrl+K (rappels clavier). */}
             <div className="flex items-center gap-4 border-t border-border px-3 py-2 text-[11px] text-muted-foreground">
               <span className="flex items-center gap-1.5">
                 <kbd className="inline-flex size-4 items-center justify-center rounded border border-border bg-muted text-[10px]">↑</kbd>

@@ -3,10 +3,10 @@ import { Search, FileText, Quote } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
- * ContextRetrieval — illustration du bloc « Brain OS ».
+ * ContextRetrieval - illustration du bloc « Brain OS ».
  *
  * Remplace le graphe de nœuds décoratif : un graphe joli ne répond pas à la question
- * « qu'est-ce que ça m'apporte ». Ici on montre le seul comportement qui compte —
+ * « qu'est-ce que ça m'apporte ». Ici on montre le seul comportement qui compte -
  * une étape du run **cite les décisions de l'équipe**, et on voit lesquelles ont été
  * retenues, avec quel score, et lesquelles ont été écartées.
  *
@@ -141,7 +141,7 @@ export function ContextRetrieval() {
         })}
       </ul>
 
-      {/* La réponse — citée. La place est réservée en permanence. */}
+      {/* La réponse - citée. La place est réservée en permanence. */}
       <div className="border-t p-4">
         <div
           className={cn(
@@ -153,7 +153,7 @@ export function ContextRetrieval() {
           <p className="text-[12.5px] leading-6 text-foreground">
             Delegate identity to Keycloak, one realm per workspace
             <Cite n={1} on={answered} />. A SAML library inside the API was considered and
-            rejected — it would leave two auth paths to maintain
+            rejected - it would leave two auth paths to maintain
             <Cite n={2} on={answered} />.
           </p>
         </div>

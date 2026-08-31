@@ -229,7 +229,7 @@ export interface ConnectorView {
   docsUrl: string | null;
   /** Aide (tooltip) : où récupérer la clé quand ce n'est pas du 1-clic OAuth. */
   setupHint: string | null;
-  /** Site officiel du service (homepage) — affiché dans la fiche détaillée. */
+  /** Site officiel du service (homepage) - affiché dans la fiche détaillée. */
   websiteUrl: string | null;
 }
 
@@ -251,7 +251,7 @@ export async function getIntegrationCatalog(slug: string): Promise<IntegrationCa
   return res.data.data;
 }
 
-/** Connecte (ou reconfigure) un connecteur générique du catalogue — identifiants stockés chiffrés. */
+/** Connecte (ou reconfigure) un connecteur générique du catalogue - identifiants stockés chiffrés. */
 export async function connectConnector(slug: string, key: string, config: Record<string, string>): Promise<void> {
   await apiClient.post(INTEGRATION_ROUTES.CONNECTOR(slug, key), { config });
 }

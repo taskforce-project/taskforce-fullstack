@@ -16,7 +16,7 @@ test.describe("Redistribution de charge (E2E)", () => {
     await expect(rebalance).toBeVisible({ timeout: 15_000 });
     await rebalance.click();
 
-    // Le dialog s'ouvre et calcule un plan (preview) — le seed a un membre surchargé.
+    // Le dialog s'ouvre et calcule un plan (preview) - le seed a un membre surchargé.
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByText(/redistribution suggérée/i)).toBeVisible();
     await expect(dialog.getByRole("button", { name: /appliquer/i })).toBeVisible();

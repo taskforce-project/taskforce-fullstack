@@ -5,7 +5,7 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 /**
- * Loader (style Apple / macOS) — adapté de intentui/Loader.
+ * Loader (style Apple / macOS) - adapté de intentui/Loader.
  * Vendu SANS les deps d'origine (@intentui/icons, react-aria-components, tailwind-variants)
  * que le réseau du poste corrompt : on utilise cva + cn + lucide (déjà présents) et un
  * wrapper a11y `role="progressbar"` natif. Variantes "spin" (défaut, type spinner Apple),

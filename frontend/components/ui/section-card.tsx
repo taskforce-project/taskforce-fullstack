@@ -29,7 +29,7 @@ export function SectionCard({
   readonly href?: string
   readonly children: React.ReactNode
   readonly className?: string
-  /** padding du corps — défaut `p-4`. Passer `p-0` pour des lignes pleine largeur. */
+  /** padding du corps - défaut `p-4`. Passer `p-0` pour des lignes pleine largeur. */
   readonly bodyClassName?: string
 }) {
   // En-tête gris subtil (distinct du blanc du corps), façon Cloudflare.

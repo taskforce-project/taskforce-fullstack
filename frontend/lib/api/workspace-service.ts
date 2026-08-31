@@ -109,7 +109,7 @@ export interface WorkspaceUsage {
 }
 
 export async function getWorkspaceUsage(slug: string): Promise<WorkspaceUsage> {
-  // Enrichissement (badges d'usage) : échec silencieux — pas de toast si la métrique n'est pas dispo.
+  // Enrichissement (badges d'usage) : échec silencieux - pas de toast si la métrique n'est pas dispo.
   const response = await apiClient.get<{ data: WorkspaceUsage }>(WORKSPACE_ROUTES.USAGE(slug), { silentError: true });
   return response.data.data;
 }
@@ -150,12 +150,12 @@ export async function removeMember(slug: string, memberId: number): Promise<void
   await apiClient.delete(WORKSPACE_ROUTES.MEMBER(slug, memberId));
 }
 
-/** Supprime le workspace (OWNER uniquement) — cascade côté DB. */
+/** Supprime le workspace (OWNER uniquement) - cascade côté DB. */
 export async function deleteWorkspace(slug: string): Promise<void> {
   await apiClient.delete(WORKSPACE_ROUTES.BY_SLUG(slug));
 }
 
-/** Rétrocompatibilité — récupère le workspace courant (owner lookup) */
+/** Rétrocompatibilité - récupère le workspace courant (owner lookup) */
 export async function getCurrentWorkspace(): Promise<Workspace> {
   const response = await apiClient.get<{ data: Workspace }>(WORKSPACE_ROUTES.CURRENT);
   return response.data.data;

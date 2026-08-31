@@ -17,7 +17,7 @@ interface IssueRealtimeEvent {
 /**
  * Abonne le board d'un projet aux événements d'issues en temps réel (PROD-1.6).
  * Le backend publie sur `/topic/projects.{projectId}` (IssueService) ; on patche le store
- * (upsert/remove) — idempotent par id, donc pas de doublon avec ses propres actions.
+ * (upsert/remove) - idempotent par id, donc pas de doublon avec ses propres actions.
  */
 export function useProjectRealtime(projectId: number | null) {
   const upsert = useIssueStore((s) => s.upsertIssueLocal)
@@ -51,7 +51,7 @@ export function useProjectRealtime(projectId: number | null) {
     async function activate(useSockJs: boolean) {
       if (disposed) return
       // Fallback chargé À LA DEMANDE : sur le chemin nominal (WS natif), SockJS n'est jamais importé,
-      // donc son écouteur `unload` — déprécié (audit Lighthouse best-practices) — n'est pas enregistré
+      // donc son écouteur `unload` - déprécié (audit Lighthouse best-practices) - n'est pas enregistré
       // et il ne pèse pas sur le bundle initial. Le repli reste identique si le WS natif échoue.
       const SockJS = useSockJs ? (await import("sockjs-client")).default : null
       if (disposed) return

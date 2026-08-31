@@ -142,7 +142,7 @@ export function WorkflowPanelContent() {
         <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
           <Layers className="size-7 text-muted-foreground/40" />
           <p className="text-sm font-medium text-foreground">No workflows</p>
-          <p className="text-xs text-muted-foreground">Launch an analysis from a project (Intelligence page) — it will appear here and keep running even if you leave the page.</p>
+          <p className="text-xs text-muted-foreground">Launch an analysis from a project (Intelligence page) - it will appear here and keep running even if you leave the page.</p>
         </div>
       ) : (
         jobs.map((job) => <JobCard key={job.id} slug={activeSlug} job={job} />)

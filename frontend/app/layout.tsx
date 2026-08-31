@@ -49,7 +49,7 @@ export default function RootLayout({
                   <CookieBanner />
                 </AuthProvider>
               </ErrorBoundary>
-              {/* Défs SVG des filtres daltonisme — appliquées à <body> via globals.css (en plus du contraste élevé) */}
+              {/* Défs SVG des filtres daltonisme - appliquées à <body> via globals.css (en plus du contraste élevé) */}
               <A11yFilters />
             </TooltipProvider>
           </I18nProvider>

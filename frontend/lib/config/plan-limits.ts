@@ -1,5 +1,5 @@
 /**
- * Limites par plan — DOIT rester aligné avec `WorkspaceService` côté backend
+ * Limites par plan - DOIT rester aligné avec `WorkspaceService` côté backend
  * (constantes MAX_WORKSPACES / MAX_MEMBERS). Sert aux CTA d'usage / upgrade (PROD-4.2/4.3).
  */
 

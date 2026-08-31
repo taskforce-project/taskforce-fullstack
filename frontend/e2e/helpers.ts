@@ -19,7 +19,7 @@ export async function login(page: Page, email = DEMO.email, password = DEMO.pass
   await page.reload();
   await page.waitForLoadState("networkidle");
 
-  // Bannière cookies — à fermer AVANT toute interaction : elle est en `fixed … z-50` et intercepte
+  // Bannière cookies - à fermer AVANT toute interaction : elle est en `fixed … z-50` et intercepte
   // par intermittence le clic sur « Se connecter », ce qui rendait la suite E2E instable.
   // Le libellé cherché était `/^accept/i` alors que le bouton dit « Got it » : ce garde-fou n'a
   // donc jamais rien fermé depuis qu'il existe.
@@ -34,7 +34,7 @@ export async function login(page: Page, email = DEMO.email, password = DEMO.pass
 
   // Un remount (Fast Refresh en dev) peut vider les champs juste après le remplissage. La version
   // précédente s'en protégeait par une simple assertion : quand le remount tombait entre `fill` et
-  // la vérification, le test ÉCHOUAIT au lieu de se rattraper — d'où une suite E2E intermittente.
+  // la vérification, le test ÉCHOUAIT au lieu de se rattraper - d'où une suite E2E intermittente.
   // `toPass` réessaie le bloc entier jusqu'à ce que la saisie tienne.
   await expect(async () => {
     await emailField.fill(email);

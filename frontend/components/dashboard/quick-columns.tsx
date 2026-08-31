@@ -31,7 +31,7 @@ function ColumnSkeleton() {
   )
 }
 
-/** État vide honnête d'une colonne — jamais de donnée fabriquée. */
+/** État vide honnête d'une colonne - jamais de donnée fabriquée. */
 function ColumnEmpty({ message }: { readonly message: string }) {
   return <p className="px-4 py-8 text-center text-xs text-muted-foreground">{message}</p>
 }
@@ -40,7 +40,7 @@ const ROW_CLASS =
   "flex items-center gap-2.5 border-b border-border px-4 py-2.5 transition-colors last:border-0 hover:bg-muted/50"
 
 // ---------------------------------------------------------------------------
-// Opérations — projets réels (store partagé avec les cartes santé/kpi)
+// Opérations - projets réels (store partagé avec les cartes santé/kpi)
 // ---------------------------------------------------------------------------
 
 function OperationsColumn() {
@@ -48,7 +48,7 @@ function OperationsColumn() {
   const isLoading = useProjectStore((s) => s.isLoading)
   const openCreateProject = useCreateProjectStore((s) => s.openCreateProject)
 
-  // Actives d'abord, archivées exclues — la page complète reste à un clic (en-tête).
+  // Actives d'abord, archivées exclues - la page complète reste à un clic (en-tête).
   const rows = projects
     .filter((p) => p.status !== "ARCHIVED")
     .sort((a, b) => (a.status === "ACTIVE" ? 0 : 1) - (b.status === "ACTIVE" ? 0 : 1))
@@ -89,7 +89,7 @@ function OperationsColumn() {
 }
 
 // ---------------------------------------------------------------------------
-// Ma file — top 5 de mes issues ouvertes (endpoint my-issues réel)
+// Ma file - top 5 de mes issues ouvertes (endpoint my-issues réel)
 // ---------------------------------------------------------------------------
 
 function MyQueueColumn({ slug }: { readonly slug: string }) {
@@ -130,7 +130,7 @@ function MyQueueColumn({ slug }: { readonly slug: string }) {
         <ColumnEmpty message={failed ? "Queue unavailable right now" : "No assigned tasks"} />
       ) : (
         open.map((i) => (
-          // Board du projet + sheet ouverte (`?issue=`) — même cible que My Work.
+          // Board du projet + sheet ouverte (`?issue=`) - même cible que My Work.
           <Link key={i.id} href={`./projects/${i.projectId}?issue=${i.id}`} className={ROW_CLASS}>
             <span className="shrink-0 font-mono text-[11px] uppercase text-muted-foreground">{i.identifier}</span>
             <span className="min-w-0 flex-1 truncate text-sm text-foreground">{i.title}</span>
@@ -142,7 +142,7 @@ function MyQueueColumn({ slug }: { readonly slug: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// Récents — 5 dernières notifications (endpoint notifications réel)
+// Récents - 5 dernières notifications (endpoint notifications réel)
 // ---------------------------------------------------------------------------
 
 function RecentColumn({ slug }: { readonly slug: string }) {
@@ -210,7 +210,7 @@ function RecentColumn({ slug }: { readonly slug: string }) {
 /**
  * Trois listes compactes (en-têtes cliquables vers la page complète), données réelles.
  * `flex-wrap` + `min-w` : les colonnes reflowent (3 → 2 → 1) au lieu d'être tassées quand la place
- * manque (fenêtre étroite ou panneau ouvert) — jamais en dessous d'une largeur lisible.
+ * manque (fenêtre étroite ou panneau ouvert) - jamais en dessous d'une largeur lisible.
  */
 export function QuickColumns({ slug }: { readonly slug: string }) {
   return (

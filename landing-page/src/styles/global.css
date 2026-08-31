@@ -2,14 +2,14 @@
 @import "tw-animate-css";
 
 /* ═══════════════════════════════════════════════════════
-   DESIGN TOKENS — repris à l'identique de la webapp
+   DESIGN TOKENS - repris à l'identique de la webapp
    Source : frontend/app/globals.css (palette Cloudflare-flat).
    Le site et le produit partagent la même palette : si elle bouge là-bas,
    elle bouge ici. Aucune couleur inventée pour le marketing.
-   Light-only (décision D2) — le bloc .dark de l'app n'est pas repris.
+   Light-only (décision D2) - le bloc .dark de l'app n'est pas repris.
 ═══════════════════════════════════════════════════════ */
 :root {
-  /* Site light-only (décision actée) : force les contrôles natifs — champs, scrollbars — en
+  /* Site light-only (décision actée) : force les contrôles natifs - champs, scrollbars - en
      clair même quand l'OS du visiteur est en sombre. Sans ça, un OS dark rend un « faux sombre ». */
   color-scheme: light;
   --background:         #fbfbfc;
@@ -20,7 +20,7 @@
   --card-foreground:    #1d1d1f;
   --popover-foreground: #1d1d1f;
 
-  /* Bleu de marque — porte TOUTES les actions primaires. */
+  /* Bleu de marque - porte TOUTES les actions primaires. */
   --primary:            #2563eb;   /* blue-600 */
   --primary-foreground: #ffffff;
   --secondary:          #f2f2f4;
@@ -36,7 +36,7 @@
   --input:              #dededf;
   --ring:               rgba(37, 99, 235, 0.35);
 
-  /* Accents sémantiques de l'app — le violet n'est QUE le marquage IA. */
+  /* Accents sémantiques de l'app - le violet n'est QUE le marquage IA. */
   --accent-green:   #34c759;
   --accent-red:     #ff3b30;
   --accent-purple:  #5856d6;
@@ -47,9 +47,9 @@
   --label-tertiary:  #67676c;
   --separator:       #e6e6e9;
 
-  --radius: 0.625rem;   /* 10px — radius de référence de l'app */
+  --radius: 0.625rem;   /* 10px - radius de référence de l'app */
 
-  /* Ombres très subtiles (flat) — valeurs de l'app */
+  /* Ombres très subtiles (flat) - valeurs de l'app */
   --shadow-2xs: 0 1px 1px rgba(0,0,0,0.03);
   --shadow-xs:  0 1px 2px rgba(0,0,0,0.04);
   --shadow-sm:  0 1px 2px rgba(0,0,0,0.05);
@@ -62,8 +62,8 @@
   /* ─── Alias propres au site marketing ───
      Ce sont des *noms*, pas de nouvelles couleurs : tout pointe sur la palette de l'app.
      Voir taskforce-docs/v1/14-design/landing-refonte/Plan_Refonte_Site.md §4 */
-  --site-bg:         var(--card);              /* #ffffff — sections pleines */
-  --site-band:       var(--secondary);         /* #f2f2f4 — bandes alternées */
+  --site-bg:         var(--card);              /* #ffffff - sections pleines */
+  --site-band:       var(--secondary);         /* #f2f2f4 - bandes alternées */
   --site-fg:         var(--foreground);
   --site-muted:      var(--muted-foreground);
   --site-border:     var(--border);
@@ -73,9 +73,9 @@
   --site-ai-soft:    #efeefc;
   --site-container: 1240px;
 
-  /* Sora (display) + Inter (corps) — chargées via <link> Google Fonts */
+  /* Sora (display) + Inter (corps) - chargées via <link> Google Fonts */
   --font-display: 'Sora', 'Inter', ui-sans-serif, system-ui, sans-serif;
-  /* Inter Variable (chargée via <link> Google Fonts) — métrique Linear/Attio */
+  /* Inter Variable (chargée via <link> Google Fonts) - métrique Linear/Attio */
   --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
@@ -161,7 +161,7 @@ body {
 ═══════════════════════════════════════════════════════ */
 
 /* ── Gradient text ── */
-/* Gold premium — both modes */
+/* Gold premium - both modes */
 .gradient-text {
   background: linear-gradient(135deg, #C9A84C 0%, #D4AF37 60%, #E8C96B 100%);
   -webkit-background-clip: text;
@@ -280,7 +280,7 @@ body {
   box-shadow: 0 10px 26px -14px rgba(16, 24, 40, 0.16);
 }
 
-/* Surface premium façon Vercel : « bordure en ombre » (0 0 0 1px) + élévation douce multi-couches —
+/* Surface premium façon Vercel : « bordure en ombre » (0 0 0 1px) + élévation douce multi-couches -
    plus subtil qu'une bordure 1px dure, rendu plus « produit ». À poser avec bg-card + rounded-* (PAS de `border`). */
 .surface {
   box-shadow:
@@ -299,7 +299,7 @@ body {
     0 16px 30px -14px rgba(16, 24, 40, 0.16);
 }
 
-/* ── Décor : touches subtiles (points + halos) — PARCIMONIE, garde la structure « traits » ──
+/* ── Décor : touches subtiles (points + halos) - PARCIMONIE, garde la structure « traits » ──
    Esthétique DotField (React Bits) en STATIQUE (zéro JS → perf + sobre, sans risque « trop IA »).
    Couleur = la marque (bleu) ; le dégradé chaud hero-wave reste réservé à Labs (cf. .labs-gradient).
    Poser `.decor` (crée le contexte) + un modificateur (`.decor-dots` / `.decor-glow-top` / `.decor-tint`). */
@@ -365,7 +365,7 @@ body {
   z-index: 0;
   pointer-events: none;
 }
-/* points fins (façon Attio, plus petits) — fondus haut/bas */
+/* points fins (façon Attio, plus petits) - fondus haut/bas */
 .bg-dots::before {
   background-image: radial-gradient(color-mix(in oklab, var(--foreground) 9%, transparent) 0.7px, transparent 1.2px);
   background-size: 20px 20px;
@@ -408,7 +408,7 @@ body {
   to { stroke-dashoffset: 0; }
 }
 
-/* connecteurs HTML : ligne bleue qui pousse — verticale (fx-line) ou horizontale depuis le centre (fx-line-x) */
+/* connecteurs HTML : ligne bleue qui pousse - verticale (fx-line) ou horizontale depuis le centre (fx-line-x) */
 .fx-line {
   transform: scaleY(0);
   transform-origin: top center;
@@ -476,7 +476,7 @@ body {
 
 /* ── Moteur v2 : VRAI enchaînement (le JS ajoute `.fx-go` étape par étape, chaque étape démarrant sur la FIN
    de la précédente via `animationend`). Bord de CARTE = **tracé SVG** `.fx-stroke` (dessin à vitesse d'ARC
-   CONSTANTE — aucune accélération sur les longueurs, contrairement au conic). Tout LINÉAIRE. ── */
+   CONSTANTE - aucune accélération sur les longueurs, contrairement au conic). Tout LINÉAIRE. ── */
 .fx-stroke {
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
@@ -492,7 +492,7 @@ body {
 .fx-go.fx-line-x {
   animation: fx-grow-x var(--dur, 0.5s) linear forwards;
 }
-/* Carte qui « apparaît » (fondu + légère montée), chaînée — robuste (pas de tracé SVG fragile). */
+/* Carte qui « apparaît » (fondu + légère montée), chaînée - robuste (pas de tracé SVG fragile). */
 .fx-pop {
   opacity: 0;
   transform: translateY(10px);
@@ -503,7 +503,7 @@ body {
 @keyframes fx-pop {
   to { opacity: 1; transform: none; }
 }
-/* Élément qui apparaît en simple fondu (pas de montée) — pour les connecteurs/flèches façon Attio. */
+/* Élément qui apparaît en simple fondu (pas de montée) - pour les connecteurs/flèches façon Attio. */
 .fx-fade {
   opacity: 0;
 }
@@ -532,7 +532,7 @@ body {
   border-inline: 0;
 }
 
-/* ─── React Flow — schémas d'orchestration (statique, façon Attio) ───
+/* ─── React Flow - schémas d'orchestration (statique, façon Attio) ───
    Canvas transparent (laisse voir les points de section), aucune interaction, badge masqué.
    Le handle SOURCE devient le « rond au départ » ; le handle TARGET est invisible (la flèche
    du marker suffit à l'arrivée). Couleurs = bleu de marque (#2563eb = --primary). */
@@ -567,7 +567,7 @@ body {
   border: 1.5px solid color-mix(in oklab, var(--foreground) 24%, transparent);
   opacity: 1;
 }
-/* Survol discret des cartes (le « hover par défaut » suffit — cf. retour user). */
+/* Survol discret des cartes (le « hover par défaut » suffit - cf. retour user). */
 .tf-node {
   transition: border-color 0.18s ease;
 }
@@ -599,7 +599,7 @@ body {
 /* ── Scènes produit ──
    Deux primitives de motion, pas plus. Tout le reste des scènes est piloté par
    des transitions d'état en React : une transition sait d'où elle part, une
-   keyframe non — et c'est ce qui donne le mouvement continu plutôt que saccadé. */
+   keyframe non - et c'est ce qui donne le mouvement continu plutôt que saccadé. */
 
 /* Anneau d'attention : se joue UNE fois, sur l'action que le run attend.
    Une pulsation qui se répète devient du bruit et on cesse de la voir. */
@@ -611,7 +611,7 @@ body {
   animation: attention-ring 1200ms cubic-bezier(0.16, 1, 0.3, 1) 1 both;
 }
 
-/* Curseur de frappe — le signe qu'un agent est en train d'écrire, pas que du
+/* Curseur de frappe - le signe qu'un agent est en train d'écrire, pas que du
    texte est apparu. `steps(1)` pour un clignotement franc, jamais un fondu. */
 @keyframes caret-blink {
   0%, 49%  { opacity: 1; }
@@ -687,7 +687,7 @@ body {
   50%       { box-shadow: 0 0 0 4px rgba(34,197,94,0); }
 }
 
-/* ── Icône de contenu (HORS flux) — règle user : CHAQUE icône = UNE couleur, et SANS fond.
+/* ── Icône de contenu (HORS flux) - règle user : CHAQUE icône = UNE couleur, et SANS fond.
    On pose la teinte via `style="--ic: #2563eb"` → seul le glyphe est coloré (currentColor).
    Fond + bordure neutralisés ici, donc les ~30 usages `.ic-tile ... border bg-card` deviennent
    des glyphes colorés nus d'un coup, sans toucher chaque page. La taille/centrage du wrapper
@@ -698,7 +698,7 @@ body {
   color: var(--ic, var(--primary));
 }
 
-/* ── Point « live » (badge / loader) — pulsation douce qui reprend la couleur du texte parent.
+/* ── Point « live » (badge / loader) - pulsation douce qui reprend la couleur du texte parent.
    Poser sur un point plein : `<span class="tf-pulse size-1.5 rounded-full bg-current" />`. ── */
 .tf-pulse {
   position: relative;
@@ -718,7 +718,7 @@ body {
   .tf-pulse::before { animation: none; }
 }
 
-/* ── Selection — alignée sur le primaire de l'app ── */
+/* ── Selection - alignée sur le primaire de l'app ── */
 ::selection { background: rgba(37, 99, 235, 0.16); color: inherit; }
 
 /* ── Glass ── */
@@ -765,7 +765,7 @@ body {
 }
 
 /* ═══════════════════════════════════════════════════════
-   SITE MARKETING — primitives de la refonte (24/07/2026)
+   SITE MARKETING - primitives de la refonte (24/07/2026)
    Réf. taskforce-docs/v1/14-design/landing-refonte/Plan_Refonte_Site.md §4
 ═══════════════════════════════════════════════════════ */
 
@@ -783,7 +783,7 @@ body {
 /* ── Rails ──
    La grille de la page : deux filets verticaux aux bords du conteneur, et un
    séparateur horizontal pleine largeur par section (porté par la <section>).
-   C'est ce qui donne sa forme à la page — sans lui, tout flotte. */
+   C'est ce qui donne sa forme à la page - sans lui, tout flotte. */
 .container-rail {
   width: 100%;
   max-width: var(--site-container);
@@ -891,14 +891,14 @@ body {
     0 2px 8px -2px rgba(0, 0, 0, 0.06);
 }
 
-/* ── Accessibilité : focus visible homogène (WCAG 2.2 — 2.4.7 / 2.4.11) ── */
+/* ── Accessibilité : focus visible homogène (WCAG 2.2 - 2.4.7 / 2.4.11) ── */
 :where(a, button, [role="button"], input, select, textarea, summary):focus-visible {
   outline: 2px solid var(--site-brand);
   outline-offset: 2px;
   border-radius: 4px;
 }
 
-/* Lien d'évitement — visible seulement au focus clavier */
+/* Lien d'évitement - visible seulement au focus clavier */
 .skip-link {
   position: absolute;
   left: 1rem;
@@ -931,10 +931,10 @@ body {
 }
 
 /* ═══════════════════════════════════════════════════════
-   LABS — surface expérimentale SOMBRE (scoped aux routes /labs)
+   LABS - surface expérimentale SOMBRE (scoped aux routes /labs)
    Décision : Labs est son propre « monde » sombre, PAS un dark-mode global
    (D2 = light-only reste vraie pour les 62 autres routes). Ces jetons ne
-   redéfinissent rien de global — ils vivent sous .labs-scope uniquement.
+   redéfinissent rien de global - ils vivent sous .labs-scope uniquement.
    Bleu = action (marque) · Violet = marquage IA/Labs (cf. --site-ai).
 ═══════════════════════════════════════════════════════ */
 .labs-scope {
@@ -980,7 +980,7 @@ body {
   .labs-panel-hover:hover { transform: none; }
 }
 
-/* Vignette de bord — donne la profondeur « chambre » sans ajouter de dépendance */
+/* Vignette de bord - donne la profondeur « chambre » sans ajouter de dépendance */
 .labs-vignette {
   background: radial-gradient(125% 90% at 50% -8%, transparent 52%, rgba(0, 0, 0, 0.55) 100%);
 }
@@ -993,7 +993,7 @@ body {
 .labs-pulse { animation: labs-ping 2.6s cubic-bezier(0.16, 1, 0.3, 1) infinite; }
 @media (prefers-reduced-motion: reduce) { .labs-pulse { animation: none; } }
 
-/* BorderBeam (Magic UI, réécrit sans `motion`) — le faisceau parcourt le bord via offset-path. */
+/* BorderBeam (Magic UI, réécrit sans `motion`) - le faisceau parcourt le bord via offset-path. */
 @keyframes border-beam-move {
   to { offset-distance: 100%; }
 }
@@ -1013,13 +1013,13 @@ body {
           background-clip: text;
   color: transparent;
 }
-/* Icônes : l'ICÔNE prend le dégradé (aucun fond) — dégradés déclarés par <LabsGradientDefs/>. */
+/* Icônes : l'ICÔNE prend le dégradé (aucun fond) - dégradés déclarés par <LabsGradientDefs/>. */
 .labs-ic-a { stroke: url(#lgA); }
 .labs-ic-b { stroke: url(#lgB); }
 .labs-ic-c { stroke: url(#lgC); }
 .labs-ic-d { stroke: url(#lgD); }
 .labs-ic-e { stroke: url(#lgE); }
-/* Fiole Labs dans le header (site-wide) — dégradé déclaré par le <svg> caché de SiteHeader. */
+/* Fiole Labs dans le header (site-wide) - dégradé déclaré par le <svg> caché de SiteHeader. */
 .labs-ic-head { stroke: url(#lgLabsHead); }
 
 /* PixelBlast FIGÉ (statique) : petits carrés warm (palette hero-wave), concentrés sur les BORDS via un
@@ -1051,7 +1051,7 @@ body {
   background: radial-gradient(50% 100% at 50% 0%, rgba(255, 122, 151, 0.14), transparent 72%);
 }
 
-/* Échelle typographique Labs — miroir des .t-* mais en encre claire.
+/* Échelle typographique Labs - miroir des .t-* mais en encre claire.
    (Les .t-* portent color:var(--site-fg) = sombre : inutilisables ici.) */
 .labs-scope .labs-h1 {
   font-family: var(--font-display);

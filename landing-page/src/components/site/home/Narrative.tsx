@@ -4,14 +4,14 @@ import { BrandLogo } from "../BrandLogo";
 import { Placeholder } from "../Placeholder";
 
 /**
- * Narrative — la thèse, les 3 temps, le pipeline, les agents.
+ * Narrative - la thèse, les 3 temps, le pipeline, les agents.
  * Aucun logo client, aucun témoignage : la preuve est technique (décision D9).
- * Les logos ici sont des OUTILS (pas des clients) — on les a, donc on les met.
+ * Les logos ici sont des OUTILS (pas des clients) - on les a, donc on les met.
  */
 
 /* ─────────────────────────  1. Le mur de logos  ───────────────────────── */
 
-/** Clés du catalogue de connecteurs — vrais logos vendorisés (`public/logos/`). */
+/** Clés du catalogue de connecteurs - vrais logos vendorisés (`public/logos/`). */
 const WALL = [
   { key: "github", label: "GitHub" },
   { key: "gitlab", label: "GitLab" },
@@ -50,7 +50,7 @@ export function LogoWall() {
 }
 
 /* ─────────────────────────  1a. Manifeste (entre le hero et le problème)  ─────────────────────────
- * Décision review 3 (27/07) : une phrase-catégorie à dimension historique, façon Linear —
+ * Décision review 3 (27/07) : une phrase-catégorie à dimension historique, façon Linear -
  * le workflow a été fait pour des humains qui se passent des documents ; l'IA change le
  * bâtisseur ; le workflow doit changer aussi. Pose la thèse avant d'énoncer le problème. */
 
@@ -92,7 +92,7 @@ export function BrainTeaser() {
             </div>
             <h2 className="t-h3 mt-2">Your organization has memory. Your AI should too.</h2>
             <p className="text-muted-foreground mt-2 text-[14px] leading-6">
-              Every architectural decision, constraint and convention becomes reusable intelligence —
+              Every architectural decision, constraint and convention becomes reusable intelligence -
               so a senior stops re-explaining the system for two hours, and the next run (or the next
               hire) never starts from a blank page.
             </p>
@@ -115,7 +115,7 @@ export function BrainTeaser() {
 /**
  * Remplace le « how it works » en trois cartes : ici on montre, checkpoint par checkpoint,
  * ce qui atterrit réellement dans le workspace et ce que la personne décide.
- * L'ordre est le vrai ordre d'exécution — c'est ce qui fait l'explication.
+ * L'ordre est le vrai ordre d'exécution - c'est ce qui fait l'explication.
  */
 const ANATOMY: { step: string; by: string; artifact: string; decision: string; level?: "live" | "beta" | "labs" }[] = [
   {
@@ -135,7 +135,7 @@ const ANATOMY: { step: string; by: string; artifact: string; decision: string; l
   {
     step: "Architecture",
     by: "CTO agent",
-    artifact: "The proposed approach — and the option that was rejected, with the reason.",
+    artifact: "The proposed approach - and the option that was rejected, with the reason.",
     decision: "Approve the trade-off. This is the decision that is expensive to reverse later.",
     level: "labs",
   },
@@ -150,7 +150,7 @@ const ANATOMY: { step: string; by: string; artifact: string; decision: string; l
     step: "Breakdown",
     by: "COO agent",
     artifact: "Issues, sized and ordered, each one linked back to the line of spec it came from.",
-    decision: "Approve — then Smart Assign routes each issue to a person.",
+    decision: "Approve - then Smart Assign routes each issue to a person.",
     level: "live",
   },
   {
@@ -175,7 +175,7 @@ export function Anatomy() {
       <SectionHeader
         eyebrow="Anatomy of a run"
         title="Every checkpoint leaves something behind that you can read"
-        lead="This is the whole product, in order. Not a black box that returns a pull request — a sequence of artifacts, each one attributable, each one refusable."
+        lead="This is the whole product, in order. Not a black box that returns a pull request - a sequence of artifacts, each one attributable, each one refusable."
       />
 
       <div className="bg-card mt-14 overflow-x-auto rounded-2xl border">
@@ -219,8 +219,8 @@ export function Anatomy() {
       </div>
 
       <p className="text-muted-foreground mt-6 text-[13px]">
-        Seven checkpoints is the default. A run can be shortened — a bug fix rarely needs a vision
-        step — but it cannot skip the approval.
+        Seven checkpoints is the default. A run can be shortened - a bug fix rarely needs a vision
+        step - but it cannot skip the approval.
       </p>
     </Section>
   );
@@ -230,7 +230,7 @@ export function Anatomy() {
 
 /**
  * Suite directe du hero : la scène s'arrêtait sur votre approbation, celle-ci
- * reprend au battement suivant. Même run, même issue, même écran — c'est ce
+ * reprend au battement suivant. Même run, même issue, même écran - c'est ce
  * plan-séquence qui fait qu'on suit quelque chose au lieu de feuilleter des
  * fonctionnalités.
  */
@@ -240,7 +240,7 @@ export function Pipeline() {
       tinted
       eyebrow="Assignment"
       level="labs"
-      title="The breakdown goes out — to people, and to agents"
+      title="The breakdown goes out - to people, and to agents"
       lead="Once you approve the spec, TaskForce splits it into issues and routes each one. A coding agent is an assignee like any other: same card, same column, same review checkpoint."
       aside={
         <>
@@ -254,14 +254,14 @@ export function Pipeline() {
       }
       cta={{ label: "How assignment works", href: "/product/smart-assign" }}
     >
-      <Placeholder label="Assignment — Smart Assign" />
+      <Placeholder label="Assignment - Smart Assign" />
     </FeatureBand>
   );
 }
 
 /**
  * Le troisième plan : ce que l'agent a réellement fait. C'est la scène qui ferme
- * la boucle — l'étape marquée `criterion 4` travaille sur la ligne née du
+ * la boucle - l'étape marquée `criterion 4` travaille sur la ligne née du
  * commentaire humain du hero.
  */
 export function AgentDelivery() {
@@ -277,7 +277,7 @@ export function AgentDelivery() {
           />
           <ul className="mt-8 flex flex-col gap-3">
             {[
-              "The step that edits the service carries the acceptance criterion it serves — the one your comment created.",
+              "The step that edits the service carries the acceptance criterion it serves - the one your comment created.",
               "Tests run before the pull request exists, and the result is written down.",
               "The pull request does not merge itself. It goes back through your normal review.",
             ].map((b) => (
@@ -309,13 +309,13 @@ export function Agents() {
       eyebrow="Agents"
       level="labs"
       title="Three responsibilities, not one generalist"
-      lead="A single agent asked to do everything produces work nobody can review. Split the run the way a team already splits it, and every output has an owner — and a reviewer who knows what they are looking at."
+      lead="A single agent asked to do everything produces work nobody can review. Split the run the way a team already splits it, and every output has an owner - and a reviewer who knows what they are looking at."
       aside={
         <>
           The hand-off between roles is exactly where a checkpoint belongs.
           <span className="text-muted-foreground mt-3 flex flex-wrap items-center gap-2 text-[13px]">
             <LevelBadge level="labs" />
-            Not shipped yet — dated on the{" "}
+            Not shipped yet - dated on the{" "}
             <a href="/roadmap" className="link-underline text-foreground">
               public roadmap
             </a>

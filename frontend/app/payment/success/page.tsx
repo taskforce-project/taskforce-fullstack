@@ -76,7 +76,7 @@ function PaymentSuccessContent() {
   }, [sessionId, refreshUser]);
 
   const handleContinue = () => {
-    // Upgrade in-app : l'utilisateur est déjà connecté, on le renvoie dans l'app — son forfait est
+    // Upgrade in-app : l'utilisateur est déjà connecté, on le renvoie dans l'app - son forfait est
     // désormais actif (appliqué par le webhook Stripe).
     router.push("/");
   };

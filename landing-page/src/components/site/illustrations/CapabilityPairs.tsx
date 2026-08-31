@@ -2,10 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * CapabilityPairs — illustration du bloc « The consequence ».
+ * CapabilityPairs - illustration du bloc « The consequence ».
  *
  * Six cartes de texte alignées ne démontraient rien : on lisait une liste de features.
- * Ici on montre le **couplage** — deux capacités s'allument, un trait les relie, et le
+ * Ici on montre le **couplage** - deux capacités s'allument, un trait les relie, et le
  * bénéfice qui en découle s'écrit dessous. C'est l'argument « une seule plateforme »
  * rendu visible : sans les deux moitiés dans le même système, la ligne du bas n'existe pas.
  */
@@ -46,7 +46,7 @@ const PAIRS: Pair[] = [
     a: "Analytics",
     b: "Model routing",
     title: "The slow step gets named, then rerouted",
-    text: "You can see which checkpoint drags, and move that one — not the whole workspace — onto something faster.",
+    text: "You can see which checkpoint drags, and move that one - not the whole workspace - onto something faster.",
   },
   {
     a: "Approvals",
@@ -64,7 +64,7 @@ const PAIRS: Pair[] = [
 
 const MS = 3400;
 
-/** Centre d'une puce dans la grille 3 × 2, en pourcentage — pour tracer le trait. */
+/** Centre d'une puce dans la grille 3 × 2, en pourcentage - pour tracer le trait. */
 const centre = (cap: Cap) => {
   const i = CAPS.indexOf(cap);
   const col = i % 3;
@@ -148,7 +148,7 @@ export function CapabilityPairs() {
         </ul>
       </div>
 
-      {/* Le bénéfice — hauteur réservée pour le texte le plus long.
+      {/* Le bénéfice - hauteur réservée pour le texte le plus long.
           148px et pas 132 : deux paires sur six passent sur une ligne de plus,
           ce qui faisait varier la carte de 12px à chaque cycle. */}
       <div className="min-h-[148px] border-t p-5">

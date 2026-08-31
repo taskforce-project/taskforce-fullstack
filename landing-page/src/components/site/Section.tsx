@@ -11,7 +11,7 @@ import { MATURITY_LABEL, type Maturity } from "./nav";
  * Réf. taskforce-docs/v1/14-design/landing-refonte/Plan_Refonte_Site.md §4
  */
 
-/** Badge de maturité — porte l'info par le texte, jamais par la couleur seule (WCAG 1.4.1). */
+/** Badge de maturité - porte l'info par le texte, jamais par la couleur seule (WCAG 1.4.1). */
 export function LevelBadge({ level, className }: { level: Maturity; className?: string }) {
   return (
     <Badge
@@ -31,7 +31,7 @@ export function Section({
   children,
 }: {
   id?: string;
-  /** Fond gris `--secondary` au lieu du blanc — sert à alterner les sections. */
+  /** Fond gris `--secondary` au lieu du blanc - sert à alterner les sections. */
   band?: boolean;
   className?: string;
   children: ReactNode;
@@ -60,7 +60,7 @@ export function SectionHeader({
   level?: Maturity;
   /** Numéro de chapitre façon Linear (« 1.0 »), en monospace devant l'eyebrow. */
   index?: string;
-  /** Rend l'eyebrow numéroté cliquable, avec une flèche — comme « 1.0 Intake → » chez Linear. */
+  /** Rend l'eyebrow numéroté cliquable, avec une flèche - comme « 1.0 Intake → » chez Linear. */
   indexHref?: string;
   align?: "left" | "center";
   className?: string;
@@ -98,7 +98,7 @@ export function SectionHeader({
 }
 
 /**
- * Cadre de mock produit — la carte blanche qui porte chaque visuel.
+ * Cadre de mock produit - la carte blanche qui porte chaque visuel.
  * `chrome` ajoute la barre de fenêtre (pastilles + URL) pour les vues « application ».
  */
 export function MockFrame({
@@ -142,7 +142,7 @@ export function MockFrame({
 /**
  * Bloc pleine largeur : en-tête à gauche, visuel **sous** le texte et sur toute la largeur.
  *
- * Sert à casser la monotonie de `FeatureSplit` — une page entière en « texte à gauche,
+ * Sert à casser la monotonie de `FeatureSplit` - une page entière en « texte à gauche,
  * carte à droite » se lit comme un seul bloc et on décroche. Deux `FeatureSplit`
  * consécutifs maximum, puis un `FeatureBand`.
  *

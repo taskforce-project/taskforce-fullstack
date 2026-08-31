@@ -202,7 +202,7 @@ function mapProjectCycles(cycles: ApiCycle[], p: Project): RoadmapItem[] {
 }
 
 function mapScheduledIssue(issue: ApiIssue, projectsById: Map<number, Project>): RoadmapItem | null {
-  // projectId n'est pas dans ApiIssue directement — on l'infère depuis l'identifier (ex: "WEB-42" → project identifier "WEB")
+  // projectId n'est pas dans ApiIssue directement - on l'infère depuis l'identifier (ex: "WEB-42" → project identifier "WEB")
   const prefix = issue.identifier.replace(/-\d+$/, "")
   const proj = Array.from(projectsById.values()).find((p) => p.identifier === prefix)
   if (!proj) return null
@@ -360,7 +360,7 @@ export function RoadmapGantt({ slug, projectId }: { readonly slug: string; reado
 
   return (
     <div className="flex flex-col gap-6 w-full">
-      {/* Header — masqué en mode onglet projet (le layout du projet fournit déjà le titre) */}
+      {/* Header - masqué en mode onglet projet (le layout du projet fournit déjà le titre) */}
       {!scoped && (
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -473,7 +473,7 @@ export function RoadmapGantt({ slug, projectId }: { readonly slug: string; reado
 
               return (
                 <div key={projectName}>
-                  {/* En-tête de groupe par projet — inutile en mode onglet projet (un seul projet) */}
+                  {/* En-tête de groupe par projet - inutile en mode onglet projet (un seul projet) */}
                   {!scoped && (
                   <div className="flex items-center border-b border-border/50 bg-muted/20" style={{ height: ROW_H }}>
                     {/* Label cell */}
@@ -490,7 +490,7 @@ export function RoadmapGantt({ slug, projectId }: { readonly slug: string; reado
                       </button>
                     </div>
 
-                    {/* Timeline cell — empty for group header */}
+                    {/* Timeline cell - empty for group header */}
                     <div className="relative flex-1 h-full" style={{ width: totalPx }}>
                       {/* Today line */}
                       {todayLeft >= 0 && todayLeft <= totalPx && (
@@ -505,7 +505,7 @@ export function RoadmapGantt({ slug, projectId }: { readonly slug: string; reado
                   </div>
                   )}
 
-                  {/* Item rows — toujours visibles en scoped (pas de repli) */}
+                  {/* Item rows - toujours visibles en scoped (pas de repli) */}
                   {(scoped || !isCollapsed) && groupItems.map((item) => (
                     <div key={item.id} className="flex items-center border-b border-border/50 last:border-0 hover:bg-muted/20 transition-colors group" style={{ height: ROW_H }}>
                       {/* Label */}
@@ -550,7 +550,7 @@ export function RoadmapGantt({ slug, projectId }: { readonly slug: string; reado
         </div>
       </div>
 
-      {/* Legend — couleur = projet, forme = type (QA Q-12) */}
+      {/* Legend - couleur = projet, forme = type (QA Q-12) */}
       <div className="flex items-center gap-x-4 gap-y-2 text-xs text-muted-foreground flex-wrap">
         {/* Échantillon « une couleur par projet » */}
         <span className="flex items-center gap-1.5">

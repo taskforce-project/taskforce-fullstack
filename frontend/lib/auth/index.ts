@@ -34,7 +34,7 @@ export type AuthUser = {
 export type LoginCredentials = {
   email: string;
   password: string;
-  /** Code TOTP (2FA) — envoyé seulement au 2ᵉ passage, quand le serveur a répondu `twoFactorRequired`. */
+  /** Code TOTP (2FA) - envoyé seulement au 2ᵉ passage, quand le serveur a répondu `twoFactorRequired`. */
   totp?: string;
 };
 

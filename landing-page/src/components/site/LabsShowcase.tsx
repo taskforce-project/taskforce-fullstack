@@ -4,8 +4,8 @@ import { Bot, Brain, Cpu, RefreshCw, ArrowRight, ArrowUpRight } from "lucide-rea
 import { cn } from "@/lib/utils";
 
 /**
- * LabsShowcase — les sujets de recherche présentés en FEATURES (onglets), pas en grille plate.
- * Retour user (03/08) : « faut innover, système de tabs, chaque sujet a son storytelling — pourquoi,
+ * LabsShowcase - les sujets de recherche présentés en FEATURES (onglets), pas en grille plate.
+ * Retour user (03/08) : « faut innover, système de tabs, chaque sujet a son storytelling - pourquoi,
  * le but, où on en est, les docs/démos ». Îlot React autonome (pas de dépendance : useState maison).
  * Données passées en prop depuis `index.astro` (source unique `labs.ts`). D11 : direction, pas mécanisme.
  * Les dégradés de trait (`labs-ic-*`) viennent de <LabsGradientDefs/>, présent sur la page.

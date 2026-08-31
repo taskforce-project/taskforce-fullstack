@@ -6,13 +6,13 @@ import { useEffect, useRef } from "react";
  * Widget Cloudflare Turnstile.
  *
  * <h3>La clé de site vient du serveur, pas de l'environnement du client</h3>
- * Elle est publique par nature — elle est destinée au navigateur — mais elle est servie par
+ * Elle est publique par nature - elle est destinée au navigateur - mais elle est servie par
  * `GET /api/auth/challenge` plutôt que dupliquée dans la configuration du frontend. Motif :
  * dupliquée, elle finirait par diverger de celle que le serveur utilise réellement pour vérifier, et
  * la panne serait silencieuse (widget affiché, vérification systématiquement en échec). Une seule
  * source, celle qui décide.
  *
- * <h3>Rendu explicite uniquement — pas de scan implicite</h3>
+ * <h3>Rendu explicite uniquement - pas de scan implicite</h3>
  * Le script est injecté une seule fois et jamais retiré : Turnstile installe un objet global, et
  * démonter puis remonter le script laisse un état incohérent. Le composant rend le widget lui-même
  * via `turnstile.render()` quand l'API globale est disponible.
@@ -61,7 +61,7 @@ export function TurnstileWidget({ siteKey, onToken }: TurnstileWidgetProps) {
   const widgetId = useRef<string | null>(null);
   // Gardée dans une référence pour que l'effet de construction ne se relance pas à chaque rendu du
   // parent : le widget ne doit être bâti qu'une fois. La mise à jour se fait dans un effet et non
-  // pendant le rendu — écrire dans une `ref` en pleine phase de rendu casse la garantie de pureté et
+  // pendant le rendu - écrire dans une `ref` en pleine phase de rendu casse la garantie de pureté et
   // le linter le signale à juste titre (`react-hooks/refs`).
   const rappel = useRef(onToken);
   useEffect(() => {
@@ -78,7 +78,7 @@ export function TurnstileWidget({ siteKey, onToken }: TurnstileWidgetProps) {
       // Repartir d'un conteneur VIDE. En développement, le mode strict de React monte, démonte puis
       // remonte le composant : le démontage appelle `remove()`, mais Turnstile peut laisser un résidu
       // (l'`<input>` de réponse) dans le conteneur. Rendre par-dessus ce résidu produirait un widget
-      // sans iframe — présent dans le DOM mais inutilisable. On nettoie donc d'abord.
+      // sans iframe - présent dans le DOM mais inutilisable. On nettoie donc d'abord.
       conteneur.current.innerHTML = "";
       widgetId.current = window.turnstile.render(conteneur.current, {
         sitekey: siteKey,
@@ -113,7 +113,7 @@ export function TurnstileWidget({ siteKey, onToken }: TurnstileWidgetProps) {
       annule = true;
       if (widgetId.current && window.turnstile) {
         // `remove` peut lever si le widget a déjà été retiré (double démontage du mode strict) : on
-        // ignore, l'objectif — plus de widget actif — est de toute façon atteint.
+        // ignore, l'objectif - plus de widget actif - est de toute façon atteint.
         try {
           window.turnstile.remove(widgetId.current);
         } catch {

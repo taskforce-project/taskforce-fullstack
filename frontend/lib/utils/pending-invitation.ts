@@ -6,7 +6,7 @@
  * (redirection vers Keycloak puis retour sur `/auth/callback`, qui PERD les paramètres d'URL). On le
  * met donc de côté dès qu'on le voit, pour tenter une acceptation explicite une fois authentifié.
  *
- * `sessionStorage` (et non `localStorage`) : la portée est l'onglet et la session — un token
+ * `sessionStorage` (et non `localStorage`) : la portée est l'onglet et la session - un token
  * d'invitation n'a pas à persister indéfiniment sur la machine.
  */
 const KEY = "tf-pending-invitation"
@@ -16,7 +16,7 @@ export function stashInvitationToken(token: string | null | undefined): void {
   try {
     window.sessionStorage.setItem(KEY, token)
   } catch {
-    /* stockage indisponible (navigation privée stricte) — l'acceptation via le lien reste possible */
+    /* stockage indisponible (navigation privée stricte) - l'acceptation via le lien reste possible */
   }
 }
 

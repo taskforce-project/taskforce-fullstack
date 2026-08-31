@@ -27,7 +27,7 @@ function bodyOf(mock: ReturnType<typeof vi.fn>, call = 0): Record<string, unknow
   return JSON.parse((mock.mock.calls[call][1] as RequestInit).body as string);
 }
 
-describe("client-logger — reportClientError", () => {
+describe("client-logger - reportClientError", () => {
   let fetchMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
@@ -100,7 +100,7 @@ describe("client-logger — reportClientError", () => {
   });
 });
 
-describe("client-logger — initClientLogger", () => {
+describe("client-logger - initClientLogger", () => {
   let fetchMock: ReturnType<typeof vi.fn>;
   let addSpy: ReturnType<typeof vi.spyOn>;
 

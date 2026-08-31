@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Check, CircleCheck } from "lucide-react";
 
 /**
- * PricingSection — page Pricing (light-only). Raconte la MONTÉE EN GAMME, pas une grille de features :
+ * PricingSection - page Pricing (light-only). Raconte la MONTÉE EN GAMME, pas une grille de features :
  *   Free = delivery workspace · Pro = cloud AI · Business = cloud + controls & scale · Enterprise = self-host + gouvernance.
  * Décision user (02/08, corrigée) :
  *   · **Self-hosting = ENTERPRISE = Custom = « Talk to sales »** (« si tu veux self-host, tu es en entreprise »).
@@ -98,7 +98,7 @@ const TIERS: Tier[] = [
 ];
 
 /* ── Grille comparative : le land-and-expand, lisible d'un coup d'œil ── */
-type Cell = boolean | string; // true = ✓ · false = — · string = libellé (ex. "Beta")
+type Cell = boolean | string; // true = ✓ · false = - · string = libellé (ex. "Beta")
 type Row = { label: string; free: Cell; pro: Cell; biz: Cell; ent: Cell };
 
 const COMPARE: Row[] = [
@@ -123,7 +123,7 @@ const COMPARE: Row[] = [
 const FAQ: { q: string; a: string }[] = [
   {
     q: "Can I try TaskForce for free?",
-    a: "Yes — Free is free forever, and Basic and Business include a 14-day trial. No credit card required.",
+    a: "Yes - Free is free forever, and Basic and Business include a 14-day trial. No credit card required.",
   },
   {
     q: "How does billing work?",
@@ -131,15 +131,15 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "What are Cortex AI tokens?",
-    a: "Cortex is the AI engine behind TaskForce. Every plan includes a monthly token allotment — 100K on Free, 500K on Basic, 2M on Business, unlimited on Enterprise. Beyond the allotment, usage is metered. A self-hosted Enterprise deployment on local models (Ollama) incurs no token charges.",
+    a: "Cortex is the AI engine behind TaskForce. Every plan includes a monthly token allotment - 100K on Free, 500K on Basic, 2M on Business, unlimited on Enterprise. Beyond the allotment, usage is metered. A self-hosted Enterprise deployment on local models (Ollama) incurs no token charges.",
   },
   {
     q: "How do AI decisions & workflows work today?",
-    a: "TaskForce agents propose each delivery step — spec, approach, breakdown — and you approve it before your coding agent (Claude Code, Cursor…) implements. The full multi-checkpoint run is on the roadmap.",
+    a: "TaskForce agents propose each delivery step - spec, approach, breakdown - and you approve it before your coding agent (Claude Code, Cursor…) implements. The full multi-checkpoint run is on the roadmap.",
   },
   {
     q: "Can I self-host TaskForce?",
-    a: "Yes — self-hosting comes with Enterprise. It runs TaskForce inside your own infrastructure with local models, so prompts and data stay on your network. It's a custom agreement, so talk to sales and we'll map the deployment with you.",
+    a: "Yes - self-hosting comes with Enterprise. It runs TaskForce inside your own infrastructure with local models, so prompts and data stay on your network. It's a custom agreement, so talk to sales and we'll map the deployment with you.",
   },
 ];
 
@@ -153,7 +153,7 @@ function FeatureBadge({ badge }: { badge: "Beta" }) {
 
 function Cell({ value }: { value: Cell }) {
   if (value === true) return <Check className="mx-auto size-4 text-emerald-600" strokeWidth={2.5} />;
-  if (value === false) return <span className="text-muted-foreground/40">—</span>;
+  if (value === false) return <span className="text-muted-foreground/40">-</span>;
   if (value === "Beta")
     return (
       <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700">Beta</span>
@@ -265,7 +265,7 @@ export function PricingSection() {
           </div>
         </div>
 
-        {/* Tiers — UN SEUL BLOC : colonnes collées, séparées par des filets (style app), qui montent crescendo */}
+        {/* Tiers - UN SEUL BLOC : colonnes collées, séparées par des filets (style app), qui montent crescendo */}
         <div className="mx-auto mt-14 max-w-6xl overflow-hidden rounded-2xl border">
           <div className="grid gap-px bg-border sm:grid-cols-2 lg:grid-cols-4">
             {TIERS.map((tier) => (
@@ -276,7 +276,7 @@ export function PricingSection() {
 
         <p className="text-muted-foreground mt-8 text-center text-[13px]">
           Prices are indicative and may change before launch. All plans include TLS encryption and
-          GDPR-oriented data controls. Availability targets and SLAs vary by plan — see the{" "}
+          GDPR-oriented data controls. Availability targets and SLAs vary by plan - see the{" "}
           <a href="/trust" className="link-underline text-foreground font-medium">
             trust center
           </a>
@@ -287,7 +287,7 @@ export function PricingSection() {
           self-hosted Enterprise deployment on local models incurs no token charges.
         </p>
 
-        {/* Comparaison — la montée en gamme, ligne par ligne */}
+        {/* Comparaison - la montée en gamme, ligne par ligne */}
         <div className="mx-auto mt-20 max-w-5xl">
           <h2 className="text-center text-2xl font-semibold tracking-tight text-foreground">
             Everything from a free workspace to a governed enterprise deployment
@@ -328,7 +328,7 @@ export function PricingSection() {
           </div>
         </div>
 
-        {/* Deux façons de faire tourner l'IA — pont vers Trust Center / Orchestration */}
+        {/* Deux façons de faire tourner l'IA - pont vers Trust Center / Orchestration */}
         <div className="mx-auto mt-20 max-w-5xl">
           <div className="mx-auto max-w-2xl text-center">
             <h2 className="text-2xl font-semibold tracking-tight text-foreground">
@@ -344,14 +344,14 @@ export function PricingSection() {
               <p className="text-muted-foreground mt-1 text-[13.5px]">Cortex · Claude · OpenAI · other providers</p>
               <p className="mt-4 text-[13.5px] leading-6 text-foreground">
                 Each plan includes a monthly Cortex AI token allotment; beyond it, usage is metered. The
-                simplest way to start — on any cloud plan.
+                simplest way to start - on any cloud plan.
               </p>
             </div>
             <div className="bg-card p-6">
               <h3 className="text-[16px] font-semibold text-foreground">Self-hosted</h3>
               <p className="text-muted-foreground mt-1 text-[13.5px]">Ollama · local models · Enterprise</p>
               <p className="mt-4 text-[13.5px] leading-6 text-foreground">
-                Your infrastructure, zero model cost — and no prompts or outputs leave your network.
+                Your infrastructure, zero model cost - and no prompts or outputs leave your network.
                 Available with Enterprise; talk to sales.
               </p>
             </div>

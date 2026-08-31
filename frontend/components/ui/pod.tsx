@@ -9,7 +9,7 @@ interface PodProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 /**
- * Pod — modular container component inspired by Globant's design system
+ * Pod - modular container component inspired by Globant's design system
  * Modern, clean styling with subtle gradients and shadows
  */
 const Pod = React.forwardRef<HTMLDivElement, PodProps>(
@@ -52,7 +52,7 @@ interface PodHeaderProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 /**
- * PodHeader — custom header for advanced pod layouts
+ * PodHeader - custom header for advanced pod layouts
  */
 const PodHeader = React.forwardRef<HTMLDivElement, PodHeaderProps>(
   ({ className, children, ...props }, ref) => {
@@ -74,7 +74,7 @@ interface PodContentProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 /**
- * PodContent — content area for pod
+ * PodContent - content area for pod
  */
 const PodContent = React.forwardRef<HTMLDivElement, PodContentProps>(
   ({ className, children, ...props }, ref) => {

@@ -1,9 +1,9 @@
 import { useEffect, useRef } from "react";
 
 /**
- * FluidBackdrop — fond « verre liquide » fluide (retour user : style Microsoft 365, glassmorphisme).
+ * FluidBackdrop - fond « verre liquide » fluide (retour user : style Microsoft 365, glassmorphisme).
  *
- * WebGL2 BRUT, zéro dépendance (comme LabField / RetroGrid — pas d'ogl/three, safe Docker) : un
+ * WebGL2 BRUT, zéro dépendance (comme LabField / RetroGrid - pas d'ogl/three, safe Docker) : un
  * dégradé domain-warpé (bruit simplex) qui coule lentement, palette sombre → violet/bleu/cyan/magenta.
  * Le tiers gauche est assombri par le shader pour garder le texte du hero lisible. Le curseur pose une
  * lueur douce. Rendu à résolution réduite (dégradé basse fréquence → invisible) pour la perf.
@@ -76,7 +76,7 @@ void main() {
   vec2 p = uv * vec2(uResolution.x / uResolution.y, 1.0) * 1.6;
   float t = uTime * 0.05;
 
-  // Domain warp — donne l'écoulement « satin / verre liquide ».
+  // Domain warp - donne l'écoulement « satin / verre liquide ».
   vec2 q = vec2(fbm(p + t), fbm(p + vec2(5.2, 1.3) - t));
   vec2 r = vec2(fbm(p + 1.6 * q + vec2(1.7, 9.2) + 0.12 * t),
                 fbm(p + 1.6 * q + vec2(8.3, 2.8) - 0.10 * t));

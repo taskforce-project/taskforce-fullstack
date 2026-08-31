@@ -14,11 +14,11 @@ import { SITE_URL } from "@/lib/config/urls";
  * Coquille des pages d'authentification.
  *
  * Trois bandes en grille : barre supérieure, contenu centré, footer. La hauteur est verrouillée à
- * 100svh et le débordement masqué — ces pages sont un passage, elles ne doivent pas défiler.
+ * 100svh et le débordement masqué - ces pages sont un passage, elles ne doivent pas défiler.
  *
  * **Regroupement à gauche** : la marque et le retour au site forment un seul bloc, plutôt que d'être
  * jetés aux deux extrémités d'une barre par ailleurs vide. La droite ne porte que les réglages et
- * **l'action opposée à la page courante** — proposer « Créer un compte » sur la page de connexion,
+ * **l'action opposée à la page courante** - proposer « Créer un compte » sur la page de connexion,
  * et « Se connecter » sur les pages d'inscription. C'est la convention des applications qui font
  * cet écran correctement : la barre cesse d'être décorative et devient un raccourci utile.
  *
@@ -37,7 +37,7 @@ export default function AuthLayout({
   // d'hydratation (mauvais thème, mauvaise langue pendant une frame). On attend donc le client.
   //
   // `useSyncExternalStore` plutôt qu'un `useState` + `useEffect` : c'est le motif prévu pour cette
-  // question précise — l'instantané serveur vaut `false`, l'instantané client `true`, sans appeler
+  // question précise - l'instantané serveur vaut `false`, l'instantané client `true`, sans appeler
   // `setState` depuis un effet, ce que le linter du projet signale à juste titre.
   const mounted = useSyncExternalStore(
     () => () => { },
@@ -52,7 +52,7 @@ export default function AuthLayout({
     : { href: "/auth/login", label: t.auth.ui.signIn };
 
   // « Le site » n'est PAS la racine de cette application : le site vitrine est un projet Astro
-  // distinct, servi sur une autre origine — `www.example.com` face à `app.example.com` en
+  // distinct, servi sur une autre origine - `www.example.com` face à `app.example.com` en
   // production, un autre port en développement. Pointer `/` renvoyait donc au tableau de bord.
   //
   // Conséquence directe : ce sont des `<a>` et non des `<Link>`. `Link` sert la navigation interne
@@ -66,7 +66,7 @@ export default function AuthLayout({
         <div className="auth-topbar-left">
           {/* Le logo seul, sans le mot « TaskForce » à côté : la marque est dans le dessin, la
               répéter en texte n'apprend rien et bridait la taille du signe. Le nom reste porté par
-              l'`aria-label` du lien — les lecteurs d'écran annoncent toujours « TaskForce ».
+              l'`aria-label` du lien - les lecteurs d'écran annoncent toujours « TaskForce ».
               Dimensionné par la HAUTEUR : le fichier est plus large que haut (rapport ~3:2), fixer
               la largeur revenait à laisser la hauteur décider seule. */}
           <a href={siteUrl} className="auth-brand" aria-label="TaskForce, retour au site">

@@ -19,7 +19,7 @@ const v = ((Math.max(0, USE_CASE_ORDER.indexOf(c.key)) % 3) + 3) % 3;
 const worksInline = v === 1;
 ---
 
-<BaseLayout title={`${c.name} — Use cases`} description={c.lead}>
+<BaseLayout title={`${c.name} - Use cases`} description={c.lead}>
   <PageHero
     kicker="Use case"
     title={c.name}
@@ -52,7 +52,7 @@ const worksInline = v === 1;
     </div>
   </section>
 
-  {/* ── In a run — TROIS agencements distincts ── */}
+  {/* ── In a run - TROIS agencements distincts ── */}
   {
     v === 0 && (
       /* A · steps en LISTE numérotée à gauche, demo à droite, fond à points */
@@ -74,7 +74,7 @@ const worksInline = v === 1;
             <div>
               {demo && <UseCaseDemo demo={demo} client:visible />}
               <p class="text-muted-foreground mt-3 text-center text-[11px]">
-                Illustrative — produced, reviewed and approved before the next step.
+                Illustrative - produced, reviewed and approved before the next step.
               </p>
             </div>
           </div>
@@ -102,7 +102,7 @@ const worksInline = v === 1;
           <div class="mx-auto mt-12 max-w-xl">
             {demo && <UseCaseDemo demo={demo} client:visible />}
             <p class="text-muted-foreground mt-3 text-center text-[11px]">
-              Illustrative — produced, reviewed and approved before the next step.
+              Illustrative - produced, reviewed and approved before the next step.
             </p>
           </div>
         </div>
@@ -118,7 +118,7 @@ const worksInline = v === 1;
             <div>
               {demo && <UseCaseDemo demo={demo} client:visible />}
               <p class="text-muted-foreground mt-3 text-center text-[11px]">
-                Illustrative — produced, reviewed and approved before the next step.
+                Illustrative - produced, reviewed and approved before the next step.
               </p>
             </div>
             <div>
@@ -139,7 +139,7 @@ const worksInline = v === 1;
     )
   }
 
-  {/* ── Works with — cartes (A/C) ou liens inline (B) ── */}
+  {/* ── Works with - cartes (A/C) ou liens inline (B) ── */}
   <section class="bg-card border-b">
     <div class="container-rail py-16 lg:py-20">
       <div class="max-w-2xl">

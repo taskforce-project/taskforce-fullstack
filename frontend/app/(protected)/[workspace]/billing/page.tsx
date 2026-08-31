@@ -32,7 +32,7 @@ interface PlanDef {
   highlight?: boolean
 }
 
-/** Forfaits TaskForce (par membre/mois) — crédits IA alignés sur le quota par compte (AiUsageService.limitFor). */
+/** Forfaits TaskForce (par membre/mois) - crédits IA alignés sur le quota par compte (AiUsageService.limitFor). */
 const PLANS: PlanDef[] = [
   {
     key: "FREE",
@@ -108,7 +108,7 @@ function YearlyToggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
 }
 
 /**
- * Page **Facturation** — grille d'offres à 4 forfaits (par membre/mois), présentée en colonnes façon
+ * Page **Facturation** - grille d'offres à 4 forfaits (par membre/mois), présentée en colonnes façon
  * page d'abonnement moderne. Barre compacte plan courant + consommation IA (agrégée par compte).
  */
 export default function BillingPage() {
@@ -271,7 +271,7 @@ export default function BillingPage() {
                 {price.per && <span className="text-xs text-muted-foreground">{price.per}</span>}
               </div>
 
-              {/* Toggle annuel (forfaits payants) — sinon ligne d'équilibre */}
+              {/* Toggle annuel (forfaits payants) - sinon ligne d'équilibre */}
               <div className="mt-3 flex h-5 items-center">
                 {paid ? <YearlyToggle on={annual} onToggle={() => setAnnual((v) => !v)} /> : (
                   <span className="text-xs text-muted-foreground">

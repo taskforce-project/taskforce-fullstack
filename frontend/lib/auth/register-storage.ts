@@ -20,7 +20,7 @@ export type RegisterData = {
    * traverser le choix de la formule.
    */
   challengeToken?: string;
-  /** Jeton Cloudflare Turnstile — même trajet que le défi signé : émis étape 1, consommé étape 3. */
+  /** Jeton Cloudflare Turnstile - même trajet que le défi signé : émis étape 1, consommé étape 3. */
   turnstileToken?: string;
 };
 

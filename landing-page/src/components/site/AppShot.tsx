@@ -2,11 +2,11 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * AppShot — un CADRE d'application VIDE, prêt à recevoir une VRAIE capture du produit.
+ * AppShot - un CADRE d'application VIDE, prêt à recevoir une VRAIE capture du produit.
  *
  * Décision user (phase design) : les moments de PREUVE / CONFIANCE (« du dur, de l'argument »)
- * montrent l'app RÉELLE, pas une animation. On pose donc un cadre propre — barre de fenêtre +
- * corps neutre, AUCUN placeholder pointillé « à la Placeholder » — que l'équipe remplira avec la
+ * montrent l'app RÉELLE, pas une animation. On pose donc un cadre propre - barre de fenêtre +
+ * corps neutre, AUCUN placeholder pointillé « à la Placeholder » - que l'équipe remplira avec la
  * capture. Les `children` sont des overlays (toasts / callouts custom) posés PAR-DESSUS : c'est le
  * pattern « vrai screen + petits toasts » demandé.
  *
@@ -56,7 +56,7 @@ export function AppShot({
 }
 
 /**
- * Toast — petit callout custom posé sur un AppShot (ou n'importe quel conteneur `relative`).
+ * Toast - petit callout custom posé sur un AppShot (ou n'importe quel conteneur `relative`).
  * Sobre : bordure, ombre, une icône optionnelle. Purement démonstratif.
  */
 export function Toast({

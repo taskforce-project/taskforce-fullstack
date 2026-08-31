@@ -5,7 +5,7 @@ import { ResponsiveContainer, AreaChart, Area, YAxis } from "recharts"
 
 import { cn } from "@/lib/utils"
 
-/** Teintes disponibles — alignées sur le sens produit : bleu = activité, rouge = risque. */
+/** Teintes disponibles - alignées sur le sens produit : bleu = activité, rouge = risque. */
 const TONE = {
   blue: "#3b82f6",
   red:  "#ef4444",
@@ -47,7 +47,7 @@ const CHART_MARGIN = { top: 2, right: 0, left: 0, bottom: 0 } as const
 export const BASELINE_OFFSET_PX = 15
 
 /**
- * Dégradé d'aire — <b>source unique</b> pour toutes les courbes de l'app (sparklines des
+ * Dégradé d'aire - <b>source unique</b> pour toutes les courbes de l'app (sparklines des
  * opérations, cartes du dashboard…). À placer dans un `<defs>`, puis référencer via
  * {@code fill={`url(#${id})`}}.
  *
@@ -102,7 +102,7 @@ export function Sparkline({
   renderZero = false,
 }: SparklineProps) {
   // `useId` : plusieurs sparklines coexistent sur la page, chacune a besoin d'un
-  // identifiant de dégradé unique — sinon toutes héritent du premier rendu.
+  // identifiant de dégradé unique - sinon toutes héritent du premier rendu.
   const gradientId = useId().replace(/:/g, "")
   const color = TONE[tone]
 
@@ -119,7 +119,7 @@ export function Sparkline({
   const max = Math.max(...values)
 
   // Domaine forcé à partir de 0 : sans lui, Recharts recadre sur les valeurs et une série plate
-  // à 0 se dessine au MILIEU du cadre — visuellement identique à une série plate à 5.
+  // à 0 se dessine au MILIEU du cadre - visuellement identique à une série plate à 5.
   const domainMax = Math.max(1, max)
   const baseline = chartBaseline({ height, domainMax })
 

@@ -140,7 +140,7 @@ export async function removeIssueFromCycle(
   await apiClient.delete(CYCLE_ROUTES.ISSUE(slug, projectId, cycleId, issueId));
 }
 
-/** Cycles auxquels une issue est rattachée (reverse-lookup pour le sélecteur du sheet — CYC-03b). */
+/** Cycles auxquels une issue est rattachée (reverse-lookup pour le sélecteur du sheet - CYC-03b). */
 export async function listIssueCycles(
   slug: string,
   projectId: number,

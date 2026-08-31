@@ -122,7 +122,7 @@ function IssueRow({ issue, onOpen, onToggleDone }: { readonly issue: Issue; read
         ))}
       </div>
       <span className="hidden md:block text-xs text-muted-foreground w-20 text-right shrink-0">
-        {issue.dueDate ? new Date(issue.dueDate).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }) : "—"}
+        {issue.dueDate ? new Date(issue.dueDate).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }) : "-"}
       </span>
       <div className="hidden lg:flex items-center justify-center w-8 shrink-0">
         {issue.assignee && (
@@ -159,7 +159,7 @@ function StatusGroup({
   const [open, setOpen] = useState(true)
   return (
     <div>
-      {/* Group header — cliquable pour replier/déplier */}
+      {/* Group header - cliquable pour replier/déplier */}
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -245,12 +245,12 @@ export default function ProjectListPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
-      {/* Filtres en ligne — restent fixes pendant le scroll (QA2-30) */}
+      {/* Filtres en ligne - restent fixes pendant le scroll (QA2-30) */}
       <div className="flex flex-wrap items-center gap-2 shrink-0">
         <InlineIssueFilters issues={issues} value={filters} onChange={setFilters} />
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto rounded-xl border border-border bg-card [box-shadow:var(--shadow-sm)]">
-      {/* Header row — sticky en haut du scroll */}
+      {/* Header row - sticky en haut du scroll */}
       <div className="sticky top-0 z-20 flex items-center gap-3 px-4 py-2.5 border-b border-border bg-card text-xs text-muted-foreground">
         <div className="w-2 shrink-0" />
         <div className="w-3.5 shrink-0" />

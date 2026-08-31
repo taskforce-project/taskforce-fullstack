@@ -23,7 +23,7 @@ vi.mock('sonner', () => ({
   },
 }));
 
-// Real French constants (importActual avoids the vi.mock hoisting trap) — keeps text queries valid
+// Real French constants (importActual avoids the vi.mock hoisting trap) - keeps text queries valid
 // and drift-proof; also feeds the embedded <AuthStepper/>, which now reads the store.
 vi.mock('@/lib/store/preferences-store', async () => {
   const { CONSTANTS_FR } = await vi.importActual<typeof import('@/lib/constants_fr')>('@/lib/constants_fr');

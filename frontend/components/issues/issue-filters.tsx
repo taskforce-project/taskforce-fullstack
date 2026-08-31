@@ -76,7 +76,7 @@ function FilterDropdown({
         >
           {label}
           {/* Compteur en gris : c'est une information d'état, pas une action. Le bleu primaire
-              reste réservé à ce sur quoi on agit (bouton, case, interrupteur) — l'étendre à un
+              reste réservé à ce sur quoi on agit (bouton, case, interrupteur) - l'étendre à un
               simple décompte diluerait le signal. */}
           {count > 0 && (
             <span className="flex size-4 items-center justify-center rounded-full bg-muted text-[10px] font-medium tabular-nums text-muted-foreground">

@@ -3,7 +3,7 @@ import { Check, FileText, GitPullRequest, ListTree, Brain, ClipboardCheck, Netwo
 import { cn } from "@/lib/utils";
 
 /**
- * UseCaseDemo — une mini-illustration ANIMÉE par use-case, pilotée par la donnée (`c.demo`).
+ * UseCaseDemo - une mini-illustration ANIMÉE par use-case, pilotée par la donnée (`c.demo`).
  * 5 formes distinctes (draft / check / split / recall / pr) → chaque page use-case se DÉMONTRE
  * au lieu de reprendre le même flux. Même contrat que AgentToolDemos : self-play, joué à l'écran,
  * figé si prefers-reduced-motion. DA « traits » : carré, filet 1px, sans ombre, accents teintés.
@@ -252,7 +252,7 @@ function Pr({ d, className }: { d: Extract<UseCaseDemoSpec, { kind: "pr" }>; cla
         <p className="text-muted-foreground mt-3 flex items-center gap-1.5 text-[11.5px]">
           {merged ? (
             <>
-              <Check className="size-3 text-emerald-600" strokeWidth={3} /> Merged — linked to {d.issue}, human-approved
+              <Check className="size-3 text-emerald-600" strokeWidth={3} /> Merged - linked to {d.issue}, human-approved
             </>
           ) : (
             <>
@@ -265,7 +265,7 @@ function Pr({ d, className }: { d: Extract<UseCaseDemoSpec, { kind: "pr" }>; cla
   );
 }
 
-/* ── graph — une décision se LIE à ses raisons : nœuds + arêtes qui se connectent (mémoire / liens). ── */
+/* ── graph - une décision se LIE à ses raisons : nœuds + arêtes qui se connectent (mémoire / liens). ── */
 function Graph({ d, className }: { d: Extract<UseCaseDemoSpec, { kind: "graph" }>; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const n = Math.min(d.nodes.length, 3);
@@ -315,7 +315,7 @@ function Graph({ d, className }: { d: Extract<UseCaseDemoSpec, { kind: "graph" }
   );
 }
 
-/* ── pipeline — le run AVANCE : étapes horizontales qui s'allument l'une après l'autre (exécution). ── */
+/* ── pipeline - le run AVANCE : étapes horizontales qui s'allument l'une après l'autre (exécution). ── */
 function Pipeline({ d, className }: { d: Extract<UseCaseDemoSpec, { kind: "pipeline" }>; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const { inView, reduced } = useInViewReduced(ref);
@@ -376,7 +376,7 @@ function Pipeline({ d, className }: { d: Extract<UseCaseDemoSpec, { kind: "pipel
       <p className="text-muted-foreground mt-3 flex items-center gap-1.5 px-4 text-[11px]">
         {done ? (
           <>
-            <Check className="size-3 text-emerald-600" strokeWidth={3} /> Run complete — every step approved
+            <Check className="size-3 text-emerald-600" strokeWidth={3} /> Run complete - every step approved
           </>
         ) : (
           <>
@@ -388,7 +388,7 @@ function Pipeline({ d, className }: { d: Extract<UseCaseDemoSpec, { kind: "pipel
   );
 }
 
-/* ── board — TON board se lit : mini-kanban, les cartes se posent par colonne (collaboration / priorités). ── */
+/* ── board - TON board se lit : mini-kanban, les cartes se posent par colonne (collaboration / priorités). ── */
 function Board({ d, className }: { d: Extract<UseCaseDemoSpec, { kind: "board" }>; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const total = d.columns.reduce((a, c) => a + c.cards.length, 0);

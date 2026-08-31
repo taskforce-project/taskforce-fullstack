@@ -212,7 +212,7 @@ export default function MemberProfilePage() {
               <span className="text-xs">{label}</span>
             </div>
             <p className="text-2xl font-bold text-foreground">
-              {issuesLoading ? "—" : value}
+              {issuesLoading ? "-" : value}
             </p>
           </div>
         ))}
@@ -220,10 +220,10 @@ export default function MemberProfilePage() {
 
       <Separator />
 
-      {/* Skills profile — feeds Smart Assign (PROD-1.2) */}
+      {/* Skills profile - feeds Smart Assign (PROD-1.2) */}
       <MemberSkillsCard slug={slug} userId={member.userId} canEdit={canEdit} />
 
-      {/* Disponibilité — congés / indisponibilités (US-006) */}
+      {/* Disponibilité - congés / indisponibilités (US-006) */}
       <MemberAvailabilityCard slug={slug} userId={member.userId} canEdit={canEdit} />
 
       {/* Recent issues */}

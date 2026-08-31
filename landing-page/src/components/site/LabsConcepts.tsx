@@ -3,8 +3,8 @@ import { FileText, Network, ListTree, User, Check, ArrowDown, ArrowRight, Brain,
 import { cn } from "@/lib/utils";
 
 /**
- * LabsConcepts — 1 mini-illustration par direction de recherche. Chaque petit composant (l'« insight »)
- * ENTRE en reveal staggered UNE fois à l'arrivée à l'écran, puis reste (pas de boucle) — façon Attio :
+ * LabsConcepts - 1 mini-illustration par direction de recherche. Chaque petit composant (l'« insight »)
+ * ENTRE en reveal staggered UNE fois à l'arrivée à l'écran, puis reste (pas de boucle) - façon Attio :
  * ça se construit quand on arrive, ça attire l'œil, puis c'est posé. D11 : concept (chip « concept »),
  * jamais un mécanisme livré. Visible d'emblée si prefers-reduced-motion / pas d'IntersectionObserver.
  */
@@ -90,7 +90,7 @@ function ConceptShell({ label, children }: { label: string; children: ReactNode 
   );
 }
 
-/* ── agent-roles — les rôles cadrés + leurs portes « human » se posent l'un après l'autre. ── */
+/* ── agent-roles - les rôles cadrés + leurs portes « human » se posent l'un après l'autre. ── */
 const HANDOFF = [
   { role: "Product", artifact: "Problem + spec", icon: FileText },
   { role: "Architecture", artifact: "API contract", icon: Network },
@@ -135,7 +135,7 @@ function RolesHandoff() {
   );
 }
 
-/* ── run-memory — Run 1 → 3 décisions nommées → Memory → Run 2, chaque pièce se pose l'une après l'autre. ── */
+/* ── run-memory - Run 1 → 3 décisions nommées → Memory → Run 2, chaque pièce se pose l'une après l'autre. ── */
 const DECISIONS = [
   { k: "DB", v: "Postgres · EU residency" },
   { k: "API", v: "Idempotent keys" },
@@ -183,7 +183,7 @@ function MemoryCarry() {
   );
 }
 
-/* ── model-choice — chaque étape reçoit son modèle (+ la raison), ligne après ligne. ── */
+/* ── model-choice - chaque étape reçoit son modèle (+ la raison), ligne après ligne. ── */
 const ROUTES = [
   { step: "Draft spec", model: "Local", reason: "on your hardware", icon: Server },
   { step: "Generate code", model: "Hosted", reason: "stronger model", icon: Cpu },
@@ -212,13 +212,13 @@ function ModelPerStep() {
             );
           })}
         </ul>
-        <p className="text-muted-foreground mt-3 text-[10.5px]">routed by need — privacy, strength, cost — not one model for all</p>
+        <p className="text-muted-foreground mt-3 text-[10.5px]">routed by need - privacy, strength, cost - not one model for all</p>
       </ConceptShell>
     </div>
   );
 }
 
-/* ── learning-from-reviews — les tours se posent l'un après l'autre ; l'édition rétrécit → accepted. ── */
+/* ── learning-from-reviews - les tours se posent l'un après l'autre ; l'édition rétrécit → accepted. ── */
 const ROUNDS = [
   { fit: 30, label: "big edit" },
   { fit: 65, label: "small edit" },
@@ -259,7 +259,7 @@ function ReviewCalibrate() {
             );
           })}
         </div>
-        <p className="text-muted-foreground mt-3 text-[10.5px]">each correction is a signal — the next proposal lands closer</p>
+        <p className="text-muted-foreground mt-3 text-[10.5px]">each correction is a signal - the next proposal lands closer</p>
       </ConceptShell>
     </div>
   );

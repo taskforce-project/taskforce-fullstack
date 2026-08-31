@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 
 /**
- * Aurora — shader d'aurora fluide de React Bits, réimplémenté en WebGL2 BRUT (sans la dépendance `ogl`).
+ * Aurora - shader d'aurora fluide de React Bits, réimplémenté en WebGL2 BRUT (sans la dépendance `ogl`).
  * Motif : la landing tourne en Docker (/app) dont le node_modules n'embarque pas `ogl` → « Cannot find module
  * 'ogl' » au SSR. Le shader (VERT/FRAG) est identique à React Bits ; on remplace juste ogl (Renderer/Program/
  * Mesh/Triangle/Color) par ~40 lignes de WebGL natif → zéro dépendance, rien à installer/rebuild.

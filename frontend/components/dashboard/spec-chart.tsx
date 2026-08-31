@@ -34,7 +34,7 @@ import {
 import { listProjectsQuiet } from "@/lib/api/dashboard-card-service"
 import { CardEmpty, CardError } from "./card-states"
 
-// Palette sémantique des séries (miroir de chart-explorer — le backend n'envoie que la clé).
+// Palette sémantique des séries (miroir de chart-explorer - le backend n'envoie que la clé).
 const SERIES_META: Record<string, { label: string; color: string }> = {
   resolved: { label: "Resolved", color: "#10b981" },
   opened: { label: "Ouvertes", color: "#3b82f6" },
@@ -94,7 +94,7 @@ export function DashboardSpecChart({ slug, spec, refreshToken = 0, preferInlineD
 }
 
 // ---------------------------------------------------------------------------
-// Répartition « X par Y » — ré-exécutée en base pour rester à jour
+// Répartition « X par Y » - ré-exécutée en base pour rester à jour
 // ---------------------------------------------------------------------------
 
 function BreakdownBody({
@@ -161,7 +161,7 @@ function BreakdownBody({
 }
 
 // ---------------------------------------------------------------------------
-// Timeseries — recharge le dataset réel référencé par la spec
+// Timeseries - recharge le dataset réel référencé par la spec
 // ---------------------------------------------------------------------------
 
 function TimeseriesBody({ slug, spec, refreshToken }: Readonly<{ slug: string; spec: ChartSpec; refreshToken: number }>) {
@@ -191,7 +191,7 @@ function TimeseriesBody({ slug, spec, refreshToken }: Readonly<{ slug: string; s
           const d = await getAnalyticsCapacity(slug, null)
           if (alive) setRows(d.map((m) => ({ name: m.displayName, openIssues: m.openIssues })))
         } else if (dataset === "workload") {
-          // Charge par membre : la heatmap complète vit dans Intelligence — ici, total ouvert par membre.
+          // Charge par membre : la heatmap complète vit dans Intelligence - ici, total ouvert par membre.
           const w = await getAnalyticsWorkload(slug, 14)
           if (alive) setRows(w.members.map((m) => ({ name: m.displayName, openIssues: m.openIssues })))
         } else {
@@ -264,7 +264,7 @@ function TimeseriesBody({ slug, spec, refreshToken }: Readonly<{ slug: string; s
     )
   }
 
-  // area (défaut) — silhouette dégradée style dashboard.
+  // area (défaut) - silhouette dégradée style dashboard.
   return (
     <ResponsiveContainer width="100%" height="100%">
       <AreaChart data={rows} margin={margin}>

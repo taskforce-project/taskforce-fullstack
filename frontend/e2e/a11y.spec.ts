@@ -3,7 +3,7 @@ import path from "path";
 import { login, DEMO } from "./helpers";
 
 /**
- * Audit d'accessibilité (C13/C15 — RGAA / WCAG 2.1 AA) via axe-core injecté dans la page.
+ * Audit d'accessibilité (C13/C15 - RGAA / WCAG 2.1 AA) via axe-core injecté dans la page.
  * axe.min.js est copié depuis node_modules (voir README).
  *
  * <p><b>Seuil relevé le 22/07/2026.</b> Ce fichier s'intitulait « WCAG 2.1 AA » mais n'échouait que
@@ -40,7 +40,7 @@ async function scan(page: Page, label: string): Promise<AxeViolation[]> {
   const violations = (results.violations ?? []) as AxeViolation[];
   const count = (imp: string) => violations.filter((v) => v.impact === imp).reduce((n, v) => n + v.nodes.length, 0);
   console.log(
-    `\n[a11y] ${label} — ${violations.length} règles en échec ` +
+    `\n[a11y] ${label} - ${violations.length} règles en échec ` +
       `(critical=${count("critical")}, serious=${count("serious")}, moderate=${count("moderate")}, minor=${count("minor")})`,
   );
   for (const v of violations) {
@@ -66,7 +66,7 @@ test.describe("Accessibilité (axe-core WCAG 2.1 AA)", () => {
     // La bannière cookies s'affiche depuis un `useEffect` (lecture de localStorage), donc APRÈS
     // `networkidle`. Sans cette attente, axe scannait tantôt avant tantôt après son apparition :
     // le résultat oscillait entre 0 et 3 violations sans qu'aucun code ne change. On attend qu'elle
-    // soit là — au passage, elle entre réellement dans le périmètre audité.
+    // soit là - au passage, elle entre réellement dans le périmètre audité.
     await page.getByRole("button", { name: /got it/i }).waitFor({ state: "visible", timeout: 10_000 });
     const violations = await scan(page, "/auth/login");
     expect(violations.filter((v) => BLOCKING.has(v.impact ?? ""))).toEqual([]);
@@ -88,7 +88,7 @@ test.describe("Accessibilité (axe-core WCAG 2.1 AA)", () => {
     // `state: "attached"` et non la visibilité par défaut : à la largeur de test, la colonne e-mail
     // est masquée par les classes responsives. Le sélecteur résolvait donc bien 33 éléments, tous
     // « hidden », et le test expirait alors que la page était parfaitement chargée. axe analyse le
-    // DOM — la visibilité de ce span précis n'entre pas en compte.
+    // DOM - la visibilité de ce span précis n'entre pas en compte.
     await page.getByText(/@seed\.taskforce\.dev/i).first().waitFor({ state: "attached", timeout: 15_000 });
     const violations = await scan(page, "membres");
     expect(violations.filter((v) => BLOCKING.has(v.impact ?? ""))).toEqual([]);

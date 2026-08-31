@@ -35,7 +35,7 @@ export function SettingsModal() {
         {/* min-w-0 : DialogContent est en display:grid ; sans lui, ce grid-item flex gonfle à la
             largeur min-content de son contenu (ex. catalogue d'intégrations) et déborde/coupe à droite. */}
         <div className="flex h-full min-h-0 min-w-0">
-          {/* Navigation latérale — la recherche (dans SettingsNav) tient lieu d'en-tête. */}
+          {/* Navigation latérale - la recherche (dans SettingsNav) tient lieu d'en-tête. */}
           <aside className="hidden w-56 shrink-0 flex-col overflow-y-auto border-r bg-muted/30 p-4 sm:flex">
             <SettingsNav active={active} onSelect={setSection} />
           </aside>

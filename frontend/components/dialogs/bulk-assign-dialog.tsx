@@ -65,7 +65,7 @@ export function BulkAssignDialog({ slug, projectId, issues }: BulkAssignDialogPr
   const selected = rows.filter((r) => r.selected)
   const selectedCount = selected.length
   const allSelected = rows.length > 0 && selectedCount === rows.length
-  // Nb de personnes distinctes visées — rend visible le cas « tout à la même personne »
+  // Nb de personnes distinctes visées - rend visible le cas « tout à la même personne »
   // (charge/skills concentrés) sans le masquer derrière une liste d'issues.
   const distinctAssignees = new Set(selected.map((r) => r.candidate.userId)).size
 
@@ -98,7 +98,7 @@ export function BulkAssignDialog({ slug, projectId, issues }: BulkAssignDialogPr
         })
       setRows(next2)
       setRan(true)
-      if (next2.length === 0) toast.warning("No recommendations — add members or skills")
+      if (next2.length === 0) toast.warning("No recommendations - add members or skills")
     } catch {
       toast.error("Could not generate recommendations")
     } finally {
@@ -145,7 +145,7 @@ export function BulkAssignDialog({ slug, projectId, issues }: BulkAssignDialogPr
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="size-4 text-primary" /> Smart Assign — unassigned issues
+            <Sparkles className="size-4 text-primary" /> Smart Assign - unassigned issues
           </DialogTitle>
           <DialogDescription>
             Recommendations based on skills, workload and availability. Uncheck the ones to exclude.

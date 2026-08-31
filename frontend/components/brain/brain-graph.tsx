@@ -40,7 +40,7 @@ const MARCH_STEP = 5       // pas de la marche, en unités de graphe
 const PRESSURE = 0.62      // poids de la poussée exercée par les nœuds des AUTRES cellules
 
 /**
- * Calcule le contour d'une cellule comme une **isoligne de champ scalaire** (metaball) — c'est ce
+ * Calcule le contour d'une cellule comme une **isoligne de champ scalaire** (metaball) - c'est ce
  * qui donne le vrai rendu fluide, plutôt que des ronds collés.
  *
  * <p>Le champ vaut la somme des influences des nœuds de la cellule **moins** celle des nœuds des
@@ -50,7 +50,7 @@ const PRESSURE = 0.62      // poids de la poussée exercée par les nœuds des A
  *
  * <p>Et là où une note appartient aux deux cellules, elle nourrit les **deux** champs (elle n'est
  * dans les « autres » de personne) : les contours se recouvrent en lentille. L'intersection est
- * l'information — c'est tout l'intérêt sur un camembert exclusif.
+ * l'information - c'est tout l'intérêt sur un camembert exclusif.
  *
  * <p>Marche radiale depuis le barycentre plutôt qu'un marching squares : même résultat sur des
  * cellules compactes, une fraction du coût, et un contour trivialement ordonné (donc lissable). Le
@@ -86,7 +86,7 @@ function metaballContour(own: Pt[], others: Pt[], radius: number): Pt[] {
     })
 
   // Cellule écrasée par la pression des voisines : il n'y a plus d'isoligne à tracer. On rend un
-  // disque minimal plutôt qu'un contour aberrant — mieux vaut une forme fausse mais lisible.
+  // disque minimal plutôt qu'un contour aberrant - mieux vaut une forme fausse mais lisible.
   const center = field(cx, cy)
   if (center <= 1) return circle(radius * 0.55)
 
@@ -212,7 +212,7 @@ function readTheme(el: HTMLElement | null): ThemeColors {
   }
 }
 
-/** Ce que le graphe a besoin de savoir d'un projet — pas plus (découplé de `Project`). */
+/** Ce que le graphe a besoin de savoir d'un projet - pas plus (découplé de `Project`). */
 export interface GraphProject {
   id: number
   name: string
@@ -224,7 +224,7 @@ interface BrainGraphProps {
   edges: KnowledgeEdge[]
   selectedNodeId: number | null
   onSelect: (id: number) => void
-  /** Projets du workspace — sert à nommer les régions. Sans eux, tout est « global ». */
+  /** Projets du workspace - sert à nommer les régions. Sans eux, tout est « global ». */
   projects?: GraphProject[]
   includeTags?: boolean
   onSelectTag?: (tag: string) => void
@@ -293,7 +293,7 @@ export function BrainGraph({
     cellAt.set("global", { x: 0, y: 0 })
 
     /**
-     * Cellules projet : en couronne **collée** au noyau, packées par leur **largeur angulaire** —
+     * Cellules projet : en couronne **collée** au noyau, packées par leur **largeur angulaire** -
      * surtout pas réparties sur 360°. Deux fois de suite ça a été l'erreur : réparties, deux projets
      * se retrouvent dos à dos et leur note commune finit à l'opposé des deux → enveloppes en bâtons.
      * Packées, elles sont voisines : la note commune tombe **au milieu du segment** qui les sépare,
@@ -357,7 +357,7 @@ export function BrainGraph({
      * **Camembert par domaine à l'intérieur d'une cellule.** Chaque domaine (Projet, Produit,
      * Architecture, Sécurité…) prend un secteur proportionnel à son nombre de notes, et ses notes s'y
      * rangent. Sans ce second niveau, une cellule dit « ces notes sont au projet WEB » mais pas « voici
-     * la partie archi de WEB » — or c'est ça qu'on cherche à lire.
+     * la partie archi de WEB » - or c'est ça qu'on cherche à lire.
      */
     const cells: CellLayout[] = []
     const layOutCell = (key: string, at: Pt, ids: number[], radius: number, depth: number, color: string) => {
@@ -403,7 +403,7 @@ export function BrainGraph({
       }
       const ps = key.split("-").map(Number)
       if (ps.length > 1) {
-        // Amas transverse : il n'habite aucune cellule, il se pose entre elles — pas de camembert.
+        // Amas transverse : il n'habite aucune cellule, il se pose entre elles - pas de camembert.
         const anchor = anchorFor(ps)
         const color = theme.fg // neutre : la note n'appartient en propre à aucune couleur
         sorted.forEach((id, i) => {
@@ -420,7 +420,7 @@ export function BrainGraph({
 
     // Points par cellule. Une note transverse compte dans CHAQUE cellule dont elle relève : c'est ce
     // qui fait que deux cellules se recouvrent au lieu de se découper. Le hors-projet (clé -1) est
-    // une cellule lui aussi — sans elle, la base flotterait sans frontière.
+    // une cellule lui aussi - sans elle, la base flotterait sans frontière.
     const ptsOf = new Map<number, Pt[]>()
     const globalPts: Pt[] = []
     if (root) { const p = pos.get(root.id); if (p) globalPts.push(p) }
@@ -581,7 +581,7 @@ export function BrainGraph({
   /**
    * Sous les nœuds : une région par projet, dessinée comme l'enveloppe de ses notes.
    *
-   * <p>Les régions se **chevauchent** là où une note relève de plusieurs projets — c'est voulu, et
+   * <p>Les régions se **chevauchent** là où une note relève de plusieurs projets - c'est voulu, et
    * c'est précisément ce qu'une part de tarte ne sait pas dire : une connaissance transverse
    * n'appartient pas à un seul quartier. L'intersection *est* l'information.
    */
@@ -601,7 +601,7 @@ export function BrainGraph({
     }
 
     // Second niveau : le camembert par domaine, découpé DANS la forme organique de la cellule
-    // (`clip`) — les traits épousent donc le contour au lieu d'en déborder.
+    // (`clip`) - les traits épousent donc le contour au lieu d'en déborder.
     for (const cell of data.cells) {
       if (cell.wedges.length < 2) continue
       const region = data.regions.find((r) => r.id === (cell.key === "global" ? -1 : Number(cell.key)))
@@ -625,7 +625,7 @@ export function BrainGraph({
   }, [data, theme])
 
   /**
-   * Au-dessus des nœuds : le nom de chaque cellule, posé **vers l'extérieur du graphe** — la base au
+   * Au-dessus des nœuds : le nom de chaque cellule, posé **vers l'extérieur du graphe** - la base au
    * sud (les projets lui sont collés au nord), chaque projet à l'opposé du noyau. Le poser au sommet
    * de l'enveloppe, comme au premier jet, l'enfouissait sous les cellules voisines.
    */
@@ -648,7 +648,7 @@ export function BrainGraph({
       ctx.fillText(region.name, lx, ly)
     }
 
-    // Nom des domaines dans leur secteur — au zoom seulement : à l'échelle « vue globale » ça
+    // Nom des domaines dans leur secteur - au zoom seulement : à l'échelle « vue globale » ça
     // empilerait 17 libellés dans la base et ne dirait plus rien.
     const wa = fade(scale, 1.0, 1.6)
     if (wa > 0.03) {
@@ -688,7 +688,7 @@ export function BrainGraph({
    *    pas et `onEngineStop` ne se rejoue jamais → la vue resterait cadrée sur l'image d'avant ;
    *  - la **taille** conditionne le montage de `ForceGraph2D` (`size.w > 0`).
    *
-   * ⚠️ **Durée 0, pas une transition.** `zoomToFit(400, …)` anime le zoom via d3 — et l'animation se
+   * ⚠️ **Durée 0, pas une transition.** `zoomToFit(400, …)` anime le zoom via d3 - et l'animation se
    * fait écraser avant d'aboutir (les ticks du moteur reprennent la main), sans la moindre erreur :
    * la vue ne bouge pas d'un pixel. Diagnostiqué en live : `getGraphBbox()` renvoyait déjà le bon
    * cadre, et le même appel rejoué à la console avec une durée **0** cadrait parfaitement. On

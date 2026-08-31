@@ -1,5 +1,5 @@
 /**
- * Dégradé SVG de l'identité « Labs » — aligné sur le site (palette tirée de l'image du hero Labs :
+ * Dégradé SVG de l'identité « Labs » - aligné sur le site (palette tirée de l'image du hero Labs :
  * pêche → rose → bleu, **sans violet**). Rendu caché (0×0) une seule fois dans {@code AppShell} pour que
  * les icônes portant la classe {@code tf-labs-icon} ({@code stroke: url(#tf-labs-grad)}) puissent le
  * référencer partout dans l'app (barre latérale, topbar, palette Ctrl+K). Même principe que le

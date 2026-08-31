@@ -3,7 +3,7 @@ import { ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
- * SystemGraph — signature #2 : la boucle de delivery que TaskForce parcourt.
+ * SystemGraph - signature #2 : la boucle de delivery que TaskForce parcourt.
  *
  * Signal → Memory → Reasoning → Model → Evaluation → Decision → (retour) Memory.
  * Survol / focus / tap d'un nœud : il s'agrandit, ses arêtes s'allument, le panneau révèle
@@ -34,7 +34,7 @@ const NODES: Node[] = [
   {
     key: "signal",
     label: "Signal",
-    desc: "A person's intent — an issue, a goal, a review note. Every run starts from what someone actually wants.",
+    desc: "A person's intent - an issue, a goal, a review note. Every run starts from what someone actually wants.",
     mat: "input",
     href: "/product",
     linkLabel: "The product",
@@ -44,7 +44,7 @@ const NODES: Node[] = [
   {
     key: "memory",
     label: "Memory",
-    desc: "What your organisation already decided — constraints, rejected paths — carried into the next run instead of re-derived from scratch.",
+    desc: "What your organisation already decided - constraints, rejected paths - carried into the next run instead of re-derived from scratch.",
     mat: "beta",
     href: "/product/brain-os",
     linkLabel: "TaskForce Memory",
@@ -74,7 +74,7 @@ const NODES: Node[] = [
   {
     key: "evaluation",
     label: "Evaluation",
-    desc: "Proposals measured, not assumed — what a human edits or sends back becomes signal for the next run.",
+    desc: "Proposals measured, not assumed - what a human edits or sends back becomes signal for the next run.",
     mat: "research",
     href: "/labs/learning-from-reviews",
     linkLabel: "Learning from reviews",
@@ -84,7 +84,7 @@ const NODES: Node[] = [
   {
     key: "decision",
     label: "Decision",
-    desc: "A human signs off at each checkpoint. The approved decision is what becomes durable — and feeds straight back into memory.",
+    desc: "A human signs off at each checkpoint. The approved decision is what becomes durable - and feeds straight back into memory.",
     mat: "beta",
     href: "/product/approvals",
     linkLabel: "Approvals",
@@ -148,7 +148,7 @@ export default function SystemGraph() {
               key={n.key}
               type="button"
               aria-pressed={on}
-              aria-label={`${n.label} — ${n.desc}`}
+              aria-label={`${n.label} - ${n.desc}`}
               onMouseEnter={() => setActive(n.key)}
               onFocus={() => setActive(n.key)}
               onClick={() => setActive(n.key)}
@@ -213,7 +213,7 @@ export default function SystemGraph() {
             <h3 className="labs-h3 mt-3">Reasoning over a loop, not a prompt</h3>
             <p className="mt-2.5 text-[14.5px] leading-6 text-[color:var(--labs-muted)]">
               Intent enters, runs against what your organisation already decided, and every decision feeds
-              back into memory. We publish the loop — what happens inside each step stays in the lab until it
+              back into memory. We publish the loop - what happens inside each step stays in the lab until it
               ships.
             </p>
             <p className="mt-5 font-mono text-[11px] text-[color:var(--labs-faint)]">

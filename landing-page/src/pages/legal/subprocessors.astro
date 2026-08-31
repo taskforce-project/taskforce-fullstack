@@ -18,35 +18,35 @@ import LegalDoc from "@/layouts/LegalDoc.astro";
   <h2>The big picture first</h2>
   <p>
     Much of TaskForce can run on <strong>your own infrastructure</strong>. On a self-hosted deployment
-    using <strong>local models through Ollama</strong>, your content need not touch any third party — the
+    using <strong>local models through Ollama</strong>, your content need not touch any third party - the
     subprocessors below apply mainly to our hosted service and to hosted-model calls you choose to make.
   </p>
 
   <h2>Current subprocessors</h2>
   <ul>
     <li>
-      <strong>Stripe</strong> — payments. Processes billing and customer contact details for paid plans.
+      <strong>Stripe</strong> - payments. Processes billing and customer contact details for paid plans.
       We don't store full card numbers.
     </li>
     <li>
-      <strong>Groq, Inc.</strong> — United States — <em>optional subprocessor, active only when the Groq
+      <strong>Groq, Inc.</strong> - United States - <em>optional subprocessor, active only when the Groq
       provider is configured (<code>GROQ_API_KEY</code>)</em>. Receives the <strong>task context</strong> for
       inference (no direct PII). <strong>By default the AI runs locally (Ollama/Qwen)</strong>, so there is no
       transfer. Safeguards when enabled: a <strong>DPA</strong> plus an out-of-EU transfer mechanism
       (<strong>Standard Contractual Clauses (SCCs)</strong> or the EU-US Data Privacy Framework).
     </li>
     <li>
-      <strong>Hetzner Online GmbH</strong> — cloud infrastructure for our hosted service (application
+      <strong>Hetzner Online GmbH</strong> - cloud infrastructure for our hosted service (application
       data at rest and in transit), located in the EU (Germany).
     </li>
     <li>
-      <strong>[Transactional email provider]</strong> — account and notification emails, if applicable.
+      <strong>[Transactional email provider]</strong> - account and notification emails, if applicable.
       <em>To be confirmed.</em>
     </li>
   </ul>
   <p>
     Components such as identity (Keycloak), object storage (MinIO) and the database (PostgreSQL) run
-    <strong>within the deployment</strong> — on a self-hosted install, they're yours, not third-party
+    <strong>within the deployment</strong> - on a self-hosted install, they're yours, not third-party
     subprocessors.
   </p>
 

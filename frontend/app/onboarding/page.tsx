@@ -18,7 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { getAvatarUrl } from "@/lib/utils/avatar";
 
 /**
- * Wizard d'onboarding — universel (tous les comptes, au 1ᵉʳ login), sautable.
+ * Wizard d'onboarding - universel (tous les comptes, au 1ᵉʳ login), sautable.
  *
  * <p>Il nourrit la base de connaissances du Smart Assign : l'étape « compétences » alimente
  * {@code member_skill_profiles} via l'endpoint existant. Le rôle saisi à l'étape 1 amorce la
@@ -26,7 +26,7 @@ import { getAvatarUrl } from "@/lib/utils/avatar";
  *
  * <p>Toutes les données sont enregistrées à la fin, en <b>best-effort</b> : un échec sur les
  * compétences / le workspace / les invitations n'empêche pas de terminer. Seul l'appel qui lève le
- * drapeau {@code onboardingCompleted} est bloquant — sinon l'utilisateur resterait piégé dans le
+ * drapeau {@code onboardingCompleted} est bloquant - sinon l'utilisateur resterait piégé dans le
  * wizard. On recharge en dur à la fin pour repartir sur un état d'auth frais.</p>
  */
 
@@ -151,7 +151,7 @@ export default function OnboardingPage() {
       const tags = await suggestSkills(slug, jobTitle.trim(), skills);
       setSuggestions(tags);
       setSuggestedFor(jobTitle.trim());
-      if (tags.length === 0) toast.info("No suggestions right now — add your skills manually.");
+      if (tags.length === 0) toast.info("No suggestions right now - add your skills manually.");
     } finally {
       setLoadingSuggestions(false);
     }
@@ -174,7 +174,7 @@ export default function OnboardingPage() {
 
   async function persistAndLeave() {
     setSubmitting(true);
-    // Compétences — le cœur de valeur (Smart Assign). Best-effort.
+    // Compétences - le cœur de valeur (Smart Assign). Best-effort.
     if (slug && userId && (skills.length > 0 || seniority || capacity || bio.trim())) {
       try {
         await updateMemberSkills(slug, userId, {
@@ -184,7 +184,7 @@ export default function OnboardingPage() {
           profileText: bio.trim() || undefined,
         });
       } catch {
-        toast.error("Skills not saved — you can complete them in your profile.");
+        toast.error("Skills not saved - you can complete them in your profile.");
       }
     }
     // Renommage du workspace (si changé). Best-effort.
@@ -210,10 +210,10 @@ export default function OnboardingPage() {
       try {
         await createProject(slug, { name: projectName.trim(), identifier: deriveIdentifier(projectName) });
       } catch {
-        toast.error("Project not created — you can create it from the dashboard.");
+        toast.error("Project not created - you can create it from the dashboard.");
       }
     }
-    // Drapeau d'onboarding — BLOQUANT : sans lui, la garde renverrait ici en boucle.
+    // Drapeau d'onboarding - BLOQUANT : sans lui, la garde renverrait ici en boucle.
     try {
       await finishOnboarding(jobTitle.trim() || undefined);
       window.location.href = "/";
@@ -337,7 +337,7 @@ export default function OnboardingPage() {
               </p>
             </div>
 
-            {/* Suggestions — lancées automatiquement à l'arrivée sur l'étape (cf. useEffect). */}
+            {/* Suggestions - lancées automatiquement à l'arrivée sur l'étape (cf. useEffect). */}
             <div>
               <div className="mb-2 flex items-center gap-2 text-xs" style={{ color: "var(--label-tertiary)" }}>
                 {loadingSuggestions ? (
@@ -346,7 +346,7 @@ export default function OnboardingPage() {
                   <>
                     <Sparkles className="h-3.5 w-3.5" style={{ color: "var(--primary)" }} />
                     <span>
-                      Suggested by Cortex{suggestedFor ? ` for “${suggestedFor}”` : ""} — click to add
+                      Suggested by Cortex{suggestedFor ? ` for “${suggestedFor}”` : ""} - click to add
                     </span>
                     {suggestedFor && (
                       <button
@@ -515,7 +515,7 @@ export default function OnboardingPage() {
                 A first project?
               </h1>
               <p className="mt-1 text-sm" style={{ color: "var(--label-tertiary)" }}>
-                Optional — you can also create it later from the dashboard.
+                Optional - you can also create it later from the dashboard.
               </p>
             </div>
             <label className="block">

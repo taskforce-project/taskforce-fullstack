@@ -188,11 +188,11 @@ export function SmartAssignPanel({
                   {l}
                 </Badge>
               ))
-            : <span className="text-xs text-muted-foreground italic">No labels — analysis based on workload & availability</span>
+            : <span className="text-xs text-muted-foreground italic">No labels - analysis based on workload & availability</span>
           }
         </div>
 
-        {/* Analyse en cours — retour immédiat au clic, pas de bouton à re-cliquer. */}
+        {/* Analyse en cours - retour immédiat au clic, pas de bouton à re-cliquer. */}
         {loading && (
           <div className="flex items-center justify-center gap-1.5 rounded-md bg-muted/40 px-2 py-2 text-sm">
             <Loader2 className="size-3 animate-spin text-muted-foreground" />
@@ -313,7 +313,7 @@ export function SmartAssignPanel({
             {result?.fallbackUsed && (
               <div className="flex items-start gap-1.5 text-xs text-amber-400 bg-amber-500/10 rounded-md px-2 py-1.5">
                 <AlertCircle className="size-3 shrink-0 mt-0.5" />
-                AI fallback active — recommendation generated from Java rules.
+                AI fallback active - recommendation generated from Java rules.
               </div>
             )}
 
@@ -325,7 +325,7 @@ export function SmartAssignPanel({
               </div>
             )}
 
-            {/* Relance directement l'analyse — même principe que le bouton d'entrée : une
+            {/* Relance directement l'analyse - même principe que le bouton d'entrée : une
                 intention explicite ne doit pas retomber sur un second bouton. */}
             <button
               type="button"

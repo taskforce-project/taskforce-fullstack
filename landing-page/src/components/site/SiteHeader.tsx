@@ -27,17 +27,17 @@ import { cn } from "@/lib/utils";
 import { AnimatedNavIcon } from "./AnimatedNavIcon";
 
 /**
- * SiteHeader — barre de navigation du site marketing.
+ * SiteHeader - barre de navigation du site marketing.
  * 4 entrées + actions, méga-menus mixtes : cartes (Product / Resources)
  * et grilles de liens (Solutions), d'après relevanceai.com.
- * Composants : shadcn NavigationMenu / Button / Badge / Sheet — rien de réécrit à la main.
+ * Composants : shadcn NavigationMenu / Button / Badge / Sheet - rien de réécrit à la main.
  * Accessibilité : clavier + Échap (Radix), focus visible, cibles >= 24px.
  */
 
 const triggerCls =
   "h-9 rounded-full bg-transparent px-3 text-[14px] font-normal text-muted-foreground hover:bg-accent hover:text-foreground focus:bg-accent focus:text-foreground data-[state=open]:bg-accent data-[state=open]:text-foreground";
 
-/** Badge de maturité — variantes portées par le Badge shadcn. */
+/** Badge de maturité - variantes portées par le Badge shadcn. */
 function LevelBadge({ level }: { level: Maturity }) {
   return (
     <Badge variant={level} className="px-1.5 py-px text-[10px] font-semibold tracking-wide uppercase">
@@ -46,7 +46,7 @@ function LevelBadge({ level }: { level: Maturity }) {
   );
 }
 
-/** Marqueur « page pas encore construite » — grisé, non cliquable (décision user 30/07). */
+/** Marqueur « page pas encore construite » - grisé, non cliquable (décision user 30/07). */
 function SoonTag() {
   return (
     <span className="text-muted-foreground/70 inline-flex items-center rounded border border-dashed px-1 py-px text-[9px] font-semibold tracking-wide uppercase">
@@ -152,7 +152,7 @@ export function SiteHeader() {
 
   return (
     <header className="bg-card/85 fixed inset-x-0 top-0 z-50 border-b backdrop-blur-md">
-      {/* Dégradé de la fiole Labs — déclaré ici pour être dispo sur TOUTES les pages (les defs Labs ne vivent que sur /labs). */}
+      {/* Dégradé de la fiole Labs - déclaré ici pour être dispo sur TOUTES les pages (les defs Labs ne vivent que sur /labs). */}
       <svg aria-hidden focusable="false" width="0" height="0" style={{ position: "absolute", width: 0, height: 0 }}>
         <defs>
           <linearGradient id="lgLabsHead" x1="0" y1="0" x2="1" y2="1">
@@ -163,7 +163,7 @@ export function SiteHeader() {
       </svg>
       <div className="container-site flex h-16 items-center justify-between gap-6">
         {/* Marque */}
-        <a href="/" className="flex shrink-0 items-center gap-2.5" aria-label="TaskForce — home">
+        <a href="/" className="flex shrink-0 items-center gap-2.5" aria-label="TaskForce - home">
           <img src="/logo-taskforce.svg" alt="" aria-hidden className="h-8 w-auto" />
           <span className="font-display text-[17px] font-semibold tracking-[-0.02em] text-foreground">
             TaskForce
@@ -253,7 +253,7 @@ export function SiteHeader() {
               </NavigationMenuContent>
             </NavigationMenuItem>
 
-            {/* ── Resources (contient Labs — fiole violette sur le trigger pour attirer l'œil) ── */}
+            {/* ── Resources (contient Labs - fiole violette sur le trigger pour attirer l'œil) ── */}
             <NavigationMenuItem>
               <NavigationMenuTrigger className={cn(triggerCls, "gap-1.5")}>
                 Resources
@@ -419,7 +419,7 @@ function MobileItem({ item, onNavigate }: { item: NavLink; onNavigate: () => voi
 
 type MobileGroupData = { title?: string; items: NavLink[]; viewAll?: { label: string; href: string } | null };
 
-/** Section repliable du menu mobile (façon Attio) — COPIE fidèle du méga-menu : groupes + titres +
+/** Section repliable du menu mobile (façon Attio) - COPIE fidèle du méga-menu : groupes + titres +
  *  « view all » par groupe + lien de pied. Rien de retiré, juste ré-agencé en accordéon. */
 function MobileAccordion({
   label,

@@ -3,7 +3,7 @@ import { ShieldCheck, Boxes } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
- * LiveSchematics — mini-illustrations ANIMÉES (locales, sans dépendance) qui remplacent des
+ * LiveSchematics - mini-illustrations ANIMÉES (locales, sans dépendance) qui remplacent des
  * ScreenPlaceholder par une vraie preuve visuelle. Même contrat que AgentToolDemos :
  * self-play, joué UNIQUEMENT à l'écran (IntersectionObserver), figé si prefers-reduced-motion.
  * DA « traits » : carré, filet 1px, aucun ombrage, accents teintés.
@@ -23,7 +23,7 @@ function useInViewReduced(ref: RefObject<HTMLElement | null>) {
   return { inView, reduced };
 }
 
-/* ── Audit trail — les approbations tombent une à une (who · what · when). ── */
+/* ── Audit trail - les approbations tombent une à une (who · what · when). ── */
 const ENTRIES = [
   { color: "#059669", type: "Spec", what: "Payments API", who: "Inès", when: "2m" },
   { color: "#4f46e5", type: "External action", what: "Slack · post update", who: "Léo", when: "just now", write: true },
@@ -103,11 +103,11 @@ export function AuditTrailDemo({ className, compact = false }: { className?: str
   );
 }
 
-/* ── Decision record — un décision devient un OBJET : les champs se remplissent, puis « linked in Memory ». ── */
+/* ── Decision record - un décision devient un OBJET : les champs se remplissent, puis « linked in Memory ». ── */
 const FIELDS = [
   { k: "Decision", v: "Postgres over MongoDB" },
   { k: "Because", v: "EU data residency (GDPR)" },
-  { k: "Rejected", v: "MongoDB Atlas — data leaves EU" },
+  { k: "Rejected", v: "MongoDB Atlas - data leaves EU" },
   { k: "Shaped", v: "3 files · schema, migration, config" },
 ];
 

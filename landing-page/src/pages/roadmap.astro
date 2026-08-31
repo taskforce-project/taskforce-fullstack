@@ -9,7 +9,7 @@ import type { Maturity } from "@/components/site/nav";
 type Item = { title: string; desc: string; level: Maturity };
 type Phase = { key: string; heading: string; blurb: string; dot: string; edge: string; items: Item[] };
 
-/* Now / Next / Later — direction publique, séquence sans dates promises (D11). Teintes calées sur
+/* Now / Next / Later - direction publique, séquence sans dates promises (D11). Teintes calées sur
    la palette sémantique : émeraude = livré, ambre = en cours, violet = planifié. */
 const PHASES: Phase[] = [
   {
@@ -20,22 +20,22 @@ const PHASES: Phase[] = [
     edge: "border-emerald-500",
     items: [
       { title: "Real-time collaboration", desc: "Boards, issues and cycles, live for the whole team.", level: "live" },
-      { title: "Smart Assign", desc: "The right task to the right person — an agent counts as an assignee.", level: "live" },
+      { title: "Smart Assign", desc: "The right task to the right person - an agent counts as an assignee.", level: "live" },
       { title: "Delivery analytics", desc: "Lead time, throughput and approval rate, per project.", level: "live" },
-      { title: "Integrations", desc: "129 connectors across tracker, repo, chat and cloud — connect today, deep sync rolling out.", level: "beta" },
+      { title: "Integrations", desc: "129 connectors across tracker, repo, chat and cloud - connect today, deep sync rolling out.", level: "beta" },
       { title: "Human approvals", desc: "A required sign-off at each checkpoint of a run.", level: "beta" },
     ],
   },
   {
     key: "next",
     heading: "Next",
-    blurb: "In progress — usable, still hardening.",
+    blurb: "In progress - usable, still hardening.",
     dot: "bg-amber-500",
     edge: "border-amber-500",
     items: [
       { title: "TaskForce Memory retrieval", desc: "Runs recall the decisions and constraints you already set.", level: "beta" },
       { title: "Specialized agent team", desc: "CPO, CTO and COO agents with distinct responsibilities instead of one generalist.", level: "labs" },
-      { title: "Model choice per step", desc: "The right model for each checkpoint — local or hosted.", level: "labs" },
+      { title: "Model choice per step", desc: "The right model for each checkpoint - local or hosted.", level: "labs" },
     ],
   },
   {
@@ -46,7 +46,7 @@ const PHASES: Phase[] = [
     edge: "border-violet-500",
     items: [
       { title: "Full orchestration", desc: "The complete intent-to-deploy run, from product framing to QA and sign-off.", level: "labs" },
-      { title: "Prediction calibration", desc: "Compare what agents predicted with what actually shipped — and calibrate future decisions.", level: "labs" },
+      { title: "Prediction calibration", desc: "Compare what agents predicted with what actually shipped - and calibrate future decisions.", level: "labs" },
       { title: "Beyond engineering", desc: "The same governed run for teams outside software.", level: "labs" },
     ],
   },
@@ -54,20 +54,20 @@ const PHASES: Phase[] = [
 
 const FAQ = [
   { q: "Why are there no dates?", a: "We commit to sequence, not to dates we can't keep. Now is shipped, Next is in progress, Later is direction." },
-  { q: "Do these labels change?", a: "Yes — a capability moves from Planned to Beta to Live as it matures, and the changelog records what actually shipped." },
-  { q: "Can I influence what's next?", a: "Yes. Tell us what you need at contact@taskforce-project.fr — real usage shapes priority far more than a wishlist does." },
+  { q: "Do these labels change?", a: "Yes - a capability moves from Planned to Beta to Live as it matures, and the changelog records what actually shipped." },
+  { q: "Can I influence what's next?", a: "Yes. Tell us what you need at contact@taskforce-project.fr - real usage shapes priority far more than a wishlist does." },
   { q: "Is “Later” a commitment?", a: "It's direction, not a deadline. We'd rather under-promise on timing and stay honest about what's real today." },
 ];
 ---
 
 <BaseLayout
-  title="Roadmap — TaskForce"
-  description="What is live, what is in progress and where TaskForce is going — in the open. We commit to sequence, not to dates we can't keep."
+  title="Roadmap - TaskForce"
+  description="What is live, what is in progress and where TaskForce is going - in the open. We commit to sequence, not to dates we can't keep."
 >
   <PageHero
     eyebrow="Roadmap"
     title="What's shipped, what's next, and where this goes"
-    lead="We publish the direction in the open. Each capability is clearly marked Planned, Beta or Live — and the changelog records what actually ships."
+    lead="We publish the direction in the open. Each capability is clearly marked Planned, Beta or Live - and the changelog records what actually ships."
     primary={{ label: "Run your first workflow", href: "/waitlist" }}
     secondary={{ label: "See the changelog", href: "/changelog" }}
   />
@@ -108,7 +108,7 @@ const FAQ = [
       <p class="text-muted-foreground mt-12 text-[13px] leading-6">
         Maturity labels are honest on purpose: <span class="text-foreground">Live</span> is in
         production, <span class="text-foreground">Beta</span> works with rough edges, and
-        <span class="text-foreground">Planned</span> is direction we're building toward — sequence, not
+        <span class="text-foreground">Planned</span> is direction we're building toward - sequence, not
         a dated promise.
       </p>
     </div>
@@ -118,7 +118,7 @@ const FAQ = [
 
   <PageCta
     title="Start with what's live today"
-    lead="The delivery foundation is already shipped. Start with your board, issues and integrations — then add governed runs as they become available."
+    lead="The delivery foundation is already shipped. Start with your board, issues and integrations - then add governed runs as they become available."
     primary={{ label: "Run your first workflow", href: "/waitlist" }}
     secondary={{ label: "Book a demo", href: "/book-a-demo" }}
   />
