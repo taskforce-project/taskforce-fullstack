@@ -37,6 +37,7 @@ import com.taskforce.tf_api.core.repository.IssueRepository;
 import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import org.springframework.cache.annotation.Cacheable;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import lombok.RequiredArgsConstructor;
@@ -103,6 +104,11 @@ public class AnalyticsService {
     // KPIs
     // -------------------------------------------------------------------------
 
+    // Agrégats de dashboard coûteux (plusieurs count/aggregate), lus fréquemment et tolérants à une
+    // courte péremption -> cache Redis, TTL 5 min (PERF-CACHE-01). Clé par (slug, userId, projectId) :
+    // les projets visibles dépendent du rôle. L'autorisation reste faite en amont (interceptor).
+    @Cacheable(cacheNames = "analytics-kpis",
+        key = "#slug + ':' + #userId + ':' + (#projectId != null ? #projectId : 'all')")
     public AnalyticsKpisResponse getKpis(String slug, Long userId, Long projectId) {
         Workspace ws = requireWorkspaceMember(slug, userId);
         List<Long> projectIds = resolveProjectIds(ws.getId(), userId, projectId);
