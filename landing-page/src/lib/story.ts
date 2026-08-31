@@ -1,17 +1,17 @@
 /**
- * story.ts — la fiction de référence de la home.
+ * story.ts - la fiction de référence de la home.
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * POURQUOI CE FICHIER EXISTE
  * ─────────────────────────────────────────────────────────────────────────────
  * Avant, chaque illustration inventait ses propres données : une phrase ici, un
  * « Run #145 » là, quatre candidats ailleurs, 128 sources plus bas. Résultat, on
- * ne suivait rien — la page se lisait comme un catalogue de fonctionnalités
+ * ne suivait rien - la page se lisait comme un catalogue de fonctionnalités
  * animées plutôt que comme une démonstration.
  *
  * Ici, la home est **un seul run, filmé en plan-séquence**. Toutes les scènes
  * lisent ce fichier : même workspace, mêmes personnes, mêmes chiffres, du hero
- * jusqu'au dashboard. La continuité est ce qui rend une démo crédible — c'est la
+ * jusqu'au dashboard. La continuité est ce qui rend une démo crédible - c'est la
  * grammaire des vidéos de lancement Linear / Raycast.
  *
  * RÈGLE : aucune scène ne code en dur un nom, un horaire ou un chiffre. Si une
@@ -29,7 +29,7 @@ export const PROJECT_SUBTITLE = "Billing, invoices and account area.";
 
 /* ─────────────────────────  Le casting  ─────────────────────────
  * Pas d'images : des initiales, comme dans l'app quand personne n'a d'avatar.
- * Un seul cercle coloré — « You ». Le visiteur est le protagoniste, et c'est la
+ * Un seul cercle coloré - « You ». Le visiteur est le protagoniste, et c'est la
  * seule chose de l'écran qui porte le bleu de marque.
  * Les libellés ne portent aucun pronom : on ne présume pas de celui des gens. */
 
@@ -51,7 +51,7 @@ export const PEOPLE = {
 } as const satisfies Record<string, Person>;
 
 /* ─────────────────────────  Le run  ─────────────────────────
- * Une demande que n'importe qui comprend — elle vient du support, pas d'un
+ * Une demande que n'importe qui comprend - elle vient du support, pas d'un
  * ticket technique. C'est ce qui permet de vendre au-delà de l'ingénierie (D10)
  * sans inventer d'écrans pour des métiers qu'on n'a jamais livrés. */
 
@@ -67,7 +67,7 @@ export const RUN = {
   },
 } as const;
 
-/** Les sept checkpoints — le vrai ordre d'exécution, partagé par toutes les scènes. */
+/** Les sept checkpoints - le vrai ordre d'exécution, partagé par toutes les scènes. */
 export type CheckpointId =
   | "vision"
   | "spec"
@@ -92,13 +92,13 @@ export const CHECKPOINTS: readonly Checkpoint[] = [
   { id: "architecture", label: "Propose the approach", short: "Approach", by: "CTO agent", took: "18s" },
   { id: "contract", label: "Write the API contract", short: "Contract", by: "CTO agent", took: "12s" },
   { id: "breakdown", label: "Break the work into issues", short: "Breakdown", by: "COO agent", took: "11s" },
-  { id: "implementation", label: "Hand off to your coding agent", short: "Build", by: "Your tools", took: "—" },
+  { id: "implementation", label: "Hand off to your coding agent", short: "Build", by: "Your tools", took: "-" },
   { id: "qa", label: "QA checklist and sign-off", short: "QA", by: "COO agent", took: "7s" },
 ] as const;
 
 /* ─────────────────────────  La spec  ─────────────────────────
  * Trois critères que l'agent écrit seul. Le quatrième n'est PAS ici : il naît
- * d'un rejet humain dans la scène du run, et c'est tout le propos du produit —
+ * d'un rejet humain dans la scène du run, et c'est tout le propos du produit -
  * donc il ne doit être divulgué nulle part avant ce moment-là. */
 
 export const SPEC_CRITERIA = [
@@ -107,7 +107,7 @@ export const SPEC_CRITERIA = [
   "Exports over 500 invoices are generated in the background and emailed",
 ] as const;
 
-/** Le critère né du commentaire humain — payload de la scène « approbation ». */
+/** Le critère né du commentaire humain - payload de la scène « approbation ». */
 export const SPEC_CRITERION_FROM_HUMAN =
   "Invoices issued before 2024 are fetched from the legacy billing system";
 
@@ -117,7 +117,7 @@ export const HUMAN_COMMENT = "Invoices before 2024 live in the old billing syste
 /* ─────────────────────────  Le board  ─────────────────────────
  * Repris de la vraie vue Board (captures du 24/07) : colonnes avec compteur et
  * filet de couleur, cartes à chips de label, clé `CP-xx`, pastille de priorité,
- * avatar d'assigné. L'issue du run est `CP-12`, dans Todo — c'est celle qu'on ouvre. */
+ * avatar d'assigné. L'issue du run est `CP-12`, dans Todo - c'est celle qu'on ouvre. */
 
 export type Priority = "urgent" | "high" | "medium" | "low" | "none";
 
@@ -147,7 +147,7 @@ export type Card = {
   labels?: Label[];
   priority: Priority;
   assignee?: Person;
-  /** La carte du run — celle que le curseur va ouvrir. */
+  /** La carte du run - celle que le curseur va ouvrir. */
   hero?: boolean;
 };
 
@@ -190,7 +190,7 @@ export const BOARD: readonly Column[] = [
     accent: "bg-amber-400",
     cards: [
       { key: "CP-9", title: "Invoice PDF renderer times out over 500 rows", labels: ["billing"], priority: "urgent", assignee: PEOPLE.leo },
-      { key: "CP-6", title: "Account settings — billing tab", labels: ["ui"], priority: "medium", assignee: PEOPLE.ines },
+      { key: "CP-6", title: "Account settings - billing tab", labels: ["ui"], priority: "medium", assignee: PEOPLE.ines },
     ],
   },
   {
@@ -217,7 +217,7 @@ export type Agent = { id: string; name: string; logo: string; kind: string };
 
 /** Les agents de code assignables. `logo` = clé d'un SVG vendorisé dans `public/logos/`
  *  (récupérés le 24/07 : anthropic, cursor, copilot, windsurf). L'histoire assigne
- *  `claude`, mais le sélecteur en montre plusieurs — n'importe lequel fait l'affaire. */
+ *  `claude`, mais le sélecteur en montre plusieurs - n'importe lequel fait l'affaire. */
 export const AGENTS = {
   claude: { id: "claude", name: "Claude Code", logo: "anthropic", kind: "Coding agent" },
   cursor: { id: "cursor", name: "Cursor", logo: "cursor", kind: "Coding agent" },
@@ -235,7 +235,7 @@ export const AGENT_LIST: readonly Agent[] = [
 
 /* ─────────────────────────  Le découpage  ─────────────────────────
  * Ce que le checkpoint « Breakdown » produit à partir de la spec approuvée.
- * `from` relie chaque issue à la ligne de spec dont elle sort — dont le critère 4,
+ * `from` relie chaque issue à la ligne de spec dont elle sort - dont le critère 4,
  * celui né du commentaire humain. La chaîne reste lisible de bout en bout. */
 
 /**
@@ -257,7 +257,7 @@ export type Task = {
   /** Le critère d'acceptation dont l'issue est issue (1-indexé). */
   from: number;
   points: number;
-  /** Qui relit et approuve — toujours un humain. */
+  /** Qui relit et approuve - toujours un humain. */
   reviewer: Person;
   /** Ce que Smart Assign a retenu pour justifier l'exécutant. */
   why: string;
@@ -286,7 +286,7 @@ export const BREAKDOWN: readonly Task[] = [
   },
   {
     key: "CP-42",
-    title: "Export dialog — period and format",
+    title: "Export dialog - period and format",
     from: 2,
     points: 3,
     assignee: PEOPLE.ines,
@@ -307,7 +307,7 @@ export const BREAKDOWN: readonly Task[] = [
 /* ─────────────────────────  Ce que l'agent fait  ─────────────────────────
  * La vue qui récupère le travail de l'agent. Chaque étape est vérifiable :
  * un fichier, un diff, un résultat de test, un numéro de PR.
- * `CP-41` est choisie exprès — c'est l'issue née du **commentaire humain**, donc
+ * `CP-41` est choisie exprès - c'est l'issue née du **commentaire humain**, donc
  * l'agent travaille littéralement sur ce que la personne a exigé au checkpoint. */
 
 export type AgentStep = {
@@ -316,7 +316,7 @@ export type AgentStep = {
   detail?: string;
   /** Rattache l'étape au critère d'acceptation qu'elle sert. */
   criterion?: number;
-  /** Étape à statut vert/rouge — les gates que tout le monde veut voir passer. */
+  /** Étape à statut vert/rouge - les gates que tout le monde veut voir passer. */
   gate?: boolean;
 };
 

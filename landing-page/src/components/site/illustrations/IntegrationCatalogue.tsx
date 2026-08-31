@@ -6,9 +6,9 @@ import { logoSrc } from "../BrandLogo";
 import { cn } from "@/lib/utils";
 
 /**
- * IntegrationCatalogue — le VRAI pool de connecteurs, en zone cherchable.
+ * IntegrationCatalogue - le VRAI pool de connecteurs, en zone cherchable.
  *
- * Source de vérité : `backend/.../core/service/integration/ConnectorCatalog.java` — un catalogue
+ * Source de vérité : `backend/.../core/service/integration/ConnectorCatalog.java` - un catalogue
  * DÉCLARATIF (ajouter un outil = une ligne). On le reproduit fidèlement ici : **129 connecteurs,
  * 16 catégories**, mêmes clés que la webapp (donc mêmes logos). Le compteur ne triche pas.
  *
@@ -46,7 +46,7 @@ const CAT_LABEL: Record<string, string> = Object.fromEntries(CATS.map((c) => [c.
 /**
  * Profondeur RÉELLE par connecteur (cf. `ConnectorCatalog` caps + l'UI de sync). On n'invente rien :
  * Plane a l'ingestion Memory aujourd'hui ; GitHub & Slack portent la capability `act` (Actions).
- * Tout le reste est « connectable » (cap `observe`), la profondeur arrive — dit dans la légende.
+ * Tout le reste est « connectable » (cap `observe`), la profondeur arrive - dit dans la légende.
  */
 const DEEP: Record<string, string> = {
   plane: "Memory",
@@ -63,10 +63,10 @@ const FEATURED = [
   "shopify", "google-drive", "figma", "postgresql", "anthropic", "sentry",
 ];
 
-/** Connecteurs dotés d'une fiche détaillée (`/product/integrations/{key}`) — tuile cliquable. */
+/** Connecteurs dotés d'une fiche détaillée (`/product/integrations/{key}`) - tuile cliquable. */
 const DETAIL = new Set(["github", "slack", "plane"]);
 
-/** Transcription fidèle de `ConnectorCatalog.build()` — 129 entrées, ordre du catalogue. */
+/** Transcription fidèle de `ConnectorCatalog.build()` - 129 entrées, ordre du catalogue. */
 const TOOLS: Tool[] = [
   { key: "plane", label: "Plane", cat: "pm" },
   { key: "linear", label: "Linear", cat: "pm" },
@@ -199,7 +199,7 @@ const TOOLS: Tool[] = [
   { key: "replicate", label: "Replicate", cat: "ai" },
 ];
 
-/** Initiales de repli quand un logo manque — jamais d'image cassée. */
+/** Initiales de repli quand un logo manque - jamais d'image cassée. */
 function initials(label: string) {
   const words = label.replace(/[()]/g, "").trim().split(/\s+/);
   return (words.length > 1 ? words[0][0] + words[1][0] : label.slice(0, 2)).toUpperCase();
@@ -308,7 +308,7 @@ export function IntegrationCatalogue() {
             type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search for a tool — Linear, Sentry, Ollama…"
+            placeholder="Search for a tool - Linear, Sentry, Ollama…"
             aria-label="Search integrations"
             className="bg-card h-11 rounded-full pl-9 text-[14px]"
           />
@@ -350,7 +350,7 @@ export function IntegrationCatalogue() {
         </ul>
       </div>
 
-      {/* Compteur — la vue « featured » par défaut, le « 129 » comme preuve de profondeur. */}
+      {/* Compteur - la vue « featured » par défaut, le « 129 » comme preuve de profondeur. */}
       <div
         className="text-muted-foreground mt-6 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px]"
         role="status"
@@ -382,7 +382,7 @@ export function IntegrationCatalogue() {
 
       {/* Légende honnête : tout est connectable ; Memory/Actions = la profondeur réelle, en cours. */}
       <p className="text-muted-foreground mt-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[12px] leading-6">
-        Every connector is connectable today. Deeper capabilities —
+        Every connector is connectable today. Deeper capabilities -
         <span className="border-primary/30 text-primary rounded-full border px-1.5 py-px text-[10px] font-medium">
           Memory
         </span>
@@ -390,10 +390,10 @@ export function IntegrationCatalogue() {
         <span className="border-primary/30 text-primary rounded-full border px-1.5 py-px text-[10px] font-medium">
           Actions
         </span>
-        — are rolling out; Plane, GitHub and Slack lead.
+        - are rolling out; Plane, GitHub and Slack lead.
       </p>
 
-      {/* La grille — min-h pour que filtrer ne fasse pas sauter la section */}
+      {/* La grille - min-h pour que filtrer ne fasse pas sauter la section */}
       <div className="mt-4 min-h-[336px]">
         {shown.length > 0 ? (
           <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
@@ -405,7 +405,7 @@ export function IntegrationCatalogue() {
           <div className="flex flex-col items-start gap-3 border border-dashed p-8">
             <p className="text-[14px] text-foreground">Nothing matches &laquo; {q} &raquo;.</p>
             <p className="text-muted-foreground text-[13px]">
-              The catalogue is declarative — adding a tool is a line of configuration. Ask, and it lands
+              The catalogue is declarative - adding a tool is a line of configuration. Ask, and it lands
               in a release, not a quarter.
             </p>
             <Button asChild variant="outline" size="pill-sm">

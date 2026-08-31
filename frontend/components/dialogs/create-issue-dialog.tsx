@@ -177,7 +177,7 @@ export function CreateIssueDialog({
       })
       setSuggestion(result)
       if (!result.recommended) {
-        toast.warning("No suggestion — add members to the project (or labels/skills)")
+        toast.warning("No suggestion - add members to the project (or labels/skills)")
       }
     } catch {
       toast.error("Could not generate Smart Assign suggestion")
@@ -368,7 +368,7 @@ export function CreateIssueDialog({
             </Popover>
           </div>
 
-          {/* Smart Assign suggestion (PROD-1.3) — recommande un assigné dès la création */}
+          {/* Smart Assign suggestion (PROD-1.3) - recommande un assigné dès la création */}
           <div className="flex flex-col gap-2">
             <Button
               type="button"

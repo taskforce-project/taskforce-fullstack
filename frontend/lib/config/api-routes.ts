@@ -38,7 +38,7 @@ export const STRIPE_ROUTES = {
 } as const;
 
 /**
- * Routes facturation self-service (Stripe Customer Portal) — chemin protégé.
+ * Routes facturation self-service (Stripe Customer Portal) - chemin protégé.
  * Backend: @RequestMapping("/api/billing")
  */
 export const BILLING_ROUTES = {
@@ -112,7 +112,7 @@ export const WORKSPACE_ROUTES = {
   // Redistribution de charge (PROD-1.12)
   REDISTRIBUTE_PREVIEW: (slug: string) => `/api/workspaces/${slug}/redistribute/preview`,
   REDISTRIBUTE_APPLY: (slug: string) => `/api/workspaces/${slug}/redistribute/apply`,
-  // Journalisation des erreurs client (E25) — logs serveur classiques
+  // Journalisation des erreurs client (E25) - logs serveur classiques
   CLIENT_LOG: "/api/logs/client",
   // Rétrocompatibilité
   CURRENT: "/api/workspaces/current",
@@ -166,7 +166,7 @@ export const PROJECT_ROUTES = {
   /** Activité de tous les projets visibles en un appel (sparklines de la page Operations) */
   ALL_ACTIVITY:   (slug: string) => `/api/workspaces/${slug}/projects/activity`,
   BY_ID:   (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}`,
-  /** Export COMPLET du projet (JSON/CSV) — issues + descriptions + commentaires + activité (P1b bêta). */
+  /** Export COMPLET du projet (JSON/CSV) - issues + descriptions + commentaires + activité (P1b bêta). */
   EXPORT:  (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/export`,
   UPDATE:  (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}`,
   ARCHIVE: (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/archive`,
@@ -188,11 +188,11 @@ export const PROJECT_ROUTES = {
  * Backend: /api/workspaces/{slug}/projects/{projectId}/issues
  */
 export const ISSUE_ROUTES = {
-  /** Vue My Work — issues assignées à l'utilisateur, tous projets du workspace */
+  /** Vue My Work - issues assignées à l'utilisateur, tous projets du workspace */
   MY_ISSUES: (slug: string) => `/api/workspaces/${slug}/my-issues`,
-  /** Vue My Work — cycles de tous les projets visibles, en un appel (évite un appel par projet) */
+  /** Vue My Work - cycles de tous les projets visibles, en un appel (évite un appel par projet) */
   MY_CYCLES: (slug: string) => `/api/workspaces/${slug}/my-cycles`,
-  /** Vue My Work — pages récentes de tous les projets visibles, en un appel */
+  /** Vue My Work - pages récentes de tous les projets visibles, en un appel */
   MY_PAGES:  (slug: string) => `/api/workspaces/${slug}/my-pages`,
   LIST:    (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues`,
   /** Liste paginée pour l'infinite-scroll du backlog (QA2-33) */
@@ -221,9 +221,9 @@ export const ISSUE_ROUTES = {
   RELATION:         (slug: string, projectId: number, issueId: number, relationId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/relations/${relationId}`,
   WORKLOGS:         (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/worklogs`,
   WORKLOG:          (slug: string, projectId: number, issueId: number, worklogId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/worklogs/${worklogId}`,
-  /** IA — génère un brouillon spec + prompt d'exécution (human-in-the-loop, rien persisté) */
+  /** IA - génère un brouillon spec + prompt d'exécution (human-in-the-loop, rien persisté) */
   AI_SPEC:          (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/ai/spec`,
-  /** IA — approuve le brouillon → persiste un node SPEC lié à l'issue */
+  /** IA - approuve le brouillon → persiste un node SPEC lié à l'issue */
   AI_SPEC_APPROVE:  (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/ai/spec/approve`,
 } as const;
 
@@ -239,7 +239,7 @@ export const CYCLE_ROUTES = {
   DELETE:       (slug: string, projectId: number, cycleId: number) => `/api/workspaces/${slug}/projects/${projectId}/cycles/${cycleId}`,
   ISSUES:       (slug: string, projectId: number, cycleId: number) => `/api/workspaces/${slug}/projects/${projectId}/cycles/${cycleId}/issues`,
   ISSUE:        (slug: string, projectId: number, cycleId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/cycles/${cycleId}/issues/${issueId}`,
-  // Reverse-lookup : cycles auxquels une issue est rattachée (sélecteur du sheet — CYC-03b).
+  // Reverse-lookup : cycles auxquels une issue est rattachée (sélecteur du sheet - CYC-03b).
   FOR_ISSUE:    (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/cycles`,
 } as const;
 
@@ -265,7 +265,7 @@ export const ANALYTICS_ROUTES = {
 } as const;
 
 /**
- * Cartes de dashboard épinglées — par utilisateur et par workspace.
+ * Cartes de dashboard épinglées - par utilisateur et par workspace.
  * Backend: @RequestMapping("/api/workspaces/{slug}/dashboard-cards")
  */
 export const DASHBOARD_CARD_ROUTES = {
@@ -273,13 +273,13 @@ export const DASHBOARD_CARD_ROUTES = {
   LIST:    (slug: string) => `/api/workspaces/${slug}/dashboard-cards`,
   CREATE:  (slug: string) => `/api/workspaces/${slug}/dashboard-cards`,
   UPDATE:  (slug: string, id: number) => `/api/workspaces/${slug}/dashboard-cards/${id}`,
-  /** PUT { orderedIds } — réécrit les positions 0..n dans cet ordre */
+  /** PUT { orderedIds } - réécrit les positions 0..n dans cet ordre */
   REORDER: (slug: string) => `/api/workspaces/${slug}/dashboard-cards/reorder`,
   DELETE:  (slug: string, id: number) => `/api/workspaces/${slug}/dashboard-cards/${id}`,
 } as const;
 
 /**
- * Workflows d'analyse IA — async, persistés, temps réel (dock « Workflows IA »).
+ * Workflows d'analyse IA - async, persistés, temps réel (dock « Workflows IA »).
  * Backend: /api/workspaces/{slug}/analysis & /api/workspaces/{slug}/priorities/{id}
  */
 export const ANALYSIS_ROUTES = {
@@ -306,7 +306,7 @@ export const ASSISTANT_ROUTES = {
 } as const;
 
 /**
- * Consommation IA (tokens) du workspace — mois courant + plafond du plan.
+ * Consommation IA (tokens) du workspace - mois courant + plafond du plan.
  * Backend: @RequestMapping("/api/workspaces/{slug}/ai")
  */
 export const AI_ROUTES = {
@@ -365,7 +365,7 @@ export const TEAM_ROUTES = {
   REMOVE_MEMBER:  (slug: string, teamId: number, userId: number) => `/api/workspaces/${slug}/teams/${teamId}/members/${userId}`,
 } as const;
 
-// Base backend pour les redirections navigateur (OAuth) — PAS pour les appels Axios.
+// Base backend pour les redirections navigateur (OAuth) - PAS pour les appels Axios.
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
 /**
@@ -399,7 +399,7 @@ export const INTEGRATION_ROUTES = {
   PLANE_DISCONNECT:  (slug: string) => `/api/workspaces/${slug}/integrations/plane`,
 } as const;
 
-/** Routes RGPD — droits des personnes (CERT-C11). */
+/** Routes RGPD - droits des personnes (CERT-C11). */
 export const GDPR_ROUTES = {
   EXPORT:  () => `/api/gdpr/export`,
   ACCOUNT: () => `/api/gdpr/account`,

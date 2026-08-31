@@ -33,14 +33,14 @@ const TOOLBAR: { icon: typeof Bold; label: string; action: ToolAction }[] = [
 ]
 
 /**
- * Éditeur Markdown maison (sans tiptap — réseau du poste) : toolbar de formatage, bascule
+ * Éditeur Markdown maison (sans tiptap - réseau du poste) : toolbar de formatage, bascule
  * Écrire / Aperçu live, et gestion des tags. Le contenu supporte les [[wikilinks]] et #tags
  * (matérialisés en arêtes côté backend → réseau de neurones).
  */
 export interface MarkdownEditorProps {
   value: string
   onChange: (value: string) => void
-  /** Tags Brain OS — optionnels : la barre de tags n'est rendue que si `onTagsChange` est fourni. */
+  /** Tags Brain OS - optionnels : la barre de tags n'est rendue que si `onTagsChange` est fourni. */
   tags?: string[]
   onTagsChange?: (tags: string[]) => void
   /** Upload d'une pièce jointe (image/doc) → MinIO. Active les boutons image/joindre. */
@@ -136,7 +136,7 @@ export function MarkdownEditor({ value, onChange, tags = [], onTagsChange, onUpl
 
   return (
     <div className="flex flex-col gap-2">
-      {/* Toolbar + bascule mode — collante en haut au scroll */}
+      {/* Toolbar + bascule mode - collante en haut au scroll */}
       <div className="sticky top-0 z-10 flex flex-wrap items-center gap-1 rounded-md border bg-background/95 p-1 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         {TOOLBAR.map((b) => (
           <button key={b.label} type="button" title={b.label}
@@ -184,7 +184,7 @@ export function MarkdownEditor({ value, onChange, tags = [], onTagsChange, onUpl
         </div>
       )}
 
-      {/* Tags — masqués si l'appelant ne gère pas les tags (ex. description d'issue) */}
+      {/* Tags - masqués si l'appelant ne gère pas les tags (ex. description d'issue) */}
       {onTagsChange && (
       <div className="flex flex-wrap items-center gap-1.5 rounded-md border bg-muted/20 px-2 py-1.5">
         <span className="text-xs text-muted-foreground">Tags</span>

@@ -79,7 +79,7 @@ export default function ProtectedLayout({
         </>
       )}
 
-      {/* Overlay d'intro — rendu au niveau LE PLUS HAUT (stable à travers la transition loading→app,
+      {/* Overlay d'intro - rendu au niveau LE PLUS HAUT (stable à travers la transition loading→app,
           donc l'animation ne redémarre pas). L'app charge dessous ; la vague se dissout dessus. */}
       {showIntro && <LoginIntro phase="reveal" onDone={() => setShowIntro(false)} />}
     </>

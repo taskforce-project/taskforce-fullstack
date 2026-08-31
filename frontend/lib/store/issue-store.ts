@@ -51,7 +51,7 @@ interface IssueState {
   activity: IssueActivity[];
   isLoading: boolean;
   error: string | null;
-  /** Projet dont les issues sont en cache (évite le refetch au changement d'onglet — PROD-2.7). */
+  /** Projet dont les issues sont en cache (évite le refetch au changement d'onglet - PROD-2.7). */
   loadedProjectId: number | null;
 
   // Issues
@@ -60,12 +60,12 @@ interface IssueState {
   createIssue: (slug: string, projectId: number, payload: CreateIssuePayload) => Promise<Issue | null>;
   updateIssue: (slug: string, projectId: number, issueId: number, payload: UpdateIssuePayload) => Promise<Issue | null>;
   deleteIssue: (slug: string, projectId: number, issueId: number) => Promise<void>;
-  /** Archive (true) / désarchive (false) — une issue archivée quitte les vues par défaut. */
+  /** Archive (true) / désarchive (false) - une issue archivée quitte les vues par défaut. */
   archiveIssue: (slug: string, projectId: number, issueId: number, archived: boolean) => Promise<Issue | null>;
-  /** Épingle (true) / dépingle (false) — remonte en tête de board/liste. */
+  /** Épingle (true) / dépingle (false) - remonte en tête de board/liste. */
   pinIssue: (slug: string, projectId: number, issueId: number, pinned: boolean) => Promise<Issue | null>;
   setActiveIssue: (issue: Issue | null) => void;
-  /** Patch local (événement temps réel STOMP) — insère ou met à jour sans appel API. */
+  /** Patch local (événement temps réel STOMP) - insère ou met à jour sans appel API. */
   upsertIssueLocal: (issue: Issue) => void;
   /** Retrait local (événement temps réel STOMP). */
   removeIssueLocal: (issueId: number) => void;

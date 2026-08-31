@@ -15,10 +15,10 @@ const METRICS = [
   { icon: Gauge, title: "Velocity", text: "How much gets resolved per cycle." },
   { icon: CalendarRange, title: "Active cycles", text: "What's in flight right now, and how full it is." },
   { icon: TrendingDown, title: "Burndown", text: "Remaining work against the ideal line, per cycle." },
-  { icon: Users, title: "Team workload", text: "Who's carrying what, day by day — before anyone is buried." },
+  { icon: Users, title: "Team workload", text: "Who's carrying what, day by day - before anyone is buried." },
 ];
 
-/* Mock du graphe généré depuis une demande en langage naturel — données ILLUSTRATIVES (fiction story). */
+/* Mock du graphe généré depuis une demande en langage naturel - données ILLUSTRATIVES (fiction story). */
 const CHART = [
   { name: "Inès", n: 9 },
   { name: "Léo", n: 7 },
@@ -33,20 +33,20 @@ const QUESTIONS = [
   { icon: BarChart3, q: "Opened vs resolved this week?", a: "Throughput at a glance, by day or by cycle." },
   { icon: Timer, q: "Is resolution time getting worse?", a: "The trend on how long work takes to close, against last period." },
   { icon: CalendarRange, q: "What slipped this cycle?", a: "What's in flight, what shipped, and what carried over." },
-  { icon: Users, q: "Who's overloaded right now?", a: "Workload by person, day by day — before anyone gets buried." },
+  { icon: Users, q: "Who's overloaded right now?", a: "Workload by person, day by day - before anyone gets buried." },
   { icon: Gauge, q: "How much ships per cycle?", a: "Velocity, so planning starts from reality instead of a guess." },
-  { icon: TrendingDown, q: "Where do runs get sent back?", a: "The checkpoint that keeps costing you — only a checkpoint system sees it." },
+  { icon: TrendingDown, q: "Where do runs get sent back?", a: "The checkpoint that keeps costing you - only a checkpoint system sees it." },
 ];
 ---
 
 <BaseLayout
-  title="Analytics — TaskForce"
-  description="The analytics your delivery actually produces: throughput, resolution time, velocity and workload, computed from your real board. Ask for any chart in plain English — rendered from your data, never invented."
+  title="Analytics - TaskForce"
+  description="The analytics your delivery actually produces: throughput, resolution time, velocity and workload, computed from your real board. Ask for any chart in plain English - rendered from your data, never invented."
 >
   <PageHero
     kicker="Analytics"
     title="The analytics your delivery actually produces"
-    lead="Throughput, resolution time, velocity and workload — computed from your real board, not a spreadsheet you keep by hand. Ask for any chart in plain English, and get one rendered from your data."
+    lead="Throughput, resolution time, velocity and workload - computed from your real board, not a spreadsheet you keep by hand. Ask for any chart in plain English, and get one rendered from your data."
     level="live"
     primary={{ label: "Run your first workflow", href: "/waitlist" }}
     secondary={{ label: "See pricing", href: "/pricing" }}
@@ -60,7 +60,7 @@ const QUESTIONS = [
         <h2 class="t-h2">The numbers, from the work itself</h2>
         <p class="t-lead mt-4">
           No manual roll-ups. TaskForce reads your board and computes the delivery metrics teams
-          actually track — updated as work moves.
+          actually track - updated as work moves.
         </p>
       </div>
       <div class="-mx-6 mt-12 grid grid-cols-1 gap-px border-y border-border bg-border sm:grid-cols-2 lg:grid-cols-3 lg:-mx-10">
@@ -93,30 +93,30 @@ const QUESTIONS = [
           <p class="t-eyebrow mb-3">Ask in plain English</p>
           <h2 class="t-h2">Describe the chart. Get it from your data.</h2>
           <p class="t-lead mt-4">
-            Type a question and TaskForce builds the chart from your real board — then let you pin the
+            Type a question and TaskForce builds the chart from your real board - then let you pin the
             ones worth keeping.
           </p>
           <p class="text-muted-foreground mt-6 flex items-start gap-2 text-[13.5px] leading-6">
             <Sparkles className="mt-0.5 size-4 shrink-0" strokeWidth={2} style={{ color: hueFor(Sparkles) }} />
-            And when a question can't be answered from your data, it says so — and suggests one it can
-            — instead of inventing a number.
+            And when a question can't be answered from your data, it says so - and suggests one it can
+            - instead of inventing a number.
           </p>
           <p class="text-muted-foreground mt-4 text-[13.5px] leading-6">
             People and coding agents share the same delivery surface, so analytics can measure
-            both — just like Smart Assign and Collaboration.
+            both - just like Smart Assign and Collaboration.
           </p>
         </div>
 
         {/* Mock : prompt → graphe → garde-fou. Panneau carré intégré (pas de toast/modal flottant). Données illustratives. */}
         <div class="mx-auto w-full max-w-md">
           <div class="bg-card overflow-hidden border">
-            {/* La demande — barre façon champ de saisie */}
+            {/* La demande - barre façon champ de saisie */}
             <div class="flex items-center gap-2.5 border-b px-4 py-3">
               <Sparkles className="size-4 shrink-0" strokeWidth={2} style={{ color: hueFor(Sparkles) }} />
               <span class="text-foreground flex-1 text-[13px]">Resolved issues by assignee, this cycle</span>
               <CornerDownLeft className="text-muted-foreground size-3.5 shrink-0" strokeWidth={2} />
             </div>
-            {/* La réponse — rendue depuis le board */}
+            {/* La réponse - rendue depuis le board */}
             <div class="px-4 py-4">
               <p class="text-muted-foreground mb-3 flex items-center gap-1.5 text-[11.5px]">
                 <span class="tf-pulse size-1.5 rounded-full bg-emerald-500 text-emerald-500" />
@@ -141,18 +141,18 @@ const QUESTIONS = [
                 }
               </ul>
             </div>
-            {/* Le garde-fou — illustre « il ne l'invente pas » */}
+            {/* Le garde-fou - illustre « il ne l'invente pas » */}
             <div class="bg-secondary/30 border-t px-4 py-2.5">
               <p class="text-muted-foreground flex items-start gap-2 text-[11px] leading-5">
                 <Info className="mt-px size-3.5 shrink-0" strokeWidth={2} />
                 <span>
-                  <span class="text-foreground">"Revenue by region"</span> isn't in your data — it says so and
+                  <span class="text-foreground">"Revenue by region"</span> isn't in your data - it says so and
                   suggests <span class="text-foreground">resolved by label</span> instead.
                 </span>
               </p>
             </div>
           </div>
-          <p class="text-muted-foreground mt-3 text-center text-[11px]">Illustrative — not a TaskForce customer metric.</p>
+          <p class="text-muted-foreground mt-3 text-center text-[11px]">Illustrative - not a TaskForce customer metric.</p>
         </div>
       </div>
     </div>
@@ -167,12 +167,12 @@ const QUESTIONS = [
         <p class="t-lead mt-4">
           A classic tracker tells you what's late. Because TaskForce runs through validated
           checkpoints, it can measure not just what shipped, but where work gets rejected, revised or <span class="text-foreground font-medium">sent
-          back</span> — the step where your process actually hurts. It's early, and grows as orchestration does.
+          back</span> - the step where your process actually hurts. It's early, and grows as orchestration does.
         </p>
       </div>
       <div class="mx-auto mt-12 max-w-2xl">
         <DeliveryInsights client:idle />
-        <p class="text-muted-foreground mt-3 text-center text-[11px]">Illustrative — not a TaskForce customer metric.</p>
+        <p class="text-muted-foreground mt-3 text-center text-[11px]">Illustrative - not a TaskForce customer metric.</p>
       </div>
     </div>
   </section>
@@ -188,8 +188,8 @@ const QUESTIONS = [
           </div>
           <h2 class="t-h2">Measurement that feeds the next run</h2>
           <p class="t-lead mt-4">
-            Reporting is the start. The direction is a loop: a pattern that keeps costing you — an
-            approach repeatedly sent back — can become context in Memory, so the next run can start with context
+            Reporting is the start. The direction is a loop: a pattern that keeps costing you - an
+            approach repeatedly sent back - can become context in Memory, so the next run can start with context
             learned from the last.
           </p>
           <div class="mt-6 flex flex-wrap items-center gap-4">
@@ -216,14 +216,14 @@ const QUESTIONS = [
     </div>
   </section>
 
-  {/* ── Clôture : on ne finit pas sur le graphe — les réponses concrètes, straight from the board ── */}
+  {/* ── Clôture : on ne finit pas sur le graphe - les réponses concrètes, straight from the board ── */}
   <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-28">
       <div class="max-w-2xl">
         <p class="t-eyebrow mb-3">In plain terms</p>
         <h2 class="t-h2">The questions it answers, day to day</h2>
         <p class="t-lead mt-4">
-          Not a wall of dashboards — the handful of answers a lead actually needs, computed straight
+          Not a wall of dashboards - the handful of answers a lead actually needs, computed straight
           from the board.
         </p>
       </div>
@@ -248,7 +248,7 @@ const QUESTIONS = [
 
   <PageCta
     title="Measure the delivery, not the busywork"
-    lead="Get the metrics your board already contains — plus the delivery signals that become possible when work moves through validated checkpoints."
+    lead="Get the metrics your board already contains - plus the delivery signals that become possible when work moves through validated checkpoints."
     primary={{ label: "Run your first workflow", href: "/waitlist" }}
     secondary={{ label: "Book a demo", href: "/book-a-demo" }}
   />

@@ -2,7 +2,7 @@ import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 
 export const metadata = {
-  title: "Legal Notices — TaskForce",
+  title: "Legal Notices - TaskForce",
   description: "Terms of service, acceptable use, and legal information for TaskForce.",
 }
 

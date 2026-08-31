@@ -9,50 +9,50 @@ const PARTS = [
   {
     eyebrow: "The problem",
     title: "AI made generating work cheap. It didn't make deciding cheaper.",
-    body: "A software project isn't one task — it's a chain of decisions that compound: what to build, how, in what order, at what risk. Producing a spec or a pull request takes minutes now. Keeping the chain coherent, exposing the trade-offs, and staying accountable is the part that still costs you — and the context behind it leaks at every handoff.",
+    body: "A software project isn't one task - it's a chain of decisions that compound: what to build, how, in what order, at what risk. Producing a spec or a pull request takes minutes now. Keeping the chain coherent, exposing the trade-offs, and staying accountable is the part that still costs you - and the context behind it leaks at every handoff.",
     link: { href: "/product/orchestration", label: "See a run" },
   },
   {
     eyebrow: "A governed run",
     title: "The unit of work is a checkpoint, not a prompt.",
-    body: "A checkpoint is a governed stage where an artifact is produced, reviewed and explicitly approved before the run continues. The AI proposes; a human decides. Only an approved artifact becomes context for the next step — so a run is an accountable chain, not a pile of AI output.",
+    body: "A checkpoint is a governed stage where an artifact is produced, reviewed and explicitly approved before the run continues. The AI proposes; a human decides. Only an approved artifact becomes context for the next step - so a run is an accountable chain, not a pile of AI output.",
     link: { href: "/product/approvals", label: "How approval works" },
   },
   {
     eyebrow: "Memory",
     title: "The reasoning is kept, so the next run starts smarter.",
-    body: "Every decision has a reason — a trade-off weighed, a constraint respected, an alternative rejected. An AI delivery OS keeps that reasoning as a graph the next run can read, instead of letting it evaporate into chat threads and people's heads. That's what makes delivery compound instead of repeat.",
+    body: "Every decision has a reason - a trade-off weighed, a constraint respected, an alternative rejected. An AI delivery OS keeps that reasoning as a graph the next run can read, instead of letting it evaporate into chat threads and people's heads. That's what makes delivery compound instead of repeat.",
     link: { href: "/product/brain-os", label: "TaskForce Memory" },
   },
   {
     eyebrow: "Why it's different",
     title: "It's not a tracker with a chatbot bolted on.",
-    body: "A tracker records what happened. A coding agent writes code. An AI delivery OS governs the decisions between them — orchestrating specialized agents, keeping a human accountable at each checkpoint, remembering why, and running on the models and infrastructure you choose. It sits on your board and your coding agents, and adds the layer they were never meant to be.",
+    body: "A tracker records what happened. A coding agent writes code. An AI delivery OS governs the decisions between them - orchestrating specialized agents, keeping a human accountable at each checkpoint, remembering why, and running on the models and infrastructure you choose. It sits on your board and your coding agents, and adds the layer they were never meant to be.",
     link: { href: "/vs", label: "How it compares" },
   },
 ];
 
 const FAQ = [
-  { q: "Isn't this just a project tracker with AI?", a: "No. A tracker records what happened; an AI delivery OS governs the decisions between intent and production — orchestrating agents, keeping a human accountable at each checkpoint, and remembering why." },
+  { q: "Isn't this just a project tracker with AI?", a: "No. A tracker records what happened; an AI delivery OS governs the decisions between intent and production - orchestrating agents, keeping a human accountable at each checkpoint, and remembering why." },
   { q: "Does the AI decide for me?", a: "The AI proposes; a human decides. Only an approved artifact becomes context for the next step, so a run stays an accountable chain, not a pile of AI output." },
   { q: "What exactly is a checkpoint?", a: "A governed stage where an artifact is produced, reviewed and explicitly approved before the run continues." },
-  { q: "How is this different from a coding agent?", a: "A coding agent writes code. TaskForce governs the decisions around it and runs on the models and infrastructure you choose — it sits on top of your board and your agents." },
+  { q: "How is this different from a coding agent?", a: "A coding agent writes code. TaskForce governs the decisions around it and runs on the models and infrastructure you choose - it sits on top of your board and your agents." },
 ];
 ---
 
 <BaseLayout
-  title="Learn — TaskForce"
-  description="What an AI delivery operating system actually is: a governed path from intent to production where AI proposes, humans decide, and the reasoning is kept — not a tracker with a chatbot bolted on."
+  title="Learn - TaskForce"
+  description="What an AI delivery operating system actually is: a governed path from intent to production where AI proposes, humans decide, and the reasoning is kept - not a tracker with a chatbot bolted on."
 >
   <PageHero
     kicker="Learn"
     title="What an AI delivery OS actually is"
-    lead="The term gets used loosely. Here's the plain version: what it means to put AI in the delivery path without losing the plot — the problem, the governed run, the memory, and why it's more than a tracker plus a chatbot."
+    lead="The term gets used loosely. Here's the plain version: what it means to put AI in the delivery path without losing the plot - the problem, the governed run, the memory, and why it's more than a tracker plus a chatbot."
     primary={{ label: "Run your first workflow", href: "/waitlist" }}
     secondary={{ label: "See the run", href: "/product/orchestration" }}
   />
 
-  {/* Récit en 4 temps : numéroté, en 2 colonnes ALTERNÉES (rail ↔ prose) — plus 4 blocs identiques. */}
+  {/* Récit en 4 temps : numéroté, en 2 colonnes ALTERNÉES (rail ↔ prose) - plus 4 blocs identiques. */}
   {
     PARTS.map((p, i) => {
       const railRight = i % 2 === 1;

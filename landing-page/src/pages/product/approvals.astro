@@ -19,17 +19,17 @@ const APPROVE = [
   {
     icon: FileCheck2,
     title: "A drafted spec",
-    desc: "The AI drafts a spec; you approve it, and the decision becomes trusted context in your Memory — what the next step builds on.",
+    desc: "The AI drafts a spec; you approve it, and the decision becomes trusted context in your Memory - what the next step builds on.",
   },
   {
     icon: Terminal,
     title: "An external action",
-    desc: "Reads can run on their own. Anything that writes to a connected tool is proposed as a pending action — and runs only after a human approves it.",
+    desc: "Reads can run on their own. Anything that writes to a connected tool is proposed as a pending action - and runs only after a human approves it.",
   },
   {
     icon: Sparkles,
     title: "A recommendation",
-    desc: "Smart Assign suggests who should own a task, with its reason. You approve it, or override it — overrides can also become signals for improving future recommendations.",
+    desc: "Smart Assign suggests who should own a task, with its reason. You approve it, or override it - overrides can also become signals for improving future recommendations.",
   },
 ];
 
@@ -38,36 +38,36 @@ const APPROVE = [
 const RECORDED = [
   "Who approved it, and the exact content they signed off on.",
   "The reasoning the agent proposed, kept next to the decision.",
-  "A record you can read later — in the run, and in the audit trail.",
+  "A record you can read later - in the run, and in the audit trail.",
 ];
 ---
 
 <BaseLayout
-  title="Approvals — TaskForce"
-  description="The AI proposes; a human approves. TaskForce puts a person at every consequential step — approving specs, external actions and recommendations — and records who signed off on what."
+  title="Approvals - TaskForce"
+  description="The AI proposes; a human approves. TaskForce puts a person at every consequential step - approving specs, external actions and recommendations - and records who signed off on what."
 >
   {/* ───── Hero ───── */}
   <PageHero
     kicker="Approvals"
     title="The AI proposes. A human approves."
-    lead="TaskForce is built so consequential steps wait for a person. An agent drafts, suggests or prepares an action — and a human approves it before it becomes part of the governed workflow or is executed externally."
+    lead="TaskForce is built so consequential steps wait for a person. An agent drafts, suggests or prepares an action - and a human approves it before it becomes part of the governed workflow or is executed externally."
     level="beta"
     primary={{ label: "Run your first workflow", href: "/waitlist" }}
     secondary={{ label: "See the run", href: "/product/orchestration" }}
   />
 
-  {/* ───── What you approve — BorderedGrid (remplace la grille de cartes) ───── */}
+  {/* ───── What you approve - BorderedGrid (remplace la grille de cartes) ───── */}
   <BorderedGrid
     bg="card"
     align="left"
     eyebrow="What you approve"
     title="Sign-off where it actually matters"
-    lead="Not a settings checkbox. Approval sits at the points where a decision compounds — where getting it wrong would cost you later."
+    lead="Not a settings checkbox. Approval sits at the points where a decision compounds - where getting it wrong would cost you later."
     items={APPROVE}
     cols={3}
   />
 
-  {/* ───── The primitive — FeatureSplit : texte + Panel (flux réel) ───── */}
+  {/* ───── The primitive - FeatureSplit : texte + Panel (flux réel) ───── */}
   <FeatureSplit bg="card" eyebrow="The primitive" title="Approval is what a checkpoint is">
     <div slot="aside" class="mt-6">
       <span class="ic-tile inline-flex size-11 items-center justify-center rounded-xl border" style={`--ic:${hueFor(ShieldCheck)}`}>
@@ -76,17 +76,17 @@ const RECORDED = [
       <p class="text-foreground mt-6 text-[15px] leading-7">
         A <span class="font-medium">checkpoint</span> is a governed stage where an artifact is
         produced, reviewed and explicitly approved before the run continues. Approval isn't bolted
-        on afterwards — it's the moment that defines the stage.
+        on afterwards - it's the moment that defines the stage.
       </p>
     </div>
 
-    {/* Visuel : le flux qui DÉFINIT la primitive — React Flow (même DA que l'orchestration). */}
+    {/* Visuel : le flux qui DÉFINIT la primitive - React Flow (même DA que l'orchestration). */}
     <div class="flow-canvas relative h-[500px] overflow-hidden border">
       <ApprovalsFlow client:only="react" />
     </div>
   </FeatureSplit>
 
-  {/* ───── La règle qui tient partout — CalloutBand (respiration) ───── */}
+  {/* ───── La règle qui tient partout - CalloutBand (respiration) ───── */}
   <CalloutBand
     bg="card"
     statement="That's why the same rule holds across the product: an agent proposes, a human decides, and only an approved decision becomes context for what follows."
@@ -96,13 +96,13 @@ const RECORDED = [
     </p>
   </CalloutBand>
 
-  {/* ───── Recorded — FeatureSplit inversé : liste réelle + ScreenPlaceholder (trace) ───── */}
+  {/* ───── Recorded - FeatureSplit inversé : liste réelle + ScreenPlaceholder (trace) ───── */}
   <FeatureSplit
     reverse
     bg="card"
     eyebrow="Recorded"
     title="Every approval leaves a trail"
-    lead="An approval isn't just a click. Who signed off, on what, and when is recorded — so a decision made months ago can still be explained."
+    lead="An approval isn't just a click. Who signed off, on what, and when is recorded - so a decision made months ago can still be explained."
   >
     <div slot="aside">
       <ul class="mt-8 flex flex-col gap-3.5">
@@ -132,14 +132,14 @@ const RECORDED = [
       </p>
     </div>
 
-    {/* Visuel : la piste d'audit, animée — les approbations tombent une à une (who · what · when). */}
+    {/* Visuel : la piste d'audit, animée - les approbations tombent une à une (who · what · when). */}
     <AuditTrailDemo client:visible />
   </FeatureSplit>
 
   {/* ───── CTA ───── */}
   <PageCta
     title="Keep a human on every decision that matters"
-    lead="Let agents draft, suggest and prepare — and keep the sign-off, and the record, with your team."
+    lead="Let agents draft, suggest and prepare - and keep the sign-off, and the record, with your team."
     primary={{ label: "Run your first workflow", href: "/waitlist" }}
     secondary={{ label: "Book a demo", href: "/book-a-demo" }}
   />

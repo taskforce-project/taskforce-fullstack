@@ -189,7 +189,7 @@ export const CONSTANTS_FR: TranslationKeys = {
       emailVerified: "Email vérifié avec succès",
     },
 
-    // Écrans d'authentification redessinés — routés depuis les composants d'auth. Les jetons
+    // Écrans d'authentification redessinés - routés depuis les composants d'auth. Les jetons
     // {provider} / {email} / {seconds} sont substitués dans le composant via String.replace.
     ui: {
       // Commun
@@ -219,7 +219,7 @@ export const CONSTANTS_FR: TranslationKeys = {
       twoFactorActivate: "Activer",
       twoFactorCancel: "Annuler",
       twoFactorSetupError: "Impossible de démarrer l'activation 2FA.",
-      twoFactorCodeInvalid: "Code invalide — réessayez.",
+      twoFactorCodeInvalid: "Code invalide - réessayez.",
       twoFactorEnabled: "Double authentification activée.",
       twoFactorCopySecret: "Copier le secret (saisie manuelle)",
       // Inscription (étape 1)
@@ -567,7 +567,7 @@ export const CONSTANTS_FR: TranslationKeys = {
     },
   },
 
-  // Coquille de l'app — footer, barre supérieure, sélecteur d'espace (sur chaque écran authentifié).
+  // Coquille de l'app - footer, barre supérieure, sélecteur d'espace (sur chaque écran authentifié).
   shell: {
     // Footer
     privacy: "Confidentialité",
@@ -587,12 +587,12 @@ export const CONSTANTS_FR: TranslationKeys = {
     sharedWorkspaces: "Partagés avec vous",
     active: "actif",
     workspacesCount: "{count}/{limit} espaces",
-    limitReachedUpgrade: "Limite atteinte — Améliorer",
+    limitReachedUpgrade: "Limite atteinte - Améliorer",
     newWorkspace: "Nouveau workspace",
     createWorkspace: "Créer un workspace",
     workspaceName: "Nom du workspace",
     workspaceNamePlaceholder: "Mon équipe",
-    brainTemplate: "Brain OS — gabarit de départ",
+    brainTemplate: "Brain OS - gabarit de départ",
     templateBlank: "Vierge (16 domaines)",
     templateSaas: "SaaS (expert)",
     templateEcommerce: "E-commerce (expert)",

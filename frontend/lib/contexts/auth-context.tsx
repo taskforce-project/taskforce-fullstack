@@ -48,7 +48,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const { fetchMe, setUser: setStoreUser, clearUser } = useUserStore();
 
   /**
-   * Initialisation — lit le token en localStorage puis charge le profil depuis le backend.
+   * Initialisation - lit le token en localStorage puis charge le profil depuis le backend.
    * Si le token est absent ou expiré, reste non-authentifié.
    */
   useEffect(() => {
@@ -78,7 +78,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
    * Redirections post-authentification : garde d'onboarding + sortie de la page login.
    *
    * <p><b>Garde d'onboarding</b> : tant que le parcours n'est pas franchi
-   * ({@code onboardingCompleted === false}), on force le wizard `/onboarding` — sauf si on y est déjà,
+   * ({@code onboardingCompleted === false}), on force le wizard `/onboarding` - sauf si on y est déjà,
    * ou sur une page d'auth (l'inscription/OAuth est en cours, le rappel gère lui-même la suite). Le
    * test est strictement {@code === false} : si le drapeau est inconnu (ancien cache, réponse
    * partielle), on ne bloque personne. Le wizard, à sa fin, recharge en dur → l'utilisateur revient ici
@@ -92,7 +92,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       router.replace("/onboarding");
       return;
     }
-    // Sortie de la page login : on route direct vers l'onboarding si non fait — pas de passage par
+    // Sortie de la page login : on route direct vers l'onboarding si non fait - pas de passage par
     // l'app avant (sinon elle « flashe » le temps que la garde ci-dessus se déclenche).
     if (path === "/auth/login") {
       router.replace(user.onboardingCompleted === false ? "/onboarding" : "/");

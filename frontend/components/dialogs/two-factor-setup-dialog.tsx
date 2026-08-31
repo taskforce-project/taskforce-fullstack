@@ -20,7 +20,7 @@ import { setupTwoFactor, confirmTwoFactor } from "@/lib/api/user-service"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 
 /**
- * Activation du 2FA (TOTP) — 100 % dans l'app, jamais de page Keycloak.
+ * Activation du 2FA (TOTP) - 100 % dans l'app, jamais de page Keycloak.
  *
  * À l'ouverture : `setup` génère un secret + l'URI otpauth, encodée en QR côté client (`qrcode`).
  * L'utilisateur scanne avec son authenticator, saisit un premier code, et `confirm` active le 2FA.

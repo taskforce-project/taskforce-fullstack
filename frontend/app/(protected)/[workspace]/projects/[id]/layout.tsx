@@ -102,7 +102,7 @@ export default function ProjectLayout({ children }: { readonly children: React.R
 
   return (
     <div className="mx-auto flex h-full w-full max-w-screen-2xl flex-col">
-      {/* Project header — pas de breadcrumb (le header de l'app suffit) ; largeur alignée sur le dashboard */}
+      {/* Project header - pas de breadcrumb (le header de l'app suffit) ; largeur alignée sur le dashboard */}
       <div className="shrink-0 border-b border-border">
         {/* Project name + actions */}
         <div className="flex items-center justify-between gap-4 mb-3">
@@ -177,7 +177,7 @@ export default function ProjectLayout({ children }: { readonly children: React.R
           </div>
         </div>
 
-        {/* Tab nav — bande scrollable avec chevrons (l'onglet Settings restait hors écran, QA3) */}
+        {/* Tab nav - bande scrollable avec chevrons (l'onglet Settings restait hors écran, QA3) */}
         <ScrollableTabs>
           {PROJECT_TABS.map(({ key, icon: Icon, pathSuffix }) => {
             const active = isTabActive(pathSuffix)
@@ -208,7 +208,7 @@ export default function ProjectLayout({ children }: { readonly children: React.R
         </ScrollableTabs>
       </div>
 
-      {/* Page content — one-screen : scroll interne ici (et par colonne sur le board) */}
+      {/* Page content - one-screen : scroll interne ici (et par colonne sur le board) */}
       <div className="min-h-0 flex-1 overflow-y-auto pt-6">
         {children}
       </div>

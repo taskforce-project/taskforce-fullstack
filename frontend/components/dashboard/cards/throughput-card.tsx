@@ -10,7 +10,7 @@ import { GLOBAL_RANGE_DAYS, type DashboardCardBodyProps } from "../card-registry
 import { CardEmpty, CardError, CardSkeleton } from "../card-states"
 
 /**
- * Débit de résolution — série réelle (analytics/throughput), gated par plan (409).
+ * Débit de résolution - série réelle (analytics/throughput), gated par plan (409).
  * Périodes carte : « 30d » (quotidien) / « 8w » (hebdo). Sans réglage propre, la
  * période globale sert de fenêtre (série quotidienne tronquée côté client).
  */
@@ -39,7 +39,7 @@ export function ThroughputCard({ slug, card, globalRange, refreshToken }: Dashbo
       .catch((e: unknown) => {
         if (!alive) return
         setPoints([])
-        // 409 = mur de plan (FREE) — à distinguer d'un vrai manque de données.
+        // 409 = mur de plan (FREE) - à distinguer d'un vrai manque de données.
         const status = (e as { response?: { status?: number } }).response?.status
         if (status === 409) setGated(true)
         else setError(true)

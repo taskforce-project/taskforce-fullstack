@@ -12,7 +12,7 @@ import { CardError, CardSkeleton } from "../card-states"
 const pctOf = (used: number, total: number) => (total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0)
 
 /**
- * Consommation IA du mois vs plafond du forfait — jauge BLEUE de référence
+ * Consommation IA du mois vs plafond du forfait - jauge BLEUE de référence
  * (mêmes classes que la jauge de tokens Cortex / Settings « Usage IA »).
  */
 export function AiUsageCard({ slug, refreshToken }: DashboardCardBodyProps) {
@@ -55,7 +55,7 @@ export function AiUsageCard({ slug, refreshToken }: DashboardCardBodyProps) {
         <span className="text-[11px] uppercase tracking-wide text-muted-foreground">{usage.plan}</span>
       </div>
 
-      {/* Jauge bleue de référence — classes exactes de la jauge de tokens. */}
+      {/* Jauge bleue de référence - classes exactes de la jauge de tokens. */}
       <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
         <div
           className={cn(

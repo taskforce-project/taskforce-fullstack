@@ -47,7 +47,7 @@ interface KpiMetric {
   deltaInverse?: boolean
 }
 
-/** Une cellule KPI dans le MetricSplit — même chrome que les cartes du dashboard. */
+/** Une cellule KPI dans le MetricSplit - même chrome que les cartes du dashboard. */
 function KpiCell({ metric }: { readonly metric: KpiMetric }) {
   const positive = metric.delta > 0
   const isGood = metric.deltaInverse ? !positive : positive
@@ -116,13 +116,13 @@ export default function AnalyticsPage() {
     getAiInsights(slug).then(setInsights).catch(() => { /* non-critical */ })
   }, [slug])
 
-  // KPIs réels (re-fetch au changement de filtre projet — PROD-1.7)
+  // KPIs réels (re-fetch au changement de filtre projet - PROD-1.7)
   useEffect(() => {
     if (!slug) return
     getAnalyticsKpis(slug, projectId).then(setKpis).catch(() => { /* non-critical */ })
   }, [slug, projectId])
 
-  // KPIs réels → cartes (zéros tant que non chargés ; aucun mock — PROD-1.7)
+  // KPIs réels → cartes (zéros tant que non chargés ; aucun mock - PROD-1.7)
   const k = kpis ?? { tasksResolved: 0, tasksResolvedDelta: 0, avgResolutionDays: 0, avgResolutionDaysDelta: 0, velocity: 0, velocityDelta: 0, activeCycles: 0 }
   const kpiMetrics: KpiMetric[] = [
     { label: "Tasks completed", value: String(k.tasksResolved),   delta: k.tasksResolvedDelta,                 unit: "this month", icon: TrendingUp },
@@ -137,7 +137,7 @@ export default function AnalyticsPage() {
     <PageContainer>
       <PageHeader
         title="Intelligence"
-        description="What the AI observes about your operations — and what it recommends doing next."
+        description="What the AI observes about your operations - and what it recommends doing next."
       />
 
       {/* Contexte : le sélecteur pilote toute la page, il doit se voir. */}
@@ -159,14 +159,14 @@ export default function AnalyticsPage() {
         </span>
       </div>
 
-      {/* 1 — La décision du jour : la raison d'être de la page. */}
+      {/* 1 - La décision du jour : la raison d'être de la page. */}
       {projectFilter === ALL_PROJECTS ? (
         <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border px-6 py-10 text-center">
           <Brain className="size-7 text-muted-foreground/40" />
           <p className="text-sm font-medium text-foreground">Choose a project for decision support</p>
           <p className="max-w-md text-sm text-muted-foreground">
             The AI reads the project&apos;s real metrics and the Brain OS, then suggests the situation, the risks
-            and the day&apos;s top 3 priorities — convertible into issues in one click.
+            and the day&apos;s top 3 priorities - convertible into issues in one click.
           </p>
         </div>
       ) : (
@@ -177,7 +177,7 @@ export default function AnalyticsPage() {
         />
       )}
 
-      {/* 2 — Les signaux détectés par l'IA. */}
+      {/* 2 - Les signaux détectés par l'IA. */}
       <SectionCard
         title="AI Signals"
         icon={<Brain className="size-4" />}
@@ -189,14 +189,14 @@ export default function AnalyticsPage() {
           : insights.map((ins, i) => <InsightRow key={`${ins.agent}-${i}`} insight={ins} />)}
       </SectionCard>
 
-      {/* 3 — Les chiffres (même chrome que les cartes du dashboard : en-tête + MetricSplit). */}
+      {/* 3 - Les chiffres (même chrome que les cartes du dashboard : en-tête + MetricSplit). */}
       <SectionCard title="Key metrics" icon={<Activity className="size-4" />} bodyClassName="p-0">
         <MetricSplit className="max-sm:flex-col max-sm:divide-x-0 max-sm:divide-y">
           {kpiMetrics.map((m) => <KpiCell key={m.label} metric={m} />)}
         </MetricSplit>
       </SectionCard>
 
-      {/* 4 — L'exploration : 3 aperçus → modal (catalogue + génération IA). */}
+      {/* 4 - L'exploration : 3 aperçus → modal (catalogue + génération IA). */}
       <ChartExplorer slug={slug} projectId={projectId} gated={!isPro} onUpgrade={openUpgrade} />
     </PageContainer>
   )

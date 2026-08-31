@@ -9,7 +9,7 @@ import { FlaskConical, ArrowRight, ChevronLeft } from "lucide-react";
 import type { Lab } from "@/lib/labs";
 
 /**
- * LabDetail — page détail d'une expérience. CLAIR, STATIQUE, SOBRE. Image plein cadre + pas de rails sur le
+ * LabDetail - page détail d'une expérience. CLAIR, STATIQUE, SOBRE. Image plein cadre + pas de rails sur le
  * hero, icônes en dégradé (le trait), accents bleu/neutre (plus de violet). D11 : direction, pas mécanisme.
  */
 interface Props {
@@ -18,7 +18,7 @@ interface Props {
 const { c } = Astro.props;
 ---
 
-<BaseLayout title={`${c.name} — Labs`} description={c.lead}>
+<BaseLayout title={`${c.name} - Labs`} description={c.lead}>
   <LabsGradientDefs />
 
   {/* ── Hero (image plein cadre, sans rails) ── */}
@@ -60,7 +60,7 @@ const { c } = Astro.props;
     </div>
   </section>
 
-  {/* ── What we're exploring — hypothèses ── */}
+  {/* ── What we're exploring - hypothèses ── */}
   <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-28">
       <div class="max-w-2xl">
@@ -69,7 +69,7 @@ const { c } = Astro.props;
         </p>
         <h2 class="t-h2 mt-3">The questions, not the recipe</h2>
         <p class="t-lead mt-4">
-          We publish the direction we're working in — not how we build it. The mechanism is what makes
+          We publish the direction we're working in - not how we build it. The mechanism is what makes
           TaskForce different, so it stays in the lab until it ships.
         </p>
       </div>
@@ -115,7 +115,7 @@ const { c } = Astro.props;
 
   <PageCta
     title="Follow where this goes"
-    lead="The roadmap is public. Hold us to it — and start with what ships today."
+    lead="The roadmap is public. Hold us to it - and start with what ships today."
     primary={{ label: "See the roadmap", href: "/roadmap" }}
     secondary={{ label: "Run your first workflow", href: "/waitlist" }}
   />

@@ -187,7 +187,7 @@ export const CONSTANTS_EN = {
       emailVerified: "Email verified successfully",
     },
 
-    // Redesigned auth screens — routed from the auth components (login, register step 1,
+    // Redesigned auth screens - routed from the auth components (login, register step 1,
     // password reset, social buttons, OAuth callback, auth layout). Interpolation tokens
     // {provider} / {email} / {seconds} are substituted in the component via String.replace.
     ui: {
@@ -218,7 +218,7 @@ export const CONSTANTS_EN = {
       twoFactorActivate: "Enable",
       twoFactorCancel: "Cancel",
       twoFactorSetupError: "Couldn't start 2FA setup.",
-      twoFactorCodeInvalid: "Invalid code — try again.",
+      twoFactorCodeInvalid: "Invalid code - try again.",
       twoFactorEnabled: "Two-factor authentication enabled.",
       twoFactorCopySecret: "Copy the secret (manual entry)",
       // Register (step 1)
@@ -566,7 +566,7 @@ export const CONSTANTS_EN = {
     },
   },
 
-  // App shell — footer, top bar, workspace switcher (rendered on every authenticated screen).
+  // App shell - footer, top bar, workspace switcher (rendered on every authenticated screen).
   shell: {
     // Footer
     privacy: "Privacy",
@@ -586,12 +586,12 @@ export const CONSTANTS_EN = {
     sharedWorkspaces: "Shared with you",
     active: "active",
     workspacesCount: "{count}/{limit} workspaces",
-    limitReachedUpgrade: "Limit reached — Upgrade",
+    limitReachedUpgrade: "Limit reached - Upgrade",
     newWorkspace: "New workspace",
     createWorkspace: "Create a workspace",
     workspaceName: "Workspace name",
     workspaceNamePlaceholder: "My team",
-    brainTemplate: "Brain OS — starter template",
+    brainTemplate: "Brain OS - starter template",
     templateBlank: "Blank (16 domains)",
     templateSaas: "SaaS (expert)",
     templateEcommerce: "E-commerce (expert)",

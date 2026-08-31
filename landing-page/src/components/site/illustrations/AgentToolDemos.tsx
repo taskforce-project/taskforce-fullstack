@@ -4,7 +4,7 @@ import { BrandLogo } from "../BrandLogo";
 import { cn } from "@/lib/utils";
 
 /**
- * AgentToolDemos — 3 mini-illustrations ANIMÉES (locales, sans dépendance) posées en haut des
+ * AgentToolDemos - 3 mini-illustrations ANIMÉES (locales, sans dépendance) posées en haut des
  * cartes « Search your Memory / Take notes / Use connected tools » de la page Agents.
  * Chacune se joue seule, en boucle douce, UNIQUEMENT à l'écran (IntersectionObserver) et se fige
  * si `prefers-reduced-motion`. DA « traits » : carré, filet 1px, aucun ombrage, accents teintés.
@@ -26,10 +26,10 @@ function useInViewReduced(ref: RefObject<HTMLElement | null>) {
 
 const SHELL = "relative h-[132px] overflow-hidden border bg-card";
 
-/* ── 1) Search your Memory — la requête se tape seule, puis deux souvenirs remontent. ── */
+/* ── 1) Search your Memory - la requête se tape seule, puis deux souvenirs remontent. ── */
 const QUERY = "Why Postgres over Mongo?";
 const HITS = [
-  { color: "#059669", key: "ADR-014", text: "Postgres over Mongo — chosen" },
+  { color: "#059669", key: "ADR-014", text: "Postgres over Mongo - chosen" },
   { color: "#d97706", key: "Constraint", text: "EU data residency (GDPR)" },
 ];
 
@@ -108,7 +108,7 @@ export function MemorySearchDemo() {
   );
 }
 
-/* ── 2) Take notes — trois lignes s'écrivent l'une après l'autre, puis « Saved to graph ». ── */
+/* ── 2) Take notes - trois lignes s'écrivent l'une après l'autre, puis « Saved to graph ». ── */
 const LINES = [72, 92, 58];
 
 export function TakeNotesDemo() {
@@ -180,7 +180,7 @@ export function TakeNotesDemo() {
   );
 }
 
-/* ── 3) Use connected tools — l'actif défile ; lecture = done, écriture = waits for you. ── */
+/* ── 3) Use connected tools - l'actif défile ; lecture = done, écriture = waits for you. ── */
 const CONNS = [
   { brand: "github", label: "GitHub", act: "read PR", write: false },
   { brand: "slack", label: "Slack", act: "post update", write: true },

@@ -53,7 +53,7 @@ function formatDate(iso: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Gestion des membres d'un projet — inviter / lister / retirer, avec recherche
+// Gestion des membres d'un projet - inviter / lister / retirer, avec recherche
 // et pagination. Utilisé dans « Réglages › Membres » (et sur la route /members
 // conservée pour les liens profonds). Source unique pour éviter la divergence.
 // ---------------------------------------------------------------------------
@@ -214,7 +214,7 @@ export function ProjectMembersManager({
         })}
       </div>
 
-      {/* Pagination — seulement si ça dépasse une page */}
+      {/* Pagination - seulement si ça dépasse une page */}
       {filtered.length > PAGE_SIZE && (
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>

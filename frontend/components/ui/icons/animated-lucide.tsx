@@ -16,7 +16,7 @@ import type { AnimatedIconHandle } from "./types"
 
 /**
  * Repli générique pour les glyphes lucide sans équivalent chez animateicons.in : on garde le glyphe
- * EXACT (pas de substitution) et on l'anime au niveau du conteneur — petit ressort + inclinaison —
+ * EXACT (pas de substitution) et on l'anime au niveau du conteneur - petit ressort + inclinaison -
  * au survol de la ligne. Même contrat impératif ({@link AnimatedIconHandle}) que les composants
  * bespoke, donc pilotable par ref de la même façon (cf. AnimatedNavIcon).
  */
@@ -62,7 +62,7 @@ function makeAnimatedLucide(Icon: LucideIcon, displayName: string) {
   return Comp
 }
 
-/** Réglages (glyphe lucide Settings2 conservé — animateicons.in n'a pas `settings-2`). */
+/** Réglages (glyphe lucide Settings2 conservé - animateicons.in n'a pas `settings-2`). */
 export const Settings2Icon = makeAnimatedLucide(Settings2, "Settings2Icon")
-/** Aide (glyphe lucide HelpCircle conservé — animateicons.in n'a pas `circle-help`). */
+/** Aide (glyphe lucide HelpCircle conservé - animateicons.in n'a pas `circle-help`). */
 export const HelpCircleIcon = makeAnimatedLucide(HelpCircle, "HelpCircleIcon")

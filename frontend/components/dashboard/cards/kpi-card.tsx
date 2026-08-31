@@ -42,7 +42,7 @@ function KpiBody({
   )
 }
 
-/** Stat tiles « kpi-resolved » / « kpi-velocity » — endpoint analytics/kpis réel. */
+/** Stat tiles « kpi-resolved » / « kpi-velocity » - endpoint analytics/kpis réel. */
 export function KpiCard({ slug, card, refreshToken }: DashboardCardBodyProps) {
   const [kpis, setKpis] = useState<AnalyticsKpis | null>(null)
   const [loading, setLoading] = useState(true)
@@ -79,7 +79,7 @@ export function KpiCard({ slug, card, refreshToken }: DashboardCardBodyProps) {
 }
 
 /**
- * Stat tile « kpi-open » — le endpoint kpis n'expose pas les issues ouvertes :
+ * Stat tile « kpi-open » - le endpoint kpis n'expose pas les issues ouvertes :
  * agrégat réel calculé depuis le store projets (somme des openIssues).
  */
 export function KpiOpenCard({ slug, refreshToken }: DashboardCardBodyProps) {
@@ -89,7 +89,7 @@ export function KpiOpenCard({ slug, refreshToken }: DashboardCardBodyProps) {
   const fetchProjects = useProjectStore((s) => s.fetchProjects)
 
   useEffect(() => {
-    // Garde anti-doublon : le store est partagé entre cartes — un seul GET par refresh global.
+    // Garde anti-doublon : le store est partagé entre cartes - un seul GET par refresh global.
     if (slug && refreshToken > 0 && !useProjectStore.getState().isLoading) void fetchProjects(slug)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug, refreshToken])

@@ -32,7 +32,7 @@ interface SortableCardProps {
   readonly refreshToken: number
 }
 
-/** Une carte à la fois draggable ET droppable — le réordonnancement se fait carte sur carte. */
+/** Une carte à la fois draggable ET droppable - le réordonnancement se fait carte sur carte. */
 function SortableCard({ slug, card, globalRange, refreshToken }: SortableCardProps) {
   const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({ id: card.id })
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id: card.id })
@@ -127,7 +127,7 @@ export function DashboardGrid({ slug, cards, globalRange, refreshToken, onAddCar
         ))}
       </div>
 
-      {/* Clone compact suivi par le curseur — le placeholder estompé reste en place. */}
+      {/* Clone compact suivi par le curseur - le placeholder estompé reste en place. */}
       <DragOverlay dropAnimation={null}>
         {activeCard ? (
           <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 shadow-lg">

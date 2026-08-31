@@ -7,7 +7,7 @@ import { ProposalPathFlow } from "@/components/site/flows/OrchestrationFlows";
 ---
 
 <BaseLayout
-  title="AI transparency — TaskForce"
+  title="AI transparency - TaskForce"
   description="How AI is used in TaskForce: what it does, what it can access, where human approval stays required, which models run where, what is logged, and why your data is not used to train TaskForce models."
 >
   <PageHero
@@ -24,14 +24,14 @@ import { ProposalPathFlow } from "@/components/site/flows/OrchestrationFlows";
         <p>
           Inside a run, AI agents <strong>frame the problem, draft the spec, propose an approach,
           write the API contract and break the work into issues</strong>. Every one of these is a
-          draft, produced from your workspace context — a proposal, not a decision.
+          draft, produced from your workspace context - a proposal, not a decision.
         </p>
 
         <h2>TaskForce agents vs coding agents</h2>
         <p>
-          TaskForce agents plan and propose delivery artifacts — they don't write and ship your code
-          themselves. Implementation is delegated to the <strong>coding agent you choose</strong> —
-          such as Claude Code or Cursor — within the permissions and workflow configuration you
+          TaskForce agents plan and propose delivery artifacts - they don't write and ship your code
+          themselves. Implementation is delegated to the <strong>coding agent you choose</strong> -
+          such as Claude Code or Cursor - within the permissions and workflow configuration you
           provide. TaskForce orchestrates; your coding agent executes.
         </p>
 
@@ -42,7 +42,7 @@ import { ProposalPathFlow } from "@/components/site/flows/OrchestrationFlows";
         </p>
         <ul>
           <li>Workspace context</li>
-          <li>TaskForce Memory — decisions, constraints and conventions</li>
+          <li>TaskForce Memory - decisions, constraints and conventions</li>
           <li>Connected repositories</li>
           <li>Issues and projects</li>
           <li>Previously approved artifacts</li>
@@ -56,7 +56,7 @@ import { ProposalPathFlow } from "@/components/site/flows/OrchestrationFlows";
         <h2>What it never does on its own</h2>
         <p>
           In governed runs, no consequential workflow step advances without human approval. TaskForce does not let an
-          AI-generated decision become the next stage of a governed run on its own — each checkpoint
+          AI-generated decision become the next stage of a governed run on its own - each checkpoint
           can be <strong>approved, edited, rejected or sent back</strong> before the workflow
           continues. The AI proposes. A named human decides. That gate is the product, not a setting
           you can quietly turn off.
@@ -70,16 +70,16 @@ import { ProposalPathFlow } from "@/components/site/flows/OrchestrationFlows";
     <div class="container-rail py-16 lg:py-20">
       <div class="max-w-2xl">
         <p class="t-eyebrow mb-3">The path of a proposal</p>
-        <h2 class="t-h2">Context in, a proposal out — a human decides</h2>
+        <h2 class="t-h2">Context in, a proposal out - a human decides</h2>
       </div>
 
-      {/* Le schéma en React Flow (même DA que l'orchestration) — statique. */}
+      {/* Le schéma en React Flow (même DA que l'orchestration) - statique. */}
       <div class="flow-canvas relative -mx-6 mt-10 h-[320px] border-y border-border lg:-mx-10">
         <ProposalPathFlow client:only="react" />
       </div>
       <p class="text-muted-foreground mt-6 max-w-2xl text-[13px] leading-6">
         Only an approved proposal becomes the context for what follows. A rejection isn't silently
-        discarded — it stays in the run's audit trail with your feedback, and can shape the next
+        discarded - it stays in the run's audit trail with your feedback, and can shape the next
         proposal.
       </p>
     </div>
@@ -92,7 +92,7 @@ import { ProposalPathFlow } from "@/components/site/flows/OrchestrationFlows";
         <h2>Which models run, and where</h2>
         <p>
           TaskForce runs on your models. It can run local, open models through Ollama on your own
-          hardware — the default today — or call an optional hosted provider (such as Groq). You choose
+          hardware - the default today - or call an optional hosted provider (such as Groq). You choose
           the tier, fast or deep, per run, and an enterprise deployment can restrict runs to local
           models only. Model choice is a configuration, not a code change.
         </p>
@@ -101,7 +101,7 @@ import { ProposalPathFlow } from "@/components/site/flows/OrchestrationFlows";
         <p>
           TaskForce does not use your code, decisions, documents or run artifacts to train its own
           models. What enters a run stays in your workspace, and self-hosting keeps it on your
-          infrastructure — the memory a run builds is an asset you own, not a corpus we harvest.
+          infrastructure - the memory a run builds is an asset you own, not a corpus we harvest.
         </p>
         <p>
           When a hosted model provider is used, data handling is governed by that provider and your
@@ -123,7 +123,7 @@ import { ProposalPathFlow } from "@/components/site/flows/OrchestrationFlows";
         </ul>
         <p>
           Depending on your deployment and retention configuration, prompts and outputs may also be
-          retained as run artifacts for review and audit — <strong>“logged” does not mean every
+          retained as run artifacts for review and audit - <strong>“logged” does not mean every
           prompt is kept forever</strong>.
         </p>
 
@@ -135,7 +135,7 @@ import { ProposalPathFlow } from "@/components/site/flows/OrchestrationFlows";
           fact. You get the leverage of agents without handing them the final say.
         </p>
         <p>
-          Human approval does not make an AI-generated decision correct — <strong>it makes
+          Human approval does not make an AI-generated decision correct - <strong>it makes
           responsibility explicit</strong>.
         </p>
 
@@ -163,7 +163,7 @@ import { ProposalPathFlow } from "@/components/site/flows/OrchestrationFlows";
           <li>Hosted vs local model selection, per step, including local-only deployments.</li>
           <li>Connector-level permissions and per-project access controls.</li>
           <li>The ability to reject or revise any generated artifact.</li>
-          <li>A full audit trail — with owner-only audit access.</li>
+          <li>A full audit trail - with owner-only audit access.</li>
           <li>Self-hosting, so data and models stay on your own network.</li>
         </ul>
       </Prose>

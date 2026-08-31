@@ -34,7 +34,7 @@ const AiChartCard = dynamic(() => import("./cards/ai-chart-card").then((m) => m.
   ssr: false,
 })
 
-/** Corps de carte par type — tous branchés sur des endpoints réels. */
+/** Corps de carte par type - tous branchés sur des endpoints réels. */
 const CARD_BODIES: Readonly<Record<string, ComponentType<DashboardCardBodyProps>>> = {
   "ops-health": OpsHealthCard,
   "throughput": ThroughputCard,
@@ -91,7 +91,7 @@ export function DashboardCardItem({
 
   const handleRemove = async () => {
     const ok = await removeCard(slug, card.id)
-    // Le store a déjà rétabli la carte (revert visuel) — on prévient seulement.
+    // Le store a déjà rétabli la carte (revert visuel) - on prévient seulement.
     if (!ok) toast.error("Couldn't remove the card")
   }
 

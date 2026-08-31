@@ -1,6 +1,6 @@
 ---
 /**
- * Synergy (.astro) — « why it's different » : la thèse + la grille des 4 pièces (traits) + le bento
+ * Synergy (.astro) - « why it's different » : la thèse + la grille des 4 pièces (traits) + le bento
  * « la couche de savoir » avec le **graphe de décision en React Flow** (`DecisionGraphFlow`, sur canvas
  * à points). Anciennement `Showcase.tsx › Synergy` (React) : converti en `.astro` pour héberger l'îlot RF.
  */
@@ -15,7 +15,7 @@ const SYSTEMS = [
   {
     verb: "Plan",
     part: "Agent runtime",
-    text: "Agents draft each checkpoint — the vision, the spec, the architecture.",
+    text: "Agents draft each checkpoint - the vision, the spec, the architecture.",
     demo: {
       kind: "draft" as const,
       title: "Checkpoint · Spec",
@@ -26,7 +26,7 @@ const SYSTEMS = [
   {
     verb: "Remember",
     part: "TaskForce Memory",
-    text: "Links every decision, constraint and trade-off — with the reason attached.",
+    text: "Links every decision, constraint and trade-off - with the reason attached.",
     demo: {
       kind: "graph" as const,
       title: "Why this decision",
@@ -56,7 +56,7 @@ const SYSTEMS = [
 <SectionShell
   eyebrow="Why it's different"
   title="A delivery system, not an assistant"
-  lead="Most AI tools optimize execution. TaskForce optimizes the system that decides what gets executed — one platform where planning, memory, the governed run and the audit trail already know about each other, instead of four tools you wire together."
+  lead="Most AI tools optimize execution. TaskForce optimizes the system that decides what gets executed - one platform where planning, memory, the governed run and the audit trail already know about each other, instead of four tools you wire together."
 >
   <p class="mt-8 max-w-2xl text-[16px] leading-8 font-medium text-foreground">
     Agents without context become assistants.<br />
@@ -84,12 +84,12 @@ const SYSTEMS = [
     }
   </div>
 
-  {/* Bento : la couche de savoir — edge-to-edge, DecisionGraph en React Flow sur canvas à points. */}
+  {/* Bento : la couche de savoir - edge-to-edge, DecisionGraph en React Flow sur canvas à points. */}
   <div class="bg-card -mx-6 mt-6 grid items-center gap-8 border-y border-border px-6 py-8 sm:px-8 lg:-mx-10 lg:grid-cols-2 lg:gap-14 lg:px-10">
     <div>
       <h3 class="t-h3">Git remembers what changed. TaskForce remembers why.</h3>
       <p class="text-muted-foreground mt-3 text-[14px] leading-7">
-        Not a search box over your docs — a map of why. TaskForce Memory links the decisions,
+        Not a search box over your docs - a map of why. TaskForce Memory links the decisions,
         constraints and trade-offs behind the system, and how they connect. Every run reads why the
         system is the way it is, and writes its own decisions back. Retrieval hands you passages; this
         hands you the reasoning.
@@ -108,7 +108,7 @@ const SYSTEMS = [
   </div>
 
   <p class="text-muted-foreground mt-10 max-w-2xl text-[14px] leading-7">
-    The payoff is daily: fewer meetings, fewer half-written tickets, less context re-explained — and
+    The payoff is daily: fewer meetings, fewer half-written tickets, less context re-explained - and
     agents that already understand your system.
   </p>
 </SectionShell>

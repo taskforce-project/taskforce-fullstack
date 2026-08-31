@@ -2,8 +2,8 @@ import type { NextConfig } from "next";
 
 // CSP adaptée App Router Next.js :
 // - unsafe-inline requis pour Tailwind (styles inline) et Next.js hydration
-// - unsafe-eval requis en dev (hot-reload) — à retirer si nonce mis en place en production
-// Domaine de base unique (miroir de `lib/config/urls.ts` — la config Next ne peut pas importer ce
+// - unsafe-eval requis en dev (hot-reload) - à retirer si nonce mis en place en production
+// Domaine de base unique (miroir de `lib/config/urls.ts` - la config Next ne peut pas importer ce
 // module au chargement) : en prod on ne fixe que `NEXT_PUBLIC_BASE_DOMAIN` et on dérive api.<base> /
 // files.<base>. Une variable `NEXT_PUBLIC_*` explicite l'emporte toujours.
 const BASE_DOMAIN = (process.env.NEXT_PUBLIC_BASE_DOMAIN ?? "").replace(/^https?:\/\//, "").replace(/\/+$/, "");
@@ -11,7 +11,7 @@ const fromBase = (subdomainPrefix: string) => (BASE_DOMAIN ? `https://${subdomai
 const API_ORIGIN = process.env.NEXT_PUBLIC_API_URL || fromBase("api.") || "http://localhost:8080";
 // Origine du stockage objet (MinIO/S3) telle que le NAVIGATEUR la joint. Les pièces jointes sont
 // servies par URL présignée : l'hôte fait partie de la signature, le navigateur charge donc
-// directement depuis cette origine — sans elle dans img-src/connect-src, la CSP bloque la requête
+// directement depuis cette origine - sans elle dans img-src/connect-src, la CSP bloque la requête
 // (vignette cassée, `TypeError: Failed to fetch`) alors que le backend et MinIO sont sains.
 // `https:` dans img-src ne couvre pas un MinIO local en http:// → il faut l'origine explicite.
 const STORAGE_ORIGIN = process.env.NEXT_PUBLIC_STORAGE_URL || fromBase("files.") || "http://localhost:9000";
@@ -21,24 +21,24 @@ const IS_PROD = process.env.NODE_ENV === "production";
 // Origine WebSocket du temps réel (STOMP/SockJS), DÉRIVÉE de l'API au lieu d'être écrite en dur.
 // Auparavant la CSP listait `ws://localhost:8080 wss://localhost:8080` : en production, la
 // connexion vers le vrai hôte d'API était donc bloquée par la CSP et le temps réel tombait
-// silencieusement — un bug qui ne pouvait pas se voir en développement.
+// silencieusement - un bug qui ne pouvait pas se voir en développement.
 const WS_ORIGIN = API_ORIGIN.replace(/^http/, "ws");
 
 // Origine unique de Cloudflare Turnstile. Le widget charge un script depuis ce domaine et rend son
 // défi dans une iframe servie par le même : sans l'autoriser explicitement, la CSP le bloque et
-// l'échec est TOTALEMENT SILENCIEUX côté produit — le conteneur reste vide, `window.turnstile` reste
+// l'échec est TOTALEMENT SILENCIEUX côté produit - le conteneur reste vide, `window.turnstile` reste
 // indéfini, aucune erreur n'apparaît dans le parcours utilisateur. Constaté le 24/07/2026.
 //
 // Autorisée en permanence, et non conditionnée à la présence d'une clé : la CSP est figée dans la
 // configuration alors que la clé de site vient de l'API à l'exécution. Les lier ferait dépendre un
 // en-tête de sécurité d'un état qu'il ne peut pas connaître. Le coût est une origine nommée, précise,
-// utilisée par ce seul widget — pas un joker.
+// utilisée par ce seul widget - pas un joker.
 const TURNSTILE_ORIGIN = "https://challenges.cloudflare.com";
 
 // Cloudflare Web Analytics : le proxy Cloudflare injecte automatiquement `beacon.min.js` (servi par
 // static.cloudflareinsights.com) sur les pages passant par le tunnel, et le beacon POSTe les mesures
 // RUM vers cloudflareinsights.com. Sans ces deux origines dans la CSP, le script est bloqué et une
-// erreur apparaît en console de production — alors qu'aucun code applicatif ne charge ce script.
+// erreur apparaît en console de production - alors qu'aucun code applicatif ne charge ce script.
 const CF_BEACON_SCRIPT = "https://static.cloudflareinsights.com";
 const CF_BEACON_CONNECT = "https://cloudflareinsights.com";
 
@@ -80,7 +80,7 @@ const securityHeaders = [
   { key: "Strict-Transport-Security",   value: "max-age=31536000; includeSubDomains; preload" },
   { key: "X-Content-Type-Options",      value: "nosniff" },
   { key: "X-Frame-Options",             value: "DENY" },
-  { key: "X-XSS-Protection",            value: "0" }, // désactivé — la CSP prend le relais
+  { key: "X-XSS-Protection",            value: "0" }, // désactivé - la CSP prend le relais
   { key: "Referrer-Policy",             value: "strict-origin-when-cross-origin" },
   // Isole le contexte de navigation : une fenêtre ouverte depuis un autre site ne peut plus
   // manipuler celle-ci via `window.opener` (ZAP le signalait manquant).

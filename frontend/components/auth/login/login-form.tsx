@@ -21,7 +21,7 @@ import { stashInvitationToken, takeInvitationToken } from "@/lib/utils/pending-i
  *
  * Une colonne, quatre éléments : titre, deux champs, une action. Quand le compte a le 2FA activé, une
  * <b>seconde étape</b> demande le code TOTP (le serveur répond `twoFactorRequired` sans émettre de
- * token — cf. {@link login}), puis on rejoue la connexion avec le code.
+ * token - cf. {@link login}), puis on rejoue la connexion avec le code.
  *
  * Validation Zod + limitation de tentatives (mot de passe ET codes 2FA). Après connexion, on pose le
  * drapeau `tf.intro` → l'intro de marque joue aussi sur un login par mot de passe (comme en OAuth).
@@ -46,7 +46,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
     e.preventDefault()
 
     if (!totpStep) {
-      // Étape 1 — email + mot de passe. Validation Zod (règle d'or #8) + limitation de tentatives.
+      // Étape 1 - email + mot de passe. Validation Zod (règle d'or #8) + limitation de tentatives.
       const parsed = loginSchema.safeParse(formData)
       if (!parsed.success) {
         toast.error(t.common.error, { description: firstZodError(parsed.error) })
@@ -58,7 +58,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
         return
       }
     } else {
-      // Étape 2 — code TOTP à 6 chiffres, avec limite dédiée (anti-brute-force ; le backend a la sienne).
+      // Étape 2 - code TOTP à 6 chiffres, avec limite dédiée (anti-brute-force ; le backend a la sienne).
       if (code.length !== 6) {
         toast.error(t.common.error, { description: t.auth.ui.twoFactorEnterCode })
         return
@@ -94,11 +94,11 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
       try {
         sessionStorage.setItem("tf.intro", "1")
       } catch {
-        /* mode privé / stockage indisponible — pas d'intro, on entre quand même */
+        /* mode privé / stockage indisponible - pas d'intro, on entre quand même */
       }
 
       // Approbation explicite : si l'utilisateur arrive d'un lien d'invitation, on l'applique
-      // maintenant (best-effort — un échec n'empêche jamais la connexion réussie).
+      // maintenant (best-effort - un échec n'empêche jamais la connexion réussie).
       const invitationToken = takeInvitationToken()
       if (invitationToken) {
         try {
@@ -110,7 +110,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
       } else {
         toast.success(t.auth.success.loginSuccess)
       }
-      // Direct vers l'onboarding si non fait — évite que l'app « flashe » avant le wizard.
+      // Direct vers l'onboarding si non fait - évite que l'app « flashe » avant le wizard.
       router.replace(result.user?.onboardingCompleted === false ? "/onboarding" : "/")
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)

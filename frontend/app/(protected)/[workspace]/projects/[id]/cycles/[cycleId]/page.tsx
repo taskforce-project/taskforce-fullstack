@@ -85,7 +85,7 @@ function getCategoryLabel(category: IssueStatusCategory): string {
 }
 
 function formatDate(iso: string | null | undefined): string {
-  if (!iso) return "—"
+  if (!iso) return "-"
   try {
     return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" })
   } catch {
@@ -168,7 +168,7 @@ function IssueRow({
  * fait d'issue à synthétiser.
  *
  * <p>Le backend n'expose PAS le cycle d'une issue (pas de reverse-lookup sur `IssueResponse`), donc on
- * exclut les candidats en comparant à la liste des issues DÉJÀ dans le cycle (`alreadyIn`) — l'info
+ * exclut les candidats en comparant à la liste des issues DÉJÀ dans le cycle (`alreadyIn`) - l'info
  * qu'on possède réellement, plutôt qu'un champ fantôme.</p>
  */
 function AddIssuesDialog({
@@ -418,7 +418,7 @@ export default function CycleDetailPage() {
               </div>
             )}
 
-            {/* Actions du cycle — Démarrer / Terminer / Rouvrir / Supprimer (CYC-02/04/08). */}
+            {/* Actions du cycle - Démarrer / Terminer / Rouvrir / Supprimer (CYC-02/04/08). */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" disabled={acting} aria-label="Cycle actions">

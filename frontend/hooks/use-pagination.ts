@@ -17,7 +17,7 @@ export function usePagination<T>(items: readonly T[], initialSize = 25) {
   // cascade qu'imposait le `setPage` en effet.
   // Effet de bord voulu : la page demandée est conservée telle quelle. Si l'utilisateur est page 5,
   // filtre jusqu'à 2 pages puis retire le filtre, il retrouve la page 5 au lieu de rester bloqué
-  // page 2 — le filtre était temporaire, la position de lecture ne devrait pas l'être.
+  // page 2 - le filtre était temporaire, la position de lecture ne devrait pas l'être.
   const page = Math.min(requestedPage, pageCount)
 
   const pageItems = useMemo(() => {

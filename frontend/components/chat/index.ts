@@ -1,5 +1,5 @@
 /**
- * Kit de composants chat agentique — vendus à la main (no-dep ; le réseau du poste corrompt
+ * Kit de composants chat agentique - vendus à la main (no-dep ; le réseau du poste corrompt
  * npm/prompt-kit). Themables via tokens Tailwind, prêts à câbler sur le deep-path agentique
  * (tool calling, reasoning, recherche web, tâches longues).
  */

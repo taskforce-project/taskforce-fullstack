@@ -1,5 +1,5 @@
 /**
- * Gating des fonctionnalités par plan (PROD-4.4) — DOIT rester aligné avec
+ * Gating des fonctionnalités par plan (PROD-4.4) - DOIT rester aligné avec
  * `PlanFeatureService` côté backend.
  */
 

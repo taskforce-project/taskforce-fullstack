@@ -14,7 +14,7 @@ interface CreateProjectUiState {
  * <p>Avant, « New project » naviguait vers `…/projects?new=1` et la page ouvrait le modal au montage.
  * En dev, le double-montage de React Strict Mode rejouait l'animation d'ouverture → le modal
  * clignotait (ouvre / se ferme « parce que la page change » / rouvre). Ouvrir le modal <b>en place</b>
- * (un simple booléen, aucune navigation) supprime le changement de page — donc le clignotement.</p>
+ * (un simple booléen, aucune navigation) supprime le changement de page - donc le clignotement.</p>
  */
 export const useCreateProjectStore = create<CreateProjectUiState>((set) => ({
   open: false,

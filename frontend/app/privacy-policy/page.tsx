@@ -2,7 +2,7 @@ import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 
 export const metadata = {
-  title: "Privacy Policy — TaskForce",
+  title: "Privacy Policy - TaskForce",
   description: "How TaskForce collects, uses, and protects your personal data.",
 }
 
@@ -49,9 +49,9 @@ export default function PrivacyPolicyPage() {
           <section>
             <h2 className="text-lg font-semibold text-foreground mb-3">3. Legal basis for processing</h2>
             <ul className="list-disc pl-5 space-y-1.5">
-              <li><strong className="text-foreground">Contract performance</strong> (Art. 6(1)(b) GDPR) — processing necessary to provide the TaskForce service you signed up for.</li>
-              <li><strong className="text-foreground">Legitimate interests</strong> (Art. 6(1)(f) GDPR) — security monitoring, fraud prevention, and service improvement.</li>
-              <li><strong className="text-foreground">Legal obligation</strong> (Art. 6(1)(c) GDPR) — compliance with applicable law, including tax and financial regulations.</li>
+              <li><strong className="text-foreground">Contract performance</strong> (Art. 6(1)(b) GDPR) - processing necessary to provide the TaskForce service you signed up for.</li>
+              <li><strong className="text-foreground">Legitimate interests</strong> (Art. 6(1)(f) GDPR) - security monitoring, fraud prevention, and service improvement.</li>
+              <li><strong className="text-foreground">Legal obligation</strong> (Art. 6(1)(c) GDPR) - compliance with applicable law, including tax and financial regulations.</li>
             </ul>
           </section>
 
@@ -66,9 +66,9 @@ export default function PrivacyPolicyPage() {
             <h2 className="text-lg font-semibold text-foreground mb-3">5. Data sharing</h2>
             <p>We do not sell your personal data. We share data only with the following sub-processors:</p>
             <ul className="list-disc pl-5 space-y-1.5 mt-2">
-              <li><strong className="text-foreground">Stripe</strong> — payment processing (EU data center).</li>
-              <li><strong className="text-foreground">Mailtrap / transactional email provider</strong> — sending account and notification emails.</li>
-              <li><strong className="text-foreground">MinIO</strong> — file attachment storage (self-hosted or configured cloud region).</li>
+              <li><strong className="text-foreground">Stripe</strong> - payment processing (EU data center).</li>
+              <li><strong className="text-foreground">Mailtrap / transactional email provider</strong> - sending account and notification emails.</li>
+              <li><strong className="text-foreground">MinIO</strong> - file attachment storage (self-hosted or configured cloud region).</li>
             </ul>
           </section>
 
@@ -85,12 +85,12 @@ export default function PrivacyPolicyPage() {
             <h2 className="text-lg font-semibold text-foreground mb-3">7. Your rights (GDPR)</h2>
             <p>Under the GDPR you have the right to:</p>
             <ul className="list-disc pl-5 space-y-1.5 mt-2">
-              <li><strong className="text-foreground">Access</strong> — obtain a copy of all personal data we hold about you.</li>
-              <li><strong className="text-foreground">Rectification</strong> — correct inaccurate or incomplete data.</li>
-              <li><strong className="text-foreground">Erasure</strong> — request deletion of your account and associated data.</li>
-              <li><strong className="text-foreground">Portability</strong> — receive your data in a machine-readable format.</li>
-              <li><strong className="text-foreground">Restriction</strong> — ask us to restrict processing of your data.</li>
-              <li><strong className="text-foreground">Objection</strong> — object to processing based on legitimate interests.</li>
+              <li><strong className="text-foreground">Access</strong> - obtain a copy of all personal data we hold about you.</li>
+              <li><strong className="text-foreground">Rectification</strong> - correct inaccurate or incomplete data.</li>
+              <li><strong className="text-foreground">Erasure</strong> - request deletion of your account and associated data.</li>
+              <li><strong className="text-foreground">Portability</strong> - receive your data in a machine-readable format.</li>
+              <li><strong className="text-foreground">Restriction</strong> - ask us to restrict processing of your data.</li>
+              <li><strong className="text-foreground">Objection</strong> - object to processing based on legitimate interests.</li>
             </ul>
             <p className="mt-3">
               To exercise these rights, go to{" "}

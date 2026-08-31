@@ -10,9 +10,9 @@ import { Compass, Building2, CalendarClock, BrainCircuit, Boxes, Server, ShieldC
 import { hueFor } from "@/lib/site-icons";
 
 /**
- * Orchestration — refonte façon Attio (attio.com/platform/workflows, 04/08) : hero 2 colonnes avec un
+ * Orchestration - refonte façon Attio (attio.com/platform/workflows, 04/08) : hero 2 colonnes avec un
  * GRAPHE de run à droite (pas de screenshot d'app), et des FONDS DE SECTION qui alternent (points /
- * rayures / vide / NOIR) — pas de fond sur les cartes. « Structure par traits » gardée (colonnes à filets).
+ * rayures / vide / NOIR) - pas de fond sur les cartes. « Structure par traits » gardée (colonnes à filets).
  * D11 : le graphe est illustratif (badge PLANNED + légende « Illustrative »), rien n'est présenté comme Live.
  */
 
@@ -22,14 +22,14 @@ const AGENTS_FULL = [
     owns: "the what",
     icon: Compass,
     box: "ring-violet-200 text-violet-600",
-    steps: ["Frame the problem — users, outcome, DoD", "Draft the product spec — stories, acceptance"],
+    steps: ["Frame the problem - users, outcome, DoD", "Draft the product spec - stories, acceptance"],
   },
   {
     code: "CTO",
     owns: "the how",
     icon: Building2,
     box: "ring-blue-200 text-blue-600",
-    steps: ["Propose the approach — architecture, risks", "Write the API contract — endpoints, payloads"],
+    steps: ["Propose the approach - architecture, risks", "Write the API contract - endpoints, payloads"],
   },
   {
     code: "COO",
@@ -49,10 +49,10 @@ const PRINCIPLES = [
 ---
 
 <BaseLayout
-  title="Orchestration — TaskForce"
+  title="Orchestration - TaskForce"
   description="TaskForce turns a product outcome into a governed delivery run. Specialized agents handle product, architecture and delivery; your team validates every decision. The AI proposes. Your team decides."
 >
-  {/* ───── Hero façon Attio : texte à gauche, GRAPHE de run à droite — fond POINTS ───── */}
+  {/* ───── Hero façon Attio : texte à gauche, GRAPHE de run à droite - fond POINTS ───── */}
   <section class="bg-card bg-dots border-b">
     <div class="container-rail py-16 lg:py-24">
       <div class="grid items-center gap-12 lg:grid-cols-[minmax(0,460px)_minmax(0,1fr)] lg:gap-16">
@@ -63,7 +63,7 @@ const PRINCIPLES = [
           </div>
           <h1 class="t-h1 mt-4">Set the outcome.<br />The team runs the play.</h1>
           <p class="t-lead mx-auto mt-5 max-w-xl lg:mx-0">
-            Specialized agents propose every step — spec, architecture, plan, QA. Your team approves each
+            Specialized agents propose every step - spec, architecture, plan, QA. Your team approves each
             decision before it becomes the next.
           </p>
           <div class="mt-8 flex flex-wrap justify-center gap-3 lg:justify-start">
@@ -76,27 +76,27 @@ const PRINCIPLES = [
           </p>
         </div>
 
-        {/* le graphe de run — React Flow (statique, façon Attio). client:only : RF a besoin du DOM navigateur. */}
+        {/* le graphe de run - React Flow (statique, façon Attio). client:only : RF a besoin du DOM navigateur. */}
         <div class="lg:pl-4">
           <div class="relative mx-auto w-full max-w-[600px]" style="aspect-ratio: 600 / 620">
             <HeroFlow client:only="react" />
           </div>
           <p class="text-muted-foreground/60 mt-6 text-center font-mono text-[10px] tracking-wide uppercase">
-            Illustrative — orchestration is Planned
+            Illustrative - orchestration is Planned
           </p>
         </div>
       </div>
     </div>
   </section>
 
-  {/* ───── Pourquoi — fond VIDE ───── */}
+  {/* ───── Pourquoi - fond VIDE ───── */}
   <CalloutBand
     eyebrow="The problem"
     statement="A software project isn't one task. It's a chain of decisions that compound."
-    support="TaskForce turns each into a checkpoint — proposed, reviewed, approved before it becomes context for the next."
+    support="TaskForce turns each into a checkpoint - proposed, reviewed, approved before it becomes context for the next."
   />
 
-  {/* ───── Comment tourne un run — GRILLE À FILETS INTÉGRÉS : 4 capacités = 4 cellules (titre + texte + schéma) ───── */}
+  {/* ───── Comment tourne un run - GRILLE À FILETS INTÉGRÉS : 4 capacités = 4 cellules (titre + texte + schéma) ───── */}
   <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-28">
       <div class="mb-12 max-w-2xl">
@@ -136,7 +136,7 @@ const PRINCIPLES = [
             <p class="t-eyebrow mb-2">Handoff</p>
             <h3 class="t-h3">Approved plans go straight to your coding agent</h3>
             <p class="text-muted-foreground mt-2 text-[13.5px] leading-6">
-              TaskForce hands the full approved context to the agent you already use — it builds and opens a PR.
+              TaskForce hands the full approved context to the agent you already use - it builds and opens a PR.
             </p>
           </div>
           <div class="flow-canvas rail-y relative mt-auto h-[280px]">
@@ -149,7 +149,7 @@ const PRINCIPLES = [
             <p class="t-eyebrow mb-2">Human-in-the-loop</p>
             <h3 class="t-h3">Every checkpoint is a decision, not a setting</h3>
             <p class="text-muted-foreground mt-2 max-w-xl text-[13.5px] leading-6">
-              The agent proposes. Your team approves it or sends it back — nothing moves on its own.
+              The agent proposes. Your team approves it or sends it back - nothing moves on its own.
             </p>
           </div>
           <div class="flow-canvas rail-y relative mt-auto h-[150px]">
@@ -174,19 +174,19 @@ const PRINCIPLES = [
         </div>
       </div>
       <p class="text-muted-foreground/60 mt-6 font-mono text-[10px] tracking-wide uppercase">
-        Illustrative — orchestration is Planned
+        Illustrative - orchestration is Planned
       </p>
     </div>
   </section>
 
-  {/* ───── L'équipe — colonnes à filets (structure par traits) — fond RAYURES ───── */}
+  {/* ───── L'équipe - colonnes à filets (structure par traits) - fond RAYURES ───── */}
   <section class="bg-card bg-striped border-b">
     <div class="container-rail no-rail pt-28 pb-20 lg:pt-44 lg:pb-28">
       <div class="max-w-2xl">
         <p class="t-eyebrow mb-3">The team</p>
         <h2 class="t-h2 text-balance">One outcome. Three specialists. Seven checkpoints.</h2>
         <p class="t-lead mt-4">
-          Responsibility is split the way a strong software org does — each agent proposes in its lane, and
+          Responsibility is split the way a strong software org does - each agent proposes in its lane, and
           your team approves before it moves.
         </p>
       </div>
@@ -204,7 +204,7 @@ const PRINCIPLES = [
               <ul class="mt-5 flex flex-col gap-2.5">
                 {a.steps.map((s) => (
                   <li class="text-foreground flex items-start gap-2 text-[13px] leading-5">
-                    <span class="text-primary mt-px">—</span>
+                    <span class="text-primary mt-px">-</span>
                     <span>{s}</span>
                   </li>
                 ))}
@@ -216,14 +216,14 @@ const PRINCIPLES = [
     </div>
   </section>
 
-  {/* ───── Modèles + preuve — GRILLE À FILETS (bento : notre DA de structure = les traits ; on pose le contenu dans les cellules) ───── */}
+  {/* ───── Modèles + preuve - GRILLE À FILETS (bento : notre DA de structure = les traits ; on pose le contenu dans les cellules) ───── */}
   <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-28">
       <div class="mb-12 max-w-2xl">
         <p class="t-eyebrow mb-3">Run it your way</p>
         <h2 class="t-h2 text-balance">Your models. Your numbers. One human gate.</h2>
         <p class="t-lead mt-4">
-          Run every agent on the model you choose — local at zero cost or hosted for depth — and keep the
+          Run every agent on the model you choose - local at zero cost or hosted for depth - and keep the
           whole run legible: seven checkpoints, three specialists, one decision-maker.
         </p>
       </div>
@@ -287,14 +287,14 @@ const PRINCIPLES = [
     </div>
   </section>
 
-  {/* ───── Le moat — fond VIDE (blanc), gros énoncé + colonnes à filets ───── */}
+  {/* ───── Le moat - fond VIDE (blanc), gros énoncé + colonnes à filets ───── */}
   <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-28">
       <div class="mx-auto max-w-3xl text-center">
         <p class="t-eyebrow mb-3">Why orchestration matters</p>
         <h2 class="t-h2 text-balance">The model is replaceable.<br />The orchestration isn't.</h2>
         <p class="t-lead mx-auto mt-4 max-w-2xl">
-          Models and agents will change. The hard part is coordinating the chain of decisions — preserving
+          Models and agents will change. The hard part is coordinating the chain of decisions - preserving
           context, exposing trade-offs, keeping humans accountable.
         </p>
       </div>
@@ -312,7 +312,7 @@ const PRINCIPLES = [
     </div>
   </section>
 
-  {/* ───── CTA — fond VIDE, carte propre (aucun point) ───── */}
+  {/* ───── CTA - fond VIDE, carte propre (aucun point) ───── */}
   <PageCta
     title="Describe the outcome. Let the team work the path."
     lead="Your team decides at every gate. Your coding agent builds it."

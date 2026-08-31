@@ -1,5 +1,5 @@
 /**
- * Service Brain OS — couche de connaissance (knowledge graph) du workspace.
+ * Service Brain OS - couche de connaissance (knowledge graph) du workspace.
  * Backend : /api/workspaces/{slug}/brain (cf. KnowledgeController).
  */
 import { apiClient } from "./client"
@@ -20,7 +20,7 @@ export interface KnowledgeNode {
   refId: number | null
   parentNodeId: number | null
   tags: string[]
-  /** Node du noyau (hub règles/AGENTS) — masqué de l'explorateur par défaut. */
+  /** Node du noyau (hub règles/AGENTS) - masqué de l'explorateur par défaut. */
   system: boolean
   metadata: Record<string, unknown>
   createdAt: string

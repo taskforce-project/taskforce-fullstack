@@ -19,8 +19,8 @@ function resolveApiAvatarUrl(avatarUrl: string): string {
 }
 
 /**
- * Cache déterministe (même seed → même SVG). Évite de régénérer l'identicon à chaque rendu — listes
- * de membres, sidebar, sélecteurs — alors que le résultat est stable pour un email donné.
+ * Cache déterministe (même seed → même SVG). Évite de régénérer l'identicon à chaque rendu - listes
+ * de membres, sidebar, sélecteurs - alors que le résultat est stable pour un email donné.
  */
 const generatedCache = new Map<string, string>()
 

@@ -114,7 +114,7 @@ export default function BrainPage() {
   }, [visibleNodes, activeTag])
 
   // Notes regroupées par domaine. Les dossiers vides restent visibles (squelette d'architecture) :
-  // au démarrage le vault n'a pas de notes, juste les dossiers — l'agent le remplit ensuite.
+  // au démarrage le vault n'a pas de notes, juste les dossiers - l'agent le remplit ensuite.
   const nodesByDomain = useMemo(() => {
     const m = new Map<string, KnowledgeNode[]>()
     for (const n of filteredNodes) {
@@ -185,7 +185,7 @@ export default function BrainPage() {
         </div>
       )}
 
-      {/* Body : 2 panneaux façon Obsidian — explorateur (animé) | éditeur central */}
+      {/* Body : 2 panneaux façon Obsidian - explorateur (animé) | éditeur central */}
       <div className="flex min-h-0 flex-1">
         {/* ── Explorateur (gauche, collapsible animé) : recherche + dossiers + tags ── */}
         <aside className={`min-h-0 shrink-0 overflow-hidden border-r transition-[width] duration-300 ease-in-out ${explorerOpen ? "w-[260px]" : "w-0 border-r-0"}`}>
@@ -303,7 +303,7 @@ export default function BrainPage() {
                     </div>
                   )}
 
-                  {/* Noyau système (hub règles / AGENTS) — caché par défaut (expertise) */}
+                  {/* Noyau système (hub règles / AGENTS) - caché par défaut (expertise) */}
                   <div className="mt-3 border-t pt-2">
                     <button onClick={() => setShowSystem((v) => !v)}
                       className="flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground">
@@ -347,7 +347,7 @@ export default function BrainPage() {
                   <p className="text-base font-semibold">Your Brain is ready</p>
                   <p className="text-sm text-muted-foreground">
                     The folders on the left are the base architecture. Notes are created and organized
-                    automatically as your projects progress — or add one manually.
+                    automatically as your projects progress - or add one manually.
                   </p>
                 </div>
               ) : (
@@ -425,7 +425,7 @@ function PlanetHeader({ node }: { node: KnowledgeNode }) {
         })}
         {tags.length === 0 && (
           <text x={cx} y={cy + 56} textAnchor="middle" fontSize="9" fill="currentColor" fillOpacity="0.5">
-            no moons — add #tags to link this planet
+            no moons - add #tags to link this planet
           </text>
         )}
       </svg>
@@ -668,7 +668,7 @@ function CreateNodeDialog({
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-muted-foreground">Title</label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. ADR-002 — Cache choice" />
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. ADR-002 - Cache choice" />
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-muted-foreground">Content (markdown)</label>

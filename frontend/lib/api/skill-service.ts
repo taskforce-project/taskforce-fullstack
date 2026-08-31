@@ -42,7 +42,7 @@ export interface UpsertSkillsPayload {
 // ---------------------------------------------------------------------------
 
 export async function listSkillProfiles(slug: string): Promise<MemberSkillProfile[]> {
-  // Enrichissement (page Membres) : échec silencieux — la liste des membres reste affichée sans les compétences.
+  // Enrichissement (page Membres) : échec silencieux - la liste des membres reste affichée sans les compétences.
   const res = await apiClient.get<{ data: MemberSkillProfile[] }>(SKILL_ROUTES.LIST(slug), { silentError: true });
   return res.data.data;
 }
@@ -67,7 +67,7 @@ export async function updateMemberSkills(
 /**
  * Suggestion IA de tags de compétences à partir d'un rôle (onboarding, étape 2).
  * Le backend borne l'appel LLM (~8 s) et retombe sur un repli déterministe : cet appel ne bloque donc
- * jamais longtemps. En cas d'échec réseau on renvoie une liste vide plutôt que de propager — la saisie
+ * jamais longtemps. En cas d'échec réseau on renvoie une liste vide plutôt que de propager - la saisie
  * manuelle des compétences reste possible sans suggestion.
  */
 export async function suggestSkills(

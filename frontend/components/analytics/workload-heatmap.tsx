@@ -90,7 +90,7 @@ export function WorkloadHeatmap({ data }: { readonly data: Workload | null }) {
     <div ref={wrapperRef} className="relative h-full">
       <div className="h-full overflow-auto">
         <div className="min-w-[640px]">
-          {/* Légende d'intensité — en tête pour rester visible même avec beaucoup de membres. */}
+          {/* Légende d'intensité - en tête pour rester visible même avec beaucoup de membres. */}
           <div className="mb-2 flex items-center gap-1.5 text-[10px] text-muted-foreground">
             <span className="mr-1 font-medium uppercase tracking-wide">Due dates / day</span>
             <span>less</span>
@@ -144,7 +144,7 @@ export function WorkloadHeatmap({ data }: { readonly data: Workload | null }) {
         </div>
       </div>
 
-      {/* Tooltip riche (façon GitHub) — `absolute` dans le wrapper, posé juste au-dessus de la cellule. */}
+      {/* Tooltip riche (façon GitHub) - `absolute` dans le wrapper, posé juste au-dessus de la cellule. */}
       {hover && (
         <div
           role="tooltip"

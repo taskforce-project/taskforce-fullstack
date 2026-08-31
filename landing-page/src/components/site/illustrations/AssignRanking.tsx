@@ -3,10 +3,10 @@ import { RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
- * AssignRanking — illustration du bloc « Smart Assign ».
+ * AssignRanking - illustration du bloc « Smart Assign ».
  *
  * L'ancien visuel ne montrait que le gagnant : impossible de juger si le choix était bon.
- * Ici on montre **la comparaison** — quatre personnes notées sur les mêmes cinq signaux,
+ * Ici on montre **la comparaison** - quatre personnes notées sur les mêmes cinq signaux,
  * la composition de chaque score (barre segmentée), et la raison en clair.
  * C'est ce qui rend l'affectation contestable, donc acceptable.
  */
@@ -165,7 +165,7 @@ export function AssignRanking() {
         })}
       </ul>
 
-      {/* La raison — place réservée en permanence */}
+      {/* La raison - place réservée en permanence */}
       <div className="border-t px-4 py-3">
         <p
           className={cn(

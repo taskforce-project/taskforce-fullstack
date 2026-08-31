@@ -1,11 +1,11 @@
 ---
 /**
- * PixelBleed — champ PixelBlast en OVERLAY absolu (aucune hauteur de flux) : les sections restent
+ * PixelBleed - champ PixelBlast en OVERLAY absolu (aucune hauteur de flux) : les sections restent
  * COLLÉES, le pixel vient transitionner / faire un effet et passe DERRIÈRE le contenu (les cartes le
  * recouvrent, il apparaît autour). À poser dans une section `relative isolate` dont le contenu est
  * `relative z-10`. Deux modes :
- *   - défaut : bord (`edge` top/bottom) masqué en fondu vers l'intérieur — pour la couture entre sections ;
- *   - `patch` : tache libre (masque RADIAL doux) positionnée via `class` — pour semer des effets derrière les cartes.
+ *   - défaut : bord (`edge` top/bottom) masqué en fondu vers l'intérieur - pour la couture entre sections ;
+ *   - `patch` : tache libre (masque RADIAL doux) positionnée via `class` - pour semer des effets derrière les cartes.
  * Remplace l'ancien `PixelBand` (qui, lui, ajoutait une bande de 172px et SÉPARAIT les sections).
  */
 import PixelBlast from "@/components/PixelBlast";

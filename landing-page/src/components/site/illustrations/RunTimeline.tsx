@@ -14,15 +14,15 @@ import {
 import { cn } from "@/lib/utils";
 
 /**
- * RunTimeline — l'illustration du bloc Orchestration.
+ * RunTimeline - l'illustration du bloc Orchestration.
  *
  * Structure reprise du composant « agent planning » fourni en référence : une timeline
  * d'étapes repliables, avec statut, durée et contenu riche par étape.
  * Adaptations : jetons de l'app (light-only), contenu TaskForce réel, et surtout
- * **le run se déroule tout seul** — c'est une démonstration, pas une capture figée.
+ * **le run se déroule tout seul** - c'est une démonstration, pas une capture figée.
  *
  * Garde-fous : l'animation ne tourne que si le composant est visible (IntersectionObserver)
- * et jamais si `prefers-reduced-motion` est demandé — sinon on affiche l'état final.
+ * et jamais si `prefers-reduced-motion` est demandé - sinon on affiche l'état final.
  */
 
 type Status = "pending" | "active" | "success" | "returned";
@@ -75,7 +75,7 @@ function Criteria() {
       <div className="mt-1.5 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2">
         <CornerDownLeft className="mt-[3px] size-3 shrink-0 text-amber-700" />
         <p className="text-[11px] leading-5 text-amber-800">
-          Sent back once — <span className="font-medium">&laquo; the logout case is missing &raquo;</span>.
+          Sent back once - <span className="font-medium">&laquo; the logout case is missing &raquo;</span>.
           The third criterion came from that comment.
         </p>
       </div>
@@ -92,7 +92,7 @@ function Tradeoff() {
         <span className="text-muted-foreground">Rejected</span>
         <span className="text-foreground">
           A SAML library in the API{" "}
-          <span className="text-muted-foreground">— two auth paths to maintain</span>
+          <span className="text-muted-foreground">- two auth paths to maintain</span>
         </span>
         <span className="text-muted-foreground">Because</span>
         <span className="text-foreground">ADR-004 already puts identity outside the API</span>
@@ -141,7 +141,7 @@ const STEPS: Step[] = [
   },
   {
     id: "gate",
-    title: "Checkpoint — your approval",
+    title: "Checkpoint - your approval",
     icon: <ShieldCheck className="size-3.5" />,
     took: "waiting",
     gate: true,
@@ -212,7 +212,7 @@ export function RunTimeline() {
     /**
      * `min-h` : les panneaux dépliés n'ont pas tous la même hauteur, donc la carte
      * variait de 150 px au fil du cycle et faisait bouger toute la section.
-     * On réserve la hauteur du plus grand état une fois pour toutes — mesuré à 459 px
+     * On réserve la hauteur du plus grand état une fois pour toutes - mesuré à 459 px
      * en desktop, arrondi avec de la marge pour le repli du texte sur écran étroit.
      */
     <div
@@ -302,7 +302,7 @@ export function RunTimeline() {
                     {step.title}
                   </span>
                   <span className="text-muted-foreground shrink-0 font-mono text-[11px] tabular-nums">
-                    {status === "pending" ? "—" : step.took}
+                    {status === "pending" ? "-" : step.took}
                   </span>
                   {step.content && (
                     <span className="text-muted-foreground/50 group-hover:text-muted-foreground shrink-0 transition-colors">

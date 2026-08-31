@@ -32,7 +32,7 @@ interface CreateProjectDialogProps {
 }
 
 // ---------------------------------------------------------------------------
-// CreateProjectDialog — contrôlé, sans trigger (ouvert « en place » par le store global)
+// CreateProjectDialog - contrôlé, sans trigger (ouvert « en place » par le store global)
 // ---------------------------------------------------------------------------
 
 export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogProps) {

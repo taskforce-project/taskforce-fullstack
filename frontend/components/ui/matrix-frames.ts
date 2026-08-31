@@ -24,7 +24,7 @@ function px(frame: Frame, r: number, c: number, v = 1): void {
 // Static patterns (7×7)
 // ---------------------------------------------------------------------------
 
-/** Idle: abstract constellation — scattered dots forming a diamond lattice */
+/** Idle: abstract constellation - scattered dots forming a diamond lattice */
 export const idlePattern: Frame = [
   [1, 0, 0, 0, 0, 0, 1],
   [0, 0, 0, 1, 0, 0, 0],
@@ -35,7 +35,7 @@ export const idlePattern: Frame = [
   [1, 0, 0, 0, 0, 0, 1],
 ]
 
-/** Question mark — 7×7 */
+/** Question mark - 7×7 */
 export const questionPattern: Frame = [
   [0, 1, 1, 1, 1, 0, 0],
   [1, 0, 0, 0, 0, 1, 0],
@@ -46,7 +46,7 @@ export const questionPattern: Frame = [
   [0, 0, 1, 0, 0, 0, 0],
 ]
 
-/** Info "i" — 7×7 */
+/** Info "i" - 7×7 */
 export const infoPattern: Frame = [
   [0, 0, 1, 1, 0, 0, 0],
   [0, 0, 1, 1, 0, 0, 0],
@@ -57,7 +57,7 @@ export const infoPattern: Frame = [
   [0, 1, 1, 1, 1, 0, 0],
 ]
 
-/** Warning "!" — centered 7×7 */
+/** Warning "!" - centered 7×7 */
 export const warningPattern: Frame = [
   [0, 0, 0, 1, 0, 0, 0],
   [0, 0, 0, 1, 0, 0, 0],
@@ -68,7 +68,7 @@ export const warningPattern: Frame = [
   [0, 0, 0, 1, 0, 0, 0],
 ]
 
-/** Tip: right-pointing chevron `>` — 7×7 */
+/** Tip: right-pointing chevron `>` - 7×7 */
 export const tipPattern: Frame = [
   [0, 0, 0, 0, 0, 0, 0],
   [0, 1, 0, 0, 0, 0, 0],
@@ -79,7 +79,7 @@ export const tipPattern: Frame = [
   [0, 0, 0, 0, 0, 0, 0],
 ]
 
-/** Success: checkmark — 7×7 */
+/** Success: checkmark - 7×7 */
 export const successPattern: Frame = [
   [0, 0, 0, 0, 0, 0, 1],
   [0, 0, 0, 0, 0, 1, 0],
@@ -90,7 +90,7 @@ export const successPattern: Frame = [
   [0, 0, 0, 0, 0, 0, 0],
 ]
 
-/** Error: × cross — 7×7 */
+/** Error: × cross - 7×7 */
 export const errorPattern: Frame = [
   [1, 0, 0, 0, 0, 0, 1],
   [0, 1, 0, 0, 0, 1, 0],
@@ -102,7 +102,7 @@ export const errorPattern: Frame = [
 ]
 
 // ---------------------------------------------------------------------------
-// Thinking: 8-position pixel spinner — 8 frames
+// Thinking: 8-position pixel spinner - 8 frames
 // ---------------------------------------------------------------------------
 
 export const thinkingAnim: Frame[] = (() => {
@@ -129,7 +129,7 @@ export const thinkingAnim: Frame[] = (() => {
 })()
 
 // ---------------------------------------------------------------------------
-// Writing / active: organic blob morphing — 20 frames
+// Writing / active: organic blob morphing - 20 frames
 // ---------------------------------------------------------------------------
 
 export const writing: Frame[] = (() => {
@@ -164,7 +164,7 @@ export const writing: Frame[] = (() => {
 })()
 
 // ---------------------------------------------------------------------------
-// Question animated: "?" morphing pulse — 12 frames
+// Question animated: "?" morphing pulse - 12 frames
 // ---------------------------------------------------------------------------
 
 export const questionAnim: Frame[] = (() => {
@@ -180,7 +180,7 @@ export const questionAnim: Frame[] = (() => {
 })()
 
 // ---------------------------------------------------------------------------
-// Warning animated: centred "!" flashing — 8 frames
+// Warning animated: centred "!" flashing - 8 frames
 // ---------------------------------------------------------------------------
 
 export const warningAnim: Frame[] = (() => {
@@ -194,7 +194,7 @@ export const warningAnim: Frame[] = (() => {
 })()
 
 // ---------------------------------------------------------------------------
-// Success animated: checkmark sweep — 10 frames
+// Success animated: checkmark sweep - 10 frames
 // ---------------------------------------------------------------------------
 
 export const successAnim: Frame[] = (() => {
@@ -217,7 +217,7 @@ export const successAnim: Frame[] = (() => {
 })()
 
 // ---------------------------------------------------------------------------
-// Error animated: × cross sweep — 10 frames
+// Error animated: × cross sweep - 10 frames
 // ---------------------------------------------------------------------------
 
 export const errorAnim: Frame[] = (() => {
@@ -261,7 +261,7 @@ export const successStatic: Frame[] = [successPattern]
 export const errorStatic: Frame[] = [errorPattern]
 
 // ---------------------------------------------------------------------------
-// Info animated: "i" with pulse dot — 8 frames
+// Info animated: "i" with pulse dot - 8 frames
 // ---------------------------------------------------------------------------
 
 export const infoAnim: Frame[] = (() => {
@@ -277,7 +277,7 @@ export const infoAnim: Frame[] = (() => {
 })()
 
 // ---------------------------------------------------------------------------
-// Tip animated: ">" chevron bouncing right — 10 frames
+// Tip animated: ">" chevron bouncing right - 10 frames
 // ---------------------------------------------------------------------------
 
 export const tipAnim: Frame[] = (() => {
@@ -300,7 +300,7 @@ export const tipAnim: Frame[] = (() => {
 })()
 
 // ---------------------------------------------------------------------------
-// Idle animated: 3 dots orbiting at 120° with trailing fade — 24 frames
+// Idle animated: 3 dots orbiting at 120° with trailing fade - 24 frames
 // ---------------------------------------------------------------------------
 
 export const idleAnim: Frame[] = (() => {
@@ -336,7 +336,7 @@ export const idleAnim: Frame[] = (() => {
 // Mode config map
 // ---------------------------------------------------------------------------
 
-// biome-ignore lint/suspicious/noDuplicateUnionMembers: false positive — Biome sees Record key as duplicate
+// biome-ignore lint/suspicious/noDuplicateUnionMembers: false positive - Biome sees Record key as duplicate
 export type AiMode =
   | "idle"
   | "thinking"

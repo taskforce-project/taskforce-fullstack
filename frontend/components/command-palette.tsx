@@ -44,7 +44,7 @@ import {
   CommandSeparator,
 } from "@/components/ui/command"
 
-// ─── Hook IA — appelle le VRAI assistant (Cortex), plus de mock ──────────────
+// ─── Hook IA - appelle le VRAI assistant (Cortex), plus de mock ──────────────
 //
 // ⚠️ Ce hook renvoyait auparavant une phrase FIGÉE (« Cette réponse sera bientôt connectée à l'API »)
 // avec un faux streaming mot-à-mot. C'était un mensonge servi à l'utilisateur sur le différenciateur du
@@ -126,7 +126,7 @@ export function CommandPalette({ open, onOpenChange }: Readonly<CommandPalettePr
   }, [aiInput, aiQuery, isRunning])
 
   // ─── Navigation ────────────────────────────────────────────────────────────
-  // Les routes sont scopées au workspace (/{slug}/…) — on préfixe le slug courant. (QA Q-24)
+  // Les routes sont scopées au workspace (/{slug}/…) - on préfixe le slug courant. (QA Q-24)
   function go(path: string) { router.push(slug ? `/${slug}${path}` : path); onOpenChange(false) }
 
   const ACTIONS: CommandAction[] = [
@@ -141,14 +141,14 @@ export function CommandPalette({ open, onOpenChange }: Readonly<CommandPalettePr
     { id: "members",       label: "Go to Members",       group: "Navigation", icon: <Users className="h-4 w-4" />,           shortcut: "G T", action: () => go("/members") },
     { id: "settings",      label: "Go to Settings",      group: "Navigation", icon: <Settings className="h-4 w-4" />,       shortcut: "G S", action: () => go("/settings") },
     { id: "profile",       label: "View my profile",     group: "Navigation", icon: <User className="h-4 w-4" />,           shortcut: "G F", action: () => go("/profile") },
-    // Labs — accès rapide aux fonctionnalités en finition. Mêmes icônes que la sidebar (Activity / Brain),
+    // Labs - accès rapide aux fonctionnalités en finition. Mêmes icônes que la sidebar (Activity / Brain),
     // en couleur normale (pas de dégradé) : la carte « Labs » suffit à les signaler.
     { id: "intelligence",  label: "Intelligence",        group: "Labs",       icon: <Activity className="h-4 w-4" />, shortcut: "G A", action: () => go("/analytics") },
     { id: "brain",         label: "Brain OS",            group: "Labs",       icon: <Brain className="h-4 w-4" />,                     action: () => go("/brain") },
     // Actions
     { id: "ask-ai",        label: "Ask AI",              group: "Actions",    icon: <Sparkles className="h-4 w-4" />,        shortcut: "A",   action: enterAiMode },
     // La création d'issue est propre à un projet : on mène à la liste des projets, où chacun porte
-    // son propre bouton « New issue » — plutôt qu'un dialogue de création sans projet.
+    // son propre bouton « New issue » - plutôt qu'un dialogue de création sans projet.
     { id: "new-issue",     label: "Create issue",     group: "Actions",    icon: <Plus className="h-4 w-4" />,            shortcut: "C",   action: () => go("/projects") },
     { id: "new-project",   label: "Create project",     group: "Actions",    icon: <Plus className="h-4 w-4" />,                             action: () => { openCreateProject(); onOpenChange(false) } },
     { id: "notifications", label: "Open notifications", group: "Actions", icon: <Bell className="h-4 w-4" />,                          action: () => go("/inbox") },

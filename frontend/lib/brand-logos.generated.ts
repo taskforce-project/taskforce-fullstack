@@ -1,5 +1,5 @@
-// AUTOGÉNÉRÉ par scripts/fetch-logos.mjs — ne pas éditer à la main.
-// Logos de marque (SVGL — https://svgl.app) vendorisés dans public/logos/.
+// AUTOGÉNÉRÉ par scripts/fetch-logos.mjs - ne pas éditer à la main.
+// Logos de marque (SVGL - https://svgl.app) vendorisés dans public/logos/.
 // Régénérer : npm run logos
 
 export type BrandLogoKind = "single" | "themed" | "mono"

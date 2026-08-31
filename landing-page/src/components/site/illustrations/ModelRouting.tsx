@@ -3,11 +3,11 @@ import { Cpu, Cloud, Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
- * ModelRouting — illustration du bloc « Models ».
+ * ModelRouting - illustration du bloc « Models ».
  *
  * ⚠️ Aucune promesse de prix ici. Dire « €0 » n'est pas crédible pour un produit qui fait
  * tourner des agents, et la tarification réelle vit sur /pricing. Ce que cette illustration
- * démontre, c'est le seul point qui nous distingue vraiment : **le choix par étape** —
+ * démontre, c'est le seul point qui nous distingue vraiment : **le choix par étape** -
  * où le modèle tourne, et si la donnée sort du réseau.
  */
 
@@ -147,12 +147,12 @@ export function ModelRouting() {
         </tbody>
       </table>
 
-      {/* Conséquence du profil — hauteur réservée */}
+      {/* Conséquence du profil - hauteur réservée */}
       <div className="bg-secondary/40 flex min-h-[52px] items-center border-t px-4 py-3">
         <p className="text-[11.5px] leading-5 text-foreground">
           {profile.summary}{" "}
           <span className="text-muted-foreground">
-            The routing is a setting, not a rebuild — and it is per step, not per workspace.
+            The routing is a setting, not a rebuild - and it is per step, not per workspace.
           </span>
         </p>
       </div>

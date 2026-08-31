@@ -59,7 +59,7 @@ export function FeedbackDialog() {
         <DialogHeader>
           <DialogTitle>Share feedback</DialogTitle>
           <DialogDescription>
-            {context ? `About ${context} — ` : ""}tell us what&apos;s working, what&apos;s not, or what you&apos;d love to see.
+            {context ? `About ${context} - ` : ""}tell us what&apos;s working, what&apos;s not, or what you&apos;d love to see.
           </DialogDescription>
         </DialogHeader>
 

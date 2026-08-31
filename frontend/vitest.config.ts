@@ -33,7 +33,7 @@ export default defineConfig({
         "lib/i18n/**",        // Traductions (données, pas de logique)
         "lib/constants/**",   // Données statiques
         "lib/mocks/**",       // Fixtures de dev
-        "**/*.generated.ts",  // Fichiers générés (ex. brand-logos.generated.ts via `npm run logos`) — data
+        "**/*.generated.ts",  // Fichiers générés (ex. brand-logos.generated.ts via `npm run logos`) - data
         "**/index.ts",        // Barrels de ré-exports (aucune logique ; types compile-time)
         "components/auth/floating-paths.tsx", // Fond SVG animé décoratif (présentation pure, aucune logique)
       ],
@@ -94,7 +94,7 @@ export default defineConfig({
           branches: 80,
           statements: 90,
         },
-        // Utils & Validation (seuils alignés sur l'actuel — reste des fns utilitaires non couvertes)
+        // Utils & Validation (seuils alignés sur l'actuel - reste des fns utilitaires non couvertes)
         'lib/utils/**/*.ts': {
           lines: 72,
           functions: 85,

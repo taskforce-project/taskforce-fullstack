@@ -310,7 +310,7 @@ export default function ProjectSettingsPage() {
               <p className="text-sm font-medium text-foreground">🌱 Skill growth mode</p>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Smart Assign can suggest a task a notch above a member&apos;s usual level
-                (never on urgent work, only when capacity is available). Bounded bonus — it won&apos;t override the best fit.
+                (never on urgent work, only when capacity is available). Bounded bonus - it won&apos;t override the best fit.
               </p>
             </div>
             <Switch checked={growthMode} onCheckedChange={setGrowthMode} />
@@ -340,7 +340,7 @@ export default function ProjectSettingsPage() {
         <SectionTitle icon={Tag} title="Labels" description="Custom labels to categorize issues" />
         <div className="flex flex-col gap-2">
           {projectLabels.length === 0 && (
-            <p className="text-xs text-muted-foreground italic py-2">No labels — add one below.</p>
+            <p className="text-xs text-muted-foreground italic py-2">No labels - add one below.</p>
           )}
           {projectLabels.map((l) => editingLabelId === l.id ? (
             <div key={l.id} className="flex items-center gap-2 py-2 px-3 rounded-lg border border-border bg-card">
@@ -443,7 +443,7 @@ export default function ProjectSettingsPage() {
             <span className="ml-1 text-xs text-muted-foreground">+40 others</span>
           </div>
           <p className="text-sm text-muted-foreground">
-            GitHub, Slack and all connectors plug in at the <span className="font-medium text-foreground">workspace</span> level, then apply to this project — a single place to manage.
+            GitHub, Slack and all connectors plug in at the <span className="font-medium text-foreground">workspace</span> level, then apply to this project - a single place to manage.
           </p>
           <Button className="gap-2" onClick={() => openSettings("integrations")}>
             <Plug className="size-4" /> Manage integrations

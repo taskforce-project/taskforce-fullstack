@@ -8,7 +8,7 @@ import { useWorkflowStore } from "@/lib/store/workflow-store"
 import { toggleWorkflowPanel, isActiveJob } from "@/components/workflows/workflow-dock"
 
 /**
- * Bouton topbar « Workflows IA » — ouvre le panneau et porte le cycle de vie des données :
+ * Bouton topbar « Workflows IA » - ouvre le panneau et porte le cycle de vie des données :
  * charge les workflows au montage puis **poll tant qu'un job est actif** (le badge reflète le
  * nombre en cours, même quand le panneau est fermé). STOMP viendra compléter le polling.
  */

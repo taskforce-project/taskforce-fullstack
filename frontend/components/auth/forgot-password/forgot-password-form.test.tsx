@@ -24,7 +24,7 @@ vi.mock('@/lib/api/auth-service', () => ({
   },
 }));
 
-// Real French constants (importActual avoids the vi.mock hoisting trap) — every French toast/label
+// Real French constants (importActual avoids the vi.mock hoisting trap) - every French toast/label
 // asserted here is byte-identical to the constants, so the suite stays green and drift-proof.
 vi.mock('@/lib/store/preferences-store', async () => {
   const { CONSTANTS_FR } = await vi.importActual<typeof import('@/lib/constants_fr')>('@/lib/constants_fr');

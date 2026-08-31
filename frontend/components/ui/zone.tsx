@@ -4,7 +4,7 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 /**
- * `Zone` — conteneur encadré à sémantique de couleur, façon « Danger Zone » de GitHub, réutilisable pour
+ * `Zone` - conteneur encadré à sémantique de couleur, façon « Danger Zone » de GitHub, réutilisable pour
  * toute mise en garde ou action sensible (suppression, opération CRUD globale…). Un seul composant, plusieurs
  * variantes (`danger` / `warning` / `info` / `success` / `neutral`) pour rester cohérent partout : on choisit
  * la variante, on remplit avec le contenu (texte + action). En-tête optionnel (titre + description).

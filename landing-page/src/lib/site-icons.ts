@@ -1,9 +1,9 @@
 import type { LucideIcon } from "lucide-react";
 
 /**
- * Palette sémantique des icônes — SOURCE UNIQUE pour tout le site marketing.
+ * Palette sémantique des icônes - SOURCE UNIQUE pour tout le site marketing.
  *
- * Chaque icône a **sa** teinte (« une couleur par icône » — règle user) et la garde d'une page à
+ * Chaque icône a **sa** teinte (« une couleur par icône » - règle user) et la garde d'une page à
  * l'autre. Contrainte forte dans les menus : deux items d'un même panneau ne doivent JAMAIS partager
  * une teinte. Les familles ci-dessous (bleu/violet/cyan/…) restent le repli pour les icônes non
  * singularisées. On lit par le **nom Lucide** (`icon.displayName`) → on enrobe le rendu avec `hueFor(Icon)`.
@@ -11,7 +11,7 @@ import type { LucideIcon } from "lucide-react";
  * Règle : on ne colore que les **icônes de CONTENU** (features, cartes, puces, en-têtes). Les icônes
  * de CHROME (chevrons, flèches de lien, menu, croix de fermeture, logos de marque) restent neutres.
  *
- * Miroir de `ICON_COLOR` dans `flows/OrchestrationFlows.tsx` (mêmes hex) — cf. `.ai/landing-design-system.md` §2.
+ * Miroir de `ICON_COLOR` dans `flows/OrchestrationFlows.tsx` (mêmes hex) - cf. `.ai/landing-design-system.md` §2.
  */
 export const HUE = {
   blue: "#2563eb", //  build · spec · plan · exécution · action (= --primary)
@@ -35,7 +35,7 @@ export const HUE = {
 
 /** Teinte par nom d'icône Lucide (`displayName`). Familles = repli ; le bloc « singulières » désambiguïse les icônes de menu. */
 const ICON_HUE: Record<string, string> = {
-  // ── build / spec / plan / exécution / code — bleu de marque ──
+  // ── build / spec / plan / exécution / code - bleu de marque ──
   FileText: HUE.blue, FileCode2: HUE.blue, FilePlus2: HUE.blue, Code2: HUE.blue,
   Terminal: HUE.blue, GitBranch: HUE.blue, GitPullRequest: HUE.blue, Building2: HUE.slate,
   CalendarClock: HUE.blue, CalendarRange: HUE.sky, Clock: HUE.blue, Timer: HUE.blue,
@@ -44,11 +44,11 @@ const ICON_HUE: Record<string, string> = {
   SlidersHorizontal: HUE.blue, Settings2: HUE.blue, Mail: HUE.blue, MessageSquare: HUE.blue,
   Info: HUE.blue, HelpCircle: HUE.blue, Cpu: HUE.blue, Map: HUE.blue,
 
-  // ── IA / modèle / pensée / agent — violet ──
+  // ── IA / modèle / pensée / agent - violet ──
   Bot: HUE.violet, BrainCircuit: HUE.violet, Compass: HUE.violet, Network: HUE.violet,
   Repeat: HUE.violet, RotateCcw: HUE.violet, Radio: HUE.violet, FlaskConical: HUE.violet,
 
-  // ── data / analytics / monitoring / recherche / board — cyan ──
+  // ── data / analytics / monitoring / recherche / board - cyan ──
   // ⚠️ Lucide alias : `BarChart3` rend `lucide-chart-column` → son displayName est « ChartColumn ».
   // On mappe les DEUX, sinon repli bleu silencieux (→ collision menu). Idem si d'autres alias surgissent.
   BarChart3: HUE.cyan, ChartColumn: HUE.cyan, Gauge: HUE.teal, TrendingDown: HUE.orange, Radar: HUE.sky,
@@ -56,19 +56,19 @@ const ICON_HUE: Record<string, string> = {
   LayoutGrid: HUE.cyan, KanbanSquare: HUE.cyan, SquareKanban: HUE.cyan, ClipboardList: HUE.cyan, LifeBuoy: HUE.cyan,
   Scale: HUE.cyan, Zap: HUE.cyan,
 
-  // ── gouvernance / revue / sécurité / attention — ambre ──
+  // ── gouvernance / revue / sécurité / attention - ambre ──
   ShieldCheck: HUE.amber, Lock: HUE.rose, KeyRound: HUE.orange, EyeOff: HUE.slate,
   Pencil: HUE.purple, PenLine: HUE.purple, Bell: HUE.amber, Megaphone: HUE.amber,
   TriangleAlert: HUE.rose, CalendarCheck: HUE.emerald,
 
-  // ── livré / validé / succès — émeraude ──
+  // ── livré / validé / succès - émeraude ──
   Check: HUE.emerald, CheckIcon: HUE.emerald, ClipboardCheck: HUE.emerald, FileCheck2: HUE.emerald,
   UserCheck: HUE.emerald, Rocket: HUE.emerald, GraduationCap: HUE.emerald,
 
-  // ── rejet / incident / alerte — rose ──
+  // ── rejet / incident / alerte - rose ──
   Siren: HUE.rose, X: HUE.rose, Ticket: HUE.rose, Activity: HUE.rose,
 
-  // ── neutre / structurel / infra / gens / marque — ardoise ──
+  // ── neutre / structurel / infra / gens / marque - ardoise ──
   Boxes: HUE.indigo, Database: HUE.slate, Server: HUE.slate, Inbox: HUE.slate, Eye: HUE.slate,
   User: HUE.slate, UserPlus: HUE.slate, Quote: HUE.slate, Github: HUE.slate, Newspaper: HUE.slate,
 

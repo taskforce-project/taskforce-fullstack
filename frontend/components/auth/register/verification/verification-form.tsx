@@ -178,7 +178,7 @@ export function OTPForm({ className, ...props }: React.ComponentProps<"div">) {
       {/* Le fil d'étapes est porté par la page. La barre de progression, le « Étape 3 sur 3 » et le
           bouton retour en position absolue ont été retirés : doublon pour les deux premiers,
           recouvrement de la barre supérieure pour le troisième. Le panneau illustré à droite
-          disparaît aussi — il doublait la hauteur de la carte sans rien apporter. */}
+          disparaît aussi - il doublait la hauteur de la carte sans rien apporter. */}
       <div>
         <div>
           <form onSubmit={handleSubmit} className="flex flex-col">

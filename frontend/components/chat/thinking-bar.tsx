@@ -26,7 +26,7 @@ export function ThinkingBar({
   label?: string
   className?: string
   cycle?: boolean
-  /** Phases défilées (sans `label`) — surchargeable par contexte (chat, suggestion de compétences…). */
+  /** Phases défilées (sans `label`) - surchargeable par contexte (chat, suggestion de compétences…). */
   phases?: string[]
 }) {
   const [i, setI] = useState(0)

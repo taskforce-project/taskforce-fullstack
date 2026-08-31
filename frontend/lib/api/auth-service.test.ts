@@ -528,7 +528,7 @@ describe('authService - API Service', () => {
   });
 });
 
-describe('authService — couverture OAuth / challenge / fallbacks / garde-fous', () => {
+describe('authService - couverture OAuth / challenge / fallbacks / garde-fous', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorageMock.clear();

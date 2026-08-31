@@ -18,7 +18,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { authService, type AuthChallenge } from "@/lib/api/auth-service";
 import { TurnstileWidget } from "@/components/auth/turnstile-widget";
 
-/** Seuil de refus au moment de la soumission — aligné sur la règle métier existante. */
+/** Seuil de refus au moment de la soumission - aligné sur la règle métier existante. */
 const STRENGTH_FLOOR = 50;
 
 /**
@@ -112,7 +112,7 @@ export function SignupForm({
 
   // Deux vérifications, une seule sollicitation de l'utilisateur. Turnstile juge le visiteur et le
   // fait mieux qu'une case à cocher : dès qu'il est actif, il la remplace à l'écran. Le défi signé
-  // reste vérifié côté serveur dans les deux cas — il ne demande rien à personne.
+  // reste vérifié côté serveur dans les deux cas - il ne demande rien à personne.
   const afficheTurnstile = challenge.turnstileRequired && Boolean(challenge.turnstileSiteKey);
   const afficheCaseACocher = !afficheTurnstile && challenge.required;
 
@@ -120,13 +120,13 @@ export function SignupForm({
     e.preventDefault();
 
     // Validation front via Zod (règle d'or #8) : identité, email (format + jetables), robustesse du mot
-    // de passe et concordance de la confirmation — schéma qui réutilise les mêmes helpers qu'avant.
+    // de passe et concordance de la confirmation - schéma qui réutilise les mêmes helpers qu'avant.
     const parsed = registerSchema.safeParse(formData);
     if (!parsed.success) {
       toast.error(t.common.error, { description: firstZodError(parsed.error) });
       return;
     }
-    // La case « je ne suis pas un robot » n'est exigée que lorsqu'elle est RÉELLEMENT affichée —
+    // La case « je ne suis pas un robot » n'est exigée que lorsqu'elle est RÉELLEMENT affichée -
     // c'est-à-dire quand Turnstile est inactif. Quand Turnstile est actif, il REMPLACE la case à
     // l'écran (`afficheCaseACocher` est faux) : `isHuman` reste donc false et l'exiger bloquait
     // l'inscription malgré un Turnstile résolu. Dans ce cas, c'est le jeton Turnstile qui fait foi.
@@ -241,7 +241,7 @@ export function SignupForm({
 
           {/* La place de la jauge est réservée en permanence (`invisible` plutôt que démontage).
               Autrement, la première frappe dans le champ fait grandir le formulaire de 18 pixels et
-              tout ce qui suit sursaute — y compris le bouton, sous le curseur. */}
+              tout ce qui suit sursaute - y compris le bouton, sous le curseur. */}
           <div
             className="mt-1.5 flex items-center gap-2"
             aria-hidden={formData.password.length === 0}
@@ -283,9 +283,9 @@ export function SignupForm({
 
         {/* Vérification humaine et consentement dans un seul bloc. Ce ne sont pas deux sujets
             distincts : ce sont les deux conditions pour continuer, et les regrouper est à la fois
-            plus juste et plus court — la hauteur récupérée est celle qui permet à l'écran de tenir
+            plus juste et plus court - la hauteur récupérée est celle qui permet à l'écran de tenir
             sans défilement sur un portable court.
-            Le libellé dit ce qui est réellement vérifié — « je confirme » et non « prouvez-le » : le
+            Le libellé dit ce qui est réellement vérifié - « je confirme » et non « prouvez-le » : le
             mécanisme filtre les envois automatisés, il ne prouve pas l'humanité. */}
         <div
           className="mt-3 rounded-md border px-3 py-2"
@@ -293,7 +293,7 @@ export function SignupForm({
         >
           {/* Turnstile juge le VISITEUR (empreinte navigateur, réputation). Quand il est actif, il
               remplace la case à cocher : les deux poseraient la même question à l'utilisateur, et
-              Turnstile la pose mieux. Le défi signé, lui, reste actif côté serveur en second rideau —
+              Turnstile la pose mieux. Le défi signé, lui, reste actif côté serveur en second rideau -
               il juge la SOUMISSION, pas le visiteur, et ne dépend d'aucun tiers. */}
           {afficheTurnstile ? (
             <TurnstileWidget
@@ -321,7 +321,7 @@ export function SignupForm({
           )}
 
           {/* L'indentation aligne le texte sous le libellé de la case à cocher. Elle ne doit donc
-              s'appliquer QUE si c'est bien la case qui est affichée au-dessus — pas sous le widget
+              s'appliquer QUE si c'est bien la case qui est affichée au-dessus - pas sous le widget
               Turnstile, qui n'a pas de puce à laquelle s'aligner. */}
           <p
             className={

@@ -1,5 +1,5 @@
 /**
- * Statut opérationnel — santé RÉELLE des services, lue de l'actuator Spring via /api/status.
+ * Statut opérationnel - santé RÉELLE des services, lue de l'actuator Spring via /api/status.
  */
 
 import { apiClient } from "./client";

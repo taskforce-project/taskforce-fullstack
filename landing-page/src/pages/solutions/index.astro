@@ -20,7 +20,7 @@ const TEAMS = [
     icon: Code2,
     label: "Engineering",
     href: "/solutions/engineering",
-    desc: "Turn an outcome into a governed run — spec, approach, breakdown, execution through your coding agents, QA — with a human on every decision.",
+    desc: "Turn an outcome into a governed run - spec, approach, breakdown, execution through your coding agents, QA - with a human on every decision.",
     proven: true,
   },
   {
@@ -34,7 +34,7 @@ const TEAMS = [
     icon: Layers,
     label: "Operations",
     href: "/solutions/operations",
-    desc: "The same governed, auditable checkpoints could structure operational delivery. Exploratory — we haven't shipped it.",
+    desc: "The same governed, auditable checkpoints could structure operational delivery. Exploratory - we haven't shipped it.",
     proven: false,
   },
   {
@@ -91,13 +91,13 @@ const codingAgents = compares.filter((c) => c.kind === "agent");
 ---
 
 <BaseLayout
-  title="Solutions — TaskForce"
-  description="TaskForce is built for software delivery — a governed path from outcome to production. The same pattern could extend to other teams; we're honest about what's proven and what isn't."
+  title="Solutions - TaskForce"
+  description="TaskForce is built for software delivery - a governed path from outcome to production. The same pattern could extend to other teams; we're honest about what's proven and what isn't."
 >
   <PageHero
     kicker="Solutions"
     title="Built for software delivery. Designed to go further."
-    lead="TaskForce runs software delivery today — that's the proven wedge. The underlying pattern, governed work through validated checkpoints with the reasoning kept, isn't specific to code. We mark clearly what's proven and what's still exploration."
+    lead="TaskForce runs software delivery today - that's the proven wedge. The underlying pattern, governed work through validated checkpoints with the reasoning kept, isn't specific to code. We mark clearly what's proven and what's still exploration."
     primary={{ label: "Run your first workflow", href: "/waitlist" }}
     secondary={{ label: "See the run", href: "/product/orchestration" }}
   />
@@ -110,10 +110,10 @@ const codingAgents = compares.filter((c) => c.kind === "agent");
         <h2 class="t-h2">One proven use, and where it could extend</h2>
         <p class="t-lead mt-4">
           Software engineering is the first team we've proven. Everything else here is the same idea
-          applied elsewhere — labelled honestly as exploration, not a shipped product.
+          applied elsewhere - labelled honestly as exploration, not a shipped product.
         </p>
       </div>
-      {/* Engineering — le métier PROUVÉ, mis en avant (traitement distinct des exploratoires). */}
+      {/* Engineering - le métier PROUVÉ, mis en avant (traitement distinct des exploratoires). */}
       <a
         href={engineering.href}
         class="border-primary/30 bg-primary/[0.03] hover:border-primary/50 mt-12 flex flex-col gap-5 border p-6 transition-colors sm:flex-row sm:items-center sm:gap-6 sm:p-8"
@@ -136,7 +136,7 @@ const codingAgents = compares.filter((c) => c.kind === "agent");
         </span>
       </a>
 
-      {/* Les autres métiers — exploratoires, en traits (4 items → remplissent, pas de cellule vide). */}
+      {/* Les autres métiers - exploratoires, en traits (4 items → remplissent, pas de cellule vide). */}
       <div class="-mx-6 mt-6 grid gap-px border-y border-border bg-border sm:grid-cols-2 lg:grid-cols-4 lg:-mx-10">
         {
           exploratory.map((team) => {
@@ -170,7 +170,7 @@ const codingAgents = compares.filter((c) => c.kind === "agent");
     </div>
   </section>
 
-  {/* ── By use case ── (structure LISTE, distincte des cartes « By team » — index 2 colonnes) */}
+  {/* ── By use case ── (structure LISTE, distincte des cartes « By team » - index 2 colonnes) */}
   <section class="bg-card border-b">
     <div class="container-rail py-20 lg:py-28">
       <div class="max-w-2xl">
@@ -178,10 +178,10 @@ const codingAgents = compares.filter((c) => c.kind === "agent");
         <h2 class="t-h2">Or by the job to be done</h2>
         <p class="t-lead mt-4">
           The same governed run, pointed at one job. Each is marked for what ships today and
-          what's part of the Planned orchestration — no overselling.
+          what's part of the Planned orchestration - no overselling.
         </p>
       </div>
-      {/* Liste en 2 colonnes — style « traits » (border-b, sans bg-border) : 10 items → 5 par colonne, zéro cellule grise. */}
+      {/* Liste en 2 colonnes - style « traits » (border-b, sans bg-border) : 10 items → 5 par colonne, zéro cellule grise. */}
       <div class="mt-12 grid gap-x-10 border-t border-border sm:grid-cols-2">
         {
           useCases.map((uc) => (
@@ -225,7 +225,7 @@ const codingAgents = compares.filter((c) => c.kind === "agent");
         </p>
       </div>
 
-      {/* Project trackers — 4 items remplissent une grille 4 colonnes (aucun trou). */}
+      {/* Project trackers - 4 items remplissent une grille 4 colonnes (aucun trou). */}
       <div class="mt-12">
         <div class="flex items-center gap-2.5">
           <span class="ic-tile flex size-7 items-center justify-center rounded-md border" style={`--ic:${hueFor(KanbanSquare)}`}>
@@ -250,7 +250,7 @@ const codingAgents = compares.filter((c) => c.kind === "agent");
         </div>
       </div>
 
-      {/* Coding agents — 2 items en 2 colonnes larges (remplissent ; structure différente = variété). */}
+      {/* Coding agents - 2 items en 2 colonnes larges (remplissent ; structure différente = variété). */}
       <div class="mt-10">
         <div class="flex items-center gap-2.5">
           <span class="ic-tile flex size-7 items-center justify-center rounded-md border" style={`--ic:${hueFor(Bot)}`}>
@@ -291,7 +291,7 @@ const codingAgents = compares.filter((c) => c.kind === "agent");
         <p class="t-eyebrow mb-3">Why the pattern travels</p>
         <h2 class="t-h2">Any team that ships reviewed work</h2>
         <p class="t-lead mx-auto mt-4">
-          A governed run — an artifact produced, reviewed and explicitly approved before the next step —
+          A governed run - an artifact produced, reviewed and explicitly approved before the next step -
           isn't specific to engineering. It fits any team whose work is decided in stages, reviewed by a
           human, and worth remembering afterwards. We'd rather prove that team by team than claim it.
         </p>
@@ -309,7 +309,7 @@ const codingAgents = compares.filter((c) => c.kind === "agent");
 
   <PageCta
     title="Start where it's proven"
-    lead="Run your first software delivery workflow today — and tell us where else the pattern should go."
+    lead="Run your first software delivery workflow today - and tell us where else the pattern should go."
     primary={{ label: "Run your first workflow", href: "/waitlist" }}
     secondary={{ label: "Book a demo", href: "/book-a-demo" }}
   />

@@ -8,7 +8,7 @@ import { PROJECT_ROUTES } from "../config/api-routes";
 
 /**
  * Télécharge l'export COMPLET d'un projet (issues + descriptions + commentaires + activité) au format
- * JSON ou CSV, généré côté serveur (P1b bêta) — pour reprendre le projet dans un autre outil. Récupère le
+ * JSON ou CSV, généré côté serveur (P1b bêta) - pour reprendre le projet dans un autre outil. Récupère le
  * blob via XHR authentifié (Bearer) puis déclenche le téléchargement navigateur.
  */
 export async function downloadProjectExport(
@@ -112,7 +112,7 @@ export interface CreateLabelPayload {
 }
 
 // ---------------------------------------------------------------------------
-// API calls — Projets
+// API calls - Projets
 // ---------------------------------------------------------------------------
 
 /** Liste tous les projets du workspace */
@@ -163,7 +163,7 @@ export async function deleteProject(slug: string, id: number): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// API calls — Membres
+// API calls - Membres
 // ---------------------------------------------------------------------------
 
 /** Liste les membres d'un projet */
@@ -184,7 +184,7 @@ export async function removeProjectMember(slug: string, id: number, memberId: nu
 }
 
 // ---------------------------------------------------------------------------
-// API calls — Équipes associées (PROD-3.6b)
+// API calls - Équipes associées (PROD-3.6b)
 // ---------------------------------------------------------------------------
 
 export interface ProjectTeam {
@@ -213,7 +213,7 @@ export async function detachProjectTeam(slug: string, id: number, teamId: number
 }
 
 // ---------------------------------------------------------------------------
-// API calls — Activité (QA2-32)
+// API calls - Activité (QA2-32)
 // ---------------------------------------------------------------------------
 
 /** Un point d'activité quotidienne (issues créées ce jour-là). */
@@ -231,7 +231,7 @@ export interface ProjectHealthPoint {
 
 /**
  * Historique de santé des opérations du workspace (série continue, un point par jour).
- * `silentError` : la courbe est un complément d'information — son indisponibilité ne doit
+ * `silentError` : la courbe est un complément d'information - son indisponibilité ne doit
  * pas faire surgir un toast d'erreur au chargement de la page.
  */
 export async function getProjectsHealthHistory(
@@ -280,7 +280,7 @@ export async function getProjectActivity(
 }
 
 // ---------------------------------------------------------------------------
-// API calls — Labels
+// API calls - Labels
 // ---------------------------------------------------------------------------
 
 /** Liste les labels d'un projet */

@@ -1,6 +1,6 @@
 ---
 /**
- * Hero (.astro) — anciennement Hero.tsx (visuel = `SpecPanel`, fausse UI). Le hero utilise
+ * Hero (.astro) - anciennement Hero.tsx (visuel = `SpecPanel`, fausse UI). Le hero utilise
  * maintenant **React Flow** (le run), présenté dans la **double-card** façon orchestration :
  * une card blanche (extérieure) → une card à points `flow-canvas` (intérieure) → le flow posé dessus.
  * Le texte reste en SSR (LCP protégé : le H1 est l'élément LCP) ; seul le flow est `client:only`
@@ -24,7 +24,7 @@ const BUILT_WITH = [
 <section class="bg-card relative border-b">
   <div class="container-rail relative py-20 lg:py-28">
     <div class="grid items-center gap-12 lg:grid-cols-[minmax(0,520px)_minmax(0,1fr)] lg:gap-16">
-      {/* Colonne texte — SSR (le H1 = LCP) */}
+      {/* Colonne texte - SSR (le H1 = LCP) */}
       <div>
         <p class="text-primary mb-4 text-[14px] font-medium tracking-[-0.01em]">
           The AI delivery operating system
@@ -34,7 +34,7 @@ const BUILT_WITH = [
         </h1>
         <p class="t-lead mt-5 max-w-xl">
           You describe the outcome. TaskForce drafts the spec, the plan and the prompt your coding
-          agent runs, keeps you on every decision, and remembers why. Today it works issue by issue —
+          agent runs, keeps you on every decision, and remembers why. Today it works issue by issue -
           the full governed run is where it is headed.
         </p>
         <div class="mt-8 flex flex-wrap gap-3">
@@ -48,7 +48,7 @@ const BUILT_WITH = [
         <p class="text-muted-foreground mt-6 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]">
           <span>You approve every decision</span>
           <span aria-hidden class="text-border">·</span>
-          <span>Runs on your models — local or hosted</span>
+          <span>Runs on your models - local or hosted</span>
           <span aria-hidden class="text-border">·</span>
           <span>Self-hosted, your network</span>
         </p>
@@ -62,12 +62,12 @@ const BUILT_WITH = [
           </div>
         </div>
         <p class="text-muted-foreground/60 mt-4 text-center font-mono text-[10px] tracking-wide uppercase">
-          Illustrative — the full run is Planned
+          Illustrative - the full run is Planned
         </p>
       </div>
     </div>
 
-    {/* Preuve sociale honnête : « Built with » (pas « customers ») — l'écosystème qu'on utilise. */}
+    {/* Preuve sociale honnête : « Built with » (pas « customers ») - l'écosystème qu'on utilise. */}
     <div class="mt-14 flex flex-col gap-5 border-t pt-8 sm:flex-row sm:items-center sm:gap-8">
       <span class="text-muted-foreground shrink-0 text-[12.5px]">
         Works with the tools your engineers already trust

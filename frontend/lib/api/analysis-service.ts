@@ -1,5 +1,5 @@
 /**
- * Service des **workflows d'analyse IA** — async, persistés, actionnables.
+ * Service des **workflows d'analyse IA** - async, persistés, actionnables.
  * Un workflow (`AnalysisJob`) tourne en arrière-plan ; son plan (`AgentPlan`) reflète
  * les étapes en direct ; quand il aboutit, il produit un `StoredBrief` dont chaque
  * priorité est actionnable (accepter → issue, épingler, écarter, éditer).
@@ -25,7 +25,7 @@ export interface AnalysisJob {
   projectName: string
   depth: AnalysisDepth
   status: JobStatus
-  /** Étapes du workflow (arbre agent-plan) — mis à jour en direct. */
+  /** Étapes du workflow (arbre agent-plan) - mis à jour en direct. */
   plan: PlanTask[]
   /** HITL : question du modèle quand `status === "WAITING_FOR_INPUT"`. */
   question: string | null
@@ -68,7 +68,7 @@ export interface StoredBrief {
 // Workflows
 // ---------------------------------------------------------------------------
 
-/** Lance un workflow d'analyse (retour immédiat — il tourne en arrière-plan). */
+/** Lance un workflow d'analyse (retour immédiat - il tourne en arrière-plan). */
 export async function launchAnalysis(slug: string, projectId: number, depth: AnalysisDepth): Promise<AnalysisJob> {
   const res = await apiClient.post<{ data: AnalysisJob }>(ANALYSIS_ROUTES.JOBS(slug), { projectId, depth })
   return res.data.data
@@ -121,7 +121,7 @@ export async function pinPriority(slug: string, priorityId: number): Promise<Sto
   return res.data.data
 }
 
-/** Écarte une priorité, ou la restaure si elle l'était déjà (bascule — feedback modèle). */
+/** Écarte une priorité, ou la restaure si elle l'était déjà (bascule - feedback modèle). */
 export async function dismissPriority(slug: string, priorityId: number): Promise<StoredPriority> {
   const res = await apiClient.post<{ data: StoredPriority }>(ANALYSIS_ROUTES.PRIORITY_DISMISS(slug, priorityId))
   return res.data.data

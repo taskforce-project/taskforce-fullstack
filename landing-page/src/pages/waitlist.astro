@@ -1,6 +1,6 @@
 ---
 /**
- * Waitlist — destination des CTA d'inscription tant que l'app n'est pas déployée (évite les liens morts
+ * Waitlist - destination des CTA d'inscription tant que l'app n'est pas déployée (évite les liens morts
  * vers app.taskforce-project.fr). Capture par mailto (site statique, aucun backend) ; brancher un service de
  * formulaire (Formspree/Tally…) plus tard si besoin.
  */
@@ -12,18 +12,18 @@ const CONTACT = "contact@taskforce-project.fr";
 const PERKS = [
   "First access the day TaskForce opens up",
   "Early influence on what we build next",
-  "One email when it's ready — no spam",
+  "One email when it's ready - no spam",
 ];
 ---
 
 <BaseLayout
-  title="Join the waitlist — TaskForce"
+  title="Join the waitlist - TaskForce"
   description="TaskForce is launching soon. Join the waitlist and we'll let you know the moment you can run your first governed AI workflow."
 >
   <PageHero
     kicker="Waitlist"
     title="Be first when TaskForce opens"
-    lead="We're finishing the first release of the AI delivery operating system. Leave us a line and we'll tell you the moment you can run your first governed workflow — on your models, with a human at every checkpoint."
+    lead="We're finishing the first release of the AI delivery operating system. Leave us a line and we'll tell you the moment you can run your first governed workflow - on your models, with a human at every checkpoint."
     primary={{ label: "Join the waitlist", href: `mailto:${CONTACT}?subject=TaskForce waitlist` }}
     secondary={{ label: "See the roadmap", href: "/roadmap" }}
   />

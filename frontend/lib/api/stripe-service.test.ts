@@ -46,7 +46,7 @@ describe('stripeService', () => {
       // When
       const result = await stripeService.createCheckoutSession('BUSINESS');
 
-      // Then — le service renomme `sessionUrl` en `checkoutUrl` pour l'appelant.
+      // Then - le service renomme `sessionUrl` en `checkoutUrl` pour l'appelant.
       expect(result).toEqual({
         sessionId: 'session_123',
         checkoutUrl: 'https://checkout.stripe.com/session_123',
@@ -64,7 +64,7 @@ describe('stripeService', () => {
         envelope({ sessionId: 'session_456', sessionUrl: 'https://checkout.stripe.com/session_456' })
       );
 
-      // When — seuls BASIC et BUSINESS sont souscrivables en self-service ; ENTERPRISE passe par un devis.
+      // When - seuls BASIC et BUSINESS sont souscrivables en self-service ; ENTERPRISE passe par un devis.
       const result = await stripeService.createCheckoutSession('BASIC');
 
       // Then

@@ -136,9 +136,9 @@ export interface ChartSuggestion {
 }
 
 /**
- * Spec de graphe produite par l'IA — deux modes, jamais de données inventées :
+ * Spec de graphe produite par l'IA - deux modes, jamais de données inventées :
  * - `timeseries` : référence un `dataset` réel que le front charge via les endpoints ci-dessus.
- * - `breakdown` : répartition « X par Y » **calculée en base** (retrieval SQL sûr) — les points
+ * - `breakdown` : répartition « X par Y » **calculée en base** (retrieval SQL sûr) - les points
  *   réels sont dans `data`, avec `xLabel`/`yLabel`.
  * - `unsupported` : la demande ne peut pas être satisfaite (le front affiche `unsupported`).
  */
@@ -158,7 +158,7 @@ export interface ChartSpec {
   xLabel: string | null;
   yLabel: string | null;
   unsupported: string | null;
-  /** Reformulations proposées quand `unsupported` — cliquables pour relancer. */
+  /** Reformulations proposées quand `unsupported` - cliquables pour relancer. */
   suggestions: ChartSuggestion[];
 }
 
@@ -219,7 +219,7 @@ export async function deleteSavedChart(slug: string, id: number): Promise<void> 
 // ---------------------------------------------------------------------------
 
 /**
- * Métriques observées d'un projet — la jambe « observe » de la boucle.
+ * Métriques observées d'un projet - la jambe « observe » de la boucle.
  *
  * La décision elle-même est produite par un **workflow asynchrone** : voir
  * `lib/api/analysis-service.ts` (`StoredBrief`, `StoredPriority`).
