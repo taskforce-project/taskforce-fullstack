@@ -26,8 +26,8 @@ import { useEffect } from "react"
  *   wrapper : il déforme le bord du masque ET la texture de quelques pixels.
  * - La **texture a son propre mouvement** : la turbulence est animée en boucle lente (SMIL),
  *   indépendamment de l'expansion — les vagues glissent, elles ne sont pas « étirées ».
- * - **Expansion continue** : une seule course, courbe douce qui démarre lentement puis **accélère**
- *   jusqu'à la sortie (pas de « hold » staggé) ; le volume dépasse les quatre bords du viewport.
+ * - **Expansion continue** : une seule course en **courbe S** (ease-in-out ~10/80/10) — démarrage
+ *   doux, rush au milieu, décélération en fin (« plongée dans l'eau ») ; le volume dépasse les 4 bords.
  * - Le **logo est absorbé** : baisse d'opacité + léger flou (pas de fade brutal, pas de scale).
  * - **Zéro gadget** : ni halo/glow, ni rotation, ni bounce/overshoot, ni particules, ni spinner.
  *
@@ -83,21 +83,23 @@ export function LoginIntro({
     }
 
     // ── reveal : expansion continue (ease-in-out qui accélère) → recouvrement → cut ─────────
-    const D = 3.6
+    const D = 1.6
     const controls = [
-      // Rayon : une SEULE course r0 → R, en continu. Courbe douce qui démarre lentement et
-      // ACCÉLÈRE jusqu'à la sortie (pas de « hold » staggé). Bezier réglable si besoin.
+      // Rayon : une SEULE course r0 → R. Courbe en S : démarrage doux, RUSH au milieu, puis
+      // DÉCÉLÉRATION sur les derniers ~20 % — mais `y2=0.9` (pas 1) évite la queue qui « rampe »
+      // à la fin : ça décélère en FINISSANT le mouvement. Effet « zoom in / plongée dans l'eau ».
       animate(radius, [r0, R], {
         duration: D,
-        ease: [0.42, 0, 0.68, 0.35],
+        ease: [0.7, 0, 0.3, 0.9],
       }),
       // Logo absorbé : opacité qui descend puis flou qui monte, tôt dans l'expansion.
       animate(logoOpacity, [1, 1, 0], { duration: D, times: [0, 0.12, 0.4], ease: "easeInOut" }),
       animate(logoBlur, [0, 0, 14], { duration: D, times: [0, 0.12, 0.5], ease: "easeIn" }),
-      // La matière a recouvert l'écran vers 90 % → cut propre vers l'app (montée dessous).
+      // L'écran est recouvert bien avant la fin (rush du milieu) → on révèle l'app dès ~80 % au lieu
+      // d'attendre : plus de « hold » recouvert qui traîne. Fondu court, puis onDone au bout.
       animate(overlayOpacity, [1, 1, 0], {
         duration: D,
-        times: [0, 0.9, 1],
+        times: [0, 0.8, 0.96],
         ease: "easeInOut",
         onComplete: () => onDone?.(),
       }),
