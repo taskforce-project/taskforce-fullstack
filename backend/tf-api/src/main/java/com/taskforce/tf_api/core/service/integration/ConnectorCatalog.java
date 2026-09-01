@@ -263,8 +263,11 @@ public class ConnectorCatalog {
      * réelle et persistée ; la sync des données par service viendra ensuite (comme pour Plane).
      */
     private void connectable(String key, String name, ConnectorCategory cat, ConnectorAuthType auth, String description) {
+        // Capability "mcp" : ces connecteurs peuvent être branchés comme SERVEUR MCP (l'utilisateur colle
+        // l'URL du serveur MCP de l'outil) → leurs outils deviennent live dans Cortex, écritures validées.
+        // C'est le pont qui rend le catalogue concret sans coder chaque intégration à la main.
         byKey.put(key, new ConnectorDescriptor(key, name, cat, auth, ConnectorStatus.AVAILABLE,
-            defaultFields(auth), List.of("observe"), null, description, defaultHint(auth), website(key)));
+            defaultFields(auth), List.of("observe", "mcp"), null, description, defaultHint(auth), website(key)));
     }
 
     /** Champs de connexion par défaut selon le mode d'auth (pour les connecteurs génériques). */
