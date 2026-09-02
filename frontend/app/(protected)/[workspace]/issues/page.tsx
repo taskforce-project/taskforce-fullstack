@@ -20,7 +20,6 @@ import {
   MoreHorizontal,
   SlidersHorizontal,
 } from "lucide-react"
-import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { UserAvatar } from "@/components/ui/user-avatar"
@@ -133,12 +132,12 @@ const LABEL_COLORS: Record<string, string> = {
 function IssueRow({ issue, slug }: Readonly<{ issue: Issue; slug: string }>) {
   const status   = STATUS_CONFIG[issue.status]
   const priority = PRIORITY_CONFIG[issue.priority]
-  const { deleteIssue } = useIssueStore()
+  const { deleteIssueWithUndo } = useIssueStore()
 
-  async function handleDelete() {
-    const ok = await deleteIssue(slug, Number.parseInt(issue.project.id, 10), Number.parseInt(issue.id, 10))
-    if (!ok) { toast.error("Couldn't delete issue"); return }
-    toast.success("Issue deleted")
+  // Suppression différée annulable : le store retire l'issue en optimiste, affiche un toast « Undo »
+  // (~6 s) et ne lance le vrai DELETE qu'à l'expiration. Toast succès/échec gérés par le store.
+  function handleDelete() {
+    deleteIssueWithUndo(slug, Number.parseInt(issue.project.id, 10), Number.parseInt(issue.id, 10))
   }
 
   return (

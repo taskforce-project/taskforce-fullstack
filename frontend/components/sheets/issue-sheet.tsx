@@ -1115,7 +1115,7 @@ interface IssueSheetProps {
 }
 
 export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId }: Readonly<IssueSheetProps>) {
-  const { fetchComments, addComment, deleteComment, fetchActivity, updateIssue, deleteIssue,
+  const { fetchComments, addComment, deleteComment, fetchActivity, updateIssue, deleteIssueWithUndo,
           archiveIssue, pinIssue, fetchStatuses, fetchIssue,
           comments: storeComments, activity: storeActivity, statuses: storeStatuses } = useIssueStore()
   const { labelsByProject, fetchLabels } = useLabelStore()
@@ -1254,16 +1254,11 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
   }
 
 
-  async function handleDelete() {
+  function handleDelete() {
     if (!workspaceSlug || !projectId) return
-    // deleteIssue avale l'erreur et renvoie un booléen : on distingue succès/échec sur ce retour.
-    // (L'ancien try/catch ne se déclenchait jamais → « Issue deleted » s'affichait même en cas d'échec.)
-    const ok = await deleteIssue(workspaceSlug, projectId, issueId)
-    if (!ok) {
-      toast.error("Delete failed")
-      return
-    }
-    toast.success("Issue deleted")
+    // Suppression différée annulable : le store retire l'issue en optimiste + toast « Undo » (~6 s),
+    // le vrai DELETE ne part qu'à l'expiration. On ferme le panneau ; un Undo restaure l'issue dans la liste.
+    deleteIssueWithUndo(workspaceSlug, projectId, issueId)
     onOpenChange(false)
   }
 
