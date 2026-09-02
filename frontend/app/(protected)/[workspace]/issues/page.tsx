@@ -20,6 +20,7 @@ import {
   MoreHorizontal,
   SlidersHorizontal,
 } from "lucide-react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { UserAvatar } from "@/components/ui/user-avatar"
@@ -135,7 +136,9 @@ function IssueRow({ issue, slug }: Readonly<{ issue: Issue; slug: string }>) {
   const { deleteIssue } = useIssueStore()
 
   async function handleDelete() {
-    await deleteIssue(slug, Number.parseInt(issue.project.id, 10), Number.parseInt(issue.id, 10))
+    const ok = await deleteIssue(slug, Number.parseInt(issue.project.id, 10), Number.parseInt(issue.id, 10))
+    if (!ok) { toast.error("Couldn't delete issue"); return }
+    toast.success("Issue deleted")
   }
 
   return (

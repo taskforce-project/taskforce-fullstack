@@ -11,6 +11,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
+import { getErrorMessage } from "@/lib/api/client"
 import {
   Sheet, SheetContent, SheetClose, SheetTitle,
 } from "@/components/ui/sheet"
@@ -712,6 +713,9 @@ export function SubtasksTab({
         setTitle("")
         refresh()
         toast.success("Subtask created")
+      } else {
+        // createIssue avale l'erreur et renvoie null → on signale l'échec (ex. refus VIEWER).
+        toast.error("Couldn't create subtask")
       }
     } finally {
       setAdding(false)
@@ -786,8 +790,8 @@ function ChecklistTab({
       const item = await addChecklistItem(workspaceSlug, projectId, issueId, c)
       setItems((prev) => [...prev, item])
       setContent("")
-    } catch {
-      // client toast
+    } catch (e) {
+      toast.error(getErrorMessage(e))
     } finally {
       setAdding(false)
     }
@@ -797,8 +801,10 @@ function ChecklistTab({
     setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, done: !i.done } : i)))
     try {
       await updateChecklistItem(workspaceSlug, projectId, issueId, item.id, { done: !item.done })
-    } catch {
+    } catch (e) {
+      // Rollback optimiste + on explique pourquoi la coche ne tient pas.
       refresh()
+      toast.error(getErrorMessage(e))
     }
   }
 
@@ -806,8 +812,9 @@ function ChecklistTab({
     setItems((prev) => prev.filter((i) => i.id !== item.id))
     try {
       await deleteChecklistItem(workspaceSlug, projectId, issueId, item.id)
-    } catch {
+    } catch (e) {
       refresh()
+      toast.error(getErrorMessage(e))
     }
   }
 
@@ -907,8 +914,8 @@ function WorklogTab({
       setEntries((prev) => [entry, ...prev])
       setMinutes("")
       setDescription("")
-    } catch {
-      // client toast
+    } catch (e) {
+      toast.error(getErrorMessage(e))
     } finally {
       setAdding(false)
     }
@@ -918,8 +925,9 @@ function WorklogTab({
     setEntries((prev) => prev.filter((e) => e.id !== entry.id))
     try {
       await deleteWorklog(workspaceSlug, projectId, issueId, entry.id)
-    } catch {
+    } catch (e) {
       refresh()
+      toast.error(getErrorMessage(e))
     }
   }
 
@@ -1023,8 +1031,9 @@ function RelationsTab({
       setTargetId(undefined)
       refresh()
       toast.success("Relation added")
-    } catch {
-      // erreur déjà notifiée par le client HTTP
+    } catch (e) {
+      // Les 4xx (ex. relation en double / circulaire) ne sont PAS toastés globalement → on le fait ici.
+      toast.error(getErrorMessage(e))
     } finally {
       setAdding(false)
     }
@@ -1034,8 +1043,8 @@ function RelationsTab({
     try {
       await deleteRelation(workspaceSlug, projectId, issueId, relationId)
       refresh()
-    } catch {
-      // client toast
+    } catch (e) {
+      toast.error(getErrorMessage(e))
     }
   }
 
@@ -1247,13 +1256,15 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
 
   async function handleDelete() {
     if (!workspaceSlug || !projectId) return
-    try {
-      await deleteIssue(workspaceSlug, projectId, issueId)
-      toast.success("Issue deleted")
-      onOpenChange(false)
-    } catch {
+    // deleteIssue avale l'erreur et renvoie un booléen : on distingue succès/échec sur ce retour.
+    // (L'ancien try/catch ne se déclenchait jamais → « Issue deleted » s'affichait même en cas d'échec.)
+    const ok = await deleteIssue(workspaceSlug, projectId, issueId)
+    if (!ok) {
       toast.error("Delete failed")
+      return
     }
+    toast.success("Issue deleted")
+    onOpenChange(false)
   }
 
   async function copyToClipboard(text: string, label: string) {

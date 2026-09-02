@@ -59,7 +59,7 @@ interface IssueState {
   fetchIssue: (slug: string, projectId: number, issueId: number) => Promise<Issue | null>;
   createIssue: (slug: string, projectId: number, payload: CreateIssuePayload) => Promise<Issue | null>;
   updateIssue: (slug: string, projectId: number, issueId: number, payload: UpdateIssuePayload) => Promise<Issue | null>;
-  deleteIssue: (slug: string, projectId: number, issueId: number) => Promise<void>;
+  deleteIssue: (slug: string, projectId: number, issueId: number) => Promise<boolean>;
   /** Archive (true) / désarchive (false) - une issue archivée quitte les vues par défaut. */
   archiveIssue: (slug: string, projectId: number, issueId: number, archived: boolean) => Promise<Issue | null>;
   /** Épingle (true) / dépingle (false) - remonte en tête de board/liste. */
@@ -74,7 +74,7 @@ interface IssueState {
   fetchStatuses: (slug: string, projectId: number) => Promise<IssueStatus[]>;
   createStatus: (slug: string, projectId: number, payload: CreateIssueStatusPayload) => Promise<IssueStatus | null>;
   updateStatus: (slug: string, projectId: number, statusId: number, payload: UpdateIssueStatusPayload) => Promise<IssueStatus | null>;
-  deleteStatus: (slug: string, projectId: number, statusId: number) => Promise<void>;
+  deleteStatus: (slug: string, projectId: number, statusId: number) => Promise<boolean>;
   fetchTypes: (slug: string, projectId: number) => Promise<IssueType[]>;
 
   // Commentaires
@@ -181,9 +181,13 @@ export const useIssueStore = create<IssueState>((set, get) => ({
         issues: state.issues.filter((i) => i.id !== issueId),
         activeIssue: state.activeIssue?.id === issueId ? null : state.activeIssue,
       }));
+      return true;
     } catch (err) {
+      // On garde le message d'erreur dans le store (bannière/diagnostic) mais on signale l'échec
+      // par le retour `false` : l'appelant affiche un toast au bon moment (cf. WS-10 sur updateIssue).
       const message = extractError(err, "Erreur lors de la suppression de l'issue");
       set({ error: message });
+      return false;
     }
   },
 
@@ -277,9 +281,12 @@ export const useIssueStore = create<IssueState>((set, get) => ({
     try {
       await deleteStatusApi(slug, projectId, statusId);
       set((state) => ({ statuses: state.statuses.filter((s) => s.id !== statusId) }));
+      return true;
     } catch (err) {
+      // Retour `false` pour que l'appelant toaste l'échec (ex. 409 colonne non vide) au bon moment.
       const message = extractError(err, "Erreur lors de la suppression du statut");
       set({ error: message });
+      return false;
     }
   },
 

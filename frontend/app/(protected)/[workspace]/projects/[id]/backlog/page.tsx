@@ -7,6 +7,7 @@ import {
   Plus,
   ArrowUpRight,
 } from "lucide-react"
+import { toast } from "sonner"
 
 import { IssueSheet, type SheetIssue } from "@/components/sheets/issue-sheet"
 import { CreateIssueDialog } from "@/components/dialogs/create-issue-dialog"
@@ -101,7 +102,10 @@ export default function ProjectBacklogPage() {
   // QA3-9 : clic sur l'icône → marque la tâche terminée (sort du backlog)
   async function handleToggleDone(issue: Issue) {
     const done = statuses.find((s) => s.category === "COMPLETED")
-    if (done) await updateIssue(workspace, projectId, issue.id, { statusId: done.id })
+    if (!done) return
+    // Succès muet : l'issue sort du backlog (UI). On ne signale que l'échec (updateIssue → null).
+    const ok = await updateIssue(workspace, projectId, issue.id, { statusId: done.id })
+    if (!ok) toast.error("Couldn't update status")
   }
 
   // Backlog = issues with BACKLOG status category (puis filtres avancés)
