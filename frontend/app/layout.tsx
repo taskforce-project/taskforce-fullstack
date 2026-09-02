@@ -8,6 +8,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorBoundary } from "@/components/providers/error-boundary";
 import { CookieBanner } from "@/components/common/cookie-banner";
 import { A11yFilters } from "@/components/a11y/a11y-filters";
+import { Toaster } from "@/components/ui/sonner";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -51,6 +52,9 @@ export default function RootLayout({
               </ErrorBoundary>
               {/* Défs SVG des filtres daltonisme - appliquées à <body> via globals.css (en plus du contraste élevé) */}
               <A11yFilters />
+              {/* Toaster UNIQUE, au niveau racine : couvre TOUTES les routes (app, auth, onboarding,
+                  paiement, pages d'erreur). Un seul, sinon sonner rend chaque toast en double. */}
+              <Toaster position="bottom-right" richColors closeButton />
             </TooltipProvider>
           </I18nProvider>
         </ThemeProvider>

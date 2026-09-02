@@ -262,6 +262,44 @@ export async function disconnectConnector(slug: string, key: string): Promise<vo
 }
 
 // ---------------------------------------------------------------------------
+// MCP (serveur MCP externe → outils live dans Cortex, écritures validées)
+// ---------------------------------------------------------------------------
+
+/** Statut d'un serveur MCP connecté : joignabilité + outils exposés (après allow-list). */
+export interface McpServerStatus {
+  connectorKey: string;
+  url: string;
+  reachable: boolean;
+  tools: string[];
+  error: string | null;
+}
+
+export interface McpServerPayload {
+  connectorKey: string;
+  mcpUrl: string;
+  mcpToken?: string;
+  mcpAllow?: string;
+}
+
+/** Statut des serveurs MCP connectés sur le workspace. */
+export async function getMcpServers(slug: string): Promise<McpServerStatus[]> {
+  const res = await apiClient.get<{ data: McpServerStatus[] }>(INTEGRATION_ROUTES.MCP_SERVERS(slug));
+  return res.data.data;
+}
+
+/** Connecte (ou reconfigure) un serveur MCP externe ; renvoie le statut frais (joignable + outils). */
+export async function connectMcpServer(slug: string, payload: McpServerPayload): Promise<McpServerStatus[]> {
+  const res = await apiClient.post<{ data: McpServerStatus[] }>(INTEGRATION_ROUTES.MCP_SERVERS(slug), payload);
+  return res.data.data;
+}
+
+/** Déconnecte un serveur MCP externe ; renvoie le statut frais. */
+export async function disconnectMcpServer(slug: string, connectorKey: string): Promise<McpServerStatus[]> {
+  const res = await apiClient.delete<{ data: McpServerStatus[] }>(INTEGRATION_ROUTES.MCP_SERVER(slug, connectorKey));
+  return res.data.data;
+}
+
+// ---------------------------------------------------------------------------
 // Plane (connecteur clé API → ingestion Brain OS)
 // ---------------------------------------------------------------------------
 

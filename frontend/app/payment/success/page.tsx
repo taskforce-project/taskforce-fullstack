@@ -1,18 +1,23 @@
 /**
- * Page de succès de paiement
- * Affichée après un paiement Stripe réussi
+ * Page de retour de paiement Stripe (succès / erreur / vérification en cours).
+ *
+ * <p>Reprend la <b>direction artistique des pages d'erreur</b> de l'app (404/500) : fond
+ * {@code bg-background}, motif rayé {@link StripedPattern}, fondu radial, lockup de marque et
+ * jetons de couleur - au lieu du dégradé vert/rouge générique d'origine, hors charte.</p>
  */
 
 "use client";
 
 import { useEffect, useState, Suspense } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { CheckCircle2, Loader2, AlertCircle } from "lucide-react";
+import { CheckCircle2, Loader2, AlertCircle, ArrowLeft, ArrowUpRight } from "lucide-react";
 import { toast } from "sonner";
+
+import { PaymentShell } from "@/components/payment/payment-shell";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/contexts/auth-context";
-import { STRIPE_ROUTES } from "@/lib/config/api-routes";
+import { stripeService } from "@/lib/api/stripe-service";
 
 function PaymentSuccessContent() {
   const router = useRouter();
@@ -20,7 +25,7 @@ function PaymentSuccessContent() {
   const { refreshUser } = useAuth();
   const [isVerifying, setIsVerifying] = useState(true);
   const [verificationStatus, setVerificationStatus] = useState<"success" | "error" | "pending">("pending");
-  
+
   const sessionId = searchParams.get("session_id");
 
   useEffect(() => {
@@ -28,38 +33,23 @@ function PaymentSuccessContent() {
       if (!sessionId) {
         setVerificationStatus("error");
         setIsVerifying(false);
-        toast.error("Error", {
-          description: "No payment session found",
-        });
+        toast.error("Error", { description: "No payment session found" });
         return;
       }
 
       try {
-        // Appeler l'API backend pour vérifier le paiement et créer l'utilisateur
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${STRIPE_ROUTES.VERIFY_SESSION}?session_id=${sessionId}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
+        // Vérifie le paiement côté serveur (via l'apiClient : base URL centralisée + enveloppe
+        // ApiResponse). Le forfait est appliqué par le webhook Stripe ; cet appel le confirme et
+        // couvre les environnements sans webhook. Un statut non-2xx lève et bascule sur l'écran d'erreur.
+        const result = await stripeService.verifySession(sessionId);
 
-        if (!response.ok) {
-          throw new Error(`HTTP error: ${response.status}`);
-        }
-
-        const data = await response.json();
-        
-        if (!data.success) {
-          throw new Error(data.message || "Error while verifying the payment");
-        }
-        
         setVerificationStatus("success");
-        
-        // Rafraîchir les données utilisateur pour obtenir le nouveau plan
+
+        // Rafraîchit les données utilisateur pour obtenir le nouveau plan
         refreshUser();
-        
+
         toast.success("Payment successful!", {
-          description: data.data?.message || "Your subscription has been activated successfully",
+          description: result.message || "Your subscription has been activated successfully",
         });
       } catch (error) {
         setVerificationStatus("error");
@@ -83,121 +73,97 @@ function PaymentSuccessContent() {
 
   if (isVerifying) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-green-50 to-emerald-100 dark:from-gray-900 dark:to-gray-800">
-        <Card className="w-full max-w-md">
-          <CardContent className="pt-6 pb-6">
-            <div className="flex flex-col items-center gap-4 text-center">
-              <Loader2 className="h-16 w-16 text-primary animate-spin" />
-              <h2 className="text-2xl font-bold">Verifying payment</h2>
-              <p className="text-muted-foreground">
-                Please wait while we confirm your payment...
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <PaymentShell tone="primary">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-10 w-10 animate-spin text-primary" />
+          <div className="flex max-w-sm flex-col gap-2">
+            <h1 className="text-xl font-semibold tracking-tight">Verifying payment</h1>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              Please wait while we confirm your payment…
+            </p>
+          </div>
+        </div>
+      </PaymentShell>
     );
   }
 
   if (verificationStatus === "error") {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-red-50 to-orange-100 dark:from-gray-900 dark:to-gray-800">
-        <Card className="w-full max-w-md border-destructive">
-          <CardHeader className="text-center">
-            <div className="flex justify-center mb-4">
-              <AlertCircle className="h-16 w-16 text-destructive" />
-            </div>
-            <CardTitle className="text-2xl">Verification error</CardTitle>
-            <CardDescription>
-              We couldn&apos;t verify your payment
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground text-center">
-              Your payment may have been processed, but we can&apos;t confirm it right now.
-              Please contact our support with the following session reference:
-            </p>
-            {sessionId && (
-              <div className="p-3 bg-muted rounded-md">
-                <code className="text-xs break-all">{sessionId}</code>
-              </div>
-            )}
-            <div className="flex flex-col gap-2">
-              <Button onClick={handleContinue} variant="outline" className="w-full">
-                Go to login
-              </Button>
-              <Button
-                onClick={() => router.push("/")}
-                variant="ghost"
-                className="w-full"
-              >
-                Back to TaskForce
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <PaymentShell tone="destructive">
+        <div className="flex size-14 items-center justify-center rounded-2xl bg-destructive/10 text-destructive">
+          <AlertCircle className="size-7" />
+        </div>
+        <div className="flex max-w-sm flex-col gap-2">
+          <h1 className="text-xl font-semibold tracking-tight">Verification error</h1>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            We couldn&apos;t verify your payment. It may still have gone through - contact our support
+            with the reference below.
+          </p>
+          {sessionId && (
+            <p className="mt-1 break-all font-mono text-xs text-muted-foreground/50">ref: {sessionId}</p>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          <Button asChild size="sm" variant="outline" className="gap-2">
+            <Link href="/">
+              <ArrowLeft className="size-4" />
+              Back to TaskForce
+            </Link>
+          </Button>
+          <Button asChild size="sm" className="gap-2">
+            <Link href="/dashboard">Go to dashboard</Link>
+          </Button>
+        </div>
+      </PaymentShell>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-green-50 to-emerald-100 dark:from-gray-900 dark:to-gray-800">
-      <Card className="w-full max-w-md border-green-500">
-        <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            <div className="rounded-full bg-green-100 dark:bg-green-900 p-3">
-              <CheckCircle2 className="h-16 w-16 text-green-600 dark:text-green-400" />
-            </div>
-          </div>
-          <CardTitle className="text-3xl font-bold">Payment successful!</CardTitle>
-          <CardDescription className="text-base">
-            Your subscription has been activated successfully
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-3">
-            <div className="flex items-center gap-3">
-              <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />
-              <p className="text-sm">Immediate access to all premium features</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />
-              <p className="text-sm">Confirmation email sent to your address</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />
-              <p className="text-sm">Automatic billing each period</p>
-            </div>
-          </div>
+    <PaymentShell tone="primary">
+      <div className="flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+        <CheckCircle2 className="size-7" />
+      </div>
+      <div className="flex max-w-sm flex-col gap-2">
+        <h1 className="text-2xl font-semibold tracking-tight">Payment successful</h1>
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          Your subscription is now active. You have immediate access to every premium feature.
+        </p>
+      </div>
 
-          <div className="p-4 bg-muted rounded-lg">
-            <p className="text-sm text-muted-foreground text-center">
-              You can manage your subscription at any time from your account settings.
-            </p>
-          </div>
+      <ul className="flex w-full flex-col gap-2.5 rounded-xl border border-border/60 bg-muted/30 p-4 text-left">
+        {[
+          "Immediate access to all premium features",
+          "Confirmation email sent to your address",
+          "Automatic billing each period",
+        ].map((perk) => (
+          <li key={perk} className="flex items-center gap-2.5 text-sm text-muted-foreground">
+            <CheckCircle2 className="size-4 shrink-0 text-primary" />
+            {perk}
+          </li>
+        ))}
+      </ul>
 
-          <Button onClick={handleContinue} className="w-full" size="lg">
-            Start using TaskForce
-          </Button>
+      <Button onClick={handleContinue} size="lg" className="gap-2">
+        Start using TaskForce
+        <ArrowUpRight className="size-4" />
+      </Button>
 
-          {sessionId && (
-            <p className="text-xs text-muted-foreground text-center">
-              Transaction reference: {sessionId.slice(-12)}
-            </p>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+      {sessionId && (
+        <p className="font-mono text-xs text-muted-foreground/50">Reference: {sessionId.slice(-12)}</p>
+      )}
+    </PaymentShell>
   );
 }
 
 export default function PaymentSuccessPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-background">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      }
+    >
       <PaymentSuccessContent />
     </Suspense>
   );

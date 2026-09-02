@@ -105,8 +105,8 @@ interface NotificationState {
   fetchUnreadCount: (slug: string) => Promise<void>;
   /** Marque une notification comme lue (API + optimistic) */
   markAsRead: (slug: string, id: string) => Promise<void>;
-  /** Marque toutes comme lues (API + optimistic) */
-  markAllAsRead: (slug: string) => Promise<void>;
+  /** Marque toutes comme lues (API + optimistic). Renvoie `false` si l'appel échoue (échec détectable côté appelant). */
+  markAllAsRead: (slug: string) => Promise<boolean>;
   /** Acquitte toutes les notifications (dismiss) + refetch */
   acknowledgeAll: (slug: string) => Promise<void>;
   /** Acquitte (dismiss) une notification unique (API + optimistic) */
@@ -174,8 +174,10 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     }));
     try {
       await markAllAsReadApi(slug);
+      return true;
     } catch {
-      // Rollback silencieux
+      // Optimiste conservé (corrigé au prochain fetch) ; l'échec est rendu détectable à l'appelant.
+      return false;
     }
   },
 

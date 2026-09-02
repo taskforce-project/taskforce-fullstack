@@ -34,6 +34,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { usePageStore } from "@/lib/store/page-store"
+import { toast } from "sonner"
+import { getErrorMessage } from "@/lib/api/client"
 import { cn } from "@/lib/utils"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty"
@@ -63,9 +65,11 @@ export default function ProjectPagesPage() {
         title: payload.title,
         emoji: payload.emoji,
       })
+      // Succès = navigation vers la nouvelle page (feedback visuel), pas de toast succès.
       router.push(`/${slug}/projects/${projectId}/pages/${created.id}`)
-    } catch {
-      // erreur silencieuse - le store gère le state
+    } catch (e) {
+      // createPage THROW ; 4xx non toasté globalement -> on notifie ici (sinon échec totalement muet).
+      toast.error(getErrorMessage(e))
     }
   }
 
@@ -195,8 +199,10 @@ export default function ProjectPagesPage() {
                 if (!pageToDelete) return
                 try {
                   await deletePage(slug, projectId, String(pageToDelete.id))
-                } catch {
-                  // le store gère l'état d'erreur
+                  toast.success("Page deleted")
+                } catch (e) {
+                  // deletePage THROW ; 4xx non toasté globalement -> on notifie ici.
+                  toast.error(getErrorMessage(e))
                 }
                 setPageToDelete(null)
               }}

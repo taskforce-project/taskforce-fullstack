@@ -472,15 +472,17 @@ public class AuthService {
     }
 
     /**
-     * Finalise l'inscription après validation du paiement Stripe
-     * 1. Récupère la session Stripe et vérifie le paiement
-     * 2. Récupère les données d'inscription depuis otp_verification
-     * 3. Crée l'utilisateur en base avec plan PRO/ENTERPRISE + ACTIVE
-     * 4. Marque l'email comme vérifié dans Keycloak
-     * 5. Retourne les tokens JWT et les détails du paiement
-     * 
+     * Vérifie une session Stripe Checkout payée et applique le forfait. Deux cas :
+     * <ol>
+     *   <li><b>Upgrade in-app</b> (cas courant) : l'utilisateur existe déjà → on applique le forfait
+     *       lu dans les métadonnées de la session, sans exiger d'inscription en attente (OTP). Écriture
+     *       idempotente, en doublon sûr du webhook {@code checkout.session.completed}.</li>
+     *   <li><b>Legacy « inscription PUIS paiement »</b> : l'utilisateur n'existe pas encore → on utilise
+     *       les données mises de côté (OTP) pour le créer en base et vérifier l'email côté Keycloak.</li>
+     * </ol>
+     *
      * @param sessionId ID de la session Stripe Checkout
-     * @return Détails de la vérification et création de l'utilisateur
+     * @return Détails de la vérification (email, forfait, statut de paiement, IDs Stripe)
      */
     public com.taskforce.tf_api.core.dto.response.VerifySessionResponse completeRegistrationAfterPayment(String sessionId) throws StripeException {
         log.info("Finalisation de l'inscription après paiement - Session: {}", sessionId);
@@ -503,37 +505,36 @@ public class AuthService {
         log.info("Paiement validé pour {} - Customer: {}, Subscription: {}", 
             customerEmail, customerId, subscriptionId);
 
-        // 3. Récupérer les données d'inscription depuis OTP (dernier OTP même si déjà vérifié)
-        OtpVerification otpVerification = otpService.getLatestOtp(customerEmail);
-        
-        if (otpVerification == null) {
-            throw new RuntimeException("Aucune inscription en attente trouvée pour cet email");
-        }
+        // Forfait acheté : source primaire = métadonnées de la session de checkout (posées par
+        // BillingController lors d'un upgrade in-app). L'OTP (ancien flux « inscription PUIS paiement »)
+        // ne sert plus qu'à créer un utilisateur qui n'existe pas encore.
+        String planFromMeta = session.getMetadata() != null ? session.getMetadata().get("planType") : null;
 
-        String keycloakId = otpVerification.getKeycloakId();
-        String planType = otpVerification.getPlanType();
-
-        if (keycloakId == null || planType == null) {
-            throw new RuntimeException("Données d'inscription incomplètes");
-        }
-
-        // 4. Vérifier si l'utilisateur existe déjà en base (cas normal pour plans payants)
+        // Cas normal (upgrade in-app) : l'utilisateur existe déjà → on applique le forfait payé SANS
+        // exiger d'OTP (sinon un compte inscrit normalement, sans inscription en attente, échouait avec
+        // « Aucune inscription en attente trouvée »). Le webhook checkout.session.completed applique la
+        // même chose côté serveur ; les deux écritures sont idempotentes (même plan ACTIVE ré-écrit).
         if (userRepository.existsByEmail(customerEmail)) {
             User existingUser = userRepository.findByEmail(customerEmail)
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
-            
-            log.info("Utilisateur {} déjà créé en base. Mise à jour avec les infos de paiement.", customerEmail);
-            
-            // Mettre à jour avec les informations de paiement (paiement déjà validé ci-dessus).
+
+            PlanType purchased = parsePlanType(planFromMeta);
+            if (purchased == null) purchased = existingUser.getPlanType(); // repli : ne jamais rétrograder
+            if (purchased == null || purchased == PlanType.FREE) {
+                throw new RuntimeException("Forfait acheté indéterminé pour la session " + sessionId);
+            }
+
+            log.info("Utilisateur {} déjà en base : application du forfait {} après paiement.", customerEmail, purchased);
+
             existingUser.setStripeCustomerId(customerId);
             existingUser.setStripeSubscriptionId(subscriptionId);
-            existingUser.setPlanType(PlanType.valueOf(planType.toUpperCase())); // applique le forfait payé
+            existingUser.setPlanType(purchased); // applique le forfait payé
             existingUser.setPlanStatus(PlanStatus.ACTIVE);
             userRepository.save(existingUser);
-            
-            log.info("Utilisateur {} mis à jour : plan {} ACTIVE, subscription {}", 
+
+            log.info("Utilisateur {} mis à jour : plan {} ACTIVE, subscription {}",
                 customerEmail, existingUser.getPlanType(), subscriptionId);
-            
+
             return com.taskforce.tf_api.core.dto.response.VerifySessionResponse.builder()
                 .email(customerEmail)
                 .planType(existingUser.getPlanType().toString())
@@ -543,6 +544,20 @@ public class AuthService {
                 .userCreated(false)
                 .message("Paiement validé avec succès. Votre abonnement est maintenant actif.")
                 .build();
+        }
+
+        // Legacy (inscription PUIS paiement) : l'utilisateur n'existe pas encore → il faut les données
+        // d'inscription mises de côté (OTP) pour finaliser la création en base + Keycloak.
+        OtpVerification otpVerification = otpService.getLatestOtp(customerEmail);
+        if (otpVerification == null) {
+            throw new RuntimeException("Aucune inscription en attente trouvée pour cet email");
+        }
+
+        String keycloakId = otpVerification.getKeycloakId();
+        String planType = planFromMeta != null ? planFromMeta : otpVerification.getPlanType();
+
+        if (keycloakId == null || planType == null) {
+            throw new RuntimeException("Données d'inscription incomplètes");
         }
 
         // 5. Récupérer l'utilisateur Keycloak
@@ -583,6 +598,16 @@ public class AuthService {
             .userCreated(true)
             .message("Inscription finalisée avec succès. Votre abonnement est actif.")
             .build();
+    }
+
+    /** Parse un nom de forfait en {@link PlanType} ; renvoie {@code null} si absent/invalide. */
+    private static PlanType parsePlanType(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        try {
+            return PlanType.valueOf(raw.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
     }
 
     /**

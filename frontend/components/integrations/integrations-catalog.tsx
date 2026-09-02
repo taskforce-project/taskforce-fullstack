@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo } from "react"
-import { Info, Loader2, ExternalLink, Check, Plug, Search, ChevronLeft, Globe, BookOpen } from "lucide-react"
+import { Info, Loader2, ExternalLink, Check, Plug, Search, ChevronLeft, Globe, BookOpen, Server, Wrench, AlertTriangle } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -19,15 +19,17 @@ import { useIntegrationStore } from "@/lib/store/integration-store"
 import {
   getIntegrationCatalog, getPlaneStatus, connectPlane, listPlaneProjects, syncPlane, disconnectPlane,
   connectConnector, disconnectConnector,
-  type IntegrationCatalog, type ConnectorView, type PlaneProject, type PlaneStatus,
+  getMcpServers, connectMcpServer, disconnectMcpServer,
+  type IntegrationCatalog, type ConnectorView, type PlaneProject, type PlaneStatus, type McpServerStatus,
 } from "@/lib/api/integration-service"
 
-const CAP_LABEL: Record<string, string> = { observe: "Observe", act: "Act", metrics: "Metrics", recommend: "Components" }
+const CAP_LABEL: Record<string, string> = { observe: "Observe", act: "Act", metrics: "Metrics", recommend: "Components", mcp: "MCP" }
 const CAP_DESC: Record<string, string> = {
   observe: "Feeds the Brain OS with the service's data (read).",
   act: "Can act in the service from TaskForce (write).",
   metrics: "Reports metrics and indicators.",
   recommend: "Component recommendations by Cortex (coming soon).",
+  mcp: "Plug this tool's MCP server: its tools go live in Cortex (read + actions under your approval).",
 }
 const AUTH_LABEL: Record<string, string> = { OAUTH2: "OAuth", API_KEY: "API Key", TOKEN: "Token", CONFIG: "Config", NONE: "No auth" }
 const AUTH_HELP: Record<string, string> = {
@@ -149,7 +151,7 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
         <>
         <LabBanner
           feature="integrations"
-          message="Integrations: most connectors can be plugged in (credentials stored), but per-tool data sync isn't active yet. A few integrations (UI & components) are on the roadmap, shown as 'Soon'."
+          message="Integrations: connectors marked MCP can plug in their tool's MCP server, so its tools go live in Cortex (reads run, writes need your approval). Others store credentials for now, with per-tool sync rolling out. A few (UI & components) are on the roadmap, shown as 'Soon'."
         />
 
         {/* Filtre par statut de connexion - « ce que j'ai connecté ou pas » (en tête). */}
@@ -400,6 +402,14 @@ function ConnectorDialog({
   const isPlane = tool.key === "plane"
   const connected = tool.connected || Boolean(status?.connected)
 
+  // Connecteur « MCP-connectable » : on branche un serveur MCP externe (URL) → ses outils deviennent
+  // live dans Cortex (lecture + actions validées). Prime sur le stockage d'identifiants opaque.
+  const isMcp = tool.capabilities.includes("mcp")
+  const [mcpUrl, setMcpUrl] = useState("")
+  const [mcpToken, setMcpToken] = useState("")
+  const [mcpStatus, setMcpStatus] = useState<McpServerStatus | null>(null)
+  const [mcpBusy, setMcpBusy] = useState(false)
+
   const loadConnected = useCallback(async () => {
     if (!isPlane) return
     try {
@@ -411,6 +421,54 @@ function ConnectorDialog({
   }, [isPlane, slug])
 
   useEffect(() => { if (tool.connected) loadConnected() }, [tool.connected, loadConnected])
+
+  // Statut du serveur MCP de ce connecteur (si déjà branché) - à l'ouverture.
+  useEffect(() => {
+    if (!isMcp) return
+    getMcpServers(slug)
+      .then((list) => {
+        const s = list.find((x) => x.connectorKey === tool.key) ?? null
+        setMcpStatus(s)
+        if (s) setMcpUrl(s.url)
+      })
+      .catch(() => { /* pas branché, ou plan sans intégrations */ })
+  }, [isMcp, slug, tool.key])
+
+  async function handleMcpConnect() {
+    if (!mcpUrl.trim()) return
+    setMcpBusy(true)
+    try {
+      const list = await connectMcpServer(slug, {
+        connectorKey: tool.key,
+        mcpUrl: mcpUrl.trim(),
+        mcpToken: mcpToken.trim() || undefined,
+      })
+      const s = list.find((x) => x.connectorKey === tool.key) ?? null
+      setMcpStatus(s)
+      if (s?.reachable) toast.success(`${tool.name}: ${s.tools.length} tool(s) live in Cortex`)
+      else toast.error("Connected, but the MCP server is unreachable")
+      onChanged()
+    } catch {
+      toast.error("MCP connection failed - check the server URL")
+    } finally {
+      setMcpBusy(false)
+    }
+  }
+
+  async function handleMcpDisconnect() {
+    setMcpBusy(true)
+    try {
+      await disconnectMcpServer(slug, tool.key)
+      setMcpStatus(null)
+      setMcpUrl(""); setMcpToken("")
+      toast.success(`${tool.name} MCP server disconnected`)
+      onChanged()
+    } catch {
+      toast.error("Could not disconnect")
+    } finally {
+      setMcpBusy(false)
+    }
+  }
 
   async function handleConnect() {
     setConnecting(true)
@@ -485,7 +543,73 @@ function ConnectorDialog({
           </div>
         )}
 
-        {!connected ? (
+        {isMcp ? (
+          <div className="flex flex-col gap-3">
+            <div className="flex gap-2 rounded-md border border-primary/25 bg-primary/5 p-3 text-xs leading-relaxed text-muted-foreground">
+              <Server className="mt-0.5 size-3.5 shrink-0 text-primary" />
+              <span>
+                Plug <span className="font-medium text-foreground">{tool.name}</span>&apos;s MCP server. Its tools go
+                live in Cortex: reads run directly, writes are proposed and executed only after your approval.
+              </span>
+            </div>
+
+            {mcpStatus ? (
+              <>
+                {mcpStatus.reachable ? (
+                  <div className="flex flex-col gap-2 rounded-md border border-emerald-500/25 bg-emerald-500/10 p-3 text-xs text-emerald-600 dark:text-emerald-400">
+                    <span className="inline-flex items-center gap-1.5 font-medium">
+                      <Check className="size-4 shrink-0" /> Connected - {mcpStatus.tools.length} tool(s) live in Cortex
+                    </span>
+                    {mcpStatus.tools.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {mcpStatus.tools.slice(0, 8).map((t) => (
+                          <span key={t} className="inline-flex items-center gap-1 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[11px]">
+                            <Wrench className="size-3" /> {t}
+                          </span>
+                        ))}
+                        {mcpStatus.tools.length > 8 && <span className="text-[11px]">+{mcpStatus.tools.length - 8} more</span>}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-start gap-2 rounded-md border border-amber-500/25 bg-amber-500/10 p-3 text-xs text-amber-600 dark:text-amber-400">
+                    <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                    <span>Server saved but <span className="font-medium">unreachable</span>{mcpStatus.error ? ` - ${mcpStatus.error}` : ""}.</span>
+                  </div>
+                )}
+                <DialogFooter className="sm:justify-between">
+                  <Button variant="outline" size="sm"
+                          className="h-8 text-xs text-destructive border-destructive/30 hover:bg-destructive/10"
+                          onClick={handleMcpDisconnect} disabled={mcpBusy}>
+                    Disconnect
+                  </Button>
+                  <span className="max-w-[55%] self-center truncate text-[11px] text-muted-foreground" title={mcpStatus.url}>
+                    {mcpStatus.url}
+                  </span>
+                </DialogFooter>
+              </>
+            ) : (
+              <div className="flex flex-col gap-3">
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-medium text-muted-foreground">MCP server URL *</span>
+                  <Input type="text" placeholder="https://.../mcp" value={mcpUrl}
+                         onChange={(e) => setMcpUrl(e.target.value)} autoComplete="off" />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-medium text-muted-foreground">Access token (optional)</span>
+                  <Input type="password" value={mcpToken}
+                         onChange={(e) => setMcpToken(e.target.value)} autoComplete="off" />
+                </label>
+                <DialogFooter>
+                  <Button onClick={handleMcpConnect} disabled={mcpBusy || !mcpUrl.trim()} className="gap-1.5">
+                    {mcpBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Plug className="size-3.5" />}
+                    {mcpBusy ? "Connecting…" : "Connect MCP server"}
+                  </Button>
+                </DialogFooter>
+              </div>
+            )}
+          </div>
+        ) : !connected ? (
           <div className="flex flex-col gap-3">
             {tool.fields.map((f) => (
               <label key={f.key} className="flex flex-col gap-1">

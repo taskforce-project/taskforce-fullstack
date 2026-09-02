@@ -335,15 +335,15 @@ function ProfilePanel() {
 function AccountPanel() {
   const { user } = useAuth()
   const [deleting, setDeleting] = useState(false)
-  const [deleteConfirm, setDeleteConfirm] = useState(false)
 
   // Suppression de compte = droit à l'effacement RGPD (Art. 17) : vit ici, dans « Account »
-  // (l'export des données, lui, est dans « Privacy & Data »).
+  // (l'export des données, lui, est dans « Privacy & Data »). La confirmation (saisie de l'email,
+  // façon GitHub) est portée par le DeleteConfirmDialog ci-dessous.
   const handleDelete = async () => {
     setDeleting(true)
     try {
       await deleteMyAccount()
-      toast.success("Account anonymized. Signing out…")
+      toast.success("Account deleted. Signing out…")
       if (globalThis.window !== undefined) {
         localStorage.removeItem("accessToken")
         localStorage.removeItem("refreshToken")
@@ -351,9 +351,8 @@ function AccountPanel() {
         setTimeout(() => { window.location.href = "/auth/login" }, 1000)
       }
     } catch {
-      toast.error("Deletion failed. Try again or contact privacy@taskforce.dev.")
+      toast.error("Deletion failed. Try again or contact contact@taskforce-project.fr.")
       setDeleting(false)
-      setDeleteConfirm(false)
     }
   }
 
@@ -372,23 +371,28 @@ function AccountPanel() {
           <div>
             <p className="text-sm font-medium text-foreground">Delete my account</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Your personal data will be anonymized and your access cut off immediately (GDPR Art. 17 - right to erasure). Irreversible.
+              Deletes your account, the workspaces you own and all their data, and cuts off your access
+              immediately (GDPR Art. 17 - right to erasure). This cannot be undone.
             </p>
           </div>
-          {!deleteConfirm ? (
-            <Button variant="destructive" size="sm" className="shrink-0 h-8 text-xs" onClick={() => setDeleteConfirm(true)}>
+          {/* Confirmation façon GitHub : il faut ressaisir son email pour armer la suppression. */}
+          <DeleteConfirmDialog
+            title="Delete your account?"
+            description="This permanently deletes your account, the workspaces you own and all their data. Your access is cut off immediately and this cannot be undone."
+            confirmLabel="Delete account"
+            confirmText={user?.email ?? ""}
+            confirmTextLabel={
+              <>
+                To confirm, type your email{" "}
+                <span className="font-medium text-foreground">{user?.email}</span>
+              </>
+            }
+            onConfirm={handleDelete}
+          >
+            <Button variant="destructive" size="sm" className="shrink-0 h-8 text-xs" disabled={deleting}>
               Delete account
             </Button>
-          ) : (
-            <div className="flex items-center gap-2 shrink-0">
-              <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setDeleteConfirm(false)}>
-                Cancel
-              </Button>
-              <Button variant="destructive" size="sm" className="h-8 text-xs" disabled={deleting} onClick={handleDelete}>
-                {deleting ? "Processing…" : "Confirm deletion"}
-              </Button>
-            </div>
-          )}
+          </DeleteConfirmDialog>
         </div>
       </Zone>
     </div>
@@ -1387,7 +1391,7 @@ function PrivacyPanel() {
 
       <SectionCard title="Delete your data" description="Erasing your personal data is done by deleting your account.">
         <p className="text-xs text-muted-foreground">
-          Your personal data is anonymized when you delete your account (GDPR Art. 17 - right to erasure). Manage this from{" "}
+          Your personal data is erased when you delete your account (GDPR Art. 17 - right to erasure). Manage this from{" "}
           <button
             type="button"
             onClick={() => setSection("account")}

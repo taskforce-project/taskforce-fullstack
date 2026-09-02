@@ -197,10 +197,12 @@ class AnalyticsServiceIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("getKpis avec des issues complétées calcule résolutions, moyenne, vélocité")
     void kpis_with_completed_data() {
-        // 3 complétées récemment (ce mois + cette semaine), séquences distinctes
+        // 3 complétées récemment, séquences distinctes. Offsets en MINUTES : `tasksResolved` compte
+        // depuis le 1er du mois (`m0`) et `velocity` sur 7 jours → l'ancien `now-1d` tombait au mois
+        // précédent le 1er du mois (échec du 1er septembre). Des minutes restent toujours dans les deux fenêtres.
         var status = issueStatusRepository.save(com.taskforce.tf_api.core.model.IssueStatus.builder()
             .project(project).name("Done").category(IssueStatusCategory.COMPLETED).build());
-        LocalDateTime[] when = { LocalDateTime.now().minusMinutes(1), LocalDateTime.now().minusHours(2), LocalDateTime.now().minusDays(1) };
+        LocalDateTime[] when = { LocalDateTime.now().minusMinutes(1), LocalDateTime.now().minusMinutes(2), LocalDateTime.now().minusMinutes(3) };
         for (int i = 0; i < when.length; i++) {
             issueRepository.save(com.taskforce.tf_api.core.model.Issue.builder()
                 .project(project).status(status).reporter(owner).assignee(owner)

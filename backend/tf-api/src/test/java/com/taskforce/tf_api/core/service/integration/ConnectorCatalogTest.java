@@ -221,13 +221,14 @@ class ConnectorCatalogTest {
     }
 
     @Test
-    @DisplayName("les connecteurs génériques observent sans agir")
+    @DisplayName("les connecteurs génériques observent + sont MCP-connectables, sans « act » écrit à la main")
     void connecteursGeneriquesObserventSeulement() {
         // « act » suppose une intégration écrite à la main (comme GitHub/Slack) : un connecteur
-        // générique ne doit jamais l'annoncer.
+        // générique ne doit jamais l'annoncer. Il porte « mcp » (branchable comme serveur MCP externe,
+        // écritures validées humainement) en plus d'« observe » depuis le pont MCP-catalogue.
         assertThat(catalogue.all())
             .filteredOn(d -> d.docsUrl() == null)
-            .allSatisfy(d -> assertThat(d.capabilities()).containsExactly("observe"));
+            .allSatisfy(d -> assertThat(d.capabilities()).containsExactly("observe", "mcp"));
     }
 
     // ── Utilitaire ───────────────────────────────────────────────────────────

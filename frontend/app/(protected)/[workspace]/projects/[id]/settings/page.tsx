@@ -43,6 +43,7 @@ import {
 import { BrandLogo } from "@/components/ui/brand-logo"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
+import { getErrorMessage } from "@/lib/api/client"
 import { useProjectStore } from "@/lib/store/project-store"
 import { useLabelStore } from "@/lib/store/label-store"
 import type { ProjectStatus } from "@/lib/api/project-service"
@@ -155,8 +156,13 @@ export default function ProjectSettingsPage() {
 
   async function handleDelete() {
     if (deleteConfirm !== activeProject!.name) return
-    await deleteProject(workspace, projectId)
-    toast.error("Project deleted", { description: `${activeProject!.name} has been deleted.` })
+    // Le store avale l'erreur : sans ce garde, on toastait « supprimé » et on naviguait sur un échec.
+    const ok = await deleteProject(workspace, projectId)
+    if (!ok) {
+      toast.error("Couldn't delete project")
+      return
+    }
+    toast.success("Project deleted", { description: `${activeProject!.name} has been deleted.` })
     setDeleteOpen(false)
     router.push(`/${workspace}/projects`)
   }
@@ -167,12 +173,19 @@ export default function ProjectSettingsPage() {
     e.preventDefault()
     if (!newLabelName.trim()) return
     setAddingLabel(true)
-    await addLabel(workspace, projectId, { name: newLabelName.trim(), color: newLabelColor, description: newLabelDesc.trim() || undefined })
-    setNewLabelName("")
-    setNewLabelColor("#6366f1")
-    setNewLabelDesc("")
-    setAddingLabel(false)
-    toast.success("Label created")
+    // Le store propage l'erreur (throw) : sans try/catch le spinner restait bloqué et l'échec muet.
+    try {
+      await addLabel(workspace, projectId, { name: newLabelName.trim(), color: newLabelColor, description: newLabelDesc.trim() || undefined })
+      // On ne vide les champs qu'en cas de succès (sinon on perd la saisie sur un échec).
+      setNewLabelName("")
+      setNewLabelColor("#6366f1")
+      setNewLabelDesc("")
+      toast.success("Label created")
+    } catch (e) {
+      toast.error(getErrorMessage(e))
+    } finally {
+      setAddingLabel(false)
+    }
   }
 
   function startEditLabel(l: typeof projectLabels[0]) {
@@ -183,14 +196,24 @@ export default function ProjectSettingsPage() {
   }
 
   async function handleSaveEditLabel(labelId: number) {
-    await editLabel(workspace, projectId, labelId, { name: editLabelName.trim() || undefined, color: editLabelColor || undefined, description: editLabelDesc.trim() || undefined })
-    setEditingLabelId(null)
-    toast.success("Label updated")
+    // Le store propage l'erreur (throw) : on garde la ligne en édition ouverte sur un échec.
+    try {
+      await editLabel(workspace, projectId, labelId, { name: editLabelName.trim() || undefined, color: editLabelColor || undefined, description: editLabelDesc.trim() || undefined })
+      setEditingLabelId(null)
+      toast.success("Label updated")
+    } catch (e) {
+      toast.error(getErrorMessage(e))
+    }
   }
 
   async function handleDeleteLabel(labelId: number) {
-    await removeLabel(workspace, projectId, labelId)
-    toast.success("Label deleted")
+    // Le store propage l'erreur (throw) : sans try/catch la suppression échouait en silence.
+    try {
+      await removeLabel(workspace, projectId, labelId)
+      toast.success("Label deleted")
+    } catch (e) {
+      toast.error(getErrorMessage(e))
+    }
   }
 
   return (

@@ -20,7 +20,8 @@ interface WorkflowState {
   fetchJobs: (slug: string) => Promise<void>
   launch: (slug: string, projectId: number, depth: AnalysisDepth) => Promise<AnalysisJob | null>
   answer: (slug: string, jobId: number, answer: string) => Promise<boolean>
-  dismissJob: (slug: string, jobId: number) => Promise<void>
+  /** Archive un job terminé. Renvoie `false` si l'appel échoue (échec détectable côté composant). */
+  dismissJob: (slug: string, jobId: number) => Promise<boolean>
   /** Upsert d'un job reçu en temps réel (STOMP) ou par polling. */
   applyJobUpdate: (job: AnalysisJob) => void
 
@@ -85,8 +86,9 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     try {
       await dismissAnalysisJob(slug, jobId)
       set((s) => ({ jobs: s.jobs.filter((j) => j.id !== jobId) }))
+      return true
     } catch {
-      /* ignore */
+      return false
     }
   },
 

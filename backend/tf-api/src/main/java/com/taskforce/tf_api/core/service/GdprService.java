@@ -24,9 +24,11 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * Droits des personnes RGPD (CERT-C11.3) : portabilité (export) et droit à l'effacement.
  *
- * <p>L'effacement est une <b>anonymisation</b> (pas un hard-delete) : les données personnelles
- * de l'utilisateur sont effacées/neutralisées et son accès révoqué, mais l'intégrité référentielle
- * (issues, commentaires, historique) est préservée — approche RGPD-compatible et non destructive.</p>
+ * <p>L'effacement supprime tout le <b>footprint</b> du compte (workspaces possédés + leur contenu en
+ * cascade, appartenances, profils de compétences, secret 2FA) et l'identité Keycloak, puis
+ * <b>anonymise le row {@code User} résiduel</b> (tombstone) au lieu d'un hard-delete : ce qui reste ne
+ * porte plus aucune donnée personnelle mais préserve l'intégrité référentielle des contenus laissés
+ * dans les workspaces d'autrui (issues, commentaires). Approche RGPD-compatible.</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -134,7 +136,21 @@ public class GdprService {
 
         final String keycloakId = u.getKeycloakId();
 
-        // Anonymisation des données personnelles
+        // Supprimer tout le « footprint » du compte AVANT d'anonymiser le row résiduel — sinon la
+        // suppression laissait derrière elle les workspaces créés, les appartenances et les données
+        // perso (« ça ne supprime pas tout le compte »). En SQL brut (et NON via des delete d'entités
+        // JPA) volontairement : supprimer une entité Workspace managée alors qu'un WorkspaceMember la
+        // référence encore en session lève TransientPropertyValueException à l'auto-flush suivant. La
+        // cascade DB (FK ON DELETE CASCADE) fait le ménage sous les workspaces possédés
+        // (projets, issues, membres, invitations, profils de compétences rattachés).
+        int workspacesDeleted = jdbcTemplate.update("DELETE FROM workspaces WHERE owner_id = ?", userId);
+        jdbcTemplate.update("DELETE FROM workspace_members WHERE user_id = ?", userId);      // appartenances chez d'autres
+        jdbcTemplate.update("DELETE FROM member_skill_profiles WHERE user_id = ?", userId);  // profils (autres workspaces)
+        jdbcTemplate.update("DELETE FROM user_two_factor WHERE user_id = ?", userId);        // secret 2FA (TOTP)
+
+        // Anonymiser le row résiduel (tombstone) : conservé UNIQUEMENT pour l'intégrité référentielle
+        //    des contenus laissés dans les workspaces d'autrui (issues, commentaires) ; il ne porte plus
+        //    aucune donnée personnelle et l'accès est coupé.
         u.setEmail("deleted-" + u.getId() + "@anonymized.invalid");
         u.setDisplayName(null);
         u.setAvatarUrl(null);
@@ -148,8 +164,9 @@ public class GdprService {
         // invalide toutes les sessions/refresh tokens. Plus de table de refresh tokens custom.
 
         auditService.record(null, userId, AuditService.GDPR_DELETE,
-            "User", String.valueOf(userId), Map.of("anonymized", true));
-        log.info("Compte {} anonymisé (droit à l'effacement RGPD)", userId);
+            "User", String.valueOf(userId), Map.of("anonymized", true, "workspacesDeleted", workspacesDeleted));
+        log.info("Compte {} effacé : {} workspace(s) possédé(s) supprimé(s), données perso purgées, row anonymisé",
+            userId, workspacesDeleted);
 
         // Suppression de l'identité Keycloak APRÈS commit : l'appel IdP externe ne doit pas
         // pouvoir annuler l'anonymisation locale déjà validée (préoccupation ACID). TF-RGPD-007.

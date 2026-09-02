@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
-import { Send, Sparkles, MessageSquare, ChevronDown, Plus, Trash2, ArrowUpRight } from "lucide-react"
+import { Send, Sparkles, MessageSquare, ChevronDown, Plus, Trash2, ArrowUpRight, Plug } from "lucide-react"
 import {
   Message, Steps, Reasoning, Tool, Sources, ThinkingBar, FeedbackBar, PromptSuggestion, TokenMeter,
   type ToolStatus,
@@ -16,6 +16,7 @@ import {
   listConversations, getConversation, deleteConversation,
   type ConversationSummary, type ConversationMessage,
 } from "@/lib/api/ai-conversation-service"
+import { getMcpServers } from "@/lib/api/integration-service"
 import { CortexUsage } from "./cortex-usage"
 
 interface Turn {
@@ -98,6 +99,11 @@ export function AgentChat() {
   const [convTokens, setConvTokens] = useState(0) // empreinte de la conversation (jauge de contexte)
   const [showList, setShowList] = useState(false)
 
+  // Outils MCP externes live (serveurs connectés joignables) - surfacés dans l'empty-state pour que la
+  // personne voie que Cortex peut AGIR, pas seulement lire le Brain. Best-effort : un plan sans
+  // intégrations (409) ou l'absence de serveur MCP donne simplement une liste vide (rien d'affiché).
+  const [mcpTools, setMcpTools] = useState<{ connector: string; name: string }[]>([])
+
   const [elapsed, setElapsed] = useState(0)
   const [lastMs, setLastMs] = useState<number | null>(null)
   const startRef = useRef<number>(0)
@@ -110,6 +116,23 @@ export function AgentChat() {
   }, [slug])
 
   useEffect(() => { void loadConversations() }, [loadConversations])
+
+  // Découvre les outils MCP live du workspace (best-effort, non bloquant).
+  useEffect(() => {
+    if (!slug) return
+    let cancelled = false
+    getMcpServers(slug)
+      .then((servers) => {
+        if (cancelled) return
+        setMcpTools(
+          servers
+            .filter((s) => s.reachable)
+            .flatMap((s) => s.tools.map((name) => ({ connector: s.connectorKey, name }))),
+        )
+      })
+      .catch(() => { /* plan sans intégrations (409) ou aucun serveur MCP → rien à surfacer */ })
+    return () => { cancelled = true }
+  }, [slug])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -275,6 +298,30 @@ export function AgentChat() {
                 <PromptSuggestion key={s} onClick={() => send(s)}>{s}</PromptSuggestion>
               ))}
             </div>
+
+            {/* Outils externes (MCP) live : montre que Cortex peut AGIR, pas seulement citer le Brain.
+                N'apparaît que si un serveur MCP joignable est connecté (plan BUSINESS+). */}
+            {mcpTools.length > 0 && (
+              <div className="mt-1 w-full rounded-lg border border-border/60 bg-muted/30 p-2.5 text-left">
+                <p className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+                  <Plug className="size-3 shrink-0" /> It can also act on your connected tools
+                </p>
+                <div className="mt-1.5 flex flex-wrap gap-1">
+                  {mcpTools.slice(0, 10).map((t) => (
+                    <span
+                      key={`${t.connector}-${t.name}`}
+                      title={`${t.connector}: ${t.name}`}
+                      className="rounded-md border border-border/60 bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                    >
+                      {t.name}
+                    </span>
+                  ))}
+                  {mcpTools.length > 10 && (
+                    <span className="self-center text-[10px] text-muted-foreground">+{mcpTools.length - 10} more</span>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           turns.map((t) =>

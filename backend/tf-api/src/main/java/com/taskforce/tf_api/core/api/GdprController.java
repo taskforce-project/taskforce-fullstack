@@ -36,12 +36,12 @@ public class GdprController {
         return ResponseEntity.ok(ApiResponse.success("Données exportées", gdprService.exportMyData(userId)));
     }
 
-    /** Droit à l'effacement : anonymise mon compte et révoque l'accès. */
+    /** Droit à l'effacement : supprime le footprint du compte (workspaces, données perso, IdP) et révoque l'accès. */
     @DeleteMapping("/account")
     public ResponseEntity<ApiResponse<Void>> deleteMyAccount(@AuthenticationPrincipal Jwt jwt) {
         Long userId = resolveUserId(jwt);
         gdprService.deleteMyAccount(userId);
-        return ResponseEntity.ok(ApiResponse.success("Compte anonymisé", null));
+        return ResponseEntity.ok(ApiResponse.success("Compte supprimé", null));
     }
 
     private Long resolveUserId(Jwt jwt) {
