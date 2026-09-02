@@ -132,10 +132,12 @@ const LABEL_COLORS: Record<string, string> = {
 function IssueRow({ issue, slug }: Readonly<{ issue: Issue; slug: string }>) {
   const status   = STATUS_CONFIG[issue.status]
   const priority = PRIORITY_CONFIG[issue.priority]
-  const { deleteIssue } = useIssueStore()
+  const { deleteIssueWithUndo } = useIssueStore()
 
-  async function handleDelete() {
-    await deleteIssue(slug, Number.parseInt(issue.project.id, 10), Number.parseInt(issue.id, 10))
+  // Suppression différée annulable : le store retire l'issue en optimiste, affiche un toast « Undo »
+  // (~6 s) et ne lance le vrai DELETE qu'à l'expiration. Toast succès/échec gérés par le store.
+  function handleDelete() {
+    deleteIssueWithUndo(slug, Number.parseInt(issue.project.id, 10), Number.parseInt(issue.id, 10))
   }
 
   return (

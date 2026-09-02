@@ -391,6 +391,9 @@ export const INTEGRATION_ROUTES = {
   CATALOG:           (slug: string) => `/api/workspaces/${slug}/integrations/catalog`,
   /** Connexion générique d'un connecteur du catalogue (POST config / DELETE) */
   CONNECTOR:         (slug: string, key: string) => `/api/workspaces/${slug}/integrations/connectors/${key}`,
+  /** Serveurs MCP externes du workspace (GET statut · POST connect · DELETE par clé) → outils live dans Cortex */
+  MCP_SERVERS:       (slug: string) => `/api/workspaces/${slug}/mcp/servers`,
+  MCP_SERVER:        (slug: string, key: string) => `/api/workspaces/${slug}/mcp/servers/${key}`,
   /** Plane (connecteur clé API → ingestion Brain OS) */
   PLANE_STATUS:      (slug: string) => `/api/workspaces/${slug}/integrations/plane/status`,
   PLANE_CONNECT:     (slug: string) => `/api/workspaces/${slug}/integrations/plane/connect`,

@@ -19,6 +19,8 @@ import { MarkdownEditor } from "@/components/brain/markdown-editor"
 import { Markdown } from "@/components/ui/lightweight-markdown"
 import { DeleteConfirmDialog } from "@/components/dialogs/delete-confirm-dialog"
 import { uploadBrainFile, type KnowledgeNode } from "@/lib/api/brain-service"
+import { toast } from "sonner"
+import { getErrorMessage } from "@/lib/api/client"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -335,7 +337,15 @@ export default function BrainPage() {
               key={selected.id}
               slug={slug}
               node={selected}
-              onDelete={async () => removeNode(slug, selected.id)}
+              onDelete={async () => {
+                // removeNode THROW ; la confirmation avale la promesse (void) -> on notifie ici.
+                try {
+                  await removeNode(slug, selected.id)
+                  toast.success("Node deleted")
+                } catch (e) {
+                  toast.error(getErrorMessage(e))
+                }
+              }}
             />
           ) : (
             <div className="flex h-full flex-col items-center justify-center gap-4 px-6 text-center">
@@ -455,7 +465,10 @@ function NodeDetail({
     setSaving(true)
     try {
       await editNode(slug, node.id, { title, content, tags })
+      toast.success("Node saved")
       setEditing(false)
+    } catch (e) {
+      toast.error(getErrorMessage(e))
     } finally {
       setSaving(false)
     }
@@ -628,8 +641,11 @@ function CreateNodeDialog({
     setSaving(true)
     try {
       await addNode(slug, { type, domain, title: title.trim(), content })
+      toast.success("Node created")
       reset()
       onOpenChange(false)
+    } catch (e) {
+      toast.error(getErrorMessage(e))
     } finally {
       setSaving(false)
     }

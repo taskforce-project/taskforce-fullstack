@@ -2,7 +2,6 @@
 
 import { usePreferencesStore } from "@/lib/store/preferences-store";
 import { Moon, Sun, ArrowLeft } from "lucide-react";
-import { Toaster } from "@/components/ui/sonner";
 import { useSyncExternalStore } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -113,8 +112,6 @@ export default function AuthLayout({
       <main className="auth-main">{children}</main>
 
       <AppFooter bleed={false} />
-
-      <Toaster position="top-center" richColors closeButton />
     </div>
   );
 }

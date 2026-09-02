@@ -969,7 +969,8 @@ class AuthServiceTest {
 
             when(stripeService.getCheckoutSession("session_123")).thenReturn(stripeSession);
             when(stripeService.retrieveCustomer("cus_123")).thenReturn(stripeCustomer);
-            when(otpService.getLatestOtp(TEST_EMAIL)).thenReturn(otpVerification);
+            // Plus de stub OTP : pour un utilisateur DÉJÀ en base, le forfait vient des métadonnées de
+            // session (upgrade in-app), plus de l'OTP → getLatestOtp n'est jamais appelé sur ce chemin.
             when(userRepository.existsByEmail(TEST_EMAIL)).thenReturn(true);
             when(userRepository.findByEmail(TEST_EMAIL)).thenReturn(Optional.of(existingUser));
             when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));

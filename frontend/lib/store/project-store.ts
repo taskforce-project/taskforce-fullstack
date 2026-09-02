@@ -41,8 +41,8 @@ interface ProjectState {
   /** Bascule l'état favori d'un projet (optimiste) */
   toggleFavorite: (slug: string, id: number, next: boolean) => Promise<Project | null>;
 
-  /** Supprime un projet du store */
-  deleteProject: (slug: string, id: number) => Promise<void>;
+  /** Supprime un projet du store. `true` si supprimé, `false` si l'appel a échoué (erreur avalée). */
+  deleteProject: (slug: string, id: number) => Promise<boolean>;
 
   /** Définit le projet actif */
   setActiveProject: (project: Project | null) => void;
@@ -152,9 +152,11 @@ export const useProjectStore = create<ProjectState>((set) => ({
         projects: state.projects.filter((p) => p.id !== id),
         activeProject: state.activeProject?.id === id ? null : state.activeProject,
       }));
+      return true;
     } catch (err) {
       const message = err instanceof Error ? err.message : "Erreur lors de la suppression du projet";
       set({ error: message });
+      return false;
     }
   },
 }));

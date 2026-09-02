@@ -52,6 +52,7 @@ import { cn } from "@/lib/utils"
 import { useIssueStore } from "@/lib/store/issue-store"
 import { useProjectRealtime } from "@/lib/hooks/use-project-realtime"
 import { downloadProjectExport } from "@/lib/api/project-service"
+import { notifyProgress } from "@/lib/notify"
 import { toast } from "sonner"
 import type { Issue, IssueStatus, IssueStatusCategory, IssuePriority } from "@/lib/api/issue-service"
 
@@ -438,8 +439,14 @@ function AddColumnPopover({
     const trimmed = name.trim()
     if (!trimmed) return
     setLoading(true)
-    await createStatus(workspaceSlug, projectId, { name: trimmed, category, color })
+    const created = await createStatus(workspaceSlug, projectId, { name: trimmed, category, color })
     setLoading(false)
+    if (!created) {
+      // On ne ferme/réinitialise le formulaire que si la colonne a bien été créée ; sinon on toaste
+      // l'échec et on laisse l'utilisateur réessayer (la nouvelle colonne apparaissant = succès visible).
+      toast.error("Couldn't create column")
+      return
+    }
     setName("")
     setCategory("UNSTARTED")
     setColor("#6366f1")
@@ -593,22 +600,28 @@ export default function ProjectBoardPage() {
 
   async function handleStatusChange(issueId: number, statusId: number) {
     if (!workspace) return
-    await updateIssue(workspace, projectId, issueId, { statusId })
+    // Succès muet : la carte change de colonne (UI). On ne signale que l'échec (updateIssue → null).
+    const ok = await updateIssue(workspace, projectId, issueId, { statusId })
+    if (!ok) toast.error("Couldn't move issue")
   }
 
   async function handleDeleteStatus(statusId: number) {
     if (!workspace) return
-    await deleteStatus(workspace, projectId, statusId)
+    // Échec fréquent : 409 quand la colonne contient encore des issues.
+    const ok = await deleteStatus(workspace, projectId, statusId)
+    if (!ok) toast.error("Couldn't delete column - move its issues first")
   }
 
   async function handleRenameStatus(statusId: number, name: string) {
     if (!workspace) return
-    await updateStatus(workspace, projectId, statusId, { name })
+    const ok = await updateStatus(workspace, projectId, statusId, { name })
+    if (!ok) toast.error("Couldn't rename column")
   }
 
   async function handleChangeColor(statusId: number, color: string) {
     if (!workspace) return
-    await updateStatus(workspace, projectId, statusId, { color })
+    const ok = await updateStatus(workspace, projectId, statusId, { color })
+    if (!ok) toast.error("Couldn't update column color")
   }
 
   function handleDragStart(event: DragStartEvent) {
@@ -629,17 +642,23 @@ export default function ProjectBoardPage() {
     const overData = event.over?.data.current as { statusId?: number } | undefined
     if (!workspace || !activeData?.issueId || !overData?.statusId) return
     if (activeData.statusId === overData.statusId) return
-    // updateIssue met à jour le store de façon optimiste (la card se déplace immédiatement)
-    await updateIssue(workspace, projectId, activeData.issueId, { statusId: overData.statusId })
+    // Succès muet : la carte se déplace dans sa nouvelle colonne (UI). On ne signale que l'échec.
+    const ok = await updateIssue(workspace, projectId, activeData.issueId, { statusId: overData.statusId })
+    if (!ok) toast.error("Couldn't move issue")
   }
 
   // Export COMPLET du projet (serveur) - issues + descriptions + commentaires + activité (P1b bêta).
+  // Barre de progression (progression réelle du téléchargement) au lieu d'un simple appel muet.
   async function exportProject(format: "csv" | "json") {
     if (!workspace) return
+    const progress = notifyProgress(`Exporting ${format.toUpperCase()}`, {
+      description: "Preparing your project export…",
+    })
     try {
-      await downloadProjectExport(workspace, projectId, format)
+      await downloadProjectExport(workspace, projectId, format, (pct) => progress.setProgress(pct))
+      progress.success("Export ready")
     } catch {
-      toast.error("Export failed. Please try again.")
+      progress.error("Export failed. Please try again.")
     }
   }
 

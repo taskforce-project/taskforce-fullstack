@@ -200,9 +200,14 @@ export function CreateIssueDialog({
         labelIds: selectedLabelIds.length ? selectedLabelIds : undefined,
       })
       if (issue) {
+        toast.success("Issue created")
         onCreated?.(issue)
         resetForm()
         setOpen(false)
+      } else {
+        // createIssue avale l'erreur et renvoie null → on signale l'échec ici (le succès, lui,
+        // ferme le dialog et fait apparaître l'issue).
+        toast.error("Couldn't create issue")
       }
     } finally {
       setIsCreating(false)

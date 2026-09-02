@@ -34,8 +34,9 @@ interface DeleteConfirmDialogProps {
    * workspace) pour activer le bouton de suppression. Anti-suppression accidentelle (RGPD-02).
    */
   readonly confirmText?: string
-  /** Libellé au-dessus du champ de saisie (défaut générique). */
-  readonly confirmTextLabel?: string
+  /** Libellé au-dessus du champ de saisie (défaut générique). Nœud React : accepte du texte enrichi
+   *  (ex. l'email en gras à ressaisir), comme le défaut interne. */
+  readonly confirmTextLabel?: React.ReactNode
   /** Mode contrôlé (ex. déclenché depuis un menu) - si fourni, le trigger interne est optionnel. */
   readonly open?: boolean
   readonly onOpenChange?: (open: boolean) => void

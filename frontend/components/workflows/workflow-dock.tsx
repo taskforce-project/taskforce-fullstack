@@ -114,7 +114,11 @@ function JobCard({ slug, job }: Readonly<{ slug: string; job: AnalysisJob }>) {
             {!isActiveJob(job.status) && (
               <button
                 type="button"
-                onClick={() => dismissJob(slug, job.id)}
+                onClick={async () => {
+                  // Succès visible (le job disparaît de la liste) -> pas de toast succès, seulement l'échec.
+                  const ok = await dismissJob(slug, job.id)
+                  if (!ok) toast.error("Could not archive")
+                }}
                 className="ml-auto flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
                 <Trash2 className="size-3" /> Archive

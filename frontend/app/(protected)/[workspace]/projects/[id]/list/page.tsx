@@ -10,6 +10,7 @@ import {
   ArrowUpRight,
   ChevronDown,
 } from "lucide-react"
+import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { cn } from "@/lib/utils"
@@ -199,7 +200,9 @@ export default function ProjectListPage() {
       ?? statuses.find((s) => s.category === "BACKLOG")
     const target = issue.status.category === "COMPLETED" ? reopen : done
     if (target && target.id !== issue.status.id) {
-      await updateIssue(workspace, projectId, issue.id, { statusId: target.id })
+      // Succès muet : la ligne bascule (barré / coché). On ne signale que l'échec (updateIssue → null).
+      const ok = await updateIssue(workspace, projectId, issue.id, { statusId: target.id })
+      if (!ok) toast.error("Couldn't update status")
     }
   }
 

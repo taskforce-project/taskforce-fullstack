@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useParams } from "next/navigation"
+import { toast } from "sonner"
 import {
   Plus,
   RefreshCw,
@@ -110,7 +111,13 @@ function CycleCard({ cycle, slug, reload }: Readonly<{ cycle: Cycle; slug: strin
   const cycleId   = Number.parseInt(cycle.id, 10)
 
   async function handleDelete() {
-    await deleteCycle(slug, projectId, cycleId)
+    // Le store avale l'erreur : on confirme (et on recharge) seulement si la suppression a réussi.
+    const ok = await deleteCycle(slug, projectId, cycleId)
+    if (!ok) {
+      toast.error("Couldn't delete cycle")
+      return
+    }
+    toast.success("Cycle deleted")
     await reload() // la page tient un état local → sans ça, la carte supprimée restait à l'écran
   }
 
@@ -125,7 +132,12 @@ function CycleCard({ cycle, slug, reload }: Readonly<{ cycle: Cycle; slug: strin
     setBusy(true)
     try {
       const updated = await updateCycle(slug, projectId, cycleId, { status: next })
-      if (updated) await reload() // reclasse la carte dans la bonne section (Active/Upcoming/Completed)
+      if (updated) {
+        await reload() // reclasse la carte dans la bonne section (Active/Upcoming/Completed)
+      } else {
+        // updateCycle renvoie null quand le store a avalé l'erreur - sinon l'échec passait inaperçu.
+        toast.error("Couldn't update cycle")
+      }
     } finally {
       setBusy(false)
     }
