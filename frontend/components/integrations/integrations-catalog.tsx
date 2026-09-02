@@ -422,7 +422,7 @@ function ConnectorDialog({
 
   useEffect(() => { if (tool.connected) loadConnected() }, [tool.connected, loadConnected])
 
-  // Statut du serveur MCP de ce connecteur (si déjà branché) — à l'ouverture.
+  // Statut du serveur MCP de ce connecteur (si déjà branché) - à l'ouverture.
   useEffect(() => {
     if (!isMcp) return
     getMcpServers(slug)
