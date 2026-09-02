@@ -101,9 +101,11 @@ export function ProjectTeamsSection({ workspace, projectId }: ProjectTeamsSectio
       if (linked) {
         await detachProjectTeam(workspace, projectId, team.id)
         setLinkedIds((prev) => { const n = new Set(prev); n.delete(team.id); return n })
+        toast.success("Unlinked")
       } else {
         await attachProjectTeam(workspace, projectId, team.id)
         setLinkedIds((prev) => new Set(prev).add(team.id))
+        toast.success("Linked")
       }
     } catch (err) {
       // 409 = plafond Free du projet privé (collaborateurs via équipe compris) → message clair + upsell.

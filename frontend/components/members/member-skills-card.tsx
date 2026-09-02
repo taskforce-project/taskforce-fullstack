@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { Sparkles, X, Plus, Loader2, Save, Pencil } from "lucide-react"
 import { toast } from "sonner"
+import { getErrorMessage } from "@/lib/api/client"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -124,8 +125,9 @@ export function MemberSkillsCard({ slug, userId, canEdit }: MemberSkillsCardProp
       })
       toast.success("Skills updated")
       setEditing(false)
-    } catch {
-      // erreur déjà notifiée par le client HTTP
+    } catch (e) {
+      // saveMemberSkills THROW ; 4xx (validation/permission) non toasté globalement -> on notifie ici.
+      toast.error(getErrorMessage(e))
     } finally {
       setSaving(false)
     }

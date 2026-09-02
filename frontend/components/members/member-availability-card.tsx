@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { CalendarOff, Loader2, Plus, Trash2, X } from "lucide-react"
 import { toast } from "sonner"
+import { getErrorMessage } from "@/lib/api/client"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -86,8 +87,9 @@ export function MemberAvailabilityCard({ slug, userId, canEdit }: MemberAvailabi
       await addLeave(slug, userId, { type, startDate, endDate, note: note.trim() || undefined })
       toast.success("Unavailability added")
       resetForm()
-    } catch {
-      // erreur déjà notifiée
+    } catch (e) {
+      // addLeave THROW ; 4xx non toasté globalement -> on notifie ici.
+      toast.error(getErrorMessage(e))
     } finally {
       setSaving(false)
     }
@@ -97,8 +99,9 @@ export function MemberAvailabilityCard({ slug, userId, canEdit }: MemberAvailabi
     try {
       await removeLeave(slug, userId, leaveId)
       toast.success("Unavailability removed")
-    } catch {
-      // erreur déjà notifiée
+    } catch (e) {
+      // removeLeave THROW ; 4xx non toasté globalement -> on notifie ici.
+      toast.error(getErrorMessage(e))
     }
   }
 

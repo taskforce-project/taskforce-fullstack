@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { TipTapEditor } from "@/components/editor/tiptap-editor"
 import { usePageStore } from "@/lib/store/page-store"
+import { toast } from "sonner"
+import { getErrorMessage } from "@/lib/api/client"
 import { cn } from "@/lib/utils"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty"
@@ -39,6 +41,10 @@ export default function ProjectPageDetailPage() {
     setSaving(true)
     try {
       await updatePage(slug, projectId, pageId, { content })
+      // Sauvegarde sans changement visuel immédiat -> toast crucial (risque de perte de travail).
+      toast.success("Saved")
+    } catch (e) {
+      toast.error(getErrorMessage(e))
     } finally {
       setSaving(false)
     }
