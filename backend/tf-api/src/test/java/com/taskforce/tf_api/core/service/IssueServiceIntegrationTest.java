@@ -77,6 +77,7 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
     @MockitoBean private SimpMessagingTemplate messagingTemplate;
     @MockitoBean private NotificationService notificationService;
     @MockitoBean private SlackIntegrationService slackService;  // push Slack sur issue.created (no-op en test)
+    @MockitoBean private AiGenerationService aiGenerationService;  // data flywheel : capture des recos (no-op en test)
 
     @jakarta.persistence.PersistenceContext private jakarta.persistence.EntityManager em;
 

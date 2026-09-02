@@ -24,6 +24,10 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
     @Query("SELECT w.owner.planType FROM Workspace w WHERE w.slug = :slug")
     Optional<PlanType> findOwnerPlanBySlug(@Param("slug") String slug);
 
+    /** Flag opt-in de capture du corpus IA ({@code ai_generations}) d'un workspace, sans charger l'entité. */
+    @Query("SELECT w.aiLearningEnabled FROM Workspace w WHERE w.id = :workspaceId")
+    Optional<Boolean> findAiLearningEnabledById(@Param("workspaceId") Long workspaceId);
+
     Optional<Workspace> findBySlug(String slug);
 
     boolean existsBySlug(String slug);
