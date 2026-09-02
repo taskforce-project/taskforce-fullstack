@@ -302,6 +302,15 @@ export async function disconnectMcpServer(slug: string, connectorKey: string): P
   return res.data.data;
 }
 
+/** Démarre l'OAuth 1-clic d'un serveur MCP : renvoie l'URL d'autorisation (on y redirige le navigateur). */
+export async function startMcpOAuth(slug: string, connectorKey: string, mcpUrl: string): Promise<string> {
+  const res = await apiClient.post<{ data: { authorizeUrl: string } }>(
+    INTEGRATION_ROUTES.MCP_OAUTH_START(slug, connectorKey),
+    { mcpUrl },
+  );
+  return res.data.data.authorizeUrl;
+}
+
 // ---------------------------------------------------------------------------
 // Plane (connecteur clé API → ingestion Brain OS)
 // ---------------------------------------------------------------------------
