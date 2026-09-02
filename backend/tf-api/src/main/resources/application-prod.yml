@@ -193,6 +193,12 @@ integrations:
   slack:
     client-id: ${SLACK_CLIENT_ID:}
     client-secret: ${SLACK_CLIENT_SECRET:}
+  # OAuth MCP 1-clic (TF-MCP-02) : le fournisseur redirige le navigateur vers ces bases PUBLIQUES.
+  # On reutilise les URLs prod existantes (comme les callbacks GitHub/Slack) : aucune nouvelle var d'env.
+  mcp:
+    oauth:
+      redirect-base: ${APP_API_URL:${APP_URL}}   # base publique du BACKEND (recoit le callback OAuth)
+      app-base: ${FRONTEND_URL}                   # base du FRONT (retour utilisateur apres callback)
 
 # Logging Configuration
 logging:
