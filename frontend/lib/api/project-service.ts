@@ -15,10 +15,18 @@ export async function downloadProjectExport(
   slug: string,
   projectId: number,
   format: "json" | "csv",
+  onProgress?: (pct: number) => void,
 ): Promise<void> {
   const res = await apiClient.get(PROJECT_ROUTES.EXPORT(slug, projectId), {
     params: { format },
     responseType: "blob",
+    // Progression RÉELLE du téléchargement (si le serveur envoie un Content-Length). Sinon `total`
+    // est absent → on ne pousse rien (l'appelant garde une barre à 0 puis 100 à la fin).
+    onDownloadProgress: onProgress
+      ? (e) => {
+          if (e.total) onProgress(Math.round((e.loaded / e.total) * 100));
+        }
+      : undefined,
   });
   const url = URL.createObjectURL(res.data as Blob);
   const link = document.createElement("a");

@@ -52,6 +52,7 @@ import { cn } from "@/lib/utils"
 import { useIssueStore } from "@/lib/store/issue-store"
 import { useProjectRealtime } from "@/lib/hooks/use-project-realtime"
 import { downloadProjectExport } from "@/lib/api/project-service"
+import { notifyProgress } from "@/lib/notify"
 import { toast } from "sonner"
 import type { Issue, IssueStatus, IssueStatusCategory, IssuePriority } from "@/lib/api/issue-service"
 
@@ -647,12 +648,17 @@ export default function ProjectBoardPage() {
   }
 
   // Export COMPLET du projet (serveur) - issues + descriptions + commentaires + activité (P1b bêta).
+  // Barre de progression (progression réelle du téléchargement) au lieu d'un simple appel muet.
   async function exportProject(format: "csv" | "json") {
     if (!workspace) return
+    const progress = notifyProgress(`Exporting ${format.toUpperCase()}`, {
+      description: "Preparing your project export…",
+    })
     try {
-      await downloadProjectExport(workspace, projectId, format)
+      await downloadProjectExport(workspace, projectId, format, (pct) => progress.setProgress(pct))
+      progress.success("Export ready")
     } catch {
-      toast.error("Export failed. Please try again.")
+      progress.error("Export failed. Please try again.")
     }
   }
 
