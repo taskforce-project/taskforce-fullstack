@@ -23,6 +23,7 @@ import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.PlanFeatureService;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
+import com.taskforce.tf_api.core.service.mcp.McpOAuthService;
 import com.taskforce.tf_api.core.service.mcp.WorkspaceMcpService;
 import com.taskforce.tf_api.shared.dto.ApiResponse;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
@@ -51,6 +52,7 @@ public class McpActionController {
     private final WorkspaceRepository  workspaceRepository;
     private final PlanFeatureService   planFeatureService;
     private final AuthorizationService authorizationService;
+    private final McpOAuthService      mcpOAuthService;
 
     /** Exécute une action externe validée (bouton d'approbation). */
     @PostMapping("/actions/execute")
@@ -98,6 +100,19 @@ public class McpActionController {
         return ResponseEntity.ok(ApiResponse.success(workspaceMcp.serverStatuses(ws.getId())));
     }
 
+    /** Démarre l'OAuth 1-clic d'un serveur MCP : renvoie l'URL d'autorisation (le front y redirige). */
+    @PostMapping("/servers/{connectorKey}/oauth/start")
+    public ResponseEntity<ApiResponse<Map<String, String>>> oauthStart(
+        @PathVariable String slug,
+        @PathVariable String connectorKey,
+        @Valid @RequestBody McpOAuthStartRequest body,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        Workspace ws = authorizeManager(slug, jwt);
+        String url = mcpOAuthService.start(ws, resolveUserId(jwt), connectorKey, body.mcpUrl());
+        return ResponseEntity.ok(ApiResponse.success(Map.of("authorizeUrl", url)));
+    }
+
     /** Membre du workspace + plan propriétaire couvrant les intégrations (BUSINESS+), sinon 409. */
     private Workspace authorizeIntegrations(String slug, Jwt jwt) {
         Workspace ws = access.resolveAndAuthorize(slug, resolveUserId(jwt));
@@ -125,6 +140,9 @@ public class McpActionController {
 
     /** Résultat texte de l'outil externe. */
     public record McpActionResult(String toolRef, String output) {}
+
+    /** Démarrage OAuth 1-clic : l'URL du serveur MCP dont on découvre le flux OAuth. */
+    public record McpOAuthStartRequest(@NotBlank String mcpUrl) {}
 
     /** Connexion d'un serveur MCP : clé de connecteur + endpoint {@code mcpUrl} (+ token/allow-list optionnels). */
     public record McpServerRequest(

@@ -89,7 +89,10 @@ public class SecurityConfig {
         "/ws/**",
         "/ws-sockjs/**",
         "/api/integrations/github/callback",
-        "/api/integrations/slack/callback"
+        "/api/integrations/slack/callback",
+        // Callback OAuth des serveurs MCP (TF-MCP-02) : le fournisseur y redirige le navigateur ;
+        // tout est résolu depuis le `state` (anti-CSRF), aucun JWT possible sur cette redirection.
+        "/api/mcp/oauth/callback"
     };
 
     // CSP stricte pour une API REST (pas de HTML servi — aucune ressource active autorisée)

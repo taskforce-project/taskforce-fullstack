@@ -19,7 +19,7 @@ import { useIntegrationStore } from "@/lib/store/integration-store"
 import {
   getIntegrationCatalog, getPlaneStatus, connectPlane, listPlaneProjects, syncPlane, disconnectPlane,
   connectConnector, disconnectConnector,
-  getMcpServers, connectMcpServer, disconnectMcpServer,
+  getMcpServers, connectMcpServer, disconnectMcpServer, startMcpOAuth,
   type IntegrationCatalog, type ConnectorView, type PlaneProject, type PlaneStatus, type McpServerStatus,
 } from "@/lib/api/integration-service"
 
@@ -89,6 +89,18 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
   }, [slug])
 
   useEffect(() => { refresh() }, [refresh])
+
+  // Retour du callback OAuth MCP (TF-MCP-02) : ?mcp=connected|error → toast + refresh, puis on nettoie l'URL.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const mcp = params.get("mcp")
+    if (!mcp) return
+    if (mcp === "connected") { toast.success("MCP server connected via OAuth"); refresh() }
+    else if (mcp === "error") toast.error("OAuth connection failed - try again or paste a token")
+    params.delete("mcp")
+    const q = params.toString()
+    window.history.replaceState({}, "", window.location.pathname + (q ? `?${q}` : ""))
+  }, [refresh])
 
   async function handleAction(tool: ConnectorView) {
     // GitHub / Slack : OAuth 1-clic dédié (redirection). Le reste → dialog générique (formulaire).
@@ -483,6 +495,18 @@ function ConnectorDialog({
     }
   }
 
+  async function handleMcpOAuth() {
+    if (!mcpUrl.trim()) return
+    setMcpBusy(true)
+    try {
+      const authorizeUrl = await startMcpOAuth(slug, tool.key, mcpUrl.trim())
+      window.location.href = authorizeUrl // redirection vers le consentement du service (la page quitte)
+    } catch {
+      toast.error("OAuth unavailable for this server - paste an access token instead")
+      setMcpBusy(false)
+    }
+  }
+
   async function handleMcpDisconnect() {
     setMcpBusy(true)
     try {
@@ -622,25 +646,29 @@ function ConnectorDialog({
                   <span className="text-xs font-medium text-muted-foreground">MCP server URL *</span>
                   <Input type="text" placeholder="https://.../mcp" value={mcpUrl}
                          onChange={(e) => setMcpUrl(e.target.value)} autoComplete="off" />
-                  {tool.mcpSuggestedUrl ? (
-                    <span className="text-[11px] text-muted-foreground/70">
-                      Official hosted endpoint pre-filled - add your API token below to connect.
-                    </span>
-                  ) : (
-                    <span className="text-[11px] text-muted-foreground/70">
-                      Run this tool&apos;s MCP server, then paste its URL (a hosted endpoint or http://localhost:port).
-                    </span>
-                  )}
+                  <span className="text-[11px] text-muted-foreground/70">
+                    {tool.mcpSuggestedUrl
+                      ? "Official hosted endpoint pre-filled."
+                      : "Paste this tool's MCP server URL (a hosted endpoint or http://localhost:port)."}
+                  </span>
                 </label>
+                {/* 1-clic : OAuth (decouverte + DCR + PKCE) - aucun token a coller. */}
+                <Button onClick={handleMcpOAuth} disabled={mcpBusy || !mcpUrl.trim()} className="gap-1.5">
+                  {mcpBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Server className="size-3.5" />}
+                  {mcpBusy ? "Redirecting…" : "Connect with OAuth (1-click)"}
+                </Button>
+                <div className="flex items-center gap-2 text-[11px] text-muted-foreground/50">
+                  <span className="h-px flex-1 bg-border" /> or paste a token <span className="h-px flex-1 bg-border" />
+                </div>
                 <label className="flex flex-col gap-1">
                   <span className="text-xs font-medium text-muted-foreground">Access token (optional)</span>
                   <Input type="password" value={mcpToken}
                          onChange={(e) => setMcpToken(e.target.value)} autoComplete="off" />
                 </label>
                 <DialogFooter>
-                  <Button onClick={handleMcpConnect} disabled={mcpBusy || !mcpUrl.trim()} className="gap-1.5">
+                  <Button variant="outline" onClick={handleMcpConnect} disabled={mcpBusy || !mcpUrl.trim()} className="gap-1.5">
                     {mcpBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Plug className="size-3.5" />}
-                    {mcpBusy ? "Connecting…" : "Connect MCP server"}
+                    Connect with URL + token
                   </Button>
                 </DialogFooter>
               </div>

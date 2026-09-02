@@ -64,6 +64,7 @@ public class WorkspaceMcpService {
     private final PlanFeatureService planFeatureService;
     private final McpClient client;
     private final ObjectMapper objectMapper;
+    private final McpTokenService tokenService; // OAuth (TF-MCP-02) : access token géré + refresh auto
 
     @Value("${integrations.mcp.tools-cache-ttl-ms:60000}")
     private long cacheTtlMs;
@@ -237,8 +238,15 @@ public class WorkspaceMcpService {
         Map<String, String> config = readConfig(conn.getConfig());
         String url = config.getOrDefault(CONFIG_URL, "").trim();
         if (url.isEmpty()) return null;
-        String token = config.getOrDefault(CONFIG_TOKEN, "").trim();
-        return new McpClient.ServerRef(conn.getConnectorKey(), url, token.isEmpty() ? null : token);
+        // OAuth (TF-MCP-02) : access token géré (refresh auto) ; sinon token collé (bring-your-own).
+        String token;
+        if (tokenService.isOAuth(config)) {
+            token = tokenService.validAccessToken(conn);
+        } else {
+            String pasted = config.getOrDefault(CONFIG_TOKEN, "").trim();
+            token = pasted.isEmpty() ? null : pasted;
+        }
+        return new McpClient.ServerRef(conn.getConnectorKey(), url, token);
     }
 
     private Map<String, String> readConfig(String json) {
