@@ -46,6 +46,7 @@ class WorkspaceMcpServiceTest {
     @Mock private WorkspaceRepository workspaceRepository;
     @Mock private PlanFeatureService planFeatureService;
     @Mock private McpClient client;
+    @Mock private McpTokenService tokenService; // OAuth (TF-MCP-02) : non-OAuth par défaut en test (isOAuth=false)
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private WorkspaceMcpService service;
@@ -55,7 +56,7 @@ class WorkspaceMcpServiceTest {
 
     @BeforeEach
     void setup() {
-        service = new WorkspaceMcpService(repository, workspaceRepository, planFeatureService, client, objectMapper);
+        service = new WorkspaceMcpService(repository, workspaceRepository, planFeatureService, client, objectMapper, tokenService);
         ReflectionTestUtils.setField(service, "cacheTtlMs", 60_000L);
     }
 
