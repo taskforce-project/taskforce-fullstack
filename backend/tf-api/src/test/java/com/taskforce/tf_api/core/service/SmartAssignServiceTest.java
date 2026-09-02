@@ -29,6 +29,7 @@ import com.taskforce.tf_api.core.dto.request.SmartAssignPreviewRequest;
 import com.taskforce.tf_api.core.dto.response.BulkSmartAssignItemResponse;
 import com.taskforce.tf_api.core.dto.response.SmartAssignCandidateResponse;
 import com.taskforce.tf_api.core.dto.response.SmartAssignResponse;
+import com.taskforce.tf_api.core.enums.AiGenerationKind;
 import com.taskforce.tf_api.core.enums.IssuePriority;
 import com.taskforce.tf_api.core.enums.IssueStatusCategory;
 import com.taskforce.tf_api.core.model.Issue;
@@ -93,6 +94,7 @@ class SmartAssignServiceTest {
     @Mock private LlmClient llm;   // on mocke l'INTERFACE, jamais une impl concrete (TF-AI-GROQ-CLEANUP)
     @Mock private JdbcTemplate jdbcTemplate;
     @Mock private AiUsageService aiUsageService; // dép. du vrai AiMeter (pass-through en test)
+    @Mock private AiGenerationService aiGenerationService; // data flywheel : capture des recos (no-op en test)
 
     private SmartAssignService service;
 
@@ -106,7 +108,8 @@ class SmartAssignServiceTest {
         AiMeter aiMeter = new AiMeter(aiUsageService, llm);
         service = new SmartAssignService(
             workspaceRepository, workspaceMemberRepository, projectRepository,
-            projectMemberRepository, issueRepository, llm, jdbcTemplate, new ObjectMapper(), aiMeter);
+            projectMemberRepository, issueRepository, llm, jdbcTemplate, new ObjectMapper(), aiMeter,
+            aiGenerationService);
         ReflectionTestUtils.setField(service, "modelName", "test-model");
 
         workspace = Workspace.builder().id(WS_ID).slug(SLUG).name("Demo").build();
@@ -400,6 +403,13 @@ class SmartAssignServiceTest {
             // assignment_events inséré (5 args) + ai_runs inséré
             verify(jdbcTemplate).update(contains("assignment_events"), any(), any(), any(), any(), any());
             verify(jdbcTemplate).update(contains("ai_runs"), any(), any(), any(), any(), any(), any(), any(), any());
+
+            // Data flywheel : le gate appelle record() avec la reco (top-1) comme draft SMART_ASSIGN.
+            ArgumentCaptor<AiGenerationService.Capture> capture = ArgumentCaptor.forClass(AiGenerationService.Capture.class);
+            verify(aiGenerationService).record(capture.capture());
+            assertThat(capture.getValue().kind()).isEqualTo(AiGenerationKind.SMART_ASSIGN);
+            assertThat(capture.getValue().requestRef()).isEqualTo("500");
+            assertThat(capture.getValue().draft()).containsEntry("userId", 10L);
         }
 
         @Test

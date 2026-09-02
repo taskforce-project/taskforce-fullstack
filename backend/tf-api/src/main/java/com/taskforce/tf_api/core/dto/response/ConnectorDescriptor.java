@@ -26,5 +26,8 @@ public record ConnectorDescriptor(
     /** Aide affichée en tooltip : où/comment récupérer la clé quand ce n'est pas du 1-clic OAuth. */
     String setupHint,
     /** Site officiel du service (homepage) — lien affiché dans la fiche détaillée. Null si inconnu. */
-    String websiteUrl
+    String websiteUrl,
+    /** URL d'un serveur MCP DISTANT hébergé (officiel) pour cet outil, pré-remplie (éditable) dans le
+     *  dialog Connect → « MCP-ready » 1-clic. Null si l'outil n'expose pas d'endpoint MCP hébergé. */
+    String mcpSuggestedUrl
 ) {}

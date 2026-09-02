@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -43,6 +44,7 @@ import com.taskforce.tf_api.core.dto.response.IssueTypeResponse;
 import com.taskforce.tf_api.core.dto.response.IssueSummaryResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectLabelResponse;
 import com.taskforce.tf_api.core.dto.response.UserSummaryResponse;
+import com.taskforce.tf_api.core.enums.AiGenerationKind;
 import com.taskforce.tf_api.core.enums.IssueActivityType;
 import com.taskforce.tf_api.core.enums.IssuePriority;
 import com.taskforce.tf_api.core.enums.IssueRelationType;
@@ -109,6 +111,7 @@ public class IssueService {
     private final ProjectVisibilityGuard        visibilityGuard;
     private final PlanFeatureService            planFeatureService;
     private final ApplicationEventPublisher     events;
+    private final AiGenerationService           aiGenerationService; // data flywheel : finalise les recos smart-assign
 
     /** Plafond d'issues du forfait Free (par workspace). Payant = illimité. */
     private static final long FREE_ISSUE_LIMIT = 250;
@@ -137,7 +140,8 @@ public class IssueService {
         SlackIntegrationService slackService,
         ProjectVisibilityGuard visibilityGuard,
         PlanFeatureService planFeatureService,
-        ApplicationEventPublisher events
+        ApplicationEventPublisher events,
+        AiGenerationService aiGenerationService
     ) {
         this.issueRepository = issueRepository;
         this.issueStatusRepository = issueStatusRepository;
@@ -159,6 +163,7 @@ public class IssueService {
         this.visibilityGuard = visibilityGuard;
         this.planFeatureService = planFeatureService;
         this.events = events;
+        this.aiGenerationService = aiGenerationService;
     }
 
     // =========================================================================
@@ -512,6 +517,16 @@ public class IssueService {
                 issue.setAssignmentStatus(AssignmentStatus.PENDING);
                 notificationService.notifyAssigned(issue, actor);
             }
+            // Data flywheel : si cette affectation clôt une reco smart-assign (ligne ouverte), la finaliser
+            // (ACCEPTED si l'assigné == top-1, REJECTED sinon). finalizeOnly => aucune ligne pour une affectation manuelle.
+            aiGenerationService.record(AiGenerationService.Capture.builder()
+                .workspaceId(project.getWorkspace().getId())
+                .kind(AiGenerationKind.SMART_ASSIGN)
+                .requestRef(String.valueOf(issueId))
+                .finalValue(Map.of("userId", newAssignee.getId()))
+                .finalizeOnly(true)
+                .userId(userId)
+                .build());
         }
         if (request.getParentId() != null) {
             Issue newParent = resolveIssue(request.getParentId(), project.getId());

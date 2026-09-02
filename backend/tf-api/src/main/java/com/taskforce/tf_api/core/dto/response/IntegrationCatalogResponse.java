@@ -27,6 +27,8 @@ public record IntegrationCatalogResponse(
         String description,
         String docsUrl,
         String setupHint,
-        String websiteUrl
+        String websiteUrl,
+        /** URL d'un serveur MCP distant hébergé, pré-remplie (éditable) dans le dialog Connect. Null sinon. */
+        String mcpSuggestedUrl
     ) {}
 }

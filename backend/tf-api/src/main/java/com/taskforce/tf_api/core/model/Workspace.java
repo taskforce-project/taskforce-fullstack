@@ -68,6 +68,14 @@ public class Workspace {
     @Column(name = "logo_url", length = 1000)
     private String logoUrl;
 
+    /**
+     * Opt-in RGPD : capture du corpus d'apprentissage IA ({@code ai_generations}) pour ce workspace.
+     * Defaut OFF - rien n'est capture tant que le workspace ne l'active pas (data flywheel).
+     */
+    @Column(name = "ai_learning_enabled", nullable = false)
+    @Builder.Default
+    private boolean aiLearningEnabled = false;
+
     /** Propriétaire du workspace */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id", nullable = false)
