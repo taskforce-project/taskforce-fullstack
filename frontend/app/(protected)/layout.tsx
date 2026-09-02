@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/contexts/auth-context"
 import { AppShell } from "@/components/layout/app-shell"
 import { LabShell } from "@/components/layout/lab-shell"
 import { LoginIntro } from "@/components/layout/login-intro"
+import { TwoFactorNudge } from "@/components/security/two-factor-nudge"
 
 export default function ProtectedLayout({
   children,
@@ -74,6 +75,8 @@ export default function ProtectedLayout({
           <LabShell>
             <AppShell>{children}</AppShell>
           </LabShell>
+          {/* Nudge sécurité 2FA (best-effort, une fois par session) - ne rend rien, déclenche un toast. */}
+          <TwoFactorNudge />
         </>
       )}
 
