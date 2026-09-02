@@ -25,7 +25,7 @@ import {
 
 const CAP_LABEL: Record<string, string> = { observe: "Observe", act: "Act", metrics: "Metrics", recommend: "Components", mcp: "MCP" }
 const CAP_DESC: Record<string, string> = {
-  observe: "Feeds the Brain OS with the service's data (read).",
+  observe: "Native deep integration: reads this service's data into TaskForce.",
   act: "Can act in the service from TaskForce (write).",
   metrics: "Reports metrics and indicators.",
   recommend: "Component recommendations by Cortex (coming soon).",
@@ -151,7 +151,7 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
         <>
         <LabBanner
           feature="integrations"
-          message="Integrations: connectors marked MCP can plug in their tool's MCP server, so its tools go live in Cortex (reads run, writes need your approval). Others store credentials for now, with per-tool sync rolling out. A few (UI & components) are on the roadmap, shown as 'Soon'."
+          message="GitHub, Slack and Plane are deep integrations that sync natively. Every other tool connects through its own MCP server - one click for the ones marked 'MCP-ready', or paste your endpoint - and its tools then go live in Cortex (reads run, writes need your approval). A few (UI components) are on the roadmap, shown as 'Soon'."
         />
 
         {/* Filtre par statut de connexion - « ce que j'ai connecté ou pas » (en tête). */}
@@ -261,7 +261,9 @@ function ConnectorCard({ tool, onOpenDetail }: Readonly<{ tool: ConnectorView; o
         ) : planned ? (
           <Badge variant="outline" className="text-[10px] text-muted-foreground">Soon</Badge>
         ) : (
-          <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70">{AUTH_LABEL[tool.authType] ?? tool.authType}</span>
+          // Un connecteur MCP se connecte via une URL MCP : on affiche "MCP", pas l'auth native
+          // ("OAuth"/"API Key") qui laisserait croire à une intégration native dédiée.
+          <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70">{tool.capabilities.includes("mcp") ? "MCP" : (AUTH_LABEL[tool.authType] ?? tool.authType)}</span>
         )}
       </div>
 
@@ -278,9 +280,16 @@ function ConnectorCard({ tool, onOpenDetail }: Readonly<{ tool: ConnectorView; o
             <Plug className="size-3" /> MCP-ready
           </span>
         )}
-        {tool.capabilities.slice(0, 3).map((c) => (
-          <span key={c} className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{CAP_LABEL[c] ?? c}</span>
-        ))}
+        {/* Honnêteté : pour un connecteur générique (cap "mcp"), l'"observe" se fait VIA MCP (pas
+            d'ingestion auto) → on masque le chip "Observe" redondant. Il ne reste que sur les
+            intégrations profondes (Plane/GitHub/Slack) qui lisent nativement. */}
+        {tool.capabilities
+          .filter((c) => !(c === "observe" && tool.capabilities.includes("mcp")))
+          .filter((c) => c !== "mcp")
+          .slice(0, 3)
+          .map((c) => (
+            <span key={c} className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{CAP_LABEL[c] ?? c}</span>
+          ))}
       </div>
     </div>
   )
@@ -335,28 +344,40 @@ function ConnectorDetailView({
         <section className="flex flex-col gap-2">
           <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">What this connector can do</h4>
           <ul className="flex flex-col gap-1.5">
-            {tool.capabilities.map((c) => (
-              <li key={c} className="flex items-start gap-2 text-sm text-foreground">
-                <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary/60" />
-                <span><span className="font-medium">{CAP_LABEL[c] ?? c}</span>{CAP_DESC[c] ? ` - ${CAP_DESC[c]}` : ""}</span>
-              </li>
-            ))}
+            {tool.capabilities
+              .filter((c) => !(c === "observe" && tool.capabilities.includes("mcp")))
+              .map((c) => (
+                <li key={c} className="flex items-start gap-2 text-sm text-foreground">
+                  <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary/60" />
+                  <span><span className="font-medium">{CAP_LABEL[c] ?? c}</span>{CAP_DESC[c] ? ` - ${CAP_DESC[c]}` : ""}</span>
+                </li>
+              ))}
           </ul>
         </section>
       )}
 
-      {/* Connexion */}
+      {/* Connexion - pour un connecteur MCP, on connecte via l'URL du serveur MCP (pas l'auth
+          native "API Key" du service, qui induirait en erreur). Le setupHint natif est masqué. */}
       <section className="flex flex-col gap-2">
         <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Connection</h4>
-        <p className="text-sm text-muted-foreground">
-          <span className="font-medium text-foreground">{AUTH_LABEL[tool.authType] ?? tool.authType}</span>
-          {AUTH_HELP[tool.authType] ? ` - ${AUTH_HELP[tool.authType]}` : ""}
-        </p>
-        {tool.setupHint && (
-          <div className="flex gap-2 rounded-md border border-border bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground">
-            <Info className="mt-0.5 size-3.5 shrink-0" />
-            <span>{tool.setupHint}</span>
-          </div>
+        {tool.capabilities.includes("mcp") ? (
+          <p className="text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">MCP server</span>
+            {" - Connect by pasting this tool's MCP server URL. An access token is optional."}
+          </p>
+        ) : (
+          <>
+            <p className="text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">{AUTH_LABEL[tool.authType] ?? tool.authType}</span>
+              {AUTH_HELP[tool.authType] ? ` - ${AUTH_HELP[tool.authType]}` : ""}
+            </p>
+            {tool.setupHint && (
+              <div className="flex gap-2 rounded-md border border-border bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground">
+                <Info className="mt-0.5 size-3.5 shrink-0" />
+                <span>{tool.setupHint}</span>
+              </div>
+            )}
+          </>
         )}
       </section>
 
@@ -531,8 +552,8 @@ function ConnectorDialog({
           <DialogTitle>{tool.name}</DialogTitle>
         </DialogHeader>
 
-        {/* Aide : où récupérer la clé */}
-        {tool.setupHint && (
+        {/* Aide : où récupérer la clé - masquée en mode MCP (on connecte via une URL MCP, pas la clé native). */}
+        {!isMcp && tool.setupHint && (
           <div className="flex gap-2 rounded-md border border-border bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground">
             <Info className="mt-0.5 size-3.5 shrink-0" />
             <span>
