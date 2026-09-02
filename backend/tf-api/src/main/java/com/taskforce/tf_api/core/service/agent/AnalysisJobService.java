@@ -1,6 +1,7 @@
 package com.taskforce.tf_api.core.service.agent;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -19,6 +20,8 @@ import com.taskforce.tf_api.core.dto.response.DecisionBrief.Snapshot;
 import com.taskforce.tf_api.core.dto.response.IssueResponse;
 import com.taskforce.tf_api.core.dto.response.StoredBriefResponse;
 import com.taskforce.tf_api.core.dto.response.StoredPriorityResponse;
+import com.taskforce.tf_api.core.enums.AiGenerationKind;
+import com.taskforce.tf_api.core.enums.AiGenerationSignal;
 import com.taskforce.tf_api.core.enums.AnalysisDepth;
 import com.taskforce.tf_api.core.enums.AnalysisJobStatus;
 import com.taskforce.tf_api.core.enums.DecisionPriorityStatus;
@@ -36,6 +39,7 @@ import com.taskforce.tf_api.core.repository.DecisionPriorityRepository;
 import com.taskforce.tf_api.core.repository.IssueRepository;
 import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
+import com.taskforce.tf_api.core.service.AiGenerationService;
 import com.taskforce.tf_api.core.service.IssueService;
 import com.taskforce.tf_api.core.service.ProjectVisibilityGuard;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
@@ -73,6 +77,7 @@ public class AnalysisJobService {
     private final SimpMessagingTemplate      messagingTemplate;
     private final ObjectMapper               objectMapper;
     private final ProjectVisibilityGuard     visibilityGuard;
+    private final AiGenerationService        aiGenerationService; // data flywheel : capture des décisions (best-effort)
 
     /** Contexte figé passé au runner : entités détachées, aucun accès paresseux hors transaction. */
     public record JobContext(Long workspaceId, Project project, AnalysisDepth depth, String answer) {}
@@ -243,6 +248,14 @@ public class AnalysisJobService {
 
         priority.setIssue(created);
         priority.setStatus(DecisionPriorityStatus.ACCEPTED);
+
+        // Data flywheel : la priorité IA acceptée devient une issue (signal ACCEPTED).
+        Map<String, Object> acceptedFinal = new LinkedHashMap<>();
+        acceptedFinal.put("issueId", created.getId());
+        acceptedFinal.put("issueKey", issueIdentifier(created));
+        acceptedFinal.put("title", request.getTitle());
+        recordDecision(priority, acceptedFinal, AiGenerationSignal.ACCEPTED, userId);
+
         return toResponse(priority);
     }
 
@@ -269,6 +282,12 @@ public class AnalysisJobService {
         priority.setStatus(priority.getStatus() == DecisionPriorityStatus.DISMISSED
             ? DecisionPriorityStatus.NEW
             : DecisionPriorityStatus.DISMISSED);
+
+        // Data flywheel : une mise en écart est un signal négatif (REJECTED), capté à la transition.
+        if (priority.getStatus() == DecisionPriorityStatus.DISMISSED) {
+            recordDecision(priority, null, AiGenerationSignal.REJECTED, userId);
+        }
+
         return toResponse(priority);
     }
 
@@ -291,6 +310,25 @@ public class AnalysisJobService {
     // =========================================================================
     // Interne
     // =========================================================================
+
+    /** Data flywheel : capture une décision (priorité IA -> issue si acceptée, ou écartée). Best-effort, opt-in. */
+    private void recordDecision(DecisionPriority priority, Map<String, Object> finalValue,
+                                AiGenerationSignal signal, Long userId) {
+        Map<String, Object> draft = new LinkedHashMap<>();
+        draft.put("title", priority.getTitle());
+        draft.put("rationale", priority.getRationale());
+        draft.put("level", priority.getLevel());
+        aiGenerationService.record(AiGenerationService.Capture.builder()
+            .workspaceId(priority.getBrief().getWorkspace().getId())
+            .kind(AiGenerationKind.DECISION)
+            .requestRef("priority-" + priority.getId())
+            .draft(draft)
+            .finalValue(finalValue)
+            .signal(signal)
+            .model(priority.getBrief().getMode())
+            .userId(userId)
+            .build());
+    }
 
     private DecisionBriefEntity persistBrief(AnalysisJob job, DecisionBrief brief) {
         Snapshot s = brief.snapshot();
