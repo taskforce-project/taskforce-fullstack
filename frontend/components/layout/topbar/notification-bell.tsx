@@ -3,6 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { CheckCheck } from "lucide-react"
+import { toast } from "sonner"
 
 import { BellIcon } from "@/components/ui/icons"
 import { AnimatedNavIcon } from "@/components/layout/sidebar/animated-nav-icon"
@@ -72,7 +73,11 @@ export function NotificationBell() {
           {unreadCount > 0 && slug && (
             <button
               type="button"
-              onClick={() => markAllAsRead(slug)}
+              onClick={async () => {
+                // Succès visible (les badges non-lus disparaissent) -> pas de toast succès, seulement l'échec.
+                const ok = await markAllAsRead(slug)
+                if (!ok) toast.error("Couldn't mark all as read")
+              }}
               className="flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
             >
               <CheckCheck className="size-3" /> Tout marquer lu

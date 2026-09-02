@@ -118,7 +118,12 @@ function IssueRow({
   async function handleRemove() {
     setRemoving(true)
     try {
-      await removeIssueFromCycle(slug, projectId, cycleId, issue.id)
+      // Le store avale l'erreur : on ne confirme le retrait que si l'appel a réussi.
+      const ok = await removeIssueFromCycle(slug, projectId, cycleId, issue.id)
+      if (!ok) {
+        toast.error("Couldn't remove issue")
+        return
+      }
       toast.success(`${issue.identifier} removed from cycle`)
       await onRemoved()
     } finally {
@@ -201,7 +206,12 @@ function AddIssuesDialog({
   async function handleAdd(issue: Issue) {
     setAddingId(issue.id)
     try {
-      await addIssueToCycle(slug, projectId, cycleId, issue.id)
+      // Le store avale l'erreur : on ne confirme l'ajout que si l'appel a réussi.
+      const ok = await addIssueToCycle(slug, projectId, cycleId, issue.id)
+      if (!ok) {
+        toast.error("Couldn't add issue")
+        return
+      }
       toast.success(`${issue.identifier} added to cycle`)
       await onAdded()
     } finally {
@@ -304,7 +314,12 @@ export default function CycleDetailPage() {
   async function handleDelete() {
     setActing(true)
     try {
-      await deleteCycle(workspace, projectId, cycleId)
+      // Le store avale l'erreur : sans ce garde on toastait « supprimé » et on redirigeait sur un échec.
+      const ok = await deleteCycle(workspace, projectId, cycleId)
+      if (!ok) {
+        toast.error("Couldn't delete cycle")
+        return
+      }
       toast.success("Cycle deleted")
       router.push(`/${workspace}/projects/${projectId}/cycles`)
     } finally {
@@ -483,7 +498,7 @@ export default function CycleDetailPage() {
       </div>
       {issues.length === 0 ? (
         <div className="rounded-xl border border-border border-dashed bg-card p-12 text-center text-muted-foreground text-sm">
-          No issues in this cycle. Click "Add issues" to attach some.
+          No issues in this cycle. Click &quot;Add issues&quot; to attach some.
         </div>
       ) : (
         <div className="flex flex-col gap-4">

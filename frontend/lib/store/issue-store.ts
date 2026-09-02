@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import axios from "axios";
+import { toast } from "sonner";
 
 /** Extrait le message lisible depuis une erreur Axios ou générique */
 function extractError(err: unknown, fallback: string): string {
@@ -59,7 +60,10 @@ interface IssueState {
   fetchIssue: (slug: string, projectId: number, issueId: number) => Promise<Issue | null>;
   createIssue: (slug: string, projectId: number, payload: CreateIssuePayload) => Promise<Issue | null>;
   updateIssue: (slug: string, projectId: number, issueId: number, payload: UpdateIssuePayload) => Promise<Issue | null>;
-  deleteIssue: (slug: string, projectId: number, issueId: number) => Promise<void>;
+  deleteIssue: (slug: string, projectId: number, issueId: number) => Promise<boolean>;
+  /** Suppression DIFFÉRÉE annulable : retrait optimiste + toast « Undo » (~6 s) ; l'appel API ne part
+   *  qu'à l'expiration de la fenêtre. Le minuteur vit dans le store → survit à la navigation. */
+  deleteIssueWithUndo: (slug: string, projectId: number, issueId: number) => void;
   /** Archive (true) / désarchive (false) - une issue archivée quitte les vues par défaut. */
   archiveIssue: (slug: string, projectId: number, issueId: number, archived: boolean) => Promise<Issue | null>;
   /** Épingle (true) / dépingle (false) - remonte en tête de board/liste. */
@@ -74,7 +78,7 @@ interface IssueState {
   fetchStatuses: (slug: string, projectId: number) => Promise<IssueStatus[]>;
   createStatus: (slug: string, projectId: number, payload: CreateIssueStatusPayload) => Promise<IssueStatus | null>;
   updateStatus: (slug: string, projectId: number, statusId: number, payload: UpdateIssueStatusPayload) => Promise<IssueStatus | null>;
-  deleteStatus: (slug: string, projectId: number, statusId: number) => Promise<void>;
+  deleteStatus: (slug: string, projectId: number, statusId: number) => Promise<boolean>;
   fetchTypes: (slug: string, projectId: number) => Promise<IssueType[]>;
 
   // Commentaires
@@ -181,10 +185,68 @@ export const useIssueStore = create<IssueState>((set, get) => ({
         issues: state.issues.filter((i) => i.id !== issueId),
         activeIssue: state.activeIssue?.id === issueId ? null : state.activeIssue,
       }));
+      return true;
     } catch (err) {
+      // On garde le message d'erreur dans le store (bannière/diagnostic) mais on signale l'échec
+      // par le retour `false` : l'appelant affiche un toast au bon moment (cf. WS-10 sur updateIssue).
       const message = extractError(err, "Erreur lors de la suppression de l'issue");
       set({ error: message });
+      return false;
     }
+  },
+
+  deleteIssueWithUndo: (slug, projectId, issueId) => {
+    const issues = get().issues;
+    const index = issues.findIndex((i) => i.id === issueId);
+    if (index < 0) {
+      // Issue absente du cache (autre vue) : suppression directe sans undo.
+      void get().deleteIssue(slug, projectId, issueId);
+      return;
+    }
+    const issue = issues[index];
+    const wasActive = get().activeIssue?.id === issueId;
+
+    // Ré-insère l'issue à sa place (idempotent : ne double pas si déjà présente).
+    const restore = () =>
+      set((state) => {
+        if (state.issues.some((i) => i.id === issueId)) return {};
+        const arr = [...state.issues];
+        arr.splice(Math.min(index, arr.length), 0, issue);
+        return { issues: arr };
+      });
+
+    // 1) Retrait optimiste immédiat.
+    set((state) => ({
+      issues: state.issues.filter((i) => i.id !== issueId),
+      activeIssue: wasActive ? null : state.activeIssue,
+    }));
+
+    // 2) Le vrai DELETE ne part qu'à l'expiration de la fenêtre. Minuteur porté par le store (module
+    //    singleton) → survit au démontage/à la navigation, donc la suppression n'est jamais perdue.
+    let undone = false;
+    const timer = setTimeout(async () => {
+      if (undone) return;
+      try {
+        await deleteIssueApi(slug, projectId, issueId);
+      } catch (err) {
+        restore();
+        set({ error: extractError(err, "Erreur lors de la suppression de l'issue") });
+        toast.error("Couldn't delete issue");
+      }
+    }, 6000);
+
+    // 3) Toast avec Undo : annule le minuteur + restaure.
+    toast.success(`${issue.identifier} deleted`, {
+      duration: 6000,
+      action: {
+        label: "Undo",
+        onClick: () => {
+          undone = true;
+          clearTimeout(timer);
+          restore();
+        },
+      },
+    });
   },
 
   archiveIssue: async (slug, projectId, issueId, archived) => {
@@ -277,9 +339,12 @@ export const useIssueStore = create<IssueState>((set, get) => ({
     try {
       await deleteStatusApi(slug, projectId, statusId);
       set((state) => ({ statuses: state.statuses.filter((s) => s.id !== statusId) }));
+      return true;
     } catch (err) {
+      // Retour `false` pour que l'appelant toaste l'échec (ex. 409 colonne non vide) au bon moment.
       const message = extractError(err, "Erreur lors de la suppression du statut");
       set({ error: message });
+      return false;
     }
   },
 

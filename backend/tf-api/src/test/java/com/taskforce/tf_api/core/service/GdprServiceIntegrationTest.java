@@ -91,4 +91,14 @@ class GdprServiceIntegrationTest extends AbstractIntegrationTest {
         verify(auditService).record(isNull(), eq(user.getId()), eq(AuditService.GDPR_DELETE),
             eq("User"), eq(String.valueOf(user.getId())), org.mockito.ArgumentMatchers.any());
     }
+
+    @Test
+    @DisplayName("deleteMyAccount supprime le workspace possédé et les appartenances (footprint)")
+    void delete_removes_owned_workspace_and_memberships() {
+        gdprService.deleteMyAccount(user.getId());
+
+        // Le workspace créé par le compte et son appartenance ne doivent plus exister (« tout le compte »).
+        assertThat(workspaceRepository.findBySlug("ws-gdpr")).isEmpty();
+        assertThat(workspaceMemberRepository.findByUserId(user.getId())).isEmpty();
+    }
 }

@@ -38,11 +38,11 @@ interface CycleState {
   createCycle: (slug: string, projectId: number, payload: CreateCyclePayload) => Promise<Cycle | null>;
   fetchCycle: (slug: string, projectId: number, cycleId: number) => Promise<Cycle | null>;
   updateCycle: (slug: string, projectId: number, cycleId: number, payload: UpdateCyclePayload) => Promise<Cycle | null>;
-  deleteCycle: (slug: string, projectId: number, cycleId: number) => Promise<void>;
+  deleteCycle: (slug: string, projectId: number, cycleId: number) => Promise<boolean>;
 
   fetchCycleIssues: (slug: string, projectId: number, cycleId: number) => Promise<Issue[]>;
-  addIssueToCycle: (slug: string, projectId: number, cycleId: number, issueId: number) => Promise<void>;
-  removeIssueFromCycle: (slug: string, projectId: number, cycleId: number, issueId: number) => Promise<void>;
+  addIssueToCycle: (slug: string, projectId: number, cycleId: number, issueId: number) => Promise<boolean>;
+  removeIssueFromCycle: (slug: string, projectId: number, cycleId: number, issueId: number) => Promise<boolean>;
 
   setActiveCycle: (cycle: Cycle | null) => void;
   clearCycles: () => void;
@@ -118,8 +118,10 @@ export const useCycleStore = create<CycleState>((set, get) => ({
         cycles: state.cycles.filter((c) => c.id !== cycleId),
         activeCycle: state.activeCycle?.id === cycleId ? null : state.activeCycle,
       }));
+      return true;
     } catch (err) {
       set({ error: extractError(err, "Erreur lors de la suppression du cycle") });
+      return false;
     }
   },
 
@@ -140,8 +142,10 @@ export const useCycleStore = create<CycleState>((set, get) => ({
       await addIssueToCycleApi(slug, projectId, cycleId, issueId);
       // Recharge les issues du cycle pour avoir la liste à jour
       await get().fetchCycleIssues(slug, projectId, cycleId);
+      return true;
     } catch (err) {
       set({ error: extractError(err, "Erreur lors de l'ajout de l'issue au cycle") });
+      return false;
     }
   },
 
@@ -149,8 +153,10 @@ export const useCycleStore = create<CycleState>((set, get) => ({
     try {
       await removeIssueFromCycleApi(slug, projectId, cycleId, issueId);
       set((state) => ({ cycleIssues: state.cycleIssues.filter((i) => i.id !== issueId) }));
+      return true;
     } catch (err) {
       set({ error: extractError(err, "Erreur lors du retrait de l'issue du cycle") });
+      return false;
     }
   },
 }));

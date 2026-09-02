@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Sparkles, Copy, Check, RefreshCw, BrainCircuit, Loader2, Save } from "lucide-react"
 import { toast } from "sonner"
 
@@ -44,6 +44,9 @@ export function IssueAiSpecPanel({ workspaceSlug, projectId, issueId, onApplied 
   const [approving, setApproving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [copied, setCopied] = useState(false)
+  // Temps écoulé pendant la génération : le mode « Approfondir » (14B + raisonnement) peut prendre
+  // 1-3 min → un compteur rassure (« ça travaille »), en plus des phases défilantes.
+  const [elapsed, setElapsed] = useState(0)
 
   // Champs éditables (human-in-the-loop)
   const [spec, setSpec] = useState("")
@@ -52,6 +55,15 @@ export function IssueAiSpecPanel({ workspaceSlug, projectId, issueId, onApplied 
   const [addChecklist, setAddChecklist] = useState(true)
   const [applyToIssue, setApplyToIssue] = useState(true)
   const [autoAssign, setAutoAssign] = useState(false)
+
+  // Fait avancer le compteur pendant la génération (interval uniquement ; le reset à 0 se fait dans
+  // le handler pour ne pas écrire d'état en corps d'effet).
+  useEffect(() => {
+    if (!generating) return
+    const start = Date.now()
+    const id = setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 500)
+    return () => clearInterval(id)
+  }, [generating])
 
   const applyDraft = (d: IssueSpecDraft) => {
     setDraft(d)
@@ -63,6 +75,7 @@ export function IssueAiSpecPanel({ workspaceSlug, projectId, issueId, onApplied 
 
   const handleGenerate = async (deep = false) => {
     setGenerating(true)
+    setElapsed(0)
     try {
       const d = await generateIssueSpec(workspaceSlug, projectId, issueId, deep)
       applyDraft(d)
@@ -151,6 +164,7 @@ export function IssueAiSpecPanel({ workspaceSlug, projectId, issueId, onApplied 
         <p className="text-xs text-muted-foreground">
           Brain OS retrieval + local generation - this may take a few seconds.
         </p>
+        <p className="text-xs tabular-nums text-muted-foreground/60">{elapsed}s elapsed</p>
       </div>
     )
   }

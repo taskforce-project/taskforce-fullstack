@@ -118,6 +118,9 @@ export function CreateCycleDialog({ children, onCreated, projectId }: CreateCycl
         onCreated?.(cycle)
         resetForm()
         setOpen(false)
+      } else {
+        // createCycle renvoie null quand le store a avalé l'erreur (4xx non toasté globalement).
+        toast.error("Couldn't create cycle")
       }
     } finally {
       setIsLoading(false)

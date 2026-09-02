@@ -15,6 +15,19 @@ export interface CheckoutSessionResponse {
 }
 
 /**
+ * Résultat de vérification d'une session de paiement (enveloppe ApiResponse<VerifySessionResponse>).
+ */
+export interface VerifySessionResult {
+  email?: string;
+  planType?: string;
+  paymentStatus?: string;
+  subscriptionId?: string;
+  customerId?: string;
+  userCreated?: boolean;
+  message?: string;
+}
+
+/**
  * Réponse d'informations d'abonnement
  */
 export interface SubscriptionInfo {
@@ -60,6 +73,24 @@ export const stripeService = {
 
       const data = response.data.data;
       return { sessionId: data.sessionId, checkoutUrl: data.sessionUrl };
+    } catch (error) {
+      throw new Error(getErrorMessage(error));
+    }
+  },
+
+  /**
+   * Vérifie une session de paiement Stripe après retour du checkout et renvoie le forfait appliqué.
+   * Le plan est aussi appliqué côté serveur par le webhook `checkout.session.completed` (idempotent) :
+   * cet appel confirme le paiement et couvre les environnements sans webhook (dev).
+   * @param sessionId - ID de la session Stripe Checkout (`session_id` du retour de redirection)
+   */
+  async verifySession(sessionId: string): Promise<VerifySessionResult> {
+    try {
+      const response = await apiClient.get<{ data: VerifySessionResult }>(
+        STRIPE_ROUTES.VERIFY_SESSION,
+        { params: { session_id: sessionId } },
+      );
+      return response.data.data; // enveloppe ApiResponse<T>
     } catch (error) {
       throw new Error(getErrorMessage(error));
     }
