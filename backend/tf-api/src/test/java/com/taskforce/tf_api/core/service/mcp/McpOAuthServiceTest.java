@@ -66,7 +66,8 @@ class McpOAuthServiceTest {
     }
 
     private DiscoveredAuth auth(String regEp) {
-        return new DiscoveredAuth("https://as.ex", "https://as.ex/authorize", "https://as.ex/token", regEp, "mcp");
+        // authorization_endpoint = IP publique (TEST-NET) : passe SsrfGuard sans DNS (voir start()).
+        return new DiscoveredAuth("https://as.ex", "https://203.0.113.11/authorize", "https://as.ex/token", regEp, "mcp");
     }
 
     private McpOAuthState openState(String state) {
@@ -99,7 +100,7 @@ class McpOAuthServiceTest {
         assertThat(row.getCodeVerifier()).isNotBlank();
         assertThat(row.getExpiresAt()).isAfter(LocalDateTime.now());
 
-        assertThat(url).startsWith("https://as.ex/authorize?");
+        assertThat(url).startsWith("https://203.0.113.11/authorize?");
         assertThat(url).contains("response_type=code")
             .contains("client_id=cid-123")
             .contains("code_challenge_method=S256")

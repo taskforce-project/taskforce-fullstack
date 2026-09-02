@@ -70,6 +70,10 @@ public class McpOAuthService {
     public String start(Workspace ws, Long userId, String connectorKey, String mcpUrl) {
         SsrfGuard.assertPublicHttpUrl(mcpUrl);
         DiscoveredAuth auth = discovery.discover(mcpUrl);
+        // Le navigateur sera redirige vers authorization_endpoint (issu de la metadata d'un serveur
+        // semi-fiable) : on le valide comme http(s) PUBLIC (jamais une cible interne, jamais un schema
+        // exotique type javascript:). Les autres endpoints sont deja gardes au moment du fetch serveur.
+        SsrfGuard.assertPublicHttpUrl(auth.authorizationEndpoint());
         String redirectUri = redirectBase + "/api/mcp/oauth/callback";
 
         if (auth.registrationEndpoint() == null) {
