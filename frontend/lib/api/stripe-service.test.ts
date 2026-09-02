@@ -172,6 +172,40 @@ describe('stripeService', () => {
     });
   });
 
+  describe('verifySession', () => {
+    it('devrait vérifier une session et renvoyer le forfait appliqué', async () => {
+      // Given - le back renvoie l'enveloppe ApiResponse<VerifySessionResponse>.
+      const result = {
+        email: 'user@taskforce.dev',
+        planType: 'BUSINESS',
+        paymentStatus: 'paid',
+        subscriptionId: 'sub_123',
+        customerId: 'cus_123',
+        userCreated: false,
+        message: 'Paiement validé avec succès.',
+      };
+      vi.mocked(apiClient.get).mockResolvedValue(envelope(result));
+
+      // When
+      const res = await stripeService.verifySession('cs_test_1');
+
+      // Then - le service lit `response.data.data` et passe le session_id en query param.
+      expect(res).toEqual(result);
+      expect(apiClient.get).toHaveBeenCalledWith(STRIPE_ROUTES.VERIFY_SESSION, {
+        params: { session_id: 'cs_test_1' },
+      });
+    });
+
+    it('devrait lancer une erreur si la vérification échoue', async () => {
+      // Given
+      const errorMessage = 'Session not found';
+      vi.mocked(apiClient.get).mockRejectedValue(new Error(errorMessage));
+
+      // When/Then
+      await expect(stripeService.verifySession('cs_bad')).rejects.toThrow(errorMessage);
+    });
+  });
+
   // `cancelSubscription` vise `/api/stripe/cancel` (contrôleur public), qui ne renvoie pas
   // l'enveloppe `ApiResponse<T>` : le service lit donc `response.data` directement, à un seul niveau.
   describe('cancelSubscription', () => {
