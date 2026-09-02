@@ -222,6 +222,17 @@ public class ConnectorCatalog {
             "Composants & effets animés open-source — reco. via Cortex (à venir)", "https://magicui.design");
         planned("origin-ui", "Origin UI", ConnectorCategory.UI_COMPONENTS,
             "Large collection de composants Tailwind — reco. via Cortex (à venir)", "https://originui.com");
+
+        // « MCP-ready » : connecteurs dont un serveur MCP DISTANT hébergé (officiel) existe → URL suggérée
+        // pré-remplie (éditable) dans le dialog Connect. Endpoints vérifiés sur le web (actuels, Streamable
+        // HTTP, auth par token via le champ optionnel). Les autres restent en bring-your-own.
+        suggestMcp("sentry",     "https://mcp.sentry.dev/mcp");
+        suggestMcp("linear",     "https://mcp.linear.app/mcp");
+        suggestMcp("cloudflare", "https://mcp.cloudflare.com/mcp");
+        suggestMcp("asana",      "https://mcp.asana.com/v2/mcp");
+        suggestMcp("jira",       "https://mcp.atlassian.com/v2/mcp");
+        suggestMcp("gitlab",     "https://gitlab.com/api/v4/mcp");
+        suggestMcp("vercel",     "https://mcp.vercel.com");
     }
 
     /** Tous les descripteurs, dans l'ordre de déclaration. */
@@ -243,7 +254,7 @@ public class ConnectorCatalog {
     private void available(String key, String name, ConnectorCategory cat, ConnectorAuthType auth,
                            String description, String docsUrl, String setupHint,
                            List<ConnectorField> fields, List<String> caps) {
-        byKey.put(key, new ConnectorDescriptor(key, name, cat, auth, ConnectorStatus.AVAILABLE, fields, caps, docsUrl, description, setupHint, website(key)));
+        byKey.put(key, new ConnectorDescriptor(key, name, cat, auth, ConnectorStatus.AVAILABLE, fields, caps, docsUrl, description, setupHint, website(key), null));
     }
 
     /**
@@ -254,7 +265,7 @@ public class ConnectorCatalog {
      */
     private void planned(String key, String name, ConnectorCategory cat, String description, String docsUrl) {
         byKey.put(key, new ConnectorDescriptor(key, name, cat, ConnectorAuthType.NONE, ConnectorStatus.PLANNED,
-            List.of(), List.of("recommend"), docsUrl, description, null, website(key)));
+            List.of(), List.of("recommend"), docsUrl, description, null, website(key), null));
     }
 
     /**
@@ -267,7 +278,18 @@ public class ConnectorCatalog {
         // l'URL du serveur MCP de l'outil) → leurs outils deviennent live dans Cortex, écritures validées.
         // C'est le pont qui rend le catalogue concret sans coder chaque intégration à la main.
         byKey.put(key, new ConnectorDescriptor(key, name, cat, auth, ConnectorStatus.AVAILABLE,
-            defaultFields(auth), List.of("observe", "mcp"), null, description, defaultHint(auth), website(key)));
+            defaultFields(auth), List.of("observe", "mcp"), null, description, defaultHint(auth), website(key), null));
+    }
+
+    /**
+     * Pré-remplit l'URL d'un serveur MCP DISTANT hébergé (officiel) pour un connecteur déjà déclaré →
+     * « MCP-ready » 1-clic dans le dialog Connect (URL éditable). Endpoints vérifiés sur le web.
+     */
+    private void suggestMcp(String key, String url) {
+        ConnectorDescriptor d = byKey.get(key);
+        if (d == null) return;
+        byKey.put(key, new ConnectorDescriptor(d.key(), d.name(), d.category(), d.authType(), d.status(),
+            d.fields(), d.capabilities(), d.docsUrl(), d.description(), d.setupHint(), d.websiteUrl(), url));
     }
 
     /** Champs de connexion par défaut selon le mode d'auth (pour les connecteurs génériques). */

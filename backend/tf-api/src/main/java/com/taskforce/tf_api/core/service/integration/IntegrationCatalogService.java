@@ -66,7 +66,7 @@ public class IntegrationCatalogService {
             ConnectorView view = new ConnectorView(
                 d.key(), d.name(), d.category().name(), d.authType().name(),
                 d.status().name(), isConnected, d.fields(), d.capabilities(), d.description(),
-                d.docsUrl(), d.setupHint(), d.websiteUrl());
+                d.docsUrl(), d.setupHint(), d.websiteUrl(), d.mcpSuggestedUrl());
 
             groups.computeIfAbsent(d.category().name(),
                     k -> new CategoryGroup(d.category().name(), d.category().getLabel(), new ArrayList<>()))
