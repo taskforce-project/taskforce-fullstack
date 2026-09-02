@@ -231,6 +231,9 @@ export interface ConnectorView {
   setupHint: string | null;
   /** Site officiel du service (homepage) - affiché dans la fiche détaillée. */
   websiteUrl: string | null;
+  /** URL d'un serveur MCP distant hébergé (officiel), pré-remplie (éditable) dans le dialog Connect
+   *  → « MCP-ready » 1-clic. Null si l'outil n'expose pas d'endpoint MCP hébergé. */
+  mcpSuggestedUrl: string | null;
 }
 
 export interface CategoryGroup {

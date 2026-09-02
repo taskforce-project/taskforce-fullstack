@@ -90,6 +90,23 @@ class ConnectorCatalogTest {
     }
 
     @Test
+    @DisplayName("les connecteurs à MCP hébergé officiel portent une URL MCP suggérée (MCP-ready 1-clic)")
+    void connecteursMcpReadyOntUneUrlSuggeree() {
+        // Set curé (endpoints vérifiés) : URL pré-remplie éditable dans le dialog Connect.
+        assertThat(catalogue.byKey("sentry").orElseThrow().mcpSuggestedUrl()).isEqualTo("https://mcp.sentry.dev/mcp");
+        assertThat(catalogue.byKey("linear").orElseThrow().mcpSuggestedUrl()).isEqualTo("https://mcp.linear.app/mcp");
+        assertThat(catalogue.byKey("cloudflare").orElseThrow().mcpSuggestedUrl()).isNotBlank();
+        assertThat(catalogue.byKey("asana").orElseThrow().mcpSuggestedUrl()).isNotBlank();
+        assertThat(catalogue.byKey("jira").orElseThrow().mcpSuggestedUrl()).isNotBlank();
+
+        // Un connecteur générique sans MCP hébergé reste en bring-your-own : pas d'URL suggérée,
+        // mais il garde la capability "mcp" (l'utilisateur colle l'URL de son propre serveur MCP).
+        ConnectorDescriptor docker = catalogue.byKey("docker").orElseThrow();
+        assertThat(docker.mcpSuggestedUrl()).isNull();
+        assertThat(docker.capabilities()).contains("mcp");
+    }
+
+    @Test
     @DisplayName("all() renvoie une copie : modifier le résultat n'altère pas le catalogue")
     void allRenvoieUneCopieDefensive() {
         int tailleInitiale = catalogue.all().size();

@@ -2,26 +2,26 @@ package com.taskforce.tf_api.core.enums;
 
 /**
  * Catégories du catalogue d'intégrations (regroupement du « pool » d'outils branchables sur le Brain OS).
- * Le {@code label} est l'intitulé affiché (FR).
+ * Le {@code label} est l'intitulé affiché (EN).
  */
 public enum ConnectorCategory {
-    PROJECT_MANAGEMENT("Gestion de projet"),
+    PROJECT_MANAGEMENT("Project management"),
     DEV_CICD("Dev & CI/CD"),
-    HOSTING_INFRA("Hébergement & Infra"),
-    DATABASE("Bases de données"),
-    ADS("Publicité"),
-    ANALYTICS("Analytics & Produit"),
-    PAYMENTS("Paiements & Finance"),
-    CRM_SALES("CRM & Ventes"),
+    HOSTING_INFRA("Hosting & Infra"),
+    DATABASE("Databases"),
+    ADS("Advertising"),
+    ANALYTICS("Analytics & Product"),
+    PAYMENTS("Payments & Finance"),
+    CRM_SALES("CRM & Sales"),
     COMMUNICATION("Communication & Email"),
-    IDENTITY_AUTH("Identité & Auth"),
-    SECURITY("Sécurité & Secrets"),
-    PRODUCTIVITY("Productivité & Docs"),
-    DESIGN_MEDIA("Design & Média"),
-    UI_COMPONENTS("UI & Composants"),
+    IDENTITY_AUTH("Identity & Auth"),
+    SECURITY("Security & Secrets"),
+    PRODUCTIVITY("Productivity & Docs"),
+    DESIGN_MEDIA("Design & Media"),
+    UI_COMPONENTS("UI & Components"),
     ECOMMERCE("E-commerce"),
-    AUTOMATION("Automatisation"),
-    AI_MODELS("Modèles IA");
+    AUTOMATION("Automation"),
+    AI_MODELS("AI Models");
 
     private final String label;
 
