@@ -271,8 +271,13 @@ function ConnectorCard({ tool, onOpenDetail }: Readonly<{ tool: ConnectorView; o
         {tool.description && <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">{tool.description}</p>}
       </div>
 
-      {/* Capacités */}
+      {/* Capacités - le badge « MCP-ready » (endpoint MCP hébergé officiel, connexion 1-clic) prime. */}
       <div className="flex min-w-0 flex-wrap gap-1">
+        {tool.mcpSuggestedUrl && (
+          <span className="inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+            <Plug className="size-3" /> MCP-ready
+          </span>
+        )}
         {tool.capabilities.slice(0, 3).map((c) => (
           <span key={c} className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{CAP_LABEL[c] ?? c}</span>
         ))}
@@ -405,7 +410,9 @@ function ConnectorDialog({
   // Connecteur « MCP-connectable » : on branche un serveur MCP externe (URL) → ses outils deviennent
   // live dans Cortex (lecture + actions validées). Prime sur le stockage d'identifiants opaque.
   const isMcp = tool.capabilities.includes("mcp")
-  const [mcpUrl, setMcpUrl] = useState("")
+  // « MCP-ready » : si l'outil a un serveur MCP distant hébergé officiel, on pré-remplit son URL
+  // (éditable) → 1-clic. L'effet ci-dessous la remplace par l'URL réelle si déjà branché.
+  const [mcpUrl, setMcpUrl] = useState(tool.mcpSuggestedUrl ?? "")
   const [mcpToken, setMcpToken] = useState("")
   const [mcpStatus, setMcpStatus] = useState<McpServerStatus | null>(null)
   const [mcpBusy, setMcpBusy] = useState(false)
@@ -594,6 +601,15 @@ function ConnectorDialog({
                   <span className="text-xs font-medium text-muted-foreground">MCP server URL *</span>
                   <Input type="text" placeholder="https://.../mcp" value={mcpUrl}
                          onChange={(e) => setMcpUrl(e.target.value)} autoComplete="off" />
+                  {tool.mcpSuggestedUrl ? (
+                    <span className="text-[11px] text-muted-foreground/70">
+                      Official hosted endpoint pre-filled - add your API token below to connect.
+                    </span>
+                  ) : (
+                    <span className="text-[11px] text-muted-foreground/70">
+                      Run this tool&apos;s MCP server, then paste its URL (a hosted endpoint or http://localhost:port).
+                    </span>
+                  )}
                 </label>
                 <label className="flex flex-col gap-1">
                   <span className="text-xs font-medium text-muted-foreground">Access token (optional)</span>
