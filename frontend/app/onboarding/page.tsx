@@ -12,6 +12,7 @@ import { createProject } from "@/lib/api/project-service";
 import { updateMemberSkills, suggestSkills, type Seniority } from "@/lib/api/skill-service";
 import { ThinkingBar } from "@/components/chat/thinking-bar";
 import { OnboardingShell } from "@/components/onboarding/onboarding-shell";
+import { LoginIntro } from "@/components/layout/login-intro";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -63,6 +64,28 @@ export default function OnboardingPage() {
   // (on ne peut revenir que sur une étape déjà vue, jamais sauter une étape non encore atteinte).
   const [maxStep, setMaxStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
+
+  // Intro de connexion : au 1ᵉʳ login le callback OAuth peut router directement vers /onboarding,
+  // qui vit HORS du ProtectedLayout (lequel joue l'intro partout ailleurs). On rejoue donc la même
+  // révélation ici. Lu de façon SYNCHRONE au 1er rendu → l'overlay est présent dès la 1ʳᵉ frame et
+  // couvre le spinner d'auth ET l'hydratation du wizard (pas de « loader au début »).
+  const [showIntro, setShowIntro] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return sessionStorage.getItem("tf.intro") === "1";
+    } catch {
+      return false;
+    }
+  });
+  // Consommé une seule fois : on retire le drapeau dès qu'il a servi.
+  useEffect(() => {
+    if (!showIntro) return;
+    try {
+      sessionStorage.removeItem("tf.intro");
+    } catch {
+      /* ignore */
+    }
+  }, [showIntro]);
 
   // Contexte (workspace de la personne + son id)
   const [slug, setSlug] = useState<string | null>(null);
@@ -165,7 +188,11 @@ export default function OnboardingPage() {
       return;
     }
     if (email === user?.email?.toLowerCase()) {
-      toast.info("You're already in this workspace.");
+      toast.error("You can't invite yourself - you already own this workspace.");
+      return;
+    }
+    if (invites.includes(email)) {
+      toast.info(`${email} is already in the list.`);
       return;
     }
     setInvites((prev) => (prev.includes(email) ? prev : [...prev, email]));
@@ -225,9 +252,15 @@ export default function OnboardingPage() {
 
   if (isLoading) {
     return (
-      <div className="grid min-h-svh place-items-center">
-        <Loader2 className="h-6 w-6 animate-spin" style={{ color: "var(--label-tertiary)" }} />
-      </div>
+      <>
+        {/* Si l'intro joue, elle couvre déjà tout → pas de spinner (sinon il « clignoterait » dessous). */}
+        {!showIntro && (
+          <div className="grid min-h-svh place-items-center">
+            <Loader2 className="h-6 w-6 animate-spin" style={{ color: "var(--label-tertiary)" }} />
+          </div>
+        )}
+        {showIntro && <LoginIntro phase="reveal" onDone={() => setShowIntro(false)} />}
+      </>
     );
   }
 
@@ -249,6 +282,7 @@ export default function OnboardingPage() {
   };
 
   return (
+    <>
     <OnboardingShell
       steps={STEPS}
       current={step}
@@ -383,17 +417,27 @@ export default function OnboardingPage() {
               <label className="mb-1.5 block text-sm font-medium" style={{ color: "var(--label-secondary)" }}>
                 Add a skill
               </label>
-              <Input
-                value={skillInput}
-                onChange={(e) => setSkillInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    addSkill(skillInput);
-                  }
-                }}
-                placeholder="Type then Enter (e.g. React, Java, Figma…)"
-              />
+              <div className="relative">
+                <Input
+                  value={skillInput}
+                  onChange={(e) => setSkillInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addSkill(skillInput);
+                    }
+                  }}
+                  placeholder="Type a skill (e.g. React, Java, Figma…)"
+                  className="pr-16"
+                />
+                {/* Indice clavier : rappelle qu'on valide avec Entrée. */}
+                <kbd
+                  className="pointer-events-none absolute right-2 top-1/2 inline-flex -translate-y-1/2 items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-medium"
+                  style={{ borderColor: "var(--border)", background: "var(--muted)", color: "var(--label-tertiary)" }}
+                >
+                  ↵ Enter
+                </kbd>
+              </div>
               {skills.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {skills.map((s) => (
@@ -527,15 +571,14 @@ export default function OnboardingPage() {
                 onChange={(e) => setProjectName(e.target.value)}
                 placeholder="e.g. Website redesign, Sprint 1…"
               />
-              {projectName.trim() && (
-                <span className="mt-1.5 block text-xs" style={{ color: "var(--label-tertiary)" }}>
-                  Identifier: {deriveIdentifier(projectName)}
-                </span>
-              )}
             </label>
           </div>
         )}
       </div>
     </OnboardingShell>
+    {/* Overlay d'intro - index STABLE (dernier enfant) à travers la bascule loading→wizard, sinon
+        l'animation redémarrerait. L'app monte dessous ; la matière se dissout dessus. */}
+    {showIntro && <LoginIntro phase="reveal" onDone={() => setShowIntro(false)} />}
+    </>
   );
 }
