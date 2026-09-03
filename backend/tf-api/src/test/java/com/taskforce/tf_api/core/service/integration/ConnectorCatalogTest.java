@@ -99,6 +99,16 @@ class ConnectorCatalogTest {
         assertThat(catalogue.byKey("asana").orElseThrow().mcpSuggestedUrl()).isNotBlank();
         assertThat(catalogue.byKey("jira").orElseThrow().mcpSuggestedUrl()).isNotBlank();
 
+        // TF-MCP-05 : lot vérifié par sonde le 03/09/2026 (initialize -> 401 + WWW-Authenticate OAuth).
+        assertThat(catalogue.byKey("notion").orElseThrow().mcpSuggestedUrl()).isEqualTo("https://mcp.notion.com/mcp");
+        assertThat(catalogue.byKey("stripe").orElseThrow().mcpSuggestedUrl()).isEqualTo("https://mcp.stripe.com");
+        assertThat(catalogue.byKey("attio").orElseThrow().mcpSuggestedUrl()).isEqualTo("https://mcp.attio.com/mcp");
+        assertThat(catalogue.byKey("hubspot").orElseThrow().mcpSuggestedUrl()).isNotBlank();
+        assertThat(catalogue.byKey("paypal").orElseThrow().mcpSuggestedUrl()).isNotBlank();
+        assertThat(catalogue.byKey("intercom").orElseThrow().mcpSuggestedUrl()).isNotBlank();
+        assertThat(catalogue.byKey("neon").orElseThrow().mcpSuggestedUrl()).isNotBlank();
+        assertThat(catalogue.byKey("canva").orElseThrow().mcpSuggestedUrl()).isNotBlank();
+
         // Un connecteur générique sans MCP hébergé reste en bring-your-own : pas d'URL suggérée,
         // mais il garde la capability "mcp" (l'utilisateur colle l'URL de son propre serveur MCP).
         ConnectorDescriptor docker = catalogue.byKey("docker").orElseThrow();

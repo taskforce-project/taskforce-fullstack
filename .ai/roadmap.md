@@ -18,7 +18,8 @@
 > - **Increment 3 (fait)** - Pilier 3 « connecte X » : outil `find_integration` (cherche le catalogue par nom/capacité, dit **connecté** / **disponible à connecter** / **absent**) + prompt (guider vers Réglages > Intégrations si dispo, dire franchement si absent, **ne jamais fabriquer**). Générique (piloté par le catalogue, aucun service en dur). Test `FindIntegrationToolTest`. Cortex : **6 outils internes** désormais.
 > - **Increment 3.1 (fait)** - routing élargi : `isDeepIntent` arme les outils sur les verbes naturels (liste, montre, cherche, connecte, importe, synchronise…), pas seulement analyse/crée - sinon « liste mes issues Linear » partait en fast sans outils. Test `run_liste_routes_deep`.
 > - **Déployé prod** : 1+2+3 (#221, `3dbab20b`, backend sain) ; 3.1 dans la release suivante.
-> - **Suite** : `[TF-MCP-04]` import de projet (Linear → issues natives) au wizard nouveau projet ; `[TF-MCP-05]` élargir les connecteurs MCP-ready au maximum (Attio, Notion, Stripe… URLs hébergées **vérifiées**, jamais inventées).
+> - **`[TF-MCP-05]` (lot 1 fait)** : +8 connecteurs MCP-ready 1-clic (**notion, stripe, paypal, intercom, neon, canva, attio, hubspot**) - URLs **vérifiées par sonde** (initialize → 401 OAuth, même dialecte que Linear). Le catalogue passe de **7 à 15** MCP-ready. Test `ConnectorCatalogTest`. Rallonge : square/webflow/wix (fiche catalogue à ajouter), puis d'autres au fil de l'eau (le bouton OAuth marche déjà sur toute URL MCP collée).
+> - **Suite** : `[TF-MCP-04]` import de projet (Linear → issues natives) au wizard nouveau projet.
 >
 > **▶ MAJ 03/09/2026 - Fix : serveurs MCP stateless (Linear) injoignables malgré OAuth OK.** `[TF-MCP-02b]`
 > - **Symptôme (prod)** : Linear connecté en OAuth (« Connected ») mais **« unreachable - Serveur MCP sans mcp-session-id »** → 0 outil remonté → Cortex répond « je n'ai pas accès à Linear » (`WorkspaceMcpService.toolsFor` renvoyait vide car `discover` levait).
