@@ -298,4 +298,23 @@ class AgentServiceTest {
         assertThat(systemMsg).contains("TaskForce par défaut"); // routage (Pilier 2) : cible par défaut
         assertThat(systemMsg).contains("find_integration");    // Pilier 3 : réflexe « connecte X »
     }
+
+    @Test
+    @DisplayName("routing (TF-MCP-03 3.1) : « liste mes issues » arme le chemin deep (outils)")
+    void run_liste_routes_deep() throws Exception {
+        stubWorkspace();
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "model", "m");
+        when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
+        when(groq.isConfigured()).thenReturn(true);
+        when(workspaceMcp.toolsFor(org.mockito.ArgumentMatchers.any())).thenReturn(List.of());
+        when(tools.toolDefinitions(org.mockito.ArgumentMatchers.anyList())).thenReturn(List.of());
+        var real = new ObjectMapper();
+        when(groq.rawChat(anyString(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), anyString()))
+            .thenReturn(real.readTree("{\"content\":\"ok\"}"));
+
+        // « liste » n'armait pas les outils avant 3.1 (mode fast) ; il doit désormais router deep.
+        AssistantAnswer answer = service.run("acme", 7L, "liste mes issues Linear");
+
+        assertThat(answer.mode()).isEqualTo("deep");
+    }
 }
