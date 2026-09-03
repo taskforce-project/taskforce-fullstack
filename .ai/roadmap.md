@@ -10,6 +10,12 @@
 >
 > Sources : `.ai/qa.md` (QA produit détaillée), `.ai/known-issues.md` (bugs vérifiés), `.ai/module-map.md` (domaines↔code), `.ai/architecture-map.md` (archi réelle), `.ai/P0-fix-plan.md` (correctifs P0 paste-ready).
 
+> **▶ MAJ 03/09/2026 - Fix : serveurs MCP stateless (Linear) injoignables malgré OAuth OK.** `[TF-MCP-02b]`
+> - **Symptôme (prod)** : Linear connecté en OAuth (« Connected ») mais **« unreachable - Serveur MCP sans mcp-session-id »** → 0 outil remonté → Cortex répond « je n'ai pas accès à Linear » (`WorkspaceMcpService.toolsFor` renvoyait vide car `discover` levait).
+> - **Cause** : `McpClient.initialize` **exigeait** l'en-tête `mcp-session-id`. Il est **OPTIONNEL** (transport Streamable HTTP) : Linear est **stateless**. Preuve terrain (token déchiffré + sonde directe) : `initialize` avec token → `200`, `content-type: text/event-stream`, `serverInfo:"Linear MCP"`, **pas** de `mcp-session-id`. On rejetait un serveur sain.
+> - **Fix** (`McpClient`) : session id **optionnel** (`null` en stateless ; `send()` n'ajoute l'en-tête que s'il existe → `tools/list`/`tools/call`/`close` OK sans session). + un **statut HTTP d'erreur** (401…) remonte explicitement (« Handshake MCP refusé, HTTP 401 ») au lieu du message trompeur. `McpClientTest` +2 cas (stateless, 401) → 6/6.
+> - **Reste** : déployer en prod → Linear redevient joignable, outils live dans Cortex. Suite (`[TF-MCP-03]`) : « réflexe » agentique (Cortex va chercher l'outil pertinent + invite à connecter l'intégration manquante).
+>
 > **▶ MAJ 02/09/2026 - OAuth MCP 1-clic (découverte + DCR + PKCE).** `[TF-MCP-02]` (branche `feat/mcp-oauth`)
 > - **Objectif** : connecter un serveur MCP **en 1 clic** via OAuth 2.1, sans coller de token. UNE implémentation générique (découverte + Dynamic Client Registration + PKCE) valable pour tout serveur MCP conforme - « je code une fois, valable pour tout ». Suite du pont MCP (`[TF-MCP-01]`).
 > - **Découverte** (`McpOAuthDiscovery`) : probe non-authentifié → `401`/`WWW-Authenticate` → Protected Resource Metadata (RFC 9728) → Authorization Server Metadata (RFC 8414, sinon OIDC) = `authorization_endpoint`/`token_endpoint`/`registration_endpoint`. Fallback : le serveur MCP est son propre AS.
