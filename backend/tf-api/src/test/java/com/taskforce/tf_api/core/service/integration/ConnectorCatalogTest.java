@@ -109,6 +109,14 @@ class ConnectorCatalogTest {
         assertThat(catalogue.byKey("neon").orElseThrow().mcpSuggestedUrl()).isNotBlank();
         assertThat(catalogue.byKey("canva").orElseThrow().mcpSuggestedUrl()).isNotBlank();
 
+        // TF-MCP-05 lot 2 : 7 présents + square/webflow/wix nouvellement déclarés au catalogue.
+        assertThat(catalogue.byKey("monday").orElseThrow().mcpSuggestedUrl()).isNotBlank();
+        assertThat(catalogue.byKey("figma").orElseThrow().mcpSuggestedUrl()).isNotBlank();
+        assertThat(catalogue.byKey("supabase").orElseThrow().mcpSuggestedUrl()).isNotBlank();
+        assertThat(catalogue.byKey("square").orElseThrow().mcpSuggestedUrl()).isEqualTo("https://mcp.squareup.com/sse");
+        assertThat(catalogue.byKey("webflow").orElseThrow().mcpSuggestedUrl()).isNotBlank();
+        assertThat(catalogue.byKey("wix").orElseThrow().mcpSuggestedUrl()).isNotBlank();
+
         // Un connecteur générique sans MCP hébergé reste en bring-your-own : pas d'URL suggérée,
         // mais il garde la capability "mcp" (l'utilisateur colle l'URL de son propre serveur MCP).
         ConnectorDescriptor docker = catalogue.byKey("docker").orElseThrow();
