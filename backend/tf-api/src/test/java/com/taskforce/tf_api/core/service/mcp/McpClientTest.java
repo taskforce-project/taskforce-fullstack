@@ -13,8 +13,10 @@ import org.junit.jupiter.api.Test;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
+import com.taskforce.tf_api.shared.exception.BusinessException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Tests unitaires — {@link McpClient}. Un serveur HTTP embarqué (JDK {@link HttpServer}) rejoue des
@@ -26,6 +28,8 @@ class McpClientTest {
 
     private HttpServer server;
     private String url;
+    private volatile boolean emitSession = true;   // le serveur émet-il un mcp-session-id ? (stateful)
+    private volatile boolean unauthorized = false; // le serveur répond-il 401 à l'initialize ?
     private final McpClient client = new McpClient(new ObjectMapper(), 2000L, 5000L);
 
     @BeforeEach
@@ -39,7 +43,14 @@ class McpClientTest {
 
             String rpc;
             if (body.contains("\"initialize\"")) {
-                exchange.getResponseHeaders().set("mcp-session-id", "sess-123");
+                if (unauthorized) {
+                    byte[] err = "{\"error\":\"invalid_token\"}".getBytes(StandardCharsets.UTF_8);
+                    exchange.sendResponseHeaders(401, err.length);
+                    exchange.getResponseBody().write(err);
+                    exchange.close();
+                    return;
+                }
+                if (emitSession) exchange.getResponseHeaders().set("mcp-session-id", "sess-123");
                 rpc = "{\"result\":{\"protocolVersion\":\"2025-06-18\",\"serverInfo\":{\"name\":\"t\",\"version\":\"0\"}},\"jsonrpc\":\"2.0\",\"id\":1}";
             } else if (body.contains("tools/list")) {
                 rpc = "{\"result\":{\"tools\":["
@@ -101,5 +112,27 @@ class McpClientTest {
     void extract_json_handles_sse_and_raw() {
         assertThat(McpClient.extractJson("event: message\ndata: {\"a\":1}\n\n").trim()).isEqualTo("{\"a\":1}");
         assertThat(McpClient.extractJson("{\"b\":2}")).isEqualTo("{\"b\":2}");
+    }
+
+    @Test
+    @DisplayName("initialize : serveur stateless (sans mcp-session-id) → session sans id, suite OK")
+    void initialize_stateless_without_session_id() {
+        emitSession = false; // cas Linear : le serveur ne renvoie PAS de mcp-session-id
+        McpClient.Session session = client.initialize(new McpClient.ServerRef("srv", url, null));
+        assertThat(session.sessionId()).isNull();
+        // Le mode stateless ne casse pas la suite : tools/list fonctionne sans en-tête de session.
+        List<McpClient.ToolDef> defs = client.listTools(session);
+        assertThat(defs).extracting(McpClient.ToolDef::name).containsExactly("echo", "add");
+        assertThat(client.callTool(session, "echo", Map.of("x", "hi"))).isEqualTo("CALLED echo");
+        client.close(session); // ne doit pas lever malgré un sessionId null
+    }
+
+    @Test
+    @DisplayName("initialize : statut d'erreur (401) → échec clair mentionnant le code HTTP")
+    void initialize_http_error_is_explicit() {
+        unauthorized = true; // token refusé par le serveur
+        assertThatThrownBy(() -> client.initialize(new McpClient.ServerRef("srv", url, null)))
+            .isInstanceOf(BusinessException.class)
+            .hasMessageContaining("401");
     }
 }

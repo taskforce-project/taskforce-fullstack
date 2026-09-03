@@ -58,7 +58,10 @@ public class McpClient {
      */
     public record ToolDef(String name, String description, JsonNode inputSchema, boolean readOnly) {}
 
-    /** Session MCP ouverte (mode stateful) : URL + {@code mcp-session-id} + token de pass-through. */
+    /**
+     * Session MCP ouverte : URL + token de pass-through + {@code mcp-session-id} <b>optionnel</b>
+     * ({@code null} pour un serveur stateless qui n'en émet pas — l'en-tête n'est alors pas renvoyé).
+     */
     public record Session(String baseUrl, String sessionId, String token) {}
 
     // -------------------------------------------------------------------------
@@ -78,12 +81,19 @@ public class McpClient {
 
         HttpResponse<String> res = send(ref.serverUrl(), ref.token(), null,
             rpcBody("initialize", params, 1));
-        String sessionId = res.headers().firstValue("mcp-session-id").orElse(null);
-        if (sessionId == null || sessionId.isBlank()) {
-            throw new BusinessException("Serveur MCP sans mcp-session-id (" + ref.connectorKey() + ")");
+        // Un statut d'erreur (ex. 401 token invalide) doit remonter clairement, plutôt que de se
+        // déguiser en « serveur sans session ».
+        if (res.statusCode() / 100 != 2) {
+            throw new BusinessException("Handshake MCP refusé (" + ref.connectorKey()
+                + ", HTTP " + res.statusCode() + ")");
         }
-        // Vérifie qu'initialize a renvoyé un résultat exploitable (sinon protocole KO).
+        // Vérifie qu'initialize a renvoyé un résultat JSON-RPC exploitable (sinon protocole KO).
         parseResult(res, "initialize");
+        // mcp-session-id est OPTIONNEL (transport Streamable HTTP) : un serveur stateless (ex. Linear)
+        // n'en renvoie pas. On le capture s'il est présent (à réémettre sur les appels suivants),
+        // sinon session sans id — send() n'ajoute l'en-tête que s'il est non nul, donc le mode
+        // stateless fonctionne de bout en bout (tools/list, tools/call, close).
+        String sessionId = res.headers().firstValue("mcp-session-id").orElse(null);
 
         Session session = new Session(ref.serverUrl(), sessionId, ref.token());
         // Notification obligatoire (pas d'id, pas de réponse attendue) — best-effort.
