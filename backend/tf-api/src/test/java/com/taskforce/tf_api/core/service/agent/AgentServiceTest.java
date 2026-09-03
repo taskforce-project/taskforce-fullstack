@@ -294,6 +294,7 @@ class AgentServiceTest {
         String systemMsg = String.valueOf(captor.getValue().get(0).get("content"));
         assertThat(systemMsg).contains("linear__list_things"); // l'outil connecté est annoncé
         assertThat(systemMsg).contains("APPELLE-LE");          // le réflexe (Pilier 1) est présent
-        assertThat(systemMsg).contains("système externe");     // routage de base (namespace)
+        assertThat(systemMsg).contains("système externe");     // routage : namespace
+        assertThat(systemMsg).contains("TaskForce par défaut"); // routage (Pilier 2) : cible par défaut
     }
 }

@@ -338,7 +338,11 @@ public class AgentService {
                   // Pilier 1 (réflexe, TF-MCP-03) : aller chercher l'info via l'outil au lieu de prétendre l'absence d'accès.
                   .append("Quand l'un de ces outils peut répondre (lire les données d'un système branché), APPELLE-LE ")
                   .append("au lieu de deviner ou de répondre que tu n'as pas accès : si l'outil est là, l'accès est là. ")
-                  .append("Un outil préfixé « <service>__ » agit sur ce système externe. ")
+                  .append("Un outil préfixé « <service>__ » agit sur ce système externe ; sans préfixe, sur TaskForce. ")
+                  // Pilier 2 (routage, TF-MCP-03) : défaut TaskForce ; externe seulement si nommé ; proposer les deux si pertinent.
+                  .append("Pour une action réalisable des deux côtés (ex. créer une issue), vise TaskForce par défaut ; ")
+                  .append("ne cible un système externe que si l'utilisateur le nomme, et quand c'est utile propose les deux ")
+                  .append("(« je la crée dans TaskForce, je la pousse aussi dans <service> ? »). ")
                   .append("N'appelle un outil d'écriture externe qu'avec des paramètres explicites et vérifiés, ")
                   .append("et jamais sans que l'utilisateur l'ait demandé ; il sera de toute façon soumis à sa validation. ");
             }
