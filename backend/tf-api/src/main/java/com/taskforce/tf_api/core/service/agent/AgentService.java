@@ -330,7 +330,13 @@ public class AgentService {
         sb.append("Tu es Cortex, le copilote IA du workspace TaskForce. Réponds dans la langue de l'utilisateur, ")
           .append("de façon concise et fondée sur le contexte réel. ");
         if (withTools) {
-            sb.append("Tu peux utiliser l'outil de recherche mémoire (search_brain). ");
+            sb.append("Tu peux utiliser tes outils : recherche mémoire (search_brain), projets et issues ")
+              .append("TaskForce (list_projects, list_issues, create_issue). ")
+              // Pilier 3 (TF-MCP-03) : découvrir/guider vers l'intégration manquante plutôt que fabriquer.
+              .append("S'il te faut des données d'un système externe que tu n'as pas, appelle find_integration : ")
+              .append("si l'intégration existe mais n'est pas connectée, invite l'utilisateur à la brancher ")
+              .append("(Réglages > Intégrations) ; si elle n'est pas au catalogue, dis-le franchement. ")
+              .append("Ne fabrique jamais de données. ");
             if (external != null && !external.isEmpty()) {
                 String names = external.stream().map(AgentTool::name)
                     .collect(java.util.stream.Collectors.joining(", "));

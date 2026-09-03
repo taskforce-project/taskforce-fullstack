@@ -296,5 +296,6 @@ class AgentServiceTest {
         assertThat(systemMsg).contains("APPELLE-LE");          // le réflexe (Pilier 1) est présent
         assertThat(systemMsg).contains("système externe");     // routage : namespace
         assertThat(systemMsg).contains("TaskForce par défaut"); // routage (Pilier 2) : cible par défaut
+        assertThat(systemMsg).contains("find_integration");    // Pilier 3 : réflexe « connecte X »
     }
 }
