@@ -233,6 +233,16 @@ public class ConnectorCatalog {
         suggestMcp("jira",       "https://mcp.atlassian.com/v2/mcp");
         suggestMcp("gitlab",     "https://gitlab.com/api/v4/mcp");
         suggestMcp("vercel",     "https://mcp.vercel.com");
+        // TF-MCP-05 : lot vérifié par sonde le 03/09/2026 (initialize -> 401 + WWW-Authenticate OAuth,
+        // même dialecte que Linear) → OAuth 1-clic (TF-MCP-02) opérationnel pour ces serveurs.
+        suggestMcp("notion",     "https://mcp.notion.com/mcp");
+        suggestMcp("stripe",     "https://mcp.stripe.com");
+        suggestMcp("paypal",     "https://mcp.paypal.com/mcp");
+        suggestMcp("intercom",   "https://mcp.intercom.com/mcp");
+        suggestMcp("neon",       "https://mcp.neon.tech/sse");
+        suggestMcp("canva",      "https://mcp.canva.com/mcp");
+        suggestMcp("attio",      "https://mcp.attio.com/mcp");
+        suggestMcp("hubspot",    "https://mcp.hubspot.com/anthropic");
     }
 
     /** Tous les descripteurs, dans l'ordre de déclaration. */
