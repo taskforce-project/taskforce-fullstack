@@ -23,6 +23,7 @@ import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.PlanFeatureService;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
+import com.taskforce.tf_api.core.service.mcp.McpImportService;
 import com.taskforce.tf_api.core.service.mcp.McpOAuthService;
 import com.taskforce.tf_api.core.service.mcp.WorkspaceMcpService;
 import com.taskforce.tf_api.shared.dto.ApiResponse;
@@ -53,6 +54,7 @@ public class McpActionController {
     private final PlanFeatureService   planFeatureService;
     private final AuthorizationService authorizationService;
     private final McpOAuthService      mcpOAuthService;
+    private final McpImportService     mcpImportService;
 
     /** Exécute une action externe validée (bouton d'approbation). */
     @PostMapping("/actions/execute")
@@ -113,6 +115,19 @@ public class McpActionController {
         return ResponseEntity.ok(ApiResponse.success(Map.of("authorizeUrl", url)));
     }
 
+    /** Importe un projet externe (issues d'un connecteur MCP) dans un nouveau projet natif TaskForce. */
+    @PostMapping("/import")
+    public ResponseEntity<ApiResponse<McpImportService.ImportResult>> importProject(
+        @PathVariable String slug,
+        @Valid @RequestBody McpImportRequest body,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        Workspace ws = authorizeManager(slug, jwt);
+        McpImportService.ImportResult result =
+            mcpImportService.importProject(ws, resolveUserId(jwt), body.connectorKey(), body.targetName());
+        return ResponseEntity.ok(ApiResponse.success(result));
+    }
+
     /** Membre du workspace + plan propriétaire couvrant les intégrations (BUSINESS+), sinon 409. */
     private Workspace authorizeIntegrations(String slug, Jwt jwt) {
         Workspace ws = access.resolveAndAuthorize(slug, resolveUserId(jwt));
@@ -143,6 +158,9 @@ public class McpActionController {
 
     /** Démarrage OAuth 1-clic : l'URL du serveur MCP dont on découvre le flux OAuth. */
     public record McpOAuthStartRequest(@NotBlank String mcpUrl) {}
+
+    /** Import d'un projet externe : connecteur MCP source + nom du projet natif à créer. */
+    public record McpImportRequest(@NotBlank String connectorKey, @NotBlank String targetName) {}
 
     /** Connexion d'un serveur MCP : clé de connecteur + endpoint {@code mcpUrl} (+ token/allow-list optionnels). */
     public record McpServerRequest(

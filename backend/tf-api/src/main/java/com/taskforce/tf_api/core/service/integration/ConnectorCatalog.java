@@ -223,6 +223,11 @@ public class ConnectorCatalog {
         planned("origin-ui", "Origin UI", ConnectorCategory.UI_COMPONENTS,
             "Large collection of Tailwind components - Cortex recommendations (coming soon)", "https://originui.com");
 
+        // TF-MCP-05 lot 2 : apps à serveur MCP hébergé vérifié mais absentes du catalogue → on les déclare.
+        connectable("square",  "Square",  ConnectorCategory.PAYMENTS,     ConnectorAuthType.OAUTH2, "Payments & POS");
+        connectable("webflow", "Webflow", ConnectorCategory.DESIGN_MEDIA, ConnectorAuthType.OAUTH2, "Sites & CMS");
+        connectable("wix",     "Wix",     ConnectorCategory.DESIGN_MEDIA, ConnectorAuthType.OAUTH2, "Sites & CMS");
+
         // « MCP-ready » : connecteurs dont un serveur MCP DISTANT hébergé (officiel) existe → URL suggérée
         // pré-remplie (éditable) dans le dialog Connect. Endpoints vérifiés sur le web (actuels, Streamable
         // HTTP, auth par token via le champ optionnel). Les autres restent en bring-your-own.
@@ -243,6 +248,17 @@ public class ConnectorCatalog {
         suggestMcp("canva",      "https://mcp.canva.com/mcp");
         suggestMcp("attio",      "https://mcp.attio.com/mcp");
         suggestMcp("hubspot",    "https://mcp.hubspot.com/anthropic");
+        // TF-MCP-05 lot 2 : +10 vérifiés par sonde le 03/09/2026 (initialize -> 401 OAuth).
+        suggestMcp("monday",     "https://mcp.monday.com/sse");
+        suggestMcp("clickup",    "https://mcp.clickup.com/mcp");
+        suggestMcp("airtable",   "https://mcp.airtable.com/mcp");
+        suggestMcp("supabase",   "https://mcp.supabase.com/mcp");
+        suggestMcp("figma",      "https://mcp.figma.com/mcp");
+        suggestMcp("zapier",     "https://mcp.zapier.com/api/mcp/mcp");
+        suggestMcp("grafana",    "https://mcp.grafana.com/mcp");
+        suggestMcp("square",     "https://mcp.squareup.com/sse");
+        suggestMcp("webflow",    "https://mcp.webflow.com/sse");
+        suggestMcp("wix",        "https://mcp.wix.com/sse");
     }
 
     /** Tous les descripteurs, dans l'ordre de déclaration. */
