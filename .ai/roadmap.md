@@ -10,6 +10,12 @@
 >
 > Sources : `.ai/qa.md` (QA produit détaillée), `.ai/known-issues.md` (bugs vérifiés), `.ai/module-map.md` (domaines↔code), `.ai/architecture-map.md` (archi réelle), `.ai/P0-fix-plan.md` (correctifs P0 paste-ready).
 
+> **▶ MAJ 03/09/2026 - TF-MCP-03 lancé : Cortex agentique (réflexe d'intégration).** `[TF-MCP-03]`
+> - **Vision (user)** : Cortex = **extension de mémoire**. Il va chercher l'info au bon endroit tout seul, dit « connecte X » si l'intégration manque, et « crée une issue » peut viser TaskForce OU Linear. Décisions user : **défaut TaskForce, proposer les deux quand pertinent**.
+> - **Increment 1 (fait)** - Pilier 1 (réflexe) : `AgentService.systemPrompt` demande d'APPELER l'outil connecté au lieu de répondre « pas d'accès » (« si l'outil est là, l'accès est là ») + rappelle le namespace `<service>__`. Garde : `AgentServiceTest.run_deep_prompt_carries_tool_reflex`. Suite ALL verte.
+> - **Prérequis découvert** : Cortex n'a que **2 outils internes** (`create_note`, `search_brain`) - **pas** de `create_issue`/`list_issues`. Le routage « ici ou Linear » (Pilier 2) suppose donc de créer ces outils internes d'abord.
+> - **Reste** : increment 2 = outils internes issues + routage (Pilier 2) ; increment 3 = « connecte X » (Pilier 3, injection du catalogue). Puis `[TF-MCP-04]` = import de projet (Linear → issues natives) dans le wizard nouveau projet.
+>
 > **▶ MAJ 03/09/2026 - Fix : serveurs MCP stateless (Linear) injoignables malgré OAuth OK.** `[TF-MCP-02b]`
 > - **Symptôme (prod)** : Linear connecté en OAuth (« Connected ») mais **« unreachable - Serveur MCP sans mcp-session-id »** → 0 outil remonté → Cortex répond « je n'ai pas accès à Linear » (`WorkspaceMcpService.toolsFor` renvoyait vide car `discover` levait).
 > - **Cause** : `McpClient.initialize` **exigeait** l'en-tête `mcp-session-id`. Il est **OPTIONNEL** (transport Streamable HTTP) : Linear est **stateless**. Preuve terrain (token déchiffré + sonde directe) : `initialize` avec token → `200`, `content-type: text/event-stream`, `serverInfo:"Linear MCP"`, **pas** de `mcp-session-id`. On rejetait un serveur sain.

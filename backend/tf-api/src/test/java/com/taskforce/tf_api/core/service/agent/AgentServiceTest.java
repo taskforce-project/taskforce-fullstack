@@ -260,4 +260,40 @@ class AgentServiceTest {
         org.mockito.Mockito.verify(extClient, org.mockito.Mockito.never())
             .initialize(org.mockito.ArgumentMatchers.any());
     }
+
+    @Test
+    @DisplayName("run (deep) : outils externes connectés → le system prompt porte le réflexe (TF-MCP-03)")
+    void run_deep_prompt_carries_tool_reflex() throws Exception {
+        stubWorkspace();
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "model", "m");
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "mcpToolTier", "fast");
+        when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
+        when(groq.isConfigured()).thenReturn(true);
+
+        // Un outil externe de LECTURE, namespacé « linear__list_things », connecté sur le workspace.
+        var real = new ObjectMapper();
+        var readDef = new com.taskforce.tf_api.core.service.mcp.McpClient.ToolDef(
+            "list_things", "liste des choses", real.readTree("{\"type\":\"object\"}"), true);
+        var extTool = new com.taskforce.tf_api.core.service.mcp.ExternalMcpTool(
+            org.mockito.Mockito.mock(com.taskforce.tf_api.core.service.mcp.McpClient.class),
+            new com.taskforce.tf_api.core.service.mcp.McpClient.ServerRef("linear", "http://x/mcp", null),
+            readDef, real);
+        when(workspaceMcp.toolsFor(org.mockito.ArgumentMatchers.any())).thenReturn(List.of(extTool));
+        when(tools.toolDefinitions(org.mockito.ArgumentMatchers.anyList())).thenReturn(List.of());
+        // Le LLM répond directement (aucun appel d'outil) → un seul tour ; on capture les messages envoyés.
+        when(groq.rawChat(anyString(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), anyString()))
+            .thenReturn(real.readTree("{\"content\":\"ok\"}"));
+
+        service.run("acme", 7L, "analyse le projet et propose un plan"); // message deep → boucle d'outils
+
+        @SuppressWarnings("unchecked")
+        org.mockito.ArgumentCaptor<List<java.util.Map<String, Object>>> captor =
+            org.mockito.ArgumentCaptor.forClass(List.class);
+        org.mockito.Mockito.verify(groq).rawChat(anyString(), captor.capture(),
+            org.mockito.ArgumentMatchers.any(), anyString());
+        String systemMsg = String.valueOf(captor.getValue().get(0).get("content"));
+        assertThat(systemMsg).contains("linear__list_things"); // l'outil connecté est annoncé
+        assertThat(systemMsg).contains("APPELLE-LE");          // le réflexe (Pilier 1) est présent
+        assertThat(systemMsg).contains("système externe");     // routage de base (namespace)
+    }
 }

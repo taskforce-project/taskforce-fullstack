@@ -334,9 +334,13 @@ public class AgentService {
             if (external != null && !external.isEmpty()) {
                 String names = external.stream().map(AgentTool::name)
                     .collect(java.util.stream.Collectors.joining(", "));
-                sb.append("Des outils externes sont connectés (serveurs MCP) : ").append(names)
-                  .append(". N'appelle un outil d'écriture externe qu'avec des paramètres explicites et vérifiés, ")
-                  .append("et jamais sans que l'utilisateur l'ait demandé. ");
+                sb.append("Des outils externes sont connectés (serveurs MCP) : ").append(names).append(". ")
+                  // Pilier 1 (réflexe, TF-MCP-03) : aller chercher l'info via l'outil au lieu de prétendre l'absence d'accès.
+                  .append("Quand l'un de ces outils peut répondre (lire les données d'un système branché), APPELLE-LE ")
+                  .append("au lieu de deviner ou de répondre que tu n'as pas accès : si l'outil est là, l'accès est là. ")
+                  .append("Un outil préfixé « <service>__ » agit sur ce système externe. ")
+                  .append("N'appelle un outil d'écriture externe qu'avec des paramètres explicites et vérifiés, ")
+                  .append("et jamais sans que l'utilisateur l'ait demandé ; il sera de toute façon soumis à sa validation. ");
             }
         }
         if (!hits.isEmpty()) {
