@@ -10,6 +10,14 @@
 >
 > Sources : `.ai/qa.md` (QA produit détaillée), `.ai/known-issues.md` (bugs vérifiés), `.ai/module-map.md` (domaines↔code), `.ai/architecture-map.md` (archi réelle), `.ai/P0-fix-plan.md` (correctifs P0 paste-ready).
 
+> **▶ MAJ 03/09/2026 - TF-MCP-03 lancé : Cortex agentique (réflexe d'intégration).** `[TF-MCP-03]`
+> - **Vision (user)** : Cortex = **extension de mémoire**. Il va chercher l'info au bon endroit tout seul, dit « connecte X » si l'intégration manque, et « crée une issue » peut viser TaskForce OU Linear. Décisions user : **défaut TaskForce, proposer les deux quand pertinent**.
+> - **Increment 1 (fait)** - Pilier 1 (réflexe) : `AgentService.systemPrompt` demande d'APPELER l'outil connecté au lieu de répondre « pas d'accès » (« si l'outil est là, l'accès est là ») + rappelle le namespace `<service>__`. Garde : `AgentServiceTest.run_deep_prompt_carries_tool_reflex`. Suite ALL verte.
+> - **Increment 2 (fait)** - Pilier 2 (routage) + outils internes : 3 outils **natifs génériques** (`ListProjectsTool`/`ListIssuesTool`/`CreateIssueTool`, aucun service en dur) mettent TaskForce au même niveau que les outils MCP. Prompt : **défaut TaskForce**, cible l'externe si nommé, **propose les deux** (« je la crée ici, je la pousse aussi dans `<service>` ? »). Écritures internes exécutées directement (comme `create_note`) ; écritures externes restent proposées (validation). Tests : 3 tool tests + assertion routage dans `AgentServiceTest`.
+> - **Prérequis levé** : Cortex passait de **2** outils internes (`create_note`, `search_brain`) à **5** (issues natives incluses) - « crée une issue ici » a désormais une cible.
+> - **Increment 3 (fait)** - Pilier 3 « connecte X » : outil `find_integration` (cherche le catalogue par nom/capacité, dit **connecté** / **disponible à connecter** / **absent**) + prompt (guider vers Réglages > Intégrations si dispo, dire franchement si absent, **ne jamais fabriquer**). Générique (piloté par le catalogue, aucun service en dur). Test `FindIntegrationToolTest`. Cortex : **6 outils internes** désormais.
+> - **Reste** : déployer 1+2+3 en prod (dev→main). Puis `[TF-MCP-04]` = import de projet (Linear → issues natives) dans le wizard nouveau projet.
+>
 > **▶ MAJ 03/09/2026 - Fix : serveurs MCP stateless (Linear) injoignables malgré OAuth OK.** `[TF-MCP-02b]`
 > - **Symptôme (prod)** : Linear connecté en OAuth (« Connected ») mais **« unreachable - Serveur MCP sans mcp-session-id »** → 0 outil remonté → Cortex répond « je n'ai pas accès à Linear » (`WorkspaceMcpService.toolsFor` renvoyait vide car `discover` levait).
 > - **Cause** : `McpClient.initialize` **exigeait** l'en-tête `mcp-session-id`. Il est **OPTIONNEL** (transport Streamable HTTP) : Linear est **stateless**. Preuve terrain (token déchiffré + sonde directe) : `initialize` avec token → `200`, `content-type: text/event-stream`, `serverInfo:"Linear MCP"`, **pas** de `mcp-session-id`. On rejetait un serveur sain.

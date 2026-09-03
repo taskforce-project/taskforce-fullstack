@@ -330,13 +330,27 @@ public class AgentService {
         sb.append("Tu es Cortex, le copilote IA du workspace TaskForce. Réponds dans la langue de l'utilisateur, ")
           .append("de façon concise et fondée sur le contexte réel. ");
         if (withTools) {
-            sb.append("Tu peux utiliser l'outil de recherche mémoire (search_brain). ");
+            sb.append("Tu peux utiliser tes outils : recherche mémoire (search_brain), projets et issues ")
+              .append("TaskForce (list_projects, list_issues, create_issue). ")
+              // Pilier 3 (TF-MCP-03) : découvrir/guider vers l'intégration manquante plutôt que fabriquer.
+              .append("S'il te faut des données d'un système externe que tu n'as pas, appelle find_integration : ")
+              .append("si l'intégration existe mais n'est pas connectée, invite l'utilisateur à la brancher ")
+              .append("(Réglages > Intégrations) ; si elle n'est pas au catalogue, dis-le franchement. ")
+              .append("Ne fabrique jamais de données. ");
             if (external != null && !external.isEmpty()) {
                 String names = external.stream().map(AgentTool::name)
                     .collect(java.util.stream.Collectors.joining(", "));
-                sb.append("Des outils externes sont connectés (serveurs MCP) : ").append(names)
-                  .append(". N'appelle un outil d'écriture externe qu'avec des paramètres explicites et vérifiés, ")
-                  .append("et jamais sans que l'utilisateur l'ait demandé. ");
+                sb.append("Des outils externes sont connectés (serveurs MCP) : ").append(names).append(". ")
+                  // Pilier 1 (réflexe, TF-MCP-03) : aller chercher l'info via l'outil au lieu de prétendre l'absence d'accès.
+                  .append("Quand l'un de ces outils peut répondre (lire les données d'un système branché), APPELLE-LE ")
+                  .append("au lieu de deviner ou de répondre que tu n'as pas accès : si l'outil est là, l'accès est là. ")
+                  .append("Un outil préfixé « <service>__ » agit sur ce système externe ; sans préfixe, sur TaskForce. ")
+                  // Pilier 2 (routage, TF-MCP-03) : défaut TaskForce ; externe seulement si nommé ; proposer les deux si pertinent.
+                  .append("Pour une action réalisable des deux côtés (ex. créer une issue), vise TaskForce par défaut ; ")
+                  .append("ne cible un système externe que si l'utilisateur le nomme, et quand c'est utile propose les deux ")
+                  .append("(« je la crée dans TaskForce, je la pousse aussi dans <service> ? »). ")
+                  .append("N'appelle un outil d'écriture externe qu'avec des paramètres explicites et vérifiés, ")
+                  .append("et jamais sans que l'utilisateur l'ait demandé ; il sera de toute façon soumis à sa validation. ");
             }
         }
         if (!hits.isEmpty()) {
