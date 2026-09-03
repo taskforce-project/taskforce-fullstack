@@ -318,11 +318,18 @@ public class AgentService {
     // Helpers
     // -------------------------------------------------------------------------
 
-    /** Heuristique de routing : action/décision/analyse → deep ; sinon fast. */
+    /**
+     * Heuristique de routing : action / décision / analyse / <b>consultation d'un outil</b> → deep
+     * (le chemin qui arme les outils, TF-MCP-03) ; sinon fast. On y ajoute les verbes naturels de
+     * lecture et de connexion (liste, montre, cherche, connecte…) pour que « liste mes issues Linear »
+     * arme aussi le réflexe, pas seulement « analyse… ».
+     */
     private boolean isDeepIntent(String message) {
         String m = message == null ? "" : message.toLowerCase();
         return m.matches(".*\\b(cr[ée]e|ajoute|d[ée]cide|d[ée]cision|plan|planifie|analyse|compare|"
-            + "recherche|enqu[êe]te|propose|r[ée]dige|note|archive|met[s]? à jour|strat[ée]gie).*");
+            + "recherche|enqu[êe]te|propose|r[ée]dige|note|archive|met[s]? à jour|strat[ée]gie|"
+            + "liste|lister|montre|affiche|cherche|trouve|r[ée]cup[èe]re|importe|synchronise|"
+            + "connect[e]?|connecter|connexion|branche).*");
     }
 
     private String systemPrompt(List<KnowledgeNode> hits, boolean withTools, List<AgentTool> external) {
