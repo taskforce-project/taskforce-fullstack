@@ -10,6 +10,13 @@
 >
 > Sources : `.ai/qa.md` (QA produit détaillée), `.ai/known-issues.md` (bugs vérifiés), `.ai/module-map.md` (domaines↔code), `.ai/architecture-map.md` (archi réelle), `.ai/P0-fix-plan.md` (correctifs P0 paste-ready).
 
+> **▶ MAJ 04/09/2026 - Fix paiement : `session_id` manquant au retour Checkout.** `[QA-billing]`
+> - **Problème (constaté à l'upgrade)** : la page de succès affichait « No payment session found ». Cause racine : le `success_url` du Checkout partait **sans** le placeholder `{CHECKOUT_SESSION_ID}` que Stripe substitue au retour → la page arrivait sans `session_id` à vérifier.
+> - **Fix (fait)** : `StripeService.withCheckoutSessionId` garantit le placeholder sur **tout** `success_url` (ajout idempotent, séparateur `?`/`&` selon la query, no-op si déjà présent → sûr aussi pour l'inscription qui ne lit pas le paramètre). Centralisé côté service → couvre les deux appelants (upgrade + inscription). Test `StripeServiceTest.SuccessUrlTemplateTests`.
+>
+> **▶ MAJ 04/09/2026 - Footer : TAG de version sémantique plutôt que le SHA opaque.** `[FE-footer]`
+> - **Demande (user)** : « je veux le tag de version » (pas une date) - le SHA `68203471` n'est pas lisible. Le footer affiche désormais le **semver** (« v0.1.0 »), **source unique = `package.json`** (bumpé via les labels `release:{major|minor|patch}`), injecté au build par `next.config.ts` (`env.NEXT_PUBLIC_APP_SEMVER`, lu depuis package.json). Distinct de `NEXT_PUBLIC_APP_VERSION` (SHA posé par l'auto-deploy VM) **conservé en tooltip** (`title`) pour la traçabilité exacte. `app-footer.tsx` + `next.config.ts`. Repo-contained (l'auto-deploy VM n'écrase pas package.json).
+>
 > **▶ MAJ 04/09/2026 - Suppression de compte en 2 temps + passage de flambeau.** `[TF-ACCT-DELETE]`
 > - **Problème (constaté en vrai)** : supprimer son compte purgeait TOUT immédiatement et définitivement (workspaces possédés détruits, y compris partagés → les invités perdent l'accès). L'user a perdu Nimbus + les workspaces où il était invité, sans récupération possible.
 > - **Backend (fait, Phase 1)** : `GdprService.deleteMyAccount` **PLANIFIE** désormais (délai de grâce **30 j**, colonne `users.deletion_scheduled_at`, migration **V83**) au lieu de purger. `restoreMyAccount` annule (récupérable). `purgeAccount` (job quotidien `AccountPurgeScheduler`, au-delà du délai) fait la purge RÉELLE avec **passage de flambeau** : un workspace partagé est **transféré au membre le plus ancien** (son travail survit), un solo est supprimé ; puis anonymisation + suppression Keycloak. Endpoints : `DELETE /api/gdpr/account` (renvoie la date de purge) + `POST /api/gdpr/account/restore`. Test `GdprServiceTest` (5).
