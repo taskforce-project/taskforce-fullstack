@@ -7,6 +7,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -36,12 +37,20 @@ public class GdprController {
         return ResponseEntity.ok(ApiResponse.success("Données exportées", gdprService.exportMyData(userId)));
     }
 
-    /** Droit à l'effacement : supprime le footprint du compte (workspaces, données perso, IdP) et révoque l'accès. */
+    /** Droit à l'effacement - étape 1 : PLANIFIE la suppression (délai de grâce), récupérable jusqu'à la purge. */
     @DeleteMapping("/account")
-    public ResponseEntity<ApiResponse<Void>> deleteMyAccount(@AuthenticationPrincipal Jwt jwt) {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> deleteMyAccount(@AuthenticationPrincipal Jwt jwt) {
         Long userId = resolveUserId(jwt);
-        gdprService.deleteMyAccount(userId);
-        return ResponseEntity.ok(ApiResponse.success("Compte supprimé", null));
+        java.time.LocalDateTime purgeAt = gdprService.deleteMyAccount(userId);
+        return ResponseEntity.ok(ApiResponse.success("Suppression planifiée",
+            Map.of("scheduledPurgeAt", purgeAt)));
+    }
+
+    /** Annule une suppression planifiée (récupération pendant le délai de grâce). */
+    @PostMapping("/account/restore")
+    public ResponseEntity<ApiResponse<Void>> restoreMyAccount(@AuthenticationPrincipal Jwt jwt) {
+        gdprService.restoreMyAccount(resolveUserId(jwt));
+        return ResponseEntity.ok(ApiResponse.success("Compte restauré", null));
     }
 
     private Long resolveUserId(Jwt jwt) {

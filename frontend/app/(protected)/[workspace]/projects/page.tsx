@@ -499,7 +499,7 @@ function EmptyState({ isSearch }: { readonly isSearch: boolean }) {
             <p className="text-sm font-semibold text-foreground">No active operations</p>
             <p className="text-xs text-muted-foreground">Create your first operation to start tracking work</p>
           </div>
-          <Button size="sm" className="gap-1.5" onClick={openCreateProject}>
+          <Button size="sm" className="gap-1.5" onClick={() => openCreateProject()}>
             <Plus className="size-3.5" /> New Operation
           </Button>
         </>
@@ -588,7 +588,7 @@ export default function ProjectsPage() {
         title="Active Operations"
         description="Real-time health and velocity across all workstreams"
         actions={
-          <Button size="sm" className="gap-1.5" onClick={openCreateProject}>
+          <Button size="sm" className="gap-1.5" onClick={() => openCreateProject()}>
             <Plus className="size-4" /> New Operation
           </Button>
         }

@@ -67,7 +67,7 @@ public class McpOAuthService {
      * Autorisation (membre + BUSINESS+ + manager) faite en amont par le controleur.
      */
     @Transactional
-    public String start(Workspace ws, Long userId, String connectorKey, String mcpUrl) {
+    public String start(Workspace ws, Long userId, String connectorKey, String mcpUrl, String returnTo) {
         SsrfGuard.assertPublicHttpUrl(mcpUrl);
         DiscoveredAuth auth = discovery.discover(mcpUrl);
         // Le navigateur sera redirige vers authorization_endpoint (issu de la metadata d'un serveur
@@ -93,6 +93,7 @@ public class McpOAuthService {
             .connectorKey(connectorKey).mcpUrl(mcpUrl).codeVerifier(verifier)
             .tokenEndpoint(auth.tokenEndpoint()).clientId(clientId).clientSecret(clientSecret)
             .redirectUri(redirectUri).scope(auth.scopesSupported()).issuer(auth.issuer())
+            .returnTo(sanitizeReturnTo(returnTo))
             .expiresAt(LocalDateTime.now().plus(STATE_TTL))
             .build());
 
@@ -125,10 +126,10 @@ public class McpOAuthService {
             tokenService.storeInitialTokens(conn, tok, row.getMcpUrl(), row.getIssuer(),
                 row.getClientId(), row.getClientSecret(), row.getTokenEndpoint());
             workspaceMcp.invalidate(row.getWorkspaceId());
-            return appRedirect(row.getWorkspaceId(), "connected");
+            return appRedirect(row, "connected");
         } catch (Exception e) {
             log.warn("Callback OAuth MCP echoue (connector={}) : {}", row.getConnectorKey(), e.getMessage());
-            return appRedirect(row.getWorkspaceId(), "error");
+            return appRedirect(row, "error");
         } finally {
             stateRepository.deleteById(row.getState()); // usage unique
         }
@@ -176,9 +177,26 @@ public class McpOAuthService {
         return u.toString();
     }
 
-    private String appRedirect(Long workspaceId, String status) {
-        String slug = workspaceRepository.findById(workspaceId).map(Workspace::getSlug).orElse("");
+    private String appRedirect(McpOAuthState row, String status) {
+        // Retour « fluide » : si un chemin de retour a été fourni au start (ex. le wizard de projet),
+        // on y renvoie ; sinon, retour à la page Settings > Intégrations (comportement par défaut).
+        String rt = row.getReturnTo();
+        if (rt != null && !rt.isBlank()) {
+            return appBase + rt + (rt.contains("?") ? "&" : "?") + "mcp=" + status;
+        }
+        String slug = workspaceRepository.findById(row.getWorkspaceId()).map(Workspace::getSlug).orElse("");
         return appBase + "/" + slug + "/settings?section=integrations&mcp=" + status;
+    }
+
+    /**
+     * N'autorise qu'un chemin applicatif RELATIF sûr (anti open-redirect) : doit commencer par "/",
+     * pas "//" (protocol-relative), pas de schéma ni de backslash. Sinon → {@code null} (retour défaut).
+     */
+    private static String sanitizeReturnTo(String returnTo) {
+        if (returnTo == null || returnTo.isBlank()) return null;
+        String rt = returnTo.trim();
+        if (!rt.startsWith("/") || rt.startsWith("//") || rt.contains("\\") || rt.contains("://")) return null;
+        return rt.length() > 500 ? rt.substring(0, 500) : rt;
     }
 
     private String urlSafe(int bytes) {

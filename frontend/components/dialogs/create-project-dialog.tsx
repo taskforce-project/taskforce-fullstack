@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { FolderKanban, Loader2, DownloadCloud } from "lucide-react"
+import { FolderKanban, Loader2, DownloadCloud, Plug } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -15,12 +15,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { BrandLogo } from "@/components/ui/brand-logo"
 import { ProjectIconPicker } from "@/components/ui/project-icon-picker"
 import { ColorPalettePicker, PROJECT_COLORS } from "@/components/ui/color-palette-picker"
 import { ProjectVisibilityPicker } from "@/components/ui/project-visibility-picker"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { useProjectStore } from "@/lib/store/project-store"
-import { getMcpServers, importMcpProject, type McpServerStatus } from "@/lib/api/integration-service"
+import { useCreateProjectStore } from "@/lib/store/create-project-store"
+import {
+  getIntegrationCatalog,
+  importMcpProject,
+  startMcpOAuth,
+  type ConnectorView,
+} from "@/lib/api/integration-service"
+import { cn } from "@/lib/utils"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -34,15 +42,20 @@ interface CreateProjectDialogProps {
 
 type Mode = "blank" | "import"
 
+/** Catégorie des outils depuis lesquels on peut importer un projet (des issues). */
+const PM_CATEGORY = "PROJECT_MANAGEMENT"
+
 // ---------------------------------------------------------------------------
-// CreateProjectDialog - contrôlé, sans trigger (ouvert « en place » par le store global)
-// Deux modes : projet vierge, ou import d'un projet depuis un outil connecté en MCP (TF-MCP-04).
+// CreateProjectDialog - deux modes : projet vierge, ou import d'un projet depuis un outil connecté
+// en MCP (TF-MCP-04). En mode import : grille de logos (Linear, Asana, Jira…), avec connexion 1-clic
+// inline pour les outils pas encore branchés.
 // ---------------------------------------------------------------------------
 
 export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogProps) {
   const router = useRouter()
   const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug)
   const createProject = useProjectStore((s) => s.createProject)
+  const preselectImportSource = useCreateProjectStore((s) => s.importSource)
 
   const [mode, setMode] = useState<Mode>("blank")
   const [isLoading, setIsLoading] = useState(false)
@@ -56,25 +69,36 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
   const [isPublic, setIsPublic] = useState(false)
 
   // -- Mode « import » --
-  const [servers, setServers] = useState<McpServerStatus[]>([])
-  const [serversLoading, setServersLoading] = useState(false)
+  const [tools, setTools] = useState<ConnectorView[]>([])
+  const [toolsLoading, setToolsLoading] = useState(false)
   const [importSource, setImportSource] = useState("")
   const [importName, setImportName] = useState("")
   const [importing, setImporting] = useState(false)
+  const [connectingKey, setConnectingKey] = useState<string | null>(null)
 
-  // Charge les serveurs MCP connectés (joignables) quand on passe en mode import.
+  // Charge les outils MCP-ready de gestion de projet (logos + état connecté) quand on passe en import.
   useEffect(() => {
     if (!open || mode !== "import" || !slug) return
-    setServersLoading(true)
-    getMcpServers(slug)
-      .then((list) => {
-        const reachable = list.filter((s) => s.reachable)
-        setServers(reachable)
-        setImportSource((prev) => prev || (reachable[0]?.connectorKey ?? ""))
+    setToolsLoading(true)
+    getIntegrationCatalog(slug)
+      .then((cat) => {
+        const pm = cat.categories
+          .flatMap((g) => g.tools)
+          .filter((t) => t.mcpSuggestedUrl && t.category === PM_CATEGORY)
+        setTools(pm)
       })
-      .catch(() => setServers([])) // 409 (plan) ou aucune connexion → état vide géré ci-dessous
-      .finally(() => setServersLoading(false))
+      .catch(() => setTools([]))
+      .finally(() => setToolsLoading(false))
   }, [open, mode, slug])
+
+  // Retour OAuth fluide : le modal a été rouvert avec une source présélectionnée (outil qu'on vient de
+  // connecter) → basculer en mode import et sélectionner cet outil.
+  useEffect(() => {
+    if (open && preselectImportSource) {
+      setMode("import")
+      setImportSource(preselectImportSource)
+    }
+  }, [open, preselectImportSource])
 
   function handleNameChange(value: string) {
     setName(value)
@@ -93,9 +117,10 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
     setIconUrl(null)
     setColor(PROJECT_COLORS[0])
     setIsPublic(false)
-    setServers([])
+    setTools([])
     setImportSource("")
     setImportName("")
+    setConnectingKey(null)
   }
 
   /** Point de passage unique : prévient l'appelant (store) et réinitialise le formulaire à la fermeture. */
@@ -127,6 +152,21 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
       toast.error("Something went wrong while creating the project")
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  /** Connexion 1-clic (OAuth) d'un outil pas encore branché, directement depuis le dialog. */
+  async function handleConnect(tool: ConnectorView) {
+    if (!slug || !tool.mcpSuggestedUrl) return
+    setConnectingKey(tool.key)
+    try {
+      // Retour fluide : après le consentement, on revient sur ce wizard (mode import, outil sélectionné),
+      // pas sur Settings.
+      const url = await startMcpOAuth(slug, tool.key, tool.mcpSuggestedUrl, `/${slug}?import=${tool.key}`)
+      window.location.href = url // redirection vers le consentement du service (la page quitte)
+    } catch {
+      toast.error("Couldn't start the connection - it may require a Business plan")
+      setConnectingKey(null)
     }
   }
 
@@ -164,14 +204,20 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
           <button
             type="button"
             onClick={() => setMode("blank")}
-            className={`rounded px-3 py-1.5 transition-colors ${mode === "blank" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+            className={cn(
+              "rounded px-3 py-1.5 transition-colors",
+              mode === "blank" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+            )}
           >
             Blank
           </button>
           <button
             type="button"
             onClick={() => setMode("import")}
-            className={`rounded px-3 py-1.5 transition-colors ${mode === "import" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+            className={cn(
+              "rounded px-3 py-1.5 transition-colors",
+              mode === "import" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+            )}
           >
             Import from a tool
           </button>
@@ -239,44 +285,69 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
             </div>
           </div>
         ) : (
-          <div className="flex flex-col gap-5 py-2">
-            {serversLoading ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="size-4 animate-spin" /> Loading connected tools…
+          <div className="flex flex-col gap-4 py-2">
+            {toolsLoading ? (
+              <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" /> Loading tools…
               </div>
-            ) : servers.length === 0 ? (
+            ) : tools.length === 0 ? (
               <div className="rounded-md border border-border bg-muted/30 px-3 py-4 text-sm text-muted-foreground">
-                No connected tool yet. Connect one in{" "}
-                <span className="font-medium text-foreground">Settings → Integrations</span> (OAuth 1-click), then come back to import.
+                No importable tool available yet.
               </div>
             ) : (
               <>
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="import-source" className="text-sm font-medium text-foreground">Source</label>
-                  <select
-                    id="import-source"
-                    value={importSource}
-                    onChange={(e) => setImportSource(e.target.value)}
-                    className="h-9 rounded-md border border-border bg-background px-3 text-sm text-foreground capitalize outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20"
-                  >
-                    {servers.map((s) => (
-                      <option key={s.connectorKey} value={s.connectorKey}>{s.connectorKey}</option>
-                    ))}
-                  </select>
-                  <span className="text-xs text-muted-foreground">Its issues are imported into a new TaskForce project.</span>
+                <div className="grid grid-cols-3 gap-2">
+                  {tools.map((t) => {
+                    const selected = importSource === t.key
+                    return (
+                      <button
+                        key={t.key}
+                        type="button"
+                        disabled={connectingKey !== null && connectingKey !== t.key}
+                        onClick={() => (t.connected ? setImportSource(selected ? "" : t.key) : handleConnect(t))}
+                        className={cn(
+                          "flex flex-col items-center gap-1.5 rounded-lg border p-3 text-center transition-colors",
+                          selected ? "border-primary bg-primary/5" : "border-border hover:bg-accent",
+                          connectingKey !== null && connectingKey !== t.key && "opacity-50",
+                        )}
+                      >
+                        <BrandLogo slug={t.key} name={t.name} className="size-7" />
+                        <span className="text-[12.5px] font-medium text-foreground">{t.name}</span>
+                        {t.connected ? (
+                          <span className="text-[10px] font-medium text-emerald-600">Connected</span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-primary">
+                            {connectingKey === t.key ? (
+                              <Loader2 className="size-3 animate-spin" />
+                            ) : (
+                              <Plug className="size-3" />
+                            )}
+                            Connect
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })}
                 </div>
 
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="import-name" className="text-sm font-medium text-foreground">New project name</label>
-                  <Input
-                    id="import-name"
-                    value={importName}
-                    onChange={(e) => setImportName(e.target.value)}
-                    placeholder="Imported project"
-                    className="h-9"
-                    onKeyDown={(e) => e.key === "Enter" && importSource && importName.trim() && handleImport()}
-                  />
-                </div>
+                {importSource && (
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="import-name" className="text-sm font-medium text-foreground">New project name</label>
+                    <Input
+                      id="import-name"
+                      value={importName}
+                      onChange={(e) => setImportName(e.target.value)}
+                      placeholder="Imported project"
+                      className="h-9"
+                      autoFocus
+                      onKeyDown={(e) => e.key === "Enter" && importSource && importName.trim() && handleImport()}
+                    />
+                  </div>
+                )}
+
+                <p className="text-[11px] text-muted-foreground">
+                  Pick a connected tool to import its issues, or connect one in 1 click - no need to open Settings.
+                </p>
               </>
             )}
           </div>
@@ -292,7 +363,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
               Create project
             </Button>
           ) : (
-            <Button size="sm" onClick={handleImport} disabled={!importSource || !importName.trim() || busy || serversLoading} className="gap-2">
+            <Button size="sm" onClick={handleImport} disabled={!importSource || !importName.trim() || busy || toolsLoading} className="gap-2">
               {importing ? <Loader2 className="size-4 animate-spin" /> : <DownloadCloud className="size-4" />}
               Import
             </Button>

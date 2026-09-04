@@ -359,7 +359,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenu>
             <SidebarMenuItem>
               {/* Ouvre le modal GLOBAL en place (plus de navigation `?new=1` qui faisait clignoter le modal). */}
-              <SidebarMenuButton onClick={openCreateProject} className="text-muted-foreground">
+              <SidebarMenuButton onClick={() => openCreateProject()} className="text-muted-foreground">
                 <AnimatedNavIcon icon={PlusIcon} />
                 <span>{t("nav.createProject")}</span>
               </SidebarMenuButton>
