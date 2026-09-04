@@ -64,4 +64,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
         ORDER BY u.email ASC
         """)
     List<User> searchByQuery(@Param("q") String q, Pageable pageable);
+
+    /** Comptes dont la suppression planifiée a dépassé le délai de grâce (à purger). */
+    List<User> findByDeletionScheduledAtBefore(java.time.LocalDateTime cutoff);
 }
