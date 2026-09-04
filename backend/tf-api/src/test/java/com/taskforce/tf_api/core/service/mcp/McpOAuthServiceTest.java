@@ -87,7 +87,7 @@ class McpOAuthServiceTest {
         when(discovery.discover("https://203.0.113.10/mcp")).thenReturn(auth("https://as.ex/register"));
         when(client.postJson(eq("https://as.ex/register"), any())).thenReturn(om.readTree("{\"client_id\":\"cid-123\"}"));
 
-        String url = service.start(ws, USER_ID, "linear", "https://203.0.113.10/mcp");
+        String url = service.start(ws, USER_ID, "linear", "https://203.0.113.10/mcp", "/acme?import=linear");
 
         ArgumentCaptor<McpOAuthState> captor = ArgumentCaptor.forClass(McpOAuthState.class);
         verify(stateRepository).save(captor.capture());
@@ -95,6 +95,7 @@ class McpOAuthServiceTest {
         assertThat(row.getWorkspaceId()).isEqualTo(WS_ID);
         assertThat(row.getConnectorKey()).isEqualTo("linear");
         assertThat(row.getMcpUrl()).isEqualTo("https://203.0.113.10/mcp");
+        assertThat(row.getReturnTo()).isEqualTo("/acme?import=linear"); // stocké pour le retour fluide
         assertThat(row.getClientId()).isEqualTo("cid-123");
         assertThat(row.getTokenEndpoint()).isEqualTo("https://as.ex/token");
         assertThat(row.getCodeVerifier()).isNotBlank();
@@ -113,7 +114,7 @@ class McpOAuthServiceTest {
     @DisplayName("start : sans registration_endpoint -> DCR requis, echec clair, aucun state")
     void startWithoutDcrFails() {
         when(discovery.discover(anyString())).thenReturn(auth(null));
-        assertThatThrownBy(() -> service.start(ws, USER_ID, "linear", "https://203.0.113.10/mcp"))
+        assertThatThrownBy(() -> service.start(ws, USER_ID, "linear", "https://203.0.113.10/mcp", null))
             .isInstanceOf(BusinessException.class);
         verify(stateRepository, never()).save(any());
     }
@@ -136,6 +137,23 @@ class McpOAuthServiceTest {
             eq("https://as.ex"), eq("cid-123"), eq("csecret"), eq("https://as.ex/token"));
         verify(workspaceMcp).invalidate(WS_ID);
         verify(stateRepository).deleteById("st-1");
+    }
+
+    @Test
+    @DisplayName("callback OK : returnTo present -> redirige vers ce chemin (retour fluide)")
+    void callbackHonorsReturnTo() throws Exception {
+        McpOAuthState row = openState("st-rt");
+        row.setReturnTo("/acme?import=linear");
+        when(stateRepository.findById("st-rt")).thenReturn(Optional.of(row));
+        when(client.postForm(eq("https://as.ex/token"), any()))
+            .thenReturn(om.readTree("{\"access_token\":\"AT\",\"expires_in\":3600}"));
+        when(connectionRepository.findByWorkspaceIdAndConnectorKey(WS_ID, "linear")).thenReturn(Optional.empty());
+        when(workspaceRepository.getReferenceById(WS_ID)).thenReturn(ws);
+
+        String redirect = service.callback("st-rt", "code-xyz", null);
+
+        // Chemin fourni + statut, au lieu de la page Settings par défaut.
+        assertThat(redirect).isEqualTo("http://localhost:3000/acme?import=linear&mcp=connected");
     }
 
     @Test

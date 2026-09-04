@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,6 +42,10 @@ public class GdprService {
     private final KeycloakService keycloakService;
     private final AuditService auditService;
     private final JdbcTemplate jdbcTemplate;
+
+    /** Délai de grâce (jours) avant la purge réelle d'un compte dont la suppression a été demandée. */
+    @Value("${taskforce.account.deletion-grace-days:30}")
+    private int graceDays;
 
     // NB : read-write (PAS readOnly) — l'export journalise un audit GDPR_EXPORT (INSERT).
     // Sous readOnly, l'INSERT échoue (SQLSTATE 25006) et marque la tx rollback-only → 500 (cf. FIX-006).
@@ -120,37 +125,88 @@ public class GdprService {
     }
 
     /**
-     * Droit à l'effacement : anonymise le compte local + supprime l'identité côté IdP (Keycloak).
+     * Droit à l'effacement - étape 1 : <b>PLANIFIE</b> la suppression (délai de grâce). Rien n'est
+     * détruit ici (ni workspaces, ni identité IdP) : le compte reste récupérable via
+     * {@link #restoreMyAccount} jusqu'à la purge réelle ({@link #purgeAccount}), faite par un job
+     * au-delà du délai. Évite la perte accidentelle et définitive constatée (supprimer son compte
+     * détruisait instantanément Nimbus et les workspaces partagés). Idempotent : re-demander ne
+     * réinitialise pas la date.
      *
-     * <p>La ligne {@code User} locale est conservée mais <b>anonymisée</b> (PII neutralisées,
-     * {@code isActive=false}) pour préserver l'intégrité référentielle (issues, commentaires).
-     * L'identité Keycloak, elle, est <b>supprimée</b> : c'est la véritable effacement des PII côté
-     * IdP (TF-RGPD-007). L'appel Keycloak est un appel HTTP externe, déclenché <b>après commit</b>
-     * de la transaction locale — un échec de l'IdP ne doit donc pas annuler l'anonymisation déjà
-     * validée (il est journalisé pour rejeu manuel).</p>
+     * @return la date de purge prévue (demande + délai de grâce).
      */
     @Transactional
-    public void deleteMyAccount(Long userId) {
+    public LocalDateTime deleteMyAccount(Long userId) {
         User u = userRepository.findById(userId)
             .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+        if (u.getDeletionScheduledAt() == null) {
+            u.setDeletionScheduledAt(LocalDateTime.now());
+            userRepository.save(u);
+            auditService.record(null, userId, AuditService.GDPR_DELETE,
+                "User", String.valueOf(userId), Map.of("scheduled", true, "graceDays", graceDays));
+            log.info("Compte {} : suppression planifiée (grâce {} j)", userId, graceDays);
+        }
+        return u.getDeletionScheduledAt().plusDays(graceDays);
+    }
+
+    /** Annule une suppression planifiée (récupération pendant le délai de grâce). No-op si rien n'est planifié. */
+    @Transactional
+    public void restoreMyAccount(Long userId) {
+        User u = userRepository.findById(userId)
+            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+        if (u.getDeletionScheduledAt() != null) {
+            u.setDeletionScheduledAt(null);
+            userRepository.save(u);
+            auditService.record(null, userId, AuditService.GDPR_DELETE,
+                "User", String.valueOf(userId), Map.of("restored", true));
+            log.info("Compte {} : suppression annulée (compte restauré)", userId);
+        }
+    }
+
+    /** Ids des comptes dont le délai de grâce est écoulé (à purger). Consommé par le scheduler. */
+    public List<Long> findExpiredForPurge() {
+        return userRepository.findByDeletionScheduledAtBefore(LocalDateTime.now().minusDays(graceDays))
+            .stream().map(User::getId).toList();
+    }
+
+    /**
+     * Droit à l'effacement - étape 2 : purge RÉELLE (appelée par le scheduler au-delà du délai). Passage
+     * de flambeau des workspaces partagés (transférés au membre le plus ancien, leur travail survit) et
+     * suppression des workspaces solo, puis anonymisation du row + suppression de l'identité Keycloak.
+     * No-op si la suppression a été annulée entre-temps.
+     *
+     * <p>SQL brut (et NON des delete d'entités JPA) volontairement : supprimer une entité Workspace
+     * managée alors qu'un WorkspaceMember la référence encore en session lève
+     * TransientPropertyValueException. La cascade DB (FK ON DELETE CASCADE) fait le ménage sous les
+     * workspaces supprimés (projets, issues, membres, invitations, connecteurs).</p>
+     */
+    @Transactional
+    public void purgeAccount(Long userId) {
+        User u = userRepository.findById(userId).orElse(null);
+        if (u == null || u.getDeletionScheduledAt() == null) return; // annulé/restauré ou déjà purgé
 
         final String keycloakId = u.getKeycloakId();
 
-        // Supprimer tout le « footprint » du compte AVANT d'anonymiser le row résiduel — sinon la
-        // suppression laissait derrière elle les workspaces créés, les appartenances et les données
-        // perso (« ça ne supprime pas tout le compte »). En SQL brut (et NON via des delete d'entités
-        // JPA) volontairement : supprimer une entité Workspace managée alors qu'un WorkspaceMember la
-        // référence encore en session lève TransientPropertyValueException à l'auto-flush suivant. La
-        // cascade DB (FK ON DELETE CASCADE) fait le ménage sous les workspaces possédés
-        // (projets, issues, membres, invitations, profils de compétences rattachés).
-        int workspacesDeleted = jdbcTemplate.update("DELETE FROM workspaces WHERE owner_id = ?", userId);
-        jdbcTemplate.update("DELETE FROM workspace_members WHERE user_id = ?", userId);      // appartenances chez d'autres
-        jdbcTemplate.update("DELETE FROM member_skill_profiles WHERE user_id = ?", userId);  // profils (autres workspaces)
+        int transferred = 0, deleted = 0;
+        for (Long wsId : jdbcTemplate.queryForList(
+                "SELECT id FROM workspaces WHERE owner_id = ?", Long.class, userId)) {
+            Long heir = jdbcTemplate.query(
+                "SELECT user_id FROM workspace_members WHERE workspace_id = ? AND user_id <> ? " +
+                "ORDER BY joined_at ASC, id ASC LIMIT 1",
+                rs -> rs.next() ? rs.getLong(1) : null, wsId, userId);
+            if (heir != null) {
+                jdbcTemplate.update("UPDATE workspaces SET owner_id = ? WHERE id = ?", heir, wsId); // passage de flambeau
+                transferred++;
+            } else {
+                jdbcTemplate.update("DELETE FROM workspaces WHERE id = ?", wsId); // solo → cascade DB
+                deleted++;
+            }
+        }
+        jdbcTemplate.update("DELETE FROM workspace_members WHERE user_id = ?", userId);      // appartenances (dont workspaces transférés)
+        jdbcTemplate.update("DELETE FROM member_skill_profiles WHERE user_id = ?", userId);
         jdbcTemplate.update("DELETE FROM user_two_factor WHERE user_id = ?", userId);        // secret 2FA (TOTP)
 
-        // Anonymiser le row résiduel (tombstone) : conservé UNIQUEMENT pour l'intégrité référentielle
-        //    des contenus laissés dans les workspaces d'autrui (issues, commentaires) ; il ne porte plus
-        //    aucune donnée personnelle et l'accès est coupé.
+        // Anonymiser le row résiduel (tombstone) : gardé UNIQUEMENT pour l'intégrité référentielle des
+        // contenus laissés ailleurs (issues, commentaires) ; plus aucune donnée perso, accès coupé.
         u.setEmail("deleted-" + u.getId() + "@anonymized.invalid");
         u.setDisplayName(null);
         u.setAvatarUrl(null);
@@ -158,18 +214,16 @@ public class GdprService {
         u.setStripeSubscriptionId(null);
         u.setPlanStatus(PlanStatus.CANCELED);
         u.setIsActive(false);
+        u.setDeletionScheduledAt(null); // purge effectuée
         userRepository.save(u);
 
-        // Accès coupé côté IdP : la suppression du compte Keycloak (ci-dessous, après commit)
-        // invalide toutes les sessions/refresh tokens. Plus de table de refresh tokens custom.
+        auditService.record(null, userId, AuditService.GDPR_DELETE, "User", String.valueOf(userId),
+            Map.of("purged", true, "workspacesTransferred", transferred, "workspacesDeleted", deleted));
+        log.info("Compte {} purgé : {} workspace(s) transféré(s), {} supprimé(s), row anonymisé",
+            userId, transferred, deleted);
 
-        auditService.record(null, userId, AuditService.GDPR_DELETE,
-            "User", String.valueOf(userId), Map.of("anonymized", true, "workspacesDeleted", workspacesDeleted));
-        log.info("Compte {} effacé : {} workspace(s) possédé(s) supprimé(s), données perso purgées, row anonymisé",
-            userId, workspacesDeleted);
-
-        // Suppression de l'identité Keycloak APRÈS commit : l'appel IdP externe ne doit pas
-        // pouvoir annuler l'anonymisation locale déjà validée (préoccupation ACID). TF-RGPD-007.
+        // Suppression Keycloak APRÈS commit : l'appel IdP externe ne doit pas annuler la purge locale
+        // déjà validée (ACID). TF-RGPD-007.
         if (keycloakId != null && !keycloakId.isBlank()) {
             deleteKeycloakIdentityAfterCommit(keycloakId, userId);
         }

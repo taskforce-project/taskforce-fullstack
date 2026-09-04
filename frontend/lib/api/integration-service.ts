@@ -302,11 +302,20 @@ export async function disconnectMcpServer(slug: string, connectorKey: string): P
   return res.data.data;
 }
 
-/** Démarre l'OAuth 1-clic d'un serveur MCP : renvoie l'URL d'autorisation (on y redirige le navigateur). */
-export async function startMcpOAuth(slug: string, connectorKey: string, mcpUrl: string): Promise<string> {
+/**
+ * Démarre l'OAuth 1-clic d'un serveur MCP : renvoie l'URL d'autorisation (on y redirige le navigateur).
+ * `returnTo` (chemin applicatif relatif optionnel) permet un retour fluide ailleurs que sur Settings
+ * (ex. rouvrir le wizard de création de projet).
+ */
+export async function startMcpOAuth(
+  slug: string,
+  connectorKey: string,
+  mcpUrl: string,
+  returnTo?: string,
+): Promise<string> {
   const res = await apiClient.post<{ data: { authorizeUrl: string } }>(
     INTEGRATION_ROUTES.MCP_OAUTH_START(slug, connectorKey),
-    { mcpUrl },
+    { mcpUrl, returnTo },
   );
   return res.data.data.authorizeUrl;
 }

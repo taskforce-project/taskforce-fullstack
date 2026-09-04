@@ -132,6 +132,13 @@ public class User {
     private Boolean isActive = true;
 
     /**
+     * Suppression de compte planifiée (délai de grâce) : horodatage de la DEMANDE de suppression.
+     * {@code null} = aucune suppression en cours. Le compte reste récupérable jusqu'à la purge (job).
+     */
+    @Column(name = "deletion_scheduled_at")
+    private LocalDateTime deletionScheduledAt;
+
+    /**
      * Indique si l'utilisateur a manifesté un intérêt pour le plan ENTERPRISE
      * Utilisé pour identifier les leads sales même s'ils démarrent avec un compte FREE
      */

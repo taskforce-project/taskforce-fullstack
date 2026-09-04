@@ -82,9 +82,10 @@ class PaymentAndDataControllersWebMvcTest {
     }
 
     @Test
-    @DisplayName("DELETE /api/gdpr/account (auth) → 200 (anonymisation)")
+    @DisplayName("DELETE /api/gdpr/account (auth) → 200 (suppression planifiée, renvoie la date de purge)")
     void gdpr_delete_200() throws Exception {
         stubUser();
+        when(gdprService.deleteMyAccount(anyLong())).thenReturn(java.time.LocalDateTime.now().plusDays(30));
 
         mockMvc.perform(delete("/api/gdpr/account").with(auth()))
             .andExpect(status().isOk());

@@ -80,6 +80,10 @@ public class McpOAuthState {
     @Column(columnDefinition = "TEXT")
     private String issuer;
 
+    /** Chemin applicatif RELATIF de retour apres le callback (null = page Settings par defaut). */
+    @Column(name = "return_to", length = 500)
+    private String returnTo;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

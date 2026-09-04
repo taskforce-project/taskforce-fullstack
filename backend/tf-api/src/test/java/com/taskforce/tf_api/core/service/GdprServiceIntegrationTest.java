@@ -78,26 +78,42 @@ class GdprServiceIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("deleteMyAccount anonymise le compte, coupe l'accès et journalise")
-    void delete_anonymizes_and_revokes() {
+    @DisplayName("deleteMyAccount PLANIFIE (grâce) sans rien détruire ni anonymiser")
+    void delete_schedules_grace() {
         gdprService.deleteMyAccount(user.getId());
 
         User reloaded = userRepository.findById(user.getId()).orElseThrow();
-        assertThat(reloaded.getEmail()).startsWith("deleted-").endsWith("@anonymized.invalid");
-        assertThat(reloaded.getDisplayName()).isNull();
-        assertThat(reloaded.getIsActive()).isFalse();
-        assertThat(reloaded.getPlanStatus()).isEqualTo(PlanStatus.CANCELED);
+        assertThat(reloaded.getDeletionScheduledAt()).isNotNull(); // suppression planifiée
+        assertThat(reloaded.getEmail()).isEqualTo("gdpr@it.dev");   // PAS encore anonymisé
+        assertThat(reloaded.getIsActive()).isTrue();                // accès conservé (récupérable)
+        // Rien n'est détruit à l'étape 1 : le workspace possédé est intact.
+        assertThat(workspaceRepository.findBySlug("ws-gdpr")).isPresent();
 
         verify(auditService).record(isNull(), eq(user.getId()), eq(AuditService.GDPR_DELETE),
             eq("User"), eq(String.valueOf(user.getId())), org.mockito.ArgumentMatchers.any());
     }
 
     @Test
-    @DisplayName("deleteMyAccount supprime le workspace possédé et les appartenances (footprint)")
-    void delete_removes_owned_workspace_and_memberships() {
+    @DisplayName("restoreMyAccount annule une suppression planifiée (récupération)")
+    void restore_cancels_scheduled_deletion() {
         gdprService.deleteMyAccount(user.getId());
+        gdprService.restoreMyAccount(user.getId());
 
-        // Le workspace créé par le compte et son appartenance ne doivent plus exister (« tout le compte »).
+        assertThat(userRepository.findById(user.getId()).orElseThrow().getDeletionScheduledAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("purgeAccount anonymise, coupe l'accès et supprime le workspace SOLO (aucun héritier)")
+    void purge_anonymizes_and_deletes_solo_workspace() {
+        gdprService.deleteMyAccount(user.getId()); // planifie (sinon purge = no-op)
+        gdprService.purgeAccount(user.getId());
+
+        User reloaded = userRepository.findById(user.getId()).orElseThrow();
+        assertThat(reloaded.getEmail()).startsWith("deleted-").endsWith("@anonymized.invalid");
+        assertThat(reloaded.getIsActive()).isFalse();
+        assertThat(reloaded.getPlanStatus()).isEqualTo(PlanStatus.CANCELED);
+        assertThat(reloaded.getDeletionScheduledAt()).isNull(); // purge effectuée
+        // Workspace solo (aucun autre membre) → supprimé ; appartenances nettoyées.
         assertThat(workspaceRepository.findBySlug("ws-gdpr")).isEmpty();
         assertThat(workspaceMemberRepository.findByUserId(user.getId())).isEmpty();
     }

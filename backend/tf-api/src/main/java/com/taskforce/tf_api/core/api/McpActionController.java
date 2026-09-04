@@ -111,7 +111,7 @@ public class McpActionController {
         @AuthenticationPrincipal Jwt jwt
     ) {
         Workspace ws = authorizeManager(slug, jwt);
-        String url = mcpOAuthService.start(ws, resolveUserId(jwt), connectorKey, body.mcpUrl());
+        String url = mcpOAuthService.start(ws, resolveUserId(jwt), connectorKey, body.mcpUrl(), body.returnTo());
         return ResponseEntity.ok(ApiResponse.success(Map.of("authorizeUrl", url)));
     }
 
@@ -156,8 +156,8 @@ public class McpActionController {
     /** Résultat texte de l'outil externe. */
     public record McpActionResult(String toolRef, String output) {}
 
-    /** Démarrage OAuth 1-clic : l'URL du serveur MCP dont on découvre le flux OAuth. */
-    public record McpOAuthStartRequest(@NotBlank String mcpUrl) {}
+    /** Démarrage OAuth 1-clic : URL du serveur MCP + chemin de retour applicatif optionnel (retour fluide). */
+    public record McpOAuthStartRequest(@NotBlank String mcpUrl, String returnTo) {}
 
     /** Import d'un projet externe : connecteur MCP source + nom du projet natif à créer. */
     public record McpImportRequest(@NotBlank String connectorKey, @NotBlank String targetName) {}
