@@ -1,4 +1,12 @@
 import type { NextConfig } from "next";
+import { readFileSync } from "node:fs";
+
+// Version sémantique LISIBLE affichée au footer (ex. « v0.1.0 »), à la place du SHA de commit opaque.
+// Source unique : le champ `version` de package.json (bumpé via les labels release:{major|minor|patch}).
+// Injectée au build via `env` ci-dessous → inlinée client+serveur. Distincte de NEXT_PUBLIC_APP_VERSION
+// (SHA posé par l'auto-deploy VM) que l'on garde pour la traçabilité au survol. Lu au build : le CWD de
+// `next build` est la racine frontend (et /app dans l'image Docker), où vit package.json.
+const { version: APP_SEMVER } = JSON.parse(readFileSync("./package.json", "utf8")) as { version: string };
 
 // CSP adaptée App Router Next.js :
 // - unsafe-inline requis pour Tailwind (styles inline) et Next.js hydration
@@ -97,6 +105,10 @@ const nextConfig: NextConfig = {
   // chaque réponse (ZAP : 5 occurrences). Aucune valeur fonctionnelle, uniquement du renseignement
   // offert à un attaquant.
   poweredByHeader: false,
+  // Expose la version sémantique (package.json) au bundle, lue par le footer.
+  env: {
+    NEXT_PUBLIC_APP_SEMVER: APP_SEMVER,
+  },
   // Next 16 : Turbopack est le bundler par défaut (build + dev).
   // Config vide lève le conflit « webpack config sans turbopack config »
   turbopack: {},
