@@ -152,6 +152,20 @@ export function SiteHeader() {
 
   return (
     <header className="bg-card/85 fixed inset-x-0 top-0 z-50 border-b backdrop-blur-md">
+      {/* Bandeau « beta ouverte » - tout le bandeau mène au login. Lancement en test : on explore
+          librement, sans garantie sur le produit pour l'instant (décision produit). */}
+      <a
+        href={`${APP_URL}/auth/login`}
+        className="group flex h-9 items-center justify-center gap-2 bg-primary px-4 text-center text-[12.5px] font-medium text-primary-foreground"
+      >
+        <FlaskConical className="size-3.5 shrink-0" strokeWidth={2} aria-hidden />
+        <span className="hidden sm:inline">Open beta - explore freely, no guarantees on the product yet.</span>
+        <span className="sm:hidden">Open beta - try it freely.</span>
+        <span className="inline-flex items-center gap-0.5 font-semibold underline underline-offset-2">
+          Sign in
+          <ChevronRight className="size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
+        </span>
+      </a>
       {/* Dégradé de la fiole Labs - déclaré ici pour être dispo sur TOUTES les pages (les defs Labs ne vivent que sur /labs). */}
       <svg aria-hidden focusable="false" width="0" height="0" style={{ position: "absolute", width: 0, height: 0 }}>
         <defs>
@@ -299,7 +313,10 @@ export function SiteHeader() {
             Trust
           </a>
           <Button asChild variant="outline" size="pill-sm" className="hidden sm:inline-flex">
-            <a href={`${APP_URL}/auth/login`}>Sign in</a>
+            <a href={`${APP_URL}/auth/login`} className="gap-1.5">
+              Sign in
+              <span className="rounded bg-primary/10 px-1 py-px text-[9px] font-semibold tracking-wide text-primary uppercase">beta</span>
+            </a>
           </Button>
           <Button asChild size="pill-sm">
             <a href={"/waitlist"}>Get started</a>
@@ -366,7 +383,10 @@ export function SiteHeader() {
 
               <div className="flex gap-2 border-t px-6 py-4">
                 <Button asChild variant="outline" size="pill" className="flex-1">
-                  <a href={`${APP_URL}/auth/login`}>Sign in</a>
+                  <a href={`${APP_URL}/auth/login`} className="gap-1.5">
+                    Sign in
+                    <span className="rounded bg-primary/10 px-1 py-px text-[9px] font-semibold tracking-wide text-primary uppercase">beta</span>
+                  </a>
                 </Button>
                 <Button asChild size="pill" className="flex-1">
                   <a href={"/waitlist"}>Get started</a>

@@ -10,6 +10,8 @@
 >
 > Sources : `.ai/qa.md` (QA produit détaillée), `.ai/known-issues.md` (bugs vérifiés), `.ai/module-map.md` (domaines↔code), `.ai/architecture-map.md` (archi réelle), `.ai/P0-fix-plan.md` (correctifs P0 paste-ready).
 
+> **▶ MAJ 04/09/2026 - Landing : bandeau « open beta » (lancement en test).** Bandeau haut pleine largeur (tout le bandeau → login) « Open beta - explore freely, no guarantees on the product yet » + badge **BETA** sur le bouton Sign in (`SiteHeader.tsx`, desktop + mobile). Offset header 64→100px (`BaseLayout.astro` + sous-nav sticky `LabsSubjects.tsx`). Release **landing-only → main** (Vercel prod = main).
+>
 > **▶ MAJ 03/09/2026 - TF-MCP-03 lancé : Cortex agentique (réflexe d'intégration).** `[TF-MCP-03]`
 > - **Vision (user)** : Cortex = **extension de mémoire**. Il va chercher l'info au bon endroit tout seul, dit « connecte X » si l'intégration manque, et « crée une issue » peut viser TaskForce OU Linear. Décisions user : **défaut TaskForce, proposer les deux quand pertinent**.
 > - **Increment 1 (fait)** - Pilier 1 (réflexe) : `AgentService.systemPrompt` demande d'APPELER l'outil connecté au lieu de répondre « pas d'accès » (« si l'outil est là, l'accès est là ») + rappelle le namespace `<service>__`. Garde : `AgentServiceTest.run_deep_prompt_carries_tool_reflex`. Suite ALL verte.
