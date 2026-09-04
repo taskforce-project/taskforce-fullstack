@@ -18,6 +18,7 @@ import {
   createWebhook,
   updateWebhook,
   deleteWebhook,
+  importMcpProject,
 } from './integration-service';
 import { apiClient } from './client';
 import { INTEGRATION_ROUTES } from '../config/api-routes';
@@ -258,6 +259,22 @@ describe('integration-service', () => {
       await deleteWebhook(SLUG, 1);
 
       expect(apiClient.delete).toHaveBeenCalledWith(INTEGRATION_ROUTES.WEBHOOK(SLUG, 1));
+    });
+  });
+
+  // --- Import MCP (TF-MCP-04) ---
+  describe('importMcpProject', () => {
+    it('POST le connecteur + le nom cible et renvoie le résumé d\'import', async () => {
+      const result = { projectId: 99, projectIdentifier: 'IMP', projectName: 'Import Linear', imported: 5, found: 5 };
+      vi.mocked(apiClient.post).mockResolvedValue(envelope(result));
+
+      const out = await importMcpProject(SLUG, 'linear', 'Import Linear');
+
+      expect(apiClient.post).toHaveBeenCalledWith(
+        INTEGRATION_ROUTES.MCP_IMPORT(SLUG),
+        { connectorKey: 'linear', targetName: 'Import Linear' },
+      );
+      expect(out).toEqual(result);
     });
   });
 });

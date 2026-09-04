@@ -396,6 +396,8 @@ export const INTEGRATION_ROUTES = {
   MCP_SERVER:        (slug: string, key: string) => `/api/workspaces/${slug}/mcp/servers/${key}`,
   /** OAuth 1-clic (TF-MCP-02) : démarre le flux, renvoie l'URL d'autorisation */
   MCP_OAUTH_START:   (slug: string, key: string) => `/api/workspaces/${slug}/mcp/servers/${key}/oauth/start`,
+  /** Import d'un projet externe (TF-MCP-04) : issues d'un connecteur MCP → projet natif */
+  MCP_IMPORT:        (slug: string) => `/api/workspaces/${slug}/mcp/import`,
   /** Plane (connecteur clé API → ingestion Brain OS) */
   PLANE_STATUS:      (slug: string) => `/api/workspaces/${slug}/integrations/plane/status`,
   PLANE_CONNECT:     (slug: string) => `/api/workspaces/${slug}/integrations/plane/connect`,

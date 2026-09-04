@@ -311,6 +311,28 @@ export async function startMcpOAuth(slug: string, connectorKey: string, mcpUrl: 
   return res.data.data.authorizeUrl;
 }
 
+/** Résultat d'un import de projet externe : le projet natif créé + le nombre d'issues importées. */
+export interface McpImportResult {
+  projectId: number;
+  projectIdentifier: string;
+  projectName: string;
+  imported: number;
+  found: number;
+}
+
+/** Importe un projet externe (issues d'un connecteur MCP connecté) dans un nouveau projet natif TaskForce. */
+export async function importMcpProject(
+  slug: string,
+  connectorKey: string,
+  targetName: string,
+): Promise<McpImportResult> {
+  const res = await apiClient.post<{ data: McpImportResult }>(
+    INTEGRATION_ROUTES.MCP_IMPORT(slug),
+    { connectorKey, targetName },
+  );
+  return res.data.data;
+}
+
 // ---------------------------------------------------------------------------
 // Plane (connecteur clé API → ingestion Brain OS)
 // ---------------------------------------------------------------------------
