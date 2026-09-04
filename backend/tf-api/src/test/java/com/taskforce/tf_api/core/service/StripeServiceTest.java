@@ -40,6 +40,29 @@ class StripeServiceTest {
     }
 
     @Nested
+    @DisplayName("URL de succès - template CHECKOUT_SESSION_ID")
+    class SuccessUrlTemplateTests {
+
+        @Test
+        @DisplayName("ajoute session_id={CHECKOUT_SESSION_ID} si absent (corrige « No payment session found »)")
+        void appends_template_when_missing() {
+            assertThat(StripeService.withCheckoutSessionId("https://app.tf.fr/payment/success"))
+                .isEqualTo("https://app.tf.fr/payment/success?session_id={CHECKOUT_SESSION_ID}");
+            // Query déjà présente → séparateur &
+            assertThat(StripeService.withCheckoutSessionId("https://app.tf.fr/settings/billing?success=true"))
+                .isEqualTo("https://app.tf.fr/settings/billing?success=true&session_id={CHECKOUT_SESSION_ID}");
+        }
+
+        @Test
+        @DisplayName("n'ajoute rien si le template est déjà présent (ni sur null)")
+        void leaves_existing_template_and_null() {
+            String withTemplate = "https://x/success?session_id={CHECKOUT_SESSION_ID}";
+            assertThat(StripeService.withCheckoutSessionId(withTemplate)).isEqualTo(withTemplate);
+            assertThat(StripeService.withCheckoutSessionId(null)).isNull();
+        }
+    }
+
+    @Nested
     @DisplayName("Get Price ID For Plan Tests")
     class GetPriceIdForPlanTests {
 

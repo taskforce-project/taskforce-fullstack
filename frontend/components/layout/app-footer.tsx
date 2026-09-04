@@ -25,7 +25,13 @@ interface AppFooterProps {
 export function AppFooter({ bleed = true }: AppFooterProps) {
   const { t } = usePreferencesStore()
   const year = new Date().getFullYear()
-  const version = process.env.NEXT_PUBLIC_APP_VERSION ?? "v1.0"
+  // Version affichée : le TAG sémantique (« v0.1.0 », depuis package.json) plutôt que le SHA de commit
+  // opaque - lisible, on voit d'un coup quelle version tourne. Le SHA reste consultable au survol
+  // (title) pour la traçabilité exacte du build.
+  const semver = process.env.NEXT_PUBLIC_APP_SEMVER
+  const commit = process.env.NEXT_PUBLIC_APP_VERSION
+  const version = semver ? `v${semver}` : (commit ?? "v1.0")
+  const versionTitle = commit ? `commit ${commit}` : undefined
 
   return (
     <footer
@@ -34,7 +40,7 @@ export function AppFooter({ bleed = true }: AppFooterProps) {
         bleed && "-mx-6 -mb-6 mt-auto md:-mx-8 md:-mb-8"
       )}
     >
-      <span className="truncate">© {year} TaskForce · {version}</span>
+      <span className="truncate" title={versionTitle}>© {year} TaskForce · {version}</span>
       <nav className="flex shrink-0 items-center gap-4">
         <Link href="/privacy-policy" className="transition-colors hover:text-foreground">{t.shell.privacy}</Link>
         <Link href="/legal-notices" className="transition-colors hover:text-foreground">{t.shell.legalNotices}</Link>

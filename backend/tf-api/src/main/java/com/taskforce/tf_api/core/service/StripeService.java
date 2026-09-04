@@ -88,7 +88,7 @@ public class StripeService {
         SessionCreateParams.Builder paramsBuilder = SessionCreateParams.builder()
             .setMode(SessionCreateParams.Mode.SUBSCRIPTION)
             .setCustomer(customerId)
-            .setSuccessUrl(successUrl)
+            .setSuccessUrl(withCheckoutSessionId(successUrl))
             .setCancelUrl(cancelUrl)
             .addLineItem(
                 SessionCreateParams.LineItem.builder()
@@ -105,6 +105,19 @@ public class StripeService {
         Session session = Session.create(paramsBuilder.build());
         log.info("Session Checkout créée avec ID : {}", session.getId());
         return session;
+    }
+
+    /**
+     * Garantit que l'URL de succès porte le placeholder {@code {CHECKOUT_SESSION_ID}} que Stripe
+     * remplace par l'id de session au retour. Sans lui, la page de succès arrive <b>sans</b> {@code
+     * session_id} à vérifier → « No payment session found » (bug constaté à l'upgrade). Les pages qui
+     * ne lisent pas ce paramètre l'ignorent, donc l'ajout est sûr pour tous les flux.
+     */
+    static String withCheckoutSessionId(String url) {
+        if (url == null || url.contains("{CHECKOUT_SESSION_ID}")) {
+            return url;
+        }
+        return url + (url.contains("?") ? "&" : "?") + "session_id={CHECKOUT_SESSION_ID}";
     }
 
     /**
