@@ -63,8 +63,8 @@ export function LabsSubjects({ subjects }: { subjects: Subject[] }) {
 
   return (
     <div>
-      {/* ── Barre d'onglets sticky (sous le header h-16) ── */}
-      <div className="bg-card/90 sticky top-16 z-40 border-y border-border backdrop-blur-md">
+      {/* ── Barre d'onglets sticky (sous le header + bandeau beta = 100px) ── */}
+      <div className="bg-card/90 sticky top-[100px] z-40 border-y border-border backdrop-blur-md">
         <div className="container-rail">
           <div role="tablist" aria-label="Research subjects" className="flex gap-1 overflow-x-auto py-2">
             {subjects.map((s, i) => {
