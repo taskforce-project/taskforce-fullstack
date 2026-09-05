@@ -25,8 +25,10 @@ import com.taskforce.tf_api.core.service.PlanFeatureService;
 import com.taskforce.tf_api.core.service.agent.AgentContext;
 import com.taskforce.tf_api.core.service.agent.AgentTool;
 import com.taskforce.tf_api.shared.exception.BusinessException;
+import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -190,6 +192,34 @@ class WorkspaceMcpServiceTest {
         assertThat(statuses).hasSize(1);
         assertThat(statuses.get(0).reachable()).isFalse();
         assertThat(statuses.get(0).error()).isEqualTo("timeout");
+    }
+
+    @Test
+    @DisplayName("serverTools : renvoie les outils riches (schéma + readOnly) après allow-list")
+    void server_tools_returns_rich_defs() throws Exception {
+        ConnectorConnection conn = ConnectorConnection.builder()
+            .connectorKey("linear")
+            .config("{\"mcpUrl\":\"http://x/mcp\",\"mcpAllow\":\"create_issue\"}").build();
+        when(repository.findByWorkspaceIdAndConnectorKey(1L, "linear")).thenReturn(Optional.of(conn));
+        when(client.initialize(any())).thenReturn(session);
+        when(client.listTools(session)).thenReturn(List.of(def("create_issue"), def("delete_issue")));
+
+        List<WorkspaceMcpService.McpToolInfo> tools = service.serverTools(1L, "linear");
+
+        assertThat(tools).hasSize(1); // allow-list ne garde que create_issue
+        assertThat(tools.get(0).name()).isEqualTo("create_issue");
+        assertThat(tools.get(0).description()).isEqualTo("desc create_issue");
+        assertThat(tools.get(0).inputSchema().path("type").asText()).isEqualTo("object");
+        assertThat(tools.get(0).readOnly()).isFalse();
+    }
+
+    @Test
+    @DisplayName("serverTools : connecteur non connecté → ResourceNotFoundException")
+    void server_tools_unknown_connector() {
+        when(repository.findByWorkspaceIdAndConnectorKey(1L, "linear")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.serverTools(1L, "linear"))
+            .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
