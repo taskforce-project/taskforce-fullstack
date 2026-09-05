@@ -35,4 +35,7 @@ public class UserResponse {
     private LocalDateTime trialEndDate;
     private Boolean isActive;
     private LocalDateTime createdAt;
+    /** Non nul si l'utilisateur a planifié la suppression de son compte (délai de grâce en cours) :
+     *  le front s'en sert pour afficher un bandeau « restaurer avant le JJ/MM ». */
+    private LocalDateTime deletionScheduledAt;
 }
