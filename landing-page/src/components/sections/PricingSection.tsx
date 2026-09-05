@@ -63,7 +63,7 @@ const TIERS: Tier[] = [
   },
   {
     name: "Business",
-    priceMonthly: 16,
+    priceMonthly: 19,
     priceAnnual: 13,
     unit: "per member / month",
     tagline: "For teams that ship fast.",
