@@ -13,7 +13,7 @@
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)
 ![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)
 ![Backend App](https://img.shields.io/badge/Backend_App-0.0.4--SNAPSHOT-6f42c1.svg)
-![Frontend App](https://img.shields.io/badge/Frontend_App-0.3.1-0ea5e9.svg)
+![Frontend App](https://img.shields.io/badge/Frontend_App-0.3.2-0ea5e9.svg)
 ![Landing App](https://img.shields.io/badge/Landing_App-0.0.1-f59e0b.svg)
 ![Runtime](https://img.shields.io/badge/Runtime-ci-blueviolet.svg)
 <!-- BADGES:END -->
