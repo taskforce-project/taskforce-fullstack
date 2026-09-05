@@ -10,6 +10,13 @@
 >
 > Sources : `.ai/qa.md` (QA produit détaillée), `.ai/known-issues.md` (bugs vérifiés), `.ai/module-map.md` (domaines↔code), `.ai/architecture-map.md` (archi réelle), `.ai/P0-fix-plan.md` (correctifs P0 paste-ready).
 
+> **▶ MAJ 05/09/2026 - Billing : changement de forfait self-service (Basic ⇄ Business) + proration auto — fin du « annuler puis re-souscrire ».** `[BE-billing + FE-billing]`
+> - **Constat (user)** : le Customer Portal Stripe ne proposait QUE « Cancel subscription ». Pour rétrograder Business→Basic il fallait annuler puis re-souscrire, au lieu d'un simple switch avec proration (façon Claude/Anthropic).
+> - **Cause** : la feature `subscription_update` du portail n'était pas activée (config par défaut = annulation + moyen de paiement + factures seulement).
+> - **Fix back** (`StripeService.ensurePortalConfiguration`) : crée/réutilise une **configuration Customer Portal** qui autorise le **changement de prix Basic ⇄ Business** avec **proration automatique** (`create_prorations`), en plus de l'annulation, du moyen de paiement et des factures. Produits déduits des price-ids (regroupés si Basic/Business partagent un même produit) ; id mis en cache (créée 1×/cycle de vie backend) ; null-safe → retombe sur la config par défaut si les price-ids sont absents. La session de portail référence cette config.
+> - **Fix front** (`billing/page.tsx`) : l'**upgrade depuis un plan payant** passe désormais par le **portail** (switch + proration), plus par `createCheckoutSession` — qui aurait créé un **second abonnement facturé en double**. Depuis FREE (aucun abonnement) → Checkout inchangé ; la rétrogradation passait déjà par le portail.
+> - **Gate** : `it.ps1 -Test StripeServiceTest` (recompile forcé des `.class` périmés pour vraiment valider les classes SDK `billingportal`). **Version** : back patch `0.0.11` + front patch `0.3.4` → produit **v0.3.15**.
+>
 > **▶ MAJ 05/09/2026 - Cortex : outils MCP externes DÉSACTIVÉS par défaut (cap 0) - contrainte Groq free tier 8000 TPM.** `[BE-agent]`
 > - **Cause racine** (corps d'erreur Groq capturé) : le tier gratuit `on_demand` plafonne à **~8000 tokens/MINUTE (TPM)**. Une requête Cortex (contexte Brain OS + schémas d'outils MCP) dépasse → 413/400, et le budget par minute est vite épuisé. C'est LA cause de tous les plantages Cortex+MCP (ni le nombre d'outils - Groq prend 40 outils factices - ni un schéma).
 > - **Investigation modèles (demande user)** : aucun modèle du compte ne combine tool-calling ET TPM > 8000. `gpt-oss-120b/20b`=8000, `qwen3.6/3.8-27b`=7000 (pire), `groq/compound`=**30000 MAIS** « tool calling is not supported with this model ». Impasse.
