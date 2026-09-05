@@ -30,10 +30,10 @@ export type AuthUser = {
   isActive?: boolean;
   createdAt?: string;
   /**
-   * Non nul si le compte est planifié pour suppression (délai de grâce en cours) : date de purge
-   * effective (ISO). Déclenche le bandeau de restauration tant qu'elle est présente.
+   * Non nul si le compte est planifié pour suppression : date de PURGE effective (ISO), i.e. le jour
+   * où il sera réellement supprimé (début de grâce + délai). Déclenche le bandeau de restauration.
    */
-  deletionScheduledAt?: string;
+  scheduledPurgeAt?: string;
 };
 
 export type LoginCredentials = {

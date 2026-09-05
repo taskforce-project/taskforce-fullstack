@@ -12,12 +12,14 @@ import com.taskforce.tf_api.shared.util.ImageUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.keycloak.representations.idm.UserRepresentation;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayInputStream;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -33,6 +35,10 @@ public class UserService {
     private final KeycloakService keycloakService;
     private final MinioService minioService;
     private final EmailService emailService;
+
+    // Miroir du délai de grâce porté par GdprService : sert à exposer la date de PURGE dans /me.
+    @Value("${taskforce.account.deletion-grace-days:30}")
+    private int graceDays;
 
     @Transactional
     public void processDataRequest(String email, String requestType) {
@@ -218,6 +224,12 @@ public class UserService {
             ? user.getDisplayName()
             : keycloakUser.getFirstName() + " " + keycloakUser.getLastName().toUpperCase();
 
+        // Date de PURGE (début de grâce + délai) : ce que le front affiche, cohérent avec la réponse
+        // du DELETE. Null si le compte n'est pas planifié pour suppression.
+        LocalDateTime purgeAt = user.getDeletionScheduledAt() == null
+            ? null
+            : user.getDeletionScheduledAt().plusDays(graceDays);
+
         return UserResponse.builder()
             .id(user.getId())
             .keycloakId(user.getKeycloakId())
@@ -235,7 +247,7 @@ public class UserService {
             .trialEndDate(user.getTrialEndDate())
             .isActive(user.getIsActive())
             .createdAt(user.getCreatedAt())
-            .deletionScheduledAt(user.getDeletionScheduledAt())
+            .scheduledPurgeAt(purgeAt)
             .build();
     }
 

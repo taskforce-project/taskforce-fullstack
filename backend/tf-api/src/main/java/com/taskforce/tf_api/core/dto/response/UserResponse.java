@@ -35,7 +35,9 @@ public class UserResponse {
     private LocalDateTime trialEndDate;
     private Boolean isActive;
     private LocalDateTime createdAt;
-    /** Non nul si l'utilisateur a planifié la suppression de son compte (délai de grâce en cours) :
-     *  le front s'en sert pour afficher un bandeau « restaurer avant le JJ/MM ». */
-    private LocalDateTime deletionScheduledAt;
+    /** Non nul si le compte est planifié pour suppression : date de PURGE effective (début de grâce +
+     *  {@code deletion-grace-days}), i.e. le jour où le compte sera réellement supprimé. C'est cette
+     *  date (et non le début de grâce brut de la colonne) que le front affiche dans le bandeau, pour
+     *  être cohérent avec la date renvoyée par {@code DELETE /api/gdpr/account}. */
+    private LocalDateTime scheduledPurgeAt;
 }
