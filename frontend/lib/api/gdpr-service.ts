@@ -12,7 +12,18 @@ export async function exportMyData(): Promise<Record<string, unknown>> {
   return res.data.data;
 }
 
-/** Droit à l'effacement : anonymise le compte courant et coupe l'accès. */
-export async function deleteMyAccount(): Promise<void> {
-  await apiClient.delete(GDPR_ROUTES.ACCOUNT());
+/**
+ * Droit à l'effacement (RGPD Art. 17) : PLANIFIE la suppression du compte après un délai de grâce.
+ * Le compte reste actif et RÉCUPÉRABLE jusqu'à la date renvoyée (`scheduledPurgeAt`, ISO) ; au-delà,
+ * un job purge réellement (les workspaces partagés sont transférés au membre le plus ancien, les
+ * workspaces solo supprimés). Renvoie la date de purge prévue.
+ */
+export async function deleteMyAccount(): Promise<string> {
+  const res = await apiClient.delete<{ data: { scheduledPurgeAt: string } }>(GDPR_ROUTES.ACCOUNT());
+  return res.data.data.scheduledPurgeAt;
+}
+
+/** Annule une suppression planifiée tant que le délai de grâce court (restaure le compte courant). */
+export async function restoreMyAccount(): Promise<void> {
+  await apiClient.post(GDPR_ROUTES.ACCOUNT_RESTORE());
 }

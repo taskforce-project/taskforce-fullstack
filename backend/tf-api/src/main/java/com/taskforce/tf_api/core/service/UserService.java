@@ -235,6 +235,7 @@ public class UserService {
             .trialEndDate(user.getTrialEndDate())
             .isActive(user.getIsActive())
             .createdAt(user.getCreatedAt())
+            .deletionScheduledAt(user.getDeletionScheduledAt())
             .build();
     }
 

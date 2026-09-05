@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { exportMyData, deleteMyAccount } from './gdpr-service';
+import { exportMyData, deleteMyAccount, restoreMyAccount } from './gdpr-service';
 import { apiClient } from './client';
 import { GDPR_ROUTES } from '../config/api-routes';
 
@@ -31,12 +31,21 @@ describe('gdpr-service', () => {
     expect(result).toEqual(data);
   });
 
-  it('deleteMyAccount: DELETE account route', async () => {
-    vi.mocked(apiClient.delete).mockResolvedValue(envelope(undefined));
+  it('deleteMyAccount: DELETE account route and returns the scheduled purge date', async () => {
+    vi.mocked(apiClient.delete).mockResolvedValue(envelope({ scheduledPurgeAt: '2026-10-04T04:00:00' }));
 
-    await deleteMyAccount();
+    const result = await deleteMyAccount();
 
     expect(apiClient.delete).toHaveBeenCalledWith(GDPR_ROUTES.ACCOUNT());
+    expect(result).toBe('2026-10-04T04:00:00');
+  });
+
+  it('restoreMyAccount: POST restore route', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue(envelope(undefined));
+
+    await restoreMyAccount();
+
+    expect(apiClient.post).toHaveBeenCalledWith(GDPR_ROUTES.ACCOUNT_RESTORE());
   });
 
   it('exportMyData: propagates errors', async () => {

@@ -410,6 +410,7 @@ export const INTEGRATION_ROUTES = {
 export const GDPR_ROUTES = {
   EXPORT:  () => `/api/gdpr/export`,
   ACCOUNT: () => `/api/gdpr/account`,
+  ACCOUNT_RESTORE: () => `/api/gdpr/account/restore`,
 } as const;
 
 /**

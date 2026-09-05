@@ -781,6 +781,7 @@ public class AuthService {
             .trialEndDate(user.getTrialEndDate())
             .isActive(user.getIsActive())
             .createdAt(user.getCreatedAt())
+            .deletionScheduledAt(user.getDeletionScheduledAt())
             .build();
 
         return AuthResponse.builder()

@@ -29,6 +29,11 @@ export type AuthUser = {
   planStatus?: PlanStatus;
   isActive?: boolean;
   createdAt?: string;
+  /**
+   * Non nul si le compte est planifié pour suppression (délai de grâce en cours) : date de purge
+   * effective (ISO). Déclenche le bandeau de restauration tant qu'elle est présente.
+   */
+  deletionScheduledAt?: string;
 };
 
 export type LoginCredentials = {
