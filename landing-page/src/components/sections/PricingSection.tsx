@@ -64,7 +64,7 @@ const TIERS: Tier[] = [
   {
     name: "Business",
     priceMonthly: 19,
-    priceAnnual: 13,
+    priceAnnual: 19,
     unit: "per member / month",
     tagline: "For teams that ship fast.",
     cta: { label: "Start free trial", href: REGISTER },
