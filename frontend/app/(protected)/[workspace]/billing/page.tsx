@@ -66,7 +66,7 @@ const PLANS: PlanDef[] = [
     key: "BUSINESS",
     name: "Business",
     tagline: "For teams that ship fast.",
-    monthly: 16,
+    monthly: 19,
     inherits: "Basic",
     highlight: true,
     features: [
