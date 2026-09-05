@@ -12,7 +12,7 @@
 
 > **▶ MAJ 05/09/2026 - Fix paiement : boucle infinie sur /payment/success + prix Business 16→19€.** `[FE-payment]`
 > - **Bug (constaté en test upgrade Business)** : la page de succès spammait « Payment successful » / « Verification error » en boucle. Cause : l'effet de vérification avait `refreshUser` (recréé à chaque rendu de l'`AuthProvider`, **non mémoïsé**) dans ses deps ; or l'effet **appelle** `refreshUser` → re-rendu → nouvelle référence → effet relancé → boucle infinie ; les « verification error » = appels en rafale **rate-limités**. Fix : garde par `useRef` (vérif **1×/session**) + `refreshUser` hors deps. Le plan reste appliqué par le webhook (verify n'est qu'une confirmation UI).
-> - **Prix Business** : affiché **16€ → 19€/mois** (aligné sur Stripe `price_1TubPf...`) dans `landing/PricingSection.tsx` + `app billing/page.tsx`. ⚠️ `priceAnnual: 13` (landing) laissé tel quel - à confirmer avec l'user (et vérifier si un prix annuel Stripe existe).
+> - **Prix Business** : **16€ → 19€/mois** (aligné sur Stripe `price_1TubPf...`) dans `landing/PricingSection.tsx` + `app billing/page.tsx`. `priceAnnual` **13 → 19** aussi (user : « c'est 19 en business », et Stripe n'a qu'un prix mensuel 19€, pas de prix annuel remisé).
 > - **Version** : front patch `0.3.2` → produit **v0.3.6**.
 >
 > **▶ MAJ 05/09/2026 - Fix bandeau suppression : afficher la date de PURGE, pas le début de grâce.** `[FE-account-banner]`
