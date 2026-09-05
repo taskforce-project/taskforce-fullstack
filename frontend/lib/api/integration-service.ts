@@ -302,6 +302,49 @@ export async function disconnectMcpServer(slug: string, connectorKey: string): P
   return res.data.data;
 }
 
+// --- Console d'actions (TF-MCP-06) : lister les outils d'un serveur + en exécuter un directement ---
+
+/** Sous-ensemble de JSON Schema qu'on sait rendre en formulaire (objet à propriétés surtout plates). */
+export interface JsonSchemaProperty {
+  type?: string | string[];
+  description?: string;
+  enum?: (string | number)[];
+  default?: unknown;
+  title?: string;
+}
+export interface JsonSchema {
+  type?: string;
+  properties?: Record<string, JsonSchemaProperty>;
+  required?: string[];
+}
+
+/** Outil MCP riche : nom, description, schéma d'arguments et lecture seule (écriture = confirmation). */
+export interface McpToolInfo {
+  name: string;
+  description: string;
+  inputSchema: JsonSchema | null;
+  readOnly: boolean;
+}
+
+/** Outils (schéma d'arguments inclus) d'un serveur MCP connecté — alimente la console d'actions. */
+export async function getMcpServerTools(slug: string, connectorKey: string): Promise<McpToolInfo[]> {
+  const res = await apiClient.get<{ data: McpToolInfo[] }>(INTEGRATION_ROUTES.MCP_SERVER_TOOLS(slug, connectorKey));
+  return res.data.data;
+}
+
+/** Exécute un outil MCP externe directement (hors Cortex). `toolRef` = `<connectorKey>__<tool>`. */
+export async function executeMcpAction(
+  slug: string,
+  toolRef: string,
+  args: Record<string, unknown>,
+): Promise<string> {
+  const res = await apiClient.post<{ data: { toolRef: string; output: string } }>(
+    INTEGRATION_ROUTES.MCP_ACTION_EXECUTE(slug),
+    { toolRef, arguments: args },
+  );
+  return res.data.data.output;
+}
+
 /**
  * Démarre l'OAuth 1-clic d'un serveur MCP : renvoie l'URL d'autorisation (on y redirige le navigateur).
  * `returnTo` (chemin applicatif relatif optionnel) permet un retour fluide ailleurs que sur Settings

@@ -59,6 +59,14 @@ public class WorkspaceMcpService {
     /** Statut d'un serveur MCP connecté (pour l'UI de gestion des connexions). */
     public record McpServerStatus(String connectorKey, String url, boolean reachable, List<String> tools, String error) {}
 
+    /**
+     * Outil MCP <b>riche</b> (schéma d'arguments inclus) — alimente la console d'actions (TF-MCP-06).
+     * {@code inputSchema} = JSON Schema brut du serveur (rendu en formulaire côté front) ; {@code
+     * readOnly} distingue une lecture d'une écriture (confirmation requise avant exécution).
+     */
+    public record McpToolInfo(String name, String description,
+                              com.fasterxml.jackson.databind.JsonNode inputSchema, boolean readOnly) {}
+
     private final ConnectorConnectionRepository repository;
     private final WorkspaceRepository workspaceRepository;
     private final PlanFeatureService planFeatureService;
@@ -219,6 +227,30 @@ public class WorkspaceMcpService {
             }
         }
         return out;
+    }
+
+    /**
+     * Outils <b>riches</b> (schéma d'arguments inclus) d'UN serveur MCP connecté — pour la console
+     * d'actions (TF-MCP-06). Applique l'allow-list. Lève si le connecteur n'est pas un serveur MCP
+     * ({@code mcpUrl} manquant) ou est injoignable (l'appelant remonte l'erreur telle quelle).
+     */
+    public List<McpToolInfo> serverTools(Long workspaceId, String connectorKey) {
+        ConnectorConnection conn = repository.findByWorkspaceIdAndConnectorKey(workspaceId, connectorKey)
+            .orElseThrow(() -> new ResourceNotFoundException("Connecteur MCP non connecté : " + connectorKey));
+        McpClient.ServerRef ref = toServerRef(conn);
+        if (ref == null) throw new BusinessException("Le connecteur " + connectorKey + " n'est pas un serveur MCP (mcpUrl manquant)");
+        Set<String> allow = allowList(conn);
+        McpClient.Session session = client.initialize(ref);
+        try {
+            List<McpToolInfo> out = new ArrayList<>();
+            for (McpClient.ToolDef def : client.listTools(session)) {
+                if (!allow.isEmpty() && !allow.contains(def.name())) continue;
+                out.add(new McpToolInfo(def.name(), def.description(), def.inputSchema(), def.readOnly()));
+            }
+            return out;
+        } finally {
+            client.close(session);
+        }
     }
 
     /** Allow-list (noms d'outils d'origine) d'un connecteur, depuis {@code mcpAllow} (CSV). Vide = tous. */
