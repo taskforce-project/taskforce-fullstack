@@ -1,5 +1,5 @@
 {
-  "version": "0.3.8",
+  "version": "0.3.9",
   "frontend": "0.3.3",
-  "backend": "0.0.5-SNAPSHOT"
+  "backend": "0.0.6-SNAPSHOT"
 }
