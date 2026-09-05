@@ -8,7 +8,7 @@
 
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useRef, useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2, Loader2, AlertCircle, ArrowLeft, ArrowUpRight } from "lucide-react";
@@ -27,8 +27,17 @@ function PaymentSuccessContent() {
   const [verificationStatus, setVerificationStatus] = useState<"success" | "error" | "pending">("pending");
 
   const sessionId = searchParams.get("session_id");
+  // La vérification ne doit tourner qu'UNE fois par session. Sans ce garde, `refreshUser` (recréé à
+  // chaque rendu de l'AuthProvider, non mémoïsé) était dans les deps de l'effet ; or l'effet APPELLE
+  // refreshUser → re-rendu → nouvelle référence → effet relancé → nouvelle vérification → boucle
+  // infinie (spam « Payment successful » / « Verification error », appels en rafale rate-limités).
+  const verifiedSessionRef = useRef<string | null>(null);
 
   useEffect(() => {
+    const key = sessionId ?? "__none__";
+    if (verifiedSessionRef.current === key) return;
+    verifiedSessionRef.current = key;
+
     const verifyPayment = async () => {
       if (!sessionId) {
         setVerificationStatus("error");
@@ -63,7 +72,10 @@ function PaymentSuccessContent() {
     };
 
     verifyPayment();
-  }, [sessionId, refreshUser]);
+    // refreshUser est appelé mais volontairement HORS des deps : il ne doit pas relancer la
+    // vérification (c'est lui qui provoquait la boucle). Le garde par ref suffit à ne tourner qu'une fois.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId]);
 
   const handleContinue = () => {
     // Upgrade in-app : l'utilisateur est déjà connecté, on le renvoie dans l'app - son forfait est
