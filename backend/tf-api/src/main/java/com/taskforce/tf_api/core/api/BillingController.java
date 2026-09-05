@@ -20,9 +20,7 @@ import com.taskforce.tf_api.core.dto.response.CheckoutSessionResponse;
 import com.taskforce.tf_api.core.dto.response.PortalSessionResponse;
 import com.taskforce.tf_api.core.dto.response.SubscriptionInfoResponse;
 import com.taskforce.tf_api.core.enums.PlanType;
-import com.taskforce.tf_api.core.model.Subscription;
 import com.taskforce.tf_api.core.model.User;
-import com.taskforce.tf_api.core.repository.SubscriptionRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.service.StripeService;
@@ -41,7 +39,6 @@ import lombok.RequiredArgsConstructor;
 public class BillingController {
 
     private final StripeService stripeService;
-    private final SubscriptionRepository subscriptionRepository;
     private final UserRepository userRepository;
     private final WorkspaceMemberRepository workspaceMemberRepository;
 
@@ -79,16 +76,21 @@ public class BillingController {
         User user = userRepository.findByEmail(email)
             .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
 
-        Subscription subscription = subscriptionRepository.findByUserId(user.getId())
-            .filter(s -> s.getStripeCustomerId() != null && !s.getStripeCustomerId().isBlank())
-            .orElseThrow(() -> new IllegalStateException(
-                "Aucun abonnement à gérer (plan gratuit). Souscrivez d'abord à un plan payant."));
+        // Le client Stripe est porté par la table `users` (rempli par le webhook au 1er paiement), et
+        // NON par une entité Subscription dédiée (souvent absente : 0 ligne même pour un compte payant).
+        // Lire `subscriptions` ici renvoyait "plan gratuit" à tort → portail / downgrade cassés. On
+        // source donc le customer depuis l'utilisateur. (`cus_seed_*` = seed factice → traité comme absent.)
+        String customerId = user.getStripeCustomerId();
+        if (customerId == null || customerId.isBlank() || customerId.startsWith("cus_seed")) {
+            throw new IllegalStateException(
+                "Aucun abonnement à gérer (plan gratuit). Souscrivez d'abord à un plan payant.");
+        }
 
         String returnUrl = (request != null && request.getReturnUrl() != null && !request.getReturnUrl().isBlank())
             ? request.getReturnUrl()
             : frontendUrl;
 
-        String url = stripeService.createBillingPortalSession(subscription.getStripeCustomerId(), returnUrl);
+        String url = stripeService.createBillingPortalSession(customerId, returnUrl);
         return ResponseEntity.ok(ApiResponse.success("Session portail créée", new PortalSessionResponse(url)));
     }
 
@@ -117,16 +119,17 @@ public class BillingController {
         // Réutilise le client Stripe existant, sinon en crée un.
         // Les identifiants de seed (`cus_seed_*`) sont factices → n'existent pas dans le vrai compte
         // Stripe ; on les traite comme absents pour créer un client réel (sinon "No such customer").
-        String customerId = subscriptionRepository.findByUserId(user.getId())
-            .map(Subscription::getStripeCustomerId)
-            .filter(id -> id != null && !id.isBlank() && !id.startsWith("cus_seed"))
-            .orElseGet(() -> {
-                try {
-                    return stripeService.createCustomer(user.getEmail(), user.getDisplayName()).getId();
-                } catch (StripeException e) {
-                    throw new IllegalStateException("Client Stripe indisponible : " + e.getMessage(), e);
-                }
-            });
+        String existingCustomer = user.getStripeCustomerId();
+        String customerId;
+        if (existingCustomer != null && !existingCustomer.isBlank() && !existingCustomer.startsWith("cus_seed")) {
+            customerId = existingCustomer;
+        } else {
+            try {
+                customerId = stripeService.createCustomer(user.getEmail(), user.getDisplayName()).getId();
+            } catch (StripeException e) {
+                throw new IllegalStateException("Client Stripe indisponible : " + e.getMessage(), e);
+            }
+        }
 
         String success = notBlank(body.getSuccessUrl()) ? body.getSuccessUrl() : frontendUrl + "/payment/success";
         String cancel  = notBlank(body.getCancelUrl())  ? body.getCancelUrl()  : frontendUrl + "/payment/cancel";
