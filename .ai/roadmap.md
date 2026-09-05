@@ -10,6 +10,12 @@
 >
 > Sources : `.ai/qa.md` (QA produit détaillée), `.ai/known-issues.md` (bugs vérifiés), `.ai/module-map.md` (domaines↔code), `.ai/architecture-map.md` (archi réelle), `.ai/P0-fix-plan.md` (correctifs P0 paste-ready).
 
+> **▶ MAJ 05/09/2026 - Cortex : borner les outils MCP envoyés au LLM (fix Groq 413 avec un gros serveur).** `[BE-agent]`
+> - **Bug (trouvé en test MCP live)** : Linear connecté = **60+ outils** MCP ; l'agent les envoyait **tous** au LLM → payload > limite Groq → **HTTP 413 Payload Too Large** → ai-service 503 → Cortex « génération désactivée » (ne raisonne/agit plus). Le 1er test marchait car Linear pas encore connecté (peu d'outils).
+> - **Fix** : `AgentService.relevantExternal` borne les outils externes envoyés au LLM. **Sous** `maxExternalTools` (défaut 25, tunable `integrations.mcp.max-tools-per-request`) → tout gardé (réflexe complet, le test `run_deep_prompt_carries_tool_reflex` reste vert). **Au-dessus** → priorise (connecteur nommé dans le message +100, puis segments du nom d'outil qui recoupent le message, ex. « issues » → `list_issues`) puis plafonne. `AgentServiceTest` 11/11.
+> - **Note** : la valeur 25 est prudente (guess sur la limite Groq) → ajustable sans redeploy via l'env.
+> - **Version** : back patch `0.0.7` → produit **v0.3.10**.
+>
 > **▶ MAJ 05/09/2026 - Sessions Keycloak allongées (fini les déconnexions à 30 min) + code promo au checkout.** `[PROD-auth + BE-billing]`
 > - **Déconnexion fréquente (constatée pendant les vérifs)** : en prod, `accessTokenLifespan` **et** `ssoSessionIdleTimeout` valaient tous deux **1800s (30 min)**, égaux → dès que l'access token expire, la session SSO idle expire au même instant → le refresh (sur 401) échoue → retour login. Fix appliqué via `kcadm` sur `taskforce-keycloak-prod` (realm `taskforce-prod`) : `ssoSessionIdleTimeout` 30min → **8h** (28800), `ssoSessionMaxLifespan` 3h → **24h** (86400) ; access token gardé à 30min (refresh transparent, sécurité conservée). `keycloak/realms/prod/taskforce-prod-realm.json` mis en cohérence (au cas où KC réimporte).
 > - **Réducs** : `setAllowPromotionCodes(true)` au checkout Stripe → champ « code promo » au paiement (les coupons/promotions se créent côté **dashboard Stripe**). Sans coupon actif = aucun effet.
