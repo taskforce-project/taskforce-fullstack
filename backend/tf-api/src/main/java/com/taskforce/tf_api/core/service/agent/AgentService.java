@@ -62,10 +62,12 @@ public class AgentService {
     @Value("${integrations.mcp.tool-tier:fast}")
     private String mcpToolTier;
 
-    /** Plafond d'outils MCP externes envoyés au LLM par requête. Borne le payload : un gros serveur MCP
-     *  (Linear = 60+ outils) envoyé en entier dépasse la limite du provider (Groq → HTTP 413) et casse
-     *  Cortex (« génération désactivée »). Tunable sans redeploy. */
-    @Value("${integrations.mcp.max-tools-per-request:20}")
+    /** Plafond d'outils MCP externes envoyés au LLM par requête. **0 = désactivé** (aucun outil MCP
+     *  externe envoyé). Raison du 0 par défaut : le tier Groq gratuit plafonne à ~8000 tokens/minute
+     *  (TPM) ; les schémas d'outils MCP (Linear = 60+ outils) font exploser ce budget → Cortex casse.
+     *  Les outils INTERNES (search_brain, issues TaskForce…) restent, eux, toujours actifs. Remonter
+     *  cette valeur (ex. 20) une fois Groq passé en Dev Tier (TPM bien plus élevé). Tunable. */
+    @Value("${integrations.mcp.max-tools-per-request:0}")
     private int maxExternalTools;
 
     private static final int MAX_TOOL_ITERS = 5;
@@ -318,11 +320,12 @@ public class AgentService {
      * pertinents plutôt que de tout casser.</p>
      */
     private List<AgentTool> relevantExternal(List<AgentTool> external, String message) {
+        if (maxExternalTools <= 0) return List.of();   // outils MCP externes désactivés (tier LLM à faible TPM)
         if (external.size() <= maxExternalTools) return external;
         String lower = message == null ? "" : message.toLowerCase();
         return external.stream()
             .sorted(java.util.Comparator.comparingInt((AgentTool t) -> toolScore(t.name(), lower)).reversed())
-            .limit(Math.max(1, maxExternalTools))
+            .limit(maxExternalTools)
             .toList();
     }
 
