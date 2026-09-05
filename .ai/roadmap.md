@@ -10,6 +10,11 @@
 >
 > Sources : `.ai/qa.md` (QA produit détaillée), `.ai/known-issues.md` (bugs vérifiés), `.ai/module-map.md` (domaines↔code), `.ai/architecture-map.md` (archi réelle), `.ai/P0-fix-plan.md` (correctifs P0 paste-ready).
 
+> **▶ MAJ 05/09/2026 - Sessions Keycloak allongées (fini les déconnexions à 30 min) + code promo au checkout.** `[PROD-auth + BE-billing]`
+> - **Déconnexion fréquente (constatée pendant les vérifs)** : en prod, `accessTokenLifespan` **et** `ssoSessionIdleTimeout` valaient tous deux **1800s (30 min)**, égaux → dès que l'access token expire, la session SSO idle expire au même instant → le refresh (sur 401) échoue → retour login. Fix appliqué via `kcadm` sur `taskforce-keycloak-prod` (realm `taskforce-prod`) : `ssoSessionIdleTimeout` 30min → **8h** (28800), `ssoSessionMaxLifespan` 3h → **24h** (86400) ; access token gardé à 30min (refresh transparent, sécurité conservée). `keycloak/realms/prod/taskforce-prod-realm.json` mis en cohérence (au cas où KC réimporte).
+> - **Réducs** : `setAllowPromotionCodes(true)` au checkout Stripe → champ « code promo » au paiement (les coupons/promotions se créent côté **dashboard Stripe**). Sans coupon actif = aucun effet.
+> - **Version** : back patch `0.0.6` → produit **v0.3.9**.
+>
 > **▶ MAJ 05/09/2026 - Fix downgrade (portail Stripe lisait la mauvaise table) + icône de projet éditable.** `[BE-billing + FE-project]`
 > - **Bug downgrade (constaté prod, corrélé DB)** : « Downgrade/Manage » renvoyait « Aucun abonnement à gérer (plan gratuit) » alors que le compte est **BUSINESS ACTIVE**. Cause : `/api/billing/portal` **et** `/checkout` lisaient `stripe_customer_id` depuis la table `subscriptions` (**0 ligne** même pour un payant) au lieu de `users` (remplie par le webhook). DB user 29 : `users.stripe_customer_id=cus_VCfxL...` mais `subscriptions`=0. Fix : les deux sourcent `user.getStripeCustomerId()` (garde `cus_seed_*`). Bonus : le checkout ne crée plus de **client Stripe en double** à chaque paiement. Code mort retiré (`SubscriptionRepository` + imports). → downgrade + **proration** via le portail OK.
 > - **Icône de projet éditable** : le `ProjectIconPicker` n'était atteignable que depuis la liste (menu `...` → Edit) ; ajouté dans **Settings du projet** (section General), branché sur `updateProject({iconUrl})`.
