@@ -62,6 +62,12 @@ public class AgentService {
     @Value("${integrations.mcp.tool-tier:fast}")
     private String mcpToolTier;
 
+    /** Plafond d'outils MCP externes envoyés au LLM par requête. Borne le payload : un gros serveur MCP
+     *  (Linear = 60+ outils) envoyé en entier dépasse la limite du provider (Groq → HTTP 413) et casse
+     *  Cortex (« génération désactivée »). Tunable sans redeploy. */
+    @Value("${integrations.mcp.max-tools-per-request:25}")
+    private int maxExternalTools;
+
     private static final int MAX_TOOL_ITERS = 5;
 
     public AssistantAnswer run(String slug, Long userId, String message) {
@@ -248,7 +254,9 @@ public class AgentService {
                                AgentContext ctx, List<AssistantToolCall> toolCalls,
                                List<Map<String, Object>> history) {
         // Outils externes (serveurs MCP connectés sur le workspace) — découverts par requête, cachés.
-        List<AgentTool> external = workspaceMcp.toolsFor(ctx);
+        // Bornés par pertinence AVANT l'envoi au LLM : un gros serveur MCP (Linear 60+ outils) envoyé en
+        // entier fait dépasser la limite de payload du provider (Groq 413) → Cortex cassé. Cf. relevantExternal.
+        List<AgentTool> external = relevantExternal(workspaceMcp.toolsFor(ctx), message);
         if (!external.isEmpty()) {
             log.info("Cortex deep (ws={}) : {} outil(s) interne(s) + {} externe(s) MCP {}",
                 ctx.workspaceId(), tools.all().size(), external.size(),
@@ -296,6 +304,39 @@ public class AgentService {
             return msg.path("content").asText("");
         }
         return "Réponse interrompue (trop d'étapes d'outils).";
+    }
+
+    /**
+     * Borne de payload des outils MCP externes avant l'envoi au LLM. Motivé par un incident réel :
+     * Linear connecté expose 60+ outils ; les envoyer TOUS au provider dépasse sa limite de payload
+     * (Groq → HTTP 413) et casse Cortex (« génération désactivée »).
+     *
+     * <p>Sous {@code maxExternalTools} : on garde TOUT (réflexe complet préservé — chaque outil connecté
+     * reste annoncé). Au-dessus : on priorise (connecteur nommé dans le message, puis nom d'outil qui
+     * recoupe le message — ex. « issues » → {@code list_issues}) et on plafonne. Le seul cas modifié
+     * est donc le connecteur riche : on n'expose que les {@code maxExternalTools} outils les plus
+     * pertinents plutôt que de tout casser.</p>
+     */
+    private List<AgentTool> relevantExternal(List<AgentTool> external, String message) {
+        if (external.size() <= maxExternalTools) return external;
+        String lower = message == null ? "" : message.toLowerCase();
+        return external.stream()
+            .sorted(java.util.Comparator.comparingInt((AgentTool t) -> toolScore(t.name(), lower)).reversed())
+            .limit(Math.max(1, maxExternalTools))
+            .toList();
+    }
+
+    /** Priorité d'un outil : +100 si son connecteur (préfixe avant « __ ») est nommé dans le message,
+     *  +1 par segment de son nom (après « __ », coupé sur _/-, ≥3 lettres) présent dans le message. */
+    private static int toolScore(String toolName, String lowerMessage) {
+        int sep = toolName.indexOf("__");
+        int score = 0;
+        if (sep > 0 && lowerMessage.contains(toolName.substring(0, sep).toLowerCase())) score += 100;
+        String bare = (sep > 0 ? toolName.substring(sep + 2) : toolName).toLowerCase();
+        for (String part : bare.split("[_-]")) {
+            if (part.length() >= 3 && lowerMessage.contains(part)) score++;
+        }
+        return score;
     }
 
     private String runDirect(String message, List<KnowledgeNode> hits, List<Map<String, Object>> history) {
