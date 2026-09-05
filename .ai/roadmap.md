@@ -10,6 +10,11 @@
 >
 > Sources : `.ai/qa.md` (QA produit détaillée), `.ai/known-issues.md` (bugs vérifiés), `.ai/module-map.md` (domaines↔code), `.ai/architecture-map.md` (archi réelle), `.ai/P0-fix-plan.md` (correctifs P0 paste-ready).
 
+> **▶ MAJ 05/09/2026 - Infra : VM2 (frontend) disque plein bloquait les déploiements → débloqué + auto-prune installé.** `[Ops]`
+> - **Découvert en déployant v0.3.15** : la VM2 était à **100 % de disque** → le `git fetch` de l'auto-deploy échouait **en silence** (`No space left`) → le **frontend restait figé sur v0.3.12 (#241)** (n'avait pas déployé #242/#243/#244). La VM1 (backend) suivait normalement — d'où le footer bloqué à 0.3.12.
+> - **Cause** : cache de build Docker (16,8 Go) + vieilles images `<none>`. **Débloqué** : `docker system prune -af` → **19,4 Go** libérés (100 %→33 %) ; la VM a aussitôt pull #244 et rebuild → footer **0.3.15**.
+> - **Prévention** : bloc d'auto-nettoyage en tête de `scripts/auto-deploy.sh` sur **les 2 VM** — si `df /` ≥ 85 % → `docker builder prune -af` + `docker image prune -f`. **JAMAIS `--volumes`** (DB postgres / MinIO / Keycloak / Redis sont des volumes, intacts ; prouvé sur VM1 : `postgres-prod` `Up 2 weeks (healthy)` après purge, 82 %→49 %). Auto-cicatrisant (une VM pleine se nettoie au poll suivant). Copie de référence versionnée dans **`ops/auto-deploy.sh`** (⚠️ les scripts sur les VM ne sont PAS synchronisés depuis le repo, à tenir en phase à la main).
+>
 > **▶ MAJ 05/09/2026 - Billing : changement de forfait self-service (Basic ⇄ Business) + proration auto — fin du « annuler puis re-souscrire ».** `[BE-billing + FE-billing]`
 > - **Constat (user)** : le Customer Portal Stripe ne proposait QUE « Cancel subscription ». Pour rétrograder Business→Basic il fallait annuler puis re-souscrire, au lieu d'un simple switch avec proration (façon Claude/Anthropic).
 > - **Cause** : la feature `subscription_update` du portail n'était pas activée (config par défaut = annulation + moyen de paiement + factures seulement).
