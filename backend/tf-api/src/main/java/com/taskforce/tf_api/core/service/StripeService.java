@@ -90,6 +90,9 @@ public class StripeService {
             .setCustomer(customerId)
             .setSuccessUrl(withCheckoutSessionId(successUrl))
             .setCancelUrl(cancelUrl)
+            // Affiche le champ « code promo » au checkout (les coupons/promotions se créent côté
+            // dashboard Stripe). Sans coupon actif, le champ n'a aucun effet — activation sans risque.
+            .setAllowPromotionCodes(true)
             .addLineItem(
                 SessionCreateParams.LineItem.builder()
                     .setPrice(priceId)
