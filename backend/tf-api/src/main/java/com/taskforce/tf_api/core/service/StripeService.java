@@ -218,15 +218,106 @@ public class StripeService {
      * PROD-4.5. Retourne l'URL de redirection.
      */
     public String createBillingPortalSession(String customerId, String returnUrl) throws StripeException {
-        com.stripe.param.billingportal.SessionCreateParams params =
+        com.stripe.param.billingportal.SessionCreateParams.Builder params =
             com.stripe.param.billingportal.SessionCreateParams.builder()
                 .setCustomer(customerId)
-                .setReturnUrl(returnUrl)
-                .build();
+                .setReturnUrl(returnUrl);
+        // Active le changement de plan self-service (upgrade/downgrade + proration) quand la config existe.
+        String configId = ensurePortalConfiguration();
+        if (configId != null) {
+            params.setConfiguration(configId);
+        }
         com.stripe.model.billingportal.Session session =
-            com.stripe.model.billingportal.Session.create(params);
+            com.stripe.model.billingportal.Session.create(params.build());
         log.info("Session Customer Portal créée pour le client : {}", customerId);
         return session.getUrl();
+    }
+
+    /** Id de la config portail mise en cache (créée une fois par cycle de vie du backend). */
+    private volatile String portalConfigId;
+
+    /**
+     * Crée (ou réutilise) une configuration Customer Portal qui autorise le CHANGEMENT DE PLAN
+     * (Basic ⇄ Business) avec proration automatique, en plus de l'annulation et des factures.
+     * Sans ça, le portail ne propose QUE « Cancel » et l'utilisateur doit annuler puis re-souscrire.
+     * Retourne null si les price-ids ne sont pas configurés (on retombe alors sur la config par défaut).
+     */
+    private String ensurePortalConfiguration() throws StripeException {
+        String cached = portalConfigId;
+        if (cached != null) {
+            return cached;
+        }
+        if (basicPriceId == null || basicPriceId.isBlank()
+                || businessPriceId == null || businessPriceId.isBlank()) {
+            return null;
+        }
+        synchronized (this) {
+            if (portalConfigId != null) {
+                return portalConfigId;
+            }
+            // Produits Stripe déduits de leurs price-ids (le switch se déclare par (produit, prix)).
+            String basicProduct = Price.retrieve(basicPriceId).getProduct();
+            String businessProduct = Price.retrieve(businessPriceId).getProduct();
+
+            com.stripe.param.billingportal.ConfigurationCreateParams.Features.SubscriptionUpdate.Builder subUpdate =
+                com.stripe.param.billingportal.ConfigurationCreateParams.Features.SubscriptionUpdate.builder()
+                    .setEnabled(true)
+                    .addDefaultAllowedUpdate(
+                        com.stripe.param.billingportal.ConfigurationCreateParams.Features.SubscriptionUpdate.DefaultAllowedUpdate.PRICE)
+                    .setProrationBehavior(
+                        com.stripe.param.billingportal.ConfigurationCreateParams.Features.SubscriptionUpdate.ProrationBehavior.CREATE_PRORATIONS);
+
+            if (basicProduct != null && basicProduct.equals(businessProduct)) {
+                // Basic et Business sont deux prix d'un même produit : un seul produit, deux prix.
+                subUpdate.addProduct(
+                    com.stripe.param.billingportal.ConfigurationCreateParams.Features.SubscriptionUpdate.Product.builder()
+                        .setProduct(basicProduct)
+                        .addPrice(basicPriceId)
+                        .addPrice(businessPriceId)
+                        .build());
+            } else {
+                subUpdate.addProduct(
+                    com.stripe.param.billingportal.ConfigurationCreateParams.Features.SubscriptionUpdate.Product.builder()
+                        .setProduct(basicProduct)
+                        .addPrice(basicPriceId)
+                        .build());
+                subUpdate.addProduct(
+                    com.stripe.param.billingportal.ConfigurationCreateParams.Features.SubscriptionUpdate.Product.builder()
+                        .setProduct(businessProduct)
+                        .addPrice(businessPriceId)
+                        .build());
+            }
+
+            com.stripe.param.billingportal.ConfigurationCreateParams createParams =
+                com.stripe.param.billingportal.ConfigurationCreateParams.builder()
+                    .setBusinessProfile(
+                        com.stripe.param.billingportal.ConfigurationCreateParams.BusinessProfile.builder()
+                            .setHeadline("TaskForce")
+                            .build())
+                    .setFeatures(
+                        com.stripe.param.billingportal.ConfigurationCreateParams.Features.builder()
+                            .setSubscriptionUpdate(subUpdate.build())
+                            .setSubscriptionCancel(
+                                com.stripe.param.billingportal.ConfigurationCreateParams.Features.SubscriptionCancel.builder()
+                                    .setEnabled(true)
+                                    .build())
+                            .setPaymentMethodUpdate(
+                                com.stripe.param.billingportal.ConfigurationCreateParams.Features.PaymentMethodUpdate.builder()
+                                    .setEnabled(true)
+                                    .build())
+                            .setInvoiceHistory(
+                                com.stripe.param.billingportal.ConfigurationCreateParams.Features.InvoiceHistory.builder()
+                                    .setEnabled(true)
+                                    .build())
+                            .build())
+                    .build();
+
+            com.stripe.model.billingportal.Configuration config =
+                com.stripe.model.billingportal.Configuration.create(createParams);
+            portalConfigId = config.getId();
+            log.info("Config Customer Portal créée (switch de plan + proration) : {}", portalConfigId);
+            return portalConfigId;
+        }
     }
 
     /**
