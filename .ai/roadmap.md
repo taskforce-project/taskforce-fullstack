@@ -10,6 +10,11 @@
 >
 > Sources : `.ai/qa.md` (QA produit détaillée), `.ai/known-issues.md` (bugs vérifiés), `.ai/module-map.md` (domaines↔code), `.ai/architecture-map.md` (archi réelle), `.ai/P0-fix-plan.md` (correctifs P0 paste-ready).
 
+> **▶ MAJ 05/09/2026 - Cortex : plafond MCP baissé à 6 (25 encore 413) + fix RGPD invitations.** `[BE-agent + BE-gdpr]`
+> - **Suite du fix Groq 413** : le routage (v0.3.10) marche - log prod confirme **60 → 25 outils** avec **`linear__list_issues` priorisé en 1er** (la priorisation par recoupement du message est nickel). MAIS **25 restait trop gros** pour la limite de payload Groq (413 persistait, 2s après le log). Défaut baissé **25 → 6** (`integrations.mcp.max-tools-per-request`). Avec la priorisation, 6 outils couvrent la requête ; proche des 7 internes qui passaient déjà seuls. Reste tunable.
+> - **RGPD invitations** (gap de la revue (b)) : `GdprService.purgeAccount` efface désormais `workspace_invitations WHERE email = <email réel>` (seule PII résiduelle hors row anonymisé ; `invited_by`/`created_by` = id user, pas d'AuditorAware → pointent vers le tombstone). `GdprServiceTest` 5/5.
+> - **Version** : back patch `0.0.8` → produit **v0.3.11**.
+>
 > **▶ MAJ 05/09/2026 - Cortex : borner les outils MCP envoyés au LLM (fix Groq 413 avec un gros serveur).** `[BE-agent]`
 > - **Bug (trouvé en test MCP live)** : Linear connecté = **60+ outils** MCP ; l'agent les envoyait **tous** au LLM → payload > limite Groq → **HTTP 413 Payload Too Large** → ai-service 503 → Cortex « génération désactivée » (ne raisonne/agit plus). Le 1er test marchait car Linear pas encore connecté (peu d'outils).
 > - **Fix** : `AgentService.relevantExternal` borne les outils externes envoyés au LLM. **Sous** `maxExternalTools` (défaut 25, tunable `integrations.mcp.max-tools-per-request`) → tout gardé (réflexe complet, le test `run_deep_prompt_carries_tool_reflex` reste vert). **Au-dessus** → priorise (connecteur nommé dans le message +100, puis segments du nom d'outil qui recoupent le message, ex. « issues » → `list_issues`) puis plafonne. `AgentServiceTest` 11/11.
