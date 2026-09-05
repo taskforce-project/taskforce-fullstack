@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button"
  * Bandeau de restauration de compte.
  *
  * Visible sur toute l'app tant que le compte courant est planifié pour suppression
- * (`user.deletionScheduledAt` non nul - posé par le droit à l'effacement RGPD, avec délai de grâce).
+ * (`user.scheduledPurgeAt` non nul - posé par le droit à l'effacement RGPD, avec délai de grâce).
  * Il rappelle la date de purge et propose de restaurer le compte tant que le délai court : c'est le
  * filet promis à l'utilisateur (« si je me reconnecte, est-ce que je peux récupérer mon compte ? »).
  *
@@ -23,10 +23,10 @@ export function AccountDeletionBanner() {
   const { user, refreshUser } = useAuth()
   const [restoring, setRestoring] = useState(false)
 
-  const scheduledAt = user?.deletionScheduledAt
-  if (!scheduledAt) return null
+  const purgeAt = user?.scheduledPurgeAt
+  if (!purgeAt) return null
 
-  const purgeDate = new Date(scheduledAt)
+  const purgeDate = new Date(purgeAt)
   const label = Number.isNaN(purgeDate.getTime())
     ? null
     : purgeDate.toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" })
@@ -37,7 +37,7 @@ export function AccountDeletionBanner() {
       await restoreMyAccount()
       await refreshUser()
       toast.success("Account restored. Welcome back.")
-      // Succès : refreshUser efface deletionScheduledAt → ce composant se démonte (pas de reset de
+      // Succès : refreshUser efface scheduledPurgeAt → ce composant se démonte (pas de reset de
       // `restoring` nécessaire).
     } catch {
       toast.error("Could not restore your account. Try again or contact contact@taskforce-project.fr.")

@@ -342,7 +342,7 @@ function AccountPanel() {
   //
   // On PLANIFIE (délai de grâce), on ne purge pas : le back renvoie la date de purge. On NE déconnecte
   // donc PAS - le compte reste actif et récupérable. On rafraîchit le profil pour que le bandeau de
-  // restauration (piloté par `deletionScheduledAt`) apparaisse aussitôt.
+  // restauration (piloté par `scheduledPurgeAt`) apparaisse aussitôt.
   const handleDelete = async () => {
     setDeleting(true)
     try {

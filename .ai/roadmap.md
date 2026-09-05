@@ -10,6 +10,12 @@
 >
 > Sources : `.ai/qa.md` (QA produit détaillée), `.ai/known-issues.md` (bugs vérifiés), `.ai/module-map.md` (domaines↔code), `.ai/architecture-map.md` (archi réelle), `.ai/P0-fix-plan.md` (correctifs P0 paste-ready).
 
+> **▶ MAJ 05/09/2026 - Fix bandeau suppression : afficher la date de PURGE, pas le début de grâce.** `[FE-account-banner]`
+> - **Bug (trouvé par E2E sur la prod, corrélé DB)** : le bandeau de restauration affichait `deletion_scheduled_at` **brut** (= début de grâce, ~aujourd'hui) comme date de suppression, alors que la purge réelle est à **+30 j**. Le toast (réponse du DELETE) affichait, lui, la bonne date → incohérence anxiogène (« supprimé aujourd'hui » vs « le mois prochain »).
+> - **Fix** : `/users/me` (`UserResponse` + mappings `UserService`/`AuthService`) expose désormais **`scheduledPurgeAt`** = `deletion_scheduled_at + graceDays` (même clé ET même valeur que `DELETE /api/gdpr/account`). `graceDays` injecté (`@Value`) dans les 2 services. Front : `AuthUser.scheduledPurgeAt`, bandeau branché dessus. La colonne DB **reste inchangée** (début de grâce) : seule l'exposition calcule la date de purge.
+> - **Validé E2E prod** (compte Pierre, id=29) : schedule → bandeau + toast, DB `deletion_scheduled_at` = now, `is_active` **t** (non purgé) ; restore → DB **NULL**, bandeau parti. RGPD : effacement **récupérable** OK, **aucune purge** pendant la grâce.
+> - **Version** : back patch `0.0.4` + front patch `0.3.1` → produit **v0.3.5**.
+>
 > **▶ MAJ 04/09/2026 - Fix paiement : `session_id` manquant au retour Checkout.** `[QA-billing]`
 > - **Problème (constaté à l'upgrade)** : la page de succès affichait « No payment session found ». Cause racine : le `success_url` du Checkout partait **sans** le placeholder `{CHECKOUT_SESSION_ID}` que Stripe substitue au retour → la page arrivait sans `session_id` à vérifier.
 > - **Fix (fait)** : `StripeService.withCheckoutSessionId` garantit le placeholder sur **tout** `success_url` (ajout idempotent, séparateur `?`/`&` selon la query, no-op si déjà présent → sûr aussi pour l'inscription qui ne lit pas le paramètre). Centralisé côté service → couvre les deux appelants (upgrade + inscription). Test `StripeServiceTest.SuccessUrlTemplateTests`.
