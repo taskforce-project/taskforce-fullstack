@@ -10,6 +10,12 @@
 >
 > Sources : `.ai/qa.md` (QA produit détaillée), `.ai/known-issues.md` (bugs vérifiés), `.ai/module-map.md` (domaines↔code), `.ai/architecture-map.md` (archi réelle), `.ai/P0-fix-plan.md` (correctifs P0 paste-ready).
 
+> **▶ MAJ 05/09/2026 - Backlog : « comm complète » avec les intégrations + MRR Stripe dans le Brain OS (chiffré).** `[TF-MCP-06 + TF-BRAIN-01]`
+> - **Contexte (question user)** : *connecter un outil ≠ ses données remontent*. Vérifié dans le code : la connexion générique (`ConnectorConnectionService`) **stocke juste la clé chiffrée** ; seuls **Plane (patron `sync`), GitHub/Slack (natif) et l'import MCP** alimentent le Brain OS aujourd'hui. cf. [[integration-connect-vs-ingest]].
+> - **`[TF-MCP-06]` Console d'actions MCP générique (~2-4 j, surtout front)** → **PROD-5.7**. Le backend expose déjà `GET /mcp/servers` (outils) + `POST /mcp/actions/execute` → il ne manque que l'écran pour lister/lancer un outil **hors Cortex** (donc **sans dépendre du cap Groq**). **Générique** = débloque « comm complète » avec Stripe **et les 25 MCP-ready et tout futur MCP** d'un coup. **Meilleur levier.**
+> - **`[TF-BRAIN-01]` Lecteur MRR Stripe → Brain OS (~4-5 j ; spike 1,5-2 j)** → **PROD-5.8**. Décline `PlaneIntegrationService.sync` (→ `KnowledgeNode` + embed) ; SDK Stripe déjà présent ; ingère un node « MRR snapshot » évolutif.
+> - **Reco / séquencement** : (1) console MCP générique, (2) lecteur MRR Stripe, (3) Cortex-en-chat avec outils = **LLM payant** (différé : pas de fond/users), (4) autres credential-only au cas par cas. Les ~100 restants passent par MCP dès qu'un éditeur sort un serveur hébergé (1 ligne `suggestMcp`), **pas 100 lecteurs à coder**.
+>
 > **▶ MAJ 05/09/2026 - Infra : VM2 (frontend) disque plein bloquait les déploiements → débloqué + auto-prune installé.** `[Ops]`
 > - **Découvert en déployant v0.3.15** : la VM2 était à **100 % de disque** → le `git fetch` de l'auto-deploy échouait **en silence** (`No space left`) → le **frontend restait figé sur v0.3.12 (#241)** (n'avait pas déployé #242/#243/#244). La VM1 (backend) suivait normalement — d'où le footer bloqué à 0.3.12.
 > - **Cause** : cache de build Docker (16,8 Go) + vieilles images `<none>`. **Débloqué** : `docker system prune -af` → **19,4 Go** libérés (100 %→33 %) ; la VM a aussitôt pull #244 et rebuild → footer **0.3.15**.
@@ -1359,8 +1365,10 @@ Le minimum pour que l'app tienne la promesse du CDC de bout en bout, **et** que 
 | PROD-5.3 | **Asana** : nouveau provider (OAuth + sync tâches/projets)                                                   |  🔲   |  P3  |  3,0   |
 | PROD-5.4 | Webhooks sortants configurables (`WebhookController` prêt) : UI de gestion                                   |  🟧   |  P3  |  1,0   |
 | PROD-5.5 | Centre d'intégrations dans Settings (style GitHub : sidebar, API, MCP, connexions)                           |  🔲   |  P3  |  1,5   |
+| PROD-5.7 | **Console d'actions MCP générique** `[TF-MCP-06]` — écran pour parcourir les outils d'un serveur MCP connecté et en **exécuter un directement**, **hors Cortex/LLM** (donc **non impacté par le cap Groq**). Backend **déjà prêt** : `GET …/mcp/servers` liste les outils, `POST …/mcp/actions/execute` en exécute un → il manque surtout le **front** (liste outils + formulaire d'arguments + résultat) + confirmation sur les écritures. **Générique** : marche pour Stripe **et les 25 MCP-ready et tout futur connecteur MCP** d'un coup → débloque « comm complète » sans LLM payant. **Meilleur levier/€.** cf. [[integration-connect-vs-ingest]] |  🔲   |  P2  |  2–4   |
+| PROD-5.8 | **Lecteur MRR Stripe → Brain OS** `[TF-BRAIN-01]` — décline le **patron Plane** (`PlaneIntegrationService.sync` → `KnowledgeNode` dédupliqué par `metadata.externalId` + `embedNode`). Lit la clé Stripe **du workspace** (SDK Stripe déjà présent), calcule **MRR/ARR, nb actifs, churn**, ingère un **node « MRR snapshot »** évolutif (+ top clients) → l'agent raisonne dessus. Câblage : `IntegrationProvider.STRIPE` + Flyway + endpoints connect/status/sync/disconnect + DTOs + tests + front (Connect + Sync + MRR affiché). **Ne scale pas** à 100 (autres credential-only au cas par cas). Spike **1,5–2 j** / propre **4–5 j**. |  🔲   |  P2  |  4–5   |
 
-**Sous-total : ~10 j·h** (PROD-5.1+5.2 prioritaires = 4,5 j·h).
+**Sous-total : ~10 j·h historique** (PROD-5.1+5.2 = 4,5) **+ TF-MCP-06 (2–4) + TF-BRAIN-01 (4–5) → ~16–19 j·h.**
 
 ## 2.6 — IA, agents & différenciateurs — `PROD-6`
 
