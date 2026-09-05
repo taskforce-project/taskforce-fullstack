@@ -65,7 +65,7 @@ public class AgentService {
     /** Plafond d'outils MCP externes envoyés au LLM par requête. Borne le payload : un gros serveur MCP
      *  (Linear = 60+ outils) envoyé en entier dépasse la limite du provider (Groq → HTTP 413) et casse
      *  Cortex (« génération désactivée »). Tunable sans redeploy. */
-    @Value("${integrations.mcp.max-tools-per-request:6}")
+    @Value("${integrations.mcp.max-tools-per-request:20}")
     private int maxExternalTools;
 
     private static final int MAX_TOOL_ITERS = 5;

@@ -43,7 +43,10 @@ public class AgentToolRegistry {
         return toolDefinitions(List.of());
     }
 
-    /** Définitions des outils internes + {@code extra} (outils externes découverts pour la requête). */
+    /** Définitions des outils internes + {@code extra} (outils externes découverts pour la requête).
+     *  Les descriptions/schémas sont <b>allégés</b> avant l'envoi au LLM (cf. {@link #trimSchema}) : les
+     *  serveurs MCP (Linear…) portent des schémas verbeux qui gonflent le payload (Groq 413) sans aider
+     *  le tool-calling. Alléger permet d'en envoyer davantage sous la même limite. */
     public List<Map<String, Object>> toolDefinitions(List<AgentTool> extra) {
         List<AgentTool> merged = new ArrayList<>(all());
         if (extra != null) merged.addAll(extra);
@@ -51,9 +54,49 @@ public class AgentToolRegistry {
             "type", "function",
             "function", Map.of(
                 "name", t.name(),
-                "description", t.description(),
-                "parameters", t.parametersSchema()
+                "description", trimText(t.description()),
+                "parameters", trimSchema(t.parametersSchema())
             )
         )).toList();
+    }
+
+    /** Longueur max d'une `description` envoyée au LLM. Les longues proses des schémas MCP n'améliorent
+     *  pas le tool-calling et gonflent le payload. */
+    private static final int MAX_DESC = 160;
+
+    private static String trimText(String s) {
+        if (s == null) return "";
+        s = s.strip();
+        return s.length() <= MAX_DESC ? s : s.substring(0, MAX_DESC).stripTrailing() + "…";
+    }
+
+    /**
+     * Allège récursivement un JSON schema de paramètres : tronque les `description`/`title`, retire les
+     * `examples`/`$schema`, borne les `enum` longs. Garde la structure utile (noms, types, required) →
+     * réduit fortement le payload des gros serveurs MCP sans casser le tool-calling.
+     */
+    private static Object trimSchema(Object node) {
+        if (node instanceof Map<?, ?> m) {
+            Map<String, Object> out = new LinkedHashMap<>();
+            for (Map.Entry<?, ?> e : m.entrySet()) {
+                String k = String.valueOf(e.getKey());
+                Object v = e.getValue();
+                if ("examples".equals(k) || "example".equals(k) || "$schema".equals(k)) continue;
+                if ("description".equals(k) || "title".equals(k)) {
+                    out.put(k, trimText(String.valueOf(v)));
+                } else if ("enum".equals(k) && v instanceof List<?> l && l.size() > 20) {
+                    out.put(k, new ArrayList<>(l.subList(0, 20)));
+                } else {
+                    out.put(k, trimSchema(v));
+                }
+            }
+            return out;
+        }
+        if (node instanceof List<?> l) {
+            List<Object> out = new ArrayList<>(l.size());
+            for (Object e : l) out.add(trimSchema(e));
+            return out;
+        }
+        return node;
     }
 }
