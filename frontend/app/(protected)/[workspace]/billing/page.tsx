@@ -193,13 +193,17 @@ export default function BillingPage() {
       )
     }
     if (RANK[p.key] < RANK[current]) {
+      // Rétrogradation : toujours via le portail Stripe (switch de prix + proration auto), jamais annuler/re-souscrire.
       return <Button variant="ghost" className={cn(base, "text-muted-foreground hover:text-foreground")} onClick={openPortal} disabled={busy}>Downgrade</Button>
     }
+    // Upgrade : depuis FREE (aucun abonnement) → Checkout ; depuis un plan payant → portail (changement
+    // de prix avec proration, PAS un second abonnement facturé en double).
+    const upgrade = current === "FREE" ? () => checkout(p.key as SelfServe) : openPortal
     return (
       <Button
         variant={p.highlight ? "default" : "outline"}
         className={cn(base, "gap-1.5")}
-        onClick={() => checkout(p.key as SelfServe)}
+        onClick={upgrade}
         disabled={busy}
       >
         {busy ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />} Upgrade to {p.name}
