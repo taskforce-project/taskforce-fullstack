@@ -10,6 +10,11 @@
 >
 > Sources : `.ai/qa.md` (QA produit détaillée), `.ai/known-issues.md` (bugs vérifiés), `.ai/module-map.md` (domaines↔code), `.ai/architecture-map.md` (archi réelle), `.ai/P0-fix-plan.md` (correctifs P0 paste-ready).
 
+> **▶ MAJ 05/09/2026 - Sécu : tri des 26 alertes Dependabot + patch prioritaire (tiptap/dicebear).** `[Sécu]`
+> - **Tri (contexte réel, pas le compte brut)** : **0 alerte backend Java**. Les 26 = npm, **≈ 0 exploitable en prod** : (a) outillage **dev/build** (vitest « critique », vite, esbuild, @humanfs, postcss, sharp) → jamais dans le runtime déployé ; (b) **landing statique SSG** (tous les `astro` → pas de SSR à la requête) ; (c) `taskforce-mcp` **non déployé** (qs) ; (d) `@dicebear` appelé avec **seed seul** (options vulnérables `rotate`/`fontSize` jamais utilisées).
+> - **Seule vraie surface** : `@tiptap/core` (éditeur de contenu utilisateur). **Patché** : paquets `@tiptap/*` 3.22.2 → **3.31.3** (remonte `@tiptap/core` patché), `@dicebear/*` → **9.4.3** (frontend). tsc vert + `avatar.test` 12/12. Produit **v0.3.18**.
+> - **Reste (basse priorité, non exploitable)** : bumps outillage dev (frontend) + **Astro 7.x = upgrade majeur → lot dédié** ; sinon laisser Dependabot ouvrir les PR au fil de l'eau.
+>
 > **▶ MAJ 05/09/2026 - Backlog : « comm complète » avec les intégrations + MRR Stripe dans le Brain OS (chiffré).** `[TF-MCP-06 + TF-BRAIN-01]`
 > - **Contexte (question user)** : *connecter un outil ≠ ses données remontent*. Vérifié dans le code : la connexion générique (`ConnectorConnectionService`) **stocke juste la clé chiffrée** ; seuls **Plane (patron `sync`), GitHub/Slack (natif) et l'import MCP** alimentent le Brain OS aujourd'hui. cf. [[integration-connect-vs-ingest]].
 > - **`[TF-MCP-06]` Console d'actions MCP générique (~2-4 j, surtout front)** → **PROD-5.7**. Le backend expose déjà `GET /mcp/servers` (outils) + `POST /mcp/actions/execute` → il ne manque que l'écran pour lister/lancer un outil **hors Cortex** (donc **sans dépendre du cap Groq**). **Générique** = débloque « comm complète » avec Stripe **et les 25 MCP-ready et tout futur MCP** d'un coup. **Meilleur levier.**
