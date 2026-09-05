@@ -10,6 +10,10 @@
 >
 > Sources : `.ai/qa.md` (QA produit détaillée), `.ai/known-issues.md` (bugs vérifiés), `.ai/module-map.md` (domaines↔code), `.ai/architecture-map.md` (archi réelle), `.ai/P0-fix-plan.md` (correctifs P0 paste-ready).
 
+> **▶ MAJ 05/09/2026 - Cortex : alléger les schémas d'outils MCP → remonter le cap (6 → 20).** `[BE-agent]`
+> - **Suite du 413** : plutôt que rester bloqué à 6 outils, on **allège les schémas** envoyés au LLM. `AgentToolRegistry.toolDefinitions` tronque les `description`/`title` (160 car.), retire `examples`/`example`/`$schema`, borne les `enum` longs (20) - en gardant la structure utile (noms/types/required, qui seule sert au tool-calling). Les schémas MCP (Linear) portent des proses verbeuses → gros gain de payload à iso-fonction. Cap remonté **6 → 20** (`integrations.mcp.max-tools-per-request`, tunable). À valider en prod (si re-413 → baisser le cap).
+> - **Version** : back patch `0.0.9` → produit **v0.3.12**.
+>
 > **▶ MAJ 05/09/2026 - Cortex : plafond MCP baissé à 6 (25 encore 413) + fix RGPD invitations.** `[BE-agent + BE-gdpr]`
 > - **Suite du fix Groq 413** : le routage (v0.3.10) marche - log prod confirme **60 → 25 outils** avec **`linear__list_issues` priorisé en 1er** (la priorisation par recoupement du message est nickel). MAIS **25 restait trop gros** pour la limite de payload Groq (413 persistait, 2s après le log). Défaut baissé **25 → 6** (`integrations.mcp.max-tools-per-request`). Avec la priorisation, 6 outils couvrent la requête ; proche des 7 internes qui passaient déjà seuls. Reste tunable.
 > - **RGPD invitations** (gap de la revue (b)) : `GdprService.purgeAccount` efface désormais `workspace_invitations WHERE email = <email réel>` (seule PII résiduelle hors row anonymisé ; `invited_by`/`created_by` = id user, pas d'AuditorAware → pointent vers le tombstone). `GdprServiceTest` 5/5.
