@@ -32,6 +32,7 @@ import com.taskforce.tf_api.shared.security.HumanChallengeService;
 import com.nimbusds.jwt.JWTParser;
 
 import java.text.ParseException;
+import java.time.LocalDateTime;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -62,6 +63,10 @@ public class AuthService {
 
     @Value("${stripe.cancel-url}")
     private String stripeCancelUrl;
+
+    // Miroir du délai de grâce (GdprService) : expose la date de PURGE dans la réponse d'auth.
+    @Value("${taskforce.account.deletion-grace-days:30}")
+    private int graceDays;
 
     /**
      * Inscription d'un nouvel utilisateur
@@ -764,6 +769,9 @@ public class AuthService {
 
     private AuthResponse buildAuthResponse(User user, KeycloakTokenResponse kcToken,
                                            String firstName, String lastName) {
+        LocalDateTime purgeAt = user.getDeletionScheduledAt() == null
+            ? null
+            : user.getDeletionScheduledAt().plusDays(graceDays);
         UserResponse userResponse = UserResponse.builder()
             .id(user.getId())
             .keycloakId(user.getKeycloakId())
@@ -781,7 +789,7 @@ public class AuthService {
             .trialEndDate(user.getTrialEndDate())
             .isActive(user.getIsActive())
             .createdAt(user.getCreatedAt())
-            .deletionScheduledAt(user.getDeletionScheduledAt())
+            .scheduledPurgeAt(purgeAt)
             .build();
 
         return AuthResponse.builder()
