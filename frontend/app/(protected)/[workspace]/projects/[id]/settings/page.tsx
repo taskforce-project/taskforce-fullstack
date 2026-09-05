@@ -41,6 +41,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { BrandLogo } from "@/components/ui/brand-logo"
+import { ProjectIconPicker } from "@/components/ui/project-icon-picker"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { getErrorMessage } from "@/lib/api/client"
@@ -95,6 +96,7 @@ export default function ProjectSettingsPage() {
   const [description,   setDescription]   = useState("")
   const [status,        setStatus]        = useState<ProjectStatus>("ACTIVE")
   const [growthMode,    setGrowthMode]    = useState(false)
+  const [iconUrl,       setIconUrl]       = useState<string | null>(null)
 
   // Labels state
   const [newLabelName,  setNewLabelName]  = useState("")
@@ -117,6 +119,7 @@ export default function ProjectSettingsPage() {
       setDescription(activeProject.description ?? "")
       setStatus(activeProject.status)
       setGrowthMode(activeProject.growthMode)
+      setIconUrl(activeProject.iconUrl ?? null)
     }
   }, [activeProject])
 
@@ -136,7 +139,7 @@ export default function ProjectSettingsPage() {
   async function handleSaveGeneral(e: React.FormEvent) {
     e.preventDefault()
     setIsSaving(true)
-    const result = await updateProject(workspace, projectId, { name, description, status, growthMode })
+    const result = await updateProject(workspace, projectId, { name, description, status, growthMode, iconUrl: iconUrl ?? undefined })
     setIsSaving(false)
     if (result) {
       toast.success("Settings saved", { description: "Your changes have been applied." })
@@ -272,6 +275,10 @@ export default function ProjectSettingsPage() {
       <section>
         <SectionTitle icon={Settings} title="General" description="General project information" />
         <form onSubmit={handleSaveGeneral} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Icon</label>
+            <ProjectIconPicker value={iconUrl} onChange={setIconUrl} />
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-4">
             <div className="flex flex-col gap-1.5">
               <label htmlFor="project-name" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Project name</label>
