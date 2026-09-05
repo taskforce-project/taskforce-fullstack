@@ -10,6 +10,11 @@
 >
 > Sources : `.ai/qa.md` (QA produit détaillée), `.ai/known-issues.md` (bugs vérifiés), `.ai/module-map.md` (domaines↔code), `.ai/architecture-map.md` (archi réelle), `.ai/P0-fix-plan.md` (correctifs P0 paste-ready).
 
+> **▶ MAJ 05/09/2026 - Fix paiement : boucle infinie sur /payment/success + prix Business 16→19€.** `[FE-payment]`
+> - **Bug (constaté en test upgrade Business)** : la page de succès spammait « Payment successful » / « Verification error » en boucle. Cause : l'effet de vérification avait `refreshUser` (recréé à chaque rendu de l'`AuthProvider`, **non mémoïsé**) dans ses deps ; or l'effet **appelle** `refreshUser` → re-rendu → nouvelle référence → effet relancé → boucle infinie ; les « verification error » = appels en rafale **rate-limités**. Fix : garde par `useRef` (vérif **1×/session**) + `refreshUser` hors deps. Le plan reste appliqué par le webhook (verify n'est qu'une confirmation UI).
+> - **Prix Business** : affiché **16€ → 19€/mois** (aligné sur Stripe `price_1TubPf...`) dans `landing/PricingSection.tsx` + `app billing/page.tsx`. ⚠️ `priceAnnual: 13` (landing) laissé tel quel - à confirmer avec l'user (et vérifier si un prix annuel Stripe existe).
+> - **Version** : front patch `0.3.2` → produit **v0.3.6**.
+>
 > **▶ MAJ 05/09/2026 - Fix bandeau suppression : afficher la date de PURGE, pas le début de grâce.** `[FE-account-banner]`
 > - **Bug (trouvé par E2E sur la prod, corrélé DB)** : le bandeau de restauration affichait `deletion_scheduled_at` **brut** (= début de grâce, ~aujourd'hui) comme date de suppression, alors que la purge réelle est à **+30 j**. Le toast (réponse du DELETE) affichait, lui, la bonne date → incohérence anxiogène (« supprimé aujourd'hui » vs « le mois prochain »).
 > - **Fix** : `/users/me` (`UserResponse` + mappings `UserService`/`AuthService`) expose désormais **`scheduledPurgeAt`** = `deletion_scheduled_at + graceDays` (même clé ET même valeur que `DELETE /api/gdpr/account`). `graceDays` injecté (`@Value`) dans les 2 services. Front : `AuthUser.scheduledPurgeAt`, bandeau branché dessus. La colonne DB **reste inchangée** (début de grâce) : seule l'exposition calcule la date de purge.
