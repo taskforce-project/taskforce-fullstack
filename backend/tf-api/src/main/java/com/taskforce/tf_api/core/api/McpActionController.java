@@ -78,6 +78,17 @@ public class McpActionController {
         return ResponseEntity.ok(ApiResponse.success(workspaceMcp.serverStatuses(ws.getId())));
     }
 
+    /** Outils (schéma d'arguments inclus) d'un serveur MCP connecté — alimente la console d'actions (TF-MCP-06). */
+    @GetMapping("/servers/{connectorKey}/tools")
+    public ResponseEntity<ApiResponse<List<WorkspaceMcpService.McpToolInfo>>> serverTools(
+        @PathVariable String slug,
+        @PathVariable String connectorKey,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        Workspace ws = authorizeIntegrations(slug, jwt);
+        return ResponseEntity.ok(ApiResponse.success(workspaceMcp.serverTools(ws.getId(), connectorKey)));
+    }
+
     /** Connecte (ou reconfigure) un serveur MCP externe sur le workspace ; renvoie le statut frais. */
     @PostMapping("/servers")
     public ResponseEntity<ApiResponse<List<WorkspaceMcpService.McpServerStatus>>> connect(

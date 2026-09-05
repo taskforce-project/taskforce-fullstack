@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo } from "react"
-import { Info, Loader2, ExternalLink, Check, Plug, Search, ChevronLeft, Globe, BookOpen, Server, Wrench, AlertTriangle } from "lucide-react"
+import { Info, Loader2, ExternalLink, Check, Plug, Search, ChevronLeft, Globe, BookOpen, Server, Wrench, AlertTriangle, Terminal } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -22,6 +22,7 @@ import {
   getMcpServers, connectMcpServer, disconnectMcpServer, startMcpOAuth,
   type IntegrationCatalog, type ConnectorView, type PlaneProject, type PlaneStatus, type McpServerStatus,
 } from "@/lib/api/integration-service"
+import { McpActionConsole } from "@/components/integrations/mcp-action-console"
 
 const CAP_LABEL: Record<string, string> = { observe: "Observe", act: "Act", metrics: "Metrics", recommend: "Components", mcp: "MCP" }
 const CAP_DESC: Record<string, string> = {
@@ -449,6 +450,8 @@ function ConnectorDialog({
   const [mcpToken, setMcpToken] = useState("")
   const [mcpStatus, setMcpStatus] = useState<McpServerStatus | null>(null)
   const [mcpBusy, setMcpBusy] = useState(false)
+  // Console d'actions (TF-MCP-06) : dépliée sous le statut d'un serveur MCP joignable.
+  const [showConsole, setShowConsole] = useState(false)
 
   const loadConnected = useCallback(async () => {
     if (!isPlane) return
@@ -571,7 +574,7 @@ function ConnectorDialog({
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className={cn("sm:max-w-md", showConsole && "sm:max-w-2xl")}>
         <DialogHeader>
           <DialogTitle>{tool.name}</DialogTitle>
         </DialogHeader>
@@ -608,18 +611,27 @@ function ConnectorDialog({
             {mcpStatus ? (
               <>
                 {mcpStatus.reachable ? (
-                  <div className="flex flex-col gap-2 rounded-md border border-emerald-500/25 bg-emerald-500/10 p-3 text-xs text-emerald-600 dark:text-emerald-400">
-                    <span className="inline-flex items-center gap-1.5 font-medium">
-                      <Check className="size-4 shrink-0" /> Connected - {mcpStatus.tools.length} tool(s) live in Cortex
-                    </span>
-                    {mcpStatus.tools.length > 0 && (
+                  <div className="flex flex-col gap-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-emerald-500/25 bg-emerald-500/10 p-3 text-xs text-emerald-600 dark:text-emerald-400">
+                      <span className="inline-flex items-center gap-1.5 font-medium">
+                        <Check className="size-4 shrink-0" /> Connected - {mcpStatus.tools.length} tool(s) available
+                      </span>
+                      {mcpStatus.tools.length > 0 && (
+                        <Button variant="outline" size="sm" className="h-7 gap-1.5 text-[11px]" onClick={() => setShowConsole((v) => !v)}>
+                          <Terminal className="size-3" /> {showConsole ? "Hide actions" : "Run an action"}
+                        </Button>
+                      )}
+                    </div>
+                    {showConsole ? (
+                      <McpActionConsole slug={slug} connectorKey={tool.key} connectorName={tool.name} />
+                    ) : mcpStatus.tools.length > 0 && (
                       <div className="flex flex-wrap gap-1">
                         {mcpStatus.tools.slice(0, 8).map((t) => (
-                          <span key={t} className="inline-flex items-center gap-1 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[11px]">
+                          <span key={t} className="inline-flex items-center gap-1 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[11px] text-emerald-600 dark:text-emerald-400">
                             <Wrench className="size-3" /> {t}
                           </span>
                         ))}
-                        {mcpStatus.tools.length > 8 && <span className="text-[11px]">+{mcpStatus.tools.length - 8} more</span>}
+                        {mcpStatus.tools.length > 8 && <span className="self-center text-[11px] text-muted-foreground">+{mcpStatus.tools.length - 8} more</span>}
                       </div>
                     )}
                   </div>
