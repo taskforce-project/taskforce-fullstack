@@ -10,6 +10,10 @@
 >
 > Sources : `.ai/qa.md` (QA produit détaillée), `.ai/known-issues.md` (bugs vérifiés), `.ai/module-map.md` (domaines↔code), `.ai/architecture-map.md` (archi réelle), `.ai/P0-fix-plan.md` (correctifs P0 paste-ready).
 
+> **▶ MAJ 05/09/2026 - ai-service : repli dichotomique sur les outils (Groq 4xx) → Cortex résilient, cap MCP tenu à 20.** `[AI-service]`
+> - **Diagnostic (test live)** : le trim a réglé le **413** (payload), MAIS Groq renvoyait ensuite **400** avec 20 outils Linear. Isolé : **PAS une limite de nombre** (Groq accepte 40 outils factices → 200) ni un construct courant (type-array/format/$ref/oneOf/anyOf/additionalProperties → tous 200). C'est donc **un schéma d'outil Linear précis** que Groq refuse - obscur à identifier à la main.
+> - **Fix robuste** : `ollama_gateway.chat` (ai-service) **ré-essaie avec moitié moins d'outils** (tronqués par la fin → garde le préfixe priorisé côté backend) sur `400`/`413`, jusqu'à succès ou zéro outil. Écarte l'outil fautif ET protège contre n'importe quel serveur MCP foireux. Le cap reste à **20** (le repli gère l'excès/les schémas invalides). Syntaxe validée (ast.parse dans le conteneur).
+>
 > **▶ MAJ 05/09/2026 - Cortex : alléger les schémas d'outils MCP → remonter le cap (6 → 20).** `[BE-agent]`
 > - **Suite du 413** : plutôt que rester bloqué à 6 outils, on **allège les schémas** envoyés au LLM. `AgentToolRegistry.toolDefinitions` tronque les `description`/`title` (160 car.), retire `examples`/`example`/`$schema`, borne les `enum` longs (20) - en gardant la structure utile (noms/types/required, qui seule sert au tool-calling). Les schémas MCP (Linear) portent des proses verbeuses → gros gain de payload à iso-fonction. Cap remonté **6 → 20** (`integrations.mcp.max-tools-per-request`, tunable). À valider en prod (si re-413 → baisser le cap).
 > - **Version** : back patch `0.0.9` → produit **v0.3.12**.

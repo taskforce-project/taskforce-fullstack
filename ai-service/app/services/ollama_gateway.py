@@ -146,27 +146,49 @@ class OllamaGateway:
         }
         if json_mode:
             body["response_format"] = {"type": "json_object"}
-        if tools:
-            body["tools"] = tools
-            body["tool_choice"] = "auto"
-
         # User-Agent applicatif OBLIGATOIRE : Groq est derrière Cloudflare, qui renvoie 403 aux
         # requêtes dont l'UA est `Python-urllib/x.y` (défaut urllib). Sans lui, tout appel Groq échoue.
         headers = {"Content-Type": "application/json", "User-Agent": "TaskForce-AI/1.0"}
         if self._api_key:                                  # Groq exige le Bearer ; Ollama local n'en a pas
             headers["Authorization"] = f"Bearer {self._api_key}"
-        request = urllib.request.Request(
-            self._chat_url,
-            data=json.dumps(body).encode("utf-8"),
-            headers=headers,
-            method="POST",
-        )
-        try:
-            with urllib.request.urlopen(request, timeout=self._timeout_s) as response:
-                payload = json.loads(response.read().decode("utf-8"))
-        except (urllib.error.URLError, TimeoutError) as exc:
-            logger.error("LLM chat injoignable — provider=%s (%s): %s", self.provider, self._chat_url, exc)
-            raise OllamaGatewayError(f"LLM ({self.provider}) indisponible: {exc}") from exc
+
+        # Repli sur les outils : un serveur MCP riche (Linear) peut faire dépasser la limite de payload
+        # du provider (Groq → 413) OU exposer un schéma d'outil que Groq refuse (400). Plutôt que
+        # d'échouer, on ré-essaie avec MOINS d'outils (dichotomie, tronqués par la fin) jusqu'à ce que ça
+        # passe. Les outils sont déjà priorisés côté backend (les plus pertinents d'abord) → on garde le
+        # préfixe utile. Rend Cortex résilient à n'importe quel serveur MCP.
+        attempt_tools = list(tools) if tools else None
+        payload = None
+        while True:
+            if attempt_tools:
+                body["tools"] = attempt_tools
+                body["tool_choice"] = "auto"
+            else:
+                body.pop("tools", None)
+                body.pop("tool_choice", None)
+            request = urllib.request.Request(
+                self._chat_url,
+                data=json.dumps(body).encode("utf-8"),
+                headers=headers,
+                method="POST",
+            )
+            try:
+                with urllib.request.urlopen(request, timeout=self._timeout_s) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+                break
+            except urllib.error.HTTPError as exc:
+                if exc.code in (400, 413) and attempt_tools:
+                    keep = len(attempt_tools) // 2
+                    logger.warning(
+                        "Groq %s avec %d outil(s) → retry avec %d (payload/schéma d'outil rejeté)",
+                        exc.code, len(attempt_tools), keep)
+                    attempt_tools = attempt_tools[:keep] if keep > 0 else None
+                    continue
+                logger.error("LLM chat injoignable — provider=%s (%s): %s", self.provider, self._chat_url, exc)
+                raise OllamaGatewayError(f"LLM ({self.provider}) indisponible: {exc}") from exc
+            except (urllib.error.URLError, TimeoutError) as exc:
+                logger.error("LLM chat injoignable — provider=%s (%s): %s", self.provider, self._chat_url, exc)
+                raise OllamaGatewayError(f"LLM ({self.provider}) indisponible: {exc}") from exc
 
         choices = payload.get("choices") or []
         if not choices:
