@@ -10,6 +10,11 @@
 >
 > Sources : `.ai/qa.md` (QA produit détaillée), `.ai/known-issues.md` (bugs vérifiés), `.ai/module-map.md` (domaines↔code), `.ai/architecture-map.md` (archi réelle), `.ai/P0-fix-plan.md` (correctifs P0 paste-ready).
 
+> **▶ MAJ 05/09/2026 - Fix downgrade (portail Stripe lisait la mauvaise table) + icône de projet éditable.** `[BE-billing + FE-project]`
+> - **Bug downgrade (constaté prod, corrélé DB)** : « Downgrade/Manage » renvoyait « Aucun abonnement à gérer (plan gratuit) » alors que le compte est **BUSINESS ACTIVE**. Cause : `/api/billing/portal` **et** `/checkout` lisaient `stripe_customer_id` depuis la table `subscriptions` (**0 ligne** même pour un payant) au lieu de `users` (remplie par le webhook). DB user 29 : `users.stripe_customer_id=cus_VCfxL...` mais `subscriptions`=0. Fix : les deux sourcent `user.getStripeCustomerId()` (garde `cus_seed_*`). Bonus : le checkout ne crée plus de **client Stripe en double** à chaque paiement. Code mort retiré (`SubscriptionRepository` + imports). → downgrade + **proration** via le portail OK.
+> - **Icône de projet éditable** : le `ProjectIconPicker` n'était atteignable que depuis la liste (menu `...` → Edit) ; ajouté dans **Settings du projet** (section General), branché sur `updateProject({iconUrl})`.
+> - **Version** : back patch `0.0.5` + front patch `0.3.3` → produit **v0.3.8**.
+>
 > **▶ MAJ 05/09/2026 - Fix paiement : boucle infinie sur /payment/success + prix Business 16→19€.** `[FE-payment]`
 > - **Bug (constaté en test upgrade Business)** : la page de succès spammait « Payment successful » / « Verification error » en boucle. Cause : l'effet de vérification avait `refreshUser` (recréé à chaque rendu de l'`AuthProvider`, **non mémoïsé**) dans ses deps ; or l'effet **appelle** `refreshUser` → re-rendu → nouvelle référence → effet relancé → boucle infinie ; les « verification error » = appels en rafale **rate-limités**. Fix : garde par `useRef` (vérif **1×/session**) + `refreshUser` hors deps. Le plan reste appliqué par le webhook (verify n'est qu'une confirmation UI).
 > - **Prix Business** : **16€ → 19€/mois** (aligné sur Stripe `price_1TubPf...`) dans `landing/PricingSection.tsx` + `app billing/page.tsx`. `priceAnnual` **13 → 19** aussi (user : « c'est 19 en business », et Stripe n'a qu'un prix mensuel 19€, pas de prix annuel remisé).
