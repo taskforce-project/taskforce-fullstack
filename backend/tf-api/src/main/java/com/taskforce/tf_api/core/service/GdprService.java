@@ -204,6 +204,10 @@ public class GdprService {
         jdbcTemplate.update("DELETE FROM workspace_members WHERE user_id = ?", userId);      // appartenances (dont workspaces transférés)
         jdbcTemplate.update("DELETE FROM member_skill_profiles WHERE user_id = ?", userId);
         jdbcTemplate.update("DELETE FROM user_two_factor WHERE user_id = ?", userId);        // secret 2FA (TOTP)
+        // Invitations REÇUES : la colonne `email` de workspace_invitations garde l'email de l'utilisateur
+        // (PII non couverte par l'anonymisation du row). On l'efface tant que u.getEmail() est réel. Les FK
+        // invited_by/created_by portent l'id user (pas d'AuditorAware) → pointent vers le tombstone, pas de PII.
+        jdbcTemplate.update("DELETE FROM workspace_invitations WHERE email = ?", u.getEmail());
 
         // Anonymiser le row résiduel (tombstone) : gardé UNIQUEMENT pour l'intégrité référentielle des
         // contenus laissés ailleurs (issues, commentaires) ; plus aucune donnée perso, accès coupé.
