@@ -228,6 +228,7 @@ class AgentServiceTest {
         org.springframework.test.util.ReflectionTestUtils.setField(service, "model", "m");
         org.springframework.test.util.ReflectionTestUtils.setField(service, "confirmExternalWrites", true);
         org.springframework.test.util.ReflectionTestUtils.setField(service, "mcpToolTier", "fast");
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "maxExternalTools", 20);
         when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
         when(groq.isConfigured()).thenReturn(true);
 
@@ -267,6 +268,7 @@ class AgentServiceTest {
         stubWorkspace();
         org.springframework.test.util.ReflectionTestUtils.setField(service, "model", "m");
         org.springframework.test.util.ReflectionTestUtils.setField(service, "mcpToolTier", "fast");
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "maxExternalTools", 20);
         when(search.retrieveRelevant(anyLong(), anyString(), anyInt())).thenReturn(List.of());
         when(groq.isConfigured()).thenReturn(true);
 

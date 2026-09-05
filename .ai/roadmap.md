@@ -10,6 +10,12 @@
 >
 > Sources : `.ai/qa.md` (QA produit détaillée), `.ai/known-issues.md` (bugs vérifiés), `.ai/module-map.md` (domaines↔code), `.ai/architecture-map.md` (archi réelle), `.ai/P0-fix-plan.md` (correctifs P0 paste-ready).
 
+> **▶ MAJ 05/09/2026 - Cortex : outils MCP externes DÉSACTIVÉS par défaut (cap 0) - contrainte Groq free tier 8000 TPM.** `[BE-agent]`
+> - **Cause racine** (corps d'erreur Groq capturé) : le tier gratuit `on_demand` plafonne à **~8000 tokens/MINUTE (TPM)**. Une requête Cortex (contexte Brain OS + schémas d'outils MCP) dépasse → 413/400, et le budget par minute est vite épuisé. C'est LA cause de tous les plantages Cortex+MCP (ni le nombre d'outils - Groq prend 40 outils factices - ni un schéma).
+> - **Investigation modèles (demande user)** : aucun modèle du compte ne combine tool-calling ET TPM > 8000. `gpt-oss-120b/20b`=8000, `qwen3.6/3.8-27b`=7000 (pire), `groq/compound`=**30000 MAIS** « tool calling is not supported with this model ». Impasse.
+> - **Décision** : `integrations.mcp.max-tools-per-request` **= 0** (outils MCP externes off ; garde `<=0 → List.of()` ajouté). Les outils **internes** TaskForce restent actifs. Trim + retry dichotomique conservés (utiles si réactivation). À remonter après passage **Groq Dev Tier**.
+> - **Version** : back patch `0.0.10` → produit **v0.3.13**.
+>
 > **▶ MAJ 05/09/2026 - ai-service : repli dichotomique sur les outils (Groq 4xx) → Cortex résilient, cap MCP tenu à 20.** `[AI-service]`
 > - **Diagnostic (test live)** : le trim a réglé le **413** (payload), MAIS Groq renvoyait ensuite **400** avec 20 outils Linear. Isolé : **PAS une limite de nombre** (Groq accepte 40 outils factices → 200) ni un construct courant (type-array/format/$ref/oneOf/anyOf/additionalProperties → tous 200). C'est donc **un schéma d'outil Linear précis** que Groq refuse - obscur à identifier à la main.
 > - **Fix robuste** : `ollama_gateway.chat` (ai-service) **ré-essaie avec moitié moins d'outils** (tronqués par la fin → garde le préfixe priorisé côté backend) sur `400`/`413`, jusqu'à succès ou zéro outil. Écarte l'outil fautif ET protège contre n'importe quel serveur MCP foireux. Le cap reste à **20** (le repli gère l'excès/les schémas invalides). Syntaxe validée (ast.parse dans le conteneur).
