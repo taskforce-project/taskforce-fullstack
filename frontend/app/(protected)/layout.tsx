@@ -9,6 +9,7 @@ import { AppShell } from "@/components/layout/app-shell"
 import { LabShell } from "@/components/layout/lab-shell"
 import { LoginIntro } from "@/components/layout/login-intro"
 import { TwoFactorNudge } from "@/components/security/two-factor-nudge"
+import { AccountDeletionBanner } from "@/components/account/account-deletion-banner"
 
 export default function ProtectedLayout({
   children,
@@ -77,6 +78,8 @@ export default function ProtectedLayout({
           </LabShell>
           {/* Nudge sécurité 2FA (best-effort, une fois par session) - ne rend rien, déclenche un toast. */}
           <TwoFactorNudge />
+          {/* Bandeau de restauration (barre fixe basse) tant que le compte est planifié pour suppression. */}
+          <AccountDeletionBanner />
         </>
       )}
 

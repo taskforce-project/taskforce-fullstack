@@ -37,6 +37,9 @@ interface DeleteConfirmDialogProps {
   /** Libellé au-dessus du champ de saisie (défaut générique). Nœud React : accepte du texte enrichi
    *  (ex. l'email en gras à ressaisir), comme le défaut interne. */
   readonly confirmTextLabel?: React.ReactNode
+  /** Bloc optionnel de conséquences détaillées, rendu sous la description (ex. liste à puces). La
+   *  description reste un simple `<p>` : ce slot accueille le contenu structuré (listes, etc.). */
+  readonly details?: React.ReactNode
   /** Mode contrôlé (ex. déclenché depuis un menu) - si fourni, le trigger interne est optionnel. */
   readonly open?: boolean
   readonly onOpenChange?: (open: boolean) => void
@@ -55,6 +58,7 @@ export function DeleteConfirmDialog({
   variant = "danger",
   confirmText,
   confirmTextLabel,
+  details,
   open: controlledOpen,
   onOpenChange: controlledOnOpenChange,
 }: DeleteConfirmDialogProps) {
@@ -106,6 +110,8 @@ export function DeleteConfirmDialog({
           </div>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
+
+        {details && <div className="text-xs text-muted-foreground">{details}</div>}
 
         {gated && (
           <div className="flex flex-col gap-1.5">
