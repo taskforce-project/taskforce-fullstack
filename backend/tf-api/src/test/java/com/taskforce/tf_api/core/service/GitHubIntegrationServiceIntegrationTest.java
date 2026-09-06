@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.client.RestTemplate;
 
+import com.taskforce.tf_api.core.service.brain.BrainSearchService;
 import com.taskforce.tf_api.core.dto.request.GitHubLinkRequest;
 import com.taskforce.tf_api.core.enums.IssueStatusCategory;
 import com.taskforce.tf_api.core.model.Issue;
@@ -43,6 +44,9 @@ class GitHubIntegrationServiceIntegrationTest extends AbstractIntegrationTest {
     @Autowired private com.taskforce.tf_api.core.repository.IntegrationRepository integrationRepository;
     @Autowired private com.taskforce.tf_api.core.repository.OAuthStateRepository oauthStateRepository;
     @MockitoBean private RestTemplate restTemplate;
+    // Collaborateurs Brain OS de sync() : non exerces ici, juste requis pour cabler le contexte.
+    @MockitoBean private KnowledgeService knowledgeService;
+    @MockitoBean private BrainSearchService brainSearch;
 
     private static final String SLUG = "ws-gh-it";
     private User owner;

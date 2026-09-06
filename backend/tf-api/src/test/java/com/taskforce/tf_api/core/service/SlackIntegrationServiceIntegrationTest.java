@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.client.RestTemplate;
 
+import com.taskforce.tf_api.core.service.brain.BrainSearchService;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.UserRepository;
@@ -31,6 +32,9 @@ class SlackIntegrationServiceIntegrationTest extends AbstractIntegrationTest {
     @Autowired private com.taskforce.tf_api.core.repository.IntegrationRepository integrationRepository;
     @Autowired private com.taskforce.tf_api.core.repository.OAuthStateRepository oauthStateRepository;
     @MockitoBean private RestTemplate restTemplate;
+    // Collaborateurs Brain OS de sync() : non exerces ici, juste requis pour cabler le contexte.
+    @MockitoBean private KnowledgeService knowledgeService;
+    @MockitoBean private BrainSearchService brainSearch;
 
     private static final String SLUG = "ws-slack-it";
     private User owner;

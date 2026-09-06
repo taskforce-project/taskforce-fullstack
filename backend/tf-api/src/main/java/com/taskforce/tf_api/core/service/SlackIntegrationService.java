@@ -8,12 +8,14 @@ import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -26,20 +28,25 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
+import com.taskforce.tf_api.core.dto.request.CreateKnowledgeNodeRequest;
 import com.taskforce.tf_api.core.dto.request.SlackChannelRequest;
 import com.taskforce.tf_api.core.dto.response.IntegrationStatusResponse;
 import com.taskforce.tf_api.core.dto.response.SlackChannelResponse;
 import com.taskforce.tf_api.core.dto.response.SlackHistoryMessage;
+import com.taskforce.tf_api.core.dto.response.SlackSyncResponse;
 import com.taskforce.tf_api.core.enums.IntegrationProvider;
 import com.taskforce.tf_api.core.model.Integration;
+import com.taskforce.tf_api.core.model.KnowledgeNode;
 import com.taskforce.tf_api.core.model.OAuthState;
 import com.taskforce.tf_api.core.model.SlackChannel;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.IntegrationRepository;
+import com.taskforce.tf_api.core.repository.KnowledgeNodeRepository;
 import com.taskforce.tf_api.core.repository.OAuthStateRepository;
 import com.taskforce.tf_api.core.repository.SlackChannelRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.service.brain.BrainSearchService;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
@@ -73,8 +80,20 @@ public class SlackIntegrationService {
     private final OAuthStateRepository   oauthStateRepository;
     private final RestTemplate           restTemplate;
 
+    // Ingestion Brain OS (meme patron que PlaneIntegrationService).
+    private final KnowledgeService        knowledgeService;
+    private final KnowledgeNodeRepository nodeRepository;
+    private final BrainSearchService      brainSearch;
+    private final JdbcTemplate            jdbcTemplate;
+
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final int STATE_TTL_MINUTES = 10;
+    /** Marqueur de provenance dans {@code metadata.source} (cle de deduplication cote Brain OS). */
+    private static final String SOURCE = "slack";
+    /** Longueur minimale (texte nettoye) pour ingerer un message : filtre le bruit (« ok », « +1 »). */
+    private static final int MIN_MESSAGE_LEN = 4;
+    /** Borne de securite sur le contenu ingere. */
+    private static final int MAX_BODY = 6000;
 
     /** Cache des noms d'utilisateurs Slack résolus (clé : {@code workspaceId:slackUserId}). */
     private final Map<String, String> slackUserNameCache = new java.util.concurrent.ConcurrentHashMap<>();
@@ -313,6 +332,108 @@ public class SlackIntegrationService {
         }
         slackUserNameCache.put(cacheKey, name);
         return name;
+    }
+
+    /**
+     * Synchronise l'historique d'un canal Slack vers le Brain OS.
+     *
+     * <p>Recycle les lecteurs {@link #fetchHistory}/{@link #resolveUserName} : chaque message devient
+     * un node de connaissance dedupe par {@code metadata.externalId} (= {@code canal:ts}) puis embedde.
+     * Lecture seule cote Slack. Meme patron que {@link PlaneIntegrationService#sync}. On ecarte le bruit
+     * ultra-court ; la deduplication rend l'operation idempotente (re-sync = seuls les nouveaux messages).
+     */
+    @Transactional
+    public SlackSyncResponse sync(String workspaceSlug, Long userId, String slackChannelId) {
+        Workspace workspace = workspaceRepository.findBySlug(workspaceSlug)
+            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found: " + workspaceSlug));
+        Long workspaceId = workspace.getId();
+        String channelName = resolveChannelName(workspaceId, slackChannelId);
+
+        List<SlackHistoryMessage> messages = fetchHistory(workspaceId, slackChannelId, null);
+        Map<String, Long> existing = existingSlackNodes(workspaceId);
+        int created = 0, updated = 0;
+        for (SlackHistoryMessage msg : messages) {
+            if (msg.text() == null || msg.text().strip().length() < MIN_MESSAGE_LEN) continue;
+            String externalId = slackChannelId + ":" + msg.ts();
+            String author = resolveUserName(workspaceId, msg.userId());
+            String title = truncate("[Slack] " + author + " · " + snippet(msg.text()), 300);
+            String content = buildMessageContent(channelName, author, msg);
+            Map<String, Object> metadata = messageMetadata(slackChannelId, channelName, msg, author);
+
+            Long nodeId = existing.get(externalId);
+            if (nodeId != null) {
+                KnowledgeNode node = nodeRepository.findById(nodeId).orElse(null);
+                if (node != null) {
+                    node.setTitle(title);
+                    node.setContent(content);
+                    node.setMetadata(metadata);
+                    node.setUpdatedBy(String.valueOf(userId));
+                    nodeRepository.save(node);
+                    brainSearch.embedNode(node);
+                    updated++;
+                }
+            } else {
+                CreateKnowledgeNodeRequest req = CreateKnowledgeNodeRequest.builder()
+                    .type("NOTE")
+                    .domain("HISTORIQUE")
+                    .title(title)
+                    .content(content)
+                    .tags(List.of("slack", "external"))
+                    .metadata(metadata)
+                    .build();
+                knowledgeService.createNode(workspaceSlug, userId, req); // embed + link-sync inclus
+                created++;
+            }
+        }
+        log.info("Sync Slack workspace {} canal {} : {} crees, {} MAJ ({} messages)",
+            workspaceId, slackChannelId, created, updated, messages.size());
+        return new SlackSyncResponse(created, updated, messages.size());
+    }
+
+    /** Nom lisible du canal si configure (table slack_channels), sinon l'id Slack brut. */
+    private String resolveChannelName(Long workspaceId, String slackChannelId) {
+        return slackChannelRepository.findByWorkspaceIdOrderByCreatedAtDesc(workspaceId).stream()
+            .filter(c -> slackChannelId.equals(c.getChannelId()))
+            .map(SlackChannel::getChannelName)
+            .findFirst()
+            .orElse(slackChannelId);
+    }
+
+    private Map<String, Long> existingSlackNodes(Long workspaceId) {
+        Map<String, Long> map = new HashMap<>();
+        jdbcTemplate.query(
+            "SELECT id, metadata->>'externalId' AS ext FROM knowledge_nodes "
+            + "WHERE workspace_id = ? AND metadata->>'source' = ?",
+            rs -> { map.put(rs.getString("ext"), rs.getLong("id")); },
+            workspaceId, SOURCE);
+        return map;
+    }
+
+    private String buildMessageContent(String channelName, String author, SlackHistoryMessage msg) {
+        return truncate(msg.text().strip(), MAX_BODY)
+            + "\n\n> Slack · #" + channelName + " · " + author;
+    }
+
+    private Map<String, Object> messageMetadata(
+        String slackChannelId, String channelName, SlackHistoryMessage msg, String author) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("source", SOURCE);
+        m.put("externalId", slackChannelId + ":" + msg.ts());
+        m.put("channelId", slackChannelId);
+        m.put("channelName", channelName);
+        m.put("ts", msg.ts());
+        if (author != null) m.put("author", author);
+        return m;
+    }
+
+    /** Extrait court (une ligne) pour le titre du node. */
+    private String snippet(String text) {
+        String flat = text.strip().replaceAll("\\s+", " ");
+        return flat.length() > 80 ? flat.substring(0, 80) + "..." : flat;
+    }
+
+    private String truncate(String s, int max) {
+        return s != null && s.length() > max ? s.substring(0, max) : s;
     }
 
     private String requireToken(Long workspaceId) {

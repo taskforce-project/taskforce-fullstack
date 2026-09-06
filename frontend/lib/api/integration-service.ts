@@ -125,6 +125,19 @@ export async function getGitHubRepoIssues(slug: string, repo: string): Promise<G
   return res.data.data;
 }
 
+/** Résultat d'une ingestion vers le Brain OS (GitHub/Slack) : items créés / mis à jour / total lus. */
+export interface BrainSyncResult {
+  created: number;
+  updated: number;
+  total: number;
+}
+
+/** Ingère les issues + PR d'un dépôt GitHub dans le Brain OS (dédupe, embedde). */
+export async function syncGitHub(slug: string, repo: string): Promise<BrainSyncResult> {
+  const res = await apiClient.post<{ data: BrainSyncResult }>(INTEGRATION_ROUTES.GITHUB_SYNC(slug, repo));
+  return res.data.data;
+}
+
 export async function getGitHubLinks(slug: string, issueId: number): Promise<GitHubLink[]> {
   const res = await apiClient.get<{ data: GitHubLink[] }>(INTEGRATION_ROUTES.GITHUB_LINKS(slug, issueId));
   return res.data.data;
@@ -180,6 +193,12 @@ export async function addSlackChannel(slug: string, payload: SlackChannelPayload
 
 export async function deleteSlackChannel(slug: string, channelId: number): Promise<void> {
   await apiClient.delete(INTEGRATION_ROUTES.SLACK_CHANNEL(slug, channelId));
+}
+
+/** Ingère l'historique d'un canal Slack dans le Brain OS (dédupe, embedde). */
+export async function syncSlack(slug: string, channel: string): Promise<BrainSyncResult> {
+  const res = await apiClient.post<{ data: BrainSyncResult }>(INTEGRATION_ROUTES.SLACK_SYNC(slug, channel));
+  return res.data.data;
 }
 
 // ---------------------------------------------------------------------------

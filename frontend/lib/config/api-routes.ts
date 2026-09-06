@@ -376,6 +376,8 @@ export const INTEGRATION_ROUTES = {
   GITHUB_STATUS:     (slug: string) => `/api/workspaces/${slug}/integrations/github/status`,
   GITHUB_REPOS:      (slug: string) => `/api/workspaces/${slug}/integrations/github/repos`,
   GITHUB_ISSUES:     (slug: string, repo: string) => `/api/workspaces/${slug}/integrations/github/issues?repo=${encodeURIComponent(repo)}`,
+  /** Ingestion Brain OS : issues + PR d'un depot -> nodes de connaissance */
+  GITHUB_SYNC:       (slug: string, repo: string) => `/api/workspaces/${slug}/integrations/github/sync?repo=${encodeURIComponent(repo)}`,
   GITHUB_CONNECT:    (slug: string) => `${API_BASE}/api/workspaces/${slug}/integrations/github/connect`,
   GITHUB_DISCONNECT: (slug: string) => `/api/workspaces/${slug}/integrations/github`,
   GITHUB_LINKS:      (slug: string, issueId: number) => `/api/workspaces/${slug}/integrations/github/issues/${issueId}/links`,
@@ -385,6 +387,8 @@ export const INTEGRATION_ROUTES = {
   SLACK_DISCONNECT:  (slug: string) => `/api/workspaces/${slug}/integrations/slack`,
   SLACK_CHANNELS:    (slug: string) => `/api/workspaces/${slug}/integrations/slack/channels`,
   SLACK_CHANNEL:     (slug: string, channelId: number) => `/api/workspaces/${slug}/integrations/slack/channels/${channelId}`,
+  /** Ingestion Brain OS : historique d'un canal -> nodes de connaissance */
+  SLACK_SYNC:        (slug: string, channel: string) => `/api/workspaces/${slug}/integrations/slack/sync?channel=${encodeURIComponent(channel)}`,
   WEBHOOKS:          (slug: string) => `/api/workspaces/${slug}/webhooks`,
   WEBHOOK:           (slug: string, id: number) => `/api/workspaces/${slug}/webhooks/${id}`,
   /** Catalogue générique : le pool d'outils + statut de connexion */
