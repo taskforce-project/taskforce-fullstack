@@ -10,6 +10,10 @@
 >
 > Sources : `.ai/qa.md` (QA produit détaillée), `.ai/known-issues.md` (bugs vérifiés), `.ai/module-map.md` (domaines↔code), `.ai/architecture-map.md` (archi réelle), `.ai/P0-fix-plan.md` (correctifs P0 paste-ready).
 
+> **▶ MAJ 06/09/2026 - Fix : écran workspace `/{ws}/issues` réparé (actions mortes + statut fantôme).** `[FE-issues]`
+> - Décision de la revue d'état des lieux : **RÉPARER** (vue cross-projets utile, distincte du board/My Queue). **« Edit »** ouvre l'issue (deep-link board `?issue=<id>` → sheet d'édition) + la row entière est cliquable (a11y : role/tabIndex/Enter, `stopPropagation` sur le menu). **« Assign to me »** assigne à l'utilisateur courant (`updateIssue { assigneeId }` + reflet optimiste dans la liste + toast). Statut **`in_review` retiré** (le mapping API `BACKLOG/UNSTARTED/STARTED/COMPLETED/CANCELLED` ne le produisait jamais → section toujours vide) : type + config + ordre + icône `Clock` inutile. tsc + eslint verts.
+> - **Version** : front patch `0.3.7` → produit **v0.3.20**.
+>
 > **▶ MAJ 06/09/2026 - Perf : cache des insights IA générés (coupe coût/latence LLM). PROD-6.6.** `[BE-analytics]`
 > - `AnalyticsService.generateInsights` mis en cache (`@Cacheable "ai-insights"`, clé `(slug,userId)`, TTL Redis partagé **5 min**). `unless` : on ne cache **QUE** le succès (`mode=generated`) — jamais le mur payant (`upgrade`) ni le repli sur erreur (`fallback`), sinon un plan upgradé ou une panne LLM transitoire resterait figé le TTL. Autz en amont (`WorkspaceAccessInterceptor`) + clé par utilisateur → aucun contournement d'accès (même garantie que `getKpis`).
 > - Sérialiseur de cache = **JSON** (Boot 4, prouvé par `AnalyticsKpisResponse` = record non-`Serializable` qui marche déjà) → pas besoin de `Serializable`. Test `AnalyticsServiceInsightsCacheTest` (3) valide l'expression `unless` en **slice de cache** (le cache dev est en mémoire → un SpEL erroné passerait sinon inaperçu jusqu'en prod). **Version** : back patch `0.0.13` → produit **v0.3.19**.
