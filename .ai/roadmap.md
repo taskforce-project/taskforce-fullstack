@@ -10,6 +10,11 @@
 >
 > Sources : `.ai/qa.md` (QA produit détaillée), `.ai/known-issues.md` (bugs vérifiés), `.ai/module-map.md` (domaines↔code), `.ai/architecture-map.md` (archi réelle), `.ai/P0-fix-plan.md` (correctifs P0 paste-ready).
 
+> **▶ MAJ 06/09/2026 - Perf : cache des insights IA générés (coupe coût/latence LLM). PROD-6.6.** `[BE-analytics]`
+> - `AnalyticsService.generateInsights` mis en cache (`@Cacheable "ai-insights"`, clé `(slug,userId)`, TTL Redis partagé **5 min**). `unless` : on ne cache **QUE** le succès (`mode=generated`) — jamais le mur payant (`upgrade`) ni le repli sur erreur (`fallback`), sinon un plan upgradé ou une panne LLM transitoire resterait figé le TTL. Autz en amont (`WorkspaceAccessInterceptor`) + clé par utilisateur → aucun contournement d'accès (même garantie que `getKpis`).
+> - Sérialiseur de cache = **JSON** (Boot 4, prouvé par `AnalyticsKpisResponse` = record non-`Serializable` qui marche déjà) → pas besoin de `Serializable`. Test `AnalyticsServiceInsightsCacheTest` (3) valide l'expression `unless` en **slice de cache** (le cache dev est en mémoire → un SpEL erroné passerait sinon inaperçu jusqu'en prod). **Version** : back patch `0.0.13` → produit **v0.3.19**.
+> - Option non faite (suffit pas nécessaire) : TTL dédié plus long (30 min) via un customizer par-cache — nécessite de recopier le sérialiseur JSON auto-configuré, risque/bénéfice faible.
+>
 > **▶ MAJ 06/09/2026 - Tests : couverture des 3 classes IA ~0 % (dette exhumée le 22/07).** `[BE-agent + Certif]`
 > - **`DecisionServiceTest` (13) + `AnalysisJobServiceTest` (14) + `IssueAiServiceTest` (6) = 33 tests, verts** (Mockito pur, aucun contexte Spring). Couvre : repli déterministe OODA + analyse LLM (brief / question de clarification / échec) + snapshot des métriques ; cycle de vie des workflows (launch/answer/dismiss avec garde-fous d'état) + actions sur priorités (accept idempotent, pin, dismiss, edit) ; `generateSpec` (RAG + LLM + repli, enrichissement labels/type/priorité **borné au projet**, résolution d'issue anti-fuite inter-projets). Motif technique : `@Spy ObjectMapper` réel + `AiMeter.metered` stubé en pass-through.
 > - **Ferme le point « dette de test IA »** de la revue d'état des lieux. Reste de la revue : Labs, GitHub/Slack, cache insights, gating.
