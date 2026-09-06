@@ -5,6 +5,7 @@ import {
   disconnectGitHub,
   getGitHubRepos,
   getGitHubRepoIssues,
+  syncGitHub,
   getGitHubLinks,
   addGitHubLink,
   deleteGitHubLink,
@@ -14,6 +15,7 @@ import {
   getSlackChannels,
   addSlackChannel,
   deleteSlackChannel,
+  syncSlack,
   getWebhooks,
   createWebhook,
   updateWebhook,
@@ -104,6 +106,30 @@ describe('integration-service', () => {
 
       expect(apiClient.get).toHaveBeenCalledWith(INTEGRATION_ROUTES.GITHUB_ISSUES(SLUG, 'octo/repo'));
       expect(result).toEqual(issues);
+    });
+  });
+
+  describe('syncGitHub', () => {
+    it('POST la synchro du dépôt vers le Brain OS', async () => {
+      const result = { created: 2, updated: 1, total: 3 };
+      vi.mocked(apiClient.post).mockResolvedValue(envelope(result));
+
+      const res = await syncGitHub(SLUG, 'octo/repo');
+
+      expect(apiClient.post).toHaveBeenCalledWith(INTEGRATION_ROUTES.GITHUB_SYNC(SLUG, 'octo/repo'));
+      expect(res).toEqual(result);
+    });
+  });
+
+  describe('syncSlack', () => {
+    it('POST la synchro du canal vers le Brain OS', async () => {
+      const result = { created: 5, updated: 0, total: 5 };
+      vi.mocked(apiClient.post).mockResolvedValue(envelope(result));
+
+      const res = await syncSlack(SLUG, 'C123');
+
+      expect(apiClient.post).toHaveBeenCalledWith(INTEGRATION_ROUTES.SLACK_SYNC(SLUG, 'C123'));
+      expect(res).toEqual(result);
     });
   });
 

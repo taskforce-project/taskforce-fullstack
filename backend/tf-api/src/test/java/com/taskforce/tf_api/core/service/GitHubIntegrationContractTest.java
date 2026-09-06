@@ -10,12 +10,15 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestTemplate;
 
+import com.taskforce.tf_api.core.dto.request.CreateKnowledgeNodeRequest;
 import com.taskforce.tf_api.core.dto.response.GitHubIssueResponse;
 import com.taskforce.tf_api.core.dto.response.GitHubRepoResponse;
+import com.taskforce.tf_api.core.dto.response.GitHubSyncResponse;
 import com.taskforce.tf_api.core.enums.IntegrationProvider;
 import com.taskforce.tf_api.core.model.Integration;
 import com.taskforce.tf_api.core.model.OAuthState;
@@ -23,8 +26,10 @@ import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.IntegrationRepository;
 import com.taskforce.tf_api.core.repository.IssueGitHubLinkRepository;
 import com.taskforce.tf_api.core.repository.IssueRepository;
+import com.taskforce.tf_api.core.repository.KnowledgeNodeRepository;
 import com.taskforce.tf_api.core.repository.OAuthStateRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.service.brain.BrainSearchService;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
@@ -58,6 +63,10 @@ class GitHubIntegrationContractTest {
     private IssueRepository issueRepository;
     private OAuthStateRepository oauthStateRepository;
     private ProjectVisibilityGuard visibilityGuard;
+    private KnowledgeService knowledgeService;
+    private KnowledgeNodeRepository nodeRepository;
+    private BrainSearchService brainSearch;
+    private JdbcTemplate jdbcTemplate;
 
     private Workspace workspace;
 
@@ -69,10 +78,15 @@ class GitHubIntegrationContractTest {
         issueRepository           = Mockito.mock(IssueRepository.class);
         oauthStateRepository      = Mockito.mock(OAuthStateRepository.class);
         visibilityGuard           = Mockito.mock(ProjectVisibilityGuard.class);
+        knowledgeService          = Mockito.mock(KnowledgeService.class);
+        nodeRepository            = Mockito.mock(KnowledgeNodeRepository.class);
+        brainSearch               = Mockito.mock(BrainSearchService.class);
+        jdbcTemplate              = Mockito.mock(JdbcTemplate.class);
         RestTemplate rt = new RestTemplate();
 
         // Ordre du constructeur généré par @RequiredArgsConstructor = ordre de déclaration des champs final :
-        // integrationRepository, issueGitHubLinkRepository, workspaceRepository, issueRepository, oauthStateRepository, restTemplate, visibilityGuard
+        // integrationRepository, issueGitHubLinkRepository, workspaceRepository, issueRepository,
+        // oauthStateRepository, restTemplate, visibilityGuard, knowledgeService, nodeRepository, brainSearch, jdbcTemplate
         service = new GitHubIntegrationService(
             integrationRepository,
             issueGitHubLinkRepository,
@@ -80,7 +94,11 @@ class GitHubIntegrationContractTest {
             issueRepository,
             oauthStateRepository,
             rt,
-            visibilityGuard
+            visibilityGuard,
+            knowledgeService,
+            nodeRepository,
+            brainSearch,
+            jdbcTemplate
         );
 
         ReflectionTestUtils.setField(service, "clientId", "cid");
@@ -180,6 +198,38 @@ class GitHubIntegrationContractTest {
         assertThat(issues.get(0).number()).isEqualTo(42);
         assertThat(issues.get(0).author()).isEqualTo("octocat");
         assertThat(issues.get(0).pullRequest()).isFalse();
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("sync : GET issues (per_page=100) → un node Brain OS créé par issue/PR")
+    void sync_ingest_les_issues_en_nodes() {
+        Mockito.when(workspaceRepository.findBySlug(SLUG)).thenReturn(Optional.of(workspace));
+        Integration integration = Integration.builder()
+            .workspace(workspace).provider(IntegrationProvider.GITHUB)
+            .accessToken("gho_token").meta(Map.of()).build();
+        Mockito.when(integrationRepository.findByWorkspaceIdAndProvider(1L, IntegrationProvider.GITHUB))
+            .thenReturn(Optional.of(integration));
+
+        server.expect(requestTo(
+                "https://api.github.com/repos/octocat/hello/issues?state=all&per_page=100&sort=updated"))
+            .andExpect(method(HttpMethod.GET))
+            .andExpect(header("Authorization", "Bearer gho_token"))
+            .andRespond(withSuccess(
+                "[{\"number\":42,\"title\":\"Bug\",\"state\":\"open\",\"body\":\"details\","
+                    + "\"html_url\":\"https://github.com/octocat/hello/issues/42\",\"user\":{\"login\":\"octocat\"}},"
+                    + "{\"number\":7,\"title\":\"Feature\",\"state\":\"closed\","
+                    + "\"html_url\":\"https://github.com/octocat/hello/pull/7\",\"pull_request\":{}}]",
+                MediaType.APPLICATION_JSON));
+
+        GitHubSyncResponse result = service.sync(SLUG, 9L, "octocat/hello");
+
+        assertThat(result.created()).isEqualTo(2);
+        assertThat(result.updated()).isZero();
+        assertThat(result.total()).isEqualTo(2);
+        // existingGitHubNodes (jdbcTemplate mocké) ne renvoie rien → tout passe par createNode
+        Mockito.verify(knowledgeService, Mockito.times(2))
+            .createNode(Mockito.eq(SLUG), Mockito.eq(9L), Mockito.any(CreateKnowledgeNodeRequest.class));
         server.verify();
     }
 }

@@ -3,6 +3,8 @@
 > **But** : cartographier *exactement* les actions (entrée → sortie) et **sur quelle vue** elles se passent, **avant** tout ajout/refactor. Rien d'inventé : la colonne « Statut » distingue **✅ existe**, **🟠 partiel**, **🔴 à construire**.
 > Date : 07/07/2026 · Auteur : mapping pré-implémentation.
 
+> **⚠️ MAJ 07/09/2026 : ce doc de planif a divergé du code livré.** La vision « Slack → module chat » (S3/S4 marqués ✅ ci-dessous) est **caduque** : le miroir entrant est resté **du code mort** (`fetchHistory`/`resolveUserName` sans appelant) et le **module chat a été retiré du produit** ([[chat-not-in-cdc-but-delivered]]). Le chantier réellement livré est **plus simple et orthogonal** : GitHub **et** Slack **ingèrent désormais dans le Brain OS** (patron `PlaneIntegrationService.sync` → `KnowledgeNode` dédupliqué + embed ; endpoints `POST …/github/sync?repo=` et `POST …/slack/sync?channel=`) → cf. `.ai/roadmap.md` (MAJ 07/09). Le reste ci-dessous (import repo→projet, push, 2-way GitHub, Slack sortant, chat-as-app) reste **non fait** et purement prospectif.
+
 ---
 
 ## 0. État actuel (démontrable dans le code)

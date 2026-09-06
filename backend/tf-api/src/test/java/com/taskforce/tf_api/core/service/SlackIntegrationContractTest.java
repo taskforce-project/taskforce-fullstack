@@ -10,19 +10,24 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestTemplate;
 
+import com.taskforce.tf_api.core.dto.request.CreateKnowledgeNodeRequest;
+import com.taskforce.tf_api.core.dto.response.SlackSyncResponse;
 import com.taskforce.tf_api.core.enums.IntegrationProvider;
 import com.taskforce.tf_api.core.model.Integration;
 import com.taskforce.tf_api.core.model.OAuthState;
 import com.taskforce.tf_api.core.model.SlackChannel;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.IntegrationRepository;
+import com.taskforce.tf_api.core.repository.KnowledgeNodeRepository;
 import com.taskforce.tf_api.core.repository.OAuthStateRepository;
 import com.taskforce.tf_api.core.repository.SlackChannelRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.service.brain.BrainSearchService;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -53,6 +58,10 @@ class SlackIntegrationContractTest {
     private SlackChannelRepository slackChannelRepository;
     private WorkspaceRepository workspaceRepository;
     private OAuthStateRepository oauthStateRepository;
+    private KnowledgeService knowledgeService;
+    private KnowledgeNodeRepository nodeRepository;
+    private BrainSearchService brainSearch;
+    private JdbcTemplate jdbcTemplate;
 
     private Workspace workspace;
 
@@ -62,16 +71,25 @@ class SlackIntegrationContractTest {
         slackChannelRepository = Mockito.mock(SlackChannelRepository.class);
         workspaceRepository    = Mockito.mock(WorkspaceRepository.class);
         oauthStateRepository   = Mockito.mock(OAuthStateRepository.class);
+        knowledgeService       = Mockito.mock(KnowledgeService.class);
+        nodeRepository         = Mockito.mock(KnowledgeNodeRepository.class);
+        brainSearch            = Mockito.mock(BrainSearchService.class);
+        jdbcTemplate           = Mockito.mock(JdbcTemplate.class);
         RestTemplate rt = new RestTemplate();
 
         // Ordre du constructeur @RequiredArgsConstructor = ordre de déclaration des champs final :
-        // integrationRepository, slackChannelRepository, workspaceRepository, oauthStateRepository, restTemplate
+        // integrationRepository, slackChannelRepository, workspaceRepository, oauthStateRepository, restTemplate,
+        // knowledgeService, nodeRepository, brainSearch, jdbcTemplate
         service = new SlackIntegrationService(
             integrationRepository,
             slackChannelRepository,
             workspaceRepository,
             oauthStateRepository,
-            rt
+            rt,
+            knowledgeService,
+            nodeRepository,
+            brainSearch,
+            jdbcTemplate
         );
 
         ReflectionTestUtils.setField(service, "clientId", "cid");
@@ -198,6 +216,42 @@ class SlackIntegrationContractTest {
                 MediaType.APPLICATION_JSON));
 
         assertThat(service.resolveUserName(WORKSPACE_ID, "U1")).isEqualTo("alice");
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("sync : historique → un node Brain OS par message (auteur résolu, dédupe par externalId)")
+    void sync_ingest_les_messages_en_nodes() {
+        Mockito.when(workspaceRepository.findBySlug(SLUG)).thenReturn(Optional.of(workspace));
+        Integration integration = Integration.builder()
+            .workspace(workspace).provider(IntegrationProvider.SLACK).accessToken("xoxb-token").meta(Map.of()).build();
+        Mockito.when(integrationRepository.findByWorkspaceIdAndProvider(WORKSPACE_ID, IntegrationProvider.SLACK))
+            .thenReturn(Optional.of(integration));
+        SlackChannel channel = SlackChannel.builder()
+            .workspace(workspace).channelId("C1").channelName("general").active(true).build();
+        Mockito.when(slackChannelRepository.findByWorkspaceIdOrderByCreatedAtDesc(WORKSPACE_ID))
+            .thenReturn(List.of(channel));
+
+        // 1) conversations.history (2 messages du même auteur), 2) users.info (une seule fois : cache)
+        server.expect(requestTo(org.hamcrest.Matchers.containsString("conversations.history?channel=C1")))
+            .andExpect(method(HttpMethod.GET))
+            .andRespond(withSuccess("{\"ok\":true,\"messages\":["
+                + "{\"ts\":\"200\",\"user\":\"U1\",\"text\":\"second message\"},"
+                + "{\"ts\":\"100\",\"user\":\"U1\",\"text\":\"first message\"}]}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(org.hamcrest.Matchers.containsString("users.info?user=U1")))
+            .andExpect(method(HttpMethod.GET))
+            .andRespond(withSuccess(
+                "{\"ok\":true,\"user\":{\"real_name\":\"Alice R\",\"profile\":{\"display_name\":\"alice\"}}}",
+                MediaType.APPLICATION_JSON));
+
+        SlackSyncResponse result = service.sync(SLUG, 9L, "C1");
+
+        assertThat(result.created()).isEqualTo(2);
+        assertThat(result.updated()).isZero();
+        assertThat(result.total()).isEqualTo(2);
+        // existingSlackNodes (jdbcTemplate mocké) ne renvoie rien → tout passe par createNode
+        Mockito.verify(knowledgeService, Mockito.times(2))
+            .createNode(Mockito.eq(SLUG), Mockito.eq(9L), Mockito.any(CreateKnowledgeNodeRequest.class));
         server.verify();
     }
 }
