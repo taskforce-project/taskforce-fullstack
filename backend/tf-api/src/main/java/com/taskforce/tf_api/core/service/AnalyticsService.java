@@ -364,6 +364,16 @@ public class AnalyticsService {
 
     // Pas de @Transactional englobante : lectures indépendantes + appel Groq.
     // Une tx readOnly se faisait marquer rollback-only par une écriture interne → 500 au commit (FIX-006).
+    //
+    // Cache (PERF-CACHE-01) : générer les insights = appel LLM COÛTEUX sur des métriques peu volatiles.
+    // On met en cache par (slug, userId), TTL partagé du cache Redis (5 min, cf. application-prod.yml).
+    // `unless` : on ne cache QUE le succès généré — jamais le mur payant (`mode=upgrade`) ni le repli sur
+    // erreur (`mode=fallback`), sinon un plan upgradé ou une panne LLM transitoire resterait figé le TTL.
+    // L'autorisation est faite en amont (WorkspaceAccessInterceptor) + la clé est par utilisateur : un
+    // cache hit ne contourne aucun contrôle d'accès (même garantie que getKpis).
+    @Cacheable(cacheNames = "ai-insights",
+        key = "#slug + ':' + #userId",
+        unless = "#result == null || #result.isEmpty() || #result[0].mode != 'generated'")
     public List<AiInsightResponse> generateInsights(String slug, Long userId) {
       // Résolution + autz HORS du try : un 404/403 ne doit pas être avalé par le fallback.
       Workspace ws = requireWorkspaceMember(slug, userId);
