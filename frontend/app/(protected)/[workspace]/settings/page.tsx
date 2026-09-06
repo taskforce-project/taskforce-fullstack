@@ -25,7 +25,7 @@ import { DeleteConfirmDialog } from "@/components/dialogs/delete-confirm-dialog"
 import { useSettingsStore } from "@/lib/store/settings-store"
 import { getAuditLogs, type AuditLogEntry } from "@/lib/api/workspace-service"
 import { useIntegrationStore } from "@/lib/store/integration-store"
-import { getGitHubRepos, getGitHubRepoIssues, type GitHubRepo, type GitHubRepoIssue } from "@/lib/api/integration-service"
+import { getGitHubRepos, getGitHubRepoIssues, syncGitHub, syncSlack, type GitHubRepo, type GitHubRepoIssue } from "@/lib/api/integration-service"
 import { IntegrationsCatalog } from "@/components/integrations/integrations-catalog"
 import { BrandLogo } from "@/components/ui/brand-logo"
 import { ProfileOverview } from "@/components/profile/profile-overview"
@@ -1022,10 +1022,10 @@ function GitHubRepoBrowser({ slug }: { readonly slug: string }) {
   const [issues, setIssues] = useState<GitHubRepoIssue[]>([])
   const [loadingRepos, setLoadingRepos] = useState(false)
   const [loadingIssues, setLoadingIssues] = useState(false)
+  const [syncing, setSyncing] = useState(false)
 
   useEffect(() => {
     let active = true
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoadingRepos(true)
     getGitHubRepos(slug)
       .then((r) => { if (active) setRepos(r) })
@@ -1045,6 +1045,19 @@ function GitHubRepoBrowser({ slug }: { readonly slug: string }) {
       .finally(() => setLoadingIssues(false))
   }
 
+  async function handleSync() {
+    if (!repo) return
+    setSyncing(true)
+    try {
+      const r = await syncGitHub(slug, repo)
+      toast.success(`Ingested into the Brain OS: ${r.created} created, ${r.updated} updated`)
+    } catch {
+      toast.error("Couldn't sync this repository")
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   return (
     <div className="mt-4 flex flex-col gap-3 border-t border-border/50 pt-4">
       <div className="flex items-center gap-2">
@@ -1061,6 +1074,16 @@ function GitHubRepoBrowser({ slug }: { readonly slug: string }) {
           ))}
         </SelectContent>
       </Select>
+
+      {repo && (
+        <div className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
+          <p className="text-[11px] text-muted-foreground">Ingest this repository&apos;s issues &amp; PRs into the Brain OS.</p>
+          <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs shrink-0" onClick={handleSync} disabled={syncing}>
+            {syncing ? <Loader2 className="size-3.5 animate-spin" /> : <Zap className="size-3.5" />}
+            {syncing ? "Syncing…" : "Sync → Brain OS"}
+          </Button>
+        </div>
+      )}
 
       {loadingIssues && <p className="text-xs text-muted-foreground">Loading issues…</p>}
       {!loadingIssues && repo && issues.length === 0 && (
@@ -1104,6 +1127,7 @@ function IntegrationsPanel() {
   const [channelId,   setChannelId]   = useState("")
   const [channelName, setChannelName] = useState("")
   const [addingChannel, setAddingChannel] = useState(false)
+  const [syncingChannel, setSyncingChannel] = useState<string | null>(null)
 
   // Webhook form
   const [webhookUrl,    setWebhookUrl]    = useState("")
@@ -1155,6 +1179,18 @@ function IntegrationsPanel() {
       toast.error("Couldn't add the channel")
     } finally {
       setAddingChannel(false)
+    }
+  }
+
+  async function handleSyncChannel(chId: string) {
+    setSyncingChannel(chId)
+    try {
+      const r = await syncSlack(slug, chId)
+      toast.success(`Ingested into the Brain OS: ${r.created} created, ${r.updated} updated`)
+    } catch {
+      toast.error("Couldn't sync this channel")
+    } finally {
+      setSyncingChannel(null)
     }
   }
 
@@ -1247,6 +1283,17 @@ function IntegrationsPanel() {
                     <p className="text-xs text-muted-foreground">{ch.eventTypes.join(", ")}</p>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 gap-1 text-xs"
+                      disabled={syncingChannel === ch.channelId}
+                      onClick={() => handleSyncChannel(ch.channelId)}
+                      title="Ingest this channel's recent messages into the Brain OS"
+                    >
+                      {syncingChannel === ch.channelId ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
+                      Sync
+                    </Button>
                     <Button
                       variant="ghost"
                       size="icon"
