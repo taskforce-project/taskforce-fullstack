@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import {
   Search,
   Plus,
@@ -9,7 +9,6 @@ import {
   ChevronDown,
   CircleDot,
   RefreshCw,
-  Clock,
   CheckCircle2,
   AlertTriangle,
   ArrowUp,
@@ -35,6 +34,8 @@ import { cn } from "@/lib/utils"
 import { CreateIssueDialog } from "@/components/dialogs/create-issue-dialog"
 import { useIssueStore } from "@/lib/store/issue-store"
 import { useProjectStore } from "@/lib/store/project-store"
+import { useAuth } from "@/lib/contexts/auth-context"
+import { toast } from "sonner"
 import type { IssueStatusCategory, IssuePriority as ApiPriority } from "@/lib/api/issue-service"
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -42,7 +43,7 @@ import type { IssueStatusCategory, IssuePriority as ApiPriority } from "@/lib/ap
 // ─────────────────────────────────────────────────────────────────────────────
 
 type IssuePriority = "urgent" | "high" | "medium" | "low" | "none"
-type IssueStatus   = "todo" | "in_progress" | "in_review" | "done" | "cancelled"
+type IssueStatus   = "todo" | "in_progress" | "done" | "cancelled"
 
 interface Issue {
   id: string
@@ -92,7 +93,6 @@ const PRIORITY_MAP: Record<ApiPriority, IssuePriority> = {
 const STATUS_CONFIG: Record<IssueStatus, { label: string; icon: React.ReactNode; color: string }> = {
   todo:        { label: "Todo",        icon: <CircleDot  className="h-3.5 w-3.5 text-muted-foreground" />,  color: "text-muted-foreground" },
   in_progress: { label: "In Progress", icon: <RefreshCw  className="h-3.5 w-3.5 text-blue-400"          />, color: "text-blue-400"          },
-  in_review:   { label: "In Review",   icon: <Clock      className="h-3.5 w-3.5 text-amber-400"          />, color: "text-amber-400"         },
   done:        { label: "Done",        icon: <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400"      />, color: "text-emerald-400"       },
   cancelled:   { label: "Cancelled",   icon: <AlertTriangle className="h-3.5 w-3.5 text-muted-foreground/50"/>, color: "text-muted-foreground/50"},
 }
@@ -129,7 +129,9 @@ const LABEL_COLORS: Record<string, string> = {
 // IssueRow
 // ─────────────────────────────────────────────────────────────────────────────
 
-function IssueRow({ issue, slug }: Readonly<{ issue: Issue; slug: string }>) {
+function IssueRow({ issue, slug, onOpen, onAssign }: Readonly<{
+  issue: Issue; slug: string; onOpen: (issue: Issue) => void; onAssign: (issue: Issue) => void;
+}>) {
   const status   = STATUS_CONFIG[issue.status]
   const priority = PRIORITY_CONFIG[issue.priority]
   const { deleteIssueWithUndo } = useIssueStore()
@@ -141,7 +143,13 @@ function IssueRow({ issue, slug }: Readonly<{ issue: Issue; slug: string }>) {
   }
 
   return (
-    <div className="group flex items-center gap-3 px-4 py-2.5 hover:bg-muted/30 border-b border-border/50 last:border-0 transition-colors cursor-pointer">
+    <div
+      onClick={() => onOpen(issue)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === "Enter") onOpen(issue) }}
+      className="group flex items-center gap-3 px-4 py-2.5 hover:bg-muted/30 border-b border-border/50 last:border-0 transition-colors cursor-pointer"
+    >
       {/* Priority */}
       <div className="flex items-center justify-center w-5 shrink-0" title={priority.label}>
         {priority.icon}
@@ -217,13 +225,14 @@ function IssueRow({ issue, slug }: Readonly<{ issue: Issue; slug: string }>) {
       {/* Actions */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" aria-label="Actions" className="h-6 w-6 opacity-0 group-hover:opacity-100 shrink-0">
+          <Button variant="ghost" size="icon" aria-label="Actions" onClick={(e) => e.stopPropagation()}
+                  className="h-6 w-6 opacity-0 group-hover:opacity-100 shrink-0">
             <MoreHorizontal className="h-3.5 w-3.5" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-40">
-          <DropdownMenuItem>Edit</DropdownMenuItem>
-          <DropdownMenuItem>Assign to me</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onOpen(issue)}>Edit</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onAssign(issue)}>Assign to me</DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={handleDelete}>Delete</DropdownMenuItem>
         </DropdownMenuContent>
@@ -236,7 +245,10 @@ function IssueRow({ issue, slug }: Readonly<{ issue: Issue; slug: string }>) {
 // GroupedSection
 // ─────────────────────────────────────────────────────────────────────────────
 
-function GroupedSection({ status, issues, slug }: Readonly<{ status: IssueStatus; issues: Issue[]; slug: string }>) {
+function GroupedSection({ status, issues, slug, onOpen, onAssign }: Readonly<{
+  status: IssueStatus; issues: Issue[]; slug: string;
+  onOpen: (issue: Issue) => void; onAssign: (issue: Issue) => void;
+}>) {
   const [open, setOpen] = useState(true)
   const cfg = STATUS_CONFIG[status]
 
@@ -256,7 +268,7 @@ function GroupedSection({ status, issues, slug }: Readonly<{ status: IssueStatus
       {open && (
         <div>
           {issues.map((issue) => (
-            <IssueRow key={issue.id} issue={issue} slug={slug} />
+            <IssueRow key={issue.id} issue={issue} slug={slug} onOpen={onOpen} onAssign={onAssign} />
           ))}
         </div>
       )}
@@ -272,14 +284,16 @@ type GroupBy    = "status" | "priority" | "project"
 type FilterStatus   = IssueStatus | "all"
 type FilterPriority = IssuePriority | "all"
 
-const STATUS_ORDER: IssueStatus[] = ["in_progress", "in_review", "todo", "done", "cancelled"]
+const STATUS_ORDER: IssueStatus[] = ["in_progress", "todo", "done", "cancelled"]
 
 export default function IssuesPage() {
   const params  = useParams()
+  const router  = useRouter()
   const slug    = typeof params?.workspace === "string" ? params.workspace : ""
+  const { user } = useAuth()
 
   const { fetchProjects } = useProjectStore()
-  const { fetchIssues, isLoading }  = useIssueStore()
+  const { fetchIssues, updateIssue, isLoading }  = useIssueStore()
 
   const [allIssues, setAllIssues] = useState<Issue[]>([])
   const [search,         setSearch]         = useState("")
@@ -361,6 +375,22 @@ export default function IssuesPage() {
   }, [filtered, groupBy])
 
   const openCount = filtered.filter((i) => i.status !== "done" && i.status !== "cancelled").length
+
+  // Ouvre l'issue dans son projet : le board déroule la sheet d'édition via le deep-link ?issue=<id>.
+  function openIssue(issue: Issue) {
+    router.push(`/${slug}/projects/${issue.project.id}?issue=${issue.id}`)
+  }
+
+  // « Assign to me » : assigne l'issue à l'utilisateur courant (API) + reflet optimiste dans la liste.
+  async function assignToMe(issue: Issue) {
+    if (!user) return
+    if (issue.assignee?.email === user.email) { toast.info("Already assigned to you"); return }
+    const updated = await updateIssue(slug, Number(issue.project.id), Number(issue.id), { assigneeId: Number(user.id) })
+    if (!updated) { toast.error("Couldn't assign the issue"); return }
+    setAllIssues((prev) => prev.map((i) =>
+      i.id === issue.id ? { ...i, assignee: { name: user.displayName || user.email, email: user.email } } : i))
+    toast.success(`${issue.identifier} assigned to you`)
+  }
 
   return (
     <div className="flex flex-col gap-0 w-full max-w-6xl mx-auto">
@@ -476,7 +506,7 @@ export default function IssuesPage() {
         <div className="flex flex-col gap-3">
           {groupBy === "status"
             ? grouped.map((g) => (
-                <GroupedSection key={g.key} status={g.key as IssueStatus} issues={g.issues} slug={slug} />
+                <GroupedSection key={g.key} status={g.key as IssueStatus} issues={g.issues} slug={slug} onOpen={openIssue} onAssign={assignToMe} />
               ))
             : grouped.map((g) => (
                 <div key={g.key} className="border border-border rounded-xl overflow-hidden">
@@ -494,7 +524,7 @@ export default function IssuesPage() {
                       {g.issues.length}
                     </Badge>
                   </div>
-                  {g.issues.map((issue) => <IssueRow key={issue.id} issue={issue} slug={slug} />)}
+                  {g.issues.map((issue) => <IssueRow key={issue.id} issue={issue} slug={slug} onOpen={openIssue} onAssign={assignToMe} />)}
                 </div>
               ))
           }
