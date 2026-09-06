@@ -24,11 +24,13 @@ import com.taskforce.tf_api.core.dto.response.ConnectUrlResponse;
 import com.taskforce.tf_api.core.dto.response.GitHubIssueResponse;
 import com.taskforce.tf_api.core.dto.response.GitHubLinkResponse;
 import com.taskforce.tf_api.core.dto.response.GitHubRepoResponse;
+import com.taskforce.tf_api.core.dto.response.GitHubSyncResponse;
 import com.taskforce.tf_api.core.dto.response.IntegrationCatalogResponse;
 import com.taskforce.tf_api.core.dto.response.IntegrationStatusResponse;
 import com.taskforce.tf_api.core.dto.response.PlaneStatusResponse;
 import com.taskforce.tf_api.core.dto.response.PlaneSyncResponse;
 import com.taskforce.tf_api.core.dto.response.SlackChannelResponse;
+import com.taskforce.tf_api.core.dto.response.SlackSyncResponse;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.enums.PlanFeature;
@@ -141,6 +143,18 @@ public class IntegrationController {
         @RequestParam String repo
     ) {
         return ResponseEntity.ok(ApiResponse.success(gitHubService.listRepoIssues(slug, repo)));
+    }
+
+    /** Ingere les issues + PR d'un depot dans le Brain OS (dedupe, embedde). Reserve OWNER/ADMIN. */
+    @PostMapping("/api/workspaces/{slug}/integrations/github/sync")
+    public ResponseEntity<ApiResponse<GitHubSyncResponse>> githubSync(
+        @PathVariable String slug,
+        @RequestParam("repo") String repo,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        requireManager(slug, jwt);
+        GitHubSyncResponse result = gitHubService.sync(slug, resolveUser(jwt).getId(), repo);
+        return ResponseEntity.ok(ApiResponse.success("Synchronisation GitHub terminée", result));
     }
 
     /**
@@ -293,6 +307,18 @@ public class IntegrationController {
         requireManager(slug, jwt);
         slackService.deleteChannel(slug, channelId);
         return ResponseEntity.ok(ApiResponse.success("Canal Slack supprimé", null));
+    }
+
+    /** Ingere l'historique d'un canal Slack dans le Brain OS (dedupe, embedde). Reserve OWNER/ADMIN. */
+    @PostMapping("/api/workspaces/{slug}/integrations/slack/sync")
+    public ResponseEntity<ApiResponse<SlackSyncResponse>> slackSync(
+        @PathVariable String slug,
+        @RequestParam("channel") String channel,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        requireManager(slug, jwt);
+        SlackSyncResponse result = slackService.sync(slug, resolveUser(jwt).getId(), channel);
+        return ResponseEntity.ok(ApiResponse.success("Synchronisation Slack terminée", result));
     }
 
     // ====================================================================
