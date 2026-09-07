@@ -13,9 +13,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import com.taskforce.tf_api.core.model.Subscription;
 import com.taskforce.tf_api.core.model.User;
-import com.taskforce.tf_api.core.repository.SubscriptionRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
@@ -53,7 +51,6 @@ class PaymentAndDataControllersWebMvcTest {
     @MockitoBean private WorkspaceInvitationService invitationService;
     @MockitoBean private StripeService stripeService;
     @MockitoBean private AuthService authService;
-    @MockitoBean private SubscriptionRepository subscriptionRepository;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private WorkspaceRepository workspaceRepository;
     @MockitoBean private WorkspaceMemberRepository workspaceMemberRepository;
@@ -124,9 +121,11 @@ class PaymentAndDataControllersWebMvcTest {
     @Test
     @DisplayName("POST /api/billing/portal (auth) → 200 + URL portail Stripe")
     void billing_portal_200() throws Exception {
-        stubUser();
-        when(subscriptionRepository.findByUserId(7L))
-            .thenReturn(Optional.of(Subscription.builder().userId(7L).stripeCustomerId("cus_123").build()));
+        // Le client Stripe est porte par la table `users` (getStripeCustomerId), pas par une entite
+        // Subscription : l'utilisateur doit avoir un customerId reel (non `cus_seed`) pour ouvrir le
+        // portail. Sinon BillingController leve IllegalStateException -> 409 (cf. GlobalExceptionHandler).
+        when(userRepository.findByEmail(EMAIL))
+            .thenReturn(Optional.of(User.builder().id(7L).email(EMAIL).stripeCustomerId("cus_123").build()));
         when(stripeService.createBillingPortalSession(anyString(), anyString()))
             .thenReturn("https://billing.stripe.test/session");
 

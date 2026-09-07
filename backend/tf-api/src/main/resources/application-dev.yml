@@ -243,4 +243,10 @@ ai:
   # Le routing modèle + l'URL Ollama vivent dans l'ai-service (OLLAMA_BASE_URL/OLLAMA_MODEL).
   gateway:
     base-url: ${AI_GATEWAY_BASE_URL:http://ai-service:8000}
+  # Garde-debit IA par minute (AiRateGuard) : protege le budget LLM partage (Groq gpt-oss-120b ~8000 TPM,
+  # partage par TOUTE l'org) contre les pics de concurrence. Fenetres-minute Redis (globale + par compte) ;
+  # 429 propre au depassement, fail-open sans Redis. 0 = fenetre desactivee. A remonter en Groq Dev / Ollama.
+  rate:
+    global-tpm: ${AI_RATE_GLOBAL_TPM:8000}
+    account-tpm: ${AI_RATE_ACCOUNT_TPM:6000}
 

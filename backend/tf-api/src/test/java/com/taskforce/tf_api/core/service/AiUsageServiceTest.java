@@ -43,6 +43,7 @@ class AiUsageServiceTest {
     @Mock private WorkspaceRepository workspaceRepository;
     @Mock private UserRepository userRepository;
     @Mock private BrainAccessGuard access;
+    @Mock private AiRateGuard rateGuard;
 
     @InjectMocks private AiUsageService service;
 
@@ -106,18 +107,18 @@ class AiUsageServiceTest {
 
         assertThat(res.plan()).isEqualTo("BUSINESS");
         assertThat(res.usedTokens()).isEqualTo(500);
-        assertThat(res.limitTokens()).isEqualTo(2_000_000L); // plafond BUSINESS
+        assertThat(res.limitTokens()).isEqualTo(800_000L); // plafond BUSINESS (recalibré sur budget Groq)
         assertThat(res.requestCount()).isEqualTo(3);
     }
 
     @Test
-    @DisplayName("assertWithinQuota : compte FREE au plafond (100k) → 409 (IllegalStateException)")
+    @DisplayName("assertWithinQuota : compte FREE au plafond (50k) → 409 (IllegalStateException)")
     void assertWithinQuota_throws_when_free_over_limit() {
         when(workspaceRepository.findOwnerIdByWorkspaceId(10L)).thenReturn(Optional.of(99L));
         when(userRepository.findById(99L))
             .thenReturn(Optional.of(User.builder().id(99L).planType(PlanType.FREE).build()));
         AiTokenUsage row = new AiTokenUsage();
-        row.setTotalTokens(100_000L); // pile au plafond FREE
+        row.setTotalTokens(50_000L); // pile au plafond FREE (recalibré Groq)
         when(repository.findByAccountIdAndPeriod(eq(99L), anyString())).thenReturn(Optional.of(row));
 
         assertThatThrownBy(() -> service.assertWithinQuota(10L))
@@ -126,15 +127,29 @@ class AiUsageServiceTest {
     }
 
     @Test
-    @DisplayName("assertWithinQuota : compte BUSINESS sous le plafond → OK (pas d'exception)")
+    @DisplayName("assertWithinQuota : compte BUSINESS sous le plafond → OK + garde-débit consulté")
     void assertWithinQuota_ok_when_under_limit() {
         when(workspaceRepository.findOwnerIdByWorkspaceId(10L)).thenReturn(Optional.of(99L));
         when(userRepository.findById(99L))
             .thenReturn(Optional.of(User.builder().id(99L).planType(PlanType.BUSINESS).build()));
         AiTokenUsage row = new AiTokenUsage();
-        row.setTotalTokens(500_000L); // bien sous 2M
+        row.setTotalTokens(500_000L); // sous le plafond BUSINESS (800k)
         when(repository.findByAccountIdAndPeriod(eq(99L), anyString())).thenReturn(Optional.of(row));
 
         assertThatCode(() -> service.assertWithinQuota(10L)).doesNotThrowAnyException();
+        // Le garde-débit par minute est consulté sur le COMPTE (résolu depuis le workspace).
+        verify(rateGuard).assertWithinRate(99L);
+    }
+
+    @Test
+    @DisplayName("record : débite aussi le garde-débit par minute sur le compte")
+    void record_also_feeds_rate_guard() {
+        when(workspaceRepository.findOwnerIdByWorkspaceId(10L)).thenReturn(Optional.of(99L));
+        when(repository.findByAccountIdAndPeriod(99L, PERIOD)).thenReturn(Optional.empty());
+        when(repository.save(any(AiTokenUsage.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.record(10L, new LlmUsage(100, 50, 150));
+
+        verify(rateGuard).recordTokens(99L, 150L);
     }
 }

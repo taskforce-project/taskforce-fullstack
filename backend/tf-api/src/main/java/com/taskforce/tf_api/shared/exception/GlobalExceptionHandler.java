@@ -163,6 +163,30 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Débit IA par minute dépassé (budget LLM partagé protégé) → 429 avec {@code Retry-After}.
+     * Message clair « réessaie dans un instant » plutôt qu'un échec LLM opaque. Distinct du quota
+     * mensuel ({@link IllegalStateException} → 409) : ici c'est un pic de concurrence temporaire.
+     */
+    @ExceptionHandler(AiRateLimitedException.class)
+    public ResponseEntity<ErrorResponse> handleAiRateLimited(
+            AiRateLimitedException ex,
+            HttpServletRequest request) {
+
+        log.warn("Débit IA dépassé: {}", ex.getMessage());
+
+        ErrorResponse error = ErrorResponse.of(
+                HttpStatus.TOO_MANY_REQUESTS.value(),
+                "Too Many Requests",
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header("Retry-After", "60")
+                .body(error);
+    }
+
+    /**
      * Argument métier invalide → 400 (au lieu de 500).
      */
     @ExceptionHandler(IllegalArgumentException.class)
