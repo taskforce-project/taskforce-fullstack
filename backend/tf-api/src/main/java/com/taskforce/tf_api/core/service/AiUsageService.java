@@ -16,6 +16,7 @@ import com.taskforce.tf_api.core.repository.AiTokenUsageRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
+import com.taskforce.tf_api.shared.exception.AiRateLimitedException;
 
 import lombok.RequiredArgsConstructor;
 
@@ -33,6 +34,7 @@ public class AiUsageService {
     private final WorkspaceRepository workspaceRepository;
     private final UserRepository userRepository;
     private final BrainAccessGuard access;
+    private final AiRateGuard rateGuard;
 
     private static String currentPeriod() {
         return YearMonth.now().toString(); // 'YYYY-MM'
@@ -65,6 +67,8 @@ public class AiUsageService {
         row.setTotalTokens(row.getTotalTokens() + usage.totalTokens());
         row.setRequestCount(row.getRequestCount() + 1);
         repository.save(row);
+        // Debite aussi la fenetre-minute (garde-debit partage), best-effort.
+        rateGuard.recordTokens(accountId, usage.totalTokens());
     }
 
     /**
@@ -126,7 +130,8 @@ public class AiUsageService {
      * écriture) : il ne doit jamais forcer de rollback. Le chat ({@code AgentService.run}, hors tx) reçoit
      * toujours son 409 — {@code noRollbackFor} n'affecte pas la propagation, seulement le marquage rollback.</p>
      */
-    @Transactional(readOnly = true, noRollbackFor = IllegalStateException.class)
+    @Transactional(readOnly = true,
+        noRollbackFor = {IllegalStateException.class, AiRateLimitedException.class})
     public void assertWithinQuota(Long workspaceId) {
         if (workspaceId == null) {
             return;
@@ -135,6 +140,10 @@ public class AiUsageService {
         if (accountId == null) {
             return;
         }
+        // Garde-debit par minute (budget LLM partage) : verifie AVANT tout appel LLM. Peut lever
+        // AiRateLimitedException -> 429 (pic de concurrence, distinct du quota mensuel -> 409). Meme
+        // raison de noRollbackFor : ce gate est un pur signal, il ne doit jamais forcer de rollback.
+        rateGuard.assertWithinRate(accountId);
         PlanType plan = userRepository.findById(accountId).map(User::getPlanType).orElse(PlanType.FREE);
         long limit = limitFor(plan);
         if (limit < 0) {
@@ -154,16 +163,21 @@ public class AiUsageService {
      * Claude) : une action lourde (analyse « deep » = gros modèle + raisonnement + boucle d'outils) coûte
      * déjà plus de quota qu'un smart-assign « fast » car elle <b>génère plus de tokens</b> — le routing
      * modèle par fonctionnalité (tier {@code fast}/{@code standard}/{@code deep} côté gateway) n'appelle
-     * donc <b>aucune pondération</b> ici. Échelle 1× / 5× / 20× / ∞ ; mesuré ≈ 1,2k tokens/action →
-     * FREE ≈ 80 actions/mois, BASIC ≈ 400, BUSINESS ≈ 1 600. Valeurs <b>arrêtées le 27/08/2026</b>
-     * (décision pricing, cf. QA-46).
+     * donc <b>aucune pondération</b> ici.
+     *
+     * <p><b>Recalibré le 07/09/2026 sur le budget Groq réel</b> (gpt-oss-120b, tier gratuit) :
+     * 200k tokens/JOUR = ~6M tokens/mois <b>partagés par toute l'org</b>. Découpé pour ~10 comptes avec
+     * marge (la somme des plafonds des comptes actifs reste bien sous 6M) : FREE 50k / BASIC 300k /
+     * BUSINESS 800k / ENTERPRISE ∞. Ancien barème (100k/500k/2M, QA-46) non dérivé de Groq : 3 comptes
+     * BUSINESS suffisaient à vider le mois entier. Le pic de concurrence (8000 TPM) est géré à part par
+     * {@link AiRateGuard} (429). À remonter quand on passe en Groq Dev tier ou Ollama local (illimité).
      */
     private long limitFor(PlanType plan) {
         return switch (plan) {
-            case FREE -> 100_000L;        // 100k tokens/mois (~80 actions IA)
-            case BASIC -> 500_000L;       // 500k tokens/mois (~400 actions IA)
-            case BUSINESS -> 2_000_000L;  // 2M tokens/mois (~1 600 actions IA)
-            case ENTERPRISE -> -1L;       // illimité
+            case FREE -> 50_000L;        // 50k tokens/mois
+            case BASIC -> 300_000L;      // 300k tokens/mois
+            case BUSINESS -> 800_000L;   // 800k tokens/mois
+            case ENTERPRISE -> -1L;      // illimité
         };
     }
 }

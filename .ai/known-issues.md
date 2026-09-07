@@ -5,6 +5,10 @@
 > Each issue: **Priority · Impact · Effort · Confidence**, with the fix locus (not applied here).
 > Effort scale: S ≤2h · M ½–1d · L 1–3d · XL >3d. Confidence = how sure the finding is true.
 
+## ✅ Recently fixed — 2026-09-07 (CI backend reverdie)
+
+- **`billing_portal_200` (CI backend `mvn verify` rouge en permanence depuis le 05/09) réparée.** Vraie cause = **test obsolète**, PAS les `STRIPE_PRICE_ID_*` en CI : en `@WebMvcTest`, `StripeService` est mocké et `StripeConfig` n'est pas chargé, et `/api/billing/portal` lit `user.getStripeCustomerId()` (refactor « client Stripe porté par `users` »). Le test construisait un `User` sans `stripeCustomerId` (+ stub mort `subscriptionRepository`) -> `IllegalStateException` -> 409 (`GlobalExceptionHandler`). Fix côté test seul : `User` mocké avec `cus_123`, stubs/mocks/imports morts retirés. `mvn clean verify` complet de nouveau vert (1060 tests, 0 échec, gate JaCoCo OK). `PaymentAndDataControllersWebMvcTest.java`. Le « 409 sans price-ids » reste vrai mais pour `getPriceIdForPlan` / `/checkout`, pas `/portal`.
+
 ## ✅ Recently fixed — 2026-06-15 (branche `feat/dashboard`, QA gestion de projet)
 
 | Sujet | Cause racine | Correctif | Fichier |
