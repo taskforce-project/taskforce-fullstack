@@ -123,7 +123,7 @@ function PaymentSuccessContent() {
             </Link>
           </Button>
           <Button asChild size="sm" className="gap-2">
-            <Link href="/dashboard">Go to dashboard</Link>
+            <Link href="/">Go to dashboard</Link>
           </Button>
         </div>
       </PaymentShell>

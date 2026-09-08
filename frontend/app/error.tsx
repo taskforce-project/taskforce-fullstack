@@ -86,7 +86,7 @@ export default function ErrorPage({ error, reset }: Readonly<ErrorPageProps>) {
         {/* Actions */}
         <div className="flex items-center gap-3">
           <Button asChild size="sm" variant="outline" className="gap-2">
-            <Link href="/dashboard">
+            <Link href="/">
               <ArrowLeft className="h-4 w-4" />
               Dashboard
             </Link>
