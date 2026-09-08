@@ -113,4 +113,27 @@ class AiRateGuardTest {
         when(redisProvider.getIfAvailable()).thenReturn(null);
         assertThatCode(() -> guard.recordTokens(99L, 150L)).doesNotThrowAnyException();
     }
+
+    @Test
+    @DisplayName("assertWithinRate : plafond requêtes/minute du compte atteint → 429")
+    void assertWithinRate_throws_when_account_rpm_full() {
+        ReflectionTestUtils.setField(guard, "accountRpm", 1L);
+        when(redisProvider.getIfAvailable()).thenReturn(redis);
+        when(ops.get(startsWith("ai:tpm:g:"))).thenReturn("0");    // tokens sous les seuils
+        when(ops.get(startsWith("ai:tpm:a:"))).thenReturn("0");
+        when(ops.get(startsWith("ai:rpm:a:99:"))).thenReturn("1"); // déjà 1 requête cette minute == accountRpm
+        assertThatThrownBy(() -> guard.assertWithinRate(99L))
+            .isInstanceOf(AiRateLimitedException.class);
+    }
+
+    @Test
+    @DisplayName("assertWithinRate : sous le plafond requêtes/minute → OK + incrémente le compteur")
+    void assertWithinRate_bumps_rpm_counter_when_under() {
+        ReflectionTestUtils.setField(guard, "accountRpm", 5L);
+        when(redisProvider.getIfAvailable()).thenReturn(redis);
+        when(ops.get(anyString())).thenReturn("0");                // tout sous les seuils
+        when(ops.increment(startsWith("ai:rpm:a:99:"), eq(1L))).thenReturn(1L);
+        assertThatCode(() -> guard.assertWithinRate(99L)).doesNotThrowAnyException();
+        verify(ops).increment(startsWith("ai:rpm:a:99:"), eq(1L));
+    }
 }

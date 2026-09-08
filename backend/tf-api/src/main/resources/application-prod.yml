@@ -227,6 +227,15 @@ server:
   http2:
     enabled: true
 
+# Garde-debit IA par minute (AiRateGuard) - PROD. global-tpm = TPM Groq partage (tier courant).
+# account-rpm = requetes/minute/compte (throttle beta : ~5 users a 1 req/min tiennent dans le budget).
+# Tout overridable par variable d'env (AI_RATE_*). 0 = fenetre desactivee.
+ai:
+  rate:
+    global-tpm: ${AI_RATE_GLOBAL_TPM:8000}
+    account-tpm: ${AI_RATE_ACCOUNT_TPM:6000}
+    account-rpm: ${AI_RATE_ACCOUNT_RPM:1}
+
 # Actuator Production
 management:
   endpoints:

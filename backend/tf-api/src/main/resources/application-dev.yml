@@ -249,4 +249,6 @@ ai:
   rate:
     global-tpm: ${AI_RATE_GLOBAL_TPM:8000}
     account-tpm: ${AI_RATE_ACCOUNT_TPM:6000}
+    # Requetes/minute/compte (throttle explicite). 0 = desactive (dev/test : on ne bride pas). Prod = 1.
+    account-rpm: ${AI_RATE_ACCOUNT_RPM:0}
 
