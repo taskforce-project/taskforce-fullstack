@@ -1,5 +1,6 @@
 ---
 import BaseLayout from "@/layouts/BaseLayout.astro";
+import { APP_URL } from "@/components/site/nav";
 import PageCta from "@/components/site/PageCta.astro";
 import { BrandLogo } from "@/components/site/BrandLogo";
 import { hueFor } from "@/lib/site-icons";
@@ -192,7 +193,7 @@ const MATRIX = [
   <PageCta
     title={`Put ${c.name} to work`}
     lead="Connect your stack and give every run the context it needs - with a human on every external action."
-    primary={{ label: "Run your first workflow", href: "/waitlist" }}
+    primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
     secondary={{ label: "Browse all integrations", href: "/product/integrations" }}
   />
 </BaseLayout>

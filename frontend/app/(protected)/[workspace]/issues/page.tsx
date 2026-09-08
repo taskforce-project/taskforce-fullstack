@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import {
   Search,
@@ -21,6 +21,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { Input } from "@/components/ui/input"
 import {
@@ -277,6 +278,34 @@ function GroupedSection({ status, issues, slug, onOpen, onAssign }: Readonly<{
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// IssuesSkeleton - squelette pendant le fetch (distingue « en cours » de « vide »)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function IssuesSkeleton() {
+  return (
+    <div className="flex flex-col gap-3">
+      {Array.from({ length: 2 }).map((_, s) => (
+        <div key={s} className="border border-border rounded-xl overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 bg-muted/30">
+            <Skeleton className="h-3.5 w-3.5 rounded-sm" />
+            <Skeleton className="h-4 w-24" />
+          </div>
+          {Array.from({ length: 3 }).map((_, r) => (
+            <div key={r} className="flex items-center gap-3 px-4 py-2.5 border-b border-border/50 last:border-0">
+              <Skeleton className="h-3.5 w-5 shrink-0" />
+              <Skeleton className="h-3.5 w-5 shrink-0" />
+              <Skeleton className="h-3.5 w-16 shrink-0" />
+              <Skeleton className="h-3.5 flex-1" />
+              <Skeleton className="h-6 w-6 shrink-0 rounded-full" />
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Page
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -293,48 +322,61 @@ export default function IssuesPage() {
   const { user } = useAuth()
 
   const { fetchProjects } = useProjectStore()
-  const { fetchIssues, updateIssue, isLoading }  = useIssueStore()
+  const { fetchIssues, updateIssue, clearIssues }  = useIssueStore()
 
   const [allIssues, setAllIssues] = useState<Issue[]>([])
+  const [loading,        setLoading]        = useState(true)
+  const [loadFailed,     setLoadFailed]     = useState(false)
   const [search,         setSearch]         = useState("")
   const [filterStatus,   setFilterStatus]   = useState<FilterStatus>("all")
   const [filterPriority, setFilterPriority] = useState<FilterPriority>("all")
   const [groupBy,        setGroupBy]        = useState<GroupBy>("status")
 
-  // Fetch all projects then all issues across them
-  useEffect(() => {
+  // Charge tous les projets puis toutes leurs issues (vue agrégée « toutes les issues »).
+  // `clearIssues()` repart d'un cache propre : chaque fetch re-tourne réellement (pas de court-circuit
+  // cache-first) et le champ `error` des stores reflète CE chargement. Comme les stores avalent
+  // l'exception et renvoient [], c'est le seul moyen fiable de distinguer un échec d'un « aucune issue ».
+  const loadIssues = useCallback(async () => {
     if (!slug) return
-    fetchProjects(slug).then((projs) => {
-      Promise.all(projs.map((p) => fetchIssues(slug, p.id))).then((results) => {
-        const mapped: Issue[] = results.flatMap((issues, idx) => {
-          const proj = projs[idx]
-          return issues.map((issue) => ({
-            id:         String(issue.id),
-            identifier: issue.identifier,
-            title:      issue.title,
-            status:     STATUS_MAP[issue.status.category],
-            priority:   PRIORITY_MAP[issue.priority],
-            project: {
-              id:    String(proj.id),
-              name:  proj.name,
-              color: projectColor(proj.id),
-              emoji: proj.identifier.slice(0, 2),
-            },
-            assignee: issue.assignee
-              ? {
-                  name:  issue.assignee.displayName ?? issue.assignee.email,
-                  email: issue.assignee.email,
-                }
-              : null,
-            labels:  issue.labels.map((l) => l.name.toLowerCase()),
-            dueDate: issue.dueDate ?? null,
-          }))
-        })
-        setAllIssues(mapped)
-      })
+    setLoading(true)
+    setLoadFailed(false)
+    clearIssues()
+
+    const projs = await fetchProjects(slug)
+    if (useProjectStore.getState().error) { setLoadFailed(true); setLoading(false); return }
+
+    const results = await Promise.all(projs.map((p) => fetchIssues(slug, p.id)))
+    if (useIssueStore.getState().error) { setLoadFailed(true); setLoading(false); return }
+
+    const mapped: Issue[] = results.flatMap((issues, idx) => {
+      const proj = projs[idx]
+      return issues.map((issue) => ({
+        id:         String(issue.id),
+        identifier: issue.identifier,
+        title:      issue.title,
+        status:     STATUS_MAP[issue.status.category],
+        priority:   PRIORITY_MAP[issue.priority],
+        project: {
+          id:    String(proj.id),
+          name:  proj.name,
+          color: projectColor(proj.id),
+          emoji: proj.identifier.slice(0, 2),
+        },
+        assignee: issue.assignee
+          ? {
+              name:  issue.assignee.displayName ?? issue.assignee.email,
+              email: issue.assignee.email,
+            }
+          : null,
+        labels:  issue.labels.map((l) => l.name.toLowerCase()),
+        dueDate: issue.dueDate ?? null,
+      }))
     })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug])
+    setAllIssues(mapped)
+    setLoading(false)
+  }, [slug, fetchProjects, fetchIssues, clearIssues])
+
+  useEffect(() => { void loadIssues() }, [loadIssues])
 
   const filtered = useMemo(() => {
     let list = allIssues
@@ -399,7 +441,7 @@ export default function IssuesPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Issues</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {isLoading ? "Loading…" : `${openCount} open · ${filtered.length} total`}
+            {loading ? "Loading…" : `${openCount} open · ${filtered.length} total`}
           </p>
         </div>
         <CreateIssueDialog>
@@ -495,12 +537,29 @@ export default function IssuesPage() {
         <div className="w-6 shrink-0" />
       </div>
 
-      {/* Issue groups */}
-      {grouped.length === 0 ? (
+      {/* Issue groups - on distingue chargement / échec / vide réel / vide filtré. */}
+      {loading ? (
+        <IssuesSkeleton />
+      ) : loadFailed ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <AlertTriangle className="h-10 w-10 text-amber-500/70 mb-4" />
+          <p className="text-base font-medium text-foreground">Could not load issues</p>
+          <p className="text-sm text-muted-foreground mt-1">Something went wrong while loading your issues.</p>
+          <Button variant="outline" size="sm" className="gap-1.5 mt-4" onClick={() => void loadIssues()}>
+            <RefreshCw className="h-3.5 w-3.5" /> Retry
+          </Button>
+        </div>
+      ) : allIssues.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <FolderKanban className="h-10 w-10 text-muted-foreground/30 mb-4" />
-          <p className="text-base font-medium text-foreground">No issues found</p>
-          <p className="text-sm text-muted-foreground mt-1">Try adjusting your filters</p>
+          <p className="text-base font-medium text-foreground">No issues yet</p>
+          <p className="text-sm text-muted-foreground mt-1">Create your first issue to get started.</p>
+        </div>
+      ) : grouped.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <FolderKanban className="h-10 w-10 text-muted-foreground/30 mb-4" />
+          <p className="text-base font-medium text-foreground">No issues match your filters</p>
+          <p className="text-sm text-muted-foreground mt-1">Try adjusting your search or filters.</p>
         </div>
       ) : (
         <div className="flex flex-col gap-3">

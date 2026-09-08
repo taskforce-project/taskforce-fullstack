@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import { Check, ShieldCheck, SlidersHorizontal, Activity, ArrowRight, PenLine, Network, Server } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { APP_URL } from "@/components/site/nav";
 import { Section, SectionHeader } from "../Section";
 import { AppShot, Toast } from "../AppShot";
 import { BrandLogo } from "../BrandLogo";
@@ -270,7 +271,7 @@ export function FinalCta() {
           </p>
           <div className="relative mt-8 flex flex-wrap justify-center gap-3">
             <Button asChild size="pill-lg">
-              <a href={"/waitlist"}>Run your first workflow</a>
+              <a href={`${APP_URL}/auth/register`}>Run your first workflow</a>
             </Button>
             <Button asChild variant="outline" size="pill-lg">
               <a href="/book-a-demo">Book a demo</a>

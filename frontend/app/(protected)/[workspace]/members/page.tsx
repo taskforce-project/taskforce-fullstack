@@ -15,6 +15,8 @@ import {
   Loader2,
   Sparkles,
   CalendarDays,
+  AlertTriangle,
+  RefreshCw,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -458,7 +460,7 @@ export default function MembersPage() {
   const [profilesByUser, setProfilesByUser] = useState<Record<number, MemberSkillProfile>>({})
   const [usage, setUsage] = useState<WorkspaceUsage | null>(null)
 
-  const { members, membersLoading, fetchMembers, workspace } = useWorkspaceStore()
+  const { members, membersLoading, membersError, fetchMembers, workspace } = useWorkspaceStore()
   const { projects, fetchProjects } = useProjectStore()
   const currentUser = useUserStore((s) => s.user)
   const openUpgrade = useUpgradeStore((s) => s.openUpgrade)
@@ -763,6 +765,19 @@ export default function MembersPage() {
               <Skeleton className="size-8 rounded-md" />
             </div>
           ))}
+        </div>
+      ) : membersError && members.length === 0 ? (
+        // Échec du chargement rendu explicite (message + Retry) : un fetch en erreur ne doit plus
+        // se confondre avec « No members found », qui laissait croire à un workspace vide.
+        <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-card py-16 text-center shadow-sm">
+          <div className="mb-4 flex size-12 items-center justify-center rounded-xl bg-muted">
+            <AlertTriangle className="size-5 text-amber-500" />
+          </div>
+          <p className="text-base font-medium text-foreground">Could not load members</p>
+          <p className="mt-1 text-sm text-muted-foreground">Something went wrong while loading this workspace.</p>
+          <Button variant="outline" size="sm" className="mt-4 gap-1.5" onClick={() => { void fetchMembers() }}>
+            <RefreshCw className="size-3.5" /> Retry
+          </Button>
         </div>
       ) : (
         <DataTable

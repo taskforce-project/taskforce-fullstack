@@ -1,5 +1,6 @@
 ---
 import BaseLayout from "@/layouts/BaseLayout.astro";
+import { APP_URL } from "@/components/site/nav";
 import PageHero from "@/components/site/PageHero.astro";
 import { DemoForm } from "@/components/site/DemoForm";
 import { Check } from "lucide-react";
@@ -125,7 +126,7 @@ const PROFILES = [
           </p>
         </div>
         <a
-          href={"/waitlist"}
+          href={`${APP_URL}/auth/register`}
           class="link-underline text-foreground shrink-0 text-[14px] font-medium"
         >
           Start free

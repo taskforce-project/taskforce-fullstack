@@ -1,5 +1,6 @@
 import { Check, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { APP_URL } from "@/components/site/nav";
 import { BrandLogo } from "../BrandLogo";
 import { Toast } from "../AppShot";
 
@@ -53,7 +54,7 @@ export function Hero() {
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <Button asChild size="pill-lg">
-              <a href={"/waitlist"}>Run your first workflow</a>
+              <a href={`${APP_URL}/auth/register`}>Run your first workflow</a>
             </Button>
             <Button asChild variant="outline" size="pill-lg">
               <a href="/book-a-demo">Book a demo</a>

@@ -26,9 +26,11 @@ export default function LegalNoticesPage() {
           <section>
             <h2 className="text-lg font-semibold text-foreground mb-3">1. Publisher</h2>
             <p>
-              TaskForce is published and operated by its founders. For any legal inquiry, contact{" "}
-              <a href="mailto:legal@taskforce.dev" className="text-foreground underline underline-offset-2">
-                legal@taskforce.dev
+              TaskForce is published by Pierre Michel (individual publisher; sole-proprietor
+              registration in progress), who is also the director of publication. For any legal
+              inquiry, contact{" "}
+              <a href="mailto:contact@taskforce-project.fr" className="text-foreground underline underline-offset-2">
+                contact@taskforce-project.fr
               </a>
               .
             </p>
@@ -54,8 +56,8 @@ export default function LegalNoticesPage() {
               <li>You are responsible for maintaining the confidentiality of your credentials.</li>
               <li>You must not share your account with third parties.</li>
               <li>You must notify us immediately of any unauthorized access at{" "}
-                <a href="mailto:security@taskforce.dev" className="text-foreground underline underline-offset-2">
-                  security@taskforce.dev
+                <a href="mailto:contact@taskforce-project.fr" className="text-foreground underline underline-offset-2">
+                  contact@taskforce-project.fr
                 </a>.
               </li>
             </ul>
@@ -110,8 +112,8 @@ export default function LegalNoticesPage() {
             <h2 className="text-lg font-semibold text-foreground mb-3">10. Contact</h2>
             <p>
               For any legal or compliance question:{" "}
-              <a href="mailto:legal@taskforce.dev" className="text-foreground underline underline-offset-2">
-                legal@taskforce.dev
+              <a href="mailto:contact@taskforce-project.fr" className="text-foreground underline underline-offset-2">
+                contact@taskforce-project.fr
               </a>
               .
             </p>

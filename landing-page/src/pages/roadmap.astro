@@ -4,7 +4,7 @@ import PageHero from "@/components/site/PageHero.astro";
 import PageCta from "@/components/site/PageCta.astro";
 import FaqSection from "@/components/site/sections/FaqSection.astro";
 import { LevelBadge } from "@/components/site/Section";
-import type { Maturity } from "@/components/site/nav";
+import { APP_URL, type Maturity } from "@/components/site/nav";
 
 type Item = { title: string; desc: string; level: Maturity };
 type Phase = { key: string; heading: string; blurb: string; dot: string; edge: string; items: Item[] };
@@ -68,7 +68,7 @@ const FAQ = [
     eyebrow="Roadmap"
     title="What's shipped, what's next, and where this goes"
     lead="We publish the direction in the open. Each capability is clearly marked Planned, Beta or Live - and the changelog records what actually ships."
-    primary={{ label: "Run your first workflow", href: "/waitlist" }}
+    primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
     secondary={{ label: "See the changelog", href: "/changelog" }}
   />
 
@@ -119,7 +119,7 @@ const FAQ = [
   <PageCta
     title="Start with what's live today"
     lead="The delivery foundation is already shipped. Start with your board, issues and integrations - then add governed runs as they become available."
-    primary={{ label: "Run your first workflow", href: "/waitlist" }}
+    primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
     secondary={{ label: "Book a demo", href: "/book-a-demo" }}
   />
 </BaseLayout>

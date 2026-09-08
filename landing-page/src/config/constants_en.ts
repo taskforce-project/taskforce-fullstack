@@ -81,7 +81,7 @@ export const constants_en = {
     },
     features: ["Real-time Collaboration", "Beautiful Themes", "Open Source"],
     mockup: {
-      url: "taskforce.app",
+      url: "taskforce-project.fr",
     },
   },
 
@@ -777,7 +777,7 @@ export const constants_en = {
           "If you have any questions about these Terms, please contact us at:",
         ],
         contact: {
-          email: "legal@taskforce.app",
+          email: "contact@taskforce-project.fr",
           address: "Taskforce Legal Department",
           response: "We aim to respond to all inquiries within 48 hours.",
         },
@@ -1040,7 +1040,7 @@ export const constants_en = {
           },
         ],
         exercise:
-          "To exercise any of these rights, please contact us at privacy@taskforce.app. We will respond within 30 days.",
+          "To exercise any of these rights, please contact us at contact@taskforce-project.fr. We will respond within 30 days.",
       },
       {
         id: "gdpr-compliance",
@@ -1189,8 +1189,8 @@ export const constants_en = {
           "If you have questions, concerns, or requests regarding this Privacy Policy or our data practices, please contact us:",
         ],
         contact: {
-          email: "privacy@taskforce.app",
-          dpo: "dpo@taskforce.app",
+          email: "contact@taskforce-project.fr",
+          dpo: "contact@taskforce-project.fr",
           address: "Taskforce Data Protection Officer",
           response:
             "We aim to respond to all privacy inquiries within 30 days.",
@@ -1432,7 +1432,7 @@ export const constants_en = {
       description:
         "Your feedback is essential to our ongoing accessibility improvements. If you encounter any accessibility barriers or have suggestions, please contact us.",
       contact: {
-        email: "accessibility@taskforce.com",
+        email: "contact@taskforce-project.fr",
         subject: "Accessibility Feedback",
       },
       closing:

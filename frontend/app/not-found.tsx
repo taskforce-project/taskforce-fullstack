@@ -54,11 +54,10 @@ export default function NotFound() {
         {/* Message */}
         <div className="flex flex-col gap-2 max-w-sm">
           <h1 className="text-xl font-semibold tracking-tight">
-            Page introuvable
+            Page not found
           </h1>
           <p className="text-sm text-muted-foreground leading-relaxed">
-            Cette page n&apos;existe pas ou a été déplacée. Revenez au tableau
-            de bord pour continuer.
+            This page doesn&apos;t exist or has moved. Head back to keep going.
           </p>
         </div>
 
@@ -71,10 +70,10 @@ export default function NotFound() {
             onClick={() => router.back()}
           >
             <ArrowLeft className="h-4 w-4" />
-            Retour
+            Back
           </Button>
           <Button asChild size="sm" className="gap-2">
-            <Link href="/dashboard">Tableau de bord</Link>
+            <Link href="/">Home</Link>
           </Button>
         </div>
       </div>

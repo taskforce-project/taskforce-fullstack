@@ -37,6 +37,48 @@ bash fetch-dashboards.sh
 docker compose -f docker-compose.monitoring.yml up -d
 ```
 
+## Métriques produit (datasource PostgreSQL)
+
+Suivi de l'**évolution du produit** (utilisateurs, répartition par plan, inscriptions dans le
+temps, dernière activité) via des **vues read-only** `metrics.*`. Les métriques **excluent** le
+compte de Pierre, les comptes de démo (`keycloak_id 'seed-%'`) et les workspaces de démo.
+
+```
+ Grafana (VM2) --(datasource Postgres)--> socat 9102 (Tailscale) --> taskforce-postgres-prod:5432
+     lit les vues metrics.* en tant que role grafana_ro (lecture seule, borne au schema metrics)
+```
+
+### VM1 - rôle read-only + vues + relais
+
+```bash
+# Depuis le repo cloné sur la VM1. POSTGRES_USER / POSTGRES_DB = ceux de .env.prod.
+PW=$(openssl rand -hex 24)
+docker exec -i taskforce-postgres-prod \
+  psql -v ON_ERROR_STOP=1 -v grafana_pw="'$PW'" \
+       -U "$POSTGRES_USER" -d "$POSTGRES_DB" < monitoring/vm1/metrics/grafana-metrics.sql
+echo "grafana_ro : $PW"   # à reporter dans ~/monitoring/vm2/.env (GRAFANA_PG_PASSWORD)
+
+# Relais socat Postgres (lié à l'IP Tailscale uniquement) : recharge les exporters
+cp monitoring/vm1/docker-compose.exporters.yml ~/monitoring/vm1/
+cd ~/monitoring/vm1 && docker compose -f docker-compose.exporters.yml up -d
+```
+
+### VM2 - datasource + dashboard
+
+```bash
+cd ~/monitoring/vm2
+# .env : renseigner GRAFANA_PG_PASSWORD (= PW ci-dessus) et GRAFANA_PG_DB (= POSTGRES_DB de la VM1)
+cp -r <repo>/monitoring/vm2/grafana ~/monitoring/vm2/     # datasource + dashboard taskforce-product.json
+docker compose -f docker-compose.monitoring.yml up -d
+```
+
+Dashboard : Grafana → dossier **TaskForce** → **« TaskForce - Produit »**.
+
+- **Sécurité** : Postgres n'est joignable que sur le **tailnet** (socat lié à `100.122.50.25`), le rôle
+  `grafana_ro` est en **lecture seule** et borné au schéma `metrics` ; les vues tournent avec les droits
+  de leur propriétaire (pas d'accès direct aux tables `public.*`) et **aucune n'expose de secret**.
+- Les exclusions (toi, démo) vivent dans `monitoring/vm1/metrics/grafana-metrics.sql` (vue `metrics.real_users`).
+
 ## Alertes
 
 - **9 règles** (`prometheus/rules/taskforce-alerts.yml`, chargées via `rule_files:`) en 4 familles :

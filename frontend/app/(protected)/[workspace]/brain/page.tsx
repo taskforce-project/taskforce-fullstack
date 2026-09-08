@@ -183,7 +183,7 @@ export default function BrainPage() {
 
       {error && (
         <div className="m-6 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-          {error}
+          Something went wrong with Brain OS. Please try again.
         </div>
       )}
 

@@ -5,10 +5,11 @@ import { useRouter, useParams } from "next/navigation"
 import {
   Radio, AtSign, ShieldAlert, ClipboardList,
   CheckCheck, Flame, AlertTriangle, Clock, CheckCircle2,
-  MessageSquare, ArrowRight, ArrowUpRight, X,
+  MessageSquare, ArrowRight, ArrowUpRight, X, RefreshCw,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -88,6 +89,45 @@ function EmptyState({ tab }: { readonly tab: NotifTab }) {
   )
 }
 
+// ─── Loading state ──────────────────────────────────────────────────────────
+// Squelette de liste pendant le fetch initial : évite que « All clear » clignote avant l'arrivée
+// des données (l'état vide ne doit s'afficher qu'une fois le chargement terminé).
+function LoadingState() {
+  return (
+    <div className="overflow-hidden rounded-xl border border-border bg-card">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div key={i} className="flex items-center gap-3 border-b border-border/50 px-4 py-3 last:border-0">
+          <Skeleton className="size-2 shrink-0 rounded-full" />
+          <Skeleton className="hidden h-4 w-32 sm:block" />
+          <Skeleton className="h-4 flex-1" />
+          <Skeleton className="hidden h-4 w-16 md:block" />
+          <Skeleton className="h-4 w-12" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ─── Error state ────────────────────────────────────────────────────────────
+// Échec de chargement rendu explicite (message + Retry) : un fetch en erreur ne doit plus se
+// confondre avec un feed vide « All clear ».
+function ErrorState({ onRetry }: { readonly onRetry: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-border bg-card py-16 text-center">
+      <div className="flex size-12 items-center justify-center rounded-xl bg-muted">
+        <AlertTriangle className="size-5 text-amber-500" />
+      </div>
+      <div className="space-y-1">
+        <p className="text-sm font-semibold text-foreground">Could not load signals</p>
+        <p className="text-xs text-muted-foreground">Something went wrong while loading your feed.</p>
+      </div>
+      <Button variant="outline" size="sm" className="gap-1.5" onClick={onRetry}>
+        <RefreshCw className="size-3.5" /> Retry
+      </Button>
+    </div>
+  )
+}
+
 // ─── InboxView ────────────────────────────────────────────────────────────────
 
 interface InboxViewProps {
@@ -99,7 +139,7 @@ export function InboxView({ defaultTab = "all" }: InboxViewProps) {
   const params = useParams()
   const slug = params?.workspace as string | undefined
 
-  const { signals, lastSyncAt, fetchNotifications, markAsRead, markAllAsRead, acknowledgeAll, acknowledge: acknowledgeNotif } =
+  const { signals, isLoading, error, lastSyncAt, fetchNotifications, markAsRead, markAllAsRead, acknowledgeAll, acknowledge: acknowledgeNotif } =
     useNotificationStore()
 
 
@@ -272,7 +312,13 @@ export function InboxView({ defaultTab = "all" }: InboxViewProps) {
       </Tabs>
 
       {/* Signal table (DataTable : tri + pagination paramétrable) */}
-      {filtered.length === 0 ? (
+      {/* Chargement initial (aucune donnée encore) → squelette ; échec → état d'erreur ; sinon on ne
+          montre « All clear » QUE quand le fetch est terminé et la liste réellement vide. */}
+      {isLoading && signals.length === 0 ? (
+        <LoadingState />
+      ) : error && signals.length === 0 ? (
+        <ErrorState onRetry={() => { if (slug) void fetchNotifications(slug) }} />
+      ) : filtered.length === 0 ? (
         <EmptyState tab={activeTab} />
       ) : (
         <div className="space-y-3">

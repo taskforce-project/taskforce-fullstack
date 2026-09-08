@@ -1294,8 +1294,8 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
   async function saveDueDate(val: string) {
     const next = val || null
     setDueDate(next)
-    await callUpdate({ dueDate: next })
-    toast.success(next ? "Due date updated" : "Due date removed")
+    // callUpdate toaste deja l'erreur : on ne confirme QUE si l'ecriture a reussi.
+    if (await callUpdate({ dueDate: next })) toast.success(next ? "Due date updated" : "Due date removed")
   }
 
   function toggleLabel(l: IssueLabel) {
@@ -1328,32 +1328,34 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
     if (!comment.trim() || !workspaceSlug || !projectId) return
     const content = comment.trim()
     setComment("")
-    try {
-      await addComment(workspaceSlug, projectId, issueId, content)
-      toast.success("Comment added")
-    } catch {
+    // addComment avale l'erreur et renvoie null (pas de throw) : on branche sur le retour,
+    // sinon "Comment added" s'affichait alors que le commentaire etait PERDU (catch mort).
+    const created = await addComment(workspaceSlug, projectId, issueId, content)
+    if (!created) {
       toast.error("Failed to add comment")
       setComment(content)
+      return
     }
+    toast.success("Comment added")
   }
 
   async function handleDeleteComment(commentId: number) {
     if (!workspaceSlug || !projectId) return
-    try {
-      await deleteComment(workspaceSlug, projectId, issueId, commentId)
-      toast.success("Comment deleted")
-    } catch {
+    // deleteComment renvoie false en echec (pas de throw) : on branche sur le retour.
+    const ok = await deleteComment(workspaceSlug, projectId, issueId, commentId)
+    if (!ok) {
       toast.error("Failed to delete comment")
+      return
     }
+    toast.success("Comment deleted")
   }
 
   async function onTitleBlur() {
     setEditingTitle(false)
-    await callUpdate({ title })
-    toast.success("Title updated")
+    if (await callUpdate({ title })) toast.success("Title updated")
   }
   async function onTitleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter") { setEditingTitle(false); await callUpdate({ title }); toast.success("Title updated") }
+    if (e.key === "Enter") { setEditingTitle(false); if (await callUpdate({ title })) toast.success("Title updated") }
     if (e.key === "Escape") { setTitle(issue!.title); setEditingTitle(false) }
   }
 

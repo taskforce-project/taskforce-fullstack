@@ -105,7 +105,7 @@ export function ComparisonTable({ className }: Readonly<ComparisonTableProps>) {
         </p>
         <div className="flex gap-4 justify-center">
           <Button variant="outline" size="lg" asChild>
-            <a href="mailto:contact@taskforce.com">Nous contacter</a>
+            <a href="mailto:contact@taskforce-project.fr">Contact us</a>
           </Button>
           <Button size="lg" asChild>
             <Link href="/auth/register">Commencer gratuitement</Link>

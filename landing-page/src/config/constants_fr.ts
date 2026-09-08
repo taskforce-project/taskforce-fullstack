@@ -85,7 +85,7 @@ export const constants_fr = {
       "Open Source",
     ],
     mockup: {
-      url: "taskforce.app",
+      url: "taskforce-project.fr",
     },
   },
 
@@ -654,7 +654,7 @@ export const constants_fr = {
           "Si vous avez des questions sur ces Conditions, veuillez nous contacter à :",
         ],
         contact: {
-          email: "legal@taskforce.app",
+          email: "contact@taskforce-project.fr",
           address: "Service Juridique Taskforce",
           response: "Nous visons à répondre à toutes les demandes sous 48 heures.",
         },
@@ -934,7 +934,7 @@ export const constants_fr = {
           },
         ],
         exercise:
-          "Pour exercer l'un de ces droits, veuillez nous contacter à privacy@taskforce.app. Nous répondrons dans les 30 jours.",
+          "Pour exercer l'un de ces droits, veuillez nous contacter à contact@taskforce-project.fr. Nous répondrons dans les 30 jours.",
       },
       {
         id: "gdpr-compliance",
@@ -1086,8 +1086,8 @@ export const constants_fr = {
           "Si vous avez des questions, préoccupations ou demandes concernant cette Politique de Confidentialité ou nos pratiques en matière de données, veuillez nous contacter :",
         ],
         contact: {
-          email: "privacy@taskforce.app",
-          dpo: "dpo@taskforce.app",
+          email: "contact@taskforce-project.fr",
+          dpo: "contact@taskforce-project.fr",
           address: "Délégué à la Protection des Données Taskforce",
           response:
             "Nous visons à répondre à toutes les demandes de confidentialité dans les 30 jours.",
@@ -1330,7 +1330,7 @@ export const constants_fr = {
       description:
         "Vos retours sont essentiels à notre amélioration continue de l'accessibilité. Si vous rencontrez des obstacles d'accessibilité ou avez des suggestions, veuillez nous contacter.",
       contact: {
-        email: "accessibility@taskforce.com",
+        email: "contact@taskforce-project.fr",
         subject: "Retour d'Accessibilité",
       },
       closing:
