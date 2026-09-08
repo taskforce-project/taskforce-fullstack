@@ -43,7 +43,7 @@ const TIERS: Tier[] = [
       { label: "250 issues" },
       { label: "Boards, lists & cycles" },
       { label: "Smart Assign" },
-      { label: "100K Cortex AI tokens / month" },
+      { label: "50K Cortex AI tokens / month" },
     ],
   },
   {
@@ -59,13 +59,13 @@ const TIERS: Tier[] = [
       { label: "Unlimited issues" },
       { label: "Unlimited file uploads" },
       { label: "Admin roles" },
-      { label: "500K Cortex AI tokens / month" },
+      { label: "300K Cortex AI tokens / month" },
     ],
   },
   {
     name: "Business",
-    priceMonthly: 19,
-    priceAnnual: 19,
+    priceMonthly: 16,
+    priceAnnual: 14,
     unit: "per member / month",
     tagline: "For teams that ship fast.",
     cta: { label: "Start free trial", href: REGISTER },
@@ -77,7 +77,7 @@ const TIERS: Tier[] = [
       { label: "Advanced analytics + burndown" },
       { label: "AI decisions & workflows", badge: "Beta" },
       { label: "GitHub integration" },
-      { label: "2M Cortex AI tokens / month" },
+      { label: "800K Cortex AI tokens / month" },
     ],
   },
   {
@@ -181,7 +181,7 @@ function PriceColumn({ tier, annual }: { tier: Tier; annual: boolean }) {
           <span className="text-4xl font-semibold tracking-tight text-foreground">Custom</span>
         ) : (
           <>
-            <span className="text-4xl font-semibold tracking-tight text-foreground">{price} €</span>
+            <span className="text-4xl font-semibold tracking-tight text-foreground">${price}</span>
             {tier.unit && <span className="text-muted-foreground text-[13px]">{tier.unit}</span>}
           </>
         )}
@@ -260,7 +260,7 @@ export function PricingSection() {
             >
               Annual
               <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
-                −17%
+                Save $2/mo
               </span>
             </button>
           </div>

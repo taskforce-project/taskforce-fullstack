@@ -22,4 +22,6 @@ public class CreateCheckoutSessionRequest {
     private String successUrl; // URL de redirection après paiement réussi
 
     private String cancelUrl; // URL de redirection si l'utilisateur annule
+
+    private String billingInterval; // "month" (défaut) ou "year" (annuel, prix réduit)
 }

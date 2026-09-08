@@ -31,6 +31,12 @@ public class StripeConfig {
     @Value("${stripe.plans.business.price-id:}")
     private String businessPriceId;
 
+    @Value("${stripe.plans.basic.yearly-price-id:}")
+    private String basicYearlyPriceId;
+
+    @Value("${stripe.plans.business.yearly-price-id:}")
+    private String businessYearlyPriceId;
+
     @Value("${stripe.plans.enterprise.price-id:}")
     private String enterprisePriceId;
 

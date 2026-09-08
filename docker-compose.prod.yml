@@ -188,6 +188,8 @@ services:
       STRIPE_PUBLIC_KEY: ${STRIPE_PUBLIC_KEY}
       STRIPE_PRICE_ID_BASIC: ${STRIPE_PRICE_ID_BASIC}
       STRIPE_PRICE_ID_BUSINESS: ${STRIPE_PRICE_ID_BUSINESS}
+      STRIPE_PRICE_ID_BASIC_YEARLY: ${STRIPE_PRICE_ID_BASIC_YEARLY}
+      STRIPE_PRICE_ID_BUSINESS_YEARLY: ${STRIPE_PRICE_ID_BUSINESS_YEARLY}
 
       # Chiffrement au repos des données personnelles (RGPD).
       # Le nom DOIT être TF_ENCRYPTION_KEY : c'est celui que lit `security.encryption-key`.

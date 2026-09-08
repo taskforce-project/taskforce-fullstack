@@ -45,7 +45,7 @@ const PLANS: PlanDef[] = [
       "250 issues",
       "Board, List & Cycles",
       "Smart Assign",
-      "100,000 Cortex AI tokens / month",
+      "50,000 Cortex AI tokens / month",
     ],
   },
   {
@@ -59,14 +59,14 @@ const PLANS: PlanDef[] = [
       "Unlimited issues",
       "Unlimited file uploads",
       "Admin roles",
-      "500,000 Cortex AI tokens / month",
+      "300,000 Cortex AI tokens / month",
     ],
   },
   {
     key: "BUSINESS",
     name: "Business",
     tagline: "For teams that ship fast.",
-    monthly: 19,
+    monthly: 16,
     inherits: "Basic",
     highlight: true,
     features: [
@@ -75,7 +75,7 @@ const PLANS: PlanDef[] = [
       "Advanced analytics + burndown",
       "AI decisions & workflows",
       "GitHub integration",
-      "2,000,000 Cortex AI tokens / month",
+      "800,000 Cortex AI tokens / month",
     ],
   },
   {
@@ -159,7 +159,7 @@ export default function BillingPage() {
   async function checkout(plan: SelfServe) {
     setBusy(true)
     try {
-      const { checkoutUrl } = await stripeService.createCheckoutSession(plan)
+      const { checkoutUrl } = await stripeService.createCheckoutSession(plan, undefined, undefined, annual ? "year" : "month")
       window.location.assign(checkoutUrl)
     } catch (e) {
       // 409 = règle métier claire (ex. forfait pas encore configuré côté Stripe) → on montre le message
@@ -171,9 +171,10 @@ export default function BillingPage() {
 
   function priceFor(p: PlanDef): { big: string; per: string } {
     if (p.monthly === null) return { big: "Custom", per: "" }
-    if (p.monthly === 0) return { big: "€0", per: "" }
-    const perMonth = annual ? Math.round(p.monthly * 0.83) : p.monthly
-    return { big: `€${perMonth}`, per: "per member / month" }
+    if (p.monthly === 0) return { big: "$0", per: "" }
+    // Annuel : reduction FIXE de -2 USD/mois (facture a l'annee). Aligne sur les prix Stripe.
+    const perMonth = annual ? p.monthly - 2 : p.monthly
+    return { big: `$${perMonth}`, per: annual ? "per member / month, billed yearly" : "per member / month" }
   }
 
   function renderCta(p: PlanDef) {
