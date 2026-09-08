@@ -53,10 +53,16 @@ CREATE SCHEMA IF NOT EXISTS metrics;
 CREATE OR REPLACE VIEW metrics.real_users AS
 SELECT u.*
 FROM public.users u
-WHERE u.keycloak_id NOT LIKE 'seed-%'
+WHERE u.keycloak_id NOT LIKE 'seed-%'                    -- coequipiers demo (nouveau seed)
+  AND u.keycloak_id NOT LIKE 'demo-%'                    -- coequipiers demo (ancien seed Nimbus)
   AND lower(u.email) NOT LIKE '%@seed.taskforce.dev'
-  AND lower(u.email) <> 'pierre.michel.work@gmail.com'
-  AND lower(u.email) <> 'admin@taskforce.dev';
+  AND lower(u.email) NOT LIKE '%@demo.taskforce.dev'     -- ancien domaine demo
+  AND lower(u.email) NOT LIKE '%@anonymized.invalid'     -- comptes supprimes/anonymises (RGPD)
+  AND lower(u.email) NOT IN (
+        'pierre.michel.work@gmail.com',                  -- toi (compte perso/owner demo)
+        'pierre.michel@stagiairesmns.fr',                -- toi (compte ecole)
+        'admin@taskforce.dev'                            -- admin dev residuel
+      );
 
 -- --------------------------------------------------------------------
 -- 4. KPIs utilisateurs (une ligne, pour des panels "stat")
@@ -116,17 +122,22 @@ ORDER BY created_at DESC;
 -- --------------------------------------------------------------------
 -- 8. KPIs workspaces / projets / issues (hors demo)
 -- --------------------------------------------------------------------
+-- Ne compte que les workspaces dont le PROPRIETAIRE est un vrai user (exclut les workspaces
+-- personnels des comptes demo/anonymises), hors slugs de demo.
 CREATE OR REPLACE VIEW metrics.kpi_workspaces AS
 SELECT
     (SELECT count(*) FROM public.workspaces w
-       WHERE w.slug NOT IN ('demo','nimbus','taskforce-demo'))              AS total_workspaces,
+       WHERE w.slug NOT IN ('demo','nimbus','taskforce-demo')
+         AND w.owner_id IN (SELECT id FROM metrics.real_users))            AS total_workspaces,
     (SELECT count(*) FROM public.projects p
        JOIN public.workspaces w ON w.id = p.workspace_id
-       WHERE w.slug NOT IN ('demo','nimbus','taskforce-demo'))             AS total_projects,
+       WHERE w.slug NOT IN ('demo','nimbus','taskforce-demo')
+         AND w.owner_id IN (SELECT id FROM metrics.real_users))           AS total_projects,
     (SELECT count(*) FROM public.issues i
        JOIN public.projects p   ON p.id = i.project_id
        JOIN public.workspaces w ON w.id = p.workspace_id
-       WHERE w.slug NOT IN ('demo','nimbus','taskforce-demo'))            AS total_issues;
+       WHERE w.slug NOT IN ('demo','nimbus','taskforce-demo')
+         AND w.owner_id IN (SELECT id FROM metrics.real_users))          AS total_issues;
 
 -- --------------------------------------------------------------------
 -- 9. Activite EXTERNE (hors toi + hors demo) : issue_activity U audit_logs.
@@ -139,15 +150,14 @@ SELECT
     u.email                                             AS email,
     'issue:' || ia.action::text                         AS what,
     w.name                                              AS workspace
+-- Acteur = vrai user (JOIN sur metrics.real_users => exclusion centralisee : demo ancien+nouveau,
+-- tes 2 comptes, comptes anonymises). On garde juste le filtre workspace de demo.
 FROM public.issue_activity ia
-JOIN public.users      u ON u.id = ia.actor_id
+JOIN metrics.real_users u ON u.id = ia.actor_id
 JOIN public.issues     i ON i.id = ia.issue_id
 JOIN public.projects   p ON p.id = i.project_id
 JOIN public.workspaces w ON w.id = p.workspace_id
-WHERE u.keycloak_id NOT LIKE 'seed-%'
-  AND lower(u.email) <> 'pierre.michel.work@gmail.com'
-  AND lower(u.email) <> 'admin@taskforce.dev'
-  AND w.slug NOT IN ('demo','nimbus','taskforce-demo')
+WHERE w.slug NOT IN ('demo','nimbus','taskforce-demo')
 UNION ALL
 SELECT
     al.created_at                                       AS at,
@@ -156,12 +166,9 @@ SELECT
     'audit:' || al.action                               AS what,
     w.name                                              AS workspace
 FROM public.audit_logs al
-JOIN public.users       u ON u.id = al.actor_user_id
+JOIN metrics.real_users u ON u.id = al.actor_user_id
 LEFT JOIN public.workspaces w ON w.id = al.workspace_id
-WHERE u.keycloak_id NOT LIKE 'seed-%'
-  AND lower(u.email) <> 'pierre.michel.work@gmail.com'
-  AND lower(u.email) <> 'admin@taskforce.dev'
-  AND (w.slug IS NULL OR w.slug NOT IN ('demo','nimbus','taskforce-demo'));
+WHERE (w.slug IS NULL OR w.slug NOT IN ('demo','nimbus','taskforce-demo'));
 
 -- Secondes depuis la derniere activite externe (-1 si aucune) : panel "stat" alertable.
 CREATE OR REPLACE VIEW metrics.seconds_since_last_activity AS
