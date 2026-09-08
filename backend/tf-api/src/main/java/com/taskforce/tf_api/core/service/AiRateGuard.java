@@ -46,6 +46,10 @@ public class AiRateGuard {
     @Value("${ai.rate.account-tpm:6000}")
     private long accountTpm;
 
+    /** Plafond REQUETES/minute par compte (throttle explicite, ex. beta ~5 users). {@code <= 0} desactive. */
+    @Value("${ai.rate.account-rpm:0}")
+    private long accountRpm;
+
     public AiRateGuard(ObjectProvider<StringRedisTemplate> redisProvider) {
         this.redisProvider = redisProvider;
     }
@@ -65,6 +69,16 @@ public class AiRateGuard {
             if (accountTpm > 0 && read(redis, "ai:tpm:a:" + accountId + ":" + minute) >= accountTpm) {
                 throw new AiRateLimitedException(
                     "Trop de requetes IA sur la derniere minute. Reessaie dans un instant.");
+            }
+            // Throttle par NOMBRE de requetes/minute/compte (ex. beta : ~5 users a 1 req/min tiennent
+            // dans le budget Groq partage). On compte la requete admise ici (le debit tokens vient apres).
+            if (accountRpm > 0) {
+                String rpmKey = "ai:rpm:a:" + accountId + ":" + minute;
+                if (read(redis, rpmKey) >= accountRpm) {
+                    throw new AiRateLimitedException(
+                        "Trop de requetes IA sur la derniere minute. Reessaie dans un instant.");
+                }
+                bump(redis, rpmKey, 1L);
             }
         } catch (AiRateLimitedException e) {
             throw e;
