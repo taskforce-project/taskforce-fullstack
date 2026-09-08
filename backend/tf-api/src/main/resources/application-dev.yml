@@ -149,8 +149,10 @@ stripe:
   plans:
     basic:
       price-id: ${STRIPE_PRICE_ID_BASIC:price_basic_test}
+      yearly-price-id: ${STRIPE_PRICE_ID_BASIC_YEARLY:}
     business:
       price-id: ${STRIPE_PRICE_ID_BUSINESS:price_business_test}
+      yearly-price-id: ${STRIPE_PRICE_ID_BUSINESS_YEARLY:}
     enterprise:
       price-id: ${STRIPE_ENTERPRISE_PRICE_ID:price_enterprise_test}
   checkout:

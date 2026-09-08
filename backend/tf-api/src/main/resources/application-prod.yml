@@ -150,8 +150,10 @@ stripe:
   plans:
     basic:
       price-id: ${STRIPE_PRICE_ID_BASIC:}
+      yearly-price-id: ${STRIPE_PRICE_ID_BASIC_YEARLY:}
     business:
       price-id: ${STRIPE_PRICE_ID_BUSINESS:}
+      yearly-price-id: ${STRIPE_PRICE_ID_BUSINESS_YEARLY:}
     enterprise:
       price-id: ${STRIPE_ENTERPRISE_PRICE_ID:}
   # Le code lit stripe.success-url / stripe.cancel-url À PLAT (StripeConfig @Value), pas sous stripe.checkout.
