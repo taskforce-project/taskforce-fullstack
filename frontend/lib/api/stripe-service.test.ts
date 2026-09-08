@@ -55,6 +55,7 @@ describe('stripeService', () => {
         planType: 'BUSINESS',
         successUrl: 'http://localhost:3000/payment/success',
         cancelUrl: 'http://localhost:3000/payment/cancel',
+        billingInterval: 'month',
       });
     });
 
@@ -76,6 +77,7 @@ describe('stripeService', () => {
         planType: 'BASIC',
         successUrl: 'http://localhost:3000/payment/success',
         cancelUrl: 'http://localhost:3000/payment/cancel',
+        billingInterval: 'month',
       });
     });
 
@@ -104,6 +106,7 @@ describe('stripeService', () => {
         planType: 'BUSINESS',
         successUrl: customSuccessUrl,
         cancelUrl: customCancelUrl,
+        billingInterval: 'month',
       });
     });
 
