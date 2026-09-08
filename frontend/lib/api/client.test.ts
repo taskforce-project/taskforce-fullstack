@@ -329,7 +329,7 @@ describe('API Client', () => {
       vi.mocked(axios.isAxiosError).mockReturnValue(true);
 
       expect(getErrorMessage({ isAxiosError: true, response: undefined, message: '' })).toBe(
-        'Une erreur est survenue',
+        'Something went wrong',
       );
     });
 
@@ -342,14 +342,14 @@ describe('API Client', () => {
     it('retombe sur un message générique pour un type inconnu', () => {
       vi.mocked(axios.isAxiosError).mockReturnValue(false);
 
-      expect(getErrorMessage({ unknown: 'error' })).toBe('Une erreur inconnue est survenue');
+      expect(getErrorMessage({ unknown: 'error' })).toBe('Something went wrong');
     });
 
     it('tolère null et undefined', () => {
       vi.mocked(axios.isAxiosError).mockReturnValue(false);
 
-      expect(getErrorMessage(null)).toBe('Une erreur inconnue est survenue');
-      expect(getErrorMessage(undefined)).toBe('Une erreur inconnue est survenue');
+      expect(getErrorMessage(null)).toBe('Something went wrong');
+      expect(getErrorMessage(undefined)).toBe('Something went wrong');
     });
   });
 });
