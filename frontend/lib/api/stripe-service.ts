@@ -55,7 +55,8 @@ export const stripeService = {
   async createCheckoutSession(
     planType: "BASIC" | "BUSINESS",
     successUrl?: string,
-    cancelUrl?: string
+    cancelUrl?: string,
+    billingInterval: "month" | "year" = "month"
   ): Promise<CheckoutSessionResponse> {
     try {
       const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
@@ -68,6 +69,7 @@ export const stripeService = {
           planType,
           successUrl: successUrl || `${baseUrl}/payment/success`,
           cancelUrl: cancelUrl || `${baseUrl}/payment/cancel`,
+          billingInterval,
         },
       );
 
