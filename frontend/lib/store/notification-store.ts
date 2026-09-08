@@ -94,6 +94,8 @@ interface NotificationState {
   signals: Signal[];
   unreadCount: number;
   isLoading: boolean;
+  /** Message d'échec du dernier chargement (null si OK) - permet à la vue de distinguer « vide » de « échec ». */
+  error: string | null;
   /** Horodatage de la dernière synchro réelle (fetch ou push STOMP) - alimente l'indicateur « Live ». */
   lastSyncAt: number | null;
 
@@ -117,17 +119,18 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   signals:     [],
   unreadCount: 0,
   isLoading:   false,
+  error:       null,
   lastSyncAt:  null,
 
   fetchNotifications: async (slug) => {
-    set({ isLoading: true });
+    set({ isLoading: true, error: null });
     try {
       const data = await listNotifications(slug);
       const signals = sortByUrgency(data.map(toSignal));
       const unreadCount = signals.filter((s) => !s.read).length;
       set({ signals, unreadCount, isLoading: false, lastSyncAt: Date.now() });
     } catch {
-      set({ isLoading: false });
+      set({ isLoading: false, error: "Could not load notifications." });
     }
   },
 

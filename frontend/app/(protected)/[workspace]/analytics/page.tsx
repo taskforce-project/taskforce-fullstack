@@ -4,11 +4,13 @@ import {
   TrendingUp, TrendingDown, Zap, AlertTriangle, Brain,
   Activity, Flame, Minus,
 } from "lucide-react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useParams } from "next/navigation"
 
 import { PageContainer, PageHeader } from "@/components/layout/page-shell"
 import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
+import { CardSkeleton, CardError } from "@/components/dashboard/card-states"
 import { SectionCard, MetricSplit } from "@/components/ui/section-card"
 import { useUpgradeStore } from "@/lib/store/upgrade-store"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -102,25 +104,47 @@ export default function AnalyticsPage() {
   const slug = params.workspace as string
   const openUpgrade = useUpgradeStore((s) => s.openUpgrade)
   const [kpis, setKpis] = useState<AnalyticsKpis | null>(null)
+  const [kpisLoading, setKpisLoading] = useState(true)
+  const [kpisError, setKpisError] = useState(false)
   const [insights, setInsights] = useState<AiInsight[]>([])
+  const [insightsLoading, setInsightsLoading] = useState(true)
+  const [insightsError, setInsightsError] = useState(false)
   const [projects, setProjects] = useState<Project[]>([])
   const [projectFilter, setProjectFilter] = useState<string>(ALL_PROJECTS)
 
   const isPro = user?.planType === "BUSINESS" || user?.planType === "ENTERPRISE"
   const projectId = projectFilter === ALL_PROJECTS ? null : Number(projectFilter)
 
-  // Liste des projets pour le filtre + insights IA (workspace-wide)
-  useEffect(() => {
+  // Signaux IA (workspace-wide) : chargement + échec explicites, pour ne plus laisser « No signals yet »
+  // masquer un fetch en erreur.
+  const loadInsights = useCallback(() => {
     if (!slug) return
-    listProjects(slug).then(setProjects).catch(() => { /* non-critical */ })
-    getAiInsights(slug).then(setInsights).catch(() => { /* non-critical */ })
+    setInsightsLoading(true)
+    setInsightsError(false)
+    getAiInsights(slug)
+      .then((data) => { setInsights(data); setInsightsLoading(false) })
+      .catch(() => { setInsightsError(true); setInsightsLoading(false) })
   }, [slug])
 
-  // KPIs réels (re-fetch au changement de filtre projet - PROD-1.7)
+  // KPIs réels (re-fetch au changement de filtre projet - PROD-1.7) : on distingue chargement et échec
+  // pour ne pas faire clignoter des zéros trompeurs pendant le fetch, et pour surfacer l'erreur.
+  const loadKpis = useCallback(() => {
+    if (!slug) return
+    setKpisLoading(true)
+    setKpisError(false)
+    getAnalyticsKpis(slug, projectId)
+      .then((data) => { setKpis(data); setKpisLoading(false) })
+      .catch(() => { setKpisError(true); setKpisLoading(false) })
+  }, [slug, projectId])
+
+  // Liste des projets : non bloquante (alimente seulement le sélecteur de filtre).
   useEffect(() => {
     if (!slug) return
-    getAnalyticsKpis(slug, projectId).then(setKpis).catch(() => { /* non-critical */ })
-  }, [slug, projectId])
+    listProjects(slug).then(setProjects).catch(() => { /* non-critical: filtre projet seulement */ })
+  }, [slug])
+
+  useEffect(() => { loadInsights() }, [loadInsights])
+  useEffect(() => { loadKpis() }, [loadKpis])
 
   // KPIs réels → cartes (zéros tant que non chargés ; aucun mock - PROD-1.7)
   const k = kpis ?? { tasksResolved: 0, tasksResolvedDelta: 0, avgResolutionDays: 0, avgResolutionDaysDelta: 0, velocity: 0, velocityDelta: 0, activeCycles: 0 }
@@ -181,19 +205,37 @@ export default function AnalyticsPage() {
       <SectionCard
         title="AI Signals"
         icon={<Brain className="size-4" />}
-        action={<span className="text-xs text-muted-foreground">{insights.length} {insights.length > 1 ? "signals" : "signal"}</span>}
+        action={
+          !insightsLoading && !insightsError
+            ? <span className="text-xs text-muted-foreground">{insights.length} {insights.length > 1 ? "signals" : "signal"}</span>
+            : undefined
+        }
         bodyClassName="p-4 space-y-2"
       >
-        {insights.length === 0
-          ? <p className="py-6 text-center text-sm text-muted-foreground">No signals yet.</p>
-          : insights.map((ins, i) => <InsightRow key={`${ins.agent}-${i}`} insight={ins} />)}
+        {insightsLoading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-lg" />)}
+          </div>
+        ) : insightsError ? (
+          <CardError onRetry={loadInsights} message="Signals unavailable" />
+        ) : insights.length === 0 ? (
+          <p className="py-6 text-center text-sm text-muted-foreground">No signals yet.</p>
+        ) : (
+          insights.map((ins, i) => <InsightRow key={`${ins.agent}-${i}`} insight={ins} />)
+        )}
       </SectionCard>
 
       {/* 3 - Les chiffres (même chrome que les cartes du dashboard : en-tête + MetricSplit). */}
       <SectionCard title="Key metrics" icon={<Activity className="size-4" />} bodyClassName="p-0">
-        <MetricSplit className="max-sm:flex-col max-sm:divide-x-0 max-sm:divide-y">
-          {kpiMetrics.map((m) => <KpiCell key={m.label} metric={m} />)}
-        </MetricSplit>
+        {kpisLoading ? (
+          <div className="p-4"><CardSkeleton /></div>
+        ) : kpisError ? (
+          <div className="p-4"><CardError onRetry={loadKpis} message="Metrics unavailable" /></div>
+        ) : (
+          <MetricSplit className="max-sm:flex-col max-sm:divide-x-0 max-sm:divide-y">
+            {kpiMetrics.map((m) => <KpiCell key={m.label} metric={m} />)}
+          </MetricSplit>
+        )}
       </SectionCard>
 
       {/* 4 - L'exploration : 3 aperçus → modal (catalogue + génération IA). */}
