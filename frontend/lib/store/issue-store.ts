@@ -85,7 +85,7 @@ interface IssueState {
   fetchComments: (slug: string, projectId: number, issueId: number) => Promise<IssueComment[]>;
   addComment: (slug: string, projectId: number, issueId: number, content: string) => Promise<IssueComment | null>;
   updateComment: (slug: string, projectId: number, issueId: number, commentId: number, content: string) => Promise<IssueComment | null>;
-  deleteComment: (slug: string, projectId: number, issueId: number, commentId: number) => Promise<void>;
+  deleteComment: (slug: string, projectId: number, issueId: number, commentId: number) => Promise<boolean>;
 
   // Activité
   fetchActivity: (slug: string, projectId: number, issueId: number) => Promise<IssueActivity[]>;
@@ -402,9 +402,12 @@ export const useIssueStore = create<IssueState>((set, get) => ({
     try {
       await deleteCommentApi(slug, projectId, issueId, commentId);
       set((state) => ({ comments: state.comments.filter((c) => c.id !== commentId) }));
+      return true;
     } catch (err) {
+      // Retour false (pas de throw) : l'appelant (issue-sheet) toaste l'echec au bon moment.
       const message = err instanceof Error ? err.message : "Erreur lors de la suppression du commentaire";
       set({ error: message });
+      return false;
     }
   },
 
