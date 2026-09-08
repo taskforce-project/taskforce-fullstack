@@ -7,3 +7,23 @@ datasources:
     url: http://prometheus:9090
     isDefault: true
     editable: false
+
+  # Metriques PRODUIT (vues read-only `metrics.*`) via le relais socat de la VM1.
+  # Valeurs injectees par l'env du conteneur grafana (docker-compose.monitoring.yml + .env).
+  - name: TaskForce Postgres
+    type: grafana-postgresql-datasource
+    uid: taskforce-postgres
+    access: proxy
+    url: $GRAFANA_PG_HOST
+    user: $GRAFANA_PG_USER
+    database: $GRAFANA_PG_DB
+    isDefault: false
+    editable: false
+    jsonData:
+      sslmode: disable
+      postgresVersion: 1500
+      maxOpenConns: 3
+      maxIdleConns: 1
+      connMaxLifetime: 14400
+    secureJsonData:
+      password: $GRAFANA_PG_PASSWORD

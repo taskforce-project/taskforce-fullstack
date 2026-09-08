@@ -62,6 +62,11 @@ services:
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_ANALYTICS_REPORTING_ENABLED: "false"
       GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      # Datasource metriques produit (interpolee dans provisioning/datasources/datasource.yml)
+      GRAFANA_PG_HOST: ${GRAFANA_PG_HOST:-100.122.50.25:9102}
+      GRAFANA_PG_DB: ${GRAFANA_PG_DB:-taskforce}
+      GRAFANA_PG_USER: ${GRAFANA_PG_USER:-grafana_ro}
+      GRAFANA_PG_PASSWORD: ${GRAFANA_PG_PASSWORD:?definir GRAFANA_PG_PASSWORD dans .env}
     volumes:
       - grafana-data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro

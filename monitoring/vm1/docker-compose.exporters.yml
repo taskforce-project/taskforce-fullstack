@@ -55,3 +55,17 @@ services:
       - "100.122.50.25:9101:9101"   # Tailscale uniquement
     networks:
       - taskforce-prod-network
+
+  # Relais TCP : 9102 (tailnet) → taskforce-postgres-prod:5432 (réseau interne). Permet à la
+  # datasource Grafana (VM2) de lire les vues `metrics.*` en tant que rôle `grafana_ro` (lecture
+  # seule, cf. metrics/grafana-metrics.sql). Lié à l'IP Tailscale UNIQUEMENT : Postgres n'est jamais
+  # exposé hors du tailnet, et l'accès requiert le mot de passe du rôle read-only.
+  pg-proxy:
+    image: alpine/socat:1.8.0.1
+    container_name: tf-pg-proxy
+    restart: unless-stopped
+    command: TCP-LISTEN:9102,fork,reuseaddr TCP:taskforce-postgres-prod:5432
+    ports:
+      - "100.122.50.25:9102:9102"   # Tailscale uniquement
+    networks:
+      - taskforce-prod-network
