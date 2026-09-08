@@ -10,6 +10,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { BrandLogo } from "@/components/site/BrandLogo";
 import { HeroFlow } from "@/components/site/flows/OrchestrationFlows";
+import { APP_URL } from "@/components/site/nav";
 
 const BUILT_WITH = [
   { key: "anthropic", label: "Claude" },
@@ -38,7 +39,7 @@ const BUILT_WITH = [
           the full governed run is where it is headed.
         </p>
         <div class="mt-8 flex flex-wrap gap-3">
-          <a href={"/waitlist"} class={cn(buttonVariants({ size: "pill" }))}>
+          <a href={`${APP_URL}/auth/register`} class={cn(buttonVariants({ size: "pill" }))}>
             Run your first workflow
           </a>
           <a href="/book-a-demo" class={cn(buttonVariants({ variant: "outline", size: "pill" }))}>

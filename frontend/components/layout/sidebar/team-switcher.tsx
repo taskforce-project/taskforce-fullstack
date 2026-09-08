@@ -3,6 +3,7 @@
 import * as React from "react"
 import { ChevronsUpDown, Plus, Building2, Crown } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import { useUserStore } from "@/lib/store/user-store"
 import { useUpgradeStore } from "@/lib/store/upgrade-store"
 import { planLimit } from "@/lib/config/plan-limits"
@@ -77,11 +78,15 @@ export function WorkspaceSwitcher() {
     setCreating(true)
     const workspace = await createWorkspace({ name: newName.trim(), brainTemplate: newTemplate })
     setCreating(false)
+    // createWorkspace avale l'erreur et renvoie null : sans ce toast, un echec (ex. quota de
+    // creation atteint) ne donnait AUCUN retour (le dialog restait ouvert, spinner arrete).
     if (workspace) {
       setDialogOpen(false)
       setNewName("")
       setNewTemplate("BLANK")
       router.push(`/${workspace.slug}/dashboard`)
+    } else {
+      toast.error("Couldn't create the workspace. You may have reached your plan limit.")
     }
   }
 

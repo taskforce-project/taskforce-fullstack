@@ -3,7 +3,7 @@ import BaseLayout from "@/layouts/BaseLayout.astro";
 import PageHero from "@/components/site/PageHero.astro";
 import PageCta from "@/components/site/PageCta.astro";
 import { ArrowRight } from "lucide-react";
-import { isLive } from "@/components/site/nav";
+import { APP_URL, isLive } from "@/components/site/nav";
 
 /* Positionnement HONNÊTE et respectueux : on dit ce qui est DIFFÉRENT, jamais « le concurrent est
    mauvais ». Les agents de code sont COMPLÉMENTAIRES (TaskForce les utilise), pas des rivaux. */
@@ -35,7 +35,7 @@ const GROUPS = [
     kicker="Compare"
     title="Where TaskForce fits"
     lead="TaskForce isn't another tracker, and it isn't another coding agent. It's the governed decision layer between them - so here's an honest read of what's different, and what it complements rather than replaces."
-    primary={{ label: "Run your first workflow", href: "/waitlist" }}
+    primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
     secondary={{ label: "See the run", href: "/product/orchestration" }}
   />
 
@@ -82,7 +82,7 @@ const GROUPS = [
   <PageCta
     title="See the difference on your own work"
     lead="Bring one outcome you were going to spec by hand, and watch the governed run come back."
-    primary={{ label: "Run your first workflow", href: "/waitlist" }}
+    primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
     secondary={{ label: "Book a demo", href: "/book-a-demo" }}
   />
 </BaseLayout>

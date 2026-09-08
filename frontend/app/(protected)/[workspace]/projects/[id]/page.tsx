@@ -689,7 +689,7 @@ export default function ProjectBoardPage() {
       {/* Error banner */}
       {error && !initializing && (
         <div className="mb-4 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-xs text-destructive flex items-center justify-between">
-          <span>Error ({workspace}/{projectId}): {error}</span>
+          <span>Couldn&apos;t load this board. Please try again.</span>
           <button
             type="button"
             className="ml-4 underline hover:no-underline"

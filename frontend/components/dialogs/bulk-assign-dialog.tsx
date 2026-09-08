@@ -114,13 +114,21 @@ export function BulkAssignDialog({ slug, projectId, issues }: BulkAssignDialogPr
     if (selected.length === 0) return
     setApplying(true)
     try {
-      await Promise.all(
+      // updateIssue avale l'erreur et renvoie null en echec (WS-10) : on compte les retours
+      // au lieu de compter sur un catch (qui ne se declenche jamais) - sinon "N assigned"
+      // s'affichait meme quand tout echouait.
+      const results = await Promise.all(
         selected.map((r) => updateIssue(slug, projectId, r.issueId, { assigneeId: r.candidate.userId }))
       )
-      toast.success(`${selected.length} issue${selected.length > 1 ? "s" : ""} assigned${selected.length > 1 ? "" : ""}`)
-      setOpen(false)
-      setRows([])
-      setRan(false)
+      const ok = results.filter((r) => r != null).length
+      const failed = results.length - ok
+      if (ok > 0) toast.success(`${ok} issue${ok > 1 ? "s" : ""} assigned`)
+      if (failed > 0) toast.error(`${failed} assignment${failed > 1 ? "s" : ""} failed`)
+      if (ok > 0) {
+        setOpen(false)
+        setRows([])
+        setRan(false)
+      }
     } catch {
       toast.error("Assignment failed")
     } finally {

@@ -1,6 +1,6 @@
-import { Github, Linkedin, Twitter } from "lucide-react";
+import { Linkedin, Instagram, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { FOOTER_GROUPS, isLive } from "./nav";
+import { FOOTER_GROUPS, isLive, APP_VERSION } from "./nav";
 
 /** Marqueur « page pas encore construite » - grisé, non cliquable (décision user 30/07). */
 function SoonTag() {
@@ -18,9 +18,9 @@ function SoonTag() {
  */
 
 const SOCIALS = [
-  { label: "GitHub", href: "https://github.com/taskforce", icon: Github },
-  { label: "LinkedIn", href: "https://www.linkedin.com/company/taskforce", icon: Linkedin },
-  { label: "X", href: "https://x.com/taskforce", icon: Twitter },
+  { label: "LinkedIn", href: "https://www.linkedin.com/in/pierre-michel-work/", icon: Linkedin },
+  { label: "Instagram", href: "https://www.instagram.com/pi_et_rh0", icon: Instagram },
+  { label: "Email", href: "mailto:contact@taskforce-project.fr", icon: Mail },
 ];
 
 export function SiteFooter() {
@@ -95,7 +95,7 @@ export function SiteFooter() {
       {/* Barre basse */}
       <div className="border-t">
         <div className="container-rail text-muted-foreground flex flex-col items-start justify-between gap-3 py-5 text-[12.5px] sm:flex-row sm:items-center">
-          <p>&copy; {new Date().getFullYear()} TaskForce. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} TaskForce · v{APP_VERSION} · All rights reserved.</p>
           <ul className="flex flex-wrap items-center gap-x-5 gap-y-2">
             <li>
               {/* /status pas encore construite : indicateur en texte, non cliquable. */}

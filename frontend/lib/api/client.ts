@@ -231,14 +231,14 @@ export interface ApiError {
 export function getErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
     const apiError = error.response?.data as ApiError;
-    return apiError?.message || error.message || "Une erreur est survenue";
+    return apiError?.message || error.message || "Something went wrong";
   }
-  
+
   if (error instanceof Error) {
     return error.message;
   }
 
-  return "Une erreur inconnue est survenue";
+  return "Something went wrong";
 }
 
 /**

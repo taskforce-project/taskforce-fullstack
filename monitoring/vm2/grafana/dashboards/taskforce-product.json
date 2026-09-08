@@ -1,0 +1,156 @@
+{
+  "id": null,
+  "uid": "taskforce-product",
+  "title": "TaskForce - Produit",
+  "tags": ["taskforce", "produit"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "refresh": "5m",
+  "time": { "from": "now-90d", "to": "now" },
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Utilisateurs (total)",
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "taskforce-postgres" },
+      "targets": [ { "refId": "A", "editorMode": "code", "rawQuery": true, "format": "table", "rawSql": "SELECT total_users FROM metrics.kpi_users;", "datasource": { "type": "grafana-postgresql-datasource", "uid": "taskforce-postgres" } } ],
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "blue" } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value", "graphMode": "none", "textMode": "value", "justifyMode": "center", "orientation": "auto" }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Actifs",
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "taskforce-postgres" },
+      "targets": [ { "refId": "A", "editorMode": "code", "rawQuery": true, "format": "table", "rawSql": "SELECT active_users FROM metrics.kpi_users;", "datasource": { "type": "grafana-postgresql-datasource", "uid": "taskforce-postgres" } } ],
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "green" } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value", "graphMode": "none", "textMode": "value", "justifyMode": "center", "orientation": "auto" }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Payants",
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "taskforce-postgres" },
+      "targets": [ { "refId": "A", "editorMode": "code", "rawQuery": true, "format": "table", "rawSql": "SELECT paid_users FROM metrics.kpi_users;", "datasource": { "type": "grafana-postgresql-datasource", "uid": "taskforce-postgres" } } ],
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "purple" } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value", "graphMode": "none", "textMode": "value", "justifyMode": "center", "orientation": "auto" }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Free",
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "taskforce-postgres" },
+      "targets": [ { "refId": "A", "editorMode": "code", "rawQuery": true, "format": "table", "rawSql": "SELECT free_users FROM metrics.kpi_users;", "datasource": { "type": "grafana-postgresql-datasource", "uid": "taskforce-postgres" } } ],
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "text" } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value", "graphMode": "none", "textMode": "value", "justifyMode": "center", "orientation": "auto" }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Inscriptions 7j",
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "taskforce-postgres" },
+      "targets": [ { "refId": "A", "editorMode": "code", "rawQuery": true, "format": "table", "rawSql": "SELECT signups_7d FROM metrics.kpi_users;", "datasource": { "type": "grafana-postgresql-datasource", "uid": "taskforce-postgres" } } ],
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "blue" } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value", "graphMode": "none", "textMode": "value", "justifyMode": "center", "orientation": "auto" }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Inscriptions 30j",
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "taskforce-postgres" },
+      "targets": [ { "refId": "A", "editorMode": "code", "rawQuery": true, "format": "table", "rawSql": "SELECT signups_30d FROM metrics.kpi_users;", "datasource": { "type": "grafana-postgresql-datasource", "uid": "taskforce-postgres" } } ],
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "blue" } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value", "graphMode": "none", "textMode": "value", "justifyMode": "center", "orientation": "auto" }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Croissance - utilisateurs (cumule)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "taskforce-postgres" },
+      "targets": [ { "refId": "A", "editorMode": "code", "rawQuery": true, "format": "time_series", "rawSql": "SELECT day AS \"time\", cumulative_users AS \"Utilisateurs (cumule)\" FROM metrics.signups_daily ORDER BY day;", "datasource": { "type": "grafana-postgresql-datasource", "uid": "taskforce-postgres" } } ],
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "blue" }, "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 15, "showPoints": "auto", "spanNulls": true } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single", "sort": "none" } }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Inscriptions par jour",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "taskforce-postgres" },
+      "targets": [ { "refId": "A", "editorMode": "code", "rawQuery": true, "format": "time_series", "rawSql": "SELECT day AS \"time\", signups AS \"Inscriptions/jour\" FROM metrics.signups_daily ORDER BY day;", "datasource": { "type": "grafana-postgresql-datasource", "uid": "taskforce-postgres" } } ],
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "green" }, "custom": { "drawStyle": "bars", "lineWidth": 1, "fillOpacity": 70, "showPoints": "never" } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single", "sort": "none" } }
+    },
+    {
+      "id": 9,
+      "type": "piechart",
+      "title": "Repartition par plan",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 12 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "taskforce-postgres" },
+      "targets": [ { "refId": "A", "editorMode": "code", "rawQuery": true, "format": "table", "rawSql": "SELECT free_users AS \"Free\", basic_users AS \"Basic\", business_users AS \"Business\", enterprise_users AS \"Enterprise\" FROM metrics.kpi_users;", "datasource": { "type": "grafana-postgresql-datasource", "uid": "taskforce-postgres" } } ],
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "pieType": "donut", "displayLabels": ["name", "value"], "legend": { "displayMode": "list", "placement": "right", "showLegend": true, "values": ["value", "percent"] }, "tooltip": { "mode": "single", "sort": "none" } }
+    },
+    {
+      "id": 10,
+      "type": "table",
+      "title": "Dernieres activites (hors toi)",
+      "gridPos": { "h": 8, "w": 16, "x": 8, "y": 12 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "taskforce-postgres" },
+      "targets": [ { "refId": "A", "editorMode": "code", "rawQuery": true, "format": "table", "rawSql": "SELECT at AS \"Quand\", who AS \"Qui\", email AS \"Email\", what AS \"Action\", workspace AS \"Workspace\" FROM metrics.external_activity ORDER BY at DESC LIMIT 100;", "datasource": { "type": "grafana-postgresql-datasource", "uid": "taskforce-postgres" } } ],
+      "fieldConfig": { "defaults": { "custom": { "align": "auto", "filterable": true } }, "overrides": [] },
+      "options": { "showHeader": true, "cellHeight": "sm", "footer": { "show": false } }
+    },
+    {
+      "id": 11,
+      "type": "table",
+      "title": "Dernieres inscriptions",
+      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 20 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "taskforce-postgres" },
+      "targets": [ { "refId": "A", "editorMode": "code", "rawQuery": true, "format": "table", "rawSql": "SELECT created_at AS \"Inscrit le\", name AS \"Nom\", email AS \"Email\", plan AS \"Plan\", onboarding_completed AS \"Onboarde\", beta_cohort AS \"Cohorte\" FROM metrics.recent_signups LIMIT 100;", "datasource": { "type": "grafana-postgresql-datasource", "uid": "taskforce-postgres" } } ],
+      "fieldConfig": { "defaults": { "custom": { "align": "auto", "filterable": true } }, "overrides": [] },
+      "options": { "showHeader": true, "cellHeight": "sm", "footer": { "show": false } }
+    },
+    {
+      "id": 12,
+      "type": "stat",
+      "title": "Derniere activite externe",
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 20 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "taskforce-postgres" },
+      "targets": [ { "refId": "A", "editorMode": "code", "rawQuery": true, "format": "table", "rawSql": "SELECT seconds FROM metrics.seconds_since_last_activity;", "datasource": { "type": "grafana-postgresql-datasource", "uid": "taskforce-postgres" } } ],
+      "fieldConfig": { "defaults": { "unit": "s", "color": { "mode": "fixed", "fixedColor": "blue" }, "mappings": [ { "type": "value", "options": { "-1": { "text": "aucune", "index": 0 } } } ] }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value", "graphMode": "none", "textMode": "value", "justifyMode": "center", "orientation": "auto" }
+    },
+    {
+      "id": 13,
+      "type": "stat",
+      "title": "Workspaces",
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 24 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "taskforce-postgres" },
+      "targets": [ { "refId": "A", "editorMode": "code", "rawQuery": true, "format": "table", "rawSql": "SELECT total_workspaces FROM metrics.kpi_workspaces;", "datasource": { "type": "grafana-postgresql-datasource", "uid": "taskforce-postgres" } } ],
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "blue" } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value", "graphMode": "none", "textMode": "value", "justifyMode": "center", "orientation": "auto" }
+    },
+    {
+      "id": 14,
+      "type": "stat",
+      "title": "Projets",
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 24 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "taskforce-postgres" },
+      "targets": [ { "refId": "A", "editorMode": "code", "rawQuery": true, "format": "table", "rawSql": "SELECT total_projects FROM metrics.kpi_workspaces;", "datasource": { "type": "grafana-postgresql-datasource", "uid": "taskforce-postgres" } } ],
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "blue" } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value", "graphMode": "none", "textMode": "value", "justifyMode": "center", "orientation": "auto" }
+    }
+  ]
+}

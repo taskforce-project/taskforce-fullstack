@@ -54,13 +54,19 @@ export function EditProjectDialog({ project, slug, open, onOpenChange }: EditPro
     if (!name.trim() || saving) return
     setSaving(true)
     try {
-      await updateProject(slug, project.id, {
+      const updated = await updateProject(slug, project.id, {
         name: name.trim(),
         description: description.trim() || undefined,
         iconUrl: iconUrl ?? undefined,
         color,
         isPublic,
       })
+      // Le store avale l'erreur et renvoie null en cas d'echec (ex. refus VIEWER) : on
+      // branche sur le retour, sinon le toast de succes s'affiche meme quand rien n'a change.
+      if (!updated) {
+        toast.error("Couldn't update the operation")
+        return
+      }
       toast.success("Operation updated")
       onOpenChange(false)
     } catch {

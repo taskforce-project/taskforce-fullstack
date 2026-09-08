@@ -27,6 +27,8 @@ interface WorkspaceState {
   members: WorkspaceMember[];
   isLoading: boolean;
   membersLoading: boolean;
+  /** Message d'échec du dernier chargement des membres (null si OK) - distingue « aucun membre » de « échec ». */
+  membersError: string | null;
   /** true une fois que fetchWorkspaces a été appelé au moins une fois */
   workspacesLoaded: boolean;
 
@@ -72,9 +74,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   members: [],
   isLoading: false,
   membersLoading: false,
+  membersError: null,
   workspacesLoaded: false,
 
-  clearWorkspace: () => set({ workspaces: [], activeWorkspace: null, workspace: null, members: [], workspacesLoaded: false }),
+  clearWorkspace: () => set({ workspaces: [], activeWorkspace: null, workspace: null, members: [], membersError: null, workspacesLoaded: false }),
 
   setWorkspace: (workspace) => set({ workspace, activeWorkspace: workspace }),
   fetchWorkspaces: async () => {
@@ -161,13 +164,13 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   fetchMembers: async () => {
     const slug = get().activeWorkspace?.slug;
     if (!slug) return [];
-    set({ membersLoading: true });
+    set({ membersLoading: true, membersError: null });
     try {
       const members = await getWorkspaceMembers(slug);
       set({ members, membersLoading: false });
       return members;
     } catch {
-      set({ membersLoading: false });
+      set({ membersLoading: false, membersError: "Could not load members." });
       return [];
     }
   },

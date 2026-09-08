@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Check, CircleCheck } from "lucide-react";
+import { APP_URL } from "@/components/site/nav";
 
 /**
  * PricingSection - page Pricing (light-only). Raconte la MONTÉE EN GAMME, pas une grille de features :
@@ -26,7 +27,7 @@ type Tier = {
   features: Feature[];
 };
 
-const REGISTER = "/waitlist";
+const REGISTER = `${APP_URL}/auth/register`;
 
 const TIERS: Tier[] = [
   {

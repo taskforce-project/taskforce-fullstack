@@ -811,7 +811,13 @@ function WorkspacePanel() {
       if (name !== activeWorkspace?.name)                       payload.name        = name
       if (description !== (activeWorkspace?.description ?? "")) payload.description = description
       if (Object.keys(payload).length === 0) { toast.info("No changes to save"); return }
-      await updateWorkspaceInfo(payload)
+      // updateWorkspaceInfo avale l'erreur et renvoie null : on branche sur le retour
+      // (sinon "Workspace updated" s'affiche meme quand l'ecriture a echoue).
+      const updated = await updateWorkspaceInfo(payload)
+      if (!updated) {
+        toast.error("Failed to update workspace")
+        return
+      }
       toast.success("Workspace updated")
     } catch {
       toast.error("Failed to update workspace")
@@ -1417,7 +1423,7 @@ function PrivacyPanel() {
       URL.revokeObjectURL(url)
       toast.success("Your data has been exported (JSON download).")
     } catch {
-      toast.error("Export failed. Try again or contact privacy@taskforce.dev.")
+      toast.error("Export failed. Try again or contact contact@taskforce-project.fr.")
     } finally {
       setLoading(false)
     }

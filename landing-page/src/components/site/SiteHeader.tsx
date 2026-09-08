@@ -319,7 +319,7 @@ export function SiteHeader() {
             </a>
           </Button>
           <Button asChild size="pill-sm">
-            <a href={"/waitlist"}>Get started</a>
+            <a href={`${APP_URL}/auth/register`}>Get started</a>
           </Button>
 
           {/* Menu mobile */}
@@ -389,7 +389,7 @@ export function SiteHeader() {
                   </a>
                 </Button>
                 <Button asChild size="pill" className="flex-1">
-                  <a href={"/waitlist"}>Get started</a>
+                  <a href={`${APP_URL}/auth/register`}>Get started</a>
                 </Button>
               </div>
             </SheetContent>
