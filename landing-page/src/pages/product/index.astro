@@ -3,7 +3,7 @@ import BaseLayout from "@/layouts/BaseLayout.astro";
 import PageHero from "@/components/site/PageHero.astro";
 import PageCta from "@/components/site/PageCta.astro";
 import { LevelBadge } from "@/components/site/Section";
-import { PRODUCT_PLATFORM, PRODUCT_DELIVERY, isLive } from "@/components/site/nav";
+import { APP_URL, PRODUCT_PLATFORM, PRODUCT_DELIVERY, isLive } from "@/components/site/nav";
 import { hueFor } from "@/lib/site-icons";
 
 const GROUPS = [
@@ -20,7 +20,7 @@ const GROUPS = [
     kicker="Platform"
     title="One platform, from intent to production"
     lead="TaskForce runs the whole path - planning, memory, approvals and the board your team already uses - as one system where every part knows about the others."
-    primary={{ label: "Run your first workflow", href: "/waitlist" }}
+    primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
     secondary={{ label: "See the run", href: "/product/orchestration" }}
   />
 
@@ -75,7 +75,7 @@ const GROUPS = [
   <PageCta
     title="See it run end to end"
     lead="The fastest way to understand TaskForce is to give it one outcome and approve each step."
-    primary={{ label: "Run your first workflow", href: "/waitlist" }}
+    primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
     secondary={{ label: "Book a demo", href: "/book-a-demo" }}
   />
 </BaseLayout>
