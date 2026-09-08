@@ -186,7 +186,7 @@ export default function BillingPage() {
     if (p.key === "ENTERPRISE") {
       return (
         <Button asChild variant="outline" className={cn(base, "gap-1.5")}>
-          <a href="mailto:sales@taskforce.dev?subject=Demande%20Enterprise%20TaskForce">
+          <a href="mailto:contact@taskforce-project.fr?subject=Demande%20Enterprise%20TaskForce">
             <Building2 className="size-4" /> Contact us
           </a>
         </Button>

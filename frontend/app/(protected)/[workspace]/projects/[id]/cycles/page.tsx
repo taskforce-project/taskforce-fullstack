@@ -141,7 +141,7 @@ export default function ProjectCyclesPage() {
         {error ? (
           <p className="flex items-center gap-1.5 text-sm text-destructive">
             <AlertCircle className="h-3.5 w-3.5" />
-            {error}
+            Couldn&apos;t load cycles. Please try again.
           </p>
         ) : (
           <p className="text-sm text-muted-foreground">{cycles.length} cycle{cycles.length !== 1 ? "s" : ""}</p>

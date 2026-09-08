@@ -28,8 +28,8 @@ export default function PrivacyPolicyPage() {
             <p>
               TaskForce (&ldquo;we&rdquo;, &ldquo;us&rdquo;) is the data controller for all personal data processed
               through this platform. For any privacy-related inquiry, contact us at{" "}
-              <a href="mailto:privacy@taskforce.dev" className="text-foreground underline underline-offset-2">
-                privacy@taskforce.dev
+              <a href="mailto:contact@taskforce-project.fr" className="text-foreground underline underline-offset-2">
+                contact@taskforce-project.fr
               </a>
               .
             </p>
@@ -95,8 +95,8 @@ export default function PrivacyPolicyPage() {
             <p className="mt-3">
               To exercise these rights, go to{" "}
               <strong className="text-foreground">Settings → Privacy & Data</strong> in the app, or email{" "}
-              <a href="mailto:privacy@taskforce.dev" className="text-foreground underline underline-offset-2">
-                privacy@taskforce.dev
+              <a href="mailto:contact@taskforce-project.fr" className="text-foreground underline underline-offset-2">
+                contact@taskforce-project.fr
               </a>
               . We respond within 30 days as required by law.
             </p>

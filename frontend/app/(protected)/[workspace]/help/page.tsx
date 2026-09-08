@@ -268,7 +268,7 @@ export default function HelpPage() {
                 <p className="mt-0.5 text-xs text-muted-foreground">{t("help.contactSupportDesc")}</p>
               </div>
               <Button asChild variant="outline" size="sm" className="h-8 shrink-0 gap-1.5 text-xs">
-                <a href="mailto:support@taskforce.dev?subject=Support%20TaskForce">
+                <a href="mailto:contact@taskforce-project.fr?subject=Support%20TaskForce">
                   <Mail className="size-3.5" />
                   {t("help.sendEmail")}
                 </a>
