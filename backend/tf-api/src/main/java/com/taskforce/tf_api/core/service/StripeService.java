@@ -36,8 +36,16 @@ public class StripeService {
     @Value("${stripe.plans.business.price-id:}")
     private String businessPriceId;
 
+    @Value("${stripe.plans.basic.yearly-price-id:}")
+    private String basicYearlyPriceId;
+
+    @Value("${stripe.plans.business.yearly-price-id:}")
+    private String businessYearlyPriceId;
+
     @Value("${stripe.plans.enterprise.price-id:}")
     private String enterprisePriceId;
+
+    private static boolean isBlank(String s) { return s == null || s.isBlank(); }
 
     @PostConstruct
     public void init() {
@@ -154,9 +162,18 @@ public class StripeService {
      * Récupère le Price ID selon le type de plan
      */
     public String getPriceIdForPlan(String planType) {
+        return getPriceIdForPlan(planType, "month");
+    }
+
+    /**
+     * Price-id du plan pour un cycle de facturation ({@code "month"} par défaut, {@code "year"} = annuel
+     * avec réduction). Si l'id annuel n'est pas configuré, on retombe sur le mensuel (dégradation sûre).
+     */
+    public String getPriceIdForPlan(String planType, String interval) {
+        boolean yearly = "year".equalsIgnoreCase(interval);
         String id = switch (planType.toUpperCase()) {
-            case "BASIC" -> basicPriceId;
-            case "BUSINESS" -> businessPriceId;
+            case "BASIC"      -> yearly && !isBlank(basicYearlyPriceId)    ? basicYearlyPriceId    : basicPriceId;
+            case "BUSINESS"   -> yearly && !isBlank(businessYearlyPriceId) ? businessYearlyPriceId : businessPriceId;
             case "ENTERPRISE" -> enterprisePriceId;
             default -> throw new IllegalArgumentException("Type de plan invalide : " + planType);
         };
@@ -182,10 +199,11 @@ public class StripeService {
         // PAS resynchroniser le plan depuis un signal non fiable — surtout ne pas RÉTROGRADER un Business
         // en Basic sur `customer.subscription.updated`. Le plan fiable reste celui posé par
         // `checkout.session.completed` (metadata `planType`). Cf. audit-livrable-pfr.md §2.
+        // Chaque plan a 2 price-ids possibles (mensuel + annuel) qui pointent vers le MEME PlanType.
         int matches = 0;
         PlanType result = null;
-        if (priceId.equals(basicPriceId))      { matches++; result = PlanType.BASIC; }
-        if (priceId.equals(businessPriceId))   { matches++; result = PlanType.BUSINESS; }
+        if (priceId.equals(basicPriceId) || priceId.equals(basicYearlyPriceId))       { matches++; result = PlanType.BASIC; }
+        if (priceId.equals(businessPriceId) || priceId.equals(businessYearlyPriceId)) { matches++; result = PlanType.BUSINESS; }
         if (priceId.equals(enterprisePriceId)) { matches++; result = PlanType.ENTERPRISE; }
         return matches == 1 ? result : null;
     }
@@ -267,25 +285,24 @@ public class StripeService {
                     .setProrationBehavior(
                         com.stripe.param.billingportal.ConfigurationCreateParams.Features.SubscriptionUpdate.ProrationBehavior.CREATE_PRORATIONS);
 
+            // Produit Basic : prix mensuel + annuel (si configure) autorises au switch.
+            var basicProd = com.stripe.param.billingportal.ConfigurationCreateParams.Features.SubscriptionUpdate.Product.builder()
+                .setProduct(basicProduct)
+                .addPrice(basicPriceId);
+            if (!isBlank(basicYearlyPriceId)) basicProd.addPrice(basicYearlyPriceId);
+
             if (basicProduct != null && basicProduct.equals(businessProduct)) {
-                // Basic et Business sont deux prix d'un même produit : un seul produit, deux prix.
-                subUpdate.addProduct(
-                    com.stripe.param.billingportal.ConfigurationCreateParams.Features.SubscriptionUpdate.Product.builder()
-                        .setProduct(basicProduct)
-                        .addPrice(basicPriceId)
-                        .addPrice(businessPriceId)
-                        .build());
+                // Basic et Business sont des prix d'un MEME produit : un seul produit, tous les prix.
+                basicProd.addPrice(businessPriceId);
+                if (!isBlank(businessYearlyPriceId)) basicProd.addPrice(businessYearlyPriceId);
+                subUpdate.addProduct(basicProd.build());
             } else {
-                subUpdate.addProduct(
-                    com.stripe.param.billingportal.ConfigurationCreateParams.Features.SubscriptionUpdate.Product.builder()
-                        .setProduct(basicProduct)
-                        .addPrice(basicPriceId)
-                        .build());
-                subUpdate.addProduct(
-                    com.stripe.param.billingportal.ConfigurationCreateParams.Features.SubscriptionUpdate.Product.builder()
-                        .setProduct(businessProduct)
-                        .addPrice(businessPriceId)
-                        .build());
+                subUpdate.addProduct(basicProd.build());
+                var businessProd = com.stripe.param.billingportal.ConfigurationCreateParams.Features.SubscriptionUpdate.Product.builder()
+                    .setProduct(businessProduct)
+                    .addPrice(businessPriceId);
+                if (!isBlank(businessYearlyPriceId)) businessProd.addPrice(businessYearlyPriceId);
+                subUpdate.addProduct(businessProd.build());
             }
 
             com.stripe.param.billingportal.ConfigurationCreateParams createParams =

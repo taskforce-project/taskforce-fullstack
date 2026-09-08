@@ -111,7 +111,8 @@ public class BillingController {
         if (!plan.equals("BASIC") && !plan.equals("BUSINESS")) {
             throw new IllegalArgumentException("Ce forfait n'est pas souscriptible en ligne : " + plan);
         }
-        String priceId = stripeService.getPriceIdForPlan(plan);
+        String interval = "year".equalsIgnoreCase(body.getBillingInterval()) ? "year" : "month";
+        String priceId = stripeService.getPriceIdForPlan(plan, interval);
 
         // Sièges facturés = membres distincts sur les workspaces du compte (min 1).
         long seats = Math.max(1L, workspaceMemberRepository.countDistinctMembersByOwnerId(user.getId()));
@@ -136,7 +137,8 @@ public class BillingController {
 
         Session session = stripeService.createCheckoutSession(
             customerId, priceId, seats, success, cancel,
-            java.util.Map.of("userId", String.valueOf(user.getId()), "planType", plan, "seats", String.valueOf(seats)));
+            java.util.Map.of("userId", String.valueOf(user.getId()), "planType", plan,
+                             "seats", String.valueOf(seats), "billingInterval", interval));
 
         return ResponseEntity.ok(ApiResponse.success("Session de paiement créée",
             CheckoutSessionResponse.builder()
