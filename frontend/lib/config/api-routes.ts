@@ -45,6 +45,8 @@ export const BILLING_ROUTES = {
   PORTAL: "/api/billing/portal",
   SUBSCRIPTION: "/api/billing/subscription",
   CHECKOUT: "/api/billing/checkout",
+  /** Change le forfait d'un abonnement existant in-app (upgrade/rétrogradation, proration auto). */
+  CHANGE_PLAN: "/api/billing/change-plan",
 } as const;
 
 /**
