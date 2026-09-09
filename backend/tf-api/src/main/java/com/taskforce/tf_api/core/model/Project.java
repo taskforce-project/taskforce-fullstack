@@ -99,6 +99,14 @@ public class Project {
     @Builder.Default
     private boolean growthMode = false;
 
+    /** Fournisseur du dépôt de code lié ("github", ...). NULL = aucun dépôt (TF-AGENT-DELIVERY). */
+    @Column(name = "repo_provider", length = 30)
+    private String repoProvider;
+
+    /** Dépôt de code lié au format "owner/name" chez le provider. Sert de défaut au coding agent. */
+    @Column(name = "repo_full_name", length = 255)
+    private String repoFullName;
+
     /** Utilisateur ayant créé le projet */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", nullable = false)

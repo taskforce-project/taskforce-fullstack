@@ -22,16 +22,19 @@ import com.taskforce.tf_api.core.dto.request.AttachProjectTeamRequest;
 import com.taskforce.tf_api.core.dto.request.CreateLabelRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateLabelRequest;
 import com.taskforce.tf_api.core.dto.request.CreateProjectRequest;
+import com.taskforce.tf_api.core.dto.request.ProjectRepoLinkRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateProjectRequest;
 import com.taskforce.tf_api.core.dto.response.ProjectActivityPointResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectActivitySeriesResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectHealthPointResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectLabelResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectMemberResponse;
+import com.taskforce.tf_api.core.dto.response.ProjectRepoResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectTeamResponse;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
+import com.taskforce.tf_api.core.service.ProjectRepoService;
 import com.taskforce.tf_api.core.service.ProjectService;
 import com.taskforce.tf_api.shared.dto.ApiResponse;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
@@ -51,8 +54,9 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class ProjectController {
 
-    private final ProjectService   projectService;
-    private final UserRepository   userRepository;
+    private final ProjectService     projectService;
+    private final ProjectRepoService projectRepoService;
+    private final UserRepository     userRepository;
 
     // -------------------------------------------------------------------------
     // Projets CRUD
@@ -86,6 +90,35 @@ public class ProjectController {
         ProjectResponse project = projectService.createProject(slug, userId, request);
         return ResponseEntity.status(HttpStatus.CREATED)
             .body(ApiResponse.success("Projet créé", project));
+    }
+
+    /**
+     * PUT /api/workspaces/{slug}/projects/{id}/repo
+     * Lie un dépôt de code au projet (mode CREATE = nouveau dépôt GitHub, LINK = dépôt existant).
+     * Utilisable à la création (le front enchaîne) ou plus tard. Écriture (LEAD/ADMIN/OWNER).
+     */
+    @PutMapping("/{id}/repo")
+    public ResponseEntity<ApiResponse<ProjectRepoResponse>> linkRepo(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String slug,
+        @PathVariable Long id,
+        @Valid @RequestBody ProjectRepoLinkRequest request
+    ) {
+        Long userId = resolveUserId(jwt);
+        ProjectRepoResponse repo = projectRepoService.linkRepo(slug, id, userId, request);
+        return ResponseEntity.ok(ApiResponse.success("Dépôt lié au projet", repo));
+    }
+
+    /** DELETE /api/workspaces/{slug}/projects/{id}/repo — délie le dépôt du projet. */
+    @DeleteMapping("/{id}/repo")
+    public ResponseEntity<ApiResponse<ProjectRepoResponse>> unlinkRepo(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String slug,
+        @PathVariable Long id
+    ) {
+        Long userId = resolveUserId(jwt);
+        ProjectRepoResponse repo = projectRepoService.unlinkRepo(slug, id, userId);
+        return ResponseEntity.ok(ApiResponse.success("Dépôt délié", repo));
     }
 
     /**

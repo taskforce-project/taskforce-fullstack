@@ -25,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import com.taskforce.tf_api.core.dto.request.CreateKnowledgeNodeRequest;
@@ -300,6 +301,51 @@ public class GitHubIntegrationService {
                 str(i.get("updated_at"))
             );
         }).toList();
+    }
+
+    /**
+     * Crée un dépôt GitHub sur le compte connecté du workspace (scope {@code repo} déjà consenti à la
+     * connexion). {@code auto_init=true} pour que le dépôt ait un commit initial → clonable tout de suite
+     * par un coding agent (TF-AGENT-DELIVERY). Renvoie le {@code "owner/name"} du dépôt créé.
+     */
+    public String createRepo(String workspaceSlug, String name, boolean isPrivate) {
+        String token = requireAccessToken(workspaceSlug);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(token);
+        headers.set("Accept", "application/vnd.github+json");
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        Map<String, Object> body = new HashMap<>();
+        body.put("name", name);
+        body.put("private", isPrivate);
+        body.put("auto_init", true);
+        try {
+            ResponseEntity<Map<String, Object>> resp = restTemplate.exchange(
+                "https://api.github.com/user/repos", HttpMethod.POST,
+                new HttpEntity<>(body, headers),
+                new ParameterizedTypeReference<Map<String, Object>>() {});
+            String fullName = resp.getBody() != null ? str(resp.getBody().get("full_name")) : null;
+            if (fullName == null || fullName.isBlank()) {
+                throw new BusinessException("Création du dépôt GitHub échouée (réponse inattendue)");
+            }
+            return fullName;
+        } catch (HttpClientErrorException e) {
+            // 422 = nom déjà pris / invalide ; 403 = permission. Message clair au lieu d'un 500 opaque.
+            throw new BusinessException("GitHub a refusé la création du dépôt '" + name + "' : " + e.getStatusText());
+        }
+    }
+
+    /** Vérifie qu'un dépôt {@code "owner/name"} existe et est accessible via le token du workspace. */
+    public void assertRepoAccessible(String workspaceSlug, String repoFullName) {
+        String token = requireAccessToken(workspaceSlug);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(token);
+        headers.set("Accept", "application/vnd.github+json");
+        try {
+            restTemplate.exchange("https://api.github.com/repos/" + repoFullName, HttpMethod.GET,
+                new HttpEntity<>(headers), new ParameterizedTypeReference<Map<String, Object>>() {});
+        } catch (HttpClientErrorException e) {
+            throw new BusinessException("Dépôt GitHub introuvable ou inaccessible : " + repoFullName);
+        }
     }
 
     private String requireAccessToken(String workspaceSlug) {
