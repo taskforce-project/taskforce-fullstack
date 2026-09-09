@@ -99,6 +99,29 @@ export const stripeService = {
   },
 
   /**
+   * Change le forfait d'un abonnement EXISTANT in-app (upgrade OU rétrogradation), sans passer par le
+   * portail Stripe : le back remplace le prix de l'abonnement actif avec proration et reflète le plan
+   * immédiatement. Renvoie l'abonnement mis à jour. Réservé aux forfaits en ligne (BASIC, BUSINESS) ;
+   * depuis FREE il faut passer par `createCheckoutSession` (aucun abonnement à modifier).
+   * @param planType - Forfait cible (BASIC, BUSINESS)
+   * @param billingInterval - "month" (défaut) ou "year" (annuel, prix réduit)
+   */
+  async changePlan(
+    planType: "BASIC" | "BUSINESS",
+    billingInterval: "month" | "year" = "month",
+  ): Promise<SubscriptionInfo> {
+    try {
+      const response = await apiClient.post<{ data: SubscriptionInfo }>(
+        BILLING_ROUTES.CHANGE_PLAN,
+        { planType, billingInterval },
+      );
+      return response.data.data; // enveloppe ApiResponse<T>
+    } catch (error) {
+      throw new Error(getErrorMessage(error));
+    }
+  },
+
+  /**
    * Récupérer les informations d'abonnement de l'utilisateur
    * @returns Informations d'abonnement
    */

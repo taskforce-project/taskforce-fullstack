@@ -122,6 +122,49 @@ describe('stripeService', () => {
     });
   });
 
+  describe('changePlan', () => {
+    it('devrait changer de forfait in-app (mensuel par défaut) et renvoyer l\'abonnement mis à jour', async () => {
+      // Given - route protégée /api/billing → enveloppe ApiResponse<SubscriptionInfo>.
+      const updated = { userId: 30, planType: 'BASIC' as const, status: 'ACTIVE' };
+      vi.mocked(apiClient.post).mockResolvedValue(envelope(updated));
+
+      // When - rétrogradation BUSINESS → BASIC sans quitter l'app.
+      const result = await stripeService.changePlan('BASIC');
+
+      // Then
+      expect(result).toEqual(updated);
+      expect(apiClient.post).toHaveBeenCalledWith(BILLING_ROUTES.CHANGE_PLAN, {
+        planType: 'BASIC',
+        billingInterval: 'month',
+      });
+    });
+
+    it('devrait transmettre l\'intervalle annuel quand demandé', async () => {
+      // Given
+      const updated = { userId: 31, planType: 'BUSINESS' as const, status: 'ACTIVE' };
+      vi.mocked(apiClient.post).mockResolvedValue(envelope(updated));
+
+      // When
+      const result = await stripeService.changePlan('BUSINESS', 'year');
+
+      // Then
+      expect(result).toEqual(updated);
+      expect(apiClient.post).toHaveBeenCalledWith(BILLING_ROUTES.CHANGE_PLAN, {
+        planType: 'BUSINESS',
+        billingInterval: 'year',
+      });
+    });
+
+    it('devrait lancer une erreur si le changement échoue', async () => {
+      // Given - ex. 409 « aucun abonnement à modifier » remonté par le back.
+      const errorMessage = 'Aucun abonnement à modifier';
+      vi.mocked(apiClient.post).mockRejectedValue(new Error(errorMessage));
+
+      // When/Then
+      await expect(stripeService.changePlan('BASIC')).rejects.toThrow(errorMessage);
+    });
+  });
+
   describe('getSubscriptionInfo', () => {
     it('devrait récupérer les informations d\'abonnement FREE', async () => {
       // Given

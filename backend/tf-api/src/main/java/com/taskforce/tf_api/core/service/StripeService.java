@@ -13,6 +13,8 @@ import com.stripe.model.Price;
 import com.stripe.model.Subscription;
 import com.stripe.model.checkout.Session;
 import com.stripe.param.CustomerCreateParams;
+import com.stripe.param.SubscriptionListParams;
+import com.stripe.param.SubscriptionUpdateParams;
 import com.stripe.param.checkout.SessionCreateParams;
 import com.taskforce.tf_api.core.enums.PlanType;
 
@@ -156,6 +158,37 @@ public class StripeService {
             params.put("cancel_at_period_end", true);
             return subscription.update(params);
         }
+    }
+
+    /**
+     * Change le plan (price) de l'abonnement ACTIF du client, avec proration : upgrade OU downgrade
+     * IN-APP, sans passer par le portail Stripe. Le sub-id n'etant pas stocke cote app, on recupere
+     * l'abonnement actif via Stripe puis on remplace son item par le nouveau price + quantite (sieges).
+     * On leve toute annulation programmee (changer de plan = rester abonne). Le plan reel est ensuite
+     * resynchronise par le webhook customer.subscription.updated (idempotent).
+     */
+    public Subscription changeSubscriptionPlan(String customerId, String newPriceId, long quantity) throws StripeException {
+        var subs = Subscription.list(
+            SubscriptionListParams.builder()
+                .setCustomer(customerId)
+                .setStatus(SubscriptionListParams.Status.ACTIVE)
+                .setLimit(1L)
+                .build());
+        if (subs.getData().isEmpty()) {
+            throw new IllegalStateException("Aucun abonnement actif a modifier.");
+        }
+        Subscription sub = subs.getData().get(0);
+        String itemId = sub.getItems().getData().get(0).getId();
+        return sub.update(
+            SubscriptionUpdateParams.builder()
+                .addItem(SubscriptionUpdateParams.Item.builder()
+                    .setId(itemId)
+                    .setPrice(newPriceId)
+                    .setQuantity(Math.max(1L, quantity))
+                    .build())
+                .setCancelAtPeriodEnd(false)
+                .setProrationBehavior(SubscriptionUpdateParams.ProrationBehavior.CREATE_PRORATIONS)
+                .build());
     }
 
     /**
