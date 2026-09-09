@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 import { SmartAssignPanel } from "@/components/smart-assign/smart-assign-panel"
+import { DelegateAgentControl } from "@/components/sheets/delegate-agent-control"
 import { IssueAiSpecPanel } from "@/components/issues/issue-ai-spec"
 import { IssueDescription } from "@/components/issues/issue-description"
 import { BrandLogo } from "@/components/ui/brand-logo"
@@ -1703,6 +1704,15 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                   await callUpdate({ assigneeId: m.userId })
                   toast.success(`Assigned to ${name}`)
                 }}
+              />
+            )}
+
+            {/* Délégation à un agent de livraison (TF-AGENT-DELIVERY) */}
+            {workspaceSlug && projectId && (
+              <DelegateAgentControl
+                workspaceSlug={workspaceSlug}
+                projectId={projectId}
+                issueId={issueId}
               />
             )}
 
