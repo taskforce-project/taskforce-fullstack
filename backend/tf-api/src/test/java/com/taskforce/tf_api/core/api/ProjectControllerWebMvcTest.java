@@ -44,6 +44,7 @@ class ProjectControllerWebMvcTest {
     @Autowired private MockMvc mockMvc;
 
     @MockitoBean private ProjectService projectService;
+    @MockitoBean private com.taskforce.tf_api.core.service.ProjectRepoService projectRepoService;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private WorkspaceRepository workspaceRepository;
     @MockitoBean private WorkspaceMemberRepository workspaceMemberRepository;

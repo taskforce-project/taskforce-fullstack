@@ -829,6 +829,8 @@ public class ProjectService {
             .iconUrl(project.getIconUrl())
             .color(project.getColor())
             .growthMode(project.isGrowthMode())
+            .repoProvider(project.getRepoProvider())
+            .repoFullName(project.getRepoFullName())
             .createdAt(project.getCreatedAt())
             .updatedAt(project.getUpdatedAt())
             .build();

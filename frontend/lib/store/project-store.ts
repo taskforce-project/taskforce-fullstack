@@ -3,6 +3,8 @@ import type {
   Project,
   CreateProjectPayload,
   UpdateProjectPayload,
+  ProjectRepoLinkPayload,
+  ProjectRepoResult,
 } from "../api/project-service";
 import {
   listProjects,
@@ -12,6 +14,8 @@ import {
   deleteProject as deleteProjectApi,
   favoriteProject as favoriteProjectApi,
   unfavoriteProject as unfavoriteProjectApi,
+  setProjectRepo as setProjectRepoApi,
+  unsetProjectRepo as unsetProjectRepoApi,
 } from "../api/project-service";
 
 // ---------------------------------------------------------------------------
@@ -43,6 +47,12 @@ interface ProjectState {
 
   /** Supprime un projet du store. `true` si supprimé, `false` si l'appel a échoué (erreur avalée). */
   deleteProject: (slug: string, id: number) => Promise<boolean>;
+
+  /** Lie/crée un dépôt de code sur un projet. Renvoie le résultat, ou `null` si l'appel échoue (erreur avalée). */
+  linkRepo: (slug: string, id: number, payload: ProjectRepoLinkPayload) => Promise<ProjectRepoResult | null>;
+
+  /** Délie le dépôt d'un projet. `true` si délié, `false` si l'appel a échoué (erreur avalée). */
+  unlinkRepo: (slug: string, id: number) => Promise<boolean>;
 
   /** Définit le projet actif */
   setActiveProject: (project: Project | null) => void;
@@ -87,6 +97,44 @@ export const useProjectStore = create<ProjectState>((set) => ({
       const message = err instanceof Error ? err.message : "Erreur lors de la création du projet";
       set({ error: message });
       return null;
+    }
+  },
+
+  linkRepo: async (slug, id, payload) => {
+    try {
+      const res = await setProjectRepoApi(slug, id, payload);
+      set((state) => ({
+        projects: state.projects.map((p) =>
+          p.id === id ? { ...p, repoProvider: res.repoProvider, repoFullName: res.repoFullName } : p,
+        ),
+        activeProject: state.activeProject?.id === id
+          ? { ...state.activeProject, repoProvider: res.repoProvider, repoFullName: res.repoFullName }
+          : state.activeProject,
+      }));
+      return res;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erreur lors du lien du dépôt";
+      set({ error: message });
+      return null;
+    }
+  },
+
+  unlinkRepo: async (slug, id) => {
+    try {
+      await unsetProjectRepoApi(slug, id);
+      set((state) => ({
+        projects: state.projects.map((p) =>
+          p.id === id ? { ...p, repoProvider: null, repoFullName: null } : p,
+        ),
+        activeProject: state.activeProject?.id === id
+          ? { ...state.activeProject, repoProvider: null, repoFullName: null }
+          : state.activeProject,
+      }));
+      return true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erreur lors du délien du dépôt";
+      set({ error: message });
+      return false;
     }
   },
 

@@ -59,6 +59,12 @@ public class ProjectResponse {
     /** Mode « montée en compétence » (PROD-1.8 Phase 3) */
     private boolean growthMode;
 
+    /** Fournisseur du dépôt de code lié ("github", ...), ou null si aucun (TF-AGENT-DELIVERY) */
+    private String repoProvider;
+
+    /** Dépôt de code lié ("owner/name"), ou null si aucun */
+    private String repoFullName;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
