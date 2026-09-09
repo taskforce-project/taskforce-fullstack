@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
-import { CircleCheck, Zap, Sparkles, Building2, Loader2, ArrowDownCircle } from "lucide-react"
+import { CircleCheck, Zap, Sparkles, Building2, Loader2, ArrowDownCircle, Info } from "lucide-react"
 
 import { PageContainer, PageHeader } from "@/components/layout/page-shell"
 import { Button } from "@/components/ui/button"
@@ -28,7 +28,7 @@ interface PlanDef {
   key: PlanKey
   name: string
   tagline: string
-  /** Prix mensuel PAR MEMBRE en € (0 = gratuit, null = sur devis). Prix annuel = −17 %. */
+  /** Prix mensuel PAR MEMBRE en USD (0 = gratuit, null = sur devis). Annuel = -2 USD/mois fixe. */
   monthly: number | null
   /** Forfait dont celui-ci hérite (« Tout ce qui est dans X, plus : »). */
   inherits?: string
@@ -259,6 +259,18 @@ export default function BillingPage() {
   return (
     <PageContainer>
       <PageHeader title="Billing" description="Your plan, your AI usage and upgrade options." />
+
+      {/* Bandeau bêta : la facturation n'est pas encore active (mode test Stripe, tout le monde en Free). */}
+      <div className="flex items-start gap-3 rounded-xl border border-blue-500/20 bg-blue-500/10 p-4 text-sm text-foreground">
+        <Info className="mt-0.5 size-4 shrink-0 text-blue-500" />
+        <div>
+          <p className="font-medium">Billing is in preview during the closed beta.</p>
+          <p className="mt-0.5 text-muted-foreground">
+            Every account stays on the Free tier for now and paid plans are not active yet. Checkout runs in
+            Stripe test mode (test cards only, no real charge) so you can try the flow safely.
+          </p>
+        </div>
+      </div>
 
       {/* Barre compacte : forfait courant + consommation IA (agrégée par compte) */}
       <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
