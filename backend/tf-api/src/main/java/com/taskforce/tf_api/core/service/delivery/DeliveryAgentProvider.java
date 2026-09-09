@@ -28,4 +28,17 @@ public interface DeliveryAgentProvider {
 
     /** Modèles proposés par le provider (indicatif, pour la reco et le picker). */
     List<String> models();
+
+    /**
+     * Lance le run dans le cloud du provider (sous le compte de l'utilisateur, cf. spec §D2) et renvoie
+     * un handle. Défaut : non exécutable (les providers réels câblent leur dispatch en slice 3+).
+     */
+    default DeliveryDispatch dispatch(AgentBrief brief) {
+        throw new UnsupportedOperationException(key() + " n'est pas encore exécutable");
+    }
+
+    /** Interroge l'état d'un run (et son résultat quand terminé). Défaut : non exécutable. */
+    default DeliveryPoll poll(String externalRef) {
+        throw new UnsupportedOperationException(key() + " n'est pas encore exécutable");
+    }
 }
