@@ -20,6 +20,9 @@ public interface IssueStatusRepository extends JpaRepository<IssueStatus, Long> 
 
     boolean existsByProjectIdAndName(Long projectId, String name);
 
+    /** Statut d'un projet par son nom (unique par projet) - pour le find-or-create de délégation. */
+    Optional<IssueStatus> findByProjectIdAndName(Long projectId, String name);
+
     @Query("SELECT s FROM IssueStatus s WHERE s.project.id = :projectId AND s.category = :category ORDER BY s.position")
     List<IssueStatus> findByProjectIdAndCategory(
         @Param("projectId") Long projectId,
