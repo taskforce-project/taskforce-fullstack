@@ -12,6 +12,8 @@ vi.mock('../api/project-service', () => ({
   deleteProject: vi.fn(),
   favoriteProject: vi.fn(),
   unfavoriteProject: vi.fn(),
+  setProjectRepo: vi.fn(),
+  unsetProjectRepo: vi.fn(),
 }));
 
 function makeProject(overrides: Partial<Project> = {}): Project {
@@ -35,6 +37,8 @@ function makeProject(overrides: Partial<Project> = {}): Project {
     iconUrl: null,
     color: '#fff',
     growthMode: false,
+    repoProvider: null,
+    repoFullName: null,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
@@ -220,6 +224,64 @@ describe('project-store', () => {
 
     expect(useProjectStore.getState().error).toBe('delfail');
     expect(useProjectStore.getState().projects).toHaveLength(1);
+  });
+
+  it('linkRepo updates the project repo fields and returns the result', async () => {
+    const original = makeProject({ id: 5 });
+    act(() => useProjectStore.setState({ projects: [original], activeProject: original }));
+    vi.mocked(svc.setProjectRepo).mockResolvedValue({ projectId: 5, repoProvider: 'github', repoFullName: 'me/new' });
+
+    let result: Awaited<ReturnType<typeof useProjectStore.getState>['linkRepo']> = null;
+    await act(async () => {
+      result = await useProjectStore.getState().linkRepo('acme', 5, { mode: 'CREATE', repoName: 'new' });
+    });
+
+    expect(svc.setProjectRepo).toHaveBeenCalledWith('acme', 5, { mode: 'CREATE', repoName: 'new' });
+    expect(result).toEqual({ projectId: 5, repoProvider: 'github', repoFullName: 'me/new' });
+    expect(useProjectStore.getState().projects[0].repoFullName).toBe('me/new');
+    expect(useProjectStore.getState().activeProject?.repoProvider).toBe('github');
+  });
+
+  it('linkRepo sets error and returns null on failure', async () => {
+    act(() => useProjectStore.setState({ projects: [makeProject({ id: 5 })] }));
+    vi.mocked(svc.setProjectRepo).mockRejectedValue(new Error('repofail'));
+
+    let result: Awaited<ReturnType<typeof useProjectStore.getState>['linkRepo']> = { projectId: 0, repoProvider: null, repoFullName: null };
+    await act(async () => {
+      result = await useProjectStore.getState().linkRepo('acme', 5, { mode: 'LINK', repoFullName: 'a/b' });
+    });
+
+    expect(result).toBeNull();
+    expect(useProjectStore.getState().error).toBe('repofail');
+  });
+
+  it('unlinkRepo clears the project repo fields and returns true', async () => {
+    const original = makeProject({ id: 5, repoProvider: 'github', repoFullName: 'me/old' });
+    act(() => useProjectStore.setState({ projects: [original], activeProject: original }));
+    vi.mocked(svc.unsetProjectRepo).mockResolvedValue({ projectId: 5, repoProvider: null, repoFullName: null });
+
+    let ok = false;
+    await act(async () => {
+      ok = await useProjectStore.getState().unlinkRepo('acme', 5);
+    });
+
+    expect(svc.unsetProjectRepo).toHaveBeenCalledWith('acme', 5);
+    expect(ok).toBe(true);
+    expect(useProjectStore.getState().projects[0].repoFullName).toBeNull();
+    expect(useProjectStore.getState().activeProject?.repoProvider).toBeNull();
+  });
+
+  it('unlinkRepo sets error and returns false on failure', async () => {
+    act(() => useProjectStore.setState({ projects: [makeProject({ id: 5 })] }));
+    vi.mocked(svc.unsetProjectRepo).mockRejectedValue(new Error('unlinkfail'));
+
+    let ok = true;
+    await act(async () => {
+      ok = await useProjectStore.getState().unlinkRepo('acme', 5);
+    });
+
+    expect(ok).toBe(false);
+    expect(useProjectStore.getState().error).toBe('unlinkfail');
   });
 
   it('setActiveProject sets and clears', () => {

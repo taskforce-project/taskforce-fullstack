@@ -8,6 +8,8 @@ import {
   favoriteProject,
   unfavoriteProject,
   deleteProject,
+  setProjectRepo,
+  unsetProjectRepo,
   listProjectMembers,
   addProjectMember,
   removeProjectMember,
@@ -58,6 +60,36 @@ describe('project-service', () => {
     it('propage l’erreur du client', async () => {
       vi.mocked(apiClient.get).mockRejectedValue(new Error('boom'));
       await expect(listProjects(SLUG)).rejects.toThrow('boom');
+    });
+  });
+
+  describe('setProjectRepo / unsetProjectRepo', () => {
+    it('PUT le lien de dépôt (mode CREATE)', async () => {
+      const payload = { mode: 'CREATE' as const, repoName: 'new-repo', privateRepo: true };
+      const result = { projectId: PROJECT_ID, repoProvider: 'github', repoFullName: 'me/new-repo' };
+      vi.mocked(apiClient.put).mockResolvedValue(envelope(result));
+
+      const res = await setProjectRepo(SLUG, PROJECT_ID, payload);
+
+      expect(apiClient.put).toHaveBeenCalledWith(PROJECT_ROUTES.REPO(SLUG, PROJECT_ID), payload);
+      expect(res).toEqual(result);
+    });
+
+    it('DELETE délie le dépôt', async () => {
+      const result = { projectId: PROJECT_ID, repoProvider: null, repoFullName: null };
+      vi.mocked(apiClient.delete).mockResolvedValue(envelope(result));
+
+      const res = await unsetProjectRepo(SLUG, PROJECT_ID);
+
+      expect(apiClient.delete).toHaveBeenCalledWith(PROJECT_ROUTES.REPO(SLUG, PROJECT_ID));
+      expect(res).toEqual(result);
+    });
+
+    it('propage l’erreur du client', async () => {
+      vi.mocked(apiClient.put).mockRejectedValue(new Error('repo boom'));
+      await expect(
+        setProjectRepo(SLUG, PROJECT_ID, { mode: 'LINK', repoFullName: 'a/b' }),
+      ).rejects.toThrow('repo boom');
     });
   });
 

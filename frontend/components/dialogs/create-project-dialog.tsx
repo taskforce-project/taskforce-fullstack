@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { FolderKanban, Loader2, DownloadCloud, Plug } from "lucide-react"
+import { FolderKanban, Loader2, DownloadCloud, Plug, Github } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -26,7 +26,10 @@ import {
   getIntegrationCatalog,
   importMcpProject,
   startMcpOAuth,
+  getGitHubStatus,
+  getGitHubRepos,
   type ConnectorView,
+  type GitHubRepo,
 } from "@/lib/api/integration-service"
 import { cn } from "@/lib/utils"
 
@@ -55,6 +58,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
   const router = useRouter()
   const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug)
   const createProject = useProjectStore((s) => s.createProject)
+  const linkRepo = useProjectStore((s) => s.linkRepo)
   const preselectImportSource = useCreateProjectStore((s) => s.importSource)
 
   const [mode, setMode] = useState<Mode>("blank")
@@ -67,6 +71,15 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
   const [iconUrl, setIconUrl] = useState<string | null>(null)
   const [color, setColor] = useState<string>(PROJECT_COLORS[0])
   const [isPublic, setIsPublic] = useState(false)
+
+  // -- Dépôt de code (optionnel, façon Linear) : aucun / créer / lier un existant (TF-AGENT-DELIVERY) --
+  const [repoMode, setRepoMode] = useState<"none" | "create" | "link">("none")
+  const [repoName, setRepoName] = useState("")
+  const [repoPrivate, setRepoPrivate] = useState(true)
+  const [linkRepoFullName, setLinkRepoFullName] = useState("")
+  const [githubConnected, setGithubConnected] = useState<boolean | null>(null)
+  const [githubRepos, setGithubRepos] = useState<GitHubRepo[]>([])
+  const [reposLoading, setReposLoading] = useState(false)
 
   // -- Mode « import » --
   const [tools, setTools] = useState<ConnectorView[]>([])
@@ -100,6 +113,26 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
     }
   }, [open, preselectImportSource])
 
+  // Statut GitHub (connecté ?) à l'ouverture du mode vierge : conditionne la section « dépôt de code ».
+  useEffect(() => {
+    if (!open || mode !== "blank" || !slug) return
+    let alive = true
+    getGitHubStatus(slug)
+      .then((s) => { if (alive) setGithubConnected(s.connected) })
+      .catch(() => { if (alive) setGithubConnected(false) })
+    return () => { alive = false }
+  }, [open, mode, slug])
+
+  // Charge les dépôts accessibles quand on choisit « lier un dépôt existant ».
+  useEffect(() => {
+    if (repoMode !== "link" || !githubConnected || !slug || githubRepos.length > 0) return
+    setReposLoading(true)
+    getGitHubRepos(slug)
+      .then(setGithubRepos)
+      .catch(() => setGithubRepos([]))
+      .finally(() => setReposLoading(false))
+  }, [repoMode, githubConnected, slug, githubRepos.length])
+
   function handleNameChange(value: string) {
     setName(value)
     const derived = value.toUpperCase().replaceAll(/[^A-Z0-9]/g, "").slice(0, 6)
@@ -117,6 +150,11 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
     setIconUrl(null)
     setColor(PROJECT_COLORS[0])
     setIsPublic(false)
+    setRepoMode("none")
+    setRepoName("")
+    setRepoPrivate(true)
+    setLinkRepoFullName("")
+    setGithubRepos([])
     setTools([])
     setImportSource("")
     setImportName("")
@@ -142,6 +180,14 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
         isPublic,
       })
       if (project) {
+        // Dépôt de code optionnel : on lie APRÈS création. Un échec de lien n'annule pas le projet.
+        if (repoMode === "create" && repoName.trim()) {
+          const linked = await linkRepo(slug, project.id, { mode: "CREATE", repoName: repoName.trim(), privateRepo: repoPrivate })
+          if (!linked) toast.warning("Project created, but the repository couldn't be created. You can link one later.")
+        } else if (repoMode === "link" && linkRepoFullName) {
+          const linked = await linkRepo(slug, project.id, { mode: "LINK", repoFullName: linkRepoFullName })
+          if (!linked) toast.warning("Project created, but the repository couldn't be linked. You can link one later.")
+        }
         toast.success(`Project "${project.name}" created`)
         changeOpen(false)
         router.push(`/${slug}/projects/${project.id}`)
@@ -282,6 +328,78 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium text-foreground">Visibility</label>
               <ProjectVisibilityPicker value={isPublic} onChange={setIsPublic} />
+            </div>
+
+            {/* Dépôt de code (optionnel, façon Linear) : aucun / créer / lier - TF-AGENT-DELIVERY */}
+            <div className="flex flex-col gap-1.5">
+              <label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                <Github className="size-4" /> Code repository{" "}
+                <span className="font-normal text-muted-foreground">(optional)</span>
+              </label>
+
+              {githubConnected === false ? (
+                <p className="rounded-md border border-border bg-muted/30 px-3 py-2.5 text-xs text-muted-foreground">
+                  Connect GitHub in{" "}
+                  <a href={`/${slug}/settings?section=integrations`} className="text-primary hover:underline">
+                    Settings → Integrations
+                  </a>{" "}
+                  to create or link a repository for this project.
+                </p>
+              ) : (
+                <>
+                  <div className="inline-flex w-fit rounded-md border border-border p-0.5 text-xs">
+                    {(["none", "create", "link"] as const).map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setRepoMode(m)}
+                        className={cn(
+                          "rounded px-2.5 py-1 transition-colors",
+                          repoMode === m ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+                        )}
+                      >
+                        {m === "none" ? "None" : m === "create" ? "New repo" : "Link existing"}
+                      </button>
+                    ))}
+                  </div>
+
+                  {repoMode === "create" && (
+                    <div className="flex items-center gap-2">
+                      <Input
+                        value={repoName}
+                        onChange={(e) => setRepoName(e.target.value.replaceAll(/\s+/g, "-"))}
+                        placeholder="my-repo"
+                        className="h-9 font-mono"
+                      />
+                      <label className="flex items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground">
+                        <input type="checkbox" checked={repoPrivate} onChange={(e) => setRepoPrivate(e.target.checked)} />
+                        Private
+                      </label>
+                    </div>
+                  )}
+
+                  {repoMode === "link" && (
+                    reposLoading ? (
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Loader2 className="size-3.5 animate-spin" /> Loading repositories…
+                      </div>
+                    ) : (
+                      <select
+                        value={linkRepoFullName}
+                        onChange={(e) => setLinkRepoFullName(e.target.value)}
+                        className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary/50"
+                      >
+                        <option value="">Select a repository…</option>
+                        {githubRepos.map((r) => (
+                          <option key={r.fullName} value={r.fullName}>
+                            {r.fullName}{r.isPrivate ? " (private)" : ""}
+                          </option>
+                        ))}
+                      </select>
+                    )
+                  )}
+                </>
+              )}
             </div>
           </div>
         ) : (
