@@ -2,11 +2,15 @@
 
 import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
-import { CircleCheck, Zap, Sparkles, Building2, Loader2 } from "lucide-react"
+import { CircleCheck, Zap, Sparkles, Building2, Loader2, ArrowDownCircle } from "lucide-react"
 
 import { PageContainer, PageHeader } from "@/components/layout/page-shell"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { useAuth } from "@/lib/contexts/auth-context"
@@ -112,7 +116,7 @@ function YearlyToggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
  * page d'abonnement moderne. Barre compacte plan courant + consommation IA (agrégée par compte).
  */
 export default function BillingPage() {
-  const { user } = useAuth()
+  const { user, refreshUser } = useAuth()
   const params = useParams()
   const slug = typeof params?.workspace === "string" ? params.workspace : ""
   const current = (user?.planType ?? "FREE") as PlanKey
@@ -121,6 +125,8 @@ export default function BillingPage() {
   const [sub, setSub] = useState<SubscriptionInfo | null>(null)
   const [usage, setUsage] = useState<AiUsage | null>(null)
   const [busy, setBusy] = useState(false)
+  /** Rétrogradation en attente de confirmation (BUSINESS -> BASIC) - null = pas de dialog ouvert. */
+  const [pendingDowngrade, setPendingDowngrade] = useState<SelfServe | null>(null)
 
   useEffect(() => {
     if (current === "FREE") return
@@ -169,6 +175,26 @@ export default function BillingPage() {
     }
   }
 
+  /**
+   * Change le forfait d'un abonnement EXISTANT sans quitter l'app (upgrade ou rétrogradation entre plans
+   * payants) : le back remplace le prix avec proration et reflète le plan aussitôt. On rafraîchit ensuite
+   * l'utilisateur (met à jour `current`) et l'abonnement affiché.
+   */
+  async function doChangePlan(plan: SelfServe) {
+    setBusy(true)
+    try {
+      const updated = await stripeService.changePlan(plan, annual ? "year" : "month")
+      setSub(updated)
+      await refreshUser()
+      toast.success(`You are now on the ${plan === "BASIC" ? "Basic" : "Business"} plan.`)
+    } catch (e) {
+      // Le service a déjà extrait le message serveur (ex. 502 Stripe indisponible) → on l'affiche tel quel.
+      toast.error(e instanceof Error ? e.message : "Could not change your plan right now. Please try again later.")
+    } finally {
+      setBusy(false)
+    }
+  }
+
   function priceFor(p: PlanDef): { big: string; per: string } {
     if (p.monthly === null) return { big: "Custom", per: "" }
     if (p.monthly === 0) return { big: "$0", per: "" }
@@ -179,11 +205,15 @@ export default function BillingPage() {
 
   function renderCta(p: PlanDef) {
     const base = "h-10 w-full font-medium"
+
+    // Forfait courant : gérer l'abonnement (portail Stripe : moyen de paiement, factures) ou badge FREE.
     if (p.key === current) {
       return current === "FREE"
         ? <Button variant="secondary" className={base} disabled>Current plan</Button>
         : <Button variant="outline" className={base} onClick={openPortal} disabled={busy}>{busy ? "Opening…" : "Manage"}</Button>
     }
+
+    // Enterprise : sur devis (contact commercial).
     if (p.key === "ENTERPRISE") {
       return (
         <Button asChild variant="outline" className={cn(base, "gap-1.5")}>
@@ -193,20 +223,34 @@ export default function BillingPage() {
         </Button>
       )
     }
-    if (RANK[p.key] < RANK[current]) {
-      // Rétrogradation : toujours via le portail Stripe (switch de prix + proration auto), jamais annuler/re-souscrire.
-      return <Button variant="ghost" className={cn(base, "text-muted-foreground hover:text-foreground")} onClick={openPortal} disabled={busy}>Downgrade</Button>
+
+    // Retour au gratuit depuis un plan payant = résiliation (accès conservé jusqu'à la fin de période).
+    // On passe par le portail Stripe (annulation en fin de période + réactivation possible), pas un change
+    // de prix - la sémantique « garde ton accès jusqu'à la fin » est différente d'une bascule de forfait.
+    if (p.key === "FREE") {
+      return <Button variant="ghost" className={cn(base, "text-muted-foreground hover:text-foreground")} onClick={openPortal} disabled={busy}>{busy ? "Opening…" : "Cancel plan"}</Button>
     }
-    // Upgrade : depuis FREE (aucun abonnement) → Checkout ; depuis un plan payant → portail (changement
-    // de prix avec proration, PAS un second abonnement facturé en double).
-    const upgrade = current === "FREE" ? () => checkout(p.key as SelfServe) : openPortal
+
+    // Depuis FREE (aucun abonnement) : nouvel abonnement via Checkout Stripe.
+    if (current === "FREE") {
+      return (
+        <Button variant={p.highlight ? "default" : "outline"} className={cn(base, "gap-1.5")} onClick={() => checkout(p.key as SelfServe)} disabled={busy}>
+          {busy ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />} Upgrade to {p.name}
+        </Button>
+      )
+    }
+
+    // Entre plans payants (BASIC <-> BUSINESS) : changement de prix IN-APP avec proration, sans portail.
+    // Rétrogradation -> dialog de confirmation (features/limites réduites) ; montée en gamme -> immédiate.
+    if (RANK[p.key] < RANK[current]) {
+      return (
+        <Button variant="ghost" className={cn(base, "gap-1.5 text-muted-foreground hover:text-foreground")} onClick={() => setPendingDowngrade(p.key as SelfServe)} disabled={busy}>
+          {busy ? <Loader2 className="size-4 animate-spin" /> : <ArrowDownCircle className="size-4" />} Downgrade to {p.name}
+        </Button>
+      )
+    }
     return (
-      <Button
-        variant={p.highlight ? "default" : "outline"}
-        className={cn(base, "gap-1.5")}
-        onClick={upgrade}
-        disabled={busy}
-      >
+      <Button variant={p.highlight ? "default" : "outline"} className={cn(base, "gap-1.5")} onClick={() => doChangePlan(p.key as SelfServe)} disabled={busy}>
         {busy ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />} Upgrade to {p.name}
       </Button>
     )
@@ -303,9 +347,42 @@ export default function BillingPage() {
       </div>
 
       <p className="mx-auto mt-6 max-w-6xl text-center text-xs text-muted-foreground">
-        Prices and plans are indicative (placeholders) and will be adjusted with the final TaskForce pricing grid.
-        Usage limits apply.
+        Per-member pricing in USD. During the closed beta, payments run in Stripe test mode (no real charge).
+        Change or cancel your plan anytime; usage limits apply.
       </p>
+
+      {/* Confirmation de rétrogradation (changement de prix in-app, proration Stripe). */}
+      <AlertDialog
+        open={pendingDowngrade !== null}
+        onOpenChange={(open) => { if (!open && !busy) setPendingDowngrade(null) }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Downgrade to {pendingDowngrade === "BUSINESS" ? "Business" : "Basic"}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Your plan changes right away. Stripe credits the unused time on your current plan against the new
+              one (proration), so you are not charged twice. Features and limits above the new plan no longer apply.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Keep my plan</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async (e) => {
+                e.preventDefault() // garde le dialog ouvert pendant l'appel (retour visuel), fermé ensuite
+                const target = pendingDowngrade
+                if (!target) return
+                await doChangePlan(target)
+                setPendingDowngrade(null)
+              }}
+              disabled={busy}
+            >
+              {busy ? "Downgrading…" : "Confirm downgrade"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PageContainer>
   )
 }

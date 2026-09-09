@@ -19,6 +19,7 @@ import com.taskforce.tf_api.core.dto.request.PortalSessionRequest;
 import com.taskforce.tf_api.core.dto.response.CheckoutSessionResponse;
 import com.taskforce.tf_api.core.dto.response.PortalSessionResponse;
 import com.taskforce.tf_api.core.dto.response.SubscriptionInfoResponse;
+import com.taskforce.tf_api.core.enums.PlanStatus;
 import com.taskforce.tf_api.core.enums.PlanType;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
@@ -146,6 +147,53 @@ public class BillingController {
                 .sessionUrl(session.getUrl())
                 .status("created")
                 .build()));
+    }
+
+    /**
+     * Change le forfait d'un abonnement EXISTANT (upgrade OU rétrogradation) **in-app**, sans passer par
+     * le portail Stripe : on remplace le prix de l'abonnement actif avec proration. Réservé aux forfaits
+     * souscriptibles en ligne (BASIC, BUSINESS). Nécessite un abonnement payant en cours (sinon 409 clair :
+     * depuis FREE il faut passer par /checkout). Le plan est reflété immédiatement côté app (le webhook
+     * {@code customer.subscription.updated} reste la source de vérité et rejoue idempotemment).
+     */
+    @PostMapping("/change-plan")
+    public ResponseEntity<ApiResponse<SubscriptionInfoResponse>> changePlan(
+        @AuthenticationPrincipal Jwt jwt,
+        @Valid @RequestBody CreateCheckoutSessionRequest body
+    ) throws StripeException {
+        User user = userRepository.findByEmail(jwt.getClaimAsString("email"))
+            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+
+        String plan = body.getPlanType() == null ? "" : body.getPlanType().toUpperCase();
+        if (!plan.equals("BASIC") && !plan.equals("BUSINESS")) {
+            throw new IllegalArgumentException("Ce forfait n'est pas modifiable en ligne : " + plan);
+        }
+
+        // Changer de plan suppose un abonnement payant existant (le client Stripe est porté par `users`).
+        // Depuis FREE il n'y a rien à modifier : on renvoie une erreur claire (le front passe par /checkout).
+        String customerId = user.getStripeCustomerId();
+        if (customerId == null || customerId.isBlank() || customerId.startsWith("cus_seed")) {
+            throw new IllegalStateException(
+                "Aucun abonnement à modifier (plan gratuit). Souscrivez d'abord à un plan payant.");
+        }
+
+        String interval = "year".equalsIgnoreCase(body.getBillingInterval()) ? "year" : "month";
+        String priceId = stripeService.getPriceIdForPlan(plan, interval);
+        long seats = Math.max(1L, workspaceMemberRepository.countDistinctMembersByOwnerId(user.getId()));
+
+        stripeService.changeSubscriptionPlan(customerId, priceId, seats);
+
+        // Reflet immédiat côté app : évite la course avec le webhook (asynchrone) pour que la page
+        // Billing montre le nouveau plan dès le retour. Le webhook rejouera le même état (idempotent).
+        PlanType target = PlanType.valueOf(plan);
+        user.setPlanType(target);
+        user.setPlanStatus(PlanStatus.ACTIVE);
+        userRepository.save(user);
+
+        String periodEnd = user.getSubscriptionEndDate() != null ? user.getSubscriptionEndDate().toString() : null;
+        SubscriptionInfoResponse info = new SubscriptionInfoResponse(
+            user.getId(), target.name(), PlanStatus.ACTIVE.name(), periodEnd, false);
+        return ResponseEntity.ok(ApiResponse.success("Forfait mis à jour", info));
     }
 
     private static boolean notBlank(String s) {

@@ -136,6 +136,35 @@ class PaymentAndDataControllersWebMvcTest {
     }
 
     @Test
+    @DisplayName("POST /api/billing/change-plan (auth) → 200 + nouveau forfait (change de prix in-app)")
+    void billing_change_plan_200() throws Exception {
+        // Changement de forfait in-app : nécessite un client Stripe réel (porté par `users`). Le back
+        // remplace le prix de l'abonnement actif (proration) puis reflète le plan aussitôt dans la réponse.
+        when(userRepository.findByEmail(EMAIL))
+            .thenReturn(Optional.of(User.builder().id(7L).email(EMAIL).stripeCustomerId("cus_123").build()));
+        when(stripeService.getPriceIdForPlan("BASIC", "month")).thenReturn("price_basic");
+        when(workspaceMemberRepository.countDistinctMembersByOwnerId(7L)).thenReturn(3L);
+        when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        mockMvc.perform(post("/api/billing/change-plan").with(auth())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"planType\":\"BASIC\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.planType").value("BASIC"));
+    }
+
+    @Test
+    @DisplayName("POST /api/billing/change-plan sans client Stripe (plan gratuit) → 409")
+    void billing_change_plan_free_409() throws Exception {
+        // Depuis FREE (aucun customer Stripe), rien à modifier → 409 clair (le front passe par /checkout).
+        stubUser(); // utilisateur sans stripeCustomerId
+
+        mockMvc.perform(post("/api/billing/change-plan").with(auth())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"planType\":\"BASIC\"}"))
+            .andExpect(status().isConflict());
+    }
+
+    @Test
     @DisplayName("GET /api/stripe/verify-session (public) → 200")
     void stripe_verify_session_200() throws Exception {
         when(authService.completeRegistrationAfterPayment(anyString())).thenReturn(null);
