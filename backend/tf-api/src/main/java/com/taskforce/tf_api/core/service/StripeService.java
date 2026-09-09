@@ -175,9 +175,19 @@ public class StripeService {
                 .setLimit(1L)
                 .build());
         if (subs.getData().isEmpty()) {
-            throw new IllegalStateException("Aucun abonnement actif a modifier.");
+            throw new IllegalStateException("No active subscription to change.");
         }
         Subscription sub = subs.getData().get(0);
+        // Stripe INTERDIT de changer la devise d'un abonnement : un abonnement pre-USD (ex. EUR) ne peut
+        // pas basculer vers un price USD. On bloque avec un message actionnable plutot que de laisser
+        // remonter une erreur Stripe opaque (502). Tous nos prix sont en USD depuis le passage tarifaire.
+        String subCurrency = sub.getCurrency();
+        if (subCurrency != null && !"usd".equalsIgnoreCase(subCurrency)) {
+            throw new IllegalStateException(
+                "Your current subscription is billed in " + subCurrency.toUpperCase()
+                + ". Stripe does not allow changing a subscription's currency: cancel it and "
+                + "re-subscribe in USD to change plan.");
+        }
         String itemId = sub.getItems().getData().get(0).getId();
         return sub.update(
             SubscriptionUpdateParams.builder()

@@ -174,7 +174,7 @@ public class BillingController {
         String customerId = user.getStripeCustomerId();
         if (customerId == null || customerId.isBlank() || customerId.startsWith("cus_seed")) {
             throw new IllegalStateException(
-                "Aucun abonnement à modifier (plan gratuit). Souscrivez d'abord à un plan payant.");
+                "No paid subscription to change (free plan). Subscribe to a paid plan first.");
         }
 
         String interval = "year".equalsIgnoreCase(body.getBillingInterval()) ? "year" : "month";
