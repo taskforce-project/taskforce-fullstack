@@ -174,6 +174,8 @@ export const PROJECT_ROUTES = {
   ARCHIVE: (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/archive`,
   FAVORITE: (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/favorite`,
   DELETE:  (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}`,
+  /** Lien projet <-> dépôt de code (PUT lier/créer, DELETE délier) - TF-AGENT-DELIVERY */
+  REPO:    (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/repo`,
   MEMBERS: (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/members`,
   MEMBER:  (slug: string, id: number, memberId: number) => `/api/workspaces/${slug}/projects/${id}/members/${memberId}`,
   LABELS:  (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/labels`,

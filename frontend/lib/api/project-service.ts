@@ -85,8 +85,30 @@ export interface Project {
   color: string;
   /** Mode « montée en compétence » (PROD-1.8 Phase 3) */
   growthMode: boolean;
+  /** Fournisseur du dépôt de code lié ("github"...), ou null (TF-AGENT-DELIVERY) */
+  repoProvider: string | null;
+  /** Dépôt de code lié ("owner/name"), ou null */
+  repoFullName: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Corps de PUT …/projects/{id}/repo : crée un dépôt (CREATE) ou lie un existant (LINK). */
+export interface ProjectRepoLinkPayload {
+  mode: "CREATE" | "LINK";
+  /** Mode CREATE : nom du dépôt à créer. */
+  repoName?: string;
+  /** Mode LINK : dépôt existant "owner/name". */
+  repoFullName?: string;
+  /** Mode CREATE : dépôt privé (défaut true côté serveur). */
+  privateRepo?: boolean;
+}
+
+/** Résultat d'un lien / délien de dépôt (repo* null quand délié). */
+export interface ProjectRepoResult {
+  projectId: number;
+  repoProvider: string | null;
+  repoFullName: string | null;
 }
 
 export interface CreateProjectPayload {
@@ -168,6 +190,18 @@ export async function unfavoriteProject(slug: string, id: number): Promise<Proje
 /** Supprime définitivement un projet */
 export async function deleteProject(slug: string, id: number): Promise<void> {
   await apiClient.delete(PROJECT_ROUTES.DELETE(slug, id));
+}
+
+/** Lie un dépôt de code au projet (CREATE = nouveau dépôt GitHub, LINK = existant) - TF-AGENT-DELIVERY */
+export async function setProjectRepo(slug: string, id: number, payload: ProjectRepoLinkPayload): Promise<ProjectRepoResult> {
+  const response = await apiClient.put<{ data: ProjectRepoResult }>(PROJECT_ROUTES.REPO(slug, id), payload);
+  return response.data.data;
+}
+
+/** Délie le dépôt du projet */
+export async function unsetProjectRepo(slug: string, id: number): Promise<ProjectRepoResult> {
+  const response = await apiClient.delete<{ data: ProjectRepoResult }>(PROJECT_ROUTES.REPO(slug, id));
+  return response.data.data;
 }
 
 // ---------------------------------------------------------------------------
