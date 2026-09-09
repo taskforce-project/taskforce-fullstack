@@ -50,6 +50,15 @@ export const BILLING_ROUTES = {
 } as const;
 
 /**
+ * Délégation à un agent de livraison (coding agent) - TF-AGENT-DELIVERY.
+ * Backend: @RequestMapping("/api/workspaces/{slug}/delivery")
+ */
+export const DELIVERY_ROUTES = {
+  /** Providers délégables (Claude Code / Copilot / Cursor...) pour le picker. */
+  PROVIDERS: (slug: string) => `/api/workspaces/${slug}/delivery/providers`,
+} as const;
+
+/**
  * Routes utilisateur (profil)
  * Backend: @RequestMapping("/api/users")
  */
