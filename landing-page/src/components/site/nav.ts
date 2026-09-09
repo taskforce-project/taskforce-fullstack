@@ -1,3 +1,4 @@
+import { PRODUCT_VERSION } from "../../product-version";
 import {
   Waypoints,
   UserRoundCog,
@@ -298,9 +299,9 @@ const BASE_DOMAIN = (import.meta.env.PUBLIC_BASE_DOMAIN ?? "taskforce-project.fr
   .replace(/^https?:\/\//, "")
   .replace(/\/+$/, "");
 export const APP_URL = import.meta.env.PUBLIC_APP_URL ?? `https://app.${BASE_DOMAIN}`;
-// Tag de version produit affiche dans le footer (aligne sur frontend/product-version.json).
-// A bumper avec la release produit (les tags par service sont geres par la CI via labels).
-export const APP_VERSION = "0.3.23";
+// Tag de version PRODUIT affiche dans le footer - source de verite unique dans `src/product-version.ts`
+// (bumpee au release via scripts/bump-product-version.mjs ; la CI tague taskforce-v<version>).
+export const APP_VERSION = PRODUCT_VERSION;
 export const LABS_ICON = Atom;
 
 /* ─────────────────────────  Pages réellement construites  ─────────────────────────

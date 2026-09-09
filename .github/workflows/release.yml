@@ -300,6 +300,16 @@ jobs:
             create_tag "${{ steps.landing.outputs.version }}" "Landing Release"
           fi
 
+          # Tag PRODUIT unique (regroupe les services) : lu depuis la source de vérité du footer.
+          # Seulement sur main (version produit stable) ; la valeur est bumpée au release via
+          # scripts/bump-product-version.mjs. Idempotent (create_tag saute si le tag existe déjà).
+          if [[ "${{ github.ref_name }}" == "main" ]]; then
+            PROD_VERSION=$(grep -oE '"[0-9]+\.[0-9]+\.[0-9]+"' landing-page/src/product-version.ts | tr -d '"' | head -n1)
+            if [ -n "$PROD_VERSION" ]; then
+              create_tag "taskforce-v${PROD_VERSION}" "Product Release"
+            fi
+          fi
+
   build-backend:
     name: 🔧 Build Backend
     needs: detect-and-version
