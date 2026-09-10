@@ -7,7 +7,7 @@
 ![License](https://img.shields.io/badge/License-Fair_Use-green.svg)
 ![Java](https://img.shields.io/badge/Java-21-orange.svg)
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.0.6-brightgreen.svg)
-![Next.js](https://img.shields.io/badge/Next.js-16.2.11-black.svg)
+![Next.js](https://img.shields.io/badge/Next.js-16.3.4-black.svg)
 ![TailwindCSS](https://img.shields.io/badge/TailwindCSS-4-38bdf8.svg)
 ![Keycloak](https://img.shields.io/badge/Keycloak-26.0.6-blue.svg)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)
