@@ -1736,10 +1736,23 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                 issuePriority={priority}
                 currentAssignee={assignee}
                 onAssign={async (m) => {
-                  const initials = (m.displayName ?? m.email).slice(0, 2).toUpperCase()
-                  const color = memberColor(m.userId)
-                  const name = m.displayName ?? m.email
-                  setAssignee({ initials, color, name, userId: m.userId, email: m.email, avatarUrl: m.avatarUrl })
+                  // Reco d'agent (A3) : on délègue (comme choisir un agent dans le menu Assignee).
+                  if (m.kind === "agent") {
+                    if (!workspaceSlug || !m.agentKey) return
+                    const res = await delegateToAgent(workspaceSlug, issueId, m.agentKey)
+                    if (res) {
+                      toast.success(`Delegated to ${m.displayName ?? "agent"}`)
+                      fetchDeliveryRun(workspaceSlug, issueId).catch(() => { /* silent */ })
+                    } else {
+                      toast.error("Couldn't delegate. Connect the agent's key in Settings → Agents.")
+                    }
+                    return
+                  }
+                  if (m.userId == null) return
+                  const email = m.email ?? ""
+                  const name = m.displayName ?? email
+                  const initials = name.slice(0, 2).toUpperCase()
+                  setAssignee({ initials, color: memberColor(m.userId), name, userId: m.userId, email, avatarUrl: m.avatarUrl })
                   await callUpdate({ assigneeId: m.userId })
                   toast.success(`Assigned to ${name}`)
                 }}
