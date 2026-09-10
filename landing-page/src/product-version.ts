@@ -7,4 +7,4 @@
  * dupliquée et gardée en sync par `scripts/bump-product-version.mjs` (le plus fort bump parmi les
  * services touchés). La CI crée le tag produit unique `taskforce-v<version>`.</p>
  */
-export const PRODUCT_VERSION = "0.19.1";
+export const PRODUCT_VERSION = "0.20.0";
