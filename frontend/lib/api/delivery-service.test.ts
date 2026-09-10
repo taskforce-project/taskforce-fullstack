@@ -1,10 +1,17 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { getDeliveryProviders, delegateIssue, getIssueRun } from './delivery-service';
+import {
+  getDeliveryProviders,
+  delegateIssue,
+  getIssueRun,
+  getDeliveryKey,
+  connectDeliveryKey,
+  disconnectDeliveryKey,
+} from './delivery-service';
 import { apiClient } from './client';
 import { DELIVERY_ROUTES } from '../config/api-routes';
 
 vi.mock('./client', () => ({
-  apiClient: { get: vi.fn(), post: vi.fn() },
+  apiClient: { get: vi.fn(), post: vi.fn(), delete: vi.fn() },
   getErrorMessage: vi.fn((e: unknown) => (e instanceof Error ? e.message : 'error')),
 }));
 
@@ -51,5 +58,33 @@ describe('delivery-service', () => {
 
     expect(apiClient.get).toHaveBeenCalledWith(DELIVERY_ROUTES.RUN(SLUG, 5));
     expect(res).toBeNull();
+  });
+
+  it('getDeliveryKey GET l’état de la clé (anthropic)', async () => {
+    const status = { connected: true, keyHint: '...AB12' };
+    vi.mocked(apiClient.get).mockResolvedValue(envelope(status));
+
+    const res = await getDeliveryKey(SLUG, 'anthropic');
+
+    expect(apiClient.get).toHaveBeenCalledWith(DELIVERY_ROUTES.KEY(SLUG, 'anthropic'));
+    expect(res).toEqual(status);
+  });
+
+  it('connectDeliveryKey POST la clé et retourne le statut (cursor)', async () => {
+    const status = { connected: true, keyHint: '...WXYZ' };
+    vi.mocked(apiClient.post).mockResolvedValue(envelope(status));
+
+    const res = await connectDeliveryKey(SLUG, 'cursor', 'key_WXYZ');
+
+    expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.KEY(SLUG, 'cursor'), { apiKey: 'key_WXYZ' });
+    expect(res).toEqual(status);
+  });
+
+  it('disconnectDeliveryKey DELETE la clé', async () => {
+    vi.mocked(apiClient.delete).mockResolvedValue(envelope(null));
+
+    await disconnectDeliveryKey(SLUG, 'anthropic');
+
+    expect(apiClient.delete).toHaveBeenCalledWith(DELIVERY_ROUTES.KEY(SLUG, 'anthropic'));
   });
 });

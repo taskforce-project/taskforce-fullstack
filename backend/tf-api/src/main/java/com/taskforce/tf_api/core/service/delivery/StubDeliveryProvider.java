@@ -29,7 +29,7 @@ public class StubDeliveryProvider implements DeliveryAgentProvider {
     }
 
     @Override
-    public DeliveryPoll poll(String externalRef) {
+    public DeliveryPoll poll(String externalRef, Long workspaceId) {
         return new DeliveryPoll(
             DeliveryRunStatus.DONE,
             "Simulated run: analyzed the task, prepared a draft change and opened a pull request.",
