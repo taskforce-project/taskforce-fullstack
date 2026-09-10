@@ -1,9 +1,10 @@
 /**
- * Version produit TaskForce - **source de vérité unique** affichée dans le footer.
+ * Version produit TaskForce affichée dans le footer de la landing - **le MÊME numéro que le footer de
+ * l'app**.
  *
- * <p>Regroupe en un seul numéro les versions par service (backend/frontend/landing) gérées
- * indépendamment par la CI. Se bumpe au release via `scripts/bump-product-version.mjs`
- * (major/minor/patch = le plus fort bump parmi les services touchés) ; la CI crée en plus le
- * tag `taskforce-v<version>` à partir de cette valeur.</p>
+ * <p>Copie synchronisée de `frontend/product-version.json` (source de vérité) : les deux contextes de
+ * build Docker étant isolés (l'app n'a que `frontend/`, la landing que `landing-page/`), la valeur est
+ * dupliquée et gardée en sync par `scripts/bump-product-version.mjs` (le plus fort bump parmi les
+ * services touchés). La CI crée le tag produit unique `taskforce-v<version>`.</p>
  */
-export const PRODUCT_VERSION = "0.4.0";
+export const PRODUCT_VERSION = "0.18.0";

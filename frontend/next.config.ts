@@ -1,13 +1,13 @@
 import type { NextConfig } from "next";
 import { readFileSync } from "node:fs";
 
-// Version PRODUIT LISIBLE affichée au footer (ex. « v0.1.1 »), à la place du SHA de commit opaque.
-// Elle représente le travail COMPLET front + back : major 0, minor/patch = somme des deux tags
-// (frontend/package.json + backend/tf-api/pom.xml). Calculée par scripts/product-version.mjs (le pom
-// backend n'est pas dans le contexte de build Docker du frontend) et écrite dans product-version.json,
-// committé et lu ici au build. Repli sur le tag frontend seul si le fichier manque. Injectée via `env`
-// ci-dessous → inlinée client+serveur. Distincte de NEXT_PUBLIC_APP_VERSION (SHA posé par l'auto-deploy
-// VM) que l'on garde pour la traçabilité au survol.
+// Version PRODUIT UNIQUE affichée au footer (ex. « v0.18.0 »), à la place du SHA de commit opaque.
+// UN seul numéro pour tout TaskForce, identique au footer de la landing. Source de vérité :
+// `frontend/product-version.json` (`version`), bumpée au release via `scripts/bump-product-version.mjs`
+// (qui écrit AUSSI `landing-page/src/product-version.ts` pour garder les deux footers en sync - les
+// deux contextes de build Docker étant isolés). La CI crée le tag `taskforce-v<version>`. Repli sur le
+// tag frontend (package.json) si le fichier manque. Injectée via `env` ci-dessous → inlinée
+// client+serveur. Distincte de NEXT_PUBLIC_APP_VERSION (SHA posé par l'auto-deploy VM), gardé au survol.
 function readProductVersion(): string {
   try {
     return (JSON.parse(readFileSync("./product-version.json", "utf8")) as { version: string }).version;
