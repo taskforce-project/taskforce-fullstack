@@ -5,7 +5,7 @@ import { useSearchParams, useRouter, useParams } from "next/navigation"
 import {
   User, Bell, Mail, Zap, Globe, Key, Palette, Webhook,
   Upload, Camera, Trash2, Shield, Loader2,
-  Activity, CheckCircle2, AlertTriangle, Gauge, Search,
+  Activity, CheckCircle2, AlertTriangle, Gauge, Search, Bot,
 } from "lucide-react"
 import { toast } from "sonner"
 import { useTheme } from "next-themes"
@@ -27,6 +27,7 @@ import { getAuditLogs, type AuditLogEntry } from "@/lib/api/workspace-service"
 import { useIntegrationStore } from "@/lib/store/integration-store"
 import { getGitHubRepos, getGitHubRepoIssues, syncGitHub, syncSlack, type GitHubRepo, type GitHubRepoIssue } from "@/lib/api/integration-service"
 import { IntegrationsCatalog } from "@/components/integrations/integrations-catalog"
+import { AgentsPanel } from "@/components/settings/agents-panel"
 import { BrandLogo } from "@/components/ui/brand-logo"
 import { ProfileOverview } from "@/components/profile/profile-overview"
 import { MemberSkillsCard } from "@/components/members/member-skills-card"
@@ -56,6 +57,7 @@ export type SettingsSection =
   | "usage"
   | "status"
   | "integrations"
+  | "agents"
   | "privacy"
 
 interface SectionConfig {
@@ -74,13 +76,14 @@ export const SECTIONS: SectionConfig[] = [
   { key: "workspace",     label: "General",        icon: <Globe className="h-4 w-4" />,      group: "Workspace" },
   { key: "usage",         label: "Usage Cortex",   icon: <Gauge className="h-4 w-4" />,       group: "Workspace" },
   { key: "integrations",  label: "Integrations",   icon: <Webhook className="h-4 w-4" />,    group: "Workspace" },
+  { key: "agents",        label: "Agents",         icon: <Bot className="h-4 w-4" />,        group: "Workspace" },
   { key: "status",        label: "Status",         icon: <Activity className="h-4 w-4" />,    group: "Workspace" },
   { key: "privacy",       label: "Privacy & Data", icon: <Shield className="h-4 w-4" />,     group: "Personal" },
 ]
 
 export const SECTION_GROUPS = [
   { label: "Personal",  keys: ["profile", "account", "appearance", "notifications", "security", "privacy"] as const },
-  { label: "Workspace", keys: ["workspace", "usage", "integrations", "status"] as const },
+  { label: "Workspace", keys: ["workspace", "usage", "integrations", "agents", "status"] as const },
 ]
 
 // SKILL_OPTIONS + SkillsTagInput retirés avec le faux champ « Skills » du Profil (TF-SETTINGS-FAKE) :
@@ -1672,6 +1675,7 @@ export function SettingsPanels({ active }: Readonly<{ active: SettingsSection }>
       {active === "workspace"     && <WorkspacePanel />}
       {active === "usage"         && <UsagePanel />}
       {active === "integrations"  && <IntegrationsPanel />}
+      {active === "agents"        && <AgentsPanel />}
       {active === "status"        && <StatusPanel />}
       {active === "privacy"       && <PrivacyPanel />}
     </>
