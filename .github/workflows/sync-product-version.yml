@@ -1,0 +1,80 @@
+name: 🔢 Sync Product Version
+
+# Calcule AUTOMATIQUEMENT la version produit unique (footer app + landing) a chaque release.
+# Regle : le produit monte du **plus fort bump parmi les services touches** (major > minor > patch),
+# lu depuis les labels de la PR vers main. La cible est ecrite dans les DEUX fichiers source du footer
+# (frontend/product-version.json + landing-page/src/product-version.ts) sur la branche de la PR, donc
+# portee sur main par le squash-merge. Jamais de regression (on ne bumpe que si la cible est plus haute).
+# Pas de push sur main protegee (on ecrit sur la branche de la PR) ; le footer, construit depuis ce
+# fichier, reflete donc la nouvelle version des la release. release.yml tague ensuite taskforce-v<version>.
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-product-version-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  bump:
+    name: Bump produit (max des bumps services)
+    runs-on: ubuntu-latest
+    # Pas sur les PR de fork : le token ne peut pas pousser sur leur branche.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute + apply product version
+        env:
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          set -euo pipefail
+
+          # Niveau de bump = le plus fort parmi les services (major=3 > minor=2 > patch=1 > aucun=0).
+          level=0
+          for svc in backend frontend landing; do
+            if   [[ ",$LABELS," == *",$svc:release:major,"* ]]; then l=3
+            elif [[ ",$LABELS," == *",$svc:release:minor,"* ]]; then l=2
+            elif [[ ",$LABELS," == *",$svc:release:patch,"* ]]; then l=1
+            else l=0; fi
+            if (( l > level )); then level=$l; fi
+          done
+          if (( level == 0 )); then
+            echo "Aucun label de release -> pas de bump produit."; exit 0
+          fi
+
+          # Version de base = celle de main (source de verite du footer).
+          BASE=$(git show origin/main:frontend/product-version.json | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
+          [ -z "$BASE" ] && BASE="0.0.0"
+          IFS='.' read -r MA MI PA <<< "$BASE"
+          if   (( level == 3 )); then MA=$((MA+1)); MI=0; PA=0
+          elif (( level == 2 )); then MI=$((MI+1)); PA=0
+          else PA=$((PA+1)); fi
+          TARGET="${MA}.${MI}.${PA}"
+
+          CUR=$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+' frontend/product-version.json | head -n1)
+          echo "labels=[$LABELS] level=$level base=$BASE target=$TARGET current=$CUR"
+
+          # Ne bumpe que si TARGET > CUR (jamais de regression : backfill/valeur deja plus haute -> skip).
+          highest=$(printf '%s\n%s\n' "$CUR" "$TARGET" | sort -V | tail -n1)
+          if [ "$TARGET" = "$CUR" ] || [ "$highest" = "$CUR" ]; then
+            echo "Version produit deja a jour ($CUR >= $TARGET) -> rien a faire."; exit 0
+          fi
+
+          node scripts/bump-product-version.mjs set "$TARGET"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add frontend/product-version.json landing-page/src/product-version.ts
+          git commit -m "chore(version): produit -> v${TARGET} (auto, max bump des services)"
+          git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
