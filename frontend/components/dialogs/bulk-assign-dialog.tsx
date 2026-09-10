@@ -6,6 +6,7 @@ import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { UserAvatar } from "@/components/ui/user-avatar"
+import { BrandLogo } from "@/components/ui/brand-logo"
 import { Badge } from "@/components/ui/badge"
 import { ShimmerLoader } from "@/components/ui/shimmer-loader"
 import {
@@ -19,6 +20,7 @@ import {
 } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import { useIssueStore } from "@/lib/store/issue-store"
+import { useDeliveryStore } from "@/lib/store/delivery-store"
 import { smartAssignBulk, type Issue, type SmartAssignCandidate } from "@/lib/api/issue-service"
 
 /** Teinte du badge de score selon la confiance (aligné sur la jauge du panneau Smart Assign). */
@@ -55,6 +57,7 @@ interface BulkAssignDialogProps {
  */
 export function BulkAssignDialog({ slug, projectId, issues }: BulkAssignDialogProps) {
   const { updateIssue } = useIssueStore()
+  const delegate = useDeliveryStore((s) => s.delegate)
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [applying, setApplying] = useState(false)
@@ -66,8 +69,11 @@ export function BulkAssignDialog({ slug, projectId, issues }: BulkAssignDialogPr
   const selectedCount = selected.length
   const allSelected = rows.length > 0 && selectedCount === rows.length
   // Nb de personnes distinctes visées - rend visible le cas « tout à la même personne »
-  // (charge/skills concentrés) sans le masquer derrière une liste d'issues.
-  const distinctAssignees = new Set(selected.map((r) => r.candidate.userId)).size
+  // (charge/skills concentrés). Les agents (A4) sont comptés à part.
+  const distinctUsers = new Set(
+    selected.filter((r) => r.candidate.kind === "user").map((r) => r.candidate.userId)
+  ).size
+  const agentCount = selected.filter((r) => r.candidate.kind === "agent").length
 
   function toggleAll() {
     const next = !allSelected
@@ -114,17 +120,27 @@ export function BulkAssignDialog({ slug, projectId, issues }: BulkAssignDialogPr
     if (selected.length === 0) return
     setApplying(true)
     try {
-      // updateIssue avale l'erreur et renvoie null en echec (WS-10) : on compte les retours
-      // au lieu de compter sur un catch (qui ne se declenche jamais) - sinon "N assigned"
-      // s'affichait meme quand tout echouait.
+      // Les stores avalent l'erreur et renvoient null en echec : on compte les retours (pas de catch).
+      // A4 : une reco d'agent est DELEGUEE (delivery), une reco humaine est ASSIGNEE (issue).
       const results = await Promise.all(
-        selected.map((r) => updateIssue(slug, projectId, r.issueId, { assigneeId: r.candidate.userId }))
+        selected.map(async (r) => {
+          if (r.candidate.kind === "agent" && r.candidate.agentKey) {
+            const run = await delegate(slug, r.issueId, r.candidate.agentKey)
+            return { ok: run != null, agent: true }
+          }
+          const upd = r.candidate.userId != null
+            ? await updateIssue(slug, projectId, r.issueId, { assigneeId: r.candidate.userId })
+            : null
+          return { ok: upd != null, agent: false }
+        })
       )
-      const ok = results.filter((r) => r != null).length
-      const failed = results.length - ok
-      if (ok > 0) toast.success(`${ok} issue${ok > 1 ? "s" : ""} assigned`)
-      if (failed > 0) toast.error(`${failed} assignment${failed > 1 ? "s" : ""} failed`)
-      if (ok > 0) {
+      const assigned  = results.filter((x) => x.ok && !x.agent).length
+      const delegated = results.filter((x) => x.ok && x.agent).length
+      const failed    = results.filter((x) => !x.ok).length
+      if (assigned > 0)  toast.success(`${assigned} issue${assigned > 1 ? "s" : ""} assigned`)
+      if (delegated > 0) toast.success(`${delegated} issue${delegated > 1 ? "s" : ""} delegated to an agent`)
+      if (failed > 0)    toast.error(`${failed} action${failed > 1 ? "s" : ""} failed`)
+      if (assigned + delegated > 0) {
         setOpen(false)
         setRows([])
         setRan(false)
@@ -185,13 +201,15 @@ export function BulkAssignDialog({ slug, projectId, issues }: BulkAssignDialogPr
                 {allSelected ? "Deselect all" : "Select all"}
               </button>
               <span className="text-[11px] text-muted-foreground">
-                {selectedCount}/{rows.length} · {distinctAssignees} {distinctAssignees > 1 ? "people" : "person"}
+                {selectedCount}/{rows.length} · {distinctUsers} {distinctUsers > 1 ? "people" : "person"}
+                {agentCount > 0 ? ` · ${agentCount} agent${agentCount > 1 ? "s" : ""}` : ""}
               </span>
             </div>
 
             <div className="flex flex-col gap-1 max-h-[50vh] overflow-y-auto pr-0.5">
               {rows.map((r) => {
-                const name = r.candidate.displayName ?? r.candidate.email
+                const isAgent = r.candidate.kind === "agent"
+                const name = r.candidate.displayName ?? r.candidate.email ?? "Agent"
                 return (
                   <button
                     key={r.issueId}
@@ -212,14 +230,20 @@ export function BulkAssignDialog({ slug, projectId, issues }: BulkAssignDialogPr
                     <span className="text-[10px] font-mono text-muted-foreground w-14 shrink-0 truncate">{r.identifier}</span>
                     <span className="flex-1 text-xs truncate">{r.title}</span>
                     <ArrowRight className="size-3 shrink-0 text-muted-foreground/50" />
-                    <UserAvatar
-                      email={r.candidate.email}
-                      name={name}
-                      avatarUrl={r.candidate.avatarUrl}
-                      className="size-5 shrink-0"
-                      fallbackClassName="text-[8px]"
-                    />
-                    <span className="hidden sm:block text-xs truncate max-w-24">{name}</span>
+                    {isAgent ? (
+                      <span className="flex size-5 shrink-0 items-center justify-center overflow-hidden rounded border border-border bg-muted p-0.5">
+                        <BrandLogo slug={r.candidate.agentLogoKey ?? "sparkles"} name={name} className="size-full" />
+                      </span>
+                    ) : (
+                      <UserAvatar
+                        email={r.candidate.email ?? undefined}
+                        name={name}
+                        avatarUrl={r.candidate.avatarUrl}
+                        className="size-5 shrink-0"
+                        fallbackClassName="text-[8px]"
+                      />
+                    )}
+                    <span className="hidden sm:block text-xs truncate max-w-24">{isAgent ? `→ ${name}` : name}</span>
                     <Badge className={cn("text-[10px] shrink-0 border-0 tabular-nums", scoreTone(r.candidate.score))}>{r.candidate.score}%</Badge>
                   </button>
                 )

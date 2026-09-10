@@ -45,6 +45,7 @@ import com.taskforce.tf_api.core.repository.ProjectMemberRepository;
 import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.service.delivery.DeliveryAgentProviderRegistry;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -95,6 +96,7 @@ class SmartAssignServiceTest {
     @Mock private JdbcTemplate jdbcTemplate;
     @Mock private AiUsageService aiUsageService; // dép. du vrai AiMeter (pass-through en test)
     @Mock private AiGenerationService aiGenerationService; // data flywheel : capture des recos (no-op en test)
+    @Mock private DeliveryAgentProviderRegistry agentRegistry; // A3 : vide en test → aucune reco d'agent
 
     private SmartAssignService service;
 
@@ -109,7 +111,7 @@ class SmartAssignServiceTest {
         service = new SmartAssignService(
             workspaceRepository, workspaceMemberRepository, projectRepository,
             projectMemberRepository, issueRepository, llm, jdbcTemplate, new ObjectMapper(), aiMeter,
-            aiGenerationService);
+            aiGenerationService, agentRegistry);
         ReflectionTestUtils.setField(service, "modelName", "test-model");
 
         workspace = Workspace.builder().id(WS_ID).slug(SLUG).name("Demo").build();

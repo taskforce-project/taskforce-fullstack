@@ -107,8 +107,16 @@ export interface IssueActivity {
 }
 
 export interface SmartAssignCandidate {
-  userId: number;
-  email: string;
+  /** "user" = assigner une personne ; "agent" = déléguer a un agent (A3). */
+  kind: "user" | "agent";
+  /** Provider d'agent quand kind="agent" (ex. "cursor", "claude-api") ; null pour un humain. */
+  agentKey: string | null;
+  /** Slug de logo de l'agent quand kind="agent" (résolu par BrandLogo) ; null pour un humain. */
+  agentLogoKey: string | null;
+  /** null pour un agent (pas d'utilisateur). */
+  userId: number | null;
+  /** null pour un agent. */
+  email: string | null;
   displayName: string | null;
   avatarUrl: string | null;
   score: number;
