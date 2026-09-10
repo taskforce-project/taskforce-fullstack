@@ -6,6 +6,7 @@ import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { UserAvatar } from "@/components/ui/user-avatar"
+import { BrandLogo } from "@/components/ui/brand-logo"
 import { Badge } from "@/components/ui/badge"
 import { ShimmerLoader } from "@/components/ui/shimmer-loader"
 import { cn } from "@/lib/utils"
@@ -99,6 +100,28 @@ export function MatchReasoning({
     </div>
   )
 }
+
+/** Visage d'un candidat : logo du provider pour un agent (A3), avatar utilisateur sinon. */
+function CandidateFace({ c, size }: Readonly<{ c: SmartAssignCandidate; size: string }>) {
+  if (c.kind === "agent") {
+    return (
+      <span className={cn("flex shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-muted p-1", size)}>
+        <BrandLogo slug={c.agentLogoKey ?? "sparkles"} name={c.displayName ?? "Agent"} className="size-full" />
+      </span>
+    )
+  }
+  return (
+    <UserAvatar
+      email={c.email ?? undefined}
+      name={c.displayName ?? c.email ?? "?"}
+      avatarUrl={c.avatarUrl}
+      className={cn(size, "shrink-0")}
+      fallbackClassName="text-[0.6875rem]"
+    />
+  )
+}
+
+const candidateName = (c: SmartAssignCandidate) => c.displayName ?? c.email ?? "Agent"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SmartAssignPanel
@@ -211,25 +234,23 @@ export function SmartAssignPanel({
         {/* Results */}
         {ran && top && (
           <div className="flex flex-col gap-2">
-            {/* Top recommendation */}
+            {/* Top recommendation (personne OU agent) */}
             <div className="rounded-md border border-primary/30 bg-primary/5 p-2.5 flex flex-col gap-2">
               <div className="flex items-center gap-2 justify-between">
-                <span className="text-xs font-semibold text-primary uppercase tracking-wide">Best match</span>
+                <span className="text-xs font-semibold text-primary uppercase tracking-wide">
+                  {top.kind === "agent" ? "Recommended agent" : "Best match"}
+                </span>
                 <span className="text-xs font-bold text-primary">{top.score}%</span>
               </div>
 
               <div className="flex items-center gap-2">
-                <UserAvatar
-                  email={top.email}
-                  name={top.displayName ?? top.email}
-                  avatarUrl={top.avatarUrl}
-                  className="size-6 shrink-0"
-                  fallbackClassName="text-[0.6875rem]"
-                />
+                <CandidateFace c={top} size="size-6" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">{top.displayName ?? top.email}</p>
+                  <p className="text-sm font-medium text-foreground truncate">{candidateName(top)}</p>
                   <p className="text-xs text-muted-foreground">
-                    {top.openIssues} open · {top.matchedSkills?.length ?? 0} skill match{(top.matchedSkills?.length ?? 0) === 1 ? "" : "es"}
+                    {top.kind === "agent"
+                      ? "Delegate this task"
+                      : `${top.openIssues} open · ${top.matchedSkills?.length ?? 0} skill match${(top.matchedSkills?.length ?? 0) === 1 ? "" : "es"}`}
                   </p>
                 </div>
               </div>
@@ -237,13 +258,15 @@ export function SmartAssignPanel({
               {/* Pourquoi : compétences qui matchent + explication en langage naturel */}
               <MatchReasoning matchedSkills={top.matchedSkills} reason={top.reason} />
 
-              {/* Breakdown du score */}
-              <div className="flex flex-col gap-1">
-                <LabeledBar label="Semantic"  value={top.semanticScore} />
-                <LabeledBar label="Workload"  value={top.workloadScore} />
-                <LabeledBar label="Available"  value={top.availability} />
-                {top.historicalScore > 0 && <LabeledBar label="History" value={top.historicalScore} />}
-              </div>
+              {/* Breakdown du score - uniquement pour une personne (un agent n'a pas de charge/dispo) */}
+              {top.kind !== "agent" && (
+                <div className="flex flex-col gap-1">
+                  <LabeledBar label="Semantic"  value={top.semanticScore} />
+                  <LabeledBar label="Workload"  value={top.workloadScore} />
+                  <LabeledBar label="Available"  value={top.availability} />
+                  {top.historicalScore > 0 && <LabeledBar label="History" value={top.historicalScore} />}
+                </div>
+              )}
 
               {top.factors.length > 0 && (
                 <div className="flex flex-wrap items-center gap-1">
@@ -253,7 +276,7 @@ export function SmartAssignPanel({
                 </div>
               )}
 
-              {currentAssignee?.userId === top.userId ? (
+              {top.kind === "user" && currentAssignee?.userId === top.userId ? (
                 <div className="flex items-center gap-1 text-xs text-emerald-400">
                   <Check className="size-3" />
                   Already assigned
@@ -261,7 +284,7 @@ export function SmartAssignPanel({
               ) : (
                 <Button size="sm" className="h-6 text-xs gap-1 mt-0.5" onClick={() => handleConfirm(top)}>
                   <Check className="size-3" />
-                  Assign {(top.displayName ?? top.email).split(" ")[0]}
+                  {top.kind === "agent" ? `Delegate to ${candidateName(top)}` : `Assign ${candidateName(top).split(" ")[0]}`}
                 </Button>
               )}
             </div>
@@ -282,20 +305,16 @@ export function SmartAssignPanel({
                   <div className="flex flex-col gap-1.5 mt-1.5">
                     {rest.map((candidate) => (
                       <button
-                        key={candidate.userId}
+                        key={candidate.kind === "agent" ? `agent-${candidate.agentKey}` : `user-${candidate.userId}`}
                         type="button"
                         className="flex items-center gap-2 p-2 rounded-md hover:bg-muted/40 transition-colors cursor-pointer group w-full text-left"
                         onClick={() => handleConfirm(candidate)}
                       >
-                        <UserAvatar
-                          email={candidate.email}
-                          name={candidate.displayName ?? candidate.email}
-                          avatarUrl={candidate.avatarUrl}
-                          className="size-5 shrink-0"
-                          fallbackClassName="text-[0.625rem]"
-                        />
+                        <CandidateFace c={candidate} size="size-5" />
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium text-foreground truncate">{candidate.displayName ?? candidate.email}</p>
+                          <p className="text-xs font-medium text-foreground truncate">
+                            {candidate.kind === "agent" ? `Delegate to ${candidateName(candidate)}` : candidateName(candidate)}
+                          </p>
                           <div className="flex items-center gap-1 mt-0.5">
                             {candidate.factors.slice(0, 2).map((f) => (
                               <span key={f} className="text-[0.6875rem] text-muted-foreground">{f}</span>

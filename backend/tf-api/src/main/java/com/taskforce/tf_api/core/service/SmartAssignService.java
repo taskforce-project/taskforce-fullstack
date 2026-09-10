@@ -35,6 +35,8 @@ import com.taskforce.tf_api.core.repository.ProjectMemberRepository;
 import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.service.delivery.DeliveryAgentProvider;
+import com.taskforce.tf_api.core.service.delivery.DeliveryAgentProviderRegistry;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import lombok.RequiredArgsConstructor;
@@ -53,6 +55,23 @@ public class SmartAssignService {
      *  = smart-assign lent. On ne lui fait rerank que le top N. La réponse finale renvoie top + 4 alt. */
     private static final int SHORTLIST_SIZE = 5;
 
+    // ── Agent-vs-humain (A3) ────────────────────────────────────────────────
+    // Labels qui indiquent un travail bien cadre, mecanique -> un agent peut le faire sans risque.
+    private static final Set<String> AGENT_FRIENDLY_LABELS = Set.of(
+        "bug", "chore", "docs", "documentation", "test", "tests", "refactor", "ci", "cleanup",
+        "typo", "dependencies", "deps", "lint", "format", "style", "boilerplate");
+    // Labels qui exigent du jugement humain -> jamais recommander un agent.
+    private static final Set<String> HUMAN_ONLY_LABELS = Set.of(
+        "design", "research", "spec", "decision", "architecture", "discovery", "ux",
+        "planning", "strategy", "rfc", "proposal", "product");
+    /** Au-dessus : l'agent est recommandé (top) ; l'humain passe en alternative. */
+    private static final int AGENT_RECOMMEND_THRESHOLD = 65;
+    /** Entre les deux : l'agent est proposé en alternative (l'humain reste recommandé). */
+    private static final int AGENT_ALTERNATIVE_THRESHOLD = 45;
+    /** Ordre de préférence du provider selon qu'un dépôt est lié (agents qui ouvrent une PR d'abord). */
+    private static final List<String> AGENT_PREF_WITH_REPO = List.of("cursor", "github-copilot", "claude-api", "stub");
+    private static final List<String> AGENT_PREF_NO_REPO   = List.of("claude-api", "github-copilot", "stub");
+
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceMemberRepository workspaceMemberRepository;
     private final ProjectRepository projectRepository;
@@ -63,6 +82,7 @@ public class SmartAssignService {
     private final ObjectMapper objectMapper;
     private final AiMeter aiMeter; // gate quota + capture/enregistrement de la conso tokens du scoring LLM
     private final AiGenerationService aiGenerationService; // data flywheel : capture des recos smart-assign (draft)
+    private final DeliveryAgentProviderRegistry agentRegistry; // A3 : agents candidats a la delegation
 
     @Value("${ai.model.smart-assign:gateway-default}")
     private String modelName;
@@ -89,10 +109,13 @@ public class SmartAssignService {
         String issueText = buildIssueText(issue, issueLabels);
 
         SmartAssignResponse response = computeRecommendation(
-            workspace, project, issueText, issueLabels, issue.getPriority(), issue.getStoryPoints(), true);
+            workspace, project, issueText, issueLabels, issue.getPriority(), issue.getStoryPoints(),
+            hasText(issue.getDescription()), true, true);
 
         SmartAssignCandidateResponse recommended = response.getRecommended();
-        if (recommended != null) {
+        // On ne trace un assignment_event / draft que pour une reco HUMAINE (userId non nul) : une reco
+        // d'agent est une delegation, pas une affectation (elle n'alimente pas le flywheel Smart Assign).
+        if (recommended != null && recommended.getUserId() != null) {
             logAssignmentEvent(workspace.getId(), issue.getId(), recommended.getUserId(), requestingUserId, recommended);
             // Data flywheel : capture la reco (top-1) comme draft ; finalisé à l'affectation réelle (updateIssue).
             recordSmartAssignDraft(workspace.getId(), issue.getId(), recommended, requestingUserId);
@@ -128,7 +151,10 @@ public class SmartAssignService {
         IssuePriority priority = request.getPriority() != null ? request.getPriority() : IssuePriority.NONE;
         String issueText = buildText(request.getTitle(), request.getDescription(), issueLabels);
 
-        return computeRecommendation(workspace, project, issueText, issueLabels, priority, null, true);
+        // A la creation, pas d'agent : on ne peut pas encore deleguer une issue inexistante (assignation
+        // humaine seulement ; la delegation se fait depuis une issue existante).
+        return computeRecommendation(workspace, project, issueText, issueLabels, priority, null,
+            hasText(request.getDescription()), true, false);
     }
 
     /**
@@ -162,7 +188,8 @@ public class SmartAssignService {
                 .map(l -> l.getName().toLowerCase())
                 .toList();
             SmartAssignResponse rec = computeRecommendation(
-                workspace, project, buildIssueText(issue, labels), labels, issue.getPriority(), issue.getStoryPoints(), true);
+                workspace, project, buildIssueText(issue, labels), labels, issue.getPriority(), issue.getStoryPoints(),
+                hasText(issue.getDescription()), true, true); // A4 : le bulk considère aussi les agents
             results.add(BulkSmartAssignItemResponse.builder()
                 .issueId(issueId)
                 .recommended(rec.getRecommended())
@@ -184,9 +211,11 @@ public class SmartAssignService {
         List<String> labels = issue.getLabels().stream()
             .map(l -> l.getName().toLowerCase())
             .toList();
-        // Redistribution : ranking HEURISTIQUE (sans LLM) → rapide, pas d'appel IA par issue.
+        // Redistribution : ranking HEURISTIQUE (sans LLM) → rapide, pas d'appel IA par issue. Jamais
+        // d'agent ici (la redistribution rééquilibre la CHARGE entre humains ; un agent n'a pas de charge).
         return computeRecommendation(
-            workspace, project, buildIssueText(issue, labels), labels, issue.getPriority(), issue.getStoryPoints(), false);
+            workspace, project, buildIssueText(issue, labels), labels, issue.getPriority(), issue.getStoryPoints(),
+            hasText(issue.getDescription()), false, false);
     }
 
     /**
@@ -196,14 +225,20 @@ public class SmartAssignService {
     private SmartAssignResponse computeRecommendation(Workspace workspace, Project project,
                                                       String issueText, List<String> issueLabels,
                                                       IssuePriority priority, Integer issueStoryPoints,
-                                                      boolean useAi) {
+                                                      boolean hasSpec, boolean useAi, boolean considerAgents) {
+        // A3 : la tâche se prête-t-elle a une délégation a un agent (bien cadree, faible risque) ? Si oui
+        // et qu'un agent est disponible, l'agent devient un candidat (recommande ou alternative).
+        SmartAssignCandidateResponse agent = considerAgents
+            ? buildAgentCandidate(project, issueLabels, priority, issueStoryPoints, hasSpec) : null;
+
         List<User> candidates = resolveCandidates(workspace, project);
         if (candidates.isEmpty()) {
+            // Aucun humain : si un agent est bien adapte, on le recommande quand meme.
             return SmartAssignResponse.builder()
-                .recommended(null)
+                .recommended(agent != null && agent.getScore() >= AGENT_ALTERNATIVE_THRESHOLD ? agent : null)
                 .alternatives(List.of())
-                .strategy("no-candidate")
-                .fallbackUsed(true)
+                .strategy(agent != null ? "agent-only" : "no-candidate")
+                .fallbackUsed(agent == null)
                 .build();
         }
 
@@ -236,10 +271,27 @@ public class SmartAssignService {
 
         List<SmartAssignCandidateResponse> ranked =
             rankCandidates(shortlist, metricsByUser, groq.scores(), groq.reasons());
-        SmartAssignCandidateResponse recommended = ranked.isEmpty() ? null : ranked.getFirst();
-        List<SmartAssignCandidateResponse> alternatives = ranked.size() <= 1
-            ? List.of()
-            : ranked.subList(1, Math.min(ranked.size(), 5));
+
+        // Fusion agent/humain (A3) : si l'agent est tres adapte, il passe recommande et les humains
+        // deviennent alternatives ; s'il est moyennement adapte, il s'ajoute en tete des alternatives ;
+        // sinon on garde la reco humaine telle quelle.
+        SmartAssignCandidateResponse recommended;
+        List<SmartAssignCandidateResponse> alternatives;
+        List<SmartAssignCandidateResponse> humanRest = ranked.size() <= 1
+            ? List.of() : new ArrayList<>(ranked.subList(1, ranked.size()));
+
+        if (agent != null && agent.getScore() >= AGENT_RECOMMEND_THRESHOLD) {
+            recommended = agent;
+            List<SmartAssignCandidateResponse> alts = new ArrayList<>();
+            if (!ranked.isEmpty()) alts.add(ranked.getFirst()); // le meilleur humain reste tout en haut des alternatives
+            alts.addAll(humanRest);
+            alternatives = alts.stream().limit(4).toList();
+        } else {
+            recommended = ranked.isEmpty() ? null : ranked.getFirst();
+            List<SmartAssignCandidateResponse> alts = new ArrayList<>(humanRest);
+            if (agent != null) alts.add(0, agent); // agent moyennement adapte -> propose en alternative
+            alternatives = alts.stream().limit(4).toList();
+        }
 
         logAiRun(workspace.getId(), fallbackUsed, ranked.size());
 
@@ -250,6 +302,82 @@ public class SmartAssignService {
                 : fallbackUsed ? "java-fallback" : "java-rules + ai-semantic + ai-history")
             .fallbackUsed(fallbackUsed)
             .build();
+    }
+
+    // ── Agent-vs-humain (A3) : heuristique + choix du provider ───────────────
+
+    /**
+     * Construit le candidat "agent" si la tâche s'y prête et qu'un agent est disponible, sinon null.
+     * Score = adéquation de la TÂCHE a une délégation (indépendant des humains).
+     */
+    private SmartAssignCandidateResponse buildAgentCandidate(Project project, List<String> labels,
+                                                             IssuePriority priority, Integer points, boolean hasSpec) {
+        boolean repoLinked = project != null && project.getRepoFullName() != null && !project.getRepoFullName().isBlank();
+        int suitability = agentSuitability(labels, priority, points, hasSpec, repoLinked);
+        if (suitability < AGENT_ALTERNATIVE_THRESHOLD) {
+            return null;
+        }
+        DeliveryAgentProvider provider = pickAgent(repoLinked);
+        if (provider == null) {
+            return null;
+        }
+        List<String> factors = new ArrayList<>();
+        if (hasSpec) factors.add("Well specified");
+        if (points == null || points <= 3) factors.add("Small scope");
+        if (priority != IssuePriority.URGENT && priority != IssuePriority.HIGH) factors.add("Low risk");
+        if (repoLinked) factors.add("Repo linked");
+        String reason = suitability >= AGENT_RECOMMEND_THRESHOLD
+            ? "Well-defined, low-risk work" + (repoLinked ? " on a linked repo" : "") + " - an agent can handle it."
+            : "Might be a fit for an agent - review the spec first.";
+        return SmartAssignCandidateResponse.builder()
+            .kind("agent")
+            .agentKey(provider.key())
+            .agentLogoKey(provider.logoKey())
+            .displayName(provider.displayName())
+            .score(suitability)
+            .semanticScore(suitability)
+            .historicalScore(0).workloadScore(0).availability(0).openIssues(0).labelMatchCount(0)
+            .factors(factors)
+            .reason(reason)
+            .matchedSkills(List.of())
+            .build();
+    }
+
+    /**
+     * Adéquation d'une tâche a une délégation a un agent (0-100). Statique et pure -> testable.
+     * Un label « humain » (design/décision/recherche...) veto (0). Sinon : base 50, bonus si labels
+     * mécaniques, si spec présente, si petit scope, si dépôt lié ; malus si urgent/important, gros scope,
+     * ou pas de spec.
+     */
+    static int agentSuitability(List<String> labels, IssuePriority priority, Integer points,
+                                boolean hasSpec, boolean repoLinked) {
+        Set<String> ls = labels == null ? Set.of() : new HashSet<>(labels);
+        for (String l : ls) {
+            if (HUMAN_ONLY_LABELS.contains(l)) return 0; // jugement humain requis
+        }
+        int s = 50;
+        long friendly = ls.stream().filter(AGENT_FRIENDLY_LABELS::contains).count();
+        s += Math.min(30, (int) friendly * 15);
+        s += hasSpec ? 15 : -20;
+        if (points == null || points <= 3) s += 10;
+        else if (points >= 8) s -= 25;
+        if (priority == IssuePriority.URGENT) s -= 20;
+        else if (priority == IssuePriority.HIGH) s -= 10;
+        if (repoLinked) s += 10;
+        return Math.max(0, Math.min(100, s));
+    }
+
+    /** Choisit le provider d'agent disponible le mieux adapté (ordre de préférence selon le dépôt lié). */
+    private DeliveryAgentProvider pickAgent(boolean repoLinked) {
+        for (String key : (repoLinked ? AGENT_PREF_WITH_REPO : AGENT_PREF_NO_REPO)) {
+            DeliveryAgentProvider p = agentRegistry.get(key);
+            if (p != null && p.available()) return p;
+        }
+        return agentRegistry.all().stream().filter(DeliveryAgentProvider::available).findFirst().orElse(null);
+    }
+
+    private boolean hasText(String s) {
+        return s != null && !s.isBlank();
     }
 
     /** Pré-score HEURISTIQUE (sans LLM) pour bâtir la shortlist : compétences + charge + dispo + historique. */

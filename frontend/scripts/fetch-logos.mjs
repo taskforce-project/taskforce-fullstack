@@ -83,6 +83,7 @@ const BRANDS = [
   { key: "insomnia", search: "Insomnia" },
   { key: "vscode", search: "Visual Studio Code", match: "Visual Studio Code" },
   { key: "cursor", search: "Cursor" },
+  { key: "githubcopilot", search: "Copilot", match: "GitHub Copilot" },
   { key: "sentry", search: "Sentry" },
   { key: "datadog", search: "Datadog" },
   { key: "grafana", search: "Grafana" },

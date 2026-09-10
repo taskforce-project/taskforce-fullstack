@@ -428,7 +428,7 @@ export function CreateIssueDialog({
                       type="button"
                       size="sm"
                       className="h-7 text-xs gap-1"
-                      onClick={() => setAssigneeId(suggestion.recommended!.userId)}
+                      onClick={() => setAssigneeId(suggestion.recommended!.userId ?? undefined)}
                     >
                       <Check className="size-3" /> Assign
                     </Button>
@@ -449,7 +449,7 @@ export function CreateIssueDialog({
                         <button
                           key={c.userId}
                           type="button"
-                          onClick={() => setAssigneeId(c.userId)}
+                          onClick={() => setAssigneeId(c.userId ?? undefined)}
                           className="flex items-center gap-1.5 rounded-full border border-border bg-background/60 py-0.5 pl-0.5 pr-2 text-[11px] transition-colors hover:border-primary/40"
                         >
                           <UserAvatar
@@ -459,7 +459,7 @@ export function CreateIssueDialog({
                             className="size-4 shrink-0"
                             fallbackClassName="text-[7px]"
                           />
-                          <span className="font-medium text-foreground/80">{(c.displayName ?? c.email).split(" ")[0]}</span>
+                          <span className="font-medium text-foreground/80">{(c.displayName ?? c.email ?? "").split(" ")[0]}</span>
                           <span className="tabular-nums text-muted-foreground">{c.score}%</span>
                         </button>
                       ))}

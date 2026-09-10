@@ -69,7 +69,7 @@ class ClaudeApiProviderTest {
     void metadata() {
         assertThat(provider.key()).isEqualTo("claude-api");
         assertThat(provider.available()).isTrue();
-        assertThat(provider.logoKey()).isEqualTo("claude");
+        assertThat(provider.logoKey()).isEqualTo("anthropic");
         assertThat(provider.models()).contains("claude-opus-5", "claude-sonnet-5");
     }
 

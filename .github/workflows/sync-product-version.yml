@@ -7,6 +7,9 @@ name: 🔢 Sync Product Version
 # portee sur main par le squash-merge. Jamais de regression (on ne bumpe que si la cible est plus haute).
 # Pas de push sur main protegee (on ecrit sur la branche de la PR) ; le footer, construit depuis ce
 # fichier, reflete donc la nouvelle version des la release. release.yml tague ensuite taskforce-v<version>.
+#
+# Robuste a la course : le flow release commit-tree merge + supprime la branche de PR tres vite ; on
+# checkout donc `main` (toujours present) puis on no-op proprement si la branche de la PR a disparu.
 
 on:
   pull_request:
@@ -27,18 +30,27 @@ jobs:
     # Pas sur les PR de fork : le token ne peut pas pousser sur leur branche.
     if: github.event.pull_request.head.repo.full_name == github.repository
     steps:
-      - name: Checkout PR head
+      - name: Checkout main (toujours present)
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.ref }}
+          ref: main
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Compute + apply product version
         env:
           LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
           set -euo pipefail
+
+          # La branche de la PR a-t-elle deja disparu (release commit-tree mergee + supprimee) ? -> no-op propre.
+          if ! git ls-remote --exit-code --heads origin "$HEAD_REF" >/dev/null 2>&1; then
+            echo "Branche $HEAD_REF absente (PR deja mergee/supprimee) -> rien a faire."
+            exit 0
+          fi
+          git fetch origin "$HEAD_REF" --depth=1
+          git checkout -B "$HEAD_REF" "origin/$HEAD_REF"
 
           # Niveau de bump = le plus fort parmi les services (major=3 > minor=2 > patch=1 > aucun=0).
           level=0
@@ -77,4 +89,4 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add frontend/product-version.json landing-page/src/product-version.ts
           git commit -m "chore(version): produit -> v${TARGET} (auto, max bump des services)"
-          git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
+          git push origin "HEAD:${HEAD_REF}"
