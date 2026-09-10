@@ -8,9 +8,9 @@ vi.mock('../api/delivery-service', () => ({
   getDeliveryProviders: vi.fn(),
   getIssueRun: vi.fn(),
   delegateIssue: vi.fn(),
-  getAnthropicStatus: vi.fn(),
-  connectAnthropicKey: vi.fn(),
-  disconnectAnthropicKey: vi.fn(),
+  getDeliveryKey: vi.fn(),
+  connectDeliveryKey: vi.fn(),
+  disconnectDeliveryKey: vi.fn(),
 }));
 
 function makeRun(overrides: Partial<DeliveryRun> = {}): DeliveryRun {
@@ -28,7 +28,7 @@ const PROVIDERS: DeliveryProvider[] = [
 describe('delivery-store', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    act(() => useDeliveryStore.setState({ providers: [], providersLoading: false, runs: {}, anthropic: null }));
+    act(() => useDeliveryStore.setState({ providers: [], providersLoading: false, runs: {}, keys: {} }));
   });
 
   it('fetchProviders loads the providers', async () => {
@@ -79,46 +79,47 @@ describe('delivery-store', () => {
     expect(res).toBeNull();
   });
 
-  it('fetchAnthropic stores the key status', async () => {
-    vi.mocked(svc.getAnthropicStatus).mockResolvedValue({ connected: true, keyHint: '...AB12' });
-    await act(async () => { await useDeliveryStore.getState().fetchAnthropic('acme'); });
-    expect(useDeliveryStore.getState().anthropic).toEqual({ connected: true, keyHint: '...AB12' });
+  it('fetchKey stores the key status by provider', async () => {
+    vi.mocked(svc.getDeliveryKey).mockResolvedValue({ connected: true, keyHint: '...AB12' });
+    await act(async () => { await useDeliveryStore.getState().fetchKey('acme', 'anthropic'); });
+    expect(useDeliveryStore.getState().keys.anthropic).toEqual({ connected: true, keyHint: '...AB12' });
+    expect(svc.getDeliveryKey).toHaveBeenCalledWith('acme', 'anthropic');
   });
 
-  it('fetchAnthropic returns null on failure', async () => {
-    vi.mocked(svc.getAnthropicStatus).mockRejectedValue(new Error('x'));
+  it('fetchKey returns null on failure', async () => {
+    vi.mocked(svc.getDeliveryKey).mockRejectedValue(new Error('x'));
     let res: unknown;
-    await act(async () => { res = await useDeliveryStore.getState().fetchAnthropic('acme'); });
+    await act(async () => { res = await useDeliveryStore.getState().fetchKey('acme', 'cursor'); });
     expect(res).toBeNull();
   });
 
-  it('connectAnthropic stores the returned status', async () => {
-    vi.mocked(svc.connectAnthropicKey).mockResolvedValue({ connected: true, keyHint: '...WXYZ' });
-    await act(async () => { await useDeliveryStore.getState().connectAnthropic('acme', 'sk-ant-WXYZ'); });
-    expect(useDeliveryStore.getState().anthropic).toEqual({ connected: true, keyHint: '...WXYZ' });
-    expect(svc.connectAnthropicKey).toHaveBeenCalledWith('acme', 'sk-ant-WXYZ');
+  it('connectKey stores the returned status under the provider (cursor)', async () => {
+    vi.mocked(svc.connectDeliveryKey).mockResolvedValue({ connected: true, keyHint: '...WXYZ' });
+    await act(async () => { await useDeliveryStore.getState().connectKey('acme', 'cursor', 'key_WXYZ'); });
+    expect(useDeliveryStore.getState().keys.cursor).toEqual({ connected: true, keyHint: '...WXYZ' });
+    expect(svc.connectDeliveryKey).toHaveBeenCalledWith('acme', 'cursor', 'key_WXYZ');
   });
 
-  it('connectAnthropic returns null on failure', async () => {
-    vi.mocked(svc.connectAnthropicKey).mockRejectedValue(new Error('x'));
+  it('connectKey returns null on failure', async () => {
+    vi.mocked(svc.connectDeliveryKey).mockRejectedValue(new Error('x'));
     let res: unknown;
-    await act(async () => { res = await useDeliveryStore.getState().connectAnthropic('acme', 'bad'); });
+    await act(async () => { res = await useDeliveryStore.getState().connectKey('acme', 'anthropic', 'bad'); });
     expect(res).toBeNull();
   });
 
-  it('disconnectAnthropic clears the status and returns true', async () => {
-    act(() => useDeliveryStore.setState({ anthropic: { connected: true, keyHint: '...AB12' } }));
-    vi.mocked(svc.disconnectAnthropicKey).mockResolvedValue(undefined);
+  it('disconnectKey clears the provider status and returns true', async () => {
+    act(() => useDeliveryStore.setState({ keys: { anthropic: { connected: true, keyHint: '...AB12' } } }));
+    vi.mocked(svc.disconnectDeliveryKey).mockResolvedValue(undefined);
     let ok: boolean = false;
-    await act(async () => { ok = await useDeliveryStore.getState().disconnectAnthropic('acme'); });
+    await act(async () => { ok = await useDeliveryStore.getState().disconnectKey('acme', 'anthropic'); });
     expect(ok).toBe(true);
-    expect(useDeliveryStore.getState().anthropic).toEqual({ connected: false, keyHint: null });
+    expect(useDeliveryStore.getState().keys.anthropic).toEqual({ connected: false, keyHint: null });
   });
 
-  it('disconnectAnthropic returns false on failure', async () => {
-    vi.mocked(svc.disconnectAnthropicKey).mockRejectedValue(new Error('x'));
+  it('disconnectKey returns false on failure', async () => {
+    vi.mocked(svc.disconnectDeliveryKey).mockRejectedValue(new Error('x'));
     let ok: boolean = true;
-    await act(async () => { ok = await useDeliveryStore.getState().disconnectAnthropic('acme'); });
+    await act(async () => { ok = await useDeliveryStore.getState().disconnectKey('acme', 'cursor'); });
     expect(ok).toBe(false);
   });
 });

@@ -3,10 +3,11 @@ import {
   getDeliveryProviders,
   getIssueRun,
   delegateIssue,
-  getAnthropicStatus,
-  connectAnthropicKey,
-  disconnectAnthropicKey,
-  type AnthropicStatus,
+  getDeliveryKey,
+  connectDeliveryKey,
+  disconnectDeliveryKey,
+  type DeliveryKeyProvider,
+  type DeliveryKeyStatus,
   type DeliveryProvider,
   type DeliveryRun,
 } from "../api/delivery-service";
@@ -22,22 +23,22 @@ interface DeliveryState {
   providersLoading: boolean;
   /** Dernier run par issueId (`null` = chargé mais aucune délégation). */
   runs: Record<number, DeliveryRun | null>;
-  /** État de la clé Anthropic du workspace (`null` = pas encore chargé). */
-  anthropic: AnthropicStatus | null;
+  /** État des clés de délégation par provider ("anthropic" | "cursor"). Absent = pas encore chargé. */
+  keys: Record<string, DeliveryKeyStatus>;
 
   fetchProviders: (slug: string) => Promise<DeliveryProvider[]>;
   fetchRun: (slug: string, issueId: number) => Promise<DeliveryRun | null>;
   delegate: (slug: string, issueId: number, providerKey: string, model?: string) => Promise<DeliveryRun | null>;
-  fetchAnthropic: (slug: string) => Promise<AnthropicStatus | null>;
-  connectAnthropic: (slug: string, apiKey: string) => Promise<AnthropicStatus | null>;
-  disconnectAnthropic: (slug: string) => Promise<boolean>;
+  fetchKey: (slug: string, provider: DeliveryKeyProvider) => Promise<DeliveryKeyStatus | null>;
+  connectKey: (slug: string, provider: DeliveryKeyProvider, apiKey: string) => Promise<DeliveryKeyStatus | null>;
+  disconnectKey: (slug: string, provider: DeliveryKeyProvider) => Promise<boolean>;
 }
 
 export const useDeliveryStore = create<DeliveryState>((set) => ({
   providers: [],
   providersLoading: false,
   runs: {},
-  anthropic: null,
+  keys: {},
 
   fetchProviders: async (slug) => {
     set({ providersLoading: true });
@@ -71,30 +72,30 @@ export const useDeliveryStore = create<DeliveryState>((set) => ({
     }
   },
 
-  fetchAnthropic: async (slug) => {
+  fetchKey: async (slug, provider) => {
     try {
-      const status = await getAnthropicStatus(slug);
-      set({ anthropic: status });
+      const status = await getDeliveryKey(slug, provider);
+      set((state) => ({ keys: { ...state.keys, [provider]: status } }));
       return status;
     } catch {
       return null;
     }
   },
 
-  connectAnthropic: async (slug, apiKey) => {
+  connectKey: async (slug, provider, apiKey) => {
     try {
-      const status = await connectAnthropicKey(slug, apiKey);
-      set({ anthropic: status });
+      const status = await connectDeliveryKey(slug, provider, apiKey);
+      set((state) => ({ keys: { ...state.keys, [provider]: status } }));
       return status;
     } catch {
       return null;
     }
   },
 
-  disconnectAnthropic: async (slug) => {
+  disconnectKey: async (slug, provider) => {
     try {
-      await disconnectAnthropicKey(slug);
-      set({ anthropic: { connected: false, keyHint: null } });
+      await disconnectDeliveryKey(slug, provider);
+      set((state) => ({ keys: { ...state.keys, [provider]: { connected: false, keyHint: null } } }));
       return true;
     } catch {
       return false;

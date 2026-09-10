@@ -3,9 +3,9 @@ import {
   getDeliveryProviders,
   delegateIssue,
   getIssueRun,
-  getAnthropicStatus,
-  connectAnthropicKey,
-  disconnectAnthropicKey,
+  getDeliveryKey,
+  connectDeliveryKey,
+  disconnectDeliveryKey,
 } from './delivery-service';
 import { apiClient } from './client';
 import { DELIVERY_ROUTES } from '../config/api-routes';
@@ -60,31 +60,31 @@ describe('delivery-service', () => {
     expect(res).toBeNull();
   });
 
-  it('getAnthropicStatus GET l’état de la clé', async () => {
+  it('getDeliveryKey GET l’état de la clé (anthropic)', async () => {
     const status = { connected: true, keyHint: '...AB12' };
     vi.mocked(apiClient.get).mockResolvedValue(envelope(status));
 
-    const res = await getAnthropicStatus(SLUG);
+    const res = await getDeliveryKey(SLUG, 'anthropic');
 
-    expect(apiClient.get).toHaveBeenCalledWith(DELIVERY_ROUTES.ANTHROPIC(SLUG));
+    expect(apiClient.get).toHaveBeenCalledWith(DELIVERY_ROUTES.KEY(SLUG, 'anthropic'));
     expect(res).toEqual(status);
   });
 
-  it('connectAnthropicKey POST la clé et retourne le statut', async () => {
+  it('connectDeliveryKey POST la clé et retourne le statut (cursor)', async () => {
     const status = { connected: true, keyHint: '...WXYZ' };
     vi.mocked(apiClient.post).mockResolvedValue(envelope(status));
 
-    const res = await connectAnthropicKey(SLUG, 'sk-ant-WXYZ');
+    const res = await connectDeliveryKey(SLUG, 'cursor', 'key_WXYZ');
 
-    expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.ANTHROPIC(SLUG), { apiKey: 'sk-ant-WXYZ' });
+    expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.KEY(SLUG, 'cursor'), { apiKey: 'key_WXYZ' });
     expect(res).toEqual(status);
   });
 
-  it('disconnectAnthropicKey DELETE la clé', async () => {
+  it('disconnectDeliveryKey DELETE la clé', async () => {
     vi.mocked(apiClient.delete).mockResolvedValue(envelope(null));
 
-    await disconnectAnthropicKey(SLUG);
+    await disconnectDeliveryKey(SLUG, 'anthropic');
 
-    expect(apiClient.delete).toHaveBeenCalledWith(DELIVERY_ROUTES.ANTHROPIC(SLUG));
+    expect(apiClient.delete).toHaveBeenCalledWith(DELIVERY_ROUTES.KEY(SLUG, 'anthropic'));
   });
 });
