@@ -3,6 +3,11 @@ import {
   getDeliveryProviders,
   getIssueRun,
   delegateIssue,
+  getDeliveryKey,
+  connectDeliveryKey,
+  disconnectDeliveryKey,
+  type DeliveryKeyProvider,
+  type DeliveryKeyStatus,
   type DeliveryProvider,
   type DeliveryRun,
 } from "../api/delivery-service";
@@ -18,16 +23,22 @@ interface DeliveryState {
   providersLoading: boolean;
   /** Dernier run par issueId (`null` = chargé mais aucune délégation). */
   runs: Record<number, DeliveryRun | null>;
+  /** État des clés de délégation par provider ("anthropic" | "cursor"). Absent = pas encore chargé. */
+  keys: Record<string, DeliveryKeyStatus>;
 
   fetchProviders: (slug: string) => Promise<DeliveryProvider[]>;
   fetchRun: (slug: string, issueId: number) => Promise<DeliveryRun | null>;
   delegate: (slug: string, issueId: number, providerKey: string, model?: string) => Promise<DeliveryRun | null>;
+  fetchKey: (slug: string, provider: DeliveryKeyProvider) => Promise<DeliveryKeyStatus | null>;
+  connectKey: (slug: string, provider: DeliveryKeyProvider, apiKey: string) => Promise<DeliveryKeyStatus | null>;
+  disconnectKey: (slug: string, provider: DeliveryKeyProvider) => Promise<boolean>;
 }
 
 export const useDeliveryStore = create<DeliveryState>((set) => ({
   providers: [],
   providersLoading: false,
   runs: {},
+  keys: {},
 
   fetchProviders: async (slug) => {
     set({ providersLoading: true });
@@ -58,6 +69,36 @@ export const useDeliveryStore = create<DeliveryState>((set) => ({
       return run;
     } catch {
       return null;
+    }
+  },
+
+  fetchKey: async (slug, provider) => {
+    try {
+      const status = await getDeliveryKey(slug, provider);
+      set((state) => ({ keys: { ...state.keys, [provider]: status } }));
+      return status;
+    } catch {
+      return null;
+    }
+  },
+
+  connectKey: async (slug, provider, apiKey) => {
+    try {
+      const status = await connectDeliveryKey(slug, provider, apiKey);
+      set((state) => ({ keys: { ...state.keys, [provider]: status } }));
+      return status;
+    } catch {
+      return null;
+    }
+  },
+
+  disconnectKey: async (slug, provider) => {
+    try {
+      await disconnectDeliveryKey(slug, provider);
+      set((state) => ({ keys: { ...state.keys, [provider]: { connected: false, keyHint: null } } }));
+      return true;
+    } catch {
+      return false;
     }
   },
 }));

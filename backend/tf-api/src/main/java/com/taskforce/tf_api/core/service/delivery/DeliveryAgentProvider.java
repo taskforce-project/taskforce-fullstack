@@ -37,8 +37,13 @@ public interface DeliveryAgentProvider {
         throw new UnsupportedOperationException(key() + " n'est pas encore exécutable");
     }
 
-    /** Interroge l'état d'un run (et son résultat quand terminé). Défaut : non exécutable. */
-    default DeliveryPoll poll(String externalRef) {
+    /**
+     * Interroge l'état d'un run asynchrone (et son résultat quand terminé), à partir du handle rendu par
+     * {@code dispatch}. {@code workspaceId} permet au provider de retrouver ses secrets (ex. clé Cursor).
+     * Défaut : non exécutable (les providers synchrones renvoient leur résultat dans {@code dispatch} via
+     * {@link DeliveryDispatch#immediateResult()} et n'ont pas besoin de {@code poll}).
+     */
+    default DeliveryPoll poll(String externalRef, Long workspaceId) {
         throw new UnsupportedOperationException(key() + " n'est pas encore exécutable");
     }
 }
