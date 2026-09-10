@@ -25,9 +25,9 @@ interface AppFooterProps {
 export function AppFooter({ bleed = true }: AppFooterProps) {
   const { t } = usePreferencesStore()
   const year = new Date().getFullYear()
-  // Version affichée : le TAG produit sémantique (« v0.1.1 » = somme front+back, cf. product-version.json
-  // via next.config) plutôt que le SHA de commit opaque - lisible, on voit d'un coup quelle version
-  // tourne. Le SHA reste consultable au survol (title) pour la traçabilité exacte du build.
+  // Version affichée : la version PRODUIT unique (« v0.18.0 » - MÊME numéro que le footer landing ;
+  // source frontend/product-version.json injectée via next.config) plutôt que le SHA opaque - lisible,
+  // on voit d'un coup quelle version tourne. Le SHA reste consultable au survol (title).
   const semver = process.env.NEXT_PUBLIC_APP_SEMVER
   const commit = process.env.NEXT_PUBLIC_APP_VERSION
   const version = semver ? `v${semver}` : (commit ?? "v1.0")
