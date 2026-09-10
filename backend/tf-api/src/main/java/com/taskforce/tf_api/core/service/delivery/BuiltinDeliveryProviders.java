@@ -23,7 +23,7 @@ final class BuiltinDeliveryProviders {
 class ClaudeCodeProvider implements DeliveryAgentProvider {
     @Override public String key() { return "claude-code"; }
     @Override public String displayName() { return "Claude Code"; }
-    @Override public String logoKey() { return "claude"; }
+    @Override public String logoKey() { return "anthropic"; } // logo vendorisé (SVGL)
     @Override public boolean available() { return false; } // suite : dispatch agentique via Managed Agents
     @Override public List<String> models() { return List.of("claude-opus-5", "claude-sonnet-5"); }
 }

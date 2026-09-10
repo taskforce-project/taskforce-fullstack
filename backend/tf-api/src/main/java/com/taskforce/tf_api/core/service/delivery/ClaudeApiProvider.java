@@ -56,7 +56,7 @@ public class ClaudeApiProvider implements DeliveryAgentProvider {
 
     @Override public String key()          { return "claude-api"; }
     @Override public String displayName()  { return "Claude (API)"; }
-    @Override public String logoKey()      { return "claude"; }
+    @Override public String logoKey()      { return "anthropic"; } // logo vendorisé (SVGL)
     @Override public boolean available()   { return true; }
     @Override public List<String> models() { return List.of("claude-opus-5", "claude-sonnet-5"); }
 
