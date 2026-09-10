@@ -60,6 +60,8 @@ export const DELIVERY_ROUTES = {
   DELEGATE: (slug: string, issueId: number) => `/api/workspaces/${slug}/delivery/issues/${issueId}/delegate`,
   /** Dernier run de délégation d'une issue (GET). */
   RUN: (slug: string, issueId: number) => `/api/workspaces/${slug}/delivery/issues/${issueId}/run`,
+  /** Clé API Anthropic du workspace (GET état / POST connecter / DELETE déconnecter) - délégation Claude (B1). */
+  ANTHROPIC: (slug: string) => `/api/workspaces/${slug}/delivery/anthropic`,
 } as const;
 
 /**

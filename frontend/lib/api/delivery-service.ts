@@ -57,3 +57,28 @@ export async function getIssueRun(slug: string, issueId: number): Promise<Delive
   const res = await apiClient.get<{ data: DeliveryRun | null }>(DELIVERY_ROUTES.RUN(slug, issueId));
   return res.data.data;
 }
+
+/** État de la connexion de la clé API Anthropic du workspace (délégation Claude via l'API, B1). */
+export interface AnthropicStatus {
+  /** Une clé est connectée (délégation à « Claude (API) » possible). */
+  connected: boolean;
+  /** Indice non sensible pour reconnaître la clé (4 derniers caractères, ex. "...AB12"), ou null. */
+  keyHint: string | null;
+}
+
+/** Lit l'état de la clé Anthropic du workspace (la clé n'est jamais renvoyée en clair). */
+export async function getAnthropicStatus(slug: string): Promise<AnthropicStatus> {
+  const res = await apiClient.get<{ data: AnthropicStatus }>(DELIVERY_ROUTES.ANTHROPIC(slug));
+  return res.data.data;
+}
+
+/** Connecte (ou remplace) la clé API Anthropic du workspace (OWNER/ADMIN). */
+export async function connectAnthropicKey(slug: string, apiKey: string): Promise<AnthropicStatus> {
+  const res = await apiClient.post<{ data: AnthropicStatus }>(DELIVERY_ROUTES.ANTHROPIC(slug), { apiKey });
+  return res.data.data;
+}
+
+/** Déconnecte la clé API Anthropic du workspace (OWNER/ADMIN). */
+export async function disconnectAnthropicKey(slug: string): Promise<void> {
+  await apiClient.delete(DELIVERY_ROUTES.ANTHROPIC(slug));
+}
