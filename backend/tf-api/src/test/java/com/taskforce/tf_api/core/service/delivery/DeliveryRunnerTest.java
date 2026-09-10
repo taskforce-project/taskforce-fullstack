@@ -21,7 +21,9 @@ import com.taskforce.tf_api.core.repository.IssueStatusRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -71,6 +73,36 @@ class DeliveryRunnerTest {
         verify(issue).setStatus(any(IssueStatus.class));       // issue déplacée
         verify(issueRepository).save(issue);
         verify(issueStatusRepository).save(any(IssueStatus.class)); // colonne créée
+    }
+
+    @Test
+    @DisplayName("provider synchrone : immediateResult utilisé directement (poll jamais appelé)")
+    void sync_provider_uses_immediate_result() {
+        Project project = mock(Project.class);
+        when(project.getId()).thenReturn(200L);
+
+        Issue issue = mock(Issue.class);
+        when(issue.getId()).thenReturn(2L);
+        when(issue.getProject()).thenReturn(project);
+
+        DeliveryRun run = DeliveryRun.builder()
+            .id(20L).issue(issue).providerKey("sync").status(DeliveryRunStatus.QUEUED).build();
+        when(runRepository.findById(20L)).thenReturn(Optional.of(run));
+
+        DeliveryAgentProvider sync = mock(DeliveryAgentProvider.class);
+        when(sync.dispatch(any())).thenReturn(new DeliveryDispatch(
+            "ref-1", new DeliveryPoll(DeliveryRunStatus.DONE, "resume sync", "http://x", null)));
+        when(registry.get("sync")).thenReturn(sync);
+        when(issueStatusRepository.findByProjectIdAndName(200L, "In review by AI")).thenReturn(Optional.empty());
+        when(issueStatusRepository.findByProjectIdOrderByPosition(200L)).thenReturn(List.of());
+        when(issueStatusRepository.save(any(IssueStatus.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        runner.execute(20L);
+
+        assertThat(run.getStatus()).isEqualTo(DeliveryRunStatus.DONE);
+        assertThat(run.getSummary()).isEqualTo("resume sync");
+        assertThat(run.getResultUrl()).isEqualTo("http://x");
+        verify(sync, never()).poll(anyString()); // résultat synchrone : pas de poll
     }
 
     @Test

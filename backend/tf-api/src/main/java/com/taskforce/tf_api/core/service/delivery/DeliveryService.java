@@ -5,15 +5,21 @@ import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.taskforce.tf_api.core.dto.response.AnthropicStatusResponse;
 import com.taskforce.tf_api.core.dto.response.DeliveryRunResponse;
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
+import com.taskforce.tf_api.core.enums.IntegrationProvider;
 import com.taskforce.tf_api.core.model.DeliveryRun;
+import com.taskforce.tf_api.core.model.Integration;
 import com.taskforce.tf_api.core.model.Issue;
 import com.taskforce.tf_api.core.model.User;
+import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.DeliveryRunRepository;
+import com.taskforce.tf_api.core.repository.IntegrationRepository;
 import com.taskforce.tf_api.core.repository.IssueRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.service.ProjectVisibilityGuard;
+import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
@@ -38,6 +44,8 @@ public class DeliveryService {
     private final UserRepository userRepository;
     private final DeliveryAgentProviderRegistry registry;
     private final ProjectVisibilityGuard visibilityGuard;
+    private final BrainAccessGuard access;
+    private final IntegrationRepository integrationRepository;
 
     /**
      * Crée un run de délégation (QUEUED) pour une issue vers un provider disponible. Écriture sur
@@ -80,6 +88,55 @@ public class DeliveryService {
         Issue issue = scopedIssue(slug, issueId);
         visibilityGuard.assertCanView(issue.getProject(), userId);
         return runRepository.findTopByIssueIdOrderByCreatedAtDesc(issue.getId()).map(this::toResponse);
+    }
+
+    // =========================================================================
+    // Clé API Anthropic du workspace (délégation Claude via l'API, B1)
+    // =========================================================================
+
+    /**
+     * Connecte (ou remplace) la clé API Anthropic du workspace. Réservé OWNER/ADMIN (secret d'espace,
+     * cf. RBAC intégrations). La clé est stockée <b>chiffrée</b> ({@code Integration.accessToken}) et
+     * n'est jamais renvoyée en clair - elle est vérifiée à la première délégation Claude.
+     */
+    @Transactional
+    public AnthropicStatusResponse connectAnthropic(String slug, Long userId, String apiKey) {
+        Workspace ws = access.resolveAndAuthorizeOwner(slug, userId);
+        Integration integ = integrationRepository
+            .findByWorkspaceIdAndProvider(ws.getId(), IntegrationProvider.ANTHROPIC)
+            .orElseGet(Integration::new);
+        integ.setWorkspace(ws);
+        integ.setProvider(IntegrationProvider.ANTHROPIC);
+        integ.setAccessToken(apiKey.trim());
+        integ.setInstalledBy(userRepository.findById(userId).orElse(null));
+        integrationRepository.save(integ);
+        log.info("Cle Anthropic connectee au workspace {} (delegation Claude)", ws.getId());
+        return status(ws);
+    }
+
+    /** État de la connexion Anthropic (tout membre du workspace). */
+    @Transactional(readOnly = true)
+    public AnthropicStatusResponse anthropicStatus(String slug, Long userId) {
+        return status(access.resolveAndAuthorize(slug, userId));
+    }
+
+    /** Déconnecte la clé Anthropic du workspace. Réservé OWNER/ADMIN. */
+    @Transactional
+    public void disconnectAnthropic(String slug, Long userId) {
+        Workspace ws = access.resolveAndAuthorizeOwner(slug, userId);
+        integrationRepository.deleteByWorkspaceIdAndProvider(ws.getId(), IntegrationProvider.ANTHROPIC);
+        log.info("Cle Anthropic deconnectee du workspace {}", ws.getId());
+    }
+
+    private AnthropicStatusResponse status(Workspace ws) {
+        return integrationRepository.findByWorkspaceIdAndProvider(ws.getId(), IntegrationProvider.ANTHROPIC)
+            .map(i -> new AnthropicStatusResponse(true, keyHint(i.getAccessToken())))
+            .orElseGet(() -> new AnthropicStatusResponse(false, null));
+    }
+
+    /** Indice non sensible : les 4 derniers caractères seulement (jamais la clé entière). */
+    private String keyHint(String key) {
+        return (key == null || key.length() < 4) ? null : "..." + key.substring(key.length() - 4);
     }
 
     /** Mappe le run en DTO DANS la transaction (les accès paresseux issue/startedBy y sont sûrs). */

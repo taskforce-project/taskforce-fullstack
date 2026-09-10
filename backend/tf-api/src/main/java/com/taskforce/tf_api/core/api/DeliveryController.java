@@ -5,6 +5,7 @@ import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -12,7 +13,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.taskforce.tf_api.core.dto.request.ConnectAnthropicRequest;
 import com.taskforce.tf_api.core.dto.request.DelegateRequest;
+import com.taskforce.tf_api.core.dto.response.AnthropicStatusResponse;
 import com.taskforce.tf_api.core.dto.response.DeliveryProviderResponse;
 import com.taskforce.tf_api.core.dto.response.DeliveryRunResponse;
 import com.taskforce.tf_api.core.model.User;
@@ -84,6 +87,41 @@ public class DeliveryController {
         Long userId = resolveUserId(jwt);
         DeliveryRunResponse run = deliveryService.latestRun(slug, issueId, userId).orElse(null);
         return ResponseEntity.ok(ApiResponse.success("Run récupéré", run));
+    }
+
+    // =========================================================================
+    // Clé API Anthropic du workspace (délégation Claude via l'API, B1)
+    // =========================================================================
+
+    /** GET …/delivery/anthropic — état de la connexion (clé jamais renvoyée en clair). */
+    @GetMapping("/anthropic")
+    public ResponseEntity<ApiResponse<AnthropicStatusResponse>> anthropicStatus(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String slug
+    ) {
+        AnthropicStatusResponse status = deliveryService.anthropicStatus(slug, resolveUserId(jwt));
+        return ResponseEntity.ok(ApiResponse.success("Statut Anthropic récupéré", status));
+    }
+
+    /** POST …/delivery/anthropic — connecte/remplace la clé API Anthropic (OWNER/ADMIN). */
+    @PostMapping("/anthropic")
+    public ResponseEntity<ApiResponse<AnthropicStatusResponse>> connectAnthropic(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String slug,
+        @Valid @RequestBody ConnectAnthropicRequest request
+    ) {
+        AnthropicStatusResponse status = deliveryService.connectAnthropic(slug, resolveUserId(jwt), request.apiKey());
+        return ResponseEntity.ok(ApiResponse.success("Clé Anthropic connectée", status));
+    }
+
+    /** DELETE …/delivery/anthropic — déconnecte la clé API Anthropic (OWNER/ADMIN). */
+    @DeleteMapping("/anthropic")
+    public ResponseEntity<ApiResponse<Void>> disconnectAnthropic(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String slug
+    ) {
+        deliveryService.disconnectAnthropic(slug, resolveUserId(jwt));
+        return ResponseEntity.ok(ApiResponse.success("Clé Anthropic déconnectée", null));
     }
 
     private Long resolveUserId(Jwt jwt) {

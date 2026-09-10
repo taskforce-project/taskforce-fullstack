@@ -61,8 +61,10 @@ public class DeliveryRunner {
 
             Issue issue = run.getIssue();
             Project project = issue.getProject();
+            Long workspaceId = (project != null && project.getWorkspace() != null)
+                ? project.getWorkspace().getId() : null;
             AgentBrief brief = new AgentBrief(
-                issue.getId(), issue.getTitle(), issue.getDescription(),
+                issue.getId(), workspaceId, issue.getTitle(), issue.getDescription(),
                 project != null ? project.getRepoFullName() : null, run.getModel());
 
             run.setStatus(DeliveryRunStatus.RUNNING);
@@ -70,7 +72,10 @@ public class DeliveryRunner {
             run.setExternalRef(dispatch.externalRef());
             runRepository.save(run);
 
-            DeliveryPoll poll = provider.poll(dispatch.externalRef());
+            // Provider synchrone (ex. ClaudeApiProvider) : résultat déjà là ; sinon on poll (async).
+            DeliveryPoll poll = dispatch.immediateResult() != null
+                ? dispatch.immediateResult()
+                : provider.poll(dispatch.externalRef());
             switch (poll.status()) {
                 case DONE -> {
                     run.setStatus(DeliveryRunStatus.DONE);
