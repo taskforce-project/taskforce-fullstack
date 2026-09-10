@@ -75,30 +75,68 @@ public class DeliveryRunner {
             // Provider synchrone (ex. ClaudeApiProvider) : résultat déjà là ; sinon on poll (async).
             DeliveryPoll poll = dispatch.immediateResult() != null
                 ? dispatch.immediateResult()
-                : provider.poll(dispatch.externalRef());
-            switch (poll.status()) {
-                case DONE -> {
-                    run.setStatus(DeliveryRunStatus.DONE);
-                    run.setSummary(poll.summary());
-                    run.setResultUrl(poll.resultUrl());
-                    moveIssueTo(run, STATUS_IN_REVIEW, IssueStatusCategory.STARTED, COLOR_IN_REVIEW);
-                }
-                case FAILED -> {
-                    run.setStatus(DeliveryRunStatus.FAILED);
-                    run.setError(poll.error());
-                    moveIssueTo(run, STATUS_BLOCKED, IssueStatusCategory.STARTED, COLOR_BLOCKED);
-                }
-                default -> run.setStatus(DeliveryRunStatus.RUNNING); // encore en cours (poll ultérieur = plus tard)
-            }
+                : provider.poll(dispatch.externalRef(), workspaceId);
+            applyPoll(run, poll);
             runRepository.save(run);
             log.info("Delivery run {} : {} (provider {})", runId, run.getStatus(), run.getProviderKey());
         } catch (Exception e) {
-            run.setStatus(DeliveryRunStatus.FAILED);
-            run.setError(e.getMessage());
-            moveIssueTo(run, STATUS_BLOCKED, IssueStatusCategory.STARTED, COLOR_BLOCKED);
-            runRepository.save(run);
+            failRun(run, e.getMessage());
             log.warn("Delivery run {} en échec : {}", runId, e.getMessage());
         }
+    }
+
+    /**
+     * Ré-interroge un run <b>asynchrone</b> encore en cours (ex. Cursor Background Agent) et applique
+     * l'avancement. Appelé par le contrôleur sur lecture du run (le polling front fait ainsi progresser
+     * l'état jusqu'au terminal). No-op si le run n'est pas RUNNING, sans handle, ou déjà résolu par un
+     * résultat immédiat (providers synchrones). Bean séparé, transaction propre.
+     */
+    @Transactional
+    public void refresh(Long runId) {
+        DeliveryRun run = runRepository.findById(runId).orElse(null);
+        if (run == null || run.getStatus() != DeliveryRunStatus.RUNNING || run.getExternalRef() == null) {
+            return;
+        }
+        DeliveryAgentProvider provider = registry.get(run.getProviderKey());
+        if (provider == null) {
+            return;
+        }
+        try {
+            Issue issue = run.getIssue();
+            Project project = issue != null ? issue.getProject() : null;
+            Long workspaceId = (project != null && project.getWorkspace() != null)
+                ? project.getWorkspace().getId() : null;
+            applyPoll(run, provider.poll(run.getExternalRef(), workspaceId));
+            runRepository.save(run);
+        } catch (Exception e) {
+            failRun(run, e.getMessage());
+            log.warn("Delivery run {} (refresh) en échec : {}", runId, e.getMessage());
+        }
+    }
+
+    /** Applique le résultat d'un poll au run : DONE -> « In review by AI », FAILED -> « Blocked », sinon RUNNING. */
+    private void applyPoll(DeliveryRun run, DeliveryPoll poll) {
+        switch (poll.status()) {
+            case DONE -> {
+                run.setStatus(DeliveryRunStatus.DONE);
+                run.setSummary(poll.summary());
+                run.setResultUrl(poll.resultUrl());
+                moveIssueTo(run, STATUS_IN_REVIEW, IssueStatusCategory.STARTED, COLOR_IN_REVIEW);
+            }
+            case FAILED -> {
+                run.setStatus(DeliveryRunStatus.FAILED);
+                run.setError(poll.error());
+                moveIssueTo(run, STATUS_BLOCKED, IssueStatusCategory.STARTED, COLOR_BLOCKED);
+            }
+            default -> run.setStatus(DeliveryRunStatus.RUNNING); // encore en cours (poll ultérieur)
+        }
+    }
+
+    private void failRun(DeliveryRun run, String error) {
+        run.setStatus(DeliveryRunStatus.FAILED);
+        run.setError(error);
+        moveIssueTo(run, STATUS_BLOCKED, IssueStatusCategory.STARTED, COLOR_BLOCKED);
+        runRepository.save(run);
     }
 
     /**

@@ -102,7 +102,7 @@ class DeliveryRunnerTest {
         assertThat(run.getStatus()).isEqualTo(DeliveryRunStatus.DONE);
         assertThat(run.getSummary()).isEqualTo("resume sync");
         assertThat(run.getResultUrl()).isEqualTo("http://x");
-        verify(sync, never()).poll(anyString()); // résultat synchrone : pas de poll
+        verify(sync, never()).poll(anyString(), any()); // résultat synchrone : pas de poll
     }
 
     @Test

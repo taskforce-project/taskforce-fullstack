@@ -5,7 +5,7 @@ import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.taskforce.tf_api.core.dto.response.AnthropicStatusResponse;
+import com.taskforce.tf_api.core.dto.response.DeliveryKeyStatus;
 import com.taskforce.tf_api.core.dto.response.DeliveryRunResponse;
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
 import com.taskforce.tf_api.core.enums.IntegrationProvider;
@@ -91,47 +91,47 @@ public class DeliveryService {
     }
 
     // =========================================================================
-    // Clé API Anthropic du workspace (délégation Claude via l'API, B1)
+    // Clés API de délégation du workspace (Anthropic B1, Cursor... - chiffrées)
     // =========================================================================
 
     /**
-     * Connecte (ou remplace) la clé API Anthropic du workspace. Réservé OWNER/ADMIN (secret d'espace,
-     * cf. RBAC intégrations). La clé est stockée <b>chiffrée</b> ({@code Integration.accessToken}) et
-     * n'est jamais renvoyée en clair - elle est vérifiée à la première délégation Claude.
+     * Connecte (ou remplace) une clé API de délégation du workspace. Réservé OWNER/ADMIN (secret d'espace,
+     * cf. RBAC intégrations). La clé est stockée <b>chiffrée</b> ({@code Integration.accessToken}) et n'est
+     * jamais renvoyée en clair - elle est vérifiée à la première délégation vers ce provider.
      */
     @Transactional
-    public AnthropicStatusResponse connectAnthropic(String slug, Long userId, String apiKey) {
+    public DeliveryKeyStatus connectKey(String slug, Long userId, IntegrationProvider provider, String apiKey) {
         Workspace ws = access.resolveAndAuthorizeOwner(slug, userId);
         Integration integ = integrationRepository
-            .findByWorkspaceIdAndProvider(ws.getId(), IntegrationProvider.ANTHROPIC)
+            .findByWorkspaceIdAndProvider(ws.getId(), provider)
             .orElseGet(Integration::new);
         integ.setWorkspace(ws);
-        integ.setProvider(IntegrationProvider.ANTHROPIC);
+        integ.setProvider(provider);
         integ.setAccessToken(apiKey.trim());
         integ.setInstalledBy(userRepository.findById(userId).orElse(null));
         integrationRepository.save(integ);
-        log.info("Cle Anthropic connectee au workspace {} (delegation Claude)", ws.getId());
-        return status(ws);
+        log.info("Cle {} connectee au workspace {} (delegation)", provider, ws.getId());
+        return keyStatus(ws, provider);
     }
 
-    /** État de la connexion Anthropic (tout membre du workspace). */
+    /** État de la connexion d'une clé de délégation (tout membre du workspace). */
     @Transactional(readOnly = true)
-    public AnthropicStatusResponse anthropicStatus(String slug, Long userId) {
-        return status(access.resolveAndAuthorize(slug, userId));
+    public DeliveryKeyStatus keyStatus(String slug, Long userId, IntegrationProvider provider) {
+        return keyStatus(access.resolveAndAuthorize(slug, userId), provider);
     }
 
-    /** Déconnecte la clé Anthropic du workspace. Réservé OWNER/ADMIN. */
+    /** Déconnecte une clé de délégation du workspace. Réservé OWNER/ADMIN. */
     @Transactional
-    public void disconnectAnthropic(String slug, Long userId) {
+    public void disconnectKey(String slug, Long userId, IntegrationProvider provider) {
         Workspace ws = access.resolveAndAuthorizeOwner(slug, userId);
-        integrationRepository.deleteByWorkspaceIdAndProvider(ws.getId(), IntegrationProvider.ANTHROPIC);
-        log.info("Cle Anthropic deconnectee du workspace {}", ws.getId());
+        integrationRepository.deleteByWorkspaceIdAndProvider(ws.getId(), provider);
+        log.info("Cle {} deconnectee du workspace {}", provider, ws.getId());
     }
 
-    private AnthropicStatusResponse status(Workspace ws) {
-        return integrationRepository.findByWorkspaceIdAndProvider(ws.getId(), IntegrationProvider.ANTHROPIC)
-            .map(i -> new AnthropicStatusResponse(true, keyHint(i.getAccessToken())))
-            .orElseGet(() -> new AnthropicStatusResponse(false, null));
+    private DeliveryKeyStatus keyStatus(Workspace ws, IntegrationProvider provider) {
+        return integrationRepository.findByWorkspaceIdAndProvider(ws.getId(), provider)
+            .map(i -> new DeliveryKeyStatus(true, keyHint(i.getAccessToken())))
+            .orElseGet(() -> new DeliveryKeyStatus(false, null));
     }
 
     /** Indice non sensible : les 4 derniers caractères seulement (jamais la clé entière). */

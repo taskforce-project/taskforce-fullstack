@@ -10,7 +10,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.taskforce.tf_api.core.dto.response.AnthropicStatusResponse;
+import com.taskforce.tf_api.core.dto.response.DeliveryKeyStatus;
 import com.taskforce.tf_api.core.enums.IntegrationProvider;
 import com.taskforce.tf_api.core.model.Integration;
 import com.taskforce.tf_api.core.model.Workspace;
@@ -58,7 +58,7 @@ class DeliveryServiceAnthropicTest {
             .thenReturn(Optional.empty(), Optional.of(saved)); // 1: connect (absente) ; 2: status
         when(userRepository.findById(1L)).thenReturn(Optional.empty());
 
-        AnthropicStatusResponse resp = service.connectAnthropic("acme", 1L, "  sk-ant-abcd  ");
+        DeliveryKeyStatus resp = service.connectKey("acme", 1L, IntegrationProvider.ANTHROPIC, "  sk-ant-abcd  ");
 
         ArgumentCaptor<Integration> cap = ArgumentCaptor.forClass(Integration.class);
         verify(integrationRepository).save(cap.capture());
@@ -79,7 +79,7 @@ class DeliveryServiceAnthropicTest {
         when(integrationRepository.findByWorkspaceIdAndProvider(5L, IntegrationProvider.ANTHROPIC))
             .thenReturn(Optional.of(integ));
 
-        AnthropicStatusResponse resp = service.anthropicStatus("acme", 1L);
+        DeliveryKeyStatus resp = service.keyStatus("acme", 1L, IntegrationProvider.ANTHROPIC);
 
         assertThat(resp.connected()).isTrue();
         assertThat(resp.keyHint()).isEqualTo("...AB12");
@@ -94,7 +94,7 @@ class DeliveryServiceAnthropicTest {
         when(integrationRepository.findByWorkspaceIdAndProvider(5L, IntegrationProvider.ANTHROPIC))
             .thenReturn(Optional.empty());
 
-        AnthropicStatusResponse resp = service.anthropicStatus("acme", 1L);
+        DeliveryKeyStatus resp = service.keyStatus("acme", 1L, IntegrationProvider.ANTHROPIC);
 
         assertThat(resp.connected()).isFalse();
         assertThat(resp.keyHint()).isNull();
@@ -107,7 +107,7 @@ class DeliveryServiceAnthropicTest {
         when(ws.getId()).thenReturn(5L);
         when(access.resolveAndAuthorizeOwner("acme", 1L)).thenReturn(ws);
 
-        service.disconnectAnthropic("acme", 1L);
+        service.disconnectKey("acme", 1L, IntegrationProvider.ANTHROPIC);
 
         verify(integrationRepository).deleteByWorkspaceIdAndProvider(5L, IntegrationProvider.ANTHROPIC);
     }
