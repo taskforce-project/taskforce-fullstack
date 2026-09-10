@@ -1,9 +1,13 @@
 name: Sync README Badges
 
+# Ne tourne QUE sur `dev` : le bot commite le badge sur dev (branche non protegee, push autorise), et
+# le badge remonte sur `main` par le squash-merge de la release (comme la version produit). Auparavant
+# le trigger incluait `main` -> le job echouait systematiquement (push refuse sur main protegee), un ❌
+# recurrent et trompeur a chaque release. Le squash-release (dev == main) fait remonter le badge sans
+# push direct sur main.
 on:
   push:
     branches:
-      - main
       - dev
     paths:
       - README.md
