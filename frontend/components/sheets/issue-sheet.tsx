@@ -31,10 +31,12 @@ import {
 } from "@/components/ui/dropdown-menu"
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  SelectGroup, SelectLabel, SelectSeparator,
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 import { SmartAssignPanel } from "@/components/smart-assign/smart-assign-panel"
 import { DelegateAgentControl } from "@/components/sheets/delegate-agent-control"
+import { useDeliveryStore } from "@/lib/store/delivery-store"
 import { IssueAiSpecPanel } from "@/components/issues/issue-ai-spec"
 import { IssueDescription } from "@/components/issues/issue-description"
 import { BrandLogo } from "@/components/ui/brand-logo"
@@ -1163,6 +1165,13 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
   // Compteurs des sections repliées (badges façon Linear) - chargés à l'ouverture, visibles repliés.
   const [sectionCounts, setSectionCounts] = useState({ checklist: 0, attachments: 0, relations: 0 })
 
+  // Agents de délégation : proposés DANS le menu Assignee (déléguer = comme assigner une personne).
+  const deliveryProviders = useDeliveryStore((s) => s.providers)
+  const fetchDeliveryProviders = useDeliveryStore((s) => s.fetchProviders)
+  const delegateToAgent = useDeliveryStore((s) => s.delegate)
+  const fetchDeliveryRun = useDeliveryStore((s) => s.fetchRun)
+  const availableAgents = deliveryProviders.filter((p) => p.available)
+
   useEffect(() => { if (editingTitle) titleRef.current?.focus() }, [editingTitle])
 
   // Reset state when issue changes
@@ -1193,7 +1202,8 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
       .catch(() => { /* silent */ })
     fetchLabels(workspaceSlug, projectId)
       .catch(() => { /* silent */ })
-  }, [open, workspaceSlug, projectId, fetchStatuses, fetchLabels])
+    fetchDeliveryProviders(workspaceSlug).catch(() => { /* silent */ })
+  }, [open, workspaceSlug, projectId, fetchStatuses, fetchLabels, fetchDeliveryProviders])
 
   // Cycles du projet (options du sélecteur) + cycle courant de l'issue - CYC-03b.
   useEffect(() => {
@@ -1618,6 +1628,20 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                 <Select
                   value={assignee ? String(assignee.userId) : "none"}
                   onValueChange={async (val) => {
+                    // Déléguer à un agent = même menu qu'assigner une personne (Linear-like).
+                    if (val.startsWith("agent:")) {
+                      if (!workspaceSlug) return
+                      const providerKey = val.slice("agent:".length)
+                      const agent = availableAgents.find((a) => a.key === providerKey)
+                      const res = await delegateToAgent(workspaceSlug, issueId, providerKey)
+                      if (res) {
+                        toast.success(`Delegated to ${agent?.displayName ?? "agent"}`)
+                        fetchDeliveryRun(workspaceSlug, issueId).catch(() => { /* silent */ })
+                      } else {
+                        toast.error("Couldn't delegate. Connect the agent's key in Settings → Agents.")
+                      }
+                      return
+                    }
                     if (val === "none") {
                       setAssignee(null)
                       await callUpdate({ assigneeId: null })
@@ -1653,6 +1677,21 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                         </SelectItem>
                       )
                     })}
+                    {/* Agents : déléguer se fait dans le MÊME menu qu'assigner une personne. */}
+                    {availableAgents.length > 0 && (
+                      <SelectGroup>
+                        <SelectSeparator />
+                        <SelectLabel className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                          Delegate to an agent
+                        </SelectLabel>
+                        {availableAgents.map((a) => (
+                          <SelectItem key={a.key} value={`agent:${a.key}`}>
+                            <BrandLogo slug={a.logoKey} name={a.displayName} className="size-4 shrink-0" />
+                            {a.displayName}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
                   </SelectContent>
                 </Select>
 
