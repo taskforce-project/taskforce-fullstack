@@ -20,9 +20,13 @@ import com.taskforce.tf_api.core.model.Cycle;
 import com.taskforce.tf_api.core.model.CycleIssue;
 import com.taskforce.tf_api.core.model.Issue;
 import com.taskforce.tf_api.core.model.KnowledgeNode;
+import com.taskforce.tf_api.core.model.Project;
+import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.CycleIssueRepository;
 import com.taskforce.tf_api.core.repository.CycleRepository;
 import com.taskforce.tf_api.core.repository.KnowledgeNodeRepository;
+import com.taskforce.tf_api.core.repository.ProjectRepository;
+import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.AiMeter;
 import com.taskforce.tf_api.core.service.KnowledgeService;
 import com.taskforce.tf_api.core.service.LlmClient;
@@ -63,6 +67,8 @@ public class BrainIngestionService {
 
     private final CycleRepository          cycleRepository;
     private final CycleIssueRepository     cycleIssueRepository;
+    private final ProjectRepository        projectRepository;
+    private final WorkspaceRepository      workspaceRepository;
     private final KnowledgeNodeRepository  nodeRepository;
     private final KnowledgeService         knowledgeService;
     private final LlmClient                llm;
@@ -78,6 +84,12 @@ public class BrainIngestionService {
     static final int LIST_CAP = 50;
 
     private static final List<String> TAGS = List.of("cycle", "retro", "ingestion-auto");
+
+    /** Tags de la fiche projet (upsert par refType=PROJECT). */
+    private static final List<String> PROJECT_TAGS = List.of("project", "contexte", "ingestion-auto");
+
+    /** Tags de la fiche de contexte de l'espace (upsert par refType=WORKSPACE). */
+    private static final List<String> WORKSPACE_TAGS = List.of("contexte", "entreprise", "ingestion-auto");
 
     private static final String SYNTHESIS_SYSTEM = """
         Tu es l'analyste du Brain OS de TaskForce. On te donne les FAITS d'un cycle de développement,
@@ -352,6 +364,125 @@ public class BrainIngestionService {
             log.debug("Brain OS ← avancement du cycle « {} » : {}/{}",
                 facts.cycleName(), facts.delivered().size(), facts.total());
         }
+    }
+
+    /**
+     * Fiche de contexte d'un projet dans le Brain OS, ecrite a sa creation. Contrairement a la retro
+     * de cycle, <b>aucun appel LLM</b> : le contexte est la description ecrite par l'equipe, on ne
+     * paraphrase pas un texte deja fourni (gratuit, instantane). Upsert idempotent (un node par
+     * projet, {@code refType=PROJECT}) ; le node <b>ancre la region du projet</b> dans le graphe via
+     * {@code metadata.projects} (cf. BrainGraph / regions par projet).
+     */
+    @Transactional
+    public void writeProjectNode(String slug, Long workspaceId, Long userId, Long projectId) {
+        Project project = projectRepository.findById(projectId).orElse(null);
+        if (project == null) {
+            log.warn("Ingestion Brain OS : projet {} introuvable a l'ecriture", projectId);
+            return;
+        }
+        String title = truncate("Projet - " + project.getName() + " (" + project.getIdentifier() + ")", 300);
+        String content = renderProjectContext(project);
+
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("projectId", project.getId());
+        metadata.put("projectIdentifier", project.getIdentifier());
+        // Appartenance projet (liste : une note peut etre transverse a plusieurs projets ; ici un seul).
+        // C'est ce champ qui ancre la region du projet dans le graphe (cf. BrainGraph).
+        metadata.put("projects", List.of(project.getId()));
+        metadata.put("generatedBy", "ingestion-auto");
+        metadata.put("mode", "facts-only");
+
+        Optional<KnowledgeNode> existing = nodeRepository
+            .findFirstByWorkspaceIdAndRefTypeAndRefId(workspaceId, NodeRefType.PROJECT, project.getId());
+
+        if (existing.isPresent()) {
+            knowledgeService.updateNode(slug, existing.get().getId(), userId, UpdateKnowledgeNodeRequest.builder()
+                .title(title)
+                .content(content)
+                .metadata(metadata)
+                .tags(PROJECT_TAGS)
+                .build());
+        } else {
+            knowledgeService.createNode(slug, userId, CreateKnowledgeNodeRequest.builder()
+                .type("NOTE")
+                .domain("PROJET")
+                .title(title)
+                .content(content)
+                .refType("PROJECT")
+                .refId(project.getId())
+                .tags(PROJECT_TAGS)
+                .metadata(metadata)
+                .build());
+        }
+        log.info("Brain OS <- fiche projet « {} » ({})", project.getName(), project.getIdentifier());
+    }
+
+    /**
+     * Fiche de contexte metier de l'espace de travail (« que fait l'entreprise / equipe ? »), ecrite a
+     * l'onboarding / a la creation. Aucun LLM (c'est le texte de l'equipe). Upsert idempotent
+     * ({@code refType=WORKSPACE}). Node <b>transverse</b> (pas de {@code metadata.projects}) : il se pose
+     * dans la « Base commune » au centre du graphe. Rien a ecrire si l'activite est vide.
+     */
+    @Transactional
+    public void writeWorkspaceNode(String slug, Long workspaceId, Long userId) {
+        Workspace ws = workspaceRepository.findById(workspaceId).orElse(null);
+        if (ws == null) {
+            log.warn("Ingestion Brain OS : espace {} introuvable a l'ecriture", workspaceId);
+            return;
+        }
+        String activity = ws.getActivity();
+        if (activity == null || activity.isBlank()) {
+            log.debug("Ingestion Brain OS : espace {} sans activite, rien a ecrire", workspaceId);
+            return;
+        }
+        String title = truncate("Contexte - " + ws.getName(), 300);
+        String content = "> [!info] Contexte de l'espace de travail - fourni a l'onboarding / a la creation.\n\n"
+            + "## Activite\n\n" + activity.trim() + "\n\n#contexte #entreprise\n";
+
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("workspaceLevel", true);
+        metadata.put("generatedBy", "ingestion-auto");
+        metadata.put("mode", "facts-only");
+
+        Optional<KnowledgeNode> existing = nodeRepository
+            .findFirstByWorkspaceIdAndRefTypeAndRefId(workspaceId, NodeRefType.WORKSPACE, workspaceId);
+
+        if (existing.isPresent()) {
+            knowledgeService.updateNode(slug, existing.get().getId(), userId, UpdateKnowledgeNodeRequest.builder()
+                .title(title)
+                .content(content)
+                .metadata(metadata)
+                .tags(WORKSPACE_TAGS)
+                .build());
+        } else {
+            knowledgeService.createNode(slug, userId, CreateKnowledgeNodeRequest.builder()
+                .type("NOTE")
+                .domain("PRODUIT")
+                .title(title)
+                .content(content)
+                .refType("WORKSPACE")
+                .refId(workspaceId)
+                .tags(WORKSPACE_TAGS)
+                .metadata(metadata)
+                .build());
+        }
+        log.info("Brain OS <- fiche contexte de l'espace « {} »", ws.getName());
+    }
+
+    /** Rendu deterministe de la fiche projet (format Obsidian). La description peut etre absente. */
+    private String renderProjectContext(Project p) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("> [!info] Fiche projet - creee a l'ouverture du projet. Contexte fourni par l'equipe.\n\n");
+        sb.append("## Contexte\n\n");
+        sb.append("- **Projet** : ").append(p.getName()).append(" (`").append(p.getIdentifier()).append("`)\n");
+        String desc = p.getDescription();
+        sb.append("- **Description** : ")
+          .append(desc != null && !desc.isBlank() ? desc.trim() : "(non renseignee)").append("\n");
+        if (p.getRepoFullName() != null && !p.getRepoFullName().isBlank()) {
+            sb.append("- **Depot** : `").append(p.getRepoFullName()).append("`\n");
+        }
+        sb.append("\n#project #contexte\n");
+        return sb.toString();
     }
 
     // =========================================================================

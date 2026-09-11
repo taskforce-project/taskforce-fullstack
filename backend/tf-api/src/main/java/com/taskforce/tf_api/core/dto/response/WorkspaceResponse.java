@@ -22,6 +22,7 @@ public class WorkspaceResponse {
     private String name;
     private String slug;
     private String description;
+    private String activity;
     private String logoUrl;
 
     /** Résumé du propriétaire */
