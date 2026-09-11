@@ -7,6 +7,7 @@ import {
   getBrainOverview,
   createNode as createNodeApi,
   updateNode as updateNodeApi,
+  moveNode as moveNodeApi,
   deleteNode as deleteNodeApi,
   searchBrain as searchBrainApi,
   createEdge as createEdgeApi,
@@ -33,6 +34,8 @@ interface BrainState {
   selectNode: (nodeId: number | null) => void
   addNode: (slug: string, input: CreateNodeInput) => Promise<KnowledgeNode>
   editNode: (slug: string, nodeId: number, input: UpdateNodeInput) => Promise<void>
+  /** Déplace une page dans l'arbre (drag-to-nest). parentNodeId null = racine du domaine. Avale l'erreur → null. */
+  moveNode: (slug: string, nodeId: number, parentNodeId: number | null, domain?: string) => Promise<KnowledgeNode | null>
   removeNode: (slug: string, nodeId: number) => Promise<void>
   search: (slug: string, query: string) => Promise<void>
   clearSearch: () => void
@@ -71,6 +74,16 @@ export const useBrainStore = create<BrainState>((set, get) => ({
   editNode: async (slug, nodeId, input) => {
     await updateNodeApi(slug, nodeId, input)
     await get().fetchOverview(slug)
+  },
+
+  moveNode: async (slug, nodeId, parentNodeId, domain) => {
+    try {
+      const node = await moveNodeApi(slug, nodeId, parentNodeId, domain)
+      await get().fetchOverview(slug)
+      return node
+    } catch {
+      return null
+    }
   },
 
   removeNode: async (slug, nodeId) => {
