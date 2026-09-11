@@ -672,9 +672,10 @@ export function BrainGraph({
 
   const onClick = useCallback((node: NodeObject) => {
     const n = node as GraphNode
-    const fg = fgRef.current
-    if (n.hasChildren && fg && n.x != null && n.y != null) { fg.centerAt(n.x, n.y, 600); fg.zoom(Math.min(4, 1.6 + n.depth * 0.7), 600) }
-    else if (n.ref != null) onSelect(n.ref)
+    // Clic = TOUJOURS ouvrir la note (facon Notion). Avant, un noeud AVEC enfants zoomait au lieu
+    // d'ouvrir -> impossible d'ouvrir un noeud parent (retour CEO « je peux meme pas cliquer
+    // dessus »). Le zoom d'exploration reste dispo a la molette / au cadrage auto.
+    if (n.ref != null) onSelect(n.ref)
   }, [onSelect])
 
   // Durée 0 (une transition ne s'applique pas, cf. plus bas) et marge large : `zoomToFit` ne cadre
