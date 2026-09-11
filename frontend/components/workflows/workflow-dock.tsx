@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import {
-  Layers, Loader2, RefreshCw, Trash2, ChevronRight, Send,
+  Layers, Loader2, RefreshCw, Trash2, ChevronRight, Send, Network,
   CheckCircle2, XCircle, PauseCircle, CircleDashed,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils"
 import { AgentPlan } from "@/components/ui/agent-plan"
 import { ShimmerLoader } from "@/components/ui/shimmer-loader"
 import { Button } from "@/components/ui/button"
+import { WorkflowCanvasDialog } from "@/components/workflows/workflow-canvas-dialog"
 import { usePanelStore } from "@/lib/store/panel-store"
 import { useWorkflowStore } from "@/lib/store/workflow-store"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
@@ -139,18 +140,27 @@ function JobCard({ slug, job }: Readonly<{ slug: string; job: AnalysisJob }>) {
 export function WorkflowPanelContent() {
   const jobs = useWorkflowStore((s) => s.jobs)
   const activeSlug = useWorkspaceStore((s) => s.activeWorkspace?.slug) ?? ""
+  const [canvasOpen, setCanvasOpen] = useState(false)
 
   return (
-    <div className="flex flex-1 flex-col gap-2.5 overflow-y-auto p-3">
-      {jobs.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
-          <Layers className="size-7 text-muted-foreground/40" />
-          <p className="text-sm font-medium text-foreground">No workflows</p>
-          <p className="text-xs text-muted-foreground">Launch an analysis from a project (Intelligence page) - it will appear here and keep running even if you leave the page.</p>
-        </div>
-      ) : (
-        jobs.map((job) => <JobCard key={job.id} slug={activeSlug} job={job} />)
-      )}
+    <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="shrink-0 border-b p-2">
+        <Button size="sm" variant="outline" className="h-8 w-full gap-1.5 text-xs" onClick={() => setCanvasOpen(true)}>
+          <Network className="size-3.5" /> Open the workflow canvas
+        </Button>
+      </div>
+      <div className="flex flex-1 flex-col gap-2.5 overflow-y-auto p-3">
+        {jobs.length === 0 ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
+            <Layers className="size-7 text-muted-foreground/40" />
+            <p className="text-sm font-medium text-foreground">No workflows</p>
+            <p className="text-xs text-muted-foreground">Launch an analysis from a project (Intelligence page) - it will appear here and keep running even if you leave the page.</p>
+          </div>
+        ) : (
+          jobs.map((job) => <JobCard key={job.id} slug={activeSlug} job={job} />)
+        )}
+      </div>
+      <WorkflowCanvasDialog open={canvasOpen} onOpenChange={setCanvasOpen} />
     </div>
   )
 }

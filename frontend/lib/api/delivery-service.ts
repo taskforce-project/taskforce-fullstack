@@ -58,6 +58,12 @@ export async function getIssueRun(slug: string, issueId: number): Promise<Delive
   return res.data.data;
 }
 
+/** Runs de délégation du workspace (les plus récents), pour la vue « workflow » (agents en parallèle). */
+export async function listWorkspaceRuns(slug: string): Promise<DeliveryRun[]> {
+  const res = await apiClient.get<{ data: DeliveryRun[] }>(DELIVERY_ROUTES.RUNS(slug), { silentError: true });
+  return res.data.data ?? [];
+}
+
 /** Providers de délégation dont l'exécution dépend d'une clé API stockée par workspace. */
 export type DeliveryKeyProvider = "anthropic" | "cursor";
 
