@@ -18,6 +18,8 @@ export interface Workspace {
   slug: string;
   description: string | null;
   logoUrl: string | null;
+  /** Contexte metier (« que fait l'entreprise / equipe ? ») - alimente le Brain OS. */
+  activity: string | null;
   ownerId: number;
   ownerName: string;
   /** Vrai si l'utilisateur courant est le propriétaire (espace perso) ; faux si simple membre (partagé). */
@@ -40,12 +42,16 @@ export interface WorkspaceMember {
 export interface UpdateWorkspacePayload {
   name?: string;
   description?: string;
+  /** Contexte metier (« que fait l'entreprise / equipe ? ») - alimente le Brain OS. */
+  activity?: string;
   logoUrl?: string;
 }
 
 export interface CreateWorkspacePayload {
   name: string;
   description?: string;
+  /** Contexte metier (« que fait l'entreprise / equipe ? ») - alimente le Brain OS. */
+  activity?: string;
   /** Gabarit d'amorçage du Brain OS : BLANK | SAAS | ECOMMERCE | MARKETPLACE | AGENTIC. */
   brainTemplate?: string;
 }
