@@ -163,7 +163,18 @@ export function AssigneeMenu({
           <CommandInput placeholder="Assign to…" className="h-9" />
           {/* Dropdown COMPACT (max ~20rem) qui scrolle - jamais une colonne pleine hauteur ; borne aussi
               a la hauteur dispo a l'ecran (var Radix) pour ne pas depasser le viewport quand ouvert bas. */}
-          <CommandList className="max-h-[min(20rem,var(--radix-popover-content-available-height,20rem))]">
+          <CommandList
+            // Le sheet parent (Radix Dialog / shadcn Sheet) verrouille le scroll via react-remove-scroll,
+            // qui bloque la MOLETTE sur ce popover (portalise HORS du sheet) - d'ou « scroll molette KO,
+            // seuls le clic-molette et la scrollbar marchent » (retour CEO). react-remove-scroll ne fait que
+            // preventDefault (pas de stopPropagation), donc on scrolle la liste a la main ici. Le menu ne
+            // vit QUE dans le sheet (toujours verrouille) -> le scroll natif est deja bloque, pas de double.
+            onWheel={(e) => {
+              const el = e.currentTarget
+              if (el.scrollHeight > el.clientHeight) el.scrollTop += e.deltaY
+            }}
+            className="max-h-[min(20rem,var(--radix-popover-content-available-height,20rem))]"
+          >
             <CommandEmpty>No match.</CommandEmpty>
 
             {/* Suggested : la reco IA, en tete du meme menu (pas un panneau a part). */}
