@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.taskforce.tf_api.core.dto.request.CreateKnowledgeEdgeRequest;
 import com.taskforce.tf_api.core.dto.request.CreateKnowledgeNodeRequest;
+import com.taskforce.tf_api.core.dto.request.MoveNodeRequest;
 import com.taskforce.tf_api.core.dto.request.SearchBrainRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateKnowledgeNodeRequest;
 import com.taskforce.tf_api.core.dto.response.BrainOverviewResponse;
@@ -133,6 +134,18 @@ public class KnowledgeController {
         Long userId = resolveUserId(jwt);
         return ResponseEntity.ok(ApiResponse.success("Node mis à jour",
             knowledgeService.updateNode(slug, nodeId, userId, request)));
+    }
+
+    @PatchMapping("/nodes/{nodeId}/move")
+    public ResponseEntity<ApiResponse<KnowledgeNodeResponse>> moveNode(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String slug,
+        @PathVariable Long nodeId,
+        @Valid @RequestBody MoveNodeRequest request
+    ) {
+        Long userId = resolveUserId(jwt);
+        return ResponseEntity.ok(ApiResponse.success("Node déplacé",
+            knowledgeService.moveNode(slug, nodeId, userId, request)));
     }
 
     @DeleteMapping("/nodes/{nodeId}")
