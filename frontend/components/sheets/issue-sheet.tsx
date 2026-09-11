@@ -31,10 +31,9 @@ import {
 } from "@/components/ui/dropdown-menu"
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-  SelectGroup, SelectLabel, SelectSeparator,
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
-import { SmartAssignPanel } from "@/components/smart-assign/smart-assign-panel"
+import { AssigneeMenu } from "@/components/smart-assign/assignee-menu"
 import { DelegateAgentControl } from "@/components/sheets/delegate-agent-control"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
 import { IssueAiSpecPanel } from "@/components/issues/issue-ai-spec"
@@ -1155,10 +1154,6 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
   const [labels, setLabels] = useState<IssueLabel[]>(issue?.labels ?? [])
   const [points, setPoints] = useState<number | null>(issue?.storyPoints ?? null)
   const [dueDate, setDueDate] = useState<string | null>(issue?.dueDate ?? null)
-  // Smart Assign : déclenché par l'étoile IA dans la ligne Assignee (pas un bloc pleine largeur).
-  // `smartRun` = jeton incrémenté au clic pour relancer l'analyse ; l'ouverture par défaut n'analyse pas.
-  const [smartOpen, setSmartOpen] = useState(false)
-  const [smartRun, setSmartRun] = useState(0)
   // Cycle courant de l'issue + cycles du projet (options du sélecteur) - CYC-03b.
   const [cycleId, setCycleId] = useState<number | null>(null)
   const [projectCycles, setProjectCycles] = useState<Cycle[]>([])
@@ -1189,7 +1184,6 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
     setStatusCategory(issue.statusCategory)
     setPinned(issue.pinned ?? false)
     setCycleId(null)
-    setSmartOpen(false)   // ne pas laisser le panneau Smart Assign ouvert d'une issue à l'autre
   }, [issue])
 
   // Load project members + statuses + labels when sheet opens
@@ -1247,7 +1241,6 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
   const priorityCfg = PRIORITY_CONFIG[priority]
   const dueIso      = dueDate && /^\d{4}-\d{2}-\d{2}/.test(dueDate) ? dueDate.slice(0, 10) : ""
   const isOverdue   = dueDate === "Overdue" || (dueIso !== "" && dueIso < new Date().toISOString().slice(0, 10))
-  const noAssignee  = assignee === null
   const issueId     = Number(issue.id)
 
   // Use real statuses from store if loaded, fallback to category-based config
@@ -1622,142 +1615,45 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
               </Select>
             </MetaRow>
 
-            {/* Assignee - Select + étoile Smart Assign IA inline (taille input, pas un bloc pleine largeur) */}
+            {/* Assignee - un seul menu cherchable (Linear-like) : la reco IA vit EN HAUT du menu,
+                les membres au milieu, les agents en bas. Plus de panneau de scores a cote. */}
             <MetaRow icon={<Avatar className="size-3.5"><AvatarFallback className="text-[7px]">?</AvatarFallback></Avatar>} label="Assignee">
-              <div className="flex w-full items-center gap-1.5">
-                <Select
-                  value={assignee ? String(assignee.userId) : "none"}
-                  onValueChange={async (val) => {
-                    // Déléguer à un agent = même menu qu'assigner une personne (Linear-like).
-                    if (val.startsWith("agent:")) {
-                      if (!workspaceSlug) return
-                      const providerKey = val.slice("agent:".length)
-                      const agent = availableAgents.find((a) => a.key === providerKey)
-                      const res = await delegateToAgent(workspaceSlug, issueId, providerKey)
-                      if (res) {
-                        toast.success(`Delegated to ${agent?.displayName ?? "agent"}`)
-                        fetchDeliveryRun(workspaceSlug, issueId).catch(() => { /* silent */ })
-                      } else {
-                        toast.error("Couldn't delegate. Connect the agent's key in Settings → Agents.")
-                      }
-                      return
-                    }
-                    if (val === "none") {
-                      setAssignee(null)
-                      await callUpdate({ assigneeId: null })
-                      toast.success("Unassigned")
-                      return
-                    }
-                    const m = projectMembers.find((x) => String(x.userId) === val)
+              {workspaceSlug && projectId ? (
+                <AssigneeMenu
+                  workspaceSlug={workspaceSlug}
+                  projectId={projectId}
+                  issueId={issueId}
+                  assignee={assignee}
+                  members={projectMembers}
+                  agents={availableAgents}
+                  onAssign={async (userId) => {
+                    const m = projectMembers.find((x) => x.userId === userId)
                     if (!m) return
                     const name = m.displayName ?? m.email
                     setAssignee({ initials: memberInitials(m), color: memberColor(m.userId), name, userId: m.userId, email: m.email, avatarUrl: m.avatarUrl })
                     await callUpdate({ assigneeId: m.userId })
                     toast.success(`Assigned to ${name}`)
                   }}
-                >
-                  <SelectTrigger size="sm" className="w-full min-w-0 flex-1">
-                    {assignee ? (
-                      <span className="flex items-center gap-1.5 min-w-0">
-                        <UserAvatar email={assignee.email} name={assignee.name} avatarUrl={assignee.avatarUrl} className="size-4 shrink-0" fallbackClassName="text-[8px]" />
-                        <span className="truncate">{assignee.name}</span>
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground">Unassigned</span>
-                    )}
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none"><span className="text-muted-foreground">No assignee</span></SelectItem>
-                    {projectMembers.map((m) => {
-                      const name = m.displayName ?? m.email
-                      return (
-                        <SelectItem key={m.userId} value={String(m.userId)}>
-                          <UserAvatar email={m.email} name={name} avatarUrl={m.avatarUrl} className="size-4 shrink-0" fallbackClassName="text-[8px]" />
-                          {name}
-                        </SelectItem>
-                      )
-                    })}
-                    {/* Agents : déléguer se fait dans le MÊME menu qu'assigner une personne. */}
-                    {availableAgents.length > 0 && (
-                      <SelectGroup>
-                        <SelectSeparator />
-                        <SelectLabel className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                          Delegate to an agent
-                        </SelectLabel>
-                        {availableAgents.map((a) => (
-                          <SelectItem key={a.key} value={`agent:${a.key}`}>
-                            <BrandLogo slug={a.logoKey} name={a.displayName} className="size-4 shrink-0" />
-                            {a.displayName}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    )}
-                  </SelectContent>
-                </Select>
-
-                {/* Étoile IA : petit bouton de la hauteur de l'input. Quand personne n'est assigné,
-                    il « brille » (primary) pour appeler l'action ; sinon discret (re-analyse). */}
-                {workspaceSlug && projectId && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (smartOpen) { setSmartOpen(false); return }
-                      setSmartOpen(true)
-                      setSmartRun((t) => t + 1)
-                    }}
-                    title="Assign with AI"
-                    aria-label="Assign with AI"
-                    aria-pressed={smartOpen}
-                    className={cn(
-                      "flex size-8 shrink-0 items-center justify-center rounded-md border transition-colors",
-                      smartOpen
-                        ? "border-primary/40 bg-primary/15 text-primary"
-                        : noAssignee
-                          ? "border-primary/30 bg-primary/10 text-primary ring-1 ring-inset ring-primary/15 hover:bg-primary/20"
-                          : "border-input text-muted-foreground hover:bg-muted/40 hover:text-foreground"
-                    )}
-                  >
-                    <Sparkles className="size-4" />
-                  </button>
-                )}
-              </div>
-            </MetaRow>
-
-            {/* Smart Auto-Assign - panneau contrôlé, ouvert par l'étoile IA ci-dessus */}
-            {workspaceSlug && projectId && (
-              <SmartAssignPanel
-                open={smartOpen}
-                onOpenChange={setSmartOpen}
-                runToken={smartRun}
-                workspaceSlug={workspaceSlug}
-                projectId={projectId}
-                issueId={issueId}
-                issueLabels={labels.map((l) => l.name)}
-                issuePriority={priority}
-                currentAssignee={assignee}
-                onAssign={async (m) => {
-                  // Reco d'agent (A3) : on délègue (comme choisir un agent dans le menu Assignee).
-                  if (m.kind === "agent") {
-                    if (!workspaceSlug || !m.agentKey) return
-                    const res = await delegateToAgent(workspaceSlug, issueId, m.agentKey)
+                  onUnassign={async () => {
+                    setAssignee(null)
+                    await callUpdate({ assigneeId: null })
+                    toast.success("Unassigned")
+                  }}
+                  onDelegate={async (agentKey) => {
+                    const agent = availableAgents.find((a) => a.key === agentKey)
+                    const res = await delegateToAgent(workspaceSlug, issueId, agentKey)
                     if (res) {
-                      toast.success(`Delegated to ${m.displayName ?? "agent"}`)
+                      toast.success(`Delegated to ${agent?.displayName ?? "agent"}`)
                       fetchDeliveryRun(workspaceSlug, issueId).catch(() => { /* silent */ })
                     } else {
                       toast.error("Couldn't delegate. Connect the agent's key in Settings → Agents.")
                     }
-                    return
-                  }
-                  if (m.userId == null) return
-                  const email = m.email ?? ""
-                  const name = m.displayName ?? email
-                  const initials = name.slice(0, 2).toUpperCase()
-                  setAssignee({ initials, color: memberColor(m.userId), name, userId: m.userId, email, avatarUrl: m.avatarUrl })
-                  await callUpdate({ assigneeId: m.userId })
-                  toast.success(`Assigned to ${name}`)
-                }}
-              />
-            )}
+                  }}
+                />
+              ) : (
+                <span className="text-sm text-muted-foreground">{assignee?.name ?? "Unassigned"}</span>
+              )}
+            </MetaRow>
 
             {/* Délégation à un agent de livraison (TF-AGENT-DELIVERY) */}
             {workspaceSlug && projectId && (
