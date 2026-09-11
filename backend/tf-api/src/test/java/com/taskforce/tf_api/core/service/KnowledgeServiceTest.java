@@ -179,4 +179,28 @@ class KnowledgeServiceTest {
 
         verify(nodeRepository, never()).save(any());
     }
+
+    @Test
+    @DisplayName("capStructureAware : sous le plafond, renvoie tout (aucune troncature)")
+    void cap_under_limit_returns_all() {
+        var all = java.util.List.of(node(1L, null), node(2L, 1L), node(3L, 1L));
+        assertThat(KnowledgeService.capStructureAware(all, 10)).isEqualTo(all);
+    }
+
+    @Test
+    @DisplayName("capStructureAware : au-dela du plafond, l'ossature (conteneurs) survit meme si elle vient en dernier")
+    void cap_keeps_skeleton_even_when_containers_sort_last() {
+        // Simule le tri par domaine : d'abord les feuilles, PUIS les conteneurs (hub/projet) en fin de liste
+        // - exactement le cas qui, avec un simple subList, ejectait le hub et les projets hors plafond.
+        var ordered = new java.util.ArrayList<KnowledgeNode>();
+        for (long i = 1; i <= 8; i++) ordered.add(node(i, 100L));   // 8 feuilles, parent = le conteneur 100
+        KnowledgeNode container = node(100L, null);                 // le conteneur arrive en DERNIER
+        ordered.add(container);
+
+        var kept = KnowledgeService.capStructureAware(ordered, 5);
+
+        assertThat(kept).hasSize(5);
+        assertThat(kept).contains(container);                       // l'ossature n'est jamais larguee
+        assertThat(kept.stream().filter(n -> n.getParentNodeId() != null)).hasSize(4); // + feuilles jusqu'au plafond
+    }
 }

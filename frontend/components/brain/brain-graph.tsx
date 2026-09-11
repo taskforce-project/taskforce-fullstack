@@ -5,15 +5,21 @@ import ForceGraph2D, { type ForceGraphMethods, type NodeObject, type LinkObject 
 import { Maximize2 } from "lucide-react"
 import type { KnowledgeNode, KnowledgeEdge } from "@/lib/api/brain-service"
 
-// ─── Couleur : une teinte par projet (branche de 1er niveau). ──────────────────
-const PROJECT_HUE = [210, 165, 38, 330, 262, 8, 142, 28, 190, 300]
-function hsl(hue: number, s: number, l: number): string {
-  return `hsl(${(((hue % 360) + 360) % 360).toFixed(0)}, ${s}%, ${l}%)`
+// ─── Couleur : une teinte par PROJET (groupe refId). Palette categorielle choisie (distincte + lisible
+// clair/sombre), pas une rampe HSL generee. ────────────────────────────────────
+const PALETTE = ["#6366f1", "#14b8a6", "#f59e0b", "#f43f5e", "#8b5cf6", "#0ea5e9", "#10b981", "#f97316", "#06b6d4", "#d946ef"]
+/** #rrggbb → rgba(...) avec alpha (pour les territoires translucides). */
+function withAlpha(hex: string, a: number): string {
+  const h = hex.replace("#", "")
+  const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16)
+  return `rgba(${r}, ${g}, ${b}, ${a})`
 }
 const FINDING_RED = "#e0584d"
 const ENTRANCE_MS = 600
 
 interface Pt { x: number; y: number }
+/** Territoire d'un projet : secteur annulaire (couronne) + nom, dessine derriere les noeuds. */
+interface Territory { color: string; a0: number; a1: number; rInner: number; rOuter: number; name: string; mid: number }
 
 /** Rampe douce 0→1 entre deux niveaux de zoom (fondu des labels et des niveaux profonds). */
 function fade(scale: number, a: number, b: number): number {
@@ -130,19 +136,20 @@ export function BrainGraph({
     return () => { ro.disconnect(); mo.disconnect() }
   }, [])
 
-  // ── Layout radial par containment (parentNodeId). Positions FIXES, déterministes. ──
+  // ── Layout « coeur + galaxies de projets ». Positions FIXES, déterministes. Le COEUR (hub Brain OS,
+  // dossier d'espace, socle transverse : refId null) est au centre ; chaque PROJET (groupe refId) devient
+  // un secteur colore (galaxie) autour, dispose radialement. Les territoires rendent la separation
+  // espace/projets visible ; les couleurs viennent du groupe, pas de la profondeur. ──
   const data = useMemo(() => {
     const byId = new Map<number, KnowledgeNode>()
     for (const n of nodes) if (!n.system) byId.set(n.id, n)
 
-    // Racine = le hub « Brain OS » (le gabarit le pose en racine, projets nichés dessous). Repli : la
-    // première racine si le hub n'existe pas.
+    // Racine du coeur = le hub « Brain OS » (repli : la première racine).
     const hub = [...byId.values()].find((n) => n.title === "Brain OS")
       ?? [...byId.values()].find((n) => n.parentNodeId == null || !byId.has(n.parentNodeId))
       ?? null
 
-    // Enfants par parent (containment via parentNodeId). Les racines orphelines (docs globaux sans
-    // parent) se raccrochent au hub → une seule constellation connectée, jamais d'îlots.
+    // Containment (parentNodeId) : enfants/parent. Les orphelins se raccrochent au hub (jamais d'îlots).
     const childrenOf = new Map<number, number[]>()
     const parentOf = new Map<number, number>()
     for (const n of byId.values()) {
@@ -158,7 +165,18 @@ export function BrainGraph({
       arr.sort((a, b) => (byId.get(a)?.title ?? "").localeCompare(byId.get(b)?.title ?? ""))
     }
 
-    // Feuilles par sous-arbre → largeur angulaire allouée à chacun.
+    // Profondeur de containment depuis le hub (BFS) → rayon dans la galaxie + niveau de detail (LOD).
+    const depthOf = new Map<number, number>()
+    if (hub) {
+      depthOf.set(hub.id, 0)
+      const q = [hub.id]
+      while (q.length) {
+        const id = q.shift()!, d = depthOf.get(id)!
+        for (const c of childrenOf.get(id) ?? []) if (!depthOf.has(c)) { depthOf.set(c, d + 1); q.push(c) }
+      }
+    }
+
+    // Feuilles par sous-arbre → largeur angulaire allouée à chaque branche.
     const leafCount = new Map<number, number>()
     const countLeaves = (id: number): number => {
       const ch = childrenOf.get(id) ?? []
@@ -166,48 +184,80 @@ export function BrainGraph({
       let s = 0; for (const c of ch) s += countLeaves(c)
       const v = s || 1; leafCount.set(id, v); return v
     }
+    if (hub) countLeaves(hub.id)
 
-    // Placement radial : rayon = profondeur, secteur ∝ feuilles. Brain OS au centre, puis projets,
-    // systèmes, notes en rayons. Récursif, anti-cycle par `seen`.
-    const RING = 92
-    const depthOf = new Map<number, number>()
+    // Groupes par PROJET (refId). Coeur = refId null. La racine d'un groupe = le node dont le parent est
+    // HORS groupe (le README du projet, enfant de l'espace).
+    const groupOf = new Map<number, number | null>()
+    const projectIds: number[] = []
+    for (const n of byId.values()) {
+      const rid = n.refId ?? null
+      groupOf.set(n.id, rid)
+      if (rid != null && !projectIds.includes(rid)) projectIds.push(rid)
+    }
+    const groupRoot = new Map<number, number>()
+    for (const id of byId.keys()) {
+      const rid = groupOf.get(id)
+      if (rid == null) continue
+      const pid = parentOf.get(id)
+      if ((pid != null ? groupOf.get(pid) : null) !== rid && !groupRoot.has(rid)) groupRoot.set(rid, id)
+    }
+    const rootTitle = (rid: number) => byId.get(groupRoot.get(rid) ?? -1)?.title ?? ""
+    projectIds.sort((a, b) => rootTitle(a).localeCompare(rootTitle(b)))
+    const weightOf = (rid: number) => { const r = groupRoot.get(rid); return r != null ? (leafCount.get(r) ?? 1) : 1 }
+    const totalWeight = projectIds.reduce((s, r) => s + weightOf(r), 0) || 1
+
+    const RING = 78, R0 = 150, CORE_R = 34
     const posById = new Map<number, Pt>()
-    const seen = new Set<number>()
-    const place = (id: number, depth: number, a0: number, a1: number) => {
-      if (seen.has(id)) return
-      seen.add(id)
-      depthOf.set(id, depth)
-      const a = (a0 + a1) / 2
-      posById.set(id, { x: Math.cos(a) * depth * RING, y: Math.sin(a) * depth * RING })
-      const ch = childrenOf.get(id) ?? []
-      const total = leafCount.get(id) ?? 1
-      let acc = a0
-      for (const c of ch) {
-        const span = (a1 - a0) * ((leafCount.get(c) ?? 1) / total)
-        place(c, depth + 1, acc, acc + span)
-        acc += span
-      }
-    }
-    if (hub) { countLeaves(hub.id); place(hub.id, 0, 0, Math.PI * 2) }
+    const colorByNode = new Map<number, string>()
 
-    // Couleur : une teinte par PROJET (enfant direct du hub qui a lui-même des enfants). Descendants
-    // héritent. Hub = neutre ; docs globaux (feuilles de 1er niveau) = gris.
-    const hueByNode = new Map<number, string>()
+    // COEUR au centre : hub à l'origine, les autres nodes du coeur (espace, socle, docs) sur un petit cercle.
+    const coreNodes = [...byId.values()].filter((n) => (n.refId ?? null) == null)
+    if (hub) posById.set(hub.id, { x: 0, y: 0 })
+    const otherCore = coreNodes.filter((n) => !hub || n.id !== hub.id)
+    otherCore.forEach((n, i) => {
+      const a = -Math.PI / 2 + (i / Math.max(1, otherCore.length)) * Math.PI * 2
+      posById.set(n.id, { x: Math.cos(a) * CORE_R, y: Math.sin(a) * CORE_R })
+    })
+
+    // GALAXIES de projets : un secteur par projet (∝ feuilles), sous-arbre dispose radialement dedans.
+    const GAP = 0.07
+    const territories: Territory[] = []
     const legend: { id: string; name: string; color: string }[] = []
-    const topChildren = hub ? childrenOf.get(hub.id) ?? [] : []
-    let projIdx = 0
-    for (const cid of topChildren) {
-      if ((childrenOf.get(cid)?.length ?? 0) === 0) continue // doc global (feuille) → neutre
-      const color = hsl(PROJECT_HUE[projIdx++ % PROJECT_HUE.length], 58, 55)
-      const short = (byId.get(cid)?.title ?? "").split(" › ").pop() ?? ""
-      legend.push({ id: `n${cid}`, name: short, color })
-      const stack = [cid]
-      while (stack.length) {
-        const id = stack.pop()!
-        hueByNode.set(id, color)
-        for (const c of childrenOf.get(id) ?? []) stack.push(c)
+    let acc = -Math.PI / 2
+    for (let pi = 0; pi < projectIds.length; pi++) {
+      const rid = projectIds[pi]
+      const color = PALETTE[pi % PALETTE.length]
+      const span = (Math.PI * 2 - GAP * projectIds.length) * (weightOf(rid) / totalWeight)
+      const a0 = acc + GAP / 2, a1 = a0 + span
+      acc = a1 + GAP / 2
+      let rMax = R0
+      // Rayon = profondeur RELATIVE a la racine du projet (README=0), pas absolue depuis le hub : robuste
+      // que l'espace soit present (README a la profondeur 2) ou non (donnees pre-reseed, profondeur 1).
+      const assign = (id: number, b0: number, b1: number, ld: number) => {
+        const a = (b0 + b1) / 2
+        const radius = R0 + ld * RING
+        rMax = Math.max(rMax, radius)
+        posById.set(id, { x: Math.cos(a) * radius, y: Math.sin(a) * radius })
+        colorByNode.set(id, color)
+        const ch = (childrenOf.get(id) ?? []).filter((c) => groupOf.get(c) === rid)
+        const tot = ch.reduce((s, c) => s + (leafCount.get(c) ?? 1), 0) || 1
+        let cc = b0
+        for (const c of ch) { const s = (b1 - b0) * ((leafCount.get(c) ?? 1) / tot); assign(c, cc, cc + s, ld + 1); cc += s }
       }
+      const root = groupRoot.get(rid)
+      if (root != null) assign(root, a0, a1, 0)
+      const short = rootTitle(rid).split(" › ").pop() ?? ""
+      territories.push({ color, a0, a1, rInner: R0 - 48, rOuter: rMax + 30, name: short, mid: (a0 + a1) / 2 })
+      if (root != null) legend.push({ id: `n${root}`, name: short, color })
     }
+
+    // Filet : tout node non place (chaine cassee) → couronne externe, pour rester present ET cliquable.
+    const orphans = [...byId.keys()].filter((id) => !posById.has(id))
+    orphans.forEach((id, i) => {
+      const a = (i / Math.max(1, orphans.length)) * Math.PI * 2
+      posById.set(id, { x: Math.cos(a) * (R0 + 5 * RING), y: Math.sin(a) * (R0 + 5 * RING) })
+    })
 
     const childCount = new Map<number, number>()
     for (const [pid, ch] of childrenOf) childCount.set(pid, ch.length)
@@ -217,7 +267,7 @@ export function BrainGraph({
       const node = byId.get(id)
       if (!node) continue
       const archived = node.status === "ARCHIVED" || node.domain === "ARCHIVE"
-      const color = hub && id === hub.id ? theme.fg : hueByNode.get(id) ?? theme.muted
+      const color = hub && id === hub.id ? theme.fg : colorByNode.get(id) ?? theme.muted
       gNodes.push({
         id: `n${node.id}`, ref: node.id, label: node.title,
         color: archived ? theme.muted : color,
@@ -226,8 +276,7 @@ export function BrainGraph({
       } as GraphNode)
     }
 
-    // Liens : la hiérarchie (parent → enfant = « struct », dendrogramme radial) + les wikilinks
-    // (transverses, faibles). La hiérarchie porte la lecture ; les transverses sont le liant.
+    // Liens : la hiérarchie (parent → enfant = « struct ») + les wikilinks (transverses, faibles).
     const present = new Set(gNodes.map((n) => n.id))
     const gLinks: GraphLink[] = []
     const degree = new Map<string, number>()
@@ -242,7 +291,7 @@ export function BrainGraph({
       gLinks.push({ source: s, target: t, kind: e.auto ? "auto" : "edge" }); bump(s); bump(t)
     }
     for (const gn of gNodes) gn.deg = degree.get(gn.id) ?? 0
-    return { nodes: gNodes, links: gLinks, legend }
+    return { nodes: gNodes, links: gLinks, legend, territories }
   }, [nodes, edges, theme])
 
   const neighbors = useMemo(() => {
@@ -346,6 +395,28 @@ export function BrainGraph({
     ctx.setLineDash([])
   }, [linkColor, hoverId])
 
+  // Territoires : un secteur annulaire teinte par projet, dessine DERRIERE les noeuds → la separation
+  // espace (coeur au centre) / projets (galaxies colorees autour) devient visible d'un coup d'oeil.
+  const drawTerritories = useCallback((ctx: CanvasRenderingContext2D, scale: number) => {
+    for (const t of data.territories) {
+      ctx.beginPath()
+      ctx.arc(0, 0, t.rOuter, t.a0, t.a1, false)
+      ctx.arc(0, 0, t.rInner, t.a1, t.a0, true)
+      ctx.closePath()
+      ctx.fillStyle = withAlpha(t.color, 0.07)
+      ctx.fill()
+      // Nom du projet, oriente ecran, juste au-dela de la couronne (a gauche/droite selon le cote).
+      const lr = t.rOuter + 16
+      const fs = Math.max(4, 13 / scale)
+      ctx.font = `700 ${fs}px ui-sans-serif, system-ui, sans-serif`
+      ctx.textAlign = Math.cos(t.mid) >= 0 ? "left" : "right"
+      ctx.textBaseline = "middle"
+      ctx.fillStyle = withAlpha(t.color, 0.9)
+      ctx.globalAlpha = 1
+      ctx.fillText(t.name, Math.cos(t.mid) * lr, Math.sin(t.mid) * lr)
+    }
+  }, [data])
+
   const onClick = useCallback((node: NodeObject) => {
     const n = node as GraphNode
     // Clic = TOUJOURS ouvrir la note (façon Notion). Le zoom d'exploration reste à la molette / au cadrage.
@@ -373,6 +444,7 @@ export function BrainGraph({
           nodeRelSize={4}
           nodeCanvasObject={paintNode}
           nodePointerAreaPaint={paintPointer}
+          onRenderFramePre={drawTerritories}
           linkCanvasObject={drawLink}
           linkCanvasObjectMode={() => "replace"}
           enableNodeDrag={false}
