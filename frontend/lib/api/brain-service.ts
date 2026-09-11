@@ -60,6 +60,8 @@ export interface CreateNodeInput {
   content?: string
   refType?: string
   refId?: number
+  /** Page parente (arbre facon Notion) ; absent = page racine du domaine. */
+  parentNodeId?: number
   tags?: string[]
   metadata?: Record<string, unknown>
 }
@@ -71,6 +73,8 @@ export interface UpdateNodeInput {
   domain?: string
   status?: string
   versionLabel?: string
+  /** Reparentage (deplacer sous une autre page) ; absent = inchange. */
+  parentNodeId?: number
   tags?: string[]
   metadata?: Record<string, unknown>
 }
