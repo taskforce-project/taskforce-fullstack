@@ -152,6 +152,11 @@ public class KnowledgeService {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
         BrainWorkspace brain = brainWorkspaceRepository.findByWorkspaceId(ws.getId()).orElse(null);
 
+        // Page parente (arbre facon Notion) : validee dans le MEME workspace (requireNode leve sinon).
+        Long parentId = req.getParentNodeId() != null
+            ? access.requireNode(req.getParentNodeId(), ws.getId()).getId()
+            : null;
+
         KnowledgeNode node = KnowledgeNode.builder()
             .workspace(ws)
             .brain(brain)
@@ -163,6 +168,7 @@ public class KnowledgeService {
             .versionLabel("v1")
             .refType(req.getRefType() != null ? BrainEnums.refType(req.getRefType()) : null)
             .refId(req.getRefId())
+            .parentNodeId(parentId)
             .metadata(withProjects(req.getMetadata(), req.getProjects()))
             .build();
         // Attribution explicite (pas d'AuditorAware ; convention projet = id user en string).
@@ -186,6 +192,10 @@ public class KnowledgeService {
         if (req.getDomain() != null)       node.setDomain(BrainEnums.domain(req.getDomain()));
         if (req.getStatus() != null)       node.setStatus(BrainEnums.status(req.getStatus()));
         if (req.getVersionLabel() != null) node.setVersionLabel(req.getVersionLabel());
+        // Reparentage (deplacer une page sous une autre) : garde meme-workspace + anti-cycle.
+        if (req.getParentNodeId() != null) {
+            node.setParentNodeId(resolveParentForMove(nodeId, req.getParentNodeId(), ws.getId()));
+        }
         // Les projets peuvent être révisés seuls (sans toucher au reste des metadata) — on repart
         // alors de l'existant plutôt que de l'écraser.
         if (req.getMetadata() != null || req.getProjects() != null) {
@@ -198,6 +208,29 @@ public class KnowledgeService {
         links.syncFromContent(saved, req.getTags()); // re-sync #tags + [[wikilinks]]
         search.embedNode(saved); // recalcul de l'embedding après édition
         return BrainMapper.toNodeResponse(saved);
+    }
+
+    /**
+     * Valide un nouveau parent pour le deplacement d'une page : meme workspace ({@code requireNode}
+     * leve sinon), pas soi-meme, et <b>aucun cycle</b> (le nouveau parent ne doit pas etre un
+     * descendant de la page deplacee). Retourne l'id du parent valide.
+     */
+    private Long resolveParentForMove(Long nodeId, Long newParentId, Long workspaceId) {
+        if (newParentId.equals(nodeId)) {
+            throw new IllegalArgumentException("Une page ne peut pas etre sa propre parente");
+        }
+        KnowledgeNode parent = access.requireNode(newParentId, workspaceId);
+        // Remonte la chaine des ancetres du nouveau parent : si on retombe sur la page, c'est un cycle.
+        Long cursor = parent.getParentNodeId();
+        int guard = 0;
+        while (cursor != null && guard++ < 10_000) {
+            if (cursor.equals(nodeId)) {
+                throw new IllegalArgumentException("Deplacement invalide : cela creerait un cycle dans l'arbre");
+            }
+            KnowledgeNode ancestor = nodeRepository.findByIdAndWorkspaceId(cursor, workspaceId).orElse(null);
+            cursor = ancestor != null ? ancestor.getParentNodeId() : null;
+        }
+        return parent.getId();
     }
 
     @Transactional
