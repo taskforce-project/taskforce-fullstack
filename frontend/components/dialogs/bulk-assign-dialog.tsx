@@ -1,13 +1,12 @@
 "use client"
 
 import { useState } from "react"
-import { Sparkles, Loader2, Check, Minus, ArrowRight } from "lucide-react"
+import { Sparkles, Loader2, Check, X, RotateCcw } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import { BrandLogo } from "@/components/ui/brand-logo"
-import { Badge } from "@/components/ui/badge"
 import { ShimmerLoader } from "@/components/ui/shimmer-loader"
 import {
   Dialog,
@@ -23,7 +22,6 @@ import { useIssueStore } from "@/lib/store/issue-store"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
 import { smartAssignBulk, type Issue, type SmartAssignCandidate } from "@/lib/api/issue-service"
 
-/** Teinte du badge de score selon la confiance (aligné sur la jauge du panneau Smart Assign). */
 /** Messages du loader Smart Assign en lot (bouclés : compétences / charge / dispo de toute l'équipe). */
 const BULK_ASSIGN_PHASES = [
   "Analyzing the team…",
@@ -32,18 +30,13 @@ const BULK_ASSIGN_PHASES = [
   "Finding the best matches…",
 ]
 
-function scoreTone(score: number): string {
-  if (score >= 70) return "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
-  if (score >= 50) return "bg-amber-500/15 text-amber-600 dark:text-amber-400"
-  return "bg-muted text-muted-foreground"
-}
-
 interface Row {
   issueId: number
   identifier: string
   title: string
   candidate: SmartAssignCandidate
-  selected: boolean
+  /** Ligne exclue du plan (l'utilisateur ne veut pas cette suggestion). */
+  skipped: boolean
 }
 
 interface BulkAssignDialogProps {
@@ -53,7 +46,11 @@ interface BulkAssignDialogProps {
 }
 
 /**
- * Multi-assign (PROD-1.9) : recommande puis assigne en lot toutes les issues non assignées.
+ * Multi-assign (PROD-1.9), refonte Linear-like : au lieu d'un tableau a cocher score-par-score,
+ * on présente un PLAN a valider (issue -> qui). Chaque suggestion (personne ou agent) est proposée ;
+ * on peut écarter une ligne d'un clic ("skip"), puis appliquer tout le reste en une action.
+ * Pas de scores affichés : la reco est une proposition, pas un classement a lire. Cf.
+ * linear.app/docs/assigning-issues.
  */
 export function BulkAssignDialog({ slug, projectId, issues }: BulkAssignDialogProps) {
   const { updateIssue } = useIssueStore()
@@ -65,20 +62,13 @@ export function BulkAssignDialog({ slug, projectId, issues }: BulkAssignDialogPr
   const [rows, setRows] = useState<Row[]>([])
 
   const unassigned = issues.filter((i) => i.assignee == null)
-  const selected = rows.filter((r) => r.selected)
-  const selectedCount = selected.length
-  const allSelected = rows.length > 0 && selectedCount === rows.length
-  // Nb de personnes distinctes visées - rend visible le cas « tout à la même personne »
-  // (charge/skills concentrés). Les agents (A4) sont comptés à part.
+  const active = rows.filter((r) => !r.skipped)
+  const activeCount = active.length
+  // Résumé du plan : personnes distinctes + agents (rend visible "tout a la meme personne").
   const distinctUsers = new Set(
-    selected.filter((r) => r.candidate.kind === "user").map((r) => r.candidate.userId)
+    active.filter((r) => r.candidate.kind === "user").map((r) => r.candidate.userId)
   ).size
-  const agentCount = selected.filter((r) => r.candidate.kind === "agent").length
-
-  function toggleAll() {
-    const next = !allSelected
-    setRows((rs) => rs.map((r) => ({ ...r, selected: next })))
-  }
+  const agentCount = active.filter((r) => r.candidate.kind === "agent").length
 
   async function handleOpenChange(next: boolean) {
     setOpen(next)
@@ -99,7 +89,7 @@ export function BulkAssignDialog({ slug, projectId, issues }: BulkAssignDialogPr
             identifier: issue?.identifier ?? `#${it.issueId}`,
             title: issue?.title ?? "",
             candidate: it.recommended!,
-            selected: true,
+            skipped: false,
           }
         })
       setRows(next2)
@@ -112,18 +102,18 @@ export function BulkAssignDialog({ slug, projectId, issues }: BulkAssignDialogPr
     }
   }
 
-  function toggle(issueId: number) {
-    setRows((rs) => rs.map((r) => (r.issueId === issueId ? { ...r, selected: !r.selected } : r)))
+  function toggleSkip(issueId: number) {
+    setRows((rs) => rs.map((r) => (r.issueId === issueId ? { ...r, skipped: !r.skipped } : r)))
   }
 
   async function applyAll() {
-    if (selected.length === 0) return
+    if (active.length === 0) return
     setApplying(true)
     try {
       // Les stores avalent l'erreur et renvoient null en echec : on compte les retours (pas de catch).
-      // A4 : une reco d'agent est DELEGUEE (delivery), une reco humaine est ASSIGNEE (issue).
+      // Une reco d'agent est DELEGUEE (delivery), une reco humaine est ASSIGNEE (issue).
       const results = await Promise.all(
-        selected.map(async (r) => {
+        active.map(async (r) => {
           if (r.candidate.kind === "agent" && r.candidate.agentKey) {
             const run = await delegate(slug, r.issueId, r.candidate.agentKey)
             return { ok: run != null, agent: true }
@@ -169,10 +159,10 @@ export function BulkAssignDialog({ slug, projectId, issues }: BulkAssignDialogPr
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="size-4 text-primary" /> Smart Assign - unassigned issues
+            <Sparkles className="size-4 text-primary" /> Auto-assign
           </DialogTitle>
           <DialogDescription>
-            Recommendations based on skills, workload and availability. Uncheck the ones to exclude.
+            A suggested assignee for each unassigned issue. Skip any you disagree with, then apply.
           </DialogDescription>
         </DialogHeader>
 
@@ -182,73 +172,74 @@ export function BulkAssignDialog({ slug, projectId, issues }: BulkAssignDialogPr
             <ShimmerLoader phrases={BULK_ASSIGN_PHASES} className="text-xs" />
           </div>
         ) : ran && rows.length > 0 ? (
-          <div className="flex flex-col gap-1.5">
-            {/* Barre d'outils : tout cocher/décocher + résumé (issues sélectionnées · personnes distinctes) */}
-            <div className="flex items-center justify-between gap-2 px-0.5">
-              <button
-                type="button"
-                onClick={toggleAll}
-                className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
-              >
-                <span className={cn(
-                  "flex size-4 items-center justify-center rounded border transition-colors",
-                  allSelected ? "border-primary bg-primary text-primary-foreground"
-                    : selectedCount > 0 ? "border-primary bg-primary/20 text-primary"
-                    : "border-border"
-                )}>
-                  {allSelected ? <Check className="size-3" /> : selectedCount > 0 ? <Minus className="size-3" /> : null}
-                </span>
-                {allSelected ? "Deselect all" : "Select all"}
-              </button>
-              <span className="text-[11px] text-muted-foreground">
-                {selectedCount}/{rows.length} · {distinctUsers} {distinctUsers > 1 ? "people" : "person"}
-                {agentCount > 0 ? ` · ${agentCount} agent${agentCount > 1 ? "s" : ""}` : ""}
-              </span>
-            </div>
-
-            <div className="flex flex-col gap-1 max-h-[50vh] overflow-y-auto pr-0.5">
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-col divide-y divide-border/60 overflow-hidden rounded-lg border border-border">
               {rows.map((r) => {
                 const isAgent = r.candidate.kind === "agent"
                 const name = r.candidate.displayName ?? r.candidate.email ?? "Agent"
+                const first = name.split(" ")[0]
+                const why = r.candidate.reason ?? (r.candidate.factors?.length ? r.candidate.factors.join(" · ") : undefined)
                 return (
-                  <button
+                  <div
                     key={r.issueId}
-                    type="button"
-                    onClick={() => toggle(r.issueId)}
-                    title={r.candidate.factors?.length ? r.candidate.factors.join(" · ") : undefined}
                     className={cn(
-                      "flex items-center gap-2 rounded-md border px-2.5 py-2 text-left transition-colors",
-                      r.selected ? "border-primary/40 bg-primary/5" : "border-border hover:bg-muted/40"
+                      "group flex items-center gap-2 px-3 py-2 transition-colors",
+                      r.skipped ? "bg-muted/20" : "hover:bg-muted/30"
                     )}
                   >
-                    <span className={cn(
-                      "flex size-4 shrink-0 items-center justify-center rounded border",
-                      r.selected ? "border-primary bg-primary text-primary-foreground" : "border-border"
-                    )}>
-                      {r.selected && <Check className="size-3" />}
+                    <span className={cn("w-16 shrink-0 truncate font-mono text-[10px] text-muted-foreground", r.skipped && "opacity-50")}>
+                      {r.identifier}
                     </span>
-                    <span className="text-[10px] font-mono text-muted-foreground w-14 shrink-0 truncate">{r.identifier}</span>
-                    <span className="flex-1 text-xs truncate">{r.title}</span>
-                    <ArrowRight className="size-3 shrink-0 text-muted-foreground/50" />
-                    {isAgent ? (
-                      <span className="flex size-5 shrink-0 items-center justify-center overflow-hidden rounded border border-border bg-muted p-0.5">
-                        <BrandLogo slug={r.candidate.agentLogoKey ?? "sparkles"} name={name} className="size-full" />
+                    <span className={cn("min-w-0 flex-1 truncate text-xs", r.skipped ? "text-muted-foreground line-through" : "text-foreground")}>
+                      {r.title}
+                    </span>
+
+                    {/* Suggestion (personne ou agent). Le "pourquoi" au survol (title). */}
+                    <span
+                      className={cn("flex shrink-0 items-center gap-1.5 rounded-full border py-0.5 pl-0.5 pr-2 transition-opacity",
+                        r.skipped ? "border-transparent opacity-40" : "border-border/70")}
+                      title={why}
+                    >
+                      {isAgent ? (
+                        <span className="flex size-5 items-center justify-center overflow-hidden rounded-full border border-border bg-muted p-0.5">
+                          <BrandLogo slug={r.candidate.agentLogoKey ?? "sparkles"} name={name} className="size-full" />
+                        </span>
+                      ) : (
+                        <UserAvatar
+                          email={r.candidate.email ?? undefined}
+                          name={name}
+                          avatarUrl={r.candidate.avatarUrl}
+                          className="size-5 shrink-0"
+                          fallbackClassName="text-[8px]"
+                        />
+                      )}
+                      <span className="max-w-24 truncate text-xs font-medium text-foreground/90">
+                        {isAgent ? `→ ${first}` : first}
                       </span>
-                    ) : (
-                      <UserAvatar
-                        email={r.candidate.email ?? undefined}
-                        name={name}
-                        avatarUrl={r.candidate.avatarUrl}
-                        className="size-5 shrink-0"
-                        fallbackClassName="text-[8px]"
-                      />
-                    )}
-                    <span className="hidden sm:block text-xs truncate max-w-24">{isAgent ? `→ ${name}` : name}</span>
-                    <Badge className={cn("text-[10px] shrink-0 border-0 tabular-nums", scoreTone(r.candidate.score))}>{r.candidate.score}%</Badge>
-                  </button>
+                    </span>
+
+                    {/* Skip / restaurer : discret (survol) quand inclus, visible quand écarté. */}
+                    <button
+                      type="button"
+                      onClick={() => toggleSkip(r.issueId)}
+                      aria-label={r.skipped ? "Include this issue" : "Skip this issue"}
+                      title={r.skipped ? "Include" : "Skip"}
+                      className={cn(
+                        "flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-all hover:bg-muted hover:text-foreground",
+                        r.skipped ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                      )}
+                    >
+                      {r.skipped ? <RotateCcw className="size-3.5" /> : <X className="size-3.5" />}
+                    </button>
+                  </div>
                 )
               })}
             </div>
+
+            <p className="px-0.5 text-[11px] text-muted-foreground">
+              {activeCount} of {rows.length} · {distinctUsers} {distinctUsers > 1 ? "people" : "person"}
+              {agentCount > 0 ? ` · ${agentCount} agent${agentCount > 1 ? "s" : ""}` : ""}
+            </p>
           </div>
         ) : ran ? (
           <p className="py-8 text-center text-sm text-muted-foreground">No recommendations available.</p>
@@ -260,9 +251,9 @@ export function BulkAssignDialog({ slug, projectId, issues }: BulkAssignDialogPr
           <Button variant="ghost" size="sm" onClick={() => handleOpenChange(false)} disabled={applying}>
             Cancel
           </Button>
-          <Button size="sm" className="gap-1.5" onClick={applyAll} disabled={applying || selectedCount === 0}>
+          <Button size="sm" className="gap-1.5" onClick={applyAll} disabled={applying || activeCount === 0}>
             {applying ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
-            Assign{selectedCount > 0 ? ` ${selectedCount}` : ""}
+            Assign{activeCount > 0 ? ` ${activeCount}` : ""}
           </Button>
         </DialogFooter>
       </DialogContent>
