@@ -107,6 +107,7 @@ export default function OnboardingPage() {
 
   // Étape 3
   const [wsName, setWsName] = useState("");
+  const [activity, setActivity] = useState(""); // « que fait l'entreprise ? » -> Brain OS
   const [inviteInput, setInviteInput] = useState("");
   const [invites, setInvites] = useState<string[]>([]);
 
@@ -214,12 +215,21 @@ export default function OnboardingPage() {
         toast.error("Skills not saved - you can complete them in your profile.");
       }
     }
-    // Renommage du workspace (si changé). Best-effort.
-    if (slug && wsName.trim() && wsName.trim() !== initialWsName.current) {
-      try {
-        await updateWorkspace(slug, { name: wsName.trim() });
-      } catch {
-        /* silencieux */
+    // Espace : nom (si changé) + contexte metier « que fait l'entreprise ? ». L'activite ecrit une
+    // fiche de contexte dans le Brain OS (cote back). Best-effort.
+    if (slug) {
+      const trimmedName = wsName.trim();
+      const trimmedActivity = activity.trim();
+      const nameChanged = trimmedName !== "" && trimmedName !== initialWsName.current;
+      if (nameChanged || trimmedActivity !== "") {
+        try {
+          await updateWorkspace(slug, {
+            ...(nameChanged ? { name: trimmedName } : {}),
+            ...(trimmedActivity ? { activity: trimmedActivity } : {}),
+          });
+        } catch {
+          /* silencieux */
+        }
       }
     }
     // Invitations. Best-effort, une par une.
@@ -505,6 +515,21 @@ export default function OnboardingPage() {
                 onChange={(e) => setWsName(e.target.value)}
                 placeholder="My team"
               />
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-medium" style={{ color: "var(--label-secondary)" }}>
+                What does your company / team do? <span style={{ color: "var(--label-quaternary)" }}>(optional)</span>
+              </span>
+              <Textarea
+                value={activity}
+                onChange={(e) => setActivity(e.target.value)}
+                placeholder="e.g. We build a CRM for independent craftspeople"
+                rows={2}
+                maxLength={500}
+              />
+              <span className="mt-1 block text-xs" style={{ color: "var(--label-quaternary)" }}>
+                One sentence. It feeds your Brain OS so the AI understands your context.
+              </span>
             </label>
             <div>
               <span className="mb-1.5 block text-sm font-medium" style={{ color: "var(--label-secondary)" }}>

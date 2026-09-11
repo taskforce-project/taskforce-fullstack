@@ -34,9 +34,12 @@ import com.taskforce.tf_api.core.model.IssueType;
 import com.taskforce.tf_api.core.model.KnowledgeNode;
 import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.model.User;
+import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.CycleIssueRepository;
 import com.taskforce.tf_api.core.repository.CycleRepository;
 import com.taskforce.tf_api.core.repository.KnowledgeNodeRepository;
+import com.taskforce.tf_api.core.repository.ProjectRepository;
+import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.AiMeter;
 import com.taskforce.tf_api.core.service.KnowledgeService;
 import com.taskforce.tf_api.core.service.LlmClient;
@@ -52,6 +55,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -72,6 +76,8 @@ class BrainIngestionServiceTest {
 
     @Mock private CycleRepository         cycleRepository;
     @Mock private CycleIssueRepository    cycleIssueRepository;
+    @Mock private ProjectRepository       projectRepository;
+    @Mock private WorkspaceRepository     workspaceRepository;
     @Mock private KnowledgeNodeRepository nodeRepository;
     @Mock private KnowledgeService        knowledgeService;
     @Mock private LlmClient               llm;
@@ -80,6 +86,7 @@ class BrainIngestionServiceTest {
 
     private static final Long WS = 7L;
     private static final Long CYCLE_ID = 42L;
+    private static final Long PROJECT_ID = 88L;
 
     @BeforeEach
     void setUp() {
@@ -395,6 +402,165 @@ class BrainIngestionServiceTest {
     private void passThroughMeter() throws Exception {
         when(aiMeter.metered(any(), any()))
             .thenAnswer(inv -> ((AiMeter.AiCall<?>) inv.getArgument(1)).call());
+    }
+
+    // =========================================================================
+    // 3. Fiche projet — ecrite a la creation, sans LLM (contexte deja fourni)
+    // =========================================================================
+
+    @Test
+    @DisplayName("Creation de projet : cree un node NOTE/PROJET rattache au projet (refType=PROJECT)")
+    void should_create_project_node_on_creation() {
+        givenProject("Refonte du site public");
+        when(nodeRepository.findFirstByWorkspaceIdAndRefTypeAndRefId(WS, NodeRefType.PROJECT, PROJECT_ID))
+            .thenReturn(Optional.empty());
+
+        service.writeProjectNode("taskforce-demo", WS, 1L, PROJECT_ID);
+
+        CreateKnowledgeNodeRequest req = captureCreate();
+        assertThat(req.getType()).isEqualTo("NOTE");
+        assertThat(req.getDomain()).isEqualTo("PROJET");
+        assertThat(req.getRefType()).isEqualTo("PROJECT");
+        assertThat(req.getRefId()).isEqualTo(PROJECT_ID);
+        assertThat(req.getTitle()).isEqualTo("Projet - Refonte Web (WEB)");
+        assertThat(req.getTags()).contains("project", "contexte", "ingestion-auto");
+        assertThat(req.getContent()).contains("Refonte du site public");
+        // metadata.projects ancre la region du projet dans le graphe (Phase 4ter)
+        assertThat(req.getMetadata()).containsEntry("projects", List.of(PROJECT_ID));
+    }
+
+    @Test
+    @DisplayName("Aucun LLM n'est appele pour une fiche projet (le contexte est deja ecrit)")
+    void should_not_call_llm_for_project_node() {
+        givenProject("desc");
+        when(nodeRepository.findFirstByWorkspaceIdAndRefTypeAndRefId(WS, NodeRefType.PROJECT, PROJECT_ID))
+            .thenReturn(Optional.empty());
+
+        service.writeProjectNode("taskforce-demo", WS, 1L, PROJECT_ID);
+
+        verifyNoInteractions(llm);
+    }
+
+    @Test
+    @DisplayName("Rejouer la creation met a jour la fiche au lieu d'empiler un doublon")
+    void should_update_project_node_when_existing() {
+        givenProject("desc");
+        KnowledgeNode existing = mock(KnowledgeNode.class);
+        when(existing.getId()).thenReturn(555L);
+        when(nodeRepository.findFirstByWorkspaceIdAndRefTypeAndRefId(WS, NodeRefType.PROJECT, PROJECT_ID))
+            .thenReturn(Optional.of(existing));
+
+        service.writeProjectNode("taskforce-demo", WS, 1L, PROJECT_ID);
+
+        verify(knowledgeService, never()).createNode(anyString(), any(), any());
+        ArgumentCaptor<UpdateKnowledgeNodeRequest> captor = ArgumentCaptor.forClass(UpdateKnowledgeNodeRequest.class);
+        verify(knowledgeService).updateNode(eq("taskforce-demo"), eq(555L), eq(1L), captor.capture());
+        assertThat(captor.getValue().getTitle()).isEqualTo("Projet - Refonte Web (WEB)");
+    }
+
+    @Test
+    @DisplayName("Un projet supprime avant l'ecriture n'ecrit rien")
+    void should_write_nothing_when_project_vanished() {
+        when(projectRepository.findById(PROJECT_ID)).thenReturn(Optional.empty());
+
+        service.writeProjectNode("taskforce-demo", WS, 1L, PROJECT_ID);
+
+        verify(knowledgeService, never()).createNode(anyString(), any(), any());
+        verify(knowledgeService, never()).updateNode(anyString(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Sans description, la fiche note « non renseignee » sans casser")
+    void should_tolerate_missing_project_description() {
+        givenProject(null);
+        when(nodeRepository.findFirstByWorkspaceIdAndRefTypeAndRefId(WS, NodeRefType.PROJECT, PROJECT_ID))
+            .thenReturn(Optional.empty());
+
+        service.writeProjectNode("taskforce-demo", WS, 1L, PROJECT_ID);
+
+        assertThat(captureCreate().getContent()).contains("(non renseignee)");
+    }
+
+    /** Projet mocke rattache a {@link #projectRepository} ; description variable (peut etre null). */
+    private Project givenProject(String description) {
+        Project p = mock(Project.class);
+        when(p.getId()).thenReturn(PROJECT_ID);
+        when(p.getName()).thenReturn("Refonte Web");
+        when(p.getIdentifier()).thenReturn("WEB");
+        when(p.getDescription()).thenReturn(description);
+        when(p.getRepoFullName()).thenReturn(null);
+        when(projectRepository.findById(PROJECT_ID)).thenReturn(Optional.of(p));
+        return p;
+    }
+
+    // =========================================================================
+    // 4. Fiche de contexte de l'espace — « que fait l'entreprise ? », sans LLM
+    // =========================================================================
+
+    @Test
+    @DisplayName("Activite renseignee : cree un node NOTE/PRODUIT transverse (refType=WORKSPACE)")
+    void should_create_workspace_context_node() {
+        givenWorkspace("On construit un CRM pour artisans");
+        when(nodeRepository.findFirstByWorkspaceIdAndRefTypeAndRefId(WS, NodeRefType.WORKSPACE, WS))
+            .thenReturn(Optional.empty());
+
+        service.writeWorkspaceNode("taskforce-demo", WS, 1L);
+
+        CreateKnowledgeNodeRequest req = captureCreate();
+        assertThat(req.getType()).isEqualTo("NOTE");
+        assertThat(req.getDomain()).isEqualTo("PRODUIT");
+        assertThat(req.getRefType()).isEqualTo("WORKSPACE");
+        assertThat(req.getRefId()).isEqualTo(WS);
+        assertThat(req.getTitle()).isEqualTo("Contexte - Acme");
+        assertThat(req.getContent()).contains("On construit un CRM pour artisans");
+        assertThat(req.getTags()).contains("contexte", "entreprise", "ingestion-auto");
+        // Node transverse : pas d'appartenance projet -> il reste dans la « Base commune » du graphe.
+        assertThat(req.getMetadata()).doesNotContainKey("projects");
+    }
+
+    @Test
+    @DisplayName("Activite vide : aucune fiche ecrite (rien a dire)")
+    void should_skip_workspace_node_when_activity_blank() {
+        givenWorkspace("   ");
+
+        service.writeWorkspaceNode("taskforce-demo", WS, 1L);
+
+        verify(knowledgeService, never()).createNode(anyString(), any(), any());
+        verify(knowledgeService, never()).updateNode(anyString(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Rejouer met a jour la fiche de contexte au lieu d'empiler un doublon")
+    void should_update_workspace_node_when_existing() {
+        givenWorkspace("Activite mise a jour");
+        KnowledgeNode existing = mock(KnowledgeNode.class);
+        when(existing.getId()).thenReturn(777L);
+        when(nodeRepository.findFirstByWorkspaceIdAndRefTypeAndRefId(WS, NodeRefType.WORKSPACE, WS))
+            .thenReturn(Optional.of(existing));
+
+        service.writeWorkspaceNode("taskforce-demo", WS, 1L);
+
+        verify(knowledgeService, never()).createNode(anyString(), any(), any());
+        verify(knowledgeService).updateNode(eq("taskforce-demo"), eq(777L), eq(1L), any());
+    }
+
+    @Test
+    @DisplayName("Un espace supprime avant l'ecriture n'ecrit rien")
+    void should_write_nothing_when_workspace_vanished() {
+        when(workspaceRepository.findById(WS)).thenReturn(Optional.empty());
+
+        service.writeWorkspaceNode("taskforce-demo", WS, 1L);
+
+        verify(knowledgeService, never()).createNode(anyString(), any(), any());
+    }
+
+    /** Espace mocke rattache a {@link #workspaceRepository} ; activite variable (peut etre vide). */
+    private Workspace givenWorkspace(String activity) {
+        Workspace w = mock(Workspace.class);
+        lenient().when(w.getName()).thenReturn("Acme");
+        when(w.getActivity()).thenReturn(activity);
+        when(workspaceRepository.findById(WS)).thenReturn(Optional.of(w));
+        return w;
     }
 
     private void givenNoExistingNode() {

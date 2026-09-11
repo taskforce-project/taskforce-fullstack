@@ -57,6 +57,7 @@ export function WorkspaceSwitcher() {
 
   const [dialogOpen, setDialogOpen] = React.useState(false)
   const [newName, setNewName] = React.useState("")
+  const [newActivity, setNewActivity] = React.useState("")
   const [newTemplate, setNewTemplate] = React.useState("BLANK")
   const [creating, setCreating] = React.useState(false)
 
@@ -76,13 +77,18 @@ export function WorkspaceSwitcher() {
   const handleCreate = async () => {
     if (!newName.trim()) return
     setCreating(true)
-    const workspace = await createWorkspace({ name: newName.trim(), brainTemplate: newTemplate })
+    const workspace = await createWorkspace({
+      name: newName.trim(),
+      activity: newActivity.trim() || undefined,
+      brainTemplate: newTemplate,
+    })
     setCreating(false)
     // createWorkspace avale l'erreur et renvoie null : sans ce toast, un echec (ex. quota de
     // creation atteint) ne donnait AUCUN retour (le dialog restait ouvert, spinner arrete).
     if (workspace) {
       setDialogOpen(false)
       setNewName("")
+      setNewActivity("")
       setNewTemplate("BLANK")
       router.push(`/${workspace.slug}/dashboard`)
     } else {
@@ -225,6 +231,17 @@ export function WorkspaceSwitcher() {
                 onKeyDown={(e) => e.key === "Enter" && handleCreate()}
                 autoFocus
               />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="workspace-activity">{t.shell.workspaceActivity}</Label>
+              <Input
+                id="workspace-activity"
+                placeholder={t.shell.workspaceActivityPlaceholder}
+                value={newActivity}
+                onChange={(e) => setNewActivity(e.target.value)}
+                maxLength={500}
+              />
+              <p className="text-xs text-muted-foreground">{t.shell.workspaceActivityHint}</p>
             </div>
             <div className="space-y-1">
               <Label htmlFor="workspace-template">{t.shell.brainTemplate}</Label>

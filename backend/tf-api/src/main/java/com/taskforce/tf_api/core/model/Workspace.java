@@ -68,6 +68,11 @@ public class Workspace {
     @Column(name = "logo_url", length = 1000)
     private String logoUrl;
 
+    /** Contexte metier (« que fait l'entreprise / equipe ? »), capte a l'onboarding / creation.
+     *  Alimente une fiche de contexte dans le Brain OS. Nullable. */
+    @Column(length = 500)
+    private String activity;
+
     /**
      * Opt-in RGPD : capture du corpus d'apprentissage IA ({@code ai_generations}) pour ce workspace.
      * Defaut OFF - rien n'est capture tant que le workspace ne l'active pas (data flywheel).
