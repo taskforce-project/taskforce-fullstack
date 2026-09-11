@@ -64,6 +64,18 @@ public class SmartAssignService {
     private static final Set<String> HUMAN_ONLY_LABELS = Set.of(
         "design", "research", "spec", "decision", "architecture", "discovery", "ux",
         "planning", "strategy", "rfc", "proposal", "product");
+    // Mots du TITRE/description qui trahissent un travail mécanique quand aucun label ne le dit
+    // (beaucoup d'issues n'ont pas de label mais un titre explicite, ex. "Bug: ..." / "Fix ..."). Match
+    // par TOKEN (pas substring) -> pas de faux positif "prefix"->"fix".
+    private static final Set<String> AGENT_FRIENDLY_KEYWORDS = Set.of(
+        "bug", "bugfix", "hotfix", "fix", "fixes", "fixed", "typo", "refactor", "cleanup",
+        "rename", "docs", "documentation", "test", "tests", "lint", "format", "chore",
+        "bump", "upgrade", "dependency", "dependencies", "boilerplate", "scaffold");
+    // Mots du TITRE/description qui trahissent un travail de jugement humain -> malus (pas un veto dur :
+    // le texte libre est plus bruité qu'un label ; seul un LABEL humain veto).
+    private static final Set<String> HUMAN_ONLY_KEYWORDS = Set.of(
+        "design", "redesign", "research", "architecture", "strategy", "strategic",
+        "proposal", "roadmap", "wireframe", "brainstorm", "discovery");
     /** Au-dessus : l'agent est recommandé (top) ; l'humain passe en alternative. */
     private static final int AGENT_RECOMMEND_THRESHOLD = 65;
     /** Entre les deux : l'agent est proposé en alternative (l'humain reste recommandé). */
@@ -229,7 +241,7 @@ public class SmartAssignService {
         // A3 : la tâche se prête-t-elle a une délégation a un agent (bien cadree, faible risque) ? Si oui
         // et qu'un agent est disponible, l'agent devient un candidat (recommande ou alternative).
         SmartAssignCandidateResponse agent = considerAgents
-            ? buildAgentCandidate(project, issueLabels, priority, issueStoryPoints, hasSpec) : null;
+            ? buildAgentCandidate(project, issueLabels, issueText, priority, issueStoryPoints, hasSpec) : null;
 
         List<User> candidates = resolveCandidates(workspace, project);
         if (candidates.isEmpty()) {
@@ -310,10 +322,10 @@ public class SmartAssignService {
      * Construit le candidat "agent" si la tâche s'y prête et qu'un agent est disponible, sinon null.
      * Score = adéquation de la TÂCHE a une délégation (indépendant des humains).
      */
-    private SmartAssignCandidateResponse buildAgentCandidate(Project project, List<String> labels,
+    private SmartAssignCandidateResponse buildAgentCandidate(Project project, List<String> labels, String issueText,
                                                              IssuePriority priority, Integer points, boolean hasSpec) {
         boolean repoLinked = project != null && project.getRepoFullName() != null && !project.getRepoFullName().isBlank();
-        int suitability = agentSuitability(labels, priority, points, hasSpec, repoLinked);
+        int suitability = agentSuitability(labels, issueText, priority, points, hasSpec, repoLinked);
         if (suitability < AGENT_ALTERNATIVE_THRESHOLD) {
             return null;
         }
@@ -322,6 +334,9 @@ public class SmartAssignService {
             return null;
         }
         List<String> factors = new ArrayList<>();
+        boolean mechanical = (labels != null && labels.stream().anyMatch(AGENT_FRIENDLY_LABELS::contains))
+            || textTokens(issueText).stream().anyMatch(AGENT_FRIENDLY_KEYWORDS::contains);
+        if (mechanical) factors.add("Routine change");
         if (hasSpec) factors.add("Well specified");
         if (points == null || points <= 3) factors.add("Small scope");
         if (priority != IssuePriority.URGENT && priority != IssuePriority.HIGH) factors.add("Low risk");
@@ -346,18 +361,25 @@ public class SmartAssignService {
     /**
      * Adéquation d'une tâche a une délégation a un agent (0-100). Statique et pure -> testable.
      * Un label « humain » (design/décision/recherche...) veto (0). Sinon : base 50, bonus si labels
-     * mécaniques, si spec présente, si petit scope, si dépôt lié ; malus si urgent/important, gros scope,
-     * ou pas de spec.
+     * mécaniques (ou, a défaut de label, un titre/description mécanique), si spec présente, si petit
+     * scope, si dépôt lié ; malus si urgent/important, gros scope, pas de spec, ou texte de jugement humain.
+     *
+     * @param issueText titre + description (les labels y sont ignorés : ils sont déja pris via {@code labels}).
      */
-    static int agentSuitability(List<String> labels, IssuePriority priority, Integer points,
+    static int agentSuitability(List<String> labels, String issueText, IssuePriority priority, Integer points,
                                 boolean hasSpec, boolean repoLinked) {
         Set<String> ls = labels == null ? Set.of() : new HashSet<>(labels);
         for (String l : ls) {
-            if (HUMAN_ONLY_LABELS.contains(l)) return 0; // jugement humain requis
+            if (HUMAN_ONLY_LABELS.contains(l)) return 0; // jugement humain requis (label = signal fort)
         }
+        Set<String> tokens = textTokens(issueText);
         int s = 50;
         long friendly = ls.stream().filter(AGENT_FRIENDLY_LABELS::contains).count();
-        s += Math.min(30, (int) friendly * 15);
+        int friendlyBonus = Math.min(30, (int) friendly * 15);
+        // Pas de label mécanique mais le titre/description en parle (ex. "Bug: ..." sans label bug) : +15.
+        if (friendly == 0 && tokens.stream().anyMatch(AGENT_FRIENDLY_KEYWORDS::contains)) friendlyBonus = 15;
+        s += friendlyBonus;
+        if (tokens.stream().anyMatch(HUMAN_ONLY_KEYWORDS::contains)) s -= 20; // "design/architecture..." en texte libre
         s += hasSpec ? 15 : -20;
         if (points == null || points <= 3) s += 10;
         else if (points >= 8) s -= 25;
@@ -365,6 +387,16 @@ public class SmartAssignService {
         else if (priority == IssuePriority.HIGH) s -= 10;
         if (repoLinked) s += 10;
         return Math.max(0, Math.min(100, s));
+    }
+
+    /** Tokens minuscules d'un texte libre (titre/description) - découpe sur tout ce qui n'est pas alphanum. */
+    private static Set<String> textTokens(String text) {
+        if (text == null || text.isBlank()) return Set.of();
+        Set<String> out = new HashSet<>();
+        for (String t : text.toLowerCase().split("[^a-z0-9]+")) {
+            if (!t.isEmpty()) out.add(t);
+        }
+        return out;
     }
 
     /** Choisit le provider d'agent disponible le mieux adapté (ordre de préférence selon le dépôt lié). */
