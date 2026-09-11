@@ -34,6 +34,9 @@ public class CreateKnowledgeNodeRequest {
     private String refType;     // NodeRefType
     private Long refId;
 
+    /** Page parente (arbre facon Notion) ; null = page racine (au niveau du domaine). */
+    private Long parentNodeId;
+
     /** Tags explicites (les #tags du contenu sont aussi détectés automatiquement). */
     private List<String> tags;
 
