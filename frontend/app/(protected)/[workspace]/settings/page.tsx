@@ -785,6 +785,7 @@ function WorkspacePanel() {
   const currentUser = useUserStore((s) => s.user)
   const [name,        setName]        = useState(activeWorkspace?.name ?? "")
   const [description, setDescription] = useState(activeWorkspace?.description ?? "")
+  const [activity,    setActivity]    = useState(activeWorkspace?.activity ?? "")
   const [saving, setSaving] = useState(false)
 
   const isOwner = !!activeWorkspace && activeWorkspace.ownerId === Number(currentUser?.id)
@@ -804,15 +805,17 @@ function WorkspacePanel() {
     if (activeWorkspace) {
       setName(activeWorkspace.name)
       setDescription(activeWorkspace.description ?? "")
+      setActivity(activeWorkspace.activity ?? "")
     }
   }, [activeWorkspace])
 
   async function handleSave() {
     setSaving(true)
     try {
-      const payload: { name?: string; description?: string } = {}
+      const payload: { name?: string; description?: string; activity?: string } = {}
       if (name !== activeWorkspace?.name)                       payload.name        = name
       if (description !== (activeWorkspace?.description ?? "")) payload.description = description
+      if (activity !== (activeWorkspace?.activity ?? ""))      payload.activity    = activity
       if (Object.keys(payload).length === 0) { toast.info("No changes to save"); return }
       // updateWorkspaceInfo avale l'erreur et renvoie null : on branche sur le retour
       // (sinon "Workspace updated" s'affiche meme quand l'ecriture a echoue).
@@ -846,6 +849,16 @@ function WorkspacePanel() {
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Describe your workspace…"
               rows={3}
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all resize-none"
+            />
+          </FormField>
+          <FormField label="Activity" hint="What does your company / team do? Feeds the Brain OS so the AI knows your context.">
+            <textarea
+              value={activity}
+              onChange={(e) => setActivity(e.target.value)}
+              placeholder="e.g. We build a CRM for independent craftspeople"
+              rows={2}
+              maxLength={500}
               className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all resize-none"
             />
           </FormField>

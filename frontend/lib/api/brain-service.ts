@@ -111,6 +111,19 @@ export async function updateNode(slug: string, nodeId: number, input: UpdateNode
   return res.data.data
 }
 
+/**
+ * Déplace une page dans l'arbre (drag-to-nest). `parentNodeId` null = racine du domaine (explicite).
+ * `domain` optionnel = garde la cohérence quand on déplace sous une page d'un autre domaine.
+ */
+export async function moveNode(
+  slug: string, nodeId: number, parentNodeId: number | null, domain?: string,
+): Promise<KnowledgeNode> {
+  const res = await apiClient.patch<{ data: KnowledgeNode }>(
+    BRAIN_ROUTES.NODE_MOVE(slug, nodeId), { parentNodeId, domain },
+  )
+  return res.data.data
+}
+
 /** Supprime un node (les relations sont supprimées en cascade côté backend). */
 export async function deleteNode(slug: string, nodeId: number): Promise<void> {
   await apiClient.delete(BRAIN_ROUTES.NODE(slug, nodeId))

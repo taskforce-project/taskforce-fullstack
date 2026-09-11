@@ -467,6 +467,7 @@ export const BRAIN_ROUTES = {
   SEARCH:      (slug: string) => `/api/workspaces/${slug}/brain/search`,
   NODES:       (slug: string) => `/api/workspaces/${slug}/brain/nodes`,
   NODE:        (slug: string, nodeId: number) => `/api/workspaces/${slug}/brain/nodes/${nodeId}`,
+  NODE_MOVE:   (slug: string, nodeId: number) => `/api/workspaces/${slug}/brain/nodes/${nodeId}/move`,
   EDGES:       (slug: string) => `/api/workspaces/${slug}/brain/edges`,
   EDGE:        (slug: string, edgeId: number) => `/api/workspaces/${slug}/brain/edges/${edgeId}`,
   FILES:       (slug: string) => `/api/workspaces/${slug}/brain/files`,

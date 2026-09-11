@@ -12,6 +12,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.taskforce.tf_api.core.dto.request.CreateKnowledgeNodeRequest;
+import com.taskforce.tf_api.core.dto.request.MoveNodeRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateKnowledgeNodeRequest;
 import com.taskforce.tf_api.core.dto.response.KnowledgeNodeResponse;
 import com.taskforce.tf_api.core.enums.NodeDomain;
@@ -132,6 +133,35 @@ class KnowledgeServiceTest {
             .isInstanceOf(IllegalArgumentException.class);
 
         verify(nodeRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("moveNode : deplacer sous une page pose le parent + aligne le domaine")
+    void move_under_page_sets_parent_and_domain() {
+        workspace();
+        KnowledgeNode target = node(10L, null);
+        when(access.requireNode(10L, WS)).thenReturn(target);
+        when(access.requireNode(20L, WS)).thenReturn(node(20L, null));
+        when(nodeRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        service.moveNode(SLUG, 10L, USER, MoveNodeRequest.builder().parentNodeId(20L).domain("ENGINEERING").build());
+
+        assertThat(target.getParentNodeId()).isEqualTo(20L);
+        assertThat(target.getDomain()).isEqualTo(NodeDomain.ENGINEERING);
+    }
+
+    @Test
+    @DisplayName("moveNode : parentNodeId null = remonter a la racine du domaine (parent efface)")
+    void move_to_root_clears_parent() {
+        workspace();
+        KnowledgeNode target = node(10L, 99L); // avait un parent
+        when(access.requireNode(10L, WS)).thenReturn(target);
+        when(nodeRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        service.moveNode(SLUG, 10L, USER, MoveNodeRequest.builder().parentNodeId(null).build());
+
+        assertThat(target.getParentNodeId()).isNull();
+        assertThat(target.getDomain()).isEqualTo(NodeDomain.PROJET); // domaine inchange (req.domain null)
     }
 
     @Test

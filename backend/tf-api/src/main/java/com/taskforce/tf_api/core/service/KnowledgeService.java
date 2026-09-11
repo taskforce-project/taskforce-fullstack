@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.taskforce.tf_api.core.dto.request.CreateKnowledgeEdgeRequest;
 import com.taskforce.tf_api.core.dto.request.CreateKnowledgeNodeRequest;
+import com.taskforce.tf_api.core.dto.request.MoveNodeRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateKnowledgeNodeRequest;
 import com.taskforce.tf_api.core.dto.response.BrainOverviewResponse;
 import com.taskforce.tf_api.core.dto.response.KnowledgeEdgeResponse;
@@ -231,6 +232,25 @@ public class KnowledgeService {
             cursor = ancestor != null ? ancestor.getParentNodeId() : null;
         }
         return parent.getId();
+    }
+
+    /**
+     * Deplace une page dans l'arbre (drag-to-nest). {@code parentNodeId} null = racine du domaine
+     * (explicite, contrairement a updateNode). Reutilise la garde anti-cycle. Deplacement purement
+     * STRUCTUREL : contenu/tags inchanges -> ni re-embed ni re-sync des liens.
+     */
+    @Transactional
+    public KnowledgeNodeResponse moveNode(String slug, Long nodeId, Long userId, MoveNodeRequest req) {
+        Workspace ws = access.resolveAndAuthorize(slug, userId);
+        KnowledgeNode node = access.requireNode(nodeId, ws.getId());
+        node.setParentNodeId(req.getParentNodeId() != null
+            ? resolveParentForMove(nodeId, req.getParentNodeId(), ws.getId())
+            : null);
+        if (req.getDomain() != null) {
+            node.setDomain(BrainEnums.domain(req.getDomain()));
+        }
+        node.setUpdatedBy(String.valueOf(userId));
+        return BrainMapper.toNodeResponse(nodeRepository.save(node));
     }
 
     @Transactional

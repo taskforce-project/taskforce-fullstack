@@ -70,7 +70,7 @@ export default function BrainPage() {
   const slug = typeof params?.workspace === "string" ? params.workspace : ""
 
   const {
-    overview, loading, error, selectedNodeId, fetchOverview, selectNode, removeNode,
+    overview, loading, error, selectedNodeId, fetchOverview, selectNode, removeNode, moveNode,
     searchResults, searching, search, clearSearch,
   } = useBrainStore()
   const projects = useProjectStore((s) => s.projects)
@@ -138,6 +138,13 @@ export default function BrainPage() {
   const handleNewPage = (domain: string, parentId: number | null) => {
     setCreatePreset({ domain, parentId })
     setCreateOpen(true)
+  }
+  // Drag-to-nest : deplacer une page sous une autre (ou a la racine d'un domaine). Le store avale
+  // l'erreur (ex. cycle refuse par le back) et renvoie null -> on branche sur le retour.
+  const handleMovePage = async (nodeId: number, parentId: number | null, domain: string) => {
+    const res = await moveNode(slug, nodeId, parentId, domain)
+    if (res) toast.success("Page moved")
+    else toast.error("Couldn't move the page")
   }
 
   return (
@@ -264,6 +271,7 @@ export default function BrainPage() {
                     activeTag={activeTag}
                     onSelect={(id) => { selectNode(id); setView("editor") }}
                     onNewPage={handleNewPage}
+                    onMove={handleMovePage}
                   />
 
                   {/* Tags : cliquer pour filtrer l'explorateur */}
