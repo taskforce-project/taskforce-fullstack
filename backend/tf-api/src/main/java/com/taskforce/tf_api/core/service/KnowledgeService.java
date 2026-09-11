@@ -1,9 +1,12 @@
 package com.taskforce.tf_api.core.service;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -56,7 +59,7 @@ public class KnowledgeService {
     private final BrainLinkService         links;
 
     /** Plafond de nodes/arêtes renvoyés dans la vue d'ensemble (protège le payload + le rendu). */
-    private static final int OVERVIEW_CAP = 1000;
+    private static final int OVERVIEW_CAP = 2000;
 
     /**
      * Slugs d'espaces de démo qui s'amorcent avec le gabarit TASKFORCE (riche, dérivé des projets réels)
@@ -121,7 +124,7 @@ public class KnowledgeService {
         }
 
         // Borne le payload : au-delà du plafond, on tronque (totalNodes reflète le vrai total).
-        List<KnowledgeNode> nodes = allNodes.size() > OVERVIEW_CAP ? allNodes.subList(0, OVERVIEW_CAP) : allNodes;
+        List<KnowledgeNode> nodes = capStructureAware(allNodes, OVERVIEW_CAP);
         List<KnowledgeEdge> edges = allEdges.size() > OVERVIEW_CAP ? allEdges.subList(0, OVERVIEW_CAP) : allEdges;
 
         return BrainOverviewResponse.builder()
@@ -134,6 +137,30 @@ public class KnowledgeService {
             .nodes(nodes.stream().map(BrainMapper::toNodeResponse).toList())
             .edges(edges.stream().map(BrainMapper::toEdgeResponse).toList())
             .build();
+    }
+
+    /**
+     * Tronque en préservant le SQUELETTE de containment. Sous le plafond, renvoie tout ; au-delà, garde
+     * d'abord tous les nœuds « conteneurs » (référencés comme {@code parentNodeId} par un autre : hub,
+     * espace, projets, systèmes…) puis complète avec les feuilles jusqu'au plafond. Sans ça, un tri par
+     * domaine peut éjecter le hub/les projets (domaine PROJET tardif) au-delà du plafond → l'arbre et le
+     * graphe perdent leur ossature (tout devient orphelin). L'ordre d'entrée (domaine, titre) est conservé.
+     */
+    static List<KnowledgeNode> capStructureAware(List<KnowledgeNode> ordered, int cap) {
+        if (ordered.size() <= cap) return ordered;
+        Set<Long> containerIds = new HashSet<>();
+        for (KnowledgeNode n : ordered) {
+            if (n.getParentNodeId() != null) containerIds.add(n.getParentNodeId());
+        }
+        List<KnowledgeNode> kept = new ArrayList<>(cap);
+        for (KnowledgeNode n : ordered) {                     // 1re passe : l'ossature, toujours retenue
+            if (containerIds.contains(n.getId())) kept.add(n);
+        }
+        for (KnowledgeNode n : ordered) {                     // 2e passe : les feuilles, jusqu'au plafond
+            if (kept.size() >= cap) break;
+            if (!containerIds.contains(n.getId())) kept.add(n);
+        }
+        return kept;
     }
 
     /** Réinitialise et réamorce le brain avec un gabarit (OWNER/ADMIN). Destructif. */

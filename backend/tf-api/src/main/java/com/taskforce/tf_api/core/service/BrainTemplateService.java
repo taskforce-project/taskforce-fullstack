@@ -63,9 +63,9 @@ public class BrainTemplateService {
      * Le hub central « Brain OS » porte le contexte global ; chaque projet a son README + ses notes
      * (backlog, fait, problèmes, décisions, archi, runbook) rattachées via {@code refId}.
      */
-    public List<SeedNode> nodesFor(BrainTemplateType template, List<ProjectRef> projects) {
+    public List<SeedNode> nodesFor(BrainTemplateType template, List<ProjectRef> projects, String workspaceName) {
         if (template == BrainTemplateType.TASKFORCE && projects != null && !projects.isEmpty()) {
-            return taskforceProjectSeed(projects);
+            return taskforceProjectSeed(projects, workspaceName);
         }
         return nodesFor(template);
     }
@@ -74,26 +74,46 @@ public class BrainTemplateService {
     // TASKFORCE (par projet) — Brain OS global + 1 cluster de notes par projet
     // =========================================================================
 
-    private List<SeedNode> taskforceProjectSeed(List<ProjectRef> projects) {
+    private List<SeedNode> taskforceProjectSeed(List<ProjectRef> projects, String workspaceName) {
         List<SeedNode> n = new ArrayList<>();
         String agentsTitle = "AGENTS — contrat d'agent";
+        String wsName = workspaceName != null && !workspaceName.isBlank() ? workspaceName.trim() : "Workspace";
+        String transverseTitle = "Socle transverse";
 
-        // ── Hub global : contexte workspace + un lien par projet ─────────────────
-        StringBuilder hub = new StringBuilder();
-        hub.append("# 🧠 Brain OS — TaskForce\n\n")
-           .append("Mémoire vivante du workspace. Le **contexte global** est ici ; chaque **projet** ouvre sa propre dimension.\n\n")
-           .append("> [!tip] Méthode\n> Règles de tenue dans [[").append(agentsTitle).append("]] (appliquées par l'agent IA).\n\n")
-           .append("## Global\n")
-           .append("- [[Charte & conventions]]\n- [[Architecture transverse]]\n- [[Sécurité — politique]]\n")
-           .append("- [[Stack & infra commune]]\n- [[Roadmap workspace]]\n\n")
-           .append("## Projets\n");
-        for (ProjectRef p : projects) hub.append("- [[").append(p.name()).append("]]\n");
-        // Le hub est la RACINE du brain de l'espace (cle "hub") : docs globaux et projets s'y rattachent
-        // par parentKey -> vraie hierarchie Brain OS > Workspace > Projets > notes (pas juste des wikilinks).
-        n.add(new SeedNode(NodeDomain.PROJET, NodeType.README, "Brain OS", hub.toString(), false, null, "hub", null));
+        // ── Racine : Brain OS -> 1 dossier par espace -> (Transverse + projets). ──
+        // La hierarchie de containment (parentKey -> parentNodeId) EST le modele : Brain OS (racine) abrite
+        // l'espace, l'espace abrite le socle transverse ET un dossier par projet, chaque projet son archi.
+        n.add(new SeedNode(NodeDomain.PROJET, NodeType.README, "Brain OS", ("""
+            # 🧠 Brain OS
+
+            Memoire vivante du compte. Chaque **espace de travail** ouvre sa propre dimension ; ici, [[%s]].
+
+            > [!tip] Methode
+            > Regles de tenue dans [[%s]] (appliquees par l'agent IA).""")
+            .formatted(wsName, agentsTitle),
+            false, null, "hub", null));
         n.add(new SeedNode(NodeDomain.PROJET, NodeType.SOP, agentsTitle, agentsContract(), true));
 
-        // ── Docs globaux (refId null → cluster « global » autour du hub) ─────────
+        // Dossier d'espace (enfant de la racine) : contexte global + un lien par projet.
+        StringBuilder ws = new StringBuilder();
+        ws.append("# ").append(wsName).append("\n\n")
+          .append("Espace de travail. Le **socle transverse** est dans [[").append(transverseTitle).append("]] ; ")
+          .append("chaque **projet** a sa propre galaxie.\n\n")
+          .append("## Projets\n");
+        for (ProjectRef p : projects) ws.append("- [[").append(p.name()).append("]]\n");
+        n.add(new SeedNode(NodeDomain.PROJET, NodeType.README, wsName, ws.toString(), false, null, "ws", "hub"));
+
+        // Dossier « socle transverse » de l'espace : les docs communs a tous les projets s'y rangent.
+        n.add(new SeedNode(NodeDomain.ARCHITECTURE, NodeType.README, transverseTitle, ("""
+            # Socle transverse
+
+            Commun a tous les projets de **%s** : architecture, securite, infra, roadmap.
+
+            - [[Charte & conventions]] · [[Architecture transverse]] · [[Sécurité — politique]]
+            - [[Stack & infra commune]] · [[Roadmap workspace]]""").formatted(wsName),
+            false, null, "ws:transverse", "ws"));
+
+        // ── Docs globaux (socle transverse de l'espace, refId null). ─────────────
         n.add(new SeedNode(NodeDomain.PROJET, NodeType.DOC, "Charte & conventions", """
             # Charte & conventions #convention
 
@@ -104,29 +124,34 @@ public class BrainTemplateService {
             - DB = migrations Flyway `V{n}__…` ; `ddl-auto=validate`.
             - Pas de mock, TS strict, un store Zustand par domaine.
 
-            Hub : [[Brain OS]] · Règles : [[%s]]""".formatted(agentsTitle)));
+            Socle : [[%s]] · Règles : [[%s]]""".formatted(transverseTitle, agentsTitle),
+            false, null, "g:charte", "ws:transverse"));
         n.add(new SeedNode(NodeDomain.ARCHITECTURE, NodeType.DOC, "Architecture transverse", """
             # Architecture transverse #archi
 
             Services joints par nom Docker (`http://backend:8080`). Postgres + pgvector(384) pour le Brain OS.
             Auth JWT, autorisation au niveau service (`WorkspaceMember`/`ProjectMember`).
 
-            Voir aussi : [[Stack & infra commune]] · [[Sécurité — politique]]"""));
+            Voir aussi : [[Stack & infra commune]] · [[Sécurité — politique]]""",
+            false, null, "g:archi", "ws:transverse"));
         n.add(new SeedNode(NodeDomain.SECURITE, NodeType.SOP, "Sécurité — politique", """
             # Sécurité — politique #securite
 
             Secrets via variables d'env (jamais en dur). Validation `@Valid` (back) / Zod (front).
-            Revue de sécurité avant release. Voir [[Architecture transverse]]."""));
+            Revue de sécurité avant release. Voir [[Architecture transverse]].""",
+            false, null, "g:secu", "ws:transverse"));
         n.add(new SeedNode(NodeDomain.INFRA, NodeType.DOC, "Stack & infra commune", """
             # Stack & infra commune #infra
 
             Docker Compose (dev) : `backend`, `frontend`, `postgres`, `minio`, `ai-service`.
-            MinIO pour les pièces jointes. Voir [[Architecture transverse]]."""));
+            MinIO pour les pièces jointes. Voir [[Architecture transverse]].""",
+            false, null, "g:infra", "ws:transverse"));
         n.add(new SeedNode(NodeDomain.ROADMAP, NodeType.DOC, "Roadmap workspace", """
             # Roadmap workspace #roadmap
 
             Jalons transverses. Le détail par projet vit dans chaque dimension projet.
-            Hub : [[Brain OS]]"""));
+            Socle : [[%s]]""".formatted(transverseTitle),
+            false, null, "g:roadmap", "ws:transverse"));
 
         // ── Un ARBRE récursif par projet (système → sous-système → … → notes). ───
         for (ProjectRef p : projects) n.addAll(projectTree(p));
@@ -148,10 +173,11 @@ public class BrainTemplateService {
         List<SeedNode> n = new ArrayList<>();
         List<String> subTitles = new ArrayList<>();
 
-        // parentKey "hub" : le projet est un ENFANT de la racine d'espace (Brain OS) -> containment reelle.
+        // parentKey "ws" : le projet est un ENFANT du dossier d'espace -> containment reelle
+        // (Brain OS > espace > projet > systemes > notes), pas juste des wikilinks.
         n.add(new SeedNode(NodeDomain.PROJET, NodeType.README, name,
-            "# " + name + "\n\nGalaxie du projet **" + name + "**. Systèmes : Produit · Engineering · Ops · Finance · Marketing."
-            + "\n\nWorkspace : [[Brain OS]]", false, id, rootKey, "hub"));
+            "# " + name + "\n\nGalaxie du projet **" + name + "**. Systèmes : Produit · Engineering · Ops · Finance · Marketing.",
+            false, id, rootKey, "ws"));
 
         List<Sys> systems = List.of(
             new Sys("Produit", NodeDomain.PRODUIT, List.of("Recherche", "Design", "Roadmap")),
