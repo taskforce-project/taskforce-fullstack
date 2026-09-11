@@ -94,13 +94,15 @@ export const SECTION_GROUPS = [
 // ---------------------------------------------------------------------------
 
 function FormField({ label, hint, children }: Readonly<{ label: string; hint?: string; children: React.ReactNode }>) {
+  // Mobile : le label passe AU-DESSUS du champ (grid-cols-1) ; >= sm on repasse en 2 colonnes
+  // 180px + champ. Sans ca le label fixe a 180px ecrasait le champ sur ecran etroit (« pas responsive »).
   return (
-    <div className="grid grid-cols-[180px_1fr] items-start gap-4">
-      <div className="pt-2">
+    <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-[180px_1fr] sm:items-start sm:gap-4">
+      <div className="sm:pt-2">
         <span className="text-sm font-medium text-foreground">{label}</span>
         {hint && <p className="text-xs text-muted-foreground mt-0.5 leading-snug">{hint}</p>}
       </div>
-      <div>{children}</div>
+      <div className="min-w-0">{children}</div>
     </div>
   )
 }
