@@ -160,7 +160,9 @@ export function AssigneeMenu({
       <PopoverContent align="start" className="w-[--radix-popover-trigger-width] min-w-[16rem] p-0">
         <Command>
           <CommandInput placeholder="Assign to…" className="h-9" />
-          <CommandList>
+          {/* Borne la liste a la hauteur DISPO a l'ecran (var Radix) moins la barre de recherche : le
+              menu ne depasse jamais le viewport (ex. ouvert bas dans le sheet) et scrolle a l'interieur. */}
+          <CommandList className="max-h-[calc(var(--radix-popover-content-available-height,22rem)-2.75rem)]">
             <CommandEmpty>No match.</CommandEmpty>
 
             {/* Suggested : la reco IA, en tete du meme menu (pas un panneau a part). */}
