@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -58,6 +59,24 @@ public class KnowledgeService {
     private static final int OVERVIEW_CAP = 1000;
 
     /**
+     * Slugs d'espaces de démo qui s'amorcent avec le gabarit TASKFORCE (riche, dérivé des projets réels)
+     * plutôt que BLANK, à la première ouverture de leur Brain OS. Réglable via `brain.demo-slugs`
+     * (liste séparée par des virgules). Défaut : `demo`.
+     */
+    @Value("${brain.demo-slugs:demo}")
+    private String demoSlugs;
+
+    /** Gabarit d'amorçage paresseux : TASKFORCE pour un espace de démo listé, BLANK sinon. */
+    private BrainTemplateType lazySeedTemplate(String slug) {
+        if (slug != null && demoSlugs != null) {
+            for (String s : demoSlugs.split(",")) {
+                if (s.trim().equalsIgnoreCase(slug)) return BrainTemplateType.TASKFORCE;
+            }
+        }
+        return BrainTemplateType.BLANK;
+    }
+
+    /**
      * Fusionne l'appartenance projet dans les metadata (clé {@code projects}).
      *
      * <p>C'est une <b>liste</b>, pas un {@code projectId} : une connaissance est souvent transverse
@@ -82,10 +101,13 @@ public class KnowledgeService {
     @Transactional
     public BrainOverviewResponse getOverview(String slug, Long userId) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
-        // Rollout : les workspaces antérieurs à la feature n'ont pas de brain → amorçage vierge
-        // à la première ouverture pour que la vue ne soit jamais vide.
+        // Rollout : les workspaces antérieurs à la feature n'ont pas de brain → amorçage à la première
+        // ouverture pour que la vue ne soit jamais vide. Gabarit BLANK par défaut, mais TASKFORCE (riche,
+        // dérivé des projets réels, hiérarchie Brain OS > Projets > notes) pour les espaces de démo listés
+        // dans `brain.demo-slugs` : le brain de démo se remplit tout seul à sa 1re ouverture, sans passer
+        // par le reseed owner-only (pratique quand l'espace est monté par SQL, hors flux applicatif).
         if (!seeding.exists(ws.getId())) {
-            seeding.seedBrain(ws, BrainTemplateType.BLANK, String.valueOf(userId));
+            seeding.seedBrain(ws, lazySeedTemplate(ws.getSlug()), String.valueOf(userId));
         }
         BrainWorkspace brain = brainWorkspaceRepository.findByWorkspaceId(ws.getId()).orElse(null);
 

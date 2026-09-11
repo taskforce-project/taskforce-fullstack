@@ -139,8 +139,11 @@ BEGIN
     -- ----------------------------------------------------------------
     -- 3. Workspace démo (owner = admin)
     -- ----------------------------------------------------------------
-    INSERT INTO workspaces (name, slug, description, owner_id)
-    VALUES ('Demo Workspace', 'demo', 'Espace de demonstration TaskForce : equipe complete, board realiste, Smart Assign.', v_admin)
+    -- `activity` = contexte metier de l'espace (la question d'onboarding « que fait l'entreprise ? »).
+    -- Le renseigner rend l'espace de demo onboarding-complet et nourrit le Brain OS.
+    INSERT INTO workspaces (name, slug, description, owner_id, activity)
+    VALUES ('Demo Workspace', 'demo', 'Espace de demonstration TaskForce : equipe complete, board realiste, Smart Assign.', v_admin,
+        'Demo Workspace construit TaskForce, un AI Delivery OS : une plateforme qui orchestre des agents IA et des equipes humaines pour livrer du logiciel de bout en bout. Stack : backend Java/Spring, frontend Next.js, IA via Groq/Ollama, Postgres + pgvector pour le Brain OS. Operations : Web Application, API Platform, Infrastructure, Solo Initiatives, et le produit TaskForce lui-meme. Equipe produit + engineering + ops.')
     RETURNING id INTO v_ws;
 
     -- Membres du workspace (admin OWNER + l'équipe)
