@@ -79,10 +79,18 @@ export function PageTree({ nodes, selectedNodeId, onSelect, onNewPage, onMove }:
     return set
   }, [dragId, childrenOf])
 
-  // Le hub est deplie PAR DEFAUT (on voit Brain OS -> projets d'emblee) : pour lui, `expanded` = REPLIE
-  // (appartenance inversee) -> pas de setState dans un effet, le clic replie/deplie comme attendu.
+  // Deplies PAR DEFAUT : la racine (Brain OS) ET ses dossiers d'espace (containers de 1er niveau), pour
+  // qu'on voie d'emblee Brain OS -> espace -> projets. Pour ces ids, `expanded` = REPLIE (appartenance
+  // inversee) -> pas de setState dans un effet, le clic replie/deplie comme attendu.
+  const defaultOpen = useMemo(() => {
+    const s = new Set<number>()
+    if (!root) return s
+    s.add(root.id)
+    for (const c of childrenOf.get(root.id) ?? []) if ((childrenOf.get(c.id)?.length ?? 0) > 0) s.add(c.id)
+    return s
+  }, [root, childrenOf])
   const isExpanded = (id: number) =>
-    root && id === root.id ? !expanded.has(id) : expanded.has(id) || ancestors.has(id)
+    defaultOpen.has(id) ? !expanded.has(id) : expanded.has(id) || ancestors.has(id)
   const togglePage = (id: number) =>
     setExpanded((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
 

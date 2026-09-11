@@ -85,7 +85,8 @@ public class BrainSeedingService {
                     .getContent().stream().map(i -> i.getTitle()).toList()))
             .toList();
 
-        List<BrainTemplateService.SeedNode> seeds = templateService.nodesFor(brain.getTemplateType(), projects);
+        List<BrainTemplateService.SeedNode> seeds =
+            templateService.nodesFor(brain.getTemplateType(), projects, workspace.getName());
         List<KnowledgeNode> nodes = new ArrayList<>(seeds.size());
         Map<String, Integer> keyToIdx = new HashMap<>();
         for (int i = 0; i < seeds.size(); i++) {
