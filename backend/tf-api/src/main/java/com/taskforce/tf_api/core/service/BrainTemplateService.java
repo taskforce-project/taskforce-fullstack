@@ -88,7 +88,9 @@ public class BrainTemplateService {
            .append("- [[Stack & infra commune]]\n- [[Roadmap workspace]]\n\n")
            .append("## Projets\n");
         for (ProjectRef p : projects) hub.append("- [[").append(p.name()).append("]]\n");
-        n.add(new SeedNode(NodeDomain.PROJET, NodeType.README, "Brain OS", hub.toString(), false));
+        // Le hub est la RACINE du brain de l'espace (cle "hub") : docs globaux et projets s'y rattachent
+        // par parentKey -> vraie hierarchie Brain OS > Workspace > Projets > notes (pas juste des wikilinks).
+        n.add(new SeedNode(NodeDomain.PROJET, NodeType.README, "Brain OS", hub.toString(), false, null, "hub", null));
         n.add(new SeedNode(NodeDomain.PROJET, NodeType.SOP, agentsTitle, agentsContract(), true));
 
         // ── Docs globaux (refId null → cluster « global » autour du hub) ─────────
@@ -146,9 +148,10 @@ public class BrainTemplateService {
         List<SeedNode> n = new ArrayList<>();
         List<String> subTitles = new ArrayList<>();
 
+        // parentKey "hub" : le projet est un ENFANT de la racine d'espace (Brain OS) -> containment reelle.
         n.add(new SeedNode(NodeDomain.PROJET, NodeType.README, name,
             "# " + name + "\n\nGalaxie du projet **" + name + "**. Systèmes : Produit · Engineering · Ops · Finance · Marketing."
-            + "\n\nWorkspace : [[Brain OS]]", false, id, rootKey, null));
+            + "\n\nWorkspace : [[Brain OS]]", false, id, rootKey, "hub"));
 
         List<Sys> systems = List.of(
             new Sys("Produit", NodeDomain.PRODUIT, List.of("Recherche", "Design", "Roadmap")),
