@@ -98,6 +98,19 @@ public class DeliveryController {
         return ResponseEntity.ok(ApiResponse.success("Run récupéré", run));
     }
 
+    /**
+     * GET /api/workspaces/{slug}/delivery/runs — runs de délégation du workspace (vue « workflow »).
+     * Les plus récents d'abord, bornés aux projets visibles par l'utilisateur.
+     */
+    @GetMapping("/runs")
+    public ResponseEntity<ApiResponse<List<DeliveryRunResponse>>> listRuns(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String slug
+    ) {
+        List<DeliveryRunResponse> runs = deliveryService.listRuns(slug, resolveUserId(jwt));
+        return ResponseEntity.ok(ApiResponse.success("Runs récupérés", runs));
+    }
+
     // =========================================================================
     // Clés API de délégation du workspace (Anthropic B1, Cursor... - chiffrées)
     // =========================================================================
