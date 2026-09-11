@@ -36,6 +36,7 @@ import { cn } from "@/lib/utils"
 import { AssigneeMenu } from "@/components/smart-assign/assignee-menu"
 import { DelegateAgentControl } from "@/components/sheets/delegate-agent-control"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
+import { useSettingsStore } from "@/lib/store/settings-store"
 import { IssueAiSpecPanel } from "@/components/issues/issue-ai-spec"
 import { IssueDescription } from "@/components/issues/issue-description"
 import { BrandLogo } from "@/components/ui/brand-logo"
@@ -1121,7 +1122,8 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
           archiveIssue, pinIssue, fetchStatuses, fetchIssue,
           comments: storeComments, activity: storeActivity, statuses: storeStatuses } = useIssueStore()
   const { labelsByProject, fetchLabels } = useLabelStore()
-  const { githubLinks, githubStatus, fetchGitHubLinks } = useIntegrationStore()
+  const { githubLinks, githubStatus, fetchGitHubLinks, fetchGitHubStatus, connectGitHub } = useIntegrationStore()
+  const openSettings = useSettingsStore((s) => s.openSettings)
 
   const initDescription = issue?.description ?? ""
   const [comment, setComment] = useState("")
@@ -1165,7 +1167,37 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
   const fetchDeliveryProviders = useDeliveryStore((s) => s.fetchProviders)
   const delegateToAgent = useDeliveryStore((s) => s.delegate)
   const fetchDeliveryRun = useDeliveryStore((s) => s.fetchRun)
+  const fetchDeliveryKey = useDeliveryStore((s) => s.fetchKey)
+  const deliveryKeys = useDeliveryStore((s) => s.keys)
   const availableAgents = deliveryProviders.filter((p) => p.available)
+
+  // Delegation : verifie la connexion requise par l'agent AVANT de deleguer. Si absente, on ne cree
+  // pas de run en echec : on renvoie un "gate" que l'appelant transforme en toast ACTIONNABLE (bouton
+  // Connect) - GitHub en 1 clic (OAuth) pour Copilot, sinon saut vers Reglages > Agents pour les cles.
+  async function checkAgentConnection(agentKey: string, slug: string):
+    Promise<{ message: string; actionLabel: string; onConnect: () => void } | null> {
+    if (agentKey === "github-copilot") {
+      let st = githubStatus
+      if (!st) { await fetchGitHubStatus(slug).catch(() => {}); st = useIntegrationStore.getState().githubStatus }
+      if (st?.connected) return null
+      return {
+        message: "GitHub isn't connected - Copilot runs under your GitHub account.",
+        actionLabel: "Connect GitHub",
+        onConnect: () => { connectGitHub(slug).catch(() => {}) }, // OAuth 1-clic (redirige)
+      }
+    }
+    const keyProvider = agentKey === "claude-api" ? "anthropic" : agentKey === "cursor" ? "cursor" : null
+    if (keyProvider) {
+      const st = deliveryKeys[keyProvider] ?? (await fetchDeliveryKey(slug, keyProvider))
+      if (st?.connected) return null
+      return {
+        message: `Connect your ${keyProvider === "anthropic" ? "Anthropic" : "Cursor"} key to delegate.`,
+        actionLabel: "Connect",
+        onConnect: () => openSettings("agents"), // ouvre le modal Reglages > Agents en place
+      }
+    }
+    return null // stub / claude-code : aucune connexion requise
+  }
 
   useEffect(() => { if (editingTitle) titleRef.current?.focus() }, [editingTitle])
 
@@ -1641,12 +1673,21 @@ export function IssueSheet({ issue, open, onOpenChange, workspaceSlug, projectId
                   }}
                   onDelegate={async (agentKey) => {
                     const agent = availableAgents.find((a) => a.key === agentKey)
+                    const name = agent?.displayName ?? "agent"
+                    // Connexion requise absente -> toast actionnable (bouton Connect), pas de run en echec.
+                    const gate = await checkAgentConnection(agentKey, workspaceSlug)
+                    if (gate) {
+                      toast.error(gate.message, { action: { label: gate.actionLabel, onClick: gate.onConnect } })
+                      return
+                    }
                     const res = await delegateToAgent(workspaceSlug, issueId, agentKey)
                     if (res) {
-                      toast.success(`Delegated to ${agent?.displayName ?? "agent"}`)
+                      toast.success(`Delegated to ${name}`)
                       fetchDeliveryRun(workspaceSlug, issueId).catch(() => { /* silent */ })
                     } else {
-                      toast.error("Couldn't delegate. Connect the agent's key in Settings → Agents.")
+                      toast.error("Couldn't delegate to the agent.", {
+                        action: { label: "Open settings", onClick: () => openSettings("agents") },
+                      })
                     }
                   }}
                 />
