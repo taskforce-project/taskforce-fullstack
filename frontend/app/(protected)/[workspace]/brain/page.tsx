@@ -1,10 +1,10 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { useParams } from "next/navigation"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
 import {
   Brain, Plus, Trash2, Save, X, FileText, Search, Sparkles, Network, Link2,
-  ChevronRight, Folder, FolderOpen, Tag as TagIcon, PanelLeftClose, PanelLeftOpen, Eye, EyeOff,
+  ChevronRight, Tag as TagIcon, PanelLeftClose, PanelLeftOpen, Eye, EyeOff,
 } from "lucide-react"
 
 import { useBrainStore } from "@/lib/store/brain-store"
@@ -16,6 +16,7 @@ const BrainGraph = dynamic(
   { ssr: false, loading: () => <div className="h-full w-full bg-muted/20" /> },
 )
 import { MarkdownEditor } from "@/components/brain/markdown-editor"
+import { PageTree } from "@/components/brain/page-tree"
 import { Markdown } from "@/components/ui/lightweight-markdown"
 import { DeleteConfirmDialog } from "@/components/dialogs/delete-confirm-dialog"
 import { uploadBrainFile, type KnowledgeNode } from "@/lib/api/brain-service"
@@ -64,6 +65,8 @@ const domainLabel = (value: string) => DOMAINS.find((d) => d.value === value)?.l
 
 export default function BrainPage() {
   const params = useParams()
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const slug = typeof params?.workspace === "string" ? params.workspace : ""
 
   const {
@@ -77,7 +80,8 @@ export default function BrainPage() {
   const [queryText, setQueryText] = useState("")
   const [view, setView] = useState<"editor" | "graph">("editor")
   const [activeTag, setActiveTag] = useState<string | null>(null)
-  const [openFolders, setOpenFolders] = useState<Set<string>>(new Set())
+  // Preselection du dialog de creation : domaine + page parente (arbre facon Notion).
+  const [createPreset, setCreatePreset] = useState<{ domain?: string; parentId?: number | null }>({})
   const [showTags, setShowTags] = useState(true)
   const [explorerOpen, setExplorerOpen] = useState(true)
   const [showSystem, setShowSystem] = useState(false)
@@ -91,6 +95,18 @@ export default function BrainPage() {
   useEffect(() => {
     if (slug) fetchOverview(slug)
   }, [slug, fetchOverview])
+
+  // Deep-link depuis la palette Cmd+K (`/brain?node=<id>`) : ouvre la page puis nettoie l'URL
+  // (sinon le param rejouerait a chaque render). Meme motif que le deep-link d'issue sur le board.
+  useEffect(() => {
+    const raw = searchParams.get("node")
+    if (!raw) return
+    const id = Number(raw)
+    if (Number.isFinite(id)) { selectNode(id); setView("editor") }
+    const url = new URL(window.location.href)
+    url.searchParams.delete("node")
+    router.replace(url.pathname + url.search, { scroll: false })
+  }, [searchParams, selectNode, router])
 
   // Les projets nomment et colorent les régions du graphe (metadata.projects → région).
   useEffect(() => {
@@ -115,25 +131,14 @@ export default function BrainPage() {
     return activeTag ? visibleNodes.filter((n) => (n.tags ?? []).includes(activeTag)) : visibleNodes
   }, [visibleNodes, activeTag])
 
-  // Notes regroupées par domaine. Les dossiers vides restent visibles (squelette d'architecture) :
-  // au démarrage le vault n'a pas de notes, juste les dossiers - l'agent le remplit ensuite.
-  const nodesByDomain = useMemo(() => {
-    const m = new Map<string, KnowledgeNode[]>()
-    for (const n of filteredNodes) {
-      const arr = m.get(n.domain) ?? []
-      arr.push(n)
-      m.set(n.domain, arr)
-    }
-    for (const arr of m.values()) arr.sort((a, b) => a.title.localeCompare(b.title))
-    return m
-  }, [filteredNodes])
-
   const selected = overview?.nodes.find((n) => n.id === selectedNodeId) ?? null
 
   const toggleTag = (t: string) => setActiveTag((cur) => (cur === t ? null : t))
-  const toggleFolder = (d: string) =>
-    setOpenFolders((s) => { const n = new Set(s); if (n.has(d)) n.delete(d); else n.add(d); return n })
-  const folderOpen = (d: string) => openFolders.has(d) || selected?.domain === d || activeTag != null
+  // Nouvelle page depuis l'arbre : sous un domaine (parentId null) ou sous une page (parentId).
+  const handleNewPage = (domain: string, parentId: number | null) => {
+    setCreatePreset({ domain, parentId })
+    setCreateOpen(true)
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -175,8 +180,8 @@ export default function BrainPage() {
               <Network className="size-3.5" /> Graph
             </button>
           </div>
-          <Button size="sm" onClick={() => setCreateOpen(true)}>
-            <Plus className="size-4" /> New node
+          <Button size="sm" onClick={() => { setCreatePreset({}); setCreateOpen(true) }}>
+            <Plus className="size-4" /> New page
           </Button>
         </div>
       </div>
@@ -251,36 +256,15 @@ export default function BrainPage() {
                       <X className="size-3" /> Filter #{activeTag}
                     </button>
                   )}
-                  {/* Arborescence : tous les dossiers (domaines) visibles, même vides */}
-                  {DOMAINS.filter((d) => !activeTag || (nodesByDomain.get(d.value)?.length ?? 0) > 0).map((d) => {
-                    const items = nodesByDomain.get(d.value) ?? []
-                    const hasItems = items.length > 0
-                    const open = hasItems && folderOpen(d.value)
-                    return (
-                      <div key={d.value}>
-                        <button onClick={() => hasItems && toggleFolder(d.value)}
-                          className="flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground">
-                          <ChevronRight className={`size-3.5 shrink-0 transition-transform ${open ? "rotate-90" : ""} ${hasItems ? "" : "opacity-0"}`} />
-                          {open ? <FolderOpen className="size-3.5 shrink-0" /> : <Folder className={`size-3.5 shrink-0 ${hasItems ? "" : "opacity-40"}`} />}
-                          <span className="min-w-0 flex-1 truncate">{d.code} · {d.label}</span>
-                          <span className={`shrink-0 rounded px-1 text-[10px] ${hasItems ? "bg-muted" : "text-muted-foreground/40"}`}>{items.length}</span>
-                        </button>
-                        {open && (
-                          <div className="ml-3 border-l pl-1">
-                            {items.map((node) => (
-                              <button key={node.id} onClick={() => { selectNode(node.id); setView("editor") }}
-                                className={`flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left text-sm transition-colors hover:bg-accent ${
-                                  selectedNodeId === node.id ? "bg-accent font-medium text-foreground" : "text-foreground/80"
-                                }`}>
-                                <FileText className="size-3.5 shrink-0 text-muted-foreground" />
-                                <span className="min-w-0 flex-1 truncate">{node.title}</span>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
+                  {/* Arbre de pages facon Notion : domaines = racines, pages nichees via parentNodeId */}
+                  <PageTree
+                    nodes={filteredNodes}
+                    domains={DOMAINS}
+                    selectedNodeId={selectedNodeId}
+                    activeTag={activeTag}
+                    onSelect={(id) => { selectNode(id); setView("editor") }}
+                    onNewPage={handleNewPage}
+                  />
 
                   {/* Tags : cliquer pour filtrer l'explorateur */}
                   {tagCounts.length > 0 && (
@@ -378,15 +362,27 @@ export default function BrainPage() {
                   </div>
                 ))}
               </div>
-              <Button size="sm" variant="outline" onClick={() => setCreateOpen(true)}>
-                <Plus className="size-4" /> New note
+              <Button size="sm" variant="outline" onClick={() => { setCreatePreset({}); setCreateOpen(true) }}>
+                <Plus className="size-4" /> New page
               </Button>
             </div>
           )}
         </main>
       </div>
 
-      <CreateNodeDialog open={createOpen} onOpenChange={setCreateOpen} slug={slug} />
+      {createOpen && (
+        <CreateNodeDialog
+          key={`${createPreset.domain ?? ""}:${createPreset.parentId ?? ""}`}
+          open={createOpen}
+          onOpenChange={(o) => { setCreateOpen(o); if (!o) setCreatePreset({}) }}
+          slug={slug}
+          presetDomain={createPreset.domain}
+          presetParentId={createPreset.parentId ?? null}
+          parentTitle={createPreset.parentId != null
+            ? (overview?.nodes.find((n) => n.id === createPreset.parentId)?.title ?? null)
+            : null}
+        />
+      )}
     </div>
   )
 }
@@ -474,11 +470,38 @@ function NodeDetail({
     }
   }
 
+  // Renommage inline du titre (facon Notion) : editable directement en lecture, sans passer par le
+  // mode edition complet. Sauve seulement si change + non vide ; Echap annule.
+  const commitRename = async () => {
+    const t = title.trim()
+    if (!t || t === node.title) { setTitle(node.title); return }
+    try {
+      await editNode(slug, node.id, { title: t })
+      toast.success("Page renamed")
+    } catch (e) {
+      toast.error(getErrorMessage(e))
+      setTitle(node.title)
+    }
+  }
+
   // Navigation [[wikilink]] → ouvre la note correspondante.
   const openWikiLink = (linkTitle: string) => {
     const target = nodes.find((n) => n.title.toLowerCase() === linkTitle.toLowerCase())
     if (target) selectNode(target.id)
   }
+
+  // Fil d'Ariane : chaine des pages parentes (arbre facon Notion), de la racine jusqu'au parent direct.
+  const nodeById = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes])
+  const ancestors = useMemo(() => {
+    const chain: KnowledgeNode[] = []
+    let cur = node.parentNodeId != null ? nodeById.get(node.parentNodeId) : undefined
+    let guard = 0
+    while (cur && guard++ < 1000) {
+      chain.unshift(cur)
+      cur = cur.parentNodeId != null ? nodeById.get(cur.parentNodeId) : undefined
+    }
+    return chain
+  }, [node, nodeById])
 
   return (
     <div className="flex h-full flex-col">
@@ -538,8 +561,36 @@ function NodeDetail({
             </div>
           ) : (
             <>
+              {ancestors.length > 0 && (
+                <nav className="mb-3 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+                  {ancestors.map((a) => (
+                    <span key={a.id} className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => selectNode(a.id)}
+                        className="max-w-[12rem] truncate transition-colors hover:text-foreground hover:underline"
+                      >
+                        {a.title}
+                      </button>
+                      <ChevronRight className="size-3 shrink-0 opacity-50" />
+                    </span>
+                  ))}
+                  <span className="truncate font-medium text-foreground/70">{node.title}</span>
+                </nav>
+              )}
               <PlanetHeader node={node} />
-              <h2 className="mb-3 text-xl font-semibold">{node.title}</h2>
+              {/* Titre editable inline (Notion) : clic -> on tape -> Entree/blur sauve, Echap annule. */}
+              <input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                onBlur={commitRename}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur() }
+                  if (e.key === "Escape") { setTitle(node.title); e.currentTarget.blur() }
+                }}
+                aria-label="Page title"
+                className="mb-3 w-full rounded-md bg-transparent text-2xl font-semibold tracking-tight outline-none transition-colors hover:bg-muted/40 focus:bg-transparent"
+              />
               {node.tags && node.tags.length > 0 && (
                 <div className="mb-4 flex flex-wrap gap-1.5">
                   {node.tags.map((t) => (
@@ -617,21 +668,29 @@ function CreateNodeDialog({
   open,
   onOpenChange,
   slug,
+  presetDomain,
+  presetParentId = null,
+  parentTitle = null,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   slug: string
+  /** Domaine pre-selectionne (racine cliquee ou domaine herite du parent). */
+  presetDomain?: string
+  /** Page parente si on cree une sous-page (arbre facon Notion). */
+  presetParentId?: number | null
+  parentTitle?: string | null
 }) {
   const addNode = useBrainStore((s) => s.addNode)
   const [type, setType] = useState<string>("NOTE")
-  const [domain, setDomain] = useState<string>("PROJET")
+  const [domain, setDomain] = useState<string>(presetDomain ?? "PROJET")
   const [title, setTitle] = useState("")
   const [content, setContent] = useState("")
   const [saving, setSaving] = useState(false)
 
   const reset = () => {
     setType("NOTE")
-    setDomain("PROJET")
+    setDomain(presetDomain ?? "PROJET")
     setTitle("")
     setContent("")
   }
@@ -640,8 +699,11 @@ function CreateNodeDialog({
     if (!title.trim()) return
     setSaving(true)
     try {
-      await addNode(slug, { type, domain, title: title.trim(), content })
-      toast.success("Node created")
+      await addNode(slug, {
+        type, domain, title: title.trim(), content,
+        parentNodeId: presetParentId ?? undefined,
+      })
+      toast.success(presetParentId != null ? "Sub-page created" : "Page created")
       reset()
       onOpenChange(false)
     } catch (e) {
@@ -655,8 +717,13 @@ function CreateNodeDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>New node</DialogTitle>
+          <DialogTitle>{presetParentId != null ? "New sub-page" : "New page"}</DialogTitle>
         </DialogHeader>
+        {parentTitle && (
+          <p className="-mt-1 text-xs text-muted-foreground">
+            Sub-page of <span className="font-medium text-foreground">{parentTitle}</span>
+          </p>
+        )}
         <div className="mt-2 space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
