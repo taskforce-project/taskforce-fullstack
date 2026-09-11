@@ -12,7 +12,10 @@ import {
   ChevronDown,
   Download,
   Pin,
+  Flag,
+  CalendarDays,
 } from "lucide-react"
+import { format } from "date-fns"
 import {
   DndContext,
   DragOverlay,
@@ -34,6 +37,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { ColorPicker } from "@/components/ui/color-picker"
 import { InlineIssueFilters } from "@/components/issues/issue-filters"
 import { BulkAssignDialog } from "@/components/dialogs/bulk-assign-dialog"
+import { CreateIssueDialog } from "@/components/dialogs/create-issue-dialog"
 import { type IssueFilterState, EMPTY_ISSUE_FILTERS, applyIssueFilters } from "@/lib/issue-filters"
 import {
   DropdownMenu,
@@ -59,14 +63,6 @@ import type { Issue, IssueStatus, IssueStatusCategory, IssuePriority } from "@/l
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-const PRIORITY_DOT: Record<IssuePriority, string> = {
-  URGENT: "bg-red-400",
-  HIGH:   "bg-orange-400",
-  MEDIUM: "bg-yellow-400",
-  LOW:    "bg-slate-400",
-  NONE:   "bg-muted-foreground/30",
-}
 
 const AVATAR_COLORS = [
   "bg-violet-500", "bg-blue-500", "bg-emerald-500", "bg-orange-500",
@@ -125,6 +121,61 @@ function toSheetIssue(issue: Issue): SheetIssue {
 }
 
 // ---------------------------------------------------------------------------
+// Chips de carte (priorite, echeance) - structure facon Linear, style TaskForce
+// ---------------------------------------------------------------------------
+
+/** Chip de priorite : teinte douce par niveau (rien pour NONE). */
+const PRIORITY_CHIP: Record<IssuePriority, { label: string; cls: string } | null> = {
+  URGENT: { label: "Urgent", cls: "bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-300" },
+  HIGH:   { label: "High",   cls: "bg-orange-50 text-orange-600 dark:bg-orange-500/15 dark:text-orange-300" },
+  MEDIUM: { label: "Medium", cls: "bg-yellow-50 text-yellow-700 dark:bg-yellow-500/15 dark:text-yellow-300" },
+  LOW:    { label: "Low",    cls: "bg-muted text-muted-foreground" },
+  NONE:   null,
+}
+
+function PriorityChip({ priority }: { readonly priority: IssuePriority }) {
+  const p = PRIORITY_CHIP[priority]
+  if (!p) return null
+  return (
+    <span className={cn("inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium leading-none", p.cls)}>
+      <Flag className="size-2.5 shrink-0" strokeWidth={2.5} />
+      {p.label}
+    </span>
+  )
+}
+
+/** Echeance proche (aujourd'hui, demain ou depassee) -> peinte en ambre. */
+function isDueSoon(due?: string | null): boolean {
+  if (!due) return false
+  const d = new Date(due)
+  if (Number.isNaN(d.getTime())) return false
+  const limit = new Date()
+  limit.setHours(0, 0, 0, 0)
+  limit.setDate(limit.getDate() + 1)
+  return d <= limit
+}
+
+function formatDue(due?: string | null): string | null {
+  if (!due) return null
+  const d = new Date(due)
+  if (Number.isNaN(d.getTime())) return null
+  return format(d, "d MMM")
+}
+
+/** Echeance : icone calendrier + date courte, ambre si proche. */
+function DueChip({ due }: { readonly due?: string | null }) {
+  const label = formatDue(due)
+  if (!label) return null
+  return (
+    <span className={cn("inline-flex items-center gap-1 text-[11px] tabular-nums",
+      isDueSoon(due) ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground")}>
+      <CalendarDays className="size-3 shrink-0" strokeWidth={2.25} />
+      {label}
+    </span>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // IssueCard (draggable)
 // ---------------------------------------------------------------------------
 
@@ -154,17 +205,19 @@ function IssueCard({
       onClick={() => onOpen(issue)}
       onKeyDown={(e) => e.key === "Enter" && onOpen(issue)}
       className={cn(
-        "group/card rounded-lg border border-border bg-card p-3 transition-all cursor-grab active:cursor-grabbing",
-        // Le clone est rendu via <DragOverlay> → on laisse juste un placeholder estompé en place
+        "group/card rounded-lg border border-border bg-card p-3 shadow-xs transition-all cursor-grab active:cursor-grabbing",
+        // Le clone suit le curseur via <DragOverlay> ; on laisse un placeholder estompe en place
         isDragging ? "opacity-40" : "hover:border-primary/30 hover:shadow-md"
       )}
     >
-      {issue.labels.length > 0 && (
-        <div className="flex flex-wrap gap-1 mb-2">
+      {/* Priorite + labels */}
+      {(issue.priority !== "NONE" || issue.labels.length > 0) && (
+        <div className="mb-2 flex flex-wrap items-center gap-1">
+          <PriorityChip priority={issue.priority} />
           {issue.labels.map((label) => (
             <span
               key={label.id}
-              className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full font-medium border"
+              className="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium leading-none"
               style={{ color: label.color, borderColor: `${label.color}40`, backgroundColor: `${label.color}15` }}
             >
               {label.name}
@@ -173,19 +226,31 @@ function IssueCard({
         </div>
       )}
 
-      <p className="text-sm text-foreground leading-snug mb-3 line-clamp-2">
-        {issue.pinned && <Pin className="inline size-3 mr-1 -mt-0.5 text-amber-500 fill-amber-500" aria-label="Pinned" />}
+      {/* Titre */}
+      <p className="text-sm font-medium leading-snug tracking-[-0.005em] text-foreground line-clamp-2">
+        {issue.pinned && <Pin className="mr-1 -mt-0.5 inline size-3 fill-amber-500 text-amber-500" aria-label="Pinned" />}
         {issue.title}
       </p>
 
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5">
-          {/* Priority + identifier */}
-          <div className={cn("size-2 rounded-full shrink-0", PRIORITY_DOT[issue.priority])} title={issue.priority} />
-          <span className="text-[10px] text-muted-foreground font-mono">{issue.identifier}</span>
+      {/* Note (description) */}
+      {issue.description && (
+        <p className="mt-1 line-clamp-2 text-xs leading-snug text-muted-foreground">{issue.description}</p>
+      )}
+
+      {/* Footer : identifiant + echeance + points | assigne + statut */}
+      <div className="mt-3 h-px bg-border/60" />
+      <div className="mt-2.5 flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{issue.identifier}</span>
+          <DueChip due={issue.dueDate} />
+          {issue.storyPoints != null && (
+            <span className="inline-flex shrink-0 items-center rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">
+              {issue.storyPoints} pts
+            </span>
+          )}
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex shrink-0 items-center gap-1.5">
           {issue.assignee && (
             <UserAvatar
               email={issue.assignee.email}
@@ -196,14 +261,14 @@ function IssueCard({
             />
           )}
 
-          {/* Status change dropdown */}
+          {/* Raccourci de statut : discret, apparait au survol */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
                 onClick={(e) => e.stopPropagation()}
                 onPointerDown={(e) => e.stopPropagation()}
-                className="opacity-0 group-hover/card:opacity-100 transition-opacity flex items-center gap-0.5 text-muted-foreground hover:text-foreground px-1 py-0.5 rounded hover:bg-muted/60"
+                className="flex items-center gap-0.5 rounded px-1 py-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-muted/60 hover:text-foreground group-hover/card:opacity-100"
                 title="Change status"
               >
                 {getCategoryIcon(issue.status.category, issue.status.color, "size-3")}
@@ -237,12 +302,13 @@ function IssueCard({
 function IssueCardPreview({ issue }: { readonly issue: Issue }) {
   return (
     <div className="w-64 rotate-2 cursor-grabbing rounded-lg border border-primary/40 bg-card p-3 shadow-xl">
-      {issue.labels.length > 0 && (
-        <div className="flex flex-wrap gap-1 mb-2">
+      {(issue.priority !== "NONE" || issue.labels.length > 0) && (
+        <div className="mb-2 flex flex-wrap items-center gap-1">
+          <PriorityChip priority={issue.priority} />
           {issue.labels.map((label) => (
             <span
               key={label.id}
-              className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full font-medium border"
+              className="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium leading-none"
               style={{ color: label.color, borderColor: `${label.color}40`, backgroundColor: `${label.color}15` }}
             >
               {label.name}
@@ -250,11 +316,15 @@ function IssueCardPreview({ issue }: { readonly issue: Issue }) {
           ))}
         </div>
       )}
-      <p className="text-sm text-foreground leading-snug mb-3 line-clamp-2">{issue.title}</p>
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5">
-          <div className={cn("size-2 rounded-full shrink-0", PRIORITY_DOT[issue.priority])} />
-          <span className="text-[10px] text-muted-foreground font-mono">{issue.identifier}</span>
+      <p className="text-sm font-medium leading-snug tracking-[-0.005em] text-foreground line-clamp-2">{issue.title}</p>
+      {issue.description && (
+        <p className="mt-1 line-clamp-2 text-xs leading-snug text-muted-foreground">{issue.description}</p>
+      )}
+      <div className="mt-3 h-px bg-border/60" />
+      <div className="mt-2.5 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2.5">
+          <span className="font-mono text-[10px] text-muted-foreground">{issue.identifier}</span>
+          <DueChip due={issue.dueDate} />
         </div>
         {issue.assignee && (
           <UserAvatar
@@ -278,6 +348,8 @@ function BoardColumn({
   status,
   issues,
   statuses,
+  workspaceSlug,
+  projectId,
   onStatusChange,
   onDeleteStatus,
   onRenameStatus,
@@ -289,6 +361,8 @@ function BoardColumn({
   readonly status: IssueStatus
   readonly issues: Issue[]
   readonly statuses: IssueStatus[]
+  readonly workspaceSlug: string
+  readonly projectId: number
   readonly onStatusChange: (issueId: number, statusId: number) => void
   readonly onDeleteStatus: (statusId: number) => void
   readonly onRenameStatus: (statusId: number, name: string) => void
@@ -323,77 +397,72 @@ function BoardColumn({
   }
 
   return (
-    <div className="flex h-full min-h-0 w-70 shrink-0 flex-col">
-      {/* Column header */}
-      <div className="group/col flex items-center justify-between mb-2 px-1 py-1.5 shrink-0">
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          {getCategoryIcon(status.category, status.color)}
-          {editing ? (
-            <input
-              ref={inputRef}
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-              onKeyDown={onEditKeyDown}
-              onBlur={commitEdit}
-              className="text-xs font-semibold uppercase tracking-wide bg-transparent border-b border-primary outline-none w-full text-muted-foreground"
-            />
-          ) : (
+    <div className="flex h-full min-h-0 w-70 shrink-0 flex-col rounded-xl border border-border/60 bg-muted/40 p-2.5">
+      {/* En-tete : pastille de couleur + nom (renommable) + compteur + menu */}
+      <div className="group/col flex shrink-0 items-center gap-2 px-1 pb-1">
+        <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: status.color }} />
+        {editing ? (
+          <input
+            ref={inputRef}
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            onKeyDown={onEditKeyDown}
+            onBlur={commitEdit}
+            className="min-w-0 flex-1 border-b border-primary bg-transparent text-[13px] font-medium tracking-[-0.005em] text-foreground outline-none"
+          />
+        ) : (
+          <button
+            type="button"
+            className="min-w-0 flex-1 cursor-pointer truncate border-0 bg-transparent p-0 text-left text-[13px] font-medium tracking-[-0.005em] text-foreground hover:text-foreground"
+            onDoubleClick={startEdit}
+            onKeyDown={(e) => e.key === "Enter" && startEdit()}
+            title="Double-click to rename"
+          >
+            {status.name}
+          </button>
+        )}
+        <span className="grid h-[18px] min-w-[18px] shrink-0 place-items-center rounded-md bg-muted px-1 text-[11px] font-medium tabular-nums text-muted-foreground">
+          {issues.length}
+        </span>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="text-xs font-semibold uppercase tracking-wide text-muted-foreground truncate cursor-pointer hover:text-foreground text-left bg-transparent border-0 p-0 min-w-0"
-              onDoubleClick={startEdit}
-              onKeyDown={(e) => e.key === "Enter" && startEdit()}
-              title="Double-click to rename"
+              className="flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 transition-all hover:bg-muted hover:text-foreground group-hover/col:opacity-100"
             >
-              {status.name}
+              <MoreHorizontal className="size-3.5" />
             </button>
-          )}
-          <span className="text-xs text-muted-foreground/60 font-medium ml-0.5 shrink-0">{issues.length}</span>
-        </div>
-
-        <div className="flex items-center gap-1">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className="size-6 flex items-center justify-center rounded opacity-0 group-hover/col:opacity-100 hover:bg-muted/60 text-muted-foreground hover:text-foreground transition-all"
-              >
-                <MoreHorizontal className="size-3.5" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52">
-              <DropdownMenuItem className="gap-2 text-xs" onClick={startEdit}>
-                Rename
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel className="text-[10px] font-normal text-muted-foreground">Color</DropdownMenuLabel>
-              <div className="px-2 py-1.5" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
-                <ColorPicker value={status.color} onChange={(c) => onChangeColor(status.id, c)} />
-              </div>
-              {!status.isDefault && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    className="gap-2 text-xs text-destructive focus:text-destructive"
-                    onClick={() => onDeleteStatus(status.id)}
-                  >
-                    Delete
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuItem className="gap-2 text-xs" onClick={startEdit}>
+              Rename
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-[10px] font-normal text-muted-foreground">Color</DropdownMenuLabel>
+            <div className="px-2 py-1.5" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+              <ColorPicker value={status.color} onChange={(c) => onChangeColor(status.id, c)} />
+            </div>
+            {!status.isDefault && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="gap-2 text-xs text-destructive focus:text-destructive"
+                  onClick={() => onDeleteStatus(status.id)}
+                >
+                  Delete
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
-      {/* Divider with status color */}
-      <div className="h-0.5 w-full rounded-full mb-3 opacity-60 shrink-0" style={{ backgroundColor: status.color }} />
-
-      {/* Cards (droppable) - scroll interne par colonne */}
+      {/* Cartes (droppable) - scroll interne par colonne */}
       <div
         ref={setNodeRef}
         className={cn(
-          "flex flex-col gap-2 flex-1 min-h-0 overflow-y-auto rounded-lg pr-0.5 transition-colors",
+          "mt-2 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto rounded-lg pr-0.5 transition-colors",
           isOver && "bg-primary/5 ring-1 ring-primary/30"
         )}
       >
@@ -413,6 +482,17 @@ function BoardColumn({
           </div>
         )}
       </div>
+
+      {/* Ajouter une tache dans la colonne (statut pre-rempli) */}
+      <CreateIssueDialog projectId={projectId} workspaceSlug={workspaceSlug} defaultStatusId={status.id}>
+        <button
+          type="button"
+          className="mt-2 flex w-full shrink-0 items-center gap-1.5 rounded-lg px-2 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-black/[0.03] hover:text-foreground dark:hover:bg-white/[0.05]"
+        >
+          <Plus className="size-3.5" aria-hidden />
+          Add task
+        </button>
+      </CreateIssueDialog>
     </div>
   )
 }
@@ -731,6 +811,8 @@ export default function ProjectBoardPage() {
                 status={status}
                 issues={issuesByStatus.get(status.id) ?? []}
                 statuses={sortedStatuses}
+                workspaceSlug={workspace}
+                projectId={projectId}
                 onStatusChange={handleStatusChange}
                 onDeleteStatus={handleDeleteStatus}
                 onRenameStatus={handleRenameStatus}
