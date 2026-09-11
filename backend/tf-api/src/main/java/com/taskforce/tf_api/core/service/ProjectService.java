@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +20,7 @@ import com.taskforce.tf_api.core.dto.response.ProjectActivitySeriesResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectHealthPointResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectMemberResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectResponse;
+import com.taskforce.tf_api.core.event.ProjectCreatedEvent;
 import com.taskforce.tf_api.core.enums.ProjectRole;
 import com.taskforce.tf_api.core.enums.ProjectStatus;
 import com.taskforce.tf_api.core.dto.response.ProjectTeamResponse;
@@ -71,6 +73,7 @@ public class ProjectService {
     private final IssueRepository          issueRepository;
     private final IssueService             issueService;
     private final ProjectVisibilityGuard   visibilityGuard;
+    private final ApplicationEventPublisher events; // Brain OS : fiche projet a la creation (cf. BrainIngestionListener)
 
     /**
      * Plafond « façon GitHub » : nombre max de collaborateurs sur un projet PRIVÉ en forfait Free
@@ -276,6 +279,10 @@ public class ProjectService {
 
         // Seed labels par défaut
         seedDefaultLabels(project);
+
+        // Le graphe se nourrit tout seul : la creation d'un projet ecrit sa fiche de contexte dans le
+        // Brain OS (apres commit, hors requete HTTP ; cf. BrainIngestionListener). Effet de bord best-effort.
+        events.publishEvent(new ProjectCreatedEvent(workspaceSlug, workspace.getId(), project.getId(), requestingUserId));
 
         return toResponse(project, false);
     }

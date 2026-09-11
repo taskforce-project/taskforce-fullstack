@@ -21,6 +21,9 @@ public class UpdateWorkspaceRequest {
     @Size(max = 500, message = "La description ne peut pas dépasser 500 caractères")
     private String description;
 
+    @Size(max = 500, message = "L'activité ne peut pas dépasser 500 caractères")
+    private String activity;
+
     @Size(max = 1000, message = "L'URL du logo ne peut pas dépasser 1000 caractères")
     private String logoUrl;
 }

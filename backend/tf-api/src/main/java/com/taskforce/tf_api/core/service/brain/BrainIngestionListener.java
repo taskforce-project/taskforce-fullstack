@@ -7,6 +7,8 @@ import org.springframework.transaction.event.TransactionalEventListener;
 
 import com.taskforce.tf_api.core.event.CycleCompletedEvent;
 import com.taskforce.tf_api.core.event.IssueCompletedEvent;
+import com.taskforce.tf_api.core.event.ProjectCreatedEvent;
+import com.taskforce.tf_api.core.event.WorkspaceContextEvent;
 import com.taskforce.tf_api.core.service.brain.BrainIngestionService.CycleFacts;
 
 import lombok.RequiredArgsConstructor;
@@ -67,6 +69,37 @@ public class BrainIngestionListener {
                 event.workspaceSlug(), event.workspaceId(), event.userId(), cycleId, null, false);
         } catch (Exception ex) {
             log.warn("Ingestion Brain OS KO pour l'issue {} : {}", event.issueId(), ex.getMessage(), ex);
+        }
+    }
+
+    /**
+     * Projet cree -> fiche de contexte dans le Brain OS. Le contexte est la description ecrite par
+     * l'equipe : aucun LLM (on ne paraphrase pas un texte deja fourni), ecriture directe et gratuite.
+     * Le node ancre aussi la region du projet dans le graphe (cf. BrainGraph / regions par projet).
+     */
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onProjectCreated(ProjectCreatedEvent event) {
+        try {
+            ingestion.writeProjectNode(
+                event.workspaceSlug(), event.workspaceId(), event.userId(), event.projectId());
+        } catch (Exception ex) {
+            log.warn("Ingestion Brain OS KO pour le projet {} : {}", event.projectId(), ex.getMessage(), ex);
+        }
+    }
+
+    /**
+     * Contexte metier de l'espace renseigne (onboarding / creation) -> fiche « Contexte » dans le Brain OS.
+     * Comme la fiche projet : aucun LLM (l'activite est le texte de l'equipe). Node transverse (hors projet),
+     * il se pose dans la « Base commune » au centre du graphe.
+     */
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onWorkspaceContext(WorkspaceContextEvent event) {
+        try {
+            ingestion.writeWorkspaceNode(event.workspaceSlug(), event.workspaceId(), event.userId());
+        } catch (Exception ex) {
+            log.warn("Ingestion Brain OS KO pour le contexte de l'espace {} : {}", event.workspaceId(), ex.getMessage(), ex);
         }
     }
 }

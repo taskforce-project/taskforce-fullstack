@@ -4,5 +4,6 @@ package com.taskforce.tf_api.core.enums;
 public enum NodeRefType {
     ISSUE,
     PROJECT,
-    CYCLE
+    CYCLE,
+    WORKSPACE
 }

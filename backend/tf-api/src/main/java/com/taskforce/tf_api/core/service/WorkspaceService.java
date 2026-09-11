@@ -6,8 +6,11 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import com.taskforce.tf_api.core.event.WorkspaceContextEvent;
 
 import com.taskforce.tf_api.core.dto.request.CreateWorkspaceRequest;
 import com.taskforce.tf_api.core.dto.request.InviteMemberRequest;
@@ -47,6 +50,7 @@ public class WorkspaceService {
     private final UserRepository userRepository;
     private final AuditService auditService;
     private final BrainSeedingService brainSeedingService;
+    private final ApplicationEventPublisher events; // Brain OS : fiche de contexte de l'espace (cf. BrainIngestionListener)
 
     // Limites de workspaces par plan (les membres sont illimités : tarification par membre/mois)
     private static final long MAX_WORKSPACES_FREE = 2;
@@ -153,6 +157,7 @@ public class WorkspaceService {
             .name(request.getName())
             .slug(slug)
             .description(request.getDescription())
+            .activity(request.getActivity())
             .owner(owner)
             .build();
 
@@ -169,7 +174,16 @@ public class WorkspaceService {
         // Amorçage du Brain OS selon le gabarit choisi (BLANK par défaut).
         brainSeedingService.seedBrain(workspace, parseBrainTemplate(request.getBrainTemplate()), owner.getEmail());
 
+        // Contexte metier renseigne des la creation -> fiche de contexte dans le Brain OS (apres commit).
+        if (hasText(request.getActivity())) {
+            events.publishEvent(new WorkspaceContextEvent(workspace.getSlug(), workspace.getId(), userId));
+        }
+
         return toResponse(workspace);
+    }
+
+    private static boolean hasText(String s) {
+        return s != null && !s.isBlank();
     }
 
     /** Parse le gabarit de brain demandé ; tolère null/invalide → BLANK. */
@@ -306,8 +320,18 @@ public class WorkspaceService {
         if (request.getLogoUrl() != null) {
             workspace.setLogoUrl(request.getLogoUrl());
         }
+        if (request.getActivity() != null) {
+            workspace.setActivity(request.getActivity());
+        }
 
-        return toResponse(workspaceRepository.save(workspace));
+        WorkspaceResponse response = toResponse(workspaceRepository.save(workspace));
+
+        // Contexte metier (re)renseigne -> (re)ecrit la fiche de contexte dans le Brain OS (apres commit).
+        // C'est le chemin de l'onboarding (le 1er espace, cree au signup, recoit son activite ici).
+        if (hasText(request.getActivity())) {
+            events.publishEvent(new WorkspaceContextEvent(workspace.getSlug(), workspace.getId(), requestingUserId));
+        }
+        return response;
     }
 
     // -------------------------------------------------------------------------
@@ -524,6 +548,7 @@ public class WorkspaceService {
             .name(workspace.getName())
             .slug(workspace.getSlug())
             .description(workspace.getDescription())
+            .activity(workspace.getActivity())
             .logoUrl(workspace.getLogoUrl())
             .ownerId(owner.getId())
             .ownerName(ownerName)
