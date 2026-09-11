@@ -373,11 +373,17 @@ html.high-contrast {
   --sidebar-border: #000000;
 }
 
-/* Mode daltonien (option) : filtre de correction (daltonisation) sur <body> → toute l'app, portails
-   inclus. Défs SVG dans <A11yFilters/>. Sans effet sur le layout (body ≈ viewport, ne scrolle pas). */
-html.cb-protanopia   body { filter: url("#cb-protanopia"); }
-html.cb-deuteranopia body { filter: url("#cb-deuteranopia"); }
-html.cb-tritanopia   body { filter: url("#cb-tritanopia"); }
+/* Mode daltonien (option) : filtre de correction (daltonisation) sur le conteneur d'app `#app-root`,
+   PAS sur <body>. Un `filter` cree un bloc conteneur pour les descendants `position: fixed` : mis sur
+   <body> (qui grandit avec le contenu, cf. min-height:100svh + board large), il decalait les modals
+   Radix (portails dans <body>) et laissait le voile ne pas couvrir tout le viewport -> la board
+   transparaissait a droite. En le posant sur `#app-root`, les portails (voile/modals/menus/toasts,
+   rendus HORS de `#app-root` dans <body>) restent bien fixes au viewport. Contrepartie assumee : ces
+   portails ne sont pas daltonises (le filtre est un bonus ; le design gere deja le daltonisme par
+   couleur+icone+libelle). Defs SVG dans <A11yFilters/>. */
+html.cb-protanopia   #app-root { filter: url("#cb-protanopia"); }
+html.cb-deuteranopia #app-root { filter: url("#cb-deuteranopia"); }
+html.cb-tritanopia   #app-root { filter: url("#cb-tritanopia"); }
 
 /* Aucune surface shadcn/radix ne floute son arrière-plan : design plat */
 [data-sidebar="sidebar"],

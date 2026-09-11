@@ -173,7 +173,7 @@ export function BulkAssignDialog({ slug, projectId, issues }: BulkAssignDialogPr
           </div>
         ) : ran && rows.length > 0 ? (
           <div className="flex flex-col gap-2">
-            <div className="flex flex-col divide-y divide-border/60 overflow-hidden rounded-lg border border-border">
+            <div className="flex max-h-[55vh] flex-col divide-y divide-border/60 overflow-y-auto rounded-lg border border-border">
               {rows.map((r) => {
                 const isAgent = r.candidate.kind === "agent"
                 const name = r.candidate.displayName ?? r.candidate.email ?? "Agent"

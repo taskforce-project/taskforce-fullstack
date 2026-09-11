@@ -46,7 +46,10 @@ export default function RootLayout({
             <TooltipProvider>
               <ErrorBoundary>
                 <AuthProvider>
-                  {children}
+                  {/* Conteneur d'app : porte le filtre daltonien (cf. globals.css). Les portails Radix
+                      (modals/voile/menus) + le Toaster + la banniere cookie vivent HORS de ce div ->
+                      leur `position: fixed` reste ancree au viewport meme en mode daltonien. */}
+                  <div id="app-root">{children}</div>
                   <CookieBanner />
                 </AuthProvider>
               </ErrorBoundary>
