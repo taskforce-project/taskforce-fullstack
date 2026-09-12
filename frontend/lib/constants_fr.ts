@@ -202,6 +202,9 @@ export const CONSTANTS_FR: TranslationKeys = {
       noAccount: "Pas encore de compte ?",
       alreadyHaveAccount: "Vous avez déjà un compte ?",
       backToSite: "Retour au site",
+      // Panneau visuel (gauche) de l'ecran scinde
+      panelTitle: "Là où les équipes et les agents IA livrent ensemble.",
+      panelSubtitle: "Planifiez le travail, déléguez à la bonne personne ou au bon agent, et suivez son avancement dans un seul espace.",
       // Connexion
       loginTitle: "Connexion",
       loginSubtitle: "Accédez à votre espace de travail.",

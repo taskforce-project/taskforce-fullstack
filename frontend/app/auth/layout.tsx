@@ -1,7 +1,7 @@
 "use client";
 
 import { usePreferencesStore } from "@/lib/store/preferences-store";
-import { Moon, Sun, ArrowLeft } from "lucide-react";
+import { Moon, Sun } from "lucide-react";
 import { useSyncExternalStore } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -10,19 +10,16 @@ import { AppFooter } from "@/components/layout/app-footer";
 import { SITE_URL } from "@/lib/config/urls";
 
 /**
- * Coquille des pages d'authentification.
+ * Coquille des pages d'authentification - **ecran scinde**.
  *
- * Trois bandes en grille : barre supérieure, contenu centré, footer. La hauteur est verrouillée à
- * 100svh et le débordement masqué - ces pages sont un passage, elles ne doivent pas défiler.
+ * A GAUCHE (>= 1024px) un panneau de marque : fond sombre, grain recree en interne (feTurbulence, aucune
+ * dependance), titre produit et une **capture reelle de l'app**. A DROITE le formulaire, sur fond de
+ * theme, en trois bandes (barre · contenu centre · mention legale). Sous 1024px le panneau cede la place
+ * et le formulaire prend toute la largeur (la marque revient alors dans la barre). Hauteur 100svh, sans
+ * defilement : ces pages restent un passage.
  *
- * **Regroupement à gauche** : la marque et le retour au site forment un seul bloc, plutôt que d'être
- * jetés aux deux extrémités d'une barre par ailleurs vide. La droite ne porte que les réglages et
- * **l'action opposée à la page courante** - proposer « Créer un compte » sur la page de connexion,
- * et « Se connecter » sur les pages d'inscription. C'est la convention des applications qui font
- * cet écran correctement : la barre cesse d'être décorative et devient un raccourci utile.
- *
- * Le footer est **celui de l'application** (`AppFooter`), sans marges négatives : ces pages en font
- * techniquement partie, il n'y a aucune raison d'en entretenir un second.
+ * Le panneau gauche est un decor de marque volontairement sombre dans les deux themes ; seule la colonne
+ * formulaire suit le theme clair/sombre.
  */
 export default function AuthLayout({
   children,
@@ -32,86 +29,94 @@ export default function AuthLayout({
   const { theme, toggleTheme, t } = usePreferencesStore();
   const pathname = usePathname();
 
-  // Les préférences viennent du stockage local : rendues côté serveur, elles produiraient un écart
-  // d'hydratation (mauvais thème, mauvaise langue pendant une frame). On attend donc le client.
-  //
-  // `useSyncExternalStore` plutôt qu'un `useState` + `useEffect` : c'est le motif prévu pour cette
-  // question précise - l'instantané serveur vaut `false`, l'instantané client `true`, sans appeler
-  // `setState` depuis un effet, ce que le linter du projet signale à juste titre.
+  // Preferences = stockage local : rendues cote serveur elles produiraient un ecart d'hydratation.
+  // `useSyncExternalStore` (instantane serveur=false, client=true) evite un setState dans un effet.
   const mounted = useSyncExternalStore(
     () => () => { },
     () => true,
     () => false
   );
 
-  // Sur la connexion on propose l'inscription, partout ailleurs on propose la connexion.
+  // Sur la connexion on propose l'inscription, partout ailleurs la connexion.
   const onLoginPage = pathname?.startsWith("/auth/login") ?? false;
   const opposite = onLoginPage
     ? { href: "/auth/register", label: t.auth.ui.createAccount }
     : { href: "/auth/login", label: t.auth.ui.signIn };
 
-  // « Le site » n'est PAS la racine de cette application : le site vitrine est un projet Astro
-  // distinct, servi sur une autre origine - `www.example.com` face à `app.example.com` en
-  // production, un autre port en développement. Pointer `/` renvoyait donc au tableau de bord.
-  //
-  // Conséquence directe : ce sont des `<a>` et non des `<Link>`. `Link` sert la navigation interne
-  // de Next ; l'employer pour une autre origine déclenche une tentative de navigation côté client
-  // sur une route qui n'existe pas ici.
+  // « Le site » est un projet Astro sur une autre origine (www vs app) -> `<a>`, pas `<Link>`.
   const siteUrl = SITE_URL;
 
   return (
     <div className="auth-shell">
-      <header className="auth-topbar">
-        <div className="auth-topbar-left">
-          {/* Le logo seul, sans le mot « TaskForce » à côté : la marque est dans le dessin, la
-              répéter en texte n'apprend rien et bridait la taille du signe. Le nom reste porté par
-              l'`aria-label` du lien - les lecteurs d'écran annoncent toujours « TaskForce ».
-              Dimensionné par la HAUTEUR : le fichier est plus large que haut (rapport ~3:2), fixer
-              la largeur revenait à laisser la hauteur décider seule. */}
-          <a href={siteUrl} className="auth-brand" aria-label="TaskForce, retour au site">
+      {/* ── Panneau de marque (gauche, desktop) : grain interne + capture reelle de l'app ── */}
+      <aside className="auth-aside">
+        <div className="auth-aside-noise" />
+        <div className="auth-aside-content">
+          <a href={siteUrl} className="auth-aside-brand" aria-label="TaskForce, retour au site">
             <Image
               src="/assets/logo/logo_taskforce_tp.png"
-              alt=""
+              alt="TaskForce"
               width={120}
               height={80}
               priority
-              className="h-20 w-auto dark:invert"
+              className="h-12 w-auto invert"
             />
           </a>
 
-          <a href={siteUrl} className="auth-back-link">
-            <ArrowLeft className="h-3.5 w-3.5" />
-            {t.auth.ui.backToSite}
-          </a>
-        </div>
+          <div className="auth-aside-copy">
+            <h2 className="auth-aside-title">{t.auth.ui.panelTitle}</h2>
+            <p className="auth-aside-subtitle">{t.auth.ui.panelSubtitle}</p>
+          </div>
 
-        <div className="auth-actions">
-          {mounted && (
-            <>
+          <div className="auth-aside-shot">
+            <Image
+              src="/screens/dashboard.webp"
+              alt=""
+              width={1600}
+              height={862}
+              priority
+              className="auth-aside-shot-img"
+            />
+          </div>
+        </div>
+      </aside>
+
+      {/* ── Colonne formulaire (droite) : barre · contenu · footer ── */}
+      <div className="auth-formcol">
+        <header className="auth-topbar">
+          <a href={siteUrl} className="auth-brand-mobile" aria-label="TaskForce, retour au site">
+            <Image
+              src="/assets/logo/logo_taskforce_tp.png"
+              alt=""
+              width={96}
+              height={64}
+              priority
+              className="h-9 w-auto dark:invert"
+            />
+          </a>
+
+          <div className="auth-actions">
+            {mounted && (
               <button
                 type="button"
                 className="auth-icon-btn"
                 onClick={toggleTheme}
                 aria-label={t.accessibility.toggleTheme}
               >
-                {theme === "dark" ? (
-                  <Sun className="h-4 w-4" />
-                ) : (
-                  <Moon className="h-4 w-4" />
-                )}
+                {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </button>
-            </>
-          )}
+            )}
 
-          <Link href={opposite.href} className="auth-cta-btn">
-            {opposite.label}
-          </Link>
-        </div>
-      </header>
+            <Link href={opposite.href} className="auth-cta-btn">
+              {opposite.label}
+            </Link>
+          </div>
+        </header>
 
-      <main className="auth-main">{children}</main>
+        <main className="auth-main">{children}</main>
 
-      <AppFooter bleed={false} />
+        <AppFooter bleed={false} />
+      </div>
     </div>
   );
 }

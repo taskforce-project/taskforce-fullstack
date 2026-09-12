@@ -510,33 +510,110 @@ textarea:not([disabled]) { cursor: text; }
 @layer components {
 
   /* ══════════════════════════════════════════════════════════════════════════
-     AUTH - coquille plein écran, sans défilement
+     AUTH - ecran scinde, sans défilement
      ─────────────────────────────────────────────────────────────────────────
-     Parti pris : une seule colonne centrée sur fond calme. Pas de panneau
-     latéral, pas de décor animé. Les pages d'authentification sont un passage,
-     pas une destination - tout ce que l'œil n'a pas besoin de voir est retiré.
-     La hauteur est verrouillée à 100svh (`svh` et non `vh` : sur mobile, la
-     barre d'URL rétractable fausse `vh` et réintroduit un défilement).
+     Parti pris (revu) : ecran scinde facon SaaS. A GAUCHE un panneau de marque
+     (fond sombre, grain recree en interne via feTurbulence, capture reelle de
+     l'app) ; a DROITE le formulaire, sur fond de theme. Le panneau gauche cede
+     la place sous 1024px (le formulaire prend toute la largeur). Hauteur
+     verrouillée à 100svh (`svh` et non `vh` : sur mobile la barre d'URL
+     rétractable fausse `vh` et réintroduit un défilement).
      ══════════════════════════════════════════════════════════════════════════ */
 
   .auth-shell {
     height: 100svh;
     background: var(--background);
     display: grid;
-    grid-template-rows: auto 1fr auto;  /* barre · contenu · mention légale */
+    grid-template-columns: 1fr;         /* mobile : formulaire seul */
+    overflow: hidden;
+  }
+  @media (min-width: 1024px) {
+    /* Le visuel est un poil plus large que le formulaire : il porte le recit, le form reste concentre. */
+    .auth-shell { grid-template-columns: 1.1fr 1fr; }
+  }
+
+  /* Colonne formulaire (droite) : reprend les 3 bandes barre · contenu · mention legale. */
+  .auth-formcol {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    min-height: 0;
     overflow: hidden;
   }
 
-  /* ── Barre supérieure : marque à gauche, rien au centre, actions à droite ── */
-  /* La hauteur suit le logo, pas l'inverse : 80 px de signe plus 6 px d'air de part et d'autre.
-     Passer de 56 à 92 px prend 36 px sur le budget vertical du contenu - assumé, c'est le prix
-     demandé pour un logo deux fois plus grand. */
+  /* ── Panneau de marque (gauche) : masqué sous 1024px ── */
+  .auth-aside {
+    position: relative;
+    display: none;
+    overflow: hidden;
+    color: #eef2ff;
+    background:
+      radial-gradient(120% 85% at 12% 0%, rgba(37, 99, 235, 0.38) 0%, rgba(37, 99, 235, 0) 55%),
+      radial-gradient(90% 70% at 100% 100%, rgba(59, 130, 246, 0.22) 0%, rgba(59, 130, 246, 0) 50%),
+      linear-gradient(155deg, #0a1122 0%, #0b1a35 55%, #070d1c 100%);
+  }
+  @media (min-width: 1024px) { .auth-aside { display: flex; } }
+
+  /* Grain recree en interne (feTurbulence desature), sans dependance ni image externe. */
+  .auth-aside-noise {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.14;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  .auth-aside-content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    padding: 3rem 3rem 0;
+    gap: 2rem;
+  }
+  .auth-aside-brand { display: inline-flex; align-items: center; }
+  .auth-aside-copy { max-width: 30rem; }
+  .auth-aside-title {
+    font-size: clamp(1.6rem, 2.2vw, 2.1rem);
+    font-weight: 600;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+  .auth-aside-subtitle {
+    margin-top: 0.9rem;
+    font-size: 1rem;
+    line-height: 1.55;
+    color: rgba(238, 242, 255, 0.68);
+  }
+  /* La capture flotte en bas et deborde le bord bas (clippee par le panneau) : fenetre d'app posee. */
+  .auth-aside-shot { margin-top: auto; display: flex; justify-content: center; }
+  .auth-aside-shot-img {
+    width: 100%;
+    max-width: 46rem;
+    height: auto;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-bottom: none;
+    border-radius: 12px 12px 0 0;
+    box-shadow: 0 -10px 44px rgba(0, 0, 0, 0.45);
+    transform: translateY(6px);
+  }
+
+  /* Marque affichee dans la barre du formulaire uniquement en mobile (en desktop elle vit sur le panneau).
+     N'utilise QUE cette classe (pas .auth-brand, defini plus bas, qui gagnerait par ordre source). */
+  .auth-brand-mobile { display: inline-flex; align-items: center; flex-shrink: 0; }
+  @media (min-width: 1024px) { .auth-brand-mobile { display: none; } }
+
+  /* ── Barre de la colonne formulaire : marque (mobile) à gauche, actions à droite ── */
+  /* Depuis l'ecran scinde, la marque desktop vit sur le panneau gauche : cette barre ne porte plus
+     qu'un petit logo (mobile) + le theme + l'action opposee. Hauteur ramenee a 4rem en consequence. */
   .auth-topbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
-    height: 5.75rem;
+    height: 4rem;
     padding: 0 1rem;
   }
   @media (min-width: 640px) {
@@ -584,6 +661,7 @@ textarea:not([disabled]) { cursor: text; }
     display: flex;
     align-items: center;
     gap: 0.375rem;
+    margin-left: auto;   /* colle les actions a droite meme quand la marque (mobile) est masquee en desktop */
   }
 
   /* Action opposée à la page courante (créer un compte / se connecter). */
@@ -676,25 +754,8 @@ textarea:not([disabled]) { cursor: text; }
     font-size: 0.875rem;
   }
 
-  /* ── Connexion via un fournisseur externe ── */
-  .auth-social-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    height: 2.375rem;
-    border-radius: var(--radius-md);
-    border: 1px solid var(--border);
-    background: var(--card);
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: var(--label-primary);
-    transition: background 140ms ease, border-color 140ms ease;
-  }
-  .auth-social-btn:hover {
-    background: var(--fill-secondary);
-    border-color: var(--label-quaternary);
-  }
+  /* Connexion via un fournisseur externe : boutons shadcn `Button variant="outline"` (hover propre,
+     coherent avec le reste de l'app) - plus de classe `.auth-social-btn` maison. */
 
   /* Séparateur « ou » : filet continu barré par le libellé, plutôt que deux traits à ajuster. */
   .auth-separator {

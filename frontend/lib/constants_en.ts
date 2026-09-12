@@ -201,6 +201,9 @@ export const CONSTANTS_EN = {
       noAccount: "Don't have an account?",
       alreadyHaveAccount: "Already have an account?",
       backToSite: "Back to site",
+      // Split-screen visual panel (left)
+      panelTitle: "Where teams and AI agents ship together.",
+      panelSubtitle: "Plan the work, delegate to the right person or agent, and watch it move, all in one workspace.",
       // Login
       loginTitle: "Sign in",
       loginSubtitle: "Access your workspace.",
