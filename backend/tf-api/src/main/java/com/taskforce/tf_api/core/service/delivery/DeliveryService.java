@@ -1,7 +1,9 @@
 package com.taskforce.tf_api.core.service.delivery;
 
+import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -88,6 +90,23 @@ public class DeliveryService {
         Issue issue = scopedIssue(slug, issueId);
         visibilityGuard.assertCanView(issue.getProject(), userId);
         return runRepository.findTopByIssueIdOrderByCreatedAtDesc(issue.getId()).map(this::toResponse);
+    }
+
+    /** Nombre de runs renvoyés par la vue workflow (borne le payload + le rendu du canvas). */
+    private static final int RUNS_CAP = 200;
+
+    /**
+     * Runs de délégation du workspace, les plus récents d'abord (vue « workflow » : les délégations
+     * vers agents, plusieurs en parallèle). Borné aux projets visibles par l'utilisateur (jamais de
+     * fuite d'un projet privé) et plafonné.
+     */
+    @Transactional(readOnly = true)
+    public List<DeliveryRunResponse> listRuns(String slug, Long userId) {
+        Workspace ws = access.resolveAndAuthorize(slug, userId);
+        List<Long> projectIds = visibilityGuard.viewableProjectIds(ws.getId(), userId);
+        if (projectIds.isEmpty()) return List.of();
+        return runRepository.findByProjectIds(projectIds, PageRequest.of(0, RUNS_CAP))
+            .stream().map(this::toResponse).toList();
     }
 
     // =========================================================================

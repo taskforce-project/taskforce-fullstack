@@ -2,6 +2,7 @@ import { create } from "zustand";
 import {
   getDeliveryProviders,
   getIssueRun,
+  listWorkspaceRuns,
   delegateIssue,
   getDeliveryKey,
   connectDeliveryKey,
@@ -23,11 +24,14 @@ interface DeliveryState {
   providersLoading: boolean;
   /** Dernier run par issueId (`null` = chargé mais aucune délégation). */
   runs: Record<number, DeliveryRun | null>;
+  /** Runs de délégation du workspace (vue « workflow »), les plus récents d'abord. */
+  workspaceRuns: DeliveryRun[];
   /** État des clés de délégation par provider ("anthropic" | "cursor"). Absent = pas encore chargé. */
   keys: Record<string, DeliveryKeyStatus>;
 
   fetchProviders: (slug: string) => Promise<DeliveryProvider[]>;
   fetchRun: (slug: string, issueId: number) => Promise<DeliveryRun | null>;
+  fetchWorkspaceRuns: (slug: string) => Promise<DeliveryRun[]>;
   delegate: (slug: string, issueId: number, providerKey: string, model?: string) => Promise<DeliveryRun | null>;
   fetchKey: (slug: string, provider: DeliveryKeyProvider) => Promise<DeliveryKeyStatus | null>;
   connectKey: (slug: string, provider: DeliveryKeyProvider, apiKey: string) => Promise<DeliveryKeyStatus | null>;
@@ -38,6 +42,7 @@ export const useDeliveryStore = create<DeliveryState>((set) => ({
   providers: [],
   providersLoading: false,
   runs: {},
+  workspaceRuns: [],
   keys: {},
 
   fetchProviders: async (slug) => {
@@ -59,6 +64,16 @@ export const useDeliveryStore = create<DeliveryState>((set) => ({
       return run;
     } catch {
       return null;
+    }
+  },
+
+  fetchWorkspaceRuns: async (slug) => {
+    try {
+      const runs = await listWorkspaceRuns(slug);
+      set({ workspaceRuns: runs });
+      return runs;
+    } catch {
+      return [];
     }
   },
 
