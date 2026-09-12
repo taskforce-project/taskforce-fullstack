@@ -3,6 +3,7 @@ import {
   getDeliveryProviders,
   delegateIssue,
   getIssueRun,
+  listWorkspaceRuns,
   getDeliveryKey,
   connectDeliveryKey,
   disconnectDeliveryKey,
@@ -58,6 +59,22 @@ describe('delivery-service', () => {
 
     expect(apiClient.get).toHaveBeenCalledWith(DELIVERY_ROUTES.RUN(SLUG, 5));
     expect(res).toBeNull();
+  });
+
+  it('listWorkspaceRuns GET les runs du workspace (silentError, [] si vide)', async () => {
+    const runs = [
+      { id: 1, issueId: 5, providerKey: 'stub', model: null, status: 'RUNNING', summary: null, resultUrl: null, error: null, startedById: 7, createdAt: null, updatedAt: null },
+    ];
+    vi.mocked(apiClient.get).mockResolvedValue(envelope(runs));
+    const res = await listWorkspaceRuns(SLUG);
+    expect(apiClient.get).toHaveBeenCalledWith(DELIVERY_ROUTES.RUNS(SLUG), { silentError: true });
+    expect(res).toEqual(runs);
+  });
+
+  it('listWorkspaceRuns retourne [] si data null', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue(envelope(null));
+    const res = await listWorkspaceRuns(SLUG);
+    expect(res).toEqual([]);
   });
 
   it('getDeliveryKey GET l’état de la clé (anthropic)', async () => {

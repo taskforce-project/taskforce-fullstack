@@ -7,6 +7,7 @@ import * as svc from '../api/delivery-service';
 vi.mock('../api/delivery-service', () => ({
   getDeliveryProviders: vi.fn(),
   getIssueRun: vi.fn(),
+  listWorkspaceRuns: vi.fn(),
   delegateIssue: vi.fn(),
   getDeliveryKey: vi.fn(),
   connectDeliveryKey: vi.fn(),
@@ -28,7 +29,7 @@ const PROVIDERS: DeliveryProvider[] = [
 describe('delivery-store', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    act(() => useDeliveryStore.setState({ providers: [], providersLoading: false, runs: {}, keys: {} }));
+    act(() => useDeliveryStore.setState({ providers: [], providersLoading: false, runs: {}, workspaceRuns: [], keys: {} }));
   });
 
   it('fetchProviders loads the providers', async () => {
@@ -60,6 +61,23 @@ describe('delivery-store', () => {
     let res: DeliveryRun | null = makeRun();
     await act(async () => { res = await useDeliveryStore.getState().fetchRun('acme', 5); });
     expect(res).toBeNull();
+  });
+
+  it('fetchWorkspaceRuns loads the workspace runs', async () => {
+    const runs = [makeRun({ id: 1, issueId: 5 }), makeRun({ id: 2, issueId: 8, status: 'RUNNING' })];
+    vi.mocked(svc.listWorkspaceRuns).mockResolvedValue(runs);
+    let res: DeliveryRun[] = [];
+    await act(async () => { res = await useDeliveryStore.getState().fetchWorkspaceRuns('acme'); });
+    expect(res).toEqual(runs);
+    expect(useDeliveryStore.getState().workspaceRuns).toEqual(runs);
+    expect(svc.listWorkspaceRuns).toHaveBeenCalledWith('acme');
+  });
+
+  it('fetchWorkspaceRuns returns [] on failure', async () => {
+    vi.mocked(svc.listWorkspaceRuns).mockRejectedValue(new Error('x'));
+    let res: DeliveryRun[] = [makeRun()];
+    await act(async () => { res = await useDeliveryStore.getState().fetchWorkspaceRuns('acme'); });
+    expect(res).toEqual([]);
   });
 
   it('delegate stores the new run', async () => {
