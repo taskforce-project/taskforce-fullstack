@@ -4,6 +4,7 @@ import { Github } from "lucide-react";
 import { toast } from "sonner";
 import { authService } from "@/lib/api/auth-service";
 import { usePreferencesStore } from "@/lib/store/preferences-store";
+import { Button } from "@/components/ui/button";
 
 /**
  * Connexion via un fournisseur externe (GitHub, Google).
@@ -91,10 +92,11 @@ export function AuthSocialButtons() {
             // Un bouton et non un lien : l'URL de départ n'est pas connue d'avance, elle est demandée
             // au serveur parce qu'elle porte l'état anti-CSRF signé.
             return (
-              <button
+              <Button
                 key={key}
                 type="button"
-                className="auth-social-btn"
+                variant="outline"
+                className="w-full gap-2"
                 onClick={() => {
                   void authService
                     .oauthAuthorizeUrl(key, `${window.location.origin}/auth/callback`)
@@ -110,15 +112,16 @@ export function AuthSocialButtons() {
               >
                 <Icon className="h-4 w-4" />
                 {label}
-              </button>
+              </Button>
             );
           }
 
           return (
-            <button
+            <Button
               key={key}
               type="button"
-              className="auth-social-btn"
+              variant="outline"
+              className="w-full gap-2"
               aria-describedby={`${key}-indispo`}
               onClick={() =>
                 toast.info(t.auth.ui.socialComingSoonTitle.replace("{provider}", label), {
@@ -131,7 +134,7 @@ export function AuthSocialButtons() {
               <span id={`${key}-indispo`} className="sr-only">
                 {t.auth.ui.socialComingSoonBadge}
               </span>
-            </button>
+            </Button>
           );
         })}
       </div>
