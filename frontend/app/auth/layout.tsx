@@ -56,10 +56,10 @@ export default function AuthLayout({
             <Image
               src="/assets/logo/logo_taskforce_tp.png"
               alt="TaskForce"
-              width={120}
-              height={80}
+              width={150}
+              height={100}
               priority
-              className="h-12 w-auto invert"
+              className="h-16 w-auto"
             />
           </a>
 

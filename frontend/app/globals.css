@@ -540,31 +540,55 @@ textarea:not([disabled]) { cursor: text; }
     overflow: hidden;
   }
 
-  /* ── Panneau de marque (gauche) : masqué sous 1024px ── */
+  /* ── Panneau de marque (gauche) : masqué sous 1024px. Fond = la vague du Lab (couleurs de marque),
+     floutee, + un striped noise par-dessus. Texte sombre (le fond est clair). ── */
   .auth-aside {
     position: relative;
     display: none;
     overflow: hidden;
-    color: #eef2ff;
-    background:
-      radial-gradient(120% 85% at 12% 0%, rgba(37, 99, 235, 0.38) 0%, rgba(37, 99, 235, 0) 55%),
-      radial-gradient(90% 70% at 100% 100%, rgba(59, 130, 246, 0.22) 0%, rgba(59, 130, 246, 0) 50%),
-      linear-gradient(155deg, #0a1122 0%, #0b1a35 55%, #070d1c 100%);
+    isolation: isolate;
+    color: #1d1d1f;
+    background: #f2eef1;          /* repli proche de la vague avant chargement de l'image */
   }
   @media (min-width: 1024px) { .auth-aside { display: flex; } }
 
-  /* Grain recree en interne (feTurbulence desature), sans dependance ni image externe. */
+  /* La vague du Lab en fond, floutee (« le lab en fond, un blur au dessus »). Deborde pour masquer
+     les bords flous ; scale pour remplir apres le blur. */
+  .auth-aside::before {
+    content: "";
+    position: absolute;
+    inset: -60px;
+    z-index: 0;
+    background: url("/assets/tour/labs-wave.jpg") center / cover no-repeat;
+    filter: blur(46px) saturate(1.18);
+    transform: scale(1.18);
+  }
+  /* Voile clair (haut -> bas) : garde le titre lisible sans repasser au bleu nuit. */
+  .auth-aside::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background: linear-gradient(180deg, rgba(248, 246, 248, 0.78) 0%, rgba(248, 246, 248, 0.34) 42%, rgba(248, 246, 248, 0) 100%);
+  }
+
+  /* Striped noise : fines rayures + grain (feTurbulence desature), en multiply par-dessus la vague. */
   .auth-aside-noise {
     position: absolute;
     inset: 0;
+    z-index: 2;
     pointer-events: none;
-    opacity: 0.14;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    opacity: 0.55;
+    mix-blend-mode: multiply;
+    background-image:
+      repeating-linear-gradient(0deg, rgba(15, 20, 40, 0.07) 0, rgba(15, 20, 40, 0.07) 1px, transparent 1px, transparent 5px),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: auto, 150px 150px;
   }
 
   .auth-aside-content {
     position: relative;
-    z-index: 1;
+    z-index: 3;
     display: flex;
     flex-direction: column;
     width: 100%;
@@ -575,9 +599,9 @@ textarea:not([disabled]) { cursor: text; }
   .auth-aside-brand { display: inline-flex; align-items: center; }
   .auth-aside-copy { max-width: 30rem; }
   .auth-aside-title {
-    font-size: clamp(1.6rem, 2.2vw, 2.1rem);
-    font-weight: 600;
-    line-height: 1.15;
+    font-size: clamp(1.7rem, 2.4vw, 2.3rem);
+    font-weight: 650;
+    line-height: 1.14;
     letter-spacing: -0.02em;
     text-wrap: balance;
   }
@@ -585,7 +609,7 @@ textarea:not([disabled]) { cursor: text; }
     margin-top: 0.9rem;
     font-size: 1rem;
     line-height: 1.55;
-    color: rgba(238, 242, 255, 0.68);
+    color: rgba(29, 29, 31, 0.66);
   }
   /* La capture flotte en bas et deborde le bord bas (clippee par le panneau) : fenetre d'app posee. */
   .auth-aside-shot { margin-top: auto; display: flex; justify-content: center; }
@@ -593,10 +617,10 @@ textarea:not([disabled]) { cursor: text; }
     width: 100%;
     max-width: 46rem;
     height: auto;
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(0, 0, 0, 0.10);
     border-bottom: none;
     border-radius: 12px 12px 0 0;
-    box-shadow: 0 -10px 44px rgba(0, 0, 0, 0.45);
+    box-shadow: 0 -14px 46px rgba(24, 20, 40, 0.20);
     transform: translateY(6px);
   }
 
