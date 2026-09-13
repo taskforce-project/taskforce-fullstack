@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/layout/sidebar/app-sidebar"
 import { AppTopbar } from "@/components/layout/topbar/app-topbar"
+import { AccountDeletionBanner } from "@/components/account/account-deletion-banner"
 import { PanelDock } from "@/components/layout/panel-dock"
 import { AppFooter } from "@/components/layout/app-footer"
 import { UpgradeDialog } from "@/components/subscription/upgrade-dialog"
@@ -32,6 +33,9 @@ export function AppShell({ children }: AppShellProps) {
         {/* Invitations reçues en attente d'approbation - bannière montée hors du <main> keyé par
             la route : un seul fetch par session, persistante à la navigation. Nulle si rien. */}
         <PendingInvitationsBanner />
+        {/* Bandeau de restauration en HAUT, dans le flux (sous la topbar) : il POUSSE le contenu au
+            lieu de le masquer (l'ancienne barre fixe basse recouvrait les cartes). Nul hors suppression. */}
+        <AccountDeletionBanner />
         {/* `relative` : les panneaux (workflows / chat IA) se positionnent en OVERLAY par-dessus le
             contenu (absolute). `overflow-hidden` : pendant le slide d'ouverture le panneau part hors
             écran à droite - sans clip ici, ça crée une barre de scroll horizontale transitoire qui
