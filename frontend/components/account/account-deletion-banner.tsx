@@ -16,8 +16,9 @@ import { Button } from "@/components/ui/button"
  * Il rappelle la date de purge et propose de restaurer le compte tant que le délai court : c'est le
  * filet promis à l'utilisateur (« si je me reconnecte, est-ce que je peux récupérer mon compte ? »).
  *
- * Barre FIXE en bas : elle ne participe pas au modèle de hauteur de l'AppShell (`h-svh`), donc elle
- * s'affiche partout sans décaler le header ni la sidebar. Rend `null` hors état de suppression.
+ * Bandeau EN HAUT, dans le flux (monté sous la topbar dans l'AppShell) : il pousse le contenu vers le
+ * bas au lieu de le masquer (l'ancienne barre fixe basse recouvrait les cartes). Rend `null` hors
+ * état de suppression.
  */
 export function AccountDeletionBanner() {
   const { user, refreshUser } = useAuth()
@@ -46,8 +47,8 @@ export function AccountDeletionBanner() {
   }
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-50 border-t border-amber-500/40 bg-background/95 backdrop-blur">
-      <div className="mx-auto flex max-w-5xl flex-col items-start gap-2 px-4 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between">
+    <div className="shrink-0 border-b border-amber-500/40 bg-amber-500/5">
+      <div className="flex flex-col items-start gap-2 px-4 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between md:px-6">
         <div className="flex items-start gap-2.5">
           <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
           <p className="text-foreground">
