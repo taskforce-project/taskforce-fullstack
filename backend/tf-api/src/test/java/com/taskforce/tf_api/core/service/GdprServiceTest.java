@@ -119,6 +119,23 @@ class GdprServiceTest {
     }
 
     @Test
+    @DisplayName("deleteMyAccountImmediately : purge SUR-LE-CHAMP sans planification préalable (anonymise + Keycloak)")
+    @SuppressWarnings("unchecked")
+    void immediate_delete_purges_now() {
+        User u = user(1L); // jamais planifié (deletionScheduledAt = null)
+        when(userRepository.findById(1L)).thenReturn(Optional.of(u));
+        when(jdbcTemplate.queryForList(anyString(), eq(Long.class), any())).thenReturn(List.of()); // aucun workspace possédé
+
+        service.deleteMyAccountImmediately(1L);
+
+        // Purge effectuée immédiatement : row anonymisé, accès coupé, identité IdP supprimée.
+        assertThat(u.getEmail()).isEqualTo("deleted-1@anonymized.invalid");
+        assertThat(u.getIsActive()).isFalse();
+        assertThat(u.getDeletionScheduledAt()).isNull(); // remis à null par la purge
+        verify(keycloakService).deleteUser("kc-1");
+    }
+
+    @Test
     @DisplayName("purgeAccount : suppression déjà annulée (deletionScheduledAt null) → no-op")
     void purge_noop_if_restored() {
         User u = user(1L); // deletionScheduledAt = null
