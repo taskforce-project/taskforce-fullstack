@@ -32,7 +32,8 @@ import { BrandLogo } from "@/components/ui/brand-logo"
 import { ProfileOverview } from "@/components/profile/profile-overview"
 import { MemberSkillsCard } from "@/components/members/member-skills-card"
 import { MemberAvailabilityCard } from "@/components/members/member-availability-card"
-import { exportMyData, deleteMyAccount } from "@/lib/api/gdpr-service"
+import { exportMyData, deleteMyAccount, deleteMyAccountImmediately } from "@/lib/api/gdpr-service"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { getTwoFactorStatus, disableTwoFactor } from "@/lib/api/user-service"
 import { TwoFactorSetupDialog } from "@/components/dialogs/two-factor-setup-dialog"
 import { getAiUsage, type AiUsage } from "@/lib/api/ai-usage-service"
@@ -338,8 +339,11 @@ function ProfilePanel() {
 }
 
 function AccountPanel() {
-  const { user, refreshUser } = useAuth()
+  const { user, refreshUser, logout } = useAuth()
   const [deleting, setDeleting] = useState(false)
+  // Deux options d'effacement, au choix de l'utilisateur : planifier (grâce 30 j, récupérable) ou
+  // supprimer immédiatement (irréversible). Le défaut sûr = planifier.
+  const [mode, setMode] = useState<"schedule" | "immediate">("schedule")
 
   // Suppression de compte = droit à l'effacement RGPD (Art. 17) : vit ici, dans « Account »
   // (l'export des données, lui, est dans « Privacy & Data »). La confirmation (saisie de l'email,
@@ -369,6 +373,22 @@ function AccountPanel() {
     }
   }
 
+  // Variante IMMÉDIATE (RGPD Art. 17, choix explicite) : purge maintenant, puis on déconnecte
+  // (le compte n'existe plus). Pas de délai de grâce, aucune restauration possible.
+  const handleDeleteImmediate = async () => {
+    setDeleting(true)
+    try {
+      await deleteMyAccountImmediately()
+      toast.success("Your account has been permanently deleted.")
+      await logout() // efface la session + redirige vers /auth/login
+    } catch {
+      toast.error("Deletion failed. Try again or contact contact@taskforce-project.fr.")
+      setDeleting(false)
+    }
+  }
+
+  const immediate = mode === "immediate"
+
   return (
     <div className="flex flex-col gap-4">
       <SectionCard title="Account info" description="Manage your login and account preferences.">
@@ -379,50 +399,90 @@ function AccountPanel() {
         </div>
       </SectionCard>
 
-      <Zone variant="danger" title="Delete account" description="Schedule your account for deletion, with a 30-day grace period to restore it.">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-sm font-medium text-foreground">Delete my account</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Schedules deletion after a <span className="font-medium text-foreground">30-day grace period</span>,
-              during which you can restore your account (GDPR Art. 17 - right to erasure). After that, your
-              solo workspaces are deleted and shared ones you own are handed over to their longest-standing member.
-            </p>
-          </div>
-          {/* Confirmation façon GitHub : il faut ressaisir son email pour armer la planification. */}
-          <DeleteConfirmDialog
-            title="Delete your account?"
-            description="Your account will be scheduled for deletion after a 30-day grace period. You can restore it anytime before then."
-            details={
-              <ul className="list-disc space-y-1 pl-4">
-                <li>
-                  Your access stays active during a{" "}
-                  <span className="font-medium text-foreground">30-day grace period</span> - you can restore the account until then.
-                </li>
-                <li>
-                  After that, your solo workspaces and all their data are{" "}
-                  <span className="font-medium text-foreground">permanently deleted</span>.
-                </li>
-                <li>
-                  Shared workspaces you own are{" "}
-                  <span className="font-medium text-foreground">handed over to their longest-standing member</span>, so their work isn&apos;t lost.
-                </li>
-              </ul>
-            }
-            confirmLabel="Schedule deletion"
-            confirmText={user?.email ?? ""}
-            confirmTextLabel={
-              <>
-                To confirm, type your email{" "}
-                <span className="font-medium text-foreground">{user?.email}</span>
-              </>
-            }
-            onConfirm={handleDelete}
+      <Zone variant="danger" title="Delete account" description="Choose how to delete your account: schedule with a 30-day grace period, or delete immediately.">
+        <div className="flex flex-col gap-4">
+          <RadioGroup
+            value={mode}
+            onValueChange={(v) => setMode(v === "immediate" ? "immediate" : "schedule")}
+            className="flex flex-col gap-2"
           >
-            <Button variant="destructive" size="sm" className="shrink-0 h-8 text-xs" disabled={deleting}>
-              Delete account
-            </Button>
-          </DeleteConfirmDialog>
+            <label
+              htmlFor="del-schedule"
+              className={cn(
+                "flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors",
+                mode === "schedule" ? "border-primary bg-primary/5" : "border-border hover:bg-muted/40"
+              )}
+            >
+              <RadioGroupItem value="schedule" id="del-schedule" className="mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-foreground">
+                  Schedule deletion <span className="text-xs font-normal text-muted-foreground">(recommended)</span>
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Your account stays restorable for a <span className="font-medium text-foreground">30-day grace period</span>.
+                  After that, solo workspaces are deleted and shared ones you own are handed over to their longest-standing member.
+                </p>
+              </div>
+            </label>
+
+            <label
+              htmlFor="del-immediate"
+              className={cn(
+                "flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors",
+                mode === "immediate" ? "border-destructive bg-destructive/5" : "border-border hover:bg-muted/40"
+              )}
+            >
+              <RadioGroupItem value="immediate" id="del-immediate" className="mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-foreground">Delete immediately</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">Permanent and irreversible</span>, with no grace period.
+                  Your data is erased right now (GDPR Art. 17). Shared workspaces you own are still handed over so their work isn&apos;t lost.
+                </p>
+              </div>
+            </label>
+          </RadioGroup>
+
+          {/* Confirmation façon GitHub : il faut ressaisir son email, quel que soit le mode. */}
+          <div className="flex justify-end">
+            <DeleteConfirmDialog
+              title={immediate ? "Delete your account permanently?" : "Schedule account deletion?"}
+              description={
+                immediate
+                  ? "This permanently deletes your account right now. It cannot be undone."
+                  : "Your account will be scheduled for deletion after a 30-day grace period. You can restore it anytime before then."
+              }
+              details={
+                immediate ? (
+                  <ul className="list-disc space-y-1 pl-4">
+                    <li>Your account and personal data are <span className="font-medium text-foreground">erased immediately</span>, with no grace period.</li>
+                    <li>Your solo workspaces and all their data are <span className="font-medium text-foreground">permanently deleted now</span>.</li>
+                    <li>Shared workspaces you own are <span className="font-medium text-foreground">handed over to their longest-standing member</span>, so their work isn&apos;t lost.</li>
+                    <li>You will be signed out. <span className="font-medium text-foreground">This cannot be undone.</span></li>
+                  </ul>
+                ) : (
+                  <ul className="list-disc space-y-1 pl-4">
+                    <li>Your access stays active during a <span className="font-medium text-foreground">30-day grace period</span> - you can restore the account until then.</li>
+                    <li>After that, your solo workspaces and all their data are <span className="font-medium text-foreground">permanently deleted</span>.</li>
+                    <li>Shared workspaces you own are <span className="font-medium text-foreground">handed over to their longest-standing member</span>, so their work isn&apos;t lost.</li>
+                  </ul>
+                )
+              }
+              confirmLabel={immediate ? "Delete permanently" : "Schedule deletion"}
+              confirmText={user?.email ?? ""}
+              confirmTextLabel={
+                <>
+                  To confirm, type your email{" "}
+                  <span className="font-medium text-foreground">{user?.email}</span>
+                </>
+              }
+              onConfirm={immediate ? handleDeleteImmediate : handleDelete}
+            >
+              <Button variant="destructive" size="sm" className="h-8 shrink-0 text-xs" disabled={deleting}>
+                {immediate ? "Delete immediately" : "Schedule deletion"}
+              </Button>
+            </DeleteConfirmDialog>
+          </div>
         </div>
       </Zone>
     </div>

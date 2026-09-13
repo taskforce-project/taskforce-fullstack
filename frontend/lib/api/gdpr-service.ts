@@ -23,6 +23,15 @@ export async function deleteMyAccount(): Promise<string> {
   return res.data.data.scheduledPurgeAt;
 }
 
+/**
+ * Droit à l'effacement (RGPD Art. 17) - variante IMMÉDIATE : purge le compte SUR-LE-CHAMP, sans délai
+ * de grâce. Irréversible (double confirmation côté UI : choix explicite + ressaisie de l'email). L'Art.
+ * 17 permet l'effacement « sans délai indu » ; le délai de grâce n'est qu'un filet anti-erreur.
+ */
+export async function deleteMyAccountImmediately(): Promise<void> {
+  await apiClient.delete(`${GDPR_ROUTES.ACCOUNT()}?immediate=true`);
+}
+
 /** Annule une suppression planifiée tant que le délai de grâce court (restaure le compte courant). */
 export async function restoreMyAccount(): Promise<void> {
   await apiClient.post(GDPR_ROUTES.ACCOUNT_RESTORE());
