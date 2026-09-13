@@ -6,10 +6,10 @@ import posthog from "posthog-js"
 
 import { analyticsAllowed, CONSENT_EVENT } from "@/lib/analytics/consent"
 
-// Cle PUBLIQUE PostHog (client-side, `phc_...`) + hote UE. Bakees au build (NEXT_PUBLIC_*). Sans cle,
-// l'analytics ne charge jamais (le composant devient un no-op) : rien a casser tant que le projet
-// PostHog n'est pas cree.
-const POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY
+// Cle PROJET PostHog (client-side, `phc_...`) : PUBLIQUE et write-only (« safe to use in public apps »
+// d'apres PostHog) -> defaut en dur acceptable + surchargeable par env. Region UE (eu.i.posthog.com) :
+// aucune donnee hors UE. Sans cle, le composant est un no-op (rien ne charge).
+const POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY ?? "phc_tmS4mL7gc9zKo35GyPtM5uGkBYoTU2y2cna9acz3kkBq"
 const POSTHOG_HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST ?? "https://eu.i.posthog.com"
 
 let initialized = false
