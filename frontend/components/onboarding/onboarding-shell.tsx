@@ -150,8 +150,11 @@ export function OnboardingShell({
         </header>
 
         <div className="flex-1 overflow-y-auto">
-          <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col justify-center px-6 py-10 md:px-10">
-            {children}
+          {/* `my-auto` (pas `justify-center`) : centre l'étape quand il y a la place, mais laisse
+              défiler depuis le HAUT quand elle dépasse la hauteur visible (mobile / petits écrans),
+              au lieu de rogner le début de l'étape. */}
+          <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col px-5 py-8 sm:px-6 sm:py-10 md:px-10">
+            <div className="my-auto w-full">{children}</div>
           </div>
         </div>
 
