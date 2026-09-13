@@ -191,6 +191,12 @@ services:
       STRIPE_PRICE_ID_BASIC_YEARLY: ${STRIPE_PRICE_ID_BASIC_YEARLY}
       STRIPE_PRICE_ID_BUSINESS_YEARLY: ${STRIPE_PRICE_ID_BUSINESS_YEARLY}
 
+      # Integration OAuth GitHub (Connect GitHub a un workspace : ingestion Brain + delegation Copilot).
+      # Meme regle que Stripe : plumbe explicitement, sinon integrations.github.client-id lit "" -> 404.
+      # Defaut vide (`:`) pour ne pas crasher le boot si non renseigne.
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+
       # Chiffrement au repos des données personnelles (RGPD).
       # Le nom DOIT être TF_ENCRYPTION_KEY : c'est celui que lit `security.encryption-key`.
       # Il s'appelait ENCRYPTION_KEY jusqu'au 24/07/2026 — une variable que rien ne lisait.
