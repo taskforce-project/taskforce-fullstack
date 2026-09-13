@@ -1,26 +1,27 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { Cookie } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Field, FieldContent, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Switch } from "@/components/ui/switch";
 import { startAnalytics } from "@/lib/analytics";
 import { readConsent, writeConsent, CONSENT_OPEN_EVENT } from "@/lib/consent";
 
 /**
  * Bandeau de consentement cookies de la landing (RGPD/CNIL). Cookies **nécessaires** exemptés ;
- * **analytics** (PostHog EU) en opt-in explicite. Actions : Accepter tout / Refuser / Personnaliser
- * (+ Enregistrer). S'affiche au 1er passage (aucun choix stocké) et se rouvre via `tf-consent-open`
- * (lien « Manage cookies » du footer) pour permettre la révocation à tout moment.
+ * **analytics** (PostHog EU) en opt-in explicite. Actions : Accept all / Reject all / Manage (déplie
+ * les catégories) / Save. S'affiche au 1er passage et se rouvre via `tf-consent-open` (lien « Manage
+ * cookies » du footer) pour permettre la révocation à tout moment.
  *
  * Îlot `client:load` monté dans BaseLayout : c'est aussi lui qui initialise PostHog derrière le
- * consentement (`startAnalytics`), présent sur toutes les pages.
+ * consentement (`startAnalytics`). Design aligné sur l'app (carte d'angle, switches, entrée animée).
  */
 export function CookieConsent() {
   // Client-only (lecture localStorage) : `mounted` évite tout écart d'hydratation (serveur=false).
   const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
   const [dismissed, setDismissed] = useState(false);
   const [forceOpen, setForceOpen] = useState(false);
-  const [customize, setCustomize] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [analytics, setAnalytics] = useState(false);
 
   // PostHog : init/anti-init derrière le consentement, ré-synchronisé à chaque changement de choix.
@@ -30,7 +31,7 @@ export function CookieConsent() {
     // Réouverture : setState dans le callback (pas dans le corps de l'effet).
     const onOpen = () => {
       setAnalytics(readConsent()?.analytics ?? false);
-      setCustomize(true);
+      setExpanded(true);
       setForceOpen(true);
     };
     // 1) Évènement programmatique (`openConsentPreferences()`).
@@ -60,87 +61,88 @@ export function CookieConsent() {
     writeConsent(allowAnalytics);
     setDismissed(true);
     setForceOpen(false);
-    setCustomize(false);
+    setExpanded(false);
   };
 
   return (
     <div
-      className="fixed bottom-6 left-1/2 z-[60] w-[min(92vw,380px)] -translate-x-1/2"
       role="dialog"
-      aria-label="Cookie consent"
+      aria-modal={false}
+      aria-label="Cookie preferences"
+      className="fixed bottom-4 right-4 z-[60] flex w-[calc(100%-2rem)] max-w-sm flex-col gap-4 rounded-xl border bg-card p-5 text-card-foreground shadow-lg animate-in fade-in-0 slide-in-from-bottom-4 duration-300 motion-reduce:animate-none"
     >
-      <Card className="rounded-2xl border bg-background text-foreground shadow-lg">
-        <CardContent className="p-5">
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-2">
-              <span className="text-lg" aria-hidden="true">
-                🍪
-              </span>
-              <h2 className="font-semibold">Cookies</h2>
-            </div>
-            <p className="text-muted-foreground text-sm">
-              We use strictly necessary cookies to run this site, and - with your consent - analytics
-              cookies to understand usage and improve the product. You choose.
-            </p>
+      <div className="flex flex-col gap-1.5">
+        <h2 className="text-foreground flex items-center gap-2 text-sm font-semibold tracking-[-0.01em]">
+          <Cookie aria-hidden className="text-muted-foreground size-4" />
+          We use cookies
+        </h2>
+        <p className="text-muted-foreground text-sm leading-relaxed">
+          Necessary cookies keep this site running. With your consent, we also use PostHog (EU-hosted)
+          analytics to understand usage and improve the product.{" "}
+          <a
+            href="/legal/privacy"
+            className="text-foreground hover:text-primary underline underline-offset-4"
+          >
+            Privacy policy
+          </a>
+        </p>
+      </div>
 
-            {customize && (
-              <div className="bg-muted/30 flex flex-col gap-3 rounded-lg border p-3">
-                <label className="flex items-start justify-between gap-3 text-sm">
-                  <span>
-                    <span className="font-medium">Strictly necessary</span>
-                    <span className="text-muted-foreground block text-xs">
-                      Site delivery, security, preferences. Always on (exempt from consent).
-                    </span>
-                  </span>
-                  <Switch checked disabled className="mt-0.5" aria-label="Strictly necessary cookies (always on)" />
-                </label>
-                <label className="flex cursor-pointer items-start justify-between gap-3 text-sm">
-                  <span>
-                    <span className="font-medium">Analytics</span>
-                    <span className="text-muted-foreground block text-xs">
-                      PostHog (EU-hosted). Anonymous usage stats. No advertising.
-                    </span>
-                  </span>
-                  <Switch
-                    checked={analytics}
-                    onCheckedChange={(v) => setAnalytics(v === true)}
-                    className="mt-0.5"
-                    aria-label="Analytics cookies"
-                  />
-                </label>
-              </div>
-            )}
+      {expanded && (
+        <div className="bg-background flex flex-col divide-y rounded-md border">
+          <Field orientation="horizontal" className="justify-between gap-4 p-3">
+            <FieldContent className="min-w-0 gap-0.5">
+              <FieldLabel htmlFor="cc-necessary" className="items-center gap-2">
+                Necessary
+                <span className="text-muted-foreground font-mono text-[10px] uppercase tracking-[0.08em]">
+                  Always on
+                </span>
+              </FieldLabel>
+              <FieldDescription className="text-xs">
+                Site delivery, security, and remembering this choice.
+              </FieldDescription>
+            </FieldContent>
+            <Switch id="cc-necessary" checked disabled aria-label="Necessary cookies (always on)" />
+          </Field>
+          <Field orientation="horizontal" className="justify-between gap-4 p-3">
+            <FieldContent className="min-w-0 gap-0.5">
+              <FieldLabel htmlFor="cc-analytics">Analytics</FieldLabel>
+              <FieldDescription className="text-xs">
+                Page views and usage, aggregated. PostHog, EU-hosted. No advertising.
+              </FieldDescription>
+            </FieldContent>
+            <Switch
+              id="cc-analytics"
+              checked={analytics}
+              onCheckedChange={(v) => setAnalytics(v === true)}
+              aria-label="Analytics cookies"
+            />
+          </Field>
+        </div>
+      )}
 
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-              <a
-                href="/legal/privacy"
-                className="hover:text-primary text-xs underline underline-offset-2"
-              >
-                Privacy policy
-              </a>
-              <div className="flex flex-wrap gap-2">
-                {customize ? (
-                  <Button size="sm" onClick={() => decide(analytics)}>
-                    Save choices
-                  </Button>
-                ) : (
-                  <>
-                    <Button size="sm" variant="ghost" onClick={() => setCustomize(true)}>
-                      Customize
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => decide(false)}>
-                      Reject
-                    </Button>
-                    <Button size="sm" onClick={() => decide(true)}>
-                      Accept all
-                    </Button>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" onClick={() => decide(true)}>
+          Accept all
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => decide(false)}>
+          Reject all
+        </Button>
+        {expanded ? (
+          <Button size="sm" variant="outline" onClick={() => decide(analytics)}>
+            Save choices
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-muted-foreground ms-auto"
+            onClick={() => setExpanded(true)}
+          >
+            Manage
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
