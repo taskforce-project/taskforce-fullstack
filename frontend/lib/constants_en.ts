@@ -574,6 +574,7 @@ export const CONSTANTS_EN = {
     // Footer
     privacy: "Privacy",
     legalNotices: "Legal notices",
+    manageCookies: "Manage cookies",
     // Top bar
     search: "Search…",
     searchAria: "Search",

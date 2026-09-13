@@ -6,7 +6,8 @@ import { I18nProvider } from "@/lib/i18n";
 import { ThemeProvider } from "next-themes";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorBoundary } from "@/components/providers/error-boundary";
-import { CookieBanner } from "@/components/common/cookie-banner";
+import { CookieConsent } from "@/components/common/cookie-consent";
+import { PostHogProvider } from "@/components/analytics/posthog-provider";
 import { A11yFilters } from "@/components/a11y/a11y-filters";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -50,7 +51,8 @@ export default function RootLayout({
                       (modals/voile/menus) + le Toaster + la banniere cookie vivent HORS de ce div ->
                       leur `position: fixed` reste ancree au viewport meme en mode daltonien. */}
                   <div id="app-root">{children}</div>
-                  <CookieBanner />
+                  <CookieConsent />
+                  <PostHogProvider />
                 </AuthProvider>
               </ErrorBoundary>
               {/* Défs SVG des filtres daltonisme - appliquées à <body> via globals.css (en plus du contraste élevé) */}

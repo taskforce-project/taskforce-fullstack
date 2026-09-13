@@ -575,6 +575,7 @@ export const CONSTANTS_FR: TranslationKeys = {
     // Footer
     privacy: "Confidentialité",
     legalNotices: "Mentions légales",
+    manageCookies: "Gérer les cookies",
     // Barre supérieure
     search: "Rechercher…",
     searchAria: "Rechercher",
