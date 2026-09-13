@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { useSearchParams, useRouter, useParams } from "next/navigation"
 import {
   User, Bell, Mail, Zap, Globe, Key, Palette, Webhook,
-  Upload, Camera, Trash2, Shield, Loader2,
+  Upload, Camera, Trash2, Shield, Loader2, RotateCcw,
   Activity, CheckCircle2, AlertTriangle, Gauge, Search, Bot,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -32,7 +32,7 @@ import { BrandLogo } from "@/components/ui/brand-logo"
 import { ProfileOverview } from "@/components/profile/profile-overview"
 import { MemberSkillsCard } from "@/components/members/member-skills-card"
 import { MemberAvailabilityCard } from "@/components/members/member-availability-card"
-import { exportMyData, deleteMyAccount, deleteMyAccountImmediately } from "@/lib/api/gdpr-service"
+import { exportMyData, deleteMyAccount, deleteMyAccountImmediately, restoreMyAccount } from "@/lib/api/gdpr-service"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { getTwoFactorStatus, disableTwoFactor } from "@/lib/api/user-service"
 import { TwoFactorSetupDialog } from "@/components/dialogs/two-factor-setup-dialog"
@@ -344,6 +344,7 @@ function AccountPanel() {
   // Deux options d'effacement, au choix de l'utilisateur : planifier (grâce 30 j, récupérable) ou
   // supprimer immédiatement (irréversible). Le défaut sûr = planifier.
   const [mode, setMode] = useState<"schedule" | "immediate">("schedule")
+  const [restoring, setRestoring] = useState(false)
 
   // Suppression de compte = droit à l'effacement RGPD (Art. 17) : vit ici, dans « Account »
   // (l'export des données, lui, est dans « Privacy & Data »). La confirmation (saisie de l'email,
@@ -389,6 +390,30 @@ function AccountPanel() {
 
   const immediate = mode === "immediate"
 
+  // Compte déjà planifié pour suppression : on montre l'état + « Restore » (pas les options de
+  // suppression). `scheduledPurgeAt` est posé par le droit à l'effacement (délai de grâce).
+  const purgeAt = user?.scheduledPurgeAt
+  const scheduled = Boolean(purgeAt)
+  const purgeLabel = (() => {
+    if (!purgeAt) return null
+    const d = new Date(purgeAt)
+    return Number.isNaN(d.getTime())
+      ? null
+      : d.toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" })
+  })()
+
+  const handleRestore = async () => {
+    setRestoring(true)
+    try {
+      await restoreMyAccount()
+      await refreshUser()
+      toast.success("Account restored. Welcome back.")
+    } catch {
+      toast.error("Could not restore your account. Try again or contact contact@taskforce-project.fr.")
+      setRestoring(false)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <SectionCard title="Account info" description="Manage your login and account preferences.">
@@ -399,7 +424,34 @@ function AccountPanel() {
         </div>
       </SectionCard>
 
-      <Zone variant="danger" title="Delete account" description="Choose how to delete your account: schedule with a 30-day grace period, or delete immediately.">
+      <Zone
+        variant="danger"
+        title={scheduled ? "Account deletion scheduled" : "Delete account"}
+        description={
+          scheduled
+            ? "Your account is scheduled for deletion. You can restore it during the grace period."
+            : "Choose how to delete your account: schedule with a 30-day grace period, or delete immediately."
+        }
+      >
+        {scheduled ? (
+          <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-muted-foreground">
+              Scheduled for deletion
+              {purgeLabel ? <> on <span className="font-medium text-foreground">{purgeLabel}</span></> : null}.
+              Restore it before then to keep your workspaces and access.
+            </p>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleRestore}
+              disabled={restoring}
+              className="h-8 shrink-0 gap-2 border-amber-500/50 text-xs"
+            >
+              {restoring ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <RotateCcw className="size-3.5" aria-hidden />}
+              Restore account
+            </Button>
+          </div>
+        ) : (
         <div className="flex flex-col gap-4">
           <RadioGroup
             value={mode}
@@ -484,6 +536,7 @@ function AccountPanel() {
             </DeleteConfirmDialog>
           </div>
         </div>
+        )}
       </Zone>
     </div>
   )
