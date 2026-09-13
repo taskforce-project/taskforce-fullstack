@@ -58,7 +58,7 @@ export default function PrivacyPolicyPage() {
           <section>
             <h2 className="text-lg font-semibold text-foreground mb-3">4. Cookies and local storage</h2>
             <p>
-              TaskForce uses <strong className="text-foreground">strictly necessary</strong> browser local storage entries to maintain your authenticated session (access token, refresh token). No advertising, analytics, or tracking cookies are set. No third-party trackers are embedded on this platform.
+              TaskForce uses <strong className="text-foreground">strictly necessary</strong> browser local storage entries to maintain your authenticated session (access token, refresh token) and remember interface preferences. With your <strong className="text-foreground">consent</strong>, we also use <strong className="text-foreground">PostHog (EU-hosted)</strong> analytics cookies to understand product usage and improve TaskForce: these are <strong className="text-foreground">off by default</strong>, set only after you opt in through the cookie banner, and you can withdraw at any time via <strong className="text-foreground">&quot;Manage cookies&quot;</strong> in the footer. No advertising or cross-site tracking cookies are set.
             </p>
           </section>
 
@@ -69,6 +69,7 @@ export default function PrivacyPolicyPage() {
               <li><strong className="text-foreground">Stripe</strong> - payment processing (EU data center).</li>
               <li><strong className="text-foreground">Mailtrap / transactional email provider</strong> - sending account and notification emails.</li>
               <li><strong className="text-foreground">MinIO</strong> - file attachment storage (self-hosted or configured cloud region).</li>
+              <li><strong className="text-foreground">PostHog</strong> (EU Cloud) - product analytics, only after you consent (hosted in the EU, no data leaves the EU).</li>
             </ul>
           </section>
 
