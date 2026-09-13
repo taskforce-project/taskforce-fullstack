@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
+import { openConsentPreferences } from "@/lib/analytics/consent"
 
 interface AppFooterProps {
   /**
@@ -42,6 +43,7 @@ export function AppFooter({ bleed = true }: AppFooterProps) {
     >
       <span className="truncate" title={versionTitle}>© {year} TaskForce · {version}</span>
       <nav className="flex shrink-0 items-center gap-4">
+        <button type="button" onClick={openConsentPreferences} className="transition-colors hover:text-foreground">{t.shell.manageCookies}</button>
         <Link href="/privacy-policy" className="transition-colors hover:text-foreground">{t.shell.privacy}</Link>
         <Link href="/legal-notices" className="transition-colors hover:text-foreground">{t.shell.legalNotices}</Link>
       </nav>
