@@ -107,6 +107,18 @@ export function SiteFooter() {
                 All systems operational
               </span>
             </li>
+            <li>
+              {/* Footer statique (SSR, non hydraté) : ce bouton ne porte pas d'onClick. Il émet
+                  `tf-consent-open` via une délégation posée par l'îlot CookieConsent (client:load),
+                  qui rouvre le panneau de préférences - révocation possible à tout moment (RGPD). */}
+              <button
+                type="button"
+                data-cookie-settings
+                className="link-underline text-muted-foreground"
+              >
+                Manage cookies
+              </button>
+            </li>
             {/* « Hosted in the EU » : à rétablir une fois l'hébergeur tranché (Hetzner DE),
                 pas avant - on n'affirme rien de non démontrable. */}
             <li>English</li>
