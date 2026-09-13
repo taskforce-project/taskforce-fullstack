@@ -148,6 +148,27 @@ public class GdprService {
         return u.getDeletionScheduledAt().plusDays(graceDays);
     }
 
+    /**
+     * Droit à l'effacement - variante <b>IMMÉDIATE</b> : purge le compte sur-le-champ, sans délai de
+     * grâce. L'Art. 17 permet l'effacement « sans délai indu » ; le délai de grâce n'est qu'un filet
+     * anti-erreur, l'utilisateur choisit ici explicitement l'irréversible (double confirmation côté UI).
+     * Marque puis purge dans la MÊME transaction : {@link #purgeAccount} ne s'exécute que si une
+     * suppression est planifiée, d'où le marquage préalable.
+     */
+    @Transactional
+    public void deleteMyAccountImmediately(Long userId) {
+        User u = userRepository.findById(userId)
+            .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+        if (u.getDeletionScheduledAt() == null) {
+            u.setDeletionScheduledAt(LocalDateTime.now());
+            userRepository.save(u);
+        }
+        purgeAccount(userId); // même bean, même transaction : réutilise handover + anonymisation + Keycloak
+        auditService.record(null, userId, AuditService.GDPR_DELETE,
+            "User", String.valueOf(userId), Map.of("immediate", true));
+        log.info("Compte {} : suppression IMMÉDIATE demandée par l'utilisateur (sans délai de grâce)", userId);
+    }
+
     /** Annule une suppression planifiée (récupération pendant le délai de grâce). No-op si rien n'est planifié. */
     @Transactional
     public void restoreMyAccount(Long userId) {

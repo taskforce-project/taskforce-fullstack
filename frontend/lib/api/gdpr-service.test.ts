@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { exportMyData, deleteMyAccount, restoreMyAccount } from './gdpr-service';
+import { exportMyData, deleteMyAccount, deleteMyAccountImmediately, restoreMyAccount } from './gdpr-service';
 import { apiClient } from './client';
 import { GDPR_ROUTES } from '../config/api-routes';
 
@@ -38,6 +38,14 @@ describe('gdpr-service', () => {
 
     expect(apiClient.delete).toHaveBeenCalledWith(GDPR_ROUTES.ACCOUNT());
     expect(result).toBe('2026-10-04T04:00:00');
+  });
+
+  it('deleteMyAccountImmediately: DELETE account route with immediate=true', async () => {
+    vi.mocked(apiClient.delete).mockResolvedValue(envelope({ immediate: true }));
+
+    await deleteMyAccountImmediately();
+
+    expect(apiClient.delete).toHaveBeenCalledWith(`${GDPR_ROUTES.ACCOUNT()}?immediate=true`);
   });
 
   it('restoreMyAccount: POST restore route', async () => {

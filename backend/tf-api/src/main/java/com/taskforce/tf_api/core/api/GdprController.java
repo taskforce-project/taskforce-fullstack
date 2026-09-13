@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.taskforce.tf_api.core.model.User;
@@ -37,10 +38,23 @@ public class GdprController {
         return ResponseEntity.ok(ApiResponse.success("Données exportées", gdprService.exportMyData(userId)));
     }
 
-    /** Droit à l'effacement - étape 1 : PLANIFIE la suppression (délai de grâce), récupérable jusqu'à la purge. */
+    /**
+     * Droit à l'effacement. Deux modes, au choix de l'utilisateur :
+     * <ul>
+     *   <li>défaut : <b>PLANIFIE</b> la suppression (délai de grâce), récupérable jusqu'à la purge ;</li>
+     *   <li>{@code immediate=true} : purge <b>DÉFINITIVE et immédiate</b>, sans délai (double confirmation UI).</li>
+     * </ul>
+     */
     @DeleteMapping("/account")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> deleteMyAccount(@AuthenticationPrincipal Jwt jwt) {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> deleteMyAccount(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(name = "immediate", defaultValue = "false") boolean immediate) {
         Long userId = resolveUserId(jwt);
+        if (immediate) {
+            gdprService.deleteMyAccountImmediately(userId);
+            return ResponseEntity.ok(ApiResponse.success("Compte supprimé définitivement",
+                Map.of("immediate", true)));
+        }
         java.time.LocalDateTime purgeAt = gdprService.deleteMyAccount(userId);
         return ResponseEntity.ok(ApiResponse.success("Suppression planifiée",
             Map.of("scheduledPurgeAt", purgeAt)));
