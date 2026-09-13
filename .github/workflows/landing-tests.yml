@@ -88,7 +88,9 @@ jobs:
       - name: 🔧 Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20.x
+          # Astro 7 exige Node >= 22.12 (montee 5->7, CVE AVIF) ; ce job etait reste en 20.x
+          # depuis l'upgrade et echouait donc au build. Aligne sur les jobs test/security (22.x).
+          node-version: 22.x
           cache: 'npm'
           cache-dependency-path: landing-page/package-lock.json
 
