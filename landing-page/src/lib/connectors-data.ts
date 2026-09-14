@@ -7,15 +7,23 @@ export interface Connector {
   key: string;
   name: string;
   cat: string;
+  /** Libelle lisible de la categorie. */
+  catLabel: string;
   /** Comment on le connecte. "none" = pas de moyen de connexion aujourd'hui. */
   auth: ConnectorAuth;
   /** Serveur MCP hebergé verifié -> connexion 1 clic, utilisable par l'agent. */
   mcp: boolean;
+  /** URL du serveur MCP hebergé (si mcp). */
+  mcpUrl: string | null;
   /** Profondeur native reelle au-dela du connectable ("Memory" = ingestion, "Actions" = actions). */
   native: string | null;
   /** A un moyen de connexion (auth !== "none"). */
   reachable: boolean;
   desc: string;
+  /** Doc du fournisseur. */
+  docsUrl: string;
+  /** Site du fournisseur. */
+  websiteUrl: string;
 }
 
 export const CONNECTORS: Connector[] = [
@@ -23,1380 +31,1932 @@ export const CONNECTORS: Connector[] = [
     "key": "plane",
     "name": "Plane",
     "cat": "pm",
+    "catLabel": "Project management",
     "auth": "apikey",
     "mcp": false,
+    "mcpUrl": null,
     "native": "Memory",
     "reachable": true,
-    "desc": "Projects & work-items (open-source Jira-like) to Brain OS"
+    "desc": "Projects & work-items (open-source Jira-like) to Brain OS",
+    "docsUrl": "https://developers.plane.so/api-reference/introduction",
+    "websiteUrl": "https://plane.so"
   },
   {
     "key": "linear",
     "name": "Linear",
     "cat": "pm",
+    "catLabel": "Project management",
     "auth": "apikey",
     "mcp": true,
+    "mcpUrl": "https://mcp.linear.app/mcp",
     "native": null,
     "reachable": true,
-    "desc": "Issues & projects (GraphQL)"
+    "desc": "Issues & projects (GraphQL)",
+    "docsUrl": "",
+    "websiteUrl": "https://linear.app"
   },
   {
     "key": "asana",
     "name": "Asana",
     "cat": "pm",
+    "catLabel": "Project management",
     "auth": "oauth",
     "mcp": true,
+    "mcpUrl": "https://mcp.asana.com/v2/mcp",
     "native": null,
     "reachable": true,
-    "desc": "Tasks & projects"
+    "desc": "Tasks & projects",
+    "docsUrl": "",
+    "websiteUrl": "https://asana.com"
   },
   {
     "key": "clickup",
     "name": "ClickUp",
     "cat": "pm",
+    "catLabel": "Project management",
     "auth": "apikey",
     "mcp": true,
+    "mcpUrl": "https://mcp.clickup.com/mcp",
     "native": null,
     "reachable": true,
-    "desc": "Tasks, docs, goals"
+    "desc": "Tasks, docs, goals",
+    "docsUrl": "",
+    "websiteUrl": "https://clickup.com"
   },
   {
     "key": "jira",
     "name": "Jira",
     "cat": "pm",
+    "catLabel": "Project management",
     "auth": "oauth",
     "mcp": true,
+    "mcpUrl": "https://mcp.atlassian.com/v2/mcp",
     "native": null,
     "reachable": true,
-    "desc": "Issues & sprints (Atlassian)"
+    "desc": "Issues & sprints (Atlassian)",
+    "docsUrl": "",
+    "websiteUrl": "https://www.atlassian.com/software/jira"
   },
   {
     "key": "trello",
     "name": "Trello",
     "cat": "pm",
+    "catLabel": "Project management",
     "auth": "apikey",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Kanban boards"
+    "desc": "Kanban boards",
+    "docsUrl": "",
+    "websiteUrl": "https://trello.com"
   },
   {
     "key": "monday",
     "name": "monday.com",
     "cat": "pm",
+    "catLabel": "Project management",
     "auth": "token",
     "mcp": true,
+    "mcpUrl": "https://mcp.monday.com/sse",
     "native": null,
     "reachable": true,
-    "desc": "Work OS & boards"
+    "desc": "Work OS & boards",
+    "docsUrl": "",
+    "websiteUrl": "https://monday.com"
   },
   {
     "key": "airtable",
     "name": "Airtable",
     "cat": "pm",
+    "catLabel": "Project management",
     "auth": "token",
     "mcp": true,
+    "mcpUrl": "https://mcp.airtable.com/mcp",
     "native": null,
     "reachable": true,
-    "desc": "No-code bases & tables"
+    "desc": "No-code bases & tables",
+    "docsUrl": "",
+    "websiteUrl": "https://airtable.com"
   },
   {
     "key": "shortcut",
     "name": "Shortcut",
     "cat": "pm",
+    "catLabel": "Project management",
     "auth": "token",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Dev stories & iterations"
+    "desc": "Dev stories & iterations",
+    "docsUrl": "",
+    "websiteUrl": "https://www.shortcut.com"
   },
   {
     "key": "github",
     "name": "GitHub",
     "cat": "dev",
+    "catLabel": "Dev & CI/CD",
     "auth": "oauth",
     "mcp": false,
+    "mcpUrl": null,
     "native": "Actions",
     "reachable": true,
-    "desc": "Repos, issues, PRs (code-side management)"
+    "desc": "Repos, issues, PRs (code-side management)",
+    "docsUrl": "https://docs.github.com",
+    "websiteUrl": "https://github.com"
   },
   {
     "key": "jenkins",
     "name": "Jenkins",
     "cat": "dev",
+    "catLabel": "Dev & CI/CD",
     "auth": "config",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Builds & CI pipelines"
+    "desc": "Builds & CI pipelines",
+    "docsUrl": "",
+    "websiteUrl": "https://www.jenkins.io"
   },
   {
     "key": "docker",
     "name": "Docker",
     "cat": "dev",
+    "catLabel": "Dev & CI/CD",
     "auth": "config",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Images & registries"
+    "desc": "Images & registries",
+    "docsUrl": "",
+    "websiteUrl": "https://www.docker.com"
   },
   {
     "key": "kubernetes",
     "name": "Kubernetes",
     "cat": "dev",
+    "catLabel": "Dev & CI/CD",
     "auth": "config",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Deployments & cluster status"
+    "desc": "Deployments & cluster status",
+    "docsUrl": "",
+    "websiteUrl": "https://kubernetes.io"
   },
   {
     "key": "gitlab",
     "name": "GitLab",
     "cat": "dev",
+    "catLabel": "Dev & CI/CD",
     "auth": "token",
     "mcp": true,
+    "mcpUrl": "https://gitlab.com/api/v4/mcp",
     "native": null,
     "reachable": true,
-    "desc": "Repos, MRs, CI pipelines"
+    "desc": "Repos, MRs, CI pipelines",
+    "docsUrl": "",
+    "websiteUrl": "https://gitlab.com"
   },
   {
     "key": "bitbucket",
     "name": "Bitbucket",
     "cat": "dev",
+    "catLabel": "Dev & CI/CD",
     "auth": "oauth",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Repos & pipelines (Atlassian)"
+    "desc": "Repos & pipelines (Atlassian)",
+    "docsUrl": "",
+    "websiteUrl": "https://bitbucket.org"
   },
   {
     "key": "postman",
     "name": "Postman",
     "cat": "dev",
+    "catLabel": "Dev & CI/CD",
     "auth": "apikey",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Collections & automated API tests"
+    "desc": "Collections & automated API tests",
+    "docsUrl": "",
+    "websiteUrl": "https://www.postman.com"
   },
   {
     "key": "insomnia",
     "name": "Insomnia",
     "cat": "dev",
+    "catLabel": "Dev & CI/CD",
     "auth": "token",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "API client & testing"
+    "desc": "API client & testing",
+    "docsUrl": "",
+    "websiteUrl": "https://insomnia.rest"
   },
   {
     "key": "vscode",
     "name": "Visual Studio Code",
     "cat": "dev",
+    "catLabel": "Dev & CI/CD",
     "auth": "token",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Editor & extensions"
+    "desc": "Editor & extensions",
+    "docsUrl": "",
+    "websiteUrl": "https://code.visualstudio.com"
   },
   {
     "key": "cursor",
     "name": "Cursor",
     "cat": "dev",
+    "catLabel": "Dev & CI/CD",
     "auth": "token",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "AI editor"
+    "desc": "AI editor",
+    "docsUrl": "",
+    "websiteUrl": "https://cursor.com"
   },
   {
     "key": "sentry",
     "name": "Sentry",
     "cat": "dev",
+    "catLabel": "Dev & CI/CD",
     "auth": "token",
     "mcp": true,
+    "mcpUrl": "https://mcp.sentry.dev/mcp",
     "native": null,
     "reachable": true,
-    "desc": "Error & performance tracking"
+    "desc": "Error & performance tracking",
+    "docsUrl": "",
+    "websiteUrl": "https://sentry.io"
   },
   {
     "key": "datadog",
     "name": "Datadog",
     "cat": "dev",
+    "catLabel": "Dev & CI/CD",
     "auth": "apikey",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Observability & monitoring"
+    "desc": "Observability & monitoring",
+    "docsUrl": "",
+    "websiteUrl": "https://www.datadoghq.com"
   },
   {
     "key": "grafana",
     "name": "Grafana",
     "cat": "dev",
+    "catLabel": "Dev & CI/CD",
     "auth": "config",
     "mcp": true,
+    "mcpUrl": "https://mcp.grafana.com/mcp",
     "native": null,
     "reachable": true,
-    "desc": "Dashboards & metrics"
+    "desc": "Dashboards & metrics",
+    "docsUrl": "",
+    "websiteUrl": "https://grafana.com"
   },
   {
     "key": "sonarqube",
     "name": "SonarQube",
     "cat": "dev",
+    "catLabel": "Dev & CI/CD",
     "auth": "token",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Code quality & security"
+    "desc": "Code quality & security",
+    "docsUrl": "",
+    "websiteUrl": "https://www.sonarsource.com/products/sonarqube"
   },
   {
     "key": "circleci",
     "name": "CircleCI",
     "cat": "dev",
+    "catLabel": "Dev & CI/CD",
     "auth": "token",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "CI/CD pipelines"
+    "desc": "CI/CD pipelines",
+    "docsUrl": "",
+    "websiteUrl": "https://circleci.com"
   },
   {
     "key": "terraform",
     "name": "Terraform",
     "cat": "dev",
+    "catLabel": "Dev & CI/CD",
     "auth": "config",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Infrastructure as code"
+    "desc": "Infrastructure as code",
+    "docsUrl": "",
+    "websiteUrl": "https://www.terraform.io"
   },
   {
     "key": "vercel",
     "name": "Vercel",
     "cat": "infra",
+    "catLabel": "Hosting & Infra",
     "auth": "token",
     "mcp": true,
+    "mcpUrl": "https://mcp.vercel.com",
     "native": null,
     "reachable": true,
-    "desc": "Frontend deploys & logs"
+    "desc": "Frontend deploys & logs",
+    "docsUrl": "",
+    "websiteUrl": "https://vercel.com"
   },
   {
     "key": "render",
     "name": "Render",
     "cat": "infra",
+    "catLabel": "Hosting & Infra",
     "auth": "apikey",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Services & deploys (or Railway)"
+    "desc": "Services & deploys (or Railway)",
+    "docsUrl": "",
+    "websiteUrl": "https://render.com"
   },
   {
     "key": "cloudflare",
     "name": "Cloudflare",
     "cat": "infra",
+    "catLabel": "Hosting & Infra",
     "auth": "token",
     "mcp": true,
+    "mcpUrl": "https://mcp.cloudflare.com/mcp",
     "native": null,
     "reachable": true,
-    "desc": "DNS, CDN, WAF"
+    "desc": "DNS, CDN, WAF",
+    "docsUrl": "",
+    "websiteUrl": "https://www.cloudflare.com"
   },
   {
     "key": "aws",
     "name": "Amazon Web Services",
     "cat": "infra",
+    "catLabel": "Hosting & Infra",
     "auth": "config",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "AWS suite (EC2, S3, …)"
+    "desc": "AWS suite (EC2, S3, …)",
+    "docsUrl": "",
+    "websiteUrl": "https://aws.amazon.com"
   },
   {
     "key": "azure",
     "name": "Microsoft Azure",
     "cat": "infra",
+    "catLabel": "Hosting & Infra",
     "auth": "config",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Microsoft cloud"
+    "desc": "Microsoft cloud",
+    "docsUrl": "",
+    "websiteUrl": "https://azure.microsoft.com"
   },
   {
     "key": "gcp",
     "name": "Google Cloud",
     "cat": "infra",
+    "catLabel": "Hosting & Infra",
     "auth": "config",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Google Cloud (GCP)"
+    "desc": "Google Cloud (GCP)",
+    "docsUrl": "",
+    "websiteUrl": "https://cloud.google.com"
   },
   {
     "key": "netlify",
     "name": "Netlify",
     "cat": "infra",
+    "catLabel": "Hosting & Infra",
     "auth": "token",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Frontend & edge deploys"
+    "desc": "Frontend & edge deploys",
+    "docsUrl": "",
+    "websiteUrl": "https://www.netlify.com"
   },
   {
     "key": "railway",
     "name": "Railway",
     "cat": "infra",
+    "catLabel": "Hosting & Infra",
     "auth": "token",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Deploys & services"
+    "desc": "Deploys & services",
+    "docsUrl": "",
+    "websiteUrl": "https://railway.app"
   },
   {
     "key": "fly",
     "name": "Fly.io",
     "cat": "infra",
+    "catLabel": "Hosting & Infra",
     "auth": "token",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Apps close to your users"
+    "desc": "Apps close to your users",
+    "docsUrl": "",
+    "websiteUrl": "https://fly.io"
   },
   {
     "key": "digitalocean",
     "name": "DigitalOcean",
     "cat": "infra",
+    "catLabel": "Hosting & Infra",
     "auth": "token",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Droplets, apps, databases"
+    "desc": "Droplets, apps, databases",
+    "docsUrl": "",
+    "websiteUrl": "https://www.digitalocean.com"
   },
   {
     "key": "heroku",
     "name": "Heroku",
     "cat": "infra",
+    "catLabel": "Hosting & Infra",
     "auth": "apikey",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Apps & dynos"
+    "desc": "Apps & dynos",
+    "docsUrl": "",
+    "websiteUrl": "https://www.heroku.com"
   },
   {
     "key": "firebase",
     "name": "Firebase",
     "cat": "infra",
+    "catLabel": "Hosting & Infra",
     "auth": "config",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Backend, auth, hosting (Google)"
+    "desc": "Backend, auth, hosting (Google)",
+    "docsUrl": "",
+    "websiteUrl": "https://firebase.google.com"
   },
   {
     "key": "vps",
     "name": "VPS",
     "cat": "infra",
+    "catLabel": "Hosting & Infra",
     "auth": "config",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Generic server (SSH, metrics)"
+    "desc": "Generic server (SSH, metrics)",
+    "docsUrl": "",
+    "websiteUrl": ""
   },
   {
     "key": "supabase",
     "name": "Supabase",
     "cat": "db",
+    "catLabel": "Databases",
     "auth": "config",
     "mcp": true,
+    "mcpUrl": "https://mcp.supabase.com/mcp",
     "native": null,
     "reachable": true,
-    "desc": "Postgres, auth, storage"
+    "desc": "Postgres, auth, storage",
+    "docsUrl": "",
+    "websiteUrl": "https://supabase.com"
   },
   {
     "key": "neon",
     "name": "Neon",
     "cat": "db",
+    "catLabel": "Databases",
     "auth": "apikey",
     "mcp": true,
+    "mcpUrl": "https://mcp.neon.tech/sse",
     "native": null,
     "reachable": true,
-    "desc": "Serverless Postgres"
+    "desc": "Serverless Postgres",
+    "docsUrl": "",
+    "websiteUrl": "https://neon.tech"
   },
   {
     "key": "mongodb-atlas",
     "name": "MongoDB Atlas",
     "cat": "db",
+    "catLabel": "Databases",
     "auth": "config",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "MongoDB clusters"
+    "desc": "MongoDB clusters",
+    "docsUrl": "",
+    "websiteUrl": "https://www.mongodb.com/atlas"
   },
   {
     "key": "redis-cloud",
     "name": "Redis Cloud",
     "cat": "db",
+    "catLabel": "Databases",
     "auth": "config",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Cache & data store"
+    "desc": "Cache & data store",
+    "docsUrl": "",
+    "websiteUrl": "https://redis.io"
   },
   {
     "key": "postgresql",
     "name": "PostgreSQL",
     "cat": "db",
+    "catLabel": "Databases",
     "auth": "config",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Relational database"
+    "desc": "Relational database",
+    "docsUrl": "",
+    "websiteUrl": "https://www.postgresql.org"
   },
   {
     "key": "planetscale",
     "name": "PlanetScale",
     "cat": "db",
+    "catLabel": "Databases",
     "auth": "config",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Serverless MySQL"
+    "desc": "Serverless MySQL",
+    "docsUrl": "",
+    "websiteUrl": "https://planetscale.com"
   },
   {
     "key": "prisma",
     "name": "Prisma",
     "cat": "db",
+    "catLabel": "Databases",
     "auth": "token",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "ORM & Data Platform"
+    "desc": "ORM & Data Platform",
+    "docsUrl": "",
+    "websiteUrl": "https://www.prisma.io"
   },
   {
     "key": "elasticsearch",
     "name": "Elasticsearch",
     "cat": "db",
+    "catLabel": "Databases",
     "auth": "config",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Search & indexing"
+    "desc": "Search & indexing",
+    "docsUrl": "",
+    "websiteUrl": "https://www.elastic.co/elasticsearch"
   },
   {
     "key": "snowflake",
     "name": "Snowflake",
     "cat": "db",
+    "catLabel": "Databases",
     "auth": "config",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Data warehouse"
+    "desc": "Data warehouse",
+    "docsUrl": "",
+    "websiteUrl": "https://www.snowflake.com"
   },
   {
     "key": "google-ads",
     "name": "Google Ads",
     "cat": "ads",
+    "catLabel": "Advertising",
     "auth": "oauth",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Campaigns & spend"
+    "desc": "Campaigns & spend",
+    "docsUrl": "",
+    "websiteUrl": "https://ads.google.com"
   },
   {
     "key": "meta-ads",
     "name": "Meta Ads",
     "cat": "ads",
+    "catLabel": "Advertising",
     "auth": "oauth",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Facebook/Instagram Ads"
+    "desc": "Facebook/Instagram Ads",
+    "docsUrl": "",
+    "websiteUrl": "https://www.facebook.com/business"
   },
   {
     "key": "linkedin-ads",
     "name": "LinkedIn Campaign Manager",
     "cat": "ads",
+    "catLabel": "Advertising",
     "auth": "oauth",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "B2B campaigns"
+    "desc": "B2B campaigns",
+    "docsUrl": "",
+    "websiteUrl": "https://business.linkedin.com/marketing-solutions"
   },
   {
     "key": "google-analytics",
     "name": "Google Analytics",
     "cat": "analytics",
+    "catLabel": "Analytics & Product",
     "auth": "oauth",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Audience & conversions (GA4)"
+    "desc": "Audience & conversions (GA4)",
+    "docsUrl": "",
+    "websiteUrl": "https://analytics.google.com"
   },
   {
     "key": "posthog",
     "name": "PostHog",
     "cat": "analytics",
+    "catLabel": "Analytics & Product",
     "auth": "apikey",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Product analytics & events"
+    "desc": "Product analytics & events",
+    "docsUrl": "",
+    "websiteUrl": "https://posthog.com"
   },
   {
     "key": "microsoft-clarity",
     "name": "Microsoft Clarity",
     "cat": "analytics",
+    "catLabel": "Analytics & Product",
     "auth": "apikey",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Heatmaps & sessions"
+    "desc": "Heatmaps & sessions",
+    "docsUrl": "",
+    "websiteUrl": "https://clarity.microsoft.com"
   },
   {
     "key": "mixpanel",
     "name": "Mixpanel",
     "cat": "analytics",
+    "catLabel": "Analytics & Product",
     "auth": "apikey",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Product analytics & events"
+    "desc": "Product analytics & events",
+    "docsUrl": "",
+    "websiteUrl": "https://mixpanel.com"
   },
   {
     "key": "amplitude",
     "name": "Amplitude",
     "cat": "analytics",
+    "catLabel": "Analytics & Product",
     "auth": "apikey",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Product analytics & retention"
+    "desc": "Product analytics & retention",
+    "docsUrl": "",
+    "websiteUrl": "https://amplitude.com"
   },
   {
     "key": "segment",
     "name": "Segment",
     "cat": "analytics",
+    "catLabel": "Analytics & Product",
     "auth": "apikey",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "CDP & event routing"
+    "desc": "CDP & event routing",
+    "docsUrl": "",
+    "websiteUrl": "https://segment.com"
   },
   {
     "key": "plausible",
     "name": "Plausible",
     "cat": "analytics",
+    "catLabel": "Analytics & Product",
     "auth": "apikey",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Privacy-friendly web analytics"
+    "desc": "Privacy-friendly web analytics",
+    "docsUrl": "",
+    "websiteUrl": "https://plausible.io"
   },
   {
     "key": "hotjar",
     "name": "Hotjar",
     "cat": "analytics",
+    "catLabel": "Analytics & Product",
     "auth": "apikey",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Heatmaps & user feedback"
+    "desc": "Heatmaps & user feedback",
+    "docsUrl": "",
+    "websiteUrl": "https://www.hotjar.com"
   },
   {
     "key": "stripe",
     "name": "Stripe",
     "cat": "payments",
+    "catLabel": "Payments & Finance",
     "auth": "apikey",
     "mcp": true,
+    "mcpUrl": "https://mcp.stripe.com",
     "native": null,
     "reachable": true,
-    "desc": "MRR, customers, invoices"
+    "desc": "MRR, customers, invoices",
+    "docsUrl": "",
+    "websiteUrl": "https://stripe.com"
   },
   {
     "key": "paypal",
     "name": "PayPal",
     "cat": "payments",
+    "catLabel": "Payments & Finance",
     "auth": "oauth",
     "mcp": true,
+    "mcpUrl": "https://mcp.paypal.com/mcp",
     "native": null,
     "reachable": true,
-    "desc": "Payments & payouts"
+    "desc": "Payments & payouts",
+    "docsUrl": "",
+    "websiteUrl": "https://www.paypal.com"
   },
   {
     "key": "paddle",
     "name": "Paddle",
     "cat": "payments",
+    "catLabel": "Payments & Finance",
     "auth": "apikey",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "SaaS merchant of record"
+    "desc": "SaaS merchant of record",
+    "docsUrl": "",
+    "websiteUrl": "https://www.paddle.com"
   },
   {
     "key": "lemonsqueezy",
     "name": "Lemon Squeezy",
     "cat": "payments",
+    "catLabel": "Payments & Finance",
     "auth": "apikey",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Sales & subscriptions"
+    "desc": "Sales & subscriptions",
+    "docsUrl": "",
+    "websiteUrl": "https://www.lemonsqueezy.com"
   },
   {
     "key": "wise",
     "name": "Wise",
     "cat": "payments",
+    "catLabel": "Payments & Finance",
     "auth": "apikey",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "International payments"
+    "desc": "International payments",
+    "docsUrl": "",
+    "websiteUrl": "https://wise.com"
   },
   {
     "key": "square",
     "name": "Square",
     "cat": "payments",
+    "catLabel": "Payments & Finance",
     "auth": "oauth",
     "mcp": true,
+    "mcpUrl": "https://mcp.squareup.com/sse",
     "native": null,
     "reachable": true,
-    "desc": "Payments & POS"
+    "desc": "Payments & POS",
+    "docsUrl": "",
+    "websiteUrl": ""
   },
   {
     "key": "hubspot",
     "name": "HubSpot",
     "cat": "crm",
+    "catLabel": "CRM & Sales",
     "auth": "oauth",
     "mcp": true,
+    "mcpUrl": "https://mcp.hubspot.com/anthropic",
     "native": null,
     "reachable": true,
-    "desc": "CRM, deals, marketing"
+    "desc": "CRM, deals, marketing",
+    "docsUrl": "",
+    "websiteUrl": "https://www.hubspot.com"
   },
   {
     "key": "salesforce",
     "name": "Salesforce",
     "cat": "crm",
+    "catLabel": "CRM & Sales",
     "auth": "oauth",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Enterprise CRM"
+    "desc": "Enterprise CRM",
+    "docsUrl": "",
+    "websiteUrl": "https://www.salesforce.com"
   },
   {
     "key": "zoho",
     "name": "Zoho",
     "cat": "crm",
+    "catLabel": "CRM & Sales",
     "auth": "oauth",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "CRM & business suite"
+    "desc": "CRM & business suite",
+    "docsUrl": "",
+    "websiteUrl": "https://www.zoho.com"
   },
   {
     "key": "intercom",
     "name": "Intercom",
     "cat": "crm",
+    "catLabel": "CRM & Sales",
     "auth": "oauth",
     "mcp": true,
+    "mcpUrl": "https://mcp.intercom.com/mcp",
     "native": null,
     "reachable": true,
-    "desc": "Support & customer conversations"
+    "desc": "Support & customer conversations",
+    "docsUrl": "",
+    "websiteUrl": "https://www.intercom.com"
   },
   {
     "key": "pipedrive",
     "name": "Pipedrive",
     "cat": "crm",
+    "catLabel": "CRM & Sales",
     "auth": "apikey",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Sales pipeline"
+    "desc": "Sales pipeline",
+    "docsUrl": "",
+    "websiteUrl": "https://www.pipedrive.com"
   },
   {
     "key": "zendesk",
     "name": "Zendesk",
     "cat": "crm",
+    "catLabel": "CRM & Sales",
     "auth": "oauth",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Support & tickets"
+    "desc": "Support & tickets",
+    "docsUrl": "",
+    "websiteUrl": "https://www.zendesk.com"
   },
   {
     "key": "freshworks",
     "name": "Freshworks",
     "cat": "crm",
+    "catLabel": "CRM & Sales",
     "auth": "apikey",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "CRM & customer support"
+    "desc": "CRM & customer support",
+    "docsUrl": "",
+    "websiteUrl": "https://www.freshworks.com"
   },
   {
     "key": "attio",
     "name": "Attio",
     "cat": "crm",
+    "catLabel": "CRM & Sales",
     "auth": "apikey",
     "mcp": true,
+    "mcpUrl": "https://mcp.attio.com/mcp",
     "native": null,
     "reachable": true,
-    "desc": "Modern data-driven CRM"
+    "desc": "Modern data-driven CRM",
+    "docsUrl": "",
+    "websiteUrl": "https://attio.com"
   },
   {
     "key": "slack",
     "name": "Slack",
     "cat": "comms",
+    "catLabel": "Communication & Email",
     "auth": "oauth",
     "mcp": false,
+    "mcpUrl": null,
     "native": "Actions",
     "reachable": true,
-    "desc": "Channels, messages, issue mirroring"
+    "desc": "Channels, messages, issue mirroring",
+    "docsUrl": "https://api.slack.com",
+    "websiteUrl": "https://slack.com"
   },
   {
     "key": "twilio",
     "name": "Twilio",
     "cat": "comms",
+    "catLabel": "Communication & Email",
     "auth": "config",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "SMS & voice"
+    "desc": "SMS & voice",
+    "docsUrl": "",
+    "websiteUrl": "https://www.twilio.com"
   },
   {
     "key": "resend",
     "name": "Resend",
     "cat": "comms",
+    "catLabel": "Communication & Email",
     "auth": "apikey",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Transactional emails"
+    "desc": "Transactional emails",
+    "docsUrl": "",
+    "websiteUrl": "https://resend.com"
   },
   {
     "key": "mail-smtp",
     "name": "Mail (SMTP)",
     "cat": "comms",
+    "catLabel": "Communication & Email",
     "auth": "config",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Generic email inbox"
+    "desc": "Generic email inbox",
+    "docsUrl": "",
+    "websiteUrl": ""
   },
   {
     "key": "discord",
     "name": "Discord",
     "cat": "comms",
+    "catLabel": "Communication & Email",
     "auth": "oauth",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Servers & channels"
+    "desc": "Servers & channels",
+    "docsUrl": "",
+    "websiteUrl": "https://discord.com"
   },
   {
     "key": "microsoft-teams",
     "name": "Microsoft Teams",
     "cat": "comms",
+    "catLabel": "Communication & Email",
     "auth": "oauth",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Chat & meetings (Microsoft)"
+    "desc": "Chat & meetings (Microsoft)",
+    "docsUrl": "",
+    "websiteUrl": "https://www.microsoft.com/microsoft-teams"
   },
   {
     "key": "zoom",
     "name": "Zoom",
     "cat": "comms",
+    "catLabel": "Communication & Email",
     "auth": "oauth",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Video conferencing"
+    "desc": "Video conferencing",
+    "docsUrl": "",
+    "websiteUrl": "https://zoom.us"
   },
   {
     "key": "telegram",
     "name": "Telegram",
     "cat": "comms",
+    "catLabel": "Communication & Email",
     "auth": "token",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Bots & messages"
+    "desc": "Bots & messages",
+    "docsUrl": "",
+    "websiteUrl": "https://telegram.org"
   },
   {
     "key": "whatsapp",
     "name": "WhatsApp Business",
     "cat": "comms",
+    "catLabel": "Communication & Email",
     "auth": "token",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Customer messaging"
+    "desc": "Customer messaging",
+    "docsUrl": "",
+    "websiteUrl": "https://business.whatsapp.com"
   },
   {
     "key": "sendgrid",
     "name": "SendGrid",
     "cat": "comms",
+    "catLabel": "Communication & Email",
     "auth": "apikey",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Email at scale"
+    "desc": "Email at scale",
+    "docsUrl": "",
+    "websiteUrl": "https://sendgrid.com"
   },
   {
     "key": "mailchimp",
     "name": "Mailchimp",
     "cat": "comms",
+    "catLabel": "Communication & Email",
     "auth": "oauth",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Email marketing"
+    "desc": "Email marketing",
+    "docsUrl": "",
+    "websiteUrl": "https://mailchimp.com"
   },
   {
     "key": "clerk",
     "name": "Clerk",
     "cat": "identity",
+    "catLabel": "Identity & Auth",
     "auth": "apikey",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Auth & user management"
+    "desc": "Auth & user management",
+    "docsUrl": "",
+    "websiteUrl": "https://clerk.com"
   },
   {
     "key": "keycloak",
     "name": "Keycloak",
     "cat": "identity",
+    "catLabel": "Identity & Auth",
     "auth": "config",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Open-source IAM"
+    "desc": "Open-source IAM",
+    "docsUrl": "",
+    "websiteUrl": "https://www.keycloak.org"
   },
   {
     "key": "auth0",
     "name": "Auth0",
     "cat": "identity",
+    "catLabel": "Identity & Auth",
     "auth": "apikey",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Auth as a service"
+    "desc": "Auth as a service",
+    "docsUrl": "",
+    "websiteUrl": "https://auth0.com"
   },
   {
     "key": "okta",
     "name": "Okta",
     "cat": "identity",
+    "catLabel": "Identity & Auth",
     "auth": "apikey",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "SSO & enterprise identity"
+    "desc": "SSO & enterprise identity",
+    "docsUrl": "",
+    "websiteUrl": "https://www.okta.com"
   },
   {
     "key": "bitwarden",
     "name": "Bitwarden",
     "cat": "security",
+    "catLabel": "Security & Secrets",
     "auth": "config",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Secrets vault"
+    "desc": "Secrets vault",
+    "docsUrl": "",
+    "websiteUrl": "https://bitwarden.com"
   },
   {
     "key": "1password",
     "name": "1Password",
     "cat": "security",
+    "catLabel": "Security & Secrets",
     "auth": "token",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Team vault & secrets"
+    "desc": "Team vault & secrets",
+    "docsUrl": "",
+    "websiteUrl": "https://1password.com"
   },
   {
     "key": "doppler",
     "name": "Doppler",
     "cat": "security",
+    "catLabel": "Security & Secrets",
     "auth": "token",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Secrets management"
+    "desc": "Secrets management",
+    "docsUrl": "",
+    "websiteUrl": "https://www.doppler.com"
   },
   {
     "key": "snyk",
     "name": "Snyk",
     "cat": "security",
+    "catLabel": "Security & Secrets",
     "auth": "token",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Dependency security"
+    "desc": "Dependency security",
+    "docsUrl": "",
+    "websiteUrl": "https://snyk.io"
   },
   {
     "key": "notion",
     "name": "Notion",
     "cat": "productivity",
+    "catLabel": "Productivity & Docs",
     "auth": "oauth",
     "mcp": true,
+    "mcpUrl": "https://mcp.notion.com/mcp",
     "native": null,
     "reachable": true,
-    "desc": "Docs & knowledge bases"
+    "desc": "Docs & knowledge bases",
+    "docsUrl": "",
+    "websiteUrl": "https://www.notion.so"
   },
   {
     "key": "google-workspace",
     "name": "Google Workspace",
     "cat": "productivity",
+    "catLabel": "Productivity & Docs",
     "auth": "oauth",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Gmail, Drive, Docs, Calendar…"
+    "desc": "Gmail, Drive, Docs, Calendar…",
+    "docsUrl": "",
+    "websiteUrl": "https://workspace.google.com"
   },
   {
     "key": "microsoft-365",
     "name": "Microsoft 365",
     "cat": "productivity",
+    "catLabel": "Productivity & Docs",
     "auth": "oauth",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Outlook, OneDrive, Teams…"
+    "desc": "Outlook, OneDrive, Teams…",
+    "docsUrl": "",
+    "websiteUrl": "https://www.microsoft.com/microsoft-365"
   },
   {
     "key": "granola",
     "name": "Granola",
     "cat": "productivity",
+    "catLabel": "Productivity & Docs",
     "auth": "token",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "AI meeting notes"
+    "desc": "AI meeting notes",
+    "docsUrl": "",
+    "websiteUrl": "https://www.granola.ai"
   },
   {
     "key": "raycast",
     "name": "Raycast",
     "cat": "productivity",
+    "catLabel": "Productivity & Docs",
     "auth": "token",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Launcher & scripts"
+    "desc": "Launcher & scripts",
+    "docsUrl": "",
+    "websiteUrl": "https://www.raycast.com"
   },
   {
     "key": "gmail",
     "name": "Gmail",
     "cat": "productivity",
+    "catLabel": "Productivity & Docs",
     "auth": "oauth",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Email (Google)"
+    "desc": "Email (Google)",
+    "docsUrl": "",
+    "websiteUrl": "https://mail.google.com"
   },
   {
     "key": "google-drive",
     "name": "Google Drive",
     "cat": "productivity",
+    "catLabel": "Productivity & Docs",
     "auth": "oauth",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Files & storage (Google)"
+    "desc": "Files & storage (Google)",
+    "docsUrl": "",
+    "websiteUrl": "https://drive.google.com"
   },
   {
     "key": "google-calendar",
     "name": "Google Calendar",
     "cat": "productivity",
+    "catLabel": "Productivity & Docs",
     "auth": "oauth",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Calendar (Google)"
+    "desc": "Calendar (Google)",
+    "docsUrl": "",
+    "websiteUrl": "https://calendar.google.com"
   },
   {
     "key": "google-sheets",
     "name": "Google Sheets",
     "cat": "productivity",
+    "catLabel": "Productivity & Docs",
     "auth": "oauth",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Spreadsheets (Google)"
+    "desc": "Spreadsheets (Google)",
+    "docsUrl": "",
+    "websiteUrl": "https://sheets.google.com"
   },
   {
     "key": "google-meet",
     "name": "Google Meet",
     "cat": "productivity",
+    "catLabel": "Productivity & Docs",
     "auth": "oauth",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Video conferencing (Google)"
+    "desc": "Video conferencing (Google)",
+    "docsUrl": "",
+    "websiteUrl": "https://meet.google.com"
   },
   {
     "key": "outlook",
     "name": "Outlook",
     "cat": "productivity",
+    "catLabel": "Productivity & Docs",
     "auth": "oauth",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Email & calendar (Microsoft)"
+    "desc": "Email & calendar (Microsoft)",
+    "docsUrl": "",
+    "websiteUrl": "https://outlook.com"
   },
   {
     "key": "onedrive",
     "name": "OneDrive",
     "cat": "productivity",
+    "catLabel": "Productivity & Docs",
     "auth": "oauth",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Storage (Microsoft)"
+    "desc": "Storage (Microsoft)",
+    "docsUrl": "",
+    "websiteUrl": "https://www.microsoft.com/microsoft-365/onedrive"
   },
   {
     "key": "confluence",
     "name": "Confluence",
     "cat": "productivity",
+    "catLabel": "Productivity & Docs",
     "auth": "oauth",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Wiki & docs (Atlassian)"
+    "desc": "Wiki & docs (Atlassian)",
+    "docsUrl": "",
+    "websiteUrl": "https://www.atlassian.com/software/confluence"
   },
   {
     "key": "dropbox",
     "name": "Dropbox",
     "cat": "productivity",
+    "catLabel": "Productivity & Docs",
     "auth": "oauth",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "File storage"
+    "desc": "File storage",
+    "docsUrl": "",
+    "websiteUrl": "https://www.dropbox.com"
   },
   {
     "key": "miro",
     "name": "Miro",
     "cat": "productivity",
+    "catLabel": "Productivity & Docs",
     "auth": "oauth",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Collaborative whiteboard"
+    "desc": "Collaborative whiteboard",
+    "docsUrl": "",
+    "websiteUrl": "https://miro.com"
   },
   {
     "key": "loom",
     "name": "Loom",
     "cat": "productivity",
+    "catLabel": "Productivity & Docs",
     "auth": "token",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Videos & screen recordings"
+    "desc": "Videos & screen recordings",
+    "docsUrl": "",
+    "websiteUrl": "https://www.loom.com"
   },
   {
     "key": "todoist",
     "name": "Todoist",
     "cat": "productivity",
+    "catLabel": "Productivity & Docs",
     "auth": "token",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Personal tasks"
+    "desc": "Personal tasks",
+    "docsUrl": "",
+    "websiteUrl": "https://todoist.com"
   },
   {
     "key": "obsidian",
     "name": "Obsidian",
     "cat": "productivity",
+    "catLabel": "Productivity & Docs",
     "auth": "config",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Markdown notes"
+    "desc": "Markdown notes",
+    "docsUrl": "",
+    "websiteUrl": "https://obsidian.md"
   },
   {
     "key": "canva",
     "name": "Canva",
     "cat": "design",
+    "catLabel": "Design & Media",
     "auth": "oauth",
     "mcp": true,
+    "mcpUrl": "https://mcp.canva.com/mcp",
     "native": null,
     "reachable": true,
-    "desc": "Designs & assets"
+    "desc": "Designs & assets",
+    "docsUrl": "",
+    "websiteUrl": "https://www.canva.com"
   },
   {
     "key": "figma",
     "name": "Figma",
     "cat": "design",
+    "catLabel": "Design & Media",
     "auth": "token",
     "mcp": true,
+    "mcpUrl": "https://mcp.figma.com/mcp",
     "native": null,
     "reachable": true,
-    "desc": "Files & design system"
+    "desc": "Files & design system",
+    "docsUrl": "",
+    "websiteUrl": "https://www.figma.com"
   },
   {
     "key": "elevenlabs",
     "name": "ElevenLabs",
     "cat": "design",
+    "catLabel": "Design & Media",
     "auth": "apikey",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "AI voice & audio"
+    "desc": "AI voice & audio",
+    "docsUrl": "",
+    "websiteUrl": "https://elevenlabs.io"
   },
   {
     "key": "framer",
     "name": "Framer",
     "cat": "design",
+    "catLabel": "Design & Media",
     "auth": "token",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Sites & prototypes"
+    "desc": "Sites & prototypes",
+    "docsUrl": "",
+    "websiteUrl": "https://www.framer.com"
   },
   {
     "key": "sketch",
     "name": "Sketch",
     "cat": "design",
+    "catLabel": "Design & Media",
     "auth": "token",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Interface design"
+    "desc": "Interface design",
+    "docsUrl": "",
+    "websiteUrl": "https://www.sketch.com"
   },
   {
     "key": "adobe",
     "name": "Adobe Creative Cloud",
     "cat": "design",
+    "catLabel": "Design & Media",
     "auth": "oauth",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Photoshop, Illustrator…"
+    "desc": "Photoshop, Illustrator…",
+    "docsUrl": "",
+    "websiteUrl": "https://www.adobe.com/creativecloud.html"
   },
   {
     "key": "webflow",
     "name": "Webflow",
     "cat": "design",
+    "catLabel": "Design & Media",
     "auth": "oauth",
     "mcp": true,
+    "mcpUrl": "https://mcp.webflow.com/sse",
     "native": null,
     "reachable": true,
-    "desc": "Sites & CMS"
+    "desc": "Sites & CMS",
+    "docsUrl": "",
+    "websiteUrl": ""
   },
   {
     "key": "wix",
     "name": "Wix",
     "cat": "design",
+    "catLabel": "Design & Media",
     "auth": "oauth",
     "mcp": true,
+    "mcpUrl": "https://mcp.wix.com/sse",
     "native": null,
     "reachable": true,
-    "desc": "Sites & CMS"
+    "desc": "Sites & CMS",
+    "docsUrl": "",
+    "websiteUrl": ""
   },
   {
     "key": "shopify",
     "name": "Shopify",
     "cat": "ecommerce",
+    "catLabel": "E-commerce",
     "auth": "oauth",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Store, orders, products"
+    "desc": "Store, orders, products",
+    "docsUrl": "",
+    "websiteUrl": "https://www.shopify.com"
   },
   {
     "key": "n8n",
     "name": "n8n",
     "cat": "automation",
+    "catLabel": "Automation",
     "auth": "apikey",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Self-hosted workflows"
+    "desc": "Self-hosted workflows",
+    "docsUrl": "",
+    "websiteUrl": "https://n8n.io"
   },
   {
     "key": "zapier",
     "name": "Zapier",
     "cat": "automation",
+    "catLabel": "Automation",
     "auth": "apikey",
     "mcp": true,
+    "mcpUrl": "https://mcp.zapier.com/api/mcp/mcp",
     "native": null,
     "reachable": true,
-    "desc": "No-code automations"
+    "desc": "No-code automations",
+    "docsUrl": "",
+    "websiteUrl": "https://zapier.com"
   },
   {
     "key": "make",
     "name": "Make",
     "cat": "automation",
+    "catLabel": "Automation",
     "auth": "apikey",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Automation scenarios"
+    "desc": "Automation scenarios",
+    "docsUrl": "",
+    "websiteUrl": "https://www.make.com"
   },
   {
     "key": "pipedream",
     "name": "Pipedream",
     "cat": "automation",
+    "catLabel": "Automation",
     "auth": "token",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Workflows for developers"
+    "desc": "Workflows for developers",
+    "docsUrl": "",
+    "websiteUrl": "https://pipedream.com"
   },
   {
     "key": "groq",
     "name": "Groq",
     "cat": "ai",
+    "catLabel": "AI Models",
     "auth": "apikey",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Fast LLM inference (or other gateway)"
+    "desc": "Fast LLM inference (or other gateway)",
+    "docsUrl": "",
+    "websiteUrl": "https://groq.com"
   },
   {
     "key": "openai",
     "name": "OpenAI",
     "cat": "ai",
+    "catLabel": "AI Models",
     "auth": "apikey",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "GPT & embeddings"
+    "desc": "GPT & embeddings",
+    "docsUrl": "",
+    "websiteUrl": "https://openai.com"
   },
   {
     "key": "anthropic",
     "name": "Anthropic (Claude)",
     "cat": "ai",
+    "catLabel": "AI Models",
     "auth": "apikey",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Claude - can also drive TaskForce via MCP"
+    "desc": "Claude - can also drive TaskForce via MCP",
+    "docsUrl": "",
+    "websiteUrl": "https://www.anthropic.com"
   },
   {
     "key": "gemini",
     "name": "Google Gemini",
     "cat": "ai",
+    "catLabel": "AI Models",
     "auth": "apikey",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Gemini models (Google)"
+    "desc": "Gemini models (Google)",
+    "docsUrl": "",
+    "websiteUrl": "https://gemini.google.com"
   },
   {
     "key": "mistral",
     "name": "Mistral AI",
     "cat": "ai",
+    "catLabel": "AI Models",
     "auth": "apikey",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "European LLMs"
+    "desc": "European LLMs",
+    "docsUrl": "",
+    "websiteUrl": "https://mistral.ai"
   },
   {
     "key": "huggingface",
     "name": "Hugging Face",
     "cat": "ai",
+    "catLabel": "AI Models",
     "auth": "token",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Models & inference"
+    "desc": "Models & inference",
+    "docsUrl": "",
+    "websiteUrl": "https://huggingface.co"
   },
   {
     "key": "ollama",
     "name": "Ollama",
     "cat": "ai",
+    "catLabel": "AI Models",
     "auth": "config",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "Local LLMs"
+    "desc": "Local LLMs",
+    "docsUrl": "",
+    "websiteUrl": "https://ollama.com"
   },
   {
     "key": "perplexity",
     "name": "Perplexity",
     "cat": "ai",
+    "catLabel": "AI Models",
     "auth": "apikey",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "AI-powered search"
+    "desc": "AI-powered search",
+    "docsUrl": "",
+    "websiteUrl": "https://www.perplexity.ai"
   },
   {
     "key": "cohere",
     "name": "Cohere",
     "cat": "ai",
+    "catLabel": "AI Models",
     "auth": "apikey",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "LLMs & rerank"
+    "desc": "LLMs & rerank",
+    "docsUrl": "",
+    "websiteUrl": "https://cohere.com"
   },
   {
     "key": "replicate",
     "name": "Replicate",
     "cat": "ai",
+    "catLabel": "AI Models",
     "auth": "token",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": true,
-    "desc": "On-demand hosted models"
+    "desc": "On-demand hosted models",
+    "docsUrl": "",
+    "websiteUrl": "https://replicate.com"
   },
   {
     "key": "shadcn",
     "name": "shadcn/ui",
     "cat": "ui",
+    "catLabel": "UI & Components",
     "auth": "none",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": false,
-    "desc": "Copyable React components (Radix + Tailwind) - Cortex recommendations (coming soon)"
+    "desc": "Copyable React components (Radix + Tailwind) - Cortex recommendations (coming soon)",
+    "docsUrl": "https://ui.shadcn.com",
+    "websiteUrl": "https://ui.shadcn.com"
   },
   {
     "key": "21st-dev",
     "name": "21st.dev",
     "cat": "ui",
+    "catLabel": "UI & Components",
     "auth": "none",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": false,
-    "desc": "React/Tailwind component marketplace - Cortex recommendations (coming soon)"
+    "desc": "React/Tailwind component marketplace - Cortex recommendations (coming soon)",
+    "docsUrl": "https://21st.dev",
+    "websiteUrl": "https://21st.dev"
   },
   {
     "key": "radix-ui",
     "name": "Radix UI",
     "cat": "ui",
+    "catLabel": "UI & Components",
     "auth": "none",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": false,
-    "desc": "Unstyled accessible primitives (shadcn's foundation) - Cortex recommendations (coming soon)"
+    "desc": "Unstyled accessible primitives (shadcn's foundation) - Cortex recommendations (coming soon)",
+    "docsUrl": "https://www.radix-ui.com",
+    "websiteUrl": "https://www.radix-ui.com"
   },
   {
     "key": "aceternity-ui",
     "name": "Aceternity UI",
     "cat": "ui",
+    "catLabel": "UI & Components",
     "auth": "none",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": false,
-    "desc": "Ready-to-use animated components (Framer Motion) - Cortex recommendations (coming soon)"
+    "desc": "Ready-to-use animated components (Framer Motion) - Cortex recommendations (coming soon)",
+    "docsUrl": "https://ui.aceternity.com",
+    "websiteUrl": "https://ui.aceternity.com"
   },
   {
     "key": "magic-ui",
     "name": "Magic UI",
     "cat": "ui",
+    "catLabel": "UI & Components",
     "auth": "none",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": false,
-    "desc": "Open-source animated components & effects - Cortex recommendations (coming soon)"
+    "desc": "Open-source animated components & effects - Cortex recommendations (coming soon)",
+    "docsUrl": "https://magicui.design",
+    "websiteUrl": "https://magicui.design"
   },
   {
     "key": "origin-ui",
     "name": "Origin UI",
     "cat": "ui",
+    "catLabel": "UI & Components",
     "auth": "none",
     "mcp": false,
+    "mcpUrl": null,
     "native": null,
     "reachable": false,
-    "desc": "Large collection of Tailwind components - Cortex recommendations (coming soon)"
+    "desc": "Large collection of Tailwind components - Cortex recommendations (coming soon)",
+    "docsUrl": "https://originui.com",
+    "websiteUrl": "https://originui.com"
   }
 ];

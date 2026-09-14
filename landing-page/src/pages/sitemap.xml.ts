@@ -1,8 +1,9 @@
 import { BUILT_ROUTES } from "@/components/site/nav";
+import { CONNECTORS } from "@/lib/connectors-data";
 
 /**
- * sitemap.xml - généré à partir de `BUILT_ROUTES` (source unique des pages construites).
- * Ajouter une page = l'ajouter à BUILT_ROUTES, elle entre ici automatiquement. Aucune liste à tenir.
+ * sitemap.xml - généré à partir de `BUILT_ROUTES` (source unique des pages construites) + les fiches
+ * connecteur MCP-ready (route dynamique `[key].astro`, dérivée du catalogue). Aucune liste à tenir.
  */
 // Même dérivation que nav.ts : suffixe (domaine) en variable d'env, défaut = domaine de prod réel.
 // Ne pas coder en dur un domaine (l'ancien « taskforce.dev » sortait de mauvaises URL dans le sitemap).
@@ -13,7 +14,8 @@ const SITE = `https://${BASE_DOMAIN}`;
 
 export function GET() {
   const lastmod = new Date().toISOString().slice(0, 10); // date du build (YYYY-MM-DD)
-  const paths = [...BUILT_ROUTES].sort();
+  const mcpFiches = CONNECTORS.filter((c) => c.mcp).map((c) => `/product/integrations/${c.key}`);
+  const paths = [...new Set([...BUILT_ROUTES, ...mcpFiches])].sort();
   const urls = paths
     .map((p) => {
       // La home porte la priorite max ; les pages produit/solutions au-dessus des pages legales.

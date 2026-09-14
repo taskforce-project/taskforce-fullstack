@@ -1,10 +1,11 @@
 /**
  * connectors.ts - données des FICHES connecteur détaillées (`/product/integrations/{key}`).
  *
- * RÈGLE ABSOLUE : rien ici n'est inventé. Chaque capacité listée correspond à un endpoint réel de
- * `IntegrationController` (backend) et à une méthode de `frontend/lib/api/integration-service.ts`.
- * On ne fait de fiche QUE pour les 3 connecteurs réellement implémentés en profondeur - GitHub,
- * Slack, Plane. Les 126 autres restent au catalogue (connectables, profondeur en cours).
+ * RÈGLE ABSOLUE : rien ici n'est inventé. Pour les 3 natifs profonds (GitHub, Slack, Plane), chaque
+ * capacité listée correspond à un endpoint réel de `IntegrationController` + `integration-service.ts`.
+ * Les connecteurs MCP-ready reçoivent une fiche HONNÊTE générée (`mcpFiche`) : ils marchent tous pareil
+ * (serveur MCP officiel 1-clic + l'agent s'en sert dans un run), différenciés par la vraie data du
+ * catalogue backend. On n'affirme pas d'outils précis qu'on ne connaît pas. Le reste reste au catalogue.
  *
  * Matrice Connect / Remember / Act par connecteur (le modèle du site), avec le VRAI statut :
  *   · connect  = peut-on l'authentifier et le brancher ?
@@ -12,6 +13,8 @@
  *   · act      = TaskForce agit-il avec (liens, notifications) ?
  * "na" = ce n'est pas le rôle de ce connecteur ; "rolling" = architecturé, pas encore livré ici.
  */
+
+import type { Connector } from "@/lib/connectors-data";
 
 export type ConnStatus = "live" | "beta" | "rolling" | "na";
 
@@ -101,3 +104,44 @@ export const CONNECTORS: Record<string, ConnectorDetail> = {
     docsLabel: "Plane API docs",
   },
 };
+
+/**
+ * Fiche HONNÊTE d'un connecteur MCP-ready, générée depuis la vraie data du catalogue (aucune capacité
+ * inventée). Tous les MCP-ready partagent le même moteur : serveur MCP officiel hébergé, connexion
+ * 1-clic OAuth, l'agent appelle leurs outils dans un run (avec approbation humaine sur toute écriture).
+ * La différence entre deux fiches = le nom, la description, la catégorie et le serveur MCP réels.
+ */
+export function mcpFiche(c: Connector): ConnectorDetail {
+  const docsUrl = c.docsUrl || c.websiteUrl || "https://modelcontextprotocol.io";
+  const docsLabel = c.docsUrl ? `${c.name} API docs` : c.websiteUrl ? `${c.name} website` : "About MCP";
+  return {
+    key: c.key,
+    name: c.name,
+    category: c.catLabel,
+    tagline: `${c.desc}. Connect ${c.name} over its official MCP server in one click - your agents can then use it inside a run, with a human on every write.`,
+    matrix: { connect: "live", remember: "rolling", act: "beta" },
+    auth: "MCP - one-click OAuth to the official server",
+    plan: "Beta",
+    can: [
+      {
+        title: "Connect in one click",
+        text: `TaskForce connects to ${c.name}'s official hosted MCP server over OAuth - no key to paste. The server URL stays editable if you self-host.`,
+      },
+      {
+        title: "Your agents can use it in a run",
+        text: `An agent can call ${c.name}'s MCP tools to read context or take an action. Anything that writes waits for a human approval first.`,
+      },
+      {
+        title: "Bounded by your scopes",
+        text: "The agent only reaches what the OAuth scopes you grant expose - nothing beyond them.",
+      },
+    ],
+    flows: [],
+    notYet: [
+      `Native ingestion into Brain OS memory isn't wired for ${c.name} yet - it runs through the generic MCP layer, not a dedicated reader. Deep sync is rolling out, with Plane as the reference.`,
+      `The exact tools available depend on ${c.name}'s own MCP server.`,
+    ],
+    docsUrl,
+    docsLabel,
+  };
+}
