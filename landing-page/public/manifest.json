@@ -1,21 +1,17 @@
 {
-  "name": "TaskForce",
+  "name": "TaskForce - AI Delivery Operating System",
   "short_name": "TaskForce",
-  "description": "A powerful task management platform with beautiful themes",
+  "description": "Describe the outcome and TaskForce runs the delivery: scoped agents plan and draft every step, a human approves each checkpoint.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#faf7f5",
-  "theme_color": "#9b2c2c",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
   "icons": [
     {
-      "src": "/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png"
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any"
     }
   ]
 }

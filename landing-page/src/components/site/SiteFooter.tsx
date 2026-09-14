@@ -1,4 +1,4 @@
-import { Linkedin, Instagram, Mail } from "lucide-react";
+import { Linkedin, Github, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FOOTER_GROUPS, isLive, APP_VERSION } from "./nav";
 
@@ -18,8 +18,8 @@ function SoonTag() {
  */
 
 const SOCIALS = [
+  { label: "GitHub", href: "https://github.com/taskforce-project", icon: Github },
   { label: "LinkedIn", href: "https://www.linkedin.com/in/pierre-michel-work/", icon: Linkedin },
-  { label: "Instagram", href: "https://www.instagram.com/pi_et_rh0", icon: Instagram },
   { label: "Email", href: "mailto:contact@taskforce-project.fr", icon: Mail },
 ];
 
