@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.taskforce.tf_api.core.dto.request.CreateKnowledgeNodeRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateKnowledgeNodeRequest;
+import com.taskforce.tf_api.core.dto.response.KnowledgeNodeResponse;
 import com.taskforce.tf_api.core.enums.CycleStatus;
 import com.taskforce.tf_api.core.enums.IssueStatusCategory;
 import com.taskforce.tf_api.core.enums.NodeRefType;
@@ -380,7 +381,13 @@ public class BrainIngestionService {
             log.warn("Ingestion Brain OS : projet {} introuvable a l'ecriture", projectId);
             return;
         }
-        String title = truncate("Projet - " + project.getName() + " (" + project.getIdentifier() + ")", 300);
+        // Dossier d'espace = parent de containment (Brain OS > espace > PROJET > notes). Absent sur un
+        // vieux brain a plat -> parentNodeId null (le projet reste a la racine, comportement non regressif).
+        Long wsFolderId = nodeRepository
+            .findFirstByWorkspaceIdAndRefTypeAndRefId(workspaceId, NodeRefType.WORKSPACE, workspaceId)
+            .map(KnowledgeNode::getId).orElse(null);
+
+        String title = truncate(project.getName(), 300); // le DOSSIER projet porte le nom du projet
         String content = renderProjectContext(project);
 
         Map<String, Object> metadata = new LinkedHashMap<>();
@@ -403,18 +410,51 @@ public class BrainIngestionService {
                 .tags(PROJECT_TAGS)
                 .build());
         } else {
-            knowledgeService.createNode(slug, userId, CreateKnowledgeNodeRequest.builder()
-                .type("NOTE")
+            KnowledgeNodeResponse created = knowledgeService.createNode(slug, userId, CreateKnowledgeNodeRequest.builder()
+                .type("README")
                 .domain("PROJET")
                 .title(title)
                 .content(content)
                 .refType("PROJECT")
                 .refId(project.getId())
+                .parentNodeId(wsFolderId) // niche le dossier projet sous le dossier d'espace
                 .tags(PROJECT_TAGS)
                 .metadata(metadata)
                 .build());
+            // Paquet de notes utiles du projet (niveau PROJET), niche sous le dossier projet.
+            seedProjectNotes(slug, userId, project, created.getId());
         }
-        log.info("Brain OS <- fiche projet « {} » ({})", project.getName(), project.getIdentifier());
+        log.info("Brain OS <- dossier projet « {} » ({})", project.getName(), project.getIdentifier());
+    }
+
+    /**
+     * Notes initiales d'un projet (architecture, backlog, fait & livre, problemes, decisions, runbook),
+     * creees comme ENFANTS du dossier projet (containment). Appele une seule fois, a la creation. Aucun
+     * LLM (gabarits a remplir par l'equipe / l'IA).
+     */
+    private void seedProjectNotes(String slug, Long userId, Project project, Long projectNodeId) {
+        String name = project.getName();
+        record Note(String suffix, String domain, String type, String body) {}
+        List<Note> notes = List.of(
+            new Note("Architecture", "ARCHITECTURE", "DOC", "Vue technique du projet : composants, dependances, points d'integration."),
+            new Note("Backlog", "ROADMAP", "DOC", "Travaux a venir, priorises. Ce qui est livre migre vers « Fait & livre »."),
+            new Note("Fait & livre", "HISTORIQUE", "DOC", "Historique des livraisons et travaux termines du projet."),
+            new Note("Problemes connus", "AUDITS", "FINDING", "Bugs et limites identifies, avec contournement."),
+            new Note("Decisions (ADR)", "DECISIONS", "ADR", "Decisions d'architecture : Contexte, Options, Decision, Consequences."),
+            new Note("Runbook", "RUNBOOKS", "RUNBOOK", "Procedures d'exploitation : build, deploiement, incidents."));
+        for (Note note : notes) {
+            String title = truncate(name + " - " + note.suffix(), 300);
+            knowledgeService.createNode(slug, userId, CreateKnowledgeNodeRequest.builder()
+                .type(note.type())
+                .domain(note.domain())
+                .title(title)
+                .content("# " + title + "\n\n" + note.body())
+                .refId(project.getId()) // meme galaxie que le projet dans le graphe (refId), sans refType
+                .parentNodeId(projectNodeId)
+                .tags(List.of("projet", "ingestion-auto"))
+                .metadata(Map.of("generatedBy", "ingestion-auto", "projects", List.of(project.getId())))
+                .build());
+        }
     }
 
     /**
@@ -435,9 +475,12 @@ public class BrainIngestionService {
             log.debug("Ingestion Brain OS : espace {} sans activite, rien a ecrire", workspaceId);
             return;
         }
-        String title = truncate("Contexte - " + ws.getName(), 300);
-        String content = "> [!info] Contexte de l'espace de travail - fourni a l'onboarding / a la creation.\n\n"
-            + "## Activite\n\n" + activity.trim() + "\n\n#contexte #entreprise\n";
+        // Le node refType=WORKSPACE EST le DOSSIER d'espace (cree par le seed) : on l'enrichit du
+        // contexte metier au lieu de creer une fiche « Contexte » a plat a cote. Titre = nom de l'espace.
+        String title = truncate(ws.getName(), 300);
+        String content = "# " + ws.getName() + "\n\n"
+            + activity.trim() + "\n\n"
+            + "Socle transverse : [[Socle transverse]]. Chaque projet a son propre dossier ci-dessous.\n\n#contexte #entreprise\n";
 
         Map<String, Object> metadata = new LinkedHashMap<>();
         metadata.put("workspaceLevel", true);
@@ -455,9 +498,10 @@ public class BrainIngestionService {
                 .tags(WORKSPACE_TAGS)
                 .build());
         } else {
+            // Vieux brain a plat (sans dossier d'espace) : cree la fiche a la racine (non regressif).
             knowledgeService.createNode(slug, userId, CreateKnowledgeNodeRequest.builder()
-                .type("NOTE")
-                .domain("PRODUIT")
+                .type("README")
+                .domain("PROJET")
                 .title(title)
                 .content(content)
                 .refType("WORKSPACE")
@@ -466,7 +510,7 @@ public class BrainIngestionService {
                 .metadata(metadata)
                 .build());
         }
-        log.info("Brain OS <- fiche contexte de l'espace « {} »", ws.getName());
+        log.info("Brain OS <- dossier d'espace « {} » enrichi du contexte", ws.getName());
     }
 
     /** Rendu deterministe de la fiche projet (format Obsidian). La description peut etre absente. */
