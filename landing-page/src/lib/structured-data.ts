@@ -118,6 +118,23 @@ export function breadcrumbLd(origin: string, pathname: string): JsonLd | null {
   };
 }
 
+/**
+ * FAQPage a partir d'items {q,a}. A n'utiliser QUE si les memes Q/R sont AFFICHEES sur la page
+ * (regle Google : le balisage doit correspondre au contenu visible). Emis par `FaqSection.astro`,
+ * qui rend les memes items -> correspondance garantie. Bon pour le GEO (les LLM parsent bien le FAQPage).
+ */
+export function faqPageLd(items: { q: string; a: string }[]): JsonLd {
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: items.map((f) => ({
+      "@type": "Question",
+      name: f.q,
+      acceptedAnswer: { "@type": "Answer", text: f.a },
+    })),
+  };
+}
+
 export function softwareApplicationLd(origin: string): JsonLd {
   return {
     "@context": "https://schema.org",
