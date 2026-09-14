@@ -33,6 +33,13 @@ export default [
     },
   },
   {
+    // Scripts de build (Node) : déclarer les globals Node pour éviter no-undef (process/console…).
+    files: ['scripts/**/*.{js,mjs,cjs}'],
+    languageOptions: {
+      globals: { process: 'readonly', console: 'readonly', Buffer: 'readonly', URL: 'readonly' },
+    },
+  },
+  {
     ignores: [
       'dist/',
       'node_modules/',

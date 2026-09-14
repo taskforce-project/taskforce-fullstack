@@ -4,25 +4,24 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { logoSrc } from "../BrandLogo";
 import { cn } from "@/lib/utils";
+import { CONNECTORS, type Connector } from "@/lib/connectors-data";
 
 /**
- * IntegrationCatalogue - le VRAI pool de connecteurs, en zone cherchable.
+ * IntegrationCatalogue - le VRAI pool de connecteurs, tel qu'il existe dans l'app.
  *
- * Source de vérité : `backend/.../core/service/integration/ConnectorCatalog.java` - un catalogue
- * DÉCLARATIF (ajouter un outil = une ligne). On le reproduit fidèlement ici : **138 connecteurs,
- * 17 catégories**, mêmes clés que la webapp (donc mêmes logos). Le compteur ne triche pas.
- *
- * HONNÊTETÉ (calée sur le LabBanner de l'app) : TOUT le catalogue est **connectable** aujourd'hui
- * (identifiants stockés chiffrés), mais la **synchronisation des données par outil** n'est pas
- * encore active partout. Les trois connecteurs éprouvés portent un marqueur : GitHub & Slack
- * (OAuth 1-clic) et Plane (sync → Brain OS). Le reste = connexion générique. Le détail de maturité
- * vit dans la section « How it works » de la page ; ici, c'est le pool.
+ * Source de vérité : `backend/.../ConnectorCatalog.java`, transcrit dans `lib/connectors-data.ts`
+ * (généré depuis l'endpoint catalogue). On ne survend RIEN (décision CEO) :
+ *   - chaque connecteur JOIGNABLE montre COMMENT il se connecte (badge : MCP / OAuth / API key /
+ *     Token / Config) + sa description ; les 3 natifs (Plane, GitHub, Slack) portent leur profondeur
+ *     réelle (Memory / Actions) et une fiche cliquable.
+ *   - un connecteur SANS moyen de connexion aujourd'hui (les libs UI recommandées) s'affiche
+ *     nom + logo SEULS, sans badge ni description - on le liste, on ne prétend pas le brancher.
  */
 
-type Tool = { key: string; label: string; cat: string };
+interface CatDef { id: string; label: string }
 
 /** Les 17 catégories réelles (id ← enum `ConnectorCategory`), libellés lisibles. */
-const CATS: { id: string; label: string }[] = [
+const CATS: CatDef[] = [
   { id: "pm", label: "Project management" },
   { id: "dev", label: "Dev & CI/CD" },
   { id: "infra", label: "Hosting & infra" },
@@ -41,173 +40,33 @@ const CATS: { id: string; label: string }[] = [
   { id: "ai", label: "AI models" },
   { id: "ui", label: "UI components" },
 ];
-
 const CAT_LABEL: Record<string, string> = Object.fromEntries(CATS.map((c) => [c.id, c.label]));
 
-/**
- * Profondeur RÉELLE par connecteur (cf. `ConnectorCatalog` caps + l'UI de sync). On n'invente rien :
- * Plane a l'ingestion Memory aujourd'hui ; GitHub & Slack portent la capability `act` (Actions).
- * Tout le reste est « connectable » (cap `observe`), la profondeur arrive - dit dans la légende.
- */
-const DEEP: Record<string, string> = {
-  plane: "Memory",
-  github: "Actions",
-  slack: "Actions",
+/** Libellé du MOYEN de connexion (le badge « comment c'est connectable »). */
+const AUTH_LABEL: Record<Connector["auth"], string> = {
+  oauth: "OAuth",
+  apikey: "API key",
+  token: "Token",
+  config: "Config",
+  none: "",
 };
-
-/**
- * Sélection stratégique montrée PAR DÉFAUT (review user) : ces noms racontent le produit bien mieux
- * que « 138 ». Le catalogue complet reste à un clic (« Show all »). L'ordre suit la narration.
- */
-const FEATURED = [
-  "github", "slack", "linear", "notion", "salesforce", "stripe",
-  "shopify", "google-drive", "figma", "postgresql", "anthropic", "sentry",
-];
 
 /** Connecteurs dotés d'une fiche détaillée (`/product/integrations/{key}`) - tuile cliquable. */
 const DETAIL = new Set(["github", "slack", "plane"]);
 
-/** Transcription fidèle de `ConnectorCatalog.build()` - 138 entrées, ordre du catalogue. */
-const TOOLS: Tool[] = [
-  { key: "plane", label: "Plane", cat: "pm" },
-  { key: "linear", label: "Linear", cat: "pm" },
-  { key: "asana", label: "Asana", cat: "pm" },
-  { key: "clickup", label: "ClickUp", cat: "pm" },
-  { key: "jira", label: "Jira", cat: "pm" },
-  { key: "trello", label: "Trello", cat: "pm" },
-  { key: "monday", label: "monday.com", cat: "pm" },
-  { key: "airtable", label: "Airtable", cat: "pm" },
-  { key: "shortcut", label: "Shortcut", cat: "pm" },
-  { key: "github", label: "GitHub", cat: "dev" },
-  { key: "jenkins", label: "Jenkins", cat: "dev" },
-  { key: "docker", label: "Docker", cat: "dev" },
-  { key: "kubernetes", label: "Kubernetes", cat: "dev" },
-  { key: "gitlab", label: "GitLab", cat: "dev" },
-  { key: "bitbucket", label: "Bitbucket", cat: "dev" },
-  { key: "postman", label: "Postman", cat: "dev" },
-  { key: "insomnia", label: "Insomnia", cat: "dev" },
-  { key: "vscode", label: "Visual Studio Code", cat: "dev" },
-  { key: "cursor", label: "Cursor", cat: "dev" },
-  { key: "sentry", label: "Sentry", cat: "dev" },
-  { key: "datadog", label: "Datadog", cat: "dev" },
-  { key: "grafana", label: "Grafana", cat: "dev" },
-  { key: "sonarqube", label: "SonarQube", cat: "dev" },
-  { key: "circleci", label: "CircleCI", cat: "dev" },
-  { key: "terraform", label: "Terraform", cat: "dev" },
-  { key: "vercel", label: "Vercel", cat: "infra" },
-  { key: "render", label: "Render", cat: "infra" },
-  { key: "cloudflare", label: "Cloudflare", cat: "infra" },
-  { key: "aws", label: "Amazon Web Services", cat: "infra" },
-  { key: "azure", label: "Microsoft Azure", cat: "infra" },
-  { key: "gcp", label: "Google Cloud", cat: "infra" },
-  { key: "netlify", label: "Netlify", cat: "infra" },
-  { key: "railway", label: "Railway", cat: "infra" },
-  { key: "fly", label: "Fly.io", cat: "infra" },
-  { key: "digitalocean", label: "DigitalOcean", cat: "infra" },
-  { key: "heroku", label: "Heroku", cat: "infra" },
-  { key: "firebase", label: "Firebase", cat: "infra" },
-  { key: "vps", label: "VPS", cat: "infra" },
-  { key: "supabase", label: "Supabase", cat: "db" },
-  { key: "neon", label: "Neon", cat: "db" },
-  { key: "mongodb-atlas", label: "MongoDB Atlas", cat: "db" },
-  { key: "redis-cloud", label: "Redis Cloud", cat: "db" },
-  { key: "postgresql", label: "PostgreSQL", cat: "db" },
-  { key: "planetscale", label: "PlanetScale", cat: "db" },
-  { key: "prisma", label: "Prisma", cat: "db" },
-  { key: "elasticsearch", label: "Elasticsearch", cat: "db" },
-  { key: "snowflake", label: "Snowflake", cat: "db" },
-  { key: "google-ads", label: "Google Ads", cat: "ads" },
-  { key: "meta-ads", label: "Meta Ads", cat: "ads" },
-  { key: "linkedin-ads", label: "LinkedIn Ads", cat: "ads" },
-  { key: "google-analytics", label: "Google Analytics", cat: "analytics" },
-  { key: "posthog", label: "PostHog", cat: "analytics" },
-  { key: "microsoft-clarity", label: "Microsoft Clarity", cat: "analytics" },
-  { key: "mixpanel", label: "Mixpanel", cat: "analytics" },
-  { key: "amplitude", label: "Amplitude", cat: "analytics" },
-  { key: "segment", label: "Segment", cat: "analytics" },
-  { key: "plausible", label: "Plausible", cat: "analytics" },
-  { key: "hotjar", label: "Hotjar", cat: "analytics" },
-  { key: "stripe", label: "Stripe", cat: "payments" },
-  { key: "paypal", label: "PayPal", cat: "payments" },
-  { key: "paddle", label: "Paddle", cat: "payments" },
-  { key: "lemonsqueezy", label: "Lemon Squeezy", cat: "payments" },
-  { key: "wise", label: "Wise", cat: "payments" },
-  { key: "square", label: "Square", cat: "payments" },
-  { key: "hubspot", label: "HubSpot", cat: "crm" },
-  { key: "salesforce", label: "Salesforce", cat: "crm" },
-  { key: "zoho", label: "Zoho", cat: "crm" },
-  { key: "intercom", label: "Intercom", cat: "crm" },
-  { key: "pipedrive", label: "Pipedrive", cat: "crm" },
-  { key: "zendesk", label: "Zendesk", cat: "crm" },
-  { key: "freshworks", label: "Freshworks", cat: "crm" },
-  { key: "attio", label: "Attio", cat: "crm" },
-  { key: "slack", label: "Slack", cat: "comms" },
-  { key: "twilio", label: "Twilio", cat: "comms" },
-  { key: "resend", label: "Resend", cat: "comms" },
-  { key: "mail-smtp", label: "Mail (SMTP)", cat: "comms" },
-  { key: "discord", label: "Discord", cat: "comms" },
-  { key: "microsoft-teams", label: "Microsoft Teams", cat: "comms" },
-  { key: "zoom", label: "Zoom", cat: "comms" },
-  { key: "telegram", label: "Telegram", cat: "comms" },
-  { key: "whatsapp", label: "WhatsApp Business", cat: "comms" },
-  { key: "sendgrid", label: "SendGrid", cat: "comms" },
-  { key: "mailchimp", label: "Mailchimp", cat: "comms" },
-  { key: "clerk", label: "Clerk", cat: "identity" },
-  { key: "keycloak", label: "Keycloak", cat: "identity" },
-  { key: "auth0", label: "Auth0", cat: "identity" },
-  { key: "okta", label: "Okta", cat: "identity" },
-  { key: "bitwarden", label: "Bitwarden", cat: "security" },
-  { key: "1password", label: "1Password", cat: "security" },
-  { key: "doppler", label: "Doppler", cat: "security" },
-  { key: "snyk", label: "Snyk", cat: "security" },
-  { key: "notion", label: "Notion", cat: "productivity" },
-  { key: "google-workspace", label: "Google Workspace", cat: "productivity" },
-  { key: "microsoft-365", label: "Microsoft 365", cat: "productivity" },
-  { key: "granola", label: "Granola", cat: "productivity" },
-  { key: "raycast", label: "Raycast", cat: "productivity" },
-  { key: "gmail", label: "Gmail", cat: "productivity" },
-  { key: "google-drive", label: "Google Drive", cat: "productivity" },
-  { key: "google-calendar", label: "Google Calendar", cat: "productivity" },
-  { key: "google-sheets", label: "Google Sheets", cat: "productivity" },
-  { key: "google-meet", label: "Google Meet", cat: "productivity" },
-  { key: "outlook", label: "Outlook", cat: "productivity" },
-  { key: "onedrive", label: "OneDrive", cat: "productivity" },
-  { key: "confluence", label: "Confluence", cat: "productivity" },
-  { key: "dropbox", label: "Dropbox", cat: "productivity" },
-  { key: "miro", label: "Miro", cat: "productivity" },
-  { key: "loom", label: "Loom", cat: "productivity" },
-  { key: "todoist", label: "Todoist", cat: "productivity" },
-  { key: "obsidian", label: "Obsidian", cat: "productivity" },
-  { key: "canva", label: "Canva", cat: "design" },
-  { key: "figma", label: "Figma", cat: "design" },
-  { key: "elevenlabs", label: "ElevenLabs", cat: "design" },
-  { key: "framer", label: "Framer", cat: "design" },
-  { key: "sketch", label: "Sketch", cat: "design" },
-  { key: "adobe", label: "Adobe Creative Cloud", cat: "design" },
-  { key: "webflow", label: "Webflow", cat: "design" },
-  { key: "wix", label: "Wix", cat: "design" },
-  { key: "shopify", label: "Shopify", cat: "ecommerce" },
-  { key: "n8n", label: "n8n", cat: "automation" },
-  { key: "zapier", label: "Zapier", cat: "automation" },
-  { key: "make", label: "Make", cat: "automation" },
-  { key: "pipedream", label: "Pipedream", cat: "automation" },
-  { key: "groq", label: "Groq", cat: "ai" },
-  { key: "openai", label: "OpenAI", cat: "ai" },
-  { key: "anthropic", label: "Anthropic (Claude)", cat: "ai" },
-  { key: "gemini", label: "Google Gemini", cat: "ai" },
-  { key: "mistral", label: "Mistral AI", cat: "ai" },
-  { key: "huggingface", label: "Hugging Face", cat: "ai" },
-  { key: "ollama", label: "Ollama", cat: "ai" },
-  { key: "perplexity", label: "Perplexity", cat: "ai" },
-  { key: "cohere", label: "Cohere", cat: "ai" },
-  { key: "replicate", label: "Replicate", cat: "ai" },
-  { key: "shadcn", label: "shadcn/ui", cat: "ui" },
-  { key: "21st-dev", label: "21st.dev", cat: "ui" },
-  { key: "radix-ui", label: "Radix UI", cat: "ui" },
-  { key: "aceternity-ui", label: "Aceternity UI", cat: "ui" },
-  { key: "magic-ui", label: "Magic UI", cat: "ui" },
-  { key: "origin-ui", label: "Origin UI", cat: "ui" },
-];
+/** Le badge de connexion : MCP en tête (1 clic, utilisable par l'agent), sinon le type d'auth. */
+function connBadge(c: Connector): string {
+  return c.mcp ? "MCP" : AUTH_LABEL[c.auth];
+}
+
+const totalConnectors = CONNECTORS.length;
+const nativeCount = CONNECTORS.filter((c) => c.native).length;
+const mcpCount = CONNECTORS.filter((c) => c.mcp).length;
+
+/** Vue par défaut : ce qui MARCHE réellement - les natifs d'abord, puis les MCP-ready. */
+const WORKING = CONNECTORS.filter((c) => c.native || c.mcp).sort(
+  (a, b) => (a.native ? 0 : 1) - (b.native ? 0 : 1),
+);
 
 /** Initiales de repli quand un logo manque - jamais d'image cassée. */
 function initials(label: string) {
@@ -216,7 +75,7 @@ function initials(label: string) {
 }
 
 /** Logo d'un connecteur, avec repli initiales sur erreur de chargement. */
-function ConnLogo({ toolKey, label }: { toolKey: string; label: string }) {
+function ConnLogo({ connKey, label }: { connKey: string; label: string }) {
   const [failed, setFailed] = useState(false);
   if (failed) {
     return (
@@ -227,7 +86,7 @@ function ConnLogo({ toolKey, label }: { toolKey: string; label: string }) {
   }
   return (
     <img
-      src={logoSrc(toolKey)}
+      src={logoSrc(connKey)}
       alt=""
       loading="lazy"
       decoding="async"
@@ -237,36 +96,68 @@ function ConnLogo({ toolKey, label }: { toolKey: string; label: string }) {
   );
 }
 
-/** Une tuile de connecteur. Cliquable (→ fiche) pour les connecteurs éprouvés. */
-function Tile({ t }: { t: Tool }) {
-  const marker = DEEP[t.key];
-  const hasDetail = DETAIL.has(t.key);
+/**
+ * Une tuile de connecteur.
+ * - JOIGNABLE : logo + nom + profondeur native éventuelle (Memory/Actions) + description + badge de
+ *   connexion (MCP / OAuth / API key…) ; cliquable vers la fiche pour les 3 éprouvés.
+ * - NON JOIGNABLE : logo + nom SEULS (aucune promesse).
+ */
+function Tile({ c }: { c: Connector }) {
+  if (!c.reachable) {
+    return (
+      <li className="bg-card flex items-center gap-3 border px-4 py-3">
+        <ConnLogo connKey={c.key} label={c.name} />
+        <span className="truncate text-[13px] font-medium text-foreground">{c.name}</span>
+      </li>
+    );
+  }
+
+  const badge = connBadge(c);
+  const hasDetail = DETAIL.has(c.key);
   const inner = (
-    <>
-      <ConnLogo toolKey={t.key} label={t.label} />
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-[13px] font-medium text-foreground">{t.label}</span>
-        <span className="text-muted-foreground block text-[11px]">{CAT_LABEL[t.cat]}</span>
-      </span>
-      {marker && (
-        <span className="border-primary/30 text-primary hidden shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium sm:inline">
-          {marker}
+    <div className="flex h-full flex-col px-4 py-3">
+      <div className="flex items-start gap-3">
+        <ConnLogo connKey={c.key} label={c.name} />
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-2">
+            <span className="truncate text-[13px] font-medium text-foreground">{c.name}</span>
+            {c.native && (
+              <span className="border-primary/30 text-primary shrink-0 rounded-full border px-1.5 py-px text-[10px] font-medium">
+                {c.native}
+              </span>
+            )}
+          </span>
+          <span className="text-muted-foreground mt-0.5 block text-[11.5px] leading-[1.35]">{c.desc}</span>
         </span>
-      )}
-      {hasDetail && <ChevronRight className="text-muted-foreground/40 size-4 shrink-0" />}
-    </>
+        {hasDetail && <ChevronRight className="text-muted-foreground/40 mt-0.5 size-4 shrink-0" />}
+      </div>
+      <div className="mt-2.5 flex items-center gap-2 pl-9">
+        <span
+          className={cn(
+            "rounded-full border px-1.5 py-px text-[10px] font-medium",
+            c.mcp
+              ? "border-primary/40 text-primary bg-primary/5"
+              : "text-muted-foreground/80 border-border",
+          )}
+        >
+          {badge}
+        </span>
+        <span className="text-muted-foreground/60 text-[10.5px]">{CAT_LABEL[c.cat]}</span>
+      </div>
+    </div>
   );
+
   return (
     <li className="bg-card border">
       {hasDetail ? (
         <a
-          href={`/product/integrations/${t.key}`}
-          className="hover:bg-secondary/50 flex h-full items-center gap-3 px-4 py-3 transition-colors"
+          href={`/product/integrations/${c.key}`}
+          className="hover:bg-secondary/50 block h-full transition-colors"
         >
           {inner}
         </a>
       ) : (
-        <div className="flex h-full items-center gap-3 px-4 py-3">{inner}</div>
+        inner
       )}
     </li>
   );
@@ -282,22 +173,21 @@ export function IntegrationCatalogue() {
 
   const filtered = useMemo(
     () =>
-      TOOLS.filter(
-        (t) =>
-          (!cat || t.cat === cat) &&
+      CONNECTORS.filter(
+        (c) =>
+          (!cat || c.cat === cat) &&
           (!needle ||
-            t.label.toLowerCase().includes(needle) ||
-            CAT_LABEL[t.cat].toLowerCase().includes(needle)),
+            c.name.toLowerCase().includes(needle) ||
+            c.desc.toLowerCase().includes(needle) ||
+            CAT_LABEL[c.cat].toLowerCase().includes(needle)),
       ),
     [needle, cat],
   );
 
-  /* Vue par défaut = la sélection stratégique ; on bascule sur le catalogue complet dès qu'on
-     cherche/filtre, ou via « Show all ». Le « 138 » reste une preuve, pas le message principal. */
-  const featuredMode = !filtering && !showAll;
-  const shown = featuredMode
-    ? (FEATURED.map((k) => TOOLS.find((t) => t.key === k)).filter(Boolean) as Tool[])
-    : filtered;
+  // Par défaut on montre CE QUI MARCHE (natifs + MCP-ready) ; le catalogue complet est à un clic
+  // (« Show all ») ou via la recherche / les filtres - toutes les intégrations restent accessibles.
+  const workingMode = !filtering && !showAll;
+  const shown = workingMode ? WORKING : filtered;
 
   const reset = () => {
     setQ("");
@@ -318,7 +208,7 @@ export function IntegrationCatalogue() {
             type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search for a tool - Linear, Sentry, Ollama…"
+            placeholder="Search for a tool - Linear, Sentry, Notion…"
             aria-label="Search integrations"
             className="bg-card h-11 rounded-full pl-9 text-[14px]"
           />
@@ -360,23 +250,23 @@ export function IntegrationCatalogue() {
         </ul>
       </div>
 
-      {/* Compteur - la vue « featured » par défaut, le « 138 » comme preuve de profondeur. */}
+      {/* Compteur honnête : ce qui marche vs le catalogue complet. */}
       <div
         className="text-muted-foreground mt-6 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px]"
         role="status"
       >
-        {featuredMode ? (
+        {workingMode ? (
           <>
-            <span className="text-foreground font-medium">Featured</span>
+            <span className="text-foreground font-medium">Working today</span>
             <span aria-hidden className="text-border">·</span>
             <span className="font-mono tabular-nums">
-              {TOOLS.length} connectors, {CATS.length} categories
+              {nativeCount} native + {mcpCount} MCP-ready
             </span>
           </>
         ) : (
           <>
             <span className="font-mono tabular-nums">
-              {shown.length} of {TOOLS.length}
+              {shown.length} of {totalConnectors}
             </span>
             <button
               type="button"
@@ -390,25 +280,21 @@ export function IntegrationCatalogue() {
         )}
       </div>
 
-      {/* Légende honnête : tout est connectable ; Memory/Actions = la profondeur réelle, en cours. */}
-      <p className="text-muted-foreground mt-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[12px] leading-6">
-        Every connector is connectable today. Deeper capabilities -
-        <span className="border-primary/30 text-primary rounded-full border px-1.5 py-px text-[10px] font-medium">
-          Memory
-        </span>
-        ingestion and
-        <span className="border-primary/30 text-primary rounded-full border px-1.5 py-px text-[10px] font-medium">
-          Actions
-        </span>
-        - are rolling out; Plane, GitHub and Slack lead.
+      {/* Légende honnête : les tiers réels, et ce que dit le badge. */}
+      <p className="text-muted-foreground mt-3 text-[12px] leading-6">
+        <span className="text-foreground font-medium">Native</span> integrations (Plane, GitHub,
+        Slack) run today.{" "}
+        <span className="text-foreground font-medium">MCP-ready</span> ones connect in a click and
+        your agents can use them. The rest of the catalogue is connectable now, with deeper sync
+        rolling out. The badge on each tile shows how it connects.
       </p>
 
       {/* La grille - min-h pour que filtrer ne fasse pas sauter la section */}
-      <div className="mt-4 min-h-[336px]">
+      <div className="mt-5 min-h-[336px]">
         {shown.length > 0 ? (
-          <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
-            {shown.map((t) => (
-              <Tile key={t.key} t={t} />
+          <ul className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+            {shown.map((c) => (
+              <Tile key={c.key} c={c} />
             ))}
           </ul>
         ) : (
@@ -427,13 +313,13 @@ export function IntegrationCatalogue() {
 
       {shown.length > 0 && (
         <div className="mt-6 flex justify-center">
-          {featuredMode ? (
+          {workingMode ? (
             <Button variant="outline" size="pill-sm" onClick={() => setShowAll(true)}>
-              Show all {TOOLS.length} connectors
+              Show all {totalConnectors} connectors
             </Button>
           ) : !filtering && showAll ? (
             <Button variant="ghost" size="pill-sm" onClick={() => setShowAll(false)}>
-              Show featured only
+              Show what works today
             </Button>
           ) : null}
         </div>
