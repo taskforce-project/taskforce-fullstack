@@ -44,9 +44,10 @@ for (const c of cat.categories) {
   for (const t of c.tools) {
     const auth = AUTH[t.authType] ?? "config";
     rows.push({
-      key: t.key, name: t.name, cat: CAT_ID[t.category] ?? "other", auth,
-      mcp: !!t.mcpSuggestedUrl, native: NATIVE[t.key] ?? null, reachable: auth !== "none",
-      desc: clean(t.description),
+      key: t.key, name: t.name, cat: CAT_ID[t.category] ?? "other", catLabel: c.label, auth,
+      mcp: !!t.mcpSuggestedUrl, mcpUrl: t.mcpSuggestedUrl ?? null, native: NATIVE[t.key] ?? null,
+      reachable: auth !== "none", desc: clean(t.description),
+      docsUrl: t.docsUrl ?? "", websiteUrl: t.websiteUrl ?? "",
     });
   }
 }
@@ -60,15 +61,23 @@ export interface Connector {
   key: string;
   name: string;
   cat: string;
+  /** Libelle lisible de la categorie. */
+  catLabel: string;
   /** Comment on le connecte. "none" = pas de moyen de connexion aujourd'hui. */
   auth: ConnectorAuth;
   /** Serveur MCP hebergé verifié -> connexion 1 clic, utilisable par l'agent. */
   mcp: boolean;
+  /** URL du serveur MCP hebergé (si mcp). */
+  mcpUrl: string | null;
   /** Profondeur native reelle au-dela du connectable ("Memory" = ingestion, "Actions" = actions). */
   native: string | null;
   /** A un moyen de connexion (auth !== "none"). */
   reachable: boolean;
   desc: string;
+  /** Doc du fournisseur. */
+  docsUrl: string;
+  /** Site du fournisseur. */
+  websiteUrl: string;
 }
 
 export const CONNECTORS: Connector[] = ${JSON.stringify(rows, null, 2)};
