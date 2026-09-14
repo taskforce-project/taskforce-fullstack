@@ -5,16 +5,22 @@ import { BrandLogo } from "../BrandLogo";
 import { Toast } from "../AppShot";
 
 /**
- * Preuve sociale HONNÊTE (review 6) : « Built with », pas « customers » - on n'a pas de
- * clients à montrer, mais on peut montrer l'écosystème sur lequel on construit. Vrais logos.
+ * Preuve sociale HONNÊTE (review 6) : « Works with », pas « customers » - on n'a pas de
+ * clients à montrer, mais on montre l'écosystème sur lequel on se branche. Vrais logos.
+ *
+ * Set VOLONTAIREMENT transverse (un par catégorie) pour dire « on touche à toute la chaîne » :
+ * repo, tracker, chat, docs, design, cloud, observabilité, modèles - pas juste l'IA + le code.
+ * Le mot « tools » de la légende renvoie au catalogue complet (/product/integrations).
  */
 const BUILT_WITH = [
-  { key: "anthropic", label: "Claude" },
-  { key: "cursor", label: "Cursor" },
-  { key: "openai", label: "OpenAI" },
-  { key: "ollama", label: "Ollama" },
-  { key: "github", label: "GitHub" },
-  { key: "linear", label: "Linear" },
+  { key: "github", label: "GitHub" }, // repo
+  { key: "linear", label: "Linear" }, // tracker
+  { key: "slack", label: "Slack" }, // chat
+  { key: "notion", label: "Notion" }, // docs
+  { key: "figma", label: "Figma" }, // design
+  { key: "aws", label: "AWS" }, // cloud
+  { key: "datadog", label: "Datadog" }, // observabilité
+  { key: "anthropic", label: "Claude" }, // modèles
 ];
 
 /**
@@ -65,7 +71,11 @@ export function Hero() {
         {/* Preuve sociale honnête : « Works with » (pas « customers ») - l'écosystème qu'on utilise. Centré. */}
         <div className="mt-14 flex flex-col items-center gap-5">
           <span className="text-muted-foreground text-[12.5px]">
-            Works with the tools your engineers already trust
+            Works with the{" "}
+            <a href="/product/integrations" className="link-underline text-foreground font-medium">
+              tools
+            </a>{" "}
+            your engineers already trust
           </span>
           <ul className="flex flex-wrap items-center justify-center gap-x-8 gap-y-4">
             {BUILT_WITH.map((b) => (
