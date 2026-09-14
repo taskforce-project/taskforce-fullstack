@@ -8,7 +8,7 @@
       "email": "support@taskforce.com"
     },
     "license": {
-      "name": "PropriÃ©taire",
+      "name": "Propriétaire",
       "url": "https://taskforce.com/license"
     },
     "version": "1.0.0"
@@ -159,6 +159,15 @@
     },
     {
       "name": "Status"
+    },
+    {
+      "name": "Delivery"
+    },
+    {
+      "name": "Mcp O Auth Callback"
+    },
+    {
+      "name": "Project Export"
     }
   ],
   "paths": {
@@ -241,6 +250,92 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/projects/{id}/repo": {
+      "put": {
+        "tags": [
+          "Projects"
+        ],
+        "operationId": "linkRepo",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectRepoLinkRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseProjectRepoResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Projects"
+        ],
+        "operationId": "unlinkRepo",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseProjectRepoResponse"
                 }
               }
             }
@@ -3002,6 +3097,94 @@
         }
       }
     },
+    "/api/workspaces/{slug}/mcp/servers/{connectorKey}/oauth/start": {
+      "post": {
+        "tags": [
+          "MCP actions"
+        ],
+        "operationId": "oauthStart",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "connectorKey",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/McpOAuthStartRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseMapStringString"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/mcp/import": {
+      "post": {
+        "tags": [
+          "MCP actions"
+        ],
+        "operationId": "importProject",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/McpImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseImportResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workspaces/{slug}/mcp/actions/execute": {
       "post": {
         "tags": [
@@ -3103,6 +3286,44 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseInvitationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/integrations/slack/sync": {
+      "post": {
+        "tags": [
+          "Integrations"
+        ],
+        "operationId": "slackSync",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "channel",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSlackSyncResponse"
                 }
               }
             }
@@ -3249,6 +3470,44 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponsePlaneStatusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/integrations/github/sync": {
+      "post": {
+        "tags": [
+          "Integrations"
+        ],
+        "operationId": "githubSync",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "repo",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseGitHubSyncResponse"
                 }
               }
             }
@@ -3404,6 +3663,247 @@
           },
           {
             "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/delivery/issues/{issueId}/delegate": {
+      "post": {
+        "tags": [
+          "Delivery"
+        ],
+        "operationId": "delegate",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "issueId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DelegateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDeliveryRunResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/delivery/cursor": {
+      "get": {
+        "tags": [
+          "Delivery"
+        ],
+        "operationId": "cursorStatus",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDeliveryKeyStatus"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Delivery"
+        ],
+        "operationId": "connectCursor",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectKeyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDeliveryKeyStatus"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Delivery"
+        ],
+        "operationId": "disconnectCursor",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/delivery/anthropic": {
+      "get": {
+        "tags": [
+          "Delivery"
+        ],
+        "operationId": "anthropicStatus",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDeliveryKeyStatus"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Delivery"
+        ],
+        "operationId": "connectAnthropic",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectKeyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDeliveryKeyStatus"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Delivery"
+        ],
+        "operationId": "disconnectAnthropic",
+        "parameters": [
+          {
+            "name": "slug",
             "in": "path",
             "required": true,
             "schema": {
@@ -4263,12 +4763,42 @@
         }
       }
     },
-    "/api/users/me/2fa/enable": {
+    "/api/users/me/2fa/setup": {
       "post": {
         "tags": [
           "Users"
         ],
-        "operationId": "enableTwoFactor",
+        "operationId": "setupTwoFactor",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseTwoFactorSetupResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/me/2fa/confirm": {
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "operationId": "confirmTwoFactor",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TwoFactorConfirmRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "OK",
@@ -4466,6 +4996,26 @@
         }
       }
     },
+    "/api/gdpr/account/restore": {
+      "post": {
+        "tags": [
+          "GDPR"
+        ],
+        "operationId": "restoreMyAccount",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/feedback": {
       "post": {
         "tags": [
@@ -4548,6 +5098,36 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseCheckoutSessionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/billing/change-plan": {
+      "post": {
+        "tags": [
+          "Billing"
+        ],
+        "operationId": "changePlan",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCheckoutSessionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseSubscriptionInfoResponse"
                 }
               }
             }
@@ -4711,6 +5291,16 @@
           "Authentication"
         ],
         "operationId": "refreshToken",
+        "parameters": [
+          {
+            "name": "tf_refresh",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -4718,8 +5308,7 @@
                 "$ref": "#/components/schemas/RefreshTokenRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -6545,6 +7134,55 @@
         }
       }
     },
+    "/api/workspaces/{slug}/brain/nodes/{nodeId}/move": {
+      "patch": {
+        "tags": [
+          "Brain OS"
+        ],
+        "operationId": "moveNode",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "nodeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveNodeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseKnowledgeNodeResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/users/me": {
       "get": {
         "tags": [
@@ -6918,6 +7556,54 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponsePageResponseIssueResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/projects/{projectId}/export": {
+      "get": {
+        "tags": [
+          "Project Export"
+        ],
+        "operationId": "export",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "json"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
                 }
               }
             }
@@ -7303,6 +7989,44 @@
         }
       }
     },
+    "/api/workspaces/{slug}/mcp/servers/{connectorKey}/tools": {
+      "get": {
+        "tags": [
+          "MCP actions"
+        ],
+        "operationId": "serverTools",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "connectorKey",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListMcpToolInfo"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workspaces/{slug}/integrations/slack/status": {
       "get": {
         "tags": [
@@ -7574,6 +8298,105 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseIntegrationCatalogResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/delivery/runs": {
+      "get": {
+        "tags": [
+          "Delivery"
+        ],
+        "operationId": "listRuns",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListDeliveryRunResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/delivery/providers": {
+      "get": {
+        "tags": [
+          "Delivery"
+        ],
+        "operationId": "listProviders",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListDeliveryProviderResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/delivery/issues/{issueId}/run": {
+      "get": {
+        "tags": [
+          "Delivery"
+        ],
+        "operationId": "latestRun",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "issueId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseDeliveryRunResponse"
                 }
               }
             }
@@ -8190,6 +9013,45 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/mcp/oauth/callback": {
+      "get": {
+        "tags": [
+          "Mcp O Auth Callback"
+        ],
+        "operationId": "callback_1",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "error",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
           }
         }
       }
@@ -9264,13 +10126,24 @@
           "GDPR"
         ],
         "operationId": "deleteMyAccount",
+        "parameters": [
+          {
+            "name": "immediate",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
+                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
                 }
               }
             }
@@ -9354,6 +10227,60 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "ProjectRepoLinkRequest": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "minLength": 1
+          },
+          "repoName": {
+            "type": "string"
+          },
+          "repoFullName": {
+            "type": "string"
+          },
+          "privateRepo": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "mode"
+        ]
+      },
+      "ApiResponseProjectRepoResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ProjectRepoResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ProjectRepoResponse": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "repoProvider": {
+            "type": "string"
+          },
+          "repoFullName": {
+            "type": "string"
           }
         }
       },
@@ -9722,6 +10649,11 @@
             "maxLength": 500,
             "minLength": 0
           },
+          "activity": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 0
+          },
           "brainTemplate": {
             "type": "string"
           }
@@ -9765,6 +10697,9 @@
             "type": "string"
           },
           "description": {
+            "type": "string"
+          },
+          "activity": {
             "type": "string"
           },
           "logoUrl": {
@@ -10322,6 +11257,12 @@
           "growthMode": {
             "type": "boolean"
           },
+          "repoProvider": {
+            "type": "string"
+          },
+          "repoFullName": {
+            "type": "string"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -10771,6 +11712,15 @@
       "SmartAssignCandidateResponse": {
         "type": "object",
         "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "agentKey": {
+            "type": "string"
+          },
+          "agentLogoKey": {
+            "type": "string"
+          },
           "userId": {
             "type": "integer",
             "format": "int64"
@@ -11930,6 +12880,100 @@
           }
         }
       },
+      "McpOAuthStartRequest": {
+        "type": "object",
+        "properties": {
+          "mcpUrl": {
+            "type": "string",
+            "minLength": 1
+          },
+          "returnTo": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "mcpUrl"
+        ]
+      },
+      "ApiResponseMapStringString": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "McpImportRequest": {
+        "type": "object",
+        "properties": {
+          "connectorKey": {
+            "type": "string",
+            "minLength": 1
+          },
+          "targetName": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "connectorKey",
+          "targetName"
+        ]
+      },
+      "ApiResponseImportResult": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ImportResult"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ImportResult": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "projectIdentifier": {
+            "type": "string"
+          },
+          "projectName": {
+            "type": "string"
+          },
+          "imported": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "found": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "McpActionRequest": {
         "type": "object",
         "properties": {
@@ -11989,6 +13033,18 @@
               "OWNER",
               "ADMIN",
               "MEMBER"
+            ]
+          },
+          "projectId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "projectRole": {
+            "type": "string",
+            "enum": [
+              "LEAD",
+              "MEMBER",
+              "VIEWER"
             ]
           }
         },
@@ -12051,6 +13107,41 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseSlackSyncResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SlackSyncResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SlackSyncResponse": {
+        "type": "object",
+        "properties": {
+          "created": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "updated": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -12210,6 +13301,41 @@
           }
         }
       },
+      "ApiResponseGitHubSyncResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/GitHubSyncResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "GitHubSyncResponse": {
+        "type": "object",
+        "properties": {
+          "created": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "updated": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "GitHubLinkRequest": {
         "type": "object",
         "properties": {
@@ -12311,6 +13437,123 @@
             "additionalProperties": {
               "type": "string"
             }
+          }
+        }
+      },
+      "DelegateRequest": {
+        "type": "object",
+        "properties": {
+          "providerKey": {
+            "type": "string",
+            "minLength": 1
+          },
+          "model": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "providerKey"
+        ]
+      },
+      "ApiResponseDeliveryRunResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DeliveryRunResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DeliveryRunResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "issueId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "providerKey": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "resultUrl": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          },
+          "startedById": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ConnectKeyRequest": {
+        "type": "object",
+        "properties": {
+          "apiKey": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "apiKey"
+        ]
+      },
+      "ApiResponseDeliveryKeyStatus": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DeliveryKeyStatus"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DeliveryKeyStatus": {
+        "type": "object",
+        "properties": {
+          "connected": {
+            "type": "boolean"
+          },
+          "keyHint": {
+            "type": "string"
           }
         }
       },
@@ -12441,6 +13684,10 @@
             "type": "string"
           },
           "refId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "parentNodeId": {
             "type": "integer",
             "format": "int64"
           },
@@ -13156,6 +14403,10 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "scheduledPurgeAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -13170,6 +14421,48 @@
         },
         "required": [
           "type"
+        ]
+      },
+      "ApiResponseTwoFactorSetupResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/TwoFactorSetupResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "TwoFactorSetupResponse": {
+        "type": "object",
+        "properties": {
+          "secret": {
+            "type": "string"
+          },
+          "otpauthUri": {
+            "type": "string"
+          }
+        }
+      },
+      "TwoFactorConfirmRequest": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\d{6}"
+          }
+        },
+        "required": [
+          "code"
         ]
       },
       "EnterpriseInquiryRequest": {
@@ -13350,6 +14643,9 @@
           },
           "cancelUrl": {
             "type": "string"
+          },
+          "billingInterval": {
+            "type": "string"
           }
         },
         "required": [
@@ -13385,6 +14681,45 @@
           },
           "status": {
             "type": "string"
+          }
+        }
+      },
+      "ApiResponseSubscriptionInfoResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SubscriptionInfoResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SubscriptionInfoResponse": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "planType": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "currentPeriodEnd": {
+            "type": "string"
+          },
+          "cancelAtPeriodEnd": {
+            "type": "boolean"
           }
         }
       },
@@ -13444,6 +14779,9 @@
           },
           "user": {
             "$ref": "#/components/schemas/UserResponse"
+          },
+          "twoFactorRequired": {
+            "type": "boolean"
           }
         }
       },
@@ -13648,13 +14986,9 @@
         "type": "object",
         "properties": {
           "refreshToken": {
-            "type": "string",
-            "minLength": 1
+            "type": "string"
           }
-        },
-        "required": [
-          "refreshToken"
-        ]
+        }
       },
       "ApiResponseAuthResponse": {
         "type": "object",
@@ -13699,6 +15033,9 @@
           "password": {
             "type": "string",
             "minLength": 1
+          },
+          "totp": {
+            "type": "string"
           }
         },
         "required": [
@@ -13728,6 +15065,11 @@
             "minLength": 1
           },
           "description": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 0
+          },
+          "activity": {
             "type": "string",
             "maxLength": 500,
             "minLength": 0
@@ -14103,6 +15445,10 @@
               "type": "string"
             }
           },
+          "parentNodeId": {
+            "type": "integer",
+            "format": "int64"
+          },
           "projects": {
             "type": "array",
             "items": {
@@ -14113,6 +15459,18 @@
           "metadata": {
             "type": "object",
             "additionalProperties": {}
+          }
+        }
+      },
+      "MoveNodeRequest": {
+        "type": "object",
+        "properties": {
+          "parentNodeId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "domain": {
+            "type": "string"
           }
         }
       },
@@ -15123,6 +16481,45 @@
           }
         }
       },
+      "ApiResponseListMcpToolInfo": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/McpToolInfo"
+            }
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "JsonNode": {},
+      "McpToolInfo": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "inputSchema": {
+            "$ref": "#/components/schemas/JsonNode"
+          },
+          "readOnly": {
+            "type": "boolean"
+          }
+        }
+      },
       "ApiResponseListInvitationResponse": {
         "type": "object",
         "properties": {
@@ -15473,6 +16870,9 @@
           },
           "websiteUrl": {
             "type": "string"
+          },
+          "mcpSuggestedUrl": {
+            "type": "string"
           }
         }
       },
@@ -15495,6 +16895,71 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/CategoryGroup"
+            }
+          }
+        }
+      },
+      "ApiResponseListDeliveryRunResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeliveryRunResponse"
+            }
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseListDeliveryProviderResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeliveryProviderResponse"
+            }
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DeliveryProviderResponse": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "logoKey": {
+            "type": "string"
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "models": {
+            "type": "array",
+            "items": {
+              "type": "string"
             }
           }
         }
@@ -16334,6 +17799,9 @@
           "expiresAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "projectName": {
+            "type": "string"
           }
         }
       },
@@ -16349,66 +17817,6 @@
           "data": {
             "type": "object",
             "additionalProperties": {}
-          },
-          "timestamp": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "ApiResponseSubscriptionInfoResponse": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "$ref": "#/components/schemas/SubscriptionInfoResponse"
-          },
-          "timestamp": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "SubscriptionInfoResponse": {
-        "type": "object",
-        "properties": {
-          "userId": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "planType": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string"
-          },
-          "currentPeriodEnd": {
-            "type": "string"
-          },
-          "cancelAtPeriodEnd": {
-            "type": "boolean"
-          }
-        }
-      },
-      "ApiResponseMapStringString": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "string"
-            }
           },
           "timestamp": {
             "type": "string",
