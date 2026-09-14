@@ -167,8 +167,14 @@ const BRANDS = [
   { key: "perplexity", search: "Perplexity" },
   { key: "cohere", search: "Cohere" },
   { key: "replicate", search: "Replicate" },
+  // UI components + ajouts catalogue (resync v138)
+  { key: "webflow", search: "Webflow" },
+  { key: "shadcn", search: "shadcn", match: "shadcn/ui" },
+  { key: "radix-ui", search: "radix", match: "Radix UI" },
+  { key: "magic-ui", search: "magic ui", match: "Magic UI" },
   // Absents de SVGL / pas de marque unique → fallback initiales : plane, vps, mail-smtp, granola,
-  // jenkins, zapier, hubspot, intercom, elevenlabs, google-ads, microsoft-clarity, zoho.
+  // jenkins, zapier, hubspot, intercom, elevenlabs, google-ads, microsoft-clarity, zoho,
+  // square, wix, 21st-dev, aceternity-ui, origin-ui.
 ]
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
