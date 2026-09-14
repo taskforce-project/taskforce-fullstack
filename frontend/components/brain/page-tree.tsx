@@ -1,12 +1,28 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { ChevronRight, FileText, Folder, FolderOpen, Plus } from "lucide-react"
+import {
+  AlertTriangle, BookText, ChevronRight, FileCode, FileText, Folder, FolderOpen,
+  Plus, Scale, ScrollText, StickyNote, Terminal, type LucideIcon,
+} from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import type { KnowledgeNode } from "@/lib/api/brain-service"
 
 interface DomainDef { value: string; code: string; label: string }
+
+/** Icone de page par TYPE de node (feuilles) - facon Notion. Les conteneurs gardent le dossier. */
+const TYPE_ICON: Record<string, LucideIcon> = {
+  README: BookText,
+  ADR: Scale,
+  DECISION: Scale,
+  FINDING: AlertTriangle,
+  RUNBOOK: Terminal,
+  SPEC: FileCode,
+  SOP: ScrollText,
+  NOTE: StickyNote,
+  DOC: FileText,
+}
 
 interface PageTreeProps {
   /** Nodes visibles (deja filtres system/tag par le parent). */
@@ -22,8 +38,17 @@ interface PageTreeProps {
   onMove: (nodeId: number, parentId: number | null, domain: string) => void
 }
 
-/** Titre court : dernier segment apres « › » (l'arbre montre deja la hierarchie, le chemin complet est redondant). */
-function shortLabel(title: string): string {
+/**
+ * Libelle court facon Notion : l'arbre montre deja la hierarchie, on n'affiche donc pas le nom du parent
+ * en prefixe. « VMoney - Architecture » sous « VMoney » -> « Architecture » ; sinon dernier segment apres « › ».
+ */
+function smartLabel(title: string, parentTitle: string | null): string {
+  if (parentTitle) {
+    for (const sep of [" - ", " › "]) {
+      const prefix = parentTitle + sep
+      if (title.startsWith(prefix) && title.length > prefix.length) return title.slice(prefix.length)
+    }
+  }
   return title.includes(" › ") ? title.slice(title.lastIndexOf(" › ") + 3) : title
 }
 
@@ -115,13 +140,13 @@ export function PageTree({ nodes, selectedNodeId, onSelect, onNewPage, onMove }:
     }
   }
 
-  function renderNode(node: KnowledgeNode, depth: number) {
+  function renderNode(node: KnowledgeNode, parentTitle: string | null) {
     const kids = childrenOf.get(node.id) ?? []
     const hasKids = kids.length > 0
     const open = isExpanded(node.id)
     const active = selectedNodeId === node.id
     const isDrop = dropId === node.id
-    const Icon = hasKids ? (open ? FolderOpen : Folder) : FileText
+    const Icon = hasKids ? (open ? FolderOpen : Folder) : (TYPE_ICON[node.type] ?? FileText)
     return (
       <div key={node.id}>
         <div
@@ -130,7 +155,6 @@ export function PageTree({ nodes, selectedNodeId, onSelect, onNewPage, onMove }:
             active && "bg-accent",
             isDrop && "ring-1 ring-inset ring-primary bg-primary/5",
           )}
-          style={{ paddingLeft: depth * 12 }}
           onDragOver={(e) => { if (dragId != null && !dragBlocked.has(node.id)) { e.preventDefault(); setDropId(node.id) } }}
           onDragLeave={() => setDropId((k) => (k === node.id ? null : k))}
           onDrop={(e) => { e.preventDefault(); dropOnPage(node) }}
@@ -158,7 +182,7 @@ export function PageTree({ nodes, selectedNodeId, onSelect, onNewPage, onMove }:
             )}
           >
             <Icon className={cn("size-3.5 shrink-0", hasKids ? "text-muted-foreground" : "text-muted-foreground/70")} />
-            <span className="min-w-0 flex-1 truncate">{shortLabel(node.title)}</span>
+            <span className="min-w-0 flex-1 truncate">{smartLabel(node.title, parentTitle)}</span>
             {hasKids && <span className="shrink-0 rounded px-1 text-[10px] tabular-nums text-muted-foreground/60">{kids.length}</span>}
           </button>
           <button
@@ -172,11 +196,17 @@ export function PageTree({ nodes, selectedNodeId, onSelect, onNewPage, onMove }:
             <Plus className="size-3.5" />
           </button>
         </div>
-        {hasKids && open && kids.map((k) => renderNode(k, depth + 1))}
+        {hasKids && open && (
+          // Indentation + guide vertical facon Notion : chaque niveau s'enfonce d'un cran, avec un fin
+          // trait a gauche qui materialise la containment.
+          <div className="ml-[15px] border-l border-border/60 pl-[3px]">
+            {kids.map((k) => renderNode(k, node.title))}
+          </div>
+        )}
       </div>
     )
   }
 
   if (!root) return <p className="px-2 py-3 text-sm text-muted-foreground">No pages yet.</p>
-  return <div onKeyDown={onTreeKeyDown}>{renderNode(root, 0)}</div>
+  return <div onKeyDown={onTreeKeyDown}>{renderNode(root, null)}</div>
 }
