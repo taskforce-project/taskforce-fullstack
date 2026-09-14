@@ -1,0 +1,21 @@
+---
+/**
+ * Fiche détaillée générée pour les connecteurs MCP-ready (les 3 natifs GitHub/Slack/Plane gardent
+ * leurs fiches statiques riches, qui priment sur cette route dynamique). Contenu HONNÊTE issu du
+ * catalogue réel via `mcpFiche` - aucune capacité inventée.
+ */
+import ConnectorDetail from "@/components/site/ConnectorDetail.astro";
+import { mcpFiche } from "@/lib/connectors";
+import { CONNECTORS, type Connector } from "@/lib/connectors-data";
+
+export function getStaticPaths() {
+  return CONNECTORS.filter((c) => c.mcp).map((c) => ({
+    params: { key: c.key },
+    props: { connector: c },
+  }));
+}
+
+const { connector } = Astro.props as { connector: Connector };
+---
+
+<ConnectorDetail c={mcpFiche(connector)} />

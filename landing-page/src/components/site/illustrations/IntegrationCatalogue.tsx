@@ -51,8 +51,8 @@ const AUTH_LABEL: Record<Connector["auth"], string> = {
   none: "",
 };
 
-/** Connecteurs dotés d'une fiche détaillée (`/product/integrations/{key}`) - tuile cliquable. */
-const DETAIL = new Set(["github", "slack", "plane"]);
+/** A une fiche détaillée (`/product/integrations/{key}`) : les 3 natifs (riches) + les MCP-ready (générées). */
+const hasFiche = (c: Connector) => c.native != null || c.mcp;
 
 /** Le badge de connexion : MCP en tête (1 clic, utilisable par l'agent), sinon le type d'auth. */
 function connBadge(c: Connector): string {
@@ -113,7 +113,7 @@ function Tile({ c }: { c: Connector }) {
   }
 
   const badge = connBadge(c);
-  const hasDetail = DETAIL.has(c.key);
+  const hasDetail = hasFiche(c);
   const inner = (
     <div className="flex h-full flex-col px-4 py-3">
       <div className="flex items-start gap-3">
