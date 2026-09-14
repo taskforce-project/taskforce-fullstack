@@ -1,0 +1,28 @@
+# TaskForce
+
+> TaskForce is an AI delivery operating system: you describe an outcome, scoped agents plan and draft every step, and a human approves each checkpoint before anything ships.
+
+TaskForce sits on top of your existing board and repository. You state the goal; the system breaks it into steps, agents draft the work, and every step waits for a human sign off. Software engineering is the first proven workflow, and the same approve-at-each-checkpoint model extends to other delivery work. The underlying models can run on hosted providers or on your own hardware.
+
+TaskForce is an evolving product: some capabilities are live today, others are in beta or planned. The public roadmap tracks what is shipped and what comes next.
+
+## Product
+- [Orchestration](https://taskforce-project.fr/product/orchestration): Turn an intent into validated checkpoints, from vision to deploy.
+- [Agents](https://taskforce-project.fr/product/agents): Scoped agents (CPO, CTO and COO roles) that work your delivery instead of one generalist.
+- [Approvals](https://taskforce-project.fr/product/approvals): A human signs off at every checkpoint.
+- [TaskForce Memory](https://taskforce-project.fr/product/brain-os): The memory layer that remembers every run and decision, powered by Brain OS.
+- [Smart Assign](https://taskforce-project.fr/product/smart-assign): Route the right task to the right person or agent.
+- [Collaboration](https://taskforce-project.fr/product/collaboration): Boards, issues and cycles in real time.
+- [Analytics](https://taskforce-project.fr/product/analytics): Throughput, resolution time and workload.
+- [Integrations](https://taskforce-project.fr/product/integrations): Connectors across many tools, sitting on the stack you already use.
+
+## Resources
+- [Pricing](https://taskforce-project.fr/pricing): Free plan, with paid tiers for teams.
+- [Documentation](https://taskforce-project.fr/docs): Guides, API and self-host.
+- [Roadmap](https://taskforce-project.fr/roadmap): What is shipped and what comes next, in the open.
+- [Trust center](https://taskforce-project.fr/trust): Security and privacy posture.
+
+## About
+- Product: TaskForce, the AI Delivery Operating System
+- Website: https://taskforce-project.fr
+- Contact: contact@taskforce-project.fr
