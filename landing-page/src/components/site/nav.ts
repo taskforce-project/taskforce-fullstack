@@ -113,7 +113,7 @@ export const PRODUCT_DELIVERY: NavLink[] = [
   {
     label: "Integrations",
     href: "/product/integrations",
-    desc: "129 connectors across 16 categories",
+    desc: "138 connectors across 17 categories",
     icon: Plug,
     badge: "beta",
   },
