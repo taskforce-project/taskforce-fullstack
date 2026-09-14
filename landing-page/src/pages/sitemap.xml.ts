@@ -12,9 +12,14 @@ const BASE_DOMAIN = (import.meta.env.PUBLIC_BASE_DOMAIN ?? "taskforce-project.fr
 const SITE = `https://${BASE_DOMAIN}`;
 
 export function GET() {
+  const lastmod = new Date().toISOString().slice(0, 10); // date du build (YYYY-MM-DD)
   const paths = [...BUILT_ROUTES].sort();
   const urls = paths
-    .map((p) => `  <url><loc>${SITE}${p}</loc><changefreq>weekly</changefreq></url>`)
+    .map((p) => {
+      // La home porte la priorite max ; les pages produit/solutions au-dessus des pages legales.
+      const priority = p === "/" ? "1.0" : p.startsWith("/legal") ? "0.4" : "0.7";
+      return `  <url><loc>${SITE}${p}</loc><lastmod>${lastmod}</lastmod><changefreq>weekly</changefreq><priority>${priority}</priority></url>`;
+    })
     .join("\n");
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
