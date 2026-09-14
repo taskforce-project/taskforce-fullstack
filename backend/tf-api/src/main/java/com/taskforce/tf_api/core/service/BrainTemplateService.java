@@ -67,7 +67,116 @@ public class BrainTemplateService {
         if (template == BrainTemplateType.TASKFORCE && projects != null && !projects.isEmpty()) {
             return taskforceProjectSeed(projects, workspaceName);
         }
+        // Comptes reels (BLANK, defaut) : containment GENERIQUE (Brain OS > espace > projet > notes),
+        // et non plus le scaffold plat des 16 domaines a la racine (demande CEO). Les gabarits experts
+        // (SAAS/ECOMMERCE/...) gardent leur seed a plat.
+        if (template == null || template == BrainTemplateType.BLANK) {
+            return blankContainmentSeed(projects, workspaceName);
+        }
         return nodesFor(template);
+    }
+
+    // =========================================================================
+    // BLANK containment (comptes reels) : Brain OS > espace > (socle transverse + projets > notes)
+    // =========================================================================
+
+    /**
+     * Gabarit de containment GENERIQUE d'un compte reel : la hierarchie {@code parentKey -> parentNodeId}
+     * EST le modele. Brain OS (racine) abrite le <b>dossier d'espace</b> ; l'espace abrite un <b>socle
+     * transverse</b> (notes utiles au niveau espace) et <b>un dossier par projet</b>, chaque projet
+     * abritant ses notes. Des notes benefiques a CHAQUE niveau, pas une liste plate a la racine.
+     */
+    private List<SeedNode> blankContainmentSeed(List<ProjectRef> projects, String workspaceName) {
+        List<SeedNode> n = new ArrayList<>();
+        String agentsTitle = "AGENTS - contrat d'agent";
+        String wsName = (workspaceName != null && !workspaceName.isBlank()) ? workspaceName.trim() : "Workspace";
+        String transverseTitle = "Socle transverse";
+
+        // Racine : Brain OS (hub visible).
+        n.add(new SeedNode(NodeDomain.PROJET, NodeType.README, "Brain OS", ("""
+            # 🧠 Brain OS
+
+            Memoire de connaissance vivante du compte. Chaque **espace de travail** ouvre sa propre
+            dimension ; ici, [[%s]].
+
+            > [!tip] Methode
+            > Les regles de tenue (remplissage, mise a jour, archivage) vivent dans [[%s]], appliquees
+            > automatiquement par l'agent IA.""").formatted(wsName, agentsTitle),
+            false, null, "hub", null));
+        n.add(new SeedNode(NodeDomain.PROJET, NodeType.SOP, agentsTitle, agentsContract(), true));
+
+        // Dossier d'espace (enfant de la racine) : la « home » de l'espace.
+        n.add(new SeedNode(NodeDomain.PROJET, NodeType.README, wsName, ("""
+            # %s
+
+            Espace de travail. Le **socle transverse** (docs communs a tous les projets) est dans
+            [[%s]] ; chaque **projet** a son propre dossier, visible juste en dessous.""")
+            .formatted(wsName, transverseTitle),
+            false, null, "ws", "hub"));
+
+        // Socle transverse de l'espace + ses notes (niveau ESPACE).
+        n.add(new SeedNode(NodeDomain.ARCHITECTURE, NodeType.README, transverseTitle, ("""
+            # Socle transverse
+
+            Commun a tous les projets de **%s** : conventions, architecture, securite, roadmap.
+
+            - [[Charte & conventions]] · [[Architecture transverse]] · [[Politique de securite]] · [[Roadmap de l'espace]]""")
+            .formatted(wsName),
+            false, null, "ws:transverse", "ws"));
+        n.add(new SeedNode(NodeDomain.PROJET, NodeType.DOC, "Charte & conventions",
+            "# Charte & conventions #convention\n\nComment l'equipe travaille : conventions de code, workflow git, Definition of Done. Socle : [[" + transverseTitle + "]].",
+            false, null, "g:charte", "ws:transverse"));
+        n.add(new SeedNode(NodeDomain.ARCHITECTURE, NodeType.DOC, "Architecture transverse",
+            "# Architecture transverse #archi\n\nVue d'ensemble technique commune aux projets : composants, flux, choix structurants. Voir [[Politique de securite]].",
+            false, null, "g:archi", "ws:transverse"));
+        n.add(new SeedNode(NodeDomain.SECURITE, NodeType.SOP, "Politique de securite",
+            "# Politique de securite #securite\n\nSecrets via variables d'env, validation des entrees, revue de securite avant release. Voir [[Architecture transverse]].",
+            false, null, "g:secu", "ws:transverse"));
+        n.add(new SeedNode(NodeDomain.ROADMAP, NodeType.DOC, "Roadmap de l'espace",
+            "# Roadmap de l'espace #roadmap\n\nJalons transverses. Le detail par projet vit dans chaque dossier projet.",
+            false, null, "g:roadmap", "ws:transverse"));
+
+        // Un dossier par projet + ses notes (niveau PROJET), enfants du dossier d'espace.
+        if (projects != null) for (ProjectRef p : projects) n.addAll(projectFolderNested(p, wsName));
+        return n;
+    }
+
+    /**
+     * Dossier d'un projet (enfant du dossier d'espace « ws ») + son paquet de notes utiles, nichees
+     * dessous. Meme idee que le cluster de la demo, range en containment reelle.
+     */
+    private List<SeedNode> projectFolderNested(ProjectRef p, String wsName) {
+        Long id = p.id();
+        String name = p.name();
+        String pk = "p" + id;
+        List<SeedNode> n = new ArrayList<>();
+
+        n.add(new SeedNode(NodeDomain.PROJET, NodeType.README, name, ("""
+            # %s
+
+            Dossier du projet. Tout ce qui concerne **%s** vit ici. Espace : [[%s]].
+
+            ## Notes
+            - [[%s - Architecture]] · [[%s - Backlog]] · [[%s - Fait & livre]]
+            - [[%s - Problemes connus]] · [[%s - Decisions (ADR)]] · [[%s - Runbook]]""")
+            .formatted(name, name, wsName, name, name, name, name, name, name),
+            false, id, pk, "ws"));
+
+        record Note(String suffix, NodeDomain domain, NodeType type, String body) {}
+        List<Note> notes = List.of(
+            new Note("Architecture", NodeDomain.ARCHITECTURE, NodeType.DOC, "Vue technique du projet : composants, dependances, points d'integration. Decisions structurantes -> [[%s - Decisions (ADR)]]."),
+            new Note("Backlog", NodeDomain.ROADMAP, NodeType.DOC, "Travaux a venir, priorises. Ce qui est livre migre vers [[%s - Fait & livre]]."),
+            new Note("Fait & livre", NodeDomain.HISTORIQUE, NodeType.DOC, "Historique des livraisons et travaux termines du projet **%s**."),
+            new Note("Problemes connus", NodeDomain.AUDITS, NodeType.FINDING, "Bugs et limites identifies, avec contournement. Une decision de fond -> [[%s - Decisions (ADR)]]."),
+            new Note("Decisions (ADR)", NodeDomain.DECISIONS, NodeType.ADR, "Decisions d'architecture : Contexte, Options, Decision, Consequences. Reference [[%s - Architecture]]."),
+            new Note("Runbook", NodeDomain.RUNBOOKS, NodeType.RUNBOOK, "Procedures d'exploitation du projet **%s** : build, deploiement, incidents."));
+        for (Note note : notes) {
+            String title = name + " - " + note.suffix();
+            n.add(new SeedNode(note.domain(), note.type(), title,
+                "# " + title + "\n\n" + note.body().formatted(name),
+                false, id, pk + ":" + note.suffix(), pk));
+        }
+        return n;
     }
 
     // =========================================================================

@@ -94,6 +94,12 @@ public class BrainSeedingService {
             Map<String, Object> meta = new HashMap<>();
             meta.put("seeded", true);
             if (seed.system()) meta.put("system", true); // node du noyau (caché côté utilisateur)
+            // Le dossier d'espace (clé "ws") porte refType=WORKSPACE (refId = id de l'espace) : c'est
+            // l'ancre que l'ingestion live (writeProjectNode/writeWorkspaceNode) retrouve pour rattacher
+            // les projets dessous et enrichir le contexte. Les projets portent refType=PROJECT.
+            NodeRefType refType = seed.projectRefId() != null ? NodeRefType.PROJECT : null;
+            Long refId = seed.projectRefId();
+            if ("ws".equals(seed.key())) { refType = NodeRefType.WORKSPACE; refId = workspace.getId(); }
             nodes.add(KnowledgeNode.builder()
                 .workspace(workspace)
                 .brain(brain)
@@ -101,8 +107,8 @@ public class BrainSeedingService {
                 .domain(seed.domain())
                 .title(seed.title())
                 .content(seed.content())
-                .refType(seed.projectRefId() != null ? NodeRefType.PROJECT : null)
-                .refId(seed.projectRefId())
+                .refType(refType)
+                .refId(refId)
                 .status(NodeStatus.ACTIVE)
                 .versionLabel("v1")
                 .metadata(meta)

@@ -51,11 +51,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import com.taskforce.tf_api.core.dto.response.KnowledgeNodeResponse;
 import static org.mockito.Mockito.when;
 
 /**
@@ -91,6 +93,11 @@ class BrainIngestionServiceTest {
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(service, "model", "test-model");
+        // writeProjectNode cherche le dossier d'espace (refType=WORKSPACE) comme parent de containment.
+        // Par defaut absent -> parentNodeId null (non regressif) ; lenient car tous les tests ne
+        // passent pas par writeProjectNode, et les tests writeWorkspaceNode le re-stubent explicitement.
+        lenient().when(nodeRepository.findFirstByWorkspaceIdAndRefTypeAndRefId(WS, NodeRefType.WORKSPACE, WS))
+            .thenReturn(Optional.empty());
     }
 
     // =========================================================================
@@ -409,24 +416,32 @@ class BrainIngestionServiceTest {
     // =========================================================================
 
     @Test
-    @DisplayName("Creation de projet : cree un node NOTE/PROJET rattache au projet (refType=PROJECT)")
+    @DisplayName("Creation de projet : cree le DOSSIER projet (README/PROJET, refType=PROJECT) + ses notes")
     void should_create_project_node_on_creation() {
         givenProject("Refonte du site public");
         when(nodeRepository.findFirstByWorkspaceIdAndRefTypeAndRefId(WS, NodeRefType.PROJECT, PROJECT_ID))
             .thenReturn(Optional.empty());
+        when(knowledgeService.createNode(anyString(), any(), any())).thenReturn(nodeResponse(4242L));
 
         service.writeProjectNode("taskforce-demo", WS, 1L, PROJECT_ID);
 
-        CreateKnowledgeNodeRequest req = captureCreate();
-        assertThat(req.getType()).isEqualTo("NOTE");
-        assertThat(req.getDomain()).isEqualTo("PROJET");
-        assertThat(req.getRefType()).isEqualTo("PROJECT");
-        assertThat(req.getRefId()).isEqualTo(PROJECT_ID);
-        assertThat(req.getTitle()).isEqualTo("Projet - Refonte Web (WEB)");
-        assertThat(req.getTags()).contains("project", "contexte", "ingestion-auto");
-        assertThat(req.getContent()).contains("Refonte du site public");
+        // 1er create = le dossier projet ; les suivants = ses notes (architecture, backlog, ...).
+        ArgumentCaptor<CreateKnowledgeNodeRequest> captor = ArgumentCaptor.forClass(CreateKnowledgeNodeRequest.class);
+        verify(knowledgeService, atLeastOnce()).createNode(anyString(), any(), captor.capture());
+        CreateKnowledgeNodeRequest folder = captor.getAllValues().get(0);
+        assertThat(folder.getType()).isEqualTo("README");
+        assertThat(folder.getDomain()).isEqualTo("PROJET");
+        assertThat(folder.getRefType()).isEqualTo("PROJECT");
+        assertThat(folder.getRefId()).isEqualTo(PROJECT_ID);
+        assertThat(folder.getTitle()).isEqualTo("Refonte Web"); // le dossier porte le nom du projet
+        assertThat(folder.getTags()).contains("project", "contexte", "ingestion-auto");
+        assertThat(folder.getContent()).contains("Refonte du site public");
         // metadata.projects ancre la region du projet dans le graphe (Phase 4ter)
-        assertThat(req.getMetadata()).containsEntry("projects", List.of(PROJECT_ID));
+        assertThat(folder.getMetadata()).containsEntry("projects", List.of(PROJECT_ID));
+        // Notes du projet creees en plus, nichees sous le dossier (niveau PROJET).
+        assertThat(captor.getAllValues().size()).isGreaterThan(1);
+        assertThat(captor.getAllValues()).anySatisfy(c ->
+            assertThat(c.getParentNodeId()).isEqualTo(4242L));
     }
 
     @Test
@@ -435,6 +450,7 @@ class BrainIngestionServiceTest {
         givenProject("desc");
         when(nodeRepository.findFirstByWorkspaceIdAndRefTypeAndRefId(WS, NodeRefType.PROJECT, PROJECT_ID))
             .thenReturn(Optional.empty());
+        when(knowledgeService.createNode(anyString(), any(), any())).thenReturn(nodeResponse(1L));
 
         service.writeProjectNode("taskforce-demo", WS, 1L, PROJECT_ID);
 
@@ -455,7 +471,7 @@ class BrainIngestionServiceTest {
         verify(knowledgeService, never()).createNode(anyString(), any(), any());
         ArgumentCaptor<UpdateKnowledgeNodeRequest> captor = ArgumentCaptor.forClass(UpdateKnowledgeNodeRequest.class);
         verify(knowledgeService).updateNode(eq("taskforce-demo"), eq(555L), eq(1L), captor.capture());
-        assertThat(captor.getValue().getTitle()).isEqualTo("Projet - Refonte Web (WEB)");
+        assertThat(captor.getValue().getTitle()).isEqualTo("Refonte Web");
     }
 
     @Test
@@ -475,10 +491,11 @@ class BrainIngestionServiceTest {
         givenProject(null);
         when(nodeRepository.findFirstByWorkspaceIdAndRefTypeAndRefId(WS, NodeRefType.PROJECT, PROJECT_ID))
             .thenReturn(Optional.empty());
+        when(knowledgeService.createNode(anyString(), any(), any())).thenReturn(nodeResponse(1L));
 
         service.writeProjectNode("taskforce-demo", WS, 1L, PROJECT_ID);
 
-        assertThat(captureCreate().getContent()).contains("(non renseignee)");
+        assertThat(captureFirstCreate().getContent()).contains("(non renseignee)");
     }
 
     /** Projet mocke rattache a {@link #projectRepository} ; description variable (peut etre null). */
@@ -498,7 +515,7 @@ class BrainIngestionServiceTest {
     // =========================================================================
 
     @Test
-    @DisplayName("Activite renseignee : cree un node NOTE/PRODUIT transverse (refType=WORKSPACE)")
+    @DisplayName("Activite renseignee (brain a plat sans dossier) : cree le dossier d'espace (README/PROJET, refType=WORKSPACE)")
     void should_create_workspace_context_node() {
         givenWorkspace("On construit un CRM pour artisans");
         when(nodeRepository.findFirstByWorkspaceIdAndRefTypeAndRefId(WS, NodeRefType.WORKSPACE, WS))
@@ -507,14 +524,14 @@ class BrainIngestionServiceTest {
         service.writeWorkspaceNode("taskforce-demo", WS, 1L);
 
         CreateKnowledgeNodeRequest req = captureCreate();
-        assertThat(req.getType()).isEqualTo("NOTE");
-        assertThat(req.getDomain()).isEqualTo("PRODUIT");
+        assertThat(req.getType()).isEqualTo("README");
+        assertThat(req.getDomain()).isEqualTo("PROJET");
         assertThat(req.getRefType()).isEqualTo("WORKSPACE");
         assertThat(req.getRefId()).isEqualTo(WS);
-        assertThat(req.getTitle()).isEqualTo("Contexte - Acme");
+        assertThat(req.getTitle()).isEqualTo("Acme"); // le dossier porte le nom de l'espace
         assertThat(req.getContent()).contains("On construit un CRM pour artisans");
         assertThat(req.getTags()).contains("contexte", "entreprise", "ingestion-auto");
-        // Node transverse : pas d'appartenance projet -> il reste dans la « Base commune » du graphe.
+        // Node d'espace : pas d'appartenance projet -> pas de metadata.projects.
         assertThat(req.getMetadata()).doesNotContainKey("projects");
     }
 
@@ -575,6 +592,20 @@ class BrainIngestionServiceTest {
             ArgumentCaptor.forClass(CreateKnowledgeNodeRequest.class);
         verify(knowledgeService).createNode(anyString(), any(), captor.capture());
         return captor.getValue();
+    }
+
+    /** Le 1er {@code createNode} capture (le dossier projet), quand plusieurs sont emis (dossier + notes). */
+    private CreateKnowledgeNodeRequest captureFirstCreate() {
+        ArgumentCaptor<CreateKnowledgeNodeRequest> captor =
+            ArgumentCaptor.forClass(CreateKnowledgeNodeRequest.class);
+        verify(knowledgeService, atLeastOnce()).createNode(anyString(), any(), captor.capture());
+        return captor.getAllValues().get(0);
+    }
+
+    /** Reponse de createNode avec un id (writeProjectNode l'utilise pour parenter les notes). Objet REEL
+     *  (pas un mock) : evite tout stubbing imbrique dans un {@code when(...).thenReturn(nodeResponse(...))}. */
+    private KnowledgeNodeResponse nodeResponse(long id) {
+        return KnowledgeNodeResponse.builder().id(id).build();
     }
 
     /** Faits synthétiques : N livrées, M reportées, K annulées — pour les cas qui ne testent pas la collecte. */
