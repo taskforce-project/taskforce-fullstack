@@ -9,8 +9,8 @@ import { cn } from "@/lib/utils";
  * IntegrationCatalogue - le VRAI pool de connecteurs, en zone cherchable.
  *
  * Source de vérité : `backend/.../core/service/integration/ConnectorCatalog.java` - un catalogue
- * DÉCLARATIF (ajouter un outil = une ligne). On le reproduit fidèlement ici : **129 connecteurs,
- * 16 catégories**, mêmes clés que la webapp (donc mêmes logos). Le compteur ne triche pas.
+ * DÉCLARATIF (ajouter un outil = une ligne). On le reproduit fidèlement ici : **138 connecteurs,
+ * 17 catégories**, mêmes clés que la webapp (donc mêmes logos). Le compteur ne triche pas.
  *
  * HONNÊTETÉ (calée sur le LabBanner de l'app) : TOUT le catalogue est **connectable** aujourd'hui
  * (identifiants stockés chiffrés), mais la **synchronisation des données par outil** n'est pas
@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils";
 
 type Tool = { key: string; label: string; cat: string };
 
-/** Les 16 catégories réelles (id ← enum `ConnectorCategory`), libellés lisibles. */
+/** Les 17 catégories réelles (id ← enum `ConnectorCategory`), libellés lisibles. */
 const CATS: { id: string; label: string }[] = [
   { id: "pm", label: "Project management" },
   { id: "dev", label: "Dev & CI/CD" },
@@ -39,6 +39,7 @@ const CATS: { id: string; label: string }[] = [
   { id: "ecommerce", label: "E-commerce" },
   { id: "automation", label: "Automation" },
   { id: "ai", label: "AI models" },
+  { id: "ui", label: "UI components" },
 ];
 
 const CAT_LABEL: Record<string, string> = Object.fromEntries(CATS.map((c) => [c.id, c.label]));
@@ -56,7 +57,7 @@ const DEEP: Record<string, string> = {
 
 /**
  * Sélection stratégique montrée PAR DÉFAUT (review user) : ces noms racontent le produit bien mieux
- * que « 129 ». Le catalogue complet reste à un clic (« Show all »). L'ordre suit la narration.
+ * que « 138 ». Le catalogue complet reste à un clic (« Show all »). L'ordre suit la narration.
  */
 const FEATURED = [
   "github", "slack", "linear", "notion", "salesforce", "stripe",
@@ -66,7 +67,7 @@ const FEATURED = [
 /** Connecteurs dotés d'une fiche détaillée (`/product/integrations/{key}`) - tuile cliquable. */
 const DETAIL = new Set(["github", "slack", "plane"]);
 
-/** Transcription fidèle de `ConnectorCatalog.build()` - 129 entrées, ordre du catalogue. */
+/** Transcription fidèle de `ConnectorCatalog.build()` - 138 entrées, ordre du catalogue. */
 const TOOLS: Tool[] = [
   { key: "plane", label: "Plane", cat: "pm" },
   { key: "linear", label: "Linear", cat: "pm" },
@@ -131,6 +132,7 @@ const TOOLS: Tool[] = [
   { key: "paddle", label: "Paddle", cat: "payments" },
   { key: "lemonsqueezy", label: "Lemon Squeezy", cat: "payments" },
   { key: "wise", label: "Wise", cat: "payments" },
+  { key: "square", label: "Square", cat: "payments" },
   { key: "hubspot", label: "HubSpot", cat: "crm" },
   { key: "salesforce", label: "Salesforce", cat: "crm" },
   { key: "zoho", label: "Zoho", cat: "crm" },
@@ -182,6 +184,8 @@ const TOOLS: Tool[] = [
   { key: "framer", label: "Framer", cat: "design" },
   { key: "sketch", label: "Sketch", cat: "design" },
   { key: "adobe", label: "Adobe Creative Cloud", cat: "design" },
+  { key: "webflow", label: "Webflow", cat: "design" },
+  { key: "wix", label: "Wix", cat: "design" },
   { key: "shopify", label: "Shopify", cat: "ecommerce" },
   { key: "n8n", label: "n8n", cat: "automation" },
   { key: "zapier", label: "Zapier", cat: "automation" },
@@ -197,6 +201,12 @@ const TOOLS: Tool[] = [
   { key: "perplexity", label: "Perplexity", cat: "ai" },
   { key: "cohere", label: "Cohere", cat: "ai" },
   { key: "replicate", label: "Replicate", cat: "ai" },
+  { key: "shadcn", label: "shadcn/ui", cat: "ui" },
+  { key: "21st-dev", label: "21st.dev", cat: "ui" },
+  { key: "radix-ui", label: "Radix UI", cat: "ui" },
+  { key: "aceternity-ui", label: "Aceternity UI", cat: "ui" },
+  { key: "magic-ui", label: "Magic UI", cat: "ui" },
+  { key: "origin-ui", label: "Origin UI", cat: "ui" },
 ];
 
 /** Initiales de repli quand un logo manque - jamais d'image cassée. */
@@ -283,7 +293,7 @@ export function IntegrationCatalogue() {
   );
 
   /* Vue par défaut = la sélection stratégique ; on bascule sur le catalogue complet dès qu'on
-     cherche/filtre, ou via « Show all ». Le « 129 » reste une preuve, pas le message principal. */
+     cherche/filtre, ou via « Show all ». Le « 138 » reste une preuve, pas le message principal. */
   const featuredMode = !filtering && !showAll;
   const shown = featuredMode
     ? (FEATURED.map((k) => TOOLS.find((t) => t.key === k)).filter(Boolean) as Tool[])
@@ -350,7 +360,7 @@ export function IntegrationCatalogue() {
         </ul>
       </div>
 
-      {/* Compteur - la vue « featured » par défaut, le « 129 » comme preuve de profondeur. */}
+      {/* Compteur - la vue « featured » par défaut, le « 138 » comme preuve de profondeur. */}
       <div
         className="text-muted-foreground mt-6 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px]"
         role="status"

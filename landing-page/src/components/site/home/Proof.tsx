@@ -197,14 +197,14 @@ export function Integrations() {
           title="TaskForce doesn’t replace your stack. It connects to it."
           lead={
             <>
-              The same connector catalogue as the app - <span className="text-primary">129</span>{" "}
+              The same connector catalogue as the app - <span className="text-primary">138</span>{" "}
               tools across your tracker, repo, chat and cloud. Adding one is a line of configuration,
               not a release.
             </>
           }
         />
         <a
-          href="/integrations"
+          href="/product/integrations"
           className="link-underline text-foreground flex shrink-0 items-center gap-1 text-[14px] font-medium"
         >
           Browse all integrations
