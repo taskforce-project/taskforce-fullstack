@@ -13,6 +13,10 @@
  * compte et brouille la desambiguisation - l'inverse du but recherche).
  */
 
+import {
+  PRODUCT_PLATFORM, PRODUCT_DELIVERY, LABS_LINKS, RESOURCES_LINKS, SOLUTIONS_GROUPS, FOOTER_GROUPS,
+} from "@/components/site/nav";
+
 const ORG_HASH = "#organization";
 const SITE_HASH = "#website";
 const SOFTWARE_HASH = "#software";
@@ -64,6 +68,53 @@ export function websiteLd(origin: string): JsonLd {
     url: `${origin}/`,
     inLanguage: "en",
     publisher: { "@id": `${origin}/${ORG_HASH}` },
+  };
+}
+
+/**
+ * Fil d'Ariane (BreadcrumbList) derive de l'URL. Nomme chaque miette avec le libelle REEL de la
+ * nav quand il existe (source unique `nav.ts`), sinon un libelle de segment connu, sinon le slug
+ * embelli. Rien sur la home (pas de fil). Alimente la section "Ameliorations" de Search Console
+ * et aide les LLM a situer la page dans l'arborescence.
+ */
+const SEGMENT_LABEL: Record<string, string> = {
+  product: "Product", solutions: "Solutions", "use-cases": "Use cases", vs: "Compare",
+  labs: "Labs", legal: "Legal", company: "Company", docs: "Documentation", pricing: "Pricing",
+  enterprise: "Enterprise", trust: "Trust", roadmap: "Roadmap", changelog: "Changelog",
+  blog: "Blog", learn: "Learn", status: "Status",
+};
+
+let HREF_LABEL: Map<string, string> | null = null;
+function hrefLabels(): Map<string, string> {
+  if (HREF_LABEL) return HREF_LABEL;
+  const m = new Map<string, string>();
+  for (const l of [...PRODUCT_PLATFORM, ...PRODUCT_DELIVERY, ...LABS_LINKS, ...RESOURCES_LINKS]) m.set(l.href, l.label);
+  for (const g of SOLUTIONS_GROUPS) { for (const l of g.links) m.set(l.href, l.label); if (g.viewAll) m.set(g.viewAll.href, g.viewAll.label); }
+  for (const g of FOOTER_GROUPS) for (const l of g.links) if (!m.has(l.href)) m.set(l.href, l.label);
+  HREF_LABEL = m;
+  return m;
+}
+
+function prettify(seg: string): string {
+  return seg.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+export function breadcrumbLd(origin: string, pathname: string): JsonLd | null {
+  const parts = pathname.split("/").filter(Boolean);
+  if (parts.length === 0) return null; // pas de fil d'Ariane sur la home
+  const labels = hrefLabels();
+  const items: { name: string; url: string }[] = [{ name: "Home", url: `${origin}/` }];
+  let acc = "";
+  for (const p of parts) {
+    acc += `/${p}`;
+    items.push({ name: labels.get(acc) ?? SEGMENT_LABEL[p] ?? prettify(p), url: `${origin}${acc}` });
+  }
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: items.map((it, i) => ({
+      "@type": "ListItem", position: i + 1, name: it.name, item: it.url,
+    })),
   };
 }
 

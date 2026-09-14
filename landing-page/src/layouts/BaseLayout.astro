@@ -8,7 +8,7 @@ import "@/styles/global.css";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { CookieConsent } from "@/components/site/CookieConsent";
-import { organizationLd, websiteLd, softwareApplicationLd } from "@/lib/structured-data";
+import { organizationLd, websiteLd, softwareApplicationLd, breadcrumbLd } from "@/lib/structured-data";
 
 interface Props {
   title: string;
@@ -43,6 +43,8 @@ const imageURL = Astro.site ? new URL(image, Astro.site).href : image;
 const origin = Astro.site ? Astro.site.origin : "https://taskforce-project.fr";
 const structuredData: Record<string, unknown>[] = [organizationLd(origin), websiteLd(origin)];
 if (software) structuredData.push(softwareApplicationLd(origin));
+const breadcrumb = breadcrumbLd(origin, Astro.url.pathname);
+if (breadcrumb) structuredData.push(breadcrumb);
 if (jsonLd) structuredData.push(...(Array.isArray(jsonLd) ? jsonLd : [jsonLd]));
 ---
 
