@@ -35,6 +35,22 @@ const TRUST_COLUMNS: { icon: typeof ShieldCheck; ic: string; group: string; item
   },
 ];
 
+/**
+ * Contenu de la « vraie vue d'audit » posée DANS le cadre d'app (AppShot) - remplace l'ancien
+ * corps vide. Feed d'evenements attribuables (approbations, refus, appels modele, assignations)
+ * facon audit trail : point de statut, evenement, acteur/role, modele, horodatage.
+ */
+const AUDIT_EVENTS: { dot: string; type: string; what: string; who: string; meta?: string; when: string }[] = [
+  { dot: "#059669", type: "Approved", what: "Architecture · Postgres over MongoDB", who: "Inès · CTO", meta: "claude-sonnet-5", when: "2m" },
+  { dot: "#d97706", type: "Sent back", what: "API contract · error cases", who: "Inès · CTO", meta: "needs idempotency", when: "6m" },
+  { dot: "#059669", type: "Approved", what: "Product spec · Checkout", who: "Théo · CPO", meta: "claude-opus-5", when: "14m" },
+  { dot: "#4f46e5", type: "Model call", what: "Breakdown drafted", who: "COO agent", meta: "gpt-oss-20b · self-hosted", when: "21m" },
+  { dot: "#059669", type: "Approved", what: "Vision · Checkout redesign", who: "Théo · CPO", when: "34m" },
+  { dot: "#059669", type: "Assigned", what: "Implementation → Maya", who: "Léo · COO", meta: "Claude Code", when: "42m" },
+  { dot: "#4f46e5", type: "Model call", what: "Spec drafted", who: "CPO agent", meta: "claude-opus-5", when: "55m" },
+  { dot: "#059669", type: "Approved", what: "Breakdown · 8 issues", who: "Léo · COO", when: "1h" },
+];
+
 export function Trust() {
   return (
     <Section>
@@ -63,8 +79,39 @@ export function Trust() {
           remplir avec une capture ; toast custom par-dessus (pattern « vrai screen + toasts »). */}
       <div className="mt-12">
         <AppShot chrome="app.taskforce-project.fr/runs/checkout-redesign · audit">
+          {/* La vraie vue d'audit : feed d'evenements attribuables qui remplit le cadre (les
+              lignes s'etirent en flex-1 -> aucun vide, quel que soit le ratio). */}
+          <div className="absolute inset-0 flex flex-col">
+            <div className="flex items-center gap-2 border-b px-4 py-2.5">
+              <ShieldCheck className="size-4 shrink-0" strokeWidth={2} style={{ color: "#d97706" }} />
+              <span className="text-foreground text-[13px] font-medium">Audit trail</span>
+            </div>
+            <ul className="flex flex-1 flex-col divide-y divide-border">
+              {AUDIT_EVENTS.map((e) => (
+                <li key={`${e.type}-${e.what}`} className="flex flex-1 items-center gap-3 px-4">
+                  <span className="size-1.5 shrink-0 rounded-full" style={{ background: e.dot }} />
+                  <span className="min-w-0 flex-1">
+                    <span className="text-foreground block truncate text-[12.5px]">
+                      <span className="font-medium">{e.type}</span> · {e.what}
+                    </span>
+                    <span className="text-muted-foreground block text-[11px]">{e.who}</span>
+                  </span>
+                  {e.meta && (
+                    <span className="text-muted-foreground hidden shrink-0 rounded border px-1.5 py-px font-mono text-[10px] md:inline">
+                      {e.meta}
+                    </span>
+                  )}
+                  <span className="text-muted-foreground shrink-0 font-mono text-[11px] tabular-nums">{e.when}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="text-muted-foreground flex items-center justify-between border-t px-4 py-2 text-[10.5px]">
+              <span>checkout-redesign · 5 of 7 checkpoints approved</span>
+              <span className="hidden sm:inline">Immutable · exportable to your SIEM</span>
+            </div>
+          </div>
           <Toast
-            className="right-4 top-4"
+            className="right-4 top-3"
             icon={
               <span className="flex size-5 items-center justify-center rounded-full bg-emerald-500 text-white">
                 <Check className="size-3" strokeWidth={3} />
@@ -75,7 +122,7 @@ export function Trust() {
           </Toast>
         </AppShot>
         <p className="text-muted-foreground mt-3 text-[12.5px]">
-          Your real audit view drops in here - every approval, rejection and model call, attributable.
+          Every approval, rejection and model call, attributable - and exportable to your SIEM.
         </p>
       </div>
 
