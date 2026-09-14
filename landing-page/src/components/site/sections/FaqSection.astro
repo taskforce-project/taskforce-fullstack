@@ -3,7 +3,12 @@
  * FaqSection - bloc FAQ réutilisable (motif repris d'enterprise.astro), posé en bas de page
  * JUSTE avant le <PageCta>. DA « traits » : section pleine + filet 1px, `dl` en 2 colonnes,
  * zéro carte flottante / ombre / radius. On passe l'eyebrow, le titre et les items {q,a}.
+ *
+ * Émet AUSSI le JSON-LD `FAQPage` à partir des MÊMES items -> le balisage correspond toujours
+ * au contenu visible (règle Google) et nourrit les LLM (GEO).
  */
+import { faqPageLd } from "@/lib/structured-data";
+
 interface Props {
   eyebrow?: string;
   title: string;
@@ -31,3 +36,4 @@ const { eyebrow = "Common questions", title, items, class: cls } = Astro.props;
     </dl>
   </div>
 </section>
+<script type="application/ld+json" is:inline set:html={JSON.stringify(faqPageLd(items))} />

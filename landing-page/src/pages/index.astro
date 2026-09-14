@@ -10,6 +10,39 @@ import WhatShipsToday from "@/components/site/home/WhatShipsToday.astro";
 import Synergy from "@/components/site/home/Synergy.astro";
 import SmartAssign from "@/components/site/home/SmartAssign.astro";
 import TheRun from "@/components/site/home/TheRun.astro";
+import FaqSection from "@/components/site/sections/FaqSection.astro";
+
+/**
+ * FAQ de la home. Réponses HONNÊTES et alignées sur la maturité réelle (badges nav : Smart Assign /
+ * Collaboration / Analytics = live ; Approvals / Memory / Integrations = beta ; Orchestration /
+ * Agents = planned). Le même tableau nourrit le bloc visible ET le JSON-LD FAQPage (via FaqSection).
+ */
+const FAQ_ITEMS: { q: string; a: string }[] = [
+  {
+    q: "What is TaskForce?",
+    a: "TaskForce is an AI delivery operating system. You describe an outcome, scoped agents plan and draft each step, and a human approves every checkpoint before anything ships. It sits on top of the board and repository you already use.",
+  },
+  {
+    q: "How is TaskForce different from Cursor, Copilot or Devin?",
+    a: "Those tools help write code inside the editor. TaskForce runs the delivery around the code: it turns an intent into reviewable checkpoints, keeps the context of every decision, and routes work to the right person or agent. It orchestrates the flow rather than autocompleting one file.",
+  },
+  {
+    q: "Does a human stay in control?",
+    a: "Yes. Every step waits for a human sign off at its checkpoint. Agents draft and propose, they do not ship on their own, and you keep an auditable trail of what was decided.",
+  },
+  {
+    q: "Can the AI models run on our own hardware?",
+    a: "Yes. TaskForce can use hosted providers or models running on your own infrastructure, so sensitive work does not have to leave your environment.",
+  },
+  {
+    q: "What can TaskForce do today, and what is planned?",
+    a: "Collaboration, Smart Assign and analytics are live. Approvals, TaskForce Memory and integrations are in beta. Deeper orchestration and agent roles are on the public roadmap. We label maturity honestly rather than promising everything at once.",
+  },
+  {
+    q: "Is there a free plan?",
+    a: "Yes. You can start for free, with paid tiers for teams that need more. Members are unlimited on every plan.",
+  },
+];
 ---
 
 <BaseLayout
@@ -45,5 +78,6 @@ import TheRun from "@/components/site/home/TheRun.astro";
   <TeamGrid />
 
   <WhereThisGoes />
+  <FaqSection eyebrow="FAQ" title="Frequently asked questions" items={FAQ_ITEMS} />
   <FinalCta />
 </BaseLayout>
