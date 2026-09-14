@@ -108,6 +108,29 @@ for (const p of Object.keys(spec.paths ?? {})) {
   if (p.startsWith("/actuator")) { delete spec.paths[p]; removedPaths++; }
 }
 
+// 1b. Retirer les endpoints INTERNES de la doc publique (décision sécu : ne pas exposer la surface
+// qui n'est pas destinée aux consommateurs de l'API). Télémétrie, feedback, ventes, RGPD in-app et
+// tout le cluster paiement sortent ; la gestion de webhooks (feature API légitime) RESTE.
+// Filtrage sur les tags BRUTS springdoc (« xxx-controller »), donc AVANT le renommage.
+const HIDE = new Set([
+  "client-log-controller",
+  "feedback-controller",
+  "sales-controller",
+  "gdpr-controller",
+  "billing-controller",
+  "stripe-controller",
+  "stripe-webhook-controller",
+]);
+let removedInternal = 0;
+for (const [p, item] of Object.entries(spec.paths ?? {})) {
+  for (const method of Object.keys(item)) {
+    const op = item[method];
+    if (!["get", "post", "put", "patch", "delete"].includes(method)) continue;
+    if (Array.isArray(op?.tags) && op.tags.some((t) => HIDE.has(t))) { delete item[method]; removedInternal++; }
+  }
+  if (Object.keys(item).length === 0) delete spec.paths[p];
+}
+
 // 2. Renommer les tags au niveau des opérations + collecter ceux réellement utilisés.
 const used = new Set();
 for (const item of Object.values(spec.paths ?? {})) {
@@ -137,5 +160,5 @@ spec.info.description ??=
 
 writeFileSync(SPEC, JSON.stringify(spec, null, 2) + "\n", { encoding: "utf8" });
 
-console.log(`OK clean-openapi : -${removedPaths} chemins actuator, ${used.size} sections, ` +
-  `${Object.keys(spec.paths).length} chemins restants.`);
+console.log(`OK clean-openapi : -${removedPaths} chemins actuator, -${removedInternal} opérations internes, ` +
+  `${used.size} sections, ${Object.keys(spec.paths).length} chemins restants.`);

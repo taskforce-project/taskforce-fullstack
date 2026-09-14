@@ -130,32 +130,10 @@
       "name": "MCP actions"
     },
     {
-      "name": "Billing",
-      "description": "Forfaits et facturation."
-    },
-    {
-      "name": "Stripe"
-    },
-    {
-      "name": "Stripe webhooks"
-    },
-    {
-      "name": "Sales"
-    },
-    {
-      "name": "GDPR"
-    },
-    {
       "name": "Files"
     },
     {
       "name": "Attachments"
-    },
-    {
-      "name": "Feedback"
-    },
-    {
-      "name": "Client logs"
     },
     {
       "name": "Status"
@@ -4605,46 +4583,6 @@
         }
       }
     },
-    "/api/webhooks/stripe": {
-      "post": {
-        "tags": [
-          "Stripe webhooks"
-        ],
-        "operationId": "handleStripeWebhook",
-        "parameters": [
-          {
-            "name": "Stripe-Signature",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "string"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/users/me/password/reset": {
       "post": {
         "tags": [
@@ -4813,36 +4751,6 @@
         }
       }
     },
-    "/api/sales/inquiry": {
-      "post": {
-        "tags": [
-          "Sales"
-        ],
-        "operationId": "createInquiry",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/EnterpriseInquiryRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseEnterpriseInquiryResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/me/assignments/{issueId}/decline": {
       "post": {
         "tags": [
@@ -4905,36 +4813,6 @@
         }
       }
     },
-    "/api/logs/client": {
-      "post": {
-        "tags": [
-          "Client logs"
-        ],
-        "operationId": "ingest",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ClientLogRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/invitations/{token}/accept": {
       "post": {
         "tags": [
@@ -4989,145 +4867,6 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseVoid"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/gdpr/account/restore": {
-      "post": {
-        "tags": [
-          "GDPR"
-        ],
-        "operationId": "restoreMyAccount",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/feedback": {
-      "post": {
-        "tags": [
-          "Feedback"
-        ],
-        "operationId": "submit",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SubmitFeedbackRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVoid"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/billing/portal": {
-      "post": {
-        "tags": [
-          "Billing"
-        ],
-        "operationId": "createPortalSession",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PortalSessionRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponsePortalSessionResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/billing/checkout": {
-      "post": {
-        "tags": [
-          "Billing"
-        ],
-        "operationId": "createCheckout",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateCheckoutSessionRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseCheckoutSessionResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/billing/change-plan": {
-      "post": {
-        "tags": [
-          "Billing"
-        ],
-        "operationId": "changePlan",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateCheckoutSessionRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseSubscriptionInfoResponse"
                 }
               }
             }
@@ -8967,36 +8706,6 @@
         }
       }
     },
-    "/api/stripe/verify-session": {
-      "get": {
-        "tags": [
-          "Stripe"
-        ],
-        "operationId": "verifySession",
-        "parameters": [
-          {
-            "name": "session_id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseVerifySessionResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/status": {
       "get": {
         "tags": [
@@ -9168,26 +8877,6 @@
         }
       }
     },
-    "/api/gdpr/export": {
-      "get": {
-        "tags": [
-          "GDPR"
-        ],
-        "operationId": "exportMyData",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/files/brain/{workspaceId}/{name}": {
       "get": {
         "tags": [
@@ -9253,26 +8942,6 @@
                 "schema": {
                   "type": "string",
                   "format": "binary"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/billing/subscription": {
-      "get": {
-        "tags": [
-          "Billing"
-        ],
-        "operationId": "getSubscription",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseSubscriptionInfoResponse"
                 }
               }
             }
@@ -10113,37 +9782,6 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseVoid"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/gdpr/account": {
-      "delete": {
-        "tags": [
-          "GDPR"
-        ],
-        "operationId": "deleteMyAccount",
-        "parameters": [
-          {
-            "name": "immediate",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "boolean",
-              "default": false
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiResponseMapStringObject"
                 }
               }
             }
