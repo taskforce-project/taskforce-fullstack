@@ -37,13 +37,13 @@ import { CardEmpty, CardError } from "./card-states"
 // Palette sémantique des séries (miroir de chart-explorer - le backend n'envoie que la clé).
 const SERIES_META: Record<string, { label: string; color: string }> = {
   resolved: { label: "Resolved", color: "#10b981" },
-  opened: { label: "Ouvertes", color: "#3b82f6" },
-  remaining: { label: "Restant", color: "#f43f5e" },
+  opened: { label: "Opened", color: "#3b82f6" },
+  remaining: { label: "Remaining", color: "#f43f5e" },
   ideal: { label: "Ideal", color: "#94a3b8" },
-  openIssues: { label: "Issues ouvertes", color: "#6366f1" },
-  completion: { label: "Avancement (%)", color: "#6366f1" },
+  openIssues: { label: "Open issues", color: "#6366f1" },
+  completion: { label: "Completion (%)", color: "#6366f1" },
   done: { label: "Done", color: "#10b981" },
-  open: { label: "Ouvertes", color: "#f59e0b" },
+  open: { label: "Open", color: "#f59e0b" },
 }
 
 const FALLBACK_COLORS = ["#3b82f6", "#10b981", "#f43f5e", "#6366f1", "#f59e0b", "#14b8a6"]
