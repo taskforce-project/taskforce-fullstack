@@ -62,6 +62,17 @@
   --spacing:         0.25rem;
   --tracking-normal: -0.011em;
 
+  /* Densité « outil pro » (passe du 20/09) : hauteurs de contrôle et de ligne SYSTÉMIQUES, consommées
+     par les primitives ui/ via `h-control` / `size-control` / `h-row` (mapping @theme plus bas).
+     Avant : bouton/input/select 36px, grand bouton 40px, en-tête de table 40px - des valeurs shadcn
+     par défaut, jamais décidées. Cible : 32px par défaut (28 / 32 / 36), en-tête 36px. Une seule
+     source à changer pour redensifier ou aérer toute l'app. Indépendant du thème (clair / sombre /
+     contraste élevé) : la densité n'est pas une couleur. */
+  --control-height-sm: 1.75rem;  /* 28px - petits boutons, sidebar sm */
+  --control-height:    2rem;     /* 32px - bouton, input, select, date-picker, tabs, toggle */
+  --control-height-lg: 2.25rem;  /* 36px - grands boutons */
+  --row-height:        2.25rem;  /* 36px - en-tête de table ; lignes a 32px via le padding des cellules */
+
   /* Ombres très subtiles (flat) */
   --shadow-2xs: 0 1px 1px rgba(0,0,0,0.03);
   --shadow-xs:  0 1px 2px rgba(0,0,0,0.04);
@@ -221,6 +232,13 @@
   /* Aligné sur --radius (et non +4px) : les cartes/popovers en `rounded-xl` gardent le radius
      de référence au lieu de sur-arrondir, ce qui unifie tout l'app sur une seule valeur. */
   --radius-xl: var(--radius);              /* 10px - cartes (Card shadcn, cartes dashboard) */
+
+  /* Densité : expose les hauteurs comme tokens d'espacement Tailwind v4 (namespace `--spacing-*`),
+     d'où les utilitaires h-control, h-control-sm, h-control-lg, size-control*, min-w-control*, h-row. */
+  --spacing-control-sm: var(--control-height-sm);
+  --spacing-control:    var(--control-height);
+  --spacing-control-lg: var(--control-height-lg);
+  --spacing-row:        var(--row-height);
 
   --shadow-2xs: var(--shadow-2xs);
   --shadow-xs:  var(--shadow-xs);

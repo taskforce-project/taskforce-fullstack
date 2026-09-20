@@ -134,7 +134,7 @@ export function MemberAvailabilityCard({ slug, userId, canEdit }: MemberAvailabi
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-medium text-muted-foreground">Type</label>
                   <Select value={type} onValueChange={(v) => setType(v as LeaveType)}>
-                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="h-control"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {LEAVE_OPTIONS.map((o) => (
                         <SelectItem key={o} value={o}>{LEAVE_META[o].label}</SelectItem>
@@ -156,7 +156,7 @@ export function MemberAvailabilityCard({ slug, userId, canEdit }: MemberAvailabi
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="Note (optional)"
                 maxLength={1000}
-                className="h-9"
+                className="h-control"
               />
               <div className="flex items-center gap-2">
                 <Button size="sm" onClick={handleAdd} disabled={saving} className="gap-1.5">

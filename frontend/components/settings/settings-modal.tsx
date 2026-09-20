@@ -47,7 +47,7 @@ export function SettingsModal() {
               value={active}
               onChange={(e) => setSection(e.target.value as SettingsSection)}
               aria-label={activeSection?.label ?? "Settings section"}
-              className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm text-foreground outline-none focus:border-primary/50"
+              className="h-control w-full rounded-md border border-border bg-background px-2 text-sm text-foreground outline-none focus:border-primary/50"
             >
               {SECTIONS.map((s) => (
                 <option key={s.key} value={s.key}>{s.label}</option>

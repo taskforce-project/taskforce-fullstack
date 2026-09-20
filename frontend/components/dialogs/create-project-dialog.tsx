@@ -282,7 +282,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
                   value={name}
                   onChange={(e) => handleNameChange(e.target.value)}
                   placeholder="My New Project"
-                  className="h-9"
+                  className="h-control"
                   autoFocus
                   onKeyDown={(e) => e.key === "Enter" && name.trim() && identifier.trim() && handleCreate()}
                 />
@@ -300,7 +300,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value.toUpperCase().replaceAll(/[^A-Z0-9-]/g, "").slice(0, 10))}
                 placeholder="WEB"
-                className="h-9 font-mono uppercase"
+                className="h-control font-mono uppercase"
               />
             </div>
 
@@ -369,7 +369,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
                         value={repoName}
                         onChange={(e) => setRepoName(e.target.value.replaceAll(/\s+/g, "-"))}
                         placeholder="my-repo"
-                        className="h-9 font-mono"
+                        className="h-control font-mono"
                       />
                       <label className="flex items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground">
                         <input type="checkbox" checked={repoPrivate} onChange={(e) => setRepoPrivate(e.target.checked)} />
@@ -387,7 +387,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
                       <select
                         value={linkRepoFullName}
                         onChange={(e) => setLinkRepoFullName(e.target.value)}
-                        className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary/50"
+                        className="h-control w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary/50"
                       >
                         <option value="">Select a repository…</option>
                         {githubRepos.map((r) => (
@@ -456,7 +456,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
                       value={importName}
                       onChange={(e) => setImportName(e.target.value)}
                       placeholder="Imported project"
-                      className="h-9"
+                      className="h-control"
                       autoFocus
                       onKeyDown={(e) => e.key === "Enter" && importSource && importName.trim() && handleImport()}
                     />

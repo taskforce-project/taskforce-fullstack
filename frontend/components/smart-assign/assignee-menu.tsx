@@ -160,7 +160,7 @@ export function AssigneeMenu({
       {/* sideOffset + collisionPadding : le menu ne colle jamais au bord de l'ecran (marge de 12px). */}
       <PopoverContent align="start" sideOffset={6} collisionPadding={12} className="w-[--radix-popover-trigger-width] min-w-[16rem] p-0">
         <Command>
-          <CommandInput placeholder="Assign to…" className="h-9" />
+          <CommandInput placeholder="Assign to…" className="h-control" />
           {/* Dropdown COMPACT (max ~20rem) qui scrolle - jamais une colonne pleine hauteur ; borne aussi
               a la hauteur dispo a l'ecran (var Radix) pour ne pas depasser le viewport quand ouvert bas. */}
           <CommandList

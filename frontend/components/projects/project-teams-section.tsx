@@ -178,7 +178,7 @@ export function ProjectTeamsSection({ workspace, projectId }: ProjectTeamsSectio
           onChange={(e) => setNewName(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleCreate()}
           placeholder="Create a new team…"
-          className="h-9 flex-1"
+          className="h-control flex-1"
         />
         <Button size="sm" onClick={handleCreate} disabled={!newName.trim() || creating} className="gap-1.5">
           {creating ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}

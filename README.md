@@ -2,11 +2,21 @@
 
 <div align="center">
 
-![Status](https://img.shields.io/badge/status-beta-f59e0b?style=flat-square)
-![Backend](https://img.shields.io/badge/backend-Java%2021%20·%20Spring%20Boot%204-111827?style=flat-square)
-![Frontend](https://img.shields.io/badge/frontend-Next.js%2016%20·%20React%2019-111827?style=flat-square)
-![AI](https://img.shields.io/badge/AI-auto--héberg%C3%A9%20·%20Ollama-16a34a?style=flat-square)
-![Infra](https://img.shields.io/badge/infra-Docker%20·%20Keycloak%20·%20PostgreSQL-111827?style=flat-square)
+<!-- BADGES:START -->
+![Version](https://img.shields.io/badge/Version-0.2.0--rc1-blue.svg)
+![License](https://img.shields.io/badge/License-Fair_Use-green.svg)
+![Java](https://img.shields.io/badge/Java-21-orange.svg)
+![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.0.6-brightgreen.svg)
+![Next.js](https://img.shields.io/badge/Next.js-16.3.4-black.svg)
+![TailwindCSS](https://img.shields.io/badge/TailwindCSS-4-38bdf8.svg)
+![Keycloak](https://img.shields.io/badge/Keycloak-26.0.6-blue.svg)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)
+![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)
+![Backend App](https://img.shields.io/badge/Backend_App-0.0.15--SNAPSHOT-6f42c1.svg)
+![Frontend App](https://img.shields.io/badge/Frontend_App-0.3.8-0ea5e9.svg)
+![Landing App](https://img.shields.io/badge/Landing_App-0.0.1-f59e0b.svg)
+![Runtime](https://img.shields.io/badge/Runtime-ci-blueviolet.svg)
+<!-- BADGES:END -->
 
 **TaskForce se pose au-dessus des outils qu'une équipe utilise déjà et transforme une intention en résultat livré.**
 

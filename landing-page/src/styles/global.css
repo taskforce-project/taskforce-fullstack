@@ -47,8 +47,6 @@
   --label-tertiary:  #67676c;
   --separator:       #e6e6e9;
 
-  --radius: 0.625rem;   /* 10px - radius de référence de l'app */
-
   /* Ombres très subtiles (flat) - valeurs de l'app */
   --shadow-2xs: 0 1px 1px rgba(0,0,0,0.03);
   --shadow-xs:  0 1px 2px rgba(0,0,0,0.04);
@@ -79,14 +77,16 @@
   --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  --radius: 0.5rem;
-  --shadow-sm: 0 1px 2px 0 rgba(0,0,0,0.05);
-  --shadow: 0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px -1px rgba(0,0,0,0.1);
-  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);
-  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1);
-  --shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1);
+  --radius: 0.5rem;   /* 8px. Avec le mapping @theme du site (md = radius) : sm 6 / md 8 / lg 10, la meme echelle que l'app. */
   --tracking-normal: -0.011em;
   --spacing: 0.25rem;
+
+  /* Hauteurs de controle : meme grammaire que l'app (source unique, utilitaires h-control*), avec un cran
+     d'air en plus parce que c'est du marketing. App : 28 / 32 / 36. Site : 32 / 36 / 40. Les boutons « pill »
+     (42 / 48, mesures sur des sites de reference) restent des tailles marketing a part. */
+  --control-height-sm: 2rem;     /* 32px */
+  --control-height:    2.25rem;  /* 36px */
+  --control-height-lg: 2.5rem;   /* 40px */
 }
 
 
@@ -128,6 +128,10 @@
   --radius-md: var(--radius);
   --radius-lg: calc(var(--radius) + 2px);
   --radius-xl: calc(var(--radius) + 6px);
+  /* Densite : tokens d'espacement Tailwind v4, d'ou h-control, size-control, min-w-control (cf. lib/utils.ts). */
+  --spacing-control-sm: var(--control-height-sm);
+  --spacing-control:    var(--control-height);
+  --spacing-control-lg: var(--control-height-lg);
   --shadow-2xs: var(--shadow-2xs);
   --shadow-xs: var(--shadow-xs);
   --shadow-sm: var(--shadow-sm);

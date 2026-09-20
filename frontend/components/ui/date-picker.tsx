@@ -43,7 +43,7 @@ export function DatePicker({
           type="button"
           variant="outline"
           className={cn(
-            "h-9 w-full justify-start gap-2 font-normal",
+            "h-control w-full justify-start gap-2 font-normal",
             !selected && "text-muted-foreground",
             className
           )}

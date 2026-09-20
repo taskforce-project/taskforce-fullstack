@@ -149,7 +149,7 @@ function IssueRow({ issue, slug, onOpen, onAssign }: Readonly<{
       role="button"
       tabIndex={0}
       onKeyDown={(e) => { if (e.key === "Enter") onOpen(issue) }}
-      className="group flex items-center gap-3 px-4 py-2.5 hover:bg-muted/30 border-b border-border/50 last:border-0 transition-colors cursor-pointer"
+      className="group flex items-center gap-3 px-4 py-1.5 hover:bg-muted/30 border-b border-border/50 last:border-0 transition-colors cursor-pointer"
     >
       {/* Priority */}
       <div className="flex items-center justify-center w-5 shrink-0" title={priority.label}>
@@ -291,7 +291,7 @@ function IssuesSkeleton() {
             <Skeleton className="h-4 w-24" />
           </div>
           {Array.from({ length: 3 }).map((_, r) => (
-            <div key={r} className="flex items-center gap-3 px-4 py-2.5 border-b border-border/50 last:border-0">
+            <div key={r} className="flex items-center gap-3 px-4 py-1.5 border-b border-border/50 last:border-0">
               <Skeleton className="h-3.5 w-5 shrink-0" />
               <Skeleton className="h-3.5 w-5 shrink-0" />
               <Skeleton className="h-3.5 w-16 shrink-0" />

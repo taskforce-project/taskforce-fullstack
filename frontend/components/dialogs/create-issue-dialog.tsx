@@ -253,7 +253,7 @@ export function CreateIssueDialog({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Issue title…"
-            className="h-10 text-base font-medium"
+            className="h-control-lg text-base font-medium"
             autoFocus
             onKeyDown={(e) => e.key === "Enter" && title.trim() && handleCreate()}
           />

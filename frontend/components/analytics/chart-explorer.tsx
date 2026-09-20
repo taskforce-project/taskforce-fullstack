@@ -682,9 +682,9 @@ function ChartExplorerModal({
                   onChange={(e) => setPrompt(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); runGenerate() } }}
                   placeholder="e.g. workload per member"
-                  className="h-9 min-w-0 flex-1 rounded-md border border-border bg-background px-2.5 text-sm outline-none focus:border-primary/50"
+                  className="h-control min-w-0 flex-1 rounded-md border border-border bg-background px-2.5 text-sm outline-none focus:border-primary/50"
                 />
-                <Button size="sm" className="h-9 shrink-0 px-2.5" onClick={() => runGenerate()} disabled={!prompt.trim() || generating}>
+                <Button size="sm" className="h-control shrink-0 px-2.5" onClick={() => runGenerate()} disabled={!prompt.trim() || generating}>
                   {generating ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
                 </Button>
               </div>
