@@ -58,13 +58,13 @@ export function NeedsAttentionCard({ slug, refreshToken }: DashboardCardBodyProp
           <span className={cn("size-2 shrink-0 rounded-full", healthOf(p) === "critical" ? "bg-rose-500" : "bg-amber-500")} />
           <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{p.name}</span>
           <Badge variant="secondary" className="shrink-0 font-normal text-muted-foreground">
-            {p.openIssues} ouvertes
+            {p.openIssues} open
           </Badge>
         </Link>
       ))}
       {flagged.length > MAX_ROWS && (
         <Link href="./projects" className="px-4 py-2 text-[11px] text-muted-foreground hover:text-foreground">
-          +{flagged.length - MAX_ROWS} autres opérations
+          +{flagged.length - MAX_ROWS} more operations
         </Link>
       )}
     </div>

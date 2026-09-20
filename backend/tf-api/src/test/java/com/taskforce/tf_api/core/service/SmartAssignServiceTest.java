@@ -306,6 +306,8 @@ class SmartAssignServiceTest {
             assertThat(res.getRecommended().getUserId()).isEqualTo(10L);
             // pas de raison Groq → raison synthétisée côté Java (repli)
             assertThat(res.getRecommended().getReason()).isNotBlank();
+            // Le repli parle anglais, comme le LLM (sinon l'UI anglaise affiche du français).
+            assertThat(res.getRecommended().getReason()).containsPattern("skills|availability|workload|delivery history|open task");
         }
 
         @Test

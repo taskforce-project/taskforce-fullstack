@@ -35,10 +35,10 @@ export function OpsHealthCard({ slug, refreshToken }: DashboardCardBodyProps) {
   return (
     <div className="flex h-full flex-col justify-between gap-3 p-4">
       <div className="grid grid-cols-3 gap-2">
-        <MiniMetric label="Actives" value={`${activeOps}/${projects.length}`} />
-        <MiniMetric label="Ouvertes" value={String(openIssues)} />
+        <MiniMetric label="Active" value={`${activeOps}/${projects.length}`} />
+        <MiniMetric label="Open" value={String(openIssues)} />
         <MiniMetric
-          label="À risque"
+          label="At risk"
           value={String(atRisk)}
           valueClassName={atRisk > 0 ? "text-amber-600 dark:text-amber-400" : undefined}
         />
@@ -48,7 +48,7 @@ export function OpsHealthCard({ slug, refreshToken }: DashboardCardBodyProps) {
         <div className="flex items-center justify-between text-[11px] text-muted-foreground">
           <span>Operations health</span>
           <span className="tabular-nums">
-            {health.healthy} sain · {atRisk} à risque · {health.paused} en pause
+            {health.healthy} healthy · {atRisk} at risk · {health.paused} paused
           </span>
         </div>
         {/* Empilement sémantique : les couleurs de statut restent vert/orange/rouge. */}

@@ -748,23 +748,23 @@ public class SmartAssignService {
         }
     }
 
-    /** Synthèse Java d'un « pourquoi » quand Groq n'a pas fourni d'explication (repli). */
+    /** Synthèse Java d'un « pourquoi » quand Groq n'a pas fourni d'explication (repli). En ANGLAIS, comme les raisons du LLM (prompt anglais) : sinon l'UI anglaise affiche du français. */
     private String buildFallbackReason(CandidateMetrics m, int historical) {
         List<String> parts = new ArrayList<>();
         if (!m.matchedSkills().isEmpty()) {
-            parts.add("compétences : " + String.join(", ", m.matchedSkills()));
+            parts.add("skills: " + String.join(", ", m.matchedSkills()));
         }
         if (m.availability() >= 70) {
-            parts.add("forte disponibilité");
+            parts.add("high availability");
         }
         if (m.openIssues() <= 2) {
-            parts.add("charge faible (" + m.openIssues() + " en cours)");
+            parts.add("light workload (" + m.openIssues() + " open)");
         }
         if (historical >= 65) {
-            parts.add("bon historique de livraison");
+            parts.add("strong delivery history");
         }
         if (parts.isEmpty()) {
-            parts.add(m.openIssues() + " tâche(s) en cours · disponibilité " + m.availability() + "%");
+            parts.add(m.openIssues() + " open task(s) · availability " + m.availability() + "%");
         }
         return parts.stream().reduce((a, b) -> a + " · " + b).orElse("");
     }
