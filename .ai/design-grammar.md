@@ -80,5 +80,24 @@ emojis dans l'interface · valeurs en dur · données mock.
   backlog, issues projet, fiche membre). Mesuré sur la stack dev, validé par le CEO le 20/09.
 - Laissé à dessein (23 occurrences) : icônes, avatars, logos, spinners, le bandeau Labs (`lab-shell`, sa hauteur
   de 36 px est couplée au décalage de la sidebar dans `globals.css`).
-- À faire : `projects/[id]/list/page.tsx` (même pattern `py-2.5`, fichier en cours côté CEO) ; puis la même
-  grammaire, adaptée (plus d'air : c'est du marketing), pour la landing (`landing-page/src/styles/global.css`).
+- À faire : `projects/[id]/list/page.tsx` (même pattern `py-2.5`, fichier en cours côté CEO) ; recapturer les
+  visuels d'app du site (`landing-page/public/screens/`) à la nouvelle densité.
+
+## 7. La landing : même grammaire, un cran d'air (20/09)
+
+Le site partage le système de l'app, pas sa densité : c'est du marketing, on respire.
+
+| | App | Site |
+| --- | --- | --- |
+| Hauteurs de contrôle (sm / défaut / lg) | 28 / 32 / 36 | 32 / 36 / 40 |
+| Radius effectif (sm / md / lg) | 6 / 8 / 10 | 6 / 8 / 10 (`--radius` 8 px, mapping décalé d'un cran) |
+| Ombres | flat (`--shadow-lg` = 0 4px 12px à 8 %) | les mêmes valeurs |
+| CTA marketing | sans objet | boutons « pill » 42 / 48, hors échelle de contrôle |
+
+- Source unique : `landing-page/src/styles/global.css` ; utilitaires `h-control*`, `size-control*`,
+  `min-w-control*` ; clés déclarées dans tailwind-merge (`landing-page/src/lib/utils.ts`).
+- Un formulaire = une seule hauteur (démo : tout à 40).
+- Piège rencontré deux fois dans ce fichier : une variable CSS redéclarée plus bas dans le même `:root` écrase
+  la première EN SILENCE (`--radius`, puis 5 niveaux d'ombre). Avant d'ajouter un token, chercher s'il existe.
+- Vérifier : mesure DOM, `npm run lint`, puis un build de prod (`astro build`) et chercher `.h-control` dans
+  `dist/_astro/*.css` : le mode dev ne prouve pas que l'utilitaire est émis en prod.

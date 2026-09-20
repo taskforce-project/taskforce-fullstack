@@ -195,7 +195,7 @@ function PriceColumn({ tier, annual }: { tier: Tier; annual: boolean }) {
       <a
         href={tier.cta.href}
         className={
-          "mt-5 inline-flex h-10 w-full items-center justify-center rounded-full px-4 text-sm font-medium transition " +
+          "mt-5 inline-flex h-control-lg w-full items-center justify-center rounded-full px-4 text-sm font-medium transition " +
           (tier.featured
             ? "bg-primary text-primary-foreground hover:bg-primary/90"
             : "text-foreground hover:bg-secondary/60 border")
