@@ -5,6 +5,17 @@
 > Each issue: **Priority · Impact · Effort · Confidence**, with the fix locus (not applied here).
 > Effort scale: S ≤2h · M ½–1d · L 1–3d · XL >3d. Confidence = how sure the finding is true.
 
+## ✅ Recently fixed - 2026-09-20 (image Docker de prod du site restée en Node 20)
+
+- **Symptôme** : le workflow « Release Services » échoue sur `dev` à chaque push qui touche `landing-page/` :
+  « Node.js v20.20.2 is not supported by Astro! Please upgrade to >=22.12.0 » (`RUN npm run build`).
+- **Cause** : `landing-page/Dockerfile` (prod) avait ses trois étages en `node:20-alpine`. `Dockerfile.dev` avait été
+  corrigé (Node 22) mais pas celui-ci. Invisible au quotidien : c'est Vercel qui déploie le site, pas cette image,
+  et le job ne reconstruit l'image que si le site a changé.
+- **Fix** : les trois `FROM` passent en `node:22-alpine`.
+- **Règle** : quand Astro (ou Next) relève sa version minimale de Node, vérifier TOUS les Dockerfile du service
+  (`Dockerfile` et `Dockerfile.dev`) + les workflows qui fixent `node-version`.
+
 ## ✅ Recently fixed - 2026-09-20 (workflow « Sync README Badges » rouge sur dev)
 
 - **Symptôme** : le job « Sync README Badges » échoue sur chaque push de dev touchant README.md :
