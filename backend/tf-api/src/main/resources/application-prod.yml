@@ -202,6 +202,16 @@ integrations:
       redirect-base: ${APP_API_URL:${APP_URL}}   # base publique du BACKEND (recoit le callback OAuth)
       app-base: ${FRONTEND_URL}                   # base du FRONT (retour utilisateur apres callback)
 
+# Runner local de délégation (ADR-013). DÉSACTIVÉ par défaut en prod : tant qu'il l'est, le provider
+# « Claude Code » reste affiché « à venir », et ni les endpoints machine ni le filtre de session déléguée
+# n'existent. L'activer suppose un client Keycloak de runner (scripts/keycloak-runner.ps1) et, pour tout
+# usage au-delà d'un prototype personnel, une clé API Anthropic (cf. ADR-013, contrainte d'abonnement).
+delivery:
+  local-runner:
+    enabled: ${DELIVERY_LOCAL_RUNNER_ENABLED:false}
+    session-ttl-minutes: ${DELIVERY_RUNNER_SESSION_TTL_MINUTES:120}
+    heartbeat-timeout-minutes: ${DELIVERY_RUNNER_HEARTBEAT_TIMEOUT_MINUTES:10}
+
 # Logging Configuration
 logging:
   level:
