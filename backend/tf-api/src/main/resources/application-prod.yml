@@ -204,8 +204,9 @@ integrations:
 
 # Runner local de délégation (ADR-013). DÉSACTIVÉ par défaut en prod : tant qu'il l'est, le provider
 # « Claude Code » reste affiché « à venir », et ni les endpoints machine ni le filtre de session déléguée
-# n'existent. L'activer suppose un client Keycloak de runner (scripts/keycloak-runner.ps1) et, pour tout
-# usage au-delà d'un prototype personnel, une clé API Anthropic (cf. ADR-013, contrainte d'abonnement).
+# n'existent. L'activer suppose un client Keycloak par runner (scripts/keycloak-runner.ps1 en dev) ; avant
+# de l'ouvrir à des utilisateurs, relire l'ADR-013 (conditions d'Anthropic : chacun son Claude Code et son
+# compte, aucun identifiant Claude côté TaskForce, Commercial Terms, usage du nom et du logo).
 delivery:
   local-runner:
     enabled: ${DELIVERY_LOCAL_RUNNER_ENABLED:false}

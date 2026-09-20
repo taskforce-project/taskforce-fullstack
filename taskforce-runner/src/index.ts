@@ -133,7 +133,7 @@ async function check(config: RunnerConfig, api: TaskforceApi): Promise<boolean> 
     const probe = await run("git", ["-C", repo.path, "rev-parse", "--is-inside-work-tree"]).catch(() => null);
     line(probe !== null && probe.code === 0, `Dépôt ${name}`, `${repo.path} (base ${repo.baseBranch})`);
   }
-  console.log(`  Authentification de Claude Code : ${config.agent.auth === "subscription" ? "abonnement (usage personnel uniquement)" : "clé API"}`);
+  console.log(`  Authentification de Claude Code : ${config.agent.auth === "subscription" ? "abonnement (le login de la personne, dans son Claude Code)" : "clé API"}`);
   console.log(`  Sortie du poste : ${config.push ? (config.openPullRequest ? "push + pull request" : "push seul") : "aucune (branche locale)"}`);
   return ok;
 }

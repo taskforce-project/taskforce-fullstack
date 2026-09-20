@@ -20,11 +20,12 @@ export interface AgentConfig {
   /** Exécutable Claude Code. */
   command: string;
   /**
-   * Comment Claude Code s'authentifie.
-   * - `subscription` (défaut) : le login claude.ai de la personne sur SON poste. Réservé à un usage
-   *   personnel et individuel : les conditions d'Anthropic interdisent à un produit de faire passer les
-   *   requêtes de ses utilisateurs par un abonnement Free/Pro/Max.
-   * - `api-key` : `ANTHROPIC_API_KEY`, facturé à l'usage. C'est le mode d'un usage produit.
+   * Comment Claude Code s'authentifie. C'est le choix de la personne qui fait tourner le runner : il lance
+   * SON Claude Code, non modifié, où elle s'est connectée elle-même. TaskForce ne voit jamais ces
+   * identifiants (c'est la forme que les conditions d'Anthropic admettent, cf. ADR-013).
+   * - `subscription` (défaut) : son login claude.ai. La clé API ambiante est retirée de l'environnement
+   *   de l'agent, sinon Claude Code la préférerait et facturerait le compte API sans prévenir.
+   * - `api-key` : `ANTHROPIC_API_KEY`, facturé à l'usage.
    */
   auth: "subscription" | "api-key";
   /** Modèle imposé ; null = celui choisi à la délégation, sinon le défaut de Claude Code. */

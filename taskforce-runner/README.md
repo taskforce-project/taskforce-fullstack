@@ -74,14 +74,30 @@ cd ../taskforce-runner && npm install
 
 ## Abonnement ou clé API
 
-`agent.auth: "subscription"` fait tourner Claude Code avec **ton** login claude.ai, sur **ton** poste. C'est
-permis pour un usage personnel et individuel, et c'est le mode de ce prototype. La clé `ANTHROPIC_API_KEY`
-ambiante est alors retirée de l'environnement de l'agent, sinon Claude Code la préférerait et facturerait
-ton compte API sans prévenir.
+Le choix appartient à la personne qui fait tourner le runner, le runner n'en retire aucun :
 
-Les conditions d'Anthropic interdisent à un produit de faire passer les requêtes de **ses utilisateurs** par
-un abonnement Free/Pro/Max. Proposer ce runner à d'autres personnes que toi suppose donc
-`agent.auth: "api-key"` (facturé à l'usage), ou un accord écrit d'Anthropic. Le détail est dans l'ADR-013.
+- `agent.auth: "subscription"` : Claude Code tourne avec **son** login claude.ai, sur **son** poste. La clé
+  `ANTHROPIC_API_KEY` ambiante est alors retirée de l'environnement de l'agent, sinon Claude Code la
+  préférerait et facturerait le compte API sans prévenir.
+- `agent.auth: "api-key"` : `ANTHROPIC_API_KEY`, facturé à l'usage.
+
+**Ce que disent les conditions d'Anthropic** (page « Legal and compliance » de Claude Code, relue le
+20/09/2026 ; à relire avant toute mise sur le marché, je ne suis pas juriste) :
+
+- Chaque personne peut se connecter au binaire Claude Code **non modifié** avec **son propre** abonnement, y
+  compris quand une plateforme fait tourner Claude Code pour elle. C'est exactement ce que fait le runner :
+  il lance le Claude Code de la personne, TaskForce ne voit jamais ses identifiants Claude.
+- Un produit ne peut pas proposer le login claude.ai dans sa propre application, ni collecter, stocker ou
+  relayer les identifiants ou les jetons Claude de ses utilisateurs, ni payer, revendre ou intermédier leur
+  usage : chacun s'authentifie lui-même, et son usage lui est facturé.
+- Le binaire ne doit pas être modifié, ni aucune de ses méthodes d'authentification retirée ou restreinte.
+- Intégrer Claude Code à une offre suppose d'accepter les Commercial Terms d'Anthropic. On peut écrire en
+  texte que le produit fait tourner Claude Code, pas en faire un nom de fonctionnalité ni utiliser le logo
+  sans permission.
+- Les limites des abonnements supposent un usage ordinaire et individuel. Anthropic peut faire respecter ces
+  règles sans préavis, et renvoie vers son équipe commerciale pour valider un cas d'usage.
+
+Le détail est dans l'ADR-013.
 
 ## Éprouver la chaîne sans consommer Claude
 
