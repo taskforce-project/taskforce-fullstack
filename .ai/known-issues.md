@@ -5,6 +5,18 @@
 > Each issue: **Priority · Impact · Effort · Confidence**, with the fix locus (not applied here).
 > Effort scale: S ≤2h · M ½–1d · L 1–3d · XL >3d. Confidence = how sure the finding is true.
 
+## ✅ Recently fixed - 2026-09-20 (workflow « Sync README Badges » rouge sur dev)
+
+- **Symptôme** : le job « Sync README Badges » échoue sur chaque push de dev touchant README.md :
+  « Badge markers not found in README.md » (scripts/update-readme-badges.ps1, ligne 110).
+- **Cause** : le README racine a été réécrit (fin du template « ERP », commit b5e3276b) sans conserver les
+  deux marqueurs BADGES:START / BADGES:END (commentaires HTML) entre lesquels le bot régénère les 13 badges
+  versionnés (pom.xml, package.json).
+- **Fix** : marqueurs restaurés autour du bloc de badges (commit 875ecc5a) ; le bot remplace le contenu à sa
+  prochaine exécution et commite sur dev.
+- **Règle** : ne JAMAIS retirer ces deux marqueurs du README.md racine ; tout ce qui est entre eux est écrasé
+  par le bot (workflow dev-only, permission contents: write ; remonte sur main par la release squash).
+
 ## ✅ Recently fixed — 2026-09-07 (CI backend reverdie)
 
 - **`billing_portal_200` (CI backend `mvn verify` rouge en permanence depuis le 05/09) réparée.** Vraie cause = **test obsolète**, PAS les `STRIPE_PRICE_ID_*` en CI : en `@WebMvcTest`, `StripeService` est mocké et `StripeConfig` n'est pas chargé, et `/api/billing/portal` lit `user.getStripeCustomerId()` (refactor « client Stripe porté par `users` »). Le test construisait un `User` sans `stripeCustomerId` (+ stub mort `subscriptionRepository`) -> `IllegalStateException` -> 409 (`GlobalExceptionHandler`). Fix côté test seul : `User` mocké avec `cus_123`, stubs/mocks/imports morts retirés. `mvn clean verify` complet de nouveau vert (1060 tests, 0 échec, gate JaCoCo OK). `PaymentAndDataControllersWebMvcTest.java`. Le « 409 sans price-ids » reste vrai mais pour `getPriceIdForPlan` / `/checkout`, pas `/portal`.
