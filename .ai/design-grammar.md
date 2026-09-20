@@ -80,8 +80,10 @@ emojis dans l'interface · valeurs en dur · données mock.
   backlog, issues projet, fiche membre). Mesuré sur la stack dev, validé par le CEO le 20/09.
 - Laissé à dessein (23 occurrences) : icônes, avatars, logos, spinners, le bandeau Labs (`lab-shell`, sa hauteur
   de 36 px est couplée au décalage de la sidebar dans `globals.css`).
-- À faire : `projects/[id]/list/page.tsx` (même pattern `py-2.5`, fichier en cours côté CEO) ; recapturer les
-  visuels d'app du site (`landing-page/public/screens/`) à la nouvelle densité.
+- À faire : `projects/[id]/list/page.tsx` (même pattern `py-2.5`, fichier en cours côté CEO).
+- Visuels d'app du site (`landing-page/public/screens/`) : recapturés le 20/09 avec l'outil `design-assets`
+  (`npm run capture`). Attention : les étapes de `capture/film.mjs` MODIFIENT la base de dev (elles appliquent
+  les assignations) : sauvegarder puis restaurer les lignes concernées autour de la capture.
 
 ## 7. La landing : même grammaire, un cran d'air (20/09)
 
