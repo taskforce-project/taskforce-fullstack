@@ -2,11 +2,13 @@
 
 <div align="center">
 
+<!-- BADGES:START -->
 ![Status](https://img.shields.io/badge/status-beta-f59e0b?style=flat-square)
 ![Backend](https://img.shields.io/badge/backend-Java%2021%20·%20Spring%20Boot%204-111827?style=flat-square)
 ![Frontend](https://img.shields.io/badge/frontend-Next.js%2016%20·%20React%2019-111827?style=flat-square)
 ![AI](https://img.shields.io/badge/AI-auto--héberg%C3%A9%20·%20Ollama-16a34a?style=flat-square)
 ![Infra](https://img.shields.io/badge/infra-Docker%20·%20Keycloak%20·%20PostgreSQL-111827?style=flat-square)
+<!-- BADGES:END -->
 
 **TaskForce se pose au-dessus des outils qu'une équipe utilise déjà et transforme une intention en résultat livré.**
 
