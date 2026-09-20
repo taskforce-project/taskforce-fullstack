@@ -186,7 +186,7 @@ export function McpActionConsole({
                   <label key={key} className="flex flex-col gap-1">
                     {label}
                     <Select value={values[key] ?? ""} onValueChange={(v) => setValues((p) => ({ ...p, [key]: v }))}>
-                      <SelectTrigger className="h-9"><SelectValue placeholder="Choose…" /></SelectTrigger>
+                      <SelectTrigger className="h-control"><SelectValue placeholder="Choose…" /></SelectTrigger>
                       <SelectContent>
                         {spec.enum.map((opt) => <SelectItem key={String(opt)} value={String(opt)}>{String(opt)}</SelectItem>)}
                       </SelectContent>
@@ -199,7 +199,7 @@ export function McpActionConsole({
                   <label key={key} className="flex flex-col gap-1">
                     {label}
                     <Select value={values[key] ?? ""} onValueChange={(v) => setValues((p) => ({ ...p, [key]: v }))}>
-                      <SelectTrigger className="h-9"><SelectValue placeholder="true / false" /></SelectTrigger>
+                      <SelectTrigger className="h-control"><SelectValue placeholder="true / false" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="true">true</SelectItem>
                         <SelectItem value="false">false</SelectItem>
@@ -252,7 +252,7 @@ export function McpActionConsole({
             </div>
           </div>
         ) : (
-          <Button size="sm" className="h-9 w-fit gap-1.5" onClick={onRunClick} disabled={running}>
+          <Button size="sm" className="h-control w-fit gap-1.5" onClick={onRunClick} disabled={running}>
             {running ? <Loader2 className="size-3.5 animate-spin" /> : <Play className="size-3.5" />}
             {running ? "Running…" : "Run"}
           </Button>
@@ -281,7 +281,7 @@ export function McpActionConsole({
     <div className="flex flex-col gap-3">
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-        <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search tools…" className="h-9 pl-9" />
+        <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search tools…" className="h-control pl-9" />
       </div>
       <div className="flex max-h-80 flex-col gap-1.5 overflow-auto pr-1">
         {filtered.length === 0 ? (

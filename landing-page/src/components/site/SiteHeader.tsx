@@ -35,7 +35,7 @@ import { AnimatedNavIcon } from "./AnimatedNavIcon";
  */
 
 const triggerCls =
-  "h-9 rounded-full bg-transparent px-3 text-[14px] font-normal text-muted-foreground hover:bg-accent hover:text-foreground focus:bg-accent focus:text-foreground data-[state=open]:bg-accent data-[state=open]:text-foreground";
+  "h-control rounded-full bg-transparent px-3 text-[14px] font-normal text-muted-foreground hover:bg-accent hover:text-foreground focus:bg-accent focus:text-foreground data-[state=open]:bg-accent data-[state=open]:text-foreground";
 
 /** Badge de maturité - variantes portées par le Badge shadcn. */
 function LevelBadge({ level }: { level: Maturity }) {
@@ -289,7 +289,7 @@ export function SiteHeader() {
               <NavigationMenuLink asChild>
                 <a
                   href="/enterprise"
-                  className="!flex-row hover:bg-accent h-9 items-center !rounded-full px-3 text-[14px] text-muted-foreground transition-colors hover:text-foreground"
+                  className="!flex-row hover:bg-accent h-control items-center !rounded-full px-3 text-[14px] text-muted-foreground transition-colors hover:text-foreground"
                 >
                   Enterprise
                 </a>
@@ -302,13 +302,13 @@ export function SiteHeader() {
         <div className="flex shrink-0 items-center gap-2">
           <a
             href="/pricing"
-            className="hover:bg-accent hidden h-9 items-center rounded-full px-3 text-[14px] text-muted-foreground transition-colors hover:text-foreground lg:inline-flex"
+            className="hover:bg-accent hidden h-control items-center rounded-full px-3 text-[14px] text-muted-foreground transition-colors hover:text-foreground lg:inline-flex"
           >
             Pricing
           </a>
           <a
             href="/trust"
-            className="hover:bg-accent hidden h-9 items-center rounded-full px-3 text-[14px] text-muted-foreground transition-colors hover:text-foreground lg:inline-flex"
+            className="hover:bg-accent hidden h-control items-center rounded-full px-3 text-[14px] text-muted-foreground transition-colors hover:text-foreground lg:inline-flex"
           >
             Trust
           </a>

@@ -483,8 +483,9 @@ const sidebarMenuButtonVariants = cva(
           "bg-background shadow-[0_0_0_1px_hsl(var(--sidebar-border))] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-[0_0_0_1px_hsl(var(--sidebar-accent))]",
       },
       size: {
-        default: "h-8 text-sm",
-        sm: "h-7 text-xs",
+        // Densité (20/09) : la navigation s'efface derrière le contenu (13px, hauteur tokenisée).
+        default: "h-control text-[13px]",
+        sm: "h-control-sm text-xs",
         lg: "h-12 text-sm group-data-[collapsible=icon]:p-0!",
       },
     },

@@ -28,7 +28,7 @@ const TOPICS = [
 ] as const;
 
 const FIELD =
-  "border-input focus-visible:border-ring focus-visible:ring-ring/50 h-10 w-full rounded-md border bg-transparent px-3 text-[14px] shadow-xs outline-none transition-[color,box-shadow] focus-visible:ring-[3px]";
+  "border-input focus-visible:border-ring focus-visible:ring-ring/50 h-control-lg w-full rounded-md border bg-transparent px-3 text-[14px] shadow-xs outline-none transition-[color,box-shadow] focus-visible:ring-[3px]";
 
 type Form = {
   name: string;
@@ -98,12 +98,13 @@ export function DemoForm() {
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="df-name">Name</Label>
-          <Input id="df-name" required value={form.name} onChange={set("name")} autoComplete="name" />
+          <Input id="df-name" className="h-control-lg" required value={form.name} onChange={set("name")} autoComplete="name" />
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="df-email">Work email</Label>
           <Input
             id="df-email"
+            className="h-control-lg"
             type="email"
             required
             value={form.email}
@@ -116,7 +117,7 @@ export function DemoForm() {
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="df-company">Company</Label>
-          <Input id="df-company" value={form.company} onChange={set("company")} autoComplete="organization" />
+          <Input id="df-company" className="h-control-lg" value={form.company} onChange={set("company")} autoComplete="organization" />
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="df-size">Team size</Label>

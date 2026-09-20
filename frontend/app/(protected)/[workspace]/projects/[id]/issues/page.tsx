@@ -158,7 +158,7 @@ function IssueRow({ issue, onOpen }: { readonly issue: Issue; readonly onOpen: (
     <button
       type="button"
       onClick={() => onOpen(issue)}
-      className="group flex w-full items-center gap-3 px-4 py-2.5 hover:bg-muted/40 transition-colors border-b border-border/50 last:border-0 text-left"
+      className="group flex w-full items-center gap-3 px-4 py-1.5 hover:bg-muted/40 transition-colors border-b border-border/50 last:border-0 text-left"
     >
       {/* Priority dot */}
       <div className={cn("size-2 rounded-full shrink-0", PRIORITY_DOT[issue.priority])} />

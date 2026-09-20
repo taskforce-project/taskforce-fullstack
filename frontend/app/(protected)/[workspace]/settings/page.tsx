@@ -133,7 +133,7 @@ function StyledInput(props: Readonly<React.InputHTMLAttributes<HTMLInputElement>
     <input
       {...props}
       className={cn(
-        "h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all",
+        "h-control w-full rounded-md border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all",
         props.readOnly && "bg-muted/40 text-muted-foreground cursor-default",
         props.className
       )}
@@ -1202,7 +1202,7 @@ function GitHubRepoBrowser({ slug }: { readonly slug: string }) {
         {loadingRepos && <Loader2 className="size-3.5 animate-spin text-muted-foreground" />}
       </div>
       <Select value={repo} onValueChange={selectRepo}>
-        <SelectTrigger className="h-9"><SelectValue placeholder="Choose a repository…" /></SelectTrigger>
+        <SelectTrigger className="h-control"><SelectValue placeholder="Choose a repository…" /></SelectTrigger>
         <SelectContent>
           {repos.map((r) => (
             <SelectItem key={r.fullName} value={r.fullName}>
@@ -1457,7 +1457,7 @@ function IntegrationsPanel() {
                   value={channelName}
                   onChange={(e) => setChannelName(e.target.value)}
                 />
-                <Button size="sm" className="h-9 text-xs shrink-0" onClick={handleAddChannel} disabled={addingChannel || !channelId || !channelName}>
+                <Button size="sm" className="h-control text-xs shrink-0" onClick={handleAddChannel} disabled={addingChannel || !channelId || !channelName}>
                   {addingChannel ? "Adding…" : "Add"}
                 </Button>
               </div>
@@ -1506,7 +1506,7 @@ function IntegrationsPanel() {
               value={webhookUrl}
               onChange={(e) => setWebhookUrl(e.target.value)}
             />
-            <Button size="sm" className="h-9 text-xs shrink-0" disabled={!webhookUrl || addingWebhook} onClick={handleAddWebhook}>
+            <Button size="sm" className="h-control text-xs shrink-0" disabled={!webhookUrl || addingWebhook} onClick={handleAddWebhook}>
               {addingWebhook ? "Adding…" : "Add webhook"}
             </Button>
           </div>

@@ -201,7 +201,7 @@ function InviteMemberDialog({ onInvited }: { readonly onInvited?: () => void }) 
   return (
     <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset() }}>
       <DialogTrigger asChild>
-        <Button size="sm" className="gap-2 h-9">
+        <Button size="sm" className="gap-2 h-control">
           <UserPlus className="size-4" />
           Invite member
         </Button>
@@ -251,7 +251,7 @@ function InviteMemberDialog({ onInvited }: { readonly onInvited?: () => void }) 
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Name or email…"
-                className="pl-9 h-9"
+                className="pl-9 h-control"
                 autoComplete="off"
               />
               {searching && <Loader2 className="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground" />}
@@ -303,7 +303,7 @@ function InviteMemberDialog({ onInvited }: { readonly onInvited?: () => void }) 
             <Select value={role} onValueChange={(v) => setRole(v as WorkspaceRole)}>
               {/* Le <label> voisin n'est pas associé au contrôle (pas de `htmlFor`) : sans
                   `aria-label`, ce sélecteur reste anonyme malgré son intitulé visible. */}
-              <SelectTrigger className="h-9" aria-label="Invited member role"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-control" aria-label="Invited member role"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="MEMBER">Member</SelectItem>
                 <SelectItem value="ADMIN">Admin</SelectItem>
@@ -715,7 +715,7 @@ export default function MembersPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search members…"
-            className="pl-8 h-9 text-sm"
+            className="pl-8 h-control text-sm"
           />
           {search && (
             <button
@@ -733,7 +733,7 @@ export default function MembersPage() {
             {/* Le nom accessible ne doit pas dépendre de la valeur affichée : selon la sélection,
                 `SelectValue` peut ne rendre aucun texte et le bouton devient anonyme pour un
                 lecteur d'écran (axe : `button-name`, critique). */}
-            <SelectTrigger className="h-9 w-44 text-sm shrink-0" aria-label="Filter by project"><SelectValue placeholder="Project" /></SelectTrigger>
+            <SelectTrigger className="h-control w-44 text-sm shrink-0" aria-label="Filter by project"><SelectValue placeholder="Project" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All projects</SelectItem>
               {projects.map((p) => (

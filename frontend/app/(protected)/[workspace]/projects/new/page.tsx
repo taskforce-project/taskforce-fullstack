@@ -92,7 +92,7 @@ export default function NewProjectPage() {
               value={name}
               onChange={(e) => handleNameChange(e.target.value)}
               placeholder="My New Project"
-              className="h-9"
+              className="h-control"
               autoFocus
               onKeyDown={(e) => e.key === "Enter" && name.trim() && identifier.trim() && handleCreate()}
             />
@@ -114,7 +114,7 @@ export default function NewProjectPage() {
               setIdentifier(e.target.value.toUpperCase().replaceAll(/[^A-Z0-9-]/g, "").slice(0, 10))
             }
             placeholder="WEB"
-            className="h-9 font-mono uppercase"
+            className="h-control font-mono uppercase"
           />
         </div>
 

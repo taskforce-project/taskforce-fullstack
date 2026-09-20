@@ -168,7 +168,7 @@ export default function AnalyticsPage() {
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
         <span className="text-sm font-medium text-foreground">Analyzed project</span>
         <Select value={projectFilter} onValueChange={setProjectFilter}>
-          <SelectTrigger className="h-9 w-64 text-sm"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="h-control w-64 text-sm"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value={ALL_PROJECTS}>All projects</SelectItem>
             {projects.map((p) => (
