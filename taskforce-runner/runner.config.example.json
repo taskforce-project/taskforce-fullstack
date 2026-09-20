@@ -1,0 +1,22 @@
+{
+  "repos": {
+    "owner/name": {
+      "path": "C:/chemin/vers/le/checkout/local",
+      "baseBranch": "main",
+      "setup": []
+    }
+  },
+  "pollSeconds": 5,
+  "push": true,
+  "openPullRequest": true,
+  "keepWorktree": false,
+  "agent": {
+    "command": "claude",
+    "auth": "subscription",
+    "model": null,
+    "maxTurns": 60,
+    "timeoutMinutes": 45,
+    "attribution": false,
+    "extraAllowedTools": []
+  }
+}

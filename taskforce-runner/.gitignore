@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.env
+# Chemins des dépôts sur CE poste : propre à chaque machine.
+runner.config.json
+*.log
