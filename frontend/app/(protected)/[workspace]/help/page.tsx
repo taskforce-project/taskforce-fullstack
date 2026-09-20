@@ -199,7 +199,7 @@ export default function HelpPage() {
         /* ── Résultats de recherche (à plat) ─────────────────────────── */
         <div className="flex flex-col gap-4">
           <p className="text-xs text-muted-foreground">
-            {searchResults.length} result{searchResults.length !== 1 ? "s" : ""} for "{query}"
+            {searchResults.length} result{searchResults.length !== 1 ? "s" : ""} for &ldquo;{query}&rdquo;
           </p>
           {searchResults.length === 0 ? (
             <p className="rounded-xl border border-border bg-card py-10 text-center text-sm text-muted-foreground">
