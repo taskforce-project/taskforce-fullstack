@@ -191,7 +191,7 @@ export function MemberSkillsCard({ slug, userId, canEdit }: MemberSkillsCardProp
                 value={capacity}
                 onChange={(e) => setCapacity(e.target.value)}
                 placeholder="e.g. 35"
-                className="h-9"
+                className="h-control"
               />
             </div>
             <div className="flex flex-col gap-1.5">
@@ -200,7 +200,7 @@ export function MemberSkillsCard({ slug, userId, canEdit }: MemberSkillsCardProp
                 value={seniority === "" ? NO_SENIORITY : seniority}
                 onValueChange={(v) => setSeniority(v === NO_SENIORITY ? "" : (v as Seniority))}
               >
-                <SelectTrigger className="h-9"><SelectValue placeholder="Not specified" /></SelectTrigger>
+                <SelectTrigger className="h-control"><SelectValue placeholder="Not specified" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NO_SENIORITY}>Not specified</SelectItem>
                   {SENIORITY_OPTIONS.map((o) => (

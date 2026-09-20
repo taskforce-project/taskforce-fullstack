@@ -180,7 +180,7 @@ export function ProjectInviteDialog({ workspace, projectId, onInvited }: Project
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Name or email…"
-                  className="pl-9 h-9"
+                  className="pl-9 h-control"
                   autoComplete="off"
                 />
                 {searching && <Loader2 className="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground" />}
@@ -227,7 +227,7 @@ export function ProjectInviteDialog({ workspace, projectId, onInvited }: Project
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium">Role</label>
             <Select value={role} onValueChange={(v) => setRole(v as ProjectRole)}>
-              <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-control"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {PROJECT_ROLES.map((r) => (
                   <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
@@ -240,7 +240,7 @@ export function ProjectInviteDialog({ workspace, projectId, onInvited }: Project
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium">Team <span className="font-normal text-muted-foreground">(optional)</span></label>
             <Select value={teamChoice} onValueChange={setTeamChoice}>
-              <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-control"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={NO_TEAM}>No team</SelectItem>
                 {teams.map((t) => (
@@ -254,7 +254,7 @@ export function ProjectInviteDialog({ workspace, projectId, onInvited }: Project
                 value={newTeamName}
                 onChange={(e) => setNewTeamName(e.target.value)}
                 placeholder="New team name"
-                className="h-9 mt-1"
+                className="h-control mt-1"
               />
             )}
           </div>

@@ -70,7 +70,7 @@ function IssueList({ issues, loading, slug }: Readonly<{ issues: Issue[]; loadin
         <Link
           key={issue.id}
           href={`/${slug}/projects/${issue.projectId}?issue=${issue.id}`}
-          className="flex items-center gap-3 px-4 py-2.5 border-b border-border/50 last:border-0 hover:bg-muted/30 transition-colors group"
+          className="flex items-center gap-3 px-4 py-1.5 border-b border-border/50 last:border-0 hover:bg-muted/30 transition-colors group"
         >
           <CircleDot className={cn("h-3.5 w-3.5 shrink-0", issueDotColor(issue.status.category))} />
           <span className="text-xs text-muted-foreground font-mono w-20 shrink-0">

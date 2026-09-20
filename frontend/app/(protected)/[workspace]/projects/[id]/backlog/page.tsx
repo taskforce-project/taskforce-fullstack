@@ -174,7 +174,7 @@ export default function ProjectBacklogPage() {
             tabIndex={0}
             onClick={() => setSelectedIssue(toSheetIssue(issue))}
             onKeyDown={(e) => e.key === "Enter" && setSelectedIssue(toSheetIssue(issue))}
-            className="group flex w-full cursor-pointer items-center gap-3 px-4 py-2.5 hover:bg-muted/40 transition-colors border-b border-border/50 last:border-0 text-left"
+            className="group flex w-full cursor-pointer items-center gap-3 px-4 py-1.5 hover:bg-muted/40 transition-colors border-b border-border/50 last:border-0 text-left"
           >
             <div className={cn("h-2 w-2 rounded-full shrink-0", PRIORITY_DOT[issue.priority])} />
             <button

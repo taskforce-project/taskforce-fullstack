@@ -204,7 +204,7 @@ export default function BillingPage() {
   }
 
   function renderCta(p: PlanDef) {
-    const base = "h-10 w-full font-medium"
+    const base = "h-control-lg w-full font-medium"
 
     // Forfait courant : gérer l'abonnement (portail Stripe : moyen de paiement, factures) ou badge FREE.
     if (p.key === current) {

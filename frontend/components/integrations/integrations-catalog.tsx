@@ -187,7 +187,7 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search connectors…"
-            className="h-10 pl-9"
+            className="h-control-lg pl-9"
           />
         </div>
 
@@ -717,7 +717,7 @@ function ConnectorDialog({
             <label className="flex flex-col gap-1">
               <span className="text-xs font-medium text-muted-foreground">Project to sync</span>
               <Select value={projectId} onValueChange={setProjectId}>
-                <SelectTrigger className="h-9"><SelectValue placeholder="Choose a project…" /></SelectTrigger>
+                <SelectTrigger className="h-control"><SelectValue placeholder="Choose a project…" /></SelectTrigger>
                 <SelectContent>
                   {projects.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                 </SelectContent>

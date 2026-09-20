@@ -191,7 +191,7 @@ export default function HelpPage() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={t("help.searchPlaceholder")}
-          className="h-10 w-full rounded-md border border-border bg-background pl-9 pr-4 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
+          className="h-control-lg w-full rounded-md border border-border bg-background pl-9 pr-4 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-all"
         />
       </div>
 

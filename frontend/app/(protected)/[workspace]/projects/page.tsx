@@ -612,7 +612,7 @@ export default function ProjectsPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search operations…"
-            className="h-9 pl-8"
+            className="h-control pl-8"
           />
         </div>
         <div className="ml-auto flex items-center gap-2">
@@ -624,7 +624,7 @@ export default function ProjectsPage() {
           {/* Tri */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-9 gap-1.5 text-xs">
+              <Button variant="outline" size="sm" className="h-control gap-1.5 text-xs">
                 <ArrowUpDown className="size-3.5" /> {SORT_LABEL[sortBy]}
               </Button>
             </DropdownMenuTrigger>
