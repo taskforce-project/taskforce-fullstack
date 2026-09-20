@@ -91,6 +91,7 @@ taskforce-fullstack/
 ├─ landing-page/     Site marketing Astro
 ├─ ai-service/       Passerelle IA (FastAPI) -> runtime Ollama local
 ├─ taskforce-mcp/    Serveur Model Context Protocol
+├─ taskforce-runner/ Runner local de délégation (Claude Code sur ton poste, prototype)
 ├─ keycloak/         Identité & accès
 ├─ nginx/            Reverse proxy / TLS
 ├─ observability/    OpenTelemetry + SigNoz

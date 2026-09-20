@@ -120,6 +120,10 @@ const HIDE = new Set([
   "billing-controller",
   "stripe-controller",
   "stripe-webhook-controller",
+  // Endpoints MACHINE du runner local de délégation (ADR-013) : réservés à un compte de service
+  // Keycloak, sans intérêt pour un consommateur de l'API. La spec vient du backend DEV, où ils existent.
+  "delivery-runner-controller",
+  "runner-auth-controller",
 ]);
 let removedInternal = 0;
 for (const [p, item] of Object.entries(spec.paths ?? {})) {
