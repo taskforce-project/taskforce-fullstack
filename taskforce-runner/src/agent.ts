@@ -34,6 +34,14 @@ export function allowedTools(extra: string[]): string[] {
   ];
 }
 
+/**
+ * Nom de modèle sûr à poser sur une ligne de commande, ou null. Le modèle choisi à la délégation vient du
+ * serveur : on n'accepte que la forme d'un identifiant (`claude-sonnet-5`, `opus`, `sonnet[1m]`).
+ */
+export function safeModel(model: string | null | undefined): string | null {
+  return typeof model === "string" && /^[A-Za-z0-9][A-Za-z0-9._\[\]-]{0,79}$/.test(model) ? model : null;
+}
+
 /** Arguments de `claude -p`. Exporté pour les tests : c'est la frontière de sécurité de l'exécution locale. */
 export function agentArgs(config: RunnerConfig, claim: Claim, mcpConfigPath: string, settingsPath: string): string[] {
   const args = [
@@ -46,7 +54,7 @@ export function agentArgs(config: RunnerConfig, claim: Claim, mcpConfigPath: str
     "--settings", settingsPath,
     "--max-turns", String(config.agent.maxTurns),
   ];
-  const model = config.agent.model ?? claim.model;
+  const model = safeModel(config.agent.model) ?? safeModel(claim.model);
   if (model) args.push("--model", model);
   return args;
 }

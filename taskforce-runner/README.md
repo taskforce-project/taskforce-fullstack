@@ -62,7 +62,7 @@ cd ../taskforce-runner && npm install
 
 | Clé | Défaut | Rôle |
 |---|---|---|
-| `repos["owner/name"]` | (aucun) | `path` (absolu), `baseBranch` (`main`), `setup` (commandes avant l'agent, ex. `["npm ci"]` : un worktree neuf n'a pas de dépendances). |
+| `repos["owner/name"]` | (aucun) | `path` (absolu), `baseBranch` (`main`), `setup` (commandes avant l'agent, chacune en tableau d'arguments, ex. `[["npm", "ci"]]` : un worktree neuf n'a pas de dépendances). |
 | `pollSeconds` | 5 | Fréquence du claim. |
 | `push` / `openPullRequest` | `true` / `true` | `push: false` : rien ne sort du poste, le travail reste sur une branche locale. |
 | `keepWorktree` | `false` | Garder le worktree après un succès. Un run en échec le garde toujours (seule trace du travail). |

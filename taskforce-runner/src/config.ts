@@ -9,8 +9,11 @@ export interface RepoConfig {
   path: string;
   /** Branche de base des pull requests. */
   baseBranch: string;
-  /** Commandes lancées dans le worktree avant l'agent (ex. `npm ci`) : un worktree neuf n'a pas de dépendances. */
-  setup: string[];
+  /**
+   * Commandes lancées dans le worktree avant l'agent : un worktree neuf n'a pas de dépendances. Chaque
+   * commande est un tableau d'arguments (`["npm", "ci"]`), jamais une chaîne passée à un shell.
+   */
+  setup: string[][];
 }
 
 export interface AgentConfig {
@@ -77,6 +80,18 @@ function asPositiveInt(value: unknown, fallback: number, label: string): number 
   return value;
 }
 
+/** Liste de commandes, chacune en tableau d'arguments non vide. */
+function asCommandList(value: unknown, label: string): string[][] {
+  if (value === undefined || value === null) return [];
+  const valid = Array.isArray(value) && value.every(
+    (cmd) => Array.isArray(cmd) && cmd.length > 0 && cmd.every((part) => typeof part === "string" && part.length > 0),
+  );
+  if (!valid) {
+    throw new Error(`Configuration : ${label} doit être une liste de commandes en tableaux d'arguments, ex. [["npm", "ci"]]`);
+  }
+  return value as string[][];
+}
+
 function asStringArray(value: unknown, label: string): string[] {
   if (value === undefined || value === null) return [];
   if (!Array.isArray(value) || value.some((v) => typeof v !== "string")) {
@@ -111,7 +126,7 @@ export function parseRunnerConfigFile(json: unknown): Omit<RunnerConfig, "apiUrl
     repos[fullName.toLowerCase()] = {
       path: repo.path,
       baseBranch,
-      setup: asStringArray(repo.setup, `repos["${fullName}"].setup`),
+      setup: asCommandList(repo.setup, `repos["${fullName}"].setup`),
     };
   }
 

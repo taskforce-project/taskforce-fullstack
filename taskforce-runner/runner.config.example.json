@@ -3,7 +3,7 @@
     "owner/name": {
       "path": "C:/chemin/vers/le/checkout/local",
       "baseBranch": "main",
-      "setup": []
+      "setup": [["npm", "ci"]]
     }
   },
   "pollSeconds": 5,

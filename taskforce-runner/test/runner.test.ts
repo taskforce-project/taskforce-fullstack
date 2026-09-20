@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { agentArgs, agentEnv, allowedTools, parseAgentOutput } from "../src/agent.js";
+import { agentArgs, agentEnv, allowedTools, parseAgentOutput, safeModel } from "../src/agent.js";
 import type { Claim } from "../src/api.js";
 import { parseEnvFile, parseRunnerConfigFile, type RunnerConfig } from "../src/config.js";
 import { branchName, pullRequestBody } from "../src/git.js";
@@ -72,7 +72,15 @@ describe("parseRunnerConfigFile", () => {
     ["maxTurns négatif", { agent: { maxTurns: -1 } }],
     ["pollSeconds non entier", { pollSeconds: 1.5 }],
     ["setup qui n'est pas une liste", { repos: { "a/b": { path: process.platform === "win32" ? "C:/x" : "/x", setup: "npm ci" } } }],
+    ["setup en chaînes shell (refusé : tableaux d'arguments seulement)", { repos: { "a/b": { path: process.platform === "win32" ? "C:/x" : "/x", setup: ["npm ci && rm -rf /"] } } }],
+    ["setup avec une commande vide", { repos: { "a/b": { path: process.platform === "win32" ? "C:/x" : "/x", setup: [[]] } } }],
   ];
+
+  it("setup : commandes en tableaux d'arguments", () => {
+    const root = process.platform === "win32" ? "C:/work/site" : "/work/site";
+    const cfg = parseRunnerConfigFile({ repos: { "a/b": { path: root, setup: [["npm", "ci"], ["npm", "run", "build"]] } } });
+    assert.deepEqual(cfg.repos["a/b"]?.setup, [["npm", "ci"], ["npm", "run", "build"]]);
+  });
   for (const [label, json] of invalid) {
     it(`refuse : ${label}`, () => assert.throws(() => parseRunnerConfigFile(json), /Configuration/));
   }
@@ -90,6 +98,33 @@ describe("agent : frontière de sécurité de l'exécution locale", () => {
   it("le modèle de la configuration prime sur celui de la délégation", () => {
     const args = agentArgs(config({ model: "opus" }), claim, "/tmp/mcp.json", "/tmp/settings.json");
     assert.equal(args[args.indexOf("--model") + 1], "opus");
+  });
+
+  // Le modèle choisi à la délégation vient du serveur et finit sur une ligne de commande.
+  const models: Array<[string | null, string | null]> = [
+    ["claude-sonnet-5", "claude-sonnet-5"],
+    ["opus", "opus"],
+    ["sonnet[1m]", "sonnet[1m]"],
+    ["claude-haiku-4-5-20251001", "claude-haiku-4-5-20251001"],
+    [null, null],
+    ["", null],
+    ["sonnet --dangerously-skip-permissions", null],
+    ["%COMSPEC%", null],
+    ["a\"; calc; \"", null],
+    ["-p", null],
+    ["$(whoami)", null],
+    ["x".repeat(81), null],
+  ];
+  for (const [input, expected] of models) {
+    it(`safeModel(${JSON.stringify(input)?.slice(0, 40)}) -> ${JSON.stringify(expected)}`, () => {
+      assert.equal(safeModel(input), expected);
+    });
+  }
+
+  it("un modèle douteux venu du serveur est ignoré, pas transmis", () => {
+    const args = agentArgs(config(), { ...claim, model: "sonnet --dangerously-skip-permissions" }, "/tmp/mcp.json", "/tmp/s.json");
+    assert.ok(!args.includes("--model"));
+    assert.ok(!args.some((a) => a.includes("dangerously")));
   });
 
   it("aucun outil qui sort du poste ou du dépôt : ni push, ni shell libre, ni réseau, ni Cortex", () => {
@@ -183,5 +218,10 @@ describe("quoteForCmd", () => {
   ];
   for (const [input, expected] of cases) {
     it(`${JSON.stringify(input)} -> ${expected}`, () => assert.equal(quoteForCmd(input), expected));
+  }
+
+  // cmd.exe développe %VAR% même entre guillemets, et un saut de ligne coupe la commande : refus net.
+  for (const hostile of ["%COMSPEC%", "100%", "a\nb", "a\r\nb"]) {
+    it(`refuse ${JSON.stringify(hostile)}`, () => assert.throws(() => quoteForCmd(hostile), /refusé/));
   }
 });

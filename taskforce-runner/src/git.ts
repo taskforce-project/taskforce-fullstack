@@ -9,7 +9,7 @@ import { run, runOrThrow } from "./proc.js";
 export function branchName(issueKey: string, title: string, runId: number): string {
   const slug = title
     .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/\p{M}/gu, "") // marques combinantes : « é » décomposé -> « e »
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
@@ -40,12 +40,13 @@ export async function prepareWorktree(repo: RepoConfig, claim: Claim, home: stri
   return { path: dir, branch, base: `origin/${repo.baseBranch}` };
 }
 
-/** Commande `setup` de la configuration (ex. `npm ci`), lancée dans le worktree avant l'agent. */
-export async function runSetup(worktree: Worktree, commands: string[]): Promise<void> {
-  for (const command of commands) {
-    const result = await run(command, [], { cwd: worktree.path, shell: true, timeoutMs: 15 * 60_000 });
+/** Commandes `setup` de la configuration (ex. `["npm", "ci"]`), lancées dans le worktree avant l'agent. */
+export async function runSetup(worktree: Worktree, commands: string[][]): Promise<void> {
+  for (const [file, ...args] of commands) {
+    if (!file) continue;
+    const result = await run(file, args, { cwd: worktree.path, timeoutMs: 15 * 60_000 });
     if (result.code !== 0) {
-      throw new Error(`Commande de préparation en échec (« ${command} », code ${result.code})`);
+      throw new Error(`Commande de préparation en échec (« ${[file, ...args].join(" ")} », code ${result.code})`);
     }
   }
 }
