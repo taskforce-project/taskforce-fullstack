@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 import { agentArgs, agentEnv, allowedTools, parseAgentOutput, safeModel } from "../src/agent.js";
 import type { Claim } from "../src/api.js";
 import { parseEnvFile, parseRunnerConfigFile, type RunnerConfig } from "../src/config.js";
-import { branchName, pullRequestBody } from "../src/git.js";
+import { branchName, isValidRepoFullName, managedCheckoutDir, pullRequestBody, resolveRepo } from "../src/git.js";
 import { quoteForCmd } from "../src/proc.js";
 import { buildPrompt } from "../src/prompt.js";
 
@@ -40,6 +40,41 @@ describe("branchName", () => {
   }
 });
 
+describe("dépôt du projet : nom validé, clone géré par le runner", () => {
+  const valid = ["acme/website", "Miche1-Pierre/runner-sandbox", "taskforce-project/taskforce.docs", "a/b_c-d.e"];
+  for (const name of valid) {
+    it(`accepte ${name}`, () => assert.equal(isValidRepoFullName(name), true));
+  }
+
+  // Le nom vient du serveur, devient un chemin sur le disque puis un argument de `gh` : forme stricte.
+  const invalid: Array<string | null | undefined> = [
+    null, undefined, "", "website", "acme/", "/website", "acme/web/site", "acme/../etc", "../x/y",
+    "acme/website;rm -rf", "acme/web site", "-acme/website", "acme/website\n", "https://github.com/acme/website",
+    "acme\\website", `${"a".repeat(40)}/website`,
+  ];
+  for (const name of invalid) {
+    it(`refuse ${JSON.stringify(name)?.slice(0, 40)}`, () => assert.equal(isValidRepoFullName(name), false));
+  }
+
+  it("le clone géré vit sous <home>/repos/<owner>/<name>, en minuscules", () => {
+    const dir = managedCheckoutDir("/home/u/.taskforce-runner", "Miche1-Pierre/Runner-Sandbox").replaceAll("\\", "/");
+    assert.equal(dir, "/home/u/.taskforce-runner/repos/miche1-pierre/runner-sandbox");
+  });
+
+  it("un dépôt déclaré dans la configuration prime sur le clone automatique", async () => {
+    const declared = { path: "/work/site", baseBranch: "develop", setup: [] };
+    assert.deepEqual(await resolveRepo({ "acme/website": declared }, true, "/tmp/h", "Acme/Website"), declared);
+  });
+
+  it("clone automatique désactivé et dépôt non déclaré : erreur claire, rien n'est cloné", async () => {
+    await assert.rejects(resolveRepo({}, false, "/tmp/h", "acme/website"), /autoClone is off/);
+  });
+
+  it("nom de dépôt invalide : refusé avant toute commande", async () => {
+    await assert.rejects(resolveRepo({}, true, "/tmp/h", "acme/../../etc"), /not a valid GitHub/);
+  });
+});
+
 describe("parseEnvFile", () => {
   it("lit CLE=valeur, ignore commentaires et lignes vides, retire les guillemets", () => {
     const env = parseEnvFile('# commentaire\nA=1\n\nB = "deux mots"\nC=\'x=y\'\nsans_egal\n=vide\n');
@@ -54,6 +89,7 @@ describe("parseRunnerConfigFile", () => {
     assert.equal(cfg.agent.attribution, false);
     assert.equal(cfg.agent.command, "claude");
     assert.equal(cfg.keepWorktree, false);
+    assert.equal(cfg.autoClone, true); // rien à configurer : le dépôt du projet est cloné à la demande
     assert.deepEqual(cfg.repos, {});
   });
 

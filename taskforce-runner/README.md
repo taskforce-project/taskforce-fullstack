@@ -47,8 +47,11 @@ cd ../taskforce-runner && npm install
    `delivery-runner`, propriétaire signé dans le jeton) et écrit `taskforce-runner/.env`. Le secret n'est
    jamais affiché. Le runner ne réclamera que les tâches déléguées **par ce compte**.
 
-2. **Dépôts**. Copier `runner.config.example.json` en `runner.config.json` et y déclarer, pour chaque dépôt
-   lié à un projet TaskForce (onglet repository du projet), son checkout local.
+2. **Dépôts : rien à déclarer.** Le dépôt se crée ou se lie dans TaskForce, à la création du projet (section
+   « Code repository », GitHub connecté en un clic). À la première tâche, le runner le clone lui-même avec ton
+   `gh` (donc tes droits, dépôts privés compris) dans `~/.taskforce-runner/repos/<owner>/<name>`, puis
+   réutilise ce clone. Déclare un dépôt dans `runner.config.json` seulement pour le faire travailler dans un
+   checkout que tu as déjà, ou pour lui donner des commandes `setup`.
 
 3. **Vérifier**, puis lancer :
 
@@ -63,6 +66,7 @@ cd ../taskforce-runner && npm install
 | Clé | Défaut | Rôle |
 |---|---|---|
 | `repos["owner/name"]` | (aucun) | `path` (absolu), `baseBranch` (`main`), `setup` (commandes avant l'agent, chacune en tableau d'arguments, ex. `[["npm", "ci"]]` : un worktree neuf n'a pas de dépendances). |
+| `autoClone` | `true` | Dépôt non déclaré : cloné à la demande dans le dossier du runner. `false` = seuls les dépôts déclarés sont acceptés. |
 | `pollSeconds` | 5 | Fréquence du claim. |
 | `push` / `openPullRequest` | `true` / `true` | `push: false` : rien ne sort du poste, le travail reste sur une branche locale. |
 | `keepWorktree` | `false` | Garder le worktree après un succès. Un run en échec le garde toujours (seule trace du travail). |

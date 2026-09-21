@@ -12,12 +12,13 @@
  * Options : `--check` (vérifie l'installation, ne réclame rien), `--once` (traite au plus un run puis sort).
  */
 import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 
 import { runAgent } from "./agent.js";
 import { ApiError, TaskforceApi, type Claim, type RunResult } from "./api.js";
-import { loadConfig, type RunnerConfig } from "./config.js";
-import { finalizeCommits, openPullRequest, prepareWorktree, pushBranch, removeWorktree, runSetup, type Worktree } from "./git.js";
+import { loadConfig, type RepoConfig, type RunnerConfig } from "./config.js";
+import { finalizeCommits, openPullRequest, prepareWorktree, pushBranch, removeWorktree, resolveRepo, runSetup, type Worktree } from "./git.js";
 import { log } from "./log.js";
 import { resolveCommand, run } from "./proc.js";
 
@@ -34,14 +35,12 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim)
 
   let result: RunResult;
   let worktree: Worktree | null = null;
-  const repo = claim.repoFullName ? config.repos[claim.repoFullName.toLowerCase()] : undefined;
+  let repo: RepoConfig | null = null;
   try {
     if (!claim.repoFullName) {
-      throw new Error("This project has no linked repository. Link one in the project's repository tab, then delegate again.");
+      throw new Error("This project has no linked repository. Create or link one when creating the project (Code repository), then delegate again.");
     }
-    if (!repo) {
-      throw new Error(`No local checkout is configured for ${claim.repoFullName} on this runner (runner.config.json > repos).`);
-    }
+    repo = await resolveRepo(config.repos, config.autoClone, config.home, claim.repoFullName);
     worktree = await prepareWorktree(repo, claim, config.home);
     log.info(`Worktree prêt : ${worktree.path} (branche ${worktree.branch}, base ${worktree.base})`);
     await runSetup(worktree, repo.setup);
@@ -128,7 +127,11 @@ async function check(config: RunnerConfig, api: TaskforceApi): Promise<boolean> 
   line(existsSync(config.mcpEntry), "Serveur MCP TaskForce", existsSync(config.mcpEntry) ? config.mcpEntry : `${config.mcpEntry} absent : cd taskforce-mcp ; npm install ; npm run build`);
 
   const repos = Object.entries(config.repos);
-  if (repos.length === 0) line(false, "Dépôts", "aucun dans runner.config.json (copier runner.config.example.json)");
+  if (config.autoClone) {
+    console.log(`  [ok] Dépôts : clonés à la demande dans ${join(config.home, "repos")} (rien à configurer)`);
+  } else if (repos.length === 0) {
+    line(false, "Dépôts", "aucun dans runner.config.json, et autoClone est désactivé");
+  }
   for (const [name, repo] of repos) {
     const probe = await run("git", ["-C", repo.path, "rev-parse", "--is-inside-work-tree"]).catch(() => null);
     line(probe !== null && probe.code === 0, `Dépôt ${name}`, `${repo.path} (base ${repo.baseBranch})`);

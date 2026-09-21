@@ -6,6 +6,7 @@
       "setup": [["npm", "ci"]]
     }
   },
+  "autoClone": true,
   "pollSeconds": 5,
   "push": true,
   "openPullRequest": true,

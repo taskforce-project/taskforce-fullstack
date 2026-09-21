@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
 import type { Claim } from "./api.js";
@@ -23,6 +23,55 @@ export interface Worktree {
   path: string;
   branch: string;
   base: string;
+}
+
+/**
+ * `owner/name` tel que GitHub l'accepte. Le nom vient de TaskForce (le dépôt lié au projet) et devient un
+ * chemin sur le disque puis un argument de commande : on n'accepte que la forme stricte, sans « .. ».
+ */
+export function isValidRepoFullName(fullName: string | null | undefined): fullName is string {
+  return typeof fullName === "string"
+    && /^[A-Za-z0-9][A-Za-z0-9-]{0,38}\/[A-Za-z0-9_.-]{1,100}$/.test(fullName)
+    && !fullName.includes("..");
+}
+
+/** Dossier du clone géré par le runner : `<home>/repos/<owner>/<name>` (en minuscules, comme la config). */
+export function managedCheckoutDir(home: string, fullName: string): string {
+  const [owner = "", name = ""] = fullName.toLowerCase().split("/");
+  return join(home, "repos", owner, name);
+}
+
+/** `origin/main` -> `main`. Branche par défaut du dépôt, telle que le clone la connaît. */
+async function defaultBranch(path: string): Promise<string> {
+  const head = await run("git", ["-C", path, "symbolic-ref", "--short", "refs/remotes/origin/HEAD"]);
+  const branch = head.code === 0 ? head.stdout.trim().replace(/^origin\//, "") : "";
+  return /^[\w./-]+$/.test(branch) ? branch : "main";
+}
+
+/**
+ * Le dépôt où travailler pour une tâche : l'entrée de `repos` si la personne en a déclaré une, sinon un
+ * clone que le runner gère lui-même. Dans ce second cas il n'y a <b>rien à configurer</b> : le projet et
+ * son dépôt se créent dans TaskForce, le runner clone à la première tâche avec le `gh` de la personne (donc
+ * ses droits GitHub, dépôts privés compris), puis réutilise ce clone.
+ */
+export async function resolveRepo(
+  repos: Record<string, RepoConfig>, autoClone: boolean, home: string, fullName: string,
+): Promise<RepoConfig> {
+  if (!isValidRepoFullName(fullName)) {
+    throw new Error(`The repository linked to this project is not a valid GitHub "owner/name": ${String(fullName).slice(0, 80)}`);
+  }
+  const declared = repos[fullName.toLowerCase()];
+  if (declared) return declared;
+  if (!autoClone) {
+    throw new Error(`No local checkout is configured for ${fullName} on this runner (runner.config.json > repos), and autoClone is off.`);
+  }
+
+  const path = managedCheckoutDir(home, fullName);
+  if (!existsSync(join(path, ".git"))) {
+    mkdirSync(join(path, ".."), { recursive: true });
+    await runOrThrow("gh", ["repo", "clone", fullName, path], { timeoutMs: 10 * 60_000 });
+  }
+  return { path, baseBranch: await defaultBranch(path), setup: [] };
 }
 
 /**

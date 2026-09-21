@@ -45,6 +45,11 @@ export interface RunnerConfig {
   /** Dossier de travail du runner : worktrees et fichiers temporaires. */
   home: string;
   repos: Record<string, RepoConfig>;
+  /**
+   * Dépôt sans entrée dans `repos` : le runner le clone lui-même (avec le `gh` de la personne) dans son
+   * dossier de travail. Rien à configurer : créer le projet et son dépôt dans TaskForce suffit.
+   */
+  autoClone: boolean;
   pollSeconds: number;
   /** false = rien ne sort du poste : ni push, ni pull request (le travail reste sur une branche locale). */
   push: boolean;
@@ -141,6 +146,7 @@ export function parseRunnerConfigFile(json: unknown): Omit<RunnerConfig, "apiUrl
 
   return {
     repos,
+    autoClone: cfg.autoClone === undefined ? true : cfg.autoClone === true,
     pollSeconds: asPositiveInt(cfg.pollSeconds, 5, "pollSeconds"),
     push: cfg.push === undefined ? true : cfg.push === true,
     openPullRequest: cfg.openPullRequest === undefined ? true : cfg.openPullRequest === true,
