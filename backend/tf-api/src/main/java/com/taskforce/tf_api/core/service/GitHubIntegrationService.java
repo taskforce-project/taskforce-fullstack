@@ -54,6 +54,7 @@ import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.brain.BrainSearchService;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
+import com.taskforce.tf_api.shared.security.SafeReturnPath;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -112,6 +113,16 @@ public class GitHubIntegrationService {
      */
     @Transactional
     public URI buildAuthorizeUrl(String workspaceSlug, User user) {
+        return buildAuthorizeUrl(workspaceSlug, user, null);
+    }
+
+    /**
+     * Variante avec <b>retour fluide</b> : {@code returnTo} est le chemin applicatif où revenir après le
+     * consentement (ex. le dialogue de création de projet, qui se rouvre). Il n'est gardé que s'il est sûr
+     * ({@link SafeReturnPath}) ; sinon le retour se fait sur Settings, comme sans lui.
+     */
+    @Transactional
+    public URI buildAuthorizeUrl(String workspaceSlug, User user, String returnTo) {
         Workspace workspace = workspaceRepository.findBySlug(workspaceSlug)
             .orElseThrow(() -> new ResourceNotFoundException("Workspace not found: " + workspaceSlug));
 
@@ -123,6 +134,7 @@ public class GitHubIntegrationService {
             .workspace(workspace)
             .user(user)
             .expiresAt(LocalDateTime.now().plusMinutes(STATE_TTL_MINUTES))
+            .returnTo(SafeReturnPath.withinWorkspace(returnTo, workspaceSlug))
             .build());
 
         String callbackUrl = apiUrl + "/api/integrations/github/callback";
@@ -173,10 +185,15 @@ public class GitHubIntegrationService {
         integration.setInstalledBy(oauthState.getUser());
         integrationRepository.save(integration);
 
-        // 4. State consommé
+        // 4. State consommé (on lit le chemin de retour avant : il disparaît avec lui)
+        String returnTo = oauthState.getReturnTo();
         oauthStateRepository.delete(oauthState);
 
-        // 5. Redirect to frontend
+        // 5. Redirect to frontend : là d'où la connexion a été lancée, sinon Settings > Integrations.
+        // Le chemin a été validé à l'écriture (relatif, borné au workspace) : ce n'est pas un open redirect.
+        if (returnTo != null && !returnTo.isBlank()) {
+            return frontendUrl + returnTo + (returnTo.contains("?") ? "&" : "?") + "github=connected";
+        }
         return frontendUrl + "/" + workspace.getSlug() + "/settings?section=integrations&github=connected";
     }
 
