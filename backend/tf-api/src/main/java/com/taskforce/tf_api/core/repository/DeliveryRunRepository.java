@@ -29,9 +29,14 @@ public interface DeliveryRunRepository extends JpaRepository<DeliveryRun, Long> 
     /**
      * Runs de délégation des projets donnés (issue → projet), les plus récents d'abord. Sert la vue
      * « workflow » au niveau workspace : on borne aux projets que l'utilisateur peut voir (calculés en
-     * amont) pour ne jamais fuiter les runs d'un projet privé.
+     * amont) pour ne jamais fuiter les runs d'un projet privé. L'issue et son projet sont chargés dans la
+     * même requête : la réponse porte leur clé, leur titre et leur projet, et sans cela chaque run
+     * coûterait une requête de plus (jusqu'à 200 runs par appel).
      */
-    @Query("SELECT r FROM DeliveryRun r WHERE r.issue.project.id IN :projectIds ORDER BY r.updatedAt DESC")
+    @Query("""
+        SELECT r FROM DeliveryRun r JOIN FETCH r.issue i JOIN FETCH i.project p
+        WHERE p.id IN :projectIds ORDER BY r.updatedAt DESC
+        """)
     List<DeliveryRun> findByProjectIds(@Param("projectIds") Collection<Long> projectIds, Pageable pageable);
 
     // =========================================================================
