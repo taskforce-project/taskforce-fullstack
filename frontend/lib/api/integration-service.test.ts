@@ -73,6 +73,20 @@ describe('integration-service', () => {
       expect(apiClient.get).toHaveBeenCalledWith(INTEGRATION_ROUTES.GITHUB_CONNECT(SLUG));
       expect(window.location.href).toBe(url);
     });
+
+    it('avec returnTo : le chemin de retour part en paramètre (le dialogue de création se rouvrira)', async () => {
+      const url = 'https://github.com/login/oauth/authorize?client_id=x&state=def';
+      vi.mocked(apiClient.get).mockResolvedValue({ data: { data: { authorizeUrl: url } } });
+      window.location.href = '';
+
+      await connectGitHub(SLUG, `/${SLUG}?newProject=repo`);
+
+      expect(apiClient.get).toHaveBeenCalledWith(
+        INTEGRATION_ROUTES.GITHUB_CONNECT(SLUG),
+        { params: { returnTo: `/${SLUG}?newProject=repo` } },
+      );
+      expect(window.location.href).toBe(url);
+    });
   });
 
   describe('disconnectGitHub', () => {

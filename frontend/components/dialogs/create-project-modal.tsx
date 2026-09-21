@@ -21,6 +21,21 @@ export function CreateProjectModal() {
   const openCreateProject = useCreateProjectStore((s) => s.openCreateProject)
   const closeCreateProject = useCreateProjectStore((s) => s.closeCreateProject)
 
+  // Même retour fluide pour GitHub connecté depuis la section « dépôt de code » : le callback renvoie sur
+  // `…?newProject=repo&github=connected`, on rouvre la création là où elle en était (brouillon restauré).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get("newProject") !== "repo") return
+    if (params.get("github") === "connected") {
+      openCreateProject({ repoSetup: true })
+      toast.success("GitHub connected - create or link the repository")
+    }
+    params.delete("newProject")
+    params.delete("github")
+    const q = params.toString()
+    window.history.replaceState({}, "", window.location.pathname + (q ? `?${q}` : ""))
+  }, [openCreateProject])
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const src = params.get("import")
