@@ -113,6 +113,21 @@ laisse un commit. Il suffit de le désigner dans `agent.command`. Jamais en prod
 npm test          # tests unitaires (nommage de branche, config, frontière d'outils, lecture du résultat)
 ```
 
+## Dépannage
+
+- **`claude` : « The specified executable is not a valid application for this OS platform »** (Windows, juste
+  après `npm install -g @anthropic-ai/claude-code`). Le paquet npm n'est qu'une enveloppe : `bin/claude.exe` y
+  est un fichier bouche-trou que le script d'installation remplace par le binaire natif (~240 Mo), livré dans un
+  paquet optionnel. Si ce gros paquet n'est pas arrivé (réseau lent, téléchargement coupé), le bouche-trou reste
+  en place. Relancer `npm install -g @anthropic-ai/claude-code` suffit ; `claude --version` doit répondre un
+  numéro de version. En dernier recours, l'installeur natif d'Anthropic ne passe pas par npm.
+- **`npm run check`** dit quel maillon manque : jeton machine, `git`, `gh`, `claude`, serveur MCP, dépôts.
+- **Versions.** Les options que le runner passe à `claude -p` ont été vérifiées contre Claude Code 2.1.278
+  (`--max-turns` n'apparaît plus dans `claude --help`, mais reste acceptée ; une option inconnue, elle, est
+  refusée net).
+- Un run en échec garde son worktree dans `~/.taskforce-runner/worktrees/run-<id>` : c'est la trace de ce que
+  l'agent a fait. Le message d'échec s'affiche dans le panneau « AI Workflows » de TaskForce.
+
 ## Révoquer un runner
 
 Désactiver ou supprimer le client `tf-runner-<nom>` dans Keycloak : plus aucun jeton n'est émis.
