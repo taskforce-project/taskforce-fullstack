@@ -107,7 +107,7 @@ app.post("/mcp", async (req: Request, res: Response) => {
   };
 
   const tf = new TaskforceClient(bearer ? { token: bearer } : {});
-  const server = new McpServer({ name: "taskforce-mcp", version: "0.2.0" });
+  const server = new McpServer({ name: "taskforce-mcp", version: "0.3.0" });
   registerTaskforceTools(server, tf);
 
   await server.connect(transport);

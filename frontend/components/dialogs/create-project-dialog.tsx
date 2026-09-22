@@ -26,6 +26,7 @@ import {
   getIntegrationCatalog,
   importMcpProject,
   startMcpOAuth,
+  connectGitHub,
   getGitHubStatus,
   getGitHubRepos,
   type ConnectorView,
@@ -54,12 +55,38 @@ const PM_CATEGORY = "PROJECT_MANAGEMENT"
 // inline pour les outils pas encore branchés.
 // ---------------------------------------------------------------------------
 
+/** Brouillon mis de côté le temps d'un aller-retour chez GitHub (la page est quittée : l'état React est perdu). */
+const DRAFT_KEY = "tf-create-project-draft"
+interface ProjectDraft { name: string; identifier: string; description: string }
+
+function saveProjectDraft(draft: ProjectDraft) {
+  try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft)) } catch { /* stockage indisponible : on perd le brouillon, pas la connexion */ }
+}
+
+function takeProjectDraft(): ProjectDraft | null {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_KEY)
+    sessionStorage.removeItem(DRAFT_KEY)
+    if (!raw) return null
+    const d = JSON.parse(raw) as Partial<ProjectDraft>
+    return { name: String(d.name ?? ""), identifier: String(d.identifier ?? ""), description: String(d.description ?? "") }
+  } catch {
+    return null
+  }
+}
+
+/** « Mobile App v2 » -> « mobile-app-v2 » : nom de dépôt proposé à partir du nom du projet. */
+export function toRepoName(projectName: string): string {
+  return projectName.toLowerCase().replaceAll(/[^a-z0-9._-]+/g, "-").replaceAll(/^-+|-+$/g, "").slice(0, 100)
+}
+
 export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogProps) {
   const router = useRouter()
   const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug)
   const createProject = useProjectStore((s) => s.createProject)
   const linkRepo = useProjectStore((s) => s.linkRepo)
   const preselectImportSource = useCreateProjectStore((s) => s.importSource)
+  const repoSetup = useCreateProjectStore((s) => s.repoSetup)
 
   const [mode, setMode] = useState<Mode>("blank")
   const [isLoading, setIsLoading] = useState(false)
@@ -80,6 +107,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
   const [githubConnected, setGithubConnected] = useState<boolean | null>(null)
   const [githubRepos, setGithubRepos] = useState<GitHubRepo[]>([])
   const [reposLoading, setReposLoading] = useState(false)
+  const [connectingGithub, setConnectingGithub] = useState(false)
 
   // -- Mode « import » --
   const [tools, setTools] = useState<ConnectorView[]>([])
@@ -112,6 +140,21 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
       setImportSource(preselectImportSource)
     }
   }, [open, preselectImportSource])
+
+  // Retour de la connexion GitHub lancée d'ici : on reprend la création là où elle en était (le brouillon
+  // a été mis de côté avant de quitter la page), dépôt à créer présélectionné.
+  useEffect(() => {
+    if (!open || !repoSetup) return
+    setMode("blank")
+    setRepoMode("create")
+    const draft = takeProjectDraft()
+    if (draft) {
+      setName(draft.name)
+      setIdentifier(draft.identifier)
+      setDescription(draft.description)
+      setRepoName(toRepoName(draft.name))
+    }
+  }, [open, repoSetup])
 
   // Statut GitHub (connecté ?) à l'ouverture du mode vierge : conditionne la section « dépôt de code ».
   useEffect(() => {
@@ -198,6 +241,23 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
       toast.error("Something went wrong while creating the project")
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  /**
+   * Connexion GitHub 1-clic depuis la section « dépôt de code » : on met le brouillon de côté, on part
+   * chez GitHub, et le callback rouvre ce dialogue (`?newProject=repo`) au lieu de finir dans Settings.
+   */
+  async function handleConnectGithub() {
+    if (!slug) return
+    setConnectingGithub(true)
+    saveProjectDraft({ name, identifier, description })
+    try {
+      await connectGitHub(slug, `/${slug}?newProject=repo`) // la page quitte vers le consentement GitHub
+    } catch {
+      // 403 : réservé aux OWNER/ADMIN du workspace (ou plan sans intégrations). Le brouillon reste à l'écran.
+      toast.error("Couldn't start the GitHub connection - it is reserved to workspace owners and admins")
+      setConnectingGithub(false)
     }
   }
 
@@ -338,13 +398,18 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
               </label>
 
               {githubConnected === false ? (
-                <p className="rounded-md border border-border bg-muted/30 px-3 py-2.5 text-xs text-muted-foreground">
-                  Connect GitHub in{" "}
-                  <a href={`/${slug}/settings?section=integrations`} className="text-primary hover:underline">
-                    Settings → Integrations
-                  </a>{" "}
-                  to create or link a repository for this project.
-                </p>
+                <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/30 px-3 py-2.5">
+                  <p className="text-xs text-muted-foreground">
+                    Connect GitHub to create or link a repository for this project. You will come right back here.
+                  </p>
+                  <Button
+                    type="button" size="sm" variant="outline" className="shrink-0 gap-1.5"
+                    onClick={handleConnectGithub} disabled={connectingGithub}
+                  >
+                    {connectingGithub ? <Loader2 className="size-3.5 animate-spin" /> : <Github className="size-3.5" />}
+                    Connect GitHub
+                  </Button>
+                </div>
               ) : (
                 <>
                   <div className="inline-flex w-fit rounded-md border border-border p-0.5 text-xs">

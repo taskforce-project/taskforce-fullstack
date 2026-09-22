@@ -5,7 +5,7 @@ Serveur **MCP** (Model Context Protocol) qui expose **TaskForce** à Claude et �
 Idée : faire de TaskForce **une étape de réflexion / de process** pour l'agent — une source d'info
 (Brain OS) et de process (workflows, règles) à consulter **avant d'agir**, dans TaskForce ou ailleurs.
 
-## Tools exposés (v0.2 — 10 tools : lecture + écriture)
+## Tools exposés (v0.3 - 12 tools : lecture + écriture)
 
 **Contexte / lecture** — le « cerveau » à consulter avant d'agir :
 
@@ -16,6 +16,7 @@ Idée : faire de TaskForce **une étape de réflexion / de process** pour l'agen
 | `taskforce_workspace_kpis` | KPIs réels du workspace (santé, vélocité, à risque). |
 | `taskforce_list_projects` | Liste des projets. |
 | `taskforce_list_issues` | Issues d'un projet. |
+| `taskforce_get_issue` | **Une** issue avec son contexte : description complète + fil de commentaires. |
 | `taskforce_list_issue_statuses` | Statuts d'un projet (pour résoudre `statusId`). |
 | `taskforce_list_my_issues` | Issues assignées à l'utilisateur du token. |
 
@@ -25,7 +26,8 @@ Idée : faire de TaskForce **une étape de réflexion / de process** pour l'agen
 |---|---|
 | `taskforce_create_issue` | Crée une issue (titre, priorité, assigné, échéance). |
 | `taskforce_update_issue` | Met à jour une issue (statut, assigné, priorité, titre…). |
-| `taskforce_smart_assign` | Recommande le meilleur assigné (IA) — à appliquer via `update_issue`. |
+| `taskforce_add_comment` | Commente une issue (question bloquante, hypothèse prise, point à vérifier en revue). |
+| `taskforce_smart_assign` | Recommande le meilleur assigné (IA) - à appliquer via `update_issue`. |
 
 Deux transports, mêmes tools : **stdio** (local, `npm start`) et **Streamable HTTP** (remote/SaaS,
 `npm run start:http`).
@@ -96,6 +98,21 @@ Vérif end-to-end (serveur HTTP + backend up) :
 MCP_HTTP_URL=http://127.0.0.1:3000/mcp npx tsx src/verify-http.ts
 # pass-through : ajouter MCP_VERIFY_BEARER=<token>
 ```
+
+## Session déléguée (runner local, ADR-013)
+
+Lancé par `taskforce-runner` pour une tâche déléguée à Claude Code, le serveur reçoit deux variables :
+
+| Variable | Rôle |
+|---|---|
+| `TASKFORCE_TOKEN` | Jeton **machine** du runner (compte de service Keycloak), de courte durée. |
+| `TASKFORCE_DELIVERY_RUN` | Id du run : envoyé dans l'en-tête `X-TaskForce-Delivery-Run` à chaque appel. |
+
+Le backend évalue alors chaque appel **au nom de la personne qui a délégué la tâche** (ses droits sont le
+plafond), dans un périmètre resserré : le workspace du run en lecture (projets, Brain OS, mes issues,
+analytics), les issues **du projet du run** en écriture, **jamais de suppression**. Hors périmètre, l'API
+répond `403` et l'outil renvoie le message tel quel (ex. `taskforce_ask_cortex`, qui peut écrire une note
+de workspace, est refusé dans une session déléguée).
 
 ## Auth
 

@@ -121,6 +121,52 @@ class DeliveryRunnerTest {
     }
 
     @Test
+    @DisplayName("provider « pull » (runner local) : rien n'est dispatché ni écrit, le run reste QUEUED")
+    void pull_based_provider_leaves_run_queued() {
+        Issue issue = mock(Issue.class);
+        DeliveryRun run = DeliveryRun.builder()
+            .id(30L).issue(issue).providerKey("claude-code").status(DeliveryRunStatus.QUEUED).build();
+        when(runRepository.findById(30L)).thenReturn(Optional.of(run));
+        DeliveryAgentProvider pull = mock(DeliveryAgentProvider.class);
+        when(pull.pullBased()).thenReturn(true);
+        when(registry.get("claude-code")).thenReturn(pull);
+
+        runner.execute(30L);
+
+        assertThat(run.getStatus()).isEqualTo(DeliveryRunStatus.QUEUED);
+        verify(pull, never()).dispatch(any());
+        // Aucune sauvegarde : elle pourrait écraser un claim arrivé entre-temps.
+        verify(runRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("complete : résultat poussé par le runner -> DONE, issue déplacée ; ignoré si déjà terminé")
+    void complete_applies_pushed_result_once() {
+        Project project = mock(Project.class);
+        when(project.getId()).thenReturn(300L);
+        Issue issue = mock(Issue.class);
+        when(issue.getProject()).thenReturn(project);
+        DeliveryRun run = DeliveryRun.builder()
+            .id(31L).issue(issue).providerKey("claude-code").status(DeliveryRunStatus.RUNNING).build();
+        when(runRepository.findById(31L)).thenReturn(Optional.of(run));
+        when(issueStatusRepository.findByProjectIdAndName(300L, "In review by AI")).thenReturn(Optional.empty());
+        when(issueStatusRepository.findByProjectIdOrderByPosition(300L)).thenReturn(List.of());
+        when(issueStatusRepository.save(any(IssueStatus.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        runner.complete(31L, new DeliveryPoll(DeliveryRunStatus.DONE, "PR opened", "https://github.com/o/r/pull/1", null));
+
+        assertThat(run.getStatus()).isEqualTo(DeliveryRunStatus.DONE);
+        assertThat(run.getSummary()).isEqualTo("PR opened");
+        assertThat(run.getResultUrl()).isEqualTo("https://github.com/o/r/pull/1");
+        verify(issueRepository).save(issue);
+
+        // Second résultat sur un run terminé : ignoré (le premier fait foi).
+        runner.complete(31L, new DeliveryPoll(DeliveryRunStatus.FAILED, null, null, "late failure"));
+        assertThat(run.getStatus()).isEqualTo(DeliveryRunStatus.DONE);
+        assertThat(run.getError()).isNull();
+    }
+
+    @Test
     @DisplayName("run introuvable : no-op silencieux")
     void missing_run_is_noop() {
         when(runRepository.findById(99L)).thenReturn(Optional.empty());

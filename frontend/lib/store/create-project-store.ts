@@ -5,7 +5,9 @@ interface CreateProjectUiState {
   open: boolean
   /** Si défini à l'ouverture : ouvrir en mode « import », avec cette source (connectorKey) présélectionnée. */
   importSource: string | null
-  openCreateProject: (opts?: { importSource?: string }) => void
+  /** À l'ouverture : reprendre la création là où elle en était, section « dépôt de code » prête (retour GitHub). */
+  repoSetup: boolean
+  openCreateProject: (opts?: { importSource?: string; repoSetup?: boolean }) => void
   closeCreateProject: () => void
 }
 
@@ -19,11 +21,14 @@ interface CreateProjectUiState {
  * changement de page - donc le clignotement.</p>
  *
  * <p>`importSource` sert au <b>retour OAuth fluide</b> (TF-MCP-04) : après avoir connecté un outil
- * depuis le wizard, le callback renvoie sur `…?import=X` et le modal se rouvre en mode import sur X.</p>
+ * depuis le wizard, le callback renvoie sur `…?import=X` et le modal se rouvre en mode import sur X.
+ * `repoSetup` fait de même pour <b>GitHub</b> connecté depuis la section « dépôt de code » : le callback
+ * renvoie sur `…?newProject=repo` et le modal se rouvre sur la création, dépôt à créer présélectionné.</p>
  */
 export const useCreateProjectStore = create<CreateProjectUiState>((set) => ({
   open: false,
   importSource: null,
-  openCreateProject: (opts) => set({ open: true, importSource: opts?.importSource ?? null }),
-  closeCreateProject: () => set({ open: false, importSource: null }),
+  repoSetup: false,
+  openCreateProject: (opts) => set({ open: true, importSource: opts?.importSource ?? null, repoSetup: opts?.repoSetup ?? false }),
+  closeCreateProject: () => set({ open: false, importSource: null, repoSetup: false }),
 }))

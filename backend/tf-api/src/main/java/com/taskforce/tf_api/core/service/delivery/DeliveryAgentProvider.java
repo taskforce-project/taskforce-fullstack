@@ -30,6 +30,15 @@ public interface DeliveryAgentProvider {
     List<String> models();
 
     /**
+     * {@code true} pour un provider <b>« pull »</b> : l'exécution a lieu sur une machine que le backend ne
+     * peut pas joindre (runner local, ADR-013). Le run n'est alors pas dispatché : il reste {@code QUEUED}
+     * jusqu'à ce qu'un runner le réclame, puis le runner poste lui-même le résultat.
+     */
+    default boolean pullBased() {
+        return false;
+    }
+
+    /**
      * Lance le run dans le cloud du provider (sous le compte de l'utilisateur, cf. spec §D2) et renvoie
      * un handle. Défaut : non exécutable (les providers réels câblent leur dispatch en slice 3+).
      */

@@ -13,6 +13,7 @@ import com.taskforce.tf_api.core.dto.response.DeliveryRunResponse;
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
 import com.taskforce.tf_api.core.model.DeliveryRun;
 import com.taskforce.tf_api.core.model.Issue;
+import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.DeliveryRunRepository;
 import com.taskforce.tf_api.core.repository.IntegrationRepository;
@@ -71,6 +72,40 @@ class DeliveryServiceRunsTest {
         assertThat(res.get(0).issueId()).isEqualTo(42L);
         assertThat(res.get(0).providerKey()).isEqualTo("claude-code");
         assertThat(res.get(0).status()).isEqualTo("RUNNING");
+        // Issue sans projet chargé (cas dégradé) : pas de clé ni de projet, mais jamais d'exception.
+        assertThat(res.get(0).issueKey()).isNull();
+        assertThat(res.get(0).projectId()).isNull();
+    }
+
+    @Test
+    @DisplayName("listRuns : le run porte la clé, le titre et le projet de l'issue (lisible et cliquable)")
+    void listRuns_carries_issue_key_title_and_project() {
+        Workspace ws = mock(Workspace.class);
+        when(ws.getId()).thenReturn(5L);
+        when(access.resolveAndAuthorize("acme", 1L)).thenReturn(ws);
+        when(visibilityGuard.viewableProjectIds(5L, 1L)).thenReturn(List.of(3L));
+
+        Project project = mock(Project.class);
+        when(project.getId()).thenReturn(3L);
+        when(project.getName()).thenReturn("Website");
+        when(project.getIdentifier()).thenReturn("WEB");
+        Issue issue = mock(Issue.class);
+        when(issue.getId()).thenReturn(42L);
+        when(issue.getSequenceNumber()).thenReturn(12);
+        when(issue.getTitle()).thenReturn("Fix the footer links");
+        when(issue.getProject()).thenReturn(project);
+        DeliveryRun run = DeliveryRun.builder()
+            .id(9L).issue(issue).providerKey("claude-code").status(DeliveryRunStatus.DONE)
+            .summary("Done.").resultUrl("https://github.com/acme/website/pull/9").build();
+        when(runRepository.findByProjectIds(eq(List.of(3L)), any(Pageable.class))).thenReturn(List.of(run));
+
+        DeliveryRunResponse res = service.listRuns("acme", 1L).get(0);
+
+        assertThat(res.issueKey()).isEqualTo("WEB-12");
+        assertThat(res.issueTitle()).isEqualTo("Fix the footer links");
+        assertThat(res.projectId()).isEqualTo(3L);
+        assertThat(res.projectName()).isEqualTo("Website");
+        assertThat(res.resultUrl()).isEqualTo("https://github.com/acme/website/pull/9");
     }
 
     @Test

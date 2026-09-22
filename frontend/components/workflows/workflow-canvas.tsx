@@ -39,6 +39,7 @@ interface FlowData extends Record<string, unknown> {
   tone: Tone
   status?: string
   ref?: number // id metier (job/issue) pour la navigation
+  projectRef?: number | null // projet de l'issue d'un run : requis par le lien profond du board
 }
 
 const KIND_ICON = { job: Layers, task: GitBranch, agent: Bot, run: FileText } as const
@@ -154,7 +155,8 @@ function buildFlow({ jobs, runs, providers }: BuildInput): { nodes: Node<FlowDat
     runs.forEach((run, i) => {
       const rid = `run-${run.id}`
       const tone = toneOf(run.status)
-      nodes.push({ id: rid, type: "flow", position: { x: COL_W * 0.4, y: baseY + i * ROW_H }, data: { kind: "run", title: `Issue #${run.issueId}`, sub: run.model ?? undefined, tone, status: run.status, ref: run.issueId } })
+      const title = [run.issueKey, run.issueTitle].filter(Boolean).join(" · ") || `Issue #${run.issueId}`
+      nodes.push({ id: rid, type: "flow", position: { x: COL_W * 0.4, y: baseY + i * ROW_H }, data: { kind: "run", title, sub: run.model ?? undefined, tone, status: run.status, ref: run.issueId, projectRef: run.projectId } })
       edges.push(edge(`e-${rid}`, rid, `agent-${run.providerKey}`, tone))
     })
   }
@@ -181,7 +183,7 @@ interface WorkflowCanvasProps {
   providers: DeliveryProvider[]
   /** Clic sur un noeud portant un id metier : job/run -> ouvre la ressource (projet Intelligence / issue). */
   onSelectProject?: (projectId: number) => void
-  onSelectIssue?: (issueId: number) => void
+  onSelectIssue?: (issueId: number, projectId: number) => void
 }
 
 /**
@@ -195,7 +197,7 @@ export function WorkflowCanvas({ jobs, runs, providers, onSelectProject, onSelec
 
   const onNodeClick = useCallback((_: unknown, node: Node<FlowData>) => {
     if (node.data.kind === "job" && node.data.ref != null) onSelectProject?.(node.data.ref)
-    else if (node.data.kind === "run" && node.data.ref != null) onSelectIssue?.(node.data.ref)
+    else if (node.data.kind === "run" && node.data.ref != null && node.data.projectRef != null) onSelectIssue?.(node.data.ref, node.data.projectRef)
   }, [onSelectProject, onSelectIssue])
 
   if (nodes.length === 0) {

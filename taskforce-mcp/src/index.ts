@@ -16,7 +16,7 @@ import { registerTaskforceTools, TOOL_COUNT } from "./tools.js";
 
 async function main(): Promise<void> {
   const tf = new TaskforceClient();
-  const server = new McpServer({ name: "taskforce-mcp", version: "0.2.0" });
+  const server = new McpServer({ name: "taskforce-mcp", version: "0.3.0" });
   registerTaskforceTools(server, tf);
 
   const transport = new StdioServerTransport();
@@ -24,8 +24,9 @@ async function main(): Promise<void> {
   // stderr : ne pas polluer stdout (réservé au protocole MCP).
   console.error(
     `taskforce-mcp opérationnel (stdio) — ${TOOL_COUNT} tools (lecture + écriture) : ask_cortex, ` +
-    "brain_search, workspace_kpis, list_projects, list_issues, list_issue_statuses, list_my_issues, " +
-    "create_issue, update_issue, smart_assign",
+    "brain_search, workspace_kpis, list_projects, list_issues, get_issue, list_issue_statuses, " +
+    "list_my_issues, create_issue, update_issue, add_comment, smart_assign" +
+    (process.env.TASKFORCE_DELIVERY_RUN ? ` [session déléguée : run ${process.env.TASKFORCE_DELIVERY_RUN}]` : ""),
   );
 }
 

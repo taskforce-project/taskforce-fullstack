@@ -1,5 +1,7 @@
 package com.taskforce.tf_api.shared.security;
 
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -14,6 +16,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 
@@ -35,6 +38,13 @@ public class SecurityConfig {
 
     @Value("${keycloak.realm:taskforce}")
     private String keycloakRealm;
+
+    /**
+     * Filtres à exécuter juste après l'authentification du bearer (cf. {@link PostAuthenticationFilter}).
+     * Vide tant qu'aucune fonctionnalité n'en déclare : la chaîne protégée est alors inchangée.
+     */
+    @Autowired
+    private ObjectProvider<PostAuthenticationFilter> postAuthenticationFilters;
 
     /**
      * JwtDecoder RS256 adossé au JWK Set de Keycloak : valide les access tokens <b>émis par
@@ -194,6 +204,11 @@ public class SecurityConfig {
             .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(jwtDecoder())))
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+
+        // Après le bearer, avant l'autorisation : le principal est connu, et peut encore être resserré
+        // (session déléguée d'un runner, ADR-013).
+        postAuthenticationFilters.orderedStream()
+            .forEach(filter -> http.addFilterAfter(filter, BearerTokenAuthenticationFilter.class));
 
         return http.build();
     }

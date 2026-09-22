@@ -16,7 +16,8 @@ vi.mock('../api/delivery-service', () => ({
 
 function makeRun(overrides: Partial<DeliveryRun> = {}): DeliveryRun {
   return {
-    id: 1, issueId: 5, providerKey: 'stub', model: 'stub', status: 'QUEUED',
+    id: 1, issueId: 5, issueKey: 'WEB-5', issueTitle: 'Fix the footer', projectId: 12, projectName: 'Website',
+    providerKey: 'stub', model: 'stub', status: 'QUEUED',
     summary: null, resultUrl: null, error: null, startedById: 7, createdAt: null, updatedAt: null,
     ...overrides,
   };

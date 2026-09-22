@@ -79,6 +79,18 @@ class GitHubIntegrationServiceIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @DisplayName("buildAuthorizeUrl garde un chemin de retour sûr, écarte tout le reste (anti open-redirect)")
+    void should_keep_only_a_safe_return_path() {
+        service.buildAuthorizeUrl(SLUG, owner, "/" + SLUG + "?newProject=repo");
+        service.buildAuthorizeUrl(SLUG, owner, "https://evil.example/" + SLUG);
+        service.buildAuthorizeUrl(SLUG, owner, "/another-workspace/projects");
+
+        assertThat(oauthStateRepository.findAll())
+            .extracting(com.taskforce.tf_api.core.model.OAuthState::getReturnTo)
+            .containsExactlyInAnyOrder("/" + SLUG + "?newProject=repo", null, null);
+    }
+
+    @Test
     @DisplayName("getStatus = déconnecté sans intégration ; disconnect est idempotent")
     void should_report_disconnected_and_disconnect() {
         assertThat(service.getStatus(SLUG).connected()).isFalse();
@@ -188,6 +200,38 @@ class GitHubIntegrationServiceIntegrationTest extends AbstractIntegrationTest {
         var status = service.getStatus(SLUG);
         assertThat(status.connected()).isTrue();
         assertThat(status.meta()).containsEntry("login", "octocat");
+    }
+
+    @Test
+    @DisplayName("handleCallback renvoie là d'où la connexion a été lancée quand un chemin de retour a été gardé")
+    void handle_callback_returns_to_the_caller() {
+        org.mockito.Mockito.doReturn(org.springframework.http.ResponseEntity.ok(
+                java.util.Map.of("access_token", "gho_abc")))
+            .when(restTemplate).exchange(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.eq(org.springframework.http.HttpMethod.POST),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(org.springframework.core.ParameterizedTypeReference.class));
+        org.mockito.Mockito.doReturn(org.springframework.http.ResponseEntity.ok(
+                java.util.Map.of("login", "octocat", "avatar_url", "https://gh/avatar.png")))
+            .when(restTemplate).exchange(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.eq(org.springframework.http.HttpMethod.GET),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(org.springframework.core.ParameterizedTypeReference.class));
+        var ws = workspaceRepository.findBySlug(SLUG).orElseThrow();
+        String state = oauthStateRepository.save(com.taskforce.tf_api.core.model.OAuthState.builder()
+            .state("st-" + java.util.UUID.randomUUID())
+            .provider(com.taskforce.tf_api.core.enums.IntegrationProvider.GITHUB)
+            .workspace(ws).user(owner)
+            .expiresAt(java.time.LocalDateTime.now().plusMinutes(5))
+            .returnTo("/" + SLUG + "?newProject=repo")
+            .build()).getState();
+
+        String redirect = service.handleCallback("the-code", state);
+
+        // Retour sur le dialogue de création de projet, pas sur Settings ; le drapeau s'ajoute avec « & ».
+        assertThat(redirect).endsWith("/" + SLUG + "?newProject=repo&github=connected");
+        assertThat(redirect).doesNotContain("/settings");
+        assertThat(service.getStatus(SLUG).connected()).isTrue();
     }
 
     @Test

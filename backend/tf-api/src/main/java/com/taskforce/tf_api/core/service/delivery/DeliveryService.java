@@ -14,6 +14,7 @@ import com.taskforce.tf_api.core.enums.IntegrationProvider;
 import com.taskforce.tf_api.core.model.DeliveryRun;
 import com.taskforce.tf_api.core.model.Integration;
 import com.taskforce.tf_api.core.model.Issue;
+import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.DeliveryRunRepository;
@@ -160,9 +161,18 @@ public class DeliveryService {
 
     /** Mappe le run en DTO DANS la transaction (les accès paresseux issue/startedBy y sont sûrs). */
     private DeliveryRunResponse toResponse(DeliveryRun r) {
+        Issue issue = r.getIssue();
+        Project project = issue.getProject();
+        String issueKey = (project != null && issue.getSequenceNumber() != null)
+            ? project.getIdentifier() + "-" + issue.getSequenceNumber()
+            : null;
         return new DeliveryRunResponse(
             r.getId(),
-            r.getIssue().getId(),
+            issue.getId(),
+            issueKey,
+            issue.getTitle(),
+            project != null ? project.getId() : null,
+            project != null ? project.getName() : null,
             r.getProviderKey(),
             r.getModel(),
             r.getStatus().name(),

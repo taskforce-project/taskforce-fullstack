@@ -58,6 +58,13 @@ public class DeliveryRunner {
             if (provider == null) {
                 throw new IllegalStateException("Provider inconnu : " + run.getProviderKey());
             }
+            if (provider.pullBased()) {
+                // Runner local (ADR-013) : rien à dispatcher, le backend ne peut pas joindre le poste de
+                // l'utilisateur. Le run reste QUEUED ; le claim du runner le passera RUNNING. On n'écrit
+                // RIEN ici : une sauvegarde de cette copie pourrait écraser un claim arrivé entre-temps.
+                log.info("Delivery run {} : en attente d'un runner local (provider {})", runId, run.getProviderKey());
+                return;
+            }
 
             Issue issue = run.getIssue();
             Project project = issue.getProject();
@@ -112,6 +119,23 @@ public class DeliveryRunner {
             failRun(run, e.getMessage());
             log.warn("Delivery run {} (refresh) en échec : {}", runId, e.getMessage());
         }
+    }
+
+    /**
+     * Clôt un run avec un résultat <b>poussé de l'extérieur</b> (runner local, ADR-013) : même traitement
+     * qu'un résultat obtenu par {@code poll}, donc même auto-move de l'issue. Les contrôles d'autorité
+     * (run réclamé par ce runner, encore en cours) sont faits par l'appelant, {@link LocalRunnerService}.
+     * No-op si le run est introuvable ou déjà terminé.
+     */
+    @Transactional
+    public void complete(Long runId, DeliveryPoll result) {
+        DeliveryRun run = runRepository.findById(runId).orElse(null);
+        if (run == null || run.getStatus() == DeliveryRunStatus.DONE || run.getStatus() == DeliveryRunStatus.FAILED) {
+            return;
+        }
+        applyPoll(run, result);
+        runRepository.save(run);
+        log.info("Delivery run {} : {} (résultat poussé, provider {})", runId, run.getStatus(), run.getProviderKey());
     }
 
     /** Applique le résultat d'un poll au run : DONE -> « In review by AI », FAILED -> « Blocked », sinon RUNNING. */

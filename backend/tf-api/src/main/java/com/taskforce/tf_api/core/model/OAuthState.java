@@ -56,4 +56,11 @@ public class OAuthState {
 
     @Column(name = "expires_at", nullable = false)
     private LocalDateTime expiresAt;
+
+    /**
+     * Chemin applicatif relatif où renvoyer l'utilisateur après le consentement (ex. le dialogue de
+     * création de projet qui a lancé la connexion). Validé à l'écriture ; null = retour à Settings.
+     */
+    @Column(name = "return_to", length = 500)
+    private String returnTo;
 }

@@ -27,6 +27,12 @@ export type DeliveryRunStatus = "QUEUED" | "RUNNING" | "DONE" | "FAILED";
 export interface DeliveryRun {
   id: number;
   issueId: number;
+  /** Clé lisible de l'issue (ex. "WEB-12"). Avec le titre et le projet, rend le run lisible hors de sa fiche. */
+  issueKey: string | null;
+  issueTitle: string | null;
+  /** Projet de l'issue : requis par le lien profond `/projects/{projectId}?issue={issueId}`. */
+  projectId: number | null;
+  projectName: string | null;
   providerKey: string;
   model: string | null;
   status: DeliveryRunStatus;
