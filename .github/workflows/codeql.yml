@@ -50,7 +50,7 @@ jobs:
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
-          queries: security-extended   # jeu de requêtes de sécurité élargi
+          config-file: ./.github/codeql/codeql-config.yml   # security-extended + hors-perimetre taskforce-runner
 
       # build-mode: manual → on compile nous-mêmes le backend pour que CodeQL trace le build.
       - name: Compile backend (tf-api)

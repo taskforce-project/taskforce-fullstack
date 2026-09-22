@@ -1,0 +1,13 @@
+# Configuration CodeQL de TaskForce.
+# Objet : analyser l'APPLICATION DÉPLOYÉE (backend Spring Boot + frontend Next.js + landing Astro).
+# `taskforce-runner/` est un OUTIL LOCAL en ligne de commande (paquet npm distinct, exécuté sur le poste
+# de l'opérateur, jamais dans les images Docker ni sur les VM de prod) : il est hors du périmètre de
+# l'analyse de l'application. Son lancement de processus suit le motif éprouvé de cross-spawn (cmd.exe
+# + arguments protégés un à un, seule façon robuste de lancer un `.cmd` sur Windows) et ses entrées sont
+# contrôlées par l'opérateur (config) ou validées (modèle, nom de dépôt). Ce durcissement vit dans le
+# code du runner, pas dans une analyse qui casse sur un faux positif « credential vers son propre auth ».
+name: "TaskForce CodeQL config"
+queries:
+  - uses: security-extended
+paths-ignore:
+  - taskforce-runner
