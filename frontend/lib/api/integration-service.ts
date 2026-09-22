@@ -85,9 +85,15 @@ export async function getGitHubStatus(slug: string): Promise<IntegrationStatus> 
  * Démarre le flux OAuth GitHub : appel XHR authentifié qui renvoie l'URL d'autorisation,
  * puis navigation du navigateur vers celle-ci. (Une navigation directe vers l'endpoint
  * protégé n'enverrait pas le Bearer du localStorage → 401.)
+ *
+ * `returnTo` : chemin applicatif où revenir après le consentement (ex. le dialogue de création de projet,
+ * qui se rouvre) ; validé côté serveur, sinon le retour se fait sur Settings → Integrations.
  */
-export async function connectGitHub(slug: string): Promise<void> {
-  const res = await apiClient.get<{ data: { authorizeUrl: string } }>(INTEGRATION_ROUTES.GITHUB_CONNECT(slug));
+export async function connectGitHub(slug: string, returnTo?: string): Promise<void> {
+  const url = INTEGRATION_ROUTES.GITHUB_CONNECT(slug);
+  const res = returnTo
+    ? await apiClient.get<{ data: { authorizeUrl: string } }>(url, { params: { returnTo } })
+    : await apiClient.get<{ data: { authorizeUrl: string } }>(url);
   window.location.href = res.data.data.authorizeUrl;
 }
 

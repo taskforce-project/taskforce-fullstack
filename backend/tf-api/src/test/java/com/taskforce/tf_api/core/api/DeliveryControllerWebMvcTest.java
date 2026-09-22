@@ -83,7 +83,7 @@ class DeliveryControllerWebMvcTest {
     @DisplayName("POST /delivery/issues/{id}/delegate → 200 + run (QUEUED)")
     void delegate_200() throws Exception {
         var a = auth();
-        var run = new DeliveryRunResponse(1L, 5L, "stub", "stub", "QUEUED",
+        var run = new DeliveryRunResponse(1L, 5L, "WEB-5", "Fix the footer", 12L, "Website", "stub", "stub", "QUEUED",
             null, null, null, 7L, null, null);
         when(deliveryService.delegate(anyString(), anyLong(), anyString(), org.mockito.ArgumentMatchers.any(), anyLong()))
             .thenReturn(run);
@@ -93,7 +93,11 @@ class DeliveryControllerWebMvcTest {
                 .content("{\"providerKey\":\"stub\"}"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.providerKey").value("stub"))
-            .andExpect(jsonPath("$.data.status").value("QUEUED"));
+            .andExpect(jsonPath("$.data.status").value("QUEUED"))
+            // De quoi afficher et ouvrir le run hors de sa fiche d'issue (historique, canvas).
+            .andExpect(jsonPath("$.data.issueKey").value("WEB-5"))
+            .andExpect(jsonPath("$.data.issueTitle").value("Fix the footer"))
+            .andExpect(jsonPath("$.data.projectId").value(12));
     }
 
     @Test

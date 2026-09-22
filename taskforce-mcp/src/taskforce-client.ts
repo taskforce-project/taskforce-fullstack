@@ -6,7 +6,12 @@ export interface TaskforceClientOptions {
   token?: string;
   /** Workspace par défaut pour cette instance (sinon `TASKFORCE_WORKSPACE`). */
   workspace?: string;
+  /** Run de délégation dont cette instance emprunte la session (sinon `TASKFORCE_DELIVERY_RUN`). */
+  deliveryRun?: string;
 }
+
+/** En-tête qui désigne le run d'une session déléguée (cf. `DeliverySessionFilter`, ADR-013). */
+const DELIVERY_RUN_HEADER = "X-TaskForce-Delivery-Run";
 
 /**
  * Client HTTP vers l'API TaskForce (`/api/...`, enveloppe `ApiResponse<T>` → on renvoie `.data`).
@@ -19,12 +24,19 @@ export interface TaskforceClientOptions {
  * En transport **HTTP** (remote/SaaS), on construit une instance **par session** avec le bearer
  * présenté par le client (`new TaskforceClient({ token })`) : chaque appel agit avec l'identité du
  * caller (compte de service en prod, ou token utilisateur).
+ *
+ * **Session déléguée** (runner local, ADR-013) : lancé par le runner avec le jeton machine de celui-ci
+ * (`TASKFORCE_TOKEN`) et `TASKFORCE_DELIVERY_RUN`, le client joint l'en-tête de session à chaque appel.
+ * Le backend évalue alors la requête au nom de la personne qui a délégué la tâche, dans un périmètre
+ * resserré : workspace du run en lecture, issues de son projet en écriture, jamais de suppression. Hors
+ * de ce périmètre l'API répond 403, et l'outil MCP renvoie l'erreur telle quelle.
  */
 export class TaskforceClient {
   private readonly http: AxiosInstance;
   private readonly apiUrl: string;
   private readonly defaultWorkspace: string;
   private readonly staticToken?: string;
+  private readonly deliveryRun?: string;
   private readonly kc: {
     url: string; hostHeader: string; realm: string;
     clientId: string; clientSecret: string; username: string; password: string;
@@ -35,6 +47,7 @@ export class TaskforceClient {
     this.apiUrl = process.env.TASKFORCE_API_URL ?? "http://localhost:8080/api";
     this.defaultWorkspace = opts.workspace?.trim() || process.env.TASKFORCE_WORKSPACE || "taskforce-demo";
     this.staticToken = opts.token || process.env.TASKFORCE_TOKEN || undefined;
+    this.deliveryRun = opts.deliveryRun?.trim() || process.env.TASKFORCE_DELIVERY_RUN?.trim() || undefined;
     this.kc = {
       url: process.env.KEYCLOAK_URL ?? "http://localhost:8180",
       hostHeader: process.env.KEYCLOAK_HOST_HEADER ?? "keycloak:8080",
@@ -91,10 +104,9 @@ export class TaskforceClient {
     params?: Record<string, unknown>,
   ): Promise<T> {
     const token = await this.token();
-    const res = await this.http.request({
-      method, url: path, data, params,
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+    if (this.deliveryRun) headers[DELIVERY_RUN_HEADER] = this.deliveryRun;
+    const res = await this.http.request({ method, url: path, data, params, headers });
     const body = res.data;
     if (body && typeof body === "object" && "data" in body) {
       return (body as { data: T }).data;

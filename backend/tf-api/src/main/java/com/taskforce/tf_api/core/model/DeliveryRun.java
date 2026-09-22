@@ -1,5 +1,7 @@
 package com.taskforce.tf_api.core.model;
 
+import java.time.LocalDateTime;
+
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
 import com.taskforce.tf_api.shared.audit.AuditableEntity;
 
@@ -81,4 +83,16 @@ public class DeliveryRun extends AuditableEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "started_by")
     private User startedBy;
+
+    /** Runner local qui a réclamé le run : client Keycloak du compte de service (ADR-013), sinon null. */
+    @Column(name = "claimed_by", length = 120)
+    private String claimedBy;
+
+    /** Début de la session déléguée du runner (borne sa durée de vie). */
+    @Column(name = "claimed_at")
+    private LocalDateTime claimedAt;
+
+    /** Dernier signe de vie du runner : muet trop longtemps, le run passe en échec. */
+    @Column(name = "heartbeat_at")
+    private LocalDateTime heartbeatAt;
 }

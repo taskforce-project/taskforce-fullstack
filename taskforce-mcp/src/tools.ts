@@ -10,7 +10,7 @@ import { z } from "zod";
 import type { TaskforceClient } from "./taskforce-client.js";
 
 /** Nombre de tools exposés (pour les logs de démarrage). */
-export const TOOL_COUNT = 10;
+export const TOOL_COUNT = 12;
 
 // ── Helpers de sortie MCP ─────────────────────────────────────────────────────
 type ToolResult = {
@@ -27,14 +27,18 @@ function ok(data: unknown): ToolResult {
 }
 
 function fail(error: unknown): ToolResult {
-  const msg = error instanceof Error ? error.message : String(error);
+  let msg = error instanceof Error ? error.message : String(error);
+  // Le message de l'API dit POURQUOI (ex. 403 hors de la session de délégation) ; « status code 403 » seul
+  // laisserait l'agent réessayer à l'aveugle.
+  const apiMessage = (error as { response?: { data?: { message?: unknown } } })?.response?.data?.message;
+  if (typeof apiMessage === "string" && apiMessage.trim()) msg = `${msg} - ${apiMessage.trim()}`;
   return { content: [{ type: "text", text: `Erreur TaskForce : ${msg}` }], isError: true };
 }
 
 const workspaceArg = z.string().optional().describe("Slug du workspace (défaut : env TASKFORCE_WORKSPACE)");
 
 /**
- * Enregistre les 10 tools TaskForce (7 lecture + 3 écriture) sur `server`, câblés sur `tf`.
+ * Enregistre les 12 tools TaskForce (8 lecture + 4 écriture) sur `server`, câblés sur `tf`.
  * `tf` peut être un client « compte de service » (env) ou un client propre à une session HTTP
  * (token pass-through) — les définitions de tools sont identiques dans les deux cas.
  */
@@ -178,6 +182,66 @@ export function registerTaskforceTools(server: McpServer, tf: TaskforceClient): 
           "GET", `/workspaces/${tf.workspace(workspace)}/projects/${projectId}/issues`,
         );
         return ok({ count: issues.length, issues });
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  // ── Une issue avec son contexte (lecture) : le point d'entrée d'un agent délégué ──
+  server.registerTool(
+    "taskforce_get_issue",
+    {
+      title: "Get issue with context",
+      description:
+        "Lit UNE issue avec son contexte : titre, description complète, statut, priorité, assigné, échéance, " +
+        "et le fil de commentaires (du plus ancien au plus récent). À appeler en premier quand on travaille " +
+        "sur une tâche déléguée : c'est la spécification et la discussion qui l'entoure.",
+      inputSchema: {
+        projectId: z.number().int().describe("Id du projet"),
+        issueId: z.number().int().describe("Id de l'issue"),
+        workspace: workspaceArg,
+      },
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    async ({ projectId, issueId, workspace }) => {
+      try {
+        const base = `/workspaces/${tf.workspace(workspace)}/projects/${projectId}/issues/${issueId}`;
+        const [issue, comments] = await Promise.all([
+          tf.request<Record<string, unknown>>("GET", base),
+          tf.request<Array<Record<string, unknown>>>("GET", `${base}/comments`),
+        ]);
+        return ok({ issue, commentCount: comments.length, comments });
+      } catch (e) {
+        return fail(e);
+      }
+    },
+  );
+
+  // ── Commenter une issue (ÉCRITURE) ────────────────────────────────────────────
+  server.registerTool(
+    "taskforce_add_comment",
+    {
+      title: "Add comment",
+      description:
+        "Ajoute un commentaire (markdown) sur une issue. Écriture. Sert à laisser une trace utile à l'équipe : " +
+        "une question bloquante, une hypothèse prise, un point à vérifier en revue. Ne pas s'en servir pour " +
+        "narrer chaque étape.",
+      inputSchema: {
+        projectId: z.number().int().describe("Id du projet"),
+        issueId: z.number().int().describe("Id de l'issue"),
+        content: z.string().min(1).max(10000).describe("Contenu du commentaire (markdown)"),
+        workspace: workspaceArg,
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+    },
+    async ({ projectId, issueId, content, workspace }) => {
+      try {
+        const comment = await tf.request<Record<string, unknown>>(
+          "POST", `/workspaces/${tf.workspace(workspace)}/projects/${projectId}/issues/${issueId}/comments`,
+          { content },
+        );
+        return ok(comment);
       } catch (e) {
         return fail(e);
       }

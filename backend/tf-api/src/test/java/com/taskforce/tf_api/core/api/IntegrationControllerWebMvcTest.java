@@ -128,13 +128,29 @@ class IntegrationControllerWebMvcTest {
     void github_connect_url() throws Exception {
         when(userRepository.findByEmail(anyString()))
             .thenReturn(Optional.of(User.builder().id(3L).email("dev@it.dev").build()));
-        when(gitHubService.buildAuthorizeUrl(anyString(), any()))
+        when(gitHubService.buildAuthorizeUrl(anyString(), any(), any()))
             .thenReturn(java.net.URI.create("https://github.com/login/oauth/authorize?state=xyz"));
 
         mockMvc.perform(get("/api/workspaces/acme/integrations/github/connect").with(auth()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.data.authorizeUrl").value("https://github.com/login/oauth/authorize?state=xyz"));
+    }
+
+    @Test
+    @DisplayName("GET github/connect?returnTo= → le chemin de retour est transmis au service (qui le valide)")
+    void github_connect_passes_return_path() throws Exception {
+        when(userRepository.findByEmail(anyString()))
+            .thenReturn(Optional.of(User.builder().id(3L).email("dev@it.dev").build()));
+        when(gitHubService.buildAuthorizeUrl(anyString(), any(), any()))
+            .thenReturn(java.net.URI.create("https://github.com/login/oauth/authorize?state=xyz"));
+
+        mockMvc.perform(get("/api/workspaces/acme/integrations/github/connect")
+                .param("returnTo", "/acme?newProject=repo").with(auth()))
+            .andExpect(status().isOk());
+
+        org.mockito.Mockito.verify(gitHubService)
+            .buildAuthorizeUrl(org.mockito.ArgumentMatchers.eq("acme"), any(), org.mockito.ArgumentMatchers.eq("/acme?newProject=repo"));
     }
 
     @Test

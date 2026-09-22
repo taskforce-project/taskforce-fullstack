@@ -58,6 +58,7 @@ export function WorkflowCanvasDialog({ open, onOpenChange }: Readonly<{ open: bo
               runs={workspaceRuns}
               providers={providers}
               onSelectProject={() => { onOpenChange(false); router.push(`/${slug}/analytics`) }}
+              onSelectIssue={(issueId, projectId) => { onOpenChange(false); router.push(`/${slug}/projects/${projectId}?issue=${issueId}`) }}
             />
           )}
         </div>

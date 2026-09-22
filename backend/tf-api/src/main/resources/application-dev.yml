@@ -197,6 +197,13 @@ integrations:
     tools-cache-ttl-ms: ${MCP_TOOLS_CACHE_TTL_MS:60000}   # cache tools/list par workspace
     confirm-writes: ${MCP_CONFIRM_WRITES:true}            # écritures externes proposées (validation humaine)
     tool-tier: ${MCP_TOOL_TIER:fast}                      # tier LLM des tours avec outils externes (fast|standard|deep)
+# Runner local de délégation (ADR-013) : Claude Code exécuté sur le poste de l'utilisateur.
+# Activé en dev ; le client Keycloak du runner se crée avec scripts/keycloak-runner.ps1.
+delivery:
+  local-runner:
+    enabled: ${DELIVERY_LOCAL_RUNNER_ENABLED:true}
+    session-ttl-minutes: ${DELIVERY_RUNNER_SESSION_TTL_MINUTES:120}          # durée de vie max d'une session déléguée
+    heartbeat-timeout-minutes: ${DELIVERY_RUNNER_HEARTBEAT_TIMEOUT_MINUTES:10} # runner muet au-delà = run en échec
 # JWT Configuration
 jwt:
   secret: ${JWT_SECRET:myVerySecretKeyForJWTTokenGenerationThatIsLongEnoughToBeSecure256Bits}

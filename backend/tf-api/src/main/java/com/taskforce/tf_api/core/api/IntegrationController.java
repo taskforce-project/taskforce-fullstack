@@ -165,12 +165,15 @@ public class IntegrationController {
     @GetMapping("/api/workspaces/{slug}/integrations/github/connect")
     public ResponseEntity<ApiResponse<ConnectUrlResponse>> githubConnect(
         @PathVariable String slug,
+        // Chemin applicatif où revenir après le consentement (ex. le dialogue de création de projet) ;
+        // validé côté service, ignoré s'il n'est pas sûr.
+        @RequestParam(required = false) String returnTo,
         @AuthenticationPrincipal Jwt jwt
     ) {
         requireIntegrations(slug);
         requireManager(slug, jwt);
         User user = resolveUser(jwt);
-        URI authorizeUrl = gitHubService.buildAuthorizeUrl(slug, user);
+        URI authorizeUrl = gitHubService.buildAuthorizeUrl(slug, user, returnTo);
         return ResponseEntity.ok(ApiResponse.success(new ConnectUrlResponse(authorizeUrl.toString())));
     }
 
