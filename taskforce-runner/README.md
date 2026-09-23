@@ -26,6 +26,16 @@ Le texte d'une issue ou d'une note est écrit par d'autres personnes. Le brief l
 une donnée de la tâche, jamais comme une instruction, et le périmètre ci-dessus borne ce qu'une
 instruction glissée dans ce texte pourrait obtenir.
 
+### Tâches sans dépôt (non-code)
+
+TaskForce n'est pas réservé au code. Si le projet n'a **pas** de dépôt lié, la tâche est traitée en mode
+« sans dépôt » : Claude Code travaille dans un dossier temporaire jetable (`<home>/scratch/run-<id>`, jamais
+ta machine), et **rend son travail en commentaire** sur l'issue (`taskforce_add_comment`), sans git, sans
+branche, sans pull request. Le périmètre de la session déléguée reste le même (lecture du workspace, écriture
+sur les issues du projet), et une consigne du type « écris un fichier sur le bureau » glissée dans l'issue
+sort du périmètre et est ignorée. Pour n'accepter que des tâches de code, mettre `acceptRepoless: false` dans
+`runner.config.json`.
+
 ## Installation
 
 Prérequis : Node 20+, `git`, `gh` connecté (`gh auth status`), le CLI Claude Code
@@ -70,6 +80,7 @@ cd ../taskforce-runner && npm install
 | `pollSeconds` | 5 | Fréquence du claim. |
 | `push` / `openPullRequest` | `true` / `true` | `push: false` : rien ne sort du poste, le travail reste sur une branche locale. |
 | `keepWorktree` | `false` | Garder le worktree après un succès. Un run en échec le garde toujours (seule trace du travail). |
+| `acceptRepoless` | `true` | Tâche déléguée d'un projet **sans dépôt** (non-code) : l'agent travaille dans un dossier temporaire jetable et rend son résultat **en commentaire** sur l'issue, jamais de PR. `false` = ce runner ne prend que des tâches de code (dépôt requis). |
 | `agent.auth` | `subscription` | Voir ci-dessous. |
 | `agent.model` | `null` | `null` = le modèle choisi à la délégation. |
 | `agent.maxTurns` / `agent.timeoutMinutes` | 60 / 45 | Bornes de l'agent. La durée est aussi plafonnée par la durée de vie du jeton de session. |

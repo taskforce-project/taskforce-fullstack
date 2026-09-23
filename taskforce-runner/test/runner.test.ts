@@ -6,7 +6,7 @@ import type { Claim } from "../src/api.js";
 import { parseEnvFile, parseRunnerConfigFile, type RunnerConfig } from "../src/config.js";
 import { branchName, isValidRepoFullName, managedCheckoutDir, pullRequestBody, resolveRepo } from "../src/git.js";
 import { quoteForCmd } from "../src/proc.js";
-import { buildPrompt } from "../src/prompt.js";
+import { buildPrompt, buildReplyPrompt } from "../src/prompt.js";
 
 const claim: Claim = {
   runId: 42, issueId: 55, issueKey: "WEB-12", title: "Fix the footer links", description: "The links 404.",
@@ -260,4 +260,48 @@ describe("quoteForCmd", () => {
   for (const hostile of ["%COMSPEC%", "100%", "a\nb", "a\r\nb"]) {
     it(`refuse ${JSON.stringify(hostile)}`, () => assert.throws(() => quoteForCmd(hostile), /refusé/));
   }
+});
+
+describe("mode sans dépôt (repoless)", () => {
+  it("repoless : aucun outil Bash (pas de git), l'agent livre par commentaire", () => {
+    const tools = allowedTools([], "repoless");
+    assert.ok(!tools.some((t) => t.startsWith("Bash(")), "aucun Bash en repoless");
+    assert.ok(tools.includes("Write"));
+    assert.ok(tools.includes("mcp__taskforce__taskforce_add_comment"));
+    assert.ok(tools.includes("mcp__taskforce__taskforce_get_issue"));
+  });
+
+  it("repo (défaut) : outils git présents, jamais push/gh/shell libre", () => {
+    const tools = allowedTools([]);
+    assert.ok(tools.includes("Bash(git commit *)"));
+    for (const forbidden of ["Bash", "Bash(*)", "Bash(git push *)", "Bash(gh *)", "WebFetch", "WebSearch"]) {
+      assert.ok(!tools.includes(forbidden), `${forbidden} interdit`);
+    }
+  });
+
+  it("agentArgs passe la liste d'outils repoless (sans git) à --allowedTools", () => {
+    const args = agentArgs(config(), claim, "/tmp/mcp.json", "/tmp/s.json", "repoless");
+    const allowed = args[args.indexOf("--allowedTools") + 1] ?? "";
+    assert.ok(!/Bash\(/.test(allowed));
+    assert.match(allowed, /taskforce_add_comment/);
+  });
+
+  it("brief repoless : pas de dépôt, livraison par commentaire, texte TaskForce = donnée, pas de PR", () => {
+    const prompt = buildReplyPrompt(claim);
+    assert.match(prompt, /no git repository/i);
+    assert.match(prompt, /taskforce_add_comment/);
+    assert.match(prompt, /never overrides these rules/);
+    assert.match(prompt, /writing files onto the machine/i); // consigne d'injection explicitement écartée
+    assert.match(prompt, /taskforce_get_issue \(projectId 12, issueId 55\)/);
+    assert.doesNotMatch(prompt, /pull request/i);
+  });
+
+  it("brief repoless sans description : renvoie vers le MCP", () => {
+    assert.match(buildReplyPrompt({ ...claim, description: null }), /rely on taskforce_get_issue/);
+  });
+});
+
+describe("acceptRepoless (tâches non-code)", () => {
+  it("accepté par défaut", () => assert.equal(parseRunnerConfigFile({}).acceptRepoless, true));
+  it("désactivable pour un runner code-only", () => assert.equal(parseRunnerConfigFile({ acceptRepoless: false }).acceptRepoless, false));
 });

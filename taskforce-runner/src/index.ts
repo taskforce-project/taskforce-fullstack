@@ -11,11 +11,11 @@
  *
  * Options : `--check` (vérifie l'installation, ne réclame rien), `--once` (traite au plus un run puis sort).
  */
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 
-import { runAgent } from "./agent.js";
+import { runAgent, type AgentOutcome } from "./agent.js";
 import { ApiError, TaskforceApi, type Claim, type RunResult } from "./api.js";
 import { loadConfig, type RepoConfig, type RunnerConfig } from "./config.js";
 import { finalizeCommits, openPullRequest, prepareWorktree, pushBranch, removeWorktree, resolveRepo, runSetup, type Worktree } from "./git.js";
@@ -26,7 +26,35 @@ const HEARTBEAT_MS = 30_000;
 /** Marge gardée sur la durée de vie du jeton de session : l'agent doit finir avant son expiration. */
 const TOKEN_SAFETY_MS = 3 * 60_000;
 
-/** Traite un run réclamé, de la préparation du dépôt au résultat posté. Ne lève jamais : tout échec devient un résultat FAILED. */
+/** Dossier de travail jetable d'une tâche sans dépôt : `<home>/scratch/run-<id>`, vidé s'il existait déjà. */
+function prepareScratch(home: string, runId: number): string {
+  const dir = join(home, "scratch", `run-${runId}`);
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+/**
+ * Jeton NEUF pour la session de l'agent (durée de vie entière), et durée d'agent ramenée sous cette durée
+ * de vie : l'agent doit finir avant l'expiration du jeton.
+ */
+async function startAgentSession(config: RunnerConfig, api: TaskforceApi): Promise<{ agentConfig: RunnerConfig; token: string }> {
+  const session = await api.token(true);
+  const budgetMs = session.expiresAt - Date.now() - TOKEN_SAFETY_MS;
+  const timeoutMinutes = Math.max(1, Math.min(config.agent.timeoutMinutes, Math.floor(budgetMs / 60_000)));
+  if (timeoutMinutes < config.agent.timeoutMinutes) {
+    log.warn(`Durée de l'agent ramenée à ${timeoutMinutes} min : c'est la durée de vie du jeton de session.`);
+  }
+  return { agentConfig: { ...config, agent: { ...config.agent, timeoutMinutes } }, token: session.token };
+}
+
+function logOutcome(outcome: AgentOutcome): void {
+  const meta = [outcome.turns !== null ? `${outcome.turns} tours` : "", outcome.costUsd !== null ? `${outcome.costUsd.toFixed(2)} USD` : ""]
+    .filter(Boolean).join(", ");
+  log.info(`Claude Code a terminé (${outcome.ok ? "succès" : "échec"}${meta ? `, ${meta}` : ""})`);
+}
+
+/** Traite un run réclamé, jusqu'au résultat posté. Ne lève jamais : tout échec devient un résultat FAILED. */
 async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim): Promise<void> {
   log.info(`Run #${claim.runId} réclamé : ${claim.issueKey} - ${claim.title}`);
   const heartbeat = setInterval(() => {
@@ -36,44 +64,49 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim)
   let result: RunResult;
   let worktree: Worktree | null = null;
   let repo: RepoConfig | null = null;
+  let scratch: string | null = null;
   try {
-    if (!claim.repoFullName) {
-      throw new Error("This project has no linked repository. Create or link one when creating the project (Code repository), then delegate again.");
-    }
-    repo = await resolveRepo(config.repos, config.autoClone, config.home, claim.repoFullName);
-    worktree = await prepareWorktree(repo, claim, config.home);
-    log.info(`Worktree prêt : ${worktree.path} (branche ${worktree.branch}, base ${worktree.base})`);
-    await runSetup(worktree, repo.setup);
+    if (claim.repoFullName) {
+      repo = await resolveRepo(config.repos, config.autoClone, config.home, claim.repoFullName);
+      worktree = await prepareWorktree(repo, claim, config.home);
+      log.info(`Worktree prêt : ${worktree.path} (branche ${worktree.branch}, base ${worktree.base})`);
+      await runSetup(worktree, repo.setup);
 
-    // Jeton NEUF pour la session de l'agent : il dispose ainsi de sa durée de vie entière.
-    const session = await api.token(true);
-    const budgetMs = session.expiresAt - Date.now() - TOKEN_SAFETY_MS;
-    const timeoutMinutes = Math.max(1, Math.min(config.agent.timeoutMinutes, Math.floor(budgetMs / 60_000)));
-    if (timeoutMinutes < config.agent.timeoutMinutes) {
-      log.warn(`Durée de l'agent ramenée à ${timeoutMinutes} min : c'est la durée de vie du jeton de session.`);
-    }
-    const agentConfig: RunnerConfig = { ...config, agent: { ...config.agent, timeoutMinutes } };
+      const { agentConfig, token } = await startAgentSession(config, api);
+      log.info("Claude Code au travail...");
+      const outcome = await runAgent(agentConfig, claim, worktree.path, token, { mode: "repo", branch: worktree.branch });
+      logOutcome(outcome);
+      if (!outcome.ok) throw new Error(outcome.text);
 
-    log.info("Claude Code au travail...");
-    const outcome = await runAgent(agentConfig, claim, worktree.path, worktree.branch, session.token);
-    const meta = [outcome.turns !== null ? `${outcome.turns} tours` : "", outcome.costUsd !== null ? `${outcome.costUsd.toFixed(2)} USD` : ""]
-      .filter(Boolean).join(", ");
-    log.info(`Claude Code a terminé (${outcome.ok ? "succès" : "échec"}${meta ? `, ${meta}` : ""})`);
-    if (!outcome.ok) throw new Error(outcome.text);
-
-    const commits = await finalizeCommits(worktree, claim);
-    if (commits === 0) {
-      result = { status: "DONE", summary: `No code change was needed.\n\n${outcome.text}`.slice(0, 7900) };
-    } else if (!config.push) {
-      result = {
-        status: "DONE",
-        summary: `${outcome.text}\n\n${commits} commit(s) on local branch ${worktree.branch} (push disabled on this runner).`.slice(0, 7900),
-      };
+      const commits = await finalizeCommits(worktree, claim);
+      if (commits === 0) {
+        result = { status: "DONE", summary: `No code change was needed.\n\n${outcome.text}`.slice(0, 7900) };
+      } else if (!config.push) {
+        result = {
+          status: "DONE",
+          summary: `${outcome.text}\n\n${commits} commit(s) on local branch ${worktree.branch} (push disabled on this runner).`.slice(0, 7900),
+        };
+      } else {
+        await pushBranch(worktree);
+        const url = config.openPullRequest ? await openPullRequest(worktree, repo, claim, outcome.text, config.home) : undefined;
+        result = { status: "DONE", summary: outcome.text.slice(0, 7900), resultUrl: url };
+        log.info(url ? `Pull request ouverte : ${url}` : `Branche poussée : ${worktree.branch}`);
+      }
     } else {
-      await pushBranch(worktree);
-      const url = config.openPullRequest ? await openPullRequest(worktree, repo, claim, outcome.text, config.home) : undefined;
-      result = { status: "DONE", summary: outcome.text.slice(0, 7900), resultUrl: url };
-      log.info(url ? `Pull request ouverte : ${url}` : `Branche poussée : ${worktree.branch}`);
+      // Projet sans dépôt (tâche non-code) : l'agent travaille dans un dossier jetable et rend son travail
+      // dans TaskForce (commentaire), jamais de pull request, jamais un fichier hors de ce dossier.
+      if (!config.acceptRepoless) {
+        throw new Error("This project has no linked repository, and this runner only takes code tasks (acceptRepoless is off). Link a repository to the project, or enable repo-less tasks on the runner.");
+      }
+      scratch = prepareScratch(config.home, claim.runId);
+      log.info(`Espace de travail sans dépôt : ${scratch}`);
+
+      const { agentConfig, token } = await startAgentSession(config, api);
+      log.info("Claude Code au travail (tâche sans dépôt)...");
+      const outcome = await runAgent(agentConfig, claim, scratch, token, { mode: "repoless" });
+      logOutcome(outcome);
+      if (!outcome.ok) throw new Error(outcome.text);
+      result = { status: "DONE", summary: outcome.text.slice(0, 7900) };
     }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
@@ -90,9 +123,10 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim)
     log.error(`Résultat du run #${claim.runId} non posté : ${(e as Error).message}`);
   }
 
-  // Un worktree en échec est gardé : c'est la seule trace de ce que l'agent a fait.
-  if (worktree && repo && result.status === "DONE" && !config.keepWorktree) {
-    await removeWorktree(repo, worktree);
+  // Un dossier de travail en échec est gardé : c'est la seule trace locale de ce que l'agent a fait.
+  if (result.status === "DONE" && !config.keepWorktree) {
+    if (worktree && repo) await removeWorktree(repo, worktree);
+    if (scratch) rmSync(scratch, { recursive: true, force: true });
   }
 }
 
@@ -138,6 +172,7 @@ async function check(config: RunnerConfig, api: TaskforceApi): Promise<boolean> 
   }
   console.log(`  Authentification de Claude Code : ${config.agent.auth === "subscription" ? "abonnement (le login de la personne, dans son Claude Code)" : "clé API"}`);
   console.log(`  Sortie du poste : ${config.push ? (config.openPullRequest ? "push + pull request" : "push seul") : "aucune (branche locale)"}`);
+  console.log(`  Tâches sans dépôt (non-code) : ${config.acceptRepoless ? "acceptées, résultat rendu en commentaire" : "refusées (code uniquement)"}`);
   return ok;
 }
 
