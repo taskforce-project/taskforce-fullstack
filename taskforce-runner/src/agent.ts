@@ -4,7 +4,7 @@ import { join } from "node:path";
 import type { Claim } from "./api.js";
 import type { RunnerConfig } from "./config.js";
 import { run } from "./proc.js";
-import { buildPrompt } from "./prompt.js";
+import { buildPrompt, buildReplyPrompt } from "./prompt.js";
 
 export interface AgentOutcome {
   ok: boolean;
@@ -18,18 +18,36 @@ export interface AgentOutcome {
 const MCP_SERVER = "taskforce";
 
 /**
- * Outils pré-autorisés. En mode `dontAsk`, tout le reste est refusé d'office, sans question : pas de
- * shell libre, pas de réseau, pas de push. Les outils MCP listés sont ceux qui restent dans le périmètre
- * d'une session déléguée (le backend refuserait les autres de toute façon).
+ * Mode d'exécution de l'agent :
+ * - `repo` : le projet a un dépôt, l'agent travaille dans un worktree git et livre par pull request ;
+ * - `repoless` : le projet n'a pas de dépôt (tâche non-code), l'agent travaille dans un dossier temporaire
+ *   jetable et rend son travail dans TaskForce (commentaire markdown). Pas de git, donc aucun outil Bash.
  */
-export function allowedTools(extra: string[]): string[] {
+export type AgentMode = "repo" | "repoless";
+
+/** Outils MCP TaskForce ouverts à l'agent : ceux qui restent dans le périmètre d'une session déléguée. */
+const MCP_TOOLS = [
+  "get_issue", "add_comment", "brain_search", "list_projects", "list_issues", "list_issue_statuses",
+  "list_my_issues", "workspace_kpis", "create_issue", "update_issue",
+];
+
+/**
+ * Outils pré-autorisés. En mode `dontAsk`, tout le reste est refusé d'office, sans question : pas de
+ * shell libre, pas de réseau, pas de push. En mode `repoless` il n'y a pas de dépôt : aucun outil Bash
+ * n'est ouvert (l'agent brouillonne dans son dossier temporaire et livre par commentaire). Les outils MCP
+ * listés sont ceux qui restent dans le périmètre d'une session déléguée (le backend refuserait les autres).
+ */
+export function allowedTools(extra: string[], mode: AgentMode = "repo"): string[] {
+  const local = mode === "repoless"
+    ? ["Read", "Glob", "Grep", "Edit", "Write"]
+    : [
+        "Read", "Glob", "Grep", "Edit", "Write",
+        "Bash(git status *)", "Bash(git status)", "Bash(git diff *)", "Bash(git diff)", "Bash(git log *)",
+        "Bash(git add *)", "Bash(git commit *)", "Bash(git mv *)", "Bash(git rm *)",
+      ];
   return [
-    "Read", "Glob", "Grep", "Edit", "Write",
-    "Bash(git status *)", "Bash(git status)", "Bash(git diff *)", "Bash(git diff)", "Bash(git log *)",
-    "Bash(git add *)", "Bash(git commit *)", "Bash(git mv *)", "Bash(git rm *)",
-    ...["get_issue", "add_comment", "brain_search", "list_projects", "list_issues", "list_issue_statuses",
-      "list_my_issues", "workspace_kpis", "create_issue", "update_issue"]
-      .map((tool) => `mcp__${MCP_SERVER}__taskforce_${tool}`),
+    ...local,
+    ...MCP_TOOLS.map((tool) => `mcp__${MCP_SERVER}__taskforce_${tool}`),
     ...extra,
   ];
 }
@@ -43,12 +61,12 @@ export function safeModel(model: string | null | undefined): string | null {
 }
 
 /** Arguments de `claude -p`. Exporté pour les tests : c'est la frontière de sécurité de l'exécution locale. */
-export function agentArgs(config: RunnerConfig, claim: Claim, mcpConfigPath: string, settingsPath: string): string[] {
+export function agentArgs(config: RunnerConfig, claim: Claim, mcpConfigPath: string, settingsPath: string, mode: AgentMode = "repo"): string[] {
   const args = [
     "-p",
     "--output-format", "json",
     "--permission-mode", "dontAsk",
-    "--allowedTools", allowedTools(config.agent.extraAllowedTools).join(","),
+    "--allowedTools", allowedTools(config.agent.extraAllowedTools, mode).join(","),
     "--mcp-config", mcpConfigPath,
     "--strict-mcp-config",
     "--settings", settingsPath,
@@ -77,15 +95,22 @@ export function agentEnv(config: RunnerConfig, base: NodeJS.ProcessEnv = process
   return env;
 }
 
+export interface AgentRunOptions {
+  mode: AgentMode;
+  /** Nom de la branche git (mode `repo`) ; absent en mode `repoless`. */
+  branch?: string;
+}
+
 /**
- * Lance Claude Code sans interface dans le worktree, MCP TaskForce branché sur la session déléguée du run.
+ * Lance Claude Code sans interface dans le dossier de travail (worktree git en mode `repo`, dossier
+ * temporaire jetable en mode `repoless`), MCP TaskForce branché sur la session déléguée du run.
  *
  * Le MCP reçoit un jeton machine de COURTE durée (jamais le secret du runner), utilisable seulement
- * dans le périmètre de ce run. Le fichier qui le porte vit hors du worktree (l'agent ne lit pas hors de son
- * dossier en mode `dontAsk`) et est supprimé à la fin.
+ * dans le périmètre de ce run. Le fichier qui le porte vit hors du dossier de travail (l'agent ne lit pas
+ * hors de son dossier en mode `dontAsk`) et est supprimé à la fin.
  */
 export async function runAgent(
-  config: RunnerConfig, claim: Claim, worktreePath: string, branch: string, sessionToken: string,
+  config: RunnerConfig, claim: Claim, workDir: string, sessionToken: string, opts: AgentRunOptions,
 ): Promise<AgentOutcome> {
   const tmp = join(config.home, "tmp");
   mkdirSync(tmp, { recursive: true });
@@ -114,10 +139,10 @@ export async function runAgent(
   ), "utf8");
 
   try {
-    const result = await run(config.agent.command, agentArgs(config, claim, mcpConfigPath, settingsPath), {
-      cwd: worktreePath,
+    const result = await run(config.agent.command, agentArgs(config, claim, mcpConfigPath, settingsPath, opts.mode), {
+      cwd: workDir,
       env: agentEnv(config),
-      input: buildPrompt(claim, branch),
+      input: opts.mode === "repoless" ? buildReplyPrompt(claim) : buildPrompt(claim, opts.branch ?? ""),
       timeoutMs: config.agent.timeoutMinutes * 60_000,
     });
     if (result.timedOut) {

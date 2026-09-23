@@ -55,6 +55,12 @@ export interface RunnerConfig {
   push: boolean;
   openPullRequest: boolean;
   keepWorktree: boolean;
+  /**
+   * Tâche déléguée depuis un projet SANS dépôt (non-code) : l'agent travaille dans un dossier temporaire
+   * jetable et rend son résultat dans TaskForce (commentaire), jamais de pull request. `false` = ce runner
+   * ne prend que des tâches de code (dépôt requis).
+   */
+  acceptRepoless: boolean;
   agent: AgentConfig;
   /** Entrée du serveur MCP TaskForce (dist/index.js de taskforce-mcp). */
   mcpEntry: string;
@@ -151,6 +157,7 @@ export function parseRunnerConfigFile(json: unknown): Omit<RunnerConfig, "apiUrl
     push: cfg.push === undefined ? true : cfg.push === true,
     openPullRequest: cfg.openPullRequest === undefined ? true : cfg.openPullRequest === true,
     keepWorktree: cfg.keepWorktree === true,
+    acceptRepoless: cfg.acceptRepoless === undefined ? true : cfg.acceptRepoless === true,
     agent: {
       command: typeof rawAgent.command === "string" && rawAgent.command.trim() ? rawAgent.command.trim() : "claude",
       auth,
