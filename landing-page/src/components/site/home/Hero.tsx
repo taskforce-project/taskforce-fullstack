@@ -48,15 +48,16 @@ export function Hero() {
             deux actions. Une seule colonne → fini le désalignement titre/texte du layout 2-col. */}
         <div className="mx-auto max-w-3xl text-center">
           <p className="text-primary mb-4 text-[14px] font-medium tracking-[-0.01em]">
-            The AI delivery operating system
+            The governed layer above your coding agents
           </p>
           <h1 className="t-h1 text-balance">
             Describe the outcome.
             <br className="hidden sm:block" /> TaskForce runs the delivery.
           </h1>
           <p className="t-lead mx-auto mt-6 max-w-2xl text-balance">
-            TaskForce turns an outcome into the spec, the plan and the prompt your coding agent runs -
-            a human approves every step, and the reasons are remembered.
+            Your coding agent writes the code. TaskForce turns the outcome into the spec, plan and
+            prompt it runs (Claude Code, Cursor, Copilot) - a human approves every step, and the
+            reasons are remembered.
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <Button asChild size="pill-lg">
