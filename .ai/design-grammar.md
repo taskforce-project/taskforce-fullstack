@@ -103,3 +103,12 @@ Le site partage le système de l'app, pas sa densité : c'est du marketing, on r
   la première EN SILENCE (`--radius`, puis 5 niveaux d'ombre). Avant d'ajouter un token, chercher s'il existe.
 - Vérifier : mesure DOM, `npm run lint`, puis un build de prod (`astro build`) et chercher `.h-control` dans
   `dist/_astro/*.css` : le mode dev ne prouve pas que l'utilitaire est émis en prod.
+- **Échelle des titres (25/09)** : `t-h1` (H1, Sora 40 → 56), `t-h2` (sections, 30 → 40), `t-h3` (20), puis
+  `t-h4` (titre de carte, 16 / 600) et `t-h5` (carte dense, ligne de liste, 14 / 600). Jamais de
+  `text-[15px] font-semibold` sur un titre : un titre de carte prend `t-h4` ou `t-h5`. Ces tokens sont
+  hors couche, ils l'emportent sur les utilitaires (une marge `mt-*` s'ajoute, une taille ne s'écrase pas).
+- **Titres de section révélés au scroll** : tout `h2.t-h2` est traité par `src/scripts/reveal-titles.ts`
+  (mots gris → noirs au défilement). Exclure un titre : l'envelopper dans `[data-no-reveal]`. Pages
+  `/legal/` exclues d'office.
+- **Ponctuation** : ni tiret long, ni tiret de liaison « - » entre deux propositions dans les titres, les
+  leads et les metas. Choisir la vraie ponctuation (virgule, deux-points, point, parenthèses).
