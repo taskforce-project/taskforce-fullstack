@@ -28,12 +28,12 @@ const ITEMS = USE_CASE_ORDER.map((k) => USE_CASES[k]);
 
 <BaseLayout
   title="Use cases - TaskForce"
-  description="The jobs TaskForce turns into governed, remembered outputs - from product spec and architecture decision to code review, QA, onboarding and sprint planning. We mark clearly what ships today and what's Planned."
+  description="The jobs TaskForce turns into governed, remembered outputs, from product specs and architecture decisions to code review, onboarding and sprint planning."
 >
   <PageHero
     kicker="Use cases"
     title="One pattern, many jobs"
-    lead="A run isn't one task - it's a chain of decisions, each producing a reviewed artifact. These are the jobs TaskForce turns from busywork into governed, remembered outputs. Each carries an honest maturity badge."
+    lead="A run isn't one task. It's a chain of decisions, each producing a reviewed artifact. These are the jobs TaskForce turns from busywork into governed, remembered outputs. Each carries an honest maturity badge."
     primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
     secondary={{ label: "See the run", href: "/product/orchestration" }}
   />
@@ -55,7 +55,7 @@ const ITEMS = USE_CASE_ORDER.map((k) => USE_CASES[k]);
                   </span>
                   <LevelBadge level={u.level} />
                 </div>
-                <h3 class="mt-4 text-[15.5px] font-semibold text-foreground">{u.name}</h3>
+                <h3 class="t-h4 mt-4">{u.name}</h3>
                 <p class="text-muted-foreground mt-2 flex-1 text-[13px] leading-6">{u.lead}</p>
                 <span class="link-underline text-foreground mt-4 inline-flex items-center gap-1.5 text-[13px] font-medium">
                   Read more
@@ -90,7 +90,7 @@ const ITEMS = USE_CASE_ORDER.map((k) => USE_CASES[k]);
 
   <PageCta
     title="Turn a job into a governed output"
-    lead="Start with what ships today - approvals and memory - and grow into the full run as it lands."
+    lead="Start with what ships today (approvals and memory) and grow into the full run as it lands."
     primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
     secondary={{ label: "Book a demo", href: "/book-a-demo" }}
   />

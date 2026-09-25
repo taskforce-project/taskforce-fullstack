@@ -54,12 +54,12 @@ const RULES = [
 
 <BaseLayout
   title="Agents - TaskForce"
-  description="A delivery team, not a single generalist: specialized agents for product, architecture and delivery, grounded in your Memory and approved by a human. Today, one assistant agent grounded in your Brain OS; the specialized team is the direction."
+  description="A delivery team, not one generalist: specialized agents for product, architecture and delivery, grounded in your Memory and approved by a human."
 >
   <PageHero
     kicker="Agents"
     title="A delivery team, not a single generalist"
-    lead="Most AI workflows start with a generalist agent. TaskForce is building a small team of specialized agents - product, architecture and delivery - each grounded in your Memory, each producing proposals a human approves."
+    lead="Most AI workflows start with a generalist agent. TaskForce is building a small team of specialized agents (product, architecture and delivery), each grounded in your Memory, each producing proposals a human approves."
     level="labs"
     primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
     secondary={{ label: "See the run", href: "/product/orchestration" }}
@@ -144,7 +144,7 @@ const RULES = [
               {i === 2 && <ConnectedToolsDemo client:visible />}
               <div class="mt-5 flex items-center gap-2.5">
                 <t.icon className="size-5 shrink-0" strokeWidth={1.75} style={{ color: hueFor(t.icon) }} />
-                <h3 class="text-[16px] font-semibold text-foreground">{t.title}</h3>
+                <h3 class="t-h4">{t.title}</h3>
               </div>
               <p class="text-muted-foreground mt-2 text-[13.5px] leading-6">{t.text}</p>
             </div>
@@ -180,7 +180,7 @@ const RULES = [
               <span class="ic-tile flex size-10 items-center justify-center rounded-lg border" style={`--ic:${hueFor(r.icon)}`}>
                 <r.icon className="size-5" strokeWidth={1.75} />
               </span>
-              <h3 class="mt-4 text-[15px] font-semibold text-foreground">{r.title}</h3>
+              <h3 class="t-h4 mt-4">{r.title}</h3>
               <p class="text-muted-foreground mt-1.5 text-[13px] leading-6">{r.desc}</p>
             </div>
           ))

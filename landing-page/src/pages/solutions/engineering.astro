@@ -17,12 +17,12 @@ const FITS = [
 
 <BaseLayout
   title="TaskForce for engineering - Solutions"
-  description="Governed software delivery for engineering teams: turn an outcome into a validated run, route work to people and coding agents, keep the reasoning, and measure what ships - with a human on every decision."
+  description="Governed software delivery for engineering teams: turn an outcome into a validated run, route work to people and coding agents, and keep the reasoning."
 >
   <PageHero
     kicker="Solutions · Engineering"
     title="Ship with AI, without losing the decision trail"
-    lead="Engineering teams are already delivering with coding agents. TaskForce governs the decisions around them - turning an outcome into a validated run, keeping the reasoning, and putting a human on every step."
+    lead="Engineering teams are already delivering with coding agents. TaskForce governs the decisions around them: turning an outcome into a validated run, keeping the reasoning, and putting a human on every step."
     level="live"
     primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
     secondary={{ label: "See the run", href: "/product/orchestration" }}
@@ -90,7 +90,7 @@ const FITS = [
               <span class="ic-tile flex size-11 items-center justify-center rounded-xl border" style={`--ic:${hueFor(f.icon)}`}>
                 <f.icon className="size-5" strokeWidth={1.75} />
               </span>
-              <h3 class="mt-4 text-[16px] font-semibold text-foreground">{f.title}</h3>
+              <h3 class="t-h4 mt-4">{f.title}</h3>
               <p class="text-muted-foreground mt-2 flex-1 text-[13.5px] leading-6">{f.text}</p>
               <a href={f.href} class="link-underline text-foreground mt-4 inline-flex items-center gap-1.5 text-[13.5px] font-medium">
                 {f.label}

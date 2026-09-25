@@ -1,8 +1,12 @@
 ---
 /**
- * BeforeAfter (.astro) - 2 pipelines React Flow, sur la DA « traits intégrés » via les primitives
- * `SectionShell` + `TraitGrid` (cf. `.ai/landing-design-system.md`). Le message tient dans la LONGUEUR :
- * 6 mains (le contexte fuit à chacune) vs 5 étapes gouvernées.
+ * BeforeAfter (.astro) - « The problem » : la douleur ET sa démonstration dans une seule section
+ * (fusion validée par le CEO le 24/09, home 14 → ~10 écrans). Anciennement deux blocs : `Problem`
+ * (Platform.tsx, un titre + une litanie de 7 « Someone… ») puis ce Before/After. La litanie redisait
+ * exactement ce que montre le diagramme « Before » : elle part, le titre et la chute restent.
+ *
+ * 2 pipelines React Flow sur la DA « traits intégrés » (`SectionShell` + `TraitGrid`). Le message
+ * tient dans la LONGUEUR : 6 mains (le contexte fuit à chacune) contre 5 étapes gouvernées.
  */
 import SectionShell from "@/components/site/sections/SectionShell.astro";
 import TraitGrid from "@/components/site/sections/TraitGrid.astro";
@@ -26,10 +30,9 @@ const AFTER = [
 ---
 
 <SectionShell
-  align="center"
-  eyebrow="From idea to shipped"
-  title="Same outcome. Fewer places for context to disappear."
-  lead="The building is the same. What changes is how many times the context has to survive a handoff."
+  eyebrow="The problem"
+  title="Teams don’t lose time building. They lose it transferring context."
+  lead="Most software delivery moves the same way: an intention is passed from hand to hand until something ships. At each handoff the reason behind a decision gets thinner, and the reason is the part nobody writes down."
 >
   <TraitGrid cols={2} class="mt-12">
     {/* Avant */}
@@ -57,4 +60,15 @@ const AFTER = [
       </div>
     </div>
   </TraitGrid>
+
+  {/* La chute de l'ancien bloc Problem : elle conclut le diagramme au lieu de le précéder. */}
+  <div class="mt-10 flex flex-col gap-2 lg:flex-row lg:items-baseline lg:gap-8">
+    <p class="text-foreground shrink-0 text-[18px] leading-8 font-semibold">
+      The work isn’t the problem. The transfer is.
+    </p>
+    <p class="text-primary text-[15px] leading-7 font-medium">
+      TaskForce keeps the context in one governed run, written down once and carried from outcome to
+      ship.
+    </p>
+  </div>
 </SectionShell>

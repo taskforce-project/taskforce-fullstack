@@ -1,14 +1,12 @@
 ---
 import BaseLayout from "@/layouts/BaseLayout.astro";
 import { Hero } from "@/components/site/home/Hero";
-import { BrainTeaser } from "@/components/site/home/Narrative";
-import { Problem } from "@/components/site/home/Platform";
-import { TeamGrid } from "@/components/site/home/Showcase";
-import { Trust, WhereThisGoes, FinalCta } from "@/components/site/home/Proof";
+import HeroRuns from "@/components/site/home/HeroRuns";
+import { TeamGrid } from "@/components/site/home/TeamGrid";
+import { Trust, FinalCta } from "@/components/site/home/Proof";
 import BeforeAfter from "@/components/site/home/BeforeAfter.astro";
 import WhatShipsToday from "@/components/site/home/WhatShipsToday.astro";
 import Synergy from "@/components/site/home/Synergy.astro";
-import SmartAssign from "@/components/site/home/SmartAssign.astro";
 import TheRun from "@/components/site/home/TheRun.astro";
 import FaqSection from "@/components/site/sections/FaqSection.astro";
 
@@ -47,37 +45,33 @@ const FAQ_ITEMS: { q: string; a: string }[] = [
 
 <BaseLayout
   title="TaskForce - AI Delivery Operating System"
-  description="Describe the outcome and TaskForce runs the delivery: agents plan and draft every step, a human approves each checkpoint, and the models can run on your own hardware."
+  description="The governed layer above your coding agents: TaskForce turns an outcome into the spec, plan and prompt your agent runs, with a human approving every step."
   software
 >
-  {/* PASSE DE RÉDUCTION (review 13, validée) : 16 → 10 sections, tout accroché à l'idée UNIQUE
-      « software delivery loses context; TaskForce preserves it from intent to production ».
-      Coupées / absorbées comme PREUVES (plus des « produits » séparés) :
-        · Manifesto  → l'idée vit dans Problem
-        · Pillars    → fondu dans Synergy (« Why it's different »)
-        · Foundations→ redondant avec les bullets du Run + la checklist Trust
-        · Integrations→ compat couverte par TeamGrid (« sits on your board/repo ») + logos du hero
-        · Phases     → fondu dans TeamGrid (getting started / missing layer)
-        · Maturity   → Vision porte déjà « dated roadmap »
+  {/* 2e PASSE DE RÉDUCTION (24/09, validée CEO) : ~14 → ~10 écrans. Fusions, aucun message perdu :
+        · Problem + Before/After   → une section « The problem » (titre + diagrammes + chute)
+        · Smart Assign             → carte pleine largeur de « What ships today » (+ vraie capture)
+        · Memory (BrainTeaser)     → bloc mémoire de « Why it's different » (même lien)
+        · The direction            → bandeau bas de « Who it's for » (wedge, pas plafond + roadmap)
+      Doublons retirés : les 4 puces entreprise de The run, la 2e piste d'audit (cellule Verify).
+      (1re passe, review 13 : 16 → 10 sections, Manifesto / Pillars / Foundations / Phases absorbés.)
 
-      Spine : IDÉE (Problem + Before/After, la démo des fuites) → PRODUIT (Run) → MOAT (Memory) →
-      WHY DIFFERENT (Synergy) → PREUVE (Enterprise) → WHO/HOW (Teams) → FUTUR (Vision) → TRY.
-      Bandes alternées blanc/gris. 1 seul îlot (RunTimeline, `client:idle`). */}
-  <Hero />
+      Spine : PROMESSE + PREUVE VIVANTE (hero scindé, table de runs par rôle) → PROBLÈME (fuites de
+      contexte) → POURQUOI DIFFÉRENT (+ Memory) → CE QUI EST LIVE → LE RUN → ENTREPRISE → POUR QUI
+      (+ direction) → FAQ → ESSAI. Îlots : HeroRuns (`client:idle`) + démos `client:visible` + flux
+      React Flow `client:only`. */}
+  <Hero>
+    <HeroRuns client:idle />
+  </Hero>
 
-  <Problem />
   <BeforeAfter />
-  <SmartAssign />
   <Synergy />
   <WhatShipsToday />
 
   <TheRun />
-  <BrainTeaser />
-
   <Trust />
   <TeamGrid />
 
-  <WhereThisGoes />
   <FaqSection eyebrow="FAQ" title="Frequently asked questions" items={FAQ_ITEMS} />
   <FinalCta />
 </BaseLayout>

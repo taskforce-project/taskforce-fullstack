@@ -2,17 +2,18 @@
 /**
  * TheRun (.astro) - « The run » : le run en **React Flow** (`HeroFlow`, sur canvas à points) au lieu de
  * l'ancienne timeline animée maison (`RunTimeline.tsx`). Copie conservée : 3 garanties, note honnête,
- * puces entreprise, et le détail des 7 checkpoints (table). Converti en `.astro` pour héberger l'îlot RF.
+ * et le détail des 7 checkpoints (table). Converti en `.astro` pour héberger l'îlot RF.
+ * 24/09 (validé CEO) : les 4 puces « entreprise » (audit, self-hosted, any coding agent, a model per
+ * step) sont retirées, la section Enterprise les dit déjà presque mot pour mot.
  */
 import SectionShell from "@/components/site/sections/SectionShell.astro";
 import { StepChainFlow } from "@/components/site/flows/OrchestrationFlows";
 import { LevelBadge } from "@/components/site/Section";
-import { hueFor } from "@/lib/site-icons";
-import { ArrowRight, ScrollText, Server, GitBranch, Cpu } from "lucide-react";
+import { ArrowRight, ChevronDown } from "lucide-react";
 
 const RUN_SUB = [
   { title: "Every step is attributable", text: "Each checkpoint names what produced it and the model it ran on." },
-  { title: "Nothing advances without you", text: "Each checkpoint waits for a human - which is exactly what lets you hand agents more, not less." },
+  { title: "Nothing advances without you", text: "Each checkpoint waits for a human, which is exactly what lets you hand agents more, not less." },
   { title: "Rejections carry your comment", text: "Send a step back with a note and it comes into the next attempt." },
 ];
 
@@ -25,19 +26,12 @@ const RUN_STEPS = [
   { icon: "rocket", title: "Ship", sub: "reviewed" },
 ];
 
-const RUN_BULLETS = [
-  { icon: ScrollText, label: "Full audit trail", text: "Who approved what, and when." },
-  { icon: Server, label: "Self-hosted", text: "Your infrastructure, your network." },
-  { icon: GitBranch, label: "Any coding agent", text: "Claude Code, Cursor, or your own." },
-  { icon: Cpu, label: "A model per step", text: "Routine local, hard steps stronger." },
-];
-
 const ANATOMY = [
   { step: "Vision", by: "CPO agent", artifact: "One page: the problem, who has it, what « done » looks like.", decision: "Approve the framing, or reframe it before anything is built on top.", level: "labs" as const },
   { step: "Product spec", by: "CPO agent", artifact: "Stories with acceptance criteria, and the edge cases nobody asked about.", decision: "Approve, or send it back with what is missing.", level: "labs" as const },
-  { step: "Architecture", by: "CTO agent", artifact: "The proposed approach - and the option that was rejected, with the reason.", decision: "Approve the trade-off. This is the decision that is expensive to reverse later.", level: "labs" as const },
+  { step: "Architecture", by: "CTO agent", artifact: "The proposed approach, and the option that was rejected with the reason.", decision: "Approve the trade-off. This is the decision that is expensive to reverse later.", level: "labs" as const },
   { step: "API contract", by: "CTO agent", artifact: "Endpoints, payloads and error cases, written against your existing conventions.", decision: "Approve or amend. Downstream steps are generated from what you sign here.", level: "labs" as const },
-  { step: "Breakdown", by: "COO agent", artifact: "Issues, sized and ordered, each linked back to the line of spec it came from.", decision: "Approve - then Smart Assign routes each issue to a person.", level: "live" as const },
+  { step: "Breakdown", by: "COO agent", artifact: "Issues, sized and ordered, each linked back to the line of spec it came from.", decision: "Approve it, then Smart Assign routes each issue to a person.", level: "live" as const },
   { step: "Implementation", by: "Your coding agent", artifact: "A branch. TaskForce hands over the context and stays out of the way.", decision: "Your normal code review. We do not replace it.", level: "live" as const },
   { step: "QA & deploy", by: "COO agent", artifact: "A checklist derived from the acceptance criteria you approved in step two.", decision: "Sign off. The whole chain is in the audit trail.", level: "beta" as const },
 ];
@@ -54,11 +48,12 @@ const ANATOMY = [
   </div>
 
   {/* Le run en TIMELINE horizontale, pleine largeur (≠ le pipeline vertical d'orchestration). */}
-  <div class="flow-canvas relative mt-10 h-[200px] w-full overflow-hidden border">
-    <StepChainFlow steps={RUN_STEPS} dir="h" id="run-timeline" highlight={2} w={176} client:only="react" />
+  {/* Horizontale dès 640 px ; empilée en dessous (sinon textes illisibles), d'où la hauteur mobile. */}
+  <div class="flow-canvas relative mt-10 h-[440px] w-full overflow-hidden border sm:h-[200px]">
+    <StepChainFlow steps={RUN_STEPS} dir="h" stackOnMobile id="run-timeline" highlight={2} w={176} client:only="react" />
   </div>
   <p class="text-muted-foreground mt-3 text-[12.5px]">
-    Illustrative - each step is an agent draft a human approves; the seven real checkpoints are detailed below.
+    Illustrative: each step is an agent draft that a human approves. The seven real checkpoints are detailed below.
   </p>
 
   {/* Les 3 garanties, en 3 colonnes sous la timeline. */}
@@ -66,7 +61,7 @@ const ANATOMY = [
     {
       RUN_SUB.map((s) => (
         <div>
-          <h3 class="text-[14.5px] font-semibold text-foreground">{s.title}</h3>
+          <h3 class="t-h5">{s.title}</h3>
           <p class="text-muted-foreground mt-1 text-[13.5px] leading-6">{s.text}</p>
         </div>
       ))
@@ -86,33 +81,24 @@ const ANATOMY = [
     </p>
   </div>
 
-  {/* Puces entreprise. */}
-  <div class="mt-12 grid gap-x-8 gap-y-6 border-t pt-8 sm:grid-cols-2 lg:grid-cols-4">
-    {
-      RUN_BULLETS.map((b) => (
-        <div class="flex gap-3">
-          <span
-            class="ic-tile mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg border"
-            style={`--ic:${hueFor(b.icon)}`}
-          >
-            <b.icon className="size-[18px]" strokeWidth={1.75} />
-          </span>
-          <div>
-            <p class="text-[14px] font-medium text-foreground">{b.label}</p>
-            <p class="text-muted-foreground text-[13px] leading-5">{b.text}</p>
-          </div>
-        </div>
-      ))
-    }
-  </div>
-
-  {/* Le détail des 7 checkpoints - table sur filets edge-to-edge. */}
-  <div class="mt-16">
-    <h3 class="t-h3">Seven checkpoints. Seven artifacts. One accountable chain.</h3>
-    <p class="text-muted-foreground mt-2 max-w-2xl text-[14px] leading-7">
-      Not a black box that returns a pull request - a sequence of artifacts, each one attributable,
-      each one refusable.
-    </p>
+  {/* Le détail des 7 checkpoints - DÉPLIABLE (25/09, objectif home ~10 écrans validé CEO) : le titre et
+      sa phrase portent le message et restent visibles ; le tableau (~700 px) s'ouvre au clic. Contenu
+      toujours dans le DOM, donc toujours indexé. <details> natif : clavier et lecteurs d'écran OK. */}
+  <details class="group mt-16">
+    <summary class="flex cursor-pointer list-none flex-col gap-4 rounded-md sm:flex-row sm:items-end sm:justify-between [&::-webkit-details-marker]:hidden">
+      <span class="block max-w-2xl">
+        <h3 class="t-h3">Seven checkpoints. Seven artifacts. One accountable chain.</h3>
+        <span class="text-muted-foreground mt-2 block text-[14px] leading-7">
+          Not a black box that returns a pull request, but a sequence of artifacts, each one
+          attributable and each one refusable.
+        </span>
+      </span>
+      <span class="text-primary inline-flex shrink-0 items-center gap-1 text-[14px] font-medium">
+        <span class="group-open:hidden">Show the seven checkpoints</span>
+        <span class="hidden group-open:inline">Hide the checkpoints</span>
+        <ChevronDown className="size-4 transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none" />
+      </span>
+    </summary>
     <div class="-mx-6 mt-7 overflow-x-auto border-y border-border lg:-mx-10">
       <table class="w-full min-w-[860px] border-collapse text-left">
         <caption class="sr-only">What each checkpoint of a run produces and what the human decides</caption>
@@ -149,8 +135,8 @@ const ANATOMY = [
       <p class="text-[14px] font-semibold text-foreground">Adaptive by design</p>
       <p class="text-muted-foreground mt-1 text-[13.5px] leading-6">
         A bug fix doesn't need a strategy phase; a migration doesn't take the same path as a feature
-        launch. The run adapts to the decision being made - it just never skips the approval.
+        launch. The run adapts to the decision being made. It just never skips the approval.
       </p>
     </div>
-  </div>
+  </details>
 </SectionShell>

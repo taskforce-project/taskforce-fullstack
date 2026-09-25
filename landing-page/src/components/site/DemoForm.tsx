@@ -81,7 +81,7 @@ export function DemoForm() {
         <span className="flex size-11 items-center justify-center rounded-full bg-emerald-500 text-white">
           <Check className="size-5" strokeWidth={3} />
         </span>
-        <h3 className="mt-4 text-[16px] font-semibold text-foreground">Your email is ready to send</h3>
+        <h3 className="t-h4 mt-4">Your email is ready to send</h3>
         <p className="text-muted-foreground mt-1.5 max-w-xs text-[13.5px] leading-6">
           Your mail app should have opened with the details filled in. Nothing opened? Write us at{" "}
           <a href={`mailto:${CONTACT}`} className="link-underline text-foreground">

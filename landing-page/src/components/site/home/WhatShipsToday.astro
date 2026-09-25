@@ -1,20 +1,25 @@
 ---
 /**
- * WhatShipsToday (.astro) - les 2 « actes IA » réellement livrés, en flux React Flow, sur la DA
- * « traits intégrés » via `SectionShell` + `TraitGrid`. Chaque acte = un flux vertical avec l'étape
- * humaine mise en avant ; le socle Live = cellule pleine largeur.
+ * WhatShipsToday (.astro) - ce qui est réellement livré, sur la DA « traits intégrés » via
+ * `SectionShell` + `TraitGrid` : les 2 « actes IA » (flux animés), puis Smart Assign en cellule
+ * pleine largeur avec sa CAPTURE RÉELLE, puis le socle Live.
+ *
+ * Fusion du 24/09 (validée CEO) : Smart Assign avait sa propre section juste après Before/After.
+ * C'est une capacité live comme les deux actes, et le hero la montre déjà en action : elle rejoint
+ * donc la section « live », et garde la seule vraie capture produit de la page.
  */
 import SectionShell from "@/components/site/sections/SectionShell.astro";
 import TraitGrid from "@/components/site/sections/TraitGrid.astro";
+import ScreenFrame from "@/components/site/sections/ScreenFrame.astro";
 import { UseCaseDemo } from "@/components/site/illustrations/UseCaseDemo";
 import { hueFor, HUE } from "@/lib/site-icons";
-import { Check, FileCode2, Compass, Cpu } from "lucide-react";
+import { ArrowRight, Check, FileCode2, Compass, Cpu, UserCheck } from "lucide-react";
 
 const ACTS = [
   {
     icon: FileCode2,
-    title: "Turn an issue into a spec - and a prompt",
-    text: "Point TaskForce at an issue. It drafts the product spec, a ready-to-run prompt for your coding agent and the breakdown - checked against your past decisions. You approve; the decision is saved to Memory.",
+    title: "Turn an issue into a spec and a prompt",
+    text: "Point TaskForce at an issue. It drafts the product spec, a ready-to-run prompt for your coding agent and the breakdown, checked against your past decisions. You approve, and the decision is saved to Memory.",
     demo: {
       kind: "draft" as const,
       title: "Spec · issue #142",
@@ -29,7 +34,7 @@ const ACTS = [
   {
     icon: Compass,
     title: "Ask your project what to do next",
-    text: "The decision board reads your real project - what's open, what's late, what's due this week - and proposes your next three priorities, with the reasoning. One click turns a priority into an issue.",
+    text: "The decision board reads your real project (what's open, what's late, what's due this week) and proposes your next three priorities, with the reasoning. One click turns a priority into an issue.",
     demo: {
       kind: "board" as const,
       title: "Reads your board → your 3 priorities",
@@ -42,21 +47,29 @@ const ACTS = [
   },
 ];
 
+const ASSIGN_POINTS: [string, string][] = [
+  ["Skills-aware.", "Matches the work to who's actually good at it, not who's free first."],
+  ["Workload-balanced.", "Reads current load and availability so nobody gets buried."],
+  ["One click, whole batch.", "Assign every unassigned issue at once, and uncheck the ones to keep."],
+];
+
 const ALSO_LIVE = [
   "Boards, issues & cycles",
   "Real-time sync",
-  "Smart Assign",
   "Delivery analytics",
   "SSO & RBAC",
   "Self-hosting",
   "Audit logging",
 ];
+
+const LIVE_BADGE =
+  "inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-emerald-700 uppercase";
 ---
 
 <SectionShell
   eyebrow="What ships today"
   title="Not a someday demo. This part is already live."
-  lead="The full governed run is the direction. But the core act works today - grounded in your memory, on the models you choose."
+  lead="The full governed run is the direction. But the core act works today, grounded in your memory and running on the models you choose."
 >
   <TraitGrid cols={2} class="mt-12">
     {
@@ -66,12 +79,12 @@ const ALSO_LIVE = [
             <span class="ic-tile flex size-10 items-center justify-center rounded-lg border" style={`--ic:${hueFor(a.icon)}`}>
               <a.icon className="size-5" strokeWidth={1.75} />
             </span>
-            <span class="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-emerald-700 uppercase">
+            <span class={LIVE_BADGE}>
               <span class="tf-pulse size-1.5 rounded-full bg-current" aria-hidden="true"></span>
               Live
             </span>
           </div>
-          <h3 class="mt-4 text-[16px] font-semibold text-foreground">{a.title}</h3>
+          <h3 class="t-h4 mt-4">{a.title}</h3>
           <p class="text-muted-foreground mt-2 flex-1 text-[13.5px] leading-6">{a.text}</p>
           <div class="mt-6">
             <UseCaseDemo demo={a.demo} className="h-[172px]" client:visible />
@@ -80,11 +93,74 @@ const ALSO_LIVE = [
       ))
     }
 
+    {/* Smart Assign - cellule pleine largeur, texte + vraie capture (zoom au survol). */}
+    <div class="bg-card grid items-center gap-8 p-6 sm:col-span-2 sm:p-8 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-12">
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="ic-tile flex size-10 items-center justify-center rounded-lg border" style={`--ic:${hueFor(UserCheck)}`}>
+            <UserCheck className="size-5" strokeWidth={1.75} />
+          </span>
+          <span class={LIVE_BADGE}>
+            <span class="tf-pulse size-1.5 rounded-full bg-current" aria-hidden="true"></span>
+            Live
+          </span>
+        </div>
+        <h3 class="t-h4 mt-4">
+          Smart Assign: the right task to the right person, with the reason
+        </h3>
+        <p class="text-muted-foreground mt-2 text-[13.5px] leading-6">
+          TaskForce reads each unassigned issue and every teammate's skills, workload and availability,
+          then proposes who should own what. You review the recommendations, then assign the whole batch.
+        </p>
+        <ul class="mt-5 space-y-2.5">
+          {
+            ASSIGN_POINTS.map(([t, d]) => (
+              <li class="flex gap-2.5">
+                <span class="mt-1 flex size-4 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200">
+                  <Check className="size-2.5" strokeWidth={3} />
+                </span>
+                <span class="text-[13.5px] leading-6">
+                  <span class="text-foreground font-medium">{t}</span>{" "}
+                  <span class="text-muted-foreground">{d}</span>
+                </span>
+              </li>
+            ))
+          }
+        </ul>
+        <a
+          href="/product/smart-assign"
+          class="link-underline text-primary mt-6 inline-flex items-center gap-1 text-[14px] font-medium"
+        >
+          See how Smart Assign works
+          <ArrowRight className="size-4" />
+        </a>
+      </div>
+
+      <ScreenFrame
+        src="/screens/smart-assign.webp"
+        alt="TaskForce Smart Assign: recommendations by skills, workload and availability"
+        width={1600}
+        height={863}
+      >
+        {/* Détail « zoom » révélé au survol : la recommandation de l'IA en gros plan. */}
+        <img
+          src="/screens/smart-assign-zoom.webp"
+          alt=""
+          width={626}
+          height={632}
+          loading="lazy"
+          decoding="async"
+          class="pointer-events-none absolute right-3 bottom-3 z-20 w-[38%] max-w-[210px] translate-y-3 scale-95 rounded-lg border bg-card opacity-0 shadow-2xl ring-1 ring-black/5 transition-all duration-300 ease-out group-hover:translate-y-0 group-hover:scale-100 group-hover:opacity-100 motion-reduce:translate-y-0 motion-reduce:opacity-100 motion-reduce:transition-none"
+          draggable="false"
+        />
+      </ScreenFrame>
+    </div>
+
     {/* Socle Live - cellule pleine largeur. */}
     <div class="bg-card flex flex-col gap-4 p-6 sm:col-span-2 sm:flex-row sm:items-center sm:justify-between">
       <p class="flex items-center gap-3 text-[14px] font-medium text-foreground">
         <Cpu className="size-10 shrink-0" style={{ color: hueFor(Cpu, HUE.violet) }} strokeWidth={1.4} />
-        Hosted in the cloud, or self-hosted on local models - zero model cost.
+        Hosted in the cloud, or self-hosted on local models at zero model cost.
       </p>
       <div class="flex flex-wrap gap-1.5">
         {
