@@ -230,10 +230,10 @@ export function PricingSection() {
           <span className="border-border bg-card text-muted-foreground inline-flex items-center rounded-full border px-3 py-1 text-[13px] font-medium">
             Pricing
           </span>
-          <h1 className="mt-5 text-4xl font-semibold tracking-[-0.02em] text-foreground sm:text-5xl">
-            Pricing that scales with your delivery
-          </h1>
-          <p className="text-muted-foreground mt-4 text-[15px] sm:text-lg">
+          {/* Tokens communs (24/09) : c'était le seul H1 du site hors `t-h1` (Inter 48 px / 600 au lieu
+              de Sora 56 px / 500), il détonnait en passant d'une page à l'autre. */}
+          <h1 className="t-h1 mt-5 text-balance">Pricing that scales with your delivery</h1>
+          <p className="t-lead mt-4">
             Start with the delivery workspace. Add AI when you're ready. Scale with controls, and go
             self-hosted with Enterprise when you need it.
           </p>
@@ -341,7 +341,7 @@ export function PricingSection() {
           </div>
           <div className="mt-8 grid gap-px overflow-hidden border bg-border sm:grid-cols-2">
             <div className="bg-card p-6">
-              <h3 className="text-[16px] font-semibold text-foreground">Hosted</h3>
+              <h3 className="t-h4">Hosted</h3>
               <p className="text-muted-foreground mt-1 text-[13.5px]">Cortex · Claude · OpenAI · other providers</p>
               <p className="mt-4 text-[13.5px] leading-6 text-foreground">
                 Each plan includes a monthly Cortex AI token allotment; beyond it, usage is metered. The
@@ -349,7 +349,7 @@ export function PricingSection() {
               </p>
             </div>
             <div className="bg-card p-6">
-              <h3 className="text-[16px] font-semibold text-foreground">Self-hosted</h3>
+              <h3 className="t-h4">Self-hosted</h3>
               <p className="text-muted-foreground mt-1 text-[13.5px]">Ollama · local models · Enterprise</p>
               <p className="mt-4 text-[13.5px] leading-6 text-foreground">
                 Your infrastructure, zero model cost - and no prompts or outputs leave your network.
@@ -367,7 +367,7 @@ export function PricingSection() {
           <div className="mt-8 grid gap-x-10 gap-y-7 sm:grid-cols-2">
             {FAQ.map((item) => (
               <div key={item.q}>
-                <h3 className="text-[15px] font-medium text-foreground">{item.q}</h3>
+                <h3 className="t-h4">{item.q}</h3>
                 <p className="text-muted-foreground mt-1.5 text-[13px] leading-5">{item.a}</p>
               </div>
             ))}

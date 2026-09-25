@@ -44,18 +44,22 @@ export function BrandLogo({
   brand,
   label,
   className,
+  loading = "lazy",
 }: {
   /** Clé du catalogue de connecteurs (ex. `github`, `linear`). */
   brand: string;
-  /** Nom lisible - sert d'alternative textuelle quand le logo porte l'information. */
+  /** Nom lisible - sert d'alternative textuelle quand le logo porte l'information.
+   *  Passer `""` quand le nom est déjà écrit à côté (logo décoratif, pas de double lecture). */
   label: string;
   className?: string;
+  /** `eager` au-dessus de la ligne de flottaison (hero), `lazy` partout ailleurs. */
+  loading?: "lazy" | "eager";
 }) {
   return (
     <img
       src={logoSrc(brand)}
       alt={label}
-      loading="lazy"
+      loading={loading}
       decoding="async"
       className={cn("h-6 w-auto object-contain", className)}
     />

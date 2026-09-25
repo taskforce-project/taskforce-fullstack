@@ -31,7 +31,7 @@ export const LABS: Record<string, Lab> = {
   "run-memory": {
     key: "run-memory",
     name: "Run memory",
-    lead: "Runs that start from what your organization already decided - instead of a blank slate.",
+    lead: "Runs that start from what your organization already decided, instead of a blank slate.",
     why: "Every run today re-derives context that already exists somewhere. Memory that carries decisions, constraints and rejected alternatives across runs is what makes the next one faster, and more consistent with the last.",
     exploring: [
       "What's actually worth remembering from a run",
@@ -44,7 +44,7 @@ export const LABS: Record<string, Lab> = {
   "model-choice": {
     key: "model-choice",
     name: "Model choice",
-    lead: "The right model for each step - local or hosted - instead of one model for everything.",
+    lead: "The right model for each step, local or hosted, instead of one model for everything.",
     why: "Different steps have different needs: some want a fast local model, some a stronger hosted one, some must stay on your own hardware. Choosing per step keeps cost, latency and privacy under your control.",
     exploring: [
       "Matching a model to what a step actually needs",

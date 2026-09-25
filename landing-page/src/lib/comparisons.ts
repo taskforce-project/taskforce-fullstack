@@ -49,7 +49,7 @@ export const COMPARISONS: Record<string, Comparison> = {
     key: "linear",
     name: "Linear",
     kind: "tracker",
-    lead: "Linear is a fast, elegant tracker with a workflow teams love. TaskForce sits on the same kind of board and adds governed decisions, memory and AI orchestration.",
+    lead: "Linear is a fast, elegant tracker teams love. TaskForce sits on the same kind of board and adds governed decisions, memory and AI orchestration.",
     goodAt: [
       "Exceptional speed and product design",
       "An opinionated, low-friction workflow with cycles",
@@ -75,7 +75,7 @@ export const COMPARISONS: Record<string, Comparison> = {
     key: "notion",
     name: "Notion",
     kind: "tracker",
-    lead: "Notion is where flexible docs and wikis live. TaskForce makes the spec, the decision and the sign-off outputs of the run itself - not pages you maintain by hand.",
+    lead: "Notion is where docs and wikis live. TaskForce makes the spec, the decision and the sign-off outputs of the run itself, not pages you maintain by hand.",
     goodAt: [
       "Flexible documents, wikis and databases",
       "A great home for freeform knowledge and notes",
@@ -101,7 +101,7 @@ export const COMPARISONS: Record<string, Comparison> = {
     key: "shortcut",
     name: "Shortcut",
     kind: "tracker",
-    lead: "Shortcut is a developer-friendly tracker with stories, iterations and epics. TaskForce sits on the same kind of board and adds governed decisions, memory and AI orchestration.",
+    lead: "Shortcut is a developer-friendly tracker with stories and iterations. TaskForce sits on the same kind of board and adds governed decisions and memory.",
     goodAt: [
       "A clean, developer-oriented tracker",
       "Stories, iterations and epics that fit dev workflows",
@@ -127,7 +127,7 @@ export const COMPARISONS: Record<string, Comparison> = {
     key: "claude-code-alone",
     name: "Claude Code alone",
     kind: "agent",
-    lead: "A coding agent writes and ships code fast. TaskForce frames the work first, keeps a human on each decision, remembers why - then hands the build to that same agent.",
+    lead: "A coding agent writes and ships code fast. TaskForce frames the work, keeps a human on each decision and remembers why, then hands the build to that agent.",
     goodAt: [
       "Writing, editing and shipping code directly in your repo",
       "Fast, capable execution on well-scoped tasks",
@@ -153,7 +153,7 @@ export const COMPARISONS: Record<string, Comparison> = {
     key: "devin",
     name: "Devin",
     kind: "agent",
-    lead: "Autonomous agents aim to do the whole job. TaskForce takes the opposite stance: keep people accountable at each checkpoint, and orchestrate the agent you choose.",
+    lead: "Autonomous agents aim to do the whole job. TaskForce takes the opposite stance: people stay accountable at each checkpoint, orchestrating your agent.",
     goodAt: [
       "Attempting end-to-end tasks with minimal input",
       "Autonomous execution as a single agent",
@@ -179,7 +179,7 @@ export const COMPARISONS: Record<string, Comparison> = {
     key: "cursor",
     name: "Cursor",
     kind: "agent",
-    lead: "Cursor is an AI-native editor that helps you write code. TaskForce governs the delivery around it - and can route work to it as an assignee.",
+    lead: "Cursor is an AI-native editor that helps you write code. TaskForce governs the delivery around it, and can route work to it as an assignee.",
     goodAt: [
       "An excellent AI-native coding editor",
       "Fast, in-context help while you write code",

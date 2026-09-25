@@ -31,12 +31,12 @@ const CHANNELS = [
 
 <BaseLayout
   title="Contact - TaskForce"
-  description="Get in touch with TaskForce - book a demo, ask about enterprise and self-hosting, raise a security question, or just say hello."
+  description="Get in touch with TaskForce: book a demo, ask about enterprise and self-hosting, raise a security question, or just say hello."
 >
   <PageHero
     eyebrow="Contact"
     title="Talk to us"
-    lead="Whether you want to see TaskForce run, discuss a private deployment, or ask a hard security question - here's where to start."
+    lead="Whether you want to see TaskForce run, discuss a private deployment, or ask a hard security question, here's where to start."
     primary={{ label: "Email us", href: `mailto:${CONTACT}` }}
     secondary={{ label: "Book a demo", href: "/book-a-demo" }}
   />
@@ -51,7 +51,7 @@ const CHANNELS = [
               <span class="ic-tile flex size-11 items-center justify-center rounded-xl border" style={`--ic:${hueFor(c.icon)}`}>
                 <c.icon className="size-5" strokeWidth={1.75} />
               </span>
-              <h3 class="mt-4 text-[16px] font-semibold text-foreground">{c.title}</h3>
+              <h3 class="t-h4 mt-4">{c.title}</h3>
               <p class="text-muted-foreground mt-2 flex-1 text-[13.5px] leading-6">{c.text}</p>
               <a
                 href={c.cta.href}
@@ -72,7 +72,7 @@ const CHANNELS = [
             <Mail className="size-5" strokeWidth={1.75} />
           </span>
           <div>
-            <h3 class="text-[16px] font-semibold text-foreground">Prefer to write?</h3>
+            <h3 class="t-h4">Prefer to write?</h3>
             <p class="text-muted-foreground mt-1 text-[13.5px] leading-6">
               Reach us directly and we'll route you to the right person.
             </p>

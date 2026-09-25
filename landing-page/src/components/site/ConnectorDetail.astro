@@ -36,7 +36,7 @@ const MATRIX = [
 
 <BaseLayout
   title={`${c.name} integration - TaskForce`}
-  description={`${c.name} on TaskForce: ${c.tagline}`}
+  description={c.metaDescription ?? `${c.name} on TaskForce: ${c.tagline}`}
 >
   <section class="bg-card border-b">
     <div class="container-rail py-16 lg:py-20">
@@ -81,7 +81,7 @@ const MATRIX = [
                     {STATE_LABEL[state]}
                   </span>
                 </div>
-                <h3 class="mt-3 text-[15px] font-semibold text-foreground">{m.label}</h3>
+                <h3 class="t-h4 mt-3">{m.label}</h3>
                 <p class="text-muted-foreground mt-0.5 text-[12.5px]">{m.sub}</p>
               </div>
             );
@@ -128,7 +128,7 @@ const MATRIX = [
                   <Check className="size-3.5" strokeWidth={2.5} />
                 </span>
                 <div>
-                  <h3 class="text-[15px] font-semibold text-foreground">{cap.title}</h3>
+                  <h3 class="t-h4">{cap.title}</h3>
                   <p class="text-muted-foreground mt-1 text-[13.5px] leading-6">{cap.text}</p>
                 </div>
               </li>
@@ -192,7 +192,7 @@ const MATRIX = [
 
   <PageCta
     title={`Put ${c.name} to work`}
-    lead="Connect your stack and give every run the context it needs - with a human on every external action."
+    lead="Connect your stack and give every run the context it needs, with a human on every external action."
     primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
     secondary={{ label: "Browse all integrations", href: "/product/integrations" }}
   />
