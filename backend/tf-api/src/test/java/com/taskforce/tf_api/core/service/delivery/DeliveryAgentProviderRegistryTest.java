@@ -22,7 +22,7 @@ class DeliveryAgentProviderRegistryTest {
     void indexes_all_providers_and_resolves_by_key() {
         IntegrationRepository integrations = mock(IntegrationRepository.class);
         // Runner local désactivé (défaut) : Claude Code reste « à venir ».
-        LocalRunnerSettings runnerOff = new LocalRunnerSettings(false, "delivery-runner", "tf-runner-", "tf_runner_owner", 120, 10);
+        LocalRunnerSettings runnerOff = new LocalRunnerSettings(false, "delivery-runner", "tf-runner-", "tf_runner_owner", 120, 10, 15);
         var reg = new DeliveryAgentProviderRegistry(List.of(
             new ClaudeCodeProvider(runnerOff, mock(DeliveryRunRepository.class)),
             new CopilotProvider(integrations), new CursorProvider(integrations)));

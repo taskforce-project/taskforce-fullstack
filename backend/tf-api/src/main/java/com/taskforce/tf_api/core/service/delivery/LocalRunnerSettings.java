@@ -23,6 +23,7 @@ public class LocalRunnerSettings {
     private final String ownerClaim;
     private final Duration sessionTtl;
     private final Duration heartbeatTimeout;
+    private final Duration claimTimeout;
 
     public LocalRunnerSettings(
         @Value("${delivery.local-runner.enabled:false}") boolean enabled,
@@ -30,7 +31,8 @@ public class LocalRunnerSettings {
         @Value("${delivery.local-runner.client-prefix:tf-runner-}") String clientPrefix,
         @Value("${delivery.local-runner.owner-claim:tf_runner_owner}") String ownerClaim,
         @Value("${delivery.local-runner.session-ttl-minutes:120}") long sessionTtlMinutes,
-        @Value("${delivery.local-runner.heartbeat-timeout-minutes:10}") long heartbeatTimeoutMinutes
+        @Value("${delivery.local-runner.heartbeat-timeout-minutes:10}") long heartbeatTimeoutMinutes,
+        @Value("${delivery.local-runner.claim-timeout-minutes:15}") long claimTimeoutMinutes
     ) {
         this.enabled = enabled;
         this.runnerRole = runnerRole;
@@ -38,6 +40,7 @@ public class LocalRunnerSettings {
         this.ownerClaim = ownerClaim;
         this.sessionTtl = Duration.ofMinutes(sessionTtlMinutes);
         this.heartbeatTimeout = Duration.ofMinutes(heartbeatTimeoutMinutes);
+        this.claimTimeout = Duration.ofMinutes(claimTimeoutMinutes);
     }
 
     public boolean enabled()            { return enabled; }
@@ -51,4 +54,9 @@ public class LocalRunnerSettings {
     public Duration sessionTtl()        { return sessionTtl; }
     /** Silence au-delà duquel un runner est considéré perdu. */
     public Duration heartbeatTimeout()  { return heartbeatTimeout; }
+    /**
+     * Attente maximale d'un run que personne ne réclame (aucun runner allumé pour son délégant). Au-delà,
+     * il est clos en échec avec un message qui dit quoi faire, au lieu de rester « en attente » pour toujours.
+     */
+    public Duration claimTimeout()      { return claimTimeout; }
 }

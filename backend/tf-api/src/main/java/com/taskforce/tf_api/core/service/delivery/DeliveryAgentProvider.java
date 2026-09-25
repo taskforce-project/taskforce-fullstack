@@ -1,5 +1,6 @@
 package com.taskforce.tf_api.core.service.delivery;
 
+import java.time.Duration;
 import java.util.List;
 
 /**
@@ -36,6 +37,14 @@ public interface DeliveryAgentProvider {
      */
     default boolean pullBased() {
         return false;
+    }
+
+    /**
+     * Provider « pull » : attente maximale d'un run que personne ne réclame. Au-delà, il est clos en échec
+     * (cf. {@link DeliveryRunner#refresh}). {@code null} = jamais : un provider « push » dispatche lui-même.
+     */
+    default Duration claimTimeout() {
+        return null;
     }
 
     /**

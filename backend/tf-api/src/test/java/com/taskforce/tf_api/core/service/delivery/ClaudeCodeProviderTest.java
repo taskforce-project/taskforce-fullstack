@@ -1,5 +1,6 @@
 package com.taskforce.tf_api.core.service.delivery;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
@@ -27,7 +28,7 @@ class ClaudeCodeProviderTest {
 
     private ClaudeCodeProvider provider(boolean enabled) {
         return new ClaudeCodeProvider(
-            new LocalRunnerSettings(enabled, "delivery-runner", "tf-runner-", "tf_runner_owner", 120, 10), runRepository);
+            new LocalRunnerSettings(enabled, "delivery-runner", "tf-runner-", "tf_runner_owner", 120, 10, 15), runRepository);
     }
 
     @Test
@@ -37,6 +38,8 @@ class ClaudeCodeProviderTest {
         assertThat(provider(true).available()).isTrue();
         assertThat(provider(true).pullBased()).isTrue();
         assertThat(provider(true).key()).isEqualTo("claude-code");
+        // Délai de réclamation lu dans la config : au-delà, DeliveryRunner clôt un run que personne ne prend.
+        assertThat(provider(true).claimTimeout()).isEqualTo(Duration.ofMinutes(15));
     }
 
     @ParameterizedTest(name = "dernier signe de vie il y a {0} min -> {1}")
