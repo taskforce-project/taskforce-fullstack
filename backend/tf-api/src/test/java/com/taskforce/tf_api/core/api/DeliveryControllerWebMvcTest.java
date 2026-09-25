@@ -5,6 +5,8 @@ import java.util.Optional;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -26,6 +28,9 @@ import com.taskforce.tf_api.shared.security.SecurityConfig;
 
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -109,5 +114,54 @@ class DeliveryControllerWebMvcTest {
         mockMvc.perform(get("/api/workspaces/acme/delivery/issues/5/run").with(a))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true));
+    }
+
+    private static DeliveryRunResponse run(long id, String status) {
+        return new DeliveryRunResponse(id, 5L, "WEB-5", "Fix the footer", 12L, "Website", "claude-code", "Claude Code",
+            status, null, null, null, 7L, null, null);
+    }
+
+    @ParameterizedTest(name = "dernier run {0} : relu = {1}")
+    @CsvSource({ "RUNNING, true", "QUEUED, true", "DONE, false", "FAILED, false" })
+    @DisplayName("GET /delivery/issues/{id}/run : relit un run en cours OU en attente (délégation non réclamée close)")
+    void latestRun_refreshes_in_flight_runs(String status, boolean refreshed) throws Exception {
+        var a = auth();
+        when(deliveryService.latestRun(anyString(), anyLong(), anyLong())).thenReturn(Optional.of(run(9L, status)));
+
+        mockMvc.perform(get("/api/workspaces/acme/delivery/issues/5/run").with(a))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value(status));
+
+        verify(deliveryRunner, times(refreshed ? 1 : 0)).refresh(9L);
+    }
+
+    @Test
+    @DisplayName("GET /delivery/runs : relit les runs en attente, puis recharge la liste")
+    void listRuns_refreshes_queued_runs() throws Exception {
+        var a = auth();
+        when(deliveryService.listRuns(anyString(), anyLong()))
+            .thenReturn(List.of(run(1L, "QUEUED"), run(2L, "DONE")))
+            .thenReturn(List.of(run(1L, "FAILED"), run(2L, "DONE")));
+
+        mockMvc.perform(get("/api/workspaces/acme/delivery/runs").with(a))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[0].status").value("FAILED"));
+
+        verify(deliveryRunner).refresh(1L);
+        verify(deliveryRunner, never()).refresh(2L);
+        verify(deliveryService, times(2)).listRuns(anyString(), anyLong());
+    }
+
+    @Test
+    @DisplayName("GET /delivery/runs sans run en attente : une seule lecture, aucune relecture")
+    void listRuns_without_queued_reads_once() throws Exception {
+        var a = auth();
+        when(deliveryService.listRuns(anyString(), anyLong())).thenReturn(List.of(run(2L, "DONE")));
+
+        mockMvc.perform(get("/api/workspaces/acme/delivery/runs").with(a))
+            .andExpect(status().isOk());
+
+        verify(deliveryRunner, never()).refresh(anyLong());
+        verify(deliveryService, times(1)).listRuns(anyString(), anyLong());
     }
 }

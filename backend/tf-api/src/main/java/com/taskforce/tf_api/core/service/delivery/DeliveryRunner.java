@@ -1,5 +1,7 @@
 package com.taskforce.tf_api.core.service.delivery;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.Objects;
 
 import org.springframework.scheduling.annotation.Async;
@@ -96,12 +98,22 @@ public class DeliveryRunner {
      * Ré-interroge un run <b>asynchrone</b> encore en cours (ex. Cursor Background Agent) et applique
      * l'avancement. Appelé par le contrôleur sur lecture du run (le polling front fait ainsi progresser
      * l'état jusqu'au terminal). No-op si le run n'est pas RUNNING, sans handle, ou déjà résolu par un
-     * résultat immédiat (providers synchrones). Bean séparé, transaction propre.
+     * résultat immédiat (providers synchrones). Seule exception : un run encore en attente d'un provider
+     * « pull » est clos s'il a dépassé son délai de réclamation ({@link #expireIfUnclaimed}). Bean séparé,
+     * transaction propre.
      */
     @Transactional
     public void refresh(Long runId) {
         DeliveryRun run = runRepository.findById(runId).orElse(null);
-        if (run == null || run.getStatus() != DeliveryRunStatus.RUNNING || run.getExternalRef() == null) {
+        if (run == null) {
+            return;
+        }
+        // Runner local (ADR-013) : un run que personne ne réclame ne doit pas rester « en attente » pour toujours.
+        if (run.getStatus() == DeliveryRunStatus.QUEUED) {
+            expireIfUnclaimed(run, LocalDateTime.now());
+            return;
+        }
+        if (run.getStatus() != DeliveryRunStatus.RUNNING || run.getExternalRef() == null) {
             return;
         }
         DeliveryAgentProvider provider = registry.get(run.getProviderKey());
@@ -119,6 +131,40 @@ public class DeliveryRunner {
             failRun(run, e.getMessage());
             log.warn("Delivery run {} (refresh) en échec : {}", runId, e.getMessage());
         }
+    }
+
+    /**
+     * Clôt en échec un run « pull » que personne n'a réclamé dans le délai de son provider
+     * ({@link DeliveryAgentProvider#claimTimeout()}) : aucun runner allumé pour son délégant. La clôture est une
+     * mise à jour CONDITIONNELLE (encore en attente, sans runner) : un runner qui réclame au même instant gagne
+     * toujours, rien n'écrase son claim. Renvoie {@code true} si le run a été clos ici.
+     */
+    boolean expireIfUnclaimed(DeliveryRun run, LocalDateTime now) {
+        if (run.getStatus() != DeliveryRunStatus.QUEUED || run.getClaimedBy() != null || run.getCreatedAt() == null) {
+            return false;
+        }
+        DeliveryAgentProvider provider = registry.get(run.getProviderKey());
+        Duration timeout = provider != null && provider.pullBased() ? provider.claimTimeout() : null;
+        if (timeout == null || !now.isAfter(run.getCreatedAt().plus(timeout))) {
+            return false;
+        }
+        Long runId = run.getId();
+        int closed = runRepository.expireUnclaimed(runId, unclaimedMessage(timeout), now,
+            DeliveryRunStatus.QUEUED, DeliveryRunStatus.FAILED);
+        if (closed != 1) {
+            return false; // réclamé entre-temps : le runner a gagné
+        }
+        // La mise à jour vide le contexte de persistance : on relit le run avant de déplacer son issue.
+        runRepository.findById(runId)
+            .ifPresent(expired -> moveIssueTo(expired, STATUS_BLOCKED, IssueStatusCategory.STARTED, COLOR_BLOCKED));
+        log.info("Delivery run {} clos : aucun runner ne l'a réclamé en {} min", runId, timeout.toMinutes());
+        return true;
+    }
+
+    /** Message d'un run jamais réclamé : ce qui s'est passé et quoi faire, dans la langue de l'interface. */
+    static String unclaimedMessage(Duration timeout) {
+        return "No runner picked this task up within " + timeout.toMinutes() + " min. Start the TaskForce runner"
+            + " on your machine, then delegate the task again. The local runner is in early access.";
     }
 
     /**

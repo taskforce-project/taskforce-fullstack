@@ -77,7 +77,8 @@ function initials(label: string) {
 /** Logo d'un connecteur, avec repli initiales sur erreur de chargement. */
 function ConnLogo({ connKey, label }: { connKey: string; label: string }) {
   const [failed, setFailed] = useState(false);
-  if (failed) {
+  const src = logoSrc(connKey); // null = marque nommée en texte seulement (cf. BrandLogo › NAME_ONLY)
+  if (failed || !src) {
     return (
       <span className="bg-secondary text-muted-foreground flex size-6 shrink-0 items-center justify-center rounded-md text-[9px] font-semibold">
         {initials(label)}
@@ -86,7 +87,7 @@ function ConnLogo({ connKey, label }: { connKey: string; label: string }) {
   }
   return (
     <img
-      src={logoSrc(connKey)}
+      src={src}
       alt=""
       loading="lazy"
       decoding="async"

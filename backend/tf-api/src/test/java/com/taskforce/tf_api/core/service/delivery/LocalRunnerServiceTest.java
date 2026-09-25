@@ -63,7 +63,7 @@ class LocalRunnerServiceTest {
 
     @BeforeEach
     void setUp() {
-        LocalRunnerSettings settings = new LocalRunnerSettings(true, "delivery-runner", "tf-runner-", "tf_runner_owner", 120, 10);
+        LocalRunnerSettings settings = new LocalRunnerSettings(true, "delivery-runner", "tf-runner-", "tf_runner_owner", 120, 10, 15);
         service = new LocalRunnerService(runRepository, userRepository, visibilityGuard, deliveryRunner, settings);
         owner = User.builder().id(7L).email(OWNER_EMAIL).keycloakId("kc-7").isActive(true).build();
     }

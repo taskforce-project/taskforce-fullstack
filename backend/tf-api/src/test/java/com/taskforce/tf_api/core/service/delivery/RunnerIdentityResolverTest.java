@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class RunnerIdentityResolverTest {
 
     private final RunnerIdentityResolver resolver = new RunnerIdentityResolver(
-        new LocalRunnerSettings(true, "delivery-runner", "tf-runner-", "tf_runner_owner", 120, 10));
+        new LocalRunnerSettings(true, "delivery-runner", "tf-runner-", "tf_runner_owner", 120, 10, 15));
 
     /** Jeton de compte de service complet ; chaque test en retire ou en fausse une preuve. */
     private static Jwt.Builder runnerToken() {

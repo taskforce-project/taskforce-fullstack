@@ -180,6 +180,10 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
 
+      # Runner local « Claude Code » (ADR-013), coupé par défaut. L'accès anticipé se règle dans .env.prod
+      # (DELIVERY_LOCAL_RUNNER_ENABLED=true) : valeur durable, reprise à chaque rebuild, sans override hors dépôt.
+      DELIVERY_LOCAL_RUNNER_ENABLED: ${DELIVERY_LOCAL_RUNNER_ENABLED:-false}
+
       # Paiement — le conteneur ne reçoit QUE les variables listées ici (--env-file ne sert qu'à
       # l'interpolation compose). Les price-ids et la clé publique DOIVENT donc être plumbés
       # explicitement, sinon StripeService.getPriceIdForPlan lit "" → checkout KO (cf. QA-47/billing).
