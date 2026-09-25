@@ -109,6 +109,7 @@ Le site partage le système de l'app, pas sa densité : c'est du marketing, on r
   hors couche, ils l'emportent sur les utilitaires (une marge `mt-*` s'ajoute, une taille ne s'écrase pas).
 - **Titres de section révélés au scroll** : tout `h2.t-h2` est traité par `src/scripts/reveal-titles.ts`
   (mots gris → noirs au défilement). Exclure un titre : l'envelopper dans `[data-no-reveal]`. Pages
-  `/legal/` exclues d'office.
+  `/legal/` exclues d'office. Plancher d'opacité 0.55 (≥ 3:1 même sur `--secondary`) : un mot non
+  révélé reste lisible et conforme AA, ne jamais le baisser pour « plus d'effet ».
 - **Ponctuation** : ni tiret long, ni tiret de liaison « - » entre deux propositions dans les titres, les
   leads et les metas. Choisir la vraie ponctuation (virgule, deux-points, point, parenthèses).
