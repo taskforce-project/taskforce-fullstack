@@ -8,7 +8,7 @@ import CalloutBand from "@/components/site/sections/CalloutBand.astro";
 import ScreenPlaceholder from "@/components/site/sections/ScreenPlaceholder.astro";
 import { AutoAssign } from "@/components/site/illustrations/AutoAssign";
 import { SmartAssignFlow } from "@/components/site/flows/OrchestrationFlows";
-import { Sparkles, Gauge, Clock, Bot, ShieldCheck } from "lucide-react";
+import { Sparkles, Gauge, Clock, Bot, ShieldCheck, ArrowRight } from "lucide-react";
 import { hueFor } from "@/lib/site-icons";
 
 /**
@@ -51,7 +51,7 @@ const REVIEW = [
         <p class="t-eyebrow mb-3">In practice</p>
         <h2 class="t-h2">Recommendations, not decisions</h2>
         <p class="t-lead mt-4">
-          When a breakdown produces a batch of issues, Smart Assign proposes an owner for each -
+          When a breakdown produces a batch of issues, Smart Assign proposes an owner for each,
           with the reason next to it. You approve, adjust, or keep any for a specific person.
         </p>
       </div>
@@ -72,7 +72,7 @@ const REVIEW = [
           <h2 class="t-h2">Three signals, and its reasoning shown</h2>
           <p class="t-lead mt-4">
             Not a black box. Smart Assign weighs three signals and shows the reason behind every
-            suggestion - so a lead can trust it, or overrule it, in a glance.
+            suggestion, so a lead can trust it, or overrule it, in a glance.
           </p>
           <p class="text-muted-foreground mt-6 flex items-start gap-2 text-[13px] leading-6">
             <Sparkles className="mt-0.5 size-4 shrink-0" strokeWidth={2} style={{ color: hueFor(Sparkles) }} />
@@ -121,12 +121,19 @@ const REVIEW = [
       <div class="mt-6 flex flex-col gap-4 text-[15px] leading-7 text-foreground">
         <p>
           Same board, same card, same review checkpoint. Assign an issue to Claude Code, Cursor or
-          a teammate - Smart Assign weighs them the same way, by what the work needs.
+          a teammate: Smart Assign weighs them the same way, by what the work needs.
         </p>
         <p class="text-muted-foreground">
           That's the whole idea: an agent isn't a feature bolted on the side. It's a member of the
-          team that happens not to need sleep - and it still hands its work to a human to approve.
+          team that happens not to need sleep, and it still hands its work to a human to approve.
         </p>
+        <a
+          href="/product/orchestration#local-runner"
+          class="link-underline text-foreground inline-flex w-fit items-center gap-1.5 text-[13px] font-medium"
+        >
+          What happens when Claude Code takes the issue
+          <ArrowRight className="size-3.5" />
+        </a>
       </div>
     </div>
     <ScreenPlaceholder label="Board · agent as assignee" />
