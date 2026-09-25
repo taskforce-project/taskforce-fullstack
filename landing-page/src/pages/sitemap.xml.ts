@@ -12,10 +12,14 @@ const BASE_DOMAIN = (import.meta.env.PUBLIC_BASE_DOMAIN ?? "taskforce-project.fr
   .replace(/\/+$/, "");
 const SITE = `https://${BASE_DOMAIN}`;
 
+/** Routes construites mais NON indexables : les soumettre ferait lever « URL envoyée marquée
+ *  noindex » dans Search Console. /docs = redirection vers docs.taskforce-project.fr (noindex). */
+const NOINDEX = new Set(["/docs"]);
+
 export function GET() {
   const lastmod = new Date().toISOString().slice(0, 10); // date du build (YYYY-MM-DD)
   const mcpFiches = CONNECTORS.filter((c) => c.mcp).map((c) => `/product/integrations/${c.key}`);
-  const paths = [...new Set([...BUILT_ROUTES, ...mcpFiches])].sort();
+  const paths = [...new Set([...BUILT_ROUTES, ...mcpFiches])].filter((p) => !NOINDEX.has(p)).sort();
   const urls = paths
     .map((p) => {
       // La home porte la priorite max ; les pages produit/solutions au-dessus des pages legales.

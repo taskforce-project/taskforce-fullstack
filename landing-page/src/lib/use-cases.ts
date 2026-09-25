@@ -26,7 +26,7 @@ export const USE_CASES: Record<string, UseCase> = {
     key: "product-spec",
     name: "Product spec",
     level: "labs",
-    lead: "Turn an outcome into a product spec - stories, acceptance criteria, edge cases - as a reviewed artifact, not a doc written from scratch.",
+    lead: "Turn an outcome into a product spec (stories, acceptance criteria, edge cases) as a reviewed artifact, not a doc written from scratch.",
     what: "A product agent frames the problem and drafts the spec from your workspace context. It's a proposal, not a decision: a human reviews it, and once approved it becomes trusted context the rest of the run builds on.",
     inRun: [
       "Frame the problem, the users and the definition of done",
@@ -41,7 +41,7 @@ export const USE_CASES: Record<string, UseCase> = {
     key: "architecture-decision",
     name: "Architecture decision",
     level: "labs",
-    lead: "Propose an approach and API contract with the trade-offs and risks made explicit - for a human to approve before anything is built.",
+    lead: "Propose an approach and API contract with the trade-offs and risks made explicit, for a human to approve before anything is built.",
     what: "A technical agent proposes architecture, trade-offs and the API contract, grounded in your existing decisions and constraints. The value isn't a confident answer - it's a decision a human can weigh, approve and have remembered.",
     inRun: [
       "Propose an approach, with the trade-offs stated",
@@ -56,7 +56,7 @@ export const USE_CASES: Record<string, UseCase> = {
     key: "backlog-grooming",
     name: "Backlog grooming",
     level: "labs",
-    lead: "Break an outcome into issues - estimated, sequenced and ready to assign - instead of grooming a backlog by hand.",
+    lead: "Break an outcome into issues (estimated, sequenced and ready to assign) instead of grooming a backlog by hand.",
     what: "From an approved spec, a delivery agent proposes the breakdown: issues, dependencies, estimates and a delivery order. You review it, and Smart Assign can route each issue to the right owner - person or coding agent.",
     inRun: [
       "Break the work into issues from the spec",
@@ -101,7 +101,7 @@ export const USE_CASES: Record<string, UseCase> = {
     key: "documentation",
     name: "Documentation",
     level: "beta",
-    lead: "The spec, the decision and the sign-off are outputs of the run itself, kept in Memory - not homework once the work is done.",
+    lead: "The spec, the decision and the sign-off are outputs of the run itself, kept in Memory, not homework once the work is done.",
     what: "Because each stage produces a reviewed artifact, your documentation is a byproduct of delivery. Memory keeps the decisions, constraints and reasoning as a graph the next run can read - instead of pages someone has to keep current.",
     inRun: [
       "Artifacts produced at each checkpoint",
@@ -116,7 +116,7 @@ export const USE_CASES: Record<string, UseCase> = {
     key: "onboarding",
     name: "Onboarding",
     level: "beta",
-    lead: "A new teammate reads why the system is the way it is - instead of asking around and piecing it together.",
+    lead: "A new teammate reads why the system is the way it is, instead of asking around and piecing it together.",
     what: "The decisions, constraints and trade-offs behind your project live in Memory, not in people's heads. A new person can retrieve the reasoning directly. A short onboarding also captures each member's skills, so work gets routed well from day one.",
     inRun: [
       "Retrieve the decisions behind the system from Memory",
@@ -146,7 +146,7 @@ export const USE_CASES: Record<string, UseCase> = {
     key: "release-notes",
     name: "Release notes",
     level: "labs",
-    lead: "Turn a run's approved artifacts into release notes - drawn from what actually shipped, not written from memory.",
+    lead: "Turn a run's approved artifacts into release notes, drawn from what actually shipped, not written from memory.",
     what: "Because each stage of a run produces a reviewed artifact, the raw material for release notes already exists. Drafting them from those artifacts, for a human to approve, is a natural fit - and one we mark honestly as not yet shipped.",
     inRun: [
       "Draw from the approved artifacts of the run",
@@ -161,7 +161,7 @@ export const USE_CASES: Record<string, UseCase> = {
     key: "sprint-planning",
     name: "Sprint planning",
     level: "beta",
-    lead: "Plan a cycle with real capacity and workload from the board - not a guess on a whiteboard.",
+    lead: "Plan a cycle with real capacity and workload from the board, not a guess on a whiteboard.",
     what: "Cycles, issues and team workload are live in TaskForce. Planning a sprint starts from what your board actually contains: who's loaded, what's in flight, what slipped. AI-assisted sequencing of the plan is the part that grows with orchestration.",
     inRun: [
       "Group work into a cycle",
