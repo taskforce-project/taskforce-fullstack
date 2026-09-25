@@ -1,14 +1,21 @@
 package com.taskforce.tf_api.core.service.delivery;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
 import com.taskforce.tf_api.core.model.DeliveryRun;
@@ -22,8 +29,11 @@ import com.taskforce.tf_api.core.repository.IssueStatusRepository;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -164,6 +174,66 @@ class DeliveryRunnerTest {
         runner.complete(31L, new DeliveryPoll(DeliveryRunStatus.FAILED, null, null, "late failure"));
         assertThat(run.getStatus()).isEqualTo(DeliveryRunStatus.DONE);
         assertThat(run.getError()).isNull();
+    }
+
+    /** (libellé, provider « pull » ?, délai de réclamation en min, âge du run en min, lignes closes par l'UPDATE, clos ?) */
+    static Stream<Arguments> unclaimedCases() {
+        return Stream.of(
+            Arguments.of("délai dépassé : clos, issue vers « Blocked »", true, 15, 16, 1, true),
+            Arguments.of("délai non atteint : rien", true, 15, 5, 1, false),
+            Arguments.of("réclamé au même instant : le runner gagne", true, 15, 16, 0, false),
+            Arguments.of("provider « push » : jamais clos par ce chemin", false, null, 60, 1, false));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("unclaimedCases")
+    @DisplayName("refresh d'un run en attente : une délégation que personne ne réclame est close")
+    void refresh_expires_unclaimed_pull_runs(String label, boolean pull, Integer timeoutMinutes, int ageMinutes,
+                                             int closedRows, boolean expectClosed) {
+        Project project = mock(Project.class);
+        lenient().when(project.getId()).thenReturn(400L);
+        Issue issue = mock(Issue.class);
+        lenient().when(issue.getProject()).thenReturn(project);
+        DeliveryRun run = DeliveryRun.builder()
+            .id(40L).issue(issue).providerKey("claude-code").status(DeliveryRunStatus.QUEUED).build();
+        ReflectionTestUtils.setField(run, "createdAt", LocalDateTime.now().minusMinutes(ageMinutes));
+        when(runRepository.findById(40L)).thenReturn(Optional.of(run));
+
+        DeliveryAgentProvider provider = mock(DeliveryAgentProvider.class);
+        when(provider.pullBased()).thenReturn(pull);
+        lenient().when(provider.claimTimeout())
+            .thenReturn(timeoutMinutes == null ? null : Duration.ofMinutes(timeoutMinutes));
+        when(registry.get("claude-code")).thenReturn(provider);
+        lenient().when(runRepository.expireUnclaimed(eq(40L), anyString(), any(),
+            eq(DeliveryRunStatus.QUEUED), eq(DeliveryRunStatus.FAILED))).thenReturn(closedRows);
+        lenient().when(issueStatusRepository.findByProjectIdAndName(400L, "Blocked")).thenReturn(Optional.empty());
+        lenient().when(issueStatusRepository.findByProjectIdOrderByPosition(400L)).thenReturn(List.of());
+        lenient().when(issueStatusRepository.save(any(IssueStatus.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        runner.refresh(40L);
+
+        boolean attempted = pull && timeoutMinutes != null && ageMinutes > timeoutMinutes;
+        verify(runRepository, times(attempted ? 1 : 0)).expireUnclaimed(eq(40L), anyString(), any(),
+            eq(DeliveryRunStatus.QUEUED), eq(DeliveryRunStatus.FAILED));
+        if (expectClosed) {
+            verify(runRepository).expireUnclaimed(eq(40L), eq(DeliveryRunner.unclaimedMessage(Duration.ofMinutes(timeoutMinutes))),
+                any(), eq(DeliveryRunStatus.QUEUED), eq(DeliveryRunStatus.FAILED));
+            verify(issue).setStatus(any(IssueStatus.class)); // issue déplacée vers « Blocked »
+            verify(issueRepository).save(issue);
+        } else {
+            verify(issueRepository, never()).save(any());
+        }
+        // Jamais d'écriture de la copie chargée : elle pourrait écraser un claim arrivé entre-temps.
+        verify(runRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("message d'une délégation non réclamée : délai, action, accès anticipé")
+    void unclaimed_message_says_what_to_do() {
+        assertThat(DeliveryRunner.unclaimedMessage(Duration.ofMinutes(15)))
+            .contains("within 15 min")
+            .contains("Start the TaskForce runner")
+            .contains("early access");
     }
 
     @Test

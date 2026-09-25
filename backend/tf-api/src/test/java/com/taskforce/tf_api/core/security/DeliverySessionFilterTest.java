@@ -61,7 +61,7 @@ class DeliverySessionFilterTest {
 
     @BeforeEach
     void setUp() {
-        LocalRunnerSettings settings = new LocalRunnerSettings(true, "delivery-runner", "tf-runner-", "tf_runner_owner", 120, 10);
+        LocalRunnerSettings settings = new LocalRunnerSettings(true, "delivery-runner", "tf-runner-", "tf_runner_owner", 120, 10, 15);
         filter = new DeliverySessionFilter(new RunnerIdentityResolver(settings), localRunnerService);
     }
 

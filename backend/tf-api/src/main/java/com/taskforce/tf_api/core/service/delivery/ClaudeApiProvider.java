@@ -56,7 +56,8 @@ public class ClaudeApiProvider implements DeliveryAgentProvider {
 
     @Override public String key()          { return "claude-api"; }
     @Override public String displayName()  { return "Claude (API)"; }
-    @Override public String logoKey()      { return "anthropic"; } // logo vendorisé (SVGL)
+    // Clé de marque. Les fronts n'en affichent que le NOM : les conditions d'Anthropic interdisent son logo sans permission (ADR-013).
+    @Override public String logoKey()      { return "anthropic"; }
     @Override public boolean available()   { return true; }
     @Override public List<String> models() { return List.of("claude-opus-5", "claude-sonnet-5"); }
 
