@@ -102,5 +102,9 @@ if (jsonLd) structuredData.push(...(Array.isArray(jsonLd) ? jsonLd : [jsonLd]));
     </main>
     <SiteFooter />
     <CookieConsent client:load />
+    {/* Titres de section révélés au scroll (h2.t-h2). Bundlé et différé par Astro. */}
+    <script>
+      import "@/scripts/reveal-titles";
+    </script>
   </body>
 </html>

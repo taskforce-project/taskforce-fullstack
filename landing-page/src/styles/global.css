@@ -842,6 +842,21 @@ body {
   letter-spacing: 0;
 }
 
+/* ── Titres révélés au scroll (façon Relevance, 24/09) ──
+   `--p` (0 → 1) est posé par src/scripts/reveal-titles.ts selon la position du titre à l'écran ;
+   chaque mot (`.rw`, rang `--i`, sur `--n` mots) s'allume quand p·(n+1) le dépasse.
+   Sans JS, `--p` est absent et vaut 1 : tout est noir. */
+.reveal-words .rw {
+  opacity: clamp(0.22, calc(var(--p, 1) * (var(--n, 1) + 1) - var(--i, 0)), 1);
+  transition: opacity 90ms linear;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal-words .rw {
+    opacity: 1;
+    transition: none;
+  }
+}
+
 /* ── Liens : soulignage animé de gauche à droite ──
    Repris du breadcrumb de la webapp (frontend/components/ui/breadcrumb.tsx, QA2-3) :
    after:w-0 → hover:after:w-full, transition sur `width`, 200ms ease-out.
