@@ -112,4 +112,7 @@ Le site partage le système de l'app, pas sa densité : c'est du marketing, on r
   `/legal/` exclues d'office. Plancher d'opacité 0.55 (≥ 3:1 même sur `--secondary`) : un mot non
   révélé reste lisible et conforme AA, ne jamais le baisser pour « plus d'effet ».
 - **Ponctuation** : ni tiret long, ni tiret de liaison « - » entre deux propositions dans les titres, les
-  leads et les metas. Choisir la vraie ponctuation (virgule, deux-points, point, parenthèses).
+  leads et les metas. Choisir la vraie ponctuation (virgule, deux-points, point, parenthèses). Un lead
+  existe sous trois formes : l'attribut `lead=` des composants, le paragraphe `<p class="t-lead">` des
+  pages et le `support=` des CalloutBand. Un contrôle qui n'en lit qu'une rate les autres (25/09 : 40
+  oublis rattrapés dans une 2e passe).
