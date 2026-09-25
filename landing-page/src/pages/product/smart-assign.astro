@@ -8,7 +8,7 @@ import CalloutBand from "@/components/site/sections/CalloutBand.astro";
 import ScreenPlaceholder from "@/components/site/sections/ScreenPlaceholder.astro";
 import { AutoAssign } from "@/components/site/illustrations/AutoAssign";
 import { SmartAssignFlow } from "@/components/site/flows/OrchestrationFlows";
-import { Sparkles, Gauge, Clock, Bot, ShieldCheck } from "lucide-react";
+import { Sparkles, Gauge, Clock, Bot, ShieldCheck, ArrowRight } from "lucide-react";
 import { hueFor } from "@/lib/site-icons";
 
 /**
@@ -121,12 +121,19 @@ const REVIEW = [
       <div class="mt-6 flex flex-col gap-4 text-[15px] leading-7 text-foreground">
         <p>
           Same board, same card, same review checkpoint. Assign an issue to Claude Code, Cursor or
-          a teammate - Smart Assign weighs them the same way, by what the work needs.
+          a teammate: Smart Assign weighs them the same way, by what the work needs.
         </p>
         <p class="text-muted-foreground">
           That's the whole idea: an agent isn't a feature bolted on the side. It's a member of the
-          team that happens not to need sleep - and it still hands its work to a human to approve.
+          team that happens not to need sleep, and it still hands its work to a human to approve.
         </p>
+        <a
+          href="/product/orchestration#local-runner"
+          class="link-underline text-foreground inline-flex w-fit items-center gap-1.5 text-[13px] font-medium"
+        >
+          What happens when Claude Code takes the issue
+          <ArrowRight className="size-3.5" />
+        </a>
       </div>
     </div>
     <ScreenPlaceholder label="Board · agent as assignee" />

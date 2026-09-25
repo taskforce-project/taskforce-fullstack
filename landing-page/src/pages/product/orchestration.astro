@@ -15,7 +15,26 @@ import { hueFor } from "@/lib/site-icons";
  * GRAPHE de run à droite (pas de screenshot d'app), et des FONDS DE SECTION qui alternent (points /
  * rayures / vide / NOIR) - pas de fond sur les cartes. « Structure par traits » gardée (colonnes à filets).
  * D11 : le graphe est illustratif (badge PLANNED + légende « Illustrative »), rien n'est présenté comme Live.
+ * Exception volontaire : la section « Local runner » (Beta, accès anticipé) décrit ce qui tourne VRAIMENT
+ * aujourd'hui (ADR-013, `taskforce-runner/README.md`). Conditions d'Anthropic : on écrit en texte que le
+ * produit fait tourner Claude Code, jamais comme nom de fonctionnalité, et sans son logo.
  */
+
+/** Le chemin réel d'une délégation au runner local (README du runner : claim → worktree → PR). */
+const RUNNER_STEPS = [
+  { title: "Assign", text: "Choose Claude Code in the issue's assignee menu. The run waits in TaskForce." },
+  { title: "Claim", text: "The runner on your computer fetches it. TaskForce never connects to your machine." },
+  { title: "Build", text: "Claude Code works in a fresh worktree and reads the issue through the TaskForce MCP server." },
+  { title: "Review", text: "The runner pushes the branch and opens the pull request. The issue moves to “In review by AI”." },
+];
+
+/** Ce que l'agent peut toucher, repris du tableau « Ce que l'agent a le droit de faire » du README. */
+const RUNNER_SCOPE = [
+  { where: "Your repository", what: "An isolated worktree on a new branch. Your checkout and your current branch are never touched." },
+  { where: "Your machine", what: "A closed list of tools: read, edit and commit. No free shell, no network, no push." },
+  { where: "TaskForce", what: "The rights of the person who delegated, narrowed to reading the workspace and writing that project's issues. Never a deletion." },
+  { where: "GitHub", what: "Nothing. The runner pushes and opens the pull request once the agent is done." },
+];
 
 const AGENTS_FULL = [
   {
@@ -137,8 +156,16 @@ const PRINCIPLES = [
             <p class="t-eyebrow mb-2">Handoff</p>
             <h3 class="t-h3">Approved plans go straight to your coding agent</h3>
             <p class="text-muted-foreground mt-2 text-[13.5px] leading-6">
-              TaskForce hands the full approved context to the agent you already use - it builds and opens a PR.
+              TaskForce hands the full approved context to the agent you already use. It builds on a new branch
+              and opens a pull request.
             </p>
+            <a
+              href="#local-runner"
+              class="link-underline text-foreground mt-4 inline-flex w-fit items-center gap-1.5 text-[13px] font-medium"
+            >
+              How the local runner works
+              <ArrowRight className="size-3.5" />
+            </a>
           </div>
           <div class="flow-canvas rail-y relative mt-auto h-[280px]">
             <HandoffFlow client:only="react" />
@@ -177,6 +204,71 @@ const PRINCIPLES = [
       <p class="text-muted-foreground/60 mt-6 font-mono text-[10px] tracking-wide uppercase">
         Illustrative - orchestration is Planned
       </p>
+    </div>
+  </section>
+
+  {/* ───── Local runner - la remise à l'agent qui tourne AUJOURD'HUI (Beta, accès anticipé) - fond GRIS ───── */}
+  <section id="local-runner" class="bg-secondary scroll-mt-20 border-b">
+    <div class="container-rail py-20 lg:py-28">
+      <div class="grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:gap-16">
+        <div>
+          <div class="mb-3 flex items-center gap-2.5">
+            <p class="t-eyebrow">Local runner</p>
+            <LevelBadge level="beta" />
+          </div>
+          <h2 class="t-h2 text-balance">Assign the issue. Your agent opens the pull request.</h2>
+          <p class="t-lead mt-4">
+            Pick Claude Code as the assignee and a small runner on your computer takes the issue. It starts your
+            own Claude Code, signed in with your own account, in an isolated branch. Nothing is merged until a
+            person reviews it.
+          </p>
+          <ol class="mt-10 grid gap-x-8 gap-y-6 sm:grid-cols-2">
+            {
+              RUNNER_STEPS.map((s, i) => (
+                <li class="border-t pt-4">
+                  <span class="text-muted-foreground font-mono text-[11px]">{String(i + 1).padStart(2, "0")}</span>
+                  <h3 class="t-h5 mt-1">{s.title}</h3>
+                  <p class="text-muted-foreground mt-1.5 text-[13.5px] leading-6">{s.text}</p>
+                </li>
+              ))
+            }
+          </ol>
+        </div>
+
+        <div class="lg:pt-10">
+          <div class="bg-card overflow-hidden rounded-xl border">
+            <p class="text-foreground border-b px-5 py-3 text-[13px] font-semibold">What the agent can touch</p>
+            <table class="w-full border-collapse text-left">
+              <caption class="sr-only">What the coding agent can access when the local runner works on an issue</caption>
+              <tbody>
+                {
+                  RUNNER_SCOPE.map((r) => (
+                    <tr class="border-t align-top first:border-t-0">
+                      <th scope="row" class="text-foreground w-[32%] px-5 py-3.5 text-[13px] font-medium">{r.where}</th>
+                      <td class="text-muted-foreground py-3.5 pr-5 text-[13.5px] leading-6">{r.what}</td>
+                    </tr>
+                  ))
+                }
+              </tbody>
+            </table>
+          </div>
+          <p class="text-muted-foreground mt-4 text-[13px] leading-6">
+            The text of an issue is handed to the agent as data, never as instructions, and the scope above caps
+            what a planted instruction could reach. No repository linked? The agent works in a disposable folder
+            and answers with a comment on the issue: no git, no pull request.
+          </p>
+        </div>
+      </div>
+
+      <div class="mt-12 flex flex-col gap-5 border-t pt-8 sm:flex-row sm:items-center sm:justify-between">
+        <p class="text-muted-foreground max-w-2xl text-[13px] leading-6">
+          Early access. Today we set the runner up with you. It runs on your computer with Node, git, the GitHub
+          CLI and Claude Code, on your own subscription or API key. TaskForce never sees your Claude credentials.
+        </p>
+        <a href="/book-a-demo" class={cn(buttonVariants({ variant: "outline", size: "pill" }), "shrink-0")}>
+          Ask for early access
+        </a>
+      </div>
     </div>
   </section>
 
