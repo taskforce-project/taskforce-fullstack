@@ -33,12 +33,12 @@ const REVIEW = [
 
 <BaseLayout
   title="Smart Assign - TaskForce"
-  description="TaskForce routes each task to the teammate or coding agent best matched to the work, based on skills, current load and availability. Every recommendation comes with its reason, and a human approves it."
+  description="Route each task to the teammate or coding agent best matched to the work, by skills, load and availability. Every pick comes with its reason."
 >
   <PageHero
     kicker="Smart Assign"
     title="The right work to the right hands"
-    lead="TaskForce routes each task to the teammate or coding agent best matched to the work - based on skills, current load and availability. Every recommendation comes with the reason, and a human approves it."
+    lead="TaskForce routes each task to the teammate or coding agent best matched to the work, based on skills, current load and availability. Every recommendation comes with the reason, and a human approves it."
     level="live"
     primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
     secondary={{ label: "See pricing", href: "/pricing" }}
@@ -88,7 +88,7 @@ const REVIEW = [
                   <f.icon className="size-5" strokeWidth={1.75} />
                 </span>
                 <div class="min-w-0">
-                  <h3 class="text-foreground text-[14.5px] font-semibold">{f.title}</h3>
+                  <h3 class="t-h5">{f.title}</h3>
                   <p class="text-muted-foreground mt-1 text-[13px] leading-6">{f.text}</p>
                 </div>
               </li>
@@ -150,7 +150,7 @@ const REVIEW = [
 
   <PageCta
     title="Put the right work in the right hands"
-    lead="Smart Assign is live today - route work to teammates or coding agents based on what the task actually needs."
+    lead="Smart Assign is live today. Route work to teammates or coding agents based on what the task actually needs."
     primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
     secondary={{ label: "Book a demo", href: "/book-a-demo" }}
   />

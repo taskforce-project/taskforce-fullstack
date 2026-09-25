@@ -828,6 +828,22 @@ body {
   line-height: 1.3;
   color: var(--site-fg);
 }
+/* Titres de CARTES (24/09) : deux crans au lieu de sept tailles ad hoc (14, 14.5, 15, 15.5, 16,
+   17 px relevées sur le site). Police de texte (Inter), pas display : ce sont des libellés d'UI. */
+.t-h4 {
+  font-size: 1rem; /* 16 px : carte standard */
+  font-weight: 600;
+  letter-spacing: -0.011em;
+  line-height: 1.4;
+  color: var(--site-fg);
+}
+.t-h5 {
+  font-size: 0.875rem; /* 14 px : carte dense, ligne de liste */
+  font-weight: 600;
+  letter-spacing: -0.006em;
+  line-height: 1.45;
+  color: var(--site-fg);
+}
 .t-eyebrow {
   font-size: 0.8125rem;
   font-weight: 600;

@@ -63,12 +63,12 @@ const LIVE = [
 
 <BaseLayout
   title="Collaboration - TaskForce"
-  description="Boards, issues and cycles your team already knows, kept in sync in real time. People and coding agents work the same board, and every change is broadcast live to everyone."
+  description="Boards, issues and cycles your team knows, synced in real time. People and coding agents work the same board, and every change reaches everyone live."
 >
   <PageHero
     kicker="Collaboration"
-    title="Where a run's work lands - one shared board"
-    lead="The surface a governed run delivers onto - boards, issues and cycles your team already knows - kept in sync in real time. People and coding agents work the same board, and every change shows up for everyone the moment it happens."
+    title="Where a run's work lands: one shared board"
+    lead="The surface a governed run delivers onto (boards, issues and cycles your team already knows), kept in sync in real time. People and coding agents work the same board, and every change shows up for everyone the moment it happens."
     level="live"
     primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
     secondary={{ label: "See pricing", href: "/pricing" }}
@@ -97,7 +97,7 @@ const LIVE = [
     bg="card"
     eyebrow="The building blocks"
     title="Built to run the work, not just track it"
-    lead="The primitives are the ones you'd expect from a modern issue tracker - with the run's context attached to each one."
+    lead="The primitives are the ones you'd expect from a modern issue tracker, with the run's context attached to each one."
   >
     <ScreenPlaceholder label="Boards & issues" />
     <ul slot="aside" class="mt-8 border-t">
@@ -108,7 +108,7 @@ const LIVE = [
               <b.icon className="size-5" strokeWidth={1.75} />
             </span>
             <div class="min-w-0">
-              <h3 class="text-foreground text-[14.5px] font-semibold">{b.title}</h3>
+              <h3 class="t-h5">{b.title}</h3>
               <p class="text-muted-foreground mt-1 text-[13px] leading-6">{b.text}</p>
             </div>
           </li>
@@ -122,7 +122,7 @@ const LIVE = [
     bg="card"
     eyebrow="Real time"
     title="Everyone sees the same board, the moment it changes"
-    lead="When anyone creates, moves, re-labels or re-assigns an issue, it updates on every open board instantly - over a live connection, no refresh. Your agents' changes arrive the same way people's do."
+    lead="When anyone creates, moves, re-labels or re-assigns an issue, it updates on every open board instantly, over a live connection, with no refresh. Your agents' changes arrive the same way people's do."
   >
     {
       LIVE.map((l, i) => (
@@ -157,7 +157,7 @@ const LIVE = [
 
   <PageCta
     title="Bring your team onto one board"
-    lead="Start with the delivery workspace - boards, issues, cycles and real-time collaboration, free. Invite your team and your agents to the same place."
+    lead="Start with the delivery workspace: boards, issues, cycles and real-time collaboration, free. Invite your team and your agents to the same place."
     primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
     secondary={{ label: "Book a demo", href: "/book-a-demo" }}
   />

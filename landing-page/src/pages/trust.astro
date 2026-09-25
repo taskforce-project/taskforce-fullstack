@@ -169,12 +169,12 @@ const FLOW = [
 
 <BaseLayout
   title="Trust center - TaskForce"
-  description="Security you can verify, not just claim. How TaskForce handles data, who can do what, what every run leaves behind, and exactly where each control stands - Available, Beta, Planned or not started."
+  description="Security you can verify, not just claim: how TaskForce handles data, who can do what, what every run leaves behind, and where each control stands today."
 >
   <PageHero
     eyebrow="Trust center"
     title="Security you can verify, not just claim"
-    lead="TaskForce puts AI in your delivery path, so it should answer for it. Here is how data is handled, who can do what, and what every run leaves behind - with a public roadmap you can hold us to."
+    lead="TaskForce puts AI in your delivery path, so it should answer for it. Here is how data is handled, who can do what, and what every run leaves behind, with a public roadmap you can hold us to."
     primary={{ label: "Read the AI transparency note", href: "/legal/ai-transparency" }}
     secondary={{ label: "Book a security review", href: "/book-a-demo" }}
   />
@@ -197,7 +197,7 @@ const FLOW = [
               <span class="text-primary font-mono text-[12px] tabular-nums">
                 {String(i + 1).padStart(2, "0")}
               </span>
-              <h3 class="mt-2 text-[15px] font-semibold text-foreground">{p.t}</h3>
+              <h3 class="t-h4 mt-2">{p.t}</h3>
               <p class="text-muted-foreground mt-1.5 text-[13.5px] leading-6">{p.d}</p>
             </div>
           ))
@@ -311,7 +311,7 @@ const FLOW = [
     <div class="container-rail py-20 lg:py-24">
       <div class="max-w-2xl">
         <p class="t-eyebrow mb-3">Data flow</p>
-        <h2 class="t-h2">Where your data goes - and where it doesn't</h2>
+        <h2 class="t-h2">Where your data goes, and where it doesn't</h2>
         <p class="t-lead mt-4">
           For an AI product this matters more than any single control. This is the path your data
           takes through a run, and what self-hosting changes about it.
@@ -370,7 +370,7 @@ const FLOW = [
         {
           AI_GOV.map((p) => (
             <div class="bg-card flex flex-col p-5">
-              <h3 class="text-[15px] font-semibold text-foreground">{p.t}</h3>
+              <h3 class="t-h4">{p.t}</h3>
               <p class="text-muted-foreground mt-1.5 text-[13.5px] leading-6">{p.d}</p>
             </div>
           ))
@@ -518,7 +518,7 @@ const FLOW = [
         <div class="border bg-card p-6">
           <div class="flex items-center gap-2.5">
             <Server className="size-5" strokeWidth={1.75} style={{ color: hueFor(Server) }} />
-            <h3 class="text-[16px] font-semibold text-foreground">Self-hosted</h3>
+            <h3 class="t-h4">Self-hosted</h3>
             <span class:list={["ml-auto rounded-full border px-2.5 py-0.5 text-[11px] font-medium", TONE.available]}>Available</span>
           </div>
           <p class="text-muted-foreground mt-3 text-[13.5px] leading-6">
@@ -529,7 +529,7 @@ const FLOW = [
         <div class="border bg-card p-6">
           <div class="flex items-center gap-2.5">
             <Server className="size-5" strokeWidth={1.75} style={{ color: hueFor(Server) }} />
-            <h3 class="text-[16px] font-semibold text-foreground">Managed cloud</h3>
+            <h3 class="t-h4">Managed cloud</h3>
             <span class:list={["ml-auto rounded-full border px-2.5 py-0.5 text-[11px] font-medium", TONE.planned]}>Planned</span>
           </div>
           <p class="text-muted-foreground mt-3 text-[13.5px] leading-6">
@@ -649,7 +649,7 @@ const FLOW = [
             <div class="flex flex-col border-b border-border py-5">
               <div class="flex items-center gap-2">
                 <Radar className="size-4 shrink-0" strokeWidth={2} style={{ color: hueFor(Radar) }} />
-                <h3 class="text-[14px] font-semibold text-foreground">{s.t}</h3>
+                <h3 class="t-h5">{s.t}</h3>
               </div>
               <p class="text-muted-foreground mt-2 text-[13px] leading-6">{s.d}</p>
             </div>
@@ -684,7 +684,7 @@ const FLOW = [
         {
           AVAILABILITY.map((a) => (
             <div class="bg-card flex flex-col p-5">
-              <h3 class="text-[14px] font-semibold text-foreground">{a.t}</h3>
+              <h3 class="t-h5">{a.t}</h3>
               <ul class="mt-3 flex flex-col gap-2">
                 {a.items.map((it) => (
                   <li class="text-muted-foreground flex items-start gap-2 text-[13px] leading-5">
@@ -781,7 +781,7 @@ const FLOW = [
 
   <PageCta
     title="Bring it to your security team"
-    lead="Send us your security questionnaire, or book a review and we'll walk your team through the architecture, the controls and the roadmap - including the parts that aren't done yet."
+    lead="Send us your security questionnaire, or book a review and we'll walk your team through the architecture, the controls and the roadmap, including the parts that aren't done yet."
     primary={{ label: "Book a security review", href: "/book-a-demo" }}
     secondary={{ label: "Read the AI transparency note", href: "/legal/ai-transparency" }}
     note={`Security contact - ${CONTACT}`}

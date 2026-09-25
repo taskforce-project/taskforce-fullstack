@@ -14,12 +14,12 @@ const GROUPS = [
 
 <BaseLayout
   title="Product - TaskForce"
-  description="One platform from intent to production: governed orchestration, a memory layer for every run, human approvals, and the delivery tools your team already works in."
+  description="One platform from intent to production: governed orchestration, a memory layer for every run, human approvals, and the delivery tools your team uses."
 >
   <PageHero
     kicker="Platform"
     title="One platform, from intent to production"
-    lead="TaskForce runs the whole path - planning, memory, approvals and the board your team already uses - as one system where every part knows about the others."
+    lead="TaskForce runs the whole path (planning, memory, approvals and the board your team already uses) as one system where every part knows about the others."
     primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
     secondary={{ label: "See the run", href: "/product/orchestration" }}
   />
@@ -40,7 +40,7 @@ const GROUPS = [
                       {Icon && <Icon className="size-[18px]" strokeWidth={1.75} />}
                     </span>
                     <div class="mt-3 flex items-center gap-2">
-                      <h3 class="text-[15px] font-medium text-foreground">{item.label}</h3>
+                      <h3 class="t-h4">{item.label}</h3>
                       {live ? (
                         item.badge && <LevelBadge level={item.badge} />
                       ) : (

@@ -22,12 +22,12 @@ const PROFILES = [
 
 <BaseLayout
   title="Book a demo - TaskForce"
-  description="Bring us a real outcome from your team and we'll run TaskForce against it - the governed delivery path end to end, where humans stay in control, and straight answers on what's live versus planned."
+  description="Bring a real outcome from your team: we'll run TaskForce on it end to end, show where humans stay in control, and say plainly what's live or planned."
 >
   <PageHero
     eyebrow="Book a demo"
     title="See it run on your own workflow"
-    lead="Thirty minutes, using a real outcome from your team. We'll run it end to end, show where humans stay in control, and answer the hard questions - no obligation."
+    lead="Thirty minutes, using a real outcome from your team. We'll run it end to end, show where humans stay in control, and answer the hard questions. No obligation."
     primary={{ label: "See TaskForce in action", href: "#demo-form" }}
     secondary={{ label: "See pricing", href: "/pricing" }}
   />
@@ -45,7 +45,7 @@ const PROFILES = [
             <div class="flex items-start gap-3">
               <Check className="text-primary mt-0.5 size-4 shrink-0" strokeWidth={2.5} />
               <div>
-                <h3 class="text-[14.5px] font-semibold text-foreground">{e.t}</h3>
+                <h3 class="t-h5">{e.t}</h3>
                 <p class="text-muted-foreground mt-1 text-[13.5px] leading-6">{e.d}</p>
               </div>
             </div>
@@ -90,7 +90,7 @@ const PROFILES = [
         {
           PROFILES.map((p) => (
             <div class="border bg-card p-6">
-              <h3 class="text-[15px] font-semibold text-foreground">{p.t}</h3>
+              <h3 class="t-h4">{p.t}</h3>
               <p class="text-muted-foreground mt-2 text-[13.5px] leading-6">{p.d}</p>
             </div>
           ))

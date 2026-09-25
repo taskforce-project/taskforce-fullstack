@@ -157,7 +157,7 @@ export function CapabilityPairs() {
           <span>+</span>
           <span className="text-primary font-medium">{pair.b}</span>
         </p>
-        <h3 className="mt-2 text-[14.5px] leading-6 font-semibold text-foreground">{pair.title}</h3>
+        <h3 className="t-h5 mt-2">{pair.title}</h3>
         <p className="text-muted-foreground mt-1.5 text-[12.5px] leading-6">{pair.text}</p>
       </div>
     </div>
