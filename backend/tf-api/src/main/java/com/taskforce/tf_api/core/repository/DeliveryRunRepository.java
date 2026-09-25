@@ -78,6 +78,22 @@ public interface DeliveryRunRepository extends JpaRepository<DeliveryRun, Long> 
         @Param("queued") DeliveryRunStatus queued,
         @Param("running") DeliveryRunStatus running);
 
+    /**
+     * Clôt en échec un run « pull » que personne n'a réclamé dans le délai. Même garde que {@link #claim} :
+     * encore en attente et sans runner, donc un claim concurrent gagne toujours. Renvoie 1 si clos ici.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+        UPDATE DeliveryRun r SET r.status = :failed, r.error = :error, r.updatedAt = :now
+        WHERE r.id = :id AND r.status = :queued AND r.claimedBy IS NULL
+        """)
+    int expireUnclaimed(
+        @Param("id") Long id,
+        @Param("error") String error,
+        @Param("now") LocalDateTime now,
+        @Param("queued") DeliveryRunStatus queued,
+        @Param("failed") DeliveryRunStatus failed);
+
     /** Signe de vie d'un runner sur SON run en cours. Renvoie 1 si le run lui appartient encore. */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""

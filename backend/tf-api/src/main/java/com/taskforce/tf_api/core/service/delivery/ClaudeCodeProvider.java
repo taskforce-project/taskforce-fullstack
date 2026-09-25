@@ -1,5 +1,6 @@
 package com.taskforce.tf_api.core.service.delivery;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -16,7 +17,8 @@ import com.taskforce.tf_api.core.repository.DeliveryRunRepository;
  * donc rien n'est dispatché. Le run reste {@code QUEUED} jusqu'à ce que le runner le réclame
  * ({@link LocalRunnerService#claim}), travaille, puis poste son résultat. {@link #poll} ne sert qu'à
  * détecter un runner <b>perdu</b> : muet plus longtemps que le délai toléré, le run passe en échec au
- * lieu de rester « en cours » pour toujours.</p>
+ * lieu de rester « en cours » pour toujours. Symétrique, {@link #claimTimeout()} : un run que <b>personne</b>
+ * ne réclame (aucun runner allumé pour son délégant) est clos au lieu de rester « en attente » pour toujours.</p>
  *
  * <p>{@code available} suit {@code delivery.local-runner.enabled} : désactivé, le provider reste affiché
  * « à venir » dans le picker, comme avant.</p>
@@ -36,9 +38,11 @@ public class ClaudeCodeProvider implements DeliveryAgentProvider {
 
     @Override public String key()          { return KEY; }
     @Override public String displayName()  { return "Claude Code"; }
-    @Override public String logoKey()      { return "anthropic"; } // logo vendorisé (SVGL)
+    // Clé de marque. Les fronts n'en affichent que le NOM : les conditions d'Anthropic interdisent son logo sans permission (ADR-013).
+    @Override public String logoKey()      { return "anthropic"; }
     @Override public boolean available()   { return settings.enabled(); }
     @Override public boolean pullBased()   { return true; }
+    @Override public Duration claimTimeout() { return settings.claimTimeout(); }
     @Override public List<String> models() { return List.of("claude-opus-5", "claude-sonnet-5"); }
 
     @Override
