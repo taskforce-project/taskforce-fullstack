@@ -828,6 +828,22 @@ body {
   line-height: 1.3;
   color: var(--site-fg);
 }
+/* Titres de CARTES (24/09) : deux crans au lieu de sept tailles ad hoc (14, 14.5, 15, 15.5, 16,
+   17 px relevées sur le site). Police de texte (Inter), pas display : ce sont des libellés d'UI. */
+.t-h4 {
+  font-size: 1rem; /* 16 px : carte standard */
+  font-weight: 600;
+  letter-spacing: -0.011em;
+  line-height: 1.4;
+  color: var(--site-fg);
+}
+.t-h5 {
+  font-size: 0.875rem; /* 14 px : carte dense, ligne de liste */
+  font-weight: 600;
+  letter-spacing: -0.006em;
+  line-height: 1.45;
+  color: var(--site-fg);
+}
 .t-eyebrow {
   font-size: 0.8125rem;
   font-weight: 600;
@@ -840,6 +856,23 @@ body {
   line-height: 1.6;
   color: var(--site-muted);
   letter-spacing: 0;
+}
+
+/* ── Titres révélés au scroll (façon Relevance, 24/09) ──
+   `--p` (0 → 1) est posé par src/scripts/reveal-titles.ts selon la position du titre à l'écran ;
+   chaque mot (`.rw`, rang `--i`, sur `--n` mots) s'allume quand p·(n+1) le dépasse.
+   Sans JS, `--p` est absent et vaut 1 : tout est noir.
+   Plancher 0.55 = contraste 3,67:1 sur le fond le plus gris (#f2f2f4), 3,79:1 sur blanc : un mot
+   pas encore révélé reste conforme WCAG AA gros texte (3:1). Ne pas descendre sous 0.5 (3,16:1). */
+.reveal-words .rw {
+  opacity: clamp(0.55, calc(var(--p, 1) * (var(--n, 1) + 1) - var(--i, 0)), 1);
+  transition: opacity 90ms linear;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal-words .rw {
+    opacity: 1;
+    transition: none;
+  }
 }
 
 /* ── Liens : soulignage animé de gauche à droite ──

@@ -78,12 +78,12 @@ const FAQ = [
 
 <BaseLayout
   title="Enterprise - TaskForce"
-  description="TaskForce for engineering organizations: self-hosted deployment, governance at every run, and full control of your data and models - with a clear path from architecture review to first workflow."
+  description="TaskForce for engineering organizations: self-hosted deployment, governance on every run, and full control of your data and models."
 >
   <PageHero
     kicker="Enterprise"
     title="AI in your delivery path, on your terms"
-    lead="TaskForce keeps a human accountable at every checkpoint and can run entirely on your own infrastructure - so you get agent leverage without giving up control, attribution or ownership of your data."
+    lead="TaskForce keeps a human accountable at every checkpoint and can run entirely on your own infrastructure, so you get agent leverage without giving up control, attribution or ownership of your data."
     primary={{ label: "Book a demo", href: "/book-a-demo" }}
     secondary={{ label: "Read the trust center", href: "/trust" }}
   />
@@ -134,7 +134,7 @@ const FAQ = [
     bg="card"
     eyebrow="Governance"
     title="A human on every consequential step"
-    lead="Approval isn't a settings toggle. It sits where a decision compounds - and it leaves a record you can read months later."
+    lead="Approval isn't a settings toggle. It sits where a decision compounds, and it leaves a record you can read months later."
   >
     <div slot="aside">
       <ul class="mt-8 flex flex-col gap-3.5">
@@ -293,7 +293,7 @@ const FAQ = [
           STEPS.map((s) => (
             <li class="bg-card flex flex-col p-6">
               <span class="text-primary font-display text-[26px] font-semibold tabular-nums">{s.n}</span>
-              <h3 class="mt-2 text-[15px] font-semibold text-foreground">{s.title}</h3>
+              <h3 class="t-h4 mt-2">{s.title}</h3>
               <p class="text-muted-foreground mt-1.5 text-[13.5px] leading-6">{s.text}</p>
             </li>
           ))

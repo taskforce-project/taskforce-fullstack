@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -1074,14 +1074,31 @@ const ICON_COLOR: Record<string, string> = {
   x: "#e11d48", ticket: "#e11d48",
 };
 
+/** Vrai sous 640 px quand `enabled`, et suit les changements (rotation d'un téléphone). */
+function useNarrow(enabled: boolean) {
+  const query = "(max-width: 639px)";
+  const [narrow, setNarrow] = useState(
+    () => enabled && typeof window !== "undefined" && window.matchMedia(query).matches,
+  );
+  useEffect(() => {
+    if (!enabled) return;
+    const mq = window.matchMedia(query);
+    const onChange = () => setNarrow(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, [enabled]);
+  return narrow;
+}
+
 /* ─── 17) Chaîne d'étapes générique (props) - pour les sections home (What ships today, Before/After) ─── */
 export function StepChainFlow({
   steps,
   id,
-  dir = "v",
+  dir: wideDir = "v",
   highlight,
   accentAll,
   w = 220,
+  stackOnMobile = false,
 }: {
   steps: { title: string; sub?: string; icon?: string; dot?: string }[];
   id: string;
@@ -1089,7 +1106,12 @@ export function StepChainFlow({
   highlight?: number;
   accentAll?: boolean;
   w?: number;
+  /** Frise horizontale qui s'EMPILE sous 640 px. Sans ça, fitView la réduisait à ~0,3 sur
+   *  téléphone : complète, mais des textes de 4 px. Le conteneur doit grandir en mobile. */
+  stackOnMobile?: boolean;
 }) {
+  const narrow = useNarrow(stackOnMobile && wideDir === "h");
+  const dir = narrow ? "v" : wideDir;
   const H = 58;
   const gap = dir === "v" ? 90 : w + 24;
   const last = steps.length - 1;
@@ -1126,7 +1148,8 @@ export function StepChainFlow({
     sourceHandle: dir === "v" ? "b" : "r",
     targetHandle: dir === "v" ? "t" : "l",
   }));
-  return <StaticFlow flowClass={`tf-chain-${id}`} nodes={nodes} edges={edges} padding={0.05} />;
+  // `key` : les nœuds sont non contrôlés (defaultNodes), changer d'orientation impose un remontage.
+  return <StaticFlow key={dir} flowClass={`tf-chain-${id}`} nodes={nodes} edges={edges} padding={0.05} />;
 }
 
 /* ─── 16) Use cases - les étapes « In a run » (verticales, texte qui wrap, hauteur mesurée) ─── */

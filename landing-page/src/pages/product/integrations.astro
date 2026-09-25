@@ -71,7 +71,7 @@ const SECURITY = [
 
 <BaseLayout
   title="Integrations - TaskForce"
-  description="Connect the tools your work already lives in - 138 connectors across 17 categories, from your tracker and repo to your cloud, docs and models. They bring context and capabilities into every run: connect, remember, act - with a human on every external action."
+  description="Connect the tools your work lives in: 138 connectors across 17 categories. They bring context into every run, with a human on every external action."
 >
   <PageHero
     kicker="Integrations"
@@ -121,7 +121,7 @@ const SECURITY = [
                 </span>
                 <LevelBadge level={w.level} />
               </div>
-              <h3 class="mt-4 text-[16px] font-semibold text-foreground">{w.title}</h3>
+              <h3 class="t-h4 mt-4">{w.title}</h3>
               <p class="text-primary mt-1 text-[12px] font-medium">{w.kind}</p>
               <p class="text-muted-foreground mt-2 text-[13.5px] leading-6">{w.text}</p>
             </div>
@@ -185,7 +185,7 @@ const SECURITY = [
               <span class="ic-tile flex size-11 items-center justify-center rounded-xl border" style={`--ic:${hueFor(s.icon)}`}>
                 <s.icon className="size-5" strokeWidth={1.75} />
               </span>
-              <h3 class="mt-4 text-[15px] font-semibold text-foreground">{s.title}</h3>
+              <h3 class="t-h4 mt-4">{s.title}</h3>
               <p class="text-muted-foreground mt-2 text-[13.5px] leading-6">{s.text}</p>
             </div>
           ))
@@ -203,7 +203,7 @@ const SECURITY = [
 
   <PageCta
     title="Your tools become context and capabilities for every run"
-    lead="Connect your stack. Give every run the context it needs. Let agents act through the tools you already use - with humans still in control."
+    lead="Connect your stack. Give every run the context it needs. Let agents act through the tools you already use, with humans still in control."
     primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
     secondary={{ label: "Book a demo", href: "/book-a-demo" }}
   />

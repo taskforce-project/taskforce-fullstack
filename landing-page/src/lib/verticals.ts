@@ -71,7 +71,7 @@ export const VERTICALS: Record<string, Vertical> = {
   product: {
     key: "product",
     name: "Product",
-    lead: "Product teams turn outcomes into specs, priorities and sequenced work - the same shape as a governed run. A natural fit in theory; we haven't proven it as a standalone product workflow.",
+    lead: "Product teams turn outcomes into specs, priorities and sequenced work, the shape of a governed run. A natural fit, not yet proven as a standalone workflow.",
     idea: "A governed run - an artifact produced, reviewed and approved before the next step - maps closely to product work: framing an outcome, drafting a spec, setting acceptance criteria, and sequencing what gets built.",
     couldApply: [
       "Frame an outcome into a reviewed spec",
@@ -84,7 +84,7 @@ export const VERTICALS: Record<string, Vertical> = {
   operations: {
     key: "operations",
     name: "Operations",
-    lead: "Operational delivery is reviewed, sequenced work with dependencies and a paper trail - the same governed checkpoints could structure it. Exploratory, not proven.",
+    lead: "Operational delivery is reviewed, sequenced work with dependencies and a paper trail. Governed checkpoints could structure it: exploratory, not proven.",
     idea: "Operations runs on stages that need review and a record. That's exactly what a checkpoint is: an artifact produced, approved, and kept.",
     couldApply: [
       "Structure operational work as governed stages",
@@ -97,7 +97,7 @@ export const VERTICALS: Record<string, Vertical> = {
   marketing: {
     key: "marketing",
     name: "Marketing",
-    lead: "Campaigns are reviewed, approved work with dependencies and a trail - a natural fit for governed runs in theory, unproven in practice.",
+    lead: "Campaigns are reviewed, approved work with dependencies and a trail: a natural fit for governed runs in theory, unproven in practice.",
     idea: "A campaign is a sequence of reviewed artifacts with sign-offs and dependencies. The governed-run pattern fits the shape of the work.",
     couldApply: [
       "Turn a campaign brief into reviewed stages",
@@ -110,7 +110,7 @@ export const VERTICALS: Record<string, Vertical> = {
   "client-services": {
     key: "client-services",
     name: "Client services",
-    lead: "Client deliverables that need review and sign-off could run on the same rails - exploratory, not proven.",
+    lead: "Client deliverables that need review and sign-off could run on the same rails: exploratory, not proven.",
     idea: "Client work is deliverables plus review plus sign-off - the same governed run, with a clear record for the client.",
     couldApply: [
       "Structure client deliverables as governed stages",

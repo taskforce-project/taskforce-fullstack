@@ -23,6 +23,8 @@ export type ConnectorDetail = {
   name: string;
   category: string;
   tagline: string;
+  /** Meta description (≤ ~155 car., coupée au-delà par Google). Absente : « {name} on TaskForce: {tagline} ». */
+  metaDescription?: string;
   matrix: { connect: ConnStatus; remember: ConnStatus; act: ConnStatus };
   auth: string;
   plan: string;
@@ -43,7 +45,7 @@ export const CONNECTORS: Record<string, ConnectorDetail> = {
     name: "GitHub",
     category: "Dev & CI/CD",
     tagline:
-      "Bring your repositories, issues and pull requests into TaskForce - and link code back to the work it belongs to.",
+      "Bring your repositories, issues and pull requests into TaskForce, and link code back to the work it belongs to.",
     matrix: { connect: "live", remember: "rolling", act: "beta" },
     auth: "OAuth · one click, no token to copy",
     plan: "Business plan and up",
@@ -65,7 +67,7 @@ export const CONNECTORS: Record<string, ConnectorDetail> = {
     key: "slack",
     name: "Slack",
     category: "Communication",
-    tagline: "Mirror the work into the channels your team already watches - the right events, in the right place.",
+    tagline: "Mirror the work into the channels your team already watches: the right events, in the right place.",
     matrix: { connect: "live", remember: "na", act: "beta" },
     auth: "OAuth · one click, no token to copy",
     plan: "Business plan and up",
@@ -118,7 +120,9 @@ export function mcpFiche(c: Connector): ConnectorDetail {
     key: c.key,
     name: c.name,
     category: c.catLabel,
-    tagline: `${c.desc}. Connect ${c.name} over its official MCP server in one click - your agents can then use it inside a run, with a human on every write.`,
+    tagline: `${c.desc}. Connect ${c.name} over its official MCP server in one click. Your agents can then use it inside a run, with a human on every write.`,
+    // La tagline complète dépassait 160 car. dans la meta (fiches MCP : 166 à 188) : version courte.
+    metaDescription: `${c.name} on TaskForce: connect it in one click over its official MCP server, and let agents use it in a run with a human approving every write.`,
     matrix: { connect: "live", remember: "rolling", act: "beta" },
     auth: "MCP - one-click OAuth to the official server",
     plan: "Beta",

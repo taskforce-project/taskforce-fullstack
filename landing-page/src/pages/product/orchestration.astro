@@ -51,7 +51,7 @@ const PRINCIPLES = [
 
 <BaseLayout
   title="Orchestration - TaskForce"
-  description="TaskForce turns a product outcome into a governed delivery run. Specialized agents handle product, architecture and delivery; your team validates every decision. The AI proposes. Your team decides."
+  description="Turn a product outcome into a governed delivery run. Specialized agents handle product, architecture and delivery; your team validates every decision."
 >
   {/* ───── Hero façon Attio : texte à gauche, GRAPHE de run à droite - fond POINTS ───── */}
   <section class="bg-card bg-dots border-b">
@@ -304,7 +304,7 @@ const PRINCIPLES = [
           PRINCIPLES.map((p, i) => (
             <div class:list={["px-5 sm:px-7", i > 0 && "sm:border-l"]}>
               <p.icon className="size-5" strokeWidth={1.6} style={{ color: hueFor(p.icon) }} />
-              <h3 class="text-foreground mt-4 text-[14px] font-semibold">{p.title}</h3>
+              <h3 class="t-h5 mt-4">{p.title}</h3>
               <p class="text-muted-foreground mt-1.5 text-[12.5px] leading-5">{p.desc}</p>
             </div>
           ))

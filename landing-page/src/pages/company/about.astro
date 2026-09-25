@@ -32,12 +32,12 @@ const BELIEFS = [
 
 <BaseLayout
   title="About - TaskForce"
-  description="TaskForce is building the decision infrastructure for AI-native software delivery: a governed path from intent to production, where AI proposes, humans decide, and the reasoning is kept."
+  description="TaskForce builds the decision infrastructure for AI-native software delivery: AI proposes, humans decide, and the reasoning behind each decision is kept."
 >
   <PageHero
     eyebrow="About"
     title="Software delivery keeps losing its context. We're rebuilding it."
-    lead="TaskForce is building the decision infrastructure for AI-native delivery - a governed path from a product outcome to production, where AI drafts the work, a human approves every step, and the reasoning behind each decision is kept."
+    lead="TaskForce is building the decision infrastructure for AI-native delivery: a governed path from a product outcome to production, where AI drafts the work, a human approves every step, and the reasoning behind each decision is kept."
     primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
     secondary={{ label: "See the run", href: "/product/orchestration" }}
   />
@@ -80,7 +80,7 @@ const BELIEFS = [
               <span class="ic-tile flex size-11 items-center justify-center rounded-xl border" style={`--ic:${hueFor(b.icon)}`}>
                 <b.icon className="size-5" strokeWidth={1.75} />
               </span>
-              <h3 class="mt-4 text-[16px] font-semibold text-foreground">{b.title}</h3>
+              <h3 class="t-h4 mt-4">{b.title}</h3>
               <p class="text-muted-foreground mt-2 text-[13.5px] leading-6">{b.text}</p>
             </div>
           ))
@@ -121,7 +121,7 @@ const BELIEFS = [
 
   <PageCta
     title="Build delivery that remembers why"
-    lead="Start with what ships today - a governed delivery workspace, free - and grow into the rest as it lands."
+    lead="Start with what ships today (a governed delivery workspace, free) and grow into the rest as it lands."
     primary={{ label: "Run your first workflow", href: `${APP_URL}/auth/register` }}
     secondary={{ label: "Book a demo", href: "/book-a-demo" }}
   />

@@ -1,10 +1,9 @@
 import type { CSSProperties } from "react";
-import { Check, ShieldCheck, SlidersHorizontal, Activity, ArrowRight, PenLine, Network, Server } from "lucide-react";
+import { Check, ShieldCheck, SlidersHorizontal, Activity, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { APP_URL } from "@/components/site/nav";
 import { Section, SectionHeader } from "../Section";
 import { AppShot, Toast } from "../AppShot";
-import { BrandLogo } from "../BrandLogo";
 
 /**
  * Proof - conformité, intégrations, direction, CTA final.
@@ -177,132 +176,8 @@ export function Trust() {
   );
 }
 
-/* ─────────────────────────  Intégrations (vraie grille de logos)  ───────────────────────── */
-
-/** Vrais logos vendorisés - grille façon Relevance « Connect to N apps ». */
-const INTEGRATIONS = [
-  "github", "gitlab", "linear", "slack", "notion", "figma", "sentry", "vscode",
-  "docker", "vercel", "netlify", "cloudflare", "aws", "azure", "gcp", "postgresql",
-  "supabase", "prisma", "anthropic", "openai", "gemini", "mistral", "ollama", "huggingface",
-  "asana", "discord", "zoom", "gmail", "dropbox", "keycloak", "auth0", "cursor",
-];
-
-export function Integrations() {
-  return (
-    <Section>
-      <div className="flex flex-wrap items-end justify-between gap-6">
-        <SectionHeader
-          eyebrow="Integrations"
-          level="live"
-          title="TaskForce doesn’t replace your stack. It connects to it."
-          lead={
-            <>
-              The same connector catalogue as the app - <span className="text-primary">138</span>{" "}
-              tools across your tracker, repo, chat and cloud. Adding one is a line of configuration,
-              not a release.
-            </>
-          }
-        />
-        <a
-          href="/product/integrations"
-          className="link-underline text-foreground flex shrink-0 items-center gap-1 text-[14px] font-medium"
-        >
-          Browse all integrations
-          <ArrowRight className="size-4" />
-        </a>
-      </div>
-
-      <ul className="bg-border mt-12 grid grid-cols-4 gap-px overflow-hidden border sm:grid-cols-6 lg:grid-cols-8">
-        {INTEGRATIONS.map((key) => (
-          <li
-            key={key}
-            className="tile-hover bg-card flex aspect-square items-center justify-center p-4"
-          >
-            <BrandLogo
-              brand={key}
-              label={key}
-              className="h-7 w-7 object-contain opacity-70 grayscale"
-            />
-          </li>
-        ))}
-      </ul>
-    </Section>
-  );
-}
-
-/* ─────────────────────────  La direction  ───────────────────────── */
-
-/**
- * Décision D11 : on vend la direction, **pas le mécanisme**.
- * Rien ici ne décrit comment c'est construit - ni la boucle de raisonnement, ni le routage
- * de modèles, ni la méthode de benchmark. Une vision se vend ; une recette se copie.
- */
-const AHEAD = [
-  {
-    icon: PenLine,
-    ic: "#2563eb",
-    title: "Less drafting, more deciding",
-    text: "Every checkpoint that gets reliable is one you stop writing yourself. The direction is not fewer humans - it is humans spending their time on the decisions instead of the paperwork around them.",
-  },
-  {
-    icon: Network,
-    ic: "#7c3aed",
-    title: "An intelligence layer for the organization",
-    text: "The decisions, constraints and trade-offs one run records don’t belong to engineering alone. The same graph that tells an agent why the system is the way it is can tell any team why the organization is - a live model to decide on top of, not a wiki to search.",
-  },
-  {
-    icon: Server,
-    ic: "#64748b",
-    title: "Still your infrastructure",
-    text: "Self-hosting is a first-class deployment - it comes with Enterprise, and where your models run stays your decision.",
-  },
-];
-
-export function WhereThisGoes() {
-  return (
-    <Section>
-      <div className="grid gap-10 lg:grid-cols-[minmax(0,400px)_1fr] lg:gap-0">
-        <div className="lg:pr-14">
-          <SectionHeader
-            eyebrow="The direction"
-            title="Software teams won’t hand-write specs forever"
-            lead="TaskForce runs software delivery today - that’s the wedge, not the ceiling. The memory that keeps one run’s context is the same intelligence an organization loses everywhere else: in meetings, in chat, in people’s heads. The destination is to make it the active layer every team decides on top of. The roadmap is public - hold us to it rather than trust a pitch."
-          />
-          <Button asChild variant="outline" size="pill" className="mt-8">
-            <a href="/roadmap">
-              See the public roadmap
-              <ArrowRight className="size-4" />
-            </a>
-          </Button>
-        </div>
-
-        {/* « Traits intégrés » : filet vertical qui relie la colonne au reste de la page, rails
-            haut/bas + séparateurs entre lignes. Pas de radius (réservé aux canvases de flux). */}
-        <ul className="divide-border divide-y lg:pl-14">
-          {AHEAD.map((n, i) => (
-            <li key={n.title} className="hover:bg-secondary/30 flex gap-5 py-6 transition-colors">
-              <span
-                className="ic-tile flex size-10 shrink-0 items-center justify-center rounded-lg border"
-                style={{ "--ic": n.ic } as CSSProperties}
-              >
-                <n.icon className="size-5" strokeWidth={1.75} />
-              </span>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground font-mono text-[11px] tabular-nums">
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                  <h3 className="text-[15px] font-semibold text-foreground">{n.title}</h3>
-                </div>
-                <p className="text-muted-foreground mt-2 text-[13.5px] leading-6">{n.text}</p>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </Section>
-  );
-}
+/* La section « The direction » (WhereThisGoes) a fusionné le 24/09 dans le bandeau bas de
+ * `Showcase.tsx › TeamGrid` : « the wedge, not the ceiling » + lien vers la roadmap publique. */
 
 /* ─────────────────────────  CTA final  ───────────────────────── */
 
