@@ -8,6 +8,7 @@ TaskForce is an evolving product: some capabilities are live today, others are i
 
 ## Product
 - [Orchestration](https://taskforce-project.fr/product/orchestration): Turn an intent into validated checkpoints, from vision to deploy.
+- [Local runner](https://taskforce-project.fr/product/orchestration#local-runner): Early access. Assign an issue to Claude Code and a runner on your own machine works in an isolated branch, then opens a pull request for a person to review.
 - [Agents](https://taskforce-project.fr/product/agents): Scoped agents (CPO, CTO and COO roles) that work your delivery instead of one generalist.
 - [Approvals](https://taskforce-project.fr/product/approvals): A human signs off at every checkpoint.
 - [TaskForce Memory](https://taskforce-project.fr/product/brain-os): The memory layer that remembers every run and decision, powered by Brain OS.

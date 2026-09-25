@@ -1,18 +1,20 @@
 import type { CSSProperties } from "react";
-import { Check, ShieldCheck, SlidersHorizontal, Activity, ArrowRight } from "lucide-react";
+import { Check, ShieldCheck, SlidersHorizontal, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { APP_URL } from "@/components/site/nav";
+import { cn } from "@/lib/utils";
 import { Section, SectionHeader } from "../Section";
 import { AppShot, Toast } from "../AppShot";
 
 /**
- * Proof - conformité, intégrations, direction, CTA final.
+ * Proof - entreprise & conformité (Trust), puis CTA final.
  * Pas de logo client ni de témoignage : la preuve est technique (décision D9).
  */
 
-/* ─────────────────────────  Entreprise & conformité (badges + checklist 3 colonnes)  ───────────────────────── */
+/* ─────────────────────────  Entreprise & conformité (texte + garanties | vue d'audit)  ───────────────────────── */
 
-/** Trois colonnes façon Relevance, chaque item = une vraie capacité produit. */
+/** Deux listes de garanties, chaque item = une vraie capacité produit. L'ancienne 3e colonne
+ *  (« Monitoring & oversight ») est portée par la vue d'audit elle-même, à droite. */
 const TRUST_COLUMNS: { icon: typeof ShieldCheck; ic: string; group: string; items: string[] }[] = [
   {
     icon: ShieldCheck,
@@ -25,12 +27,6 @@ const TRUST_COLUMNS: { icon: typeof ShieldCheck; ic: string; group: string; item
     ic: "#2563eb",
     group: "Access & controls",
     items: ["SSO / SAML via Keycloak", "Roles & permissions", "A human sign-off at each checkpoint", "Per-project access"],
-  },
-  {
-    icon: Activity,
-    ic: "#0891b2",
-    group: "Monitoring & oversight",
-    items: ["Full audit trail", "Who approved what, and when", "Which model ran where", "Delivery analytics"],
   },
 ];
 
@@ -53,131 +49,125 @@ const AUDIT_EVENTS: { dot: string; type: string; what: string; who: string; meta
 export function Trust() {
   return (
     <Section>
-      <SectionHeader
-        eyebrow="Enterprise"
-        title="Built to survive a security review"
-        lead="AI in the delivery path raises exactly the questions you would expect. We would rather answer them on a page than in a questionnaire."
-      />
+      {/* 3e passe (25/09, validée CEO) : 1,9 écran → ~1. Texte et garanties à gauche, preuve à droite.
+          Les 3 affirmations de la review du 26/07 (« attributable / recorded / logged ») deviennent la
+          légende de la preuve : les faits restent, portés par la vraie vue d'audit. */}
+      <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:gap-14">
+        <div>
+          <SectionHeader
+            eyebrow="Enterprise"
+            title="Built to survive a security review"
+            lead="AI in the delivery path raises exactly the questions you would expect. We would rather answer them on a page than in a questionnaire."
+          />
 
-      {/* Décision review (26/07) : mener par des FAITS, pas par une rangée de badges qui
-          « se lit comme une checklist ». Trois affirmations concrètes portent la gouvernance. */}
-      <div className="mt-12 grid gap-x-10 gap-y-8 border-t pt-10 sm:grid-cols-3">
-        {[
-          { stat: "Every run is attributable", sub: "Each checkpoint records what produced it and who approved it." },
-          { stat: "Every approval is recorded", sub: "Who signed off, when, and exactly what they were signing off on." },
-          { stat: "Every model call is logged", sub: "Which model ran which step, on whose infrastructure." },
-        ].map((t) => (
-          <div key={t.stat}>
-            <p className="t-h3">{t.stat}</p>
-            <p className="text-muted-foreground mt-2 text-[13.5px] leading-6">{t.sub}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* PREUVE « dure » (phase design) : la vraie UI de l'audit trail. Cadre d'app VIDE, à
-          remplir avec une capture ; toast custom par-dessus (pattern « vrai screen + toasts »). */}
-      <div className="mt-12">
-        <AppShot chrome="app.taskforce-project.fr/runs/checkout-redesign · audit">
-          {/* La vraie vue d'audit : feed d'evenements attribuables qui remplit le cadre (les
-              lignes s'etirent en flex-1 -> aucun vide, quel que soit le ratio). */}
-          <div className="absolute inset-0 flex flex-col">
-            <div className="flex items-center gap-2 border-b px-4 py-2.5">
-              <ShieldCheck className="size-4 shrink-0" strokeWidth={2} style={{ color: "#d97706" }} />
-              <span className="text-foreground text-[13px] font-medium">Audit trail</span>
-            </div>
-            <ul className="flex flex-1 flex-col divide-y divide-border">
-              {AUDIT_EVENTS.map((e) => (
-                <li key={`${e.type}-${e.what}`} className="flex flex-1 items-center gap-3 px-4">
-                  <span className="size-1.5 shrink-0 rounded-full" style={{ background: e.dot }} />
-                  <span className="min-w-0 flex-1">
-                    <span className="text-foreground block truncate text-[12.5px]">
-                      <span className="font-medium">{e.type}</span> · {e.what}
-                    </span>
-                    <span className="text-muted-foreground block text-[11px]">{e.who}</span>
+          <div className="mt-10 grid gap-x-8 gap-y-7 sm:grid-cols-2">
+            {TRUST_COLUMNS.map((col) => (
+              <div key={col.group}>
+                <p className="flex items-center gap-2.5 text-[13px] font-semibold text-foreground">
+                  <span
+                    className="ic-tile flex size-7 items-center justify-center rounded-md border"
+                    style={{ "--ic": col.ic } as CSSProperties}
+                  >
+                    <col.icon className="size-4" strokeWidth={1.9} />
                   </span>
-                  {e.meta && (
-                    <span className="text-muted-foreground hidden shrink-0 rounded border px-1.5 py-px font-mono text-[10px] md:inline">
-                      {e.meta}
+                  {col.group}
+                </p>
+                <ul className="mt-3 flex flex-col gap-2">
+                  {col.items.map((it) => (
+                    <li key={it} className="flex items-start gap-2 text-[14px] leading-6 text-foreground">
+                      <Check className="text-primary mt-[3px] size-4 shrink-0" strokeWidth={2.5} />
+                      {it}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+
+          {/* Conformité dite sans surpromesse (review 7 : « SOC 2 in progress » invite « montrez le
+              rapport »). On parle d'architecture PRÊTE et de feuille de route, pas de certif obtenue. */}
+          <p className="text-muted-foreground mt-8 text-[13px]">
+            Built for SOC 2 readiness, GDPR-ready by architecture, with a security roadmap you can read
+            on the{" "}
+            <a href="/trust" className="link-underline text-foreground">
+              trust center
+            </a>
+            .
+          </p>
+
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Button asChild variant="outline" size="pill">
+              <a href="/trust">Read the trust center</a>
+            </Button>
+            <Button asChild variant="ghost" size="pill">
+              <a href="/legal/ai-transparency">
+                AI transparency
+                <ArrowRight className="size-4" />
+              </a>
+            </Button>
+          </div>
+        </div>
+
+        {/* PREUVE « dure » : la vraie vue d'audit dans un cadre d'app, toast par-dessus. Ratio 4:3 (au lieu
+            de 16:9) : en demi-largeur, les 8 lignes gardent leur hauteur ; sous sm, 5 lignes. */}
+        <div>
+          <AppShot chrome="app.taskforce-project.fr/runs/checkout-redesign · audit" ratio="4 / 3">
+            {/* La vraie vue d'audit : feed d'evenements attribuables qui remplit le cadre (les
+                lignes s'etirent en flex-1 -> aucun vide, quel que soit le ratio). */}
+            <div className="absolute inset-0 flex flex-col">
+              <div className="flex items-center gap-2 border-b px-4 py-2.5">
+                <ShieldCheck className="size-4 shrink-0" strokeWidth={2} style={{ color: "#d97706" }} />
+                <span className="text-foreground text-[13px] font-medium">Audit trail</span>
+              </div>
+              <ul className="flex flex-1 flex-col divide-y divide-border">
+                {AUDIT_EVENTS.map((e, i) => (
+                  <li
+                    key={`${e.type}-${e.what}`}
+                    className={cn("flex flex-1 items-center gap-3 px-4", i >= 5 && "max-sm:hidden")}
+                  >
+                    <span className="size-1.5 shrink-0 rounded-full" style={{ background: e.dot }} />
+                    <span className="min-w-0 flex-1">
+                      <span className="text-foreground block truncate text-[12.5px]">
+                        <span className="font-medium">{e.type}</span> · {e.what}
+                      </span>
+                      <span className="text-muted-foreground block text-[11px]">{e.who}</span>
                     </span>
-                  )}
-                  <span className="text-muted-foreground shrink-0 font-mono text-[11px] tabular-nums">{e.when}</span>
-                </li>
-              ))}
-            </ul>
-            <div className="text-muted-foreground flex items-center justify-between border-t px-4 py-2 text-[10.5px]">
-              <span>checkout-redesign · 5 of 7 checkpoints approved</span>
-              <span className="hidden sm:inline">Immutable · exportable to your SIEM</span>
+                    {e.meta && (
+                      <span className="text-muted-foreground hidden shrink-0 rounded border px-1.5 py-px font-mono text-[10px] md:inline">
+                        {e.meta}
+                      </span>
+                    )}
+                    <span className="text-muted-foreground shrink-0 font-mono text-[11px] tabular-nums">{e.when}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="text-muted-foreground flex items-center justify-between border-t px-4 py-2 text-[10.5px]">
+                <span>checkout-redesign · 5 of 7 checkpoints approved</span>
+                <span className="hidden sm:inline">Immutable · exportable to your SIEM</span>
+              </div>
             </div>
-          </div>
-          <Toast
-            className="right-4 top-3"
-            icon={
-              <span className="flex size-5 items-center justify-center rounded-full bg-emerald-500 text-white">
-                <Check className="size-3" strokeWidth={3} />
-              </span>
-            }
-          >
-            <span className="font-medium">Approved</span> · CTO · logged to the audit trail
-          </Toast>
-        </AppShot>
-        <p className="text-muted-foreground mt-3 text-[12.5px]">
-          Every approval, rejection and model call, attributable - and exportable to your SIEM.
-        </p>
-      </div>
-
-      {/* Checklist en 3 colonnes */}
-      <div className="mt-14 grid gap-x-10 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
-        {TRUST_COLUMNS.map((col) => (
-          <div key={col.group}>
-            <p className="flex items-center gap-2.5 text-[13px] font-semibold text-foreground">
-              <span
-                className="ic-tile flex size-7 items-center justify-center rounded-md border"
-                style={{ "--ic": col.ic } as CSSProperties}
-              >
-                <col.icon className="size-4" strokeWidth={1.9} />
-              </span>
-              {col.group}
-            </p>
-            <ul className="mt-3 flex flex-col gap-2.5">
-              {col.items.map((it) => (
-                <li key={it} className="flex items-start gap-2 text-[14px] leading-6 text-foreground">
-                  <Check className="text-primary mt-[3px] size-4 shrink-0" strokeWidth={2.5} />
-                  {it}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
-      </div>
-
-      {/* Conformité dite sans surpromesse (review 7 : « SOC 2 in progress » invite « montrez le
-          rapport »). On parle d'architecture PRÊTE et de feuille de route, pas de certif obtenue. */}
-      <p className="text-muted-foreground mt-12 text-[13px]">
-        Built for SOC 2 readiness, GDPR-ready by architecture, with a security roadmap you can read
-        on the{" "}
-        <a href="/trust" className="link-underline text-foreground">
-          trust center
-        </a>
-        .
-      </p>
-
-      <div className="mt-8 flex flex-wrap gap-3">
-        <Button asChild variant="outline" size="pill">
-          <a href="/trust">Read the trust center</a>
-        </Button>
-        <Button asChild variant="ghost" size="pill">
-          <a href="/legal/ai-transparency">
-            AI transparency
-            <ArrowRight className="size-4" />
-          </a>
-        </Button>
+            <Toast
+              className="right-4 top-3"
+              icon={
+                <span className="flex size-5 items-center justify-center rounded-full bg-emerald-500 text-white">
+                  <Check className="size-3" strokeWidth={3} />
+                </span>
+              }
+            >
+              <span className="font-medium">Approved</span> · CTO · logged to the audit trail
+            </Toast>
+          </AppShot>
+          <p className="text-muted-foreground mt-3 text-[12.5px]">
+            Every run attributable, every approval recorded, every model call logged. Exportable to your SIEM.
+          </p>
+        </div>
       </div>
     </Section>
   );
 }
 
 /* La section « The direction » (WhereThisGoes) a fusionné le 24/09 dans le bandeau bas de
- * `Showcase.tsx › TeamGrid` : « the wedge, not the ceiling » + lien vers la roadmap publique. */
+ * `TeamGrid.tsx` : « the wedge, not the ceiling » + lien vers la roadmap publique. */
 
 /* ─────────────────────────  CTA final  ───────────────────────── */
 
