@@ -16,15 +16,22 @@ function initials(name: string): string {
 }
 
 /**
+ * Marques dont on n'affiche JAMAIS le logo, même vendorisé : seulement le repli neutre. Les conditions
+ * d'Anthropic interdisent d'utiliser son logo sans permission (ADR-013, `taskforce-runner/README.md`) ;
+ * on la nomme en texte. Même règle côté site (`landing-page/src/components/site/BrandLogo.tsx`).
+ */
+export const NAME_ONLY: ReadonlySet<string> = new Set(["anthropic"])
+
+/**
  * Logo de marque servi **localement** depuis `public/logos/` (vendorisé via SVGL -
  * cf. `scripts/fetch-logos.mjs`, `npm run logos`). Aucun appel réseau au runtime.
  *  - `themed`  → variante claire/sombre commutée par le thème (pas de flash JS).
  *  - `single`  → un seul fichier (logo couleur).
  *  - `mono`    → logo monochrome (blanc/noir) rendu via masque CSS + `currentColor` (thème-adaptatif).
- *  - inconnu   → initiales (repli neutre).
+ *  - inconnu ou {@link NAME_ONLY} → initiales (repli neutre).
  */
 export function BrandLogo({ slug, name, className }: Readonly<BrandLogoProps>) {
-  const kind = BRAND_LOGOS[slug]
+  const kind = NAME_ONLY.has(slug) ? undefined : BRAND_LOGOS[slug]
   const size = className ?? "size-6"
 
   if (kind === "themed") {
