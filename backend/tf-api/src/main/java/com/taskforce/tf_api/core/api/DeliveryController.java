@@ -18,6 +18,7 @@ import com.taskforce.tf_api.core.dto.request.DelegateRequest;
 import com.taskforce.tf_api.core.dto.response.DeliveryKeyStatus;
 import com.taskforce.tf_api.core.dto.response.DeliveryProviderResponse;
 import com.taskforce.tf_api.core.dto.response.DeliveryRunResponse;
+import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
 import com.taskforce.tf_api.core.enums.IntegrationProvider;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
@@ -41,6 +42,9 @@ import lombok.RequiredArgsConstructor;
 @RequestMapping("/api/workspaces/{slug}/delivery")
 @RequiredArgsConstructor
 public class DeliveryController {
+
+    private static final String RUNNING = DeliveryRunStatus.RUNNING.name();
+    private static final String QUEUED  = DeliveryRunStatus.QUEUED.name();
 
     private final DeliveryAgentProviderRegistry registry;
     private final DeliveryService deliveryService;
@@ -81,7 +85,8 @@ public class DeliveryController {
     /**
      * GET /api/workspaces/{slug}/delivery/issues/{issueId}/run — dernier run (data null si aucun).
      * Si le run est encore en cours (provider <b>asynchrone</b> type Cursor), on le ré-interroge une
-     * fois : le polling du front fait ainsi progresser l'état jusqu'au terminal (DONE/FAILED).
+     * fois : le polling du front fait ainsi progresser l'état jusqu'au terminal (DONE/FAILED). Encore en
+     * attente, il est relu aussi : une délégation que personne ne réclame y est close (runner local, ADR-013).
      */
     @GetMapping("/issues/{issueId}/run")
     public ResponseEntity<ApiResponse<DeliveryRunResponse>> latestRun(
@@ -91,8 +96,8 @@ public class DeliveryController {
     ) {
         Long userId = resolveUserId(jwt);
         DeliveryRunResponse run = deliveryService.latestRun(slug, issueId, userId).orElse(null);
-        if (run != null && "RUNNING".equals(run.status())) {
-            deliveryRunner.refresh(run.id()); // avance les runs asynchrones (transaction propre)
+        if (run != null && (RUNNING.equals(run.status()) || QUEUED.equals(run.status()))) {
+            deliveryRunner.refresh(run.id()); // transaction propre
             run = deliveryService.latestRun(slug, issueId, userId).orElse(run);
         }
         return ResponseEntity.ok(ApiResponse.success("Run récupéré", run));
@@ -100,14 +105,21 @@ public class DeliveryController {
 
     /**
      * GET /api/workspaces/{slug}/delivery/runs — runs de délégation du workspace (vue « workflow »).
-     * Les plus récents d'abord, bornés aux projets visibles par l'utilisateur.
+     * Les plus récents d'abord, bornés aux projets visibles par l'utilisateur. Les runs encore en attente
+     * sont relus, comme sur la fiche d'issue : le panneau ne montre pas « en attente » une délégation close.
      */
     @GetMapping("/runs")
     public ResponseEntity<ApiResponse<List<DeliveryRunResponse>>> listRuns(
         @AuthenticationPrincipal Jwt jwt,
         @PathVariable String slug
     ) {
-        List<DeliveryRunResponse> runs = deliveryService.listRuns(slug, resolveUserId(jwt));
+        Long userId = resolveUserId(jwt);
+        List<DeliveryRunResponse> runs = deliveryService.listRuns(slug, userId);
+        List<Long> queued = runs.stream().filter(r -> QUEUED.equals(r.status())).map(DeliveryRunResponse::id).toList();
+        if (!queued.isEmpty()) {
+            queued.forEach(deliveryRunner::refresh);
+            runs = deliveryService.listRuns(slug, userId);
+        }
         return ResponseEntity.ok(ApiResponse.success("Runs récupérés", runs));
     }
 
