@@ -101,3 +101,32 @@ export async function connectDeliveryKey(
 export async function disconnectDeliveryKey(slug: string, provider: DeliveryKeyProvider): Promise<void> {
   await apiClient.delete(DELIVERY_ROUTES.KEY(slug, provider));
 }
+
+/** Runner local de l'utilisateur (ADR-013), tel que le serveur le connaît. Ne contient jamais de secret. */
+export interface RunnerStatus {
+  /** Une identité de runner est déjà provisionnée pour cet utilisateur. */
+  exists: boolean;
+  /** Client Keycloak du runner (`TASKFORCE_RUNNER_CLIENT_ID`). */
+  clientId: string;
+  /** Propriétaire signé : le runner ne réclame que les délégations de cet e-mail. */
+  ownerEmail: string;
+}
+
+/** Identité fraîchement provisionnée. Le secret n'est renvoyé qu'une fois, à copier dans le `.env` du runner. */
+export interface RunnerProvision {
+  clientId: string;
+  clientSecret: string;
+  ownerEmail: string;
+}
+
+/** État du runner local de l'utilisateur connecté. Appel de fond (ouverture du panneau) : jamais de toast. */
+export async function getRunnerStatus(): Promise<RunnerStatus> {
+  const res = await apiClient.get<{ data: RunnerStatus }>(DELIVERY_ROUTES.RUNNER, { silentError: true });
+  return res.data.data;
+}
+
+/** Provisionne le runner local de l'utilisateur, ou régénère son secret (l'ancien cesse de fonctionner). */
+export async function provisionRunner(): Promise<RunnerProvision> {
+  const res = await apiClient.post<{ data: RunnerProvision }>(DELIVERY_ROUTES.RUNNER);
+  return res.data.data;
+}

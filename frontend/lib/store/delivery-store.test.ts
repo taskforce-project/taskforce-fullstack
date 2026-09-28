@@ -12,6 +12,8 @@ vi.mock('../api/delivery-service', () => ({
   getDeliveryKey: vi.fn(),
   connectDeliveryKey: vi.fn(),
   disconnectDeliveryKey: vi.fn(),
+  getRunnerStatus: vi.fn(),
+  provisionRunner: vi.fn(),
 }));
 
 function makeRun(overrides: Partial<DeliveryRun> = {}): DeliveryRun {
@@ -30,7 +32,7 @@ const PROVIDERS: DeliveryProvider[] = [
 describe('delivery-store', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    act(() => useDeliveryStore.setState({ providers: [], providersLoading: false, runs: {}, workspaceRuns: [], keys: {} }));
+    act(() => useDeliveryStore.setState({ providers: [], providersLoading: false, runs: {}, workspaceRuns: [], keys: {}, runner: null }));
   });
 
   it('fetchProviders loads the providers', async () => {
@@ -140,5 +142,39 @@ describe('delivery-store', () => {
     let ok: boolean = true;
     await act(async () => { ok = await useDeliveryStore.getState().disconnectKey('acme', 'cursor'); });
     expect(ok).toBe(false);
+  });
+
+  it('fetchRunner stores the runner status', async () => {
+    const status = { exists: true, clientId: 'tf-runner-u29', ownerEmail: 'pierre@example.com' };
+    vi.mocked(svc.getRunnerStatus).mockResolvedValue(status);
+    let res: unknown;
+    await act(async () => { res = await useDeliveryStore.getState().fetchRunner(); });
+    expect(res).toEqual(status);
+    expect(useDeliveryStore.getState().runner).toEqual(status);
+  });
+
+  it('fetchRunner returns null on failure', async () => {
+    vi.mocked(svc.getRunnerStatus).mockRejectedValue(new Error('x'));
+    let res: unknown = 'unset';
+    await act(async () => { res = await useDeliveryStore.getState().fetchRunner(); });
+    expect(res).toBeNull();
+    expect(useDeliveryStore.getState().runner).toBeNull();
+  });
+
+  it('provisionRunner returns the credentials but never keeps the secret in the store', async () => {
+    const creds = { clientId: 'tf-runner-u29', clientSecret: 's3cr3t', ownerEmail: 'pierre@example.com' };
+    vi.mocked(svc.provisionRunner).mockResolvedValue(creds);
+    let res: unknown;
+    await act(async () => { res = await useDeliveryStore.getState().provisionRunner(); });
+    expect(res).toEqual(creds);
+    expect(useDeliveryStore.getState().runner).toEqual({ exists: true, clientId: 'tf-runner-u29', ownerEmail: 'pierre@example.com' });
+    expect(JSON.stringify(useDeliveryStore.getState())).not.toContain('s3cr3t');
+  });
+
+  it('provisionRunner returns null on failure', async () => {
+    vi.mocked(svc.provisionRunner).mockRejectedValue(new Error('x'));
+    let res: unknown = 'unset';
+    await act(async () => { res = await useDeliveryStore.getState().provisionRunner(); });
+    expect(res).toBeNull();
   });
 });

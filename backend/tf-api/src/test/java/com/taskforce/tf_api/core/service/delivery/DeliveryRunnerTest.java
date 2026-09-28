@@ -228,12 +228,13 @@ class DeliveryRunnerTest {
     }
 
     @Test
-    @DisplayName("message d'une délégation non réclamée : délai, action, accès anticipé")
+    @DisplayName("message d'une délégation non réclamée : délai, et où configurer son runner soi-même")
     void unclaimed_message_says_what_to_do() {
         assertThat(DeliveryRunner.unclaimedMessage(Duration.ofMinutes(15)))
             .contains("within 15 min")
-            .contains("Start the TaskForce runner")
-            .contains("early access");
+            .contains("Set up your runner in Settings > Agents")
+            .contains("delegate the task again")
+            .doesNotContain("early access");
     }
 
     @Test

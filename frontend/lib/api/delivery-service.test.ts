@@ -7,6 +7,8 @@ import {
   getDeliveryKey,
   connectDeliveryKey,
   disconnectDeliveryKey,
+  getRunnerStatus,
+  provisionRunner,
 } from './delivery-service';
 import { apiClient } from './client';
 import { DELIVERY_ROUTES } from '../config/api-routes';
@@ -103,5 +105,25 @@ describe('delivery-service', () => {
     await disconnectDeliveryKey(SLUG, 'anthropic');
 
     expect(apiClient.delete).toHaveBeenCalledWith(DELIVERY_ROUTES.KEY(SLUG, 'anthropic'));
+  });
+
+  it('getRunnerStatus GET l’état du runner, en appel de fond (silentError)', async () => {
+    const status = { exists: false, clientId: 'tf-runner-u29', ownerEmail: 'pierre@example.com' };
+    vi.mocked(apiClient.get).mockResolvedValue(envelope(status));
+
+    const res = await getRunnerStatus();
+
+    expect(apiClient.get).toHaveBeenCalledWith(DELIVERY_ROUTES.RUNNER, { silentError: true });
+    expect(res).toEqual(status);
+  });
+
+  it('provisionRunner POST et retourne les identifiants (le secret n’est rendu qu’ici)', async () => {
+    const creds = { clientId: 'tf-runner-u29', clientSecret: 's3cr3t', ownerEmail: 'pierre@example.com' };
+    vi.mocked(apiClient.post).mockResolvedValue(envelope(creds));
+
+    const res = await provisionRunner();
+
+    expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.RUNNER);
+    expect(res).toEqual(creds);
   });
 });

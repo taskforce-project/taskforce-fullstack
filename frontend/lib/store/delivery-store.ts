@@ -7,10 +7,14 @@ import {
   getDeliveryKey,
   connectDeliveryKey,
   disconnectDeliveryKey,
+  getRunnerStatus,
+  provisionRunner as provisionRunnerApi,
   type DeliveryKeyProvider,
   type DeliveryKeyStatus,
   type DeliveryProvider,
   type DeliveryRun,
+  type RunnerProvision,
+  type RunnerStatus,
 } from "../api/delivery-service";
 
 // ---------------------------------------------------------------------------
@@ -28,6 +32,8 @@ interface DeliveryState {
   workspaceRuns: DeliveryRun[];
   /** État des clés de délégation par provider ("anthropic" | "cursor"). Absent = pas encore chargé. */
   keys: Record<string, DeliveryKeyStatus>;
+  /** Runner local de l'utilisateur (ADR-013). `null` = pas encore chargé. Jamais de secret ici. */
+  runner: RunnerStatus | null;
 
   fetchProviders: (slug: string) => Promise<DeliveryProvider[]>;
   fetchRun: (slug: string, issueId: number) => Promise<DeliveryRun | null>;
@@ -36,6 +42,9 @@ interface DeliveryState {
   fetchKey: (slug: string, provider: DeliveryKeyProvider) => Promise<DeliveryKeyStatus | null>;
   connectKey: (slug: string, provider: DeliveryKeyProvider, apiKey: string) => Promise<DeliveryKeyStatus | null>;
   disconnectKey: (slug: string, provider: DeliveryKeyProvider) => Promise<boolean>;
+  fetchRunner: () => Promise<RunnerStatus | null>;
+  /** Renvoie les identifiants (secret compris) à l'appelant SANS les garder : le secret ne vit pas dans l'état global. */
+  provisionRunner: () => Promise<RunnerProvision | null>;
 }
 
 export const useDeliveryStore = create<DeliveryState>((set) => ({
@@ -44,6 +53,7 @@ export const useDeliveryStore = create<DeliveryState>((set) => ({
   runs: {},
   workspaceRuns: [],
   keys: {},
+  runner: null,
 
   fetchProviders: async (slug) => {
     set({ providersLoading: true });
@@ -114,6 +124,27 @@ export const useDeliveryStore = create<DeliveryState>((set) => ({
       return true;
     } catch {
       return false;
+    }
+  },
+
+  fetchRunner: async () => {
+    try {
+      const runner = await getRunnerStatus();
+      set({ runner });
+      return runner;
+    } catch {
+      return null;
+    }
+  },
+
+  provisionRunner: async () => {
+    try {
+      const provision = await provisionRunnerApi();
+      // Seul l'état public est gardé : le secret repart vers l'appelant, qui l'affiche une fois puis l'oublie.
+      set({ runner: { exists: true, clientId: provision.clientId, ownerEmail: provision.ownerEmail } });
+      return provision;
+    } catch {
+      return null;
     }
   },
 }));
