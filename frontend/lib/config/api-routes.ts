@@ -64,6 +64,11 @@ export const DELIVERY_ROUTES = {
   RUNS: (slug: string) => `/api/workspaces/${slug}/delivery/runs`,
   /** Clé API de délégation d'un provider (GET état / POST connecter / DELETE déconnecter) - `provider` = "anthropic" | "cursor". */
   KEY: (slug: string, provider: string) => `/api/workspaces/${slug}/delivery/${provider}`,
+  /**
+   * Runner local de l'utilisateur connecté (ADR-013) : GET = état, jamais de secret ; POST = provisionner ou
+   * régénérer le secret. Sans slug : l'identité d'un runner est liée à la personne, pas au workspace.
+   */
+  RUNNER: "/api/delivery/runners",
 } as const;
 
 /**

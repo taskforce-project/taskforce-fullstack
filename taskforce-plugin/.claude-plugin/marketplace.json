@@ -1,0 +1,12 @@
+{
+  "name": "taskforce",
+  "description": "Plugins TaskForce pour Claude Code : travailler ses tâches en mode interactif via le MCP TaskForce.",
+  "owner": { "name": "TaskForce", "url": "https://taskforce-project.fr" },
+  "plugins": [
+    {
+      "name": "taskforce",
+      "source": ".",
+      "description": "Travaille tes tâches TaskForce dans ton propre Claude Code (mode interactif, via le MCP TaskForce)."
+    }
+  ]
+}

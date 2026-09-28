@@ -5,6 +5,7 @@ import { Loader2, KeyRound } from "lucide-react"
 import { toast } from "sonner"
 
 import { BrandLogo } from "@/components/ui/brand-logo"
+import { LocalRunnerSetup } from "@/components/settings/local-runner-setup"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
@@ -161,6 +162,9 @@ export function AgentsPanel() {
                     <span className="text-[10px] text-muted-foreground">{meta.note}</span>
                   </div>
                 )}
+
+                {/* Runner local : identité machine en libre-service (ADR-013) */}
+                {p.key === "claude-code" && p.available && <LocalRunnerSetup />}
               </div>
             )
           })}
@@ -178,7 +182,9 @@ function descriptionFor(key: string, available: boolean): string {
     case "claude-api": return "Claude via the Anthropic API - a single call that plans or drafts the task."
     case "cursor": return "Cursor background agent - works on the linked repo and opens a pull request."
     case "github-copilot": return "GitHub-hosted model inference, using your connected GitHub account."
-    case "claude-code": return "Full agentic Claude Code (clone, edit, open a PR) - coming soon."
+    case "claude-code": return available
+      ? "Your own Claude Code, on your machine: works on a branch and opens a pull request."
+      : "Your own Claude Code, on your machine - coming soon."
     case "stub": return "Demo agent - simulates a run end to end, no setup or cost."
     default: return available ? "Available for delegation." : "Coming soon."
   }
