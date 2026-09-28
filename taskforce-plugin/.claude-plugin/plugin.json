@@ -1,0 +1,47 @@
+{
+  "name": "taskforce",
+  "version": "0.1.0",
+  "description": "Travaille tes tâches TaskForce dans ton propre Claude Code : liste tes issues assignées, prends-en une, code ou réponds, commente. Via le serveur MCP TaskForce, en tant que toi (tes droits).",
+  "author": { "name": "TaskForce", "url": "https://taskforce-project.fr" },
+  "homepage": "https://docs.taskforce-project.fr",
+  "keywords": ["taskforce", "issues", "delivery", "mcp", "project-management"],
+  "commands": "./commands/",
+  "userConfig": {
+    "taskforce_token": {
+      "type": "string",
+      "title": "Jeton TaskForce (Bearer)",
+      "description": "Ton jeton d'accès TaskForce (voir le README pour l'obtenir). Note v1 : les jetons d'accès sont de courte durée ; un jeton personnel durable est prévu (endpoint dédié).",
+      "sensitive": true,
+      "required": true
+    },
+    "taskforce_workspace": {
+      "type": "string",
+      "title": "Workspace (slug)",
+      "description": "Le slug de ton workspace TaskForce, tel qu'il apparaît dans l'URL de l'app.",
+      "required": true
+    },
+    "taskforce_api_url": {
+      "type": "string",
+      "title": "URL de l'API TaskForce",
+      "description": "Base de l'API, suffixe /api compris.",
+      "default": "https://api.taskforce-project.fr/api"
+    },
+    "mcp_entry": {
+      "type": "file",
+      "title": "Entrée du serveur MCP (dist/index.js)",
+      "description": "Chemin absolu vers taskforce-mcp/dist/index.js sur ton poste (fais 'npm install && npm run build' dans taskforce-mcp). Une fois taskforce-mcp publié sur npm, ce champ disparaîtra au profit de npx.",
+      "required": true
+    }
+  },
+  "mcpServers": {
+    "tf": {
+      "command": "node",
+      "args": ["${user_config.mcp_entry}"],
+      "env": {
+        "TASKFORCE_API_URL": "${user_config.taskforce_api_url}",
+        "TASKFORCE_TOKEN": "${user_config.taskforce_token}",
+        "TASKFORCE_WORKSPACE": "${user_config.taskforce_workspace}"
+      }
+    }
+  }
+}
