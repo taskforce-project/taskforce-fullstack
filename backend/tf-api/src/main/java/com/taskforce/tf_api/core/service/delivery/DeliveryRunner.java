@@ -163,8 +163,8 @@ public class DeliveryRunner {
 
     /** Message d'un run jamais réclamé : ce qui s'est passé et quoi faire, dans la langue de l'interface. */
     static String unclaimedMessage(Duration timeout) {
-        return "No runner picked this task up within " + timeout.toMinutes() + " min. Start the TaskForce runner"
-            + " on your machine, then delegate the task again. The local runner is in early access.";
+        return "No runner picked this task up within " + timeout.toMinutes() + " min. Set up your runner in"
+            + " Settings > Agents, start it on your machine, then delegate the task again.";
     }
 
     /**
