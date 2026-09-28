@@ -15,7 +15,8 @@ import { hueFor } from "@/lib/site-icons";
  * GRAPHE de run à droite (pas de screenshot d'app), et des FONDS DE SECTION qui alternent (points /
  * rayures / vide / NOIR) - pas de fond sur les cartes. « Structure par traits » gardée (colonnes à filets).
  * D11 : le graphe est illustratif (badge PLANNED + légende « Illustrative »), rien n'est présenté comme Live.
- * Exception volontaire : la section « Local runner » (Beta, accès anticipé) décrit ce qui tourne VRAIMENT
+ * Exception volontaire : la section « Local runner » (Beta, en libre-service depuis le 28/09 via Réglages >
+ * Agents) décrit ce qui tourne VRAIMENT
  * aujourd'hui (ADR-013, `taskforce-runner/README.md`). Conditions d'Anthropic : on écrit en texte que le
  * produit fait tourner Claude Code, jamais comme nom de fonctionnalité, et sans son logo.
  */
@@ -207,7 +208,7 @@ const PRINCIPLES = [
     </div>
   </section>
 
-  {/* ───── Local runner - la remise à l'agent qui tourne AUJOURD'HUI (Beta, accès anticipé) - fond GRIS ───── */}
+  {/* ───── Local runner - la remise à l'agent qui tourne AUJOURD'HUI (Beta, libre-service) - fond GRIS ───── */}
   <section id="local-runner" class="bg-secondary scroll-mt-20 border-b">
     <div class="container-rail py-20 lg:py-28">
       <div class="grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:gap-16">
@@ -262,11 +263,12 @@ const PRINCIPLES = [
 
       <div class="mt-12 flex flex-col gap-5 border-t pt-8 sm:flex-row sm:items-center sm:justify-between">
         <p class="text-muted-foreground max-w-2xl text-[13px] leading-6">
-          Early access. Today we set the runner up with you. It runs on your computer with Node, git, the GitHub
-          CLI and Claude Code, on your own subscription or API key. TaskForce never sees your Claude credentials.
+          Set it up yourself: in TaskForce, open Settings, then Agents, and create your runner. You get its
+          credentials and the commands to start it. It runs on your computer with Node, git, the GitHub CLI and
+          Claude Code, on your own subscription or API key. TaskForce never sees your Claude credentials.
         </p>
-        <a href="/book-a-demo" class={cn(buttonVariants({ variant: "outline", size: "pill" }), "shrink-0")}>
-          Ask for early access
+        <a href={`${APP_URL}/auth/register`} class={cn(buttonVariants({ variant: "outline", size: "pill" }), "shrink-0")}>
+          Set up your runner
         </a>
       </div>
     </div>
