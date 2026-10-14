@@ -85,7 +85,7 @@ $runtime = Get-ProjectRuntimeStatus
 
 $badges = @(
     New-Badge -label "Version" -value "0.2.0-rc1" -color "blue"
-    New-Badge -label "License" -value "Fair Use" -color "green"
+    New-Badge -label "License" -value "AGPL-3.0" -color "blue"
     New-Badge -label "Java" -value $javaVersion -color "orange"
     New-Badge -label "Spring Boot" -value $springBootVersion -color "brightgreen"
     New-Badge -label "Next.js" -value $nextVersion -color "black"

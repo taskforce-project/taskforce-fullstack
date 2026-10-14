@@ -1,6 +1,7 @@
 {
   "name": "taskforce",
   "version": "0.1.0",
+  "license": "AGPL-3.0-only",
   "description": "Travaille tes tâches TaskForce dans ton propre Claude Code : liste tes issues assignées, prends-en une, code ou réponds, commente. Via le serveur MCP TaskForce, en tant que toi (tes droits).",
   "author": { "name": "TaskForce", "url": "https://taskforce-project.fr" },
   "homepage": "https://docs.taskforce-project.fr",
