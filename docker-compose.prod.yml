@@ -307,6 +307,8 @@ services:
         # Site vitrine : autre origine que l'application (www.<domaine> face à app.<domaine>).
         # Cible du logo et de « Retour au site » sur les pages d'authentification.
         NEXT_PUBLIC_SITE_URL: ${SITE_PUBLIC_URL}
+        # Clé de projet PostHog (analytics derrière consentement) ; vide = aucun envoi.
+        NEXT_PUBLIC_POSTHOG_KEY: ${POSTHOG_KEY:-}
     container_name: taskforce-frontend-prod
     environment:
       NODE_ENV: production

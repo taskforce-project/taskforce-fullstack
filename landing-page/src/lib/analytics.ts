@@ -3,15 +3,14 @@ import posthog from "posthog-js"
 import { analyticsAllowed, CONSENT_EVENT } from "./consent"
 
 /**
- * PostHog (EU) pour la landing, derrière le consentement. La clé PROJET (`phc_...`) est PUBLIQUE et
- * write-only (« safe to use in public apps » d'après PostHog) : défaut en dur acceptable, surchargé
- * par `PUBLIC_POSTHOG_KEY`. Région UE (`eu.i.posthog.com`) : aucune donnée hors UE. Sans clé, no-op.
+ * PostHog (EU) pour la landing, derrière le consentement. La clé PROJET (`phc_...`) vient de
+ * `PUBLIC_POSTHOG_KEY` (variable du déploiement) : aucune valeur par défaut, sinon un fork enverrait ses
+ * données au projet PostHog de TaskForce (OSS-1.9). Région UE (`eu.i.posthog.com`). Sans clé, no-op.
  *
  * La landing est un site multi-pages classique (chaque navigation = un chargement complet), donc
  * PostHog capture les pageviews automatiquement à l'init - pas de pageview manuel comme dans l'app.
  */
-const POSTHOG_KEY =
-  import.meta.env.PUBLIC_POSTHOG_KEY ?? "phc_tmS4mL7gc9zKo35GyPtM5uGkBYoTU2y2cna9acz3kkBq"
+const POSTHOG_KEY = import.meta.env.PUBLIC_POSTHOG_KEY ?? ""
 const POSTHOG_HOST = import.meta.env.PUBLIC_POSTHOG_HOST ?? "https://eu.i.posthog.com"
 
 let initialized = false

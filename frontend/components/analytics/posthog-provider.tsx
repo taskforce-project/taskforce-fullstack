@@ -6,10 +6,10 @@ import posthog from "posthog-js"
 
 import { analyticsAllowed, CONSENT_EVENT } from "@/lib/analytics/consent"
 
-// Cle PROJET PostHog (client-side, `phc_...`) : PUBLIQUE et write-only (« safe to use in public apps »
-// d'apres PostHog) -> defaut en dur acceptable + surchargeable par env. Region UE (eu.i.posthog.com) :
-// aucune donnee hors UE. Sans cle, le composant est un no-op (rien ne charge).
-const POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY ?? "phc_tmS4mL7gc9zKo35GyPtM5uGkBYoTU2y2cna9acz3kkBq"
+// Cle PROJET PostHog (client-side, `phc_...`), fournie par l'instance au build (NEXT_PUBLIC_POSTHOG_KEY).
+// Aucune valeur par defaut : un fork ou une instance auto-hebergee enverrait sinon ses donnees au projet
+// PostHog de TaskForce (OSS-1.9). Region UE (eu.i.posthog.com). Sans cle, le composant est un no-op.
+const POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY ?? ""
 const POSTHOG_HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST ?? "https://eu.i.posthog.com"
 
 let initialized = false
