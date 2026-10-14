@@ -123,7 +123,7 @@ function IssueRow({ issue, onOpen, onToggleDone }: { readonly issue: Issue; read
         ))}
       </div>
       <span className="hidden md:block text-xs text-muted-foreground w-20 text-right shrink-0">
-        {issue.dueDate ? new Date(issue.dueDate).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }) : "-"}
+        {issue.dueDate ? new Date(issue.dueDate).toLocaleDateString("en-US", { day: "numeric", month: "short" }) : "-"}
       </span>
       <div className="hidden lg:flex items-center justify-center w-8 shrink-0">
         {issue.assignee && (

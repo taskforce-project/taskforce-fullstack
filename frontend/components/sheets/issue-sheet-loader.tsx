@@ -33,7 +33,7 @@ const AVATAR_COLORS = [
 function formatDate(iso: string | null): string | null {
   if (!iso) return null
   try {
-    return new Date(iso).toLocaleDateString("fr-FR", { month: "short", day: "numeric" })
+    return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" })
   } catch {
     return null
   }
