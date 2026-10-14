@@ -18,7 +18,7 @@ Le backend ne peut pas joindre un poste local : c'est le runner qui vient cherch
 | Où | Droits |
 |---|---|
 | Dépôt | Un **worktree isolé** sur une branche neuve `tf/<clé>-<titre>-r<run>`. Ton checkout et ta branche courante ne sont jamais touchés. |
-| Poste | Mode `dontAsk` de Claude Code + liste fermée d'outils : lire, éditer, `git status/diff/log/add/commit/mv/rm`. Pas de shell libre, pas de réseau, pas de `git push`, pas de `gh`. |
+| Poste | Mode `dontAsk` de Claude Code + liste fermée d'outils : lire, éditer, `git status/diff/log/add/commit/mv/rm`. Pas de shell libre, pas de réseau, pas de `git push`, pas de `gh`. Les réglages du dépôt cloné (`.claude/settings*.json` : hooks, URL d'API) sont ignorés (`--setting-sources user`) : seuls les tiens et ceux du runner s'appliquent. |
 | TaskForce | Par le MCP, **au nom de la personne qui a délégué**, avec ses droits pour plafond, resserrés à : le workspace du run en lecture, les issues du projet du run en écriture, jamais de suppression. |
 | GitHub | Rien. C'est le **runner** qui pousse la branche et ouvre la PR, après l'agent. |
 
@@ -133,7 +133,8 @@ npm test          # tests unitaires (nommage de branche, config, frontière d'ou
   en place. Relancer `npm install -g @anthropic-ai/claude-code` suffit ; `claude --version` doit répondre un
   numéro de version. En dernier recours, l'installeur natif d'Anthropic ne passe pas par npm.
 - **`npm run check`** dit quel maillon manque : jeton machine, `git`, `gh`, `claude`, serveur MCP, dépôts.
-- **Versions.** Les options que le runner passe à `claude -p` ont été vérifiées contre Claude Code 2.1.278
+- **Versions.** Les options que le runner passe à `claude -p` ont été vérifiées contre Claude Code 2.1.278,
+  puis 2.1.293 pour `--setting-sources user`
   (`--max-turns` n'apparaît plus dans `claude --help`, mais reste acceptée ; une option inconnue, elle, est
   refusée net).
 - Un run en échec garde son worktree dans `~/.taskforce-runner/worktrees/run-<id>` : c'est la trace de ce que
