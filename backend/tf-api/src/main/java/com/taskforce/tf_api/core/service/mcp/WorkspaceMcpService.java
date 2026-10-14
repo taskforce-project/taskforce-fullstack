@@ -135,6 +135,8 @@ public class WorkspaceMcpService {
     @Transactional
     public void connectServer(Workspace ws, String connectorKey, String mcpUrl, String mcpToken, String mcpAllow) {
         if (mcpUrl == null || mcpUrl.isBlank()) throw new BusinessException("Champ requis : mcpUrl");
+        // Refus immédiat d'une URL vers le réseau interne (OSS-1.2) ; le client revérifie avant chaque appel.
+        client.assertAllowed(mcpUrl.trim());
         Map<String, String> config = new LinkedHashMap<>();
         config.put(CONFIG_URL, mcpUrl.trim());
         if (mcpToken != null && !mcpToken.isBlank()) config.put(CONFIG_TOKEN, mcpToken.trim());

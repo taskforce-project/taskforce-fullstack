@@ -31,6 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -236,6 +237,18 @@ class WorkspaceMcpServiceTest {
         assertThat(config).contains("mcpUrl").contains("http://x/mcp")
             .contains("mcpAllow").contains("create_issue");
         assertThat(config).doesNotContain("mcpToken");
+    }
+
+    @Test
+    @DisplayName("connectServer : refuse une URL vers le réseau interne, sans rien enregistrer (OSS-1.2)")
+    void connectServer_refusesInternalUrl() {
+        Workspace ws = Workspace.builder().id(1L).slug("acme").build();
+        doThrow(new BusinessException("MCP server refused: internal address"))
+            .when(client).assertAllowed("http://169.254.169.254/latest");
+
+        assertThatThrownBy(() -> service.connectServer(ws, "linear", " http://169.254.169.254/latest ", null, null))
+            .isInstanceOf(BusinessException.class);
+        verify(repository, never()).save(any());
     }
 
     @Test
