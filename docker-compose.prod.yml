@@ -228,8 +228,8 @@ services:
     networks:
       - taskforce-network
     healthcheck:
-      # L'actuator n'a PAS de préfixe /api (aucun context-path) → chemin = /actuator/health (curl installé au build).
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health >/dev/null 2>&1 || exit 1"]
+      # Sonde de disponibilité sur le port de l'API (l'actuator complet est sur le port de gestion 8081, interne).
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/readyz >/dev/null 2>&1 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
