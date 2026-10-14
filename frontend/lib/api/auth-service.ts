@@ -37,6 +37,8 @@ export interface AuthResponse {
   message?: string;
   /** Vrai quand le mot de passe est bon mais qu'un code 2FA est requis : aucun token n'est fourni. */
   twoFactorRequired?: boolean;
+  /** Connexion externe avec 2FA actif : défi scellé à renvoyer avec le code ({@link authService.oauthTwoFactor}). */
+  twoFactorChallenge?: string;
 }
 
 /**
@@ -170,6 +172,35 @@ export const authService = {
         message: string;
         data: AuthResponse;
       }>(AUTH_ROUTES.OAUTH_CALLBACK, payload);
+
+      const authData = response.data.data;
+      // 2FA actif : le serveur ne rend qu'un défi scellé, aucun jeton. On ne persiste rien - la page de
+      // rappel demande le code, puis appelle {@link oauthTwoFactor}.
+      if (authData.twoFactorRequired) {
+        return authData;
+      }
+      if (typeof window !== "undefined") {
+        // Le refresh token n'est plus stocké côté JS : il vit dans un cookie HttpOnly posé par le backend.
+        localStorage.setItem("accessToken", authData.accessToken);
+        localStorage.setItem("user", JSON.stringify(authData.user));
+      }
+      return authData;
+    } catch (error) {
+      throw new Error(getErrorMessage(error));
+    }
+  },
+
+  /**
+   * Connexion externe, second facteur : le défi rendu par {@link oauthCallback} et le code TOTP contre la
+   * session. Persiste les jetons comme {@link login}.
+   */
+  async oauthTwoFactor(payload: { challenge: string; totp: string }): Promise<AuthResponse> {
+    try {
+      const response = await apiClient.post<{
+        success: boolean;
+        message: string;
+        data: AuthResponse;
+      }>(AUTH_ROUTES.OAUTH_TWO_FACTOR, payload);
 
       const authData = response.data.data;
       if (typeof window !== "undefined") {
