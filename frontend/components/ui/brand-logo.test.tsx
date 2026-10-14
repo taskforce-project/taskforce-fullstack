@@ -17,8 +17,9 @@ describe("BrandLogo", () => {
     expect(container.textContent).toBe(expected);
   });
 
-  it("le logo d'Anthropic reste vendorisé, mais n'est jamais affiché (conditions d'Anthropic, ADR-013)", () => {
-    expect(BRAND_LOGOS["anthropic"]).toBeDefined();
+  it("le logo d'Anthropic n'est ni vendorisé ni affiché (conditions d'Anthropic, ADR-013)", () => {
+    // Plus aucun fichier servi (OSS-1.9) ; NAME_ONLY reste en garde si la marque revenait au manifeste.
+    expect(BRAND_LOGOS["anthropic"]).toBeUndefined();
     expect(NAME_ONLY.has("anthropic")).toBe(true);
   });
 
