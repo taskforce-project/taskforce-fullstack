@@ -1,0 +1,52 @@
+name: Bug report
+description: Something does not work as expected.
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a project
+        2. Click on ...
+        3. See the error
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Shown in the footer of the app (for example 1.0.0).
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Where does it run?
+      options:
+        - Self-hosted with Docker Compose
+        - taskforce-project.fr
+        - Local development setup
+    validations:
+      required: true
+  - type: dropdown
+    id: ai
+    attributes:
+      label: AI provider
+      options:
+        - Ollama
+        - Groq
+        - Another OpenAI-compatible provider
+        - No AI configured
+        - Not related to AI
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Remove tokens, passwords and personal data before pasting.
+      render: shell
