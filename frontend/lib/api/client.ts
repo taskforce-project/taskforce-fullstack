@@ -48,7 +48,7 @@ export const AI_TIMEOUT_MS = 200_000;
 /**
  * Endpoints publics qui ne nécessitent pas de token JWT
  */
-const publicEndpoints = ["/api/auth/", "/api/sales/"];
+const publicEndpoints = ["/api/auth/"];
 
 /**
  * Intercepteur pour ajouter le token JWT aux requêtes

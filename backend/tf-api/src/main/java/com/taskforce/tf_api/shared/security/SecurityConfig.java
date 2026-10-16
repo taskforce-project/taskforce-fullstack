@@ -88,7 +88,6 @@ public class SecurityConfig {
         // Avatars servis en <img> (impossible d'y joindre un Bearer) → publics, comme les fichiers Brain.
         // La clé Minio dérive de l'userId ; l'endpoint renvoie 404 si absent (cf. FileController#getAvatar).
         "/api/files/avatars/*",
-        "/api/sales/**",
         // En prod, l'actuator vit sur le port de gestion (management.server.port), jamais publié : sur le port
         // de l'API ces chemins répondent 404. Seules les sondes /livez et /readyz restent sur le port de l'API.
         "/actuator/**",

@@ -204,7 +204,7 @@ public class EmailService {
     }
 
     /**
-     * Envoi générique d'une notification interne (ex : équipe sales). Best-effort :
+     * Envoi générique d'une notification interne (ex : retours produit). Best-effort :
      * en cas d'échec on logue sans propager (ne casse jamais l'action métier appelante).
      */
     public void sendInternalNotification(String toEmail, String subject, String htmlContent) {

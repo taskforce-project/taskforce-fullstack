@@ -329,7 +329,7 @@ class EmailServiceTest {
 
             // When
             emailService.sendInternalNotification(
-                    "sales@taskforce.com", "Nouveau lead", "<html><body>Lead</body></html>");
+                    "team@taskforce.dev", "Nouveau retour", "<html><body>Retour</body></html>");
 
             // Then
             verify(mailSender).send(any(MimeMessage.class));
@@ -345,7 +345,7 @@ class EmailServiceTest {
 
             // When/Then : best-effort → aucune exception propagée
             emailService.sendInternalNotification(
-                    "sales@taskforce.com", "Nouveau lead", "<html><body>Lead</body></html>");
+                    "team@taskforce.dev", "Nouveau retour", "<html><body>Retour</body></html>");
 
             verify(mailSender).send(any(MimeMessage.class));
         }
