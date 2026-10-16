@@ -148,7 +148,6 @@ describe('authService - API Service', () => {
         password: 'NewUser@2024!',
         firstName: 'New',
         lastName: 'User',
-        planType: 'FREE',
       };
 
       const response = await authService.register(registerData);
@@ -169,61 +168,9 @@ describe('authService - API Service', () => {
         password: '',
         firstName: '',
         lastName: '',
-        planType: 'FREE',
       };
 
       await expect(authService.register(invalidData)).rejects.toThrow('Registration failed');
-    });
-  });
-
-  describe('selectPlan', () => {
-    it('should select FREE plan successfully', async () => {
-      const mockResponse = {
-        data: {
-          success: true,
-          message: 'Plan selected successfully',
-          data: {
-            email: 'test@example.com',
-            planType: 'FREE',
-            message: 'Plan selected successfully',
-          },
-        },
-      };
-
-      vi.mocked(client.apiClient.post).mockResolvedValue(mockResponse);
-
-      const response = await authService.selectPlan('test@example.com', 'FREE');
-
-      expect(response).toBeDefined();
-      expect(response.message).toBe('Plan selected successfully');
-      expect(response.stripeCheckoutUrl).toBeUndefined();
-      
-      expect(client.apiClient.post).toHaveBeenCalledWith(AUTH_ROUTES.SELECT_PLAN, {
-        email: 'test@example.com',
-        planType: 'FREE',
-      });
-    });
-
-    it('should return checkout URL for paid plans', async () => {
-      const mockResponse = {
-        data: {
-          success: true,
-          message: 'Redirecting to payment',
-          data: {
-            email: 'test@example.com',
-            planType: 'BUSINESS',
-            stripeCheckoutUrl: 'https://checkout.stripe.com/mock',
-            message: 'Redirecting to payment',
-          },
-        },
-      };
-
-      vi.mocked(client.apiClient.post).mockResolvedValue(mockResponse);
-
-      const response = await authService.selectPlan('test@example.com', 'BUSINESS');
-
-      expect(response).toBeDefined();
-      expect(response.stripeCheckoutUrl).toBe('https://checkout.stripe.com/mock');
     });
   });
 
@@ -590,11 +537,6 @@ describe('authService - couverture OAuth / challenge / fallbacks / garde-fous', 
     vi.mocked(client.apiClient.post).mockRejectedValue(new Error('bad-totp'));
     await expect(authService.oauthTwoFactor({ challenge: 'sealed', totp: '000000' })).rejects.toThrow('bad-totp');
     expect(localStorageMock.setItem).not.toHaveBeenCalled();
-  });
-
-  it('selectPlan propage une erreur', async () => {
-    vi.mocked(client.apiClient.post).mockRejectedValue(new Error('plan-fail'));
-    await expect(authService.selectPlan('a@b.co', 'BUSINESS')).rejects.toThrow('plan-fail');
   });
 
   it('forgotPassword retombe sur un message par défaut si le serveur ne renvoie rien', async () => {

@@ -10,7 +10,6 @@ import { AppTopbar } from "@/components/layout/topbar/app-topbar"
 import { AccountDeletionBanner } from "@/components/account/account-deletion-banner"
 import { PanelDock } from "@/components/layout/panel-dock"
 import { AppFooter } from "@/components/layout/app-footer"
-import { UpgradeDialog } from "@/components/subscription/upgrade-dialog"
 import { SettingsModal } from "@/components/settings/settings-modal"
 import { CreateProjectModal } from "@/components/dialogs/create-project-modal"
 import { FeedbackDialog } from "@/components/feedback/feedback-dialog"
@@ -61,7 +60,6 @@ export function AppShell({ children }: AppShellProps) {
       </SidebarInset>
 
       {/* Modals globaux - ouvrables depuis n'importe quel CTA */}
-      <UpgradeDialog />
       <SettingsModal />
       <CreateProjectModal />
       <FeedbackDialog />

@@ -52,13 +52,11 @@ import {
 } from "@/components/ui/select"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
-import { planLimit } from "@/lib/config/plan-limits"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { useUserStore } from "@/lib/store/user-store"
-import { useUpgradeStore } from "@/lib/store/upgrade-store"
 import { useProjectStore } from "@/lib/store/project-store"
 import { searchUsers, type UserSearchResult } from "@/lib/api/user-service"
-import { getWorkspaceUsage, type WorkspaceMember, type WorkspaceRole, type WorkspaceUsage } from "@/lib/api/workspace-service"
+import { type WorkspaceMember, type WorkspaceRole } from "@/lib/api/workspace-service"
 import {
   createInvitation,
   listPendingInvitations,
@@ -458,12 +456,10 @@ export default function MembersPage() {
   const [projectFilter, setProjectFilter] = useState<string>("all")
   const [invitationRefresh, setInvitationRefresh] = useState(0)
   const [profilesByUser, setProfilesByUser] = useState<Record<number, MemberSkillProfile>>({})
-  const [usage, setUsage] = useState<WorkspaceUsage | null>(null)
 
   const { members, membersLoading, membersError, fetchMembers, workspace } = useWorkspaceStore()
   const { projects, fetchProjects } = useProjectStore()
   const currentUser = useUserStore((s) => s.user)
-  const openUpgrade = useUpgradeStore((s) => s.openUpgrade)
 
   useEffect(() => {
     fetchMembers()
@@ -497,9 +493,6 @@ export default function MembersPage() {
         setProfilesByUser(Object.fromEntries(profiles.map((p) => [p.userId, p])))
       })
       .catch(() => { /* non bloquant */ })
-    getWorkspaceUsage(slug)
-      .then((u) => { if (active) setUsage(u) })
-      .catch(() => { /* non bloquant - fallback plan-limits.ts */ })
     return () => { active = false }
   }, [workspace?.slug])
 
@@ -665,29 +658,9 @@ export default function MembersPage() {
             {memberCountLabel}
           </p>
         </div>
-        {canManage && (() => {
-          // Source de vérité = endpoint usage back (PROD-4.2) ; fallback plan-limits.ts si non chargé.
-          const used = usage?.membersUsed ?? members.length
-          const rawLimit = usage ? usage.membersLimit : planLimit(currentUser?.planType, "members")
-          const unlimited = rawLimit === -1 || !Number.isFinite(rawLimit)
-          const atLimit = !unlimited && used >= rawLimit
-          return (
-            <div className="flex flex-col items-end gap-1.5">
-              {!unlimited && (
-                <span className={cn("text-xs", atLimit ? "text-amber-500 font-medium" : "text-muted-foreground")}>
-                  {used}/{rawLimit} members
-                </span>
-              )}
-              {atLimit ? (
-                <Button size="sm" variant="outline" className="gap-1.5" onClick={() => openUpgrade()}>
-                  <Crown className="size-3.5 text-amber-500" /> Upgrade plan
-                </Button>
-              ) : (
-                <InviteMemberDialog onInvited={() => setInvitationRefresh((n) => n + 1)} />
-              )}
-            </div>
-          )
-        })()}
+        {canManage && (
+          <InviteMemberDialog onInvited={() => setInvitationRefresh((n) => n + 1)} />
+        )}
       </div>
 
       {/* Toolbar */}
@@ -793,54 +766,6 @@ export default function MembersPage() {
       {canManage && workspace?.slug && (
         <PendingInvitations slug={workspace.slug} refreshKey={invitationRefresh} />
       )}
-
-      {/* Plan info - limite réelle selon le plan (QA2-20 : plus de « /5 » codé en dur) */}
-      {workspace && (() => {
-        const rawLimit = usage ? usage.membersLimit : planLimit(currentUser?.planType, "members")
-        const unlimited = rawLimit === -1 || !Number.isFinite(rawLimit)
-        const planLabel =
-          currentUser?.planType === "ENTERPRISE" ? "Enterprise"
-          : currentUser?.planType === "BUSINESS" ? "Business"
-          : currentUser?.planType === "BASIC" ? "Basic"
-          : "Free"
-        const atLimit = !unlimited && memberCount >= rawLimit
-        return (
-          <div className="rounded-xl border border-border bg-card p-4 shadow-sm flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium text-foreground">
-                {memberCount} member{memberCount === 1 ? "" : "s"} in <span className="font-semibold">{workspace.name}</span>
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {unlimited
-                  ? `${planLabel} plan - unlimited members.`
-                  : `${planLabel} plan - up to ${rawLimit} members.${atLimit ? " Limit reached." : ""}`}
-              </p>
-            </div>
-            {unlimited ? (
-              <Badge variant="secondary" className="gap-1.5 shrink-0">
-                <Crown className="size-3.5 text-amber-500" /> {planLabel}
-              </Badge>
-            ) : (
-              <div className="flex items-center gap-3 shrink-0">
-                <div className="flex items-center gap-2">
-                  <div className="w-32 h-1.5 rounded-full bg-muted overflow-hidden">
-                    <div
-                      className={cn("h-full rounded-full transition-all", atLimit ? "bg-amber-500" : "bg-gradient-to-r from-blue-600 to-blue-400 dark:from-blue-500 dark:to-blue-300")}
-                      style={{ width: `${Math.min((memberCount / rawLimit) * 100, 100)}%` }}
-                    />
-                  </div>
-                  <span className="text-xs text-muted-foreground">{memberCount}/{rawLimit}</span>
-                </div>
-                {atLimit && (
-                  <Button size="sm" variant="outline" className="gap-1.5" onClick={() => openUpgrade()}>
-                    <Crown className="size-3.5 text-amber-500" /> Upgrade
-                  </Button>
-                )}
-              </div>
-            )}
-          </div>
-        )
-      })()}
     </PageContainer>
   )
 }

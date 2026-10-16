@@ -7,7 +7,7 @@ import {
 } from "recharts"
 import {
   Activity, TrendingDown, Users, CalendarRange, Sparkles, Loader2,
-  Maximize2, AlertCircle, Send, Lock, X, FolderKanban, Pin, Trash2, BarChart3, Box,
+  Maximize2, AlertCircle, Send, X, FolderKanban, Pin, Trash2, BarChart3, Box,
 } from "lucide-react"
 
 import { toast } from "sonner"
@@ -428,13 +428,12 @@ const TRIPTYCH: ReadonlyArray<{ preset: Preset; caption: string }> = [
  * modal d'exploration, pré-positionné sur le graphe cliqué.
  */
 export function ChartExplorer({
-  slug, projectId, gated = false, onUpgrade,
-}: Readonly<{ slug: string; projectId: number | null; gated?: boolean; onUpgrade?: () => void }>) {
+  slug, projectId,
+}: Readonly<{ slug: string; projectId: number | null }>) {
   const [open, setOpen] = useState(false)
   const [initialPresetId, setInitialPresetId] = useState<string>(PRESETS[0].id)
 
   function openAt(presetId: string) {
-    if (gated) { onUpgrade?.(); return }
     setInitialPresetId(presetId)
     setOpen(true)
   }
@@ -447,9 +446,7 @@ export function ChartExplorer({
             <Activity className="size-4" /> Analytics previews
           </span>
           <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs" onClick={() => openAt(PRESETS[0].id)}>
-            {gated
-              ? <><Lock className="size-3.5 text-amber-600 dark:text-amber-400" /> Pro</>
-              : <><Sparkles className="size-3.5 text-primary" /> Explore</>}
+            <Sparkles className="size-3.5 text-primary" /> Explore
           </Button>
         </div>
 
@@ -469,9 +466,7 @@ export function ChartExplorer({
               </div>
               <p className="text-[11px] text-muted-foreground/70">{caption}</p>
               <div className="h-20 w-full">
-                {gated
-                  ? <div className="flex h-full items-center justify-center rounded-md bg-muted/50"><Lock className="size-4 text-muted-foreground/50" /></div>
-                  : <SpecChart slug={slug} projectId={projectId} spec={p.spec} variant="preview" />}
+                <SpecChart slug={slug} projectId={projectId} spec={p.spec} variant="preview" />
               </div>
             </button>
           ))}

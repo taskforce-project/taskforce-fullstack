@@ -19,36 +19,12 @@ export const AUTH_ROUTES = {
   OAUTH_CALLBACK: "/api/auth/oauth/callback",
   /** Connexion externe avec 2FA actif : défi scellé + code TOTP contre une session TaskForce. */
   OAUTH_TWO_FACTOR: "/api/auth/oauth/2fa",
-  SELECT_PLAN: "/api/auth/select-plan",
   VERIFY_OTP: "/api/auth/verify-otp",
   RESEND_OTP: "/api/auth/resend-otp",
   FORGOT_PASSWORD: "/api/auth/forgot-password",
   RESET_PASSWORD: "/api/auth/reset-password",
   REFRESH_TOKEN: "/api/auth/refresh-token",
   LOGOUT: "/api/auth/logout",
-} as const;
-
-/**
- * Routes Stripe (paiements et abonnements)
- * Backend: @RequestMapping("/api/stripe")
- */
-export const STRIPE_ROUTES = {
-  CREATE_CHECKOUT: "/api/stripe/create-checkout",
-  VERIFY_SESSION: "/api/stripe/verify-session",
-  CANCEL_SUBSCRIPTION: "/api/stripe/cancel",
-  WEBHOOK: "/api/stripe/webhook",
-} as const;
-
-/**
- * Routes facturation self-service (Stripe Customer Portal) - chemin protégé.
- * Backend: @RequestMapping("/api/billing")
- */
-export const BILLING_ROUTES = {
-  PORTAL: "/api/billing/portal",
-  SUBSCRIPTION: "/api/billing/subscription",
-  CHECKOUT: "/api/billing/checkout",
-  /** Change le forfait d'un abonnement existant in-app (upgrade/rétrogradation, proration auto). */
-  CHANGE_PLAN: "/api/billing/change-plan",
 } as const;
 
 /**
@@ -127,7 +103,6 @@ export const WORKSPACE_ROUTES = {
   // Par slug
   BY_SLUG: (slug: string) => `/api/workspaces/${slug}`,
   MEMBERS: (slug: string) => `/api/workspaces/${slug}/members`,
-  USAGE: (slug: string) => `/api/workspaces/${slug}/usage`,
   AUDIT: (slug: string) => `/api/workspaces/${slug}/audit`,
   INVITE: (slug: string) => `/api/workspaces/${slug}/members/invite`,
   MEMBER_ROLE: (slug: string, memberId: number) => `/api/workspaces/${slug}/members/${memberId}/role`,
@@ -334,7 +309,7 @@ export const ASSISTANT_ROUTES = {
 } as const;
 
 /**
- * Consommation IA (tokens) du workspace - mois courant + plafond du plan.
+ * Consommation IA (tokens) du workspace - mois courant + plafond de l'instance (illimité par défaut).
  * Backend: @RequestMapping("/api/workspaces/{slug}/ai")
  */
 export const AI_ROUTES = {
@@ -487,7 +462,6 @@ export const BRAIN_ROUTES = {
  */
 export const API_ROUTES = {
   AUTH: AUTH_ROUTES,
-  STRIPE: STRIPE_ROUTES,
   USER: USER_ROUTES,
   WORKSPACE: WORKSPACE_ROUTES,
   ANALYTICS: ANALYTICS_ROUTES,

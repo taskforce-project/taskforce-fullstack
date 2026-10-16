@@ -6,7 +6,6 @@ import {
   updateWorkspace,
   getWorkspaceMembers,
   inviteMember,
-  getWorkspaceUsage,
   getAuditLogs,
   updateMemberRole,
   removeMember,
@@ -112,19 +111,6 @@ describe('workspace-service', () => {
 
       expect(apiClient.post).toHaveBeenCalledWith(WORKSPACE_ROUTES.INVITE(SLUG), payload);
       expect(result).toEqual(member);
-    });
-  });
-
-  describe('getWorkspaceUsage', () => {
-    it('GET l’usage du plan', async () => {
-      const usage = { plan: 'FREE', membersUsed: 1, membersLimit: 5, workspacesUsed: 1, workspacesLimit: 1 };
-      vi.mocked(apiClient.get).mockResolvedValue(envelope(usage));
-
-      const result = await getWorkspaceUsage(SLUG);
-
-      // `silentError` : la jauge d'usage est un complément, son indisponibilité ne doit rien afficher.
-      expect(apiClient.get).toHaveBeenCalledWith(WORKSPACE_ROUTES.USAGE(SLUG), { silentError: true });
-      expect(result).toEqual(usage);
     });
   });
 

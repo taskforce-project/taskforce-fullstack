@@ -71,13 +71,12 @@ vi.mock('@/lib/contexts/auth-context', () => ({
   AuthProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
-describe('OTPForm - Step 3: Verification', () => {
+describe('OTPForm - Step 2: Verification', () => {
   const mockRegisterData = {
     firstName: 'John',
     lastName: 'Doe',
     email: 'test@example.com',
     password: 'StrongP@ssw0rd!',
-    planType: 'FREE',
   };
 
   beforeEach(() => {
@@ -116,8 +115,8 @@ describe('OTPForm - Step 3: Verification', () => {
       });
     });
 
-    // Voir plan-form.test.tsx : le fil d'étapes a été remonté au niveau de la page pour cesser
-    // d'être dupliqué dans les trois étapes. Il est testé dans auth-stepper.test.tsx.
+    // Le fil d'étapes a été remonté au niveau de la page pour cesser d'être dupliqué dans chaque
+    // étape. Il est testé dans auth-stepper.test.tsx.
     it('ne porte plus le fil d\'étapes, désormais rendu par la page', () => {
       render(<OTPForm />);
 
@@ -169,7 +168,6 @@ describe('OTPForm - Step 3: Verification', () => {
         firstName: 'John',
         lastName: 'Doe',
         password: 'StrongP@ssw0rd!',
-        planType: 'FREE',
         // email missing
       });
 
@@ -185,24 +183,7 @@ describe('OTPForm - Step 3: Verification', () => {
         firstName: 'John',
         lastName: 'Doe',
         email: 'test@example.com',
-        planType: 'FREE',
         // password missing
-      });
-
-      render(<OTPForm />);
-
-      await waitFor(() => {
-        expect(mockPush).toHaveBeenCalledWith('/auth/register');
-      });
-    });
-
-    it('should redirect if planType is missing', async () => {
-      mockGetRegisterData.mockReturnValue({
-        firstName: 'John',
-        lastName: 'Doe',
-        email: 'test@example.com',
-        password: 'StrongP@ssw0rd!',
-        // planType missing
       });
 
       render(<OTPForm />);
@@ -223,7 +204,6 @@ describe('OTPForm - Step 3: Verification', () => {
           password: 'StrongP@ssw0rd!',
           firstName: 'John',
           lastName: 'Doe',
-          planType: 'FREE',
         });
       });
 

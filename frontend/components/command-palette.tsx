@@ -17,7 +17,6 @@ import {
   Plus,
   User,
   Bell,
-  Zap,
   Sun,
   Moon,
   Search,
@@ -154,8 +153,6 @@ export function CommandPalette({ open, onOpenChange }: Readonly<CommandPalettePr
     { id: "new-issue",     label: "Create issue",     group: "Actions",    icon: <Plus className="h-4 w-4" />,            shortcut: "C",   action: () => go("/projects") },
     { id: "new-project",   label: "Create project",     group: "Actions",    icon: <Plus className="h-4 w-4" />,                             action: () => { openCreateProject(); onOpenChange(false) } },
     { id: "notifications", label: "Open notifications", group: "Actions", icon: <Bell className="h-4 w-4" />,                          action: () => go("/inbox") },
-    // « Voir les forfaits » → page des plans (facturation), pas les réglages génériques.
-    { id: "upgrade",       label: "View plans",   group: "Actions",    icon: <Zap className="h-4 w-4" />,                              action: () => go("/billing") },
     // Appearance
     { id: "theme-light",   label: "Switch to light mode", group: "Appearance", icon: <Sun className="h-4 w-4" />,    action: () => { setTheme("light"); onOpenChange(false) } },
     { id: "theme-dark",    label: "Switch to dark mode",  group: "Appearance", icon: <Moon className="h-4 w-4" />,   action: () => { setTheme("dark"); onOpenChange(false) } },

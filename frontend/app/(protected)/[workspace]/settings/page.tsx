@@ -1567,7 +1567,6 @@ function PrivacyPanel() {
           <li>• <strong className="text-foreground">Account</strong>: name, email, profile picture</li>
           <li>• <strong className="text-foreground">Workspace activity</strong>: issues, projects, comments, pages</li>
           <li>• <strong className="text-foreground">Authentication tokens</strong>: stored in your browser&apos;s local storage (never shared)</li>
-          <li>• <strong className="text-foreground">Billing</strong>: subscription plan status (card details are held by Stripe only)</li>
         </ul>
         <p className="text-xs text-muted-foreground mt-3">
           Read our full{" "}
@@ -1616,7 +1615,7 @@ function PrivacyPanel() {
 }
 
 // ---------------------------------------------------------------------------
-// Usage IA Panel (conso tokens réelle du mois vs plafond du plan)
+// Usage IA Panel (conso tokens réelle du mois vs plafond de l'instance)
 // ---------------------------------------------------------------------------
 
 function MiniStat({ label, value }: Readonly<{ label: string; value: number }>) {
@@ -1630,17 +1629,8 @@ function MiniStat({ label, value }: Readonly<{ label: string; value: number }>) 
 
 function UsagePanel() {
   const slug = useWorkspaceStore((s) => s.activeWorkspace?.slug)
-  const router = useRouter()
-  const closeSettings = useSettingsStore((s) => s.closeSettings)
   const [usage, setUsage] = useState<AiUsage | null>(null)
   const [loading, setLoading] = useState(true)
-
-  // Upgrade = navigation vers la page des forfaits (pas un 2e modal par-dessus les réglages). Ferme
-  // d'abord le modal Settings si ouvert, sinon il resterait affiché par-dessus la page facturation.
-  const goToPlans = () => {
-    closeSettings()
-    if (slug) router.push(`/${slug}/billing`)
-  }
 
   useEffect(() => {
     if (!slug) return
@@ -1661,24 +1651,14 @@ function UsagePanel() {
 
   return (
     <div className="flex flex-col gap-4">
-      <SectionCard title="Cortex usage" description="Tokens used by the Cortex agent this month, and your plan's cap.">
+      <SectionCard title="Cortex usage" description="Tokens used by the Cortex agent this month, and the monthly cap of this instance, if it sets one.">
         {loading ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : !usage ? (
           <p className="text-sm text-muted-foreground">Usage unavailable right now.</p>
         ) : (
           <div className="flex flex-col gap-5">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-medium text-foreground">Plan <span className="uppercase">{usage.plan}</span></p>
-                <p className="text-xs text-muted-foreground mt-0.5">Period {usage.period} · resets on {usage.resetAt}</p>
-              </div>
-              {usage.plan !== "BUSINESS" && usage.plan !== "ENTERPRISE" && (
-                <Button size="sm" className="h-8 text-xs gap-1.5 shrink-0" onClick={goToPlans}>
-                  <Zap className="h-3.5 w-3.5" /> View plans
-                </Button>
-              )}
-            </div>
+            <p className="text-xs text-muted-foreground">Period {usage.period} · resets on {usage.resetAt}</p>
 
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-sm">
@@ -1702,8 +1682,8 @@ function UsagePanel() {
             </div>
 
             <p className="text-xs text-muted-foreground leading-relaxed">
-              AI cost is deliberately low (local model ≈ server cost). Caps are indicative and will be adjusted
-              with the final pricing; only AI compute will be top-up-able on demand.
+              Unlimited by default. An instance backed by a paid AI API can set a monthly cap per account
+              (AI_MONTHLY_TOKENS_PER_ACCOUNT); the count resets on the first day of each month.
             </p>
           </div>
         )}

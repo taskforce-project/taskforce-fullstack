@@ -52,23 +52,6 @@ export const handlers = [
     );
   }),
 
-  // POST /auth/select-plan
-  http.post(`${API_URL}/auth/select-plan`, async ({ request }) => {
-    const body = await request.json() as any;
-    
-    if (body.email && body.planType) {
-      return HttpResponse.json({
-        message: 'Plan selected successfully',
-        checkoutSessionUrl: body.planType !== 'FREE' ? 'https://checkout.stripe.com/mock' : undefined,
-      });
-    }
-    
-    return HttpResponse.json(
-      { message: 'Invalid plan selection' },
-      { status: 400 }
-    );
-  }),
-
   // POST /auth/verify-otp
   http.post(`${API_URL}/auth/verify-otp`, async ({ request }) => {
     const body = await request.json() as any;

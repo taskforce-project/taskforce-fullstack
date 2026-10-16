@@ -12,9 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { CardSkeleton, CardError } from "@/components/dashboard/card-states"
 import { SectionCard, MetricSplit } from "@/components/ui/section-card"
-import { useUpgradeStore } from "@/lib/store/upgrade-store"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { useAuth } from "@/lib/contexts/auth-context"
 import { cn } from "@/lib/utils"
 import {
   getAnalyticsKpis,
@@ -99,10 +97,8 @@ function InsightRow({ insight }: { readonly insight: AiInsight }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AnalyticsPage() {
-  const { user } = useAuth()
   const params = useParams()
   const slug = params.workspace as string
-  const openUpgrade = useUpgradeStore((s) => s.openUpgrade)
   const [kpis, setKpis] = useState<AnalyticsKpis | null>(null)
   const [kpisLoading, setKpisLoading] = useState(true)
   const [kpisError, setKpisError] = useState(false)
@@ -112,7 +108,6 @@ export default function AnalyticsPage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [projectFilter, setProjectFilter] = useState<string>(ALL_PROJECTS)
 
-  const isPro = user?.planType === "BUSINESS" || user?.planType === "ENTERPRISE"
   const projectId = projectFilter === ALL_PROJECTS ? null : Number(projectFilter)
 
   // Signaux IA (workspace-wide) : chargement + échec explicites, pour ne plus laisser « No signals yet »
@@ -239,7 +234,7 @@ export default function AnalyticsPage() {
       </SectionCard>
 
       {/* 4 - L'exploration : 3 aperçus → modal (catalogue + génération IA). */}
-      <ChartExplorer slug={slug} projectId={projectId} gated={!isPro} onUpgrade={openUpgrade} />
+      <ChartExplorer slug={slug} projectId={projectId} />
     </PageContainer>
   )
 }

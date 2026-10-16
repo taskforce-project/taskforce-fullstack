@@ -2,8 +2,7 @@
 
 import * as React from "react";
 import { createPortal } from "react-dom";
-import { useParams, useRouter } from "next/navigation";
-import { X, ArrowRight, ArrowLeft, Sparkles, Layers, Activity, Compass, Rocket, Zap, FlaskConical, Lock } from "lucide-react";
+import { X, ArrowRight, ArrowLeft, Sparkles, Layers, Activity, Compass, Zap, FlaskConical, Lock } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -13,8 +12,8 @@ import { useTourStore } from "@/lib/store/tour-store";
  * Tour produit maison (coach-marks), stylé avec nos jetons shadcn - pas de dépendance externe.
  *
  * <p>Deux variantes d'étape : les <b>coach-marks</b> (petit popover + spotlight sur un vrai élément,
- * repéré par {@code data-tour="…"}) et les <b>hero</b> (grand modal centré : accueil qui explique l'app,
- * et upsell final). Piloté au clavier, rendu en portal. L'upsell ouvre le modal d'upgrade existant.</p>
+ * repéré par {@code data-tour="…"}) et les <b>hero</b> (grand modal centré, comme l'accueil qui explique
+ * l'app). Piloté au clavier, rendu en portal.</p>
  *
  * <p>Monté une fois dans {@code AppShell} ; rend {@code null} tant que le store n'est pas actif. Déclenché
  * 1× (cf. {@code hasSeen} persisté) au 1ᵉʳ dashboard, rejouable depuis l'aide.</p>
@@ -31,7 +30,7 @@ interface TourPoint {
 interface TourStep {
   readonly title: string;
   readonly body: string;
-  /** Grand modal centré (accueil / upsell) plutôt qu'un coach-mark compact. */
+  /** Grand modal centré (accueil) plutôt qu'un coach-mark compact. */
   readonly hero?: boolean;
   /** Icône du hero (si pas de bannière). */
   readonly icon?: React.ElementType;
@@ -43,8 +42,6 @@ interface TourStep {
   readonly target?: string;
   /** Placement du popover : à droite (barre latérale) sinon auto (dessous/dessus). */
   readonly placement?: "auto" | "right";
-  /** Action marketing optionnelle : ouvre le modal d'upgrade. */
-  readonly cta?: "upgrade";
 }
 
 const STEPS: readonly TourStep[] = [
@@ -96,18 +93,6 @@ const STEPS: readonly TourStep[] = [
       { icon: Lock, title: "Coming soon", text: "A padlock marks an upcoming entry." },
     ],
   },
-  {
-    hero: true,
-    icon: Rocket,
-    title: "Kick it up a notch",
-    body: "You're on Free: 100,000 Cortex tokens per month. A higher plan unlocks the app's full potential.",
-    points: [
-      { icon: Zap, title: "More Cortex tokens", text: "Enough to run the AI without counting." },
-      { icon: Sparkles, title: "Full assistant", text: "Ask AI in context, everywhere." },
-      { icon: Activity, title: "Advanced analytics", text: "Forecasts and expanded dashboards." },
-    ],
-    cta: "upgrade",
-  },
 ];
 
 const CARD_W = 344;
@@ -120,9 +105,6 @@ export function ProductTour() {
   const stepIndex = useTourStore((s) => s.stepIndex);
   const setStep = useTourStore((s) => s.setStep);
   const close = useTourStore((s) => s.close);
-  const router = useRouter();
-  const params = useParams();
-  const slug = typeof params?.workspace === "string" ? params.workspace : "";
 
   const [mounted, setMounted] = React.useState(false);
   const [rect, setRect] = React.useState<DOMRect | null>(null);
@@ -144,12 +126,6 @@ export function ProductTour() {
   const goPrev = React.useCallback(() => {
     if (stepIndex > 0) setStep(stepIndex - 1);
   }, [setStep, stepIndex]);
-
-  const handleUpgrade = React.useCallback(() => {
-    // Envoie directement sur la page des forfaits (pas d'ouverture d'un second modal par-dessus le tour).
-    close(true);
-    if (slug) router.push(`/${slug}/billing`);
-  }, [close, router, slug]);
 
   React.useEffect(() => setMounted(true), []);
 
@@ -377,21 +353,10 @@ export function ProductTour() {
                   <ArrowLeft /> Back
                 </Button>
               )}
-              {step.cta === "upgrade" ? (
-                <>
-                  <Button variant="ghost" size="sm" onClick={() => close(true)}>
-                    Finish
-                  </Button>
-                  <Button size="sm" onClick={handleUpgrade}>
-                    View plans <Sparkles />
-                  </Button>
-                </>
-              ) : (
-                <Button size="sm" onClick={goNext}>
-                  {isFirst ? "Let's go" : isLast ? "Finish" : "Next"}
-                  {!isLast && <ArrowRight />}
-                </Button>
-              )}
+              <Button size="sm" onClick={goNext}>
+                {isFirst ? "Let's go" : isLast ? "Finish" : "Next"}
+                {!isLast && <ArrowRight />}
+              </Button>
             </div>
           </div>
         </div>

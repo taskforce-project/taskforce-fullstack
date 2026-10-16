@@ -15,7 +15,6 @@ const sampleUser: AuthUser = {
   firstName: 'Alice',
   lastName: 'Example',
   displayName: 'Alice Example',
-  planType: 'FREE',
 };
 
 describe('user-store', () => {

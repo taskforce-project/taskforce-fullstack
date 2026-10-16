@@ -3,10 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { useParams } from "next/navigation"
-import { Sparkles, ExternalLink, Zap, ChevronDown, ChevronRight, RefreshCw } from "lucide-react"
+import { Sparkles, ExternalLink, ChevronDown, ChevronRight, RefreshCw } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import { useUpgradeStore } from "@/lib/store/upgrade-store"
 import { useSettingsStore } from "@/lib/store/settings-store"
 import { getAiUsage, type AiUsage } from "@/lib/api/ai-usage-service"
 
@@ -57,7 +56,6 @@ function Ring({ pct }: { pct: number }) {
 export function CortexUsage({ sessionTokens, className }: { sessionTokens: number; className?: string }) {
   const params = useParams()
   const slug = typeof params?.workspace === "string" ? params.workspace : ""
-  const openUpgrade = useUpgradeStore((s) => s.openUpgrade)
   const openSettings = useSettingsStore((s) => s.openSettings)
 
   const [open, setOpen] = useState(false)
@@ -159,14 +157,14 @@ export function CortexUsage({ sessionTokens, className }: { sessionTokens: numbe
 
           <div className="h-px bg-border" />
 
-          {/* Utilisation du forfait */}
+          {/* Utilisation du mois */}
           <div className="p-3">
             <button
               type="button"
               onClick={openDetails}
               className="flex w-full items-center justify-between text-left text-xs font-semibold transition-colors hover:text-foreground"
             >
-              <span>Plan usage · <span className="uppercase text-muted-foreground">{usage?.plan ?? "…"}</span></span>
+              <span>Monthly usage</span>
               <ChevronRight className="size-3 text-muted-foreground" />
             </button>
 
@@ -215,13 +213,6 @@ export function CortexUsage({ sessionTokens, className }: { sessionTokens: numbe
                 className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11px] font-medium transition-colors hover:bg-muted"
               >
                 <ExternalLink className="size-3" /> Details
-              </button>
-              <button
-                type="button"
-                onClick={() => { setOpen(false); openUpgrade() }}
-                className="flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-[11px] font-medium text-primary-foreground transition-opacity hover:opacity-90"
-              >
-                <Zap className="size-3" /> Upgrade
               </button>
             </div>
           </div>

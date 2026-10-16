@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
 import { UserPlus, Search, X, Loader2, Info } from "lucide-react"
 import { toast } from "sonner"
 
@@ -52,7 +51,6 @@ const PROJECT_ROLES: { value: ProjectRole; label: string }[] = [
  * Option : ajouter l'invité à une équipe existante ou en créer une.
  */
 export function ProjectInviteDialog({ workspace, projectId, onInvited }: ProjectInviteDialogProps) {
-  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<UserSearchResult[]>([])
@@ -118,17 +116,8 @@ export function ProjectInviteDialog({ workspace, projectId, onInvited }: Project
       onInvited()
       reset()
       setOpen(false)
-    } catch (err) {
-      // 409 = plafond du forfait Free sur un projet privé (façon GitHub) → upsell.
-      const e = err as { response?: { status?: number; data?: { message?: string } } }
-      if (e?.response?.status === 409) {
-        toast.error(e.response?.data?.message ?? "Free plan limit reached on this private project.", {
-          description: "Make the project public, or upgrade to a paid plan to invite without limits.",
-          action: { label: "View plans", onClick: () => router.push(`/${workspace}/billing`) },
-        })
-      } else {
-        toast.error("Error while inviting")
-      }
+    } catch {
+      toast.error("Error while inviting")
     } finally {
       setSubmitting(false)
     }

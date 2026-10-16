@@ -23,11 +23,8 @@ import { NotificationBell } from "@/components/layout/topbar/notification-bell"
 import { WorkflowsButton } from "@/components/workflows/workflows-button"
 import { useProjectStore } from "@/lib/store/project-store"
 import { usePanelStore } from "@/lib/store/panel-store"
-import { useUserStore } from "@/lib/store/user-store"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
-import { planHasFeature } from "@/lib/config/plan-features"
 import { AgentChat } from "@/components/agent/agent-chat"
-import { toast } from "sonner"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 
 /**
@@ -118,14 +115,7 @@ export function AppTopbar() {
   const { t } = usePreferencesStore()
   const [cmdOpen, setCmdOpen] = React.useState(false)
   const togglePanel = usePanelStore((s) => s.togglePanel)
-  const planType = useUserStore((s) => s.user?.planType)
-  const aiEntitled = planHasFeature(planType, "AI_ASSISTANT")
-
   const openAssistant = React.useCallback(() => {
-    if (!aiEntitled) {
-      toast.info(t.shell.aiProFeature)
-      return
-    }
     togglePanel({
       id: "assistant",
       side: "right",
@@ -133,7 +123,7 @@ export function AppTopbar() {
       icon: <Sparkles className="size-4 text-primary" />,
       content: <AgentChat />,
     })
-  }, [togglePanel, aiEntitled, t])
+  }, [togglePanel])
 
   // Global Ctrl+K / Cmd+K shortcut
   React.useEffect(() => {

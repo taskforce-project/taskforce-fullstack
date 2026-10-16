@@ -10,7 +10,6 @@ import {
   Cpu,
   Users,
   Activity,
-  CreditCard,
   Shield,
   Mail,
   Compass,
@@ -44,7 +43,6 @@ const CATEGORIES: readonly DocCategory[] = [
   { id: "smart",       label: "Smart Assign (AI)",    icon: <Cpu className="h-4 w-4" />,         color: "text-violet-500 bg-violet-500/10 border-violet-500/20" },
   { id: "people",      label: "Members & teams",      icon: <Users className="h-4 w-4" />,      color: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20" },
   { id: "analytics",   label: "Analytics & Assistant",icon: <Activity className="h-4 w-4" />,   color: "text-cyan-500 bg-cyan-500/10 border-cyan-500/20" },
-  { id: "billing",     label: "Plans & billing",      icon: <CreditCard className="h-4 w-4" />, color: "text-orange-500 bg-orange-500/10 border-orange-500/20" },
   { id: "security",    label: "Security & data",      icon: <Shield className="h-4 w-4" />,      color: "text-rose-500 bg-rose-500/10 border-rose-500/20" },
 ]
 
@@ -112,17 +110,7 @@ const ARTICLES: readonly DocArticle[] = [
   {
     id: "analytics-assistant", category: "analytics",
     title: "Using the Ask AI assistant",
-    body: "Click 'Ask AI' in the top bar to open the assistant. Ask questions about your projects, tasks or strategy; it answers in context. The AI assistant is a Pro feature.",
-  },
-  {
-    id: "billing-plans", category: "billing",
-    title: "Plans: Free, Pro, Enterprise",
-    body: "Free: 2 workspaces, up to 5 members, board/list/cycles, basic Smart Assign. Pro: 10 workspaces, up to 50 members, advanced analytics, AI assistant, integrations. Enterprise: unlimited members, SSO, advanced audit, on-premise.",
-  },
-  {
-    id: "billing-upgrade", category: "billing",
-    title: "Upgrade to Pro and manage billing",
-    body: "Click any 'Upgrade to Pro' button (profile, switcher, Members page) to open the upgrade window and start the secure payment. Once subscribed, manage your billing from Settings → Billing & Plan (Stripe portal).",
+    body: "Click 'Ask AI' in the top bar to open the assistant. Ask questions about your projects, tasks or strategy; it answers in context.",
   },
   {
     id: "security-gdpr", category: "security",

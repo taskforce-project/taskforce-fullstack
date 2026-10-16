@@ -13,7 +13,7 @@ interface CreateProjectUiState {
 
 /**
  * Pilote le modal GLOBAL de création de projet (monté une seule fois dans l'`AppShell`, comme
- * {@link useSettingsStore} / l'UpgradeDialog).
+ * {@link useSettingsStore}).
  *
  * <p>Avant, « New project » naviguait vers `…/projects?new=1` et la page ouvrait le modal au montage.
  * En dev, le double-montage de React Strict Mode rejouait l'animation d'ouverture → le modal
