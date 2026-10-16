@@ -1,7 +1,6 @@
 package com.taskforce.tf_api.shared.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -110,19 +109,5 @@ class SharedConfigBeanTest {
         ReflectionTestUtils.setField(cfg, "expirationMinutes", 10);
         ReflectionTestUtils.setField(cfg, "length", 6);
         assertThat(cfg).isNotNull();
-    }
-
-    @Test
-    @DisplayName("StripeConfig — init() (@PostConstruct) ne lève aucune exception")
-    void stripeConfig_init() {
-        StripeConfig cfg = new StripeConfig();
-        ReflectionTestUtils.setField(cfg, "apiKey", "sk_test_dummy");
-        ReflectionTestUtils.setField(cfg, "webhookSecret", "whsec_dummy");
-        ReflectionTestUtils.setField(cfg, "freePriceId", null);
-        ReflectionTestUtils.setField(cfg, "basicPriceId", "price_basic");
-        ReflectionTestUtils.setField(cfg, "businessPriceId", "price_business");
-        ReflectionTestUtils.setField(cfg, "enterprisePriceId", "price_ent");
-
-        assertThatCode(cfg::init).doesNotThrowAnyException();
     }
 }

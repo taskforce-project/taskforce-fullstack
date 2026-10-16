@@ -55,7 +55,6 @@
 		<springdoc.version>3.0.3</springdoc.version>
 		<dotenv.version>3.2.0</dotenv.version>
 		<flyway.version>11.20.0</flyway.version>
-		<stripe.version>31.2.0</stripe.version>
 		<jjwt.version>0.12.6</jjwt.version>
 		<lombok.version>1.18.36</lombok.version>
 		<minio.version>8.6.0</minio.version>
@@ -132,13 +131,6 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-security-oauth2-resource-server-test</artifactId>
 			<scope>test</scope>
-		</dependency>
-
-		<!-- Stripe Payment Integration -->
-		<dependency>
-			<groupId>com.stripe</groupId>
-			<artifactId>stripe-java</artifactId>
-			<version>${stripe.version}</version>
 		</dependency>
 
 		<!-- WebSocket / STOMP -->

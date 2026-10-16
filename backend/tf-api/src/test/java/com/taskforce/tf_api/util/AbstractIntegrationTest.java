@@ -15,7 +15,7 @@ import org.springframework.test.context.ActiveProfiles;
  * Flyway</b>, puis laisse Hibernate <b>valider</b> le mapping entités↔schéma
  * ({@code ddl-auto=validate}, comme en prod). On charge volontairement une tranche minimale
  * ({@link DataJpaTest} : JPA + repositories + Flyway) — <b>aucun client externe</b>
- * (Keycloak/Stripe/MinIO/SMTP), ce qui évite les échecs de context-load.</p>
+ * (Keycloak/MinIO/SMTP), ce qui évite les échecs de context-load.</p>
  *
  * <p>{@link ImportAutoConfiguration} (et non {@code @Import}) réintègre Flyway + JdbcTemplate dans
  * la tranche {@code @DataJpaTest} : c'est indispensable pour que Flyway soit traité comme une

@@ -93,31 +93,6 @@ public class OtpVerification {
     private String email;
 
     /**
-     * Plan sélectionné par l'utilisateur lors de l'inscription
-     * (Stocké temporairement jusqu'à la vérification OTP)
-     */
-    @Column(name = "plan_type", length = 20)
-    private String planType;
-
-    /**
-     * Nom de l'entreprise (obligatoire si planType = ENTERPRISE)
-     */
-    @Column(name = "company_name", length = 255)
-    private String companyName;
-
-    /**
-     * Numéro de téléphone de contact (obligatoire si planType = ENTERPRISE)
-     */
-    @Column(name = "phone_number", length = 20)
-    private String phoneNumber;
-
-    /**
-     * Message ou besoins spécifiques pour les demandes ENTERPRISE
-     */
-    @Column(name = "enterprise_message", columnDefinition = "TEXT")
-    private String enterpriseMessage;
-
-    /**
      * Nombre de tentatives de validation
      */
     @Column(nullable = false)

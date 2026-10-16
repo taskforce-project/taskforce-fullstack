@@ -17,5 +17,4 @@ public class VerifyOtpResponse {
     private Boolean verified;
     private String message;
     private AuthResponse authData; // Tokens JWT si vérification réussie
-    private String checkoutSessionUrl; // URL Stripe si plan payant sélectionné
 }

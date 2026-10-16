@@ -9,7 +9,6 @@ import org.springframework.context.annotation.Import;
 
 import com.taskforce.tf_api.core.dto.request.CreateWorkspaceRequest;
 import com.taskforce.tf_api.core.dto.response.WorkspaceResponse;
-import com.taskforce.tf_api.core.enums.PlanType;
 import com.taskforce.tf_api.core.enums.WorkspaceRole;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
@@ -60,7 +59,7 @@ class WorkspaceServiceIntegrationTest extends AbstractIntegrationTest {
     void seed() {
         owner = userRepository.save(User.builder()
             .keycloakId("kc-ws-owner").email("ws-owner@it.dev").displayName("Owner")
-            .isActive(true).planType(PlanType.FREE).build());
+            .isActive(true).build());
     }
 
     private CreateWorkspaceRequest req(String name) {
@@ -118,7 +117,7 @@ class WorkspaceServiceIntegrationTest extends AbstractIntegrationTest {
 
             User other = userRepository.save(User.builder()
                 .keycloakId("kc-dupe").email("dupe2@it.dev").displayName("Dupe2")
-                .isActive(true).planType(PlanType.BUSINESS).build());
+                .isActive(true).build());
             Workspace second = workspaceService.createWorkspace(other, "Dupe");
 
             assertThat(first.getSlug()).isEqualTo("dupe");

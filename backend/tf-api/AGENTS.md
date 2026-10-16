@@ -1,7 +1,7 @@
 # AGENTS.md - AI Coding Assistant Guide
 
 ## Project Overview
-Spring Boot 4 REST API for Taskforce ERP with modular architecture. Uses Java 21+, PostgreSQL, Keycloak (OAuth2/OIDC), and Stripe. Built on 3-tier architecture: `shared/` → `core/` → `modules/`.
+Spring Boot 4 REST API for Taskforce ERP with modular architecture. Uses Java 21+, PostgreSQL and Keycloak (OAuth2/OIDC). Built on 3-tier architecture: `shared/` → `core/` → `modules/`.
 
 ## Critical Architecture Principles
 
@@ -103,7 +103,7 @@ CREATE INDEX idx_invoices_user_id ON invoices(user_id);
 - Every protected route always requires a valid Keycloak JWT. The old `keycloak.enabled=false` switch, which
   opened every route, was removed (OSS-1.4). Tests mock the token instead.
 
-**Public Endpoints:** `/api/auth/**`, `/api/stripe/**`, `/actuator/**`, `/swagger-ui/**`
+**Public Endpoints:** `/api/auth/**`, `/actuator/**`, `/swagger-ui/**`
 
 **Protected Endpoints:** Everything else requires valid JWT from Keycloak
 
@@ -114,12 +114,7 @@ CREATE INDEX idx_invoices_user_id ON invoices(user_id);
 - Users created in Keycloak via `keycloak.realm-url`
 - JWT tokens validated via `spring.security.oauth2.resourceserver.jwt.issuer-uri`
 
-**2. Stripe (Subscriptions):**
-- Webhook handler: `StripeWebhookController.java`
-- Plans: FREE, PRO, ENTERPRISE
-- Stripe events trigger user plan updates
-
-**3. Email (OTP & Notifications):**
+**2. Email (OTP & Notifications):**
 - JavaMailSender in `EmailService.java`
 - SMTP config in `application-{profile}.yml`
 - Templates: `/resources/templates/email/`
@@ -131,7 +126,7 @@ CREATE INDEX idx_invoices_user_id ON invoices(user_id);
 - **Error Handling:** `shared/exception/GlobalExceptionHandler.java`
 - **Base Entity:** `shared/audit/AuditableEntity.java`
 - **Response Wrapper:** `shared/dto/ApiResponse.java`
-- **Auth Flow:** `core/api/AuthController.java` (3-step: register → select-plan → verify-otp)
+- **Auth Flow:** `core/api/AuthController.java` (2-step: register → verify-otp)
 - **API Contract:** `API_SPECIFICATION.md` (frontend-backend agreement)
 
 ## Common Pitfalls

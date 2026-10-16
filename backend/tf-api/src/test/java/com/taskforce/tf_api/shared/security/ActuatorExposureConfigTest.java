@@ -15,7 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>En prod, les métriques et Prometheus vivent sur un port de gestion séparé, jamais publié : un hébergeur
  * qui expose le port de l'API (8080) ne les rend pas publiques. Les sondes {@code /livez} et {@code /readyz}
  * restent servies par le port de l'API pour les healthchecks des conteneurs. Le test lit les fichiers de
- * configuration livrés, sans démarrer l'application (qui exigerait Keycloak, Stripe, MinIO).</p>
+ * configuration livrés, sans démarrer l'application (qui exigerait Keycloak et MinIO).</p>
  */
 class ActuatorExposureConfigTest {
 

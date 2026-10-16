@@ -89,10 +89,6 @@ public class SecurityConfig {
         // La clé Minio dérive de l'userId ; l'endpoint renvoie 404 si absent (cf. FileController#getAvatar).
         "/api/files/avatars/*",
         "/api/sales/**",
-        "/api/stripe/**",
-        // Webhook Stripe : requête serveur-à-serveur signée (pas de JWT). La signature est
-        // vérifiée dans StripeWebhookController via constructEvent. Sans ça : 401 → BILL-03 KO.
-        "/api/webhooks/stripe",
         // En prod, l'actuator vit sur le port de gestion (management.server.port), jamais publié : sur le port
         // de l'API ces chemins répondent 404. Seules les sondes /livez et /readyz restent sur le port de l'API.
         "/actuator/**",
